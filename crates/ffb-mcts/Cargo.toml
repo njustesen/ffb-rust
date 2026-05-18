@@ -1,0 +1,17 @@
+[package]
+name = "ffb-mcts"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ffb-core = { path = "../ffb-core" }
+ffb-sim = { path = "../ffb-sim" }
+rayon = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "mcts"
+harness = false
