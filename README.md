@@ -28,5 +28,5 @@ cargo bench -p ffb-sim --bench full_game
 
 MIT — see [LICENSE](LICENSE).
 
-Original Java engine copyright © 2024 Christer Kaivo-oja.
+Original Java engine copyright © 2026 Christer Kaivo-oja.
 Rust port and extensions copyright © 2026 Niels Justesen.
