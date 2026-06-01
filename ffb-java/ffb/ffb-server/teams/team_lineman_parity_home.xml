@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamLinemanParityHome">
+
+    <coach>Home</coach>
+    <name>Lineman Home</name>
+    <race>Lineman</race>
+    <rosterId>lineman.parity</rosterId>
+    <reRolls>3</reRolls>
+    <fanFactor>5</fanFactor>
+    <apothecaries>1</apothecaries>
+    <cheerleaders>0</cheerleaders>
+    <assistantCoaches>0</assistantCoaches>
+    <teamRating>100</teamRating>
+    <currentTeamValue>550000</currentTeamValue>
+    <teamStrength>550000</teamStrength>
+    <division>[X]</division>
+    <treasury>0</treasury>
+    <baseIconPath>http://localhost:2224/icons/</baseIconPath>
+    <logo>teamlogos/human.gif</logo>
+    <specialRules/>
+
+    <player nr="1" id="teamLinemanParityHome1">
+        <name>Lineman 1</name>
+        <gender>male</gender>
+        <positionId>lineman.parity.lineman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="2" id="teamLinemanParityHome2">
+        <name>Lineman 2</name>
+        <gender>male</gender>
+        <positionId>lineman.parity.lineman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="3" id="teamLinemanParityHome3">
+        <name>Lineman 3</name>
+        <gender>male</gender>
+        <positionId>lineman.parity.lineman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="4" id="teamLinemanParityHome4">
+        <name>Lineman 4</name>
+        <gender>male</gender>
+        <positionId>lineman.parity.lineman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="5" id="teamLinemanParityHome5">
+        <name>Lineman 5</name>
+        <gender>male</gender>
+        <positionId>lineman.parity.lineman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="6" id="teamLinemanParityHome6">
+        <name>Lineman 6</name>
+        <gender>male</gender>
+        <positionId>lineman.parity.lineman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="7" id="teamLinemanParityHome7">
+        <name>Lineman 7</name>
+        <gender>male</gender>
+        <positionId>lineman.parity.lineman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="8" id="teamLinemanParityHome8">
+        <name>Lineman 8</name>
+        <gender>male</gender>
+        <positionId>lineman.parity.lineman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="9" id="teamLinemanParityHome9">
+        <name>Lineman 9</name>
+        <gender>male</gender>
+        <positionId>lineman.parity.lineman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="10" id="teamLinemanParityHome10">
+        <name>Lineman 10</name>
+        <gender>male</gender>
+        <positionId>lineman.parity.lineman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+    <player nr="11" id="teamLinemanParityHome11">
+        <name>Lineman 11</name>
+        <gender>male</gender>
+        <positionId>lineman.parity.lineman</positionId>
+        <skillList/>
+        <playerStatistics currentSpps="0"/>
+    </player>
+
+</team>

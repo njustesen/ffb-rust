@@ -1,0 +1,146 @@
+{
+  "id": "5681",
+  "name": "Nippon",
+  "reroll_cost": 60000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "43571",
+      "name": "Ashigaru",
+      "display_name": "Ashigaru",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 50000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 9,
+      "shorthand": "L",
+      "skill_categories": {
+        "normal": [
+          "General"
+        ],
+        "double": [
+          "Agility",
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "43572",
+      "name": "Samurai",
+      "display_name": "Samurai",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 85000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 9,
+      "shorthand": "Bl",
+      "skills": [
+        "Block"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "43573",
+      "name": "Warrior Monk",
+      "display_name": "Warrior Monk",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 70000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "shorthand": "WM",
+      "skills": [
+        "Claws"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "43574",
+      "name": "Ninja",
+      "display_name": "Ninja",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 90000,
+      "ma": 8,
+      "st": 2,
+      "ag": 2,
+      "pa": 4,
+      "av": 8,
+      "shorthand": "N",
+      "skills": [
+        "Dodge",
+        "Leap"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    }
+  ],
+  "name_generator": "default",
+  "max_big_guys": 1,
+  "infamous_staff": [
+    {
+      "id": "47520",
+      "name": "Josef Bugman",
+      "display_name": "Josef Bugman",
+      "type": "Infamous Staff",
+      "quantity": 1,
+      "cost": 100000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": 6,
+      "av": 9,
+      "shorthand": "JB",
+      "skills": [
+        "Bugman's XXXXXX",
+        "Keen Player",
+        {
+          "name": "Loner",
+          "value": 5
+        },
+        "Tackle",
+        "Thick Skull",
+        "Wrestle"
+      ]
+    }
+  ]
+}

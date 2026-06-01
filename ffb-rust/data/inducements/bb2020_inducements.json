@@ -1,0 +1,140 @@
+{
+  "edition": "bb2020",
+  "inducements": [
+    {
+      "id": "bloodweiserKegs",
+      "name": "Bloodweiser Kegs",
+      "name_singular": "Bloodweiser Keg",
+      "cost": 50000,
+      "max_count": 3,
+      "usage": "KNOCKOUT_RECOVERY"
+    },
+    {
+      "id": "bribes",
+      "name": "Bribes",
+      "name_singular": "Bribe",
+      "cost": 100000,
+      "max_count": 3,
+      "usage": "AVOID_BAN"
+    },
+    {
+      "id": "briberyAndCorruption",
+      "name": "Bribery and Corruption ReRoll",
+      "name_singular": "Bribery and Corruption ReRoll",
+      "cost": 0,
+      "max_count": 0,
+      "usage": "REROLL_ARGUE",
+      "availability": "special_rule:BRIBERY_AND_CORRUPTION"
+    },
+    {
+      "id": "halflingMasterChef",
+      "name": "Halfling Master Chef",
+      "name_singular": "Halfling Master Chef",
+      "cost": 300000,
+      "max_count": 1,
+      "usage": "STEAL_REROLL"
+    },
+    {
+      "id": "mortuaryAssistant",
+      "name": "Mortuary Assistant",
+      "name_singular": "Mortuary Assistant",
+      "cost": 100000,
+      "max_count": 1,
+      "usage": "REGENERATION",
+      "availability": "special_rule:SYLVANIAN_SPOTLIGHT"
+    },
+    {
+      "id": "plagueDoctor",
+      "name": "Plague Doctor",
+      "name_singular": "Plague Doctor",
+      "cost": 200000,
+      "max_count": 2,
+      "usage": "REGENERATION,APOTHECARY_JOURNEYMEN",
+      "availability": "special_rule:FAVOURED_OF_NURGLE"
+    },
+    {
+      "id": "riotousRookies",
+      "name": "Riotous Rookies",
+      "name_singular": "Riotous Rookies",
+      "cost": 100000,
+      "max_count": 3,
+      "usage": "ADD_LINEMEN",
+      "availability": "special_rule:LOW_COST_LINEMEN"
+    },
+    {
+      "id": "tempCheerleader",
+      "name": "Temp Agency Cheerleaders",
+      "name_singular": "Temp Agency Cheerleader",
+      "cost": 20000,
+      "max_count": 5,
+      "usage": "ADD_CHEERLEADER"
+    },
+    {
+      "id": "partTimeCoach",
+      "name": "Part-time Assistant Coaches",
+      "name_singular": "Part-time Assistant Coach",
+      "cost": 10000,
+      "max_count": 6,
+      "usage": "ADD_COACH"
+    },
+    {
+      "id": "weatherMage",
+      "name": "Weather Mage",
+      "name_singular": "Weather Mage",
+      "cost": 30000,
+      "max_count": 1,
+      "usage": "GAME_MODIFICATION"
+    },
+    {
+      "id": "biasedReferee",
+      "name": "Biased Referee",
+      "name_singular": "Biased Referee",
+      "cost": 130000,
+      "max_count": 1,
+      "usage": "GAME_MODIFICATION"
+    },
+    {
+      "id": "bugmansXXXXXX",
+      "name": "Bugman's XXXXXX",
+      "name_singular": "Bugman's XXXXXX",
+      "cost": 100000,
+      "max_count": 1,
+      "usage": "ADD_COACH"
+    },
+    {
+      "id": "throwARock",
+      "name": "Throw a Rock",
+      "name_singular": "Throw a Rock",
+      "cost": 0,
+      "max_count": 0,
+      "usage": "GAME_MODIFICATION",
+      "availability": "special_rule:SPIRITED_CROWD"
+    },
+    {
+      "id": "prayers",
+      "name": "Prayers of Nuffle",
+      "name_singular": "Prayer of Nuffle",
+      "cost": 100000,
+      "max_count": 3,
+      "usage": "GAME_MODIFICATION"
+    },
+    {
+      "id": "infamousStaff",
+      "name": "Infamous Coaching Staff",
+      "name_singular": "Infamous Coaching Staff",
+      "cost": 0,
+      "max_count": 0,
+      "usage": "ADD_INFAMOUS_STAFF",
+      "availability": "roster_staff"
+    },
+    {
+      "id": "starPlayer",
+      "name": "Star Player",
+      "name_singular": "Star Player",
+      "cost": 0,
+      "max_count": 2,
+      "usage": "ADD_STAR_PLAYER",
+      "availability": "roster_star"
+    }
+  ]
+}

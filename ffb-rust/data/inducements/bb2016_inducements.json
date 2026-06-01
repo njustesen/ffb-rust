@@ -1,0 +1,79 @@
+{
+  "edition": "bb2016",
+  "inducements": [
+    {
+      "id": "bloodweiserBabes",
+      "name": "Bloodweiser Babes",
+      "name_singular": "Bloodweiser Babe",
+      "cost": 50000,
+      "max_count": 2,
+      "usage": "KNOCKOUT_RECOVERY"
+    },
+    {
+      "id": "assistantCoaches",
+      "name": "Assistant Coaches",
+      "name_singular": "Assistant Coach",
+      "cost": 10000,
+      "max_count": 6,
+      "usage": "ADD_COACH"
+    },
+    {
+      "id": "cheerleaders",
+      "name": "Cheerleaders",
+      "name_singular": "Cheerleader",
+      "cost": 10000,
+      "max_count": 12,
+      "usage": "ADD_CHEERLEADER"
+    },
+    {
+      "id": "bribes",
+      "name": "Bribes",
+      "name_singular": "Bribe",
+      "cost": 100000,
+      "max_count": 3,
+      "usage": "AVOID_BAN"
+    },
+    {
+      "id": "halflingMasterChef",
+      "name": "Halfling Master Chef",
+      "name_singular": "Halfling Master Chef",
+      "cost": 300000,
+      "max_count": 1,
+      "usage": "STEAL_REROLL"
+    },
+    {
+      "id": "wizard",
+      "name": "Wizard",
+      "name_singular": "Wizard",
+      "cost": 150000,
+      "max_count": 1,
+      "usage": "SPELL"
+    },
+    {
+      "id": "igor",
+      "name": "Igor",
+      "name_singular": "Igor",
+      "cost": 100000,
+      "max_count": 1,
+      "usage": "REGENERATION",
+      "availability": "special_rule:SYLVANIAN_SPOTLIGHT"
+    },
+    {
+      "id": "cards",
+      "name": "Cards",
+      "name_singular": "Card",
+      "cost": 15000,
+      "max_count": 3,
+      "usage": "CARD"
+    },
+    {
+      "id": "starPlayer",
+      "name": "Star Player",
+      "name_singular": "Star Player",
+      "cost": 0,
+      "max_count": 2,
+      "usage": "ADD_STAR_PLAYER",
+      "availability": "roster_star"
+    }
+  ]
+}

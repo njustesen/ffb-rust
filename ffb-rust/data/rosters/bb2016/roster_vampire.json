@@ -1,0 +1,100 @@
+{
+  "id": "vampire.lrb6",
+  "name": "Vampire",
+  "reroll_cost": 70000,
+  "max_rerolls": 8,
+  "apothecary": false,
+  "undead": true,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "vampire.vampire",
+      "name": "Vampire",
+      "display_name": "Vampire",
+      "type": "Regular",
+      "quantity": 6,
+      "cost": 110000,
+      "ma": 6,
+      "st": 4,
+      "ag": 4,
+      "pa": 3,
+      "av": 8,
+      "shorthand": "V",
+      "skills": [
+        {
+          "name": "Bloodlust",
+          "value": 3
+        },
+        "Hypnotic Gaze",
+        "Regeneration"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility",
+          "Strength"
+        ],
+        "double": [
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "vampire.thrall",
+      "name": "Thrall",
+      "display_name": "Thrall",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 40000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 5,
+      "av": 7,
+      "shorthand": "T",
+      "thrall": true,
+      "skill_categories": {
+        "normal": [
+          "General"
+        ],
+        "double": [
+          "Strength",
+          "Agility",
+          "Passing"
+        ]
+      }
+    }
+  ],
+  "name_generator": "vampire",
+  "keywords": [
+    "vampire lord"
+  ],
+  "raised_position_id": "vampire.thrall",
+  "infamous_staff": [
+    {
+      "id": "47520",
+      "name": "Josef Bugman",
+      "display_name": "Josef Bugman",
+      "type": "Infamous Staff",
+      "quantity": 1,
+      "cost": 100000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": 6,
+      "av": 9,
+      "shorthand": "JB",
+      "skills": [
+        "Bugman's XXXXXX",
+        "Keen Player",
+        {
+          "name": "Loner",
+          "value": 5
+        },
+        "Tackle",
+        "Thick Skull",
+        "Wrestle"
+      ]
+    }
+  ]
+}

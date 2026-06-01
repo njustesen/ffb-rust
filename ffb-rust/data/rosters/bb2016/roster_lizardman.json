@@ -1,0 +1,93 @@
+{
+  "id": "lizardman.lrb6",
+  "name": "Lizardman",
+  "reroll_cost": 60000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "lizardman.kroxigor",
+      "name": "Kroxigor",
+      "display_name": "Kroxigor",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 140000,
+      "ma": 6,
+      "st": 5,
+      "ag": 1,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+        "Loner",
+        "bone head",
+        "Mighty Blow",
+        "Prehensile Tail",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "General",
+          "Agility",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "lizardman.saurus",
+      "name": "Saurus",
+      "display_name": "Saurus",
+      "type": "Regular",
+      "quantity": 6,
+      "cost": 80000,
+      "ma": 6,
+      "st": 4,
+      "ag": 1,
+      "pa": 6,
+      "av": 9,
+      "shorthand": "S",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "lizardman.skink",
+      "name": "Skink",
+      "display_name": "Skink",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 60000,
+      "ma": 8,
+      "st": 2,
+      "ag": 3,
+      "pa": 4,
+      "av": 7,
+      "shorthand": "L",
+      "skills": [
+        "Dodge",
+        "Stunty"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility"
+        ],
+        "double": [
+          "General",
+          "Strength",
+          "Passing"
+        ]
+      }
+    }
+  ]
+}

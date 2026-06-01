@@ -1,0 +1,129 @@
+{
+  "id": "slann.lrb6",
+  "name": "Slann",
+  "reroll_cost": 50000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "slann.lineman",
+      "name": "Lineman",
+      "display_name": "Lineman",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 60000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "shorthand": "L",
+      "skills": [
+        "Leap",
+        "Very Long Legs"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General"
+        ],
+        "double": [
+          "Agility",
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "slann.catcher",
+      "name": "Catcher",
+      "display_name": "Catcher",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 80000,
+      "ma": 7,
+      "st": 2,
+      "ag": 4,
+      "pa": 4,
+      "av": 7,
+      "shorthand": "C",
+      "skills": [
+        "Diving Catch",
+        "Leap",
+        "Very Long Legs"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "slann.blitzer",
+      "name": "Blitzer",
+      "display_name": "Blitzer",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 110000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "shorthand": "B",
+      "skills": [
+        "Diving Tackle",
+        "Jump Up",
+        "Leap",
+        "Very Long Legs"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility",
+          "Strength"
+        ],
+        "double": [
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "slann.kroxigor",
+      "name": "Kroxigor",
+      "display_name": "Kroxigor",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 140000,
+      "ma": 6,
+      "st": 5,
+      "ag": 1,
+      "pa": 0,
+      "av": 9,
+      "shorthand": "K",
+      "skills": [
+        "Bone head",
+        "Loner",
+        "Mighty Blow",
+        "Prehensile Tail",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "General",
+          "Agility",
+          "Passing"
+        ]
+      }
+    }
+  ]
+}

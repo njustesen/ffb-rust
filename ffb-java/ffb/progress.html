@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FFB Parity Dashboard</title>
+<style>
+  body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 1em; }
+  h1 { color: #569cd6; }
+  table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+  th, td { border: 1px solid #444; padding: 4px 8px; text-align: left; }
+  th { background: #2d2d2d; color: #9cdcfe; }
+  tr.match td { background: #1a3a1a; }
+  tr.fail td { background: #3a1a1a; }
+  .banner { background: #2d2d2d; border-left: 4px solid #569cd6; padding: 0.5em 1em; margin-bottom: 1em; }
+</style>
+</head>
+<body>
+<h1>FFB Parity Dashboard</h1>
+<div class="banner" id="focus">Parity testing in progress...</div>
+<table>
+<thead>
+<tr>
+  <th>Seed</th><th>Matchup</th><th>Java Events</th><th>Rust Events</th>
+  <th>Status</th><th>Java Hash</th><th>Rust Hash</th>
+</tr>
+</thead>
+<tbody>
+<!-- seed-row-1 --><tr class="fail"><td>1</td><td>teamVampireBattleLore vs teamNorseKalimar</td><td>34</td><td>32</td><td>FAIL</td><td title="d9ac6d7bb0e9faf7">d9ac6d7b</td><td title="f6acbee0917e0af7">f6acbee0</td></tr>
+</tbody>
+</table>
+</body>
+</html>

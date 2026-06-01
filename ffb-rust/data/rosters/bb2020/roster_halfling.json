@@ -1,0 +1,107 @@
+{
+  "id": "halfling.lrb6",
+  "name": "Halfling",
+  "reroll_cost": 60000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "halfling.treeman",
+      "name": "Treeman",
+      "display_name": "Treeman",
+      "type": "Big Guy",
+      "quantity": 2,
+      "cost": 120000,
+      "ma": 2,
+      "st": 6,
+      "ag": 1,
+      "pa": 5,
+      "av": 11,
+      "skills": [
+        "Loner",
+        "Mighty Blow",
+        "Stand Firm",
+        "Strong Arm",
+        "Take Root",
+        "Thick Skull",
+        "Throw Team-Mate",
+        "Multiple Block"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "General",
+          "Agility",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "halfling.halfling",
+      "name": "Halfling",
+      "display_name": "Halfling",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 30000,
+      "ma": 5,
+      "st": 2,
+      "ag": 3,
+      "pa": 4,
+      "av": 6,
+      "skills": [
+        "Dodge",
+        "Right Stuff",
+        {
+          "name": "Hatred",
+          "value": "goblin;troll"
+        },
+        "Multiple Block"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility"
+        ],
+        "double": [
+          "General",
+          "Strength",
+          "Passing"
+        ]
+      }
+    }
+  ],
+  "name_generator": "default",
+  "keywords": [
+    "Master Chef"
+  ],
+  "infamous_staff": [
+    {
+      "id": "47520",
+      "name": "Josef Bugman",
+      "display_name": "Josef Bugman",
+      "type": "Infamous Staff",
+      "quantity": 1,
+      "cost": 100000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": 6,
+      "av": 9,
+      "shorthand": "JB",
+      "skills": [
+        "Bugman's XXXXXX",
+        "Keen Player",
+        {
+          "name": "Loner",
+          "value": 5
+        },
+        "Tackle",
+        "Thick Skull",
+        "Wrestle"
+      ]
+    }
+  ]
+}

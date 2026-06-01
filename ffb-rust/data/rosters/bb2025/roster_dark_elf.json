@@ -1,0 +1,147 @@
+{
+  "id": "darkelf.lrb6",
+  "name": "Dark Elf",
+  "reroll_cost": 50000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "darkelf.lineman",
+      "name": "Lineman",
+      "display_name": "Lineman",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 70000,
+      "ma": 6,
+      "st": 3,
+      "ag": 4,
+      "pa": 4,
+      "av": 8,
+      "shorthand": "L",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "darkelf.blitzer",
+      "name": "Blitzer",
+      "display_name": "Blitzer",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 100000,
+      "ma": 7,
+      "st": 3,
+      "ag": 4,
+      "pa": 4,
+      "av": 8,
+      "shorthand": "Z",
+      "skills": [
+        "Block"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "darkelf.runner",
+      "name": "Runner",
+      "display_name": "Runner",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 80000,
+      "ma": 7,
+      "st": 3,
+      "ag": 4,
+      "pa": 3,
+      "av": 7,
+      "shorthand": "R",
+      "skills": [
+        "Dump-Off"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility",
+          "Passing"
+        ],
+        "double": [
+          "Strength"
+        ]
+      }
+    },
+    {
+      "id": "darkelf.assassin",
+      "name": "Assassin",
+      "display_name": "Assassin",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 90000,
+      "ma": 6,
+      "st": 3,
+      "ag": 4,
+      "pa": 5,
+      "av": 7,
+      "shorthand": "A",
+      "skills": [
+        "Shadowing",
+        "Stab"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "darkelf.witchelf",
+      "name": "Witch Elf",
+      "display_name": "Witch Elf",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 110000,
+      "ma": 7,
+      "st": 3,
+      "ag": 4,
+      "pa": 5,
+      "av": 7,
+      "shorthand": "W",
+      "skills": [
+        "Dodge",
+        "Frenzy",
+        "Jump Up"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "General"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    }
+  ],
+  "name_generator": "default"
+}

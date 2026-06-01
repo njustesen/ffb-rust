@@ -1,0 +1,200 @@
+{
+  "id": "human.lrb6",
+  "name": "Human",
+  "reroll_cost": 50000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "human.lineman",
+      "name": "Lineman",
+      "display_name": "Human Lineman",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 50000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "skill_categories": {
+        "normal": [
+          "General"
+        ],
+        "double": [
+          "Agility",
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "human.blitzer",
+      "name": "Blitzer",
+      "display_name": "Human Blitzer",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 90000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "skills": [
+        "Block"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "human.thrower",
+      "name": "Thrower",
+      "display_name": "Human Thrower",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 70000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 2,
+      "av": 8,
+      "skills": [
+        "Pass",
+        "Sure Hands"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Passing"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      }
+    },
+    {
+      "id": "human.catcher",
+      "name": "Catcher",
+      "display_name": "Human Catcher",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 70000,
+      "ma": 8,
+      "st": 2,
+      "ag": 3,
+      "pa": 5,
+      "av": 7,
+      "skills": [
+        "Catch",
+        "Dodge"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Passing",
+          "Strength"
+        ]
+      }
+    },
+    {
+      "id": "human.catcher.old",
+      "name": "Catcher",
+      "display_name": "Human Catcher",
+      "type": "Regular",
+      "quantity": 0,
+      "cost": 70000,
+      "ma": 8,
+      "st": 2,
+      "ag": 3,
+      "pa": 5,
+      "av": 7,
+      "skills": [
+        "Catch",
+        "Dodge"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Passing",
+          "Strength"
+        ]
+      }
+    },
+    {
+      "id": "human.ogre",
+      "name": "Ogre",
+      "display_name": "Ogre",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 140000,
+      "ma": 5,
+      "st": 5,
+      "ag": 2,
+      "pa": 5,
+      "av": 9,
+      "skills": [
+        "Loner",
+        "bone head",
+        "bone-head",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Passing",
+          "General"
+        ]
+      }
+    }
+  ],
+  "name_generator": "default",
+  "infamous_staff": [
+    {
+      "id": "47520",
+      "name": "Josef Bugman",
+      "display_name": "Josef Bugman",
+      "type": "Infamous Staff",
+      "quantity": 1,
+      "cost": 100000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": 6,
+      "av": 9,
+      "shorthand": "JB",
+      "skills": [
+        "Bugman's XXXXXX",
+        "Keen Player",
+        {
+          "name": "Loner",
+          "value": 5
+        },
+        "Tackle",
+        "Thick Skull",
+        "Wrestle"
+      ]
+    }
+  ]
+}

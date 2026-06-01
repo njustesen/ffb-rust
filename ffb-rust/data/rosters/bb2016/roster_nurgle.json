@@ -1,0 +1,164 @@
+{
+  "id": "nurgle.lrb6",
+  "name": "Nurgle",
+  "reroll_cost": 70000,
+  "max_rerolls": 8,
+  "apothecary": false,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "nurgle.rotter",
+      "name": "Rotter",
+      "display_name": "Rotter",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 40000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": 6,
+      "av": 8,
+      "shorthand": "R",
+      "skills": [
+        "Decay",
+        "Nurgle's Rot"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Mutation"
+        ],
+        "double": [
+          "Agility",
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "nurgle.pestigor",
+      "name": "Pestigor",
+      "display_name": "Pestigor",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 80000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "shorthand": "P",
+      "skills": [
+        "Horns",
+        "Nurgle's Rot",
+        "Regeneration"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength",
+          "Mutation"
+        ],
+        "double": [
+          "Agility",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "nurgle.warrior",
+      "name": "Nurgle Warrior",
+      "display_name": "Nurgle Warrior",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 110000,
+      "ma": 4,
+      "st": 4,
+      "ag": 2,
+      "pa": 6,
+      "av": 9,
+      "shorthand": "W",
+      "skills": [
+        "Disturbing Presence",
+        "Foul Appearance",
+        "Nurgle's Rot",
+        "Regeneration"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength",
+          "Mutation"
+        ],
+        "double": [
+          "Agility",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "nurgle.beast",
+      "name": "Beast of Nurgle",
+      "display_name": "Beast of Nurgle",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 140000,
+      "ma": 4,
+      "st": 5,
+      "ag": 1,
+      "pa": 0,
+      "av": 9,
+      "shorthand": "B",
+      "skills": [
+        "Disturbing Presence",
+        "Foul Appearance",
+        "Loner",
+        "Mighty Blow",
+        "Nurgle's Rot",
+        "Really Stupid",
+        "Regeneration",
+        "Tentacles"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "General",
+          "Agility",
+          "Passing",
+          "Mutation"
+        ]
+      }
+    }
+  ],
+  "raised_position_id": "nurgle.beast",
+  "infamous_staff": [
+    {
+      "id": "47520",
+      "name": "Josef Bugman",
+      "display_name": "Josef Bugman",
+      "type": "Infamous Staff",
+      "quantity": 1,
+      "cost": 100000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": 6,
+      "av": 9,
+      "shorthand": "JB",
+      "skills": [
+        "Bugman's XXXXXX",
+        "Keen Player",
+        {
+          "name": "Loner",
+          "value": 5
+        },
+        "Tackle",
+        "Thick Skull",
+        "Wrestle"
+      ]
+    }
+  ]
+}

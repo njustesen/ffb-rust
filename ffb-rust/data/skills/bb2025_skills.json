@@ -1,0 +1,230 @@
+{
+  "edition": "bb2025",
+  "skills": [
+    {
+      "class_name": "AgilityIncrease"
+    },
+    {
+      "class_name": "Animosity"
+    },
+    {
+      "class_name": "BallAndChain"
+    },
+    {
+      "class_name": "BigHand"
+    },
+    {
+      "class_name": "Bombardier"
+    },
+    {
+      "class_name": "BoneHead"
+    },
+    {
+      "class_name": "Brawler"
+    },
+    {
+      "class_name": "BreakTackle"
+    },
+    {
+      "class_name": "BreatheFire"
+    },
+    {
+      "class_name": "Bullseye"
+    },
+    {
+      "class_name": "Chainsaw"
+    },
+    {
+      "class_name": "CloudBurster"
+    },
+    {
+      "class_name": "Defensive"
+    },
+    {
+      "class_name": "DirtyPlayer"
+    },
+    {
+      "class_name": "Dodge"
+    },
+    {
+      "class_name": "EyeGouge"
+    },
+    {
+      "class_name": "Fumblerooski"
+    },
+    {
+      "class_name": "GiveAndGo"
+    },
+    {
+      "class_name": "Hatred"
+    },
+    {
+      "class_name": "HitAndRun"
+    },
+    {
+      "class_name": "HypnoticGaze"
+    },
+    {
+      "class_name": "Insignificant"
+    },
+    {
+      "class_name": "Juggernaut"
+    },
+    {
+      "class_name": "Kick"
+    },
+    {
+      "class_name": "Leader"
+    },
+    {
+      "class_name": "Leap"
+    },
+    {
+      "class_name": "LethalFlight"
+    },
+    {
+      "class_name": "LoneFouler"
+    },
+    {
+      "class_name": "MightyBlow"
+    },
+    {
+      "class_name": "MonstrousMouth"
+    },
+    {
+      "class_name": "NoBall"
+    },
+    {
+      "class_name": "PassingIncrease"
+    },
+    {
+      "class_name": "PileDriver"
+    },
+    {
+      "class_name": "Pogo"
+    },
+    {
+      "class_name": "Pro"
+    },
+    {
+      "class_name": "ProjectileVomit"
+    },
+    {
+      "class_name": "Punt"
+    },
+    {
+      "class_name": "PutTheBootIn"
+    },
+    {
+      "class_name": "QuickFoul"
+    },
+    {
+      "class_name": "ReallyStupid"
+    },
+    {
+      "class_name": "Regeneration"
+    },
+    {
+      "class_name": "RightStuff"
+    },
+    {
+      "class_name": "Saboteur"
+    },
+    {
+      "class_name": "Shadowing"
+    },
+    {
+      "class_name": "Sidestep"
+    },
+    {
+      "class_name": "SneakyGit"
+    },
+    {
+      "class_name": "ASneakyPair"
+    },
+    {
+      "class_name": "BlastinSolvesEverything"
+    },
+    {
+      "class_name": "BlastIt"
+    },
+    {
+      "class_name": "DwarvenScourge"
+    },
+    {
+      "class_name": "ExcuseMeAreYouAZoat"
+    },
+    {
+      "class_name": "FrenziedRush"
+    },
+    {
+      "class_name": "Incorporeal"
+    },
+    {
+      "class_name": "KrumpAndSmash"
+    },
+    {
+      "class_name": "LordOfChaos"
+    },
+    {
+      "class_name": "MasterAssassin"
+    },
+    {
+      "class_name": "MesmerisingDance"
+    },
+    {
+      "class_name": "PumpUpTheCrowd"
+    },
+    {
+      "class_name": "PutridRegurgitation"
+    },
+    {
+      "class_name": "SlashingNails"
+    },
+    {
+      "class_name": "TeamCaptain"
+    },
+    {
+      "class_name": "TheBallista"
+    },
+    {
+      "class_name": "WhirlingDervish"
+    },
+    {
+      "class_name": "WisdomOfTheWhiteDwarf"
+    },
+    {
+      "class_name": "WoodlandFury"
+    },
+    {
+      "class_name": "WorkingInTandem"
+    },
+    {
+      "class_name": "Stab"
+    },
+    {
+      "class_name": "SteadyFooting"
+    },
+    {
+      "class_name": "StrengthIncrease"
+    },
+    {
+      "class_name": "SureFeet"
+    },
+    {
+      "class_name": "Swoop"
+    },
+    {
+      "class_name": "Taunt"
+    },
+    {
+      "class_name": "Unsteady"
+    },
+    {
+      "class_name": "VeryLongLegs"
+    },
+    {
+      "class_name": "ViolentInnovator"
+    }
+  ]
+}

@@ -1,0 +1,113 @@
+Seed 1: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 1 (teamLinemanParityHome vs teamLinemanParityAway) — 1/100
+Seed 2: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 2 (teamLinemanParityHome vs teamLinemanParityAway) — 2/100
+Seed 3: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 3 (teamLinemanParityHome vs teamLinemanParityAway) — 3/100
+Seed 4: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 4 (teamLinemanParityHome vs teamLinemanParityAway) — 4/100
+Seed 5: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 5 (teamLinemanParityHome vs teamLinemanParityAway) — 5/100
+Seed 6: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 6 (teamLinemanParityHome vs teamLinemanParityAway) — 6/100
+Seed 7: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 7 (teamLinemanParityHome vs teamLinemanParityAway) — 7/100
+Seed 8: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 8 (teamLinemanParityHome vs teamLinemanParityAway) — 8/100
+Seed 9: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 9 (teamLinemanParityHome vs teamLinemanParityAway) — 9/100
+Seed 10: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 10 (teamLinemanParityHome vs teamLinemanParityAway) — 10/100
+Seed 11: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 11 (teamLinemanParityHome vs teamLinemanParityAway) — 11/100
+Seed 12: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 12 (teamLinemanParityHome vs teamLinemanParityAway) — 12/100
+Seed 13: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 13 (teamLinemanParityHome vs teamLinemanParityAway) — 13/100
+Seed 14: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 14 (teamLinemanParityHome vs teamLinemanParityAway) — 14/100
+Seed 15: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 15 (teamLinemanParityHome vs teamLinemanParityAway) — 15/100
+Seed 16: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 16 (teamLinemanParityHome vs teamLinemanParityAway) — 16/100
+Seed 17: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 17 (teamLinemanParityHome vs teamLinemanParityAway) — 17/100
+Seed 18: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 18 (teamLinemanParityHome vs teamLinemanParityAway) — 18/100
+Seed 19: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 19 (teamLinemanParityHome vs teamLinemanParityAway) — 19/100
+Seed 20: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 20 (teamLinemanParityHome vs teamLinemanParityAway) — 20/100
+Seed 21: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 21 (teamLinemanParityHome vs teamLinemanParityAway) — 21/100
+Seed 22: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 22 (teamLinemanParityHome vs teamLinemanParityAway) — 22/100
+Seed 23: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 23 (teamLinemanParityHome vs teamLinemanParityAway) — 23/100
+Seed 24: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 24 (teamLinemanParityHome vs teamLinemanParityAway) — 24/100
+Seed 25: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 25 (teamLinemanParityHome vs teamLinemanParityAway) — 25/100
+Seed 26: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 26 (teamLinemanParityHome vs teamLinemanParityAway) — 26/100
+Seed 27: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 27 (teamLinemanParityHome vs teamLinemanParityAway) — 27/100
+Seed 28: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 28 (teamLinemanParityHome vs teamLinemanParityAway) — 28/100
+Seed 29: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 29 (teamLinemanParityHome vs teamLinemanParityAway) — 29/100
+Seed 30: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 30 (teamLinemanParityHome vs teamLinemanParityAway) — 30/100
+Seed 31: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 31 (teamLinemanParityHome vs teamLinemanParityAway) — 31/100
+Seed 32: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 32 (teamLinemanParityHome vs teamLinemanParityAway) — 32/100
+Seed 33: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 33 (teamLinemanParityHome vs teamLinemanParityAway) — 33/100
+Seed 34: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 34 (teamLinemanParityHome vs teamLinemanParityAway) — 34/100
+Seed 35: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 35 (teamLinemanParityHome vs teamLinemanParityAway) — 35/100
+Seed 36: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 36 (teamLinemanParityHome vs teamLinemanParityAway) — 36/100
+Seed 37: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 37 (teamLinemanParityHome vs teamLinemanParityAway) — 37/100
+Seed 38: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 38 (teamLinemanParityHome vs teamLinemanParityAway) — 38/100
+Seed 39: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 39 (teamLinemanParityHome vs teamLinemanParityAway) — 39/100
+Seed 40: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 40 (teamLinemanParityHome vs teamLinemanParityAway) — 40/100
+Seed 41: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 41 (teamLinemanParityHome vs teamLinemanParityAway) — 41/100
+Seed 42: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 42 (teamLinemanParityHome vs teamLinemanParityAway) — 42/100
+Seed 43: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 43 (teamLinemanParityHome vs teamLinemanParityAway) — 43/100
+Seed 44: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 44 (teamLinemanParityHome vs teamLinemanParityAway) — 44/100
+Seed 45: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 45 (teamLinemanParityHome vs teamLinemanParityAway) — 45/100
+Seed 46: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 46 (teamLinemanParityHome vs teamLinemanParityAway) — 46/100
+Seed 47: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 47 (teamLinemanParityHome vs teamLinemanParityAway) — 47/100
+Seed 48: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 48 (teamLinemanParityHome vs teamLinemanParityAway) — 48/100
+Seed 49: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 49 (teamLinemanParityHome vs teamLinemanParityAway) — 49/100
+Seed 50: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 50 (teamLinemanParityHome vs teamLinemanParityAway) — 50/100
+Seed 51: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 51 (teamLinemanParityHome vs teamLinemanParityAway) — 51/100
+Seed 52: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 52 (teamLinemanParityHome vs teamLinemanParityAway) — 52/100
+Seed 53: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 53 (teamLinemanParityHome vs teamLinemanParityAway) — 53/100
+Seed 54: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 54 (teamLinemanParityHome vs teamLinemanParityAway) — 54/100
+Seed 55: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 55 (teamLinemanParityHome vs teamLinemanParityAway) — 55/100
+Seed 56: teamLinemanParityHome vs teamLinemanParityAway
+✓ seed 56 (teamLinemanParityHome vs teamLinemanParityAway) — 56/100
+Seed 57: teamLinemanParityHome vs teamLinemanParityAway

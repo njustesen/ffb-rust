@@ -1,0 +1,10 @@
+[package]
+name = "ffb-protocol"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ffb-model = { path = "../ffb-model" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

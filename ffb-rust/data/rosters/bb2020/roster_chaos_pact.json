@@ -1,0 +1,222 @@
+{
+  "id": "chaospact.lrb6",
+  "name": "Chaos Pact",
+  "reroll_cost": 70000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "chaospact.marauder",
+      "name": "Marauder",
+      "display_name": "Marauder",
+      "type": "Regular",
+      "quantity": 12,
+      "cost": 50000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "shorthand": "Ma",
+      "skill_categories": {
+        "normal": [
+          "Strength",
+          "General",
+          "Passing",
+          "Mutation"
+        ],
+        "double": [
+          "Agility"
+        ]
+      }
+    },
+    {
+      "id": "chaospact.goblin.renegade",
+      "name": "Goblin Renegade",
+      "display_name": "Goblin Renegade",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 40000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 4,
+      "av": 7,
+      "shorthand": "G",
+      "skills": [
+        "Animosity",
+        "Dodge",
+        "Right Stuff",
+        "Stunty"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "Mutation"
+        ],
+        "double": [
+          "General",
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "chaospact.skaven.renegade",
+      "name": "Skaven Renegade",
+      "display_name": "Skaven Renegade",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 50000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 7,
+      "shorthand": "S",
+      "skills": [
+        "Animosity"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Mutation"
+        ],
+        "double": [
+          "Agility",
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "chaospact.darkelf.renegade",
+      "name": "Dark Elf Renegade",
+      "display_name": "Dark Elf Renegade",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 70000,
+      "ma": 6,
+      "st": 3,
+      "ag": 4,
+      "pa": 3,
+      "av": 8,
+      "shorthand": "D",
+      "skills": [
+        "Animosity"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility",
+          "Mutation"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "chaospact.troll.chaos",
+      "name": "Chaos Troll",
+      "display_name": "Chaos Troll",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 110000,
+      "ma": 4,
+      "st": 5,
+      "ag": 1,
+      "pa": 5,
+      "av": 9,
+      "shorthand": "T",
+      "skills": [
+        "Always Hungry",
+        "Loner",
+        "Mighty Blow",
+        "Really Stupid",
+        "Regeneration",
+        "Throw Team-Mate"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "General",
+          "Agility",
+          "Passing",
+          "Mutation"
+        ]
+      }
+    },
+    {
+      "id": "chaospact.ogre.chaos",
+      "name": "Chaos Ogre",
+      "display_name": "Chaos Ogre",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 140000,
+      "ma": 5,
+      "st": 5,
+      "ag": 2,
+      "pa": 5,
+      "av": 9,
+      "shorthand": "O",
+      "skills": [
+        "bone head",
+        "Loner",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "General",
+          "Agility",
+          "Passing",
+          "Mutation"
+        ]
+      }
+    },
+    {
+      "id": "chaospact.minotaur",
+      "name": "Minotaur",
+      "display_name": "Minotaur",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 5,
+      "st": 5,
+      "ag": 2,
+      "pa": 0,
+      "av": 8,
+      "shorthand": "M",
+      "skills": [
+        "Frenzy",
+        "Horns",
+        "Loner",
+        "Mighty Blow",
+        "Thick Skull",
+        "Wild Animal"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "General",
+          "Agility",
+          "Passing",
+          "Mutation"
+        ]
+      }
+    }
+  ],
+  "name_generator": "default"
+}

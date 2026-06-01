@@ -1,0 +1,143 @@
+{
+  "bb2016": [
+    {
+      "roll_min": 2,
+      "roll_max": 7,
+      "type": "BADLY_HURT",
+      "name": "Badly Hurt",
+      "is_serious": false
+    },
+    {
+      "roll_min": 8,
+      "roll_max": 9,
+      "type": "BADLY_HURT",
+      "name": "Badly Hurt (KO)",
+      "is_serious": false
+    },
+    {
+      "roll_min": 10,
+      "roll_max": 10,
+      "type": "NIGGLE",
+      "name": "Niggling Injury",
+      "is_serious": true
+    },
+    {
+      "roll_min": 11,
+      "roll_max": 11,
+      "type": "STAT_DECREASE",
+      "name": "Serious Injury (stat decrease)",
+      "is_serious": true
+    },
+    {
+      "roll_min": 12,
+      "roll_max": 12,
+      "type": "DEAD",
+      "name": "DEAD!",
+      "is_serious": true
+    }
+  ],
+  "bb2020": [
+    {
+      "roll_min": 2,
+      "roll_max": 7,
+      "type": "BADLY_HURT",
+      "name": "Badly Hurt",
+      "is_serious": false
+    },
+    {
+      "roll_min": 8,
+      "roll_max": 9,
+      "type": "BADLY_HURT",
+      "name": "Badly Hurt (KO)",
+      "is_serious": false
+    },
+    {
+      "roll_min": 10,
+      "roll_max": 10,
+      "type": "NIGGLE",
+      "name": "Niggling Injury",
+      "is_serious": true
+    },
+    {
+      "roll_min": 11,
+      "roll_max": 11,
+      "type": "STAT_DECREASE",
+      "name": "Serious Injury (stat decrease)",
+      "is_serious": true
+    },
+    {
+      "roll_min": 12,
+      "roll_max": 12,
+      "type": "DEAD",
+      "name": "DEAD!",
+      "is_serious": true
+    }
+  ],
+  "bb2025": [
+    {
+      "roll_min": 2,
+      "roll_max": 7,
+      "type": "BADLY_HURT",
+      "name": "Badly Hurt",
+      "is_serious": false
+    },
+    {
+      "roll_min": 8,
+      "roll_max": 9,
+      "type": "BADLY_HURT",
+      "name": "Badly Hurt (KO)",
+      "is_serious": false
+    },
+    {
+      "roll_min": 10,
+      "roll_max": 10,
+      "type": "NIGGLE",
+      "name": "Niggling Injury",
+      "is_serious": true
+    },
+    {
+      "roll_min": 11,
+      "roll_max": 11,
+      "type": "STAT_DECREASE",
+      "name": "Serious Injury (stat decrease)",
+      "is_serious": true
+    },
+    {
+      "roll_min": 12,
+      "roll_max": 12,
+      "type": "DEAD",
+      "name": "DEAD!",
+      "is_serious": true
+    }
+  ],
+  "stat_decrease_table": [
+    {
+      "roll_min": 1,
+      "roll_max": 2,
+      "type": "MOVEMENT_DECREASE",
+      "stat": "MA",
+      "delta": -1
+    },
+    {
+      "roll_min": 3,
+      "roll_max": 4,
+      "type": "AGILITY_DECREASE",
+      "stat": "AG",
+      "delta": -1
+    },
+    {
+      "roll_min": 5,
+      "roll_max": 5,
+      "type": "PASSING_DECREASE",
+      "stat": "PA",
+      "delta": -1
+    },
+    {
+      "roll_min": 6,
+      "roll_max": 6,
+      "type": "STRENGTH_DECREASE",
+      "stat": "ST",
+      "delta": -1
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+{
+  "id": "elf.lrb6",
+  "name": "Elf",
+  "reroll_cost": 50000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "elf.lineman",
+      "name": "Lineman",
+      "display_name": "Lineman",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 60000,
+      "ma": 6,
+      "st": 3,
+      "ag": 4,
+      "pa": 4,
+      "av": 7,
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "elf.catcher",
+      "name": "Catcher",
+      "display_name": "Catcher",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 100000,
+      "ma": 8,
+      "st": 3,
+      "ag": 4,
+      "pa": 4,
+      "av": 7,
+      "skills": [
+        "Catch",
+        "Nerves of Steel"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "elf.thrower",
+      "name": "Thrower",
+      "display_name": "Thrower",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 70000,
+      "ma": 6,
+      "st": 3,
+      "ag": 4,
+      "pa": 2,
+      "av": 7,
+      "skills": [
+        "Pass"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility",
+          "Passing"
+        ],
+        "double": [
+          "Strength"
+        ]
+      }
+    },
+    {
+      "id": "elf.blitzer",
+      "name": "Blitzer",
+      "display_name": "Blitzer",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 110000,
+      "ma": 7,
+      "st": 3,
+      "ag": 4,
+      "pa": 3,
+      "av": 8,
+      "skills": [
+        "Block",
+        "Side Step"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    }
+  ]
+}

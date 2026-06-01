@@ -1,0 +1,260 @@
+{
+  "edition": "mixed",
+  "skills": [
+    {
+      "class_name": "Accurate"
+    },
+    {
+      "class_name": "AgilityIncrease"
+    },
+    {
+      "class_name": "AlwaysHungry"
+    },
+    {
+      "class_name": "AnimalSavagery"
+    },
+    {
+      "class_name": "ArmBar"
+    },
+    {
+      "class_name": "ArmourIncrease"
+    },
+    {
+      "class_name": "BigHand"
+    },
+    {
+      "class_name": "Bloodlust"
+    },
+    {
+      "class_name": "Cannoneer"
+    },
+    {
+      "class_name": "Claws"
+    },
+    {
+      "class_name": "Decay"
+    },
+    {
+      "class_name": "DivingTackle"
+    },
+    {
+      "class_name": "Dodge"
+    },
+    {
+      "class_name": "Drunkard"
+    },
+    {
+      "class_name": "Frenzy"
+    },
+    {
+      "class_name": "Grab"
+    },
+    {
+      "class_name": "Guard"
+    },
+    {
+      "class_name": "IronHardSkin"
+    },
+    {
+      "class_name": "Juggernaut"
+    },
+    {
+      "class_name": "Kick"
+    },
+    {
+      "class_name": "KickTeamMate"
+    },
+    {
+      "class_name": "Leader"
+    },
+    {
+      "class_name": "Loner"
+    },
+    {
+      "class_name": "MultipleBlock"
+    },
+    {
+      "class_name": "MyBall"
+    },
+    {
+      "class_name": "NervesOfSteel"
+    },
+    {
+      "class_name": "OnTheBall"
+    },
+    {
+      "class_name": "PickMeUp"
+    },
+    {
+      "class_name": "PlagueRidden"
+    },
+    {
+      "class_name": "PrehensileTail"
+    },
+    {
+      "class_name": "Pro"
+    },
+    {
+      "class_name": "SafePairOfHands"
+    },
+    {
+      "class_name": "SafePass"
+    },
+    {
+      "class_name": "SecretWeapon"
+    },
+    {
+      "class_name": "AllYouCanEat"
+    },
+    {
+      "class_name": "BalefulHex"
+    },
+    {
+      "class_name": "BeerBarrelBash"
+    },
+    {
+      "class_name": "BlackInk"
+    },
+    {
+      "class_name": "BlindRage"
+    },
+    {
+      "class_name": "BoundingLeap"
+    },
+    {
+      "class_name": "BugmansXXXXXX"
+    },
+    {
+      "class_name": "CatchOfTheDay"
+    },
+    {
+      "class_name": "CrushingBlow"
+    },
+    {
+      "class_name": "FuriousOutburst"
+    },
+    {
+      "class_name": "FuryOfTheBloodGod"
+    },
+    {
+      "class_name": "GoredByTheBull"
+    },
+    {
+      "class_name": "HalflingLuck"
+    },
+    {
+      "class_name": "IllBeBack"
+    },
+    {
+      "class_name": "Indomitable"
+    },
+    {
+      "class_name": "Kaboom"
+    },
+    {
+      "class_name": "KeenPlayer"
+    },
+    {
+      "class_name": "KickEmWhileTheyReDown"
+    },
+    {
+      "class_name": "LookIntoMyEyes"
+    },
+    {
+      "class_name": "MaximumCarnage"
+    },
+    {
+      "class_name": "OldPro"
+    },
+    {
+      "class_name": "PrimalSavagery"
+    },
+    {
+      "class_name": "QuickBite"
+    },
+    {
+      "class_name": "RaidingParty"
+    },
+    {
+      "class_name": "Ram"
+    },
+    {
+      "class_name": "Reliable"
+    },
+    {
+      "class_name": "SavageBlow"
+    },
+    {
+      "class_name": "SavageMauling"
+    },
+    {
+      "class_name": "ShotToNothing"
+    },
+    {
+      "class_name": "Slayer"
+    },
+    {
+      "class_name": "SneakiestOfTheLot"
+    },
+    {
+      "class_name": "StarOfTheShow"
+    },
+    {
+      "class_name": "StrongPassingGame"
+    },
+    {
+      "class_name": "SwiftAsTheBreeze"
+    },
+    {
+      "class_name": "TastyMorsel"
+    },
+    {
+      "class_name": "TheFlashingBlade"
+    },
+    {
+      "class_name": "ThinkingMansTroll"
+    },
+    {
+      "class_name": "ToxinConnoisseur"
+    },
+    {
+      "class_name": "Treacherous"
+    },
+    {
+      "class_name": "UnstoppableMomentum"
+    },
+    {
+      "class_name": "ViciousVines"
+    },
+    {
+      "class_name": "WatchOut"
+    },
+    {
+      "class_name": "Yoink"
+    },
+    {
+      "class_name": "StrongArm"
+    },
+    {
+      "class_name": "Stunty"
+    },
+    {
+      "class_name": "TakeRoot"
+    },
+    {
+      "class_name": "ThrowTeamMate"
+    },
+    {
+      "class_name": "Timmmber"
+    },
+    {
+      "class_name": "Titchy"
+    },
+    {
+      "class_name": "Trickster"
+    },
+    {
+      "class_name": "UnchannelledFury"
+    }
+  ]
+}

@@ -1,0 +1,345 @@
+{
+  "id": "1050157",
+  "name": "Chaos Renegade",
+  "reroll_cost": 70000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "37733",
+      "name": "Renegade Rat Ogre",
+      "display_name": "Renegade Rat Ogre",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 6,
+      "st": 5,
+      "ag": 4,
+      "pa": 0,
+      "av": 9,
+      "shorthand": "RO",
+      "skills": [
+        "Animal Savagery",
+        "Frenzy",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Prehensile Tail"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "General",
+          "Agility",
+          "Mutations"
+        ]
+      }
+    },
+    {
+      "id": "37731",
+      "name": "Renegade Ogre",
+      "display_name": "Renegade Ogre",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 140000,
+      "ma": 5,
+      "st": 5,
+      "ag": 4,
+      "pa": 5,
+      "av": 10,
+      "shorthand": "O",
+      "skills": [
+        "Bone Head",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Thick Skull",
+        "Throw Team-mate"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "General",
+          "Agility",
+          "Mutations"
+        ]
+      }
+    },
+    {
+      "id": "37730",
+      "name": "Renegade Troll",
+      "display_name": "Renegade Troll",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 115000,
+      "ma": 4,
+      "st": 5,
+      "ag": 5,
+      "pa": 5,
+      "av": 10,
+      "shorthand": "T",
+      "skills": [
+        "Always Hungry",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Projectile Vomit",
+        "Really Stupid",
+        "Regeneration",
+        "Throw Team-mate"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "General",
+          "Agility",
+          "Mutations"
+        ]
+      }
+    },
+    {
+      "id": "37729",
+      "name": "Renegade Dark Elf",
+      "display_name": "Renegade Dark Elf",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 75000,
+      "ma": 6,
+      "st": 3,
+      "ag": 2,
+      "pa": 3,
+      "av": 9,
+      "shorthand": "DE",
+      "skills": [
+        {
+          "name": "Animosity",
+          "value": "All"
+        }
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility",
+          "Mutations"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "37725",
+      "name": "Renegade Human Thrower",
+      "display_name": "Renegade Human Thrower",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 75000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 3,
+      "av": 9,
+      "shorthand": "T",
+      "skills": [
+        {
+          "name": "Animosity",
+          "value": "All"
+        },
+        "Pass",
+        "Safe Pair of Hands"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Passing",
+          "Mutations"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      }
+    },
+    {
+      "id": "37727",
+      "name": "Renegade Orc",
+      "display_name": "Renegade Orc",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 50000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": 5,
+      "av": 10,
+      "shorthand": "O",
+      "skills": [
+        {
+          "name": "Animosity",
+          "value": "All"
+        }
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Mutations"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      }
+    },
+    {
+      "id": "37728",
+      "name": "Renegade Skaven",
+      "display_name": "Renegade Skaven",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 50000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "shorthand": "S",
+      "skills": [
+        {
+          "name": "Animosity",
+          "value": "All"
+        }
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Mutations"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      }
+    },
+    {
+      "id": "37726",
+      "name": "Renegade Goblin",
+      "display_name": "Renegade Goblin",
+      "type": "Regular",
+      "quantity": 1,
+      "cost": 40000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "shorthand": "G",
+      "skills": [
+        {
+          "name": "Animosity",
+          "value": "All"
+        },
+        "Dodge",
+        "Right Stuff",
+        "Stunty"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "Mutations"
+        ],
+        "double": [
+          "General",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "37724",
+      "name": "Renegade Human Lineman",
+      "display_name": "Renegade Human Lineman",
+      "type": "Regular",
+      "quantity": 12,
+      "cost": 50000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 9,
+      "shorthand": "L",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Mutations"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      }
+    },
+    {
+      "id": "37732",
+      "name": "Renegade Minotaur",
+      "display_name": "Renegade Minotaur",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 5,
+      "st": 5,
+      "ag": 4,
+      "pa": 0,
+      "av": 9,
+      "shorthand": "M",
+      "skills": [
+        "Frenzy",
+        "Horns",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Thick Skull",
+        "Unchannelled Fury"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "General",
+          "Agility",
+          "Mutations"
+        ]
+      }
+    }
+  ],
+  "name_generator": "chaos",
+  "max_big_guys": 3
+}

@@ -1,0 +1,174 @@
+{
+  "id": "4959",
+  "name": "Dark Elf",
+  "reroll_cost": 50000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "37736",
+      "name": "Blitzer",
+      "display_name": "Blitzer",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 100000,
+      "ma": 7,
+      "st": 3,
+      "ag": 2,
+      "pa": 4,
+      "av": 9,
+      "shorthand": "Z",
+      "skills": [
+        "Block"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "37734",
+      "name": "Dark Elf Lineman",
+      "display_name": "Dark Elf Lineman",
+      "type": "Regular",
+      "quantity": 12,
+      "cost": 70000,
+      "ma": 6,
+      "st": 3,
+      "ag": 2,
+      "pa": 4,
+      "av": 9,
+      "shorthand": "L",
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Strength"
+        ]
+      }
+    },
+    {
+      "id": "37737",
+      "name": "Assassin",
+      "display_name": "Assassin",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 85000,
+      "ma": 7,
+      "st": 3,
+      "ag": 2,
+      "pa": 5,
+      "av": 8,
+      "shorthand": "A",
+      "skills": [
+        "Shadowing",
+        "Stab"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "37735",
+      "name": "Runner",
+      "display_name": "Runner",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 80000,
+      "ma": 7,
+      "st": 3,
+      "ag": 2,
+      "pa": 3,
+      "av": 8,
+      "shorthand": "R",
+      "skills": [
+        "Dump-off"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility",
+          "Passing"
+        ],
+        "double": [
+          "Strength"
+        ]
+      }
+    },
+    {
+      "id": "37738",
+      "name": "Witch Elf",
+      "display_name": "Witch Elf",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 110000,
+      "ma": 7,
+      "st": 3,
+      "ag": 2,
+      "pa": 5,
+      "av": 8,
+      "shorthand": "WE",
+      "skills": [
+        "Dodge",
+        "Frenzy",
+        "Jump Up"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    }
+  ],
+  "name_generator": "elf",
+  "max_big_guys": 1,
+  "infamous_staff": [
+    {
+      "id": "47520",
+      "name": "Josef Bugman",
+      "display_name": "Josef Bugman",
+      "type": "Infamous Staff",
+      "quantity": 1,
+      "cost": 100000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": 6,
+      "av": 9,
+      "shorthand": "JB",
+      "skills": [
+        "Bugman's XXXXXX",
+        "Keen Player",
+        {
+          "name": "Loner",
+          "value": 5
+        },
+        "Tackle",
+        "Thick Skull",
+        "Wrestle"
+      ]
+    }
+  ]
+}

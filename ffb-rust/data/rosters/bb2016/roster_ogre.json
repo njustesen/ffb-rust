@@ -1,0 +1,72 @@
+{
+  "id": "ogre.lrb6",
+  "name": "Ogre",
+  "reroll_cost": 70000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "ogre.snotling",
+      "name": "Snotling",
+      "display_name": "Snotling",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 20000,
+      "ma": 5,
+      "st": 1,
+      "ag": 3,
+      "pa": 5,
+      "av": 5,
+      "shorthand": "S",
+      "skills": [
+        "Dodge",
+        "Right Stuff",
+        "Side Step",
+        "Stunty",
+        "Titchy"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility"
+        ],
+        "double": [
+          "General",
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "ogre.ogre",
+      "name": "Ogre",
+      "display_name": "Ogre",
+      "type": "Regular",
+      "quantity": 6,
+      "cost": 140000,
+      "ma": 5,
+      "st": 5,
+      "ag": 2,
+      "pa": 5,
+      "av": 9,
+      "shorthand": "O",
+      "skills": [
+        "bone head",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "General",
+          "Passing"
+        ]
+      }
+    }
+  ]
+}

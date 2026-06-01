@@ -1,0 +1,321 @@
+use serde::{Deserialize, Serialize};
+use ffb_model::model::player::PlayerId;
+use ffb_model::types::FieldCoordinate;
+use ffb_model::enums::{NetCommandId, PlayerAction};
+
+/// Commands sent from the Rust client to the Java server.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "netCommandId", rename_all = "camelCase")]
+pub enum ClientCommand {
+    /// Join a game.
+    ClientJoin(ClientJoin),
+    /// Start the game.
+    ClientStartGame(ClientStartGame),
+    /// Place a player during setup.
+    ClientSetupPlayer(ClientSetupPlayer),
+    /// Activate a player with an action type.
+    ClientActingPlayer(ClientActingPlayer),
+    /// Move the active player.
+    ClientMove(ClientMove),
+    /// Blitz movement step.
+    ClientBlitzMove(ClientBlitzMove),
+    /// Perform a block.
+    ClientBlock(ClientBlock),
+    /// Choose a block die result.
+    ClientBlockChoice(ClientBlockChoice),
+    /// Choose where to push a player.
+    ClientPushback(ClientPushback),
+    /// Declare follow-up (or not) after a block.
+    ClientFollowupChoice(ClientFollowupChoice),
+    /// Kick the ball.
+    ClientKickoff(ClientKickoff),
+    /// Receive a touchback.
+    ClientTouchback(ClientTouchback),
+    /// Pass the ball.
+    ClientPass(ClientPass),
+    /// Hand off the ball.
+    ClientHandOver(ClientHandOver),
+    /// Foul a prone player.
+    ClientFoul(ClientFoul),
+    /// Attempt to intercept.
+    ClientInterceptorChoice(ClientInterceptorChoice),
+    /// Declare coin choice.
+    ClientCoinChoice(ClientCoinChoice),
+    /// Declare receive/kick choice.
+    ClientReceiveChoice(ClientReceiveChoice),
+    /// End the current team turn.
+    ClientEndTurn(ClientEndTurn),
+    /// Use (or decline) a re-roll.
+    ClientUseReRoll(ClientUseReRoll),
+    /// Use (or decline) a skill.
+    ClientUseSkill(ClientUseSkill),
+    /// Use (or decline) an apothecary.
+    ClientUseApothecary(ClientUseApothecary),
+    /// Confirm the apothecary choice (heal vs accept).
+    ClientApothecaryChoice(ClientApothecaryChoice),
+    /// Throw a team-mate.
+    ClientThrowTeamMate(ClientThrowTeamMate),
+    /// Kick a team-mate.
+    ClientKickTeamMate(ClientKickTeamMate),
+    /// Swoop.
+    ClientSwoop(ClientSwoop),
+    /// Buy inducements before the game.
+    ClientBuyInducements(ClientBuyInducements),
+    /// Petty cash spending.
+    ClientPettyCash(ClientPettyCash),
+    /// Select a player from a list.
+    ClientPlayerChoice(ClientPlayerChoice),
+    /// Gaze at a target.
+    ClientGaze(ClientGaze),
+    /// Confirm current decision.
+    ClientConfirm(ClientConfirm),
+    /// Use a pile driver.
+    ClientPileDriver(ClientPileDriver),
+    /// Argue the Call.
+    ClientArgueTheCall(ClientArgueTheCall),
+    /// Declare use of Wizard spell.
+    ClientWizardSpell(ClientWizardSpell),
+    /// Select weather (Weather Mage).
+    ClientSelectWeather(ClientSelectWeather),
+    /// Select journeymen positions.
+    ClientJourneymen(ClientJourneymen),
+    /// Bloodlust action choice.
+    ClientBloodlustAction(ClientBloodlustAction),
+    /// Select a kick-off result (some editions).
+    ClientKickOffResultChoice(ClientKickOffResultChoice),
+    /// Keep-alive ping.
+    ClientPing(ClientPing),
+}
+
+// ── Individual client command structs ─────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientJoin {
+    pub coach: String,
+    pub team_id: String,
+    pub game_id: String,
+    pub password_hash: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientStartGame;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientSetupPlayer {
+    pub player_id: PlayerId,
+    pub coordinate: FieldCoordinate,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientActingPlayer {
+    pub player_id: PlayerId,
+    pub player_action: PlayerAction,
+    pub standing_up: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientMove {
+    pub move_squares: Vec<FieldCoordinate>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientBlitzMove {
+    pub move_squares: Vec<FieldCoordinate>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientBlock {
+    pub defender_id: PlayerId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientBlockChoice {
+    pub selected_die_index: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientPushback {
+    pub pushback_square: FieldCoordinate,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientFollowupChoice {
+    pub follow_up: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientKickoff {
+    pub coordinate: FieldCoordinate,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientTouchback {
+    pub player_id: PlayerId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientPass {
+    pub target_coordinate: FieldCoordinate,
+    pub hail_mary: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientHandOver {
+    pub target_player_id: PlayerId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientFoul {
+    pub defender_id: PlayerId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientInterceptorChoice {
+    pub attempt_interception: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientCoinChoice {
+    pub home_choice: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientReceiveChoice {
+    pub receive: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientEndTurn;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientUseReRoll {
+    pub use_reroll: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientUseSkill {
+    pub player_id: PlayerId,
+    pub skill: String,
+    pub use_skill: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientUseApothecary {
+    pub player_id: PlayerId,
+    pub use_apothecary: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientApothecaryChoice {
+    pub player_id: PlayerId,
+    pub choice: ApothecaryChoice,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ApothecaryChoice {
+    Apothecary,
+    RollResult,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientThrowTeamMate {
+    pub player_id: PlayerId,
+    pub target_coordinate: FieldCoordinate,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientKickTeamMate {
+    pub player_id: PlayerId,
+    pub target_coordinate: FieldCoordinate,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientSwoop {
+    pub player_id: PlayerId,
+    pub target_coordinate: FieldCoordinate,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientBuyInducements {
+    pub team_id: String,
+    pub purchases: Vec<(String, i32)>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientPettyCash {
+    pub team_id: String,
+    pub amount: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientPlayerChoice {
+    pub player_id: PlayerId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientGaze {
+    pub target_id: PlayerId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientConfirm;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientPileDriver {
+    pub player_id: PlayerId,
+    pub use_pile_driver: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientArgueTheCall {
+    pub player_id: PlayerId,
+    pub use_argue: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientWizardSpell {
+    pub team_id: String,
+    pub spell: String,
+    pub target_coordinate: Option<FieldCoordinate>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientSelectWeather {
+    pub weather: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientJourneymen {
+    pub team_id: String,
+    pub position_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientBloodlustAction {
+    pub player_id: PlayerId,
+    pub action: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientKickOffResultChoice {
+    pub team_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientPing {
+    pub timestamp: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn client_end_turn_round_trip() {
+        let cmd = ClientCommand::ClientEndTurn(ClientEndTurn);
+        let json = serde_json::to_string(&cmd).unwrap();
+        let back: ClientCommand = serde_json::from_str(&json).unwrap();
+        assert!(matches!(back, ClientCommand::ClientEndTurn(_)));
+    }
+}

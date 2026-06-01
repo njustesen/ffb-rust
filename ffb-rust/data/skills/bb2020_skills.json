@@ -1,0 +1,173 @@
+{
+  "edition": "bb2020",
+  "skills": [
+    {
+      "class_name": "Animosity"
+    },
+    {
+      "class_name": "BallAndChain"
+    },
+    {
+      "class_name": "Bombardier"
+    },
+    {
+      "class_name": "BoneHead"
+    },
+    {
+      "class_name": "Brawler"
+    },
+    {
+      "class_name": "BreakTackle"
+    },
+    {
+      "class_name": "BreatheFire"
+    },
+    {
+      "class_name": "Chainsaw"
+    },
+    {
+      "class_name": "CloudBurster"
+    },
+    {
+      "class_name": "Defensive"
+    },
+    {
+      "class_name": "DirtyPlayer"
+    },
+    {
+      "class_name": "Fumblerooskie"
+    },
+    {
+      "class_name": "HitAndRun"
+    },
+    {
+      "class_name": "HypnoticGaze"
+    },
+    {
+      "class_name": "Leap"
+    },
+    {
+      "class_name": "MightyBlow"
+    },
+    {
+      "class_name": "MonstrousMouth"
+    },
+    {
+      "class_name": "NoHands"
+    },
+    {
+      "class_name": "PassingIncrease"
+    },
+    {
+      "class_name": "PileDriver"
+    },
+    {
+      "class_name": "PilingOn"
+    },
+    {
+      "class_name": "PogoStick"
+    },
+    {
+      "class_name": "ProjectileVomit"
+    },
+    {
+      "class_name": "ReallyStupid"
+    },
+    {
+      "class_name": "Regeneration"
+    },
+    {
+      "class_name": "RightStuff"
+    },
+    {
+      "class_name": "RunningPass"
+    },
+    {
+      "class_name": "Shadowing"
+    },
+    {
+      "class_name": "SideStep"
+    },
+    {
+      "class_name": "SneakyGit"
+    },
+    {
+      "class_name": "ASneakyPair"
+    },
+    {
+      "class_name": "BlastIt"
+    },
+    {
+      "class_name": "BrutalBlock"
+    },
+    {
+      "class_name": "BurstOfSpeed"
+    },
+    {
+      "class_name": "ConsummateProfessional"
+    },
+    {
+      "class_name": "DwarfenScourge"
+    },
+    {
+      "class_name": "ExcuseMeAreYouAZoat"
+    },
+    {
+      "class_name": "FrenziedRush"
+    },
+    {
+      "class_name": "GhostlyFlames"
+    },
+    {
+      "class_name": "Incorporeal"
+    },
+    {
+      "class_name": "LordOfChaos"
+    },
+    {
+      "class_name": "MasterAssassin"
+    },
+    {
+      "class_name": "MesmerizingDance"
+    },
+    {
+      "class_name": "PumpUpTheCrowd"
+    },
+    {
+      "class_name": "PutridRegurgitation"
+    },
+    {
+      "class_name": "TheBallista"
+    },
+    {
+      "class_name": "ThenIStartedBlastin"
+    },
+    {
+      "class_name": "TwoForOne"
+    },
+    {
+      "class_name": "WhirlingDervish"
+    },
+    {
+      "class_name": "WisdomOfTheWhiteDwarf"
+    },
+    {
+      "class_name": "Stab"
+    },
+    {
+      "class_name": "StrengthIncrease"
+    },
+    {
+      "class_name": "SureFeet"
+    },
+    {
+      "class_name": "Swarming"
+    },
+    {
+      "class_name": "Swoop"
+    },
+    {
+      "class_name": "VeryLongLegs"
+    }
+  ]
+}

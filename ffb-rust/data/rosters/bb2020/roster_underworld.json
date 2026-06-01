@@ -1,0 +1,209 @@
+{
+  "id": "underworld.lrb6",
+  "name": "Underworld",
+  "reroll_cost": 70000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "37844",
+      "name": "Mutant Rat Ogre",
+      "display_name": "Mutant Rat Ogre",
+      "type": "Big Guy",
+      "quantity": 2,
+      "cost": 150000,
+      "ma": 6,
+      "st": 5,
+      "ag": 4,
+      "pa": 0,
+      "av": 9,
+      "shorthand": "RO",
+      "skills": [
+        "Animal Savagery",
+        "Frenzy",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Prehensile Tail"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength",
+          "Mutation"
+        ],
+        "double": [
+          "General",
+          "Agility"
+        ]
+      }
+    },
+    {
+      "id": "underworld.goblin",
+      "name": "Underworld Goblin",
+      "display_name": "Underworld Goblin",
+      "type": "Regular",
+      "quantity": 12,
+      "cost": 40000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 4,
+      "av": 7,
+      "shorthand": "G",
+      "skills": [
+        "Dodge",
+        "Right Stuff",
+        "Stunty",
+        {
+          "name": "Animosity",
+          "value": "Skaven"
+        }
+      ],
+      "skill_categories": {
+        "normal": [
+          "Agility",
+          "Mutation"
+        ],
+        "double": [
+          "General",
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "underworld.skaven.lineman",
+      "name": "Skaven Lineman",
+      "display_name": "Skaven Lineman",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 50000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 7,
+      "shorthand": "L",
+      "skills": [
+        {
+          "name": "Animosity",
+          "value": "underworld.skaven.thrower;underworld.troll.warpstone"
+        }
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Mutation"
+        ],
+        "double": [
+          "Agility",
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "underworld.skaven.thrower",
+      "name": "Skaven Thrower",
+      "display_name": "Skaven Thrower",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 70000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 2,
+      "av": 7,
+      "shorthand": "T",
+      "skills": [
+        {
+          "name": "Animosity",
+          "value": "All"
+        },
+        "Pass",
+        "Sure Hands"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Passing",
+          "Mutation"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      }
+    },
+    {
+      "id": "underworld.skaven.blitzer",
+      "name": "Skaven Blitzer",
+      "display_name": "Skaven Blitzer",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 90000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 5,
+      "av": 8,
+      "shorthand": "B",
+      "skills": [
+        "Animosity",
+        "Block"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength",
+          "Mutation"
+        ],
+        "double": [
+          "Agility",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "underworld.troll.warpstone",
+      "name": "Warpstone Troll",
+      "display_name": "Warpstone Troll",
+      "type": "Big Guy",
+      "quantity": 2,
+      "cost": 110000,
+      "ma": 4,
+      "st": 5,
+      "ag": 1,
+      "pa": 5,
+      "av": 9,
+      "shorthand": "WT",
+      "skills": [
+        "Always Hungry",
+        "Loner",
+        "Mighty Blow",
+        "Really Stupid",
+        "Regeneration",
+        "Throw Team-Mate"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength",
+          "Mutation"
+        ],
+        "double": [
+          "General",
+          "Agility",
+          "Passing"
+        ]
+      }
+    }
+  ],
+  "max_big_guys": 2
+}

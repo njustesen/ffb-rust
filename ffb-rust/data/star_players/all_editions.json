@@ -1,0 +1,4396 @@
+{
+  "star_players": [
+    {
+      "id": "amazon.Helmut",
+      "name": "Helmut Wulf",
+      "display_name": "Helmut Wulf",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 110000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "HW",
+      "skills": [
+        "Loner",
+        "Chainsaw",
+        "Secret Weapon",
+        "Stand Firm"
+      ],
+      "available_for": [
+        "Amazon"
+      ]
+    },
+    {
+      "id": "amazon.Willow",
+      "name": "Willow Rosebark",
+      "display_name": "Willow Rosebark",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 5,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "WR",
+      "skills": [
+        "Loner",
+        "Dauntless",
+        "Side Step",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Amazon"
+      ]
+    },
+    {
+      "id": "amazon.Roxanna",
+      "name": "Roxanna Darknail",
+      "display_name": "Roxanna Darknail",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 250000,
+      "ma": 8,
+      "st": 3,
+      "ag": 5,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "RX",
+      "skills": [
+        "Loner",
+        "Dodge",
+        "Frenzy",
+        "Jump Up",
+        "Juggernaut",
+        "Leap"
+      ],
+      "available_for": [
+        "Amazon"
+      ]
+    },
+    {
+      "id": "amazon.Zara",
+      "name": "Zara the Slayer",
+      "display_name": "Zara the Slayer",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "ZS",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dauntless",
+        "Dodge",
+        "Jump Up",
+        "Stab",
+        "Stakes"
+      ],
+      "available_for": [
+        "Amazon"
+      ]
+    },
+    {
+      "id": "amazon.Bigfist",
+      "name": "Bertha Bigfist",
+      "display_name": "Bertha Bigfist",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 6,
+      "st": 5,
+      "ag": 2,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "BB",
+      "skills": [
+        "Loner",
+        "bone head",
+        "Break Tackle",
+        "Dodge",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Amazon"
+      ]
+    },
+    {
+      "id": "amazon.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Amazon"
+      ]
+    },
+    {
+      "id": "chaos.Max",
+      "name": "Max Spleenripper",
+      "display_name": "Max Spleenripper",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "MS",
+      "skills": [
+        "Loner",
+        "Chainsaw",
+        "Secret Weapon"
+      ],
+      "available_for": [
+        "Chaos"
+      ]
+    },
+    {
+      "id": "chaos.Lewdgrip",
+      "name": "Lewdgrip Whiparm",
+      "display_name": "Lewdgrip Whiparm",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "LW",
+      "skills": [
+        "Loner",
+        "Pass",
+        "Strong Arm",
+        "Sure Hands",
+        "Tentacles"
+      ],
+      "available_for": [
+        "Chaos"
+      ]
+    },
+    {
+      "id": "chaos.Farth",
+      "name": "Brick Far'th",
+      "display_name": "Brick Far'th",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 5,
+      "st": 5,
+      "ag": 2,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "BF",
+      "skills": [
+        "Loner",
+        "bone head",
+        "Mighty Blow",
+        "Nerves of Steel",
+        "Strong Arm",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Chaos"
+      ]
+    },
+    {
+      "id": "chaos.Grotty",
+      "name": "Grotty",
+      "display_name": "Grotty",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 6,
+      "st": 2,
+      "ag": 4,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "GY",
+      "skills": [
+        "Loner",
+        "Dodge",
+        "Right Stuff",
+        "Stunty"
+      ],
+      "available_for": [
+        "Chaos"
+      ]
+    },
+    {
+      "id": "chaos.Borak",
+      "name": "Lord Borak the Despoiler",
+      "display_name": "Lord Borak the Despoiler",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 5,
+      "st": 5,
+      "ag": 3,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "BK",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dirty Player",
+        "Mighty Blow"
+      ],
+      "available_for": [
+        "Chaos"
+      ]
+    },
+    {
+      "id": "chaos.Grashnak",
+      "name": "Grashnak Blackhoof",
+      "display_name": "Grashnak Blackhoof",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 310000,
+      "ma": 6,
+      "st": 6,
+      "ag": 2,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "GB",
+      "skills": [
+        "Loner",
+        "Frenzy",
+        "Horns",
+        "Mighty Blow",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Chaos"
+      ]
+    },
+    {
+      "id": "chaos.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Chaos"
+      ]
+    },
+    {
+      "id": "chaosdwarf.Madeye",
+      "name": "Zzharg Madeye",
+      "display_name": "Zzharg Madeye",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 90000,
+      "ma": 4,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "ZZ",
+      "skills": [
+        "Loner",
+        "Hail Mary Pass",
+        "Pass",
+        "Secret Weapon",
+        "Strong Arm",
+        "Sure Hands",
+        "Tackle",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Chaos Dwarf"
+      ]
+    },
+    {
+      "id": "chaosdwarf.Nobbla",
+      "name": "Nobbla Blackwart",
+      "display_name": "Nobbla Blackwart",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "NB",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dodge",
+        "Chainsaw",
+        "Secret Weapon",
+        "Stunty"
+      ],
+      "available_for": [
+        "Chaos Dwarf"
+      ]
+    },
+    {
+      "id": "chaosdwarf.Rashnak",
+      "name": "Rashnak Backstabber",
+      "display_name": "Rashnak Backstabber",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 200000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "RB",
+      "skills": [
+        "Loner",
+        "Dodge",
+        "Side Step",
+        "Sneaky Git",
+        "Stab"
+      ],
+      "available_for": [
+        "Chaos Dwarf"
+      ]
+    },
+    {
+      "id": "chaosdwarf.Grashnak",
+      "name": "Grashnak Blackhoof",
+      "display_name": "Grashnak Blackhoof",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 310000,
+      "ma": 6,
+      "st": 6,
+      "ag": 2,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "GB",
+      "skills": [
+        "Loner",
+        "Frenzy",
+        "Horns",
+        "Mighty Blow",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Chaos Dwarf"
+      ]
+    },
+    {
+      "id": "chaosdwarf.Hthark",
+      "name": "Hthark the Unstoppable",
+      "display_name": "Hthark the Unstoppable",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 310000,
+      "ma": 6,
+      "st": 5,
+      "ag": 2,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "HK",
+      "skills": [
+        "Loner",
+        "Block",
+        "Break Tackle",
+        "Juggernaut",
+        "Sprint",
+        "Sure Feet",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Chaos Dwarf"
+      ]
+    },
+    {
+      "id": "chaosdwarf.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Chaos Dwarf"
+      ]
+    },
+    {
+      "id": "chaospact.Dribblesnot",
+      "name": "Bomber Dribblesnot",
+      "display_name": "Bomber Dribblesnot",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 60000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "BD",
+      "skills": [
+        "Loner",
+        "Accurate",
+        "Bombardier",
+        "Dodge",
+        "Right Stuff",
+        "Secret Weapon",
+        "Stunty"
+      ],
+      "available_for": [
+        "Chaos Pact"
+      ]
+    },
+    {
+      "id": "chaospact.Igor",
+      "name": "Crazy Igor",
+      "display_name": "Crazy Igor",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 120000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "CI",
+      "skills": [
+        "Loner",
+        "Dauntless",
+        "Regeneration",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Chaos Pact"
+      ]
+    },
+    {
+      "id": "chaospact.Ithaca",
+      "name": "Ithaca Benoin",
+      "display_name": "Ithaca Benoin",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "IB",
+      "skills": [
+        "Loner",
+        "Accurate",
+        "Dump Off",
+        "Nerves of Steel",
+        "Pass",
+        "Regeneration",
+        "Sure Hands"
+      ],
+      "available_for": [
+        "Chaos Pact"
+      ]
+    },
+    {
+      "id": "chaospact.Madeye",
+      "name": "Zzharg Madeye",
+      "display_name": "Zzharg Madeye",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 90000,
+      "ma": 4,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "ZZ",
+      "skills": [
+        "Loner",
+        "Hail Mary Pass",
+        "Pass",
+        "Secret Weapon",
+        "Strong Arm",
+        "Sure Hands",
+        "Tackle",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Chaos Pact"
+      ]
+    },
+    {
+      "id": "chaospact.Ugroth",
+      "name": "Ugroth Bolgrot",
+      "display_name": "Ugroth Bolgrot",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 100000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "UB",
+      "skills": [
+        "Loner",
+        "Chainsaw",
+        "Secret Weapon"
+      ],
+      "available_for": [
+        "Chaos Pact"
+      ]
+    },
+    {
+      "id": "chaospact.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Chaos Pact"
+      ]
+    },
+    {
+      "id": "darkelf.Sidewinder",
+      "name": "Eldril Sidewinder",
+      "display_name": "Eldril Sidewinder",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 200000,
+      "ma": 8,
+      "st": 3,
+      "ag": 4,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "ES",
+      "skills": [
+        "Loner",
+        "Catch",
+        "Dodge",
+        "Hypnotic Gaze",
+        "Nerves of Steel",
+        "Pass Block"
+      ],
+      "available_for": [
+        "Dark Elf"
+      ]
+    },
+    {
+      "id": "darkelf.Horkon",
+      "name": "Horkon Heartripper",
+      "display_name": "Horkon Heartripper",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 210000,
+      "ma": 7,
+      "st": 3,
+      "ag": 4,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "HH",
+      "skills": [
+        "Loner",
+        "Dodge",
+        "Leap",
+        "Multiple Block",
+        "Shadowing",
+        "Stab"
+      ],
+      "available_for": [
+        "Dark Elf"
+      ]
+    },
+    {
+      "id": "darkelf.Ithica",
+      "name": "Ithaca Benoin",
+      "display_name": "Ithaca Benoin",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "IB",
+      "skills": [
+        "Loner",
+        "Accurate",
+        "Dump Off",
+        "Nerves of Steel",
+        "Pass",
+        "Regeneration",
+        "Sure Hands"
+      ],
+      "available_for": [
+        "Dark Elf"
+      ]
+    },
+    {
+      "id": "darkelf.Roxanna",
+      "name": "Roxanna Darknail",
+      "display_name": "Roxanna Darknail",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 250000,
+      "ma": 8,
+      "st": 3,
+      "ag": 5,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "RX",
+      "skills": [
+        "Loner",
+        "Dodge",
+        "Frenzy",
+        "Jump Up",
+        "Juggernaut",
+        "Leap"
+      ],
+      "available_for": [
+        "Dark Elf"
+      ]
+    },
+    {
+      "id": "darkelf.Hubris",
+      "name": "Hubris Rakarth",
+      "display_name": "Hubris Rakarth",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 260000,
+      "ma": 7,
+      "st": 4,
+      "ag": 4,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "HR",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dirty Player",
+        "Jump Up",
+        "Mighty Blow",
+        "Strip Ball"
+      ],
+      "available_for": [
+        "Dark Elf"
+      ]
+    },
+    {
+      "id": "darkelf.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Dark Elf"
+      ]
+    },
+    {
+      "id": "39398",
+      "name": "Eldril Sidewinder",
+      "display_name": "Eldril Sidewinder",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 230000,
+      "ma": 8,
+      "st": 3,
+      "ag": 2,
+      "pa": 5,
+      "av": 8,
+      "shorthand": "ES",
+      "skills": [
+        "Catch",
+        "Dodge",
+        "Hypnotic Gaze",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Mesmerizing Dance",
+        "Nerves of Steel",
+        "On the Ball"
+      ],
+      "available_for": [
+        "Dark Elf"
+      ]
+    },
+    {
+      "id": "39458",
+      "name": "Gloriel Summerbloom",
+      "display_name": "Gloriel Summerbloom",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 7,
+      "st": 2,
+      "ag": 2,
+      "pa": 2,
+      "av": 8,
+      "shorthand": "GS",
+      "skills": [
+        "Accurate",
+        "Dodge",
+        {
+          "name": "Loner",
+          "value": 3
+        },
+        "Pass",
+        "Shot to Nothing",
+        "Side Step",
+        "Sure Hands"
+      ],
+      "available_for": [
+        "Dark Elf"
+      ]
+    },
+    {
+      "id": "39459",
+      "name": "Grak",
+      "display_name": "Grak",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 250000,
+      "ma": 5,
+      "st": 5,
+      "ag": 4,
+      "pa": 4,
+      "av": 10,
+      "shorthand": "Gr",
+      "skills": [
+        "Bone Head",
+        "Kick Team-mate",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Thick Skull",
+        "Two for One"
+      ],
+      "available_for": [
+        "Dark Elf",
+        "Goblin",
+        "Nippon",
+        "Chaos Renegade",
+        "Wood Elf"
+      ]
+    },
+    {
+      "id": "39460",
+      "name": "Crumbleberry",
+      "display_name": "Crumbleberry",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 0,
+      "ma": 5,
+      "st": 2,
+      "ag": 3,
+      "pa": 6,
+      "av": 7,
+      "shorthand": "Cr",
+      "skills": [
+        "Dodge",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Right Stuff",
+        "Stunty",
+        "Sure Hands",
+        "Two for One"
+      ],
+      "available_for": [
+        "Dark Elf",
+        "Goblin",
+        "Nippon",
+        "Chaos Renegade",
+        "Wood Elf"
+      ]
+    },
+    {
+      "id": "39465",
+      "name": "Helmut Wulf",
+      "display_name": "Helmut Wulf",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 140000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 9,
+      "shorthand": "HW",
+      "skills": [
+        "Chainsaw",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Old Pro",
+        "Pro",
+        "Secret Weapon",
+        "Stand Firm"
+      ],
+      "available_for": [
+        "Dark Elf",
+        "Nippon",
+        "Chaos Renegade"
+      ]
+    },
+    {
+      "id": "39549",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 380000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 4,
+      "av": 11,
+      "shorthand": "MT",
+      "skills": [
+        "Block",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 2
+        },
+        "The Ballista",
+        "Thick Skull",
+        "Throw Team-mate"
+      ],
+      "available_for": [
+        "Dark Elf",
+        "Chaos Renegade"
+      ]
+    },
+    {
+      "id": "39550",
+      "name": "Roxanna Darknail",
+      "display_name": "Roxanna Darknail",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 8,
+      "st": 3,
+      "ag": 1,
+      "pa": 4,
+      "av": 8,
+      "shorthand": "RD",
+      "skills": [
+        "Burst of Speed",
+        "Dodge",
+        "Frenzy",
+        "Juggernaut",
+        "Jump Up",
+        "Leap",
+        {
+          "name": "Loner",
+          "value": 4
+        }
+      ],
+      "available_for": [
+        "Dark Elf"
+      ]
+    },
+    {
+      "id": "39553",
+      "name": "Lucien Swift",
+      "display_name": "Lucien Swift",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 340000,
+      "ma": 7,
+      "st": 3,
+      "ag": 2,
+      "pa": 5,
+      "av": 9,
+      "shorthand": "LS",
+      "skills": [
+        "Block",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Tackle",
+        "Two for One"
+      ],
+      "available_for": [
+        "Dark Elf"
+      ]
+    },
+    {
+      "id": "39554",
+      "name": "Valen Swift",
+      "display_name": "Valen Swift",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 0,
+      "ma": 7,
+      "st": 3,
+      "ag": 2,
+      "pa": 2,
+      "av": 8,
+      "shorthand": "VS",
+      "skills": [
+        "Accurate",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Nerves of Steel",
+        "Pass",
+        "Safe Pass",
+        "Sure Hands",
+        "Two for One"
+      ],
+      "available_for": [
+        "Dark Elf"
+      ]
+    },
+    {
+      "id": "39557",
+      "name": "Willow Rosebark",
+      "display_name": "Willow Rosebark",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 5,
+      "st": 4,
+      "ag": 3,
+      "pa": 6,
+      "av": 9,
+      "shorthand": "WR",
+      "skills": [
+        "Dauntless",
+        "Indomitable",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Side Step",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Dark Elf"
+      ]
+    },
+    {
+      "id": "39558",
+      "name": "Zolcath the Zoat",
+      "display_name": "Zolcath the Zoat",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 230000,
+      "ma": 5,
+      "st": 5,
+      "ag": 4,
+      "pa": 5,
+      "av": 10,
+      "shorthand": "ZZ",
+      "skills": [
+        "\"Excuse Me, Are You a Zoat?\"",
+        "Disturbing Presence",
+        "Juggernaut",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Prehensile Tail",
+        "Regeneration",
+        "Sure Feet"
+      ],
+      "available_for": [
+        "Dark Elf"
+      ]
+    },
+    {
+      "id": "44743",
+      "name": "Akhorne the Squirrel",
+      "display_name": "Akhorne the Squirrel",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 80000,
+      "ma": 7,
+      "st": 1,
+      "ag": 2,
+      "pa": -1,
+      "av": 6,
+      "shorthand": "SQ",
+      "skills": [
+        "Blind Rage",
+        "Claws",
+        "Dauntless",
+        "Dodge",
+        "Frenzy",
+        "Jump Up",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "No Hands",
+        "Side Step",
+        "Stunty",
+        "Titchy"
+      ],
+      "available_for": [
+        "Dark Elf",
+        "Nippon"
+      ]
+    },
+    {
+      "id": "54496",
+      "name": "Kiroth Krakeneye",
+      "display_name": "Kiroth Krakeneye",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 160000,
+      "ma": 7,
+      "st": 3,
+      "ag": 2,
+      "pa": 3,
+      "av": 9,
+      "shorthand": "KK",
+      "skills": [
+        "Black Ink",
+        "Disturbing Presence",
+        "Foul Appearance",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "On the Ball",
+        "Tackle",
+        "Tentacles"
+      ],
+      "available_for": [
+        "Dark Elf"
+      ]
+    },
+    {
+      "id": "dwarf.Farblast",
+      "name": "Barik Farblast",
+      "display_name": "Barik Farblast",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 60000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "BF",
+      "skills": [
+        "Loner",
+        "Hail Mary Pass",
+        "Pass",
+        "Secret Weapon",
+        "Strong Arm",
+        "Sure Hands",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Dwarf"
+      ]
+    },
+    {
+      "id": "dwarf.Eziasson",
+      "name": "Boomer Eziasson",
+      "display_name": "Boomer Eziasson",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 60000,
+      "ma": 4,
+      "st": 3,
+      "ag": 2,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "BE",
+      "skills": [
+        "Loner",
+        "Accurate",
+        "Block",
+        "Bombardier",
+        "Secret Weapon",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Dwarf"
+      ]
+    },
+    {
+      "id": "dwarf.Churnblade",
+      "name": "Flint Churnblade",
+      "display_name": "Flint Churnblade",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 5,
+      "st": 3,
+      "ag": 2,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "FC",
+      "skills": [
+        "Loner",
+        "Block",
+        "Chainsaw",
+        "Secret Weapon",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Dwarf"
+      ]
+    },
+    {
+      "id": "dwarf.Ironjaw",
+      "name": "Grim Ironjaw",
+      "display_name": "Grim Ironjaw",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 5,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "GI",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dauntless",
+        "Frenzy",
+        "Mighty Blow",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Dwarf"
+      ]
+    },
+    {
+      "id": "dwarf.Zara",
+      "name": "Zara the Slayer",
+      "display_name": "Zara the Slayer",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "ZS",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dauntless",
+        "Dodge",
+        "Jump Up",
+        "Stab",
+        "Stakes"
+      ],
+      "available_for": [
+        "Dwarf"
+      ]
+    },
+    {
+      "id": "dwarf.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Dwarf"
+      ]
+    },
+    {
+      "id": "elf.Longstride",
+      "name": "Dolfar Longstride",
+      "display_name": "Dolfar Longstride",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 7,
+      "st": 3,
+      "ag": 4,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "DL",
+      "skills": [
+        "Loner",
+        "Diving Catch",
+        "Hail Mary Pass",
+        "Kick",
+        "Kick-Off Return",
+        "Pass Block"
+      ],
+      "available_for": [
+        "Elf"
+      ]
+    },
+    {
+      "id": "elf.Sidewinder",
+      "name": "Eldril Sidewinder",
+      "display_name": "Eldril Sidewinder",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 200000,
+      "ma": 8,
+      "st": 3,
+      "ag": 4,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "ES",
+      "skills": [
+        "Loner",
+        "Catch",
+        "Dodge",
+        "Hypnotic Gaze",
+        "Nerves of Steel",
+        "Pass Block"
+      ],
+      "available_for": [
+        "Elf"
+      ]
+    },
+    {
+      "id": "elf.Hubris",
+      "name": "Hubris Rakarth",
+      "display_name": "Hubris Rakarth",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 260000,
+      "ma": 7,
+      "st": 4,
+      "ag": 4,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "HR",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dirty Player",
+        "Jump Up",
+        "Mighty Blow",
+        "Strip Ball"
+      ],
+      "available_for": [
+        "Elf"
+      ]
+    },
+    {
+      "id": "elf.Prince",
+      "name": "Prince Moranion",
+      "display_name": "Prince Moranion",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 230000,
+      "ma": 7,
+      "st": 4,
+      "ag": 4,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "PM",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dauntless",
+        "Tackle",
+        "Wrestle"
+      ],
+      "available_for": [
+        "Elf"
+      ]
+    },
+    {
+      "id": "elf.Jordell",
+      "name": "Jordell Freshbreeze",
+      "display_name": "Jordell Freshbreeze",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 260000,
+      "ma": 8,
+      "st": 3,
+      "ag": 5,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "JF",
+      "skills": [
+        "Loner",
+        "Block",
+        "Diving Catch",
+        "Dodge",
+        "Leap",
+        "Side Step"
+      ],
+      "available_for": [
+        "Elf"
+      ]
+    },
+    {
+      "id": "elf.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Elf"
+      ]
+    },
+    {
+      "id": "goblin.Dribblesnot",
+      "name": "Bomber Dribblesnot",
+      "display_name": "Bomber Dribblesnot",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 60000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "BD",
+      "skills": [
+        "Loner",
+        "Accurate",
+        "Bombardier",
+        "Dodge",
+        "Right Stuff",
+        "Secret Weapon",
+        "Stunty"
+      ],
+      "available_for": [
+        "Goblin"
+      ]
+    },
+    {
+      "id": "goblin.Fungus",
+      "name": "Fungus the Loon",
+      "display_name": "Fungus the Loon",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 80000,
+      "ma": 4,
+      "st": 7,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "FL",
+      "skills": [
+        "Loner",
+        "Ball and Chain",
+        "Mighty Blow",
+        "No Hands",
+        "Secret Weapon",
+        "Stunty"
+      ],
+      "available_for": [
+        "Goblin"
+      ]
+    },
+    {
+      "id": "goblin.Nobbla",
+      "name": "Nobbla Blackwart",
+      "display_name": "Nobbla Blackwart",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "NB",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dodge",
+        "Chainsaw",
+        "Secret Weapon",
+        "Stunty"
+      ],
+      "available_for": [
+        "Goblin"
+      ]
+    },
+    {
+      "id": "goblin.Scrappa",
+      "name": "Scrappa Sorehead",
+      "display_name": "Scrappa Sorehead",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 7,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "SS",
+      "skills": [
+        "Loner",
+        "Dirty Player",
+        "Dodge",
+        "Leap",
+        "Right Stuff",
+        "Sprint",
+        "Stunty",
+        "Sure Feet",
+        "Very Long Legs"
+      ],
+      "available_for": [
+        "Goblin"
+      ]
+    },
+    {
+      "id": "goblin.Ripper",
+      "name": "Ripper",
+      "display_name": "Ripper",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 4,
+      "st": 6,
+      "ag": 1,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "RP",
+      "skills": [
+        "Loner",
+        "Grab",
+        "Mighty Blow",
+        "Regeneration",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Goblin"
+      ]
+    },
+    {
+      "id": "goblin.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Goblin"
+      ]
+    },
+    {
+      "id": "halfling.Puggy",
+      "name": "Puggy Baconbreath",
+      "display_name": "Puggy Baconbreath",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 140000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 6,
+      "shorthand": "PB",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dodge",
+        "Nerves of Steel",
+        "Right Stuff",
+        "Stunty"
+      ],
+      "available_for": [
+        "Halfling"
+      ]
+    },
+    {
+      "id": "halfling.Willow",
+      "name": "Willow Rosebark",
+      "display_name": "Willow Rosebark",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 5,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "WR",
+      "skills": [
+        "Loner",
+        "Dauntless",
+        "Side Step",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Halfling"
+      ]
+    },
+    {
+      "id": "halfling.Zara",
+      "name": "Zara the Slayer",
+      "display_name": "Zara the Slayer",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "ZS",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dauntless",
+        "Dodge",
+        "Jump Up",
+        "Stab",
+        "Stakes"
+      ],
+      "available_for": [
+        "Halfling"
+      ]
+    },
+    {
+      "id": "halfling.Deeproot",
+      "name": "Deeproot Strongbranch",
+      "display_name": "Deeproot Strongbranch",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 300000,
+      "ma": 2,
+      "st": 7,
+      "ag": 1,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "DS",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Stand Firm",
+        "Strong Arm",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Halfling"
+      ]
+    },
+    {
+      "id": "halfling.Bigfist",
+      "name": "Bertha Bigfist",
+      "display_name": "Bertha Bigfist",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 6,
+      "st": 5,
+      "ag": 2,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "BB",
+      "skills": [
+        "Loner",
+        "bone head",
+        "Break Tackle",
+        "Dodge",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Halfling"
+      ]
+    },
+    {
+      "id": "halfling.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Halfling"
+      ]
+    },
+    {
+      "id": "highelf.Longstride",
+      "name": "Dolfar Longstride",
+      "display_name": "Dolfar Longstride",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 7,
+      "st": 3,
+      "ag": 4,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "DL",
+      "skills": [
+        "Loner",
+        "Diving Catch",
+        "Hail Mary Pass",
+        "Kick",
+        "Kick-Off Return",
+        "Pass Block"
+      ],
+      "available_for": [
+        "High Elf"
+      ]
+    },
+    {
+      "id": "highelf.Soaren",
+      "name": "Soaren Hightower",
+      "display_name": "Soaren Hightower",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 180000,
+      "ma": 6,
+      "st": 3,
+      "ag": 4,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "SH",
+      "skills": [
+        "Loner",
+        "Fend",
+        "Kick-Off Return",
+        "Pass",
+        "Safe Throw",
+        "Sure Hands",
+        "Strong Arm"
+      ],
+      "available_for": [
+        "High Elf"
+      ]
+    },
+    {
+      "id": "highelf.Sidewinder",
+      "name": "Eldril Sidewinder",
+      "display_name": "Eldril Sidewinder",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 200000,
+      "ma": 8,
+      "st": 3,
+      "ag": 4,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "ES",
+      "skills": [
+        "Loner",
+        "Catch",
+        "Dodge",
+        "Hypnotic Gaze",
+        "Nerves of Steel",
+        "Pass Block"
+      ],
+      "available_for": [
+        "High Elf"
+      ]
+    },
+    {
+      "id": "highelf.Prince",
+      "name": "Prince Moranion",
+      "display_name": "Prince Moranion",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 230000,
+      "ma": 7,
+      "st": 4,
+      "ag": 4,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "PM",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dauntless",
+        "Tackle",
+        "Wrestle"
+      ],
+      "available_for": [
+        "High Elf"
+      ]
+    },
+    {
+      "id": "highelf.Zara",
+      "name": "Zara the Slayer",
+      "display_name": "Zara the Slayer",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "ZS",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dauntless",
+        "Dodge",
+        "Jump Up",
+        "Stab",
+        "Stakes"
+      ],
+      "available_for": [
+        "High Elf"
+      ]
+    },
+    {
+      "id": "highelf.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "High Elf"
+      ]
+    },
+    {
+      "id": "human.Helmut",
+      "name": "Helmut Wulf",
+      "display_name": "Helmut Wulf",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 110000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "HW",
+      "skills": [
+        "Loner",
+        "Chainsaw",
+        "Secret Weapon",
+        "Stand Firm"
+      ],
+      "available_for": [
+        "Human"
+      ]
+    },
+    {
+      "id": "human.Puggy",
+      "name": "Puggy Baconbreath",
+      "display_name": "Puggy Baconbreath",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 140000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 6,
+      "shorthand": "PB",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dodge",
+        "Nerves of Steel",
+        "Right Stuff",
+        "Stunty"
+      ],
+      "available_for": [
+        "Human"
+      ]
+    },
+    {
+      "id": "human.Zug",
+      "name": "Mighty Zug",
+      "display_name": "Mighty Zug",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 260000,
+      "ma": 4,
+      "st": 5,
+      "ag": 2,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "ZG",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow"
+      ],
+      "available_for": [
+        "Human"
+      ]
+    },
+    {
+      "id": "human.Zara",
+      "name": "Zara the Slayer",
+      "display_name": "Zara the Slayer",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "ZS",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dauntless",
+        "Dodge",
+        "Jump Up",
+        "Stab",
+        "Stakes"
+      ],
+      "available_for": [
+        "Human"
+      ]
+    },
+    {
+      "id": "human.Griff",
+      "name": "Griff Oberwald",
+      "display_name": "Griff Oberwald",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 320000,
+      "ma": 7,
+      "st": 4,
+      "ag": 4,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "GO",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dodge",
+        "Fend",
+        "Sprint",
+        "Sure Feet"
+      ],
+      "available_for": [
+        "Human"
+      ]
+    },
+    {
+      "id": "human.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Human"
+      ]
+    },
+    {
+      "id": "khemri.Sinnedbad",
+      "name": "Sinnedbad",
+      "display_name": "Sinnedbad",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 80000,
+      "ma": 6,
+      "st": 3,
+      "ag": 2,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "SB",
+      "skills": [
+        "Loner",
+        "Block",
+        "Jump Up",
+        "Pass Block",
+        "Regeneration",
+        "Secret Weapon",
+        "Side Step",
+        "Stab"
+      ],
+      "available_for": [
+        "Khemri"
+      ]
+    },
+    {
+      "id": "khemri.Hackenslash",
+      "name": "Hack Enslash",
+      "display_name": "Hack Enslash",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 120000,
+      "ma": 6,
+      "st": 3,
+      "ag": 2,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "HE",
+      "skills": [
+        "Loner",
+        "Chainsaw",
+        "Regeneration",
+        "Secret Weapon",
+        "Side Step"
+      ],
+      "available_for": [
+        "Khemri"
+      ]
+    },
+    {
+      "id": "khemri.Humerus",
+      "name": "Humerus Carpal",
+      "display_name": "Humerus Carpal",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 7,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "HC",
+      "skills": [
+        "Loner",
+        "Catch",
+        "Dodge",
+        "Regeneration",
+        "Nerves of Steel"
+      ],
+      "available_for": [
+        "Khemri"
+      ]
+    },
+    {
+      "id": "khemri.Ithaca",
+      "name": "Ithaca Benoin",
+      "display_name": "Ithaca Benoin",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "IB",
+      "skills": [
+        "Loner",
+        "Accurate",
+        "Dump Off",
+        "Nerves of Steel",
+        "Pass",
+        "Regeneration",
+        "Sure Hands"
+      ],
+      "available_for": [
+        "Khemri"
+      ]
+    },
+    {
+      "id": "khemri.Setekh",
+      "name": "Setekh",
+      "display_name": "Setekh",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 6,
+      "st": 4,
+      "ag": 2,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "ST",
+      "skills": [
+        "Loner",
+        "Block",
+        "Break Tackle",
+        "Juggernaut",
+        "Regeneration",
+        "Strip Ball"
+      ],
+      "available_for": [
+        "Khemri"
+      ]
+    },
+    {
+      "id": "khemri.Ramtut",
+      "name": "Ramtut III",
+      "display_name": "Ramtut III",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 380000,
+      "ma": 5,
+      "st": 6,
+      "ag": 1,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "R3",
+      "skills": [
+        "Loner",
+        "Break Tackle",
+        "Mighty Blow",
+        "Regeneration",
+        "Wrestle"
+      ],
+      "available_for": [
+        "Khemri"
+      ]
+    },
+    {
+      "id": "3045",
+      "name": "Ramtut III",
+      "display_name": "Ramtut III",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 360000,
+      "ma": 5,
+      "st": 6,
+      "ag": 1,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "R3",
+      "undead": true,
+      "skills": [
+        "Break Tackle",
+        "Loner",
+        "Mighty Blow",
+        "Regeneration",
+        "Wrestle"
+      ],
+      "available_for": [
+        "Tomb Kings"
+      ]
+    },
+    {
+      "id": "20821",
+      "name": "Bryce 'The Slice' Cambuel",
+      "display_name": "Bryce 'The Slice' Cambuel",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 5,
+      "st": 3,
+      "ag": 2,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "BC",
+      "undead": true,
+      "skills": [
+        "Chainsaw",
+        "Loner",
+        "Regeneration",
+        "Secret Weapon",
+        "Stand Firm",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "double": [
+          "General",
+          "Agility",
+          "Strength",
+          "Passing"
+        ]
+      },
+      "available_for": [
+        "Tomb Kings"
+      ]
+    },
+    {
+      "id": "20825",
+      "name": "Ivan 'The Animal' Deathshroud",
+      "display_name": "Ivan 'The Animal' Deathshroud",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 230000,
+      "ma": 6,
+      "st": 4,
+      "ag": 2,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "ID",
+      "undead": true,
+      "skills": [
+        "Block",
+        "Disturbing Presence",
+        "Juggernaut",
+        "Loner",
+        "Regeneration",
+        "Strip Ball",
+        "Tackle"
+      ],
+      "skill_categories": {
+        "double": [
+          "General",
+          "Agility",
+          "Strength",
+          "Passing"
+        ]
+      },
+      "available_for": [
+        "Tomb Kings"
+      ]
+    },
+    {
+      "id": "22963",
+      "name": "Skrull Halfheight",
+      "display_name": "Skrull Halfheight",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 190000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "SH",
+      "undead": true,
+      "skills": [
+        "Accurate",
+        "Loner",
+        "Nerves Of Steel",
+        "Pass",
+        "Regeneration",
+        "Sure Hands",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "double": [
+          "General",
+          "Agility",
+          "Strength",
+          "Passing"
+        ]
+      },
+      "available_for": [
+        "Tomb Kings"
+      ]
+    },
+    {
+      "id": "lizardman.Hemlock",
+      "name": "Hemlock",
+      "display_name": "Hemlock",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 170000,
+      "ma": 8,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "HL",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dodge",
+        "Side Step",
+        "Jump Up",
+        "Stab",
+        "Stunty"
+      ],
+      "available_for": [
+        "Lizardman"
+      ]
+    },
+    {
+      "id": "lizardman.Lottabottal",
+      "name": "Lottabottol",
+      "display_name": "Lottabottol",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 8,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "LB",
+      "skills": [
+        "Loner",
+        "Catch",
+        "Diving Tackle",
+        "Jump Up",
+        "Leap",
+        "Pass Block",
+        "Shadowing",
+        "Very Long Legs"
+      ],
+      "available_for": [
+        "Lizardman"
+      ]
+    },
+    {
+      "id": "lizardman.Helmut",
+      "name": "Helmut Wulf",
+      "display_name": "Helmut Wulf",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 110000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "HW",
+      "skills": [
+        "Loner",
+        "Chainsaw",
+        "Secret Weapon",
+        "Stand Firm"
+      ],
+      "available_for": [
+        "Lizardman"
+      ]
+    },
+    {
+      "id": "lizardman.Quetzal",
+      "name": "Quetzal Leap",
+      "display_name": "Quetzal Leap",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 250000,
+      "ma": 8,
+      "st": 2,
+      "ag": 4,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "QL",
+      "skills": [
+        "Loner",
+        "Catch",
+        "Diving Catch",
+        "Fend",
+        "Kick-Off Return",
+        "Leap",
+        "Nerves of Steel",
+        "Very Long Legs"
+      ],
+      "available_for": [
+        "Lizardman"
+      ]
+    },
+    {
+      "id": "lizardman.Slibli",
+      "name": "Slibli",
+      "display_name": "Slibli",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 250000,
+      "ma": 7,
+      "st": 4,
+      "ag": 1,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "SL",
+      "skills": [
+        "Loner",
+        "Block",
+        "Grab",
+        "Guard",
+        "Stand Firm"
+      ],
+      "available_for": [
+        "Lizardman"
+      ]
+    },
+    {
+      "id": "lizardman.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Lizardman"
+      ]
+    },
+    {
+      "id": "necromantic.Hackenslash",
+      "name": "Hack Enslash",
+      "display_name": "Hack Enslash",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 120000,
+      "ma": 6,
+      "st": 3,
+      "ag": 2,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "HE",
+      "skills": [
+        "Loner",
+        "Chainsaw",
+        "Regeneration",
+        "Secret Weapon",
+        "Side Step"
+      ],
+      "available_for": [
+        "Necromantic"
+      ]
+    },
+    {
+      "id": "necromantic.Earlice",
+      "name": "J. Earlice",
+      "display_name": "J. Earlice",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 180000,
+      "ma": 8,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "JE",
+      "skills": [
+        "Loner",
+        "Catch",
+        "Diving Catch",
+        "Dodge",
+        "Sprint"
+      ],
+      "available_for": [
+        "Necromantic"
+      ]
+    },
+    {
+      "id": "necromantic.Setekh",
+      "name": "Setekh",
+      "display_name": "Setekh",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 6,
+      "st": 4,
+      "ag": 2,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "ST",
+      "skills": [
+        "Loner",
+        "Block",
+        "Break Tackle",
+        "Juggernaut",
+        "Regeneration",
+        "Strip Ball"
+      ],
+      "available_for": [
+        "Necromantic"
+      ]
+    },
+    {
+      "id": "necromantic.Whilhelm",
+      "name": "Wilhelm Chaney",
+      "display_name": "Wilhelm Chaney",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 240000,
+      "ma": 8,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "WC",
+      "skills": [
+        "Loner",
+        "Catch",
+        "Claws",
+        "Frenzy",
+        "Regeneration",
+        "Wrestle"
+      ],
+      "available_for": [
+        "Necromantic"
+      ]
+    },
+    {
+      "id": "necromantic.Ramtut",
+      "name": "Ramtut III",
+      "display_name": "Ramtut III",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 380000,
+      "ma": 5,
+      "st": 6,
+      "ag": 1,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "R3",
+      "skills": [
+        "Loner",
+        "Break Tackle",
+        "Mighty Blow",
+        "Regeneration",
+        "Wrestle"
+      ],
+      "available_for": [
+        "Necromantic"
+      ]
+    },
+    {
+      "id": "necromantic.Count",
+      "name": "Count Luthor von Drakenborg",
+      "display_name": "Count Luthor von Drakenborg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 390000,
+      "ma": 6,
+      "st": 5,
+      "ag": 4,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "CL",
+      "skills": [
+        "Loner",
+        "Block",
+        "Hypnotic Gaze",
+        "Side Step",
+        "Regeneration"
+      ],
+      "available_for": [
+        "Necromantic"
+      ]
+    },
+    {
+      "id": "norse.Eziasson",
+      "name": "Boomer Eziasson",
+      "display_name": "Boomer Eziasson",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 60000,
+      "ma": 4,
+      "st": 3,
+      "ag": 2,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "BE",
+      "skills": [
+        "Loner",
+        "Accurate",
+        "Block",
+        "Bombardier",
+        "Secret Weapon",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Norse"
+      ]
+    },
+    {
+      "id": "norse.Helmut",
+      "name": "Helmut Wulf",
+      "display_name": "Helmut Wulf",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 110000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "HW",
+      "skills": [
+        "Loner",
+        "Chainsaw",
+        "Secret Weapon",
+        "Stand Firm"
+      ],
+      "available_for": [
+        "Norse"
+      ]
+    },
+    {
+      "id": "norse.Whilhelm",
+      "name": "Wilhelm Chaney",
+      "display_name": "Wilhelm Chaney",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 240000,
+      "ma": 8,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "WC",
+      "skills": [
+        "Loner",
+        "Catch",
+        "Claws",
+        "Frenzy",
+        "Regeneration",
+        "Wrestle"
+      ],
+      "available_for": [
+        "Norse"
+      ]
+    },
+    {
+      "id": "norse.Zara",
+      "name": "Zara the Slayer",
+      "display_name": "Zara the Slayer",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "ZS",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dauntless",
+        "Dodge",
+        "Jump Up",
+        "Stab",
+        "Stakes"
+      ],
+      "available_for": [
+        "Norse"
+      ]
+    },
+    {
+      "id": "norse.Icepelt",
+      "name": "Icepelt Hammerblow",
+      "display_name": "Icepelt Hammerblow",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 330000,
+      "ma": 5,
+      "st": 6,
+      "ag": 1,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "IH",
+      "skills": [
+        "Loner",
+        "Claws",
+        "Disturbing Presence",
+        "Frenzy",
+        "Regeneration",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Norse"
+      ]
+    },
+    {
+      "id": "norse.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Norse"
+      ]
+    },
+    {
+      "id": "nurgle.Max",
+      "name": "Max Spleenripper",
+      "display_name": "Max Spleenripper",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "MS",
+      "skills": [
+        "Loner",
+        "Chainsaw",
+        "Secret Weapon"
+      ],
+      "available_for": [
+        "Nurgle"
+      ]
+    },
+    {
+      "id": "nurgle.Lewdgrip",
+      "name": "Lewdgrip Whiparm",
+      "display_name": "Lewdgrip Whiparm",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "LW",
+      "skills": [
+        "Loner",
+        "Pass",
+        "Strong Arm",
+        "Sure Hands",
+        "Tentacles"
+      ],
+      "available_for": [
+        "Nurgle"
+      ]
+    },
+    {
+      "id": "nurgle.Farth",
+      "name": "Brick Far'th",
+      "display_name": "Brick Far'th",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 5,
+      "st": 5,
+      "ag": 2,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "BF",
+      "skills": [
+        "Loner",
+        "bone head",
+        "Mighty Blow",
+        "Nerves of Steel",
+        "Strong Arm",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Nurgle"
+      ]
+    },
+    {
+      "id": "nurgle.Grotty",
+      "name": "Grotty",
+      "display_name": "Grotty",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 6,
+      "st": 2,
+      "ag": 4,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "GY",
+      "skills": [
+        "Loner",
+        "Dodge",
+        "Right Stuff",
+        "Stunty"
+      ],
+      "available_for": [
+        "Nurgle"
+      ]
+    },
+    {
+      "id": "nurgle.Borak",
+      "name": "Lord Borak the Despoiler",
+      "display_name": "Lord Borak the Despoiler",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 5,
+      "st": 5,
+      "ag": 3,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "BK",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dirty Player",
+        "Mighty Blow"
+      ],
+      "available_for": [
+        "Nurgle"
+      ]
+    },
+    {
+      "id": "nurgle.Grashnak",
+      "name": "Grashnak Blackhoof",
+      "display_name": "Grashnak Blackhoof",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 310000,
+      "ma": 6,
+      "st": 6,
+      "ag": 2,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "GB",
+      "skills": [
+        "Loner",
+        "Frenzy",
+        "Horns",
+        "Mighty Blow",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Nurgle"
+      ]
+    },
+    {
+      "id": "nurgle.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Nurgle"
+      ]
+    },
+    {
+      "id": "ogre.Dribblesnot",
+      "name": "Bomber Dribblesnot",
+      "display_name": "Bomber Dribblesnot",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 60000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "BD",
+      "skills": [
+        "Loner",
+        "Accurate",
+        "Bombardier",
+        "Dodge",
+        "Right Stuff",
+        "Secret Weapon",
+        "Stunty"
+      ],
+      "available_for": [
+        "Ogre"
+      ]
+    },
+    {
+      "id": "ogre.Nobbla",
+      "name": "Nobbla Blackwart",
+      "display_name": "Nobbla Blackwart",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "NB",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dodge",
+        "Chainsaw",
+        "Secret Weapon",
+        "Stunty"
+      ],
+      "available_for": [
+        "Ogre"
+      ]
+    },
+    {
+      "id": "ogre.Scrappa",
+      "name": "Scrappa Sorehead",
+      "display_name": "Scrappa Sorehead",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 7,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "SS",
+      "skills": [
+        "Loner",
+        "Dirty Player",
+        "Dodge",
+        "Leap",
+        "Right Stuff",
+        "Sprint",
+        "Stunty",
+        "Sure Feet",
+        "Very Long Legs"
+      ],
+      "available_for": [
+        "Ogre"
+      ]
+    },
+    {
+      "id": "ogre.Bigfist",
+      "name": "Bertha Bigfist",
+      "display_name": "Bertha Bigfist",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 6,
+      "st": 5,
+      "ag": 2,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "BB",
+      "skills": [
+        "Loner",
+        "bone head",
+        "Break Tackle",
+        "Dodge",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Ogre"
+      ]
+    },
+    {
+      "id": "ogre.Farth",
+      "name": "Brick Far'th",
+      "display_name": "Brick Far'th",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 5,
+      "st": 5,
+      "ag": 2,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "BF",
+      "skills": [
+        "Loner",
+        "bone head",
+        "Mighty Blow",
+        "Nerves of Steel",
+        "Strong Arm",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Ogre"
+      ]
+    },
+    {
+      "id": "ogre.Grotty",
+      "name": "Grotty",
+      "display_name": "Grotty",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 6,
+      "st": 2,
+      "ag": 4,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "GY",
+      "skills": [
+        "Loner",
+        "Dodge",
+        "Right Stuff",
+        "Stunty"
+      ],
+      "available_for": [
+        "Ogre"
+      ]
+    },
+    {
+      "id": "ogre.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Ogre"
+      ]
+    },
+    {
+      "id": "orc.Dribblesnot",
+      "name": "Bomber Dribblesnot",
+      "display_name": "Bomber Dribblesnot",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 60000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "BD",
+      "skills": [
+        "Loner",
+        "Accurate",
+        "Bombardier",
+        "Dodge",
+        "Right Stuff",
+        "Secret Weapon",
+        "Stunty"
+      ],
+      "available_for": [
+        "Orc"
+      ]
+    },
+    {
+      "id": "orc.Ugroth",
+      "name": "Ugroth Bolgrot",
+      "display_name": "Ugroth Bolgrot",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 100000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "UB",
+      "skills": [
+        "Loner",
+        "Chainsaw",
+        "Secret Weapon"
+      ],
+      "available_for": [
+        "Orc"
+      ]
+    },
+    {
+      "id": "orc.Scrappa",
+      "name": "Scrappa Sorehead",
+      "display_name": "Scrappa Sorehead",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 7,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "SS",
+      "skills": [
+        "Loner",
+        "Dirty Player",
+        "Dodge",
+        "Leap",
+        "Right Stuff",
+        "Sprint",
+        "Stunty",
+        "Sure Feet",
+        "Very Long Legs"
+      ],
+      "available_for": [
+        "Orc"
+      ]
+    },
+    {
+      "id": "orc.Varag",
+      "name": "Varag Ghoul-Chewer",
+      "display_name": "Varag Ghoul-Chewer",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "VG",
+      "skills": [
+        "Loner",
+        "Block",
+        "Jump Up",
+        "Mighty Blow",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Orc"
+      ]
+    },
+    {
+      "id": "orc.Ripper",
+      "name": "Ripper",
+      "display_name": "Ripper",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 4,
+      "st": 6,
+      "ag": 1,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "RP",
+      "skills": [
+        "Loner",
+        "Grab",
+        "Mighty Blow",
+        "Regeneration",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Orc"
+      ]
+    },
+    {
+      "id": "orc.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Orc"
+      ]
+    },
+    {
+      "id": "39399",
+      "name": "Glart Smashrip",
+      "display_name": "Glart Smashrip",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 195000,
+      "ma": 5,
+      "st": 4,
+      "ag": 4,
+      "pa": 0,
+      "av": 9,
+      "shorthand": "GS",
+      "skills": [
+        "Block",
+        "Claws",
+        "Frenzied Rush",
+        "Grab",
+        "Juggernaut",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Stand Firm"
+      ],
+      "available_for": [
+        "Chaos Renegade"
+      ]
+    },
+    {
+      "id": "39464",
+      "name": "Hakflem Skuttlespike",
+      "display_name": "Hakflem Skuttlespike",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 180000,
+      "ma": 9,
+      "st": 3,
+      "ag": 2,
+      "pa": 3,
+      "av": 8,
+      "shorthand": "HS",
+      "skills": [
+        "Dodge",
+        "Extra Arms",
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Prehensile Tail",
+        "Treacherous",
+        "Two Heads"
+      ],
+      "available_for": [
+        "Chaos Renegade"
+      ]
+    },
+    {
+      "id": "39467",
+      "name": "Lord Borak the Despoiler",
+      "display_name": "Lord Borak the Despoiler",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 260000,
+      "ma": 5,
+      "st": 5,
+      "ag": 3,
+      "pa": 5,
+      "av": 10,
+      "shorthand": "LB",
+      "skills": [
+        "Block",
+        {
+          "name": "Dirty Player",
+          "value": 2
+        },
+        {
+          "name": "Loner",
+          "value": 4
+        },
+        "Lord of Chaos",
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        },
+        "Sneaky Git"
+      ],
+      "available_for": [
+        "Chaos Renegade"
+      ]
+    },
+    {
+      "id": "skaven.Fezglitch",
+      "name": "Fezglitch",
+      "display_name": "Fezglitch",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 100000,
+      "ma": 4,
+      "st": 7,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "FZ",
+      "skills": [
+        "Loner",
+        "Ball and Chain",
+        "Disturbing Presence",
+        "Foul Appearance",
+        "No Hands",
+        "Secret Weapon"
+      ],
+      "available_for": [
+        "Skaven"
+      ]
+    },
+    {
+      "id": "skaven.Glart",
+      "name": "Glart Smashrip Jr.",
+      "display_name": "Glart Smashrip Jr.",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 210000,
+      "ma": 7,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "GS",
+      "skills": [
+        "Loner",
+        "Block",
+        "Claw",
+        "Juggernaut"
+      ],
+      "available_for": [
+        "Skaven"
+      ]
+    },
+    {
+      "id": "skaven.Hackflem",
+      "name": "Hakflem Skuttlespike",
+      "display_name": "Hakflem Skuttlespike",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 200000,
+      "ma": 9,
+      "st": 3,
+      "ag": 4,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "HK",
+      "skills": [
+        "Loner",
+        "Dodge",
+        "Extra Arms",
+        "Prehensile Tail",
+        "Two Heads"
+      ],
+      "available_for": [
+        "Skaven"
+      ]
+    },
+    {
+      "id": "skaven.Skitter",
+      "name": "Skitter Stab-Stab",
+      "display_name": "Skitter Stab-Stab",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 160000,
+      "ma": 9,
+      "st": 2,
+      "ag": 4,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "SK",
+      "skills": [
+        "Loner",
+        "Dodge",
+        "Prehensile Tail",
+        "Shadowing",
+        "Stab"
+      ],
+      "available_for": [
+        "Skaven"
+      ]
+    },
+    {
+      "id": "skaven.Headsplitter",
+      "name": "Headsplitter",
+      "display_name": "Headsplitter",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 340000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "HS",
+      "skills": [
+        "Loner",
+        "Frenzy",
+        "Mighty Blow",
+        "Prehensile Tail"
+      ],
+      "available_for": [
+        "Skaven"
+      ]
+    },
+    {
+      "id": "skaven.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Skaven"
+      ]
+    },
+    {
+      "id": "slann.Helmut",
+      "name": "Helmut Wulf",
+      "display_name": "Helmut Wulf",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 110000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "HW",
+      "skills": [
+        "Loner",
+        "Chainsaw",
+        "Secret Weapon",
+        "Stand Firm"
+      ],
+      "available_for": [
+        "Slann"
+      ]
+    },
+    {
+      "id": "slann.Hemlock",
+      "name": "Hemlock",
+      "display_name": "Hemlock",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 170000,
+      "ma": 8,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "HL",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dodge",
+        "Side Step",
+        "Jump Up",
+        "Stab",
+        "Stunty"
+      ],
+      "available_for": [
+        "Slann"
+      ]
+    },
+    {
+      "id": "slann.Lottabottal",
+      "name": "Lottabottol",
+      "display_name": "Lottabottol",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 8,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "LB",
+      "skills": [
+        "Loner",
+        "Catch",
+        "Diving Tackle",
+        "Jump Up",
+        "Leap",
+        "Pass Block",
+        "Shadowing",
+        "Very Long Legs"
+      ],
+      "available_for": [
+        "Slann"
+      ]
+    },
+    {
+      "id": "slann.Slibli",
+      "name": "Slibli",
+      "display_name": "Slibli",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 250000,
+      "ma": 7,
+      "st": 4,
+      "ag": 1,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "SL",
+      "skills": [
+        "Loner",
+        "Block",
+        "Grab",
+        "Guard",
+        "Stand Firm"
+      ],
+      "available_for": [
+        "Slann"
+      ]
+    },
+    {
+      "id": "slann.Quetzal",
+      "name": "Quetzal Leap",
+      "display_name": "Quetzal Leap",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 250000,
+      "ma": 8,
+      "st": 2,
+      "ag": 4,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "QL",
+      "skills": [
+        "Loner",
+        "Catch",
+        "Diving Catch",
+        "Fend",
+        "Kick-Off Return",
+        "Leap",
+        "Nerves of Steel",
+        "Very Long Legs"
+      ],
+      "available_for": [
+        "Slann"
+      ]
+    },
+    {
+      "id": "slann.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Slann"
+      ]
+    },
+    {
+      "id": "3024",
+      "name": "Helmut Wulf",
+      "display_name": "Helmut Wulf",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 110000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "HW",
+      "skills": [
+        "Chainsaw",
+        "Loner",
+        "Secret Weapon",
+        "Stand Firm"
+      ],
+      "available_for": [
+        "Slann"
+      ]
+    },
+    {
+      "id": "3025",
+      "name": "Hemlock",
+      "display_name": "Hemlock",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 170000,
+      "ma": 8,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "He",
+      "skills": [
+        "Block",
+        "Dodge",
+        "Jump Up",
+        "Loner",
+        "Side Step",
+        "Stab",
+        "Stunty"
+      ],
+      "available_for": [
+        "Slann"
+      ]
+    },
+    {
+      "id": "3036",
+      "name": "Lottabottol",
+      "display_name": "Lottabottol",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 8,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "Lo",
+      "skills": [
+        "Catch",
+        "Diving Tackle",
+        "Jump Up",
+        "Leap",
+        "Loner",
+        "Pass Block",
+        "Shadowing",
+        "Very Long Legs"
+      ],
+      "available_for": [
+        "Slann"
+      ]
+    },
+    {
+      "id": "3039",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Block",
+        "Loner",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Slann"
+      ]
+    },
+    {
+      "id": "3044",
+      "name": "Quetzal Leap",
+      "display_name": "Quetzal Leap",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 250000,
+      "ma": 8,
+      "st": 2,
+      "ag": 4,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "QL",
+      "skills": [
+        "Catch",
+        "Diving Catch",
+        "Fend",
+        "Kick-Off Return",
+        "Leap",
+        "Loner",
+        "Nerves Of Steel",
+        "Very Long Legs"
+      ],
+      "available_for": [
+        "Slann"
+      ]
+    },
+    {
+      "id": "3051",
+      "name": "Slibli",
+      "display_name": "Slibli",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 250000,
+      "ma": 7,
+      "st": 4,
+      "ag": 1,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "Sl",
+      "skills": [
+        "Block",
+        "Grab",
+        "Guard",
+        "Loner",
+        "Stand Firm"
+      ],
+      "available_for": [
+        "Slann"
+      ]
+    },
+    {
+      "id": "undead.Sinnedbad",
+      "name": "Sinnedbad",
+      "display_name": "Sinnedbad",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 80000,
+      "ma": 6,
+      "st": 3,
+      "ag": 2,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "SB",
+      "skills": [
+        "Loner",
+        "Block",
+        "Jump Up",
+        "Pass Block",
+        "Regeneration",
+        "Secret Weapon",
+        "Side Step",
+        "Stab"
+      ],
+      "available_for": [
+        "Undead"
+      ]
+    },
+    {
+      "id": "undead.Hackenslash",
+      "name": "Hack Enslash",
+      "display_name": "Hack Enslash",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 120000,
+      "ma": 6,
+      "st": 3,
+      "ag": 2,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "HE",
+      "skills": [
+        "Loner",
+        "Chainsaw",
+        "Regeneration",
+        "Secret Weapon",
+        "Side Step"
+      ],
+      "available_for": [
+        "Undead"
+      ]
+    },
+    {
+      "id": "undead.Earlice",
+      "name": "J. Earlice",
+      "display_name": "J. Earlice",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 180000,
+      "ma": 8,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "JE",
+      "skills": [
+        "Loner",
+        "Catch",
+        "Diving Catch",
+        "Dodge",
+        "Sprint"
+      ],
+      "available_for": [
+        "Undead"
+      ]
+    },
+    {
+      "id": "undead.Setekh",
+      "name": "Setekh",
+      "display_name": "Setekh",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 6,
+      "st": 4,
+      "ag": 2,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "ST",
+      "skills": [
+        "Loner",
+        "Block",
+        "Break Tackle",
+        "Juggernaut",
+        "Regeneration",
+        "Strip Ball"
+      ],
+      "available_for": [
+        "Undead"
+      ]
+    },
+    {
+      "id": "undead.Ramtut",
+      "name": "Ramtut III",
+      "display_name": "Ramtut III",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 380000,
+      "ma": 5,
+      "st": 6,
+      "ag": 1,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "R3",
+      "skills": [
+        "Loner",
+        "Break Tackle",
+        "Mighty Blow",
+        "Regeneration",
+        "Wrestle"
+      ],
+      "available_for": [
+        "Undead"
+      ]
+    },
+    {
+      "id": "undead.Count",
+      "name": "Count Luthor von Drakenborg",
+      "display_name": "Count Luthor von Drakenborg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 390000,
+      "ma": 6,
+      "st": 5,
+      "ag": 4,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "CL",
+      "skills": [
+        "Loner",
+        "Block",
+        "Hypnotic Gaze",
+        "Side Step",
+        "Regeneration"
+      ],
+      "available_for": [
+        "Undead"
+      ]
+    },
+    {
+      "id": "underworld.Dribblesnot",
+      "name": "Bomber Dribblesnot",
+      "display_name": "Bomber Dribblesnot",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 60000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "BD",
+      "skills": [
+        "Loner",
+        "Accurate",
+        "Bombardier",
+        "Dodge",
+        "Right Stuff",
+        "Secret Weapon",
+        "Stunty"
+      ],
+      "available_for": [
+        "Underworld"
+      ]
+    },
+    {
+      "id": "underworld.Fezglitch",
+      "name": "Fezglitch",
+      "display_name": "Fezglitch",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 100000,
+      "ma": 4,
+      "st": 7,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "FZ",
+      "skills": [
+        "Loner",
+        "Ball and Chain",
+        "Disturbing Presence",
+        "Foul Appearance",
+        "No Hands",
+        "Secret Weapon"
+      ],
+      "available_for": [
+        "Underworld"
+      ]
+    },
+    {
+      "id": "underworld.Glart",
+      "name": "Glart Smashrip Jr.",
+      "display_name": "Glart Smashrip Jr.",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 210000,
+      "ma": 7,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "GS",
+      "skills": [
+        "Loner",
+        "Block",
+        "Claw",
+        "Juggernaut"
+      ],
+      "available_for": [
+        "Underworld"
+      ]
+    },
+    {
+      "id": "underworld.Nobbla",
+      "name": "Nobbla Blackwart",
+      "display_name": "Nobbla Blackwart",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "NB",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dodge",
+        "Chainsaw",
+        "Secret Weapon",
+        "Stunty"
+      ],
+      "available_for": [
+        "Underworld"
+      ]
+    },
+    {
+      "id": "underworld.Skitter",
+      "name": "Skitter Stab-Stab",
+      "display_name": "Skitter Stab-Stab",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 160000,
+      "ma": 9,
+      "st": 2,
+      "ag": 4,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "SK",
+      "skills": [
+        "Loner",
+        "Dodge",
+        "Prehensile Tail",
+        "Shadowing",
+        "Stab"
+      ],
+      "available_for": [
+        "Underworld"
+      ]
+    },
+    {
+      "id": "underworld.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Underworld"
+      ]
+    },
+    {
+      "id": "vampire.Helmut",
+      "name": "Helmut Wulf",
+      "display_name": "Helmut Wulf",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 110000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "HW",
+      "skills": [
+        "Loner",
+        "Chainsaw",
+        "Secret Weapon",
+        "Stand Firm"
+      ],
+      "available_for": [
+        "Vampire"
+      ]
+    },
+    {
+      "id": "vampire.Igor",
+      "name": "Crazy Igor",
+      "display_name": "Crazy Igor",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 120000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "CI",
+      "skills": [
+        "Loner",
+        "Dauntless",
+        "Regeneration",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Vampire"
+      ]
+    },
+    {
+      "id": "vampire.Earlice",
+      "name": "J. Earlice",
+      "display_name": "J. Earlice",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 180000,
+      "ma": 8,
+      "st": 3,
+      "ag": 3,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "JE",
+      "skills": [
+        "Loner",
+        "Catch",
+        "Diving Catch",
+        "Dodge",
+        "Sprint"
+      ],
+      "available_for": [
+        "Vampire"
+      ]
+    },
+    {
+      "id": "vampire.Whilhelm",
+      "name": "Wilhelm Chaney",
+      "display_name": "Wilhelm Chaney",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 240000,
+      "ma": 8,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "WC",
+      "skills": [
+        "Loner",
+        "Catch",
+        "Claws",
+        "Frenzy",
+        "Regeneration",
+        "Wrestle"
+      ],
+      "available_for": [
+        "Vampire"
+      ]
+    },
+    {
+      "id": "vampire.Count",
+      "name": "Count Luthor von Drakenborg",
+      "display_name": "Count Luthor von Drakenborg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 390000,
+      "ma": 6,
+      "st": 5,
+      "ag": 4,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "CL",
+      "skills": [
+        "Loner",
+        "Block",
+        "Hypnotic Gaze",
+        "Side Step",
+        "Regeneration"
+      ],
+      "available_for": [
+        "Vampire"
+      ]
+    },
+    {
+      "id": "vampire.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Vampire"
+      ]
+    },
+    {
+      "id": "woodelf.Longstride",
+      "name": "Dolfar Longstride",
+      "display_name": "Dolfar Longstride",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 7,
+      "st": 3,
+      "ag": 4,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "DL",
+      "skills": [
+        "Loner",
+        "Diving Catch",
+        "Hail Mary Pass",
+        "Kick",
+        "Kick-Off Return",
+        "Pass Block"
+      ],
+      "available_for": [
+        "Wood Elf"
+      ]
+    },
+    {
+      "id": "woodelf.Willow",
+      "name": "Willow Rosebark",
+      "display_name": "Willow Rosebark",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 5,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "WR",
+      "skills": [
+        "Loner",
+        "Dauntless",
+        "Side Step",
+        "Thick Skull"
+      ],
+      "available_for": [
+        "Wood Elf"
+      ]
+    },
+    {
+      "id": "woodelf.Sidewinder",
+      "name": "Eldril Sidewinder",
+      "display_name": "Eldril Sidewinder",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 200000,
+      "ma": 8,
+      "st": 3,
+      "ag": 4,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "ES",
+      "skills": [
+        "Loner",
+        "Catch",
+        "Dodge",
+        "Hypnotic Gaze",
+        "Nerves of Steel",
+        "Pass Block"
+      ],
+      "available_for": [
+        "Wood Elf"
+      ]
+    },
+    {
+      "id": "woodelf.Morg",
+      "name": "Morg 'n' Thorg",
+      "display_name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": -1,
+      "av": 10,
+      "shorthand": "MT",
+      "skills": [
+        "Loner",
+        "Block",
+        "Mighty Blow",
+        "Thick Skull",
+        "Throw Team-Mate"
+      ],
+      "available_for": [
+        "Wood Elf"
+      ]
+    },
+    {
+      "id": "woodelf.Zara",
+      "name": "Zara the Slayer",
+      "display_name": "Zara the Slayer",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "ZS",
+      "skills": [
+        "Loner",
+        "Block",
+        "Dauntless",
+        "Dodge",
+        "Jump Up",
+        "Stab",
+        "Stakes"
+      ],
+      "available_for": [
+        "Wood Elf"
+      ]
+    },
+    {
+      "id": "woodelf.Jordell",
+      "name": "Jordell Freshbreeze",
+      "display_name": "Jordell Freshbreeze",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 260000,
+      "ma": 8,
+      "st": 3,
+      "ag": 5,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "JF",
+      "skills": [
+        "Loner",
+        "Block",
+        "Diving Catch",
+        "Dodge",
+        "Leap",
+        "Side Step"
+      ],
+      "available_for": [
+        "Wood Elf"
+      ]
+    }
+  ]
+}

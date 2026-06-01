@@ -1,0 +1,148 @@
+{
+  "id": "skaven.lrb6",
+  "name": "Skaven",
+  "reroll_cost": 60000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "skaven.ratogre",
+      "name": "Rat Ogre",
+      "display_name": "Rat Ogre",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 160000,
+      "ma": 6,
+      "st": 5,
+      "ag": 2,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+        "Loner",
+        "Frenzy",
+        "Mighty Blow",
+        "Prehensile Tail",
+        "Wild Animal"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "General",
+          "Agility",
+          "Passing",
+          "Mutation"
+        ]
+      }
+    },
+    {
+      "id": "skaven.blitzer",
+      "name": "Blitzer",
+      "display_name": "Blitzer",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 90000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 5,
+      "av": 8,
+      "skills": [
+        "Block"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Passing",
+          "Mutation"
+        ]
+      }
+    },
+    {
+      "id": "skaven.gutterrunner",
+      "name": "Gutter Runner",
+      "display_name": "Gutter Runner",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 80000,
+      "ma": 9,
+      "st": 2,
+      "ag": 4,
+      "pa": 4,
+      "av": 7,
+      "skills": [
+        "Dodge"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Passing",
+          "Strength",
+          "Mutation"
+        ]
+      }
+    },
+    {
+      "id": "skaven.thrower",
+      "name": "Thrower",
+      "display_name": "Thrower",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 70000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 2,
+      "av": 7,
+      "skills": [
+        "Pass",
+        "Sure Hands"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Passing"
+        ],
+        "double": [
+          "Agility",
+          "Strength",
+          "Mutation"
+        ]
+      }
+    },
+    {
+      "id": "skaven.lineman",
+      "name": "Lineman",
+      "display_name": "Lineman",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 50000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 7,
+      "skill_categories": {
+        "normal": [
+          "General"
+        ],
+        "double": [
+          "Agility",
+          "Strength",
+          "Passing",
+          "Mutation"
+        ]
+      }
+    }
+  ]
+}

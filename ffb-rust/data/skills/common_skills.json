@@ -1,0 +1,74 @@
+{
+  "edition": "common",
+  "skills": [
+    {
+      "class_name": "Block"
+    },
+    {
+      "class_name": "Catch"
+    },
+    {
+      "class_name": "Dauntless"
+    },
+    {
+      "class_name": "DisturbingPresence"
+    },
+    {
+      "class_name": "DivingCatch"
+    },
+    {
+      "class_name": "DumpOff"
+    },
+    {
+      "class_name": "ExtraArms"
+    },
+    {
+      "class_name": "Fend"
+    },
+    {
+      "class_name": "FoulAppearance"
+    },
+    {
+      "class_name": "HailMaryPass"
+    },
+    {
+      "class_name": "Horns"
+    },
+    {
+      "class_name": "JumpUp"
+    },
+    {
+      "class_name": "MovementIncrease"
+    },
+    {
+      "class_name": "Pass"
+    },
+    {
+      "class_name": "Sprint"
+    },
+    {
+      "class_name": "StandFirm"
+    },
+    {
+      "class_name": "StripBall"
+    },
+    {
+      "class_name": "SureHands"
+    },
+    {
+      "class_name": "Tackle"
+    },
+    {
+      "class_name": "Tentacles"
+    },
+    {
+      "class_name": "ThickSkull"
+    },
+    {
+      "class_name": "TwoHeads"
+    },
+    {
+      "class_name": "Wrestle"
+    }
+  ]
+}

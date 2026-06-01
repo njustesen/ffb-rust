@@ -1,0 +1,190 @@
+{
+  "edition": "bb2025",
+  "prayers": [
+    {
+      "roll": 1,
+      "id": "TREACHEROUS_TRAPDOOR",
+      "name": "Treacherous Trapdoor",
+      "description": "Trapdoors appear. On a roll of 1 a player stepping on them falls through them",
+      "duration": "UNTIL_END_OF_HALF",
+      "exhibition_legal": true,
+      "league_only": false
+    },
+    {
+      "roll": 2,
+      "id": "FRIENDS_WITH_THE_REF",
+      "name": "Friends with the Ref",
+      "description": "Argue the call succeeds on 5+",
+      "duration": "UNTIL_END_OF_GAME",
+      "exhibition_legal": true,
+      "league_only": false
+    },
+    {
+      "roll": 3,
+      "id": "STILETTO",
+      "name": "Stiletto",
+      "description": "One random player gains Stab",
+      "duration": "UNTIL_END_OF_GAME",
+      "exhibition_legal": false,
+      "league_only": true,
+      "grants_skill": "Stab"
+    },
+    {
+      "roll": 4,
+      "id": "IRON_MAN",
+      "name": "Iron Man",
+      "description": "One chosen player improves AV by 1 (Max 11+)",
+      "duration": "UNTIL_END_OF_GAME",
+      "exhibition_legal": false,
+      "league_only": true,
+      "effect": {
+        "stat": "AV",
+        "delta": 1
+      }
+    },
+    {
+      "roll": 5,
+      "id": "KNUCKLE_DUSTERS",
+      "name": "Knuckle Dusters",
+      "description": "One chosen player gains Mighty Blow (+1)",
+      "duration": "UNTIL_END_OF_GAME",
+      "exhibition_legal": false,
+      "league_only": true,
+      "grants_skill": "Mighty Blow"
+    },
+    {
+      "roll": 6,
+      "id": "BAD_HABITS",
+      "name": "Bad Habits",
+      "description": "D3 random opponent players gain Loner (2+)",
+      "duration": "UNTIL_END_OF_GAME",
+      "exhibition_legal": false,
+      "league_only": true,
+      "grants_skill": "Loner"
+    },
+    {
+      "roll": 7,
+      "id": "GREASY_CLEATS",
+      "name": "Greasy Cleats",
+      "description": "One random opponent has MA reduced by 1",
+      "duration": "UNTIL_END_OF_GAME",
+      "exhibition_legal": false,
+      "league_only": true,
+      "effect": {
+        "stat": "MA",
+        "delta": -1
+      }
+    },
+    {
+      "roll": 8,
+      "id": "BLESSING_OF_NUFFLE",
+      "name": "Blessing of Nuffle",
+      "description": "One random player gains Pro",
+      "duration": "UNTIL_END_OF_GAME",
+      "exhibition_legal": true,
+      "league_only": false,
+      "grants_skill": "Pro"
+    },
+    {
+      "roll": 9,
+      "id": "MOLES_UNDER_THE_PITCH",
+      "name": "Moles under the Pitch",
+      "description": "GFI rolls suffer a -1 modifier",
+      "duration": "UNTIL_END_OF_GAME",
+      "exhibition_legal": false,
+      "league_only": true,
+      "effect": {
+        "type": "GFI_MODIFIER",
+        "value": -1
+      }
+    },
+    {
+      "roll": 10,
+      "id": "PERFECT_PASSING",
+      "name": "Perfect Passing",
+      "description": "Successful completions gain 2 SPP",
+      "duration": "UNTIL_END_OF_GAME",
+      "exhibition_legal": false,
+      "league_only": true,
+      "effect": {
+        "type": "COMPLETION_SPP_BONUS",
+        "value": 1
+      }
+    },
+    {
+      "roll": 11,
+      "id": "DAZZLING_CATCHING",
+      "name": "Dazzling Catching",
+      "description": "Catches from passes gain 1 SPP",
+      "duration": "UNTIL_END_OF_GAME",
+      "exhibition_legal": false,
+      "league_only": true,
+      "effect": {
+        "type": "CATCH_SPP_BONUS",
+        "value": 1
+      }
+    },
+    {
+      "roll": 12,
+      "id": "FAN_INTERACTION",
+      "name": "Fan Interaction",
+      "description": "Crowd push casualties gain 2 SPP",
+      "duration": "UNTIL_END_OF_GAME",
+      "exhibition_legal": false,
+      "league_only": true,
+      "effect": {
+        "type": "CROWD_PUSH_CAS_SPP_BONUS",
+        "value": 1
+      }
+    },
+    {
+      "roll": 13,
+      "id": "FOULING_FRENZY",
+      "name": "Fouling Frenzy",
+      "description": "Foul casualties gain 2 SPP",
+      "duration": "UNTIL_END_OF_GAME",
+      "exhibition_legal": false,
+      "league_only": true,
+      "effect": {
+        "type": "FOUL_CAS_SPP_BONUS",
+        "value": 1
+      }
+    },
+    {
+      "roll": 14,
+      "id": "THROW_A_ROCK",
+      "name": "Throw a Rock",
+      "description": "Once per game, knock down an opponent on a 4+",
+      "duration": "UNTIL_END_OF_GAME",
+      "exhibition_legal": false,
+      "league_only": true,
+      "effect": {
+        "type": "THROW_A_ROCK"
+      }
+    },
+    {
+      "roll": 15,
+      "id": "UNDER_SCRUTINY",
+      "name": "Under Scrutiny",
+      "description": "Fouls are always spotted if the target's armour is broken",
+      "duration": "UNTIL_END_OF_GAME",
+      "exhibition_legal": false,
+      "league_only": true,
+      "effect": {
+        "type": "FOULS_ALWAYS_SPOTTED"
+      }
+    },
+    {
+      "roll": 16,
+      "id": "INTENSIVE_TRAINING",
+      "name": "Intensive Training",
+      "description": "A random player gains a primary skill",
+      "duration": "UNTIL_END_OF_GAME",
+      "exhibition_legal": false,
+      "league_only": true,
+      "effect": {
+        "type": "GAIN_PRIMARY_SKILL"
+      }
+    }
+  ]
+}

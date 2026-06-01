@@ -1,0 +1,144 @@
+{
+  "id": "undead.lrb6",
+  "name": "Undead",
+  "reroll_cost": 70000,
+  "max_rerolls": 8,
+  "apothecary": false,
+  "undead": true,
+  "necromancer": true,
+  "positions": [
+    {
+      "id": "undead.mummy",
+      "name": "Mummy",
+      "display_name": "Mummy",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 110000,
+      "ma": 3,
+      "st": 5,
+      "ag": 1,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+        "Mighty Blow",
+        "Regeneration"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "General",
+          "Agility",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "undead.wight",
+      "name": "Wight",
+      "display_name": "Wight",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 90000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 5,
+      "av": 8,
+      "skills": [
+        "Block",
+        "Regeneration"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "undead.ghoul",
+      "name": "Ghoul",
+      "display_name": "Ghoul",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 70000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 7,
+      "skills": [
+        "Dodge"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "undead.zombie",
+      "name": "Zombie",
+      "display_name": "Zombie",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 40000,
+      "ma": 4,
+      "st": 3,
+      "ag": 2,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+        "Regeneration"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General"
+        ],
+        "double": [
+          "Strength",
+          "Agility",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "undead.skeleton",
+      "name": "Skeleton",
+      "display_name": "Skeleton",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 30000,
+      "ma": 5,
+      "st": 3,
+      "ag": 2,
+      "pa": 6,
+      "av": 7,
+      "skills": [
+        "Regeneration"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General"
+        ],
+        "double": [
+          "Strength",
+          "Agility",
+          "Passing"
+        ]
+      }
+    }
+  ],
+  "raised_position_id": "undead.zombie"
+}

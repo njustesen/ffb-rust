@@ -1,0 +1,173 @@
+{
+  "edition": "bb2016",
+  "skills": [
+    {
+      "class_name": "Accurate"
+    },
+    {
+      "class_name": "AlwaysHungry"
+    },
+    {
+      "class_name": "Animosity"
+    },
+    {
+      "class_name": "ArmourIncrease"
+    },
+    {
+      "class_name": "BallAndChain"
+    },
+    {
+      "class_name": "BloodLust"
+    },
+    {
+      "class_name": "Bombardier"
+    },
+    {
+      "class_name": "BoneHead"
+    },
+    {
+      "class_name": "BreakTackle"
+    },
+    {
+      "class_name": "Chainsaw"
+    },
+    {
+      "class_name": "Claw"
+    },
+    {
+      "class_name": "Decay"
+    },
+    {
+      "class_name": "DirtyPlayer"
+    },
+    {
+      "class_name": "Disposable"
+    },
+    {
+      "class_name": "DivingTackle"
+    },
+    {
+      "class_name": "FanFavourite"
+    },
+    {
+      "class_name": "Frenzy"
+    },
+    {
+      "class_name": "Grab"
+    },
+    {
+      "class_name": "Guard"
+    },
+    {
+      "class_name": "HypnoticGaze"
+    },
+    {
+      "class_name": "KickOffReturn"
+    },
+    {
+      "class_name": "KickTeamMate"
+    },
+    {
+      "class_name": "Leap"
+    },
+    {
+      "class_name": "Loner"
+    },
+    {
+      "class_name": "MightyBlow"
+    },
+    {
+      "class_name": "MonstrousMouth"
+    },
+    {
+      "class_name": "MultipleBlock"
+    },
+    {
+      "class_name": "NervesOfSteel"
+    },
+    {
+      "class_name": "NoHands"
+    },
+    {
+      "class_name": "NurglesRot"
+    },
+    {
+      "class_name": "PassBlock"
+    },
+    {
+      "class_name": "PilingOn"
+    },
+    {
+      "class_name": "PrehensileTail"
+    },
+    {
+      "class_name": "ReallyStupid"
+    },
+    {
+      "class_name": "Regeneration"
+    },
+    {
+      "class_name": "RightStuff"
+    },
+    {
+      "class_name": "SafeThrow"
+    },
+    {
+      "class_name": "SecretWeapon"
+    },
+    {
+      "class_name": "Shadowing"
+    },
+    {
+      "class_name": "SideStep"
+    },
+    {
+      "class_name": "SneakyGit"
+    },
+    {
+      "class_name": "Stab"
+    },
+    {
+      "class_name": "Stakes"
+    },
+    {
+      "class_name": "StrengthIncrease"
+    },
+    {
+      "class_name": "StrongArm"
+    },
+    {
+      "class_name": "Stunty"
+    },
+    {
+      "class_name": "SureFeet"
+    },
+    {
+      "class_name": "Swarming"
+    },
+    {
+      "class_name": "Swoop"
+    },
+    {
+      "class_name": "TakeRoot"
+    },
+    {
+      "class_name": "ThrowTeamMate"
+    },
+    {
+      "class_name": "Timmmber"
+    },
+    {
+      "class_name": "Titchy"
+    },
+    {
+      "class_name": "VeryLongLegs"
+    },
+    {
+      "class_name": "WeepingDagger"
+    },
+    {
+      "class_name": "WildAnimal"
+    }
+  ]
+}

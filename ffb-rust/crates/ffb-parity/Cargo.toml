@@ -1,0 +1,23 @@
+[package]
+name = "ffb-parity"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "ffb-parity"
+path = "src/main.rs"
+
+[dependencies]
+ffb-model = { path = "../ffb-model" }
+ffb-mechanics = { path = "../ffb-mechanics" }
+ffb-engine = { path = "../ffb-engine" }
+ffb-protocol = { path = "../ffb-protocol" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand_xoshiro = { workspace = true }
+rand_core = { workspace = true }
+rand = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }

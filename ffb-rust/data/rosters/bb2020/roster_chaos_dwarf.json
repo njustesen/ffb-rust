@@ -1,0 +1,124 @@
+{
+  "id": "chaosdwarf.lrb6",
+  "name": "Chaos Dwarf",
+  "reroll_cost": 70000,
+  "max_rerolls": 8,
+  "apothecary": true,
+  "undead": false,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "chaosdwarf.hobgoblin",
+      "name": "Hobgoblin",
+      "display_name": "Hobgoblin",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 40000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 7,
+      "skill_categories": {
+        "normal": [
+          "General"
+        ],
+        "double": [
+          "Agility",
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "chaosdwarf.blocker",
+      "name": "Chaos Dwarf Blocker",
+      "display_name": "Chaos Dwarf Blocker",
+      "type": "Regular",
+      "quantity": 6,
+      "cost": 70000,
+      "ma": 4,
+      "st": 3,
+      "ag": 2,
+      "pa": 6,
+      "av": 9,
+      "skills": [
+        "Block",
+        "Tackle",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Passing",
+          "Mutation"
+        ]
+      }
+    },
+    {
+      "id": "chaosdwarf.bullcentaur",
+      "name": "Bull Centaur",
+      "display_name": "Bull Centaur",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 130000,
+      "ma": 6,
+      "st": 4,
+      "ag": 2,
+      "pa": 6,
+      "av": 9,
+      "skills": [
+        "Sprint",
+        "Sure Feet",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "chaosdwarf.minotaur",
+      "name": "Minotaur",
+      "display_name": "Minotaur",
+      "type": "Big Guy",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 5,
+      "st": 5,
+      "ag": 2,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+        "Loner",
+        "Frenzy",
+        "Horns",
+        "Mighty Blow",
+        "Thick Skull",
+        "Wild Animal"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "General",
+          "Agility",
+          "Passing",
+          "Mutation"
+        ]
+      }
+    }
+  ],
+  "name_generator": "default"
+}

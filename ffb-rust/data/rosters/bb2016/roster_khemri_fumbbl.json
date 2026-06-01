@@ -1,0 +1,130 @@
+{
+  "id": "55051",
+  "name": "Tomb Kings",
+  "reroll_cost": 70000,
+  "max_rerolls": 8,
+  "apothecary": false,
+  "undead": true,
+  "necromancer": false,
+  "positions": [
+    {
+      "id": "2893",
+      "name": "Anointed Thrower",
+      "display_name": "Anointed Thrower",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 70000,
+      "ma": 6,
+      "st": 3,
+      "ag": 2,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "T",
+      "undead": true,
+      "skills": [
+        "Pass",
+        "Regeneration",
+        "Sure Hands"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Passing"
+        ],
+        "double": [
+          "Agility",
+          "Strength"
+        ]
+      }
+    },
+    {
+      "id": "2892",
+      "name": "Skeleton Lineman",
+      "display_name": "Skeleton Lineman",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 40000,
+      "ma": 5,
+      "st": 3,
+      "ag": 2,
+      "pa": -1,
+      "av": 7,
+      "shorthand": "S",
+      "undead": true,
+      "skills": [
+        "Regeneration",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General"
+        ],
+        "double": [
+          "Agility",
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "2895",
+      "name": "Tomb Guardian",
+      "display_name": "Tomb Guardian",
+      "type": "Regular",
+      "quantity": 4,
+      "cost": 100000,
+      "ma": 4,
+      "st": 5,
+      "ag": 1,
+      "pa": -1,
+      "av": 9,
+      "shorthand": "TG",
+      "undead": true,
+      "skills": [
+        "Decay",
+        "Regeneration"
+      ],
+      "skill_categories": {
+        "normal": [
+          "Strength"
+        ],
+        "double": [
+          "General",
+          "Agility",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "2894",
+      "name": "Anointed Blitzer",
+      "display_name": "Anointed Blitzer",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 90000,
+      "ma": 6,
+      "st": 3,
+      "ag": 2,
+      "pa": -1,
+      "av": 8,
+      "shorthand": "B",
+      "undead": true,
+      "skills": [
+        "Block",
+        "Regeneration"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Passing"
+        ]
+      }
+    }
+  ],
+  "name_generator": "tombking",
+  "max_big_guys": 3
+}

@@ -1,0 +1,149 @@
+{
+  "id": "necromantic.lrb6",
+  "name": "Necromantic",
+  "reroll_cost": 70000,
+  "max_rerolls": 8,
+  "apothecary": false,
+  "undead": true,
+  "necromancer": true,
+  "positions": [
+    {
+      "id": "necromantic.werewolf",
+      "name": "Werewolf",
+      "display_name": "Werewolf",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 120000,
+      "ma": 8,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 8,
+      "skills": [
+        "Claw",
+        "Claws",
+        "Frenzy",
+        "Regeneration"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "necromantic.fleshgolem",
+      "name": "Flesh Golem",
+      "display_name": "Flesh Golem",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 110000,
+      "ma": 4,
+      "st": 4,
+      "ag": 2,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+        "Regeneration",
+        "Stand Firm",
+        "Thick Skull"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "necromantic.wight",
+      "name": "Wight",
+      "display_name": "Wight",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 90000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+        "Block",
+        "Regeneration"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Strength"
+        ],
+        "double": [
+          "Agility",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "necromantic.ghoul",
+      "name": "Ghoul",
+      "display_name": "Ghoul",
+      "type": "Regular",
+      "quantity": 2,
+      "cost": 70000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 4,
+      "av": 7,
+      "skills": [
+        "Dodge"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General",
+          "Agility"
+        ],
+        "double": [
+          "Strength",
+          "Passing"
+        ]
+      }
+    },
+    {
+      "id": "necromantic.zombie",
+      "name": "Zombie",
+      "display_name": "Zombie",
+      "type": "Regular",
+      "quantity": 16,
+      "cost": 30000,
+      "ma": 4,
+      "st": 3,
+      "ag": 2,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+        "Regeneration"
+      ],
+      "skill_categories": {
+        "normal": [
+          "General"
+        ],
+        "double": [
+          "Agility",
+          "Strength",
+          "Passing"
+        ]
+      }
+    }
+  ],
+  "name_generator": "default",
+  "raised_position_id": "necromantic.zombie"
+}
