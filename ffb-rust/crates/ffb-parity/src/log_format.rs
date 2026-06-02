@@ -23,6 +23,10 @@ pub enum LogLine {
         chosen: String,
         dice: Vec<serde_json::Value>,
         post_hash: String,
+        /// Full state string for human-readable diagnosis (Rust --verbose only; absent in Java logs).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default)]
+        state: Option<String>,
     },
     GameEnd {
         i: u64,
@@ -83,14 +87,24 @@ impl GameLog {
     }
 }
 
-/// Path of the Java-generated JSONL log for a given seed.
+/// Path of the Java-generated JSONL log for a given seed and matchup.
+/// Uses home+away roster names to avoid cross-race contamination when testing multiple races.
 pub fn java_log_path(seed: u64) -> String {
     format!("parity/seed_{seed}_java.jsonl")
 }
 
-/// Path of the Rust-generated JSONL log for a given seed.
+/// Path of the Rust-generated JSONL log for a given seed and matchup.
 pub fn rust_log_path(seed: u64) -> String {
     format!("parity/seed_{seed}_rust.jsonl")
+}
+
+/// Race-specific log paths — include home+away so multiple races don't overwrite each other.
+pub fn java_log_path_for(seed: u64, home: &str, away: &str) -> String {
+    format!("parity/{home}_vs_{away}/seed_{seed}_java.jsonl")
+}
+
+pub fn rust_log_path_for(seed: u64, home: &str, away: &str) -> String {
+    format!("parity/{home}_vs_{away}/seed_{seed}_rust.jsonl")
 }
 
 /// A minimal LogEntry type used by comparator for per-line diffs.
@@ -132,6 +146,7 @@ mod tests {
             chosen: "EndTurn".into(),
             dice: vec![],
             post_hash: "deadbeefdeadbeef".into(),
+            state: None,
         };
         let json = serde_json::to_string(&line).unwrap();
         assert!(json.contains("\"type\":\"step\""));

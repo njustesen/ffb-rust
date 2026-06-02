@@ -5,7 +5,7 @@ use ffb_model::model::team::Team;
 use ffb_model::model::turn_data::TurnData;
 use ffb_model::enums::{
     Rules, PlayerState, TurnMode, PlayerAction, BlockResult,
-    PS_STANDING, PS_RESERVE, PS_MOVING, PS_PRONE, PS_STUNNED, PS_KNOCKED_OUT, PS_BADLY_HURT, PS_SERIOUS_INJURY, PS_RIP, PS_EXHAUSTED,
+    PS_STANDING, PS_RESERVE, PS_MOVING, PS_PRONE, PS_STUNNED, PS_KNOCKED_OUT, PS_BADLY_HURT, PS_SERIOUS_INJURY, PS_RIP, PS_EXHAUSTED, PS_BANNED,
     SkillId, Weather, SeriousInjuryKind, InjuryAttribute, PlayerStatKey,
 };
 use ffb_model::events::GameEvent;
@@ -1363,16 +1363,16 @@ impl GameEngine {
                         self.game.home_playing = self.game.home_first_offense;
                         self.game.turn_mode = TurnMode::Setup;
                         self.setup_phase = 0;
-                        self.place_all_in_reserve();
+                        // Eject BEFORE place_all_in_reserve so ejected players end up
+                        // PS_BADLY_HURT (not overwritten to PS_RESERVE by place_all).
                         let sw_events = self.eject_secret_weapon_players();
                         events.extend(sw_events);
+                        self.place_all_in_reserve();
                     } else {
-                        // Game over — mirror Java's StepEndTurn which calls
-                        // putAllPlayersIntoBox (sets field players to RESERVE + clears coords)
-                        // and getFaintingCount (KO recovery dice) before game.setFinished.
-                        self.place_all_in_reserve();
+                        // Game over — eject before reserve so state is consistent.
                         let sw_events = self.eject_secret_weapon_players();
                         events.extend(sw_events);
+                        self.place_all_in_reserve();
                         self.game.turn_mode = TurnMode::EndGame;
                         self.game.status = ffb_model::enums::GameStatus::Finished;
                         // Emit WinningsRoll for each team: base = fan_factor * 10k, roll = D6
@@ -3658,7 +3658,10 @@ impl GameEngine {
     /// Place all players of `home` (true) or away (false) team in a canonical formation.
     /// Matches Java ParityRunner.placeReserves() exactly (canonical squares + transform for away).
     fn place_team_canonical(&mut self, home: bool) {
-        // Sort players by jersey number (nr), cap at 11 — matches Java
+        // Sort players by jersey number (nr), cap at 11 — matches Java.
+        // Only place players who are in PS_RESERVE (healthy, available for setup).
+        // Players in PS_BADLY_HURT / PS_SERIOUS_INJURY / PS_RIP / PS_KNOCKED_OUT
+        // stay in their respective dugout boxes and are NOT placed on the pitch.
         let mut players: Vec<(String, i32)> = if home {
             self.game.team_home.players.iter().map(|p| (p.id.clone(), p.nr)).collect()
         } else {
@@ -3666,28 +3669,32 @@ impl GameEngine {
         };
         players.sort_by_key(|&(_, nr)| nr);
         players.truncate(11);
-
         // Canonical home-perspective squares (mirror of Java's placeReserves)
         // LOS: first 3 players on line of scrimmage (x=12)
         // Overflow: remaining players
         let los: &[(i32, i32)] = &[(12,7),(12,6),(12,8),(12,5),(12,9),(12,4),(12,10)];
         let overflow: &[(i32, i32)] = &[(5,5),(5,7),(5,9),(6,6),(6,8),(4,6),(4,8),(3,6),(3,8),(2,5),(2,9),(1,7)];
 
-        let n = players.len();
-        let los_needed = if n >= 3 { 3 } else { n };
+        // Compact placement: available players fill canonical slots from slot 0 upward,
+        // skipping ejected/injured/KO'd players (they are not placed). This matches Java's
+        // placeReserves() which iterates Reserve players in jersey order and places them
+        // at consecutive LOS/overflow squares.
+        let available: Vec<&(String, i32)> = players.iter().filter(|(pid, _)| {
+            match self.game.field_model.player_state(pid) {
+                None => true,  // No state = available (game start before first H1 setup)
+                Some(s) => s.base() == PS_RESERVE,
+            }
+        }).collect();
 
-        let mut los_placed = 0usize;
-        let mut ovf_placed = 0usize;
+        let n_avail = available.len();
+        let los_needed = if n_avail >= 3 { 3 } else { n_avail };
 
-        for (pid, _) in &players {
-            let (ox, oy) = if los_placed < los_needed {
-                let sq = los[los_placed];
-                los_placed += 1;
-                sq
+        for (placed, (pid, _)) in available.iter().enumerate() {
+            let (ox, oy) = if placed < los_needed {
+                los[placed]
             } else {
-                let sq = overflow[ovf_placed];
-                ovf_placed += 1;
-                sq
+                let ovf_idx = placed - los_needed;
+                if ovf_idx < overflow.len() { overflow[ovf_idx] } else { continue }
             };
 
             // For away team, transform: x_away = 25 - ox, y = oy
@@ -11799,6 +11806,11 @@ impl GameEngine {
                 .unwrap_or(PlayerState::new(PS_RESERVE));
             // Dead players stay dead
             if state.base() == PS_RIP { continue; }
+            // Permanently injured/dead players: leave them in their box.
+            if state.base() == PS_BADLY_HURT || state.base() == PS_SERIOUS_INJURY { continue; }
+            // Note: PS_BANNED players (sent off for Secret Weapon) DO come back for the next
+            // drive's setup in Blood Bowl — they are NOT permanently removed. Fall through to
+            // the normal Reserve placement below.
             // Exhausted players (SwelteringHeat): move off pitch preserving EXHAUSTED state
             if state.base() == PS_EXHAUSTED {
                 self.game.field_model.player_coordinates.remove(pid.as_str());
@@ -11855,34 +11867,117 @@ impl GameEngine {
     }
 
     fn eject_secret_weapon_players(&mut self) -> Vec<GameEvent> {
+        use std::collections::HashSet as SWHashSet;
         let mut events = Vec::new();
         // Clear any card-applied temporary skills at drive end.
         let card_events = self.clear_card_temporary_skills();
         events.extend(card_events);
-        // Build (id, is_home) pairs for SecretWeapon players
-        let sw_ids: Vec<(String, bool)> = self.game.team_home.players.iter()
-            .filter(|p| p.has_skill(SkillId::SecretWeapon))
-            .map(|p| (p.id.clone(), true))
-            .chain(self.game.team_away.players.iter()
-                .filter(|p| p.has_skill(SkillId::SecretWeapon))
-                .map(|p| (p.id.clone(), false)))
-            .collect();
-        for (pid, is_home) in &sw_ids {
-            // IllBeBack: skip first ejection (once per game — Regular, cleared at turn end)
-            let ill_be_back = if *is_home {
-                self.game.team_home.player(pid)
-            } else {
-                self.game.team_away.player(pid)
-            }.map(|p| p.has_skill(SkillId::IllBeBack) && !p.used_skills.contains(&SkillId::IllBeBack)).unwrap_or(false);
-            if ill_be_back {
-                if *is_home { if let Some(p) = self.game.team_home.player_mut(pid) { p.used_skills.insert(SkillId::IllBeBack); } }
-                else if let Some(p) = self.game.team_away.player_mut(pid) { p.used_skills.insert(SkillId::IllBeBack); }
-                events.push(GameEvent::SkillUse { player_id: pid.clone(), skill_id: SkillId::IllBeBack as u16, used: true });
-                continue;
+
+        // Java's reportSecretWeaponsUsed(): for SW players with penalty > 0 (Stunty Leeg-style),
+        // roll 2d6 BEFORE the argue phase. HOME team first (nr sorted), then AWAY (nr sorted).
+        // Players that roll BELOW penalty escape ejection (sw_penalty_exempt); all others stay.
+        // This consumes game RNG dice matching Java's StepEndTurn.reportSecretWeaponsUsed().
+        let mut sw_penalty_exempt: SWHashSet<String> = SWHashSet::new();
+        {
+            let sw_penalty = |p: &ffb_model::model::player::Player| -> i32 {
+                p.starting_skills.iter()
+                    .find(|s| s.skill_id == SkillId::SecretWeapon)
+                    .and_then(|s| s.value.as_ref())
+                    .and_then(|v| v.parse::<i32>().ok())
+                    .unwrap_or(0)
+            };
+            // Collect: home (nr sorted) then away (nr sorted), only those with penalty > 0
+            let mut penalty_players: Vec<(String, i32)> = Vec::new();
+            {
+                let mut home_sw: Vec<(i32, String, i32)> = self.game.team_home.players.iter()
+                    .filter(|p| p.has_skill(SkillId::SecretWeapon))
+                    .map(|p| (p.nr, p.id.clone(), sw_penalty(p)))
+                    .filter(|&(_, _, pen)| pen > 0)
+                    .collect();
+                home_sw.sort_by_key(|&(nr, _, _)| nr);
+                penalty_players.extend(home_sw.into_iter().map(|(_, id, pen)| (id, pen)));
             }
-            let state = self.game.field_model.player_state(pid).unwrap_or(PlayerState::new(PS_RESERVE));
-            if state.base() != PS_RIP {
-                self.game.field_model.set_player_state(pid, PlayerState::new(PS_RESERVE));
+            {
+                let mut away_sw: Vec<(i32, String, i32)> = self.game.team_away.players.iter()
+                    .filter(|p| p.has_skill(SkillId::SecretWeapon))
+                    .map(|p| (p.nr, p.id.clone(), sw_penalty(p)))
+                    .filter(|&(_, _, pen)| pen > 0)
+                    .collect();
+                away_sw.sort_by_key(|&(nr, _, _)| nr);
+                penalty_players.extend(away_sw.into_iter().map(|(_, id, pen)| (id, pen)));
+            }
+            for (pid, penalty) in penalty_players {
+                let total = self.rng.d6_two();
+                if total < penalty {
+                    // Rolled below penalty: player escapes ejection (like a successful Stunty Leeg check)
+                    sw_penalty_exempt.insert(pid);
+                }
+                // If total >= penalty: stays in the ejection list (will be argued and/or ejected)
+            }
+        }
+
+        // Collect SW player IDs per team sorted by jersey number (matching Java's order).
+        // AWAY first to match Java's StepEndTurn: askForArgueTheCall(away) before home.
+        let sw_away: Vec<String> = {
+            let mut v: Vec<(i32, String)> = self.game.team_away.players.iter()
+                .filter(|p| p.has_skill(SkillId::SecretWeapon) && !sw_penalty_exempt.contains(&p.id))
+                .map(|p| (p.nr, p.id.clone())).collect();
+            v.sort_by_key(|&(nr, _)| nr);
+            v.into_iter().map(|(_, id)| id).collect()
+        };
+        let sw_home: Vec<String> = {
+            let mut v: Vec<(i32, String)> = self.game.team_home.players.iter()
+                .filter(|p| p.has_skill(SkillId::SecretWeapon) && !sw_penalty_exempt.contains(&p.id))
+                .map(|p| (p.nr, p.id.clone())).collect();
+            v.sort_by_key(|&(nr, _)| nr);
+            v.into_iter().map(|(_, id)| id).collect()
+        };
+
+        // Process each team's SW players with the Argue the Call mechanic.
+        // Java: DiceInterpreter.isArgueTheCallSuccessful(roll) = roll > 5 (d6=6 only reverses).
+        //       DiceInterpreter.isCoachBanned(roll) = roll < 2 (d6=1 → coach banned).
+        // When coach is banned: NO more argue dice for remaining players (loop continues but skips roll).
+        for (sw_team, is_home) in [(&sw_away, false), (&sw_home, true)] {
+            let mut coach_banned = false;
+            for pid in sw_team {
+                // IllBeBack: skip first ejection (once per game)
+                let ill_be_back = if is_home {
+                    self.game.team_home.player(pid)
+                } else {
+                    self.game.team_away.player(pid)
+                }.map(|p| p.has_skill(SkillId::IllBeBack) && !p.used_skills.contains(&SkillId::IllBeBack)).unwrap_or(false);
+                if ill_be_back {
+                    if is_home { if let Some(p) = self.game.team_home.player_mut(pid) { p.used_skills.insert(SkillId::IllBeBack); } }
+                    else if let Some(p) = self.game.team_away.player_mut(pid) { p.used_skills.insert(SkillId::IllBeBack); }
+                    events.push(GameEvent::SkillUse { player_id: pid.clone(), skill_id: SkillId::IllBeBack as u16, used: true });
+                    continue;
+                }
+
+                let state = self.game.field_model.player_state(pid).unwrap_or(PlayerState::new(PS_RESERVE));
+                if state.base() != PS_STANDING || state.base() == PS_RIP {
+                    continue; // Only process Standing players
+                }
+
+                if coach_banned {
+                    // No argue dice: coach already banned. Ejection still proceeds.
+                    self.game.field_model.set_player_state(pid, PlayerState::new(PS_BANNED));
+                    self.game.field_model.player_coordinates.remove(pid.as_str());
+                    events.push(GameEvent::SecretWeaponBan { player_id: pid.clone() });
+                    continue;
+                }
+
+                // Argue the Call: roll d6 (matches Java's DiceRoller.rollArgueTheCall() = rollDice(6)).
+                let argue_roll = self.rng.d6();
+                if argue_roll > 5 {
+                    // d6=6: argue succeeded, ejection reversed. Player stays on field.
+                    continue;
+                }
+                if argue_roll < 2 {
+                    // d6=1: coach is banned for the rest of this team's argues.
+                    coach_banned = true;
+                }
+                // d6=1-5: ejection proceeds. PS_BANNED = "Reserve" in state hash (matches Java).
+                self.game.field_model.set_player_state(pid, PlayerState::new(PS_BANNED));
                 self.game.field_model.player_coordinates.remove(pid.as_str());
                 events.push(GameEvent::SecretWeaponBan { player_id: pid.clone() });
             }
@@ -11898,7 +11993,7 @@ impl GameEngine {
         for (pid, _) in &kp_ids {
             let state = self.game.field_model.player_state(pid).unwrap_or(PlayerState::new(PS_RESERVE));
             if state.base() != PS_RIP {
-                self.game.field_model.set_player_state(pid, PlayerState::new(PS_RESERVE));
+                self.game.field_model.set_player_state(pid, PlayerState::new(PS_BADLY_HURT));
                 self.game.field_model.player_coordinates.remove(pid.as_str());
                 events.push(GameEvent::SecretWeaponBan { player_id: pid.clone() });
             }

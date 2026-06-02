@@ -1,4 +1,4 @@
-use crate::log_format::{GameLog, LogEntry, LogLine, java_log_path, rust_log_path};
+use crate::log_format::{GameLog, LogEntry, LogLine, java_log_path_for, rust_log_path_for};
 
 /// Result of comparing a Java log against a Rust log for one seed.
 #[derive(Debug)]
@@ -14,13 +14,13 @@ pub struct CompareResult {
     pub rust_hash: String,
 }
 
-/// Compare the Java and Rust parity JSONL logs for `seed`.
+/// Compare the Java and Rust parity JSONL logs for `seed` and a specific matchup.
 ///
 /// Reads both log files from disk. Returns a `CompareResult` describing the
 /// outcome. If either file is missing, the result is a failure.
-pub fn compare_logs(seed: u64) -> CompareResult {
-    let java_path = java_log_path(seed);
-    let rust_path = rust_log_path(seed);
+pub fn compare_logs(seed: u64, home: &str, away: &str) -> CompareResult {
+    let java_path = java_log_path_for(seed, home, away);
+    let rust_path = rust_log_path_for(seed, home, away);
 
     let java_lines = match GameLog::read_from_file(&java_path) {
         Ok(l) => l,

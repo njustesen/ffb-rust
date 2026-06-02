@@ -8,50 +8,113 @@ mod state_hash;
 use rand_xoshiro::Xoshiro256StarStar;
 use rand::{RngCore, SeedableRng};
 
+/// Parsed CLI arguments for the parity runner.
+struct ParityArgs {
+    network: bool,
+    home: String,
+    home_java: String,
+    away: String,
+    away_java: String,
+    edition: String,
+    seed_start: u64,
+    seed_end: u64,
+    no_abort: bool,
+    verbose: bool,
+}
+
+impl ParityArgs {
+    fn parse() -> Self {
+        let raw: Vec<String> = std::env::args().skip(1).collect();
+        let mut home = "lineman".to_string();
+        let mut away = "lineman".to_string();
+        let mut edition = "bb2025".to_string();
+        let mut seed_start = 1u64;
+        let mut seed_end = 100u64;
+        let mut network = false;
+        let mut no_abort = false;
+        let mut verbose = false;
+
+        let mut i = 0;
+        while i < raw.len() {
+            match raw[i].as_str() {
+                "--network" => network = true,
+                "--no-abort" => no_abort = true,
+                "--verbose" => verbose = true,
+                "--home" if i + 1 < raw.len() => { home = raw[i + 1].clone(); i += 1; }
+                "--away" if i + 1 < raw.len() => { away = raw[i + 1].clone(); i += 1; }
+                "--edition" if i + 1 < raw.len() => { edition = raw[i + 1].clone(); i += 1; }
+                "--seeds" if i + 1 < raw.len() => {
+                    let s = &raw[i + 1];
+                    if let Some(dash) = s.find('-') {
+                        seed_start = s[..dash].parse().unwrap_or(1);
+                        seed_end   = s[dash+1..].parse().unwrap_or(100);
+                    } else {
+                        seed_end = s.parse().unwrap_or(100);
+                    }
+                    i += 1;
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+
+        let home_java = runner::java_team_id(&home, "home");
+        let away_java = runner::java_team_id(&away, "away");
+
+        ParityArgs { network, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose }
+    }
+}
+
 fn main() {
     env_logger::init();
 
-    let args: Vec<String> = std::env::args().collect();
-    if args.iter().any(|a| a == "--network") {
+    let args = ParityArgs::parse();
+
+    if args.network {
         println!("Running network integration test...");
         network_test::run();
         return;
     }
 
+    let total = args.seed_end - args.seed_start + 1;
     let mut passed = 0u64;
-    for seed in 1u64..=100 {
-        let (home_roster, away_roster) = pick_teams(seed);
-        println!("Seed {seed}: {home_roster} vs {away_roster}");
+    let mut failed = 0u64;
 
-        runner::run_java_headless(seed, &home_roster, &away_roster);
-        runner::run_rust_headless(seed, &home_roster, &away_roster);
-        let result = comparator::compare_logs(seed);
-        update_progress::update(seed, &home_roster, &away_roster, &result);
+    for seed in args.seed_start..=args.seed_end {
+        println!("Seed {seed}: {} vs {} ({})", args.home, args.away, args.edition);
 
-        if !result.matches {
+        runner::run_java_headless(seed, &args.home_java, &args.away_java, &args.home, &args.away);
+        runner::run_rust_headless(seed, &args.home, &args.away, &args.edition, args.verbose);
+        let result = comparator::compare_logs(seed, &args.home, &args.away);
+        update_progress::update(seed, &args.home, &args.away, &result);
+
+        if result.matches {
+            passed += 1;
+            println!("✓ seed {seed} ({} vs {}) — {passed}/{total}", args.home, args.away);
+        } else {
+            failed += 1;
             eprintln!(
                 "PARITY FAIL seed={seed} ({} vs {}), step {}: java={:?} rust={:?}",
-                home_roster, away_roster,
+                args.home, args.away,
                 result.divergence_index,
                 result.java_event,
                 result.rust_event,
             );
             eprintln!("  java_hash={}", result.java_hash);
             eprintln!("  rust_hash={}", result.rust_hash);
-            eprintln!("→ Enter TDD loop: write Java test, Rust test, fix, restart from seed 1");
-            std::process::exit(1);
+            if !args.no_abort {
+                eprintln!("→ Enter TDD loop: write Java test, Rust test, fix, restart from seed 1");
+                std::process::exit(1);
+            }
         }
-        passed += 1;
-        println!("✓ seed {seed} ({} vs {}) — {passed}/100", home_roster, away_roster);
     }
-    println!("PARITY: 100/100 games match.");
-}
 
-/// Pick two teams for parity testing.
-/// Uses identical generic lineman teams so that Java and Rust simulate exactly the same players
-/// (same stats, fan_factor=5, no skills, jersey-ordered players 1..=11).
-fn pick_teams(_seed: u64) -> (String, String) {
-    ("teamLinemanParityHome".to_string(), "teamLinemanParityAway".to_string())
+    if failed == 0 {
+        println!("PARITY: {passed}/{total} games match.");
+    } else {
+        eprintln!("PARITY: {passed}/{total} passed, {failed} FAILED.");
+        std::process::exit(1);
+    }
 }
 
 /// Diagnostic: run seed=1 (BB2025) and print state string at each step boundary.

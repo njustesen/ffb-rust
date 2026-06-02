@@ -1,14 +1,21 @@
+use std::collections::HashSet;
 use std::process::Command;
 use rand_xoshiro::Xoshiro256StarStar;
 use rand_core::{RngCore, SeedableRng};
 use ffb_engine::agent::response_to_action_pub;
 use ffb_engine::engine::GameEngine;
 use ffb_engine::legal_actions::TeamSide;
-use ffb_model::enums::Rules;
+use ffb_model::data::roster_json::{PositionJson, SkillEntry};
+use ffb_model::data::{bb2016_rosters, bb2020_rosters, bb2025_rosters};
+use ffb_model::enums::{PlayerGender, PlayerType, Rules, SkillCategory};
+use ffb_model::enums::SkillId;
+use ffb_model::model::player::Player;
+use ffb_model::model::roster_position::RosterPosition;
+use ffb_model::model::skill_def::SkillWithValue;
 use ffb_model::model::team::Team;
 use ffb_model::prompts::{AgentPrompt, AgentResponse};
 use ffb_model::types::FieldCoordinate;
-use crate::log_format::{GameLog, LogLine, rust_log_path};
+use crate::log_format::{GameLog, LogLine, java_log_path_for, rust_log_path_for};
 use crate::state_hash::state_hash;
 use ffb_model::util::state_hash::state_string;
 
@@ -72,6 +79,26 @@ impl ParityAgent {
             // empty player_id. Matches Java's ParityRunner which skips optional player selection.
             AgentPrompt::PlayerChoice { .. } => AgentResponse::PlayerChoice { player_id: String::new() },
             AgentPrompt::KickoffReturn { .. } => AgentResponse::PlayerChoice { player_id: String::new() },
+
+            // ── Inducements ─────────────────────────────────────────────────────
+            // Java RandomStrategy sends empty inducement set for all buy prompts.
+            AgentPrompt::BuyInducements { .. } | AgentPrompt::BuyPrayersAndInducements { .. } => {
+                AgentResponse::BuyInducements { purchases: vec![] }
+            }
+            // PettyCash / Journeymen: just confirm (accept without consuming RNG).
+            AgentPrompt::PettyCash { .. } | AgentPrompt::Journeymen { .. } => AgentResponse::Confirm,
+            // UseInducement: always confirm (use it). Java returns null = decline.
+            AgentPrompt::UseInducement { .. } => AgentResponse::Confirm,
+            // WizardSpell: decline by confirming (Java also declines).
+            AgentPrompt::WizardSpell { .. } => AgentResponse::Confirm,
+            // ArgueTheCall: decline. Java uses RANDOM but we mirror the Java ParityRunner
+            // default, which passes null → decline.
+            AgentPrompt::ArgueTheCall { .. } => AgentResponse::UseReRoll { use_reroll: false },
+            // BriberyAndCorruption: decline bribe. Java returns null = decline.
+            AgentPrompt::BriberyAndCorruption { .. } => AgentResponse::UseBribe { use_bribe: false },
+            // ConcedeGame: never concede.
+            AgentPrompt::ConcedeGame { .. } => AgentResponse::UseReRoll { use_reroll: false },
+
             _ => AgentResponse::Confirm,
         }
     }
@@ -84,10 +111,12 @@ impl ParityAgent {
 ///   PARITY_CP  — Java classpath (default: scans for ffb-ai fat jar)
 ///   FFB_SERVER_DIR — path to the ffb-server directory
 /// Writes `parity/seed_{seed}_java.jsonl`.
-pub fn run_java_headless(seed: u64, home_team_id: &str, away_team_id: &str) {
-    std::fs::create_dir_all("parity").ok();
-
-    let output_path = format!("parity/seed_{seed}_java.jsonl");
+/// `home_team_id` / `away_team_id` are Java server team IDs (e.g. "teamHumanKalimar").
+/// `home_race` / `away_race` are the Rust race names used for the output directory.
+pub fn run_java_headless(seed: u64, home_team_id: &str, away_team_id: &str, home_race: &str, away_race: &str) {
+    let output_path = java_log_path_for(seed, home_race, away_race);
+    let dir = std::path::Path::new(&output_path).parent().unwrap_or(std::path::Path::new("parity"));
+    std::fs::create_dir_all(dir).ok();
 
     let cp = std::env::var("PARITY_CP").unwrap_or_else(|_| {
         let candidates = [
@@ -146,21 +175,27 @@ pub fn run_java_headless(seed: u64, home_team_id: &str, away_team_id: &str) {
 ///   - game_start line with initial state_hash
 ///   - one step line per INIT_SELECTING decision point (turn >= 1)
 ///   - game_end line with final scores and state_hash
-pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str) -> Vec<LogLine> {
-    std::fs::create_dir_all("parity").ok();
+/// `home_roster` / `away_roster` are race names (e.g. "human") or "lineman" for the generic team.
+/// `edition` is "bb2016", "bb2020", or "bb2025".
+/// `verbose`: when true, each Step entry includes the full `state` string for per-player diagnosis.
+pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, edition: &str, verbose: bool) -> Vec<LogLine> {
+    let rust_path = rust_log_path_for(seed, home_roster, away_roster);
+    let dir = std::path::Path::new(&rust_path).parent().unwrap_or(std::path::Path::new("parity"));
+    std::fs::create_dir_all(dir).ok();
 
-    let home = make_team("home", home_roster);
-    let away = make_team("away", away_roster);
+    let rules = edition_to_rules(edition);
+    let home = make_team(home_roster, "home", edition);
+    let away = make_team(away_roster, "away", edition);
 
-    let mut engine = GameEngine::new(home, away, Rules::Bb2025, seed);
+    let mut engine = GameEngine::new(home, away, rules, seed);
     let mut agent = ParityAgent::new(seed);
 
     let initial_hash = state_hash(&engine.game);
     let mut lines: Vec<LogLine> = Vec::new();
     lines.push(LogLine::GameStart {
         i: 0,
-        home: format!("home_{home_roster}"),
-        away: format!("away_{away_roster}"),
+        home: home_roster.to_string(),
+        away: away_roster.to_string(),
         seed,
         state_hash: initial_hash,
     });
@@ -193,9 +228,13 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str) -> Vec
         let active_str = if engine.game.home_playing { "home" } else { "away" };
         let chosen = response_chosen_str(&response);
 
-        // Debug: print pre-action state string for seed 57 and seed 88
-        let pre_string = if (seed == 57 || seed == 88) && is_turn_boundary && turn_nr >= 1 {
-            Some(state_string(&engine.game))
+        // Capture state string if verbose or if debug seed
+        let pre_state_str = if is_turn_boundary && turn_nr >= 1 {
+            if verbose || seed == 57 || seed == 88 {
+                Some(state_string(&engine.game))
+            } else {
+                None
+            }
         } else {
             None
         };
@@ -209,9 +248,9 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str) -> Vec
             }
         }
 
-        if let Some(s) = pre_string {
+        if (seed == 57 || seed == 88) && is_turn_boundary && turn_nr >= 1 {
             eprintln!("RUST_STATE_STR step={step_index} half={half} turn={turn_nr} active={active_str} hash={pre_hash}");
-            eprintln!("  {s}");
+            if let Some(ref s) = pre_state_str { eprintln!("  {s}"); }
         }
 
         // Log one step line per INIT_SELECTING decision (turn >= 1)
@@ -223,6 +262,7 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str) -> Vec
                 active: active_str.to_string(),
                 hash: pre_hash,
                 chosen,
+                state: pre_state_str,
             });
             step_index += 1;
         }
@@ -248,6 +288,7 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str) -> Vec
             chosen: s.chosen.clone(),
             dice: vec![],
             post_hash,
+            state: s.state.clone(),
         });
     }
 
@@ -261,14 +302,13 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str) -> Vec
     });
 
     // Write to disk
-    let path = rust_log_path(seed);
     let log = GameLog {
         seed,
         home_roster: home_roster.to_string(),
         away_roster: away_roster.to_string(),
         lines: lines.clone(),
     };
-    if let Err(e) = log.write_to_file(&path) {
+    if let Err(e) = log.write_to_file(&rust_path) {
         log::warn!("Could not write Rust log for seed {seed}: {e}");
     }
 
@@ -284,13 +324,26 @@ struct PendingStep {
     active: String,
     hash: String,
     chosen: String,
+    state: Option<String>,
 }
 
-fn make_team(side: &str, roster_id: &str) -> Team {
-    use std::collections::HashSet;
-    use ffb_model::model::player::Player;
-    use ffb_model::enums::{PlayerType, PlayerGender};
+/// Build a team. `roster_name` is "lineman" (generic) or a race name like "human".
+/// `side` is "home" or "away" (used for player IDs). `edition` is "bb2016"/"bb2020"/"bb2025".
+fn make_team(roster_name: &str, side: &str, edition: &str) -> Team {
+    if roster_name == "lineman"
+        || roster_name == "teamLinemanParityHome"
+        || roster_name == "teamLinemanParityAway"
+    {
+        return make_lineman_team(side, roster_name);
+    }
+    make_team_from_roster(roster_name, side, edition)
+        .unwrap_or_else(|e| {
+            log::warn!("Could not load roster '{roster_name}': {e}; falling back to lineman");
+            make_lineman_team(side, roster_name)
+        })
+}
 
+fn make_lineman_team(side: &str, roster_id: &str) -> Team {
     let players: Vec<Player> = (1..=11).map(|nr| Player {
         id: format!("{side}_{nr:02}"),
         name: format!("{side} Player {nr}"),
@@ -334,6 +387,160 @@ fn make_team(side: &str, roster_id: &str) -> Team {
         special_rules: vec![],
         players,
     }
+}
+
+/// Build a 11-player team from a named roster (e.g. "human", "orc") for the given edition.
+/// Positions are filled in roster order up to 11 players, respecting each position's max quantity.
+pub fn make_team_from_roster(roster_name: &str, side: &str, edition: &str) -> Result<Team, String> {
+    let rosters = match edition {
+        "bb2016" => bb2016_rosters(),
+        "bb2020" => bb2020_rosters(),
+        "bb2025" | _ => bb2025_rosters(),
+    };
+
+    let roster_json = rosters
+        .into_iter()
+        .find(|r| {
+            r.name.to_ascii_lowercase() == roster_name.to_ascii_lowercase()
+                || r.id.to_ascii_lowercase().starts_with(&format!("{}.", roster_name.to_ascii_lowercase()))
+                || r.id.to_ascii_lowercase() == roster_name.to_ascii_lowercase()
+        })
+        .ok_or_else(|| format!("roster '{}' not found in edition '{}'", roster_name, edition))?;
+
+    // Sort positions by (quantity ASC, cost DESC) — premium/limited positions first,
+    // cheap/abundant filler (linemen) last. Matches gen_java_teams.py's sort order so
+    // both engines build the exact same 11-player composition.
+    let mut non_star: Vec<&PositionJson> = roster_json.positions.iter()
+        .filter(|p| p.player_type != "Star" && p.player_type != "Infamous Staff" && p.quantity > 0)
+        .collect();
+    non_star.sort_by_key(|p| (p.quantity, -(p.cost)));
+
+    let mut players: Vec<Player> = Vec::new();
+    let mut nr = 1i32;
+
+    'outer: for pos_json in &non_star {
+        let rp = position_json_to_roster_position(pos_json, &roster_json.id, roster_json.undead);
+        let max_this = pos_json.quantity.min(11 - players.len() as i32);
+        for _ in 0..max_this {
+            if players.len() >= 11 {
+                break 'outer;
+            }
+            let player = Player::from_position(
+                format!("{side}_{nr:02}"),
+                format!("{} {} {nr}", side, rp.name),
+                nr,
+                &rp,
+            );
+            players.push(player);
+            nr += 1;
+        }
+    }
+
+    if players.is_empty() {
+        return Err(format!("roster '{}' has no non-star positions", roster_name));
+    }
+
+    let team_value: i32 = players.iter()
+        .zip(non_star.iter().flat_map(|p| std::iter::repeat(p.cost).take(p.quantity as usize)))
+        .map(|(_, cost)| cost)
+        .sum();
+
+    Ok(Team {
+        id: format!("{side}_{}", roster_json.id),
+        name: format!("{} {}", side, roster_json.name),
+        race: roster_json.name.clone(),
+        roster_id: roster_json.id.clone(),
+        coach: format!("Coach_{side}"),
+        rerolls: 3,
+        apothecaries: if roster_json.apothecary { 1 } else { 0 },
+        bribes: 0,
+        master_chefs: 0,
+        prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+        cheerleaders: 0,
+        assistant_coaches: 0,
+        fan_factor: 0,
+        dedicated_fans: 0,
+        team_value,
+        treasury: 0,
+        special_rules: roster_json.special_rules.clone(),
+        players,
+    })
+}
+
+fn position_json_to_roster_position(pos: &PositionJson, roster_id: &str, is_undead: bool) -> RosterPosition {
+    let skills: Vec<SkillWithValue> = pos.skills.iter()
+        .filter_map(|e| skill_entry_to_skill_with_value(e))
+        .collect();
+    let cats_normal: Vec<SkillCategory> = pos.skill_categories.normal.iter()
+        .filter_map(|s| SkillCategory::from_name(s))
+        .collect();
+    let cats_double: Vec<SkillCategory> = pos.skill_categories.double.iter()
+        .filter_map(|s| SkillCategory::from_name(s))
+        .collect();
+    let player_type = PlayerType::from_name(&pos.player_type)
+        .unwrap_or(PlayerType::Regular);
+    let is_big_guy = player_type == PlayerType::BigGuy
+        || pos.keywords.iter().any(|k| k == "Big Guy");
+
+    RosterPosition {
+        id: pos.id.clone(),
+        name: pos.name.clone(),
+        display_name: pos.display_name.clone(),
+        shorthand: None,
+        player_type,
+        gender: PlayerGender::Male,
+        quantity: pos.quantity,
+        cost: pos.cost,
+        movement: pos.ma,
+        strength: pos.st,
+        agility: pos.ag,
+        passing: pos.pa,
+        armour: pos.av,
+        skills,
+        skill_categories_normal: cats_normal,
+        skill_categories_double: cats_double,
+        keywords: pos.keywords.clone(),
+        is_big_guy,
+        is_undead,
+        is_thrall: false,
+        race: Some(roster_id.to_string()),
+        replaces_position: None,
+    }
+}
+
+fn skill_entry_to_skill_with_value(entry: &SkillEntry) -> Option<SkillWithValue> {
+    let skill_id = SkillId::from_class_name(entry.name())?;
+    let value = match entry {
+        SkillEntry::WithValue { value, .. } => Some(value.to_string()),
+        SkillEntry::Simple(_) => None,
+    };
+    Some(SkillWithValue { skill_id, value })
+}
+
+fn edition_to_rules(edition: &str) -> Rules {
+    match edition {
+        "bb2016" => Rules::Bb2016,
+        "bb2020" => Rules::Bb2020,
+        _ => Rules::Bb2025,
+    }
+}
+
+/// Map a snake_case race name + side to the Java server parity team ID.
+/// Uses PascalCase conversion matching gen_java_teams.py exactly.
+/// e.g. "dark_elf_league_fumbbl" + "home" → "teamDarkElfLeagueFumbblParityHome"
+pub fn java_team_id(race_name: &str, side: &str) -> String {
+    let suffix = if side == "away" { "Away" } else { "Home" };
+    let pascal: String = race_name
+        .split('_')
+        .map(|part| {
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(c) => c.to_uppercase().to_string() + chars.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect();
+    format!("team{pascal}Parity{suffix}")
 }
 
 fn response_chosen_str(response: &AgentResponse) -> String {
