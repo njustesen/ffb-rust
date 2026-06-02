@@ -12,6 +12,7 @@ ffb-model = { path = "../ffb-model" }
 ffb-mechanics = { path = "../ffb-mechanics" }
 ffb-engine = { path = "../ffb-engine" }
 ffb-protocol = { path = "../ffb-protocol" }
+ffb-client = { path = "../ffb-client" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 rand_xoshiro = { workspace = true }
@@ -21,3 +22,4 @@ hex = { workspace = true }
 thiserror = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
+tokio = { workspace = true }

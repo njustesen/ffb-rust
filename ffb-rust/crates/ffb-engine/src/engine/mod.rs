@@ -455,6 +455,9 @@ pub struct GameEngine {
     blast_it_catch_bonus: bool,
     /// Card-applied temporary skills pending removal at turn/drive end: (player_id, skill_id, card_id).
     card_temporary_skills: Vec<(String, SkillId, String)>,
+    /// Star player IDs purchased by home/away during the inducement phase.
+    home_star_purchases: Vec<String>,
+    away_star_purchases: Vec<String>,
 }
 
 /// Returns true if the race string matches one of the Blood Bowl undead team races.
@@ -512,6 +515,8 @@ impl GameEngine {
             pending_solid_defence: None,
             blast_it_catch_bonus: false,
             card_temporary_skills: Vec::new(),
+            home_star_purchases: Vec::new(),
+            away_star_purchases: Vec::new(),
         };
         engine.compute_next_prompt();
         engine
@@ -2415,7 +2420,17 @@ impl GameEngine {
                             // For now, we increment a per-team wizard count as a proxy.
                             // In parity, wizards are used via Action::WizardSpell.
                         }
-                        _ => {} // Other inducements (star players, mercenaries, cards) handled elsewhere
+                        _ => {
+                            // Star players: track purchase and detect double-hire.
+                            if p.id.starts_with("starPlayer_") {
+                                let other_stars = if team_is_home { &self.away_star_purchases } else { &self.home_star_purchases };
+                                if other_stars.contains(&p.id) {
+                                    events.push(GameEvent::DoubleHiredStarPlayer);
+                                }
+                                let this_stars = if team_is_home { &mut self.home_star_purchases } else { &mut self.away_star_purchases };
+                                this_stars.push(p.id.clone());
+                            }
+                        }
                     }
                     events.push(GameEvent::BuyInducement {
                         team_id: (if team_is_home { &self.game.team_home } else { &self.game.team_away }).id.clone(),
@@ -2439,8 +2454,6 @@ impl GameEngine {
 
                 // Apply card effect based on known card_ids (CardEffect mapping).
                 // Temporary skills are added to the target player's temporary_skills list.
-                // Duration management (removal at turn/drive end) is not yet implemented;
-                // effects persist until cleared externally.
                 let effect = match card_id.as_str() {
                     // DISTRACTED: target gains BoneHead until end of this turn
                     "distract" | "Distract" | "distracted" => Some((SkillId::BoneHead, false)),
@@ -33867,6 +33880,42 @@ mod tests {
         }).unwrap();
         assert_eq!(engine.game.team_home.players.len(), initial_home_count,
             "Engine must not add star player to roster (parity runner handles that)");
+    }
+
+    #[test]
+    fn double_hired_star_player_emits_event_when_both_teams_buy_same_star() {
+        // When home buys star X and then away buys the same star X, DoubleHiredStarPlayer is emitted.
+        let home = make_test_team("home");
+        let away = make_test_team("away");
+        let mut engine = GameEngine::new(home, away, Rules::Bb2020, 1);
+        engine.game.home_playing = true;
+        engine.apply(TeamSide::Home, Action::BuyInducements {
+            purchases: vec![crate::action::InducementPurchase { id: "starPlayer_griff_oberwald".into(), count: 1 }],
+        }).unwrap();
+        engine.game.home_playing = false;
+        let events = engine.apply(TeamSide::Away, Action::BuyInducements {
+            purchases: vec![crate::action::InducementPurchase { id: "starPlayer_griff_oberwald".into(), count: 1 }],
+        }).unwrap();
+        assert!(events.iter().any(|e| matches!(e, GameEvent::DoubleHiredStarPlayer)),
+            "DoubleHiredStarPlayer must be emitted when both teams buy the same star player");
+    }
+
+    #[test]
+    fn double_hired_star_player_not_emitted_for_different_stars() {
+        // Different star players bought by each team must NOT trigger DoubleHiredStarPlayer.
+        let home = make_test_team("home");
+        let away = make_test_team("away");
+        let mut engine = GameEngine::new(home, away, Rules::Bb2020, 1);
+        engine.game.home_playing = true;
+        engine.apply(TeamSide::Home, Action::BuyInducements {
+            purchases: vec![crate::action::InducementPurchase { id: "starPlayer_griff_oberwald".into(), count: 1 }],
+        }).unwrap();
+        engine.game.home_playing = false;
+        let events = engine.apply(TeamSide::Away, Action::BuyInducements {
+            purchases: vec![crate::action::InducementPurchase { id: "starPlayer_morg_n_thorg".into(), count: 1 }],
+        }).unwrap();
+        assert!(!events.iter().any(|e| matches!(e, GameEvent::DoubleHiredStarPlayer)),
+            "DoubleHiredStarPlayer must NOT be emitted for different star players");
     }
 
     #[test]

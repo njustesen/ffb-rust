@@ -584,12 +584,12 @@ Bribes ✓, ArgueTheCall ✓, Wizard (Fireball/Lightning) ✓, MasterChef ✓, P
 
 ## Known Open Issues
 
-- Roster JSON loader: star_players and bb2020_rosters tests fail (pre-existing format mismatch)
+- Roster JSON loader: `star_players` and `bb2020_rosters` tests may fail (pre-existing format mismatch — needs investigation with `cargo test -p ffb-model`)
 - `cargo` must run from PowerShell or `~/.cargo/bin/cargo` in Git Bash (not on PATH in Bash)
 - **Sections 1–12 are now complete** — all rows ✓ or —.
-- Events not yet emitted: `DefectingPlayers`, `PettyCash`, `TimeoutEnforced`
+- Events not yet emitted in Rust engine: `DefectingPlayers` (post-match illegal-concession, edge case), `TimeoutEnforced` (network CLIENT_ILLEGAL_PROCEDURE command, not applicable to headless engine). `PettyCash` ✓ emitted since session 33. `DoubleHiredStarPlayer` ✓ emitted when both teams buy the same star player (session 37).
 - NurglesRot: post-match roster flag only — marked `—`, no engine behavior needed
-- Section 13 (Network Protocol): 6 of 7 rows ✓; ID 61 ClientConnection ~ (async WebSocket, no unit tests)
+- Section 13 (Network Protocol): 6 of 7 rows ✓; ID 61 ClientConnection ~ (async WebSocket, no unit tests); ID 71 Network integration test ○ (stub in ffb-parity/src/network_test.rs)
 
 ## Runtime Notes
 

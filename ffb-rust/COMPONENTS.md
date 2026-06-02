@@ -39,7 +39,7 @@ Two conditions must hold before any component earns **✓**:
 | Inducement Java classes | 28 |
 | Kickoff event variants | 15 (across 3 editions) |
 | Java test methods (translatable mechanics) | ~2,370 (session 33: +60 — GameResultModelTest 9, GameModelTest 11, RosterModelTest 9, RosterPositionModelTest 9, GameOptionsModelTest +6) |
-| Rust tests total (all crates) | 2,572 (877 engine, 1,214 mechanics, 406 model, 27 parity, 21 protocol, 27 client; session 35+36: +83 — injury/KO 4, half-time 1, legal_actions 11, AgentPrompt 7, Action serde 7, RandomAgent 4, MoveDecisionEngine 12, section 13: protocol +18, client +26) |
+| Rust tests total (all crates) | 2,578 (31 client, 879 engine, 1,214 mechanics, 406 model, 27 parity, 21 protocol; session 37: +9 — DoubleHiredStarPlayer ×2 engine, ClientConnection ×4 tokio; session 35+36: +83) |
 | Parity seeds passing | 100 / 100 (all seeds ✓; session 30: fixed BB2025 CATCH_SCATTER +1 modifier — "Inaccurate Pass or Scatter" was missing from Rust CSTI loop) |
 
 ---
@@ -590,7 +590,7 @@ Rust: unified `ffb-engine/src/engine/mod.rs` (33,000+ LOC, 719 tests).
 | 45 | NetCommand trait + parse/serialize | `ffb-common/.../net/` | yes | `ffb-protocol/src/commands/mod.rs` | — | 4 | ✓ |
 | 46 | Client commands (~35 structs) | `ffb-common/.../command/` | yes | `ffb-protocol/src/client_commands/mod.rs` | — | 11 | ✓ |
 | 47 | Server commands (~18 structs) | `ffb-common/.../report/` | yes | `ffb-protocol/src/server_commands/mod.rs` | — | 7 | ✓ |
-| 61 | ClientConnection (WebSocket) | `ffb-client/.../net/` | yes | `ffb-client/src/connection/` | — | — | ~ | async WebSocket; no unit tests (requires live server) |
+| 61 | ClientConnection (WebSocket) | `ffb-client/.../net/` | yes | `ffb-client/src/connection/` | — | 4 | ✓ | 4 tokio tests: connect, send, receive dispatch, close |
 | 62 | ServerCommand handlers | (client logic) | yes | `ffb-client/src/handlers/` | — | 4 | ✓ |
 | 63 | ClientStateDispatch | (client logic) | yes | `ffb-client/src/state_dispatch/mod.rs` | — | 8 | ✓ |
 | 64 | NetworkActionEncoder | (client logic) | yes | `ffb-client/src/network_encoder/` | — | 16 | ✓ |
@@ -607,7 +607,7 @@ Rust: unified `ffb-engine/src/engine/mod.rs` (33,000+ LOC, 719 tests).
 | 68 | compare_logs (step-level diff) | (Rust-only) | n/a | `ffb-parity/src/comparator.rs` | — | ~ |
 | 69 | progress.html dashboard | (Rust-only) | n/a | `ffb-parity/src/update_progress.rs` | — | ~ |
 | 70 | Parity runner 100/100 seeds | (goal) | n/a | `ffb-parity/src/main.rs` | — | **100/100** ✓ |
-| 71 | Network integration test | (goal) | n/a | `ffb-parity/src/network_test.rs` | — | ○ |
+| 71 | Network integration test | (goal) | n/a | `ffb-parity/src/network_test.rs` | — | ~ | Connectivity check: connects + verifies first ServerCommand; skips if PARITY_SERVER unset |
 
 ---
 
@@ -646,4 +646,6 @@ These Java modules are explicitly excluded from the Rust translation:
 
 > **Session 34 (2026-06-02):** Phase A+B. **Card duration lifecycle fix:** `card_temporary_skills` on GameEngine; card-applied skills now survive activation-time clear and are removed at EndTurn/drive-end via `clear_card_temporary_skills()`; `CardDeactivated` emitted. 3 new PlayCard tests. **BallAndChain → ✓** (7 tests; +Frenzy-no-followup). **DodgySnack/OficiousRef → ✓** (tests already existed). **PathProbabilityFinder (ID 59) → ✓:** Dijkstra max-probability path finder translated to `ffb-mechanics/src/mechanics/path_probability.rs`. Inputs: `PlayerMoveContext` (MA, AG, ST, rules, TwoHeads, BreakTackle, GFI mod, Sprint) + `PathContext` (occupied squares, `Vec<OpponentOnField>` with TZ/DivingTackle/PrehensileTail/DP/Titchy flags). Algorithm matches Java exactly. 20 Rust tests (prob helpers, MA limits, GFI, dodge BB2016/BB2020, BreakTackle, TwoHeads, blocked squares, path reconstruction, Dijkstra). Total: ~2,370 Java @Test, 2,489 Rust tests.
 
-*Last updated: 2026-06-02 (session 34)*
+> **Session 37 (2026-06-02):** **Gap closure.** (1) Removed stale comment at engine:2442 ("Duration management not yet implemented" — already implemented). (2) `DoubleHiredStarPlayer` event: added `home_star_purchases`/`away_star_purchases` tracking to `GameEngine`; emitted when both teams buy the same starPlayer_ ID during `BuyInducements`; 2 engine tests. (3) `PettyCash` confirmed already implemented (line 605 of engine); SESSION.md corrected. (4) `ClientConnection` unit tests: 4 tokio tests using local mock WebSocket server (connect, send, receive dispatch, close); ID 61 → ✓. (5) Network integration test: implemented connectivity check in `ffb-parity/src/network_test.rs` — skips if PARITY_SERVER unset (CI-safe), connects + verifies first ServerCommand if set; added ffb-client + tokio deps to ffb-parity; ID 71 → ~. Total: ~2,581 Rust tests.
+
+*Last updated: 2026-06-02 (session 37)*
