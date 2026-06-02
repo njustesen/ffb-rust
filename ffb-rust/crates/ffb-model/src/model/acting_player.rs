@@ -78,4 +78,33 @@ mod tests {
         let back: ActingPlayer = serde_json::from_str(&json).unwrap();
         assert_eq!(ap.player_id, back.player_id);
     }
+
+    #[test]
+    fn set_player_stores_action_and_id() {
+        let mut ap = ActingPlayer::new();
+        ap.set_player("p42".into(), PlayerAction::Foul);
+        assert_eq!(ap.player_id.as_deref(), Some("p42"));
+        assert_eq!(ap.player_action, Some(PlayerAction::Foul));
+    }
+
+    #[test]
+    fn set_player_resets_movement_counters() {
+        let mut ap = ActingPlayer::new();
+        ap.current_move = 5;
+        ap.goes_for_it = true;
+        ap.set_player("p1".into(), PlayerAction::Move);
+        assert_eq!(ap.current_move, 0);
+        assert!(!ap.goes_for_it);
+    }
+
+    #[test]
+    fn special_flags_default_false() {
+        let ap = ActingPlayer::new();
+        assert!(!ap.jumping);
+        assert!(!ap.standing_up);
+        assert!(!ap.temporary_claws);
+        assert!(!ap.temporary_frenzy);
+        assert!(!ap.ignore_tackle_zones);
+        assert_eq!(ap.fury_of_blood_god_blocks, 0);
+    }
 }

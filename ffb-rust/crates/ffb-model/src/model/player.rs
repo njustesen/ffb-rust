@@ -169,6 +169,68 @@ mod tests {
     }
 
     #[test]
+    fn movement_with_modifiers_returns_base() {
+        let p = test_player();
+        assert_eq!(p.movement_with_modifiers(), 6);
+    }
+
+    #[test]
+    fn strength_with_modifiers_returns_base() {
+        let p = test_player();
+        assert_eq!(p.strength_with_modifiers(), 3);
+    }
+
+    #[test]
+    fn agility_with_modifiers_returns_base() {
+        let p = test_player();
+        assert_eq!(p.agility_with_modifiers(), 3);
+    }
+
+    #[test]
+    fn armour_with_modifiers_returns_base() {
+        let p = test_player();
+        assert_eq!(p.armour_with_modifiers(), 8);
+    }
+
+    #[test]
+    fn passing_with_modifiers_returns_base() {
+        let p = test_player();
+        assert_eq!(p.passing_with_modifiers(), 4);
+    }
+
+    #[test]
+    fn has_skill_true_for_temporary_skill() {
+        use crate::model::skill_def::SkillWithValue;
+        let mut p = test_player();
+        p.temporary_skills.push(SkillWithValue { skill_id: SkillId::Sprint, value: None });
+        assert!(p.has_skill(SkillId::Sprint));
+        assert!(!p.has_skill(SkillId::Block));
+    }
+
+    #[test]
+    fn all_skill_ids_iterates_all_three_skill_lists() {
+        use crate::model::skill_def::SkillWithValue;
+        let mut p = test_player();
+        p.starting_skills.push(SkillWithValue { skill_id: SkillId::Block, value: None });
+        p.extra_skills.push(SkillWithValue { skill_id: SkillId::Dodge, value: None });
+        p.temporary_skills.push(SkillWithValue { skill_id: SkillId::Sprint, value: None });
+        let ids: Vec<SkillId> = p.all_skill_ids().collect();
+        assert_eq!(ids.len(), 3);
+        assert!(ids.contains(&SkillId::Block));
+        assert!(ids.contains(&SkillId::Dodge));
+        assert!(ids.contains(&SkillId::Sprint));
+    }
+
+    #[test]
+    fn niggling_injuries_default_zero_and_stat_injuries_empty() {
+        let p = test_player();
+        assert_eq!(p.niggling_injuries, 0);
+        assert!(p.stat_injuries.is_empty());
+        assert_eq!(p.current_spps, 0);
+        assert_eq!(p.career_spps, 0);
+    }
+
+    #[test]
     fn from_position_copies_starting_skills() {
         use crate::model::skill_def::SkillWithValue;
         use crate::model::roster_position::RosterPosition;

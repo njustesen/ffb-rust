@@ -118,4 +118,45 @@ mod tests {
         assert_eq!(td.turn_nr, back.turn_nr);
         assert_eq!(td.leader_state, back.leader_state);
     }
+
+    #[test]
+    fn reset_does_not_clear_rerolls() {
+        let mut td = TurnData::new();
+        td.rerolls = 3;
+        td.apothecaries = 1;
+        td.blitz_used = true;
+        td.reset_for_turn();
+        assert_eq!(td.rerolls, 3);
+        assert_eq!(td.apothecaries, 1);
+        assert!(!td.blitz_used);
+    }
+
+    #[test]
+    fn quick_snap_bonus_is_reset_on_turn_end() {
+        let mut td = TurnData::new();
+        td.quick_snap_bonus = 1;
+        td.reset_for_turn();
+        assert_eq!(td.quick_snap_bonus, 0);
+    }
+
+    #[test]
+    fn all_action_flags_reset_together() {
+        let mut td = TurnData::new();
+        td.blitz_used = true;
+        td.foul_used = true;
+        td.pass_used = true;
+        td.hand_over_used = true;
+        td.ttm_used = true;
+        td.bomb_used = true;
+        td.secure_the_ball_used = true;
+        td.punt_used = true;
+        td.reset_for_turn();
+        assert!(!td.foul_used);
+        assert!(!td.pass_used);
+        assert!(!td.hand_over_used);
+        assert!(!td.ttm_used);
+        assert!(!td.bomb_used);
+        assert!(!td.secure_the_ball_used);
+        assert!(!td.punt_used);
+    }
 }

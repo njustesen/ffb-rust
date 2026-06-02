@@ -149,6 +149,56 @@ mod tests {
     }
 
     #[test]
+    fn player_mut_modifies_player_in_place() {
+        let mut t = empty_team();
+        t.players.push(Player {
+            id: "p1".into(), name: "Joe".into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 8, starting_skills: vec![], extra_skills: vec![],
+            temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
+            career_spps: 0, race: None,
+        });
+        t.player_mut("p1").unwrap().current_spps = 10;
+        assert_eq!(t.player("p1").unwrap().current_spps, 10);
+    }
+
+    #[test]
+    fn has_player_false_for_unknown_id() {
+        let t = empty_team();
+        assert!(!t.has_player("nobody"));
+    }
+
+    #[test]
+    fn resource_fields_are_accessible() {
+        let t = empty_team();
+        assert_eq!(t.rerolls, 3);
+        assert_eq!(t.apothecaries, 1);
+        assert_eq!(t.fan_factor, 5);
+        assert_eq!(t.team_value, 1_000_000);
+    }
+
+    #[test]
+    fn multiple_players_looked_up_independently() {
+        let mut t = empty_team();
+        for nr in 1..=3i32 {
+            t.players.push(Player {
+                id: format!("p{}", nr), name: format!("Player{}", nr), nr,
+                position_id: "lineman".into(), player_type: PlayerType::Regular,
+                gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+                passing: 4, armour: 8, starting_skills: vec![], extra_skills: vec![],
+                temporary_skills: vec![], used_skills: HashSet::new(),
+                niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
+                career_spps: 0, race: None,
+            });
+        }
+        assert_eq!(t.players.len(), 3);
+        assert_eq!(t.player("p2").map(|p| p.nr), Some(2));
+        assert!(t.player("p4").is_none());
+    }
+
+    #[test]
     fn players_list_reflects_added_players() {
         let mut t = empty_team();
         assert_eq!(t.players.len(), 0);

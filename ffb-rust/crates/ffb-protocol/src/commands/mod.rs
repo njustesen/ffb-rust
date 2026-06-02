@@ -23,12 +23,35 @@ pub fn serialize_client_command(cmd: &ClientCommand) -> Result<String, ProtocolE
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client_commands::{ClientCommand, ClientEndTurn};
+    use crate::client_commands::{ClientCommand, ClientEndTurn, ClientBlock};
+    use crate::server_commands::{ServerCommand, ServerPong};
 
     #[test]
     fn serialize_client_end_turn() {
         let cmd = ClientCommand::ClientEndTurn(ClientEndTurn);
         let json = serialize_client_command(&cmd).unwrap();
         assert!(json.contains("clientEndTurn"));
+    }
+
+    #[test]
+    fn serialize_then_parse_server_pong() {
+        let cmd = ServerCommand::ServerPong(ServerPong { timestamp: 9999 });
+        let json = serde_json::to_string(&cmd).unwrap();
+        let back = parse_server_command(&json).unwrap();
+        assert!(matches!(back, ServerCommand::ServerPong(ServerPong { timestamp: 9999 })));
+    }
+
+    #[test]
+    fn parse_server_command_returns_error_on_bad_json() {
+        let result = parse_server_command("{not valid json}");
+        assert!(result.is_err(), "invalid JSON must return Err");
+    }
+
+    #[test]
+    fn serialize_client_block() {
+        let cmd = ClientCommand::ClientBlock(ClientBlock { defender_id: "p7".into() });
+        let json = serialize_client_command(&cmd).unwrap();
+        assert!(json.contains("clientBlock"), "must contain command tag");
+        assert!(json.contains("p7"), "must contain defender_id");
     }
 }

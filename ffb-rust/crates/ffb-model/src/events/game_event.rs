@@ -51,6 +51,7 @@ pub enum GameEvent {
     SpellEffectRoll { roll: i32 },
     BreatheFireRoll { attacker_id: PlayerId, defender_id: PlayerId, roll: i32, knock_down: bool, prone: bool, failure: bool, rerolled: bool },
     ProjectileVomitRoll { attacker_id: PlayerId, defender_id: PlayerId, roll: i32, success: bool, rerolled: bool },
+    TrapDoor { player_id: PlayerId, roll: i32, escaped: bool },
 
     // ── Block ──────────────────────────────────────────────────────────────────
     BlockRoll {

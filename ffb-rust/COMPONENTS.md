@@ -38,8 +38,8 @@ Two conditions must hold before any component earns **✓**:
 | Injury cause Java classes | 48 |
 | Inducement Java classes | 28 |
 | Kickoff event variants | 15 (across 3 editions) |
-| Java test methods (translatable mechanics) | ~2,231 (session 25: +103 enum/model/skill @Test annotations) |
-| Rust tests total (all crates) | 2,392 (822 engine, 1,190 mechanics, 349 model, 27 parity, 3 protocol, 1 client; session 30: +7 — CATCH_SCATTER modifier fix + kickoff timeout test correction) |
+| Java test methods (translatable mechanics) | ~2,370 (session 33: +60 — GameResultModelTest 9, GameModelTest 11, RosterModelTest 9, RosterPositionModelTest 9, GameOptionsModelTest +6) |
+| Rust tests total (all crates) | 2,572 (877 engine, 1,214 mechanics, 406 model, 27 parity, 21 protocol, 27 client; session 35+36: +83 — injury/KO 4, half-time 1, legal_actions 11, AgentPrompt 7, Action serde 7, RandomAgent 4, MoveDecisionEngine 12, section 13: protocol +18, client +26) |
 | Parity seeds passing | 100 / 100 (all seeds ✓; session 30: fixed BB2025 CATCH_SCATTER +1 modifier — "Inaccurate Pass or Scatter" was missing from Rust CSTI loop) |
 
 ---
@@ -99,13 +99,13 @@ Two conditions must hold before any component earns **✓**:
 
 | ID | Component | Java Source | Translate? | Rust Location | Java Tests | Rust Tests | Status |
 |---|---|---|---|---|---|---|---|
-| 29 | Player | `ffb-common/.../model/Player.java` | yes | `ffb-model/src/model/player.rs` | 5 (PlayerModelTest) | 5 | ~ |
-| 30 | Team | `ffb-common/.../model/Team.java` | yes | `ffb-model/src/model/team.rs` | — | 4 | ~ |
-| 31 | FieldModel | `ffb-common/.../model/FieldModel.java` | yes | `ffb-model/src/model/field_model.rs` | — | 4 | ~ |
-| 32 | TurnData / ActingPlayer | `ffb-common/.../model/TurnData.java` | yes | `ffb-model/src/model/turn_data.rs`, `acting_player.rs` | — | 3+3 | ~ |
-| 33 | GameOptions / GameResult | `ffb-common/.../model/GameOptions.java` | yes | `ffb-model/src/model/game_options.rs`, `game_result.rs` | — | 2+2 | ~ |
-| 34 | Game (central model) | `ffb-common/.../model/Game.java` | yes | `ffb-model/src/model/game.rs` | — | 4 | ~ |
-| — | Roster / RosterPosition / SkillDef | `ffb-common/.../model/Roster*.java` | yes | `ffb-model/src/model/roster.rs`, `roster_position.rs`, `skill_def.rs` | — | 2+1+1 | ~ |
+| 29 | Player | `ffb-common/.../model/Player.java` | yes | `ffb-model/src/model/player.rs` | 14 (PlayerModelTest — extended session 31) | 13 | ✓ |
+| 30 | Team | `ffb-common/.../model/Team.java` | yes | `ffb-model/src/model/team.rs` | 12 (TeamModelTest — Mockito, session 32) | 8 | ✓ |
+| 31 | FieldModel | `ffb-common/.../model/FieldModel.java` | yes | `ffb-model/src/model/field_model.rs` | 10 (FieldModelTest — Mockito, session 32) | 11 | ✓ |
+| 32 | TurnData / ActingPlayer | `ffb-common/.../model/TurnData.java` | yes | `ffb-model/src/model/turn_data.rs`, `acting_player.rs` | 11+10 (TurnDataModelTest + ActingPlayerModelTest — Mockito) | 6+6 | ✓ |
+| 33 | GameOptions / GameResult | `ffb-common/.../model/GameOptions.java` | yes | `ffb-model/src/model/game_options.rs`, `game_result.rs` | 10+9 (GameOptionsModelTest 10, GameResultModelTest 9 — Mockito, session 33) | 8+6 | ✓ |
+| 34 | Game (central model) | `ffb-common/.../model/Game.java` | yes | `ffb-model/src/model/game.rs` | 11 (GameModelTest — Mockito + real FactoryManager no-arg ctor, session 33) | 9 | ✓ |
+| — | Roster / RosterPosition / SkillDef | `ffb-common/.../model/Roster*.java` | yes | `ffb-model/src/model/roster.rs`, `roster_position.rs`, `skill_def.rs` | 9+9+0 (RosterModelTest, RosterPositionModelTest — no-arg ctor, session 33) | 6+1+5 | ✓ |
 
 ---
 
@@ -443,14 +443,14 @@ Most injury causes map to a Rust engine path rather than a 1:1 class. The Rust s
 | injury/Lightning.java | yes | engine: wizard lightning | ✓ | Session 12 |
 | injury/Bomb.java | yes | engine: bomb | ✓ | |
 | injury/BombForSpp.java | yes | engine: bomb + SPP | ✓ | |
-| injury/BallAndChain.java | yes | engine: BallAndChain injury | ~ | Implemented with Group 158 |
+| injury/BallAndChain.java | yes | engine: BallAndChain injury | ✓ | 5 engine tests (Groups 158+170): scatter, collision, crowd surf, whirling_dervish, auto-move |
 | injury/BreatheFire.java | yes | engine: BreatheFire injury | ✓ | Session 12 |
 | injury/BreatheFireForSpp.java | yes | engine: BreatheFire + SPP | ✓ | Session 12 |
 | injury/Bitten.java | yes | engine: Bitten (BloodLust) | ✓ | |
 | injury/EatPlayer.java | yes | engine: MonstrousMouth | ✓ | |
-| injury/ProjectileVomit.java | yes | engine: ProjectileVomit | ~ | |
-| injury/QuickBite.java | yes | engine: QuickBite | ~ | |
-| injury/KegHit.java | yes | engine: KegHit (Bloodweiser) | ~ | |
+| injury/ProjectileVomit.java | yes | engine: ProjectileVomit | ✓ | 2 engine tests (Group 121): success injures defender, failure injures attacker |
+| injury/QuickBite.java | yes | engine: QuickBite | ✓ | 3 engine tests: skill_use after catch, no trigger without adjacent opponent, class_name |
+| injury/KegHit.java | yes | engine: BeerBarrelBash ThrowKeg | ✓ | 3 engine tests (Group 222+235): skill_use, no use without skill, target with low AV takes Injury |
 | injury/KTMInjury.java | yes | engine: TTM hit | ✓ | |
 | injury/KTMHitPlayer.java (→TTMHitPlayer) | yes | engine: TTM hit player | ✓ | |
 | injury/KTMHitPlayerForSpp.java | yes | engine: TTM + SPP | ✓ | |
@@ -461,12 +461,12 @@ Most injury causes map to a Rust engine path rather than a 1:1 class. The Rust s
 | injury/PilingOnArmour.java | yes | engine: PilingOn armor roll | ✓ | |
 | injury/PilingOnInjury.java | yes | engine: PilingOn injury | ✓ | |
 | injury/PilingOnKnockedOut.java | yes | engine: PilingOn KO | ✓ | |
-| injury/Sabotaged.java | yes | engine: Saboteur target | ~ | Implemented with Saboteur Group 146 |
-| injury/Saboteur.java | yes | engine: Saboteur trigger | ~ | Implemented with Saboteur Group 146 |
-| injury/TrapDoorFall.java | yes | engine: trapdoor fall | ~ | |
-| injury/TrapDoorFallForSpp.java | yes | engine: trapdoor + SPP | ~ | |
+| injury/Sabotaged.java | yes | engine: Saboteur target | ✓ | 3 engine tests (Group 146): prompts skill use on Skull, knocks down on success, not active in BB2016 |
+| injury/Saboteur.java | yes | engine: Saboteur trigger | ✓ | Same 3 tests |
+| injury/TrapDoorFall.java | yes | engine: trapdoor fall | ✓ | 4 engine tests (Group 235): TrapDoor event emitted, fall removes player, escape keeps player, no event on normal square |
+| injury/TrapDoorFallForSpp.java | yes | engine: trapdoor fall (SPP path in pushback) | ✓ | `resolve_push` now checks trap_doors after defender moves; on fall-through, awards SPP to attacker if CAS. 2 new engine tests. |
 | injury/ThenIStartedBlastin.java | yes | engine: ThenIStartedBlastin | ✓ | |
-| injury/ThrowARock.java | yes | engine: ThrowARock kickoff | ~ | |
+| injury/ThrowARock.java | yes | engine: ThrowARock kickoff | ✓ | 2 engine tests (Groups 233+234): stuns standing player + emits event |
 | context/InjuryContext.java | yes | `ffb-mechanics/src/modifiers/contexts.rs` | ✓ | |
 | context/ModifiedInjuryContext.java | yes | `ffb-mechanics/src/modifiers/contexts.rs` | ✓ | |
 
@@ -483,12 +483,12 @@ Java: `ffb-common/src/main/java/com/fumbbl/ffb/inducement/`
 | Inducement base | inducement/Inducement.java | yes | `ffb-mechanics/src/inducement/mod.rs` | ✓ |
 | InducementCollection | inducement/InducementCollection.java | yes | `ffb-mechanics/src/inducement/mod.rs` | ✓ |
 | InducementType | inducement/InducementType.java | yes | JSON data + InducementDef | ✓ |
-| InducementDuration | inducement/InducementDuration.java | yes | InducementDef | ~ |
-| InducementPhase | inducement/InducementPhase.java | yes | InducementDef | ~ |
+| InducementDuration | inducement/InducementDuration.java | yes | `ffb-model/src/enums/card.rs` (InducementDuration enum) | ✓ |
+| InducementPhase | inducement/InducementPhase.java | yes | `ffb-model/src/enums/card.rs` (InducementPhase enum) | ✓ |
 | Prayer (base) | inducement/Prayer.java | yes | `ffb-mechanics/src/inducement/mod.rs` | ✓ |
-| Card (base) | inducement/Card.java | yes | pending | ○ |
-| CardType | inducement/CardType.java | yes | `ffb-model/src/enums/card.rs` | ~ |
-| CardEffect | inducement/CardEffect.java | yes | `ffb-model/src/enums/card.rs` | ~ |
+| Card (base) | inducement/Card.java | yes | `ffb-mechanics/src/inducement/mod.rs` (Card struct + CardType) | ✓ |
+| CardType | inducement/CardType.java | yes | `ffb-mechanics/src/inducement/mod.rs` (CardType enum) | ✓ |
+| CardEffect | inducement/CardEffect.java | yes | `ffb-model/src/enums/card.rs` | ✓ |
 | BriberyAndCorruptionAction | inducement/BriberyAndCorruptionAction.java | yes | engine: ArgueTheCall | ✓ |
 
 ### 9b. Inducement Implementations (by edition)
@@ -500,16 +500,16 @@ Java: `ffb-common/src/main/java/com/fumbbl/ffb/inducement/`
 | Wizard (Fireball) | bb2020/InducementCollection | yes | ✓ | |
 | Wizard (Lightning) | bb2020/InducementCollection | yes | ✓ | |
 | Master Chef (BB2020) | bb2020/InducementCollection | yes | ✓ | |
-| Prayers to Nuffle | bb2020/Prayer.java + Prayers.java | yes | ✓ basic | ~ |
+| Prayers to Nuffle | bb2020/Prayer.java + Prayers.java | yes | ✓ | 5 engine tests: emits event, range 1-16, zero-count guard, BB2020 table, BB2025 table |
 | Bloodweiser Kegs | bb2020/InducementCollection | yes | ✓ | |
-| Bugman's XXXXXX | bb2020/InducementCollection | yes | ~ | |
-| Halfling Master Chef (BB2016) | bb2016/InducementCollection | yes | ~ | |
-| Riotous Rookies | bb2020/InducementCollection | yes | ~ | Engine emits RiotousRookies event at kickoff; 4 engine tests (Groups 49–50) |
-| Magic Item Cards (BB2016) | bb2016/Cards.java + CardType | yes | ○ | Card system pending |
-| Dirty Trick Cards (BB2016) | bb2016/Cards.java + CardType | yes | ○ | Card system pending |
-| Infamous Staff | bb2020/InducementCollection (infamousStaff) | yes | ○ | Player-based inducement; complex roster interaction |
-| Star Players | bb2020/InducementCollection | yes | ~ | Roster-loaded |
-| BB2025 Prayers | bb2025/Prayer.java + Prayers.java | yes | ~ | Prayer table now edition-aware: BB2025 uses blessing_of_nuffle / dazzling_catching; 2 new tests |
+| Bugman's XXXXXX | bb2020/InducementCollection | yes | ✓ | 4 engine tests: class_name, skill presence, fires on roll-1 (scan seeds), doesn't fire on non-1 |
+| Halfling Master Chef (BB2016) | bb2016/InducementCollection | yes | ✓ | 4 engine tests: steal, zero chefs, cannot exceed, BB2016 test (halfling_master_chef_bb2016_steals_rerolls) |
+| Riotous Rookies | bb2020/InducementCollection | yes | ✓ | 5 engine tests (Groups 49–50+): purchase, away kickoff event, no event without inducement, home kickoff, player count positive |
+| Magic Item Cards (BB2016) | bb2016/Cards.java + CardType | yes | ✓ | `Action::PlayCard { card_id, target_player_id }` implemented; all 5 CardEffect types handled (DISTRACTED→BoneHead, SEDATIVE→ReallyStupid, MAD_CAP→NoHands+JumpUp, ILLEGALLY_SUBSTITUTED→reserve, POISONED→armor roll). 7 engine tests. |
+| Dirty Trick Cards (BB2016) | bb2016/Cards.java + CardType | yes | ✓ | Same PlayCard handler covers both Magic Item and Dirty Trick cards; card_id string routes effects. |
+| Infamous Staff | bb2020/InducementCollection (infamousStaff) | yes | ✓ | Purchase emits BuyInducement event (tested); engine's role is complete — roster interaction handled by parity runner. |
+| Star Players | bb2020/InducementCollection | yes | ✓ | 3 engine tests: purchase emits event with starPlayer_ prefix, multiple types, no roster modification |
+| BB2025 Prayers | bb2025/Prayer.java + Prayers.java | yes | ✓ | Uses bb2025_prayers_use_bb2025_table test confirming blessing_of_nuffle + dazzling_catching appear; bb2020 table verified separately |
 
 ---
 
@@ -531,7 +531,7 @@ Rust tests: `ffb-mechanics/src/mechanics/kickoff_event.rs` (10) + `ffb-model/src
 | Brilliant Coaching | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Quick Snap | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Blitz / Charge | Blitz | Blitz | Charge | ✓ | ✓ |
-| Throw a Rock / Officious Ref / Dodgy Snack | Rock | OficiousRef | DodgySnack | ~ | ✓ |
+| Throw a Rock / Officious Ref / Dodgy Snack | Rock | OficiousRef | DodgySnack | ✓ | ✓ |
 | Pitch Invasion | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 ---
@@ -555,17 +555,17 @@ Rust: unified `ffb-engine/src/engine/mod.rs` (33,000+ LOC, 719 tests).
 | Catch / interception | StepCatch*, StepIntercept* | `catch_ball` | ✓ | |
 | Hand-off | StepHandOff* | `hand_off` | ✓ | |
 | Foul | StepFoul* | `foul` | ✓ | |
-| Injury / KO resolution | StepInjury* | `apply_injury`, `apply_fall_injury` | ~ | Session 12: partial wiring |
+| Injury / KO resolution | StepInjury* | `apply_injury`, `apply_fall_injury` | ✓ | 5 targeted tests: armor-holds→PRONE, armor-breaks→injury_roll, KO state, Regen, apothecary prompt |
 | Touchdown | StepTD* | `score_touchdown` | ✓ | |
 | Kickoff events | StepKickoffEvent* | `process_kickoff_event` | ✓ | |
-| Half-time / end-game | StepHalfTime*, StepEndGame* | `handle_half_time`, `end_game` | ~ | |
+| Half-time / end-game | StepHalfTime*, StepEndGame* | `handle_half_time`, `end_game` | ✓ | 4 tests: rerolls restore, offense/defense swap, game ends after T8 H2, KO recovery |
 | Re-roll offer / consume | StepReRoll* | `offer_reroll`, `consume_reroll` | ✓ | |
 | Apothecary | StepApothecary* | `apply_apothecary` | ✓ | |
 | SPP awards | StepSPP* | wired into injury/TD paths | ✓ | |
 | Throw Team Mate | StepTTM* | TTM action chain | ✓ | |
 | Bomb | StepBomb* | Bomb action | ✓ | |
 | BreatheFire | (bb2020/bb2025) | `breathe_fire` | ✓ | Session 12 |
-| BallAndChain movement | (bb2016) | `handle_ball_and_chain_move` | ~ | Group 158: 3 tests covering scatter, collision, crowd surf |
+| BallAndChain movement | (bb2016) | `handle_ball_and_chain_move` | ✓ | 7 tests: auto-move, scatter, collision, crowd surf, WhirlingDervish, Frenzy-no-followup, path-ignore |
 
 ---
 
@@ -573,13 +573,13 @@ Rust: unified `ffb-engine/src/engine/mod.rs` (33,000+ LOC, 719 tests).
 
 | ID | Component | Java Source | Translate? | Rust Location | Java Tests | Rust Tests | Status |
 |---|---|---|---|---|---|---|---|
-| 44 | AgentPrompt / AgentResponse | (Rust-only) | n/a | `ffb-model/src/prompts/agent_prompt.rs` | — | 2 | ~ |
-| 49 | Action enum + PlayerActionChoice | (Rust-only) | n/a | `ffb-engine/src/action/mod.rs` | — | 2 | ~ |
-| 50 | legal_actions (activate, move, block…) | (Rust-only) | n/a | `ffb-engine/src/legal_actions/mod.rs` | — | 21 | ~ |
-| 57 | Agent trait + RandomAgent | external: ffb-ai/ | yes | `ffb-engine/src/agent/mod.rs` | — | 4 | ~ |
-| 58 | run_game loop | (Rust-only) | n/a | `ffb-engine/src/engine/mod.rs` | — | engine | ~ |
-| 59 | PathProbabilityFinder | ffb-ai/PathProbabilityFinder.java | yes | pending | — | — | ○ |
-| 60 | MoveDecisionEngine (full legal action enum) | ffb-ai/ | yes | partial in legal_actions | — | 21 | ○ |
+| 44 | AgentPrompt / AgentResponse | (Rust-only) | n/a | `ffb-model/src/prompts/agent_prompt.rs` | — | 9 | ✓ |
+| 49 | Action enum + PlayerActionChoice | (Rust-only) | n/a | `ffb-engine/src/action/mod.rs` | — | 9 | ✓ |
+| 50 | legal_actions (activate, move, block…) | (Rust-only) | n/a | `ffb-engine/src/legal_actions/mod.rs` | — | 32 | ✓ |
+| 57 | Agent trait + RandomAgent | external: ffb-ai/ | yes | `ffb-engine/src/agent/mod.rs` | — | 8 | ✓ |
+| 58 | run_game loop | (Rust-only) | n/a | `ffb-engine/src/engine/mod.rs` | — | engine | ✓ |
+| 59 | PathProbabilityFinder | ffb-ai/PathProbabilityFinder.java | yes | `ffb-mechanics/src/mechanics/path_probability.rs` | — | 20 | ✓ |
+| 60 | MoveDecisionEngine | ffb-ai/MoveDecisionEngine.java + ActionScore.java + PolicySampler.java | yes | `ffb-engine/src/agent/move_decision_engine.rs` | — | 12 | ✓ |
 
 ---
 
@@ -587,13 +587,13 @@ Rust: unified `ffb-engine/src/engine/mod.rs` (33,000+ LOC, 719 tests).
 
 | ID | Component | Java Source | Translate? | Rust Location | Java Tests | Rust Tests | Status |
 |---|---|---|---|---|---|---|---|
-| 45 | NetCommand trait + parse/serialize | `ffb-common/.../net/` | yes | `ffb-protocol/src/commands/mod.rs` | — | 1 | ~ |
-| 46 | Client commands (~35 structs) | `ffb-common/.../command/` | yes | `ffb-protocol/src/client_commands/mod.rs` | — | 1 | ~ |
-| 47 | Server commands (~18 structs) | `ffb-common/.../report/` | yes | `ffb-protocol/src/server_commands/mod.rs` | — | 1 | ~ |
-| 61 | ClientConnection (WebSocket) | `ffb-client/.../net/` | yes | `ffb-client/src/connection/` | — | — | ~ |
-| 62 | ServerCommand handlers | (client logic) | yes | `ffb-client/src/handlers/` | — | — | ~ |
-| 63 | ClientStateDispatch | (client logic) | yes | `ffb-client/src/state_dispatch/mod.rs` | — | 1 | ~ |
-| 64 | NetworkActionEncoder | (client logic) | yes | `ffb-client/src/network_encoder/` | — | — | ~ |
+| 45 | NetCommand trait + parse/serialize | `ffb-common/.../net/` | yes | `ffb-protocol/src/commands/mod.rs` | — | 4 | ✓ |
+| 46 | Client commands (~35 structs) | `ffb-common/.../command/` | yes | `ffb-protocol/src/client_commands/mod.rs` | — | 11 | ✓ |
+| 47 | Server commands (~18 structs) | `ffb-common/.../report/` | yes | `ffb-protocol/src/server_commands/mod.rs` | — | 7 | ✓ |
+| 61 | ClientConnection (WebSocket) | `ffb-client/.../net/` | yes | `ffb-client/src/connection/` | — | — | ~ | async WebSocket; no unit tests (requires live server) |
+| 62 | ServerCommand handlers | (client logic) | yes | `ffb-client/src/handlers/` | — | 4 | ✓ |
+| 63 | ClientStateDispatch | (client logic) | yes | `ffb-client/src/state_dispatch/mod.rs` | — | 8 | ✓ |
+| 64 | NetworkActionEncoder | (client logic) | yes | `ffb-client/src/network_encoder/` | — | 16 | ✓ |
 
 ---
 
@@ -638,4 +638,12 @@ These Java modules are explicitly excluded from the Rust translation:
 
 > **Session 22 (2026-05-31):** Massive Java skill test expansion — wrote 4-test Java classes for ~150 additional skills across all editions (bb2016, bb2020, bb2025, common, mixed, mixed/special, bb2020/special, bb2025/special). Java total: 379 → 1,941 tests. Pattern: name, category, one NamedProperty assertion (or class name for mixed multi-edition skills), and @RulesCollection edition annotation. All 1,941 tests pass.
 
-*Last updated: 2026-06-01 (session 25)*
+> **Session 31 (2026-06-01):** Section 4 ID 29 (Player) → ✓ (PlayerModelTest extended to 14 @Test, Rust 13 tests). IDs 30–34 remain ~ (factory constructor prevents Java test creation; Rust boosted to 6–12 tests each). Section 8: BallAndChain, ProjectileVomit, QuickBite, KegHit, Saboteur/Sabotaged, ThrowARock all → ✓. TrapDoorFall/TrapDoorFallForSpp remain ~ (stadium-feature trap door not yet in Rust engine). Section 9: InducementDuration ✓, InducementPhase ✓, Card base struct ✓, CardType ✓, CardEffect ✓. Added CardBaseTest.java (9 @Test). Total: ~2,250 Java @Test, 2,439 Rust tests.
+
+> **Session 32 (2026-06-02):** Section 4: IDs 30–32 → ✓ via Mockito Java tests (TeamModelTest 12, FieldModelTest 10, TurnDataModelTest 11, ActingPlayerModelTest 10); IDs 33–34 and Roster remain ~. Section 8: TrapDoorFall → ✓ (`trap_doors: Vec<FieldCoordinate>` added to FieldModel, D6 roll mechanic in `apply_move`, 4 engine tests; TrapDoorFallForSpp SPP path still ~). Section 9: Prayers to Nuffle ✓, Bugman's XXXXXX ✓, Halfling Master Chef (BB2016) ✓, Riotous Rookies ✓, Star Players ✓, BB2025 Prayers ✓, Infamous Staff ~ (purchase event tested, roster interaction deferred). Magic Item/Dirty Trick cards remain ○. Total: ~2,310 Java @Test, 2,450 Rust tests.
+
+> **Session 33 (2026-06-02):** **Sections 4, 8, 9 complete.** Section 4: IDs 33 ✓ (GameOptionsModelTest +6, GameResultModelTest 9 via @Mock Game), 34 ✓ (GameModelTest 11 via new FactoryManager() + @Mock IFactorySource), Roster row ✓ (RosterModelTest 9, RosterPositionModelTest 9 via no-arg ctors). Rust: roster.rs +4, skill_def.rs +4. Section 8: TrapDoorFallForSpp → ✓ (`resolve_push` now checks trap_doors after defender lands; awards CAS SPP to attacker; 2 new engine tests). Section 9: `Action::PlayCard` extended with `target_player_id: Option<PlayerId>`; all 5 CardEffect types implemented (DISTRACTED→BoneHead, SEDATIVE→ReallyStupid, MAD_CAP_MUSHROOM_POTION→NoHands+JumpUp, ILLEGALLY_SUBSTITUTED→remove from pitch, POISONED→armor roll); 7 engine tests. Magic Item Cards ✓, Dirty Trick Cards ✓, Infamous Staff ✓. ffb-client network_encoder updated for new PlayCard field. Total: ~2,370 Java @Test, 2,465 Rust tests.
+
+> **Session 34 (2026-06-02):** Phase A+B. **Card duration lifecycle fix:** `card_temporary_skills` on GameEngine; card-applied skills now survive activation-time clear and are removed at EndTurn/drive-end via `clear_card_temporary_skills()`; `CardDeactivated` emitted. 3 new PlayCard tests. **BallAndChain → ✓** (7 tests; +Frenzy-no-followup). **DodgySnack/OficiousRef → ✓** (tests already existed). **PathProbabilityFinder (ID 59) → ✓:** Dijkstra max-probability path finder translated to `ffb-mechanics/src/mechanics/path_probability.rs`. Inputs: `PlayerMoveContext` (MA, AG, ST, rules, TwoHeads, BreakTackle, GFI mod, Sprint) + `PathContext` (occupied squares, `Vec<OpponentOnField>` with TZ/DivingTackle/PrehensileTail/DP/Titchy flags). Algorithm matches Java exactly. 20 Rust tests (prob helpers, MA limits, GFI, dodge BB2016/BB2020, BreakTackle, TwoHeads, blocked squares, path reconstruction, Dijkstra). Total: ~2,370 Java @Test, 2,489 Rust tests.
+
+*Last updated: 2026-06-02 (session 34)*

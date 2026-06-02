@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use ffb_model::enums::Rules;
+use ffb_model::enums::{Rules, CardEffect, CardTarget, InducementDuration, InducementPhase};
 
 /// A parsed inducement record from the JSON data files.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,6 +66,47 @@ impl InducementSet {
     }
 }
 
+/// A card that can be played as an inducement (Magic Item or Dirty Trick deck).
+/// Maps to Java's `com.fumbbl.ffb.inducement.Card`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Card {
+    pub name: String,
+    pub short_name: String,
+    pub card_type: CardType,
+    pub target: CardTarget,
+    pub remains_in_play: bool,
+    pub phases: Vec<InducementPhase>,
+    pub duration: InducementDuration,
+    pub description: String,
+    /// Engine-side effect applied when the card activates (None = metadata only).
+    pub effect: Option<CardEffect>,
+}
+
+/// The deck a card belongs to (per-edition).
+/// Maps to Java's `com.fumbbl.ffb.inducement.CardType` interface / BB2016+BB2020 enums.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CardType {
+    MagicItem,
+    DirtyTrick,
+}
+
+impl CardType {
+    pub fn name(self) -> &'static str {
+        match self {
+            CardType::MagicItem => "magicItem",
+            CardType::DirtyTrick => "dirtyTrick",
+        }
+    }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "magicItem" => Some(Self::MagicItem),
+            "dirtyTrick" => Some(Self::DirtyTrick),
+            _ => None,
+        }
+    }
+}
+
 /// Whether a bribe inducement can be used at the point of a foul referee check.
 pub fn can_use_bribe(set: &InducementSet, _rules: Rules) -> bool {
     set.has_available("bribes")
@@ -117,6 +158,60 @@ mod tests {
         let mut set = InducementSet::default();
         set.add("bloodweiserKegs", 3);
         assert_eq!(bloodweiser_keg_bonus(&set), 3);
+    }
+
+    #[test]
+    fn card_type_round_trip_name() {
+        for ct in [CardType::MagicItem, CardType::DirtyTrick] {
+            assert_eq!(CardType::from_name(ct.name()), Some(ct));
+        }
+        assert!(CardType::from_name("unknown").is_none());
+    }
+
+    #[test]
+    fn card_type_magic_item_name() {
+        assert_eq!(CardType::MagicItem.name(), "magicItem");
+        assert_eq!(CardType::DirtyTrick.name(), "dirtyTrick");
+    }
+
+    #[test]
+    fn card_struct_fields_set_correctly() {
+        let card = Card {
+            name: "Cloud Burster".into(),
+            short_name: "CB".into(),
+            card_type: CardType::MagicItem,
+            target: CardTarget::OwnPlayer,
+            remains_in_play: true,
+            phases: vec![InducementPhase::StartOfOwnTurn],
+            duration: InducementDuration::UntilEndOfTurn,
+            description: "A test card".into(),
+            effect: Some(CardEffect::Distracted),
+        };
+        assert_eq!(card.name, "Cloud Burster");
+        assert_eq!(card.card_type, CardType::MagicItem);
+        assert!(card.remains_in_play);
+        assert_eq!(card.duration, InducementDuration::UntilEndOfTurn);
+        assert_eq!(card.effect, Some(CardEffect::Distracted));
+    }
+
+    #[test]
+    fn card_serde_round_trip() {
+        let card = Card {
+            name: "Sedative Tackle".into(),
+            short_name: "ST".into(),
+            card_type: CardType::DirtyTrick,
+            target: CardTarget::OpposingPlayer,
+            remains_in_play: false,
+            phases: vec![InducementPhase::EndOfOwnTurn],
+            duration: InducementDuration::UntilUsed,
+            description: "Sedate a player".into(),
+            effect: Some(CardEffect::Sedative),
+        };
+        let json = serde_json::to_string(&card).unwrap();
+        let back: Card = serde_json::from_str(&json).unwrap();
+        assert_eq!(card.name, back.name);
+        assert_eq!(card.card_type, back.card_type);
+        assert_eq!(card.duration, back.duration);
     }
 
     #[test]

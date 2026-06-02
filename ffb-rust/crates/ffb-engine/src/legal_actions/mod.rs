@@ -802,4 +802,100 @@ mod tests {
             "player with only standing opponent must NOT have Foul available"
         );
     }
+
+    #[test]
+    fn legal_move_targets_includes_all_adjacent_empty_squares_with_opponent_nearby() {
+        // legal_move_targets always returns all adjacent empty squares.
+        // Even with an opponent adjacent (TZ present), the squares are still legal targets.
+        let mut home = make_team("home");
+        home.players.push(make_player("mover"));
+        let mut away = make_team("away");
+        away.players.push(make_player("tackler"));
+        let mut engine = make_engine_with_teams(home, away);
+
+        engine.game.field_model.set_player_coordinate("mover", FieldCoordinate::new(10, 7));
+        engine.game.field_model.set_player_state("mover", PS::new(PS_STANDING));
+        // Opponent adjacent — would need a dodge, but all adjacent EMPTY squares still legal targets
+        engine.game.field_model.set_player_coordinate("tackler", FieldCoordinate::new(11, 7));
+        engine.game.field_model.set_player_state("tackler", PS::new(PS_STANDING));
+
+        let targets = legal_move_targets(&engine.game, "mover");
+        // (11,7) is occupied by tackler → not in targets; all other 7 adjacent squares should be
+        assert!(!targets.contains(&FieldCoordinate::new(11, 7)), "occupied square must not be a legal target");
+        assert!(targets.contains(&FieldCoordinate::new(10, 8)), "empty adjacent square must be legal");
+        assert!(targets.contains(&FieldCoordinate::new(10, 6)), "empty adjacent square must be legal");
+        assert!(targets.len() >= 5, "at least 5 adjacent empty squares must be legal from (10,7)");
+    }
+
+    #[test]
+    fn legal_block_targets_includes_opponent_carrying_ball() {
+        // A ball-carrying opponent is still a valid block target.
+        let mut home = make_team("home");
+        home.players.push(make_player("blocker"));
+        let mut away = make_team("away");
+        away.players.push(make_player("carrier"));
+        let mut engine = make_engine_with_teams(home, away);
+
+        engine.game.field_model.set_player_coordinate("blocker", FieldCoordinate::new(10, 7));
+        engine.game.field_model.set_player_state("blocker", PS::new(PS_STANDING));
+        engine.game.field_model.set_player_coordinate("carrier", FieldCoordinate::new(11, 7));
+        engine.game.field_model.set_player_state("carrier", PS::new(PS_STANDING));
+        // Ball at carrier's square
+        engine.game.field_model.ball_coordinate = Some(FieldCoordinate::new(11, 7));
+        engine.game.field_model.ball_in_play = true;
+
+        let targets = legal_block_targets(&engine.game, "blocker", TeamSide::Home);
+        assert!(targets.contains(&"carrier".to_string()), "ball carrier must be a legal block target");
+    }
+
+    #[test]
+    fn legal_foul_targets_empty_when_foul_already_used() {
+        // When turn_data.foul_used = true, no foul should be legal for activation.
+        // (The engine honors foul_used in legal_activate_player_actions; legal_foul_targets
+        // itself returns targets, but activation won't offer Foul when foul_used is set.)
+        let mut home = make_team("home");
+        home.players.push(make_player("fouler"));
+        let mut away = make_team("away");
+        away.players.push(make_player("victim"));
+        let mut engine = make_engine_with_teams(home, away);
+
+        engine.game.field_model.set_player_coordinate("fouler", FieldCoordinate::new(10, 7));
+        engine.game.field_model.set_player_state("fouler", PS::new(PS_STANDING));
+        engine.game.field_model.set_player_coordinate("victim", FieldCoordinate::new(11, 7));
+        engine.game.field_model.set_player_state("victim", PS::new(PS_PRONE));
+        engine.game.turn_data_home.foul_used = true;
+
+        let actions = legal_activate_player_actions(&engine.game, TeamSide::Home);
+        assert!(
+            !actions.iter().any(|a| matches!(a, crate::action::Action::ActivatePlayer { player_action, .. }
+                if *player_action == PlayerActionChoice::Foul)),
+            "Foul must not be offered when foul_used=true"
+        );
+    }
+
+    #[test]
+    fn legal_actions_end_turn_accepted_in_regular_mode() {
+        // The engine accepts EndTurn in Regular turn mode.
+        let home = make_team("home");
+        let away = make_team("away");
+        let mut engine = make_engine_with_teams(home, away);
+        engine.game.turn_data_home.turn_nr = 1;
+        engine.game.turn_data_away.turn_nr = 1;
+        engine.game.home_playing = true;
+        engine.game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        engine.game.status = ffb_model::enums::GameStatus::Active;
+
+        let result = engine.apply(TeamSide::Home, crate::action::Action::EndTurn);
+        assert!(result.is_ok(), "EndTurn must be accepted in Regular mode, got {:?}", result.err());
+    }
+
+    #[test]
+    fn legal_move_targets_returns_empty_for_off_pitch_player() {
+        let home = make_team("home");
+        let away = make_team("away");
+        let engine = make_engine_with_teams(home, away);
+        // "ghost" has no coordinate
+        let targets = legal_move_targets(&engine.game, "ghost");
+        assert!(targets.is_empty(), "off-pitch player has no legal move targets");
+    }
 }

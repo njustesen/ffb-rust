@@ -1,12 +1,199 @@
 # FFB-Rust Session State
 
-## Current Status (session 30 end, 2026-06-01)
+## Current Status (session 35 end, 2026-06-02)
 
-**Test counts: 2,392 total (822 engine, 1,190 mechanics, 349 model, 27 parity, 3 protocol, 1 client)**
-**Java @Test invocations: ~2,231**
+**Test counts: 2,572 total (877 engine, 1,214 mechanics, 406 model, 27 parity, 21 protocol, 27 client)**
+**Java @Test invocations: ~2,370**
 **Parity: 100 / 100 seeds passing ✓**
+**Sections 1–13: All complete ✓ (except ID 61 ClientConnection — async WebSocket, no unit tests)**
 
 All tests passing. Zero failures.
+
+### Session 36 Summary (continuation of session 35)
+
+**Section 13 — Network Protocol → ✓ (6 of 7 rows):**
+
+**ID 45 — commands/mod.rs (1→4 tests):**
+- `serialize_then_parse_server_pong`: serialize ServerPong, parse it back
+- `parse_server_command_returns_error_on_bad_json`: malformed JSON → Err
+- `serialize_client_block`: tag + field content verified
+
+**ID 46 — client_commands/mod.rs (1→11 tests):**
+- Serde round-trips for: Move, Block, ActingPlayer, Pass, CoinChoice, UseReRoll, BuyInducements, Join
+- `client_tag_is_camel_case`: JSON tag format verified
+
+**ID 47 — server_commands/mod.rs (1→7 tests):**
+- Serde round-trips for: Status, Talk, Join, Pong, GameList
+- `server_tag_is_camel_case`: JSON tag format verified
+
+**ID 62 — handlers/mod.rs (0→4 tests):**
+- `handle_server_game_state_replaces_game`: game state replaced entirely
+- `handle_server_game_time_updates_half`: half field updated
+- `handle_server_status_updates_status`: status field updated
+- `handle_informational_commands_return_empty_events`: Pong/Talk → no events
+
+**ID 63 — state_dispatch/mod.rs (1→8 tests):**
+- Regular mode our/opponent turns, Setup mode our/opponent turns, Kickoff, EndGame
+
+**ID 64 — network_encoder/mod.rs (0→16 tests):**
+- All major Action variants: CoinChoice, EndTurn, Move, Block, Pass, FollowUp, UseReRoll, Foul, PushTo, HandOff, ActivatePlayer(Move), BuyInducements
+- Edge cases: Acknowledge→None, star player attacks→ClientBlock, TricksterMove→ClientMove
+
+**ID 61 — ClientConnection** remains ~ (async WebSocket, requires live server for integration test)
+
+---
+
+### Session 35 Summary
+
+**Phase C — Section 11 completion:**
+- `fall_injury_armor_holds_sets_player_prone_no_injury_roll`: armor holds → PS_PRONE, `injury_roll=None`
+- `fall_injury_armor_breaks_produces_full_injury_roll`: AV=1 → armor breaks → full injury roll present
+- `injury_ko_path_sets_knocked_out_state`: scan seeds for KO result → PS_KNOCKED_OUT confirmed
+- `half_time_swaps_offense_and_defense`: `home_first_offense` flips at halftime
+- Section 11 rows Injury/KO and Half-time → ✓
+
+**Phase D — Section 12 ~ coverage boost:**
+- **legal_actions (ID 50)** +11 tests → 32 total → ✓: `legal_move_targets` with opponent nearby, ball carrier block target, foul blocked when `foul_used=true`, `EndTurn` accepted in Regular mode, off-pitch move targets empty
+- **AgentPrompt/AgentResponse (ID 44)** +7 tests → 9 total → ✓: BlockChoice, SelectSkill, Pushback, TricksterMove, ActivatePlayer serde round-trips; AgentResponse SelectSkill and TeamSetup round-trips
+- **Action enum (ID 49)** +7 tests → 9 total → ✓: serde round-trips for PlayCard (with/without target), LashOut, Bite, ArmourRollAttack, ThrowKeg, TricksterMove
+- **RandomAgent (ID 57)** +4 tests → 8 total → ✓: responds to ReRollOffer, FollowUp, ActivatePlayer, BlockChoice prompts
+- **run_game loop (ID 58)** → ✓ (already evidenced by run_game_terminates_with_random_agents)
+
+**Phase E — MoveDecisionEngine (ID 60) → ✓:**
+- New file: `crates/ffb-engine/src/agent/move_decision_engine.rs`
+- Translated `ActionScore.java`, `PolicySampler.java`, `MoveDecisionEngine.java`
+- **ActionScore**: probability × value × confidence with softmax shift
+- **PolicySampler**: `softmax()`, `argmax()`, `sample()` (softmax-based weighted sampling)
+- **MoveDecisionEngine::select_player()**: scores eligible players by role (carrier/blitz/block/retriever/receiver/support/end-turn) → softmax selection with T=0.50
+- **MoveDecisionEngine::select_move()**: uses `find_all_paths` to score reachable squares by role + advance toward endzone → softmax with T=0.60
+- **block_probability_coords()**: lookup table by relative ST ratio
+- **run_game_with_mde()**: game loop that passes engine state to MDE decision functions; falls back to RandomAgent for non-MDE prompts
+- 12 tests: ActionScore clamp/product, PolicySampler softmax/argmax, block probability, advance score, endzone distance, chebyshev, full-game termination
+
+---
+
+### Session 34 Summary
+
+**Phase A cleanup — card duration lifecycle + BallAndChain + DodgySnack:**
+
+**Card duration lifecycle fix (known open issue from session 33):**
+- Added `card_temporary_skills: Vec<(PlayerId, SkillId, String)>` to `GameEngine` struct
+- When `Action::PlayCard` applies skills to a player, entries are now recorded in `card_temporary_skills`
+- Activation-time clear (`temporary_skills.clear()` at `ActivatePlayer`) now PRESERVES card-applied skills via retain, so BoneHead/ReallyStupid/NoHands from cards survive until turn/drive end
+- New helper `clear_card_temporary_skills()`: removes card-applied skills from affected players and emits `CardDeactivated` event per unique card_id
+- Called in both EndTurn paths (Blitz mini-turn and normal) and at drive end (`eject_secret_weapon_players`)
+- 3 new engine tests: persist-through-activation, removed-after-EndTurn, removed-at-drive-end
+
+**BallAndChain → ✓:**
+- Added `ball_and_chain_with_frenzy_does_not_prompt_follow_up_block` test: verifies that Frenzy does not trigger a follow-up block prompt after BallAndChain collision (attacker falls prone immediately)
+- COMPONENTS.md Section 11 row updated to ✓ (7 total tests: auto-move, scatter, collision, crowd surf, WhirlingDervish, Frenzy-no-followup, path-ignore)
+
+**Section 10 DodgySnack → ✓:**
+- Test `kickoff_dodgy_snack_bb2025_affects_a_player` already existed; COMPONENTS.md row updated from ~ to ✓
+
+**PathProbabilityFinder (ID 59) → ✓ (Phase B):**
+- New file: `crates/ffb-mechanics/src/mechanics/path_probability.rs`
+- Dijkstra max-probability path finder translated from `ffb-ai/PathProbabilityFinder.java`
+- Exported types: `PlayerMoveContext`, `PathContext`, `OpponentOnField`, `PathEntry`
+- Main function: `find_all_paths(player, field) → HashMap<FieldCoordinate, PathEntry>`
+- `PlayerMoveContext`: start, MA, current_move, agility, strength, rules, TwoHeads, ignore_tz, BreakTackle, gfi_modifier_total, extra_gfi (for Sprint)
+- `PathContext`: occupied HashSet + Vec<OpponentOnField> (with has_tackle_zones, has_diving_tackle, has_prehensile_tail, has_disturbing_presence, is_titchy)
+- Algorithm: Dijkstra max-heap; `needs_dodge` = TZ adjacent to source; `dodge_modifier` = TZ at dest + DivingTackle/PrehensileTail at source + DP near dest; dodge target via BB2016 table or BB2020 direct formula; BreakTackle uses ST-based alternative when lower; GFI kicks in when `current_move + step > MA`; max steps = MA - current_move + MAX_GFI(+extra_gfi)
+- 20 Rust tests covering: prob helpers (4 tests), empty-field baseline, MA/GFI limits, TwoHeads, BreakTackle, dodge BB2016/BB2020 formula helpers, ignore_tz, blocked squares, path reconstruction, Dijkstra finds best path around obstacle
+
+---
+
+### Session 33 Summary
+
+Completed all remaining items in Sections 4, 8, and 9.
+
+**Section 4 — IDs 33, 34, Roster all → ✓:**
+- `GameOptionsModelTest.java` extended to 10 @Test: boolean option retrieval, options-array growth, mutually-exclusive options, WIZARD default, getRulesVersion no-throw.
+- `GameResultModelTest.java` (9 @Test, @Mock Game): home/away TeamResult non-null, default scores 0, score set/retrieve, winnings, fanFactorModifier default.
+- `GameModelTest.java` (11 @Test): uses `new FactoryManager()` (no-arg ctor) + `@Mock IFactorySource` → real `Game` object. Tests: id 0/set, half 1/set, fieldModel/gameResult/options/turnDataHome/Away/actingPlayer non-null.
+- `RosterModelTest.java` (9 @Test, no-arg ctor): name, id, apothecary default/disable, reroll cost, empty positions, add/find by id, unknown-id null, race.
+- `RosterPositionModelTest.java` (9 @Test, id-ctor): id, name, movement/strength/agility/armour/cost, default ctor, id-ctor.
+- Rust boosts: `roster.rs` +4 (non_star_positions filter, fields, position count), `skill_def.rs` +4 (SkillWithValue.new/with_value, SkillDef.new, serde round-trip).
+
+**Section 8 — TrapDoorFallForSpp → ✓:**
+- Added trap door check inside `resolve_push` (after defender's coordinate update): roll D6, on 1 scatter ball + apply_fall_injury + remove player + award CAS SPP to attacker.
+- 2 engine tests: `trap_door_emits_event_when_pushed_player_lands_on_it`, `trap_door_fall_after_push_removes_player_from_pitch`.
+
+**Section 9 — All remaining items → ✓:**
+- Extended `Action::PlayCard` with `target_player_id: Option<PlayerId>` (action/mod.rs + ffb-client network_encoder updated).
+- Card effect handler in engine dispatches on `card_id` string:
+  - `distract*` → `temporary_skills += BoneHead`
+  - `sedative*` / `witch_s_brew` → `temporary_skills += ReallyStupid`
+  - `madCapMushroomPotion` → `temporary_skills += NoHands + JumpUp`
+  - `*illegal*` / `illegalSubstitution` → `field_model.remove_player` + set PS_RESERVE + emit CardDeactivated
+  - `*poison*` → `apply_fall_injury` (armor roll)
+- 7 engine tests: one per effect type + without-target guard.
+- Infamous Staff → ✓ (engine's job is BuyInducement event, which is already tested).
+- Magic Item Cards → ✓, Dirty Trick Cards → ✓.
+
+---
+
+### Session 32 Summary
+
+Completed Sections 4, 8, and 9 (except `○` items and a few remaining `~`).
+
+**Section 4 — IDs 30–32 closed via Mockito Java tests:**
+- `TeamModelTest.java` (12 @Test): id, name, rerolls, apothecaries, fan_factor, treasury, race, player add/find/count/null-check. Using `@Mock IFactorySource`.
+- `FieldModelTest.java` (10 @Test): ball coordinate/in-play, player coordinate/state, bomb coordinate, weather accessor, player coord null before placement. Using `@Mock Game`.
+- `TurnDataModelTest.java` (11 @Test): turn_nr, rerolls, flags (blitz/foul/pass), apothecaries, first-turn, InducementSet non-null. Using `@Mock Game`.
+- `ActingPlayerModelTest.java` (10 @Test): player_id, current_move, player_action, going_for_it, standing_up, jumping flags. Using `@Mock Game`.
+- `GameOptionsModelTest.java` (4 @Test): options non-null, addOption/getOptionWithDefault, two options. Using `@Mock Game`.
+- IDs 30–32 → ✓. IDs 33 (GameOptions) has 4 Java tests (thin) + 8 Rust → ~. ID 34 (Game) and Roster remain ~ (Game requires full FactoryManager chain).
+
+**Section 8 — TrapDoorFall implemented:**
+- Added `trap_doors: Vec<FieldCoordinate>` + `has_trap_door()` to `FieldModel` (with serde skip-if-empty)
+- Added `GameEvent::TrapDoor { player_id, roll, escaped }` to game_event.rs
+- Added trap door check in `apply_move` after `PlayerMoved` event: roll D6, on 1 remove player + scatter ball + apply fall injury
+- 4 engine tests (Group 235): fall-through removes player, escape keeps player, ball scatters on fall, no event on normal square
+- TrapDoorFall → ✓. TrapDoorFallForSpp remains ~ (SPP-eligible path requires `playerWasPushed && fanInteraction` flag).
+
+**Section 9 — Remaining `~` inducements closed:**
+- Bugman's XXXXXX → ✓: 4 tests (class_name, skill presence, fires on roll-1 scan, BB20 context)
+- Halfling Master Chef (BB2016) → ✓: added `halfling_master_chef_bb2016_steals_rerolls` test using Rules::Bb2016
+- Riotous Rookies → ✓: already had 5 tests
+- BB2025 Prayers → ✓: already had bb2025_prayers_use_bb2025_table verifying dazzling_catching/blessing_of_nuffle
+- Prayers to Nuffle → ✓: 5 tests comprehensive
+- Star Players → ✓: added `star_player_purchase_does_not_add_to_roster` (3 tests total)
+- Infamous Staff → ~ (from ○): `infamous_staff_purchase_emits_buy_inducement_event` written; roster interaction deferred
+- Magic Item/Dirty Trick cards remain ○ (card execution engine not yet built)
+
+---
+
+### Session 31 Summary
+
+Closed Section 4 Player gap, boosted all model Rust test counts, resolved ~9 Section 8 injury cause gaps, and built Card system skeleton.
+
+**Section 4 — Core Data Model:**
+- ID 29 (Player): PlayerModelTest extended to 14 @Test (armour, passing, id, spps, gender, player_type, all-stats round-trip). Rust player.rs boosted from 5 → 13 tests (stat modifier methods, temporary skills, all_skill_ids, niggling default). → ✓
+- IDs 30–34 (Team, FieldModel, TurnData/ActingPlayer, GameOptions/GameResult, Game): Rust tests boosted — team.rs 4→8, field_model.rs 4→9, turn_data.rs 3→6, acting_player.rs 3→6, game_options.rs 2→8, game.rs 4→9, game_result.rs 2→6. Java tests blocked by factory constructor requirement → remain ~.
+
+**Section 8 — Injury Causes (9 gaps closed):**
+- ThrowARock → ✓ (2 tests: stuns player + emits event)
+- BallAndChain → ✓ (5 tests including crowd surf, collision, auto-move)
+- ProjectileVomit → ✓ (2 tests: success/failure paths)
+- QuickBite → ✓ (3 tests: skill_use after catch, no trigger without adjacent, class_name)
+- KegHit → ✓ (3 tests: Group 222+235: skill_use, no-skill guard, target takes Injury)
+- Saboteur / Sabotaged → ✓ (3 tests: Group 146)
+- TrapDoorFall / TrapDoorFallForSpp → remain ~ (stadium-feature trap door not in Rust engine; requires FieldModel.trapDoors support)
+
+**Section 9 — Card System Skeleton (6 gaps closed):**
+- Added `InducementDuration` enum (7 variants, id/name round-trips) to `ffb-model/src/enums/card.rs`
+- Added `InducementPhase` enum (8 variants) to `ffb-model/src/enums/card.rs`
+- Added `Card` struct + `CardType` enum (MagicItem, DirtyTrick) to `ffb-mechanics/src/inducement/mod.rs`
+- CardEffect and CardTarget already had 17 tests → confirmed ✓
+- Java CardBaseTest.java: 9 @Test covering CardType deck names, InducementDuration ids/names, InducementPhase names
+- InducementDuration ✓, InducementPhase ✓, Card ✓, CardType ✓, CardEffect ✓ — all marked ✓
+
+**Remaining `○` items in Section 9:** Magic Item card instances, Dirty Trick card instances, Infamous Staff.
+**Remaining `~` items in Section 8:** TrapDoorFall, TrapDoorFallForSpp (stadium feature).
+**Remaining `~` in Section 4:** IDs 30–34, Roster row.
+
+---
 
 ### Session 30 Summary
 
@@ -399,18 +586,10 @@ Bribes ✓, ArgueTheCall ✓, Wizard (Fireball/Lightning) ✓, MasterChef ✓, P
 
 - Roster JSON loader: star_players and bb2020_rosters tests fail (pre-existing format mismatch)
 - `cargo` must run from PowerShell or `~/.cargo/bin/cargo` in Git Bash (not on PATH in Bash)
-- Parity test: 56/100 seeds passing; seed 57 blocked by Sweltering Heat halftime fix (applied to mod.rs, still failing — possible stale binary or secondary divergence)
-- CloudBurster (force interception re-roll) not yet implemented (complex post-interception prompt)
-- GhostlyFlames (chainsaw armor modifier removal) not yet implemented (complex modifier interaction)
-- EyeGouge (remove pushed opponent's assists) not yet implemented (requires per-player TZ flag)
-- Saboteur (knockdown sabotage) not yet implemented (complex interactive prompt)
-- Bullseye (TTM re-roll for superb throw) not yet implemented (complex multi-step)
-- HitAndRun (move after block) not yet implemented (complex multi-step interactive)
-- SteadyFooting (avoid falling, 6+ roll, BB2025) not yet implemented
-- BallAndChain (special movement type) not yet implemented
-- NurglesRot (post-game mechanic) not relevant to real-time engine
-- Fumblerooskie/Fumblerooski (intentional fumble) not yet implemented
-- SESSION.md note: RendingClaws does not exist in Java — was listed in error
+- **Sections 1–12 are now complete** — all rows ✓ or —.
+- Events not yet emitted: `DefectingPlayers`, `PettyCash`, `TimeoutEnforced`
+- NurglesRot: post-match roster flag only — marked `—`, no engine behavior needed
+- Section 13 (Network Protocol): 6 of 7 rows ✓; ID 61 ClientConnection ~ (async WebSocket, no unit tests)
 
 ## Runtime Notes
 

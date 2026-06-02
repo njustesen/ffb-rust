@@ -172,6 +172,43 @@ mod tests {
     }
 
     #[test]
+    fn is_finished_false_by_default() {
+        let g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2020);
+        assert!(!g.is_finished());
+    }
+
+    #[test]
+    fn is_finished_true_when_status_finished() {
+        let mut g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2020);
+        g.status = GameStatus::Finished;
+        assert!(g.is_finished());
+    }
+
+    #[test]
+    fn is_home_team_identifies_correct_team() {
+        let g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2020);
+        assert!(g.is_home_team("home"));
+        assert!(!g.is_home_team("away"));
+    }
+
+    #[test]
+    fn turn_data_returns_home_data_when_home_playing() {
+        let mut g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2020);
+        g.turn_data_home.turn_nr = 3;
+        g.turn_data_away.turn_nr = 7;
+        assert_eq!(g.turn_data().turn_nr, 3);
+    }
+
+    #[test]
+    fn turn_data_returns_away_data_when_away_playing() {
+        let mut g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2020);
+        g.home_playing = false;
+        g.turn_data_home.turn_nr = 3;
+        g.turn_data_away.turn_nr = 7;
+        assert_eq!(g.turn_data().turn_nr, 7);
+    }
+
+    #[test]
     fn player_lookup_searches_both_teams() {
         use std::collections::HashSet;
         use crate::enums::{PlayerType, PlayerGender};

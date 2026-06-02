@@ -99,8 +99,8 @@ pub enum Action {
     // ── Inducement ────────────────────────────────────────────────────────────
     /// Purchase inducements before the game.
     BuyInducements { purchases: Vec<InducementPurchase> },
-    /// Play a card from the hand.
-    PlayCard { card_id: String },
+    /// Play a card from the hand, optionally targeting a player.
+    PlayCard { card_id: String, target_player_id: Option<PlayerId> },
 
     // ── Star-player special attacks ───────────────────────────────────────
     /// PrimalSavagery: lash out against an adjacent opponent (D6+ST vs D6+AV).
@@ -182,5 +182,48 @@ mod tests {
         let json = serde_json::to_string(&a).unwrap();
         let back: Action = serde_json::from_str(&json).unwrap();
         assert_eq!(a, back);
+    }
+
+    fn rt(a: Action) {
+        let json = serde_json::to_string(&a).unwrap();
+        let back: Action = serde_json::from_str(&json).unwrap();
+        assert_eq!(a, back, "round-trip failed for {:?}", a);
+    }
+
+    #[test]
+    fn play_card_with_target_round_trips() {
+        rt(Action::PlayCard { card_id: "distract".into(), target_player_id: Some("p1".into()) });
+    }
+
+    #[test]
+    fn play_card_without_target_round_trips() {
+        rt(Action::PlayCard { card_id: "any".into(), target_player_id: None });
+    }
+
+    #[test]
+    fn lash_out_round_trips() {
+        rt(Action::LashOut { target_id: "p2".into() });
+    }
+
+    #[test]
+    fn bite_round_trips() {
+        rt(Action::Bite { target_id: "victim".into() });
+    }
+
+    #[test]
+    fn armour_roll_attack_round_trips() {
+        rt(Action::ArmourRollAttack { target_id: "t".into() });
+    }
+
+    #[test]
+    fn throw_keg_round_trips() {
+        use ffb_model::types::FieldCoordinate;
+        rt(Action::ThrowKeg { coord: FieldCoordinate::new(12, 7) });
+    }
+
+    #[test]
+    fn trickster_move_round_trips() {
+        use ffb_model::types::FieldCoordinate;
+        rt(Action::TricksterMove { coord: FieldCoordinate::new(13, 8) });
     }
 }

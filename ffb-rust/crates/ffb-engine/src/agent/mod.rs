@@ -1,3 +1,5 @@
+pub mod move_decision_engine;
+
 use rand_chacha::ChaCha8Rng;
 use rand::{SeedableRng, Rng};
 use ffb_model::prompts::{AgentPrompt, AgentResponse};
@@ -400,6 +402,61 @@ mod tests {
         // Game must either finish normally or we hit the step cap (acceptable for now)
         // The key invariant: no panics or infinite loops
         assert!(steps > 0, "game must make at least one step");
+    }
+
+    #[test]
+    fn random_agent_responds_to_reroll_offer() {
+        use ffb_model::enums::ReRollSource;
+        let prompt = AgentPrompt::ReRollOffer {
+            source: ReRollSource::new("TeamReRoll"),
+            action: "Dodge".into(),
+            team_id: "home".into(),
+        };
+        let response = RandomAgent::new(42).respond(&prompt);
+        assert!(matches!(response, AgentResponse::UseReRoll { .. }),
+            "RandomAgent must return UseReRoll for ReRollOffer");
+    }
+
+    #[test]
+    fn random_agent_responds_to_follow_up() {
+        let prompt = AgentPrompt::FollowUp {
+            attacker_id: "att".into(),
+            target_coord: ffb_model::types::FieldCoordinate::new(10, 7),
+        };
+        let response = RandomAgent::new(42).respond(&prompt);
+        assert!(matches!(response, AgentResponse::FollowUp { .. }),
+            "RandomAgent must return FollowUp for FollowUp prompt");
+    }
+
+    #[test]
+    fn random_agent_responds_to_activate_player() {
+        let prompt = AgentPrompt::ActivatePlayer {
+            eligible_players: vec![
+                ("p1".into(), vec![PlayerAction::Move]),
+                ("p2".into(), vec![PlayerAction::Move, PlayerAction::Block]),
+            ],
+        };
+        let response = RandomAgent::new(42).respond(&prompt);
+        assert!(matches!(response, AgentResponse::ActivatePlayer { .. }),
+            "RandomAgent must return ActivatePlayer for ActivatePlayer prompt");
+        if let AgentResponse::ActivatePlayer { player_id, .. } = response {
+            assert!(player_id == "p1" || player_id == "p2",
+                "RandomAgent must pick from the eligible players list");
+        }
+    }
+
+    #[test]
+    fn random_agent_responds_to_block_choice() {
+        let prompt = AgentPrompt::BlockChoice {
+            attacker_id: "att".into(),
+            defender_id: "def".into(),
+            dice: vec![1, 3, 5],
+            own_choice: true,
+            nr_of_dice: 2,
+        };
+        let response = RandomAgent::new(42).respond(&prompt);
+        assert!(matches!(response, AgentResponse::BlockChoice { .. }),
+            "RandomAgent must return BlockChoice for BlockChoice prompt");
     }
 }
 

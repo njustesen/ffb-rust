@@ -59,4 +59,45 @@ mod tests {
         let back: SkillWithValue = serde_json::from_str(&json).unwrap();
         assert_eq!(sw, back);
     }
+
+    #[test]
+    fn skill_with_value_new_has_no_value() {
+        let sw = SkillWithValue::new(SkillId::Dodge);
+        assert_eq!(sw.skill_id, SkillId::Dodge);
+        assert!(sw.value.is_none());
+    }
+
+    #[test]
+    fn skill_with_value_with_value_stores_value() {
+        let sw = SkillWithValue::with_value(SkillId::MightyBlow, "+1");
+        assert_eq!(sw.value.as_deref(), Some("+1"));
+    }
+
+    #[test]
+    fn skill_def_new_sets_fields() {
+        let def = SkillDef::new(
+            SkillId::Block,
+            "Block",
+            SkillCategory::General,
+            SkillUsageType::Regular,
+        );
+        assert_eq!(def.id, SkillId::Block);
+        assert_eq!(def.name, "Block");
+        assert_eq!(def.category, SkillCategory::General);
+        assert!(def.declare_condition.is_none());
+    }
+
+    #[test]
+    fn skill_def_serde_round_trip() {
+        let def = SkillDef::new(
+            SkillId::Dodge,
+            "Dodge",
+            SkillCategory::Agility,
+            SkillUsageType::Regular,
+        );
+        let json = serde_json::to_string(&def).unwrap();
+        let back: SkillDef = serde_json::from_str(&json).unwrap();
+        assert_eq!(def.id, back.id);
+        assert_eq!(def.name, back.name);
+    }
 }

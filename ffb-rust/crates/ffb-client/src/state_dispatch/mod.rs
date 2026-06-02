@@ -117,13 +117,56 @@ mod tests {
         }
     }
 
+    fn make_game_in_mode(mode: TurnMode) -> ffb_model::model::game::Game {
+        let mut game = ffb_model::model::game::Game::new(
+            make_team("home"), make_team("away"), ffb_model::enums::Rules::Bb2020,
+        );
+        game.turn_mode = mode;
+        game
+    }
+
     #[test]
     fn start_game_state() {
-        let game = ffb_model::model::game::Game::new(
-            make_team("home"),
-            make_team("away"),
-            ffb_model::enums::Rules::Bb2020,
-        );
+        let game = make_game_in_mode(TurnMode::StartGame);
         assert_eq!(current_state(&game, "home"), ClientStateId::StartGame);
+    }
+
+    #[test]
+    fn regular_mode_our_turn_is_select_player() {
+        let game = make_game_in_mode(TurnMode::Regular);
+        // home_playing = true by default in a new game
+        assert_eq!(current_state(&game, "home"), ClientStateId::SelectPlayer);
+    }
+
+    #[test]
+    fn regular_mode_opponent_turn_is_wait() {
+        let game = make_game_in_mode(TurnMode::Regular);
+        assert_eq!(current_state(&game, "away"), ClientStateId::WaitForOpponent);
+    }
+
+    #[test]
+    fn setup_mode_our_turn_is_setup() {
+        let mut game = make_game_in_mode(TurnMode::Setup);
+        game.home_playing = true;
+        assert_eq!(current_state(&game, "home"), ClientStateId::Setup);
+    }
+
+    #[test]
+    fn setup_mode_opponent_turn_is_wait_for_setup() {
+        let game = make_game_in_mode(TurnMode::Setup);
+        assert_eq!(current_state(&game, "away"), ClientStateId::WaitForSetup);
+    }
+
+    #[test]
+    fn kickoff_mode_is_kickoff_state() {
+        let game = make_game_in_mode(TurnMode::Kickoff);
+        assert_eq!(current_state(&game, "home"), ClientStateId::Kickoff);
+        assert_eq!(current_state(&game, "away"), ClientStateId::Kickoff);
+    }
+
+    #[test]
+    fn end_game_mode_is_wait_for_opponent() {
+        let game = make_game_in_mode(TurnMode::EndGame);
+        assert_eq!(current_state(&game, "home"), ClientStateId::WaitForOpponent);
     }
 }

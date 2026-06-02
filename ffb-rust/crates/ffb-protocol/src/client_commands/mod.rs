@@ -310,12 +310,81 @@ pub struct ClientPing {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ffb_model::types::FieldCoordinate;
+    use ffb_model::enums::PlayerAction;
+
+    fn rt(cmd: &ClientCommand) {
+        let json = serde_json::to_string(cmd).unwrap();
+        let _back: ClientCommand = serde_json::from_str(&json)
+            .unwrap_or_else(|e| panic!("round-trip failed: {e}\njson={json}"));
+    }
 
     #[test]
     fn client_end_turn_round_trip() {
-        let cmd = ClientCommand::ClientEndTurn(ClientEndTurn);
-        let json = serde_json::to_string(&cmd).unwrap();
-        let back: ClientCommand = serde_json::from_str(&json).unwrap();
-        assert!(matches!(back, ClientCommand::ClientEndTurn(_)));
+        rt(&ClientCommand::ClientEndTurn(ClientEndTurn));
+    }
+
+    #[test]
+    fn client_move_round_trip() {
+        rt(&ClientCommand::ClientMove(ClientMove {
+            move_squares: vec![FieldCoordinate::new(10, 7), FieldCoordinate::new(11, 7)],
+        }));
+    }
+
+    #[test]
+    fn client_block_round_trip() {
+        rt(&ClientCommand::ClientBlock(ClientBlock { defender_id: "p42".into() }));
+    }
+
+    #[test]
+    fn client_acting_player_round_trip() {
+        rt(&ClientCommand::ClientActingPlayer(ClientActingPlayer {
+            player_id: "p1".into(),
+            player_action: PlayerAction::Move,
+            standing_up: false,
+        }));
+    }
+
+    #[test]
+    fn client_pass_round_trip() {
+        rt(&ClientCommand::ClientPass(ClientPass {
+            target_coordinate: FieldCoordinate::new(18, 7),
+            hail_mary: false,
+        }));
+    }
+
+    #[test]
+    fn client_coin_choice_round_trip() {
+        rt(&ClientCommand::ClientCoinChoice(ClientCoinChoice { home_choice: true }));
+    }
+
+    #[test]
+    fn client_use_reroll_round_trip() {
+        rt(&ClientCommand::ClientUseReRoll(ClientUseReRoll { use_reroll: true }));
+        rt(&ClientCommand::ClientUseReRoll(ClientUseReRoll { use_reroll: false }));
+    }
+
+    #[test]
+    fn client_buy_inducements_round_trip() {
+        rt(&ClientCommand::ClientBuyInducements(ClientBuyInducements {
+            team_id: "home".into(),
+            purchases: vec![("wizard".into(), 1)],
+        }));
+    }
+
+    #[test]
+    fn client_tag_is_camel_case() {
+        let json = serde_json::to_string(&ClientCommand::ClientEndTurn(ClientEndTurn)).unwrap();
+        assert!(json.contains("clientEndTurn"), "tag must be camelCase, got: {json}");
+    }
+
+    #[test]
+    fn client_join_round_trip() {
+        rt(&ClientCommand::ClientJoin(ClientJoin {
+            coach: "TestCoach".into(),
+            team_id: "team1".into(),
+            game_id: "game42".into(),
+            password_hash: None,
+        }));
     }
 }

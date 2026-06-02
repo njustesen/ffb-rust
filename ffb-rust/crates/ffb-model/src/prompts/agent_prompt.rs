@@ -211,4 +211,84 @@ mod tests {
         let back: AgentResponse = serde_json::from_str(&json).unwrap();
         assert_eq!(r, back);
     }
+
+    #[test]
+    fn serde_block_choice_prompt() {
+        let p = AgentPrompt::BlockChoice {
+            attacker_id: "att".into(), defender_id: "def".into(),
+            dice: vec![1, 3, 5], own_choice: true, nr_of_dice: 2,
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        let back: AgentPrompt = serde_json::from_str(&json).unwrap();
+        assert_eq!(p, back);
+    }
+
+    #[test]
+    fn serde_select_skill_prompt() {
+        use crate::enums::SkillCategory;
+        let p = AgentPrompt::SelectSkill {
+            player_id: "p1".into(),
+            available: vec![(SkillCategory::General, vec![1, 2, 3])],
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        let back: AgentPrompt = serde_json::from_str(&json).unwrap();
+        assert_eq!(p, back);
+    }
+
+    #[test]
+    fn serde_pushback_prompt() {
+        let p = AgentPrompt::Pushback {
+            attacker_id: "att".into(), defender_id: "def".into(),
+            squares: vec![
+                FieldCoordinate::new(10, 7),
+                FieldCoordinate::new(10, 8),
+            ],
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        let back: AgentPrompt = serde_json::from_str(&json).unwrap();
+        assert_eq!(p, back);
+    }
+
+    #[test]
+    fn serde_trickster_move_prompt() {
+        let p = AgentPrompt::TricksterMove {
+            player_id: "trickster".into(),
+            squares: vec![FieldCoordinate::new(5, 5)],
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        let back: AgentPrompt = serde_json::from_str(&json).unwrap();
+        assert_eq!(p, back);
+    }
+
+    #[test]
+    fn serde_activate_player_prompt() {
+        use crate::enums::PlayerAction;
+        let p = AgentPrompt::ActivatePlayer {
+            eligible_players: vec![
+                ("p1".into(), vec![PlayerAction::Move, PlayerAction::Block]),
+                ("p2".into(), vec![PlayerAction::Move]),
+            ],
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        let back: AgentPrompt = serde_json::from_str(&json).unwrap();
+        assert_eq!(p, back);
+    }
+
+    #[test]
+    fn agent_response_select_skill_round_trip() {
+        let r = AgentResponse::SelectSkill { skill_id: 42 };
+        let json = serde_json::to_string(&r).unwrap();
+        let back: AgentResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(r, back);
+    }
+
+    #[test]
+    fn agent_response_team_setup_round_trip() {
+        let r = AgentResponse::TeamSetup {
+            placements: vec![("p1".into(), FieldCoordinate::new(5, 7))],
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let back: AgentResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(r, back);
+    }
 }

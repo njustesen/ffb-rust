@@ -25,6 +25,10 @@ pub struct FieldModel {
     pub range_ruler: Option<RangeRuler>,
     pub move_squares: HashSet<FieldCoordinate>,
     pub pushback_squares: Vec<PushbackSquare>,
+
+    /// Stadium trap door locations. Players landing here roll D6; on 1 they fall through.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub trap_doors: Vec<FieldCoordinate>,
 }
 
 impl FieldModel {
@@ -41,7 +45,13 @@ impl FieldModel {
             range_ruler: None,
             move_squares: HashSet::new(),
             pushback_squares: Vec::new(),
+            trap_doors: Vec::new(),
         }
+    }
+
+    /// True if there is a trap door at the given coordinate.
+    pub fn has_trap_door(&self, coord: FieldCoordinate) -> bool {
+        self.trap_doors.contains(&coord)
     }
 
     pub fn player_coordinate(&self, id: &str) -> Option<FieldCoordinate> {
@@ -128,6 +138,53 @@ mod tests {
         let json = serde_json::to_string(&fm).unwrap();
         let back: FieldModel = serde_json::from_str(&json).unwrap();
         assert_eq!(fm.weather, back.weather);
+    }
+
+    #[test]
+    fn ball_coordinate_set_and_get() {
+        let mut fm = FieldModel::new();
+        assert!(fm.ball_coordinate.is_none());
+        fm.ball_coordinate = Some(FieldCoordinate::new(8, 5));
+        assert_eq!(fm.ball_coordinate, Some(FieldCoordinate::new(8, 5)));
+    }
+
+    #[test]
+    fn ball_in_play_flag_toggled() {
+        let mut fm = FieldModel::new();
+        assert!(!fm.ball_in_play);
+        fm.ball_in_play = true;
+        assert!(fm.ball_in_play);
+    }
+
+    #[test]
+    fn players_on_pitch_counts_correctly() {
+        let mut fm = FieldModel::new();
+        fm.set_player_coordinate("p1", FieldCoordinate::new(5, 7));
+        fm.set_player_coordinate("p2", FieldCoordinate::new(10, 3));
+        let count = fm.players_on_pitch().count();
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn player_state_missing_returns_none() {
+        let fm = FieldModel::new();
+        assert!(fm.player_state("nobody").is_none());
+    }
+
+    #[test]
+    fn trap_doors_default_empty() {
+        let fm = FieldModel::new();
+        assert!(fm.trap_doors.is_empty());
+        assert!(!fm.has_trap_door(FieldCoordinate::new(10, 7)));
+    }
+
+    #[test]
+    fn has_trap_door_detects_coordinate() {
+        let mut fm = FieldModel::new();
+        let trap = FieldCoordinate::new(10, 7);
+        fm.trap_doors.push(trap);
+        assert!(fm.has_trap_door(trap));
+        assert!(!fm.has_trap_door(FieldCoordinate::new(11, 7)));
     }
 
     #[test]

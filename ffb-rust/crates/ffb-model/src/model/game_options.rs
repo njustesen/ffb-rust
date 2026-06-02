@@ -60,4 +60,39 @@ mod tests {
         let back: GameOptions = serde_json::from_str(&json).unwrap();
         assert_eq!(opts.get("maxRerolls"), back.get("maxRerolls"));
     }
+
+    #[test]
+    fn get_int_parses_valid_integer() {
+        let mut opts = GameOptions::new();
+        opts.set("maxRerolls", "6");
+        assert_eq!(opts.get_int("maxRerolls"), Some(6));
+    }
+
+    #[test]
+    fn get_int_returns_none_for_missing_key() {
+        let opts = GameOptions::new();
+        assert_eq!(opts.get_int("nonexistent"), None);
+    }
+
+    #[test]
+    fn get_int_returns_none_for_non_numeric_value() {
+        let mut opts = GameOptions::new();
+        opts.set("rulesVersion", "BB2020");
+        assert_eq!(opts.get_int("rulesVersion"), None);
+    }
+
+    #[test]
+    fn is_enabled_false_for_explicit_false_string() {
+        let mut opts = GameOptions::new();
+        opts.set("extraTime", "false");
+        assert!(!opts.is_enabled("extraTime"));
+    }
+
+    #[test]
+    fn overwrite_key_returns_new_value() {
+        let mut opts = GameOptions::new();
+        opts.set("rerolls", "3");
+        opts.set("rerolls", "5");
+        assert_eq!(opts.get("rerolls"), Some("5"));
+    }
 }

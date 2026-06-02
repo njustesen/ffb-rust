@@ -65,4 +65,30 @@ mod tests {
         let back: GameResult = serde_json::from_str(&json).unwrap();
         assert_eq!(gr.home.score, back.home.score);
     }
+
+    #[test]
+    fn draw_returns_none_winner() {
+        let gr = GameResult::default();
+        assert_eq!(gr.winner(), None);
+    }
+
+    #[test]
+    fn player_result_fields_default_zero() {
+        let pr = PlayerResult::default();
+        assert_eq!(pr.touchdowns, 0);
+        assert_eq!(pr.casualties, 0);
+        assert_eq!(pr.spp_gained, 0);
+        assert!(!pr.mvp);
+    }
+
+    #[test]
+    fn team_result_accumulates_player_results() {
+        let mut tr = TeamResult::default();
+        let mut pr = PlayerResult::default();
+        pr.touchdowns = 2;
+        pr.spp_gained = 6;
+        tr.player_results.insert("p1".to_string(), pr);
+        assert_eq!(tr.player_results["p1"].touchdowns, 2);
+        assert_eq!(tr.player_results.len(), 1);
+    }
 }

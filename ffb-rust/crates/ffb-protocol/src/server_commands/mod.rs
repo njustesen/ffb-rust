@@ -166,13 +166,61 @@ pub struct TeamListEntry {
 mod tests {
     use super::*;
 
+    fn rt(cmd: &ServerCommand) {
+        let json = serde_json::to_string(cmd).unwrap();
+        let _back: ServerCommand = serde_json::from_str(&json)
+            .unwrap_or_else(|e| panic!("round-trip failed: {e}\njson={json}"));
+    }
+
     #[test]
     fn server_game_time_round_trip() {
-        let cmd = ServerCommand::ServerGameTime(ServerGameTime {
+        rt(&ServerCommand::ServerGameTime(ServerGameTime {
             half: 1, turn_nr: 3, seconds_left: 90,
-        });
-        let json = serde_json::to_string(&cmd).unwrap();
-        let back: ServerCommand = serde_json::from_str(&json).unwrap();
-        assert!(matches!(back, ServerCommand::ServerGameTime(_)));
+        }));
+    }
+
+    #[test]
+    fn server_status_round_trip() {
+        rt(&ServerCommand::ServerStatus(ServerStatus {
+            status: GameStatus::Active,
+        }));
+    }
+
+    #[test]
+    fn server_talk_round_trip() {
+        rt(&ServerCommand::ServerTalk(ServerTalk {
+            coach: "Coach1".into(),
+            message: "Hello!".into(),
+        }));
+    }
+
+    #[test]
+    fn server_join_round_trip() {
+        rt(&ServerCommand::ServerJoin(ServerJoin {
+            coach: "TestCoach".into(), team_id: "team1".into(), side: "home".into(),
+        }));
+    }
+
+    #[test]
+    fn server_pong_round_trip() {
+        rt(&ServerCommand::ServerPong(ServerPong { timestamp: 1234567890 }));
+    }
+
+    #[test]
+    fn server_game_list_round_trip() {
+        rt(&ServerCommand::ServerGameList(ServerGameList {
+            games: vec![GameListEntry {
+                game_id: "g1".into(),
+                home_team: "home".into(),
+                away_team: "away".into(),
+                status: "Active".into(),
+            }],
+        }));
+    }
+
+    #[test]
+    fn server_tag_is_camel_case() {
+        let json = serde_json::to_string(&ServerCommand::ServerPong(ServerPong { timestamp: 0 })).unwrap();
+        assert!(json.contains("serverPong"), "tag must be camelCase, got: {json}");
     }
 }

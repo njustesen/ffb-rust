@@ -1,5 +1,111 @@
 use serde::{Deserialize, Serialize};
 
+/// How long a card effect lasts (maps to Java's InducementDuration).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum InducementDuration {
+    UntilEndOfGame,
+    UntilEndOfDrive,
+    UntilEndOfTurn,
+    WhileHoldingTheBall,
+    UntilUsed,
+    UntilEndOfOpponentsTurn,
+    UntilEndOfHalf,
+}
+
+impl InducementDuration {
+    pub fn id(self) -> u8 {
+        match self {
+            InducementDuration::UntilEndOfGame => 1,
+            InducementDuration::UntilEndOfDrive => 2,
+            InducementDuration::UntilEndOfTurn => 3,
+            InducementDuration::WhileHoldingTheBall => 4,
+            InducementDuration::UntilUsed => 5,
+            InducementDuration::UntilEndOfOpponentsTurn => 6,
+            InducementDuration::UntilEndOfHalf => 7,
+        }
+    }
+
+    pub fn from_id(id: u8) -> Option<Self> {
+        match id {
+            1 => Some(Self::UntilEndOfGame),
+            2 => Some(Self::UntilEndOfDrive),
+            3 => Some(Self::UntilEndOfTurn),
+            4 => Some(Self::WhileHoldingTheBall),
+            5 => Some(Self::UntilUsed),
+            6 => Some(Self::UntilEndOfOpponentsTurn),
+            7 => Some(Self::UntilEndOfHalf),
+            _ => None,
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            InducementDuration::UntilEndOfGame => "untilEndOfGame",
+            InducementDuration::UntilEndOfDrive => "untilEndOfDrive",
+            InducementDuration::UntilEndOfTurn => "untilEndOfTurn",
+            InducementDuration::WhileHoldingTheBall => "whileHoldingTheBall",
+            InducementDuration::UntilUsed => "untilUsed",
+            InducementDuration::UntilEndOfOpponentsTurn => "untilEndOfOpponentsTurn",
+            InducementDuration::UntilEndOfHalf => "untilEndOfHalf",
+        }
+    }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "untilEndOfGame" => Some(Self::UntilEndOfGame),
+            "untilEndOfDrive" => Some(Self::UntilEndOfDrive),
+            "untilEndOfTurn" => Some(Self::UntilEndOfTurn),
+            "whileHoldingTheBall" => Some(Self::WhileHoldingTheBall),
+            "untilUsed" => Some(Self::UntilUsed),
+            "untilEndOfOpponentsTurn" => Some(Self::UntilEndOfOpponentsTurn),
+            "untilEndOfHalf" => Some(Self::UntilEndOfHalf),
+            _ => None,
+        }
+    }
+}
+
+/// When a card may be played during a game (maps to Java's InducementPhase).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum InducementPhase {
+    EndOfOpponentTurn,
+    EndOfOwnTurn,
+    StartOfOwnTurn,
+    AfterKickoffToOpponent,
+    AfterInducementsPurchased,
+    BeforeKickoffScatter,
+    EndOfTurnNotHalf,
+    BeforeSetup,
+}
+
+impl InducementPhase {
+    pub fn name(self) -> &'static str {
+        match self {
+            InducementPhase::EndOfOpponentTurn => "endOfOpponentTurn",
+            InducementPhase::EndOfOwnTurn => "endOfOwnTurn",
+            InducementPhase::StartOfOwnTurn => "startOfOwnTurn",
+            InducementPhase::AfterKickoffToOpponent => "afterKickoffToOpponent",
+            InducementPhase::AfterInducementsPurchased => "afterInducementsPurchased",
+            InducementPhase::BeforeKickoffScatter => "beforeKickoffScatter",
+            InducementPhase::EndOfTurnNotHalf => "endOfTurnNotHalf",
+            InducementPhase::BeforeSetup => "beforeSetup",
+        }
+    }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "endOfOpponentTurn" => Some(Self::EndOfOpponentTurn),
+            "endOfOwnTurn" => Some(Self::EndOfOwnTurn),
+            "startOfOwnTurn" => Some(Self::StartOfOwnTurn),
+            "afterKickoffToOpponent" => Some(Self::AfterKickoffToOpponent),
+            "afterInducementsPurchased" => Some(Self::AfterInducementsPurchased),
+            "beforeKickoffScatter" => Some(Self::BeforeKickoffScatter),
+            "endOfTurnNotHalf" => Some(Self::EndOfTurnNotHalf),
+            "beforeSetup" => Some(Self::BeforeSetup),
+            _ => None,
+        }
+    }
+}
+
 /// Effect types a card can apply.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CardEffect {
@@ -192,5 +298,71 @@ mod tests {
     #[test]
     fn card_target_any_player_name() {
         assert_eq!(CardTarget::AnyPlayer.name(), "anyPlayer");
+    }
+
+    #[test]
+    fn inducement_duration_round_trip_id() {
+        for id in 1u8..=7 {
+            let d = InducementDuration::from_id(id).unwrap();
+            assert_eq!(d.id(), id);
+        }
+        assert!(InducementDuration::from_id(0).is_none());
+        assert!(InducementDuration::from_id(8).is_none());
+    }
+
+    #[test]
+    fn inducement_duration_round_trip_name() {
+        let all = [
+            InducementDuration::UntilEndOfGame,
+            InducementDuration::UntilEndOfDrive,
+            InducementDuration::UntilEndOfTurn,
+            InducementDuration::WhileHoldingTheBall,
+            InducementDuration::UntilUsed,
+            InducementDuration::UntilEndOfOpponentsTurn,
+            InducementDuration::UntilEndOfHalf,
+        ];
+        for d in all {
+            assert_eq!(InducementDuration::from_name(d.name()), Some(d));
+        }
+    }
+
+    #[test]
+    fn inducement_duration_count_is_seven() {
+        let all = [
+            InducementDuration::UntilEndOfGame, InducementDuration::UntilEndOfDrive,
+            InducementDuration::UntilEndOfTurn, InducementDuration::WhileHoldingTheBall,
+            InducementDuration::UntilUsed, InducementDuration::UntilEndOfOpponentsTurn,
+            InducementDuration::UntilEndOfHalf,
+        ];
+        assert_eq!(all.len(), 7);
+    }
+
+    #[test]
+    fn inducement_phase_round_trip_name() {
+        let all = [
+            InducementPhase::EndOfOpponentTurn, InducementPhase::EndOfOwnTurn,
+            InducementPhase::StartOfOwnTurn, InducementPhase::AfterKickoffToOpponent,
+            InducementPhase::AfterInducementsPurchased, InducementPhase::BeforeKickoffScatter,
+            InducementPhase::EndOfTurnNotHalf, InducementPhase::BeforeSetup,
+        ];
+        for p in all {
+            assert_eq!(InducementPhase::from_name(p.name()), Some(p));
+        }
+    }
+
+    #[test]
+    fn inducement_phase_count_is_eight() {
+        let all = [
+            InducementPhase::EndOfOpponentTurn, InducementPhase::EndOfOwnTurn,
+            InducementPhase::StartOfOwnTurn, InducementPhase::AfterKickoffToOpponent,
+            InducementPhase::AfterInducementsPurchased, InducementPhase::BeforeKickoffScatter,
+            InducementPhase::EndOfTurnNotHalf, InducementPhase::BeforeSetup,
+        ];
+        assert_eq!(all.len(), 8);
+    }
+
+    #[test]
+    fn inducement_phase_start_of_own_turn_name() {
+        assert_eq!(InducementPhase::StartOfOwnTurn.name(), "startOfOwnTurn");
     }
 }
