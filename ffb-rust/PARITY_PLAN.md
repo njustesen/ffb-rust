@@ -20,11 +20,11 @@ For each tier, test at scale: **1 → 10 → 100 → 1000 seeds** before advanci
 
 ## Current Status
 
-**T1a:** ✓ 100/100 | **T1b:** ✓ 100/100 | **T2:** ✓ 25/25 races × 100/100 seeds (2,500 games)
+**T1a:** ✓ 100/100 | **T1b:** ✓ 100/100 | **T2:** ✓ 26/26 races × 100/100 seeds (2,600 games)
 
-**T2 at 100 seeds is complete.** All 25 BB2025 races pass 100/100 seeds — bit-for-bit identical state hashes between Java and Rust for every game.
+**T2 at 100 seeds is complete.** All 26 BB2025 races pass 100/100 seeds — bit-for-bit identical state hashes between Java and Rust for every game. (chaos_chosen added session 40.)
 
-**Next milestone:** T3 (requires G-RULE-3 player activation + prereq C custom roster loading).
+**Next milestone:** T3 Phase 2 — actual player activation (requires G-RULE-3 + negatrait sync).
 
 **Blocker for T3 being meaningful:** player activation (G-RULE-3). Without real moves and blocks, T3 and T2 test the same mechanics — only kickoff/halftime/ejection logic fires. T3 adds value only after activation is implemented.
 
@@ -38,7 +38,7 @@ Mark each cell: `✓` (all pass), `~` (partial, note failure count), `✗` (all 
 |------|-------------|:------:|:--------:|:---------:|:----------:|-------|
 | T1a  | Lineman vs Lineman, BB2025 | ✓ | ✓ | ✓ | — | 100/100 ✓ |
 | T1b  | Human vs Orc, BB2025 | ✓ | ✓ | ✓ | — | 100/100 ✓ |
-| T2   | All 25 races self-vs-self, BB2025 | ✓ | ✓ | ✓ | — | 25/25 races 100/100 ✓ |
+| T2   | All 26 races self-vs-self, BB2025 | ✓ | ✓ | ✓ | — | 26/26 races 100/100 ✓ |
 | T3   | Random custom TV-matched, random edition | — | — | — | — | Blocked on G-RULE-3 (activation) + prereq C |
 | T3i  | Random custom TV-imbalanced, random edition | — | — | — | — | Blocked on G-RULE-3 + prereqs C, D |
 
@@ -202,12 +202,13 @@ python scripts/parity_run.py --tier T3i --seeds 1-100 --custom-roster --tv-imbal
 | 2026-06-03 | T2 | 1–10 | 29/29 races | — | G-RULE-6 fixed: SW penalty rolls (bombardier) + argue RNG alignment |
 | 2026-06-03 | T1a | 1–100 | 100/100 | — | Re-verified after G-RULE-6 fix |
 | 2026-06-04 | T2 | 1–100 | 25/25 races | — | All 25 races 100/100 — DP in CSTI, roster name normalization, BaC Pitch Invasion immunity, BRIBES dialog fix |
+| 2026-06-04 | T2 | 1–100 | 26/26 races | — | Session 40: Dwarf fixed (Pouring Rain in kickoff CSTI, Sweltering Heat SW-before-faint ordering, H2 kickoff faint); chaos_chosen team XML added |
 
 ---
 
 ## What's Left Before T3
 
-**T2 is complete (25/25 races × 100/100 seeds).** All no-activation parity mechanics are verified.
+**T2 is complete (26/26 races × 100/100 seeds).** All no-activation parity mechanics are verified.
 
 ### Must-have
 1. **G-RULE-3: Player activation** — both agents must activate players, make moves, blocks, passes. Without this, T3 tests the same mechanics as T2 (only kickoff logic). This is the largest remaining piece.

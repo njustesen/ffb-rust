@@ -149,9 +149,13 @@ pub fn evaluate_pass(
 ) -> PassResult {
     match rules {
         Rules::Bb2016 => evaluate_pass_bb2016(stat, roll, distance, modifiers, has_sure_hands),
-        Rules::Bb2020 | Rules::Bb2025 | Rules::Common => {
-            evaluate_pass_bb2020(stat, roll, distance, modifiers, has_sure_hands)
+        Rules::Bb2025 | Rules::Common => {
+            // BB2025: "wildly inaccurate" was removed — effective <= 1 is now a Fumble.
+            // Java bb2025/PassMechanic.evaluatePass: `resultAfterModifiers <= 1 → FUMBLE`
+            let result = evaluate_pass_bb2020(stat, roll, distance, modifiers, has_sure_hands);
+            if result == PassResult::WildlyInaccurate { PassResult::Fumble } else { result }
         }
+        Rules::Bb2020 => evaluate_pass_bb2020(stat, roll, distance, modifiers, has_sure_hands),
     }
 }
 
@@ -321,5 +325,41 @@ mod tests {
     fn bb2016_quick_pass_roll1_not_modified_fumble() {
         // roll 1 + dist_mod(+1) - 0 = 2 > 1 → not a modified fumble
         assert!(!is_modified_fumble_bb2016(1, PassingDistance::QuickPass, 0));
+    }
+
+    // ── BB2025 pass evaluation ────────────────────────────────────────────────
+
+    #[test]
+    fn bb2025_effective_le_1_is_fumble_not_wildly_inaccurate() {
+        // PA=4, roll=2, short pass: effective = 2 - 1 = 1 ≤ 1 → Fumble in BB2025 (not WildlyInaccurate)
+        let result = evaluate_pass(Rules::Bb2025, 4, 2, PassingDistance::ShortPass, &[], false);
+        assert_eq!(result, PassResult::Fumble);
+    }
+
+    #[test]
+    fn bb2020_effective_le_1_is_wildly_inaccurate() {
+        // Same scenario in BB2020 → WildlyInaccurate
+        let result = evaluate_pass(Rules::Bb2020, 4, 2, PassingDistance::ShortPass, &[], false);
+        assert_eq!(result, PassResult::WildlyInaccurate);
+    }
+
+    #[test]
+    fn bb2025_natural_1_is_fumble() {
+        let result = evaluate_pass(Rules::Bb2025, 3, 1, PassingDistance::QuickPass, &[], false);
+        assert_eq!(result, PassResult::Fumble);
+    }
+
+    #[test]
+    fn bb2025_accurate_pass_unchanged() {
+        // PA=3, roll=6 → always Accurate
+        let result = evaluate_pass(Rules::Bb2025, 3, 6, PassingDistance::LongPass, &[], false);
+        assert_eq!(result, PassResult::Accurate);
+    }
+
+    #[test]
+    fn bb2025_normal_inaccurate_unchanged() {
+        // PA=4, roll=3, short pass: effective = 3 - 1 = 2, not ≥ 4, not ≤ 1 → Inaccurate
+        let result = evaluate_pass(Rules::Bb2025, 4, 3, PassingDistance::ShortPass, &[], false);
+        assert_eq!(result, PassResult::Inaccurate);
     }
 }

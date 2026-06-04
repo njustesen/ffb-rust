@@ -4,9 +4,9 @@ mod comparator;
 mod update_progress;
 mod network_test;
 mod state_hash;
+mod coverage_report;
 
-use rand_xoshiro::Xoshiro256StarStar;
-use rand::{RngCore, SeedableRng};
+#[allow(dead_code)] mod debug_rng;
 
 /// Parsed CLI arguments for the parity runner.
 struct ParityArgs {
@@ -79,14 +79,35 @@ fn main() {
     let total = args.seed_end - args.seed_start + 1;
     let mut passed = 0u64;
     let mut failed = 0u64;
+    let mut coverage = coverage_report::CoverageReport::default();
+    coverage.matchups.push(coverage_report::MatchupSummary {
+        home: args.home.clone(),
+        away: args.away.clone(),
+        seeds: total as u32,
+        home_wins: 0, away_wins: 0, draws: 0,
+        touchdowns_home: 0, touchdowns_away: 0,
+    });
 
     for seed in args.seed_start..=args.seed_end {
         println!("Seed {seed}: {} vs {} ({})", args.home, args.away, args.edition);
 
         runner::run_java_headless(seed, &args.home_java, &args.away_java, &args.home, &args.away);
-        runner::run_rust_headless(seed, &args.home, &args.away, &args.edition, args.verbose);
+        let (_, events, home_score, away_score) = runner::run_rust_headless(seed, &args.home, &args.away, &args.edition, args.verbose);
         let result = comparator::compare_logs(seed, &args.home, &args.away);
         update_progress::update(seed, &args.home, &args.away, &result);
+
+        // Accumulate coverage from this parity run
+        for ev in &events { coverage.tally(ev); }
+        coverage.games += 1;
+        coverage.touchdowns_home += home_score as u32;
+        coverage.touchdowns_away += away_score as u32;
+        if let Some(m) = coverage.matchups.last_mut() {
+            m.touchdowns_home += home_score as u32;
+            m.touchdowns_away += away_score as u32;
+            if home_score > away_score { coverage.home_wins += 1; m.home_wins += 1; }
+            else if away_score > home_score { coverage.away_wins += 1; m.away_wins += 1; }
+            else { coverage.draws += 1; m.draws += 1; }
+        }
 
         if result.matches {
             passed += 1;
@@ -115,6 +136,12 @@ fn main() {
         eprintln!("PARITY: {passed}/{total} passed, {failed} FAILED.");
         std::process::exit(1);
     }
+
+    coverage.skill_names = coverage_report::build_skill_names();
+    let json = serde_json::to_string(&coverage).expect("coverage serialization failed");
+    let html = coverage_report::generate_html(&json);
+    std::fs::write("coverage.html", &html).expect("failed to write coverage.html");
+    println!("Coverage report written to coverage.html ({} games)", coverage.games);
 }
 
 /// Diagnostic: run seed=1 (BB2025) and print state string at each step boundary.

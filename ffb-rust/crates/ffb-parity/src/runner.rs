@@ -1,10 +1,9 @@
 use std::collections::HashSet;
 use std::process::Command;
-use rand_xoshiro::Xoshiro256StarStar;
-use rand_core::{RngCore, SeedableRng};
-use ffb_engine::agent::response_to_action_pub;
+use ffb_engine::agent::{RandomAgent, response_to_action_pub};
 use ffb_engine::engine::GameEngine;
 use ffb_engine::legal_actions::TeamSide;
+use ffb_model::events::GameEvent;
 use ffb_model::data::roster_json::{PositionJson, SkillEntry};
 use ffb_model::data::{bb2016_rosters, bb2020_rosters, bb2025_rosters};
 use ffb_model::enums::{PlayerGender, PlayerType, Rules, SkillCategory};
@@ -18,91 +17,6 @@ use ffb_model::types::FieldCoordinate;
 use crate::log_format::{GameLog, LogLine, java_log_path_for, rust_log_path_for};
 use crate::state_hash::state_hash;
 use ffb_model::util::state_hash::state_string;
-
-/// Deterministic parity agent: mirrors Java ParityRunner's decision logic exactly.
-/// Uses Xoshiro256StarStar seeded with `seed ^ 0xDEAD_BEEF_CAFE_0001` — same as Java's
-/// `new Xoshiro256StarStar(seed ^ 0xDEADBEEFCAFE0001L)`.
-struct ParityAgent {
-    rng: Xoshiro256StarStar,
-    rng_advances: u32,
-    debug_seed: u64,
-}
-
-impl ParityAgent {
-    fn new(seed: u64) -> Self {
-        ParityAgent { rng: Xoshiro256StarStar::seed_from_u64(seed ^ 0xDEAD_BEEF_CAFE_0001), rng_advances: 0, debug_seed: seed }
-    }
-
-    fn respond(&mut self, prompt: &AgentPrompt, active_side: TeamSide) -> AgentResponse {
-        match prompt {
-            AgentPrompt::CoinChoice { .. } => {
-                self.rng_advances += 1;
-                AgentResponse::CoinChoice { heads: self.rng.next_u64() % 2 == 0 }
-            }
-            AgentPrompt::ReceiveChoice { .. } => {
-                self.rng_advances += 1;
-                AgentResponse::ReceiveChoice { receive: self.rng.next_u64() % 2 == 0 }
-            }
-            AgentPrompt::KickBall => {
-                // Home kicks to away's half (x 13..25), away kicks to home's half (x 0..12).
-                // Matches Java: Long.remainderUnsigned(decisionRng.nextLong(), 13) for x and y.
-                let x_raw = (self.rng.next_u64() % 13) as i32;
-                let y_raw = (self.rng.next_u64() % 13) as i32;
-                self.rng_advances += 2;
-                let x = if active_side == TeamSide::Home { x_raw + 13 } else { x_raw };
-                let y = y_raw + 1;
-                if self.debug_seed == 57 {
-                    eprintln!("RUST_KICK seed=57 rng_advances_before={} x_raw={x_raw} y_raw={y_raw} x={x} y={y}", self.rng_advances - 2);
-                }
-                AgentResponse::KickBall { coord: FieldCoordinate::new(x, y) }
-            }
-            // TeamSetup: return empty placements → Action::ConfirmSetup → engine calls
-            // place_team_canonical() which places players at the canonical squares.
-            AgentPrompt::TeamSetup { .. } => {
-                AgentResponse::TeamSetup { placements: vec![] }
-            }
-            // Touchback: pick the player nearest to (13,8) — matches Java's ParityRunner.
-            AgentPrompt::Touchback { eligible_players } => {
-                let ref_x = 13i32;
-                let ref_y = 8i32;
-                let pid = eligible_players.iter()
-                    .min_by_key(|(_, c)| {
-                        let dx = c.x as i32 - ref_x;
-                        let dy = c.y as i32 - ref_y;
-                        dx * dx + dy * dy
-                    })
-                    .map(|(id, _)| id.clone())
-                    .unwrap_or_default();
-                AgentResponse::Touchback { player_id: pid }
-            }
-            // PlayerChoice (SolidDefence, Charge, HighKick, etc.): always decline by passing
-            // empty player_id. Matches Java's ParityRunner which skips optional player selection.
-            AgentPrompt::PlayerChoice { .. } => AgentResponse::PlayerChoice { player_id: String::new() },
-            AgentPrompt::KickoffReturn { .. } => AgentResponse::PlayerChoice { player_id: String::new() },
-
-            // ── Inducements ─────────────────────────────────────────────────────
-            // Java RandomStrategy sends empty inducement set for all buy prompts.
-            AgentPrompt::BuyInducements { .. } | AgentPrompt::BuyPrayersAndInducements { .. } => {
-                AgentResponse::BuyInducements { purchases: vec![] }
-            }
-            // PettyCash / Journeymen: just confirm (accept without consuming RNG).
-            AgentPrompt::PettyCash { .. } | AgentPrompt::Journeymen { .. } => AgentResponse::Confirm,
-            // UseInducement: always confirm (use it). Java returns null = decline.
-            AgentPrompt::UseInducement { .. } => AgentResponse::Confirm,
-            // WizardSpell: decline by confirming (Java also declines).
-            AgentPrompt::WizardSpell { .. } => AgentResponse::Confirm,
-            // ArgueTheCall: decline. Java uses RANDOM but we mirror the Java ParityRunner
-            // default, which passes null → decline.
-            AgentPrompt::ArgueTheCall { .. } => AgentResponse::UseReRoll { use_reroll: false },
-            // BriberyAndCorruption: decline bribe. Java returns null = decline.
-            AgentPrompt::BriberyAndCorruption { .. } => AgentResponse::UseBribe { use_bribe: false },
-            // ConcedeGame: never concede.
-            AgentPrompt::ConcedeGame { .. } => AgentResponse::UseReRoll { use_reroll: false },
-
-            _ => AgentResponse::Confirm,
-        }
-    }
-}
 
 /// Invoke the Java parity runner as a subprocess.
 ///
@@ -169,16 +83,12 @@ pub fn run_java_headless(seed: u64, home_team_id: &str, away_team_id: &str, home
     }
 }
 
-/// Run the Rust headless engine with two RandomAgents and write a JSONL parity log.
+/// Run the Rust headless engine and write a JSONL parity log. Returns the log lines plus
+/// all GameEvents emitted during the run (for coverage analysis).
 ///
-/// The log format matches Java's ParityRunner output:
-///   - game_start line with initial state_hash
-///   - one step line per INIT_SELECTING decision point (turn >= 1)
-///   - game_end line with final scores and state_hash
-/// `home_roster` / `away_roster` are race names (e.g. "human") or "lineman" for the generic team.
-/// `edition` is "bb2016", "bb2020", or "bb2025".
-/// `verbose`: when true, each Step entry includes the full `state` string for per-player diagnosis.
-pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, edition: &str, verbose: bool) -> Vec<LogLine> {
+/// Uses `RandomAgent::new_parity(seed)` — Xoshiro256StarStar seeded with
+/// `seed ^ 0xDEAD_BEEF_CAFE_0001`, matching Java's decisionRng exactly.
+pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, edition: &str, verbose: bool) -> (Vec<LogLine>, Vec<GameEvent>, i32, i32) {
     let rust_path = rust_log_path_for(seed, home_roster, away_roster);
     let dir = std::path::Path::new(&rust_path).parent().unwrap_or(std::path::Path::new("parity"));
     std::fs::create_dir_all(dir).ok();
@@ -188,10 +98,12 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
     let away = make_team(away_roster, "away", edition);
 
     let mut engine = GameEngine::new(home, away, rules, seed);
-    let mut agent = ParityAgent::new(seed);
+    // One shared RandomAgent for both teams, seeded to match Java's decisionRng.
+    let mut agent = RandomAgent::new_parity(seed);
 
     let initial_hash = state_hash(&engine.game);
     let mut lines: Vec<LogLine> = Vec::new();
+    let mut all_events: Vec<GameEvent> = Vec::new();
     lines.push(LogLine::GameStart {
         i: 0,
         home: home_roster.to_string(),
@@ -214,10 +126,16 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
         };
 
         let side = engine.active_side();
-        let response = agent.respond(&prompt, side);
+        let response = agent.respond_parity(&prompt, side);
 
-        // Capture state BEFORE applying the action
-        let is_turn_boundary = matches!(prompt, AgentPrompt::ActivatePlayer { .. });
+        // Capture state BEFORE applying the action.
+        // Only record a step for the first ActivatePlayer prompt of each turn (eligible≠[]).
+        // The second prompt (eligible=[]) is the EndTurn signal and matches Java's single
+        // step per turn (Java only records at Phase 1 when eligible is non-empty).
+        let is_turn_boundary = match &prompt {
+            AgentPrompt::ActivatePlayer { eligible_players } => !eligible_players.is_empty(),
+            _ => false,
+        };
         let turn_nr = if engine.game.home_playing {
             engine.game.turn_data_home.turn_nr
         } else {
@@ -241,7 +159,7 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
 
         let action = response_to_action_pub(response, Some(&prompt));
         match engine.apply(side, action) {
-            Ok(_) => {}
+            Ok(evs) => all_events.extend(evs),
             Err(e) => {
                 log::warn!("engine error at seed {seed}: {e}");
                 break;
@@ -312,7 +230,7 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
         log::warn!("Could not write Rust log for seed {seed}: {e}");
     }
 
-    lines
+    (lines, all_events, score_home, score_away)
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────

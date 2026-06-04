@@ -1,7 +1,7 @@
 pub mod move_decision_engine;
 
-use rand_chacha::ChaCha8Rng;
-use rand::{SeedableRng, Rng};
+use rand_xoshiro::Xoshiro256StarStar;
+use rand_core::{RngCore, SeedableRng};
 use ffb_model::prompts::{AgentPrompt, AgentResponse};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::enums::PlayerAction;
@@ -21,154 +21,229 @@ pub trait Agent {
     fn respond(&mut self, prompt: &AgentPrompt) -> AgentResponse;
 }
 
-/// A purely random agent: makes all decisions uniformly at random.
+/// The single random agent used for both parity and coverage runs.
 ///
-/// Translated from `ffb-ai/RandomStrategy.java`.
+/// Uses Xoshiro256StarStar with `next_u64() % n` for all picks — identical to
+/// Java's `Long.remainderUnsigned(decisionRng.nextLong(), n)` pattern so that
+/// both engines consume the decision RNG in the same order given the same seed.
 pub struct RandomAgent {
-    rng: ChaCha8Rng,
+    rng: Xoshiro256StarStar,
 }
 
 impl RandomAgent {
+    /// Standard constructor — seeds with `seed` directly.
     pub fn new(seed: u64) -> Self {
-        RandomAgent { rng: ChaCha8Rng::seed_from_u64(seed) }
+        RandomAgent { rng: Xoshiro256StarStar::seed_from_u64(seed) }
     }
 
-    fn pick_index(&mut self, len: usize) -> usize {
-        if len == 0 { 0 } else { self.rng.gen_range(0..len) }
+    /// Parity constructor — seeds with `seed ^ 0xDEAD_BEEF_CAFE_0001`, matching
+    /// Java's `new Xoshiro256StarStar(seed ^ 0xDEADBEEFCAFE0001L)`.
+    pub fn new_parity(seed: u64) -> Self {
+        RandomAgent { rng: Xoshiro256StarStar::seed_from_u64(seed ^ 0xDEAD_BEEF_CAFE_0001) }
+    }
+
+    /// Pick a uniform random index in `[0, len)`. Matches Java's
+    /// `Long.remainderUnsigned(decisionRng.nextLong(), len)`.
+    fn pick(&mut self, len: usize) -> usize {
+        if len == 0 { 0 } else { (self.rng.next_u64() as usize) % len }
+    }
+
+    /// Pick a random bool. Matches Java's `decisionRng.nextLong() % 2 == 0`.
+    fn pick_bool(&mut self) -> bool {
+        self.rng.next_u64() % 2 == 0
+    }
+
+    /// Side-aware deterministic parity respond, matching Java ParityRunner's decision logic.
+    ///
+    /// Only `CoinChoice`, `ReceiveChoice`, `KickBall`, and `ActivatePlayer` consume decision RNG.
+    /// Everything else is deterministic (0 RNG calls), matching Java's existing dialog handlers.
+    pub fn respond_parity(&mut self, prompt: &AgentPrompt, side: TeamSide) -> AgentResponse {
+        match prompt {
+            // ── 1 rng call each ───────────────────────────────────────────────
+            AgentPrompt::CoinChoice { .. } =>
+                AgentResponse::CoinChoice { heads: self.rng.next_u64() % 2 == 0 },
+            AgentPrompt::ReceiveChoice { .. } =>
+                AgentResponse::ReceiveChoice { receive: self.rng.next_u64() % 2 == 0 },
+
+            // ── 2 rng calls ───────────────────────────────────────────────────
+            AgentPrompt::KickBall => {
+                // Home kicks to away's half (x 13..25), away kicks to home's half (x 0..12).
+                let x_raw = (self.rng.next_u64() % 13) as i32;
+                let y_raw = (self.rng.next_u64() % 13) as i32;
+                let x = if side == TeamSide::Home { x_raw + 13 } else { x_raw };
+                AgentResponse::KickBall { coord: FieldCoordinate::new(x, y_raw + 1) }
+            }
+
+            // ── 1 rng call (T3 Phase 1) ──────────────────────────────────────────
+            // Consume 1 decisionRng call to stay in sync with Java's dummy-call.
+            // Then return Confirm (EndTurn) WITHOUT applying the activation.
+            // Rationale: Java's `ClientCommandActingPlayer` followed by an immediate
+            // deselect cancels the activation step sequence before `StepReallyStupid`
+            // fires, so Java consumes 0 extra game dice. Rust's `check_negatrait`
+            // fires synchronously inside `Action::ActivatePlayer`, so any Troll
+            // activation would consume 1 game die that Java doesn't. Returning
+            // Confirm avoids applying the activation and keeps game-RNG in sync.
+            // ── 1 rng call (T3 Phase 1) ──────────────────────────────────────────
+            AgentPrompt::ActivatePlayer { eligible_players } => {
+                if !eligible_players.is_empty() {
+                    let _pi = (self.rng.next_u64() as usize) % eligible_players.len();
+                }
+                AgentResponse::Confirm
+            }
+
+            // ── 0 rng calls — deterministic, matches Java's dialog handlers ──
+            AgentPrompt::TeamSetup { .. } =>
+                AgentResponse::TeamSetup { placements: vec![] },
+
+            // Touchback: nearest player to (13,8) — same as Java ParityRunner
+            AgentPrompt::Touchback { eligible_players } => {
+                let pid = eligible_players.iter()
+                    .min_by_key(|(_, c)| {
+                        let dx = c.x as i32 - 13;
+                        let dy = c.y as i32 - 8;
+                        dx * dx + dy * dy
+                    })
+                    .map(|(id, _)| id.clone())
+                    .unwrap_or_default();
+                AgentResponse::Touchback { player_id: pid }
+            }
+
+            // PlayerChoice / KickoffReturn: decline (empty player) — matches Java
+            AgentPrompt::PlayerChoice { .. } | AgentPrompt::KickoffReturn { .. } =>
+                AgentResponse::PlayerChoice { player_id: String::new() },
+
+            // Block/follow-up: deterministic choices matching Java's dialog handlers
+            AgentPrompt::BlockChoice { .. } =>
+                AgentResponse::BlockChoice { index: 0 },
+            AgentPrompt::Pushback { squares, .. } => {
+                let coord = squares.first().copied().unwrap_or(FieldCoordinate::new(0, 0));
+                AgentResponse::Pushback { coord }
+            }
+            AgentPrompt::FollowUp { .. } =>
+                AgentResponse::FollowUp { follow_up: false },
+            AgentPrompt::ReRollOffer { .. } =>
+                AgentResponse::UseReRoll { use_reroll: false },
+            // SkillUse: always use — matches Java's "always USE the skill" handler
+            AgentPrompt::SkillUse { .. } | AgentPrompt::PilingOn { .. } =>
+                AgentResponse::UseSkill { use_skill: true },
+            AgentPrompt::ApothecaryChoice { .. } | AgentPrompt::UseApothecary { .. } =>
+                AgentResponse::ApothecaryChoice { heal: false },
+            AgentPrompt::ArgueTheCall { .. } =>
+                AgentResponse::UseReRoll { use_reroll: false },
+            AgentPrompt::BriberyAndCorruption { .. } =>
+                AgentResponse::UseBribe { use_bribe: false },
+            AgentPrompt::BuyInducements { .. } | AgentPrompt::BuyPrayersAndInducements { .. } =>
+                AgentResponse::BuyInducements { purchases: vec![] },
+            AgentPrompt::ConcedeGame { .. } =>
+                AgentResponse::UseReRoll { use_reroll: false },
+
+            _ => AgentResponse::Confirm,
+        }
     }
 }
 
 impl Agent for RandomAgent {
     fn respond(&mut self, prompt: &AgentPrompt) -> AgentResponse {
         match prompt {
-            AgentPrompt::ReRollOffer { .. } => {
-                AgentResponse::UseReRoll { use_reroll: self.rng.gen_bool(0.5) }
-            }
+            AgentPrompt::ReRollOffer { .. } =>
+                AgentResponse::UseReRoll { use_reroll: self.pick_bool() },
 
-            AgentPrompt::SkillUse { .. }
-            | AgentPrompt::PilingOn { .. } => {
-                AgentResponse::UseSkill { use_skill: self.rng.gen_bool(0.5) }
-            }
+            AgentPrompt::SkillUse { .. } | AgentPrompt::PilingOn { .. } =>
+                AgentResponse::UseSkill { use_skill: self.pick_bool() },
 
-            AgentPrompt::FollowUp { .. } => {
-                AgentResponse::FollowUp { follow_up: self.rng.gen_bool(0.5) }
-            }
+            AgentPrompt::FollowUp { .. } =>
+                AgentResponse::FollowUp { follow_up: self.pick_bool() },
 
             AgentPrompt::HitAndRun { squares, .. } => {
-                // Use HitAndRun 50% of the time if squares available; pick a random square
-                if !squares.is_empty() && self.rng.gen_bool(0.5) {
-                    let idx = self.pick_index(squares.len());
+                if !squares.is_empty() && self.pick_bool() {
+                    let idx = self.pick(squares.len());
                     AgentResponse::Pushback { coord: squares[idx] }
                 } else {
-                    // Decline: send a sentinel off-pitch coord (0,0) = decline
                     AgentResponse::Pushback { coord: FieldCoordinate::new(0, 0) }
                 }
             }
 
-            AgentPrompt::BlockChoice { dice, .. } => {
-                let idx = self.pick_index(dice.len()) as i32;
-                AgentResponse::BlockChoice { index: idx }
-            }
+            AgentPrompt::BlockChoice { dice, .. } =>
+                AgentResponse::BlockChoice { index: self.pick(dice.len()) as i32 },
 
             AgentPrompt::Pushback { squares, .. } => {
-                let idx = self.pick_index(squares.len());
+                let idx = self.pick(squares.len());
                 let coord = squares.get(idx).copied().unwrap_or(FieldCoordinate::new(0, 0));
                 AgentResponse::Pushback { coord }
             }
 
             AgentPrompt::ActivatePlayer { eligible_players } => {
                 if eligible_players.is_empty() {
-                    return AgentResponse::Confirm; // = end turn
+                    return AgentResponse::Confirm;
                 }
-                let pi = self.pick_index(eligible_players.len());
+                let pi = self.pick(eligible_players.len());
                 let (player_id, actions) = &eligible_players[pi];
-                let ai = self.pick_index(actions.len());
+                let ai = self.pick(actions.len());
                 let action = actions.get(ai).copied().unwrap_or(PlayerAction::Move);
                 AgentResponse::ActivatePlayer { player_id: player_id.clone(), action }
             }
 
-            AgentPrompt::CoinChoice { .. } => {
-                AgentResponse::CoinChoice { heads: self.rng.gen_bool(0.5) }
-            }
+            AgentPrompt::CoinChoice { .. } =>
+                AgentResponse::CoinChoice { heads: self.pick_bool() },
 
-            AgentPrompt::ReceiveChoice { .. } => {
-                AgentResponse::ReceiveChoice { receive: self.rng.gen_bool(0.5) }
-            }
+            AgentPrompt::ReceiveChoice { .. } =>
+                AgentResponse::ReceiveChoice { receive: self.pick_bool() },
 
             AgentPrompt::Touchback { eligible_players } => {
-                let idx = self.pick_index(eligible_players.len());
+                let idx = self.pick(eligible_players.len());
                 let pid = eligible_players.get(idx).map(|(id, _)| id.clone()).unwrap_or_default();
                 AgentResponse::Touchback { player_id: pid }
             }
 
             AgentPrompt::KickBall => {
-                // kick to a random square in the opponent half (hardcoded range)
-                let x = self.rng.gen_range(13i32..=25i32);
-                let y = self.rng.gen_range(1i32..=14i32);
-                AgentResponse::KickBall { coord: FieldCoordinate::new(x, y) }
+                // Default: kick to away half. Use respond_parity for side-aware kicking.
+                let x_raw = self.rng.next_u64() % 13;
+                let y_raw = self.rng.next_u64() % 13;
+                AgentResponse::KickBall { coord: FieldCoordinate::new(x_raw as i32 + 13, y_raw as i32 + 1) }
             }
 
             AgentPrompt::KickoffReturn { eligible_players } => {
-                let idx = self.pick_index(eligible_players.len());
+                let idx = self.pick(eligible_players.len());
                 let pid = eligible_players.get(idx).cloned().unwrap_or_default();
                 AgentResponse::PlayerChoice { player_id: pid }
             }
 
             AgentPrompt::PlayerChoice { eligible_players, .. } => {
-                let idx = self.pick_index(eligible_players.len());
+                let idx = self.pick(eligible_players.len());
                 let pid = eligible_players.get(idx).cloned().unwrap_or_default();
                 AgentResponse::PlayerChoice { player_id: pid }
             }
 
-            AgentPrompt::ApothecaryChoice { .. } => {
-                AgentResponse::ApothecaryChoice { heal: self.rng.gen_bool(0.5) }
-            }
+            AgentPrompt::ApothecaryChoice { .. } =>
+                AgentResponse::ApothecaryChoice { heal: self.pick_bool() },
 
-            AgentPrompt::UseApothecary { .. } => {
-                AgentResponse::ApothecaryChoice { heal: self.rng.gen_bool(0.5) }
-            }
+            AgentPrompt::UseApothecary { .. } =>
+                AgentResponse::ApothecaryChoice { heal: self.pick_bool() },
 
             AgentPrompt::SelectSkill { available, .. } => {
-                if available.is_empty() {
-                    return AgentResponse::Confirm;
-                }
-                let ci = self.pick_index(available.len());
+                if available.is_empty() { return AgentResponse::Confirm; }
+                let ci = self.pick(available.len());
                 let (_, skills) = &available[ci];
-                if skills.is_empty() {
-                    return AgentResponse::Confirm;
-                }
-                let si = self.pick_index(skills.len());
+                if skills.is_empty() { return AgentResponse::Confirm; }
+                let si = self.pick(skills.len());
                 AgentResponse::SelectSkill { skill_id: skills[si] }
             }
 
-            AgentPrompt::TeamSetup { .. } => {
-                // Confirm setup without manually placing players;
-                // the engine's canonical formation is used.
-                AgentResponse::TeamSetup { placements: vec![] }
-            }
+            AgentPrompt::TeamSetup { .. } =>
+                AgentResponse::TeamSetup { placements: vec![] },
 
-            AgentPrompt::BuyInducements { .. } => {
-                // Random agent never buys inducements
-                AgentResponse::BuyInducements { purchases: vec![] }
-            }
+            AgentPrompt::BuyInducements { .. } | AgentPrompt::BuyPrayersAndInducements { .. } =>
+                AgentResponse::BuyInducements { purchases: vec![] },
 
-            AgentPrompt::BuyPrayersAndInducements { .. } => {
-                AgentResponse::BuyInducements { purchases: vec![] }
-            }
+            AgentPrompt::ArgueTheCall { .. } =>
+                AgentResponse::UseReRoll { use_reroll: self.pick_bool() },
 
-            AgentPrompt::ArgueTheCall { .. } => {
-                AgentResponse::UseReRoll { use_reroll: self.rng.gen_bool(0.5) }
-            }
+            AgentPrompt::BriberyAndCorruption { .. } =>
+                AgentResponse::UseBribe { use_bribe: self.pick_bool() },
 
-            AgentPrompt::BriberyAndCorruption { .. } => {
-                AgentResponse::UseBribe { use_bribe: self.rng.gen_bool(0.5) }
-            }
+            AgentPrompt::ConcedeGame { .. } =>
+                AgentResponse::UseReRoll { use_reroll: false },
 
-            AgentPrompt::ConcedeGame { .. } => {
-                AgentResponse::UseReRoll { use_reroll: false } // never concede
-            }
-
-            // All remaining prompts: just confirm/acknowledge
             _ => AgentResponse::Confirm,
         }
     }

@@ -206,6 +206,8 @@ dependencies = [
  "log",
  "rand",
  "rand_chacha",
+ "rand_core",
+ "rand_xoshiro",
  "serde",
  "serde_json",
  "thiserror",

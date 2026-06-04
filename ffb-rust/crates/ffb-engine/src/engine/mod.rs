@@ -752,7 +752,9 @@ impl GameEngine {
                             }).count() as i32;
                             // BB2025: CATCH_SCATTER has +1 to min_roll (Inaccurate Pass or Scatter modifier)
                             let scatter_mod: i32 = if is_scatter { 1 } else { 0 };
-                            let min_roll = (c.agility + tz + dp + scatter_mod).max(2).min(6);
+                            // Pouring Rain: +1 to all catch rolls (base CatchModifierCollection)
+                            let rain_mod: i32 = if game.weather == Weather::PouringRain { 1 } else { 0 };
+                            let min_roll = (c.agility + tz + dp + scatter_mod + rain_mod).max(2).min(6);
                             let roll = rng.d6();
                             let caught = roll >= min_roll;
                             // Auto-reroll on failed CATCH: Catch and MonstrousMouth only.
@@ -816,6 +818,40 @@ impl GameEngine {
                                     break;
                                 }
                             }
+                        }
+                    }
+                }
+
+                // Sweltering Heat drive-start faint: fires at kickoff END for drives where
+                // weather was ALREADY SwelteringHeat when the kickoff began. For H2+ drives
+                // this matches Java's END_KICKOFF → StepEndTurn.start → getFaintingCount.
+                // H1 kickoff faint is handled at halftime (inside Action::EndTurn when half_done=true).
+                // Condition: weather is currently SwelteringHeat AND this is H2 (not H1 where
+                // weather may have changed TO SwelteringHeat during the kickoff event — in that
+                // case Java fires the faint at the H1 last-turn EndTurn, matched by halftime code).
+                if self.game.half == 2 && self.game.weather == Weather::SwelteringHeat {
+                    let fainting_count = self.rng.d3() as usize;
+                    for is_home in [true, false] {
+                        let player_ids: Vec<String> = {
+                            let team = if is_home { &self.game.team_home } else { &self.game.team_away };
+                            team.players.iter().map(|p| p.id.clone()).collect()
+                        };
+                        let mut on_pitch: Vec<String> = player_ids.into_iter()
+                            .filter(|id| {
+                                self.game.field_model.player_coordinate(id)
+                                    .map(|c| c.is_on_pitch())
+                                    .unwrap_or(false)
+                            })
+                            .collect();
+                        for _ in 0..fainting_count {
+                            if on_pitch.is_empty() { break; }
+                            let idx = self.rng.range(on_pitch.len());
+                            let pid = on_pitch.remove(idx);
+                            let state = self.game.field_model.player_state(&pid)
+                                .unwrap_or(PlayerState::new(PS_STANDING));
+                            self.game.field_model.set_player_state(&pid, state.change_base(PS_EXHAUSTED));
+                            self.game.field_model.player_coordinates.remove(pid.as_str());
+                            events.push(GameEvent::HeatExhaustion { player_id: pid });
                         }
                     }
                 }
@@ -1356,8 +1392,14 @@ impl GameEngine {
                         // Prayers to Nuffle: each team with prayers rolls D16
                         let prayer_events = self.apply_prayers_to_nuffle_rolls();
                         events.extend(prayer_events);
+                        // Java ordering: SW ejection (ArgueTheCall) fires BEFORE SwelteringHeat faint.
+                        // Java StepEndTurn: handleCommand processes ATC dice at pos=12-13 before
+                        // getFaintingCount fires at pos=14. Matching Java order: eject SW first.
+                        let sw_events = self.eject_secret_weapon_players();
+                        events.extend(sw_events);
                         // Sweltering Heat: exhaust random players, matching Java StepEndTurn.getFaintingCount().
                         // Dice consumed: d3 (fainting count) + d(on_pitch_size) × fainting_count per team.
+                        // Note: SW players already ejected above; on_pitch list reflects post-ejection state.
                         if self.game.weather == Weather::SwelteringHeat {
                             let fainting_count = self.rng.d3() as usize;
                             for is_home in [true, false] {
@@ -1391,10 +1433,6 @@ impl GameEngine {
                         self.game.home_playing = self.game.home_first_offense;
                         self.game.turn_mode = TurnMode::Setup;
                         self.setup_phase = 0;
-                        // Eject BEFORE place_all_in_reserve so ejected players end up
-                        // PS_BADLY_HURT (not overwritten to PS_RESERVE by place_all).
-                        let sw_events = self.eject_secret_weapon_players();
-                        events.extend(sw_events);
                         self.place_all_in_reserve();
                     } else {
                         // Game over — eject before reserve so state is consistent.
@@ -10531,9 +10569,10 @@ impl GameEngine {
             let extra_arm_mod = if has_extra_arm { -1 } else { 0 };
             // BlastIt (BB2020+): thrower's teammates get -1 to catch target on HMP scatter
             let blast_it_mod = if self.blast_it_catch_bonus && is_home == self.game.home_playing { -1 } else { 0 };
+            let rain_mod = if self.game.weather == Weather::PouringRain { 1 } else { 0 };
             let catch_min = match rules {
-                Rules::Bb2016 => (minimum_roll_catch_bb2016(ag, 0) + dp_mod + extra_arm_mod + blast_it_mod).max(2),
-                _ => (ag + dp_mod + extra_arm_mod + blast_it_mod).max(2),
+                Rules::Bb2016 => (minimum_roll_catch_bb2016(ag, 0) + dp_mod + extra_arm_mod + blast_it_mod + rain_mod).max(2),
+                _ => (ag + dp_mod + extra_arm_mod + blast_it_mod + rain_mod).max(2),
             };
             let has_catch = if is_home {
                 self.game.team_home.player(&pid).map(|p| p.has_skill(SkillId::Catch)).unwrap_or(false)

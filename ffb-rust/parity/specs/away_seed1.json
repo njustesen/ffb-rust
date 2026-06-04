@@ -1,0 +1,66 @@
+{
+  "id": "away_human_bb2016_gen",
+  "name": "Away Human",
+  "race": "human",
+  "edition": "bb2016",
+  "rerolls": 3,
+  "apothecary": true,
+  "team_value": 920000,
+  "players": [
+    {
+      "nr": 1,
+      "name": "Away Ogre 1",
+      "position": "human.ogre"
+    },
+    {
+      "nr": 2,
+      "name": "Away Thrower 2",
+      "position": "human.thrower"
+    },
+    {
+      "nr": 3,
+      "name": "Away Thrower 3",
+      "position": "human.thrower"
+    },
+    {
+      "nr": 4,
+      "name": "Away Blitzer 4",
+      "position": "human.blitzer"
+    },
+    {
+      "nr": 5,
+      "name": "Away Blitzer 5",
+      "position": "human.blitzer"
+    },
+    {
+      "nr": 6,
+      "name": "Away Blitzer 6",
+      "position": "human.blitzer"
+    },
+    {
+      "nr": 7,
+      "name": "Away Blitzer 7",
+      "position": "human.blitzer"
+    },
+    {
+      "nr": 8,
+      "name": "Away Catcher 8",
+      "position": "human.catcher"
+    },
+    {
+      "nr": 9,
+      "name": "Away Catcher 9",
+      "position": "human.catcher"
+    },
+    {
+      "nr": 10,
+      "name": "Away Catcher 10",
+      "position": "human.catcher"
+    },
+    {
+      "nr": 11,
+      "name": "Away Catcher 11",
+      "position": "human.catcher"
+    }
+  ]
+}
