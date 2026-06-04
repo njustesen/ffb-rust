@@ -1591,3 +1591,70 @@ mod seed69_engine_trace {
         }
     }
 }
+
+#[cfg(test)]
+mod roster_name_tests {
+    use crate::runner::make_team_from_roster;
+
+    // These tests verify that the roster name normalization introduced in session 39
+    // correctly resolves multi-word race names (space vs underscore) and special aliases.
+
+    #[test]
+    fn chaos_dwarf_resolves_to_actual_roster() {
+        let team = make_team_from_roster("chaos_dwarf", "home", "bb2025")
+            .expect("chaos_dwarf must resolve to the Chaos Dwarf roster");
+        assert_eq!(team.players.len(), 11, "must build 11-player team");
+        // Jersey 1 = Minotaur (qty=1, cost=150k) — wrong roster gives a generic lineman (ag=3)
+        let j1 = &team.players[0];
+        assert_ne!(j1.agility, 3, "jersey 1 must not be a generic lineman (ag=3)");
+    }
+
+    #[test]
+    fn dark_elf_resolves_to_actual_roster() {
+        make_team_from_roster("dark_elf", "home", "bb2025")
+            .expect("dark_elf must resolve to the Dark Elf roster");
+    }
+
+    #[test]
+    fn high_elf_resolves_to_actual_roster() {
+        let team = make_team_from_roster("high_elf", "home", "bb2025")
+            .expect("high_elf must resolve to the High Elf roster");
+        assert_eq!(team.players.len(), 11);
+    }
+
+    #[test]
+    fn chaos_pact_resolves_to_actual_roster() {
+        let team = make_team_from_roster("chaos_pact", "home", "bb2025")
+            .expect("chaos_pact must resolve to the Chaos Pact roster");
+        assert_eq!(team.players.len(), 11);
+        // Chaos Pact includes positions with agility < 3 (e.g. Goblin ag=2)
+        let has_low_ag = team.players.iter().any(|p| p.agility < 3);
+        assert!(has_low_ag, "Chaos Pact team must contain at least one low-agility position");
+    }
+
+    #[test]
+    fn wood_elf_resolves_to_actual_roster() {
+        let team = make_team_from_roster("wood_elf", "home", "bb2025")
+            .expect("wood_elf must resolve to the Wood Elf roster");
+        assert_eq!(team.players.len(), 11);
+    }
+
+    #[test]
+    fn renegades_resolves_via_alias() {
+        // "renegades" uses the explicit alias -> "chaos renegade" roster (id="1050157")
+        let team = make_team_from_roster("renegades", "home", "bb2025")
+            .expect("renegades must resolve to Chaos Renegade roster via alias");
+        assert_eq!(team.players.len(), 11);
+        // Renegade Rat Ogre is highest-cost qty=1 position -> jersey 1, ag=4
+        let j1 = &team.players[0];
+        assert_eq!(j1.agility, 4, "Renegade Rat Ogre (jersey 1) must have ag=4");
+    }
+
+    #[test]
+    fn single_word_races_still_resolve() {
+        for race in ["amazon", "chaos", "dwarf", "goblin", "nurgle", "norse"] {
+            make_team_from_roster(race, "home", "bb2025")
+                .unwrap_or_else(|e| panic!("{race} must resolve without fallback: {e}"));
+        }
+    }
+}
