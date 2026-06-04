@@ -319,6 +319,7 @@ pub fn make_team_from_roster(roster_name: &str, side: &str, edition: &str) -> Re
     // Explicit aliases for rosters whose JSON id/name don't match the race short-name.
     let roster_name = match roster_name.to_ascii_lowercase().as_str() {
         "renegades" => "chaos renegade",
+        "chaos_chosen" => "chaos",
         _ => roster_name,
     };
     // Normalize: lowercase, strip non-alphanumeric (collapses "Chaos Dwarf" = "chaos_dwarf" = "chaosdwarf")

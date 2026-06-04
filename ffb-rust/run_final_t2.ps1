@@ -1,5 +1,5 @@
 Set-Location 'C:\Users\Admin\niels\ffb-rust\ffb-rust'
-$races = @('amazon','chaos','chaos_dwarf','chaos_pact','dark_elf','dwarf','elf','goblin','halfling','high_elf','human','khemri','lizardman','necromantic','norse','nurgle','ogre','orc','renegades','skaven','slann','undead','underworld','vampire','wood_elf')
+$races = @('amazon','chaos_chosen','chaos_dwarf','chaos_pact','dark_elf','dwarf','elf','goblin','halfling','high_elf','human','khemri','lizardman','necromantic','norse','nurgle','ogre','orc','renegades','skaven','slann','undead','underworld','vampire','wood_elf')
 $pass = 0; $fail = 0; $failRaces = @()
 foreach ($race in $races) {
     $r = & .\target\x86_64-pc-windows-msvc\debug\ffb-parity.exe --home $race --away $race --edition bb2025 --seeds 100 --no-abort 2>&1 | Select-String 'PARITY:'
