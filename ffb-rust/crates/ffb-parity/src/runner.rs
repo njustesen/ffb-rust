@@ -398,12 +398,21 @@ pub fn make_team_from_roster(roster_name: &str, side: &str, edition: &str) -> Re
         "bb2025" | _ => bb2025_rosters(),
     };
 
+    // Explicit aliases for rosters whose JSON id/name don't match the race short-name.
+    let roster_name = match roster_name.to_ascii_lowercase().as_str() {
+        "renegades" => "chaos renegade",
+        _ => roster_name,
+    };
+    // Normalize: lowercase, strip non-alphanumeric (collapses "Chaos Dwarf" = "chaos_dwarf" = "chaosdwarf")
+    let norm = |s: &str| s.chars().filter(|c| c.is_alphanumeric()).collect::<String>().to_lowercase();
+    let roster_norm = norm(roster_name);
     let roster_json = rosters
         .into_iter()
         .find(|r| {
-            r.name.to_ascii_lowercase() == roster_name.to_ascii_lowercase()
+            norm(&r.name) == roster_norm
+                || norm(&r.id) == roster_norm
                 || r.id.to_ascii_lowercase().starts_with(&format!("{}.", roster_name.to_ascii_lowercase()))
-                || r.id.to_ascii_lowercase() == roster_name.to_ascii_lowercase()
+                || norm(&r.id).starts_with(&roster_norm)
         })
         .ok_or_else(|| format!("roster '{}' not found in edition '{}'", roster_name, edition))?;
 

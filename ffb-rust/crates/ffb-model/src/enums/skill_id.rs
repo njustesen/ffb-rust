@@ -435,6 +435,14 @@ impl SkillId {
     /// lowercasing before matching, so "Secret Weapon", "secret_weapon",
     /// "SecretWeapon", and "secret weapon" all resolve identically.
     pub fn from_class_name(s: &str) -> Option<SkillId> {
+        // Exact case-sensitive match first: distinguishes pairs like "SideStep" (BB2020)
+        // vs "Sidestep" (BB2025) that normalize to the same lowercase key.
+        let exact = match s {
+            "SideStep" => return Some(SkillId::SideStep),
+            "Sidestep" => return Some(SkillId::Sidestep),
+            _ => None::<SkillId>,
+        };
+        let _ = exact; // suppress warning
         let n: String = s.chars().filter(|c| c.is_alphanumeric()).collect::<String>().to_lowercase();
         let skill = match n.as_str() {
             "accurate" => SkillId::Accurate,

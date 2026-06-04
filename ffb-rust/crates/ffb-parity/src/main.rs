@@ -437,6 +437,85 @@ mod game_rng_test {
             println!("H2 off_pitch={off_pitch} in_half_home={in_half_home} touchback_java={}", !in_half_home || off_pitch);
         }
     }
+
+    #[test]
+    #[test]
+    fn trace_seed28_goblin_kickoff_dice() {
+        // Goblin seed 28: H1 away kicks to (5,3). DICE_TRACE shows scatter NW dist=1 → (4,2), then bounce N → (4,1).
+        // Pitch Invasion (event=12) with stun_count=2 (d3=2).
+        // Java: Ball and Chain player stunned → 2 extra injury dice at pos 14,15 before second stun.
+        let mut rng = GameRng::new(28);
+        // Pre-game: d3+d3+d6+d6+bool
+        let f_h = rng.d3(); let f_a = rng.d3();
+        let w1 = rng.d6(); let w2 = rng.d6();
+        let coin = rng.bool();
+        println!("Pre-game: fan_h={f_h} fan_a={f_a} weather={}+{}={} coin={coin}", w1, w2, w1+w2);
+        // H1 scatter
+        let sd = rng.d8(); let dist = rng.d6();
+        println!("H1 scatter: d8={sd} dist={dist}");
+        // H1 event roll
+        let e1 = rng.d6(); let e2 = rng.d6();
+        println!("H1 event: {}+{}={}", e1, e2, e1+e2);
+        // Pitch Invasion fan rolls + stun
+        let pi_h = rng.d6(); let pi_a = rng.d6();
+        let stun = rng.d3();
+        println!("PI: home_roll={pi_h} away_roll={pi_a} stun_count={stun}");
+        // First stun player selection
+        let s1 = rng.die(11);
+        println!("Stun1: die(11)={s1} → index {}", s1-1);
+        // Java has 2 Ball and Chain dice here, Rust skips them
+        // If we DON'T skip: pos 13=s1, pos 14=stun2, pos 15=CSTI_bounce
+        let s2_no_bac = rng.die(10);
+        let csti_no_bac = rng.d8();
+        println!("Without BaC: stun2=die(10)={s2_no_bac} CSTI=d8={csti_no_bac}");
+        // Now print what Java would use (skipping the d6+d6 BaC injury)
+        println!("Java stun2 at pos 16 would be a different value than at pos 13");
+    }
+
+    #[test]
+    fn dump_renegades_team_jerseys() {
+        let team = crate::runner::make_team_from_roster("renegades", "away", "bb2025").unwrap();
+        for p in &team.players {
+            println!("jersey {} ag={} name={}", p.nr, p.agility, p.name);
+        }
+    }
+
+    fn trace_seed67_norse_kickoff_dice() {
+        // Norse seed 67: H1 away kicks to (0,5). H2 home kicks to (15,6).
+        // Pre-game dice: d3(fan_h)+d3(fan_a)+d6(weather)+d6(weather)+bool(coin) = 5 dice
+        // H1 kickoff (Rust order: scatter before event):
+        //   scatter(d8,d6)+event(2d6)+CSTI_bounce(d8) = 5 dice
+        // H2 kickoff: scatter(d8,d6)+event(2d6)+BrilliantCoaching(2d6)+CSTI_catch(d6) = 7 dice
+        let mut rng = GameRng::new(67);
+        // Pre-game
+        let fan_h = rng.d3(); let fan_a = rng.d3();
+        let w1 = rng.d6(); let w2 = rng.d6();
+        let coin = rng.bool();
+        println!("Pre-game: fan_h={fan_h} fan_a={fan_a} weather={}+{}={} coin={coin}", w1, w2, w1+w2);
+        // H1 kickoff: scatter(d8,d6)+event_roll(2d6)+CheeringFans_extra(2d6)+CSTI_bounce(d8) = 7 dice
+        let h1_sd = rng.d8();
+        let h1_dist = rng.d6();
+        let h1_ev1 = rng.d6();
+        let h1_ev2 = rng.d6();
+        // Cheering Fans (sum=4): 2 extra dice
+        let cf_home = rng.d6(); let cf_away = rng.d6();
+        let h1_csti_bounce = rng.d8();
+        println!("H1: scatter_dir={h1_sd} dist={h1_dist} event={}+{}={} cf_h={cf_home} cf_a={cf_away} bounce={h1_csti_bounce}",
+            h1_ev1, h1_ev2, h1_ev1+h1_ev2);
+        // H2 kickoff: scatter(d8,d6)+event_roll(2d6)+BrilliantCoaching(2d6)+CSTI_catch(d6)+CSTI_bounce(d8)
+        let h2_sd = rng.d8();
+        let h2_dist = rng.d6();
+        let h2_ev1 = rng.d6();
+        let h2_ev2 = rng.d6();
+        let h2_coach_h = rng.d6();
+        let h2_coach_a = rng.d6();
+        let h2_catch = rng.d6();
+        let h2_bounce = rng.d8();
+        println!("H2: scatter_dir={h2_sd} dist={h2_dist} event={}+{}={} coach_h={h2_coach_h} coach_a={h2_coach_a}",
+            h2_ev1, h2_ev2, h2_ev1+h2_ev2);
+        println!("H2 CSTI: catch_roll={h2_catch} (if bounces: bounce_dir={h2_bounce})");
+        println!("Expected scatter W(7) dist=2, event=Brilliant(7)");
+    }
 }
 
 #[cfg(test)]

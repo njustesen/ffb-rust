@@ -731,14 +731,42 @@ impl GameEngine {
                         });
                         if let Some(c) = catcher {
                             let tz: i32 = opp.players.iter().filter(|p| {
-                                game.field_model.player_state(&p.id).map(|s| s.is_standing()).unwrap_or(false)
+                                game.field_model.player_state(&p.id).map(|s| s.has_tacklezones()).unwrap_or(false)
                                     && game.field_model.player_coordinate(&p.id).map(|oc| oc.is_adjacent(coord)).unwrap_or(false)
+                            }).count() as i32;
+                            // Disturbing Presence: opposing players within 3 squares that are
+                            // not prone or stunned (BB2020+: "unless your player is prone/stunned").
+                            // Java CatchModifierCollection adds +1 per adjacent DP-skilled player.
+                            let dp: i32 = opp.players.iter().filter(|p| {
+                                p.has_skill(SkillId::DisturbingPresence)
+                                    && game.field_model.player_state(&p.id)
+                                        .map(|s| !s.is_prone_or_stunned())
+                                        .unwrap_or(false)
+                                    && game.field_model.player_coordinate(&p.id)
+                                        .map(|oc| {
+                                            let dx = (oc.x - coord.x).abs();
+                                            let dy = (oc.y - coord.y).abs();
+                                            dx <= 3 && dy <= 3
+                                        })
+                                        .unwrap_or(false)
                             }).count() as i32;
                             // BB2025: CATCH_SCATTER has +1 to min_roll (Inaccurate Pass or Scatter modifier)
                             let scatter_mod: i32 = if is_scatter { 1 } else { 0 };
-                            let min_roll = (c.agility + tz + scatter_mod).max(2).min(6);
+                            let min_roll = (c.agility + tz + dp + scatter_mod).max(2).min(6);
                             let roll = rng.d6();
-                            Some(roll >= min_roll)
+                            let caught = roll >= min_roll;
+                            // Auto-reroll on failed CATCH: Catch and MonstrousMouth only.
+                            // SureHands is for PICKUP (moving to ball), not CATCH (receiving a
+                            // kicked ball). Java StepApplyKickoffResult calls DiceRoller.rollSkill()
+                            // automatically for Catch/MonstrousMouth here — no dialog is shown.
+                            let caught = if !caught && c.has_skill(SkillId::Catch) {
+                                rng.d6() >= min_roll
+                            } else if !caught && c.has_skill(SkillId::MonstrousMouth) {
+                                rng.d6() >= min_roll
+                            } else {
+                                caught
+                            };
+                            Some(caught)
                         } else {
                             None // no player
                         }
@@ -7701,10 +7729,13 @@ impl GameEngine {
                 self.game.home_playing = !home_moving;
                 self.game.turn_mode = TurnMode::Setup;
                 self.setup_phase = 0;
-                self.place_all_in_reserve();
-                // SecretWeapon players are ejected at end of drive
+                // Eject SecretWeapon players BEFORE place_all_in_reserve so their state
+                // is still on-pitch (Standing/Moving) during ejection. The scoring player
+                // is PS_MOVING at this point — ejecting first ensures they are processed
+                // (place_all_in_reserve would set them to PS_RESERVE, causing ejection to skip them).
                 let sw_events = self.eject_secret_weapon_players();
                 events.extend(sw_events);
+                self.place_all_in_reserve();
                 self.game.acting_player.current_move = 0;
                 return Ok(events);
             }
@@ -9551,8 +9582,18 @@ impl GameEngine {
                         let n = standing.len() as u32;
                         let idx = self.rng.die(n) as usize - 1;
                         let pid = standing.remove(idx);
-                        // Java stunPlayer → dropPlayer(STUNNED) but STUNNED has base=PRONE in state hash
-                        self.game.field_model.set_player_state(&pid, PlayerState::new(PS_PRONE));
+                        let has_bac = self.game.team_home.players.iter()
+                            .find(|p| p.id == pid)
+                            .map(|p| p.has_skill(SkillId::BallAndChain))
+                            .unwrap_or(false);
+                        if has_bac {
+                            // BallAndChain = immune to stun (stays Standing).
+                            // Java still calls rollInjury() → 2 extra d6 dice consumed.
+                            self.rng.d6(); self.rng.d6();
+                        } else {
+                            // Java stunPlayer → dropPlayer(STUNNED) but STUNNED has base=PRONE in state hash
+                            self.game.field_model.set_player_state(&pid, PlayerState::new(PS_PRONE));
+                        }
                         events.push(GameEvent::KickoffPitchInvasionStun { player_id: pid });
                     }
                 }
@@ -9567,7 +9608,15 @@ impl GameEngine {
                         let n = standing.len() as u32;
                         let idx = self.rng.die(n) as usize - 1;
                         let pid = standing.remove(idx);
-                        self.game.field_model.set_player_state(&pid, PlayerState::new(PS_PRONE));
+                        let has_bac = self.game.team_away.players.iter()
+                            .find(|p| p.id == pid)
+                            .map(|p| p.has_skill(SkillId::BallAndChain))
+                            .unwrap_or(false);
+                        if has_bac {
+                            self.rng.d6(); self.rng.d6();
+                        } else {
+                            self.game.field_model.set_player_state(&pid, PlayerState::new(PS_PRONE));
+                        }
                         events.push(GameEvent::KickoffPitchInvasionStun { player_id: pid });
                     }
                 }
@@ -11954,8 +12003,18 @@ impl GameEngine {
                 }
 
                 let state = self.game.field_model.player_state(pid).unwrap_or(PlayerState::new(PS_RESERVE));
-                if state.base() != PS_STANDING || state.base() == PS_RIP {
-                    continue; // Only process Standing players
+                // Skip players already dead or ejected.
+                if state.base() == PS_RIP || state.base() == PS_BANNED {
+                    continue;
+                }
+                // Skip off-pitch players (reserve / KO box / dugout).
+                // Do NOT restrict to PS_STANDING — scoring players have PS_MOVING state
+                // during touchdown resolution and must still be ejected.
+                if matches!(state.base(),
+                    b if b == PS_RESERVE || b == PS_KNOCKED_OUT
+                        || b == PS_BADLY_HURT || b == PS_SERIOUS_INJURY)
+                {
+                    continue;
                 }
 
                 if coach_banned {
