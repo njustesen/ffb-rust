@@ -1,13 +1,33 @@
 # FFB-Rust Session State
 
-## Current Status (session 39 end, 2026-06-04)
+## Current Status (session 41 end, 2026-06-04)
 
 **Test counts: 2,591 total (882 engine, 1,214 mechanics, 406 model, 37 parity, 21 protocol, 31 client)**
 **Java @Test invocations: ~2,370**
-**Parity: T2 complete — 25/25 races × 100/100 seeds (2,500 games, BB2025) ✓**
+**Parity: T2 complete — 25/25 races × 100/100 seeds (2,500 games, BB2025) ✓ (chaos_chosen confirmed)**
 **Sections 1–13: All complete ✓**
 
 All tests passing. Zero failures.
+
+---
+
+## Session 41 Summary (2026-06-04)
+
+**Goal:** Fix chaos_chosen parity (was producing empty output in T2 suite).
+
+**Result:** ✓ chaos_chosen 100/100. No new unit tests needed.
+
+### Root cause fixed
+
+**chaos_chosen roster alias missing** (`crates/ffb-parity/src/runner.rs`)
+- `make_team_from_roster("chaos_chosen", ...)` found no matching roster JSON and silently fell back to an all-lineman team.
+- Java's `teamChaosChosenParityHome.xml` uses `<rosterId>chaos.lrb6</rosterId>` — i.e. it IS the Chaos team.
+- Fix: added `"chaos_chosen" => "chaos"` to the alias table alongside the existing `"renegades"` alias.
+- Also replaced `"chaos"` with `"chaos_chosen"` in `run_final_t2.ps1` to use the canonical FUMBBL team name going forward.
+
+### Clarification
+
+"Chaos" and "Chaos Chosen" are the same team. The suite now consistently uses `chaos_chosen` as the race name; `chaos` was the old alias.
 
 ---
 

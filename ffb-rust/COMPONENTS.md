@@ -40,7 +40,7 @@ Two conditions must hold before any component earns **✓**:
 | Kickoff event variants | 15 (across 3 editions) |
 | Java test methods (translatable mechanics) | ~2,370 (session 33: +60 — GameResultModelTest 9, GameModelTest 11, RosterModelTest 9, RosterPositionModelTest 9, GameOptionsModelTest +6) |
 | Rust tests total (all crates) | 2,591 (31 client, 882 engine, 1,214 mechanics, 406 model, 37 parity, 21 protocol; session 39: +10 — BaC Pitch Invasion ×2 engine, DP CSTI ×1 engine, roster normalization ×7 parity) |
-| Parity seeds passing | T2 complete: 25/25 races × 100/100 seeds (2,500 games, BB2025) ✓ (session 39: DP in CSTI, roster name normalization, BaC Pitch Invasion immunity, BRIBES dialog fix) |
+| Parity seeds passing | T2 complete: 25/25 races × 100/100 seeds (2,500 games, BB2025) ✓ (session 41: chaos_chosen alias fix — chaos_chosen = chaos, same team) |
 
 ---
 
