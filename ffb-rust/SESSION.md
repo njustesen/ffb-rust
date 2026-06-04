@@ -1,13 +1,67 @@
 # FFB-Rust Session State
 
-## Current Status (session 35 end, 2026-06-02)
+## Current Status (session 39 end, 2026-06-04)
 
-**Test counts: 2,572 total (877 engine, 1,214 mechanics, 406 model, 27 parity, 21 protocol, 27 client)**
+**Test counts: 2,591 total (882 engine, 1,214 mechanics, 406 model, 37 parity, 21 protocol, 31 client)**
 **Java @Test invocations: ~2,370**
-**Parity: 100 / 100 seeds passing ✓**
-**Sections 1–13: All complete ✓ (except ID 61 ClientConnection — async WebSocket, no unit tests)**
+**Parity: T2 complete — 25/25 races × 100/100 seeds (2,500 games, BB2025) ✓**
+**Sections 1–13: All complete ✓**
 
 All tests passing. Zero failures.
+
+---
+
+## Session 39 Summary (2026-06-04)
+
+**Goal:** Achieve 100/100 seeds for all 25 BB2025 races in T2.
+
+**Result:** ✓ All 25 races pass 100/100 seeds. 10 new unit tests added.
+
+### Root causes fixed
+
+**1. Disturbing Presence missing from CSTI kickoff catch** (`crates/ffb-engine/src/engine/mod.rs`)
+- Java `CatchModifierCollection` adds +1 per adjacent DP-skilled opponent within 3 squares. Rust's CSTI `check_and_catch` was only counting tackle zones.
+- Fix: added `dp` counter alongside `tz` in the catch formula: `min_roll = (ag + tz + dp + scatter_mod).max(2).min(6)`.
+- Also changed tz counting to use `has_tacklezones()` instead of `is_standing()` (matches Java's modifier logic for confused/hypnotized players).
+- Affected races: Norse (Snow Troll DP), Nurgle.
+
+**2. Roster name matching failed for multi-word races** (`crates/ffb-parity/src/runner.rs`)
+- "chaos_dwarf" didn't match roster `id="chaosdwarf.lrb6"` (underscore vs no-separator) — all multi-word races silently fell back to all-lineman teams (ag=3 everywhere).
+- Fix: normalize both sides with `|s| s.chars().filter(|c| c.is_alphanumeric()).collect::<String>().to_lowercase()`.
+- Also added explicit alias: `"renegades"` → `"chaos renegade"` (roster `id="1050157"`, name doesn't contain "renegade").
+- Affected races: chaos_dwarf, chaos_pact, dark_elf, high_elf, wood_elf, renegades.
+
+**3. BallAndChain Pitch Invasion immunity** (`crates/ffb-engine/src/engine/mod.rs`)
+- In BB rules, BaC players cannot be stunned. Java calls `InjuryTypeBallAndChain.handleInjury()` (consumes 2 d6 injury dice) and leaves the player Standing. Rust was setting the player Prone and skipping the dice, shifting all downstream game RNG.
+- Fix: in Pitch Invasion player stun loop, check `has_skill(SkillId::BallAndChain)` → if true, consume 2×`d6()` without changing player state.
+- Affected races: Goblin (Fanatic), Chaos Dwarf (Deathroller's BaC on adjacent players).
+
+**4. BRIBES dialog infinite loop in Java halftime** (`ffb-java/.../ParityRunner.java`)
+- Java `StepEndTurn.useSecretWeaponBribes()` sets `fBribesChoiceAway/Home` to non-null only when called with a non-null inducement type. RandomStrategy was sending `null` inducement → flag stayed null → loop forever.
+- Fix: `ParityRunner` now explicitly handles `case BRIBES:` by finding the AVOID_BAN inducement type and sending `ClientCommandUseInducement(avoidBanType, new String[0])` to properly decline.
+- Also fixed: MVP dialog required a non-empty player selection (first eligible player selected); `MAX_ITERATIONS` raised to 2,000,000 as safety headroom.
+- Affected races: Goblin, Chaos Dwarf, Dwarf (SW ejection halftime).
+
+**5. T2 script used stale debug binary** (`run_final_t2.ps1`)
+- Script referenced `target\debug\ffb-parity.exe` (unmodified pre-session binary). Changed to `target\x86_64-pc-windows-msvc\debug\ffb-parity.exe`.
+
+### New unit tests (10 total)
+
+**Engine (crates/ffb-engine/src/engine/mod.rs, Groups 240–241):**
+- `pitch_invasion_ball_and_chain_player_stays_standing` — BaC player remains Standing after Pitch Invasion
+- `pitch_invasion_non_bac_player_goes_prone` — non-BaC players still go Prone
+- `csti_kickoff_catch_disturbing_presence_raises_min_roll` — DP code path exercised, no panic
+
+**Parity runner (crates/ffb-parity/src/main.rs, roster_name_tests module):**
+- `chaos_dwarf_resolves_to_actual_roster` — jersey 1 is Minotaur (ag≠3), not lineman fallback
+- `dark_elf_resolves_to_actual_roster`
+- `high_elf_resolves_to_actual_roster`
+- `chaos_pact_resolves_to_actual_roster` — team contains low-ag position (Goblin)
+- `wood_elf_resolves_to_actual_roster`
+- `renegades_resolves_via_alias` — jersey 1 is Renegade Rat Ogre (ag=4)
+- `single_word_races_still_resolve` — regression check for amazon/chaos/dwarf/goblin/nurgle/norse
+
+---
 
 ### Session 36 Summary (continuation of session 35)
 

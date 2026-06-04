@@ -39,8 +39,8 @@ Two conditions must hold before any component earns **✓**:
 | Inducement Java classes | 28 |
 | Kickoff event variants | 15 (across 3 editions) |
 | Java test methods (translatable mechanics) | ~2,370 (session 33: +60 — GameResultModelTest 9, GameModelTest 11, RosterModelTest 9, RosterPositionModelTest 9, GameOptionsModelTest +6) |
-| Rust tests total (all crates) | 2,578 (31 client, 879 engine, 1,214 mechanics, 406 model, 27 parity, 21 protocol; session 37: +9 — DoubleHiredStarPlayer ×2 engine, ClientConnection ×4 tokio; session 35+36: +83) |
-| Parity seeds passing | 100 / 100 (all seeds ✓; session 30: fixed BB2025 CATCH_SCATTER +1 modifier — "Inaccurate Pass or Scatter" was missing from Rust CSTI loop) |
+| Rust tests total (all crates) | 2,591 (31 client, 882 engine, 1,214 mechanics, 406 model, 37 parity, 21 protocol; session 39: +10 — BaC Pitch Invasion ×2 engine, DP CSTI ×1 engine, roster normalization ×7 parity) |
+| Parity seeds passing | T2 complete: 25/25 races × 100/100 seeds (2,500 games, BB2025) ✓ (session 39: DP in CSTI, roster name normalization, BaC Pitch Invasion immunity, BRIBES dialog fix) |
 
 ---
 
@@ -648,4 +648,8 @@ These Java modules are explicitly excluded from the Rust translation:
 
 > **Session 37 (2026-06-02):** **Gap closure.** (1) Removed stale comment at engine:2442 ("Duration management not yet implemented" — already implemented). (2) `DoubleHiredStarPlayer` event: added `home_star_purchases`/`away_star_purchases` tracking to `GameEngine`; emitted when both teams buy the same starPlayer_ ID during `BuyInducements`; 2 engine tests. (3) `PettyCash` confirmed already implemented (line 605 of engine); SESSION.md corrected. (4) `ClientConnection` unit tests: 4 tokio tests using local mock WebSocket server (connect, send, receive dispatch, close); ID 61 → ✓. (5) Network integration test: implemented connectivity check in `ffb-parity/src/network_test.rs` — skips if PARITY_SERVER unset (CI-safe), connects + verifies first ServerCommand if set; added ffb-client + tokio deps to ffb-parity; ID 71 → ~. Total: ~2,581 Rust tests.
 
-*Last updated: 2026-06-02 (session 37)*
+> **Session 38 (2026-06-03):** **T2 gap closure (10-seed level).** Investigated and fixed parity failures for goblin/dwarf (SW ejection RNG), SideStep/Sidestep skill normalization, CSTI Catch/MonstrousMouth reroll, SW ejection ordering at drive end. T2 29/29 races × 10 seeds passing.
+
+> **Session 39 (2026-06-04):** **T2 100-seed milestone.** All 25 BB2025 races pass 100/100 seeds (2,500 total games). Four root causes fixed: (1) Disturbing Presence modifier missing from CSTI kickoff catch min_roll (Norse/Nurgle); (2) Roster name normalization failing for multi-word races — chaos_dwarf/chaos_pact/dark_elf/high_elf/wood_elf/renegades all fell back to lineman teams; (3) BallAndChain Pitch Invasion immunity — BaC players must stay Standing, and 2 injury dice consumed by Java were skipped by Rust; (4) BRIBES dialog infinite loop — Java ParityRunner sent null inducement type, leaving halftime SW ejection loop at 2M iterations. Also fixed: MVP dialog needs non-empty player selection; T2 script pointed at stale binary. 10 new unit tests. Total: 2,591 Rust tests.
+
+*Last updated: 2026-06-04 (session 39)*

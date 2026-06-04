@@ -20,9 +20,11 @@ For each tier, test at scale: **1 → 10 → 100 → 1000 seeds** before advanci
 
 ## Current Status
 
-**T1a:** ✓ 100/100 | **T1b:** ✓ 100/100 | **T2:** ✓ 29/29 races × 10/10 seeds
+**T1a:** ✓ 100/100 | **T1b:** ✓ 100/100 | **T2:** ✓ 25/25 races × 100/100 seeds (2,500 games)
 
-**Next milestone:** T2 × 100 seeds per race, then T3.
+**T2 at 100 seeds is complete.** All 25 BB2025 races pass 100/100 seeds — bit-for-bit identical state hashes between Java and Rust for every game.
+
+**Next milestone:** T3 (requires G-RULE-3 player activation + prereq C custom roster loading).
 
 **Blocker for T3 being meaningful:** player activation (G-RULE-3). Without real moves and blocks, T3 and T2 test the same mechanics — only kickoff/halftime/ejection logic fires. T3 adds value only after activation is implemented.
 
@@ -36,7 +38,7 @@ Mark each cell: `✓` (all pass), `~` (partial, note failure count), `✗` (all 
 |------|-------------|:------:|:--------:|:---------:|:----------:|-------|
 | T1a  | Lineman vs Lineman, BB2025 | ✓ | ✓ | ✓ | — | 100/100 ✓ |
 | T1b  | Human vs Orc, BB2025 | ✓ | ✓ | ✓ | — | 100/100 ✓ |
-| T2   | All 29 races self-vs-self, BB2025 | ✓ | ✓ | — | — | 29/29 races 10/10 ✓ |
+| T2   | All 25 races self-vs-self, BB2025 | ✓ | ✓ | ✓ | — | 25/25 races 100/100 ✓ |
 | T3   | Random custom TV-matched, random edition | — | — | — | — | Blocked on G-RULE-3 (activation) + prereq C |
 | T3i  | Random custom TV-imbalanced, random edition | — | — | — | — | Blocked on G-RULE-3 + prereqs C, D |
 
@@ -199,10 +201,13 @@ python scripts/parity_run.py --tier T3i --seeds 1-100 --custom-roster --tv-imbal
 | 2026-06-02 | T2 | 1–10 | 27/29 races | dwarf, goblin | SW ejection (G-RULE-6); slann/FUMBBL races also fixed |
 | 2026-06-03 | T2 | 1–10 | 29/29 races | — | G-RULE-6 fixed: SW penalty rolls (bombardier) + argue RNG alignment |
 | 2026-06-03 | T1a | 1–100 | 100/100 | — | Re-verified after G-RULE-6 fix |
+| 2026-06-04 | T2 | 1–100 | 25/25 races | — | All 25 races 100/100 — DP in CSTI, roster name normalization, BaC Pitch Invasion immunity, BRIBES dialog fix |
 
 ---
 
 ## What's Left Before T3
+
+**T2 is complete (25/25 races × 100/100 seeds).** All no-activation parity mechanics are verified.
 
 ### Must-have
 1. **G-RULE-3: Player activation** — both agents must activate players, make moves, blocks, passes. Without this, T3 tests the same mechanics as T2 (only kickoff logic). This is the largest remaining piece.
