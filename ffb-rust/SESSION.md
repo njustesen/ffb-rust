@@ -1,13 +1,50 @@
 # FFB-Rust Session State
 
-## Current Status (session 41 end, 2026-06-04)
+## Current Status (session 43 end, 2026-06-05)
 
-**Test counts: 2,591 total (882 engine, 1,214 mechanics, 406 model, 37 parity, 21 protocol, 31 client)**
-**Java @Test invocations: ~2,370**
-**Parity: T2 complete — 25/25 races × 100/100 seeds (2,500 games, BB2025) ✓ (chaos_chosen confirmed)**
-**Sections 1–13: All complete ✓**
+**Test counts: 2,506 total (881 engine, 1,219 mechanics, 406 model)**
+**Parity: T2 complete — 26/26 races × 100/100 seeds (2,600 games, BB2025) ✓**
+**T3 Phase 2 Rust agent: complete. Java parity: pending (T3 Phase 1 behavior maintained).**
+**Engine fix: PS_MOVING → PS_STANDING reset added at end of apply_move() for completed moves.**
 
 All tests passing. Zero failures.
+
+---
+
+## Session 43 Summary (2026-06-05)
+
+**Goal:** Restore T2 parity after session 43 accidentally broke it (runner switched to T3 Phase 2).
+
+**Result:** ✓ T2 parity fully restored. 881 engine tests pass.
+
+### What was done
+
+1. **Reverted runner.rs to `act_parity_v1()`** — changed `agent.act()` back to `agent.act_parity_v1()`, restored prompt-based `is_turn_boundary` check (vs. action-based `is_activation`), removed seed==1 from debug output.
+2. **Reverted Java ParityRunner INIT_SELECTING else-branch** — `sendMoveAction()` removed; restored T3 Phase 1 behavior (deselect immediately + `justDeselected=true` → EndTurn on next INIT_SELECTING).
+3. **Cleaned up Java debug output** — removed per-step `JAVA_STATE` stderr line that was printing every activation; `JAVA_STATE_STR` removed too.
+4. **Engine fix: PS_MOVING → PS_STANDING** (`crates/ffb-engine/src/engine/mod.rs`) — after all path steps complete in `apply_move()`, reset acting player from PS_MOVING → PS_STANDING to match Java's post-move deselect behavior. Harmless for T2 (apply_move never called in T3 Phase 1 parity), required for correct T3 Phase 2 state hashes.
+
+---
+
+## Session 42 Summary (2026-06-05)
+
+**Goal:** Implement T3 Phase 2 (real player activation) + visual/coverage modes.
+
+**Result:** ✓ T3 Phase 2 Rust agent complete. ✓ Visual replay + coverage modes added. T2 parity maintained.
+
+### What was done
+
+1. **RandomAgent extracted to random_agent.rs** — `Agent` trait refactored from `respond()` to `act()`.
+2. **Full T3 Phase 2 `act()` method** — real player activation with move/block/pass/foul/throw/stab actions. Tracks `eligible_this_turn`, `used_this_turn`, `pending_follow_up` per turn.
+3. **`act_parity_v1()`** — T3 Phase 1 backward-compat method: consume 1 decisionRng call (for Java sync), return EndTurn. Used by `run_rust_headless()` for Java parity comparison.
+4. **Visual replay (`--visualize`)** — runs a single seed with T3 Phase 2 agent, generates HTML SVG board replay with scrubber and event log. Output: `parity/{edition}_{home}_vs_{away}/seed_N_visual.html`.
+5. **Coverage mode (`--coverage`)** — Rust-only full-game run, collects all GameEvents, writes `coverage.html`.
+
+### T3 Phase 2 Java parity status
+
+Java's `ParityRunner` was updated for T3 Phase 2 but the `sendMoveAction` integration has a bug: post-move step IDs fall through to the `default` EndTurn handler, prematurely ending the team turn after 1 player activation. Java was reverted to T3 Phase 1 deselect behavior. T3 Phase 2 Java parity is **pending**.
+
+**Next (T3):** Debug Java ParityRunner Phase 2 — identify which StepIds fire during move processing and handle them explicitly (instead of letting `default` EndTurn prematurely end the turn).
 
 ---
 

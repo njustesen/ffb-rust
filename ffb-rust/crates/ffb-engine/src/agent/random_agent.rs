@@ -53,12 +53,27 @@ pub struct RandomAgent {
 impl RandomAgent {
     /// Construct a random agent seeded with `seed`.
     ///
-    /// For parity runs (matching Java's decisionRng), callers apply the Java-compat
-    /// seed XOR before constructing: `RandomAgent::new(seed ^ 0xDEAD_BEEF_CAFE_0001)`.
+    /// For coverage/visual runs (no Java sync required). Both RNGs derive from `seed`.
     pub fn new(seed: u64) -> Self {
         RandomAgent {
             rng: Xoshiro256StarStar::seed_from_u64(seed),
             action_rng: Xoshiro256StarStar::seed_from_u64(seed ^ 0xC0FFEE_ACE0_0001),
+            eligible_this_turn: Vec::new(),
+            used_this_turn: HashSet::new(),
+            last_turn_key: (-1, -1, true),
+            pending_follow_up: None,
+        }
+    }
+
+    /// Construct a random agent for Java parity runs, given the raw game seed.
+    ///
+    /// Matches Java's ParityRunner exactly:
+    /// - `decisionRng` seeded with `game_seed ^ 0xDEAD_BEEF_CAFE_0001`
+    /// - `actionRng`   seeded with `game_seed ^ 0xC0FFEE_ACE0_0001`
+    pub fn new_parity(game_seed: u64) -> Self {
+        RandomAgent {
+            rng: Xoshiro256StarStar::seed_from_u64(game_seed ^ 0xDEAD_BEEF_CAFE_0001),
+            action_rng: Xoshiro256StarStar::seed_from_u64(game_seed ^ 0xC0FFEE_ACE0_0001),
             eligible_this_turn: Vec::new(),
             used_this_turn: HashSet::new(),
             last_turn_key: (-1, -1, true),

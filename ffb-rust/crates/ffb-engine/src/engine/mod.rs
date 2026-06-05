@@ -7781,6 +7781,21 @@ impl GameEngine {
 
         self.game.acting_player.current_move = current_move;
 
+        // All path steps completed — reset PS_MOVING → PS_STANDING.
+        // Java fires INIT_MOVING after the move, the AI sends a deselect command, and the
+        // server sets the player back to PS_STANDING. Rust has no explicit deselect; we do it
+        // here so the state hash matches Java's between-activation snapshots.
+        if let Some(ref pid) = self.game.acting_player.player_id.clone() {
+            if let Some(state) = self.game.field_model.player_state(pid) {
+                if state.base() == PS_MOVING {
+                    self.game.field_model.set_player_state(
+                        pid,
+                        state.change_base(PS_STANDING).change_active(false),
+                    );
+                }
+            }
+        }
+
         // PickMeUp (BB2020+): non-active team's PickMeUp players may stand up prone teammates.
         if rules != Rules::Bb2016 && self.pending_pick_me_up.is_none() {
             let eligible = self.compute_pick_me_up_eligible(!home_moving);

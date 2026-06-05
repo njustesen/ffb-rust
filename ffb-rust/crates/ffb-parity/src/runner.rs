@@ -97,8 +97,9 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
     let away = make_team(away_roster, "away", edition);
 
     let mut engine = GameEngine::new(home, away, rules, seed);
-    // One shared agent for both teams. Seed XOR matches Java's decisionRng seeding.
-    let mut agent = RandomAgent::new(seed ^ 0xDEAD_BEEF_CAFE_0001);
+    // One shared agent for both teams. new_parity seeds both decision and action RNGs
+    // to match Java's decisionRng and actionRng exactly.
+    let mut agent = RandomAgent::new_parity(seed);
 
     let initial_hash = state_hash(&engine.game);
     let mut lines: Vec<LogLine> = Vec::new();
