@@ -17971,13 +17971,15 @@ mod tests {
     #[test]
     fn run_game_produces_final_state() {
         // Full game simulation via agent::run_game must not panic.
-        use crate::agent::{RandomAgent, run_game};
+        use crate::agent::{RandomAgent, Agent, run_game};
         let home = make_test_team("home");
         let away = make_test_team("away");
         let mut engine = GameEngine::new(home, away, Rules::Bb2020, 12345);
         let mut home_agent = RandomAgent::new(12345);
         let mut away_agent = RandomAgent::new(99999);
-        let _events = run_game(&mut engine, &mut home_agent, &mut away_agent);
+        let _events = run_game(&mut engine, |e| {
+            if e.game.home_playing { home_agent.act(e) } else { away_agent.act(e) }
+        });
     }
 
     // ── Group 38: reroll mechanics ────────────────────────────────────────────

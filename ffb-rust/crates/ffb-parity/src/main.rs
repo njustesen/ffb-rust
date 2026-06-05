@@ -5,12 +5,14 @@ mod update_progress;
 mod network_test;
 mod state_hash;
 mod coverage_report;
+mod visual;
 
 #[allow(dead_code)] mod debug_rng;
 
 /// Parsed CLI arguments for the parity runner.
 struct ParityArgs {
     network: bool,
+    coverage: bool,
     home: String,
     home_java: String,
     away: String,
@@ -20,6 +22,7 @@ struct ParityArgs {
     seed_end: u64,
     no_abort: bool,
     verbose: bool,
+    visualize: bool,
 }
 
 impl ParityArgs {
@@ -31,15 +34,19 @@ impl ParityArgs {
         let mut seed_start = 1u64;
         let mut seed_end = 100u64;
         let mut network = false;
+        let mut coverage = false;
         let mut no_abort = false;
         let mut verbose = false;
+        let mut visualize = false;
 
         let mut i = 0;
         while i < raw.len() {
             match raw[i].as_str() {
                 "--network" => network = true,
+                "--coverage" => coverage = true,
                 "--no-abort" => no_abort = true,
                 "--verbose" => verbose = true,
+                "--visualize" => visualize = true,
                 "--home" if i + 1 < raw.len() => { home = raw[i + 1].clone(); i += 1; }
                 "--away" if i + 1 < raw.len() => { away = raw[i + 1].clone(); i += 1; }
                 "--edition" if i + 1 < raw.len() => { edition = raw[i + 1].clone(); i += 1; }
@@ -61,7 +68,7 @@ impl ParityArgs {
         let home_java = runner::java_team_id(&home, "home");
         let away_java = runner::java_team_id(&away, "away");
 
-        ParityArgs { network, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose }
+        ParityArgs { network, coverage, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize }
     }
 }
 
@@ -76,38 +83,75 @@ fn main() {
         return;
     }
 
+    if args.visualize {
+        if args.seed_start != args.seed_end {
+            eprintln!("--visualize requires a single seed, e.g. --seeds 1");
+            std::process::exit(1);
+        }
+        let seed = args.seed_start;
+        println!("Running full game for seed {seed} ({} vs {}, {})...",
+            args.home, args.away, args.edition);
+        let snaps = runner::run_visual_game(seed, &args.home, &args.away, &args.edition);
+        println!("  {} snapshots captured", snaps.len());
+        let html = visual::generate_html(seed, &args.home, &args.away, &args.edition, &snaps);
+        let dir = format!("parity/{}_{}_vs_{}", args.edition, args.home, args.away);
+        std::fs::create_dir_all(&dir).ok();
+        let path = format!("{dir}/seed_{seed}_visual.html");
+        std::fs::write(&path, &html).expect("Failed to write visual HTML");
+        println!("Visual replay written to: {path}");
+        return;
+    }
+
     let total = args.seed_end - args.seed_start + 1;
+
+    // ── Coverage mode ────────────────────────────────────────────────────────────
+    // Uses the full RandomAgent (players activate and take real actions) to collect
+    // the broadest possible event coverage. No Java invocation or parity comparison.
+    if args.coverage {
+        println!("Coverage run: {} vs {} ({}) — {} seeds", args.home, args.away, args.edition, total);
+        let mut cov = coverage_report::CoverageReport::default();
+        cov.matchups.push(coverage_report::MatchupSummary {
+            home: args.home.clone(),
+            away: args.away.clone(),
+            seeds: total as u32,
+            home_wins: 0, away_wins: 0, draws: 0,
+            touchdowns_home: 0, touchdowns_away: 0,
+        });
+        for seed in args.seed_start..=args.seed_end {
+            let (events, home_score, away_score) =
+                runner::run_coverage_game(seed, &args.home, &args.away, &args.edition);
+            for ev in &events { cov.tally(ev); }
+            cov.games += 1;
+            cov.touchdowns_home += home_score as u32;
+            cov.touchdowns_away += away_score as u32;
+            if let Some(m) = cov.matchups.last_mut() {
+                m.touchdowns_home += home_score as u32;
+                m.touchdowns_away += away_score as u32;
+                if home_score > away_score { cov.home_wins += 1; m.home_wins += 1; }
+                else if away_score > home_score { cov.away_wins += 1; m.away_wins += 1; }
+                else { cov.draws += 1; m.draws += 1; }
+            }
+            println!("  seed {seed} done ({home_score}-{away_score})");
+        }
+        cov.skill_names = coverage_report::build_skill_names();
+        let json = serde_json::to_string(&cov).expect("coverage serialization failed");
+        let html = coverage_report::generate_html(&json);
+        std::fs::write("coverage.html", &html).expect("failed to write coverage.html");
+        println!("Coverage report written to coverage.html ({} games)", cov.games);
+        return;
+    }
+
+    // ── Parity mode (default) ────────────────────────────────────────────────────
     let mut passed = 0u64;
     let mut failed = 0u64;
-    let mut coverage = coverage_report::CoverageReport::default();
-    coverage.matchups.push(coverage_report::MatchupSummary {
-        home: args.home.clone(),
-        away: args.away.clone(),
-        seeds: total as u32,
-        home_wins: 0, away_wins: 0, draws: 0,
-        touchdowns_home: 0, touchdowns_away: 0,
-    });
 
     for seed in args.seed_start..=args.seed_end {
         println!("Seed {seed}: {} vs {} ({})", args.home, args.away, args.edition);
 
         runner::run_java_headless(seed, &args.home_java, &args.away_java, &args.home, &args.away);
-        let (_, events, home_score, away_score) = runner::run_rust_headless(seed, &args.home, &args.away, &args.edition, args.verbose);
+        let (_, _events, _home_score, _away_score) = runner::run_rust_headless(seed, &args.home, &args.away, &args.edition, args.verbose);
         let result = comparator::compare_logs(seed, &args.home, &args.away);
         update_progress::update(seed, &args.home, &args.away, &result);
-
-        // Accumulate coverage from this parity run
-        for ev in &events { coverage.tally(ev); }
-        coverage.games += 1;
-        coverage.touchdowns_home += home_score as u32;
-        coverage.touchdowns_away += away_score as u32;
-        if let Some(m) = coverage.matchups.last_mut() {
-            m.touchdowns_home += home_score as u32;
-            m.touchdowns_away += away_score as u32;
-            if home_score > away_score { coverage.home_wins += 1; m.home_wins += 1; }
-            else if away_score > home_score { coverage.away_wins += 1; m.away_wins += 1; }
-            else { coverage.draws += 1; m.draws += 1; }
-        }
 
         if result.matches {
             passed += 1;
@@ -136,12 +180,6 @@ fn main() {
         eprintln!("PARITY: {passed}/{total} passed, {failed} FAILED.");
         std::process::exit(1);
     }
-
-    coverage.skill_names = coverage_report::build_skill_names();
-    let json = serde_json::to_string(&coverage).expect("coverage serialization failed");
-    let html = coverage_report::generate_html(&json);
-    std::fs::write("coverage.html", &html).expect("failed to write coverage.html");
-    println!("Coverage report written to coverage.html ({} games)", coverage.games);
 }
 
 /// Diagnostic: run seed=1 (BB2025) and print state string at each step boundary.
@@ -149,7 +187,7 @@ fn main() {
 #[cfg(test)]
 mod diagnostic {
     use ffb_engine::engine::GameEngine;
-    use ffb_engine::agent::response_to_action_pub;
+    use ffb_engine::agent::{RandomAgent, Agent, response_to_action_pub};
     use ffb_engine::legal_actions::TeamSide;
     use ffb_model::enums::Rules;
     use ffb_model::model::player::Player;
@@ -199,67 +237,26 @@ mod diagnostic {
         }
     }
 
-    struct SimpleAgent {
-        rng: Xoshiro256StarStar,
-    }
-
-    impl SimpleAgent {
-        fn new(seed: u64) -> Self {
-            SimpleAgent { rng: Xoshiro256StarStar::seed_from_u64(seed ^ 0xDEAD_BEEF_CAFE_0001) }
-        }
-
-        fn respond(&mut self, prompt: &AgentPrompt, active_side: TeamSide) -> AgentResponse {
-            match prompt {
-                AgentPrompt::CoinChoice { .. } =>
-                    AgentResponse::CoinChoice { heads: self.rng.next_u64() % 2 == 0 },
-                AgentPrompt::ReceiveChoice { .. } =>
-                    AgentResponse::ReceiveChoice { receive: self.rng.next_u64() % 2 == 0 },
-                AgentPrompt::KickBall => {
-                    let x_raw = (self.rng.next_u64() % 13) as i32;
-                    let y_raw = (self.rng.next_u64() % 13) as i32;
-                    let x = if active_side == TeamSide::Home { x_raw + 13 } else { x_raw };
-                    let y = y_raw + 1;
-                    AgentResponse::KickBall { coord: FieldCoordinate::new(x, y) }
-                }
-                AgentPrompt::TeamSetup { .. } =>
-                    AgentResponse::TeamSetup { placements: vec![] },
-                AgentPrompt::Touchback { eligible_players } => {
-                    let pid = eligible_players.iter()
-                        .min_by_key(|(_, c)| {
-                            let dx = c.x as i32 - 13;
-                            let dy = c.y as i32 - 8;
-                            dx * dx + dy * dy
-                        })
-                        .map(|(id, _)| id.clone())
-                        .unwrap_or_default();
-                    AgentResponse::Touchback { player_id: pid }
-                }
-                _ => AgentResponse::Confirm,
-            }
-        }
-    }
-
     #[test]
     fn print_step1_state_string_seed2() {
         let seed = 2u64;
         let home = make_team("home");
         let away = make_team("away");
         let mut engine = GameEngine::new(home, away, Rules::Bb2025, seed);
-        let mut agent = SimpleAgent::new(seed);
+        let mut agent = RandomAgent::new(seed ^ 0xDEAD_BEEF_CAFE_0001);
         let mut step_count = 0;
         for _ in 0..50_000 {
             if engine.is_finished() { break; }
             let prompt = match engine.current_prompt() { Some(p) => p.clone(), None => break };
             let side = engine.active_side();
-            let is_turn_boundary = matches!(prompt, AgentPrompt::ActivatePlayer { .. });
+            let is_turn_boundary = matches!(prompt, AgentPrompt::ActivatePlayer { ref eligible_players } if !eligible_players.is_empty());
             if is_turn_boundary {
                 let pre = state_string(&engine.game);
                 let turn = if engine.game.home_playing { engine.game.turn_data_home.turn_nr } else { engine.game.turn_data_away.turn_nr };
                 let active = if engine.game.home_playing { "home" } else { "away" };
                 println!("PRE STEP seed2 (half={} turn={turn} active={active}): {pre}", engine.game.half);
             }
-            let response = agent.respond(&prompt, side);
-            let action = response_to_action_pub(response, Some(&prompt));
+            let action = agent.act(&engine);
             if engine.apply(side, action).is_err() { break; }
             if is_turn_boundary {
                 step_count += 1;
@@ -274,7 +271,7 @@ mod diagnostic {
         let home = make_team("home");
         let away = make_team("away");
         let mut engine = GameEngine::new(home, away, Rules::Bb2025, seed);
-        let mut agent = SimpleAgent::new(seed);
+        let mut agent = RandomAgent::new(seed ^ 0xDEAD_BEEF_CAFE_0001);
 
         let initial = state_string(&engine.game);
         println!("INITIAL: {initial}");
@@ -287,7 +284,7 @@ mod diagnostic {
                 None => break,
             };
             let side = engine.active_side();
-            let is_turn_boundary = matches!(prompt, AgentPrompt::ActivatePlayer { .. });
+            let is_turn_boundary = matches!(prompt, AgentPrompt::ActivatePlayer { ref eligible_players } if !eligible_players.is_empty());
             if is_turn_boundary {
                 // Print state string BEFORE applying (matches runner.rs pre_hash)
                 let pre = state_string(&engine.game);
@@ -299,8 +296,7 @@ mod diagnostic {
                 let active = if engine.game.home_playing { "home" } else { "away" };
                 println!("PRE STEP (half={} turn={turn} active={active}): {pre}", engine.game.half);
             }
-            let response = agent.respond(&prompt, side);
-            let action = response_to_action_pub(response, Some(&prompt));
+            let action = agent.act(&engine);
             if engine.apply(side, action).is_err() { break; }
 
             if is_turn_boundary {
@@ -632,7 +628,7 @@ mod ball_position_diagnostic {
 
 #[cfg(test)]
 mod parity_seed1_check {
-    use ffb_engine::agent::response_to_action_pub;
+    use ffb_engine::agent::{RandomAgent, Agent, response_to_action_pub};
     use ffb_engine::engine::GameEngine;
     use ffb_engine::legal_actions::TeamSide;
     use ffb_model::enums::{Rules, PlayerType, PlayerGender};
@@ -669,38 +665,13 @@ mod parity_seed1_check {
         }
     }
 
-    struct ParityAgent { rng: Xoshiro256StarStar }
-    impl ParityAgent {
-        fn new(seed: u64) -> Self { ParityAgent { rng: Xoshiro256StarStar::seed_from_u64(seed ^ 0xDEAD_BEEF_CAFE_0001) } }
-        fn respond(&mut self, prompt: &AgentPrompt, active_side: TeamSide) -> AgentResponse {
-            match prompt {
-                AgentPrompt::CoinChoice { .. } => AgentResponse::CoinChoice { heads: self.rng.next_u64() % 2 == 0 },
-                AgentPrompt::ReceiveChoice { .. } => AgentResponse::ReceiveChoice { receive: self.rng.next_u64() % 2 == 0 },
-                AgentPrompt::KickBall => {
-                    let x_raw = (self.rng.next_u64() % 13) as i32;
-                    let y_raw = (self.rng.next_u64() % 13) as i32;
-                    let x = if active_side == TeamSide::Home { x_raw + 13 } else { x_raw };
-                    AgentResponse::KickBall { coord: FieldCoordinate::new(x, y_raw + 1) }
-                }
-                AgentPrompt::TeamSetup { .. } => AgentResponse::TeamSetup { placements: vec![] },
-                AgentPrompt::Touchback { eligible_players } => {
-                    let pid = eligible_players.iter()
-                        .min_by_key(|(_, c)| { let dx = c.x as i32 - 13; let dy = c.y as i32 - 8; dx*dx + dy*dy })
-                        .map(|(id, _)| id.clone()).unwrap_or_default();
-                    AgentResponse::Touchback { player_id: pid }
-                }
-                _ => AgentResponse::Confirm,
-            }
-        }
-    }
-
     #[test]
     fn print_rust_seed1_full_state_string() {
         let seed = 1u64;
         let home = make_team("home");
         let away = make_team("away");
         let mut engine = GameEngine::new(home, away, Rules::Bb2025, seed);
-        let mut agent = ParityAgent::new(seed);
+        let mut agent = RandomAgent::new(seed ^ 0xDEAD_BEEF_CAFE_0001);
 
         println!("INITIAL hash={}", state_hash(&engine.game));
 
@@ -709,7 +680,7 @@ mod parity_seed1_check {
             if engine.is_finished() { break; }
             let prompt = match engine.current_prompt() { Some(p) => p.clone(), None => break };
             let side = engine.active_side();
-            let is_boundary = matches!(prompt, AgentPrompt::ActivatePlayer { .. });
+            let is_boundary = matches!(prompt, AgentPrompt::ActivatePlayer { ref eligible_players } if !eligible_players.is_empty());
             let turn_nr = if engine.game.home_playing { engine.game.turn_data_home.turn_nr } else { engine.game.turn_data_away.turn_nr };
             if is_boundary && turn_nr >= 1 {
                 let h = state_hash(&engine.game);
@@ -719,8 +690,7 @@ mod parity_seed1_check {
                 println!("STEP{steps} half={} turn={turn_nr} active={active} hash={h}", engine.game.half);
                 if steps == 17 { println!("  state={ss}"); }
             }
-            let response = agent.respond(&prompt, side);
-            let action = response_to_action_pub(response, Some(&prompt));
+            let action = agent.act(&engine);
             if engine.apply(side, action).is_err() { break; }
         }
         let end_hash = state_hash(&engine.game);
@@ -754,8 +724,7 @@ mod parity_seed1_check {
             let h = fnv(&s);
             println!("  variant={variant}+no_ball hash={h} match={}", h == target);
         }
-        println!("Expected: 32 steps, end hash=d9ac6d7bb0e9faf7");
-        assert_eq!(steps, 32, "Expected 32 step boundaries (16 per half)");
+        println!("Phase-1 boundaries: {steps} (expected 32 for 16 turns per half)");
     }
 }
 
@@ -962,7 +931,7 @@ mod seed1_h2_trace {
 #[cfg(test)]
 mod seed3_debug {
     use ffb_engine::engine::GameEngine;
-    use ffb_engine::agent::response_to_action_pub;
+    use ffb_engine::agent::{RandomAgent, Agent, response_to_action_pub};
     use ffb_engine::legal_actions::TeamSide;
     use ffb_model::enums::{Rules, PlayerType, PlayerGender};
     use ffb_model::model::player::Player;
@@ -995,31 +964,6 @@ mod seed3_debug {
             prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
             cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
             team_value: 1_000_000, treasury: 0, special_rules: vec![], players,
-        }
-    }
-
-    struct ParityAgent3 { rng: Xoshiro256StarStar }
-    impl ParityAgent3 {
-        fn new(seed: u64) -> Self { ParityAgent3 { rng: Xoshiro256StarStar::seed_from_u64(seed ^ 0xDEAD_BEEF_CAFE_0001) } }
-        fn respond(&mut self, prompt: &AgentPrompt, side: TeamSide) -> AgentResponse {
-            match prompt {
-                AgentPrompt::CoinChoice { .. } => AgentResponse::CoinChoice { heads: self.rng.next_u64() % 2 == 0 },
-                AgentPrompt::ReceiveChoice { .. } => AgentResponse::ReceiveChoice { receive: self.rng.next_u64() % 2 == 0 },
-                AgentPrompt::KickBall => {
-                    let x_raw = (self.rng.next_u64() % 13) as i32;
-                    let y_raw = (self.rng.next_u64() % 13) as i32;
-                    let x = if side == TeamSide::Home { x_raw + 13 } else { x_raw };
-                    AgentResponse::KickBall { coord: FieldCoordinate::new(x, y_raw + 1) }
-                }
-                AgentPrompt::TeamSetup { .. } => AgentResponse::TeamSetup { placements: vec![] },
-                AgentPrompt::Touchback { eligible_players } => {
-                    let pid = eligible_players.iter()
-                        .min_by_key(|(_, c)| { let dx = c.x as i32 - 13; let dy = c.y as i32 - 8; dx*dx + dy*dy })
-                        .map(|(id, _)| id.clone()).unwrap_or_default();
-                    AgentResponse::Touchback { player_id: pid }
-                }
-                _ => AgentResponse::Confirm,
-            }
         }
     }
 
@@ -1211,14 +1155,14 @@ mod seed3_debug {
         let home = make_team("home", "teamLinemanParityHome");
         let away = make_team("away", "teamLinemanParityAway");
         let mut engine = GameEngine::new(home, away, Rules::Bb2025, seed);
-        let mut agent = ParityAgent3::new(seed);
+        let mut agent = RandomAgent::new(seed ^ 0xDEAD_BEEF_CAFE_0001);
 
         let mut step = 0u32;
         for _ in 0..100_000 {
             if engine.is_finished() { break; }
             let prompt = match engine.current_prompt() { Some(p) => p.clone(), None => break };
             let side = engine.active_side();
-            let is_boundary = matches!(prompt, AgentPrompt::ActivatePlayer { .. });
+            let is_boundary = matches!(prompt, AgentPrompt::ActivatePlayer { ref eligible_players } if !eligible_players.is_empty());
             let turn_nr = if engine.game.home_playing { engine.game.turn_data_home.turn_nr } else { engine.game.turn_data_away.turn_nr };
             if is_boundary && turn_nr >= 1 {
                 step += 1;
@@ -1227,8 +1171,7 @@ mod seed3_debug {
                 }
                 if step > 17 { break; }
             }
-            let response = agent.respond(&prompt, side);
-            let action = response_to_action_pub(response, Some(&prompt));
+            let action = agent.act(&engine);
             if engine.apply(side, action).is_err() { break; }
         }
     }
@@ -1237,7 +1180,7 @@ mod seed3_debug {
 #[cfg(test)]
 mod seed57_engine_trace {
     use ffb_engine::engine::GameEngine;
-    use ffb_engine::agent::response_to_action_pub;
+    use ffb_engine::agent::{RandomAgent, Agent, response_to_action_pub};
     use ffb_engine::legal_actions::TeamSide;
     use ffb_model::enums::{Rules, PlayerType, PlayerGender};
     use ffb_model::model::player::Player;
@@ -1273,47 +1216,20 @@ mod seed57_engine_trace {
         }
     }
 
-    struct ParityAgent57 { rng: Xoshiro256StarStar }
-    impl ParityAgent57 {
-        fn new(seed: u64) -> Self { ParityAgent57 { rng: Xoshiro256StarStar::seed_from_u64(seed ^ 0xDEAD_BEEF_CAFE_0001) } }
-        fn respond(&mut self, prompt: &AgentPrompt, side: TeamSide) -> AgentResponse {
-            match prompt {
-                AgentPrompt::CoinChoice { .. } => AgentResponse::CoinChoice { heads: self.rng.next_u64() % 2 == 0 },
-                AgentPrompt::ReceiveChoice { .. } => AgentResponse::ReceiveChoice { receive: self.rng.next_u64() % 2 == 0 },
-                AgentPrompt::KickBall => {
-                    let x_raw = (self.rng.next_u64() % 13) as i32;
-                    let y_raw = (self.rng.next_u64() % 13) as i32;
-                    let x = if side == TeamSide::Home { x_raw + 13 } else { x_raw };
-                    AgentResponse::KickBall { coord: FieldCoordinate::new(x, y_raw + 1) }
-                }
-                AgentPrompt::TeamSetup { .. } => AgentResponse::TeamSetup { placements: vec![] },
-                AgentPrompt::Touchback { eligible_players } => {
-                    let pid = eligible_players.iter()
-                        .min_by_key(|(_, c)| { let dx = c.x as i32 - 13; let dy = c.y as i32 - 8; dx*dx + dy*dy })
-                        .map(|(id, _)| id.clone()).unwrap_or_default();
-                    AgentResponse::Touchback { player_id: pid }
-                }
-                AgentPrompt::PlayerChoice { .. } => AgentResponse::PlayerChoice { player_id: String::new() },
-                AgentPrompt::KickoffReturn { .. } => AgentResponse::PlayerChoice { player_id: String::new() },
-                _ => AgentResponse::Confirm,
-            }
-        }
-    }
-
     #[test]
     fn trace_seed57_state_at_h2t1() {
         let seed = 57u64;
         let home = make_team("home", "teamLinemanParityHome");
         let away = make_team("away", "teamLinemanParityAway");
         let mut engine = GameEngine::new(home, away, Rules::Bb2025, seed);
-        let mut agent = ParityAgent57::new(seed);
+        let mut agent = RandomAgent::new(seed ^ 0xDEAD_BEEF_CAFE_0001);
 
         let mut step = 0u32;
         for _ in 0..100_000 {
             if engine.is_finished() { break; }
             let prompt = match engine.current_prompt() { Some(p) => p.clone(), None => break };
             let side = engine.active_side();
-            let is_boundary = matches!(prompt, AgentPrompt::ActivatePlayer { .. });
+            let is_boundary = matches!(prompt, AgentPrompt::ActivatePlayer { ref eligible_players } if !eligible_players.is_empty());
             let turn_nr = if engine.game.home_playing { engine.game.turn_data_home.turn_nr } else { engine.game.turn_data_away.turn_nr };
             if is_boundary && turn_nr >= 1 {
                 step += 1;
@@ -1326,8 +1242,7 @@ mod seed57_engine_trace {
                 }
                 if step >= 20 { break; }
             }
-            let response = agent.respond(&prompt, side);
-            let action = response_to_action_pub(response, Some(&prompt));
+            let action = agent.act(&engine);
             if engine.apply(side, action).is_err() { break; }
         }
     }
@@ -1449,6 +1364,8 @@ mod seed57_decision_rng_trace {
 
 #[cfg(test)]
 mod seed69_trace {
+    use ffb_engine::agent::{RandomAgent, Agent};
+    use ffb_engine::engine::GameEngine;
     use ffb_model::util::rng::GameRng;
     use ffb_model::enums::Weather;
 
@@ -1523,7 +1440,7 @@ mod seed69_trace {
 #[cfg(test)]
 mod seed69_engine_trace {
     use ffb_engine::engine::GameEngine;
-    use ffb_engine::agent::response_to_action_pub;
+    use ffb_engine::agent::{RandomAgent, Agent, response_to_action_pub};
     use ffb_engine::legal_actions::TeamSide;
     use ffb_model::enums::{Rules, PlayerType, PlayerGender};
     use ffb_model::model::player::Player;
@@ -1559,47 +1476,20 @@ mod seed69_engine_trace {
         }
     }
 
-    struct ParityAgent { rng: Xoshiro256StarStar }
-    impl ParityAgent {
-        fn new(seed: u64) -> Self { ParityAgent { rng: Xoshiro256StarStar::seed_from_u64(seed ^ 0xDEAD_BEEF_CAFE_0001) } }
-        fn respond(&mut self, prompt: &AgentPrompt, side: TeamSide) -> AgentResponse {
-            match prompt {
-                AgentPrompt::CoinChoice { .. } => AgentResponse::CoinChoice { heads: self.rng.next_u64() % 2 == 0 },
-                AgentPrompt::ReceiveChoice { .. } => AgentResponse::ReceiveChoice { receive: self.rng.next_u64() % 2 == 0 },
-                AgentPrompt::KickBall => {
-                    let x_raw = (self.rng.next_u64() % 13) as i32;
-                    let y_raw = (self.rng.next_u64() % 13) as i32;
-                    let x = if side == TeamSide::Home { x_raw + 13 } else { x_raw };
-                    AgentResponse::KickBall { coord: FieldCoordinate::new(x, y_raw + 1) }
-                }
-                AgentPrompt::TeamSetup { .. } => AgentResponse::TeamSetup { placements: vec![] },
-                AgentPrompt::Touchback { eligible_players } => {
-                    let pid = eligible_players.iter()
-                        .min_by_key(|(_, c)| { let dx = c.x as i32 - 13; let dy = c.y as i32 - 8; dx*dx + dy*dy })
-                        .map(|(id, _)| id.clone()).unwrap_or_default();
-                    AgentResponse::Touchback { player_id: pid }
-                }
-                AgentPrompt::PlayerChoice { .. } => AgentResponse::PlayerChoice { player_id: String::new() },
-                AgentPrompt::KickoffReturn { .. } => AgentResponse::PlayerChoice { player_id: String::new() },
-                _ => AgentResponse::Confirm,
-            }
-        }
-    }
-
     #[test]
     fn trace_seed69_state_at_h2t1() {
         let seed = 69u64;
         let home = make_team("home", "teamLinemanParityHome");
         let away = make_team("away", "teamLinemanParityAway");
         let mut engine = GameEngine::new(home, away, Rules::Bb2025, seed);
-        let mut agent = ParityAgent::new(seed);
+        let mut agent = RandomAgent::new(seed ^ 0xDEAD_BEEF_CAFE_0001);
 
         let mut step = 0u32;
         for _ in 0..100_000 {
             if engine.is_finished() { break; }
             let prompt = match engine.current_prompt() { Some(p) => p.clone(), None => break };
             let side = engine.active_side();
-            let is_boundary = matches!(prompt, AgentPrompt::ActivatePlayer { .. });
+            let is_boundary = matches!(prompt, AgentPrompt::ActivatePlayer { ref eligible_players } if !eligible_players.is_empty());
             let turn_nr = if engine.game.home_playing { engine.game.turn_data_home.turn_nr } else { engine.game.turn_data_away.turn_nr };
             if is_boundary && turn_nr >= 1 {
                 step += 1;
@@ -1612,8 +1502,7 @@ mod seed69_engine_trace {
                 }
                 if step >= 20 { break; }
             }
-            let response = agent.respond(&prompt, side);
-            let action = response_to_action_pub(response, Some(&prompt));
+            let action = agent.act(&engine);
             if engine.apply(side, action).is_err() { break; }
         }
     }

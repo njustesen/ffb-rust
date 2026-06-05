@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::process::Command;
-use ffb_engine::agent::{RandomAgent, response_to_action_pub};
+use ffb_engine::agent::{RandomAgent, Agent};
 use ffb_engine::engine::GameEngine;
 use ffb_engine::legal_actions::TeamSide;
 use ffb_model::events::GameEvent;
@@ -12,8 +12,7 @@ use ffb_model::model::player::Player;
 use ffb_model::model::roster_position::RosterPosition;
 use ffb_model::model::skill_def::SkillWithValue;
 use ffb_model::model::team::Team;
-use ffb_model::prompts::{AgentPrompt, AgentResponse};
-use ffb_model::types::FieldCoordinate;
+use ffb_model::prompts::AgentPrompt;
 use crate::log_format::{GameLog, LogLine, java_log_path_for, rust_log_path_for};
 use crate::state_hash::state_hash;
 use ffb_model::util::state_hash::state_string;
@@ -98,8 +97,8 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
     let away = make_team(away_roster, "away", edition);
 
     let mut engine = GameEngine::new(home, away, rules, seed);
-    // One shared RandomAgent for both teams, seeded to match Java's decisionRng.
-    let mut agent = RandomAgent::new_parity(seed);
+    // One shared agent for both teams. Seed XOR matches Java's decisionRng seeding.
+    let mut agent = RandomAgent::new(seed ^ 0xDEAD_BEEF_CAFE_0001);
 
     let initial_hash = state_hash(&engine.game);
     let mut lines: Vec<LogLine> = Vec::new();
@@ -117,23 +116,16 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
     let mut pending_steps: Vec<PendingStep> = Vec::new();
 
     for _ in 0..max_iters {
-        if engine.is_finished() {
-            break;
-        }
-        let prompt = match engine.current_prompt() {
-            Some(p) => p.clone(),
-            None => break,
-        };
+        if engine.is_finished() { break; }
+        if engine.current_prompt().is_none() { break; }
 
-        let side = engine.active_side();
-        let response = agent.respond_parity(&prompt, side);
-
-        // Capture state BEFORE applying the action.
-        // Only record a step for the first ActivatePlayer prompt of each turn (eligible≠[]).
-        // The second prompt (eligible=[]) is the EndTurn signal and matches Java's single
-        // step per turn (Java only records at Phase 1 when eligible is non-empty).
-        let is_turn_boundary = match &prompt {
-            AgentPrompt::ActivatePlayer { eligible_players } => !eligible_players.is_empty(),
+        // Capture state BEFORE the agent acts.
+        // Record a step only for genuine Phase 1: first ActivatePlayer of a new turn
+        // (eligible≠[] AND no player is currently active). This excludes Blitz block
+        // re-offers (eligible≠[] but acting_player is still active) and Phase 2 (eligible=[]).
+        let is_turn_boundary = match engine.current_prompt() {
+            Some(AgentPrompt::ActivatePlayer { eligible_players })
+                if !eligible_players.is_empty() && !engine.game.acting_player.is_active() => true,
             _ => false,
         };
         let turn_nr = if engine.game.home_playing {
@@ -144,9 +136,7 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
         let half = engine.game.half;
         let pre_hash = state_hash(&engine.game);
         let active_str = if engine.game.home_playing { "home" } else { "away" };
-        let chosen = response_chosen_str(&response);
 
-        // Capture state string if verbose or if debug seed
         let pre_state_str = if is_turn_boundary && turn_nr >= 1 {
             if verbose || seed == 57 || seed == 88 {
                 Some(state_string(&engine.game))
@@ -157,7 +147,9 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
             None
         };
 
-        let action = response_to_action_pub(response, Some(&prompt));
+        let side = engine.active_side();
+        let action = agent.act_parity_v1(&engine);
+        let chosen = action_label(&action);
         match engine.apply(side, action) {
             Ok(evs) => all_events.extend(evs),
             Err(e) => {
@@ -247,7 +239,7 @@ struct PendingStep {
 
 /// Build a team. `roster_name` is "lineman" (generic) or a race name like "human".
 /// `side` is "home" or "away" (used for player IDs). `edition` is "bb2016"/"bb2020"/"bb2025".
-fn make_team(roster_name: &str, side: &str, edition: &str) -> Team {
+pub(crate) fn make_team(roster_name: &str, side: &str, edition: &str) -> Team {
     if roster_name == "lineman"
         || roster_name == "teamLinemanParityHome"
         || roster_name == "teamLinemanParityAway"
@@ -445,7 +437,7 @@ fn skill_entry_to_skill_with_value(entry: &SkillEntry) -> Option<SkillWithValue>
     Some(SkillWithValue { skill_id, value })
 }
 
-fn edition_to_rules(edition: &str) -> Rules {
+pub(crate) fn edition_to_rules(edition: &str) -> Rules {
     match edition {
         "bb2016" => Rules::Bb2016,
         "bb2020" => Rules::Bb2020,
@@ -471,32 +463,213 @@ pub fn java_team_id(race_name: &str, side: &str) -> String {
     format!("team{pascal}Parity{suffix}")
 }
 
-fn response_chosen_str(response: &AgentResponse) -> String {
-    match response {
-        AgentResponse::CoinChoice { heads } =>
-            if *heads { "Heads".into() } else { "Tails".into() },
-        AgentResponse::ReceiveChoice { receive } =>
-            if *receive { "Receive".into() } else { "Kick".into() },
-        AgentResponse::UseReRoll { use_reroll } =>
-            if *use_reroll { "UseReRoll".into() } else { "NoReRoll".into() },
-        AgentResponse::UseSkill { use_skill } =>
-            if *use_skill { "UseSkill".into() } else { "NoSkill".into() },
-        AgentResponse::FollowUp { follow_up } =>
-            if *follow_up { "FollowUp".into() } else { "NoFollowUp".into() },
-        AgentResponse::BlockChoice { index } => format!("BlockChoice({index})"),
-        AgentResponse::Pushback { coord } => format!("Pushback({},{})", coord.x, coord.y),
-        AgentResponse::ActivatePlayer { player_id, action } =>
-            format!("Activate({player_id},{action:?})"),
-        AgentResponse::Touchback { player_id } => format!("Touchback({player_id})"),
-        AgentResponse::KickBall { coord } => format!("Kick({},{})", coord.x, coord.y),
-        AgentResponse::PlayerChoice { player_id } => format!("Player({player_id})"),
-        AgentResponse::ApothecaryChoice { heal } =>
-            if *heal { "Heal".into() } else { "AcceptInjury".into() },
-        AgentResponse::UseBribe { use_bribe } =>
-            if *use_bribe { "UseBribe".into() } else { "DeclineBribe".into() },
-        AgentResponse::BuyInducements { .. } => "BuyInducements".into(),
-        AgentResponse::SelectSkill { skill_id } => format!("Skill({skill_id:?})"),
-        AgentResponse::TeamSetup { .. } => "TeamSetup".into(),
-        AgentResponse::Confirm => "EndTurn".into(),
+
+pub(crate) fn action_label(action: &ffb_engine::action::Action) -> String {
+    use ffb_engine::action::Action;
+    match action {
+        Action::CoinChoice { heads } => if *heads { "Heads".into() } else { "Tails".into() },
+        Action::ReceiveChoice { receive } => if *receive { "Receive".into() } else { "Kick".into() },
+        Action::KickBall { coord } => format!("Kick({},{})", coord.x, coord.y),
+        Action::Touchback { player_id } => format!("Touchback({player_id})"),
+        Action::ActivatePlayer { player_id, player_action } => format!("Activate({player_id},{player_action:?})"),
+        Action::EndTurn => "EndTurn".into(),
+        Action::Move { path } => path.last().map(|c| format!("Move→({},{})", c.x, c.y)).unwrap_or("Move".into()),
+        Action::Block { defender_id } => format!("Block→{defender_id}"),
+        Action::Stab { defender_id } => format!("Stab→{defender_id}"),
+        Action::BlockChoice { die_index } => format!("BlockChoice({die_index})"),
+        Action::PushTo { coord } => format!("Push({},{})", coord.x, coord.y),
+        Action::FollowUp { follow_up } => if *follow_up { "FollowUp".into() } else { "NoFollowUp".into() },
+        Action::Pass { coord } => format!("Pass({},{})", coord.x, coord.y),
+        Action::HandOff { receiver_id } => format!("HandOff→{receiver_id}"),
+        Action::Foul { target_id } => format!("Foul→{target_id}"),
+        Action::UseReRoll { use_reroll } => if *use_reroll { "UseReRoll".into() } else { "NoReRoll".into() },
+        Action::UseSkill { skill_id, use_skill } => if *use_skill { format!("UseSkill({skill_id:?})") } else { format!("NoSkill({skill_id:?})") },
+        Action::SelectPlayer { player_id } => format!("Select({player_id})"),
+        Action::UseApothecary { use_apothecary, .. } => if *use_apothecary { "Heal".into() } else { "AcceptInjury".into() },
+        _ => format!("{action:?}"),
     }
+}
+
+// ── Visual snapshot types ─────────────────────────────────────────────────────
+
+#[derive(serde::Serialize)]
+pub struct PlayerSnap {
+    pub id: String,
+    pub nr: i32,
+    pub nm: String,
+    pub h: bool,
+    pub x: i32,
+    pub y: i32,
+    pub st: i32,
+    pub ma: i32,
+    pub ag: i32,
+    pub pa: i32,
+    pub av: i32,
+    pub pos: String,
+    pub skls: Vec<String>,
+    pub bs: u32,
+    pub act: bool,
+    pub cur: bool,
+}
+
+#[derive(serde::Serialize)]
+pub struct GameSnap {
+    pub i: usize,
+    pub l: String,
+    pub hl: i32,
+    pub t: i32,
+    pub hp: bool,
+    pub hs: i32,
+    pub aw: i32,
+    pub hr: i32,
+    pub ar: i32,
+    pub hb: i32,
+    pub ab: i32,
+    pub bx: Option<i32>,
+    pub by: Option<i32>,
+    pub bp: bool,
+    /// Player who currently holds the ball (on-pitch ball carrier), if any
+    pub ball_carrier: Option<String>,
+    /// Currently acting player ID + move spent/max for MA display
+    pub act_id: Option<String>,
+    pub act_ma_spent: i32,
+    pub act_ma_max: i32,
+    pub ps: Vec<PlayerSnap>,
+    pub evs: Vec<ffb_model::events::GameEvent>,
+}
+
+fn snap(engine: &GameEngine, step: usize, label: String,
+        evs: Vec<ffb_model::events::GameEvent>) -> GameSnap {
+    use ffb_model::enums::PlayerState;
+    let g = &engine.game;
+    let acting_id: Option<&str> = g.acting_player.player_id.as_deref();
+    let turn_nr = if g.home_playing { g.turn_data_home.turn_nr } else { g.turn_data_away.turn_nr };
+
+    // Find ball carrier: player on the ball's square
+    let ball_carrier = g.field_model.ball_coordinate
+        .filter(|c| c.is_on_pitch() && g.field_model.ball_in_play)
+        .and_then(|c| g.field_model.player_at(c))
+        .map(|id| id.to_string());
+
+    // Acting player MA info
+    let (act_id, act_ma_spent, act_ma_max) = if let Some(pid) = acting_id {
+        let ma = g.team_home.player(pid).or_else(|| g.team_away.player(pid))
+            .map(|p| p.movement).unwrap_or(0);
+        (Some(pid.to_string()), g.acting_player.current_move, ma)
+    } else {
+        (None, 0, 0)
+    };
+
+    let mut ps = Vec::new();
+    for is_home in [true, false] {
+        let team = if is_home { &g.team_home } else { &g.team_away };
+        for p in &team.players {
+            let coord = g.field_model.player_coordinates.get(&p.id).copied();
+            let state = g.field_model.player_states.get(&p.id).copied().unwrap_or(PlayerState(0));
+            let dx = if is_home { -1 } else { 30 };
+            let skls: Vec<String> = p.all_skill_ids().map(|s| format!("{s:?}")).collect();
+            ps.push(PlayerSnap {
+                id: p.id.clone(), nr: p.nr, nm: p.name.clone(), h: is_home,
+                x: coord.map(|c| c.x).unwrap_or(dx),
+                y: coord.map(|c| c.y).unwrap_or(7),
+                st: p.strength, ma: p.movement, ag: p.agility, pa: p.passing, av: p.armour,
+                pos: p.position_id.clone(), skls,
+                bs: state.base(), act: state.is_active(),
+                cur: acting_id == Some(p.id.as_str()),
+            });
+        }
+    }
+    GameSnap {
+        i: step, l: label, hl: g.half, t: turn_nr, hp: g.home_playing,
+        hs: g.game_result.home.score, aw: g.game_result.away.score,
+        hr: g.turn_data_home.rerolls, ar: g.turn_data_away.rerolls,
+        hb: g.team_home.bribes, ab: g.team_away.bribes,
+        bx: g.field_model.ball_coordinate.map(|c| c.x),
+        by: g.field_model.ball_coordinate.map(|c| c.y),
+        bp: g.field_model.ball_in_play,
+        ball_carrier, act_id, act_ma_spent, act_ma_max,
+        ps, evs,
+    }
+}
+
+/// Run a complete game using RandomAgent for both sides, collecting snapshots after
+/// every engine action for HTML replay generation.
+pub fn run_visual_game(
+    seed: u64,
+    home_roster: &str,
+    away_roster: &str,
+    edition: &str,
+) -> Vec<GameSnap> {
+    use ffb_engine::agent::Agent;
+
+    let rules = edition_to_rules(edition);
+    let home = make_team(home_roster, "home", edition);
+    let away = make_team(away_roster, "away", edition);
+    let mut engine = GameEngine::new(home, away, rules, seed);
+
+    // Separate agents for home and away so they don't share RNG state.
+    let mut home_agent = ffb_engine::agent::RandomAgent::new(seed);
+    let mut away_agent = ffb_engine::agent::RandomAgent::new(seed ^ 0xFFFF_FFFF);
+
+    let mut snaps: Vec<GameSnap> = Vec::new();
+    let mut idx = 0usize;
+
+    snaps.push(snap(&engine, idx, "Game Start".into(), vec![]));
+    idx += 1;
+
+    for _ in 0..200_000 {
+        if engine.is_finished() { break; }
+        if engine.current_prompt().is_none() { break; }
+        let side = engine.active_side();
+        let action = if matches!(side, TeamSide::Home) {
+            home_agent.act(&engine)
+        } else {
+            away_agent.act(&engine)
+        };
+        let label = action_label(&action);
+        let evs = engine.apply(side, action).unwrap_or_default();
+        snaps.push(snap(&engine, idx, label, evs));
+        idx += 1;
+    }
+
+    snaps
+}
+
+/// Run a complete game using RandomAgent, collecting all GameEvents for coverage reporting.
+pub fn run_coverage_game(
+    seed: u64,
+    home_roster: &str,
+    away_roster: &str,
+    edition: &str,
+) -> (Vec<GameEvent>, i32, i32) {
+    use ffb_engine::agent::Agent;
+
+    let rules = edition_to_rules(edition);
+    let home = make_team(home_roster, "home", edition);
+    let away = make_team(away_roster, "away", edition);
+    let mut engine = GameEngine::new(home, away, rules, seed);
+
+    let mut home_agent = ffb_engine::agent::RandomAgent::new(seed);
+    let mut away_agent = ffb_engine::agent::RandomAgent::new(seed ^ 0xFFFF_FFFF);
+
+    let mut all_events: Vec<GameEvent> = Vec::new();
+
+    for _ in 0..200_000 {
+        if engine.is_finished() { break; }
+        if engine.current_prompt().is_none() { break; }
+        let side = engine.active_side();
+        let action = if matches!(side, TeamSide::Home) {
+            home_agent.act(&engine)
+        } else {
+            away_agent.act(&engine)
+        };
+        match engine.apply(side, action) {
+            Ok(evs) => all_events.extend(evs),
+            Err(e) => { eprintln!("engine error seed {seed}: {e}"); break; }
+        }
+    }
+
+    let score_home = engine.game.game_result.home.score;
+    let score_away = engine.game.game_result.away.score;
+    (all_events, score_home, score_away)
 }
