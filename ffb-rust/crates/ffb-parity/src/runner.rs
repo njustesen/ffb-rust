@@ -63,15 +63,22 @@ pub fn run_java_headless(seed: u64, home_team_id: &str, away_team_id: &str, home
         "ffb-server".to_string()
     });
 
-    let mut args: Vec<String> = vec![
-        "-cp".into(), cp.clone(),
+    let mut args: Vec<String> = vec!["-cp".into(), cp.clone()];
+    // Mirror the Rust-side trace env vars onto the Java process.
+    if std::env::var_os("FFB_DICE_TRACE").is_some() {
+        args.push("-Dffb.diceTrace=true".into());
+    }
+    if std::env::var_os("FFB_TRACE").is_some() {
+        args.push("-Dffb.parityDebug=true".into());
+    }
+    args.extend([
         "com.fumbbl.ffb.ai.parity.ParityRunner".into(),
         server_dir.clone(),
         home_team_id.into(),
         away_team_id.into(),
         seed.to_string(),
         output_path.clone(),
-    ];
+    ]);
     // Tier 2 invocations stay byte-identical to the historical CLI so older jars work.
     if tier >= 3 {
         args.push("--tier".into());
@@ -160,6 +167,11 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
                 log::warn!("engine error at seed {seed}: {e}");
                 break;
             }
+        }
+
+        if ffb_engine::parity_trace_enabled() {
+            eprintln!("LOOP applied={chosen} prompt_after={:?} finished={}",
+                engine.current_prompt(), engine.is_finished());
         }
 
         // Tier 2: one step line per INIT_SELECTING turn boundary (historical T2 format).

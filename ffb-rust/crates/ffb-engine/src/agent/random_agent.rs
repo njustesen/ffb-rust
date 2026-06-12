@@ -106,6 +106,41 @@ impl RandomAgent {
         self.action_rng.next_u64() % 2 == 0
     }
 
+    /// Drop snapshot actions that are no longer legal (AGENT_CONTRACT.md §5): the
+    /// eligible list is captured at turn start, so a Blitz/Block offered there may have
+    /// been consumed by an earlier activation this turn. Both sides apply the identical
+    /// filter before the action pick, keeping the pick's N in sync.
+    fn filter_stale_actions(engine: &GameEngine, acts: &[PlayerAction]) -> Vec<PlayerAction> {
+        let td = if engine.game.home_playing {
+            &engine.game.turn_data_home
+        } else {
+            &engine.game.turn_data_away
+        };
+        acts.iter().copied().filter(|a| match a {
+            PlayerAction::Block | PlayerAction::Blitz | PlayerAction::StandUpBlitz => !td.blitz_used,
+            PlayerAction::Pass => !td.pass_used,
+            PlayerAction::HandOver => !td.hand_over_used,
+            PlayerAction::Foul => !td.foul_used,
+            _ => true,
+        }).collect()
+    }
+
+    /// Pick the action for an activated player (AGENT_CONTRACT.md §5, Stage B):
+    /// always exactly 1 actionRng call over the player's action list, even when it
+    /// has a single entry — both sides must consume the draw unconditionally.
+    /// Not used at the blitz block re-offer, which keeps the re-offered action as-is.
+    fn pick_player_action(&mut self, acts: &[PlayerAction]) -> PlayerAction {
+        if acts.is_empty() {
+            return PlayerAction::Move;
+        }
+        let arng_before = self.action_rng_calls;
+        let ai = self.pick_action(acts.len());
+        if crate::parity_trace_enabled() {
+            eprintln!("ACTION_PICK arng_before={} N={} i={} acts={:?} chosen={:?}", arng_before, acts.len(), ai, acts, acts[ai]);
+        }
+        acts[ai]
+    }
+
     /// Sort player ids by the player's coordinate (x, y) ascending.
     ///
     /// AGENT_CONTRACT.md §6: target lists are NEVER ordered by player id — Rust ids
@@ -175,7 +210,11 @@ impl RandomAgent {
                 if targets.is_empty() {
                     Action::EndTurn
                 } else {
+                    let arng_before = self.action_rng_calls;
                     let i = self.pick_action(targets.len());
+                    if crate::parity_trace_enabled() {
+                        eprintln!("BLOCK_PICK pid={} arng_before={} N={} i={} def={}", pid, arng_before, targets.len(), i, targets[i]);
+                    }
                     Action::Block { defender_id: targets[i].clone() }
                 }
             }
@@ -387,8 +426,11 @@ impl RandomAgent {
                 AgentResponse::SelectSkill { skill_id: skills[0] }
             }
 
+            // AGENT_CONTRACT.md §7: always argue (1 game d6) — Java's ParityRunner
+            // always argues with the first eligible player (declining via dialog-clear
+            // loops the server for Secret Weapon ejections).
             AgentPrompt::ArgueTheCall { .. } =>
-                AgentResponse::UseReRoll { use_reroll: false },
+                AgentResponse::UseReRoll { use_reroll: true },
 
             AgentPrompt::BriberyAndCorruption { .. } =>
                 AgentResponse::UseBribe { use_bribe: false },
@@ -525,7 +567,8 @@ impl Agent for RandomAgent {
                             .map(|s| !s.is_active())
                             .unwrap_or(false);
                         if just_unstunned { continue; }
-                        let pa = acts.get(0).copied().unwrap_or(PlayerAction::Move);
+                        let acts = Self::filter_stale_actions(engine, &acts);
+                        let pa = self.pick_player_action(&acts);
                         self.pending_follow_up = Some((pid.clone(), pa));
                         return Action::ActivatePlayer { player_id: pid, player_action: player_action_to_choice(pa) };
                     }
@@ -555,7 +598,8 @@ impl Agent for RandomAgent {
                             .map(|s| !s.is_active())
                             .unwrap_or(false);
                         if just_unstunned { continue; }
-                        let pa = acts.get(0).copied().unwrap_or(PlayerAction::Move);
+                        let acts = Self::filter_stale_actions(engine, &acts);
+                        let pa = self.pick_player_action(&acts);
                         self.pending_follow_up = Some((pid.clone(), pa));
                         return Action::ActivatePlayer { player_id: pid, player_action: player_action_to_choice(pa) };
                     }

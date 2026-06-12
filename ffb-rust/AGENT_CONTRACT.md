@@ -92,7 +92,7 @@ never enter an ordering.)
 | Pushback square | the min-`(x, y)` on-pitch square |
 | Block die choice | index 0 |
 | Interception / pass interference | decline (no voluntary interference) |
-| ArgueTheCall | decline (0 dice) — pending Phase 3 confirmation that Java can decline cleanly; fallback is implement-argue-in-Rust, in which case this row flips |
+| ArgueTheCall | ALWAYS argue (1 game d6: >5 keeps the player, <2 also bans the coach; the team turn ends either way). Java's runner cannot decline cleanly (dialog-clear loops the server on SW ejections), so both sides argue. |
 | Touchback | give to the eligible player nearest the pitch center `(13, 8)` by squared distance (first on ties, in the engine's eligible order) |
 | SkillUse / PilingOn | always use the skill |
 
