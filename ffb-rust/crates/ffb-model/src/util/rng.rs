@@ -9,11 +9,12 @@ use rand_xoshiro::Xoshiro256StarStar;
 /// This matches Java's getDieRoll(int s) exactly.
 pub struct GameRng {
     inner: Xoshiro256StarStar,
+    pub call_count: u64,
 }
 
 impl GameRng {
     pub fn new(seed: u64) -> Self {
-        GameRng { inner: Xoshiro256StarStar::seed_from_u64(seed) }
+        GameRng { inner: Xoshiro256StarStar::seed_from_u64(seed), call_count: 0 }
     }
 
     /// Roll n-sided die (1..=sides) using rejection sampling.
@@ -22,6 +23,7 @@ impl GameRng {
         let threshold = u64::MAX - (u64::MAX % s);
         loop {
             let v = self.inner.next_u64();
+            self.call_count += 1;
             if v < threshold {
                 return (v % s + 1) as i32;
             }
