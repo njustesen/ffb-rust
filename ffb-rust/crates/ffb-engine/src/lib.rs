@@ -2,6 +2,9 @@ pub mod engine;
 pub mod agent;
 pub mod action;
 pub mod legal_actions;
+/// New step-stack engine (1:1 Java port). Built alongside `engine` during the rewrite;
+/// see docs/step_port/. Replaces the monolith once it can drive a full lineman game.
+pub mod step;
 
 /// Parity debug tracing, enabled by setting the FFB_TRACE env var.
 /// Used to gate stderr diagnostics (dodge rolls, negatrait rolls, agent picks)
