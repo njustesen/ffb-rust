@@ -113,10 +113,34 @@ as Stage A/B debugging establishes them. Format: ordered list of
 As Move; standing up may consume game dice (MA < 3 stand-up roll) per engine
 rules.
 
-### Block / Blitz / Pass / HandOver / Foul
-TBD during Stage B (trace-verified before the Java side is written).
-Known so far: Blitz consumes the §2.5 re-offer pick + a second actionRng pick
-for the block target when the engine re-enters the block step.
+### Block (trace-verified, seed 1)
+| # | Channel | Purpose |
+|---|---|---|
+| 1 | decisionRng | player pick |
+| 2 | actionRng | action pick |
+| 3 | actionRng | block-target pick |
+| — | game dice | n block dice; multi-die → BlockChoice index 0 (either chooser); declined reroll = 0 dice; knockdown armor 2d6 (+injury 2d6 when broken) per fallen player, attacker first |
+
+### Blitz (trace-verified, seed 1)
+| # | Channel | Purpose |
+|---|---|---|
+| 1 | decisionRng | player pick |
+| 2 | actionRng | action pick |
+| 3 | actionRng | blitz block-target pick (Rust: compute_follow_up Block branch; Java: SELECT_BLITZ_TARGET) |
+| — | game dice | as Block. The agent's blitz blocks immediately (no pre-block move). Attacker down = turnover. |
+
+### Foul (trace-verified, seed 1)
+| # | Channel | Purpose |
+|---|---|---|
+| 1 | decisionRng | player pick |
+| 2 | actionRng | action pick |
+| 3 | actionRng | foul-target pick |
+| — | game dice | armor 2d6 (+assists/DP mods); injury 2d6 when broken (2-7 = Stunned); referee spots on armor doubles or (broken) injury doubles → argue 1d6 (§7) → turnover |
+
+### Pass / HandOver
+Not yet exercised by a passing seed: 1 decisionRng (player) + 1 actionRng
+(action pick) + 1 actionRng (teammate/receiver pick, coordinate-sorted);
+pass fallback coordinate per §2.6. Game dice TBD on first occurrence.
 
 ## 9. Known engine-rule divergences being tracked (not agent contract)
 

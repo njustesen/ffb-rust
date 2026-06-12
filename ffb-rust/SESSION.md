@@ -1,13 +1,75 @@
 # FFB-Rust Session State
 
-## Current Status (session 43 end, 2026-06-05)
+## Current Status (session 44 end, 2026-06-12)
 
-**Test counts: 2,506 total (881 engine, 1,219 mechanics, 406 model)**
-**Parity: T2 complete — 26/26 races × 100/100 seeds (2,600 games, BB2025) ✓**
-**T3 Phase 2 Rust agent: complete. Java parity: pending (T3 Phase 1 behavior maintained).**
-**Engine fix: PS_MOVING → PS_STANDING reset added at end of apply_move() for completed moves.**
+**Test counts: 2,600 total (883 engine, 1,219 mechanics, 406 model, 39 parity, 31 client, 21 protocol, 1 doc)**
+**Parity: T2 complete — 26/26 races × 100/100 seeds via `--tier 2` (default) ✓**
+**T3 MILESTONE: lineman_vs_lineman seed 1 `--tier 3` matches 100% with FULL action coverage**
+(282 steps: 271 Move incl. stand-ups, 5 Blitz, 2 Block, 2 Foul; Pass/HandOver never arose
+organically in this 0-0 game — no successful pickup). Tier-3 seeds 4/9/10 also passed at the
+Move-only stage; seeds 2,3,5-8 are the next hardening target.
 
 All tests passing. Zero failures.
+
+---
+
+## Session 44 Summary (2026-06-12)
+
+**Goal:** T3 Phase 2 parity for one seed (seed 1), lineman only, all lineman actions.
+
+**Result:** ✓ Achieved. `cargo run --release -p ffb-parity -- --tier 3 --seeds 1-1` → 1/1.
+
+### Infrastructure
+
+1. **`--tier` flag** on both runners (Rust ffb-parity + Java ParityRunner argv). Tier 2
+   (default) = historical T2 regression path (`act_parity_v1`, turn-boundary logging,
+   byte-identical Java CLI). Tier 3 = `act()` + per-activation logging.
+2. **AGENT_CONTRACT.md** — shared spec for both agents: RNG channels, decisionRng/actionRng
+   consumption order, eligibility snapshot + stale-action filter, coordinate-based target
+   sorting (NEVER player-id — Rust/Java id formats sort differently), dialog determinism.
+3. **Dice-trace tooling**: `FFB_DICE_TRACE=1` prints `DICE_TRACE pos= sides= result=` from
+   `GameRng` in the same format as Java's `-Dffb.diceTrace=true` (cap removed); the runner
+   mirrors the env vars onto the Java subprocess. Diffing the two streams pinpoints the
+   first diverging roll. `FFB_TRACE=1` gates agent/runner/engine debug prints.
+
+### Engine fixes found via dice-trace debugging (Java = ground truth)
+
+1. **BB2020/25 casualty roll = `[d16, d6]` always** (RollMechanic.rollCasualty) — was 2d6
+   approximation with a conditional SI die.
+2. **Skull/BothDown knockdowns roll armor (+injury)** for each fallen player
+   (InjuryTypeBlock) — attacker included; attacker down on own block = **turnover**.
+3. **Plain Block no longer consumes `blitz_used`** (Java sets it only for blitz actions).
+4. **Multi-die blocks always prompt BlockChoice** — including defender's choice
+   (own_choice=false); both sides answer index 0 per the contract.
+5. **Declined block rerolls resolve without re-offering** (was an infinite offer loop).
+6. **Foul injury 2-7 = Stunned** (was Prone) in all three foul paths.
+7. **ArgueTheCall = Java semantics**: 1d6, >5 keeps the player, <2 also bans the coach,
+   eject = PS_BANNED + off-pitch, team turn ends regardless of outcome. Both agents now
+   ALWAYS argue (1 game d6).
+8. **Foul referee spotting** (armor doubles, or injury doubles when broken) was already
+   present; turnover wiring fixed via the above.
+
+### Java ParityRunner restructure
+
+- Phase-1 pick: inactive-skip loop (rejected picks consume decisionRng, log nothing);
+  action pick = 1 actionRng call over the stale-filtered list (tier 3).
+- `sendConcreteAction` dispatcher: MOVE/STAND_UP → 1-step move; BLOCK/FOUL/PASS/HAND_OVER
+  → coordinate-sorted targets, 1 actionRng pick each.
+- **Real blitz flow**: BLITZ declared as BLITZ_MOVE → SELECT_BLITZ_TARGET step/dialog picks
+  the target (1 actionRng) via CLIENT_TARGET_SELECTED (sets blitzUsed) → phase 2 sends
+  CLIENT_BLOCK on the selected target → CONFIRM ends the activation.
+- BLOCK_ROLL_PROPERTIES dialog → CLIENT_BLOCK_CHOICE die 0, routed to the choosing team.
+- PUSHBACK step → min-(x,y) unlocked square (canonical coords), pushed player derived like
+  the client's PushbackLogicModule.
+
+### Known open items (next sessions)
+
+- **Tier-3 hardening**: lineman seeds 2,3,5-8 diverge (seed 2: turn-counter skew at step
+  230 — suspected turnover-condition mismatch). Same dice-trace loop applies.
+- Rust dodge adds a DisturbingPresence modifier; Java's DodgeModifierFactory does not
+  (inert for linemen, will diverge for DP races at tier 3).
+- Pass/HandOver/StandUpBlitz paths not yet exercised by any passing seed.
+- Java repo work lives on branch `t3-phase2-wip` (master was T1-era).
 
 ---
 
