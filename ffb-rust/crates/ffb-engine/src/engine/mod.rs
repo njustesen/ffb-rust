@@ -388,6 +388,10 @@ pub struct GameEngine {
     /// True if the active team's turn ended due to a turnover (e.g. failed pickup scatter).
     /// Cleared at EndTurn. Checked by the agent in Phase 2 to stop activating more players.
     pub turnover_this_turn: bool,
+    /// True while resolving a DECLINED block reroll: resolve_block_result must not
+    /// re-offer a reroll for the same bad result (declines don't consume a team
+    /// reroll, so team_reroll_available stays true and would loop forever).
+    suppress_block_reroll_offer: bool,
     /// How many players the receiving team has set up (for two-phase setup).
     setup_phase: u8,
     /// Waiting for the coin-flip winner to choose receive/kick before entering Setup.
@@ -484,6 +488,7 @@ impl GameEngine {
             cached_prompt: None,
             player_activated_this_turn: false,
             turnover_this_turn: false,
+            suppress_block_reroll_offer: false,
             setup_phase: 0,
             awaiting_receive_choice: false,
             pending_reroll: None,
@@ -1028,7 +1033,10 @@ impl GameEngine {
                     &mut self.game.turn_data_away
                 };
                 match pa {
-                    PlayerAction::Blitz | PlayerAction::StandUpBlitz | PlayerAction::Block => {
+                    // Java sets blitzUsed only for blitz-type actions (StepSelectBlitzTargetEnd,
+                    // StepEndSelecting STAND_UP_BLITZ, negatrait cancellations) — a plain Block
+                    // never consumes it.
+                    PlayerAction::Blitz | PlayerAction::StandUpBlitz => {
                         turn_data.blitz_used = true;
                     }
                     PlayerAction::Pass | PlayerAction::PassMove | PlayerAction::ThrowBomb => {
@@ -5099,9 +5107,12 @@ impl GameEngine {
         let dice: Vec<i32> = (0..n_rolls.max(1)).map(|_| self.rng.d6()).collect();
         let results: Vec<BlockResult> = dice.iter().map(|&d| block_result_for_roll(d)).collect();
 
-        // When the attacker picks and has 2+ dice, pause for an agent die choice.
-        // When the defender picks (n_dice < 0) or there's only 1 die, auto-select.
-        let auto_chosen = if !attacker_picks || n_dice <= 1 {
+        // With 2+ dice, pause for an agent die choice — for BOTH the attacker-choice
+        // and defender-choice (n_dice < 0) cases. Java shows DialogBlockRollProperties
+        // to whichever team chooses and the parity agent answers index 0 either way
+        // (AGENT_CONTRACT.md §7); auto-picking the worst here would desync outcomes.
+        // A single die resolves automatically (no real choice).
+        let auto_chosen = if n_rolls <= 1 {
             Some(Self::pick_best_block_result(&results, attacker_picks))
         } else {
             None
@@ -5153,17 +5164,17 @@ impl GameEngine {
         };
 
         if let Some(chosen) = auto_chosen {
-            // Immediate resolution (single die or defender picks)
+            // Immediate resolution (single die — no real choice)
             let resolve_events = self.resolve_block_result(chosen, context)?;
             events.extend(resolve_events);
         } else {
-            // Pause: attacker must choose which die to apply
+            // Pause: the choosing side's agent picks which die to apply
             self.pending_block_choice = Some(context);
             self.cached_prompt = Some(AgentPrompt::BlockChoice {
                 attacker_id: attacker_id.to_owned(),
                 defender_id: defender_id.to_owned(),
                 dice,
-                own_choice: true,
+                own_choice: attacker_picks,
                 nr_of_dice: n_dice,
             });
         }
@@ -5315,10 +5326,12 @@ impl GameEngine {
     ) -> Result<Vec<GameEvent>, RulesError> {
         let mut events = Vec::new();
 
-        // Before resolving bad results, check if attacker can reroll (team reroll available)
+        // Before resolving bad results, check if attacker can reroll (team reroll available).
+        // Skipped while resolving a DECLINED reroll: the decline does not consume the team
+        // reroll, so re-checking availability here would re-offer the same reroll forever.
         let bad_for_attacker = matches!(chosen, BlockResult::Skull)
             || (matches!(chosen, BlockResult::BothDown) && !ctx.att_has_block);
-        if bad_for_attacker {
+        if bad_for_attacker && !self.suppress_block_reroll_offer {
             // Brawler (BB2020): free re-roll of a single BothDown die, not available on blitzes
             if matches!(chosen, BlockResult::BothDown) && ctx.att_has_brawler && !ctx.is_blitz {
                 let brawler_used = if ctx.home_attacking {
@@ -5511,13 +5524,9 @@ impl GameEngine {
 
         match chosen {
             BlockResult::Skull => {
-                // Attacker trips — prone at current position, no armor roll
-                let att_state = self.game.field_model.player_state(&ctx.attacker_id)
-                    .unwrap_or(PlayerState::new(PS_STANDING));
-                self.game.field_model.set_player_state(
-                    &ctx.attacker_id,
-                    att_state.change_active(false).change_base(PS_PRONE),
-                );
+                // Attacker trips — knocked down at current position. Java rolls
+                // InjuryTypeBlock for every block knockdown (armor, then injury when
+                // broken), including the attacker on a Skull.
                 let att_coord = self.game.field_model.player_coordinate(&ctx.attacker_id)
                     .unwrap_or(FieldCoordinate::new(0, 0));
                 events.push(GameEvent::PlayerFellDown {
@@ -5540,6 +5549,11 @@ impl GameEngine {
                         self.mark_ball_moving();
                     }
                 }
+                let fall_evs = self.apply_fall_injury(&ctx.attacker_id, ctx.home_attacking, 0);
+                events.extend(fall_evs);
+                // The acting team's player was knocked down during their own action —
+                // turnover (Java StepEndTurn force-ends the team turn).
+                self.turnover_this_turn = true;
                 // Saboteur (BB2025): fallen attacker may roll 4+ to knock down defender.
                 if self.game.rules == Rules::Bb2025 {
                     let att_has_saboteur = if ctx.home_attacking {
@@ -5650,6 +5664,18 @@ impl GameEngine {
                             &ids,
                             &mut events,
                         );
+                        // Java rolls InjuryTypeBlock armor/injury for each knocked-down
+                        // player (attacker first). Wrestle falls are 'placed prone' and
+                        // correctly skip this (see resolve_wrestle).
+                        for pid in &ids {
+                            let pid_is_home = self.game.team_home.has_player(pid);
+                            let fall_evs = self.apply_fall_injury(pid, pid_is_home, 0);
+                            events.extend(fall_evs);
+                        }
+                        // Attacker knocked down on their own block = turnover.
+                        if ids.contains(&ctx.attacker_id) {
+                            self.turnover_this_turn = true;
+                        }
                     }
                     self.game.acting_player.has_acted = true;
                     if matches!(self.game.acting_player.player_action, Some(PlayerAction::Blitz) | Some(PlayerAction::StandUpBlitz)) {
@@ -9056,27 +9082,29 @@ impl GameEngine {
                 }
                 (SeriousInjuryKind::SeriouslyHurt, false)
             }
+            // Java RollMechanic.rollCasualty (bb2020/bb2025) always rolls the pair
+            // [d16, d6] — the SI-detail d6 is consumed even when the tier doesn't use it.
             Rules::Bb2020 => {
-                let roll = self.rng.d6() * 2 + self.rng.d6(); // approximate d16 with 2d6
+                let roll = self.rng.die(16);
+                let si_roll = self.rng.d6();
                 let tier = casualty_tier_bb2020(roll);
                 if tier == CasualtyTier::Dead {
                     return (SeriousInjuryKind::Dead, true);
                 }
                 if tier == CasualtyTier::SeriousInjury {
-                    let si_roll = self.rng.d6();
                     let si = serious_injury_bb2020(si_roll);
                     return (si.unwrap_or(SeriousInjuryKind::SeriousInjuryNi), false);
                 }
                 (SeriousInjuryKind::SeriouslyHurt, false)
             }
             Rules::Bb2025 => {
-                let roll = self.rng.d6() * 2 + self.rng.d6();
+                let roll = self.rng.die(16);
+                let si_roll = self.rng.d6();
                 let tier = casualty_tier_bb2025(roll);
                 if tier == CasualtyTier::Dead {
                     return (SeriousInjuryKind::Dead, true);
                 }
                 if tier == CasualtyTier::SeriousInjury {
-                    let si_roll = self.rng.d6();
                     let si = serious_injury_bb2025(si_roll);
                     return (si.unwrap_or(SeriousInjuryKind::SeriousInjuryNi), false);
                 }
@@ -9208,9 +9236,10 @@ impl GameEngine {
                 let was_cas = total >= 10;
                 let was_ko = total >= 8 && !was_cas;
                 let fouler_is_home = home_fouling;
+                // Injury 2-7 = Stunned (Java InjuryTypeFoul / interpretInjuryRoll)
                 let new_state = if was_cas { PlayerState::new(PS_BADLY_HURT) }
                     else if was_ko { PlayerState::new(PS_KNOCKED_OUT) }
-                    else { PlayerState::new(PS_PRONE) };
+                    else { PlayerState::new(PS_STUNNED) };
                 self.game.field_model.set_player_state(fouler_id, new_state);
                 events.push(GameEvent::Injury {
                     player_id: fouler_id.to_owned(),
@@ -9233,9 +9262,10 @@ impl GameEngine {
             let was_ko = total >= 8 && !was_cas;
             let (si, _is_dead) = if was_cas { let (s, d) = self.roll_serious_injury(); (Some(s), d) } else { (None, false) };
             let target_is_home = !home_fouling;
+            // Injury 2-7 = Stunned (Java InjuryTypeFoul / interpretInjuryRoll)
             let new_state = if was_cas { PlayerState::new(PS_BADLY_HURT) }
                 else if was_ko { PlayerState::new(PS_KNOCKED_OUT) }
-                else { PlayerState::new(PS_PRONE) };
+                else { PlayerState::new(PS_STUNNED) };
             self.game.field_model.set_player_state(target_id, new_state);
             events.push(GameEvent::Injury {
                 player_id: target_id.to_owned(),
@@ -9301,12 +9331,13 @@ impl GameEngine {
             let was_cas = was_cas && !regen;
 
             if !regen {
+                // Injury 2-7 = Stunned (Java InjuryTypeFoul / interpretInjuryRoll)
                 let new_state = if is_dead || was_cas {
                     PlayerState::new(PS_BADLY_HURT)
                 } else if was_ko {
                     PlayerState::new(PS_KNOCKED_OUT)
                 } else {
-                    PlayerState::new(PS_PRONE)
+                    PlayerState::new(PS_STUNNED)
                 };
                 self.game.field_model.set_player_state(target_id, new_state);
             }
@@ -10393,9 +10424,11 @@ impl GameEngine {
                         return Ok(events);
                     }
                 }
-                // Declined or failed Loner — apply original bad result
-                let resolve_events = self.resolve_block_result(original_result, ctx)?;
-                events.extend(resolve_events);
+                // Declined or failed Loner — apply original bad result without re-offering
+                self.suppress_block_reroll_offer = true;
+                let resolve_result = self.resolve_block_result(original_result, ctx);
+                self.suppress_block_reroll_offer = false;
+                events.extend(resolve_result?);
             }
         }
 
@@ -11061,17 +11094,19 @@ impl GameEngine {
     fn resolve_argue_the_call(&mut self, atc: PendingArgueTheCall, argue: bool) -> Result<Vec<GameEvent>, RulesError> {
         let mut events = Vec::new();
         let eject_player = |game: &mut Game, events: &mut Vec<GameEvent>, fouler_id: &str, home_fouling: bool| {
-            game.field_model.set_player_state(fouler_id, PlayerState::new(PS_RESERVE));
+            // Java StepEjectPlayer: BANNED (renders as "Reserve" in the state hash) + off pitch
+            game.field_model.set_player_state(fouler_id, PlayerState::new(PS_BANNED));
             game.field_model.player_coordinates.remove(fouler_id);
             events.push(GameEvent::PlayerEjected { player_id: fouler_id.to_owned() });
             if home_fouling { game.turn_data_home.foul_used = true; } else { game.turn_data_away.foul_used = true; }
         };
 
         if argue {
-            // Roll 2D6: 11-12 = success (player stays), 2 = fail + coach banned, else fail
-            let roll = self.rng.d6() + self.rng.d6();
-            let success = roll >= 11;
-            let coach_banned = roll == 2;
+            // Java DiceRoller.rollArgueTheCall + DiceInterpreter: 1d6, >5 = success
+            // (player stays), <2 = coach banned (and the player is still ejected).
+            let roll = self.rng.d6();
+            let success = roll > 5;
+            let coach_banned = roll < 2;
             events.push(GameEvent::ArgueTheCall {
                 player_id: atc.fouler_id.clone(),
                 roll,
@@ -11082,6 +11117,8 @@ impl GameEngine {
             } else {
                 eject_player(&mut self.game, &mut events, &atc.fouler_id, atc.home_fouling);
                 if coach_banned {
+                    let td = if atc.home_fouling { &mut self.game.turn_data_home } else { &mut self.game.turn_data_away };
+                    td.coach_banned = true;
                     let team_id = if atc.home_fouling {
                         self.game.team_home.id.clone()
                     } else {
@@ -11094,8 +11131,10 @@ impl GameEngine {
             // Coach declined to argue: eject player immediately
             eject_player(&mut self.game, &mut events, &atc.fouler_id, atc.home_fouling);
         }
+        // Java StepBribes publishes END_TURN once the argue choice is made — the team
+        // turn ends (turnover) whether or not the argument succeeded.
+        self.turnover_this_turn = true;
         self.game.acting_player.clear();
-        self.player_activated_this_turn = false;
         Ok(events)
     }
 
@@ -16933,48 +16972,42 @@ mod tests {
             "declining ArgueTheCall must eject player"
         );
         let state = engine.game.field_model.player_state("fouler");
-        assert!(state.map(|s| s.base() == PS_RESERVE).unwrap_or(false) || state.is_none(), "ejected player must be in reserve");
+        // Java StepEjectPlayer sets BANNED (renders as "Reserve" in the state hash)
+        assert!(state.map(|s| s.base() == PS_BANNED).unwrap_or(false) || state.is_none(), "ejected player must be banned (off pitch)");
+        assert!(engine.turnover_this_turn, "foul ejection ends the team turn");
     }
 
     #[test]
     fn argue_the_call_success_saves_player() {
-        // Find a seed that produces 11 or 12 on 2D6 for the argue roll
-        let mut found = false;
-        for seed in 0u64..500 {
-            let mut engine = setup_atc_engine();
-            // Override with this seed's rng state
-            let mut test_engine = GameEngine::new(make_test_team("home2"), make_test_team("away2"), Rules::Bb2020, seed);
-            test_engine.pending_argue_the_call = Some(PendingArgueTheCall {
+        // Java semantics: 1d6, >5 = argue successful (player stays); the team turn
+        // still ends. Exercise success, plain failure and coach-ban over many rolls.
+        let (mut saw_success, mut saw_fail, mut saw_coach_ban) = (false, false, false);
+        for seed in 0u64..200 {
+            let mut e2 = setup_atc_engine();
+            e2.rng = GameRng::new(seed);
+            e2.pending_argue_the_call = Some(PendingArgueTheCall {
                 fouler_id: "fouler".into(),
                 home_fouling: true,
             });
-
-            // Simulate just the resolve_argue_the_call with our engine's rng
-            let result = engine.rng.d6() + engine.rng.d6();
-            if result >= 11 {
-                // reset and actually run
-                let mut e2 = setup_atc_engine();
-                e2.pending_argue_the_call = Some(PendingArgueTheCall {
-                    fouler_id: "fouler".into(),
-                    home_fouling: true,
-                });
-                let events = e2.apply(TeamSide::Home, Action::ArgueTheCall { argue: true }).unwrap();
-                let atc_event = events.iter().find_map(|e| match e {
-                    GameEvent::ArgueTheCall { success, .. } => Some(*success),
-                    _ => None,
-                });
-                if atc_event == Some(true) {
-                    assert!(
-                        !events.iter().any(|e| matches!(e, GameEvent::PlayerEjected { .. })),
-                        "successful ArgueTheCall must not eject player"
-                    );
-                    found = true;
-                    break;
-                }
+            let events = e2.apply(TeamSide::Home, Action::ArgueTheCall { argue: true }).unwrap();
+            let (roll, success) = events.iter().find_map(|e| match e {
+                GameEvent::ArgueTheCall { roll, success, .. } => Some((*roll, *success)),
+                _ => None,
+            }).expect("argue roll event");
+            assert_eq!(success, roll > 5, "success iff d6 > 5");
+            assert!(e2.turnover_this_turn, "argued foul ejection always ends the team turn");
+            let ejected = events.iter().any(|e| matches!(e, GameEvent::PlayerEjected { .. }));
+            assert_eq!(ejected, !success, "player ejected exactly when the argue fails");
+            if success { saw_success = true; }
+            if !success { saw_fail = true; }
+            if roll == 1 {
+                saw_coach_ban = true;
+                assert!(e2.game.turn_data_home.coach_banned, "d6=1 bans the coach");
+                assert!(events.iter().any(|e| matches!(e, GameEvent::CoachBanned { .. })));
             }
+            if saw_success && saw_fail && saw_coach_ban { break; }
         }
-        // Test always passes: we just need to exercise the success path
-        let _ = found;
+        assert!(saw_success && saw_fail && saw_coach_ban, "all argue outcomes exercised over 200 seeds");
     }
 
     #[test]
@@ -25847,7 +25880,13 @@ mod tests {
             eng.game.home_playing = true;
             eng.game.turn_mode = TurnMode::Regular;
             eng.game.acting_player.set_player("att".into(), PlayerAction::Block);
-            let evs = eng.apply(TeamSide::Home, crate::action::Action::Block { defender_id: "def".into() }).unwrap_or_default();
+            let mut evs = eng.apply(TeamSide::Home, crate::action::Action::Block { defender_id: "def".into() }).unwrap_or_default();
+            // Multi-die blocks now pause for the agent's die pick: choose a Skull if present
+            // so the WoodlandFury offer can trigger.
+            if let Some(AgentPrompt::BlockChoice { dice, .. }) = eng.current_prompt().cloned() {
+                let idx = dice.iter().position(|&d| block_result_for_roll(d) == BlockResult::Skull).unwrap_or(0);
+                evs.extend(eng.apply(TeamSide::Home, crate::action::Action::BlockChoice { die_index: idx }).unwrap_or_default());
+            }
             // Check if WoodlandFury was used (SkillUse event emitted)
             let wf_used = evs.iter().any(|e| matches!(e, GameEvent::SkillUse { skill_id, used: true, .. }
                 if *skill_id == SkillId::WoodlandFury as u16));
@@ -32327,8 +32366,14 @@ mod tests {
         let evs = eng.apply(TeamSide::Home, crate::action::Action::Block { defender_id: "def".into() }).unwrap();
         let block_roll = evs.iter().find(|e| matches!(e, GameEvent::BlockRoll { nr_of_dice, .. } if *nr_of_dice == -2));
         assert!(block_roll.is_some(), "Should roll 2 dice for defender (nr_of_dice = -2) for 2:4 ratio");
-        // No pause — block resolves immediately (no pending BlockChoice)
-        assert!(eng.pending_block_choice.is_none(), "Defender's choice block should resolve without pausing");
+        // Defender's choice pauses for an agent BlockChoice with own_choice=false
+        // (AGENT_CONTRACT.md §7: the parity agent answers index 0 for either side).
+        assert!(eng.pending_block_choice.is_some(), "Defender's choice block should pause for the agent's die pick");
+        assert!(matches!(eng.current_prompt(), Some(AgentPrompt::BlockChoice { own_choice: false, .. })),
+            "BlockChoice prompt should mark own_choice=false for defender's choice");
+        // Picking a die resolves the block
+        eng.apply(TeamSide::Home, crate::action::Action::BlockChoice { die_index: 0 }).unwrap();
+        assert!(eng.pending_block_choice.is_none(), "BlockChoice should resolve the pending block");
     }
 
     // ── Group 214: Turn data bookkeeping ────────────────────────────────────
