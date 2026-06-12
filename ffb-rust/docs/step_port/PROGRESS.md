@@ -27,6 +27,20 @@
   Gate: 26 races ×100 tier-3 = 100/100 + restored T2 26×100.
 - [ ] **Phase F — editions** (BB2020/BB2016 overrides). Optional.
 
+### Networking (full framework, no GUI) — spec `40_network.md`. Runs after the engine is playable.
+- [ ] **Phase G — wire protocol fidelity**: IJsonOption-equiv key registry (643), 138
+  NetCommandIds, 32 ServerCommand + 91 ClientCommand classes byte-exact. Gate: protocol
+  round-trip parity vs Java-emitted JSON.
+- [ ] **Phase H — model serialization (dominant effort)**: full Game JSON + 169 ModelChange
+  encoder/applier with exact keys. Gate: Rust emits byte-identical GameState + ModelSync stream
+  vs the Java server for a scripted game (commandNr monotonic, away transform()).
+- [ ] **Phase I — Rust WebSocket server**: `/command`, session manager, version→challenge→join
+  (STANDALONE auth), single-thread receive→GameState.handleCommand→syncGameModel→sendModelSync,
+  entropy→GameRng.
+- [ ] **Phase J — interop**: unmodified Java Swing GUI client connects to the Rust server
+  (compression off) and plays a full game without desync. Plus a Rust headless client (portable
+  seam) for automated interop regression.
+
 ## Current parity counts (pre-rewrite baseline, monolith)
 - T2 (no-action): 25/26 races ×100 — goblin 94 fails (a session-44 regression; moot post-rewrite).
 - T3 lineman (real actions): 4/100 (the monolith burn-down; superseded).
