@@ -4,6 +4,7 @@ use rand_core::{RngCore, SeedableRng};
 use ffb_model::prompts::{AgentPrompt, AgentResponse};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::enums::PlayerAction;
+use ffb_model::model::field_model::FieldModel;
 use ffb_mechanics::skills::{SkillId, SKILL_TABLE};
 use crate::action::{Action, PlayerActionChoice};
 use crate::legal_actions::{TeamSide, legal_block_targets, legal_foul_targets, legal_move_targets};
@@ -105,6 +106,21 @@ impl RandomAgent {
         self.action_rng.next_u64() % 2 == 0
     }
 
+    /// Sort player ids by the player's coordinate (x, y) ascending.
+    ///
+    /// AGENT_CONTRACT.md §6: target lists are NEVER ordered by player id — Rust ids
+    /// ("home_01".."home_11") and Java ids ("teamLinemanParityHome1".."11") sort
+    /// differently as strings, which would desynchronize the actionRng picks.
+    /// Off-pitch players (no coordinate) sort last; ties broken by roster order
+    /// via stable sort.
+    fn sort_by_coordinate(field_model: &FieldModel, ids: &mut [String]) {
+        ids.sort_by_key(|id| {
+            field_model.player_coordinate(id)
+                .map(|c| (c.x, c.y))
+                .unwrap_or((i32::MAX, i32::MAX))
+        });
+    }
+
     /// After a player is activated, compute the concrete follow-up action (move path,
     /// block target, pass coord, etc.) using simple deterministic selection so Java
     /// can match with the same RNG calls.
@@ -113,7 +129,8 @@ impl RandomAgent {
     /// etc.) this returns EndTurn, matching Java's "activate then immediately deselect" behavior.
     ///
     /// For Move: picks from legal_move_targets() sorted by coordinate, 1-step path.
-    /// For Block/Foul: picks from legal_*_targets() sorted by player_id.
+    /// For Block/Foul/HandOver/etc.: picks from targets sorted by the TARGET's
+    /// coordinate (x, y) — see AGENT_CONTRACT.md §6 (never sort by player id).
     /// For Pass: picks a teammate on pitch sorted by coordinate; random coord if none.
     fn compute_follow_up(&mut self, engine: &GameEngine, pid: &str, pa: PlayerAction) -> Action {
         use ffb_model::enums::TurnMode;
@@ -154,7 +171,7 @@ impl RandomAgent {
             }
             PlayerAction::Block | PlayerAction::Blitz | PlayerAction::StandUpBlitz => {
                 let mut targets = legal_block_targets(game, pid, side);
-                targets.sort();
+                Self::sort_by_coordinate(&game.field_model, &mut targets);
                 if targets.is_empty() {
                     Action::EndTurn
                 } else {
@@ -164,7 +181,7 @@ impl RandomAgent {
             }
             PlayerAction::Stab | PlayerAction::Chainsaw => {
                 let mut targets = legal_block_targets(game, pid, side);
-                targets.sort();
+                Self::sort_by_coordinate(&game.field_model, &mut targets);
                 if targets.is_empty() {
                     Action::EndTurn
                 } else {
@@ -174,7 +191,7 @@ impl RandomAgent {
             }
             PlayerAction::Foul => {
                 let mut targets = legal_foul_targets(game, pid, side);
-                targets.sort();
+                Self::sort_by_coordinate(&game.field_model, &mut targets);
                 if targets.is_empty() {
                     Action::EndTurn
                 } else {
@@ -213,7 +230,7 @@ impl RandomAgent {
                     })
                     .map(|p| p.id.clone())
                     .collect();
-                receivers.sort();
+                Self::sort_by_coordinate(&game.field_model, &mut receivers);
                 if receivers.is_empty() {
                     Action::EndTurn
                 } else {
@@ -235,7 +252,7 @@ impl RandomAgent {
                     })
                     .map(|p| p.id.clone())
                     .collect();
-                throwable.sort();
+                Self::sort_by_coordinate(&game.field_model, &mut throwable);
                 if throwable.is_empty() {
                     Action::EndTurn
                 } else {
@@ -260,7 +277,7 @@ impl RandomAgent {
                     })
                     .map(|p| p.id.clone())
                     .collect();
-                throwable.sort();
+                Self::sort_by_coordinate(&game.field_model, &mut throwable);
                 if throwable.is_empty() {
                     Action::EndTurn
                 } else {
@@ -278,7 +295,7 @@ impl RandomAgent {
                     .filter(|p| game.field_model.player_state(&p.id).map(|s| s.has_tacklezones()).unwrap_or(false))
                     .map(|p| p.id.clone())
                     .collect();
-                candidates.sort();
+                Self::sort_by_coordinate(&game.field_model, &mut candidates);
                 if candidates.is_empty() {
                     Action::EndTurn
                 } else {
@@ -288,7 +305,7 @@ impl RandomAgent {
             }
             PlayerAction::BreatheFire => {
                 let mut targets = legal_block_targets(game, pid, side);
-                targets.sort();
+                Self::sort_by_coordinate(&game.field_model, &mut targets);
                 if targets.is_empty() {
                     Action::EndTurn
                 } else {
@@ -298,7 +315,7 @@ impl RandomAgent {
             }
             PlayerAction::ProjectileVomit => {
                 let mut targets = legal_block_targets(game, pid, side);
-                targets.sort();
+                Self::sort_by_coordinate(&game.field_model, &mut targets);
                 if targets.is_empty() {
                     Action::EndTurn
                 } else {
@@ -347,8 +364,13 @@ impl RandomAgent {
             AgentPrompt::BlockChoice { .. } =>
                 AgentResponse::BlockChoice { index: 0 },
 
+            // AGENT_CONTRACT.md §7: pushback = min-(x, y) square, independent of the
+            // order the engine offers them in.
             AgentPrompt::Pushback { squares, .. } => {
-                let coord = squares.first().copied().unwrap_or(FieldCoordinate::new(0, 0));
+                let coord = squares.iter()
+                    .min_by_key(|c| (c.x, c.y))
+                    .copied()
+                    .unwrap_or(FieldCoordinate::new(0, 0));
                 AgentResponse::Pushback { coord }
             }
 
@@ -450,6 +472,13 @@ impl Agent for RandomAgent {
 
         match engine.current_prompt() {
             Some(AgentPrompt::ActivatePlayer { eligible_players }) => {
+                // Turnover ends the team turn immediately: no further activations, no
+                // decisionRng pick. Mirrors Java where the server force-ends the turn
+                // (the next INIT_SELECTING arrives with a new turn key). The engine
+                // clears the flag when EndTurn is applied.
+                if engine.turnover_this_turn {
+                    return Action::EndTurn;
+                }
                 if !eligible_players.is_empty() {
                     // Phase 1: record eligible list for this turn, pick a player.
                     let turn_nr = if engine.game.home_playing {
@@ -705,6 +734,42 @@ mod tests {
         let response = AgentResponse::UseSkill { use_skill: true };
         let action = response_to_action(response, Some(&prompt));
         assert!(matches!(action, Action::UseSkill { skill_id: SkillId::Dodge, use_skill: true }));
+    }
+
+    #[test]
+    fn pushback_picks_min_xy_square() {
+        // AGENT_CONTRACT.md §7: pushback = min-(x, y) square regardless of offer order.
+        let prompt = AgentPrompt::Pushback {
+            attacker_id: "att".into(),
+            defender_id: "def".into(),
+            squares: vec![
+                FieldCoordinate::new(9, 4),
+                FieldCoordinate::new(8, 6),
+                FieldCoordinate::new(8, 5),
+            ],
+        };
+        let resp = RandomAgent::new(42).respond(&prompt);
+        match resp {
+            AgentResponse::Pushback { coord } => assert_eq!((coord.x, coord.y), (8, 5)),
+            other => panic!("expected Pushback, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn sort_by_coordinate_orders_by_position_not_id() {
+        // AGENT_CONTRACT.md §6: ids must never enter an ordering. "home_02" < "home_10"
+        // as strings, but the player at the smaller coordinate must come first.
+        let mut fm = FieldModel::new();
+        fm.set_player_coordinate("home_02", FieldCoordinate::new(12, 9));
+        fm.set_player_coordinate("home_10", FieldCoordinate::new(3, 1));
+        fm.set_player_coordinate("home_07", FieldCoordinate::new(3, 0));
+        let mut ids = vec!["home_02".to_string(), "home_07".to_string(), "home_10".to_string()];
+        RandomAgent::sort_by_coordinate(&fm, &mut ids);
+        assert_eq!(ids, vec!["home_07".to_string(), "home_10".to_string(), "home_02".to_string()]);
+        // Off-pitch players (no coordinate) sort last.
+        let mut ids2 = vec!["ghost".to_string(), "home_10".to_string()];
+        RandomAgent::sort_by_coordinate(&fm, &mut ids2);
+        assert_eq!(ids2, vec!["home_10".to_string(), "ghost".to_string()]);
     }
 
     #[test]
