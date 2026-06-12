@@ -30,6 +30,8 @@ pub struct BlockStats {
     pub total: u32,
     pub rerolled: u32,
     pub by_dice: HashMap<i32, u32>,
+    /// Selected block result (Skull/BothDown/Pushback/PowPushback/Pow) counts.
+    pub by_result: HashMap<String, u32>,
 }
 
 #[derive(Default, Serialize)]
@@ -66,6 +68,7 @@ pub struct CoverageReport {
     pub dodge_rolls: RollStats,
     pub go_for_it_rolls: RollStats,
     pub catch_rolls: RollStats,
+    pub pickup_rolls: RollStats,
     pub interception_rolls: RollStats,
     pub jump_rolls: RollStats,
     pub jump_up_rolls: RollStats,
@@ -170,6 +173,8 @@ impl CoverageReport {
                 self.go_for_it_rolls.record(*success, *rerolled),
             GameEvent::CatchRoll { success, rerolled, .. } =>
                 self.catch_rolls.record(*success, *rerolled),
+            GameEvent::PickupRoll { success, rerolled, .. } =>
+                self.pickup_rolls.record(*success, *rerolled),
             GameEvent::InterceptionRoll { success, .. } =>
                 self.interception_rolls.record(*success, false),
             GameEvent::JumpRoll { success, .. } =>
@@ -222,10 +227,14 @@ impl CoverageReport {
             GameEvent::AnimalSavagery { success, .. } =>
                 self.animal_savagery_rolls.record(*success, false),
 
-            GameEvent::BlockRoll { nr_of_dice, rerolled, .. } => {
+            GameEvent::BlockRoll { nr_of_dice, rerolled, dice, selected_index, .. } => {
                 self.block_rolls.total += 1;
                 if *rerolled { self.block_rolls.rerolled += 1; }
                 *self.block_rolls.by_dice.entry(*nr_of_dice).or_default() += 1;
+                if let Some(&roll) = dice.get(*selected_index as usize) {
+                    let result = ffb_mechanics::mechanics::block_result_for_roll(roll);
+                    *self.block_rolls.by_result.entry(format!("{result:?}")).or_default() += 1;
+                }
             }
 
             GameEvent::PassRoll { distance, result, rerolled, .. } => {
@@ -374,8 +383,9 @@ pub fn player_action_name(action: &PlayerAction) -> &'static str {
         | PlayerAction::PuntMove | PlayerAction::PutridRegurgitationMove => "Move",
         PlayerAction::Block | PlayerAction::PutridRegurgitationBlock
         | PlayerAction::KickEmBlock => "Block",
-        PlayerAction::Blitz | PlayerAction::BlitzSelect | PlayerAction::StandUpBlitz
+        PlayerAction::Blitz | PlayerAction::BlitzSelect
         | PlayerAction::PutridRegurgitationBlitz | PlayerAction::KickEmBlitz => "Blitz",
+        PlayerAction::StandUpBlitz => "StandUpBlitz",
         PlayerAction::Pass => "Pass",
         PlayerAction::HandOver => "HandOver",
         PlayerAction::Foul => "Foul",

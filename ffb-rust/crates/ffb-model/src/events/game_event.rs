@@ -23,6 +23,7 @@ pub enum GameEvent {
     BloodLustRoll { player_id: PlayerId, roll: i32, success: bool },
     BribesRoll { player_id: PlayerId, roll: i32, success: bool },
     CatchRoll { player_id: PlayerId, target: i32, roll: i32, success: bool, rerolled: bool },
+    PickupRoll { player_id: PlayerId, target: i32, roll: i32, success: bool, rerolled: bool },
     BalefulHexRoll { attacker_id: PlayerId, target_id: PlayerId, roll: i32, success: bool, rerolled: bool },
     ChainsawRoll { player_id: PlayerId, roll: i32 },
     LookIntoMyEyesRoll { player_id: PlayerId, roll: i32, success: bool, rerolled: bool },

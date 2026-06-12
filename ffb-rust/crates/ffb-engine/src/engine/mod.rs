@@ -7744,6 +7744,13 @@ impl GameEngine {
                     }
                 };
                 let mut pickup_success = is_skill_roll_successful(pickup_roll, pickup_min);
+                events.push(GameEvent::PickupRoll {
+                    player_id: player_id.to_owned(),
+                    target: pickup_min,
+                    roll: pickup_roll,
+                    success: pickup_success,
+                    rerolled: false,
+                });
 
                 // SureHands reroll on first failure (not allowed for SecureTheBall)
                 let used_sure_hands = if home_moving {
@@ -7754,6 +7761,13 @@ impl GameEngine {
                 if !pickup_success && has_sure_hands && !used_sure_hands && !is_secure_the_ball {
                     let reroll = self.rng.d6();
                     pickup_success = is_skill_roll_successful(reroll, pickup_min);
+                    events.push(GameEvent::PickupRoll {
+                        player_id: player_id.to_owned(),
+                        target: pickup_min,
+                        roll: reroll,
+                        success: pickup_success,
+                        rerolled: true,
+                    });
                     if let Some(p) = if home_moving {
                         self.game.team_home.player_mut(player_id)
                     } else {
@@ -10157,6 +10171,13 @@ impl GameEngine {
                     if can_reroll {
                         let roll = self.rng.d6();
                         let success = is_skill_roll_successful(roll, min_roll);
+                        events.push(GameEvent::PickupRoll {
+                            player_id: player_id.clone(),
+                            target: min_roll,
+                            roll,
+                            success,
+                            rerolled: true,
+                        });
                         if success {
                             events.push(GameEvent::BallPickedUp { player_id, coord });
                             self.mark_ball_not_moving();

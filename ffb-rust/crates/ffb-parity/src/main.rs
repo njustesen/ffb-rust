@@ -5,6 +5,7 @@ mod update_progress;
 mod network_test;
 mod state_hash;
 mod coverage_report;
+mod t3_checklist;
 mod visual;
 
 #[allow(dead_code)] mod debug_rng;
@@ -149,12 +150,20 @@ fn main() {
     // ── Parity mode (default) ────────────────────────────────────────────────────
     let mut passed = 0u64;
     let mut failed = 0u64;
+    // Tier 3: aggregate the Rust engine's GameEvents across all seeds for the
+    // coverage checklist (the events are a faithful proxy for both engines once
+    // the per-activation hashes match).
+    let mut t3_cov = (args.tier >= 3).then(coverage_report::CoverageReport::default);
 
     for seed in args.seed_start..=args.seed_end {
         println!("Seed {seed}: {} vs {} ({})", args.home, args.away, args.edition);
 
         runner::run_java_headless(seed, &args.home_java, &args.away_java, &args.home, &args.away, args.tier);
-        let (_, _events, _home_score, _away_score) = runner::run_rust_headless(seed, &args.home, &args.away, &args.edition, args.verbose, args.tier);
+        let (_, events, _home_score, _away_score) = runner::run_rust_headless(seed, &args.home, &args.away, &args.edition, args.verbose, args.tier);
+        if let Some(cov) = t3_cov.as_mut() {
+            for ev in &events { cov.tally(ev); }
+            cov.games += 1;
+        }
         let result = comparator::compare_logs(seed, &args.home, &args.away);
         update_progress::update(seed, &args.home, &args.away, &result);
 
@@ -179,8 +188,28 @@ fn main() {
         }
     }
 
-    if failed == 0 {
+    // Tier-3 coverage checklist: write T3_COVERAGE.md + t3_coverage.html and print
+    // the verdict. A missing required item fails the run even when parity passes.
+    let mut checklist_ok = true;
+    if let Some(cov) = t3_cov.as_mut() {
+        cov.skill_names = coverage_report::build_skill_names();
+        let (md, ok) = t3_checklist::render_markdown(cov, cov.games);
+        // Only enforce coverage on suite-sized runs — a single debug seed can't be
+        // expected to roll every mechanic, but it should still print the table.
+        checklist_ok = ok || cov.games < 50;
+        std::fs::write("T3_COVERAGE.md", &md).ok();
+        if let Ok(json) = serde_json::to_string(&*cov) {
+            std::fs::write("t3_coverage.html", coverage_report::generate_html(&json)).ok();
+        }
+        println!("\n{md}");
+        println!("Coverage written to T3_COVERAGE.md and t3_coverage.html");
+    }
+
+    if failed == 0 && checklist_ok {
         println!("PARITY: {passed}/{total} games match.");
+    } else if failed == 0 {
+        eprintln!("PARITY: {passed}/{total} games match, but required coverage items are MISSING.");
+        std::process::exit(1);
     } else {
         eprintln!("PARITY: {passed}/{total} passed, {failed} FAILED.");
         std::process::exit(1);

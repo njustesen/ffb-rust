@@ -132,6 +132,14 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
     let max_iters = 100_000usize;
     let mut step_index = 1u64;
     let mut pending_steps: Vec<PendingStep> = Vec::new();
+    // No-progress guard: a healthy loop always advances something (state hash, dice
+    // count, or the prompt kind). If none change for many consecutive iterations the
+    // engine and agent are stuck re-prompting each other (e.g. a response that
+    // silently no-ops against a missing pending) — abort with a diagnostic instead
+    // of burning to max_iters.
+    let mut stall: (String, u64, Option<std::mem::Discriminant<AgentPrompt>>) =
+        (String::new(), 0, None);
+    let mut stall_count = 0u32;
 
     for _ in 0..max_iters {
         if engine.is_finished() { break; }
@@ -155,6 +163,26 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
         let pre_hash = state_hash(&engine.game);
         let active_str = if engine.game.home_playing { "home" } else { "away" };
         let pre_state_str = if verbose { Some(state_string(&engine.game)) } else { None };
+
+        let probe = (
+            pre_hash.clone(),
+            engine.rng_call_count(),
+            engine.current_prompt().map(std::mem::discriminant),
+        );
+        if probe == stall {
+            stall_count += 1;
+            if stall_count >= 50 {
+                eprintln!(
+                    "NO_PROGRESS seed={seed} half={half} turn={turn_nr} active={active_str}: \
+                     50 iterations with unchanged hash={} rng_calls={} prompt={:?} — aborting game",
+                    probe.0, probe.1, engine.current_prompt()
+                );
+                break;
+            }
+        } else {
+            stall = probe;
+            stall_count = 0;
+        }
 
         let side = engine.active_side();
         let action = if tier >= 3 { agent.act(&engine) } else { agent.act_parity_v1(&engine) };
