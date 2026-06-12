@@ -23,6 +23,9 @@ struct ParityArgs {
     no_abort: bool,
     verbose: bool,
     visualize: bool,
+    /// Parity tier: 2 = T2 trivial agent (1 decisionRng pick + EndTurn, the 26-race
+    /// regression suite), 3 = T3 Phase 2 agent (real activations). Default 2.
+    tier: u8,
 }
 
 impl ParityArgs {
@@ -38,6 +41,7 @@ impl ParityArgs {
         let mut no_abort = false;
         let mut verbose = false;
         let mut visualize = false;
+        let mut tier = 2u8;
 
         let mut i = 0;
         while i < raw.len() {
@@ -50,6 +54,7 @@ impl ParityArgs {
                 "--home" if i + 1 < raw.len() => { home = raw[i + 1].clone(); i += 1; }
                 "--away" if i + 1 < raw.len() => { away = raw[i + 1].clone(); i += 1; }
                 "--edition" if i + 1 < raw.len() => { edition = raw[i + 1].clone(); i += 1; }
+                "--tier" if i + 1 < raw.len() => { tier = raw[i + 1].parse().unwrap_or(2); i += 1; }
                 "--seeds" if i + 1 < raw.len() => {
                     let s = &raw[i + 1];
                     if let Some(dash) = s.find('-') {
@@ -68,7 +73,7 @@ impl ParityArgs {
         let home_java = runner::java_team_id(&home, "home");
         let away_java = runner::java_team_id(&away, "away");
 
-        ParityArgs { network, coverage, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize }
+        ParityArgs { network, coverage, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier }
     }
 }
 
@@ -148,8 +153,8 @@ fn main() {
     for seed in args.seed_start..=args.seed_end {
         println!("Seed {seed}: {} vs {} ({})", args.home, args.away, args.edition);
 
-        runner::run_java_headless(seed, &args.home_java, &args.away_java, &args.home, &args.away);
-        let (_, _events, _home_score, _away_score) = runner::run_rust_headless(seed, &args.home, &args.away, &args.edition, args.verbose);
+        runner::run_java_headless(seed, &args.home_java, &args.away_java, &args.home, &args.away, args.tier);
+        let (_, _events, _home_score, _away_score) = runner::run_rust_headless(seed, &args.home, &args.away, &args.edition, args.verbose, args.tier);
         let result = comparator::compare_logs(seed, &args.home, &args.away);
         update_progress::update(seed, &args.home, &args.away, &result);
 

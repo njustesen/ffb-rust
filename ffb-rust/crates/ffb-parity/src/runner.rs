@@ -26,7 +26,7 @@ use ffb_model::util::state_hash::state_string;
 /// Writes `parity/seed_{seed}_java.jsonl`.
 /// `home_team_id` / `away_team_id` are Java server team IDs (e.g. "teamHumanKalimar").
 /// `home_race` / `away_race` are the Rust race names used for the output directory.
-pub fn run_java_headless(seed: u64, home_team_id: &str, away_team_id: &str, home_race: &str, away_race: &str) {
+pub fn run_java_headless(seed: u64, home_team_id: &str, away_team_id: &str, home_race: &str, away_race: &str, tier: u8) {
     let output_path = java_log_path_for(seed, home_race, away_race);
     let dir = std::path::Path::new(&output_path).parent().unwrap_or(std::path::Path::new("parity"));
     std::fs::create_dir_all(dir).ok();
@@ -63,17 +63,21 @@ pub fn run_java_headless(seed: u64, home_team_id: &str, away_team_id: &str, home
         "ffb-server".to_string()
     });
 
-    let status = Command::new("java")
-        .args([
-            "-cp", &cp,
-            "com.fumbbl.ffb.ai.parity.ParityRunner",
-            &server_dir,
-            home_team_id,
-            away_team_id,
-            &seed.to_string(),
-            &output_path,
-        ])
-        .status();
+    let mut args: Vec<String> = vec![
+        "-cp".into(), cp.clone(),
+        "com.fumbbl.ffb.ai.parity.ParityRunner".into(),
+        server_dir.clone(),
+        home_team_id.into(),
+        away_team_id.into(),
+        seed.to_string(),
+        output_path.clone(),
+    ];
+    // Tier 2 invocations stay byte-identical to the historical CLI so older jars work.
+    if tier >= 3 {
+        args.push("--tier".into());
+        args.push(tier.to_string());
+    }
+    let status = Command::new("java").args(&args).status();
 
     match status {
         Ok(s) if s.success() => {}
@@ -87,7 +91,13 @@ pub fn run_java_headless(seed: u64, home_team_id: &str, away_team_id: &str, home
 ///
 /// Uses `RandomAgent::new_parity(seed)` — Xoshiro256StarStar seeded with
 /// `seed ^ 0xDEAD_BEEF_CAFE_0001`, matching Java's decisionRng exactly.
-pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, edition: &str, verbose: bool) -> (Vec<LogLine>, Vec<GameEvent>, i32, i32) {
+/// `tier` selects the agent behavior and step-logging granularity:
+///   2 — T2 agent (`act_parity_v1`: 1 decisionRng pick then EndTurn), one log step per
+///       turn boundary (Phase-1 INIT_SELECTING with no acting player). Matches the
+///       historical T2 Java logs.
+///   3 — T3 Phase 2 agent (`act`: real activations), one log step per ActivatePlayer,
+///       matching Java's per-activation recordStep().
+pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, edition: &str, verbose: bool, tier: u8) -> (Vec<LogLine>, Vec<GameEvent>, i32, i32) {
     let rust_path = rust_log_path_for(seed, home_roster, away_roster);
     let dir = std::path::Path::new(&rust_path).parent().unwrap_or(std::path::Path::new("parity"));
     std::fs::create_dir_all(dir).ok();
@@ -121,9 +131,9 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
         if engine.current_prompt().is_none() { break; }
 
         // Capture state BEFORE the agent acts.
-        // Record a step only for genuine Phase 1: first ActivatePlayer of a new turn
-        // (eligible≠[] AND no player is currently active). This excludes Blitz block
-        // re-offers (eligible≠[] but acting_player is still active) and Phase 2 (eligible=[]).
+        // Tier 2 logs one step per genuine Phase-1 turn boundary: first ActivatePlayer of a
+        // new turn (eligible≠[] AND no player currently active). This excludes Blitz block
+        // re-offers (eligible≠[] but acting_player still active) and Phase 2 (eligible=[]).
         let is_turn_boundary = match engine.current_prompt() {
             Some(AgentPrompt::ActivatePlayer { eligible_players })
                 if !eligible_players.is_empty() && !engine.game.acting_player.is_active() => true,
@@ -137,20 +147,13 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
         let half = engine.game.half;
         let pre_hash = state_hash(&engine.game);
         let active_str = if engine.game.home_playing { "home" } else { "away" };
-
-        let pre_state_str = if is_turn_boundary && turn_nr >= 1 {
-            if verbose || seed == 57 || seed == 88 {
-                Some(state_string(&engine.game))
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        let pre_state_str = if verbose { Some(state_string(&engine.game)) } else { None };
 
         let side = engine.active_side();
-        let action = agent.act_parity_v1(&engine);
+        let action = if tier >= 3 { agent.act(&engine) } else { agent.act_parity_v1(&engine) };
         let chosen = action_label(&action);
+        let is_activation = matches!(action, ffb_engine::action::Action::ActivatePlayer { .. });
+
         match engine.apply(side, action) {
             Ok(evs) => all_events.extend(evs),
             Err(e) => {
@@ -159,13 +162,11 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
             }
         }
 
-        if (seed == 57 || seed == 88) && is_turn_boundary && turn_nr >= 1 {
-            eprintln!("RUST_STATE_STR step={step_index} half={half} turn={turn_nr} active={active_str} hash={pre_hash}");
-            if let Some(ref s) = pre_state_str { eprintln!("  {s}"); }
-        }
-
-        // Log one step line per INIT_SELECTING decision (turn >= 1)
-        if is_turn_boundary && turn_nr >= 1 {
+        // Tier 2: one step line per INIT_SELECTING turn boundary (historical T2 format).
+        // Tier 3: one step line per player activation (Phase 1 and Phase 2), matching
+        // Java's per-activation recordStep().
+        let log_step = if tier >= 3 { is_activation } else { is_turn_boundary };
+        if log_step && turn_nr >= 1 {
             pending_steps.push(PendingStep {
                 i: step_index,
                 turn: turn_nr,
