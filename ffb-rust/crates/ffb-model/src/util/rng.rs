@@ -2,6 +2,12 @@ use rand::RngCore;
 use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256StarStar;
 
+/// Per-roll stderr tracing, enabled by the FFB_DICE_TRACE env var.
+fn dice_trace_enabled() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| std::env::var_os("FFB_DICE_TRACE").is_some())
+}
+
 /// Seeded deterministic RNG matching Java's Xoshiro256StarStar exactly.
 /// Seeding uses SplitMix64 (same constants as Java's Xoshiro256StarStar.java).
 /// Die rolls use rejection sampling: threshold = u64::MAX - (u64::MAX % sides);
@@ -25,7 +31,13 @@ impl GameRng {
             let v = self.inner.next_u64();
             self.call_count += 1;
             if v < threshold {
-                return (v % s + 1) as i32;
+                let result = (v % s + 1) as i32;
+                if dice_trace_enabled() {
+                    // Same format as the Java Xoshiro256StarStar -Dffb.diceTrace output
+                    // so the two streams can be diffed directly.
+                    eprintln!("DICE_TRACE pos={} sides={} result={}", self.call_count, sides, result);
+                }
+                return result;
             }
         }
     }
@@ -55,14 +67,9 @@ impl GameRng {
         if n == 0 {
             return 0;
         }
-        let s = n as u64;
-        let threshold = u64::MAX - (u64::MAX % s);
-        loop {
-            let v = self.inner.next_u64();
-            if v < threshold {
-                return (v % s) as usize;
-            }
-        }
+        // Equivalent to die(n) - 1; routed through die() so the call is counted and
+        // traced like Java's Fortuna (e.g. the coin flip shows as a sides=2 roll).
+        (self.die(n as u32) - 1) as usize
     }
 
     /// Flip a fair coin (uses range(2)).
