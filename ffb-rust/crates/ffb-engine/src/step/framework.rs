@@ -127,47 +127,6 @@ pub struct Published {
     pub consumed: bool,
 }
 
-/// LIFO step stack. Java keeps top at index 0; here top = last (`Vec::last`).
-/// `push_sequence` pushes authored order REVERSED so the first-authored step ends on top
-/// and runs first (matches Java's back-to-front push). `publish` walks top→bottom and
-/// breaks on first consume — order is parity-observable.
-#[derive(Default)]
-pub struct StepStack {
-    steps: Vec<StepEntry>,
-}
-
-/// A stacked step: its id, optional label (for goto), and (later) its persistent state.
-pub struct StepEntry {
-    pub id: StepId,
-    pub label: Option<String>,
-    // state: Step  // ← the concrete Step enum lands in Phase C/D
-}
-
-impl StepStack {
-    pub fn new() -> Self { Self::default() }
-    pub fn push(&mut self, step: StepEntry) { self.steps.push(step); }
-    /// Push a whole sequence; authored order reversed so authored[0] ends on top.
-    pub fn push_sequence(&mut self, seq: Vec<StepEntry>) {
-        for s in seq.into_iter().rev() { self.steps.push(s); }
-    }
-    pub fn pop(&mut self) -> Option<StepEntry> { self.steps.pop() }
-    pub fn peek(&self) -> Option<&StepEntry> { self.steps.last() }
-    pub fn len(&self) -> usize { self.steps.len() }
-    pub fn is_empty(&self) -> bool { self.steps.is_empty() }
-
-    /// Pop the stack down until the labelled step is on top (left in place). Java
-    /// `handleStepResultGotoLabel`: discard intervening steps; error if not found.
-    pub fn goto_label(&mut self, label: &str) -> Result<(), String> {
-        while let Some(top) = self.steps.last() {
-            if top.label.as_deref() == Some(label) {
-                return Ok(());
-            }
-            self.steps.pop();
-        }
-        Err(format!("goto unknown label '{label}'"))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,39 +139,5 @@ mod tests {
         assert!(StepAction::NextStepAndRepeat.forward_command());
         assert!(StepAction::GotoLabelAndRepeat.forward_command() && StepAction::GotoLabelAndRepeat.trigger_goto());
         assert!(!StepAction::Continue.trigger_next_step() && !StepAction::Continue.trigger_repeat());
-    }
-
-    #[test]
-    fn stack_push_sequence_runs_first_authored_first() {
-        let mut s = StepStack::new();
-        s.push_sequence(vec![
-            StepEntry { id: StepId::InitMoving, label: None },
-            StepEntry { id: StepId::Move, label: None },
-            StepEntry { id: StepId::EndMoving, label: Some("endMoving".into()) },
-        ]);
-        // authored[0] = InitMoving must be on top (popped first)
-        assert_eq!(s.pop().unwrap().id, StepId::InitMoving);
-        assert_eq!(s.pop().unwrap().id, StepId::Move);
-        assert_eq!(s.pop().unwrap().id, StepId::EndMoving);
-    }
-
-    #[test]
-    fn goto_label_discards_until_label_on_top() {
-        let mut s = StepStack::new();
-        // bottom..top: EndMoving[label] , Move , InitMoving(top)
-        s.push(StepEntry { id: StepId::EndMoving, label: Some("endMoving".into()) });
-        s.push(StepEntry { id: StepId::Move, label: None });
-        s.push(StepEntry { id: StepId::InitMoving, label: None });
-        s.goto_label("endMoving").unwrap();
-        // labelled step left ON TOP (not popped)
-        assert_eq!(s.peek().unwrap().id, StepId::EndMoving);
-        assert_eq!(s.len(), 1);
-    }
-
-    #[test]
-    fn goto_unknown_label_errors() {
-        let mut s = StepStack::new();
-        s.push(StepEntry { id: StepId::Move, label: None });
-        assert!(s.goto_label("nope").is_err());
     }
 }

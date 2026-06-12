@@ -11,4 +11,6 @@
 #![allow(dead_code)] // scaffold: concrete steps land in Phase C/D
 
 mod framework;
+mod engine;
 pub use framework::*;
+pub use engine::*;
