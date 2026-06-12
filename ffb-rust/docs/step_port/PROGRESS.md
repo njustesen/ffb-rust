@@ -17,9 +17,16 @@
   TESTING, INVARIANTS, 30_skills (stub), PROGRESS. DONE.
 - [ ] **Phase B — commit + tag `pre-step-rewrite` + remove monolith** (gut `engine/mod.rs`
   apply/pending_*/inline helpers; keep crate compiling against new `step/`). NOT STARTED.
-- [ ] **Phase C — step framework** (`step/`: Step enum+dispatch, StepStack=Vec, StepParameter
-  enum, StepResult, driver loop, Action/Prompt↔ClientCommand/Dialog adapter). Gate: StartGame→
-  coin→setup runs to first prompt.
+- [~] **Phase C — step framework** (`step/`). IN PROGRESS.
+  - [x] slice 1 (commit 3505560): framework primitives; `Step` enum + match dispatch;
+    `StepStack` (Vec, push_sequence reverse, goto_label); `GameState` driver loop (start-mode
+    NextStep chain + goto); StartGame pregame steps InitStartGame/Spectators/Weather ported 1:1
+    with a characterization test pinning d3,d3,d6,d6 order. 888 ffb-engine tests green.
+  - [ ] slice 2: command handling (`handle_command` + StepCommandStatus), the
+    Action/AgentResponse↔ClientCommand boundary + AgentPrompt emission; CoinChoice/ReceiveChoice
+    steps (the first prompts). StepParameter publish/consume-down-stack.
+  - [ ] slice 3: Kickoff/Setup sequence to the first INIT_SELECTING (ActivatePlayer) prompt =
+    the Phase C gate.
 - [ ] **Phase D — BB2025 skill-less lineman steps** (~8 generators + ~50 steps, 0 behaviours).
   Gate: `--tier 3 lineman --seeds 1-100` = 100/100 + coverage checklist green; `--tier 2`
   lineman = 100/100. (This is the milestone the monolith reached only at 4/100.)
