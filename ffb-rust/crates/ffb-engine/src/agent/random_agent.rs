@@ -38,6 +38,8 @@ pub struct RandomAgent {
     /// Action diversity RNG — independent from Java's decisions.
     /// Used for: Move paths, Block/Foul targets, Pass coords.
     action_rng: Xoshiro256StarStar,
+    /// Count of pick_action calls — used for debugging RNG sync.
+    pub action_rng_calls: u64,
     /// Eligible players captured at the start of each team turn (Phase 1 ActivatePlayer).
     /// Stored as Vec to preserve roster order (same order Java uses), so no sort is needed.
     eligible_this_turn: Vec<(String, Vec<PlayerAction>)>,
@@ -58,6 +60,7 @@ impl RandomAgent {
         RandomAgent {
             rng: Xoshiro256StarStar::seed_from_u64(seed),
             action_rng: Xoshiro256StarStar::seed_from_u64(seed ^ 0xC0FFEE_ACE0_0001),
+            action_rng_calls: 0,
             eligible_this_turn: Vec::new(),
             used_this_turn: HashSet::new(),
             last_turn_key: (-1, -1, true),
@@ -74,6 +77,7 @@ impl RandomAgent {
         RandomAgent {
             rng: Xoshiro256StarStar::seed_from_u64(game_seed ^ 0xDEAD_BEEF_CAFE_0001),
             action_rng: Xoshiro256StarStar::seed_from_u64(game_seed ^ 0xC0FFEE_ACE0_0001),
+            action_rng_calls: 0,
             eligible_this_turn: Vec::new(),
             used_this_turn: HashSet::new(),
             last_turn_key: (-1, -1, true),
@@ -89,6 +93,7 @@ impl RandomAgent {
 
     /// Pick a uniform random index using the action diversity RNG (independent from Java sync).
     fn pick_action(&mut self, len: usize) -> usize {
+        self.action_rng_calls += 1;
         if len == 0 { 0 } else { (self.action_rng.next_u64() as usize) % len }
     }
 
@@ -129,7 +134,12 @@ impl RandomAgent {
                     return Action::EndTurn;
                 }
                 targets.sort_by_key(|c| (c.x, c.y));
+                let arng_before = self.action_rng_calls;
                 let i = self.pick_action(targets.len());
+                if crate::parity_trace_enabled() {
+                    let targets_str: Vec<String> = targets.iter().map(|c| format!("({},{})", c.x, c.y)).collect();
+                    eprintln!("MOVE_PICK pid={} arng_before={} N={} i={} t=({},{}) all={}", pid, arng_before, targets.len(), i, targets[i].x, targets[i].y, targets_str.join(","));
+                }
                 Action::Move { path: vec![targets[i]] }
             }
             PlayerAction::StandUp => {
@@ -427,13 +437,21 @@ impl Agent for RandomAgent {
     fn act(&mut self, engine: &GameEngine) -> Action {
         // 1. Pending follow-up from previous ActivatePlayer
         if let Some((pid, pa)) = self.pending_follow_up.take() {
-            return self.compute_follow_up(engine, &pid, pa);
+            let action = self.compute_follow_up(engine, &pid, pa);
+            if engine.game.acting_player.player_id.as_deref() == Some(pid.as_str()) {
+                return action;
+            }
+            // Player no longer acting (e.g. WildAnimal cleared acting_player).
+            // action_rng was consumed above to match Java's pre-negatrait actionRng call. Fall through.
+            if crate::parity_trace_enabled() {
+                eprintln!("WILDANIMAL_FALLTHROUGH pid={} acting={:?} half={} turn={} home={}", pid, engine.game.acting_player.player_id, engine.game.half, if engine.game.home_playing { engine.game.turn_data_home.turn_nr } else { engine.game.turn_data_away.turn_nr }, engine.game.home_playing);
+            }
         }
 
         match engine.current_prompt() {
             Some(AgentPrompt::ActivatePlayer { eligible_players }) => {
                 if !eligible_players.is_empty() {
-                    // Phase 1: record eligible list for this turn, pick a player
+                    // Phase 1: record eligible list for this turn, pick a player.
                     let turn_nr = if engine.game.home_playing {
                         engine.game.turn_data_home.turn_nr
                     } else {
@@ -441,47 +459,77 @@ impl Agent for RandomAgent {
                     };
                     let turn_key = (engine.game.half, turn_nr, engine.game.home_playing);
                     if turn_key != self.last_turn_key {
+                        // New turn: reset and capture the full eligible list.
                         self.last_turn_key = turn_key;
                         self.used_this_turn.clear();
                         self.eligible_this_turn.clear();
                         for (pid, acts) in eligible_players.iter() {
                             self.eligible_this_turn.push((pid.clone(), acts.clone()));
                         }
+                        // Fall through to the skip-loop below.
+                    } else if eligible_players.len() == 1
+                        && self.used_this_turn.contains(eligible_players[0].0.as_str())
+                    {
+                        // Blitz block step: single already-used player (the blitzing player returning for block).
+                        let pi = self.pick(eligible_players.len());
+                        let (pid, acts) = &eligible_players[pi];
+                        let pa = acts.get(0).copied().unwrap_or(PlayerAction::Move);
+                        self.used_this_turn.insert(pid.clone());
+                        self.pending_follow_up = Some((pid.clone(), pa));
+                        return Action::ActivatePlayer { player_id: pid.clone(), player_action: player_action_to_choice(pa) };
                     }
-                    let pi = self.pick(eligible_players.len());
-                    let (pid, acts) = &eligible_players[pi];
-                    // Always pick the first available action (matches Java's `actions[0]`).
-                    // This uses 0 action_rng calls so action_rng is reserved for concrete
-                    // action target selection (move square, block target, etc.).
-                    let pa = acts.get(0).copied().unwrap_or(PlayerAction::Move);
-                    self.used_this_turn.insert(pid.clone());
-                    self.pending_follow_up = Some((pid.clone(), pa));
-                    Action::ActivatePlayer { player_id: pid.clone(), player_action: player_action_to_choice(pa) }
+                    // Fall through to skip-loop. Handles WildAnimal recovery (engine's eligible list
+                    // may include the inactive player; skip-loop uses eligible_this_turn.filter(!used_this_turn)).
+                    // New-turn Phase 1: pick from eligible_this_turn with inactive-skip loop.
+                    // Java's server rejects just-unstunned players (isActive()=false → SKIP_STEP),
+                    // but still consumes a decisionRng call for the rejected pick. Mirror that here.
+                    loop {
+                        let remaining: Vec<(String, Vec<PlayerAction>)> = self.eligible_this_turn.iter()
+                            .filter(|(pid, _)| !self.used_this_turn.contains(pid.as_str()))
+                            .map(|(pid, acts)| (pid.clone(), acts.clone()))
+                            .collect();
+                        if remaining.is_empty() { return Action::EndTurn; }
+                        let pi = self.pick(remaining.len());
+                        let (pid, acts) = remaining[pi].clone();
+                        self.used_this_turn.insert(pid.clone());
+                        let just_unstunned = engine.game.field_model.player_state(&pid)
+                            .map(|s| !s.is_active())
+                            .unwrap_or(false);
+                        if just_unstunned { continue; }
+                        let pa = acts.get(0).copied().unwrap_or(PlayerAction::Move);
+                        self.pending_follow_up = Some((pid.clone(), pa));
+                        return Action::ActivatePlayer { player_id: pid, player_action: player_action_to_choice(pa) };
+                    }
                 } else {
                     // Phase 2: inject next unused eligible player (in roster order), or EndTurn.
                     // In non-Regular turn modes (kickoff Blitz!, QuickSnap, etc.),
                     // end turn immediately — matching Java's "one activation then EndTurn" behavior.
+                    // Also end immediately on turnover (ball scatter on pickup, etc.) — matching
+                    // Java's ParityRunner which re-computes eligible players after each activation
+                    // and stops when the turn has ended.
                     use ffb_model::enums::TurnMode;
                     if engine.game.turn_mode != TurnMode::Regular {
                         return Action::EndTurn;
                     }
-                    // Iterate in roster order (Vec insertion order) — same order as Java's
-                    // getPlayers(). No sort needed: both engines use identical roster order.
-                    // Collect to owned data to avoid borrow conflicts with self.pick().
-                    let remaining: Vec<(String, Vec<PlayerAction>)> = self.eligible_this_turn.iter()
-                        .filter(|(pid, acts)| !self.used_this_turn.contains(pid.as_str()) && !acts.is_empty())
-                        .map(|(pid, acts)| (pid.clone(), acts.clone()))
-                        .collect();
-                    if remaining.is_empty() {
-                        return Action::EndTurn;
+                    // Pick with inactive-skip loop: just-unstunned players (active=false) are
+                    // rejected by Java's server (SKIP_STEP). Consume the pick call and retry.
+                    loop {
+                        let remaining: Vec<(String, Vec<PlayerAction>)> = self.eligible_this_turn.iter()
+                            .filter(|(pid, acts)| !self.used_this_turn.contains(pid.as_str()) && !acts.is_empty())
+                            .map(|(pid, acts)| (pid.clone(), acts.clone()))
+                            .collect();
+                        if remaining.is_empty() { return Action::EndTurn; }
+                        let i = self.pick(remaining.len());
+                        let (pid, acts) = remaining[i].clone();
+                        self.used_this_turn.insert(pid.clone());
+                        let just_unstunned = engine.game.field_model.player_state(&pid)
+                            .map(|s| !s.is_active())
+                            .unwrap_or(false);
+                        if just_unstunned { continue; }
+                        let pa = acts.get(0).copied().unwrap_or(PlayerAction::Move);
+                        self.pending_follow_up = Some((pid.clone(), pa));
+                        return Action::ActivatePlayer { player_id: pid, player_action: player_action_to_choice(pa) };
                     }
-                    let i = self.pick(remaining.len());
-                    let (pid, acts) = &remaining[i];
-                    // Always pick the first available action (matches Java's `actions[0]`).
-                    let pa = acts.get(0).copied().unwrap_or(PlayerAction::Move);
-                    self.used_this_turn.insert(pid.clone());
-                    self.pending_follow_up = Some((pid.clone(), pa));
-                    Action::ActivatePlayer { player_id: pid.clone(), player_action: player_action_to_choice(pa) }
                 }
             }
 
