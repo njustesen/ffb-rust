@@ -691,7 +691,11 @@ impl GameEngine {
                 // Touchback fires if ballCoordinateEnd is NOT in the receiving team's half.
                 // Java FieldCoordinateBounds: HALF_HOME = x∈[0,12] ∩ y∈[0,14]; HALF_AWAY = x∈[13,25] ∩ y∈[0,14].
                 // Off-pitch (any coord outside [0,25]×[0,14]) is never in either half → touchback.
-                let receiving_home = self.game.home_first_offense;
+                // Receiving team = whoever is NOT kicking. home_playing is the kicker at
+                // kickoff. This equals home_first_offense only for the FIRST kickoff of a
+                // half; after a touchdown the receiver alternates, so home_first_offense is
+                // stale (tier-2's no-score agent never exposed this).
+                let receiving_home = !self.game.home_playing;
                 let y_ok = scatter_end_coord.y >= 0 && scatter_end_coord.y <= 14;
                 let in_receiving_half = y_ok && if receiving_home {
                     scatter_end_coord.x >= 0 && scatter_end_coord.x < 13
@@ -906,7 +910,7 @@ impl GameEngine {
                 }
 
                 // OnTheBall: receiving team players may move up to 3 squares before ball lands
-                let receiving_home = self.game.home_first_offense;
+                let receiving_home = !self.game.home_playing; // receiver = non-kicker
                 let receiving_team = if receiving_home { &self.game.team_home } else { &self.game.team_away };
                 let otb_eligible: Vec<String> = receiving_team.players.iter()
                     .filter(|p| p.has_skill(SkillId::OnTheBall)
@@ -5693,40 +5697,55 @@ impl GameEngine {
                 // Normal: 3-square push cone facing away from the attacker.
                 let push_dx = ctx.defender_coord.x - ctx.attacker_coord.x;
                 let push_dy = ctx.defender_coord.y - ctx.attacker_coord.y;
-                let cone_squares: Vec<FieldCoordinate> = if ctx.att_has_grab {
-                    // Grab: any empty adjacent square (excludes attacker's own square)
+                // Grab / Sidestep first collect EMPTY adjacent on-pitch squares (Java
+                // UtilServerPushback lines 78-92). If that yields none, both fall through
+                // to the normal cone (the `mode_squares.is_empty()` case below).
+                let mode_squares: Vec<FieldCoordinate> = if ctx.att_has_grab || ctx.def_has_sidestep {
                     ctx.defender_coord.neighbours()
                         .iter()
                         .copied()
                         .filter(|&s| {
                             s != ctx.attacker_coord
+                                && s.is_on_pitch()
                                 && self.game.field_model.player_at(s).is_none()
                         })
                         .collect()
-                } else if ctx.def_has_sidestep {
-                    ctx.defender_coord.neighbours()
-                        .iter()
-                        .copied()
-                        .filter(|&s| s != ctx.attacker_coord)
-                        .collect()
                 } else {
-                    ctx.defender_coord.neighbours()
-                        .iter()
-                        .copied()
-                        .filter(|&s| {
-                            if s == ctx.attacker_coord { return false; }
-                            let sdx = s.x - ctx.defender_coord.x;
-                            let sdy = s.y - ctx.defender_coord.y;
-                            sdx * push_dx + sdy * push_dy > 0
-                        })
-                        .collect()
+                    Vec::new()
                 };
 
-                let on_pitch_squares: Vec<FieldCoordinate> = cone_squares.iter().copied()
+                // Normal 3-square cone facing away from the attacker (in-bounds only).
+                let cone_on_pitch: Vec<FieldCoordinate> = ctx.defender_coord.neighbours()
+                    .iter()
+                    .copied()
+                    .filter(|&s| {
+                        if s == ctx.attacker_coord { return false; }
+                        let sdx = s.x - ctx.defender_coord.x;
+                        let sdy = s.y - ctx.defender_coord.y;
+                        sdx * push_dx + sdy * push_dy > 0
+                    })
                     .filter(|c| c.is_on_pitch())
                     .collect();
 
-                // Crowd surf: all push-cone squares are off-pitch
+                // Java findPushbackSquares: with a free square, offer ONLY free squares;
+                // with no free square and fewer than 3 in-bounds cone squares, it's a
+                // crowd surf; with all 3 in-bounds but occupied, offer all 3 (chain push).
+                let on_pitch_squares: Vec<FieldCoordinate> = if !mode_squares.is_empty() {
+                    mode_squares
+                } else {
+                    let free: Vec<FieldCoordinate> = cone_on_pitch.iter().copied()
+                        .filter(|&s| self.game.field_model.player_at(s).is_none())
+                        .collect();
+                    if !free.is_empty() {
+                        free
+                    } else if cone_on_pitch.len() < 3 {
+                        Vec::new() // crowd surf
+                    } else {
+                        cone_on_pitch // all occupied → chain push
+                    }
+                };
+
+                // Crowd surf: no eligible on-pitch push square
                 if on_pitch_squares.is_empty() {
                     // Crowd surf: player is pushed off the pitch.
                     // The crowd rolls 2D6; if it exceeds the player's AV, injury is rolled.
@@ -6525,9 +6544,11 @@ impl GameEngine {
                 } else { false };
                 let was_cas = was_cas && !regen;
 
+                // Armour broke → injury was rolled: 2-7 = Stunned (Java InjuryTypeBlock /
+                // interpretInjuryRoll). PS_PRONE is only for a held-armour knockdown.
                 let new_state = if !regen && (is_dead || was_cas) { PlayerState::new(PS_BADLY_HURT) }
                     else if !regen && was_ko { PlayerState::new(PS_KNOCKED_OUT) }
-                    else if !regen { PlayerState::new(PS_PRONE) }
+                    else if !regen { PlayerState::new(PS_STUNNED) }
                     else { PlayerState::new(PS_RESERVE) }; // regen: already set by try_regeneration
                 if !regen {
                     self.game.field_model.set_player_state(&push.defender_id, new_state);
@@ -9371,6 +9392,11 @@ impl GameEngine {
                     use ffb_mechanics::mechanics::casualty_spp;
                     let cas_spp = casualty_spp(rules, false);
                     self.award_spp(fouler_id, home_fouling, cas_spp);
+                }
+                // KO/CAS/regen players leave the pitch (UtilBox.putPlayerIntoBox) — same
+                // as the block injury path. Stunned players stay on the field.
+                if was_ko || was_cas || regen {
+                    self.game.field_model.player_coordinates.remove(target_id);
                 }
                 events.push(GameEvent::Injury {
                     player_id: target_id.to_owned(),
@@ -19641,12 +19667,13 @@ mod tests {
                 GameEvent::SkillUse { skill_id, used: true, .. } if *skill_id == SkillId::ThickSkull as u16
             ));
             if thick_skull_saved {
-                // Player should be Prone, not KO'd
+                // ThickSkull converts a KO (injury 8) to Stunned (Java RollMechanic
+                // convertKOToStunOn8 → PlayerState.STUNNED), not Prone.
                 let state = engine.game.field_model.player_state("def");
                 assert!(
-                    state.map(|s| s.base() == PS_PRONE).unwrap_or(false)
+                    state.map(|s| s.base() == PS_STUNNED).unwrap_or(false)
                     || state.map(|s| s.base() == PS_RESERVE).unwrap_or(false),
-                    "ThickSkull save should leave player Prone or Reserve, not KO'd"
+                    "ThickSkull save should leave player Stunned or Reserve, not KO'd"
                 );
                 found_thick_skull_save = true;
                 break;
