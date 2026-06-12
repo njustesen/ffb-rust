@@ -13,6 +13,57 @@ All tests passing. Zero failures.
 
 ---
 
+## Session 45 Summary (2026-06-12) — tier-3 lineman 1-100 burn-down (in progress)
+
+**Goal:** lineman_vs_lineman seeds 1-100 at `--tier 3` (real actions) at 100/100,
+plus a coverage checklist proving every lineman action/event occurred. Replayer work
+explicitly deferred.
+
+**Status: 4/100 passing** (seeds 1, 4, 89, 94), up from 1/100. The 4 confirmed engine
+fixes below are committed; ~96 seeds still fail, each typically with several more
+divergences. This is a multi-session grind (plan estimated 10-20 more distinct fixes).
+
+### Tooling (committed b14617d)
+- `crates/ffb-parity/src/t3_checklist.rs` — coverage checklist over aggregated
+  GameEvents; tier-3 parity runs write `T3_COVERAGE.md` + `t3_coverage.html` and
+  fail (exit 1) if a required item is zero on suite-sized runs (≥50 games).
+- `GameEvent::PickupRoll` (every pickup attempt; parity-inert, events aren't hashed).
+- `BlockStats.by_result` (Skull..Pow), StandUpBlitz own activation name.
+- No-progress guard in `run_rust_headless` (50 stalled iters → diagnostic abort).
+- `run_t3_lineman.ps1`.
+
+### Engine fixes (committed ce8a3ea) — all from seed-2 dice-trace burn-down, all
+### race-agnostic, none caught by tier-2 (no-score agent never reaches these paths)
+1. **Pushback square selection** (`resolve_block_result` Pushback arm): offer only
+   FREE on-pitch cone squares; crowd-surf when none free and <3 in-bounds; chain-push
+   only when all 3 in-bounds occupied (Java `UtilServerPushback.findPushbackSquares`).
+2. **PowPushback/Pow broken-armour knockdown → STUNNED** not Prone (`resolve_push`).
+3. **Kickoff receiving team = `!home_playing`** (non-kicker), not `home_first_offense`
+   (stale after a mid-half touchdown). Fixes H2/post-TD scatter, touchback, NICE gust.
+4. **Foul KO/CAS removes the victim's coordinate** (off-pitch), like the block path.
+- Also: ThickSkull KO→Stunned test expectation corrected (Java convertKOToStunOn8).
+
+### NEXT divergence (seed 2, the precise blocker)
+First dice divergence at **pos 80**: after a failed pickup (pos 79, d6=1 by away_9 at
+(19,5)), **Java bounces the ball one square (d8, `StepCatchScatterThrowIn.bounceBall`)**
+while Rust does NOT bounce (rolls block/other d6 — the turnover/scatter is being
+skipped or a team-reroll path differs). High-frequency path → fixing it should clear
+many seeds. Trace: `FFB_DICE_TRACE=1 ... --tier 3 --seeds 2-2`, diff caller-tagged
+(Java) vs untagged (Rust) DICE_TRACE lines.
+
+### Also open
+- **place_all_in_reserve** runs KO-recovery rolls at the touchdown handler; confirm the
+  timing/placement matches Java (KO recovery at the next kickoff, recovered players
+  eligible for that setup). Suspected contributor to post-TD desyncs.
+- Pass/HandOver/StandUpBlitz §8 contract tables still TBD (Java pass sequence already
+  documented this session: pass d6 → ACCURATE/INACCURATE/FUMBLE, intercept dialog
+  declined, catch d6, bounce d8; hand-over = catch d6 then bounce on fail).
+- Task #21: goblin seed 94 T2 regression (H2 pitch-invasion pool, secret-weapon/banned
+  players) — MUST fix before the final T2-green gate. Confirmed a session-44 regression.
+- Task #14: visualize seed 0 push loop. Task #12: dodge DisturbingPresence (real-races).
+
+---
+
 ## Session 44 Summary (2026-06-12)
 
 **Goal:** T3 Phase 2 parity for one seed (seed 1), lineman only, all lineman actions.
