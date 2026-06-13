@@ -1,10 +1,12 @@
-pub mod engine;
+/// Step-stack engine — the 1:1 Java port. Java (`com.fumbbl.ffb`) is the sole ground truth;
+/// the old monolithic `GameEngine` has been removed entirely. See docs/step_port/.
+pub mod step;
+/// Decision-maker boundary: `Agent::act(&GameState) -> Action` (parity `RandomAgent`).
 pub mod agent;
 pub mod action;
+/// Pure `&Game` legality queries (eligible players/targets), consumed by selection/action
+/// steps. Audited against Java as each consuming step is ported.
 pub mod legal_actions;
-/// New step-stack engine (1:1 Java port). Built alongside `engine` during the rewrite;
-/// see docs/step_port/. Replaces the monolith once it can drive a full lineman game.
-pub mod step;
 
 /// Parity debug tracing, enabled by setting the FFB_TRACE env var.
 /// Used to gate stderr diagnostics (dodge rolls, negatrait rolls, agent picks)

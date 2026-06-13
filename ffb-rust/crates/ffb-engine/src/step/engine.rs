@@ -19,7 +19,12 @@ use ffb_model::events::GameEvent;
 use ffb_model::enums::{GameStatus, Weather};
 use ffb_model::prompts::AgentPrompt;
 
+use ffb_model::model::team::Team;
+use ffb_model::enums::Rules;
+use ffb_model::util::state_hash::state_hash;
+
 use crate::action::Action;
+use crate::legal_actions::TeamSide;
 use super::framework::{StepAction, StepId, StepParameter};
 
 // ── Concrete steps ──────────────────────────────────────────────────────────────
@@ -234,11 +239,24 @@ pub struct GameState {
 }
 
 impl GameState {
-    pub fn new(game: Game, seed: u64) -> Self {
+    /// Construct directly from a pre-built `Game` (used by step characterization tests; the
+    /// caller pushes a sequence and drives explicitly).
+    pub fn from_game(game: Game, seed: u64) -> Self {
         GameState {
             game, rng: GameRng::new(seed), stack: StepStack::new(),
             current: None, forwarded: None, pending_prompt: None, events: Vec::new(),
         }
+    }
+
+    /// Game-driver entry point the parity harness constructs from: build the game, push the
+    /// StartGame sequence, and run to the first prompt so `current_prompt()` is immediately
+    /// available.
+    pub fn new(home: Team, away: Team, rules: Rules, seed: u64) -> Self {
+        let game = Game::new(home, away, rules);
+        let mut gs = GameState::from_game(game, seed);
+        gs.push_sequence(start_game_sequence());
+        gs.run_until_prompt();
+        gs
     }
 
     pub fn push_sequence(&mut self, seq: Vec<StepEntry>) { self.stack.push_sequence(seq); }
@@ -249,6 +267,31 @@ impl GameState {
     /// Drain events accumulated so far, resetting the buffer (parity log read point).
     pub fn take_events(&mut self) -> Vec<GameEvent> { std::mem::take(&mut self.events) }
 
+    // ── Harness-facing facade ──────────────────────────────────────────────────────
+    // The parity harness is engine-agnostic: it needs only these few methods + `.game`.
+
+    /// The side currently to act (derived from the model — the engine infers it, so `apply`'s
+    /// `side` argument is advisory only).
+    pub fn active_side(&self) -> TeamSide {
+        if self.game.home_playing { TeamSide::Home } else { TeamSide::Away }
+    }
+
+    /// Whether the game has ended.
+    pub fn is_finished(&self) -> bool { self.game.is_finished() }
+
+    /// Game-dice draw count (parity diagnostics / no-progress guard).
+    pub fn rng_call_count(&self) -> u64 { self.rng.call_count }
+
+    /// FNV-1a 64-bit state hash (matches Java's `ParityRunner.stateHash()`).
+    pub fn state_hash_str(&self) -> String { state_hash(&self.game) }
+
+    /// Feed an agent decision and advance, returning the events produced. The `side` is advisory
+    /// (the engine infers the acting side); kept for the harness's call shape.
+    pub fn apply(&mut self, _side: TeamSide, action: Action) -> Result<Vec<GameEvent>, String> {
+        self.apply_action(action);
+        Ok(self.take_events())
+    }
+
     /// Apply a step's side effects to driver-owned state (events, sub-sequence pushes, and
     /// published parameters). Shared by start- and command-mode.
     fn apply_effects(&mut self, outcome: &mut StepOutcome) {
@@ -258,9 +301,10 @@ impl GameState {
     }
 
     /// Feed an agent decision to the waiting current step (Java command-mode `executeStep`),
-    /// then drive forward until the next prompt or idle.
-    pub fn apply(&mut self, action: Action) {
-        let entry = self.current.take().expect("apply() with no waiting step");
+    /// then drive forward until the next prompt or idle. Internal driver entry; the harness
+    /// uses the `apply(side, action)` facade above.
+    pub fn apply_action(&mut self, action: Action) {
+        let entry = self.current.take().expect("apply_action() with no waiting step");
         let mut outcome = entry.step.handle_command(&action, &mut self.game, &mut self.rng);
         self.apply_effects(&mut outcome);
         self.pending_prompt = None;
@@ -383,7 +427,7 @@ pub(crate) fn test_team(side: &str, dedicated_fans: i32) -> ffb_model::model::te
 pub(crate) fn new_game(seed: u64) -> GameState {
     use ffb_model::enums::Rules;
     let game = Game::new(test_team("home", 5), test_team("away", 7), Rules::Bb2025);
-    let mut gs = GameState::new(game, seed);
+    let mut gs = GameState::from_game(game, seed);
     gs.push_sequence(start_game_sequence());
     gs
 }
@@ -471,7 +515,7 @@ mod tests {
         assert_eq!(gs.rng.call_count, 4, "no coin die before the guess");
 
         // Agent guesses heads=true. Coin flip happens now (5th die = d2).
-        gs.apply(Action::CoinChoice { heads: true });
+        gs.apply_action(Action::CoinChoice { heads: true });
         assert_eq!(gs.rng.call_count, 5, "coin flip is the 5th game die (d2)");
         let home_won = true == coin_is_heads;
         assert_eq!(gs.game.home_playing, home_won, "winner becomes the chooser");
@@ -482,7 +526,7 @@ mod tests {
 
         // Winner chooses to receive. home_first_offense follows; kicker (home_playing) is the
         // opposite. Stack then drains → idle (no further pregame steps in this slice).
-        gs.apply(Action::ReceiveChoice { receive: true });
+        gs.apply_action(Action::ReceiveChoice { receive: true });
         let home_receives = if home_won { true } else { false }; // chooser receives
         assert_eq!(gs.game.home_first_offense, home_receives);
         assert_eq!(gs.game.home_playing, !home_receives, "kicker sets up first");

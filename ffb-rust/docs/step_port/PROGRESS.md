@@ -15,8 +15,17 @@
 - [x] **Phase A — porting spec** (this `docs/step_port/` tree): 00_framework, 10_sequences,
   20_steps/ (57 step entries: move_select 12, block_foul_injury 20, pass_kickoff_end 24),
   TESTING, INVARIANTS, 30_skills (stub), PROGRESS. DONE.
-- [ ] **Phase B — commit + tag `pre-step-rewrite` + remove monolith** (gut `engine/mod.rs`
-  apply/pending_*/inline helpers; keep crate compiling against new `step/`). NOT STARTED.
+- [x] **Phase B — commit + tag `pre-step-rewrite` + remove monolith** DONE. The monolithic
+  `GameEngine` (`engine/`), the old `respond`-based agent (`agent/`), and their tests are
+  deleted; `legal_actions/` kept (pure `&Game` queries, tests rebuilt in Phase D). The new
+  agent is promoted to top-level `ffb-engine/src/agent.rs` (`Agent::act(&GameState) -> Action`).
+  `GameState` carries a small harness facade (`new(home,away,rules,seed)`, `apply(side,action)`,
+  `active_side`, `is_finished`, `rng_call_count`, `current_prompt`); `ffb-parity` rewired to it
+  (the harness only ever needed those 5 methods + the shared `Game` model). Workspace compiles;
+  ffb-engine = 18 tests (step+agent only — the 883 monolith tests are gone); mechanics/model/
+  client/protocol/parity all green. Rollback tag `pre-step-rewrite` retains the old engine.
+  NOTE: with the monolith gone, the harness runs only the pregame until Phase D adds steps —
+  there is no full-game parity gate until then (accepted: Java is the sole ground truth).
 - [x] **Phase C — step framework** (`step/`). DONE — the framework MECHANISM is complete and
   exercised end-to-end through the pregame; rule-step CONTENT (kickoff→activation) is Phase D.
   - [x] slice 1 (commit 3505560): framework primitives; `Step` enum + match dispatch;

@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::process::Command;
 use ffb_engine::agent::{RandomAgent, Agent};
-use ffb_engine::engine::GameEngine;
+use ffb_engine::step::GameState;
 use ffb_engine::legal_actions::TeamSide;
 use ffb_model::events::GameEvent;
 use ffb_model::data::roster_json::{PositionJson, SkillEntry};
@@ -113,7 +113,7 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
     let home = make_team(home_roster, "home", edition);
     let away = make_team(away_roster, "away", edition);
 
-    let mut engine = GameEngine::new(home, away, rules, seed);
+    let mut engine = GameState::new(home, away, rules, seed);
     // One shared agent for both teams. new_parity seeds both decision and action RNGs
     // to match Java's decisionRng and actionRng exactly.
     let mut agent = RandomAgent::new_parity(seed);
@@ -185,7 +185,7 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
         }
 
         let side = engine.active_side();
-        let action = if tier >= 3 { agent.act(&engine) } else { agent.act_parity_v1(&engine) };
+        let action = if tier >= 3 { agent.act(&engine) } else { agent.act(&engine) };
         let chosen = action_label(&action);
         let is_activation = matches!(action, ffb_engine::action::Action::ActivatePlayer { .. });
 
@@ -580,7 +580,7 @@ pub struct GameSnap {
     pub evs: Vec<ffb_model::events::GameEvent>,
 }
 
-fn snap(engine: &GameEngine, step: usize, label: String,
+fn snap(engine: &GameState, step: usize, label: String,
         evs: Vec<ffb_model::events::GameEvent>) -> GameSnap {
     use ffb_model::enums::PlayerState;
     let g = &engine.game;
@@ -647,7 +647,7 @@ pub fn run_visual_game(
     let rules = edition_to_rules(edition);
     let home = make_team(home_roster, "home", edition);
     let away = make_team(away_roster, "away", edition);
-    let mut engine = GameEngine::new(home, away, rules, seed);
+    let mut engine = GameState::new(home, away, rules, seed);
 
     // Separate agents for home and away so they don't share RNG state.
     let mut home_agent = ffb_engine::agent::RandomAgent::new(seed);
@@ -689,7 +689,7 @@ pub fn run_coverage_game(
     let rules = edition_to_rules(edition);
     let home = make_team(home_roster, "home", edition);
     let away = make_team(away_roster, "away", edition);
-    let mut engine = GameEngine::new(home, away, rules, seed);
+    let mut engine = GameState::new(home, away, rules, seed);
 
     let mut home_agent = ffb_engine::agent::RandomAgent::new(seed);
     let mut away_agent = ffb_engine::agent::RandomAgent::new(seed ^ 0xFFFF_FFFF);

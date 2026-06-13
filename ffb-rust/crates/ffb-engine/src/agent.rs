@@ -3,9 +3,8 @@
 //!
 //! Dependency direction is one-way: the agent reads the engine (`GameState`), never the
 //! reverse. One `act` call per prompt — the agent inspects `gs.current_prompt()` (and `gs.game`
-//! for legal-action queries) and returns the `Action` the driver should `apply`. This replaces
-//! the monolith's `respond(&AgentPrompt) -> AgentResponse` trait with a state-in / action-out
-//! contract that needs no separate response type.
+//! for legal-action queries) and returns the `Action` the driver should `apply`. State-in /
+//! action-out: no separate response type.
 //!
 //! `RandomAgent` is the parity/coverage driver — it mirrors the Java `ParityRunner` decision/
 //! action RNG contract (see `AGENT_CONTRACT.md` and `docs/step_port/INVARIANTS.md`). A single
@@ -17,7 +16,7 @@ use rand_core::{RngCore, SeedableRng};
 use ffb_model::prompts::AgentPrompt;
 
 use crate::action::Action;
-use super::engine::GameState;
+use crate::step::GameState;
 
 /// The step engine's decision-maker. Reads the game state (including the pending prompt) and
 /// returns the action to apply. `&mut self` carries the agent's own RNG/turn state; `&GameState`
@@ -43,6 +42,15 @@ impl RandomAgent {
         RandomAgent {
             decision_rng: Xoshiro256StarStar::seed_from_u64(game_seed ^ 0xDEAD_BEEF_CAFE_0001),
             action_rng: Xoshiro256StarStar::seed_from_u64(game_seed ^ 0xC0FFEE_ACE0_0001),
+        }
+    }
+
+    /// Coverage/visual constructor (no Java sync): both streams derive deterministically from
+    /// `seed`. Callers use distinct seeds per side (e.g. `seed` / `seed ^ 0xFFFF_FFFF`).
+    pub fn new(seed: u64) -> Self {
+        RandomAgent {
+            decision_rng: Xoshiro256StarStar::seed_from_u64(seed),
+            action_rng: Xoshiro256StarStar::seed_from_u64(seed ^ 0xC0FFEE_ACE0_0001),
         }
     }
 
@@ -80,7 +88,7 @@ impl Agent for RandomAgent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::engine::new_game;
+    use crate::step::new_game;
 
     /// The full boundary loop (current_prompt → act → apply) drives the pregame to idle, and the
     /// agent's decision draws match a reference decision RNG seeded per the contract — validating
@@ -101,7 +109,7 @@ mod tests {
         while gs.current_prompt().is_some() {
             let a = agent.act(&gs);
             actions.push(a.clone());
-            gs.apply(a);
+            gs.apply_action(a);
         }
 
         assert_eq!(actions.len(), 2, "pregame asks exactly coin then receive");
