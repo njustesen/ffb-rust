@@ -85,8 +85,10 @@
   `AGENT_CONTRACT.md`, and the dice-sequence notes embedded in the 20_steps entries.
 
 ## Next concrete action
-Phase B: commit the spec, `git tag pre-step-rewrite`, then begin removing the monolith and
-scaffolding `step/` per `00_framework.md`. Then Phase C framework.
+**See `NEXT_SESSION.md`** — Phase D batch 1. Milestone: lineman seed 1 reaches the first
+ActivatePlayer and matches Java's dice trace + GameStart/first-activation state_hash (stretch:
+seeds 1–10). Order: harness reconciliation → restructure StartGame/Kickoff sequences → port
+Kickoff steps to first activation → extend the agent → verify vs Java seed 1.
 
 ## Open (non-rewrite) items, deferred
 - visualize seed-0 push loop (task #14); these become moot or guide the new engine.
