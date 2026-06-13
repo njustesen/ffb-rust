@@ -52,12 +52,18 @@ later step plugs into a validated foundation.
   ReceiveChoice tail Java runs here: **StartHalf**, and **Prayers to Nuffle** (lineman = 0 ⇒
   no-op) — verify order against Java.
 
-### Progress so far (commits f11a91a, 35cc7b9, 8b2e723)
-- ✅ step 0: GameStart hash parity verified.
+### Progress so far (commits f11a91a, 35cc7b9, 8b2e723, 0473e8e, af75819)
+- ✅ step 0: GameStart hash parity verified (i:0 = 384ccaed1d572749).
 - ✅ SEED1_DICE_MAP.md captured.
-- ✅ **StepKickoffScatterRoll** (d8+d6, scatter+back-walk) and **StepKickoffResultRoll** (2d6 →
-  KickoffResult) ported + characterization-tested (ffb-engine 20 green). NOT yet wired into the
-  live sequence — they need the steps below to run before them. THIS is the next wiring task.
+- ✅ Kickoff chain ported + WIRED: InitKickoff (StartHalf), Setup ×2 (canonical placement,
+  formation recovered 1:1 from the monolith), Kickoff (ball placement; provisional target),
+  KickoffScatterRoll (d8+d6), KickoffResultRoll (2d6), ApplyKickoffResult (Cheering Fans d6+d6;
+  publish/consume of KickoffResult), CatchScatterThrowIn (bounce d8).
+- ✅ **VERIFIED: Rust game-dice stream == Java EXACTLY through pos 1–12** (the full window to the
+  first activation) for lineman seed 1. ffb-engine 20 tests green.
+- 🔜 NEXT: EndKickoff + InitSelecting → first ActivatePlayer prompt + agent ActivatePlayer
+  handler. Then close the i:1 STATE-HASH match (needs exact placement coords, ball square, and
+  the Cheering Fans reroll award — currently deferred). Then the activation grind below.
 
 ### 2. Kickoff sequence → first activation (`20_steps/pass_kickoff_end.md`)
 Port in this order (skip skill/inducement-only steps as no-ops for lineman: SWARMING,
