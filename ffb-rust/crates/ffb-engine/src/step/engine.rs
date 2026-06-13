@@ -3,20 +3,28 @@
 //! See `docs/step_port/00_framework.md` (driver) and `10_sequences.md` (sequences).
 //!
 //! Steps are dispatched via the `Step` enum (no `dyn`). A step's `start`/`handle_command`
-//! return a `StepOutcome` (next action + events + sub-sequences to push); the driver applies
-//! the pushes and processes the action. This keeps borrows simple: the driver owns the stack
-//! and current step, and hands a step only `&mut Game` + `&mut GameRng`.
+//! return a `StepOutcome` (next action + events + sub-sequences to push + params to publish +
+//! an optional prompt). The driver — sole owner of the stack — applies the pushes and processes
+//! the action, so a step only ever borrows `&mut Game` + `&mut GameRng`.
+//!
+//! Boundary (Java `ClientCommand`/`DialogParameter` analogue): the engine speaks the harness's
+//! `Action`/`AgentPrompt` vocabulary directly. A step that must wait yields `Continue` + a
+//! `prompt`; the driver surfaces it via `current_prompt()`; the harness's agent answers with an
+//! `Action`, which `apply()` feeds to the waiting step's `handle_command`. (The wire
+//! `ClientCommand` mapping is the networking phase, G/I; the engine/parity path uses `Action`.)
 
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::events::GameEvent;
 use ffb_model::enums::{GameStatus, Weather};
+use ffb_model::prompts::AgentPrompt;
 
-use super::framework::{StepAction, StepId};
+use crate::action::Action;
+use super::framework::{StepAction, StepId, StepParameter};
 
 // ── Concrete steps ──────────────────────────────────────────────────────────────
 // One variant per ported step (BB2025 lineman set grows here per docs/step_port/20_steps).
-// Each carries its persistent fields; for the pregame steps that is nothing yet.
+// Each carries its persistent fields; pregame steps are stateless.
 
 #[derive(Debug, Clone)]
 pub enum Step {
@@ -26,6 +34,10 @@ pub enum Step {
     Spectators,
     /// Roll initial weather (2d6). (Java `game/start/StepWeather`.)
     Weather,
+    /// Prompt the coin guess, then flip the coin (d2). (Java `bb2016/start/StepCoinChoice`.)
+    CoinChoice,
+    /// Prompt the coin winner to receive or kick; set first-offense. (Java `StepReceiveChoice`.)
+    ReceiveChoice,
 }
 
 impl Step {
@@ -34,20 +46,22 @@ impl Step {
             Step::InitStartGame => StepId::InitStartGame,
             Step::Spectators => StepId::Spectators,
             Step::Weather => StepId::Weather,
+            Step::CoinChoice => StepId::CoinChoice,
+            Step::ReceiveChoice => StepId::ReceiveChoice,
         }
     }
 
-    /// The step's `start()` body (Java `AbstractStep.start`). Pregame steps do all their work
-    /// here and advance with `NextStep`. Steps that wait for a command return `Continue` and
-    /// implement `handle_command` (added as those steps are ported).
+    /// The step's `start()` body (Java `AbstractStep.start`). Steps that complete immediately
+    /// advance with `NextStep`; steps that wait for an agent decision return `Continue` + a
+    /// `prompt` and do their work in `handle_command`.
     fn start(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match self {
             Step::InitStartGame => {
                 game.status = GameStatus::Active;
                 StepOutcome::next()
             }
-            // Java StepSpectators: rollFanFactor() d3 for home, then d3 for away;
-            // fanFactor = dedicatedFans + roll. No GameEvent (not in the state hash).
+            // Java StepSpectators: rollFanFactor() d3 home then d3 away; fanFactor = dedicatedFans
+            // + roll. No GameEvent (not in the state hash).
             Step::Spectators => {
                 let roll_home = rng.d3();
                 game.team_home.fan_factor = game.team_home.dedicated_fans + roll_home;
@@ -63,31 +77,84 @@ impl Step {
                 game.weather = weather;
                 StepOutcome::next().with_event(GameEvent::WeatherChange { weather })
             }
+            // Java StepCoinChoice: the away coach guesses; the home prompt asks for the guess.
+            // No dice in start — the coin is flipped in handle_command after the guess arrives.
+            Step::CoinChoice => StepOutcome::cont().with_prompt(AgentPrompt::CoinChoice { is_home: true }),
+            // Java StepReceiveChoice: the coin winner (now `home_playing`) chooses receive/kick.
+            Step::ReceiveChoice => {
+                let team_id = game.active_team().id.clone();
+                StepOutcome::cont().with_prompt(AgentPrompt::ReceiveChoice { team_id })
+            }
         }
+    }
+
+    /// The step's `handle_command()` body (Java `AbstractStep.handleCommand`). Called by the
+    /// driver when an `Action` arrives for the waiting current step.
+    fn handle_command(&self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        match (self, action) {
+            // Flip the coin with the game RNG (Java throwCoin = 1× d2). Winner = guess == coin.
+            // The winner becomes `home_playing` (the chooser) for the following ReceiveChoice.
+            (Step::CoinChoice, Action::CoinChoice { heads }) => {
+                let coin_is_heads = rng.bool();
+                let home_won = *heads == coin_is_heads;
+                game.home_playing = home_won;
+                StepOutcome::next().with_event(GameEvent::CoinThrow { home_won })
+            }
+            // The chooser's `receive` resolves to whether HOME has first offense. The KICKER
+            // sets up first, so home_playing = !home_receives (matches Java setup ordering).
+            (Step::ReceiveChoice, Action::ReceiveChoice { receive }) => {
+                let home_receives = if game.home_playing { *receive } else { !*receive };
+                game.home_first_offense = home_receives;
+                game.home_playing = !home_receives;
+                let team_id = if home_receives { game.team_home.id.clone() } else { game.team_away.id.clone() };
+                StepOutcome::next().with_event(GameEvent::ReceiveChoice { team_id, receive: home_receives })
+            }
+            // A command the current step does not recognise (Java StepCommandStatus::UNHANDLED):
+            // stay put and keep waiting. (The harness never sends one in the parity path.)
+            _ => StepOutcome::cont(),
+        }
+    }
+
+    /// Offer a published parameter to this step while the driver walks the stack top→bottom.
+    /// Return `true` to consume it (stops propagation). Java `AbstractStep.setParameter`.
+    /// Plumbing in place; the first consumers land with the Phase D steps that read params
+    /// (e.g. MoveStack, EndTurn) — pregame steps consume nothing.
+    fn set_parameter(&mut self, _param: &StepParameter) -> bool {
+        false
     }
 }
 
 // ── Step outcome / stack ─────────────────────────────────────────────────────────
 
-/// What a step produced: how to advance, the events it emitted, and any sub-sequences to push.
-/// (Java folds these into `StepResult` + `pushSequence`; we return them so the driver — sole
-/// owner of the stack — applies the pushes, avoiding aliasing `&mut StepStack` into the step.)
+/// What a step produced: how to advance, the events it emitted, sub-sequences to push, params
+/// to publish down the stack, and an optional prompt (when it yields `Continue` to wait).
 pub struct StepOutcome {
     pub action: StepAction,
     pub goto_label: Option<String>,
     pub events: Vec<GameEvent>,
     /// Sequences to push (authored order; the stack reverses them on push).
     pub pushes: Vec<Vec<StepEntry>>,
+    /// Parameters to publish down the stack (top→bottom) after this step runs.
+    pub published: Vec<StepParameter>,
+    /// Set together with `Continue` when the step is waiting for an agent decision.
+    pub prompt: Option<AgentPrompt>,
 }
 
 impl StepOutcome {
-    pub fn next() -> Self {
-        StepOutcome { action: StepAction::NextStep, goto_label: None, events: Vec::new(), pushes: Vec::new() }
+    fn base(action: StepAction) -> Self {
+        StepOutcome { action, goto_label: None, events: Vec::new(), pushes: Vec::new(), published: Vec::new(), prompt: None }
     }
-    pub fn cont() -> Self {
-        StepOutcome { action: StepAction::Continue, goto_label: None, events: Vec::new(), pushes: Vec::new() }
+    pub fn next() -> Self { Self::base(StepAction::NextStep) }
+    pub fn cont() -> Self { Self::base(StepAction::Continue) }
+    pub fn goto(label: &str) -> Self {
+        let mut o = Self::base(StepAction::GotoLabel);
+        o.goto_label = Some(label.to_owned());
+        o
     }
     pub fn with_event(mut self, e: GameEvent) -> Self { self.events.push(e); self }
+    pub fn with_prompt(mut self, p: AgentPrompt) -> Self { self.prompt = Some(p); self }
+    pub fn push_seq(mut self, seq: Vec<StepEntry>) -> Self { self.pushes.push(seq); self }
+    pub fn publish(mut self, p: StepParameter) -> Self { self.published.push(p); self }
 }
 
 /// A stacked step: the concrete step plus an optional label (goto target).
@@ -133,56 +200,152 @@ impl StepStack {
         }
         Err(format!("goto unknown label '{label}'"))
     }
+
+    /// Publish a parameter down the stack (top→bottom), stopping once a step consumes it.
+    /// Java `StepStack.publishParameter` → each step's `setParameter`. The publisher is the
+    /// current step (already popped into the driver), so this only reaches steps below it.
+    pub fn publish(&mut self, param: &StepParameter) {
+        for entry in self.steps.iter_mut().rev() {
+            if entry.step.set_parameter(param) {
+                return;
+            }
+        }
+    }
 }
 
 // ── Driver ──────────────────────────────────────────────────────────────────────
 
 /// The game driver — owns the model, RNG, step stack and current step. Port of Java
 /// `GameState` (the executeStep/processStepResult loop, flattened to an explicit loop per
-/// `00_framework.md` §7). Command handling (`handle_command`) is added as command-driven
-/// steps are ported; this slice exercises the `start`/`NextStep` chain (pregame).
+/// `00_framework.md` §7). Drives start-mode chains and command-mode (handle_command) steps,
+/// surfacing an `AgentPrompt` when a step waits and accepting an `Action` to resume.
 pub struct GameState {
     pub game: Game,
     pub rng: GameRng,
     stack: StepStack,
     current: Option<StepEntry>,
+    /// When `Some`, the next drive of `current` re-delivers this command (NextStep/GotoLabel
+    /// *AndRepeat* — Java's `forwardCommand`) instead of calling `start`.
+    forwarded: Option<Action>,
+    /// The prompt the waiting current step raised; `None` when the engine is idle.
+    pending_prompt: Option<AgentPrompt>,
     /// Events accumulated since the last drain (the parity log reads these).
     pub events: Vec<GameEvent>,
 }
 
 impl GameState {
     pub fn new(game: Game, seed: u64) -> Self {
-        GameState { game, rng: GameRng::new(seed), stack: StepStack::new(), current: None, events: Vec::new() }
+        GameState {
+            game, rng: GameRng::new(seed), stack: StepStack::new(),
+            current: None, forwarded: None, pending_prompt: None, events: Vec::new(),
+        }
     }
 
     pub fn push_sequence(&mut self, seq: Vec<StepEntry>) { self.stack.push_sequence(seq); }
 
-    /// Drive the stack until it idles — i.e. a step yields `Continue` (waiting for a command)
-    /// or the stack empties. Mirrors `GameState.executeStep`'s start-mode chain. Command-mode
-    /// (handle_command) lands with the first command-driven step.
-    pub fn run_until_idle(&mut self) {
+    /// The prompt the engine is currently waiting on, if any. `None` ⇒ idle (stack drained).
+    pub fn current_prompt(&self) -> Option<&AgentPrompt> { self.pending_prompt.as_ref() }
+
+    /// Drain events accumulated so far, resetting the buffer (parity log read point).
+    pub fn take_events(&mut self) -> Vec<GameEvent> { std::mem::take(&mut self.events) }
+
+    /// Apply a step's side effects to driver-owned state (events, sub-sequence pushes, and
+    /// published parameters). Shared by start- and command-mode.
+    fn apply_effects(&mut self, outcome: &mut StepOutcome) {
+        self.events.append(&mut outcome.events);
+        for seq in outcome.pushes.drain(..) { self.stack.push_sequence(seq); }
+        for param in outcome.published.drain(..) { self.stack.publish(&param); }
+    }
+
+    /// Feed an agent decision to the waiting current step (Java command-mode `executeStep`),
+    /// then drive forward until the next prompt or idle.
+    pub fn apply(&mut self, action: Action) {
+        let entry = self.current.take().expect("apply() with no waiting step");
+        let mut outcome = entry.step.handle_command(&action, &mut self.game, &mut self.rng);
+        self.apply_effects(&mut outcome);
+        self.pending_prompt = None;
+        self.dispatch(entry, action, outcome);
+        self.drive();
+    }
+
+    /// Drive the start-mode chain until a step waits (Continue + prompt) or the stack empties.
+    /// Mirrors `GameState.executeStep`'s start-mode loop + `processStepResult`.
+    pub fn run_until_prompt(&mut self) { self.drive(); }
+
+    fn drive(&mut self) {
         loop {
-            if self.current.is_none() {
-                self.current = match self.stack.pop() { Some(s) => Some(s), None => return };
+            // Already waiting on a prompt from a prior apply/dispatch — nothing to start.
+            if self.current.is_some() && self.pending_prompt.is_some() {
+                return;
             }
-            let entry = self.current.as_ref().unwrap();
-            let outcome = entry.step.start(&mut self.game, &mut self.rng);
-            self.events.extend(outcome.events);
-            for seq in outcome.pushes { self.stack.push_sequence(seq); }
+            if self.current.is_none() {
+                match self.stack.pop() {
+                    Some(s) => self.current = Some(s),
+                    None => { self.pending_prompt = None; return; }
+                }
+            }
+            let entry = self.current.take().unwrap();
+            // Forwarded command (AndRepeat) → re-deliver via handle_command; else start().
+            let mut outcome = match self.forwarded.take() {
+                Some(cmd) => {
+                    let o = entry.step.handle_command(&cmd, &mut self.game, &mut self.rng);
+                    // keep cmd available in case this step also forwards
+                    self.dispatch(entry, cmd, o);
+                    if self.pending_prompt.is_some() { return; }
+                    continue;
+                }
+                None => entry.step.start(&mut self.game, &mut self.rng),
+            };
+            self.apply_effects(&mut outcome);
             match outcome.action {
                 StepAction::Continue | StepAction::Repeat => {
-                    // Continue: wait for a command (none in this slice). Repeat: re-run start
-                    // is not used by pregame steps; treated as idle for now.
+                    // Continue: wait for a command (prompt set by the step). Repeat: pregame
+                    // steps don't use it; treated as idle until a repeat()-capable step lands.
+                    self.pending_prompt = outcome.prompt;
+                    self.current = Some(entry);
                     return;
                 }
-                StepAction::NextStep | StepAction::NextStepAndRepeat => {
-                    self.current = None; // pop+start the next step
-                }
-                StepAction::GotoLabel | StepAction::GotoLabelAndRepeat => {
+                StepAction::NextStep => { self.current = None; }
+                StepAction::GotoLabel => {
                     let label = outcome.goto_label.expect("goto without label");
                     self.stack.goto_label(&label).expect("goto label present");
                     self.current = None;
                 }
+                StepAction::NextStepAndRepeat | StepAction::GotoLabelAndRepeat => {
+                    // forwardCommand from a start() result has no command to forward; treat as
+                    // the non-repeat variant. (Forwarding only originates from handle_command.)
+                    if outcome.action.trigger_goto() {
+                        let label = outcome.goto_label.expect("goto without label");
+                        self.stack.goto_label(&label).expect("goto label present");
+                    }
+                    self.current = None;
+                }
+            }
+        }
+    }
+
+    /// Process a `handle_command` outcome (command-mode `processStepResult`): apply the action,
+    /// setting up forwarding when the result is an *AndRepeat* variant.
+    fn dispatch(&mut self, entry: StepEntry, cmd: Action, mut outcome: StepOutcome) {
+        self.apply_effects(&mut outcome);
+        match outcome.action {
+            StepAction::Continue | StepAction::Repeat => {
+                // Same step keeps waiting (multi-command step) — re-arm its prompt.
+                self.pending_prompt = outcome.prompt;
+                self.current = Some(entry);
+            }
+            StepAction::NextStep => { self.current = None; }
+            StepAction::GotoLabel => {
+                let label = outcome.goto_label.expect("goto without label");
+                self.stack.goto_label(&label).expect("goto label present");
+                self.current = None;
+            }
+            StepAction::NextStepAndRepeat => { self.current = None; self.forwarded = Some(cmd); }
+            StepAction::GotoLabelAndRepeat => {
+                let label = outcome.goto_label.expect("goto without label");
+                self.stack.goto_label(&label).expect("goto label present");
+                self.current = None;
+                self.forwarded = Some(cmd);
             }
         }
     }
@@ -190,13 +353,16 @@ impl GameState {
 
 // ── Sequence generators ───────────────────────────────────────────────────────────
 
-/// Java `StartGame` generator (BB2025): InitStartGame → Spectators → Weather → [PettyCash,
-/// BuyInducements, Kickoff — added next slice]. See `10_sequences.md` StartGame.
+/// Java `StartGame` generator (BB2025) — head through the coin/receive decisions:
+/// InitStartGame → Spectators → Weather → CoinChoice → ReceiveChoice → [PettyCash,
+/// BuyInducements, Setup, Kickoff — Phase D]. See `10_sequences.md` StartGame.
 pub fn start_game_sequence() -> Vec<StepEntry> {
     vec![
         StepEntry::new(Step::InitStartGame),
         StepEntry::new(Step::Spectators),
         StepEntry::new(Step::Weather),
+        StepEntry::new(Step::CoinChoice),
+        StepEntry::new(Step::ReceiveChoice),
     ]
 }
 
@@ -236,7 +402,19 @@ mod tests {
         assert!(s.goto_label("nope").is_err());
     }
 
-    // ── pregame characterization: StartGame runs and consumes d3,d3,d6,d6 in order ──
+    #[test]
+    fn publish_walks_top_to_bottom_until_consumed() {
+        // No pregame step consumes a param, so a published param propagates to the bottom and is
+        // dropped without panicking — proves the walk is wired. (Consumption asserted in Phase D
+        // once a param-reading step lands.)
+        let mut s = StepStack::new();
+        s.push(StepEntry::new(Step::ReceiveChoice));
+        s.push(StepEntry::new(Step::CoinChoice));
+        s.publish(&StepParameter::EndTurn(true));
+        assert_eq!(s.len(), 2, "non-consuming publish leaves the stack intact");
+    }
+
+    // ── fixtures ──
     fn test_team(side: &str, dedicated_fans: i32) -> ffb_model::model::team::Team {
         ffb_model::model::team::Team {
             id: format!("{side}_lineman"), name: format!("{side} Linemen"),
@@ -248,30 +426,66 @@ mod tests {
         }
     }
 
-    #[test]
-    fn start_game_pregame_consumes_d3_d3_d6_d6_in_order() {
+    fn new_game(seed: u64) -> GameState {
         use ffb_model::enums::Rules;
-        let seed = 1u64;
-        // Reference dice: the exact draws StartGame must consume, in order.
-        let mut refrng = GameRng::new(seed);
-        let exp_fan_home = refrng.d3();
-        let exp_fan_away = refrng.d3();
-        let exp_w1 = refrng.d6();
-        let exp_w2 = refrng.d6();
-        let exp_weather = Weather::for_roll(exp_w1 + exp_w2);
-
         let game = Game::new(test_team("home", 5), test_team("away", 7), Rules::Bb2025);
         let mut gs = GameState::new(game, seed);
         gs.push_sequence(start_game_sequence());
-        gs.run_until_idle();
+        gs
+    }
 
-        // Exactly 4 dice consumed, in order d3,d3,d6,d6 (parity-critical).
-        assert_eq!(gs.rng.call_count, 4, "StartGame must consume exactly 4 dice (fan d3 x2, weather d6 x2)");
+    #[test]
+    fn pregame_consumes_d3_d3_d6_d6_then_waits_at_coin_prompt() {
+        let seed = 1u64;
+        let mut refrng = GameRng::new(seed);
+        let exp_fan_home = refrng.d3();
+        let exp_fan_away = refrng.d3();
+        let exp_w = Weather::for_roll(refrng.d6() + refrng.d6());
+
+        let mut gs = new_game(seed);
+        gs.run_until_prompt();
+
+        // 4 dice consumed (fan d3 x2, weather d6 x2); the coin's d2 is NOT rolled until the
+        // guess arrives — the engine is now waiting at the coin prompt.
+        assert_eq!(gs.rng.call_count, 4);
         assert_eq!(gs.game.status, GameStatus::Active);
         assert_eq!(gs.game.team_home.fan_factor, 5 + exp_fan_home);
         assert_eq!(gs.game.team_away.fan_factor, 7 + exp_fan_away);
-        assert_eq!(gs.game.weather, exp_weather);
-        // One WeatherChange event from StepWeather.
-        assert!(matches!(gs.events.as_slice(), [GameEvent::WeatherChange { weather }] if *weather == exp_weather));
+        assert_eq!(gs.game.weather, exp_w);
+        assert!(matches!(gs.current_prompt(), Some(AgentPrompt::CoinChoice { is_home: true })));
+    }
+
+    #[test]
+    fn coin_then_receive_drives_to_idle_with_correct_offense_and_dice_order() {
+        let seed = 1u64;
+        // Reference: after fan d3,d3 + weather d6,d6, the next game die is the coin d2.
+        let mut refrng = GameRng::new(seed);
+        let (_h, _a) = (refrng.d3(), refrng.d3());
+        let (_w1, _w2) = (refrng.d6(), refrng.d6());
+        let coin_is_heads = refrng.bool();
+
+        let mut gs = new_game(seed);
+        gs.run_until_prompt();
+        assert_eq!(gs.rng.call_count, 4, "no coin die before the guess");
+
+        // Agent guesses heads=true. Coin flip happens now (5th die = d2).
+        gs.apply(Action::CoinChoice { heads: true });
+        assert_eq!(gs.rng.call_count, 5, "coin flip is the 5th game die (d2)");
+        let home_won = true == coin_is_heads;
+        assert_eq!(gs.game.home_playing, home_won, "winner becomes the chooser");
+        // CoinThrow emitted; now waiting at the receive prompt for the winner's team.
+        assert!(gs.events.iter().any(|e| matches!(e, GameEvent::CoinThrow { home_won: hw } if *hw == home_won)));
+        let chooser_team = if home_won { gs.game.team_home.id.clone() } else { gs.game.team_away.id.clone() };
+        assert!(matches!(gs.current_prompt(), Some(AgentPrompt::ReceiveChoice { team_id }) if *team_id == chooser_team));
+
+        // Winner chooses to receive. home_first_offense follows; kicker (home_playing) is the
+        // opposite. Stack then drains → idle (no further pregame steps in this slice).
+        gs.apply(Action::ReceiveChoice { receive: true });
+        let home_receives = if home_won { true } else { false }; // chooser receives
+        assert_eq!(gs.game.home_first_offense, home_receives);
+        assert_eq!(gs.game.home_playing, !home_receives, "kicker sets up first");
+        assert!(gs.events.iter().any(|e| matches!(e, GameEvent::ReceiveChoice { receive, .. } if *receive == home_receives)));
+        assert_eq!(gs.rng.call_count, 5, "receive choice consumes no game dice");
+        assert!(gs.current_prompt().is_none(), "stack drained → idle");
     }
 }
