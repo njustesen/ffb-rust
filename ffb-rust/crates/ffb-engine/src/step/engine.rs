@@ -20,7 +20,7 @@ use ffb_model::enums::{GameStatus, Weather};
 use ffb_model::prompts::AgentPrompt;
 
 use ffb_model::model::team::Team;
-use ffb_model::enums::{Rules, Direction, KickoffResult};
+use ffb_model::enums::{Rules, Direction, KickoffResult, PlayerState, PS_STANDING, PS_RESERVE};
 use ffb_model::types::{FieldCoordinate, FIELD_WIDTH, FIELD_HEIGHT};
 use ffb_model::kickoff::{kickoff_event_bb2025, KickoffEventKind};
 use ffb_model::util::state_hash::state_hash;
@@ -29,6 +29,41 @@ use ffb_mechanics::mechanics::scatter_coordinate;
 use crate::action::Action;
 use crate::legal_actions::TeamSide;
 use super::framework::{StepAction, StepId, StepParameter};
+
+/// Place a team's available (RESERVE / unset) players in the canonical parity formation —
+/// 1:1 with Java `ParityRunner.placeReserves()` (and the validated monolith port): jersey
+/// order, ≤11, first three on the LOS (x=12), then the overflow squares; away mirrored x→25-x.
+fn place_team_canonical(game: &mut Game, home: bool) {
+    let los: &[(i32, i32)] = &[(12, 7), (12, 6), (12, 8), (12, 5), (12, 9), (12, 4), (12, 10)];
+    let overflow: &[(i32, i32)] = &[
+        (5, 5), (5, 7), (5, 9), (6, 6), (6, 8), (4, 6), (4, 8), (3, 6), (3, 8), (2, 5), (2, 9), (1, 7),
+    ];
+    let mut players: Vec<(String, i32)> = if home {
+        game.team_home.players.iter().map(|p| (p.id.clone(), p.nr)).collect()
+    } else {
+        game.team_away.players.iter().map(|p| (p.id.clone(), p.nr)).collect()
+    };
+    players.sort_by_key(|&(_, nr)| nr);
+    players.truncate(11);
+    let available: Vec<&(String, i32)> = players.iter().filter(|(pid, _)| {
+        match game.field_model.player_state(pid) {
+            None => true,                          // unset before first setup = available
+            Some(s) => s.base() == PS_RESERVE,
+        }
+    }).collect();
+    let los_needed = available.len().min(3);
+    for (placed, (pid, _)) in available.iter().enumerate() {
+        let (ox, oy) = if placed < los_needed {
+            los[placed]
+        } else {
+            let i = placed - los_needed;
+            if i < overflow.len() { overflow[i] } else { continue }
+        };
+        let coord = if home { FieldCoordinate::new(ox, oy) } else { FieldCoordinate::new(25 - ox, oy) };
+        game.field_model.set_player_coordinate(pid, coord);
+        game.field_model.set_player_state(pid, PlayerState::new(PS_STANDING));
+    }
+}
 
 /// Map the rolled kickoff-event kind to the `KickoffResult` carried by events/params.
 /// (The two enums mirror each other; this is the BB2025-reachable set.)
@@ -69,6 +104,12 @@ pub enum Step {
     CoinChoice,
     /// Prompt the coin winner to receive or kick; set first-offense. (Java `StepReceiveChoice`.)
     ReceiveChoice,
+    /// First-kickoff bookkeeping: StartHalf. (Java `StepInitKickoff`.) 0 dice.
+    InitKickoff,
+    /// Canonical placement of the active team, then flip. (Java `StepSetup` ×2.) 0 dice.
+    Setup,
+    /// Latch the kick target: place the ball on the receiving half. (Java `StepKickoff`/KickBall.)
+    Kickoff,
     /// Scatter the kicked ball: d8 direction + d6 distance. (Java `StepKickoffScatterRoll`.)
     KickoffScatterRoll,
     /// Roll the 2d6 kickoff-event table; publish the result. (Java `StepKickoffResultRoll`.)
@@ -83,6 +124,9 @@ impl Step {
             Step::Weather => StepId::Weather,
             Step::CoinChoice => StepId::CoinChoice,
             Step::ReceiveChoice => StepId::ReceiveChoice,
+            Step::InitKickoff => StepId::Kickoff,
+            Step::Setup => StepId::Setup,
+            Step::Kickoff => StepId::Kickoff,
             Step::KickoffScatterRoll => StepId::KickoffScatterRoll,
             Step::KickoffResultRoll => StepId::KickoffResultRoll,
         }
@@ -121,6 +165,29 @@ impl Step {
             Step::ReceiveChoice => {
                 let team_id = game.active_team().id.clone();
                 StepOutcome::cont().with_prompt(AgentPrompt::ReceiveChoice { team_id })
+            }
+            // Java StepInitKickoff (first kickoff): start half 1. Bookkeeping, 0 dice.
+            Step::InitKickoff => {
+                StepOutcome::next().with_event(GameEvent::StartHalf { half: game.half })
+            }
+            // Java StepSetup ×2 (kicking then receiving team). The parity agent places its team
+            // in the canonical formation; we place the active team and flip so the next Setup
+            // handles the other. 0 dice, no prompt.
+            Step::Setup => {
+                place_team_canonical(game, game.home_playing);
+                game.home_playing = !game.home_playing;
+                StepOutcome::next()
+            }
+            // Java StepKickoff: latch the kick target and place the ball. The kicking team
+            // (current `home_playing` after the two setups) kicks into the receiving half.
+            // NOTE: provisional canonical target — the agent `KickBall` command replaces this
+            // when chasing the state hash; the scatter dice below are independent of the target.
+            Step::Kickoff => {
+                let kicker_home = game.home_playing;
+                // Receiving half is the opponent's: away half (x≥13) if home kicks, else home half.
+                let target = if kicker_home { FieldCoordinate::new(21, 9) } else { FieldCoordinate::new(4, 9) };
+                game.field_model.ball_coordinate = Some(target);
+                StepOutcome::next()
             }
             // Java StepKickoffScatterRoll: scatter the kicked ball. Dice IN ORDER: d8 direction,
             // then d6 distance. Walk the landing back toward the start until on-pitch (Java's
@@ -489,8 +556,17 @@ pub fn start_game_sequence() -> Vec<StepEntry> {
         StepEntry::new(Step::InitStartGame),
         StepEntry::new(Step::Spectators),
         StepEntry::new(Step::Weather),
+        // Kickoff(withCoinChoice) — coin/receive then the opening kickoff. (PettyCash/
+        // BuyInducements are 0-effect for equal-TV lineman and are omitted for now.)
         StepEntry::new(Step::CoinChoice),
         StepEntry::new(Step::ReceiveChoice),
+        StepEntry::new(Step::InitKickoff),
+        StepEntry::new(Step::Setup), // kicking team
+        StepEntry::new(Step::Setup), // receiving team
+        StepEntry::new(Step::Kickoff),
+        StepEntry::new(Step::KickoffScatterRoll),
+        StepEntry::new(Step::KickoffResultRoll),
+        // TODO(next): ApplyKickoffResult, CatchScatterThrowIn(bounce), EndKickoff, InitSelecting.
     ]
 }
 
@@ -653,13 +729,17 @@ mod tests {
         assert!(matches!(gs.current_prompt(), Some(AgentPrompt::ReceiveChoice { team_id }) if *team_id == chooser_team));
 
         // Winner chooses to receive. home_first_offense follows; kicker (home_playing) is the
-        // opposite. Stack then drains → idle (no further pregame steps in this slice).
+        // opposite. The engine then drives through the opening kickoff (InitKickoff, Setup×2,
+        // Kickoff, scatter d8+d6, result 2d6) and idles after the result roll.
         gs.apply_action(Action::ReceiveChoice { receive: true });
         let home_receives = if home_won { true } else { false }; // chooser receives
         assert_eq!(gs.game.home_first_offense, home_receives);
-        assert_eq!(gs.game.home_playing, !home_receives, "kicker sets up first");
+        assert_eq!(gs.game.home_playing, !home_receives, "kicker kicks (set up first; two Setup flips net to kicker)");
         assert!(gs.events.iter().any(|e| matches!(e, GameEvent::ReceiveChoice { receive, .. } if *receive == home_receives)));
-        assert_eq!(gs.rng.call_count, 5, "receive choice consumes no game dice");
-        assert!(gs.current_prompt().is_none(), "stack drained → idle");
+        // Receive (0 dice) + InitKickoff/Setup×2/Kickoff (0 dice) + scatter d8,d6 + result d6,d6.
+        assert_eq!(gs.rng.call_count, 9, "coin d2 + scatter d8,d6 + result d6,d6 = 5+4");
+        assert!(gs.events.iter().any(|e| matches!(e, GameEvent::KickoffScatter { .. })));
+        assert!(gs.events.iter().any(|e| matches!(e, GameEvent::KickoffResultEvent { .. })));
+        assert!(gs.current_prompt().is_none(), "stack drains after result roll (apply/bounce TODO)");
     }
 }
