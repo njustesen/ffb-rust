@@ -52,6 +52,13 @@ later step plugs into a validated foundation.
   ReceiveChoice tail Java runs here: **StartHalf**, and **Prayers to Nuffle** (lineman = 0 ⇒
   no-op) — verify order against Java.
 
+### Progress so far (commits f11a91a, 35cc7b9, 8b2e723)
+- ✅ step 0: GameStart hash parity verified.
+- ✅ SEED1_DICE_MAP.md captured.
+- ✅ **StepKickoffScatterRoll** (d8+d6, scatter+back-walk) and **StepKickoffResultRoll** (2d6 →
+  KickoffResult) ported + characterization-tested (ffb-engine 20 green). NOT yet wired into the
+  live sequence — they need the steps below to run before them. THIS is the next wiring task.
+
 ### 2. Kickoff sequence → first activation (`20_steps/pass_kickoff_end.md`)
 Port in this order (skip skill/inducement-only steps as no-ops for lineman: SWARMING,
 MASTER_CHEF, KICKOFF_RETURN, BLITZ_TURN):
