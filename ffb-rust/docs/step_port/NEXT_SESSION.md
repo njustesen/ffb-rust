@@ -33,15 +33,15 @@ later step plugs into a validated foundation.
 
 ## Ordered work
 
-### 0. Harness reconciliation (do first — unblocks all verification)
-- **GameStart hash point.** Java logs `initial_hash` on a fresh game *before any roll*. The
-  current `GameState::new` rolls the pregame in the constructor, so its post-construction hash
-  already includes weather/fan. Split it: build via `from_game` (no rolls) → harness snapshots
-  the GameStart hash → then push StartGame + `run_until_prompt`. Adjust `runner.rs` accordingly.
-- **Side inference.** Confirm `active_side()`/`apply(side,_)` agree with who Java expects to act
-  at each prompt (the `side` arg is advisory; the engine infers from `home_playing`).
-- Re-confirm the harness loop logs the existing `LogLine` shapes and runs the comparator vs the
-  Java seed-1 log. Get an (expected) early divergence report as the working signal.
+### 0. Harness reconciliation — DONE (commit f11a91a)
+- ✅ GameStart hash point fixed: `GameState` snapshots the fresh, pre-roll hash in `new` and
+  exposes `initial_state_hash()`; the harness logs that. **Verified: Rust == Java ==
+  `384ccaed1d572749` for lineman seed 1.** The verification loop works: `cargo run -p ffb-parity
+  -- --home lineman --away lineman --seeds 1 --tier 3 --no-abort` regenerates the Java log and
+  reports the first divergence (currently i:1 — Rust idles after receive; kickoff not ported).
+- 📍 **Target dice stream captured: `SEED1_DICE_MAP.md`** — the exact 12-die window to the first
+  activation. Port the kickoff chain against it; verify with `FFB_DICE_TRACE=1`.
+- Remaining: side inference sanity-check as activation steps land.
 
 ### 1. Restructure sequences to match Java (`10_sequences.md`)
 - `StartGame` = INIT_START_GAME · SPECTATORS · WEATHER · **PETTY_CASH · BUY_INDUCEMENTS**; the
