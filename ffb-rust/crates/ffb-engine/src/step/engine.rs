@@ -366,6 +366,28 @@ pub fn start_game_sequence() -> Vec<StepEntry> {
     ]
 }
 
+// ── shared test fixtures (used by engine.rs and agent.rs tests) ──
+#[cfg(test)]
+pub(crate) fn test_team(side: &str, dedicated_fans: i32) -> ffb_model::model::team::Team {
+    ffb_model::model::team::Team {
+        id: format!("{side}_lineman"), name: format!("{side} Linemen"),
+        race: "lineman".into(), roster_id: "lineman".into(), coach: format!("Coach_{side}"),
+        rerolls: 3, apothecaries: 1, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0,
+        bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
+        fan_factor: 0, dedicated_fans, team_value: 1_000_000, treasury: 0,
+        special_rules: vec![], players: vec![],
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn new_game(seed: u64) -> GameState {
+    use ffb_model::enums::Rules;
+    let game = Game::new(test_team("home", 5), test_team("away", 7), Rules::Bb2025);
+    let mut gs = GameState::new(game, seed);
+    gs.push_sequence(start_game_sequence());
+    gs
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -412,26 +434,6 @@ mod tests {
         s.push(StepEntry::new(Step::CoinChoice));
         s.publish(&StepParameter::EndTurn(true));
         assert_eq!(s.len(), 2, "non-consuming publish leaves the stack intact");
-    }
-
-    // ── fixtures ──
-    fn test_team(side: &str, dedicated_fans: i32) -> ffb_model::model::team::Team {
-        ffb_model::model::team::Team {
-            id: format!("{side}_lineman"), name: format!("{side} Linemen"),
-            race: "lineman".into(), roster_id: "lineman".into(), coach: format!("Coach_{side}"),
-            rerolls: 3, apothecaries: 1, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0,
-            bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
-            fan_factor: 0, dedicated_fans, team_value: 1_000_000, treasury: 0,
-            special_rules: vec![], players: vec![],
-        }
-    }
-
-    fn new_game(seed: u64) -> GameState {
-        use ffb_model::enums::Rules;
-        let game = Game::new(test_team("home", 5), test_team("away", 7), Rules::Bb2025);
-        let mut gs = GameState::new(game, seed);
-        gs.push_sequence(start_game_sequence());
-        gs
     }
 
     #[test]
