@@ -118,6 +118,8 @@ pub enum StepParameter {
     GotoLabelOnFailure(String),
     GotoLabelOnSuccess(String),
     UsingChainsaw(bool),
+    /// The rolled kickoff event (StepKickoffResultRoll → StepApplyKickoffResult).
+    KickoffResult(ffb_model::enums::KickoffResult),
     // … grow per 20_steps entries as steps are ported.
 }
 

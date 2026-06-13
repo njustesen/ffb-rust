@@ -20,12 +20,38 @@ use ffb_model::enums::{GameStatus, Weather};
 use ffb_model::prompts::AgentPrompt;
 
 use ffb_model::model::team::Team;
-use ffb_model::enums::Rules;
+use ffb_model::enums::{Rules, Direction, KickoffResult};
+use ffb_model::types::{FieldCoordinate, FIELD_WIDTH, FIELD_HEIGHT};
+use ffb_model::kickoff::{kickoff_event_bb2025, KickoffEventKind};
 use ffb_model::util::state_hash::state_hash;
+use ffb_mechanics::mechanics::scatter_coordinate;
 
 use crate::action::Action;
 use crate::legal_actions::TeamSide;
 use super::framework::{StepAction, StepId, StepParameter};
+
+/// Map the rolled kickoff-event kind to the `KickoffResult` carried by events/params.
+/// (The two enums mirror each other; this is the BB2025-reachable set.)
+fn kickoff_result_from_kind(kind: KickoffEventKind) -> KickoffResult {
+    match kind {
+        KickoffEventKind::GetTheRef => KickoffResult::GetTheRef,
+        KickoffEventKind::HighKick => KickoffResult::HighKick,
+        KickoffEventKind::CheeringFans => KickoffResult::CheeringFans,
+        KickoffEventKind::WeatherChange => KickoffResult::WeatherChange,
+        KickoffEventKind::BrilliantCoaching => KickoffResult::BrilliantCoaching,
+        KickoffEventKind::QuickSnap => KickoffResult::QuickSnap,
+        KickoffEventKind::PitchInvasion => KickoffResult::PitchInvasion,
+        KickoffEventKind::Riot => KickoffResult::Riot,
+        KickoffEventKind::PerfectDefence => KickoffResult::PerfectDefence,
+        KickoffEventKind::ThrowARock => KickoffResult::ThrowARock,
+        KickoffEventKind::TimeOut => KickoffResult::TimeOut,
+        KickoffEventKind::SolidDefence => KickoffResult::SolidDefence,
+        KickoffEventKind::OficiousRef => KickoffResult::OficiousRef,
+        KickoffEventKind::Blitz => KickoffResult::Blitz,
+        KickoffEventKind::Charge => KickoffResult::Charge,
+        KickoffEventKind::DodgySnack => KickoffResult::DodgySnack,
+    }
+}
 
 // ── Concrete steps ──────────────────────────────────────────────────────────────
 // One variant per ported step (BB2025 lineman set grows here per docs/step_port/20_steps).
@@ -43,6 +69,10 @@ pub enum Step {
     CoinChoice,
     /// Prompt the coin winner to receive or kick; set first-offense. (Java `StepReceiveChoice`.)
     ReceiveChoice,
+    /// Scatter the kicked ball: d8 direction + d6 distance. (Java `StepKickoffScatterRoll`.)
+    KickoffScatterRoll,
+    /// Roll the 2d6 kickoff-event table; publish the result. (Java `StepKickoffResultRoll`.)
+    KickoffResultRoll,
 }
 
 impl Step {
@@ -53,6 +83,8 @@ impl Step {
             Step::Weather => StepId::Weather,
             Step::CoinChoice => StepId::CoinChoice,
             Step::ReceiveChoice => StepId::ReceiveChoice,
+            Step::KickoffScatterRoll => StepId::KickoffScatterRoll,
+            Step::KickoffResultRoll => StepId::KickoffResultRoll,
         }
     }
 
@@ -89,6 +121,49 @@ impl Step {
             Step::ReceiveChoice => {
                 let team_id = game.active_team().id.clone();
                 StepOutcome::cont().with_prompt(AgentPrompt::ReceiveChoice { team_id })
+            }
+            // Java StepKickoffScatterRoll: scatter the kicked ball. Dice IN ORDER: d8 direction,
+            // then d6 distance. Walk the landing back toward the start until on-pitch (Java's
+            // findScatterCoordinate `lastValid` back-walk); a never-on-pitch scatter = touchback.
+            // The ball's current square is the kick target (StepKickoff placed it).
+            Step::KickoffScatterRoll => {
+                let start = game.field_model.ball_coordinate.unwrap_or(FieldCoordinate::new(0, 0));
+                let dir_roll = rng.d8();
+                let direction = Direction::for_roll(dir_roll).expect("d8 roll is 1..=8");
+                let distance = rng.d6();
+                // Back-walk: full distance first, decrement until the square is on-pitch.
+                let mut landing = None;
+                let mut d = distance;
+                while d > 0 {
+                    let (x, y) = scatter_coordinate(start.x, start.y, direction, d);
+                    let c = FieldCoordinate::new(x, y);
+                    if x >= 0 && x < FIELD_WIDTH && y >= 0 && y < FIELD_HEIGHT {
+                        landing = Some(c);
+                        break;
+                    }
+                    d -= 1;
+                }
+                // touchback (landing == None) is resolved by the later Touchback step; for now
+                // we only place the ball when it lands on-pitch.
+                if let Some(c) = landing {
+                    game.field_model.ball_coordinate = Some(c);
+                }
+                StepOutcome::next()
+                    .with_event(GameEvent::KickoffScatter { start, direction: dir_roll, distance })
+            }
+            // Java StepKickoffResultRoll: rollKickoff() = 2d6; interpret → KickoffResult; publish it.
+            Step::KickoffResultRoll => {
+                let d1 = rng.d6();
+                let d2 = rng.d6();
+                let total = d1 + d2;
+                let mut out = StepOutcome::next();
+                if let Some(kind) = kickoff_event_bb2025(total) {
+                    let result = kickoff_result_from_kind(kind);
+                    out = out
+                        .with_event(GameEvent::KickoffResultEvent { result })
+                        .publish(StepParameter::KickoffResult(result));
+                }
+                out
             }
         }
     }
@@ -508,6 +583,50 @@ mod tests {
         assert_eq!(gs.game.team_away.fan_factor, 7 + exp_fan_away);
         assert_eq!(gs.game.weather, exp_w);
         assert!(matches!(gs.current_prompt(), Some(AgentPrompt::CoinChoice { is_home: true })));
+    }
+
+    #[test]
+    fn kickoff_scatter_rolls_d8_dir_then_d6_dist_and_places_ball() {
+        // Characterization (per SEED1_DICE_MAP): direction d8 FIRST, distance d6 SECOND, ball
+        // placed at the on-pitch landing. Pin the order + mechanic against a reference RNG.
+        let seed = 99u64;
+        let mut refrng = GameRng::new(seed);
+        let exp_dir_roll = refrng.d8();
+        let exp_dist = refrng.d6();
+        let exp_dir = Direction::for_roll(exp_dir_roll).unwrap();
+        let start = FieldCoordinate::new(13, 7); // mid-pitch — scatter stays on-pitch
+        let (ex, ey) = scatter_coordinate(start.x, start.y, exp_dir, exp_dist);
+
+        let game = Game::new(test_team("home", 0), test_team("away", 0), ffb_model::enums::Rules::Bb2025);
+        let mut gs = GameState::from_game(game, seed);
+        gs.game.field_model.ball_coordinate = Some(start);
+        gs.push_sequence(vec![StepEntry::new(Step::KickoffScatterRoll)]);
+        gs.run_until_prompt();
+
+        assert_eq!(gs.rng.call_count, 2, "exactly d8 then d6");
+        assert!(matches!(gs.events.as_slice(),
+            [GameEvent::KickoffScatter { start: s, direction, distance }]
+            if *s == start && *direction == exp_dir_roll && *distance == exp_dist));
+        // mid-pitch landing is on-pitch → ball moved there.
+        assert_eq!(gs.game.field_model.ball_coordinate, Some(FieldCoordinate::new(ex, ey)));
+    }
+
+    #[test]
+    fn kickoff_result_rolls_2d6_and_maps_table() {
+        // 2d6 → BB2025 kickoff table. Pin the order + that the mapped result is published/emitted.
+        let seed = 99u64;
+        let mut refrng = GameRng::new(seed);
+        let total = refrng.d6() + refrng.d6();
+        let exp = kickoff_result_from_kind(kickoff_event_bb2025(total).unwrap());
+
+        let game = Game::new(test_team("home", 0), test_team("away", 0), ffb_model::enums::Rules::Bb2025);
+        let mut gs = GameState::from_game(game, seed);
+        gs.push_sequence(vec![StepEntry::new(Step::KickoffResultRoll)]);
+        gs.run_until_prompt();
+
+        assert_eq!(gs.rng.call_count, 2, "exactly 2d6");
+        assert!(matches!(gs.events.as_slice(),
+            [GameEvent::KickoffResultEvent { result }] if *result == exp));
     }
 
     #[test]

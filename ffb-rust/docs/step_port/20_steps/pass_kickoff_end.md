@@ -311,7 +311,7 @@ For BB2025 the relevant roll methods map to these dice (one Fortuna draw per `ro
 - Test: KickBall fixture (home & away) → published start coord (transform for away), 0 dice. Java pin: no.
 - Parity: (none yet)
 
-### StepKickoffScatterRoll  [ ]
+### StepKickoffScatterRoll  [~]  (char-test green; pending wiring+seed parity)
 - Java: `bb2025/kickoff/StepKickoffScatterRoll.java:41`.
 - Sequence(s): Kickoff step 10 (`_ASK_AFTER` variant if the "ask kick distance after" option is set —
   not default).
@@ -333,7 +333,7 @@ For BB2025 the relevant roll methods map to these dice (one Fortuna draw per `ro
   touchback-half test.
 - Parity: (none yet)
 
-### StepKickoffResultRoll  [ ]
+### StepKickoffResultRoll  [~]  (char-test green; pending wiring+seed parity)
 - Java: `bb2025/kickoff/StepKickoffResultRoll.java:36`.
 - Sequence(s): Kickoff step 12.
 - Purpose: roll the 2d6 kickoff-event table; publish the result.
