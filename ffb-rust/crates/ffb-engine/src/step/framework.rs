@@ -94,6 +94,8 @@ pub enum StepId {
     EndPassing, PickUp, CatchScatterThrowIn,
     // common / end
     Apothecary, EndPlayerAction, EndTurn, EndGame, Mvp,
+    // common / misc
+    NoOp,
     // control
     GotoLabel, NextStep,
 }

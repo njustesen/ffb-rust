@@ -26,8 +26,8 @@ use ffb_model::kickoff::{kickoff_event_bb2025, KickoffEventKind};
 use ffb_model::util::state_hash::state_hash;
 use ffb_mechanics::mechanics::scatter_coordinate;
 
-use crate::action::Action;
-use crate::legal_actions::TeamSide;
+use crate::action::{Action, PlayerActionChoice};
+use crate::legal_actions::{legal_activate_player_actions, TeamSide};
 use super::framework::{StepAction, StepId, StepParameter};
 
 /// Place a team's available (RESERVE / unset) players in the canonical parity formation —
@@ -119,6 +119,21 @@ pub enum Step {
     ApplyKickoffResult { result: Option<KickoffResult> },
     /// Bounce (or catch) the ball where it landed. (Java `StepCatchScatterThrowIn`.)
     CatchScatterThrowIn,
+    /// End-of-kickoff bookkeeping: pushes the EndTurn sequence. (Java `StepEndKickoff`.) 0 dice.
+    EndKickoff,
+    /// Pass-through no-op (lineman activation block and EndTurn prefix steps that have no
+    /// effect in a skill-less game: ForgoneStalling, SteadyFootingHit, PlaceBallHit,
+    /// ApothecaryHit, CatchScatterEndTurn, plus the 18 activation-block stubs in Select).
+    NoOp,
+    /// End-of-turn bookkeeping: flip active team, bump turn_nr, reset, push Select.
+    /// (Java `StepEndTurn`.) 0 dice.
+    EndTurn,
+    /// Activation gate: emit ActivatePlayer prompt; on command GOTO END_SELECTING.
+    /// (Java `StepInitSelecting`.) 0 dice.
+    InitSelecting,
+    /// Dispatch hub: consume published action params, push the chosen sequence.
+    /// (Java `StepEndSelecting`.) Stub for the current parity slice: NEXT_STEP only.
+    EndSelecting,
 }
 
 impl Step {
@@ -136,6 +151,11 @@ impl Step {
             Step::KickoffResultRoll => StepId::KickoffResultRoll,
             Step::ApplyKickoffResult { .. } => StepId::ApplyKickoffResult,
             Step::CatchScatterThrowIn => StepId::CatchScatterThrowIn,
+            Step::EndKickoff => StepId::EndKickoff,
+            Step::NoOp => StepId::NoOp,
+            Step::EndTurn => StepId::EndTurn,
+            Step::InitSelecting => StepId::InitSelecting,
+            Step::EndSelecting => StepId::EndSelecting,
         }
     }
 
@@ -263,6 +283,45 @@ impl Step {
                 }
                 StepOutcome::next()
             }
+            // Java StepEndKickoff: pushes the EndTurn generator so the receiving team starts.
+            Step::EndKickoff => StepOutcome::next().push_seq(end_turn_sequence()),
+            // No-op pass-through (all lineman activation-block and EndTurn prefix steps that
+            // have no effect for a skill-less game).
+            Step::NoOp => StepOutcome::next(),
+            // Java StepEndTurn: flip active team, bump the new active team's turn_nr, reset
+            // per-turn flags, push Select so they can activate a player.
+            Step::EndTurn => {
+                game.home_playing = !game.home_playing;
+                if game.home_playing {
+                    game.turn_data_home.turn_nr += 1;
+                    game.turn_data_home.reset_for_turn();
+                } else {
+                    game.turn_data_away.turn_nr += 1;
+                    game.turn_data_away.reset_for_turn();
+                }
+                StepOutcome::next().push_seq(select_sequence())
+            }
+            // Java StepInitSelecting: build the eligible player list, emit the ActivatePlayer
+            // prompt, and wait for the command. Command handling in handle_command below.
+            Step::InitSelecting => {
+                let side = if game.home_playing { TeamSide::Home } else { TeamSide::Away };
+                let raw_actions = legal_activate_player_actions(game, side);
+                // Group by player (jersey order preserved — same iteration order as team.players).
+                let mut eligible: Vec<(String, Vec<ffb_model::enums::PlayerAction>)> = Vec::new();
+                for act in raw_actions {
+                    if let Action::ActivatePlayer { player_id, player_action } = act {
+                        let pa = pac_to_player_action(player_action);
+                        if let Some((_, acts)) = eligible.iter_mut().find(|(pid, _)| pid == &player_id) {
+                            acts.push(pa);
+                        } else {
+                            eligible.push((player_id, vec![pa]));
+                        }
+                    }
+                }
+                StepOutcome::cont().with_prompt(AgentPrompt::ActivatePlayer { eligible_players: eligible })
+            }
+            // Java StepEndSelecting: stub — future iteration will dispatch to the chosen sequence.
+            Step::EndSelecting => StepOutcome::next(),
         }
     }
 
@@ -288,10 +347,21 @@ impl Step {
                 StepOutcome::next().with_event(GameEvent::ReceiveChoice { team_id, receive: home_receives })
             }
             // Java StepKickoff handleCommand(ClientCommandKickoff): place the ball on the chosen
-            // target square (the kicking coach's pick), then proceed to the scatter.
+            // target square (the kicking coach's pick), then proceed to the scatter. The ball
+            // becomes live here (ball_in_play drives the state hash and catch/throw-in logic).
             (Step::Kickoff, Action::KickBall { coord }) => {
                 game.field_model.ball_coordinate = Some(*coord);
+                game.field_model.ball_in_play = true;
                 StepOutcome::next()
+            }
+            // Java StepInitSelecting handleCommand: jump to the EndSelecting dispatch hub,
+            // skipping the activation-block stubs. In a later iteration we'll publish
+            // DISPATCH_PLAYER_ACTION so EndSelecting can route to the correct sequence.
+            (Step::InitSelecting, Action::ActivatePlayer { .. }) => {
+                StepOutcome::goto("END_SELECTING")
+            }
+            (Step::InitSelecting, Action::EndTurn) => {
+                StepOutcome::goto("END_SELECTING")
             }
             // A command the current step does not recognise (Java StepCommandStatus::UNHANDLED):
             // stay put and keep waiting. (The harness never sends one in the parity path.)
@@ -590,6 +660,25 @@ impl GameState {
     }
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────────────
+
+/// Convert an engine-local `PlayerActionChoice` to the model-level `PlayerAction` used in
+/// `AgentPrompt::ActivatePlayer`. The two enums mirror each other; this covers the lineman set.
+fn pac_to_player_action(pac: PlayerActionChoice) -> ffb_model::enums::PlayerAction {
+    use ffb_model::enums::PlayerAction as PA;
+    match pac {
+        PlayerActionChoice::Move       => PA::Move,
+        PlayerActionChoice::Block      => PA::Block,
+        PlayerActionChoice::Blitz      => PA::Blitz,
+        PlayerActionChoice::StandUp    => PA::StandUp,
+        PlayerActionChoice::StandUpBlitz => PA::StandUpBlitz,
+        PlayerActionChoice::Foul       => PA::Foul,
+        PlayerActionChoice::Pass       => PA::Pass,
+        PlayerActionChoice::HandOff    => PA::HandOver,
+        other => unimplemented!("pac_to_player_action: unhandled {other:?}"),
+    }
+}
+
 // ── Sequence generators ───────────────────────────────────────────────────────────
 
 /// Java `StartGame` generator (BB2025) — head through the coin/receive decisions:
@@ -612,8 +701,43 @@ pub fn start_game_sequence() -> Vec<StepEntry> {
         StepEntry::new(Step::KickoffResultRoll),
         StepEntry::new(Step::ApplyKickoffResult { result: None }),
         StepEntry::new(Step::CatchScatterThrowIn),
-        // TODO(next): EndKickoff, InitSelecting → first ActivatePlayer; then the agent + hash.
+        StepEntry::new(Step::EndKickoff),
     ]
+}
+
+/// Java `EndTurn` generator (BB2025). All 5 prefix steps are no-ops for a skill-less lineman
+/// (no stalling, no HIT_PLAYER context, no outstanding apothecary). `StepEndTurn` itself does
+/// the turn flip and pushes Select. See `10_sequences.md` EndTurn.
+fn end_turn_sequence() -> Vec<StepEntry> {
+    vec![
+        StepEntry::new(Step::NoOp),  // ForgoneStalling
+        StepEntry::new(Step::NoOp),  // SteadyFooting(HIT_PLAYER)
+        StepEntry::new(Step::NoOp),  // PlaceBall
+        StepEntry::new(Step::NoOp),  // Apothecary(HIT_PLAYER)
+        StepEntry::new(Step::NoOp),  // CatchScatterThrowIn
+        StepEntry::new(Step::EndTurn),
+    ]
+}
+
+/// Java `Select` generator (BB2025). InitSelecting emits the ActivatePlayer prompt and GOTOs
+/// END_SELECTING on command; the 18 intervening no-ops (14 ActivationSequenceBuilder stubs +
+/// 4 outer Select stubs) are always skipped for a standing lineman. EndSelecting is the dispatch
+/// hub — for now a stub that idles the engine. See `10_sequences.md` Select.
+fn select_sequence() -> Vec<StepEntry> {
+    let mut seq = Vec::with_capacity(20);
+    seq.push(StepEntry::new(Step::InitSelecting));
+    // 14 ActivationSequenceBuilder stubs (InitActivation, AnimalSavagery, SteadyFooting,
+    // HandleDropPlayerContext, PlaceBall, Apothecary, CatchScatterThrowIn, SetDefender,
+    // GotoLabel(NEXT), BoneHead, ReallyStupid, TakeRoot, UnchannelledFury, BloodLust).
+    for _ in 0..14 {
+        seq.push(StepEntry::new(Step::NoOp));
+    }
+    // 4 outer Select stubs (GotoLabel(NEXT,alt=END_SELECTING), JumpUp, StandUp, ResetFumblerooskie).
+    for _ in 0..4 {
+        seq.push(StepEntry::new(Step::NoOp));
+    }
+    seq.push(StepEntry::labelled(Step::EndSelecting, "END_SELECTING"));
+    seq
 }
 
 // ── shared test fixtures (used by engine.rs and agent.rs tests) ──
@@ -794,6 +918,10 @@ mod tests {
         assert_eq!(gs.rng.call_count, 12, "full opening kickoff dice after the kick");
         assert!(gs.events.iter().any(|e| matches!(e, GameEvent::KickoffScatter { .. })));
         assert!(gs.events.iter().any(|e| matches!(e, GameEvent::KickoffResultEvent { result } if *result == KickoffResult::CheeringFans)));
-        assert!(gs.current_prompt().is_none(), "stack drains after bounce (EndKickoff/InitSelecting TODO)");
+        // EndKickoff → EndTurn → InitSelecting: engine now waits at the first ActivatePlayer
+        // prompt (0 extra dice). The receiving team (away for seed 1) goes first.
+        assert!(matches!(gs.current_prompt(), Some(AgentPrompt::ActivatePlayer { .. })),
+            "engine reaches first ActivatePlayer after kickoff (0 dice beyond 12)");
+        assert_eq!(gs.rng.call_count, 12, "no game dice consumed by EndKickoff/EndTurn/InitSelecting");
     }
 }

@@ -15,8 +15,9 @@ use rand_xoshiro::Xoshiro256StarStar;
 use rand_core::{RngCore, SeedableRng};
 use ffb_model::prompts::AgentPrompt;
 use ffb_model::types::FieldCoordinate;
+use ffb_model::enums::PlayerAction;
 
-use crate::action::Action;
+use crate::action::{Action, PlayerActionChoice};
 use crate::step::GameState;
 
 /// The step engine's decision-maker. Reads the game state (including the pending prompt) and
@@ -61,13 +62,11 @@ impl RandomAgent {
     }
 
     /// Decision-RNG uniform index in `[0, len)`: `remainderUnsigned(nextLong(), len)`.
-    #[allow(dead_code)] // first used by the activation/selection prompts in Phase D
     fn pick(&mut self, len: usize) -> usize {
         if len == 0 { 0 } else { (self.decision_rng.next_u64() as usize) % len }
     }
 
     /// Action-RNG uniform index — diversity picks (move target, block/foul target).
-    #[allow(dead_code)] // first used by the move/block follow-up prompts in Phase D
     fn pick_action(&mut self, len: usize) -> usize {
         if len == 0 { 0 } else { (self.action_rng.next_u64() as usize) % len }
     }
@@ -88,10 +87,39 @@ impl Agent for RandomAgent {
                 let x = if gs.game.home_playing { x_raw + 13 } else { x_raw };
                 Action::KickBall { coord: FieldCoordinate::new(x, y_raw + 1) }
             }
+            // AGENT_CONTRACT.md §4-5: 1 decisionRng draw for player pick (over the eligible
+            // list in jersey order), 1 actionRng draw for action pick (over that player's
+            // actions). Blitz also needs 1 actionRng for target (§8) — wired per-sequence.
+            Some(AgentPrompt::ActivatePlayer { eligible_players }) => {
+                if eligible_players.is_empty() {
+                    return Action::EndTurn;
+                }
+                let player_idx = self.pick(eligible_players.len());
+                let (player_id, actions) = &eligible_players[player_idx];
+                let action_idx = self.pick_action(actions.len());
+                let player_action = player_action_to_pac(&actions[action_idx]);
+                Action::ActivatePlayer { player_id: player_id.clone(), player_action }
+            }
             // Each remaining prompt is wired as its producing step lands in Phase D; the loud
             // failure here names exactly which handler is still missing.
             other => panic!("RandomAgent::act: no handler yet for prompt {other:?}"),
         }
+    }
+}
+
+/// Convert a model-level `PlayerAction` (from `AgentPrompt`) back to the engine's
+/// `PlayerActionChoice` (for `Action::ActivatePlayer`). Covers the lineman-reachable set.
+fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
+    match pa {
+        PlayerAction::Move       => PlayerActionChoice::Move,
+        PlayerAction::Block      => PlayerActionChoice::Block,
+        PlayerAction::Blitz      => PlayerActionChoice::Blitz,
+        PlayerAction::StandUp    => PlayerActionChoice::StandUp,
+        PlayerAction::StandUpBlitz => PlayerActionChoice::StandUpBlitz,
+        PlayerAction::Foul       => PlayerActionChoice::Foul,
+        PlayerAction::Pass       => PlayerActionChoice::Pass,
+        PlayerAction::HandOver   => PlayerActionChoice::HandOff,
+        other => unimplemented!("player_action_to_pac: unhandled {other:?}"),
     }
 }
 
@@ -115,8 +143,10 @@ mod tests {
         gs.run_until_prompt();
         let mut agent = RandomAgent::new_parity(seed);
 
+        // Drive exactly the 3 pregame actions (coin, receive, kick); stop before the first
+        // ActivatePlayer so we test the pregame RNG contract in isolation.
         let mut actions = Vec::new();
-        while gs.current_prompt().is_some() {
+        while gs.current_prompt().is_some() && actions.len() < 3 {
             let a = agent.act(&gs);
             actions.push(a.clone());
             gs.apply_action(a);
@@ -126,7 +156,9 @@ mod tests {
         assert!(matches!(actions[0], Action::CoinChoice { heads } if heads == exp_heads));
         assert!(matches!(actions[1], Action::ReceiveChoice { receive } if receive == exp_receive));
         assert!(matches!(actions[2], Action::KickBall { .. }));
-        assert!(gs.current_prompt().is_none(), "loop drove the engine to idle");
+        // After KickBall the engine drives to the first ActivatePlayer prompt (0 extra dice).
+        assert!(matches!(gs.current_prompt(), Some(AgentPrompt::ActivatePlayer { .. })),
+            "engine waits at first ActivatePlayer after the kickoff");
         // The agent's decision RNG must not touch the game dice: the game dice are the pregame
         // (d3,d3,d6,d6 + coin d2) plus the opening kickoff (scatter d8,d6 + result d6,d6 +
         // Cheering Fans d6,d6 + bounce d8) = 12.
