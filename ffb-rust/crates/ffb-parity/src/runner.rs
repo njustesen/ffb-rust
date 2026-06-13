@@ -118,7 +118,9 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
     // to match Java's decisionRng and actionRng exactly.
     let mut agent = RandomAgent::new_parity(seed);
 
-    let initial_hash = state_hash(&engine.game);
+    // GameStart hash = the fresh game BEFORE any roll (Java logs it pre-pregame). The engine
+    // snapshots it during construction, since `new` runs the pregame to the first prompt.
+    let initial_hash = engine.initial_state_hash().to_string();
     let mut lines: Vec<LogLine> = Vec::new();
     let mut all_events: Vec<GameEvent> = Vec::new();
     lines.push(LogLine::GameStart {

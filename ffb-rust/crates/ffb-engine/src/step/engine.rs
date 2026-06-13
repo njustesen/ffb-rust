@@ -236,6 +236,10 @@ pub struct GameState {
     pending_prompt: Option<AgentPrompt>,
     /// Events accumulated since the last drain (the parity log reads these).
     pub events: Vec<GameEvent>,
+    /// State hash of the FRESH game, captured before any roll — the parity log's GameStart
+    /// (i:0) hash. Java logs this on the freshly-created game, so we snapshot it in `new`
+    /// before the StartGame sequence runs.
+    initial_hash: String,
 }
 
 impl GameState {
@@ -245,19 +249,24 @@ impl GameState {
         GameState {
             game, rng: GameRng::new(seed), stack: StepStack::new(),
             current: None, forwarded: None, pending_prompt: None, events: Vec::new(),
+            initial_hash: String::new(),
         }
     }
 
-    /// Game-driver entry point the parity harness constructs from: build the game, push the
-    /// StartGame sequence, and run to the first prompt so `current_prompt()` is immediately
-    /// available.
+    /// Game-driver entry point the parity harness constructs from: build the game, snapshot the
+    /// fresh-game (pre-roll) GameStart hash, push the StartGame sequence, and run to the first
+    /// prompt so `current_prompt()` is immediately available.
     pub fn new(home: Team, away: Team, rules: Rules, seed: u64) -> Self {
         let game = Game::new(home, away, rules);
         let mut gs = GameState::from_game(game, seed);
+        gs.initial_hash = state_hash(&gs.game); // fresh, before any StartGame roll
         gs.push_sequence(start_game_sequence());
         gs.run_until_prompt();
         gs
     }
+
+    /// The GameStart (i:0) state hash — the fresh game before any roll. (Parity log anchor.)
+    pub fn initial_state_hash(&self) -> &str { &self.initial_hash }
 
     pub fn push_sequence(&mut self, seq: Vec<StepEntry>) { self.stack.push_sequence(seq); }
 
