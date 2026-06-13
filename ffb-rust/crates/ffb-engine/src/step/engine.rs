@@ -114,6 +114,11 @@ pub enum Step {
     KickoffScatterRoll,
     /// Roll the 2d6 kickoff-event table; publish the result. (Java `StepKickoffResultRoll`.)
     KickoffResultRoll,
+    /// Apply the rolled kickoff event (consumes the published `KickoffResult`). (Java
+    /// `StepApplyKickoffResult`.) Cheering Fans ported; other results guarded.
+    ApplyKickoffResult { result: Option<KickoffResult> },
+    /// Bounce (or catch) the ball where it landed. (Java `StepCatchScatterThrowIn`.)
+    CatchScatterThrowIn,
 }
 
 impl Step {
@@ -129,6 +134,8 @@ impl Step {
             Step::Kickoff => StepId::Kickoff,
             Step::KickoffScatterRoll => StepId::KickoffScatterRoll,
             Step::KickoffResultRoll => StepId::KickoffResultRoll,
+            Step::ApplyKickoffResult { .. } => StepId::ApplyKickoffResult,
+            Step::CatchScatterThrowIn => StepId::CatchScatterThrowIn,
         }
     }
 
@@ -232,6 +239,37 @@ impl Step {
                 }
                 out
             }
+            // Java StepApplyKickoffResult: dispatch on the published KickoffResult (captured via
+            // set_parameter). Cheering Fans rolls d6 home then d6 away; other results are guarded
+            // until a seed exercises them.
+            Step::ApplyKickoffResult { result } => {
+                match result {
+                    Some(KickoffResult::CheeringFans) => {
+                        // Java handleCheeringFans: d6 home, then d6 away (+FAME/cheerleaders);
+                        // higher total grants a reroll. The reroll AWARD is deferred to the
+                        // hash-matching pass; the two dice are consumed here in order.
+                        let _home = rng.d6();
+                        let _away = rng.d6();
+                        StepOutcome::next()
+                    }
+                    Some(other) => unimplemented!(
+                        "kickoff result {other:?} not yet ported — add when a seed rolls it"),
+                    None => StepOutcome::next(),
+                }
+            }
+            // Java StepCatchScatterThrowIn: the ball landed; if its square is empty it bounces
+            // (d8 one square). A catch (player present) / throw-in (off-pitch) are deferred.
+            Step::CatchScatterThrowIn => {
+                if let Some(ball) = game.field_model.ball_coordinate {
+                    if game.field_model.player_at(ball).is_none() {
+                        let dir_roll = rng.d8();
+                        let dir = Direction::for_roll(dir_roll).expect("d8 roll is 1..=8");
+                        let (x, y) = scatter_coordinate(ball.x, ball.y, dir, 1);
+                        game.field_model.ball_coordinate = Some(FieldCoordinate::new(x, y));
+                    }
+                }
+                StepOutcome::next()
+            }
         }
     }
 
@@ -266,8 +304,15 @@ impl Step {
     /// Return `true` to consume it (stops propagation). Java `AbstractStep.setParameter`.
     /// Plumbing in place; the first consumers land with the Phase D steps that read params
     /// (e.g. MoveStack, EndTurn) — pregame steps consume nothing.
-    fn set_parameter(&mut self, _param: &StepParameter) -> bool {
-        false
+    fn set_parameter(&mut self, param: &StepParameter) -> bool {
+        match (self, param) {
+            // StepKickoffResultRoll publishes the rolled event down to StepApplyKickoffResult.
+            (Step::ApplyKickoffResult { result }, StepParameter::KickoffResult(r)) => {
+                *result = Some(*r);
+                true
+            }
+            _ => false,
+        }
     }
 }
 
@@ -566,7 +611,9 @@ pub fn start_game_sequence() -> Vec<StepEntry> {
         StepEntry::new(Step::Kickoff),
         StepEntry::new(Step::KickoffScatterRoll),
         StepEntry::new(Step::KickoffResultRoll),
-        // TODO(next): ApplyKickoffResult, CatchScatterThrowIn(bounce), EndKickoff, InitSelecting.
+        StepEntry::new(Step::ApplyKickoffResult { result: None }),
+        StepEntry::new(Step::CatchScatterThrowIn),
+        // TODO(next): EndKickoff, InitSelecting → first ActivatePlayer; then the agent + hash.
     ]
 }
 
@@ -736,10 +783,11 @@ mod tests {
         assert_eq!(gs.game.home_first_offense, home_receives);
         assert_eq!(gs.game.home_playing, !home_receives, "kicker kicks (set up first; two Setup flips net to kicker)");
         assert!(gs.events.iter().any(|e| matches!(e, GameEvent::ReceiveChoice { receive, .. } if *receive == home_receives)));
-        // Receive (0 dice) + InitKickoff/Setup×2/Kickoff (0 dice) + scatter d8,d6 + result d6,d6.
-        assert_eq!(gs.rng.call_count, 9, "coin d2 + scatter d8,d6 + result d6,d6 = 5+4");
+        // coin d2 (5) + scatter d8,d6 (6-7) + result d6,d6 (8-9) + Cheering Fans d6,d6 (10-11)
+        // + ball bounce d8 (12) = 12 game dice. (Seed 1's 2d6=6 → Cheering Fans.)
+        assert_eq!(gs.rng.call_count, 12, "pregame+coin + full opening kickoff dice = 12");
         assert!(gs.events.iter().any(|e| matches!(e, GameEvent::KickoffScatter { .. })));
-        assert!(gs.events.iter().any(|e| matches!(e, GameEvent::KickoffResultEvent { .. })));
-        assert!(gs.current_prompt().is_none(), "stack drains after result roll (apply/bounce TODO)");
+        assert!(gs.events.iter().any(|e| matches!(e, GameEvent::KickoffResultEvent { result } if *result == KickoffResult::CheeringFans)));
+        assert!(gs.current_prompt().is_none(), "stack drains after bounce (EndKickoff/InitSelecting TODO)");
     }
 }

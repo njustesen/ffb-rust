@@ -117,8 +117,9 @@ mod tests {
         assert!(matches!(actions[1], Action::ReceiveChoice { receive } if receive == exp_receive));
         assert!(gs.current_prompt().is_none(), "loop drove the engine to idle");
         // The agent's decision RNG must not touch the game dice: the game dice are the pregame
-        // (d3,d3,d6,d6 + coin d2) plus the opening kickoff (scatter d8,d6 + result d6,d6) = 9.
-        assert_eq!(gs.rng.call_count, 9, "agent decision RNG never perturbs the game-dice stream");
+        // (d3,d3,d6,d6 + coin d2) plus the opening kickoff (scatter d8,d6 + result d6,d6 +
+        // Cheering Fans d6,d6 + bounce d8) = 12.
+        assert_eq!(gs.rng.call_count, 12, "agent decision RNG never perturbs the game-dice stream");
     }
 
     #[test]
