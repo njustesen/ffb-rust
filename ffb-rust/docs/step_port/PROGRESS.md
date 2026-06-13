@@ -17,19 +17,34 @@
   TESTING, INVARIANTS, 30_skills (stub), PROGRESS. DONE.
 - [ ] **Phase B — commit + tag `pre-step-rewrite` + remove monolith** (gut `engine/mod.rs`
   apply/pending_*/inline helpers; keep crate compiling against new `step/`). NOT STARTED.
-- [~] **Phase C — step framework** (`step/`). IN PROGRESS.
+- [x] **Phase C — step framework** (`step/`). DONE — the framework MECHANISM is complete and
+  exercised end-to-end through the pregame; rule-step CONTENT (kickoff→activation) is Phase D.
   - [x] slice 1 (commit 3505560): framework primitives; `Step` enum + match dispatch;
     `StepStack` (Vec, push_sequence reverse, goto_label); `GameState` driver loop (start-mode
     NextStep chain + goto); StartGame pregame steps InitStartGame/Spectators/Weather ported 1:1
-    with a characterization test pinning d3,d3,d6,d6 order. 888 ffb-engine tests green.
-  - [ ] slice 2: command handling (`handle_command` + StepCommandStatus), the
-    Action/AgentResponse↔ClientCommand boundary + AgentPrompt emission; CoinChoice/ReceiveChoice
-    steps (the first prompts). StepParameter publish/consume-down-stack.
-  - [ ] slice 3: Kickoff/Setup sequence to the first INIT_SELECTING (ActivatePlayer) prompt =
-    the Phase C gate.
+    with a characterization test pinning d3,d3,d6,d6 order.
+  - [x] slice 2 (commit d9cf5f8): command-mode driver (`apply`→waiting step's `handle_command`,
+    forwardCommand/goto/repeat), AgentPrompt emission + Action boundary (`current_prompt`/`apply`/
+    `take_events`), StepParameter publish/consume-down-stack plumbing (`StepStack::publish`,
+    `Step::set_parameter`). Ported CoinChoice (flip = 1× d2) + ReceiveChoice 1:1. 890 tests green.
+  - GATE REFINED (transparent): the former "slice 3 → first ActivatePlayer prompt" requires
+    Setup placement + kickoff scatter(d8+d6) + result(2d6, 11 handlers) + catch/touchback — all
+    dice-bearing RULE steps that must be parity-validated vs Java seeds. That is Phase D scope,
+    not framework. Building them here (before the harness is wired to the new engine) would be
+    unvalidated rule code. So Phase C ends at the framework boundary; the kickoff→activation
+    chain is Phase D's opening batch.
 - [ ] **Phase D — BB2025 skill-less lineman steps** (~8 generators + ~50 steps, 0 behaviours).
   Gate: `--tier 3 lineman --seeds 1-100` = 100/100 + coverage checklist green; `--tier 2`
   lineman = 100/100. (This is the milestone the monolith reached only at 4/100.)
+  - START HERE: (a) wire `GameState`'s `current_prompt`/`apply`/`take_events` + a per-activation
+    `state_hash` into the parity harness's run loop (replaces the monolith's `run_game`), with
+    full lineman team fixtures (11 players). Validate the agent RNG contract vs AGENT_CONTRACT.md
+    on the pregame coin/receive FIRST (decisionRng channel) before adding rule steps.
+  - then the kickoff→activation batch (the former Phase C "slice 3"): StartHalf/PettyCash/Prayers
+    tail of ReceiveChoice, StepSetup (canonical placement), Kickoff generator (KickBall prompt →
+    KickoffScatterRoll d8+d6 → KickoffResultRoll 2d6 → ApplyKickoffResult → catch/touchback →
+    EndKickoff), InitSelecting → first ActivatePlayer. Each per `20_steps/` with its
+    characterization test + seed parity, ticking its checkbox.
 - [ ] **Phase E — full BB2025** (remaining steps + ~40 skill behaviours per `30_skills.md`).
   Gate: 26 races ×100 tier-3 = 100/100 + restored T2 26×100.
 - [ ] **Phase F — editions** (BB2020/BB2016 overrides). Optional.
