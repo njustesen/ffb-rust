@@ -36,10 +36,16 @@
 - [ ] **Phase D — BB2025 skill-less lineman steps** (~8 generators + ~50 steps, 0 behaviours).
   Gate: `--tier 3 lineman --seeds 1-100` = 100/100 + coverage checklist green; `--tier 2`
   lineman = 100/100. (This is the milestone the monolith reached only at 4/100.)
-  - START HERE: (a) wire `GameState`'s `current_prompt`/`apply`/`take_events` + a per-activation
-    `state_hash` into the parity harness's run loop (replaces the monolith's `run_game`), with
-    full lineman team fixtures (11 players). Validate the agent RNG contract vs AGENT_CONTRACT.md
-    on the pregame coin/receive FIRST (decisionRng channel) before adding rule steps.
+  - START HERE: (a) point the KEPT parity harness run loop (`ffb-parity/src/runner.rs`:
+    comparator/log/coverage are reused) at the new `GameState` in place of the deleted monolith
+    `GameEngine`. The harness loop is `engine.current_prompt()` → agent → `engine.apply(...)`;
+    `GameState` already exposes `current_prompt`/`apply`/`take_events` + per-activation
+    `state_hash`. NOTE the signature gap: monolith `apply(side, action)` takes a side; the new
+    `GameState::apply(action)` infers the acting side from game state — reconcile this when
+    wiring. Use full lineman team fixtures (11 players). Validate the agent RNG contract vs
+    AGENT_CONTRACT.md on the pregame coin/receive FIRST (decisionRng channel) before rule steps.
+    (`run_game` in ffb-engine/agent/mod.rs is monolith-only test glue and dies with the monolith;
+    it is NOT what the harness uses.)
   - then the kickoff→activation batch (the former Phase C "slice 3"): StartHalf/PettyCash/Prayers
     tail of ReceiveChoice, StepSetup (canonical placement), Kickoff generator (KickBall prompt →
     KickoffScatterRoll d8+d6 → KickoffResultRoll 2d6 → ApplyKickoffResult → catch/touchback →
