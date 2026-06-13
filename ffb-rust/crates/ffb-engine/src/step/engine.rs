@@ -185,17 +185,10 @@ impl Step {
                 game.home_playing = !game.home_playing;
                 StepOutcome::next()
             }
-            // Java StepKickoff: latch the kick target and place the ball. The kicking team
-            // (current `home_playing` after the two setups) kicks into the receiving half.
-            // NOTE: provisional canonical target — the agent `KickBall` command replaces this
-            // when chasing the state hash; the scatter dice below are independent of the target.
-            Step::Kickoff => {
-                let kicker_home = game.home_playing;
-                // Receiving half is the opponent's: away half (x≥13) if home kicks, else home half.
-                let target = if kicker_home { FieldCoordinate::new(21, 9) } else { FieldCoordinate::new(4, 9) };
-                game.field_model.ball_coordinate = Some(target);
-                StepOutcome::next()
-            }
+            // Java StepKickoff: the kicking coach picks the target square (KickBall command,
+            // 2 decisionRng draws — must consume them to keep the agent RNG synced with Java).
+            // The ball is placed in handle_command.
+            Step::Kickoff => StepOutcome::cont().with_prompt(AgentPrompt::KickBall),
             // Java StepKickoffScatterRoll: scatter the kicked ball. Dice IN ORDER: d8 direction,
             // then d6 distance. Walk the landing back toward the start until on-pitch (Java's
             // findScatterCoordinate `lastValid` back-walk); a never-on-pitch scatter = touchback.
@@ -293,6 +286,12 @@ impl Step {
                 game.home_playing = !home_receives;
                 let team_id = if home_receives { game.team_home.id.clone() } else { game.team_away.id.clone() };
                 StepOutcome::next().with_event(GameEvent::ReceiveChoice { team_id, receive: home_receives })
+            }
+            // Java StepKickoff handleCommand(ClientCommandKickoff): place the ball on the chosen
+            // target square (the kicking coach's pick), then proceed to the scatter.
+            (Step::Kickoff, Action::KickBall { coord }) => {
+                game.field_model.ball_coordinate = Some(*coord);
+                StepOutcome::next()
             }
             // A command the current step does not recognise (Java StepCommandStatus::UNHANDLED):
             // stay put and keep waiting. (The harness never sends one in the parity path.)
@@ -783,9 +782,16 @@ mod tests {
         assert_eq!(gs.game.home_first_offense, home_receives);
         assert_eq!(gs.game.home_playing, !home_receives, "kicker kicks (set up first; two Setup flips net to kicker)");
         assert!(gs.events.iter().any(|e| matches!(e, GameEvent::ReceiveChoice { receive, .. } if *receive == home_receives)));
-        // coin d2 (5) + scatter d8,d6 (6-7) + result d6,d6 (8-9) + Cheering Fans d6,d6 (10-11)
-        // + ball bounce d8 (12) = 12 game dice. (Seed 1's 2d6=6 → Cheering Fans.)
-        assert_eq!(gs.rng.call_count, 12, "pregame+coin + full opening kickoff dice = 12");
+        // After receive the engine runs InitKickoff/Setup×2/Kickoff and waits at KickBall (the
+        // kicking coach's target pick) — still only the coin die rolled so far.
+        assert_eq!(gs.rng.call_count, 5, "no kickoff game dice until the ball is kicked");
+        assert!(matches!(gs.current_prompt(), Some(AgentPrompt::KickBall)));
+
+        // Kick the ball; the engine then drives scatter d8,d6 (6-7) + result d6,d6 (8-9) +
+        // Cheering Fans d6,d6 (10-11) + ball bounce d8 (12) = 12 total. (Seed 1: 2d6=6 → Cheering.)
+        let target = if gs.game.home_playing { FieldCoordinate::new(21, 9) } else { FieldCoordinate::new(4, 9) };
+        gs.apply_action(Action::KickBall { coord: target });
+        assert_eq!(gs.rng.call_count, 12, "full opening kickoff dice after the kick");
         assert!(gs.events.iter().any(|e| matches!(e, GameEvent::KickoffScatter { .. })));
         assert!(gs.events.iter().any(|e| matches!(e, GameEvent::KickoffResultEvent { result } if *result == KickoffResult::CheeringFans)));
         assert!(gs.current_prompt().is_none(), "stack drains after bounce (EndKickoff/InitSelecting TODO)");

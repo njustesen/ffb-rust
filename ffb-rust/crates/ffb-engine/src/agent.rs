@@ -14,6 +14,7 @@
 use rand_xoshiro::Xoshiro256StarStar;
 use rand_core::{RngCore, SeedableRng};
 use ffb_model::prompts::AgentPrompt;
+use ffb_model::types::FieldCoordinate;
 
 use crate::action::Action;
 use crate::step::GameState;
@@ -78,6 +79,15 @@ impl Agent for RandomAgent {
             // Pregame decisions both draw the decision RNG once (AGENT_CONTRACT.md §2).
             Some(AgentPrompt::CoinChoice { .. }) => Action::CoinChoice { heads: self.pick_bool() },
             Some(AgentPrompt::ReceiveChoice { .. }) => Action::ReceiveChoice { receive: self.pick_bool() },
+            // Java parity: the kicking coach picks a target in the opponent's half — two
+            // decisionRng draws (x then y), x offset into the receiving half. 1:1 with the
+            // monolith's KickBall handler so the decisionRng stream stays synced with Java.
+            Some(AgentPrompt::KickBall) => {
+                let x_raw = (self.decision_rng.next_u64() % 13) as i32;
+                let y_raw = (self.decision_rng.next_u64() % 13) as i32;
+                let x = if gs.game.home_playing { x_raw + 13 } else { x_raw };
+                Action::KickBall { coord: FieldCoordinate::new(x, y_raw + 1) }
+            }
             // Each remaining prompt is wired as its producing step lands in Phase D; the loud
             // failure here names exactly which handler is still missing.
             other => panic!("RandomAgent::act: no handler yet for prompt {other:?}"),
@@ -112,9 +122,10 @@ mod tests {
             gs.apply_action(a);
         }
 
-        assert_eq!(actions.len(), 2, "pregame asks exactly coin then receive");
+        assert_eq!(actions.len(), 3, "pregame asks coin, receive, then KickBall");
         assert!(matches!(actions[0], Action::CoinChoice { heads } if heads == exp_heads));
         assert!(matches!(actions[1], Action::ReceiveChoice { receive } if receive == exp_receive));
+        assert!(matches!(actions[2], Action::KickBall { .. }));
         assert!(gs.current_prompt().is_none(), "loop drove the engine to idle");
         // The agent's decision RNG must not touch the game dice: the game dice are the pregame
         // (d3,d3,d6,d6 + coin d2) plus the opening kickoff (scatter d8,d6 + result d6,d6 +
