@@ -2,16 +2,16 @@
 
 | Item | Count | Status | Note |
 |---|---:|---|---|
-| action Move | 249 | ok |  |
+| action Move | 0 | **MISSING** |  |
 | action StandUp | 0 | **MISSING** | prone player stands (mapped from Move choice) |
-| action Block | 4 | ok |  |
-| action Blitz | 9 | ok |  |
+| action Block | 0 | **MISSING** |  |
+| action Blitz | 0 | **MISSING** |  |
 | action StandUpBlitz | 0 | **MISSING** | prone + adjacent + blitz available |
-| action Foul | 2 | ok |  |
+| action Foul | 0 | **MISSING** |  |
 | action Pass | 0 | **MISSING** | needs a ball carrier |
 | action HandOver | 0 | **MISSING** | needs carrier + adjacent teammate |
-| dodge success | 9 | ok |  |
-| dodge failure | 2 | ok |  |
+| dodge success | 0 | **MISSING** |  |
+| dodge failure | 0 | **MISSING** |  |
 | GFI rolls | 0 | **MISSING** |  |
 | pickup success | 0 | **MISSING** |  |
 | pickup failure | 0 | **MISSING** | turnover + scatter |
@@ -22,24 +22,24 @@
 | pass rolls | 0 | **MISSING** |  |
 | pass deviates | 0 | absent (optional) | wildly inaccurate passes only |
 | interceptions | 0 | absent (optional) | contract: agents decline voluntary interference |
-| block 1 die | 11 | ok |  |
-| block 2 dice | 2 | ok |  |
+| block 1 die | 0 | **MISSING** |  |
+| block 2 dice | 0 | **MISSING** |  |
 | block 2 dice against | 0 | **MISSING** | defender's choice |
 | block 3 dice | 0 | absent (optional) | needs ST5+ differential via assists |
-| block result Skull | 5 | ok |  |
-| block result BothDown | 5 | ok |  |
-| block result Pushback | 3 | ok |  |
+| block result Skull | 0 | **MISSING** |  |
+| block result BothDown | 0 | **MISSING** |  |
+| block result Pushback | 0 | **MISSING** |  |
 | block result PowPushback | 0 | **MISSING** |  |
 | block result Pow | 0 | **MISSING** |  |
-| pushbacks | 3 | ok |  |
+| pushbacks | 0 | **MISSING** |  |
 | crowd surfs | 0 | absent (optional) | push off pitch — board-position dependent |
-| players fell | 17 | ok |  |
-| armor held | 15 | ok |  |
-| stunned | 3 | ok | injury 2-7 |
+| players fell | 0 | **MISSING** |  |
+| armor held | 0 | **MISSING** |  |
+| stunned | 0 | **MISSING** | injury 2-7 |
 | KO | 0 | **MISSING** |  |
-| casualty (d16) | 1 | ok |  |
+| casualty (d16) | 0 | **MISSING** |  |
 | death | 0 | absent (optional) | d16 = 15-16 only |
-| fouls | 2 | ok |  |
+| fouls | 0 | **MISSING** |  |
 | argue the call | 0 | **MISSING** | referee spotted a foul (doubles) |
 | argue success | 0 | absent (optional) | d6 = 6 only |
 | players ejected | 0 | **MISSING** |  |
@@ -50,7 +50,8 @@
 
 ## Kickoff results
 
-- Cheering Fans: 2
+- Cheering Fans: 1
+- Time-out: 1
 
 ## Hash-verified (not evented)
 

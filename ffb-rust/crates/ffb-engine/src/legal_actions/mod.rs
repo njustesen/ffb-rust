@@ -1,3 +1,4 @@
+use std::collections::{HashSet, VecDeque};
 use ffb_model::model::game::Game;
 use ffb_model::model::player::PlayerId;
 use ffb_model::types::FieldCoordinate;
@@ -29,12 +30,18 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
         TeamSide::Away => &game.turn_data_away,
     };
 
+    let acted = match side {
+        TeamSide::Home => &game.turn_data_home.acted_player_ids,
+        TeamSide::Away => &game.turn_data_away.acted_player_ids,
+    };
     let ball_coord = game.field_model.ball_coordinate;
 
     let mut actions = Vec::new();
 
     for player in &team.players {
         let pid = player.id.clone();
+        if acted.contains(&pid) { continue; } // already activated this turn
+
         let coord = game.field_model.player_coordinate(&pid);
         let state = game.field_model.player_state(&pid);
 
@@ -59,6 +66,7 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             actions.push(Action::ActivatePlayer {
                 player_id: pid.clone(),
                 player_action: PlayerActionChoice::StandUp,
+                block_defender_id: None,
             });
             if !turn_data.blitz_used {
                 let adj_opponent = opponent_team.players.iter().any(|op| {
@@ -73,6 +81,7 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
                     actions.push(Action::ActivatePlayer {
                         player_id: pid.clone(),
                         player_action: PlayerActionChoice::StandUpBlitz,
+                        block_defender_id: None,
                     });
                 }
             }
@@ -83,6 +92,7 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
         actions.push(Action::ActivatePlayer {
             player_id: pid.clone(),
             player_action: PlayerActionChoice::Move,
+            block_defender_id: None,
         });
 
         // Block / Blitz: require adjacent standing opponent; Block + Blitz both use blitz slot
@@ -99,15 +109,18 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
                 actions.push(Action::ActivatePlayer {
                     player_id: pid.clone(),
                     player_action: PlayerActionChoice::Block,
+                    block_defender_id: None,
                 });
                 actions.push(Action::ActivatePlayer {
                     player_id: pid.clone(),
                     player_action: PlayerActionChoice::Blitz,
+                    block_defender_id: None,
                 });
             } else {
                 actions.push(Action::ActivatePlayer {
                     player_id: pid.clone(),
                     player_action: PlayerActionChoice::Blitz,
+                    block_defender_id: None,
                 });
             }
         }
@@ -119,6 +132,7 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             actions.push(Action::ActivatePlayer {
                 player_id: pid.clone(),
                 player_action: PlayerActionChoice::Pass,
+                block_defender_id: None,
             });
         }
 
@@ -134,6 +148,7 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
                 actions.push(Action::ActivatePlayer {
                     player_id: pid.clone(),
                     player_action: PlayerActionChoice::HandOff,
+                    block_defender_id: None,
                 });
             }
         }
@@ -152,6 +167,7 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
                 actions.push(Action::ActivatePlayer {
                     player_id: pid.clone(),
                     player_action: PlayerActionChoice::Foul,
+                    block_defender_id: None,
                 });
             }
         }
@@ -161,6 +177,7 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             actions.push(Action::ActivatePlayer {
                 player_id: pid.clone(),
                 player_action: PlayerActionChoice::ThrowBomb,
+                block_defender_id: None,
             });
         }
 
@@ -176,6 +193,7 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
                 actions.push(Action::ActivatePlayer {
                     player_id: pid.clone(),
                     player_action: PlayerActionChoice::ThrowTeamMate,
+                    block_defender_id: None,
                 });
             }
         }
@@ -192,6 +210,7 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
                 actions.push(Action::ActivatePlayer {
                     player_id: pid.clone(),
                     player_action: PlayerActionChoice::KickTeamMate,
+                    block_defender_id: None,
                 });
             }
         }
@@ -206,6 +225,7 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             actions.push(Action::ActivatePlayer {
                 player_id: pid.clone(),
                 player_action: PlayerActionChoice::Punt,
+                block_defender_id: None,
             });
         }
 
@@ -220,6 +240,7 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             actions.push(Action::ActivatePlayer {
                 player_id: pid.clone(),
                 player_action: PlayerActionChoice::SecureTheBall,
+                block_defender_id: None,
             });
         }
     }
@@ -227,18 +248,115 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
     actions
 }
 
-/// Returns all squares the active player can legally move to in one step.
-///
-/// Simplified: returns all valid, empty squares adjacent to current position.
+/// Returns all squares the player can legally move to (BFS, within MA moves, empty squares only).
+/// Excludes the player's current square. Sorted by (x, y).
 pub fn legal_move_targets(game: &Game, player_id: &str) -> Vec<FieldCoordinate> {
-    let coord = match game.field_model.player_coordinate(player_id) {
+    let start = match game.field_model.player_coordinate(player_id) {
         Some(c) => c,
         None => return vec![],
     };
-    coord.neighbours()
-        .into_iter()
-        .filter(|c| c.is_on_pitch() && game.field_model.player_at(*c).is_none())
-        .collect()
+    let ma = find_player_ma(game, player_id);
+    bfs_reachable_empty(game, player_id, start, ma)
+}
+
+/// Returns all squares the blitzing player can legally move to for a BLITZ action:
+/// empty squares within MA moves that are adjacent to `defender_id`, plus the player's
+/// current square if it is already adjacent to the defender (0-move BLITZ).
+/// Sorted by (x, y).
+pub fn legal_blitz_move_targets(game: &Game, player_id: &str, defender_id: &str) -> Vec<FieldCoordinate> {
+    let start = match game.field_model.player_coordinate(player_id) {
+        Some(c) => c,
+        None => return vec![],
+    };
+    let def_coord = match game.field_model.player_coordinate(defender_id) {
+        Some(c) => c,
+        None => return vec![],
+    };
+    let ma = find_player_ma(game, player_id);
+    let reachable = bfs_reachable_empty(game, player_id, start, ma);
+
+    let mut targets: Vec<FieldCoordinate> = reachable.into_iter()
+        .filter(|c| c.is_adjacent(def_coord))
+        .collect();
+
+    // Include current position if already adjacent to defender (0-move BLITZ)
+    if start.is_adjacent(def_coord) && !targets.contains(&start) {
+        targets.push(start);
+    }
+
+    targets.sort_by_key(|c| (c.x, c.y));
+    targets
+}
+
+/// BFS from `start` over empty squares (excluding `player_id`'s own square if it would
+/// block a revisit). Returns up to `ma` moves deep, sorted by (x, y).
+fn bfs_reachable_empty(game: &Game, player_id: &str, start: FieldCoordinate, ma: i32) -> Vec<FieldCoordinate> {
+    let mut visited: HashSet<FieldCoordinate> = HashSet::new();
+    let mut queue: VecDeque<(FieldCoordinate, i32)> = VecDeque::new();
+    let mut result: Vec<FieldCoordinate> = Vec::new();
+
+    visited.insert(start);
+    queue.push_back((start, 0));
+
+    while let Some((coord, dist)) = queue.pop_front() {
+        for n in coord.neighbours() {
+            if !n.is_on_pitch() { continue; }
+            if visited.contains(&n) { continue; }
+            // Occupied by any player (including the mover's own square is already visited)
+            if let Some(occ) = game.field_model.player_at(n) {
+                if occ != player_id {
+                    visited.insert(n); // blocked, don't revisit
+                    continue;
+                }
+            }
+            visited.insert(n);
+            result.push(n);
+            if dist + 1 < ma {
+                queue.push_back((n, dist + 1));
+            }
+        }
+    }
+
+    result.sort_by_key(|c| (c.x, c.y));
+    result
+}
+
+/// Compute the shortest path from `src` to `dest` for `player_id` using BFS.
+/// Returns each square visited, excluding `src`, including `dest`.
+/// Returns an empty vec if `dest` is unreachable.
+pub fn bfs_path(game: &Game, player_id: &str, src: FieldCoordinate, dest: FieldCoordinate) -> Vec<FieldCoordinate> {
+    if src == dest { return vec![]; }
+    let mut visited: HashSet<FieldCoordinate> = HashSet::new();
+    let mut queue: VecDeque<(FieldCoordinate, Vec<FieldCoordinate>)> = VecDeque::new();
+    visited.insert(src);
+    queue.push_back((src, vec![]));
+    while let Some((coord, path)) = queue.pop_front() {
+        // Sort neighbours by (x, y) ascending so BFS path ties break the same way as Java's
+        // smallest-coordinate-first traversal — without this, neighbour enum order gives a
+        // different path than Java (SW before W), shifting dodge-roll positions.
+        let mut ns: Vec<FieldCoordinate> = coord.neighbours().into_iter()
+            .filter(|n| n.is_on_pitch() && !visited.contains(n))
+            .collect();
+        ns.sort_by_key(|n| (n.x, n.y));
+        for n in ns {
+            let occupied = game.field_model.player_at(n).map(|occ| occ != player_id).unwrap_or(false);
+            if occupied && n != dest { visited.insert(n); continue; }
+            visited.insert(n);
+            let mut new_path = path.clone();
+            new_path.push(n);
+            if n == dest { return new_path; }
+            queue.push_back((n, new_path));
+        }
+    }
+    vec![]
+}
+
+fn find_player_ma(game: &Game, player_id: &str) -> i32 {
+    game.team_home.players.iter()
+        .chain(game.team_away.players.iter())
+        .find(|p| p.id == player_id)
+        .map(|p| p.movement_with_modifiers())
+        .unwrap_or(6)
 }
 
 /// Returns all opponent players adjacent to the given player (valid block targets).

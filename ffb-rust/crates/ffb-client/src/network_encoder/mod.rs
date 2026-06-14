@@ -33,7 +33,7 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
             Some(ClientCommand::ClientTouchback(ClientTouchback { player_id }))
         }
 
-        Action::ActivatePlayer { player_id, player_action } => {
+        Action::ActivatePlayer { player_id, player_action, .. } => {
             let action = choice_to_player_action(player_action);
             Some(ClientCommand::ClientActingPlayer(ClientActingPlayer {
                 player_id,
@@ -299,6 +299,7 @@ mod tests {
         if let ClientCommand::ClientActingPlayer(a) = enc(Action::ActivatePlayer {
             player_id: "p1".into(),
             player_action: PlayerActionChoice::Move,
+            block_defender_id: None,
         }) {
             assert_eq!(a.player_id, "p1");
             assert_eq!(a.player_action, ffb_model::enums::PlayerAction::Move);

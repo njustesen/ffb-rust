@@ -20,14 +20,26 @@ use ffb_model::enums::{GameStatus, Weather};
 use ffb_model::prompts::AgentPrompt;
 
 use ffb_model::model::team::Team;
-use ffb_model::enums::{Rules, Direction, KickoffResult, PlayerState, PS_STANDING, PS_RESERVE};
+use ffb_model::enums::{
+    Rules, Direction, KickoffResult, PlayerState, PlayerAction,
+    PS_STANDING, PS_RESERVE, PS_PRONE, PS_STUNNED,
+    PS_KNOCKED_OUT, PS_BADLY_HURT, PS_SERIOUS_INJURY, PS_RIP,
+    PS_EXHAUSTED,
+    BlockResult,
+};
 use ffb_model::types::{FieldCoordinate, FIELD_WIDTH, FIELD_HEIGHT};
 use ffb_model::kickoff::{kickoff_event_bb2025, KickoffEventKind};
 use ffb_model::util::state_hash::state_hash;
-use ffb_mechanics::mechanics::scatter_coordinate;
+use ffb_mechanics::mechanics::{
+    scatter_coordinate,
+    block_result_for_roll, block_dice_count,
+    armor_broken, injury_result, InjuryOutcome, casualty_tier_bb2025, CasualtyTier,
+    minimum_roll_dodge,
+};
+use ffb_mechanics::modifiers::DODGE_TACKLE_ZONE;
 
 use crate::action::{Action, PlayerActionChoice};
-use crate::legal_actions::{legal_activate_player_actions, TeamSide};
+use crate::legal_actions::{legal_activate_player_actions, legal_move_targets, legal_blitz_move_targets, legal_block_targets, bfs_path, TeamSide};
 use super::framework::{StepAction, StepId, StepParameter};
 
 /// Place a team's available (RESERVE / unset) players in the canonical parity formation —
@@ -62,6 +74,37 @@ fn place_team_canonical(game: &mut Game, home: bool) {
         let coord = if home { FieldCoordinate::new(ox, oy) } else { FieldCoordinate::new(25 - ox, oy) };
         game.field_model.set_player_coordinate(pid, coord);
         game.field_model.set_player_state(pid, PlayerState::new(PS_STANDING));
+    }
+}
+
+/// Java StepEndTurn.getFaintingCount: when weather is SWELTERING_HEAT and fNewHalf/fTouchdown,
+/// roll d3 → faintingCount, then for each team pick that many random on-pitch players via
+/// die(count), set them EXHAUSTED and remove from field. Consumes 1 + 2*faintingCount dice.
+fn roll_sweltering_heat_fainting(game: &mut Game, rng: &mut GameRng) {
+    let fainting_count = rng.d3() as usize;
+    for is_home in [true, false] {
+        let team_ids: Vec<(String, i32)> = if is_home {
+            game.team_home.players.iter().map(|p| (p.id.clone(), p.nr)).collect()
+        } else {
+            game.team_away.players.iter().map(|p| (p.id.clone(), p.nr)).collect()
+        };
+        let mut on_field: Vec<String> = {
+            let mut ps: Vec<(String, i32)> = team_ids.into_iter()
+                .filter(|(id, _)| game.field_model.player_coordinate(id)
+                    .map(|c| c.is_on_pitch())
+                    .unwrap_or(false))
+                .collect();
+            ps.sort_by_key(|&(_, nr)| nr);
+            ps.into_iter().map(|(id, _)| id).collect()
+        };
+        let mut i = 0;
+        while i < fainting_count && !on_field.is_empty() {
+            let idx = (rng.die(on_field.len() as u32) - 1) as usize;
+            let pid = on_field.remove(idx);
+            game.field_model.remove_player(&pid);
+            game.field_model.set_player_state(&pid, PlayerState::new(PS_EXHAUSTED));
+            i += 1;
+        }
     }
 }
 
@@ -116,9 +159,14 @@ pub enum Step {
     KickoffResultRoll,
     /// Apply the rolled kickoff event (consumes the published `KickoffResult`). (Java
     /// `StepApplyKickoffResult`.) Cheering Fans ported; other results guarded.
-    ApplyKickoffResult { result: Option<KickoffResult> },
-    /// Bounce (or catch) the ball where it landed. (Java `StepCatchScatterThrowIn`.)
-    CatchScatterThrowIn,
+    ApplyKickoffResult { result: Option<KickoffResult>, touchback: bool },
+    /// Bounce the ball where it landed — but only when there is no touchback (Java gates this
+    /// via `StepKickoffAnimation` publishing CATCH_KICKOFF mode only when `!fTouchback`).
+    /// (Java `StepCatchScatterThrowIn` in CATCH_KICKOFF mode.)
+    CatchScatterThrowIn { touchback: bool },
+    /// Give the ball to the receiving team's player nearest to (13,8) when `touchback` is true.
+    /// (Java `StepTouchback`.)
+    Touchback { touchback: bool },
     /// End-of-kickoff bookkeeping: pushes the EndTurn sequence. (Java `StepEndKickoff`.) 0 dice.
     EndKickoff,
     /// Pass-through no-op (lineman activation block and EndTurn prefix steps that have no
@@ -131,9 +179,21 @@ pub enum Step {
     /// Activation gate: emit ActivatePlayer prompt; on command GOTO END_SELECTING.
     /// (Java `StepInitSelecting`.) 0 dice.
     InitSelecting,
-    /// Dispatch hub: consume published action params, push the chosen sequence.
-    /// (Java `StepEndSelecting`.) Stub for the current parity slice: NEXT_STEP only.
+    /// Dispatch hub: read acting_player and push the correct sub-sequence.
+    /// (Java `StepEndSelecting`.) EndTurn when player_id is None.
     EndSelecting,
+    /// Movement gate: emit Move prompt for the active player; on command teleport.
+    /// (Java `StepInitMoving`.) For BLITZ: targets filtered to squares adjacent to defender.
+    InitMoving,
+    /// Post-movement stub; currently a no-op for skill-less lineman.
+    /// (Java `StepEndMoving`.)
+    EndMoving,
+    /// Roll block dice, apply the result, execute armor/injury/casualty chain.
+    /// (Java `StepDoBlock`.) Auto-picks best result for multi-die blocks.
+    DoBlock,
+    /// End of a player's activation: record acted_player_id, clear acting_player, re-select.
+    /// (Java `StepEndPlayerAction`.)
+    EndPlayerAction,
 }
 
 impl Step {
@@ -150,12 +210,17 @@ impl Step {
             Step::KickoffScatterRoll => StepId::KickoffScatterRoll,
             Step::KickoffResultRoll => StepId::KickoffResultRoll,
             Step::ApplyKickoffResult { .. } => StepId::ApplyKickoffResult,
-            Step::CatchScatterThrowIn => StepId::CatchScatterThrowIn,
+            Step::CatchScatterThrowIn { .. } => StepId::CatchScatterThrowIn,
+            Step::Touchback { .. } => StepId::CatchScatterThrowIn,
             Step::EndKickoff => StepId::EndKickoff,
             Step::NoOp => StepId::NoOp,
             Step::EndTurn => StepId::EndTurn,
             Step::InitSelecting => StepId::InitSelecting,
             Step::EndSelecting => StepId::EndSelecting,
+            Step::InitMoving => StepId::InitMoving,
+            Step::EndMoving => StepId::EndMoving,
+            Step::DoBlock => StepId::BlockRoll,
+            Step::EndPlayerAction => StepId::EndPlayerAction,
         }
     }
 
@@ -210,32 +275,58 @@ impl Step {
             // The ball is placed in handle_command.
             Step::Kickoff => StepOutcome::cont().with_prompt(AgentPrompt::KickBall),
             // Java StepKickoffScatterRoll: scatter the kicked ball. Dice IN ORDER: d8 direction,
-            // then d6 distance. Walk the landing back toward the start until on-pitch (Java's
-            // findScatterCoordinate `lastValid` back-walk); a never-on-pitch scatter = touchback.
-            // The ball's current square is the kick target (StepKickoff placed it).
+            // then d6 distance. Java back-walks from the full-distance endpoint decreasing
+            // `distance` until FieldCoordinateBounds.FIELD.isInBounds — equivalent to
+            // is_on_pitch() (FIELD = (0,0)-(25,14)). d=0 (kick start) is always in bounds.
+            // Touchback is determined from the FULL-distance endpoint (not the back-walked
+            // position): if the endpoint is not in the receiving half → touchback.
+            // Receiving half: HALF_AWAY (x 13-25) when home kicks, HALF_HOME (x 0-12) when away.
+            // Java publishes TOUCHBACK and KICKOFF_BOUNDS; we publish StepParameter::Touchback
+            // so ApplyKickoffResult and CatchScatterThrowIn can gate their logic on it.
             Step::KickoffScatterRoll => {
                 let start = game.field_model.ball_coordinate.unwrap_or(FieldCoordinate::new(0, 0));
                 let dir_roll = rng.d8();
                 let direction = Direction::for_roll(dir_roll).expect("d8 roll is 1..=8");
                 let distance = rng.d6();
-                // Back-walk: full distance first, decrement until the square is on-pitch.
-                let mut landing = None;
+                if std::env::var("FFB_KICKOFF_TRACE").is_ok() {
+                    eprintln!("SCATTER_ROLL half={} home_playing={} start=({},{}) dir_roll={} dist={}", game.half, game.home_playing, start.x, start.y, dir_roll, distance);
+                }
+                if std::env::var("FFB_SCATTER_TRACE").is_ok() {
+                    eprintln!("SCATTER half={} start=({},{}) rng_call_count={} dir_roll={} dir={:?} dist={}", game.half, start.x, start.y, rng.call_count, dir_roll, direction, distance);
+                }
+                // Full-distance endpoint for touchback determination.
+                let (ex, ey) = scatter_coordinate(start.x, start.y, direction, distance);
+                let endpoint = FieldCoordinate::new(ex, ey);
+                // Touchback = endpoint NOT in the receiving half.
+                // home_playing = kicker (home kicks), so receiving half is HALF_AWAY (x>=13).
+                let scatter_touchback = if game.home_playing {
+                    !(endpoint.x >= 13 && endpoint.x <= 25 && endpoint.y >= 0 && endpoint.y <= 14)
+                } else {
+                    !(endpoint.x >= 0 && endpoint.x <= 12 && endpoint.y >= 0 && endpoint.y <= 14)
+                };
+                if std::env::var("FFB_KICKOFF_TRACE").is_ok() {
+                    eprintln!("SCATTER_TB half={} endpoint=({},{}) scatter_touchback={}", game.half, endpoint.x, endpoint.y, scatter_touchback);
+                }
+                // Back-walk: start from full distance; decrement until FIELD.isInBounds (= is_on_pitch).
+                // d=0 (the kick start) is always in bounds and serves as the ultimate fallback.
+                let mut landing = start; // fallback: kick start position
                 let mut d = distance;
-                while d > 0 {
+                loop {
                     let (x, y) = scatter_coordinate(start.x, start.y, direction, d);
                     let c = FieldCoordinate::new(x, y);
-                    if x >= 0 && x < FIELD_WIDTH && y >= 0 && y < FIELD_HEIGHT {
-                        landing = Some(c);
+                    if c.is_on_pitch() {
+                        landing = c;
                         break;
                     }
+                    if d == 0 { break; }
                     d -= 1;
                 }
-                // touchback (landing == None) is resolved by the later Touchback step; for now
-                // we only place the ball when it lands on-pitch.
-                if let Some(c) = landing {
-                    game.field_model.ball_coordinate = Some(c);
-                }
+                game.field_model.ball_coordinate = Some(landing);
+                // Java StepKickoffScatterRoll line 153: setBallMoving(true) — needed so CSTIN's
+                // catchBall() condition (isBallInPlay && isBallMoving) fires when player is at ball.
+                game.field_model.ball_moving = true;
                 StepOutcome::next()
+                    .publish(StepParameter::Touchback(scatter_touchback))
                     .with_event(GameEvent::KickoffScatter { start, direction: dir_roll, distance })
             }
             // Java StepKickoffResultRoll: rollKickoff() = 2d6; interpret → KickoffResult; publish it.
@@ -243,6 +334,9 @@ impl Step {
                 let d1 = rng.d6();
                 let d2 = rng.d6();
                 let total = d1 + d2;
+                if std::env::var("FFB_KICKOFF_TRACE").is_ok() {
+                    eprintln!("KICKOFF_RESULT half={} d1={} d2={} total={} result={:?} ball_in_play={}", game.half, d1, d2, total, kickoff_event_bb2025(total), game.field_model.ball_in_play);
+                }
                 let mut out = StepOutcome::next();
                 if let Some(kind) = kickoff_event_bb2025(total) {
                     let result = kickoff_result_from_kind(kind);
@@ -253,9 +347,12 @@ impl Step {
                 out
             }
             // Java StepApplyKickoffResult: dispatch on the published KickoffResult (captured via
-            // set_parameter). Cheering Fans rolls d6 home then d6 away; other results are guarded
-            // until a seed exercises them.
-            Step::ApplyKickoffResult { result } => {
+            // set_parameter). Also receives fTouchback via StepParameter::Touchback.
+            // WeatherChange: gust fires only when !touchback && Nice; checks receiving half bounds.
+            Step::ApplyKickoffResult { result, touchback } => {
+                if std::env::var("FFB_KICKOFF_TRACE").is_ok() {
+                    eprintln!("APPLY_KR half={} result={:?} touchback={}", game.half, result, touchback);
+                }
                 match result {
                     Some(KickoffResult::CheeringFans) => {
                         // Java handleCheeringFans: d6 home, then d6 away (+FAME/cheerleaders);
@@ -263,22 +360,348 @@ impl Step {
                         // hash-matching pass; the two dice are consumed here in order.
                         let _home = rng.d6();
                         let _away = rng.d6();
-                        StepOutcome::next()
+                        StepOutcome::next().publish(StepParameter::Touchback(*touchback))
                     }
-                    Some(other) => unimplemented!(
-                        "kickoff result {other:?} not yet ported — add when a seed rolls it"),
-                    None => StepOutcome::next(),
+                    Some(KickoffResult::WeatherChange) => {
+                        // Java handleWeatherChange: 2d6 for new weather.
+                        // If Nice AND !fTouchback: up to 3× d8 gust (each step checks fKickoffBounds
+                        // = receiving half; goes OOB from that half → fTouchback=true, keep ball, break).
+                        // Java bb2025 StepApplyKickoffResult.handleWeatherChange lines 548-574.
+                        let w1 = rng.d6();
+                        let w2 = rng.d6();
+                        let weather = Weather::for_roll(w1 + w2);
+                        game.weather = weather;
+                        let mut new_touchback = *touchback;
+                        if weather == Weather::Nice && !new_touchback {
+                            let mut last_pos = game.field_model.ball_coordinate
+                                .unwrap_or(FieldCoordinate::new(12, 7));
+                            for _ in 0..3 {
+                                let dir_roll = rng.d8();
+                                let dir = Direction::for_roll(dir_roll).expect("d8 is 1..=8");
+                                let (nx, ny) = scatter_coordinate(last_pos.x, last_pos.y, dir, 1);
+                                let new_pos = FieldCoordinate::new(nx, ny);
+                                // Check if new position is in the receiving half (fKickoffBounds).
+                                // home_playing = kicker: receiving half is HALF_AWAY (x 13-25).
+                                let in_receiving_half = if game.home_playing {
+                                    new_pos.x >= 13 && new_pos.x <= 25 && new_pos.y >= 0 && new_pos.y <= 14
+                                } else {
+                                    new_pos.x >= 0 && new_pos.x <= 12 && new_pos.y >= 0 && new_pos.y <= 14
+                                };
+                                if in_receiving_half {
+                                    game.field_model.ball_coordinate = Some(new_pos);
+                                    last_pos = new_pos;
+                                } else {
+                                    // Gust would leave receiving half: keep ball, set touchback, stop.
+                                    game.field_model.ball_coordinate = Some(last_pos);
+                                    new_touchback = true;
+                                    break;
+                                }
+                            }
+                        }
+                        StepOutcome::next()
+                            .publish(StepParameter::Touchback(new_touchback))
+                            .with_event(GameEvent::WeatherChange { weather })
+                    }
+                    Some(KickoffResult::BrilliantCoaching) => {
+                        // Java handleBrilliantCoaching: d6 home, d6 away; higher gains a reroll.
+                        let _home = rng.d6();
+                        let _away = rng.d6();
+                        StepOutcome::next().publish(StepParameter::Touchback(*touchback))
+                    }
+                    Some(KickoffResult::QuickSnap) => {
+                        // Java handleQuickSnap: rolls d3 to determine extra MA granted.
+                        let _ = rng.d3();
+                        StepOutcome::next().publish(StepParameter::Touchback(*touchback))
+                    }
+                    Some(KickoffResult::Blitz) => {
+                        // Java handleBlitz: rolls d3 (extra MA for kicking team); same pattern as QuickSnap.
+                        let _ = rng.d3();
+                        StepOutcome::next().publish(StepParameter::Touchback(*touchback))
+                    }
+                    Some(KickoffResult::Charge) => {
+                        // Java handleCharge: rolls d3 (extra movement for receiving team).
+                        let _ = rng.d3();
+                        StepOutcome::next().publish(StepParameter::Touchback(*touchback))
+                    }
+                    Some(KickoffResult::GetTheRef) => {
+                        // No dice for GetTheRef (gains 1 reroll).
+                        StepOutcome::next().publish(StepParameter::Touchback(*touchback))
+                    }
+                    Some(KickoffResult::TimeOut) => {
+                        // Java handleTimeout: kickingTeamTurn >= 6 → both lose 1 turn; else gain 1.
+                        // home_playing = kicker at this point in the sequence.
+                        let kicking_turn = if game.home_playing {
+                            game.turn_data_home.turn_nr
+                        } else {
+                            game.turn_data_away.turn_nr
+                        };
+                        let modifier: i32 = if kicking_turn >= 6 { -1 } else { 1 };
+                        game.turn_data_home.turn_nr += modifier;
+                        game.turn_data_away.turn_nr += modifier;
+                        StepOutcome::next().publish(StepParameter::Touchback(*touchback))
+                    }
+                    Some(KickoffResult::Riot) => {
+                        // Java handleRiot: rolls d6; 1-3 = lose a turn, 4-6 = gain a turn.
+                        let roll = rng.d6();
+                        let modifier: i32 = if roll <= 3 { 1 } else { -1 };
+                        game.turn_data_home.turn_nr += modifier;
+                        game.turn_data_away.turn_nr += modifier;
+                        StepOutcome::next().publish(StepParameter::Touchback(*touchback))
+                    }
+                    Some(KickoffResult::PitchInvasion) => {
+                        // Java handlePitchInvasion: d6 home fans, d6 away fans (+ fan factor from
+                        // gameResult; starts at 0 for new games). Then d3 stun count. For each team
+                        // that "lost" the fan roll (lower or equal total), stun up to `stun_count`
+                        // of their standing players — each stun picks a random player via
+                        // rollDice(standing.size()). Teams are compared with <= and >= so ties stun both.
+                        // Java stunPlayers() iterates team.getPlayers() (jersey order).
+                        let roll_home = rng.d6();
+                        let roll_away = rng.d6();
+                        let stun_count = rng.d3();
+                        // Fan factor is 0 at game start, so total = roll.
+                        // home team gets stunned if their fans ≤ away fans.
+                        if roll_home <= roll_away {
+                            let mut standing: Vec<String> = {
+                                let mut ps: Vec<(String, i32)> = game.team_home.players.iter()
+                                    .filter(|p| game.field_model.player_state(&p.id)
+                                        .map(|s| s.base() == PS_STANDING).unwrap_or(false))
+                                    .map(|p| (p.id.clone(), p.nr))
+                                    .collect();
+                                ps.sort_by_key(|&(_, nr)| nr);
+                                ps.into_iter().map(|(id, _)| id).collect()
+                            };
+                            for _ in 0..stun_count {
+                                if standing.is_empty() { break; }
+                                let idx = (rng.die(standing.len() as u32) - 1) as usize;
+                                let pid = standing.remove(idx);
+                                game.field_model.set_player_state(&pid, PlayerState::new(PS_STUNNED));
+                            }
+                        }
+                        // away team gets stunned if their fans ≤ home fans.
+                        if roll_away <= roll_home {
+                            let mut standing: Vec<String> = {
+                                let mut ps: Vec<(String, i32)> = game.team_away.players.iter()
+                                    .filter(|p| game.field_model.player_state(&p.id)
+                                        .map(|s| s.base() == PS_STANDING).unwrap_or(false))
+                                    .map(|p| (p.id.clone(), p.nr))
+                                    .collect();
+                                ps.sort_by_key(|&(_, nr)| nr);
+                                ps.into_iter().map(|(id, _)| id).collect()
+                            };
+                            for _ in 0..stun_count {
+                                if standing.is_empty() { break; }
+                                let idx = (rng.die(standing.len() as u32) - 1) as usize;
+                                let pid = standing.remove(idx);
+                                game.field_model.set_player_state(&pid, PlayerState::new(PS_STUNNED));
+                            }
+                        }
+                        StepOutcome::next().publish(StepParameter::Touchback(*touchback))
+                    }
+                    Some(KickoffResult::SolidDefence) => {
+                        // Java handleSolidDefense: rolls d3 (number of players kicking team may redeploy).
+                        let _ = rng.d3();
+                        StepOutcome::next().publish(StepParameter::Touchback(*touchback))
+                    }
+                    Some(KickoffResult::HighKick) => {
+                        // No dice for HighKick in parity context (receiving player selection only).
+                        StepOutcome::next().publish(StepParameter::Touchback(*touchback))
+                    }
+                    Some(KickoffResult::PerfectDefence) => {
+                        // No dice for PerfectDefence (kicking team repositions, no roll needed).
+                        StepOutcome::next().publish(StepParameter::Touchback(*touchback))
+                    }
+                    Some(KickoffResult::ThrowARock) => {
+                        // Java handleThrowARock: rolls armor/injury vs a random player.
+                        // Full injury chain deferred; consume the two armor dice to stay synced.
+                        let _ = rng.d6();
+                        let _ = rng.d6();
+                        StepOutcome::next().publish(StepParameter::Touchback(*touchback))
+                    }
+                    Some(KickoffResult::DodgySnack) => {
+                        // Java handleDodgySnack: d6 home + d6 away (always). If rollAway >= rollHome,
+                        // pick a random home player via die(count) and roll d6 for effect (1=box).
+                        // If rollHome >= rollAway, pick a random away player via die(count) and roll
+                        // d6 for effect. Both branches fire on a tie. Matches Java's rollDice(6) calls
+                        // and randomPlayer(array) = rollDice(array.length) - 1 index.
+                        let roll_home = rng.d6();
+                        let roll_away = rng.d6();
+                        // Build on-field player lists in jersey order (matches Java team.getPlayers()).
+                        let home_on_field: Vec<String> = {
+                            let mut ps: Vec<(String, i32)> = game.team_home.players.iter()
+                                .filter(|p| game.field_model.player_coordinate(&p.id)
+                                    .map(|c| c.x >= 0 && c.x <= 25 && c.y >= 0 && c.y <= 14)
+                                    .unwrap_or(false))
+                                .map(|p| (p.id.clone(), p.nr))
+                                .collect();
+                            ps.sort_by_key(|&(_, nr)| nr);
+                            ps.into_iter().map(|(id, _)| id).collect()
+                        };
+                        let away_on_field: Vec<String> = {
+                            let mut ps: Vec<(String, i32)> = game.team_away.players.iter()
+                                .filter(|p| game.field_model.player_coordinate(&p.id)
+                                    .map(|c| c.x >= 0 && c.x <= 25 && c.y >= 0 && c.y <= 14)
+                                    .unwrap_or(false))
+                                .map(|p| (p.id.clone(), p.nr))
+                                .collect();
+                            ps.sort_by_key(|&(_, nr)| nr);
+                            ps.into_iter().map(|(id, _)| id).collect()
+                        };
+                        // rollAway >= rollHome → home team's player gets the snack
+                        let player_home_id: Option<String> = if roll_away >= roll_home && !home_on_field.is_empty() {
+                            let idx = (rng.die(home_on_field.len() as u32) - 1) as usize;
+                            Some(home_on_field[idx].clone())
+                        } else {
+                            None
+                        };
+                        // rollHome >= rollAway → away team's player gets the snack
+                        let player_away_id: Option<String> = if roll_home >= roll_away && !away_on_field.is_empty() {
+                            let idx = (rng.die(away_on_field.len() as u32) - 1) as usize;
+                            Some(away_on_field[idx].clone())
+                        } else {
+                            None
+                        };
+                        // insertSteps: roll d6 per selected player; 1 → box (RESERVE + remove from field)
+                        if let Some(ref pid) = player_home_id {
+                            let roll = rng.d6();
+                            if roll == 1 {
+                                game.field_model.set_player_state(pid, PlayerState::new(PS_RESERVE));
+                                game.field_model.remove_player(pid);
+                            }
+                            // else: enhancement marker (-MA/-AV) not tracked in state hash
+                        }
+                        if let Some(ref pid) = player_away_id {
+                            let roll = rng.d6();
+                            if roll == 1 {
+                                game.field_model.set_player_state(pid, PlayerState::new(PS_RESERVE));
+                                game.field_model.remove_player(pid);
+                            }
+                        }
+                        StepOutcome::next().publish(StepParameter::Touchback(*touchback))
+                    }
+                    Some(KickoffResult::OficiousRef) => {
+                        // No dice for OficiousRef in parity context.
+                        StepOutcome::next().publish(StepParameter::Touchback(*touchback))
+                    }
+                    None => StepOutcome::next().publish(StepParameter::Touchback(*touchback)),
                 }
             }
-            // Java StepCatchScatterThrowIn: the ball landed; if its square is empty it bounces
-            // (d8 one square). A catch (player present) / throw-in (off-pitch) are deferred.
-            Step::CatchScatterThrowIn => {
+            // Java StepCatchScatterThrowIn (CATCH_KICKOFF mode): bounce the ball one square if the
+            // landing square is empty (d8 direction). Java's StepKickoffAnimation gates CSTIN via
+            // the CATCH_KICKOFF mode parameter — but KickoffAnimation's fTouchback defaults to
+            // false for all non-WeatherChange events, so CSTIN ALWAYS bounces for non-WC events.
+            //
+            // For WeatherChange: if the gust went OOB (new_touchback=true) or if the initial
+            // scatter was a touchback AND weather was Nice (scatter_touchback=true → WC skips gust
+            // and re-publishes TOUCHBACK(true)), ApplyKickoffResult publishes Touchback(true)
+            // here → touchback=true → skip (matches Java's KickoffAnimation not publishing
+            // CATCH_KICKOFF when it receives TOUCHBACK=true). Ball stays at last valid pos.
+            //
+            // When the bounce goes off-pitch: Java's CSTIN publishes TOUCHBACK(true) (line 424)
+            // so StepTouchback can fire. We do the same via StepOutcome::publish.
+            Step::CatchScatterThrowIn { touchback } => {
+                if *touchback {
+                    // Touchback already set — skip bounce and forward the signal to the Touchback step.
+                    return StepOutcome::next().publish(StepParameter::Touchback(true));
+                }
+                if std::env::var("FFB_KICKOFF_TRACE").is_ok() {
+                    eprintln!("CSTIN_RUN half={} ball={:?} in_play={}", game.half, game.field_model.ball_coordinate, game.field_model.ball_in_play);
+                }
                 if let Some(ball) = game.field_model.ball_coordinate {
-                    if game.field_model.player_at(ball).is_none() {
-                        let dir_roll = rng.d8();
-                        let dir = Direction::for_roll(dir_roll).expect("d8 roll is 1..=8");
-                        let (x, y) = scatter_coordinate(ball.x, ball.y, dir, 1);
-                        game.field_model.ball_coordinate = Some(FieldCoordinate::new(x, y));
+                    if ball.is_on_pitch() {
+                        if let Some(player_id) = game.field_model.player_at(ball).cloned() {
+                            // Java CSTIN CATCH_KICKOFF: catcher found → catchBall() iff isBallInPlay && isBallMoving.
+                            if game.field_model.ball_in_play && game.field_model.ball_moving {
+                                let ps = game.field_model.player_state(&player_id).unwrap_or_default();
+                                if ps.has_tacklezones() {
+                                    // rollSkill() = d6; minimumRollCatch = max(2, 7 - AG)
+                                    let catch_roll = rng.d6();
+                                    let ag = find_player_agility(game, &player_id);
+                                    let min_roll = (7 - ag).max(2);
+                                    if std::env::var("FFB_KICKOFF_TRACE").is_ok() {
+                                        eprintln!("CSTIN_CATCH half={} at=({},{}) roll={} min={}", game.half, ball.x, ball.y, catch_roll, min_roll);
+                                    }
+                                    if catch_roll >= min_roll {
+                                        // Catch success: setBallMoving(false), ball stays.
+                                        game.field_model.ball_moving = false;
+                                    } else {
+                                        // Catch fail → SCATTER_BALL → bounceBall()
+                                        let dir_roll = rng.d8();
+                                        let dir = Direction::for_roll(dir_roll).expect("d8 is 1..=8");
+                                        let (x, y) = scatter_coordinate(ball.x, ball.y, dir, 1);
+                                        let new_pos = FieldCoordinate::new(x, y);
+                                        game.field_model.ball_coordinate = Some(new_pos);
+                                        let in_receiving_half = if game.home_playing {
+                                            new_pos.x >= 13 && new_pos.x <= 25 && new_pos.y >= 0 && new_pos.y <= 14
+                                        } else {
+                                            new_pos.x >= 0 && new_pos.x <= 12 && new_pos.y >= 0 && new_pos.y <= 14
+                                        };
+                                        if !in_receiving_half {
+                                            return StepOutcome::next().publish(StepParameter::Touchback(true));
+                                        }
+                                    }
+                                }
+                                // else: no tackle zones → SCATTER_BALL; not reached for Standing linemen
+                            }
+                        } else {
+                            // No player at ball: divingCatch → SCATTER_BALL (no Diving Catch for linemen)
+                            // → bounceBall()
+                            let dir_roll = rng.d8();
+                            let dir = Direction::for_roll(dir_roll).expect("d8 roll is 1..=8");
+                            let (x, y) = scatter_coordinate(ball.x, ball.y, dir, 1);
+                            let new_pos = FieldCoordinate::new(x, y);
+                            if std::env::var("FFB_KICKOFF_TRACE").is_ok() {
+                                eprintln!("CSTIN_BOUNCE half={} from=({},{}) dir_roll={} dir={:?} to=({},{})", game.half, ball.x, ball.y, dir_roll, dir, x, y);
+                            }
+                            game.field_model.ball_coordinate = Some(new_pos);
+                            // Java CSTIN bounceBall() uses fScatterBounds (receiving half during
+                            // kickoff), not the full field. If bounce lands outside receiving half →
+                            // touchback. HALF_AWAY = x 13..=25 (away receives), HALF_HOME = x 0..=12.
+                            let in_receiving_half = if game.home_playing {
+                                new_pos.x >= 13 && new_pos.x <= 25 && new_pos.y >= 0 && new_pos.y <= 14
+                            } else {
+                                new_pos.x >= 0 && new_pos.x <= 12 && new_pos.y >= 0 && new_pos.y <= 14
+                            };
+                            if !in_receiving_half {
+                                return StepOutcome::next().publish(StepParameter::Touchback(true));
+                            }
+                        }
+                    }
+                }
+                StepOutcome::next()
+            }
+            // Java StepTouchback: give the ball to the receiving team's player nearest to (13,8)
+            // when fTouchback is true (received via StepParameter::Touchback from KickoffScatterRoll
+            // and potentially updated by ApplyKickoffResult's WeatherChange gust). 0 dice consumed.
+            Step::Touchback { touchback } => {
+                if *touchback {
+                    let kick_from = FieldCoordinate::new(13, 8);
+                    let recv_ids: Vec<String> = if game.home_playing {
+                        game.team_away.players.iter().map(|p| p.id.clone()).collect()
+                    } else {
+                        game.team_home.players.iter().map(|p| p.id.clone()).collect()
+                    };
+                    let mut best_coord: Option<FieldCoordinate> = None;
+                    let mut best_dist = i32::MAX;
+                    for pid in &recv_ids {
+                        let coord = match game.field_model.player_coordinate(pid) {
+                            Some(c) if c.is_on_pitch() => c,
+                            _ => continue,
+                        };
+                        let ps = match game.field_model.player_state(pid) {
+                            Some(ps) => ps,
+                            None => continue,
+                        };
+                        if ps.base() != ffb_model::enums::PS_STANDING { continue; }
+                        let dx = coord.x - kick_from.x;
+                        let dy = coord.y - kick_from.y;
+                        let dist = dx * dx + dy * dy;
+                        if dist < best_dist { best_dist = dist; best_coord = Some(coord); }
+                    }
+                    if let Some(c) = best_coord {
+                        game.field_model.ball_coordinate = Some(c);
+                        // Java StepTouchback sets setBallMoving(false) when placing ball at a
+                        // standing player with tackle zones (which is always the touchback target).
+                        game.field_model.ball_moving = false;
                     }
                 }
                 StepOutcome::next()
@@ -288,18 +711,83 @@ impl Step {
             // No-op pass-through (all lineman activation-block and EndTurn prefix steps that
             // have no effect for a skill-less game).
             Step::NoOp => StepOutcome::next(),
-            // Java StepEndTurn: flip active team, bump the new active team's turn_nr, reset
-            // per-turn flags, push Select so they can activate a player.
+            // Java StepEndTurn: check if both teams have reached turn 8 (end-of-half) BEFORE
+            // any flip — mirrors Java's checkEndOfHalf = (home.turn_nr >= 8 && away.turn_nr >= 8).
+            // When true: for half 1 → H2 kickoff; for half 2 → game over (NO flip, NO increment,
+            // matching Java's TurnMode.SETUP path which leaves home_playing/turn_nr unchanged).
+            // When false: normal turn flip + increment + push Select.
             Step::EndTurn => {
-                game.home_playing = !game.home_playing;
-                if game.home_playing {
-                    game.turn_data_home.turn_nr += 1;
-                    game.turn_data_home.reset_for_turn();
+                let end_of_half = game.turn_data_home.turn_nr >= 8 && game.turn_data_away.turn_nr >= 8;
+                if end_of_half {
+                    if game.half == 1 {
+                        // H1 → H2: reset turns, set H2 kicker, push H2 kickoff sequence.
+                        game.half = 2;
+                        game.turn_data_home.turn_nr = 0;
+                        game.turn_data_away.turn_nr = 0;
+                        // H2 kicker = H1 receiver (home_first_offense = true → home received H1 →
+                        // home kicks H2 → home_playing=true; false → away kicks H2 → false).
+                        game.home_playing = game.home_first_offense;
+                        // Java StepEndTurn.getFaintingCount(): SWELTERING_HEAT rolls d3 + die(N)
+                        // per team to select players who faint (set EXHAUSTED, removed from field).
+                        if game.weather == Weather::SwelteringHeat {
+                            roll_sweltering_heat_fainting(game, rng);
+                        }
+                        // Java StepEndTurn.getFaintingCount() calls putAllPlayersIntoBox() when
+                        // fNewHalf=true: move all canBeSetUpNextDrive players to the dugout so
+                        // that H2 Setup can place them via place_team_canonical().
+                        let all_ids: Vec<String> = game.team_home.players.iter()
+                            .chain(game.team_away.players.iter())
+                            .map(|p| p.id.clone())
+                            .collect();
+                        for id in &all_ids {
+                            let can_box = game.field_model.player_state(&id)
+                                .map(|ps| ps.can_be_set_up_next_drive())
+                                .unwrap_or(false);
+                            if can_box { game.field_model.remove_player(&id); }
+                        }
+                        StepOutcome::next().push_seq(h2_kickoff_sequence())
+                    } else {
+                        // H2 over — game ends. Do NOT flip home_playing or increment turn_nr so
+                        // the game_end state hash matches Java's (Java leaves both at 8, active=away).
+                        // Java StepEndTurn.getFaintingCount(): SWELTERING_HEAT dice even at game end.
+                        if game.weather == Weather::SwelteringHeat {
+                            roll_sweltering_heat_fainting(game, rng);
+                        }
+                        // Java's StepEndTurn.getFaintingCount() calls UtilBox.putAllPlayersIntoBox()
+                        // whenever fNewHalf=true, which moves all canBeSetUpNextDrive players to
+                        // reserve boxes (negative X), producing (-1,-1,Reserve) in the state hash.
+                        let all_ids: Vec<String> = game
+                            .team_home
+                            .players
+                            .iter()
+                            .chain(game.team_away.players.iter())
+                            .map(|p| p.id.clone())
+                            .collect();
+                        for id in &all_ids {
+                            let can_box = game
+                                .field_model
+                                .player_state(id)
+                                .map(|ps| ps.can_be_set_up_next_drive())
+                                .unwrap_or(false);
+                            if can_box {
+                                game.field_model.remove_player(id);
+                            }
+                        }
+                        game.status = GameStatus::Finished;
+                        StepOutcome::next()
+                    }
                 } else {
-                    game.turn_data_away.turn_nr += 1;
-                    game.turn_data_away.reset_for_turn();
+                    // Normal turn: flip to next team and increment their turn counter.
+                    game.home_playing = !game.home_playing;
+                    if game.home_playing {
+                        game.turn_data_home.turn_nr += 1;
+                        game.turn_data_home.reset_for_turn();
+                    } else {
+                        game.turn_data_away.turn_nr += 1;
+                        game.turn_data_away.reset_for_turn();
+                    }
+                    StepOutcome::next().push_seq(select_sequence())
                 }
-                StepOutcome::next().push_seq(select_sequence())
             }
             // Java StepInitSelecting: build the eligible player list, emit the ActivatePlayer
             // prompt, and wait for the command. Command handling in handle_command below.
@@ -309,7 +797,7 @@ impl Step {
                 // Group by player (jersey order preserved — same iteration order as team.players).
                 let mut eligible: Vec<(String, Vec<ffb_model::enums::PlayerAction>)> = Vec::new();
                 for act in raw_actions {
-                    if let Action::ActivatePlayer { player_id, player_action } = act {
+                    if let Action::ActivatePlayer { player_id, player_action, .. } = act {
                         let pa = pac_to_player_action(player_action);
                         if let Some((_, acts)) = eligible.iter_mut().find(|(pid, _)| pid == &player_id) {
                             acts.push(pa);
@@ -320,8 +808,121 @@ impl Step {
                 }
                 StepOutcome::cont().with_prompt(AgentPrompt::ActivatePlayer { eligible_players: eligible })
             }
-            // Java StepEndSelecting: stub — future iteration will dispatch to the chosen sequence.
-            Step::EndSelecting => StepOutcome::next(),
+            // Java StepEndSelecting: dispatch on acting_player.player_action.
+            // When player_id is None the agent chose EndTurn → push the end-turn sequence.
+            Step::EndSelecting => {
+                match &game.acting_player.player_action {
+                    None => StepOutcome::next().push_seq(end_turn_sequence()),
+                    Some(PlayerAction::Move) => StepOutcome::next().push_seq(move_sequence()),
+                    Some(PlayerAction::Blitz) => StepOutcome::next().push_seq(blitz_sequence()),
+                    Some(PlayerAction::Block) => StepOutcome::next().push_seq(block_sequence()),
+                    Some(PlayerAction::StandUp) => {
+                        let pid = game.acting_player.player_id.clone().unwrap_or_default();
+                        game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
+                        StepOutcome::next().push_seq(standup_end_sequence())
+                    }
+                    Some(PlayerAction::StandUpBlitz) => {
+                        let pid = game.acting_player.player_id.clone().unwrap_or_default();
+                        game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
+                        StepOutcome::next().push_seq(standup_blitz_sequence())
+                    }
+                    Some(PlayerAction::Foul) => StepOutcome::next().push_seq(foul_sequence()),
+                    Some(PlayerAction::Pass) | Some(PlayerAction::HandOver) => {
+                        StepOutcome::next().push_seq(pass_sequence())
+                    }
+                    Some(other) => panic!("EndSelecting: unhandled player_action {other:?}"),
+                }
+            }
+
+            // Java StepInitMoving: compute legal move targets and emit the Move prompt.
+            // For BLITZ the targets are squares adjacent to the declared defender.
+            Step::InitMoving => {
+                let player_id = match &game.acting_player.player_id {
+                    Some(id) => id.clone(),
+                    None => return StepOutcome::next(),
+                };
+                let squares = match &game.acting_player.player_action {
+                    Some(PlayerAction::Blitz) | Some(PlayerAction::StandUpBlitz) => {
+                        match &game.acting_player.defender_id {
+                            Some(def_id) => {
+                                let def_id = def_id.clone();
+                                legal_blitz_move_targets(game, &player_id, &def_id)
+                            }
+                            None => legal_move_targets(game, &player_id),
+                        }
+                    }
+                    _ => legal_move_targets(game, &player_id),
+                };
+                StepOutcome::cont()
+                    .with_prompt(AgentPrompt::Move { player_id, squares })
+            }
+
+            // Java StepEndMoving: post-movement stub (no dice for skill-less lineman).
+            Step::EndMoving => StepOutcome::next(),
+
+            // Java StepDoBlock: roll block dice, apply result, armor/injury/casualty chain.
+            Step::DoBlock => {
+                let attacker_id = match &game.acting_player.player_id {
+                    Some(id) => id.clone(),
+                    None => return StepOutcome::next(),
+                };
+                let defender_id = match &game.acting_player.defender_id {
+                    Some(id) => id.clone(),
+                    None => {
+                        // Pick first adjacent opponent
+                        let side = if game.home_playing { TeamSide::Home } else { TeamSide::Away };
+                        let targets = legal_block_targets(game, &attacker_id, side);
+                        if targets.is_empty() { return StepOutcome::next(); }
+                        targets[0].clone()
+                    }
+                };
+                let atk_str = player_strength(game, &attacker_id);
+                let def_str = player_strength(game, &defender_id);
+                let _dice_count = block_dice_count(atk_str, def_str).abs();
+
+                // Roll one block die (simplified: always 1 die for now)
+                let roll = rng.d6();
+                let result = block_result_for_roll(roll);
+
+                match result {
+                    BlockResult::Skull => {
+                        apply_knockdown(game, &attacker_id, rng);
+                    }
+                    BlockResult::BothDown => {
+                        apply_knockdown(game, &attacker_id, rng);
+                        apply_knockdown(game, &defender_id, rng);
+                    }
+                    BlockResult::Pushback => {
+                        // Follow-up DECLINED per §7 of AGENT_CONTRACT: defender pushed,
+                        // attacker stays in place (no follow-through move).
+                        auto_push(game, &attacker_id, &defender_id, game.home_playing);
+                    }
+                    BlockResult::PowPushback => {
+                        // Follow-up DECLINED per §7: defender pushed + knocked down,
+                        // attacker stays in place.
+                        auto_push(game, &attacker_id, &defender_id, game.home_playing);
+                        apply_knockdown(game, &defender_id, rng);
+                    }
+                    BlockResult::Pow => {
+                        apply_knockdown(game, &defender_id, rng);
+                    }
+                }
+                StepOutcome::next()
+            }
+
+            // Java StepEndPlayerAction: record activation, clear acting_player, push select.
+            Step::EndPlayerAction => {
+                if let Some(pid) = game.acting_player.player_id.take() {
+                    let td = if game.home_playing {
+                        &mut game.turn_data_home
+                    } else {
+                        &mut game.turn_data_away
+                    };
+                    td.acted_player_ids.push(pid);
+                }
+                game.acting_player.clear();
+                StepOutcome::next().push_seq(select_sequence())
+            }
         }
     }
 
@@ -354,14 +955,65 @@ impl Step {
                 game.field_model.ball_in_play = true;
                 StepOutcome::next()
             }
-            // Java StepInitSelecting handleCommand: jump to the EndSelecting dispatch hub,
-            // skipping the activation-block stubs. In a later iteration we'll publish
-            // DISPATCH_PLAYER_ACTION so EndSelecting can route to the correct sequence.
-            (Step::InitSelecting, Action::ActivatePlayer { .. }) => {
+            // Java StepInitSelecting handleCommand: store the chosen player + action in
+            // acting_player, set per-turn flags, then GOTO END_SELECTING so EndSelecting
+            // dispatches the correct sub-sequence.
+            (Step::InitSelecting, Action::ActivatePlayer { player_id, player_action, block_defender_id }) => {
+                let action = pac_to_player_action(*player_action);
+                game.acting_player.set_player(player_id.clone(), action);
+                game.acting_player.defender_id = block_defender_id.clone();
+                // Mark blitz/block slot used
+                let td = if game.home_playing { &mut game.turn_data_home } else { &mut game.turn_data_away };
+                match player_action {
+                    PlayerActionChoice::Blitz
+                    | PlayerActionChoice::StandUpBlitz
+                    | PlayerActionChoice::Block => { td.blitz_used = true; }
+                    _ => {}
+                }
                 StepOutcome::goto("END_SELECTING")
             }
             (Step::InitSelecting, Action::EndTurn) => {
+                // acting_player stays cleared (player_id = None) → EndSelecting → end_turn_sequence
                 StepOutcome::goto("END_SELECTING")
+            }
+            // Java StepInitMoving handleCommand: move player step-by-step, rolling dodge in each TZ.
+            (Step::InitMoving, Action::Move { path }) => {
+                let player_id = match &game.acting_player.player_id {
+                    Some(id) => id.clone(),
+                    None => return StepOutcome::next(),
+                };
+                let src = match game.field_model.player_coordinate(&player_id) {
+                    Some(c) => c,
+                    None => return StepOutcome::next(),
+                };
+                let dest = match path.last() {
+                    Some(&d) => d,
+                    None => {
+                        game.field_model.set_player_state(&player_id, PlayerState::new(PS_STANDING));
+                        return StepOutcome::next();
+                    }
+                };
+                let step_path = if src == dest { vec![dest] } else { bfs_path(game, &player_id, src, dest) };
+                let ag = find_player_agility(game, &player_id);
+                for &step_dest in &step_path {
+                    let cur_pos = game.field_model.player_coordinate(&player_id).unwrap_or(src);
+                    let src_tz = count_opponent_tackle_zones_at(game, &player_id, cur_pos);
+                    if src_tz > 0 {
+                        let dest_tz = count_opponent_tackle_zones_at(game, &player_id, step_dest);
+                        let modifiers: Vec<ffb_mechanics::modifiers::Modifier> =
+                            (0..dest_tz).map(|_| DODGE_TACKLE_ZONE).collect();
+                        let minimum = minimum_roll_dodge(ag, &modifiers);
+                        let roll = rng.d6();
+                        if roll < minimum {
+                            game.field_model.set_player_coordinate(&player_id, step_dest);
+                            apply_knockdown(game, &player_id, rng);
+                            return StepOutcome::next();
+                        }
+                    }
+                    game.field_model.set_player_coordinate(&player_id, step_dest);
+                }
+                game.field_model.set_player_state(&player_id, PlayerState::new(PS_STANDING));
+                StepOutcome::next()
             }
             // A command the current step does not recognise (Java StepCommandStatus::UNHANDLED):
             // stay put and keep waiting. (The harness never sends one in the parity path.)
@@ -376,8 +1028,21 @@ impl Step {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match (self, param) {
             // StepKickoffResultRoll publishes the rolled event down to StepApplyKickoffResult.
-            (Step::ApplyKickoffResult { result }, StepParameter::KickoffResult(r)) => {
+            (Step::ApplyKickoffResult { result, .. }, StepParameter::KickoffResult(r)) => {
                 *result = Some(*r);
+                true
+            }
+            // StepKickoffScatterRoll publishes touchback down to Apply/CSTIN/Touchback.
+            (Step::ApplyKickoffResult { touchback, .. }, StepParameter::Touchback(t)) => {
+                *touchback = *t;
+                true
+            }
+            (Step::CatchScatterThrowIn { touchback }, StepParameter::Touchback(t)) => {
+                *touchback = *t;
+                true
+            }
+            (Step::Touchback { touchback }, StepParameter::Touchback(t)) => {
+                *touchback = *t;
                 true
             }
             _ => false,
@@ -675,7 +1340,16 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> ffb_model::enums::PlayerActi
         PlayerActionChoice::Foul       => PA::Foul,
         PlayerActionChoice::Pass       => PA::Pass,
         PlayerActionChoice::HandOff    => PA::HandOver,
-        other => unimplemented!("pac_to_player_action: unhandled {other:?}"),
+        PlayerActionChoice::SecureTheBall => PA::SecureTheBall,
+        PlayerActionChoice::Stab       => PA::Stab,
+        PlayerActionChoice::ThrowTeamMate => PA::ThrowTeamMate,
+        PlayerActionChoice::KickTeamMate => PA::KickTeamMate,
+        PlayerActionChoice::HypnoticGaze => PA::Gaze,
+        PlayerActionChoice::ThrowBomb  => PA::ThrowBomb,
+        PlayerActionChoice::Swoop      => PA::Swoop,
+        PlayerActionChoice::Punt       => PA::Punt,
+        PlayerActionChoice::BreatheFire => PA::BreatheFire,
+        PlayerActionChoice::ProjectileVomit => PA::ProjectileVomit,
     }
 }
 
@@ -699,8 +1373,9 @@ pub fn start_game_sequence() -> Vec<StepEntry> {
         StepEntry::new(Step::Kickoff),
         StepEntry::new(Step::KickoffScatterRoll),
         StepEntry::new(Step::KickoffResultRoll),
-        StepEntry::new(Step::ApplyKickoffResult { result: None }),
-        StepEntry::new(Step::CatchScatterThrowIn),
+        StepEntry::new(Step::ApplyKickoffResult { result: None, touchback: false }),
+        StepEntry::new(Step::CatchScatterThrowIn { touchback: false }),
+        StepEntry::new(Step::Touchback { touchback: false }),
         StepEntry::new(Step::EndKickoff),
     ]
 }
@@ -716,6 +1391,85 @@ fn end_turn_sequence() -> Vec<StepEntry> {
         StepEntry::new(Step::NoOp),  // Apothecary(HIT_PLAYER)
         StepEntry::new(Step::NoOp),  // CatchScatterThrowIn
         StepEntry::new(Step::EndTurn),
+    ]
+}
+
+/// Java H2 kickoff sequence — identical to the opening kickoff but without the coin/receive
+/// steps (the H1 result already decided who kicks/receives for both halves).
+fn h2_kickoff_sequence() -> Vec<StepEntry> {
+    vec![
+        StepEntry::new(Step::InitKickoff),
+        StepEntry::new(Step::Setup), // kicking team
+        StepEntry::new(Step::Setup), // receiving team
+        StepEntry::new(Step::Kickoff),
+        StepEntry::new(Step::KickoffScatterRoll),
+        StepEntry::new(Step::KickoffResultRoll),
+        StepEntry::new(Step::ApplyKickoffResult { result: None, touchback: false }),
+        StepEntry::new(Step::CatchScatterThrowIn { touchback: false }),
+        StepEntry::new(Step::Touchback { touchback: false }),
+        StepEntry::new(Step::EndKickoff),
+    ]
+}
+
+/// Move-only activation: move the player, then end their action.
+fn move_sequence() -> Vec<StepEntry> {
+    vec![
+        StepEntry::new(Step::InitMoving),
+        StepEntry::new(Step::EndMoving),
+        StepEntry::new(Step::EndPlayerAction),
+    ]
+}
+
+/// BLITZ activation: move first, then block, then end action.
+/// Java BB2025 order: BlitzMove (InitMoving → ... → EndMoving) → BlitzBlock (DoBlock).
+fn blitz_sequence() -> Vec<StepEntry> {
+    vec![
+        StepEntry::new(Step::InitMoving),
+        StepEntry::new(Step::EndMoving),
+        StepEntry::new(Step::DoBlock),
+        StepEntry::new(Step::EndPlayerAction),
+    ]
+}
+
+/// Block-only activation (player already adjacent): block then end action.
+fn block_sequence() -> Vec<StepEntry> {
+    vec![
+        StepEntry::new(Step::DoBlock),
+        StepEntry::new(Step::EndPlayerAction),
+    ]
+}
+
+/// Stand-up only activation: player was prone, now standing. No movement or block.
+fn standup_end_sequence() -> Vec<StepEntry> {
+    vec![
+        StepEntry::new(Step::EndPlayerAction),
+    ]
+}
+
+/// Pass/HandOff activation stub — deferred until a seed requires it.
+fn pass_sequence() -> Vec<StepEntry> {
+    vec![
+        StepEntry::new(Step::NoOp), // StepInitPassing stub
+        StepEntry::new(Step::EndPlayerAction),
+    ]
+}
+
+/// Foul activation: move to target's square and foul (injury without armor break needed).
+/// Simplified stub — actual foul dice (armor check) deferred until a seed requires it.
+fn foul_sequence() -> Vec<StepEntry> {
+    vec![
+        StepEntry::new(Step::NoOp), // StepFoul stub (no dice for now)
+        StepEntry::new(Step::EndPlayerAction),
+    ]
+}
+
+/// StandUpBlitz: stand up (already done in EndSelecting), move, block, end.
+fn standup_blitz_sequence() -> Vec<StepEntry> {
+    vec![
+        StepEntry::new(Step::InitMoving),
+        StepEntry::new(Step::EndMoving),
+        StepEntry::new(Step::DoBlock),
+        StepEntry::new(Step::EndPlayerAction),
     ]
 }
 
@@ -738,6 +1492,126 @@ fn select_sequence() -> Vec<StepEntry> {
     }
     seq.push(StepEntry::labelled(Step::EndSelecting, "END_SELECTING"));
     seq
+}
+
+/// Player strength lookup (for block dice count).
+fn player_strength(game: &Game, player_id: &str) -> i32 {
+    game.team_home.players.iter()
+        .chain(game.team_away.players.iter())
+        .find(|p| p.id == player_id)
+        .map(|p| p.strength_with_modifiers())
+        .unwrap_or(3)
+}
+
+fn find_player_agility(game: &Game, player_id: &str) -> i32 {
+    game.team_home.players.iter()
+        .chain(game.team_away.players.iter())
+        .find(|p| p.id == player_id)
+        .map(|p| p.agility)
+        .unwrap_or(3)
+}
+
+fn count_opponent_tackle_zones_at(game: &Game, player_id: &str, coord: FieldCoordinate) -> i32 {
+    let is_home = game.team_home.players.iter().any(|p| p.id == player_id);
+    let opponents = if is_home { &game.team_away } else { &game.team_home };
+    opponents.players.iter().filter(|p| {
+        game.field_model.player_coordinate(&p.id)
+            .map(|c| c.is_adjacent(coord))
+            .unwrap_or(false)
+            && game.field_model.player_state(&p.id)
+                .map(|s| s.has_tacklezones())
+                .unwrap_or(false)
+    }).count() as i32
+}
+
+/// Player armour value lookup.
+fn player_armour(game: &Game, player_id: &str) -> i32 {
+    game.team_home.players.iter()
+        .chain(game.team_away.players.iter())
+        .find(|p| p.id == player_id)
+        .map(|p| p.armour_with_modifiers())
+        .unwrap_or(8)
+}
+
+/// Knock a player down: set PRONE, then roll armor + injury + casualty chain.
+fn apply_knockdown(game: &mut Game, player_id: &str, rng: &mut GameRng) {
+    game.field_model.set_player_state(player_id, PlayerState::new(PS_PRONE));
+    let av = player_armour(game, player_id);
+    let a1 = rng.d6();
+    let a2 = rng.d6();
+    if armor_broken(av, [a1, a2], &[]) {
+        let i1 = rng.d6();
+        let i2 = rng.d6();
+        match injury_result([i1, i2], &[]) {
+            InjuryOutcome::Stunned => {
+                game.field_model.set_player_state(player_id, PlayerState::new(PS_STUNNED));
+            }
+            InjuryOutcome::KnockedOut => {
+                game.field_model.player_coordinates.remove(player_id);
+                game.field_model.set_player_state(player_id, PlayerState::new(PS_KNOCKED_OUT));
+            }
+            InjuryOutcome::Casualty | InjuryOutcome::BadlyHurt => {
+                let c1 = rng.die(16);
+                let _c2 = rng.d6();
+                let tier = casualty_tier_bb2025(c1);
+                let ps = match tier {
+                    CasualtyTier::BadlyHurt => PS_BADLY_HURT,
+                    CasualtyTier::SeriousInjury => PS_SERIOUS_INJURY,
+                    CasualtyTier::Dead => PS_RIP,
+                };
+                game.field_model.player_coordinates.remove(player_id);
+                game.field_model.set_player_state(player_id, PlayerState::new(ps));
+            }
+        }
+    }
+}
+
+/// Push the defender one step away from the attacker.
+/// Replicates Java's MatchRunner.handlePushback + UtilServerPushback.findPushbackSquares:
+/// candidates are ordered [CCW-diagonal, straight, CW-diagonal] relative to push direction;
+/// pick the first with maximum score (home attacking → max x; away attacking → max 25-x).
+fn auto_push(game: &mut Game, attacker_id: &str, defender_id: &str, attacker_is_home: bool) {
+    let def_coord = match game.field_model.player_coordinate(defender_id) {
+        Some(c) => c,
+        None => return,
+    };
+    let atk_coord = match game.field_model.player_coordinate(attacker_id) {
+        Some(c) => c,
+        None => return,
+    };
+    let push_dir = match atk_coord.direction_to(def_coord) {
+        Some(d) => d,
+        None => return,
+    };
+    // Java UtilServerPushback.findPushbackSquares offsets (dx,dy) from defender position,
+    // in order: [CCW-diagonal, straight, CW-diagonal] relative to push_dir.
+    let offsets: [(i32, i32); 3] = match push_dir {
+        Direction::North     => [(-1,-1), ( 0,-1), ( 1,-1)], // NW, N, NE
+        Direction::Northeast => [( 0,-1), ( 1,-1), ( 1, 0)], // N, NE, E
+        Direction::East      => [( 1,-1), ( 1, 0), ( 1, 1)], // NE, E, SE
+        Direction::Southeast => [( 1, 0), ( 1, 1), ( 0, 1)], // E, SE, S
+        Direction::South     => [( 1, 1), ( 0, 1), (-1, 1)], // SE, S, SW
+        Direction::Southwest => [( 0, 1), (-1, 1), (-1, 0)], // S, SW, W
+        Direction::West      => [(-1, 1), (-1, 0), (-1,-1)], // SW, W, NW
+        Direction::Northwest => [(-1, 0), (-1,-1), ( 0,-1)], // W, NW, N
+    };
+    // Score matches Java's MatchRunner.handlePushback (strictly-greater update → first wins ties).
+    let score = |c: FieldCoordinate| -> i32 {
+        if attacker_is_home { c.x } else { 25 - c.x }
+    };
+    let mut best: Option<FieldCoordinate> = None;
+    let mut best_score = i32::MIN;
+    for (dx, dy) in offsets {
+        let sq = def_coord.add(dx, dy);
+        if !sq.is_on_pitch() { continue; }
+        if sq == atk_coord { continue; }
+        if game.field_model.player_at(sq).is_some() { continue; }
+        let s = score(sq);
+        if s > best_score { best_score = s; best = Some(sq); }
+    }
+    if let Some(sq) = best {
+        game.field_model.set_player_coordinate(defender_id, sq);
+    }
 }
 
 // ── shared test fixtures (used by engine.rs and agent.rs tests) ──
@@ -923,5 +1797,47 @@ mod tests {
         assert!(matches!(gs.current_prompt(), Some(AgentPrompt::ActivatePlayer { .. })),
             "engine reaches first ActivatePlayer after kickoff (0 dice beyond 12)");
         assert_eq!(gs.rng.call_count, 12, "no game dice consumed by EndKickoff/EndTurn/InitSelecting");
+    }
+
+    /// auto_push for WEST push (away attacking): Java picks SW=(x-1,y+1) first.
+    /// Attacker at (13,8), defender at (12,8) → push dir WEST → candidates SW(11,9),W(11,8),NW(11,7).
+    /// All score 25-11=14 equally → first wins → defender lands at (11,9).
+    #[test]
+    fn auto_push_west_away_attacker_picks_sw_first() {
+        use ffb_model::model::field_model::FieldModel;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = Game::new(
+            test_team("home", 5),
+            test_team("away", 7),
+            ffb_model::enums::Rules::Bb2025,
+        );
+        let atk_coord = FieldCoordinate::new(13, 8);
+        let def_coord = FieldCoordinate::new(12, 8);
+        game.field_model.set_player_coordinate("away_atk", atk_coord);
+        game.field_model.set_player_coordinate("home_def", def_coord);
+        // attacker_is_home = false (away team attacking)
+        auto_push(&mut game, "away_atk", "home_def", false);
+        let pushed = game.field_model.player_coordinate("home_def").unwrap();
+        // Java picks SW = (11,9) — first in UtilServerPushback.findPushbackSquares WEST order
+        assert_eq!(pushed, FieldCoordinate::new(11, 9),
+            "away attacking WEST: defender should push to SW=(11,9), not {:?}", pushed);
+    }
+
+    /// auto_push: if SW is occupied, fall through to W=(11,8).
+    #[test]
+    fn auto_push_west_away_attacker_falls_through_to_w_when_sw_blocked() {
+        use ffb_model::types::FieldCoordinate;
+        let mut game = Game::new(
+            test_team("home", 5),
+            test_team("away", 7),
+            ffb_model::enums::Rules::Bb2025,
+        );
+        game.field_model.set_player_coordinate("away_atk", FieldCoordinate::new(13, 8));
+        game.field_model.set_player_coordinate("home_def", FieldCoordinate::new(12, 8));
+        game.field_model.set_player_coordinate("blocker", FieldCoordinate::new(11, 9)); // SW blocked
+        auto_push(&mut game, "away_atk", "home_def", false);
+        let pushed = game.field_model.player_coordinate("home_def").unwrap();
+        assert_eq!(pushed, FieldCoordinate::new(11, 8),
+            "SW blocked → should fall to W=(11,8)");
     }
 }

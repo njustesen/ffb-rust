@@ -187,7 +187,20 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
         }
 
         let side = engine.active_side();
-        let action = if tier >= 3 { agent.act(&engine) } else { agent.act(&engine) };
+        let action = if tier >= 3 {
+            agent.act(&engine)
+        } else {
+            // T2: consume exactly 1 decisionRng for the player pick (matching Java T2's
+            // pick-one-then-deselect-then-EndTurn pattern), then return EndTurn.
+            // Pre-activation prompts (coin, receive, kick) still go through the agent.
+            match engine.current_prompt() {
+                Some(AgentPrompt::ActivatePlayer { eligible_players }) => {
+                    agent.pick_t2_activation(eligible_players.len());
+                    ffb_engine::action::Action::EndTurn
+                }
+                _ => agent.act(&engine),
+            }
+        };
         let chosen = action_label(&action);
         let is_activation = matches!(action, ffb_engine::action::Action::ActivatePlayer { .. });
 
@@ -515,7 +528,7 @@ pub(crate) fn action_label(action: &ffb_engine::action::Action) -> String {
         Action::ReceiveChoice { receive } => if *receive { "Receive".into() } else { "Kick".into() },
         Action::KickBall { coord } => format!("Kick({},{})", coord.x, coord.y),
         Action::Touchback { player_id } => format!("Touchback({player_id})"),
-        Action::ActivatePlayer { player_id, player_action } => format!("Activate({player_id},{player_action:?})"),
+        Action::ActivatePlayer { player_id, player_action, .. } => format!("Activate({player_id},{player_action:?})"),
         Action::EndTurn => "EndTurn".into(),
         Action::Move { path } => path.last().map(|c| format!("Move→({},{})", c.x, c.y)).unwrap_or("Move".into()),
         Action::Block { defender_id } => format!("Block→{defender_id}"),

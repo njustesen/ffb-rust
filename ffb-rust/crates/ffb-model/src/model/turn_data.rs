@@ -34,6 +34,8 @@ pub struct TurnData {
     pub lord_of_chaos_state: LeaderState,
     /// QuickSnap kickoff event bonus: +1 MA for all players this turn.
     pub quick_snap_bonus: i32,
+    /// Players who have completed their action this turn (IDs). Cleared each turn.
+    pub acted_player_ids: Vec<String>,
 }
 
 impl TurnData {
@@ -64,6 +66,7 @@ impl TurnData {
             leader_state: LeaderState::None,
             lord_of_chaos_state: LeaderState::None,
             quick_snap_bonus: 0,
+            acted_player_ids: Vec::new(),
         }
     }
 
@@ -79,6 +82,7 @@ impl TurnData {
         self.secure_the_ball_used = false;
         self.punt_used = false;
         self.quick_snap_bonus = 0;
+        self.acted_player_ids.clear();
     }
 }
 

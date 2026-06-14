@@ -18,6 +18,7 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::enums::PlayerAction;
 
 use crate::action::{Action, PlayerActionChoice};
+use crate::legal_actions::{legal_block_targets, TeamSide};
 use crate::step::GameState;
 
 /// The step engine's decision-maker. Reads the game state (including the pending prompt) and
@@ -70,6 +71,13 @@ impl RandomAgent {
     fn pick_action(&mut self, len: usize) -> usize {
         if len == 0 { 0 } else { (self.action_rng.next_u64() as usize) % len }
     }
+
+    /// T2 parity: consume exactly 1 decisionRng draw (player pick), no actionRng.
+    /// Mirrors Java T2's one-player-pick-then-deselect-then-EndTurn pattern so the
+    /// decisionRng stream stays synced for the half-2 kickoff.
+    pub fn pick_t2_activation(&mut self, n: usize) {
+        let _ = self.pick(n);
+    }
 }
 
 impl Agent for RandomAgent {
@@ -87,18 +95,62 @@ impl Agent for RandomAgent {
                 let x = if gs.game.home_playing { x_raw + 13 } else { x_raw };
                 Action::KickBall { coord: FieldCoordinate::new(x, y_raw + 1) }
             }
-            // AGENT_CONTRACT.md §4-5: 1 decisionRng draw for player pick (over the eligible
-            // list in jersey order), 1 actionRng draw for action pick (over that player's
-            // actions). Blitz also needs 1 actionRng for target (§8) — wired per-sequence.
+            // AGENT_CONTRACT.md §4-5: 1 decisionRng for player pick over remaining (§4 — EndTurn
+            // is automatic when remaining is empty, NOT an explicit pick option),
+            // 1 actionRng for action pick, 1 actionRng for block target when Block/Blitz.
             Some(AgentPrompt::ActivatePlayer { eligible_players }) => {
-                if eligible_players.is_empty() {
+                let n = eligible_players.len();
+                if n == 0 {
                     return Action::EndTurn;
                 }
-                let player_idx = self.pick(eligible_players.len());
+                let player_idx = self.pick(n); // pick from [0, n) — no EndTurn slot
                 let (player_id, actions) = &eligible_players[player_idx];
                 let action_idx = self.pick_action(actions.len());
                 let player_action = player_action_to_pac(&actions[action_idx]);
-                Action::ActivatePlayer { player_id: player_id.clone(), player_action }
+                // For Block/Blitz: pick target from adjacent opponents
+                let block_defender_id = match player_action {
+                    PlayerActionChoice::Block
+                    | PlayerActionChoice::Blitz
+                    | PlayerActionChoice::StandUpBlitz => {
+                        let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
+                        let targets = legal_block_targets(&gs.game, player_id, side);
+                        if targets.is_empty() {
+                            None
+                        } else {
+                            let tidx = self.pick_action(targets.len());
+                            Some(targets[tidx].clone())
+                        }
+                    }
+                    _ => None,
+                };
+                Action::ActivatePlayer { player_id: player_id.clone(), player_action, block_defender_id }
+            }
+            // Move prompt: pick destination from legal squares using actionRng.
+            Some(AgentPrompt::Move { squares, .. }) => {
+                if squares.is_empty() {
+                    return Action::Move { path: vec![] };
+                }
+                let idx = self.pick_action(squares.len());
+                Action::Move { path: vec![squares[idx]] }
+            }
+            // Stubs for prompts that the engine currently handles internally (auto-push/follow-up)
+            // but may emit in future phases. Handled here to prevent panics during T3 games.
+            Some(AgentPrompt::Pushback { squares, .. }) => {
+                if squares.is_empty() {
+                    return Action::Acknowledge;
+                }
+                let idx = self.pick_action(squares.len());
+                Action::PushTo { coord: squares[idx] }
+            }
+            Some(AgentPrompt::FollowUp { .. }) => {
+                Action::FollowUp { follow_up: true }
+            }
+            Some(AgentPrompt::BlockChoice { dice, .. }) => {
+                if dice.is_empty() {
+                    return Action::BlockChoice { die_index: 0 };
+                }
+                let idx = self.pick_action(dice.len());
+                Action::BlockChoice { die_index: idx }
             }
             // Each remaining prompt is wired as its producing step lands in Phase D; the loud
             // failure here names exactly which handler is still missing.
@@ -173,5 +225,43 @@ mod tests {
         let d = a.decision_rng.next_u64();
         let act = a.action_rng.next_u64();
         assert_ne!(d, act);
+    }
+}
+
+#[cfg(test)]
+mod rng_trace_tests {
+    use super::*;
+
+    #[test]
+    fn trace_seed1_actionrng_calls() {
+        let seed = 1u64;
+        let mut a = RandomAgent::new_parity(seed);
+        
+        // Pregame: consume 4 decision calls (coin, receive, kick_x, kick_y)
+        for _ in 0..4 {
+            let _ = a.decision_rng.next_u64();
+        }
+        
+        // Decision call 5: player pick n=11
+        let v = a.decision_rng.next_u64();
+        eprintln!("decision[4] n=11: {} % 11 = {}", v, v as usize % 11);
+        
+        // Action call 1: action pick n=3 [Move,Block,Blitz]
+        let v = a.action_rng.next_u64();
+        eprintln!("action[0] n=3: {} % 3 = {}", v, v as usize % 3);
+        
+        // Action call 2: block target pick n=2 [home_01,home_03] 
+        let v = a.action_rng.next_u64();
+        eprintln!("action[1] n=2: {} % 2 = {}", v, v as usize % 2);
+        
+        // Action call 3: move target pick n=6 [(10,6),(10,7),(10,8),(11,6),(11,8),(12,8)]
+        let v = a.action_rng.next_u64();
+        eprintln!("action[2] n=6: {} % 6 = {}", v, v as usize % 6);
+        
+        // And n=7 (if targets list has 7 elements)
+        let v2 = a.action_rng.next_u64(); // this is a different call
+        eprintln!("(next) n=7: {} % 7 = {}", v2, v2 as usize % 7);
+        
+        assert!(true);
     }
 }

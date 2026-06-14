@@ -27,8 +27,8 @@ pub enum Action {
     Touchback { player_id: PlayerId },
 
     // ── Activation ──────────────────────────────────────────────────────────
-    /// Activate a player with the given action type.
-    ActivatePlayer { player_id: PlayerId, player_action: PlayerActionChoice },
+    /// Activate a player with the given action type. `block_defender_id` is set for Block/Blitz.
+    ActivatePlayer { player_id: PlayerId, player_action: PlayerActionChoice, block_defender_id: Option<PlayerId> },
     /// End the current team's turn.
     EndTurn,
 

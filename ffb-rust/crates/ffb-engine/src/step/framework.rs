@@ -122,6 +122,8 @@ pub enum StepParameter {
     UsingChainsaw(bool),
     /// The rolled kickoff event (StepKickoffResultRoll → StepApplyKickoffResult).
     KickoffResult(ffb_model::enums::KickoffResult),
+    /// Whether a touchback must fire (StepKickoffScatterRoll → StepApplyKickoffResult → StepCatchScatterThrowIn → StepTouchback).
+    Touchback(bool),
     // … grow per 20_steps entries as steps are ported.
 }
 

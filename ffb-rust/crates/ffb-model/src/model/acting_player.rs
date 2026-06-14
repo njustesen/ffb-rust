@@ -7,6 +7,8 @@ use crate::model::player::PlayerId;
 pub struct ActingPlayer {
     pub player_id: Option<PlayerId>,
     pub player_action: Option<PlayerAction>,
+    /// For Block/Blitz: the target defender chosen at activation time.
+    pub defender_id: Option<PlayerId>,
     pub current_move: i32,
     pub goes_for_it: bool,
     pub standing_up: bool,
@@ -37,6 +39,7 @@ impl ActingPlayer {
     pub fn set_player(&mut self, id: PlayerId, action: PlayerAction) {
         self.player_id = Some(id);
         self.player_action = Some(action);
+        self.defender_id = None;
         self.current_move = 0;
         self.goes_for_it = false;
         self.standing_up = false;

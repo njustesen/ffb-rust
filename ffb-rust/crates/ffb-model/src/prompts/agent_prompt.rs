@@ -29,6 +29,10 @@ pub enum AgentPrompt {
     ActivatePlayer {
         eligible_players: Vec<(PlayerId, Vec<PlayerAction>)>,
     },
+    Move {
+        player_id: PlayerId,
+        squares: Vec<FieldCoordinate>,
+    },
     FollowUp {
         attacker_id: PlayerId,
         target_coord: FieldCoordinate,
