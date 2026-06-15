@@ -1200,36 +1200,81 @@ impl Step {
                 // Index 0 = first die rolled. No change needed (we already use the first die).
                 let _ = dice_count;
 
+                // Capture ball positions before knockdowns (KO removes player coordinate).
+                let atk_coord_pre = game.field_model.player_coordinate(&attacker_id);
+                let def_coord_pre = game.field_model.player_coordinate(&defender_id);
+                let ball_coord = game.field_model.ball_coordinate;
+                let atk_has_ball = atk_coord_pre.zip(ball_coord).map_or(false, |(a, b)| a == b);
+                let def_has_ball = def_coord_pre.zip(ball_coord).map_or(false, |(d, b)| d == b);
+
                 match result {
                     BlockResult::Skull => {
                         // Attacker knocked down = turnover. Java StepDropFallingPlayers publishes
                         // END_TURN=true whenever the acting player's state is FALLING.
                         apply_knockdown(game, &attacker_id, rng);
                         game.turnover = true;
+                        // Java StepCatchScatterThrowIn.bounceBall: scatter ball if carrier fell.
+                        if atk_has_ball {
+                            scatter_ball_from_knockdown(game, atk_coord_pre.unwrap(), rng);
+                        }
                     }
                     BlockResult::BothDown => {
                         // Attacker knocked down = turnover (no Block/Wrestle skill for linemen).
-                        // Java resolves DEFENDER's armor/injury first, then ATTACKER's.
+                        // Java resolves DEFENDER's armor/injury first, then ATTACKER's,
+                        // then scatters ball after both armor rolls (not interleaved).
                         apply_knockdown(game, &defender_id, rng);
                         apply_knockdown(game, &attacker_id, rng);
                         game.turnover = true;
+                        if atk_has_ball {
+                            scatter_ball_from_knockdown(game, atk_coord_pre.unwrap(), rng);
+                        } else if def_has_ball {
+                            scatter_ball_from_knockdown(game, def_coord_pre.unwrap(), rng);
+                        }
                     }
                     BlockResult::Pushback => {
                         // Follow-up DECLINED per §7 of AGENT_CONTRACT: defender pushed,
                         // attacker stays in place (no follow-through move).
                         auto_push(game, &attacker_id, &defender_id, game.home_playing);
+                        // If defender had ball, move it with them (Java FieldModel keeps ball with pusher).
+                        if def_has_ball {
+                            if let Some(new_dc) = game.field_model.player_coordinate(&defender_id) {
+                                game.field_model.ball_coordinate = Some(new_dc);
+                            }
+                        }
                     }
                     BlockResult::PowPushback => {
                         // Follow-up DECLINED per §7: defender pushed + knocked down,
                         // attacker stays in place.
                         auto_push(game, &attacker_id, &defender_id, game.home_playing);
+                        if def_has_ball {
+                            if let Some(new_dc) = game.field_model.player_coordinate(&defender_id) {
+                                game.field_model.ball_coordinate = Some(new_dc);
+                            }
+                        }
+                        let def_coord_post_push = game.field_model.player_coordinate(&defender_id);
                         apply_knockdown(game, &defender_id, rng);
+                        if def_has_ball {
+                            if let Some(dc) = def_coord_post_push {
+                                scatter_ball_from_knockdown(game, dc, rng);
+                            }
+                        }
                     }
                     BlockResult::Pow => {
                         // Pow also pushes the defender (same as PowPushback, but no dodge option).
                         // Java StepBlockChoice case POW calls initPushback — identical sequence.
                         auto_push(game, &attacker_id, &defender_id, game.home_playing);
+                        if def_has_ball {
+                            if let Some(new_dc) = game.field_model.player_coordinate(&defender_id) {
+                                game.field_model.ball_coordinate = Some(new_dc);
+                            }
+                        }
+                        let def_coord_post_push = game.field_model.player_coordinate(&defender_id);
                         apply_knockdown(game, &defender_id, rng);
+                        if def_has_ball {
+                            if let Some(dc) = def_coord_post_push {
+                                scatter_ball_from_knockdown(game, dc, rng);
+                            }
+                        }
                     }
                 }
                 StepOutcome::next()
@@ -2226,6 +2271,17 @@ fn apply_knockdown(game: &mut Game, player_id: &str, rng: &mut GameRng) {
             }
         }
     }
+}
+
+/// Ball scatter when the carrier is knocked down (Java StepCatchScatterThrowIn.bounceBall).
+/// d8 direction, ball moves one square. Catch by a player at landing square is NOT yet
+/// implemented — all current lineman seeds land on empty squares.
+fn scatter_ball_from_knockdown(game: &mut Game, from: FieldCoordinate, rng: &mut GameRng) {
+    let dir_roll = rng.d8();
+    let dir = Direction::for_roll(dir_roll).expect("d8 is 1..=8");
+    let (nx, ny) = scatter_coordinate(from.x, from.y, dir, 1);
+    let new_pos = FieldCoordinate::new(nx, ny);
+    game.field_model.ball_coordinate = Some(new_pos);
 }
 
 /// Foul injury: roll 2d6 armor vs AV (no knockdown — target is already prone/stunned).
