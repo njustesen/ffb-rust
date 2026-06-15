@@ -44,6 +44,13 @@ pub struct Game {
     pub concession_possible: bool,
     pub conceded_legally: bool,
     pub testing: bool,
+    /// Set true when a turnover occurs (failed pickup, failed dodge, etc.) so EndPlayerAction
+    /// pushes end_turn_sequence() instead of select_sequence(). Cleared after consumption.
+    pub turnover: bool,
+    /// Cheering Fans kickoff bonus: team gets +1 to attacker strength for ONE block.
+    /// Java: GameState.getAdditionalAssist / setTeamIdsAdditionalAssist / removeAdditionalAssist.
+    pub home_additional_assists: i32,
+    pub away_additional_assists: i32,
 }
 
 impl Game {
@@ -78,6 +85,9 @@ impl Game {
             concession_possible: false,
             conceded_legally: false,
             testing: false,
+            turnover: false,
+            home_additional_assists: 0,
+            away_additional_assists: 0,
         }
     }
 
