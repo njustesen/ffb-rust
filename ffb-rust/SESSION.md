@@ -1,15 +1,132 @@
 # FFB-Rust Session State
 
-## Current Status (session 44 end, 2026-06-12)
+## Current Status (session 47 end, 2026-06-17)
 
 **Test counts: 2,600 total (883 engine, 1,219 mechanics, 406 model, 39 parity, 31 client, 21 protocol, 1 doc)**
 **Parity: T2 complete — 26/26 races × 100/100 seeds via `--tier 2` (default) ✓**
-**T3 MILESTONE: lineman_vs_lineman seed 1 `--tier 3` matches 100% with FULL action coverage**
-(282 steps: 271 Move incl. stand-ups, 5 Blitz, 2 Block, 2 Foul; Pass/HandOver never arose
-organically in this 0-0 game — no successful pickup). Tier-3 seeds 4/9/10 also passed at the
-Move-only stage; seeds 2,3,5-8 are the next hardening target.
+**T3: 55/100 lineman_vs_lineman seeds passing** (goal of 50/100 MET)
 
 All tests passing. Zero failures.
+
+---
+
+## Session 47 Summary (2026-06-17) — T3 50/100 goal achieved
+
+**Goal:** Reach 50/100 T3 seeds passing for lineman_vs_lineman.
+
+**Result:** ✓ 55/100 seeds now pass (goal was 50/100).
+
+### Bug 1: DoPass missing tackle zone penalty for passer (seed 9)
+
+Java's `PassMechanic.passModifiers()` counts adjacent opposing players with tackle zones
+and adds each as +1 to pass difficulty. Rust was computing:
+
+```rust
+let effective = pass_roll - dist_mod;
+```
+
+Fixed to:
+
+```rust
+let tz_penalty = count_opponent_tackle_zones_at(game, &passer_id, passer_coord);
+let effective = pass_roll - dist_mod - tz_penalty;
+```
+
+### Bug 2: DoPass INACCURATE pass used wrong scatter (seed 9)
+
+Java's `StepMissedPass` does a 3-step random scatter from the target coordinate
+(one d8 per step, stops if start goes OOB, tracks `lastValidCoordinate`). Rust
+was doing a single-step bounce. Rewrote the INACCURATE block to match Java's
+3-step scatter + CATCH_MISSED_PASS logic.
+
+### Bug 3: DoHandOff missing tackle zone penalty on receiver (seeds 8+, +48 seeds)
+
+Java's `CatchModifierFactory.isAffectedByTackleZones()` returns `true` for all normal
+players. The base `CatchModifierCollection` has TZ modifiers +1 through +8 for each
+adjacent opposing player. Rust was computing:
+
+```rust
+let catch_min = std::cmp::max(2, receiver_ag);
+```
+
+Fixed to:
+
+```rust
+let tz_count = count_opponent_tackle_zones_at(game, &receiver_id, receiver_coord);
+let catch_min = std::cmp::max(2, receiver_ag + tz_count);
+```
+
+This single fix jumped the passing count from 7 → 55 seeds.
+
+### Still failing (45 seeds)
+
+8, 11, 14, 15, 16, 18, 21, 26, 29, 30, 31, 32, 36, 39, 40, 46, 49, 51, 54, 55, 56, 58,
+60, 61, 63, 65, 66, 69, 71, 73, 75, 77, 78, 79, 80, 81, 83, 86, 87, 90, 92, 93, 96, 98, 99
+
+Seed 8 diverges at step 9 (`Activate(away_03,BLOCK)`) — same pre-hash, different post-hash.
+Root cause: block divergence, not yet investigated.
+
+---
+
+## Session 46 Summary (2026-06-15) — ball_moving divergence investigation
+
+**Goal:** Fix seed 7 divergence at step 181/182 (home turn ends in Java, Rust continues).
+
+**Status: 4/100 still** (no new seeds fixed). Root cause identified but fix not yet applied.
+
+### DoPass turnover guard (committed)
+
+Added early-return at the top of `Step::DoPass`:
+```rust
+if game.turnover { return StepOutcome::next(); }
+```
+This is correct for the case where a pickup fails mid-activation and the pass sub-step fires
+anyway. But it did **not** fix seed 7 because the divergence is deeper — `ball_moving` is
+already wrong before step 181 is reached.
+
+### ball_moving: the silent diverger
+
+`ball_moving` is NOT included in `state_hash` (hash covers ball x,y, ball_in_play, player
+positions). This means `ball_moving` can diverge between Rust and Java over many steps while
+hashes continue to match, until the divergence eventually manifests as a pick-up behavior
+difference or missing dice roll.
+
+- `ball_moving = true`  → ball is on the ground (loose), pickup attempt required
+- `ball_moving = false` → ball is held by a player (picked up or caught), no pickup needed
+
+At step 181, both engines choose `Activate(home_03, Pass)` with identical pre-hash
+`bbcc6f58499e5ac7`. But:
+- **Rust**: `ball_moving=false` at home_03's square → PickUp is skipped, DoPass fires at `rng=74`
+- **Java**: `ball_moving=true` → PickUp fires at `cc=80`, rolls 1 (fail), sets turnover, ends turn
+
+The 6-die difference (Rust at 74, Java at 80) confirms RNG states diverged earlier.
+
+### Transition traced to rng 54→59
+
+Added `RUST_ACTIVATION` trace at `Step::EndSelecting` to log ball state at each activation.
+Found the divergence between two consecutive activations:
+```
+Line 319: RUST_ACTIVATION pid=None action=None ball=Some((12,10)) ball_moving=true  rng=54  ← EndTurn
+Line 320: RUST_ACTIVATION pid=Some("home_09") action=Some(Move) ball=Some((12,8)) ball_moving=false rng=59
+```
+During the away team's turn (not shown — no RUST_PICKUP events trace that far back), 5 dice
+were consumed and ball changed from `(12,10) moving=true` to `(12,8) moving=false`. No
+RUST_PICKUP event with `on_ball=true` was logged for coord (12,10), so the mechanism is
+likely a **DoPass or DoHandOff** that moved the ball without setting `ball_moving=true`
+correctly, or a catch/scatter that landed at (12,8) and set `ball_moving=false`.
+
+### Debug traces still in engine.rs (to remove before final commit)
+
+Two `FFB_TRACE=1`-gated `eprintln!` calls remain:
+1. `RUST_ACTIVATION` in `Step::EndSelecting` — logs pid, action, ball, ball_moving, rng
+2. `RUST_DOPASS` in `Step::DoPass` (after turnover guard) — logs same fields
+
+### Next step
+
+Inspect the full raw trace (`FFB_TRACE=1` output) around rng=54–59 to identify which away
+activation set `ball_moving=false` at (12,8). Then find the Java equivalent to determine
+whether Java also sets `ball_moving=false` there (possible Java intentionality, not a Rust
+bug) or whether Rust is setting it incorrectly. Fix the specific code path.
 
 ---
 

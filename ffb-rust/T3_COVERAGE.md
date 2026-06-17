@@ -1,4 +1,4 @@
-# T3 lineman coverage — 1 games
+# T3 lineman coverage — 7 games
 
 | Item | Count | Status | Note |
 |---|---:|---|---|
@@ -44,14 +44,19 @@
 | argue success | 0 | absent (optional) | d6 = 6 only |
 | players ejected | 0 | **MISSING** |  |
 | touchdowns | 0 | **MISSING** |  |
-| half starts | 2 | ok |  |
-| weather changes | 1 | ok | kickoff event roll of 8 only |
-| kickoff events | 2 | ok | per-result table below |
+| half starts | 14 | ok |  |
+| weather changes | 9 | ok | kickoff event roll of 8 only |
+| kickoff events | 14 | ok | per-result table below |
 
 ## Kickoff results
 
-- Cheering Fans: 1
-- Time-out: 1
+- Brilliant Coaching: 4
+- Charge: 2
+- Cheering Fans: 2
+- High Kick: 1
+- Quick Snap: 1
+- Solid Defence: 2
+- Weather Change: 2
 
 ## Hash-verified (not evented)
 
