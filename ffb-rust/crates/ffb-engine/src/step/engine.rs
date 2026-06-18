@@ -17,7 +17,7 @@ use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::passing::can_intercept;
 use ffb_model::events::GameEvent;
-use ffb_model::enums::{GameStatus, Weather};
+use ffb_model::enums::{GameStatus, Weather, SkillId};
 use ffb_model::prompts::AgentPrompt;
 
 use ffb_model::model::team::Team;
@@ -1070,7 +1070,14 @@ impl Step {
                 }
                 let ag = find_player_agility(game, &player_id);
                 let tz_mod = count_opponent_tackle_zones_at(game, &player_id, player_coord);
-                let minimum = (ag + tz_mod).max(2);
+                // Java PickupModifierCollection: +1 for Pouring Rain unless player has BigHand.
+                let has_big_hand = game.team_home.players.iter()
+                    .chain(game.team_away.players.iter())
+                    .find(|p| p.id == player_id)
+                    .map(|p| p.has_skill(SkillId::BigHand))
+                    .unwrap_or(false);
+                let weather_mod = if game.weather == Weather::PouringRain && !has_big_hand { 1 } else { 0 };
+                let minimum = (ag + tz_mod + weather_mod).max(2);
                 let roll = rng.d6();
                 let pickup_success = is_skill_roll_successful(roll, minimum);
                 let pickup_ev = GameEvent::PickupRoll {
@@ -1507,8 +1514,15 @@ impl Step {
                     Some(c) => c,
                     None => return StepOutcome::next(),
                 };
-                let pass_dist = passing_distance_bb2025(passer_coord, receiver_coord)
-                    .unwrap_or(PassingDistance::LongBomb);
+                // Java PassMechanic.findPassingDistance: returns null when dx>=14 or dy>=14.
+                // StepInitPassing skips to END_PASSING when null → 0 dice, ball stays at thrower, turnover.
+                let pass_dist = match passing_distance_bb2025(passer_coord, receiver_coord) {
+                    Some(d) => d,
+                    None => {
+                        game.turnover = true;
+                        return StepOutcome::next();
+                    }
+                };
 
                 // StepPass.executeStep:221 — roll d6 for pass accuracy.
                 // BB2025 PassMechanic.evaluatePass:
@@ -3000,20 +3014,32 @@ fn apply_foul_injury(game: &mut Game, fouler_id: &str, target_id: &str, rng: &mu
             was_cas: false,
         });
     }
-    // StepReferee (SneakyGitBehaviour): doubles on armor OR (armor broken and doubles on injury)
+    // BB2025 referee (StepReferee → SneakyGitBehaviour):
+    // Doubles on armor roll always trigger referee (even if armor didn't break).
+    // Doubles on injury roll trigger referee only when armor broke.
     let referee_spots = armor_doubles || (broke && injury_doubles);
     if referee_spots {
-        // StepBribes: parity runner always argues with first player; roll 1 d6.
-        // BB2025: when the referee SPOTS a foul, the turn always ends (turnover) regardless
-        // of argue result. Argue only determines whether the fouler is also ejected.
-        let argue = rng.d6();
         game.turnover = true;
-        if argue <= 5 {
-            // Argue failed: StepEjectPlayer — fouler sent off (BANNED).
+        // StepBribes.askForArgueTheCall: argue offered unless coach already banned for this drive.
+        // Java also skips when wasCased (fouler is a casualty), but in normal play the fouler
+        // is never in a casualty state, so we only check coach_banned.
+        if !game.turn_data().coach_banned {
+            // Parity runner always argues; roll 1 d6.
+            // DiceInterpreter: isArgueSuccessful = roll>5, isCoachBanned = roll<2.
+            let argue = rng.d6();
+            if argue < 2 {
+                game.turn_data_mut().coach_banned = true;
+            }
+            if argue <= 5 {
+                game.field_model.player_coordinates.remove(fouler_id);
+                game.field_model.set_player_state(fouler_id, PlayerState::new(PS_BANNED));
+            }
+            // argue==6: argue succeeds, fouler stays on pitch.
+        } else {
+            // Coach already banned: no argue die, auto-eject fouler.
             game.field_model.player_coordinates.remove(fouler_id);
             game.field_model.set_player_state(fouler_id, PlayerState::new(PS_BANNED));
         }
-        // If argue == 6: argue succeeds, fouler stays on pitch, but turnover still occurs.
     }
     evs
 }

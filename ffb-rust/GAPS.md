@@ -250,11 +250,32 @@ From reading Java's `StepEndTurn.java`:
 
 ---
 
+---
+
+### G-RULE-7: Foul referee + pass out-of-range — T3 seeds 75/79/80/81 (**FIXED 2026-06-18**)
+**Found:** 2026-06-18  
+**Severity:** Medium — blocked seeds 75, 79, 80, 81 from T3 parity
+
+**Root causes (three separate bugs):**
+
+**1. Pass out-of-range (seed 81) — `engine.rs` `Step::DoPass`**  
+When the pass target is `deltaX >= 14 || deltaY >= 14`, `passing_distance_bb2025()` returns `None`. Java's `StepInitPassing.executeStep()` never advances `NEXT_STEP` when `findPassingDistance()` returns `null` — the parity runner sends `CLIENT_END_TURN`, consuming 0 dice, ball stays at thrower, turnover. Rust was using `.unwrap_or(PassingDistance::LongBomb)`, rolling 2 dice and treating it as a long-bomb attempt. Fix: early-return from `DoPass` with `game.turnover = true` when distance is `None`.
+
+**2. Coach ban persists for drive (seeds 79/80) — `turn_data.rs` `reset_for_turn()`**  
+Java's `TurnData.startTurn()` resets `blitzUsed`, `foulUsed`, `passUsed`, etc. per turn, but does NOT reset `coachBanned` — it persists for the full drive. Seeds 79 and 80 had a prior foul where the argue roll returned 1 (coach banned), and a subsequent foul in the same drive should also skip the argue die. Rust was incorrectly resetting `coach_banned = false` each turn. Fix: remove `coach_banned = false` from `reset_for_turn()`.
+
+**3. Wrong argue-skip condition (seed 1 regression) — `engine.rs` `apply_foul_injury()`**  
+A stale `auto_eject = armor_doubles && broke` condition caused Rust to skip the argue die whenever armor doubles broke armor. Java's actual condition (from `StepBribes.askForArgueTheCall()`) is `!isCoachBanned() && !wasCased`, where `wasCased` checks if the fouler is already a casualty (never true in normal play). The argue die should always be offered when the referee spots the foul and the coach is not already banned. Fix: replace `auto_eject` logic with a simple `!game.turn_data().coach_banned` guard.
+
+**Status:** All three fixed. T3 now 100/100.
+
+---
+
 ## Priority Order for Fixes
 
 1. **G-RULE-1** — Secret Weapon end-of-drive (blocks Dwarf + Goblin, common T2 race types)
-2. **G-LOG-1** — Expand state hash (catch silent reroll/ball-carrier bugs)
-3. **G-LOG-2/4** — Log sub-turn decisions + dice (required before T3 with real activation)
-4. **G-LOG-5** — Add `--verbose` state string logging (already implemented, see runner.rs)
-5. **G-RULE-3** — Real player activation (large; needed for T3)
-6. **G-RULE-2** — FUMBBL race loading (investigate Java side)
+3. **G-LOG-1** — Expand state hash (catch silent reroll/ball-carrier bugs)
+4. **G-LOG-2/4** — Log sub-turn decisions + dice (required before T3 with real activation)
+5. **G-LOG-5** — Add `--verbose` state string logging (already implemented, see runner.rs)
+6. **G-RULE-3** — Real player activation (large; needed for T3)
+7. **G-RULE-2** — FUMBBL race loading (investigate Java side)

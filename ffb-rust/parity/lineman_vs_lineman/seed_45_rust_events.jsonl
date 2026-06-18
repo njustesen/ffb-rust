@@ -16,7 +16,7 @@
 {"type":"blockRoll","attacker_id":"away_01","defender_id":"home_03","nr_of_dice":1,"dice":[2],"selected_index":0,"own_choice":true,"rerolled":false}
 {"type":"injury","player_id":"home_03","armor_roll":[5,2],"injury_roll":null,"serious_injury":null,"was_ko":false,"was_cas":false}
 {"type":"injury","player_id":"away_01","armor_roll":[1,2],"injury_roll":null,"serious_injury":null,"was_ko":false,"was_cas":false}
-{"type":"pickupRoll","player_id":"home_03","target":3,"roll":6,"success":true,"rerolled":false}
+{"type":"pickupRoll","player_id":"home_03","target":4,"roll":6,"success":true,"rerolled":false}
 {"type":"dodgeRoll","player_id":"away_02","target":3,"roll":4,"success":true,"rerolled":false}
 {"type":"dodgeRoll","player_id":"away_01","target":3,"roll":4,"success":true,"rerolled":false}
 {"type":"passRoll","player_id":"home_03","target":4,"distance":"LongPass","roll":4,"result":"Inaccurate","rerolled":false}

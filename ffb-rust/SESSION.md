@@ -1,12 +1,71 @@
 # FFB-Rust Session State
 
-## Current Status (session 47 end, 2026-06-17)
+## Current Status (session 49 end, 2026-06-18)
 
-**Test counts: 2,600 total (883 engine, 1,219 mechanics, 406 model, 39 parity, 31 client, 21 protocol, 1 doc)**
-**Parity: T2 complete — 26/26 races × 100/100 seeds via `--tier 2` (default) ✓**
-**T3: 55/100 lineman_vs_lineman seeds passing** (goal of 50/100 MET)
+**Test counts: 1,714 total (engine, mechanics, model, client, protocol)**
+**Parity: T2 complete — 26/26 races × 100/100 seeds ✓**
+**T3: 100/100 seeds passing ✓** (lineman_vs_lineman, bb2025)
 
 All tests passing. Zero failures.
+
+---
+
+## Session 49 Summary (2026-06-18) — T3 100/100
+
+**Goal:** Fix remaining T3 failures (seeds 79, 80, 81) to reach 100/100. Also fix a seed 1 regression introduced by a stale stash.
+
+**Result:** ✓ T3 100/100. All unit tests pass (zero failures).
+
+### Fixes applied this session
+
+**1. Pass out-of-range — 0 dice, turnover (seed 81)**  
+`DoPass` in `engine.rs`: `passing_distance_bb2025()` returns `None` when `deltaX >= 14 || deltaY >= 14`. Old code used `.unwrap_or(PassingDistance::LongBomb)`, rolling 2 dice. Java's `StepInitPassing` never advances `NEXT_STEP` when `findPassingDistance()` is null → parity runner sends `CLIENT_END_TURN` → 0 dice, ball stays at thrower, turnover. Fixed with an early-return when distance is `None`.
+
+**2. Coach ban persists for drive — NOT reset per turn (seeds 79/80)**  
+Java's `TurnData.startTurn()` resets per-turn action flags but does NOT reset `coachBanned`. It persists for the entire drive (half). A stash had added `self.coach_banned = false` to Rust's `reset_for_turn()`, causing Rust to offer the argue dialog on subsequent turns when Java would not. Fixed by removing that line.
+
+**3. Foul referee argue condition — use `!coach_banned` only (seed 1 regression)**  
+A stale `auto_eject = armor_doubles && broke` condition was causing Rust to skip the argue die for seed 1's step 215 foul (armor=5+5, injury=4+5=KO). Java always offers the argue die unless `isCoachBanned() || wasCased` (fouler is a casualty — never true in normal play). Fixed by replacing the `auto_eject` block with a plain `!game.turn_data().coach_banned` guard.
+
+---
+
+## Session 48 Summary (2026-06-18) — T3 seeds 1-55 all passing (55/55)
+
+**Goal:** Fix remaining T3 failures in seeds 1-55. Starting point was ~7/55; ended at 55/55.
+
+**Result:** ✓ All seeds 1-55 pass. Seeds 75, 79, 81 still fail (deferred — post-fumble pickup routing).
+
+### Fixes applied this session
+
+**1. CSTIN inline catch (seed 71 + kickoff semantics)**
+
+After a kickoff scatter lands on a player, Java's `StepCatchScatterThrowIn.executeStep()` performs a single catch attempt in-line (not via a separate step). The catch uses BB2016 formula: `(7 - min(ag,6) + modifier).max(2)` → for AG=3, TZ=0: min=4.
+
+Rust's `Step::CatchScatterThrowIn` was not attempting the catch inline; it let the ball land and triggered a separate catch step. Fixed by implementing the in-place catch attempt with BB2016 formula in the CSTIN handler.
+
+**2. GFI implementation**
+
+`current_move` increments each time a player steps. When `current_move > ma`, each additional step requires a GFI roll (d6, target ≥ 2; fail = fall + turnover). `legal_move_targets` caps reachable squares at MA+2 (MA + 2 GFI max). Both were missing in Rust.
+
+**3. Agent stubs: ReRollOffer, ApothecaryChoice, Interception → decline**
+
+Java's parity agent always declines these three dialogs without consuming additional RNG dice. Rust's agent was not handling them, causing an infinite offer loop or wrong response. Added explicit decline handlers to `RandomAgent`.
+
+**4. Intercept step in pass_sequence**
+
+Java's pass sequence includes an intercept dialog (`StepInterception`). Rust was missing this step entirely. Added `Step::Intercept` to the pass_sequence chain; the agent always declines, so no dice are consumed but the step boundary exists.
+
+**5. Eligible player list cached at turn start (InitSelecting)**
+
+Java snapshots the set of eligible players at `INIT_SELECTING` and uses that cached set throughout the turn. Rust was recomputing eligibility each activation, which could include players who became ineligible mid-turn (e.g., after a turnover). Fixed by caching the list at `InitSelecting`.
+
+**6. PickUp formula confirmed BB2025**
+
+`Step::PickUp` uses `(ag + tz_mod).max(2)` — BB2025 formula. Confirmed by seed 32 dice trace: Java's StepPickUp shows roll=3 at the relevant position, and the next step is `StepMoveDodge.dodge` (not a scatter), confirming the pickup succeeded with roll=3. The BB2016 formula gives min=4 for AG=3, TZ=0, which would fail on roll=3 and diverge.
+
+### Seeds 75, 79, 81 — deferred (post-fumble pickup)
+
+These three seeds fail at a pickup attempt that follows a block casualty (ball carrier knocked out, ball fumbled). See G-RULE-7 in GAPS.md for full diagnostic.
 
 ---
 

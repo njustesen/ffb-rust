@@ -85,6 +85,7 @@ impl TurnData {
         self.bomb_used = false;
         self.secure_the_ball_used = false;
         self.punt_used = false;
+        // coach_banned persists for the entire drive — NOT reset per turn (matches Java TurnData.startTurn())
         self.quick_snap_bonus = 0;
         self.acted_player_ids.clear();
         self.turn_eligible_cache.clear();

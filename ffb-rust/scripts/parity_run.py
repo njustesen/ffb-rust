@@ -166,8 +166,7 @@ def run_seed(seed: int, home: str, away: str, edition: str,
              java_cp: str | None, server_dir: str | None, rust_bin: Path | None,
              results_dir: Path) -> dict:
     """Run one seed through both engines and compare. Returns a result dict."""
-    from scripts_parity_compare import compare  # inline import to avoid circular issues
-    import importlib, sys as _sys
+    import importlib.util, sys as _sys
     spec = importlib.util.spec_from_file_location("parity_compare", SCRIPT_DIR / "parity_compare.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

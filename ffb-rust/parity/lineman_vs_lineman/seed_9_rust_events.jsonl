@@ -41,5 +41,5 @@
 {"type":"blockRoll","attacker_id":"home_04","defender_id":"away_01","nr_of_dice":1,"dice":[4],"selected_index":0,"own_choice":true,"rerolled":false}
 {"type":"foul","attacker_id":"home_03","defender_id":"away_03"}
 {"type":"injury","player_id":"away_03","armor_roll":[2,2],"injury_roll":null,"serious_injury":null,"was_ko":false,"was_cas":false}
-{"type":"dodgeRoll","player_id":"home_04","target":3,"roll":3,"success":true,"rerolled":false}
+{"type":"dodgeRoll","player_id":"home_04","target":3,"roll":5,"success":true,"rerolled":false}
 {"type":"dodgeRoll","player_id":"home_05","target":3,"roll":3,"success":true,"rerolled":false}
