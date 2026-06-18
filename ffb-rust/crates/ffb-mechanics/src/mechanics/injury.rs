@@ -18,7 +18,7 @@ pub enum InjuryOutcome {
 /// Formula: 2d6 + sum(modifiers) > armor_value
 pub fn armor_broken(armor_value: i32, roll: [i32; 2], modifiers: &[Modifier]) -> bool {
     let modifier_sum: i32 = modifiers.iter().map(|m| m.value).sum();
-    roll[0] + roll[1] + modifier_sum > armor_value
+    roll[0] + roll[1] + modifier_sum >= armor_value
 }
 
 /// Evaluate the injury table from a 2d6 roll (all editions share the same table).
@@ -149,6 +149,20 @@ pub fn casualty_tier_bb2025(roll: i32) -> CasualtyTier {
     }
 }
 
+/// BB2025 d16 casualty roll → specific SeriousInjuryKind (None = Badly Hurt).
+pub fn serious_injury_kind_bb2025(roll: i32) -> Option<SeriousInjuryKind> {
+    match roll {
+        1..=8  => None,
+        9      => Some(SeriousInjuryKind::SmashedKneeMa),
+        10     => Some(SeriousInjuryKind::HeadInjuryAv),
+        11     => Some(SeriousInjuryKind::BrokenArmPa),
+        12     => Some(SeriousInjuryKind::NeckInjuryAg),
+        13     => Some(SeriousInjuryKind::DislocatedHipAg),
+        14     => Some(SeriousInjuryKind::DislocatedShoulderSt),
+        _      => Some(SeriousInjuryKind::Dead),
+    }
+}
+
 /// High-level casualty outcome tier — determines what happens to the player.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CasualtyTier {
@@ -273,8 +287,10 @@ mod tests {
     fn armor_broken_exact_threshold() {
         // armor 8, roll 4+5=9 → broken
         assert!(armor_broken(8, [4, 5], &[]));
-        // armor 8, roll 4+4=8 → NOT broken (must be strictly greater)
-        assert!(!armor_broken(8, [4, 4], &[]));
+        // armor 8, roll 4+4=8 → broken (Java: armour <= roll_sum, i.e. 8 <= 8 = true)
+        assert!(armor_broken(8, [4, 4], &[]));
+        // armor 8, roll 3+4=7 → NOT broken
+        assert!(!armor_broken(8, [3, 4], &[]));
     }
 
     #[test]
@@ -286,7 +302,7 @@ mod tests {
 
     #[test]
     fn armor_not_broken_with_negative_modifier() {
-        // armor 8, roll 4+5=9, -2 mod → 7 ≤ 8 → not broken
+        // armor 8, roll 4+5=9, -2 mod → 7 < 8 → not broken
         let m = Modifier::new("test", -2, Rules::Common);
         assert!(!armor_broken(8, [4, 5], &[m]));
     }

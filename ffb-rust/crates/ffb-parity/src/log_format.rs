@@ -107,6 +107,10 @@ pub fn rust_log_path_for(seed: u64, home: &str, away: &str) -> String {
     format!("parity/{home}_vs_{away}/seed_{seed}_rust.jsonl")
 }
 
+pub fn rust_events_path_for(seed: u64, home: &str, away: &str) -> String {
+    format!("parity/{home}_vs_{away}/seed_{seed}_rust_events.jsonl")
+}
+
 /// A minimal LogEntry type used by comparator for per-line diffs.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LogEntry {

@@ -125,6 +125,22 @@ pub fn requires_si_roll_bb2020(roll: i32) -> bool {
     roll == 13 || roll == 14
 }
 
+/// BB2025 d16 casualty roll → SeriousInjuryKind.
+/// 1-8 = Badly Hurt (None), 9-14 = Serious Injury, 15-16 = Dead.
+pub fn serious_injury_kind_bb2025(roll: i32) -> Option<ffb_model::enums::SeriousInjuryKind> {
+    use ffb_model::enums::SeriousInjuryKind as K;
+    match roll {
+        1..=8   => None,
+        9       => Some(K::SmashedKneeMa),
+        10      => Some(K::HeadInjuryAv),
+        11      => Some(K::BrokenArmPa),
+        12      => Some(K::NeckInjuryAg),
+        13      => Some(K::DislocatedHipAg),
+        14      => Some(K::DislocatedShoulderSt),
+        _       => Some(K::Dead),  // 15-16
+    }
+}
+
 /// BB2020 serious injury sub-type string for rolls 7–12 (None for 13–14 which use SI table).
 pub fn serious_injury_sub_type_bb2020(roll: i32) -> Option<&'static str> {
     match roll {

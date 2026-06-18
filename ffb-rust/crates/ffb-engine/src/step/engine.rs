@@ -15,6 +15,7 @@
 
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::passing::can_intercept;
 use ffb_model::events::GameEvent;
 use ffb_model::enums::{GameStatus, Weather};
 use ffb_model::prompts::AgentPrompt;
@@ -25,7 +26,7 @@ use ffb_model::enums::{
     PS_STANDING, PS_RESERVE, PS_PRONE, PS_STUNNED,
     PS_KNOCKED_OUT, PS_BADLY_HURT, PS_SERIOUS_INJURY, PS_RIP,
     PS_EXHAUSTED, PS_BANNED,
-    BlockResult,
+    BlockResult, PassResult, PassingDistance,
 };
 use ffb_model::types::{FieldCoordinate, FIELD_WIDTH, FIELD_HEIGHT};
 use ffb_model::kickoff::{kickoff_event_bb2025, KickoffEventKind};
@@ -34,12 +35,14 @@ use ffb_mechanics::mechanics::{
     scatter_coordinate,
     block_result_for_roll, block_dice_count,
     armor_broken, injury_result, InjuryOutcome, casualty_tier_bb2025, CasualtyTier,
-    minimum_roll_dodge,
+    minimum_roll_dodge, minimum_roll_catch_bb2016,
     throw_in_distance, throw_in_direction_for_roll,
     corner_throw_in_direction_for_roll, is_corner_square, corner_direction,
     passing_distance_bb2025,
+    serious_injury_kind_bb2025,
 };
-use ffb_mechanics::modifiers::DODGE_TACKLE_ZONE;
+use ffb_mechanics::mechanics::{GFI_MINIMUM_ROLL, STAND_UP_COST, is_skill_roll_successful};
+use ffb_mechanics::modifiers::{DODGE_TACKLE_ZONE, Modifier};
 
 use crate::action::{Action, PlayerActionChoice};
 use crate::legal_actions::{legal_activate_player_actions, legal_move_targets, legal_blitz_move_targets, legal_block_targets, bfs_path, TeamSide};
@@ -210,6 +213,9 @@ pub enum Step {
     /// if catch fails set turnover + roll d8 scatter. Receiver is in acting_player.defender_id.
     /// 1:1 with Java StepPass (BB2025) + StepCatchScatterThrowIn.
     DoPass,
+    /// Intercept opportunity: find standing opponents in the pass corridor, emit one prompt.
+    /// Java StepIntercept. Agent always declines per parity contract; 0 actionRng consumed.
+    Intercept,
     /// End of a player's activation: record acted_player_id, clear acting_player, re-select.
     /// (Java `StepEndPlayerAction`.)
     EndPlayerAction,
@@ -243,6 +249,7 @@ impl Step {
             Step::DoFoul => StepId::Foul,
             Step::DoHandOff => StepId::HandOver,
             Step::DoPass => StepId::Pass,
+            Step::Intercept => StepId::Intercept,
             Step::EndPlayerAction => StepId::EndPlayerAction,
         }
     }
@@ -592,20 +599,25 @@ impl Step {
                         } else {
                             None
                         };
-                        // insertSteps: roll d6 per selected player; 1 → box (RESERVE + remove from field)
+                        // insertSteps: roll d6 per selected player; 1 → box, 2-6 → -MA/-AV for drive
                         if let Some(ref pid) = player_home_id {
                             let roll = rng.d6();
                             if roll == 1 {
                                 game.field_model.set_player_state(pid, PlayerState::new(PS_RESERVE));
                                 game.field_model.remove_player(pid);
+                            } else if let Some(p) = game.team_home.players.iter_mut().find(|p| &p.id == pid) {
+                                p.armour -= 1;
+                                p.movement -= 1;
                             }
-                            // else: enhancement marker (-MA/-AV) not tracked in state hash
                         }
                         if let Some(ref pid) = player_away_id {
                             let roll = rng.d6();
                             if roll == 1 {
                                 game.field_model.set_player_state(pid, PlayerState::new(PS_RESERVE));
                                 game.field_model.remove_player(pid);
+                            } else if let Some(p) = game.team_away.players.iter_mut().find(|p| &p.id == pid) {
+                                p.armour -= 1;
+                                p.movement -= 1;
                             }
                         }
                         StepOutcome::next().publish(StepParameter::Touchback(*touchback))
@@ -648,11 +660,12 @@ impl Step {
                                     // rollSkill() = d6; minimumRollCatch = max(2, AG)
                                     let catch_roll = rng.d6();
                                     let ag = find_player_agility(game, &player_id);
-                                    let min_roll = (ag).max(2);
+                                    // Java parity uses BB2016 catch formula: (7-AG+TZ).max(2).
+                                    let min_roll = minimum_roll_catch_bb2016(ag, 0);
                                     if std::env::var("FFB_KICKOFF_TRACE").is_ok() {
                                         eprintln!("CSTIN_CATCH half={} at=({},{}) roll={} min={}", game.half, ball.x, ball.y, catch_roll, min_roll);
                                     }
-                                    if catch_roll >= min_roll {
+                                    if is_skill_roll_successful(catch_roll, min_roll) {
                                         // Catch success: setBallMoving(false), ball stays.
                                         game.field_model.ball_moving = false;
                                     } else {
@@ -675,8 +688,9 @@ impl Step {
                                 // else: no tackle zones → SCATTER_BALL; not reached for Standing linemen
                             }
                         } else {
-                            // No player at ball: divingCatch → SCATTER_BALL (no Diving Catch for linemen)
-                            // → bounceBall()
+                            // No player at initial landing square → bounceBall() then attempt catch at new pos.
+                            // Java CSTIN.executeStep: bounce first (d8), then catchBall() at new square — all
+                            // in a single executeStep call, not a loop.
                             let dir_roll = rng.d8();
                             let dir = Direction::for_roll(dir_roll).expect("d8 roll is 1..=8");
                             let (x, y) = scatter_coordinate(ball.x, ball.y, dir, 1);
@@ -695,6 +709,25 @@ impl Step {
                             };
                             if !in_receiving_half {
                                 return StepOutcome::next().publish(StepParameter::Touchback(true));
+                            }
+                            // Ball stayed in bounds — check if a player is at the new square and attempt catch.
+                            if game.field_model.ball_in_play && game.field_model.ball_moving {
+                                if let Some(catcher_id) = game.field_model.player_at(new_pos).cloned() {
+                                    let ps2 = game.field_model.player_state(&catcher_id).unwrap_or_default();
+                                    if ps2.has_tacklezones() {
+                                        let catch_roll = rng.d6();
+                                        let ag = find_player_agility(game, &catcher_id);
+                                        // Java parity uses BB2016 catch formula: (7-AG+TZ).max(2).
+                                    let min_roll = minimum_roll_catch_bb2016(ag, 0);
+                                        if std::env::var("FFB_KICKOFF_TRACE").is_ok() {
+                                            eprintln!("CSTIN_CATCH half={} at=({},{}) roll={} min={}", game.half, new_pos.x, new_pos.y, catch_roll, min_roll);
+                                        }
+                                        if is_skill_roll_successful(catch_roll, min_roll) {
+                                            game.field_model.ball_moving = false;
+                                        }
+                                        // catch fail: ball stays at new_pos, ball_moving=true (remains loose)
+                                    }
+                                }
                             }
                         }
                     }
@@ -848,11 +881,20 @@ impl Step {
                         StepOutcome::next()
                     }
                 } else {
-                    // Java StepEndTurn: remove any unused additional assist for the acting team.
-                    if game.home_playing {
-                        game.home_additional_assists = 0;
+                    // Java StepEndTurn line 236: only remove additional assist in REGULAR/BLITZ turns.
+                    // The kickoff EndTurn fires when turn_nr==0; skip the reset then so CheeringFans
+                    // bonus survives until the first block of the new drive.
+                    let current_turn_nr = if game.home_playing {
+                        game.turn_data_home.turn_nr
                     } else {
-                        game.away_additional_assists = 0;
+                        game.turn_data_away.turn_nr
+                    };
+                    if current_turn_nr > 0 {
+                        if game.home_playing {
+                            game.home_additional_assists = 0;
+                        } else {
+                            game.away_additional_assists = 0;
+                        }
                     }
                     // Normal turn: flip to next team and increment their turn counter.
                     game.home_playing = !game.home_playing;
@@ -950,8 +992,18 @@ impl Step {
                     Some(PlayerAction::StandUp) => {
                         let pid = game.acting_player.player_id.clone().unwrap_or_default();
                         game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
+                        // Java StepStandUp: standing up for free costs STAND_UP_COST (3) MA.
+                        game.acting_player.current_move = STAND_UP_COST;
                         // Java MOVE for prone: stand up, then run full move sequence.
                         StepOutcome::next().push_seq(move_sequence())
+                    }
+                    Some(PlayerAction::StandUpBlitz) => {
+                        // Java: prone player using StandUpBlitz stands up (costs STAND_UP_COST MA),
+                        // then blitzes — same as Blitz but with the 3-MA stand-up cost applied.
+                        let pid = game.acting_player.player_id.clone().unwrap_or_default();
+                        game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
+                        game.acting_player.current_move = STAND_UP_COST;
+                        StepOutcome::next().push_seq(blitz_sequence())
                     }
                     Some(PlayerAction::Foul) => StepOutcome::next().push_seq(foul_sequence()),
                     Some(PlayerAction::Pass) => StepOutcome::next().push_seq(pass_sequence()),
@@ -1010,145 +1062,32 @@ impl Step {
                 if !game.field_model.ball_in_play || !game.field_model.ball_moving || !on_ball {
                     return StepOutcome::next();
                 }
-                // minimumRollPickup: max(2, AG + opponent_TZ_count)
+                // Prone player (failed dodge) cannot pick up — ball scatters from their square.
+                let player_state = game.field_model.player_state(&player_id).unwrap_or_default();
+                if !player_state.has_tacklezones() {
+                    bounce_ball_chain(game, player_coord, rng);
+                    return StepOutcome::next();
+                }
                 let ag = find_player_agility(game, &player_id);
                 let tz_mod = count_opponent_tackle_zones_at(game, &player_id, player_coord);
                 let minimum = (ag + tz_mod).max(2);
                 let roll = rng.d6();
-                if roll >= minimum {
+                let pickup_success = is_skill_roll_successful(roll, minimum);
+                let pickup_ev = GameEvent::PickupRoll {
+                    player_id: player_id.clone(),
+                    target: minimum,
+                    roll,
+                    success: pickup_success,
+                    rerolled: false,
+                };
+                if pickup_success {
                     game.field_model.ball_moving = false;
-                    return StepOutcome::next();
+                    return StepOutcome::next().with_event(pickup_ev);
                 }
                 // FAILURE: turnover; run CSTIN FAILED_PICK_UP → SCATTER_BALL → bounceBall chain
                 game.turnover = true;
-
-                // Local mode tags matching Java's CatchScatterThrowInMode state machine.
-                // Data (catcher_id, throw_in_coord) stored separately to avoid enum-with-data
-                // lifetime issues inside the match.
-                #[derive(PartialEq)]
-                enum Mode { Scatter, CatchScatter, ThrowIn, CatchThrowIn }
-
-                let mut mode = Mode::Scatter;
-                let mut catcher_id: Option<String> = None;
-                let mut throw_in_coord: FieldCoordinate = player_coord; // initial ball pos
-
-                loop {
-                    match mode {
-                        Mode::Scatter => {
-                            // bounceBall(): roll d8, move ball 1 step.
-                            // Java: lastValidCoordinate = end if in-bounds else start.
-                            // Sets ball_coordinate = end (even if OOB). OOB → THROW_IN.
-                            // Empty in-bounds → null (done). Player with TZ → CATCH_SCATTER.
-                            // Player without TZ → FAILED_CATCH → SCATTER_BALL (loop again).
-                            let dir_roll = rng.d8();
-                            let dir = Direction::for_roll(dir_roll).expect("d8 is 1..=8");
-                            let ball_start = game.field_model.ball_coordinate.unwrap_or(player_coord);
-                            let (ex, ey) = scatter_coordinate(ball_start.x, ball_start.y, dir, 1);
-                            let ball_end = FieldCoordinate::new(ex, ey);
-                            let last_valid = if ball_end.is_on_pitch() { ball_end } else { ball_start };
-                            game.field_model.ball_coordinate = Some(ball_end);
-                            game.field_model.ball_moving = true;
-                            if std::env::var_os("FFB_TRACE").is_some() {
-                                eprintln!("RUST_PICKUP_BOUNCE from={ball_start:?} dir={dir:?} dir_roll={dir_roll} to={ball_end:?} on_pitch={}", ball_end.is_on_pitch());
-                            }
-
-                            if ball_end.is_on_pitch() {
-                                if let Some(pid) = game.field_model.player_at(ball_end).cloned() {
-                                    let ps = game.field_model.player_state(&pid).unwrap_or_default();
-                                    if ps.has_tacklezones() {
-                                        catcher_id = Some(pid);
-                                        mode = Mode::CatchScatter;
-                                    }
-                                    // else: no TZ → FAILED_CATCH → stays Mode::Scatter
-                                } else {
-                                    break; // empty square: return null → done
-                                }
-                            } else {
-                                // OOB: fThrowInCoordinate = last valid (= ball_start)
-                                throw_in_coord = last_valid;
-                                mode = Mode::ThrowIn;
-                            }
-                        }
-                        Mode::CatchScatter => {
-                            // catchBall() with CATCH_SCATTER context: +1 modifier.
-                            // minimumRollCatch = max(2, AG + 1).
-                            let pid = catcher_id.take().unwrap();
-                            let catch_ag = find_player_agility(game, &pid);
-                            let catch_target = (catch_ag + 1).max(2);
-                            let catch_roll = rng.d6();
-                            if catch_roll >= catch_target {
-                                game.field_model.ball_moving = false;
-                                break;
-                            } else {
-                                // FAILED_CATCH → SCATTER_BALL
-                                mode = Mode::Scatter;
-                            }
-                        }
-                        Mode::ThrowIn => {
-                            // throwInBall(): roll direction (d3 corner / d6 edge) + 2×d6 distance.
-                            // Java loop: for i in 0..distance, position = start + i steps.
-                            // (i=0 gives start itself, max displacement = distance-1 squares.)
-                            // In-bounds end → CATCH_THROW_IN. OOB end → THROW_IN again.
-                            let ti_start = throw_in_coord;
-                            let is_corner = is_corner_square(ti_start.x, ti_start.y);
-                            let dir_roll = if is_corner { rng.d3() } else { rng.d6() };
-                            let dir = if is_corner {
-                                corner_throw_in_direction_for_roll(
-                                    corner_direction(ti_start.x, ti_start.y), dir_roll)
-                            } else {
-                                throw_in_direction_for_roll(ti_start.x, ti_start.y, dir_roll)
-                            };
-                            let d1 = rng.d6();
-                            let d2 = rng.d6();
-                            let distance = throw_in_distance(d1, d2, game.rules);
-                            // Java: for i in 0..distance; final pos = start + (distance-1) steps
-                            let mut ball_end = ti_start;
-                            let mut last_valid_ti = ti_start;
-                            for i in 0..distance {
-                                let (nx, ny) = scatter_coordinate(ti_start.x, ti_start.y, dir, i);
-                                let nc = FieldCoordinate::new(nx, ny);
-                                ball_end = nc;
-                                if nc.is_on_pitch() {
-                                    last_valid_ti = nc;
-                                }
-                            }
-                            game.field_model.ball_moving = true;
-                            if ball_end == last_valid_ti {
-                                // in bounds: CATCH_THROW_IN
-                                game.field_model.ball_coordinate = Some(last_valid_ti);
-                                mode = Mode::CatchThrowIn;
-                            } else {
-                                // OOB: Java sets ball_coordinate = null, throw in from last_valid
-                                game.field_model.ball_coordinate = None;
-                                throw_in_coord = last_valid_ti;
-                                // mode stays ThrowIn
-                            }
-                        }
-                        Mode::CatchThrowIn => {
-                            // CATCH_THROW_IN: player at ball → CATCH_SCATTER.
-                            // No player → divingCatch → no diving catchers for linemen
-                            // → SCATTER_BALL → bounceBall again.
-                            let ball_pos = match game.field_model.ball_coordinate {
-                                Some(c) => c,
-                                None => break,
-                            };
-                            if let Some(pid) = game.field_model.player_at(ball_pos).cloned() {
-                                let ps = game.field_model.player_state(&pid).unwrap_or_default();
-                                if ps.has_tacklezones() {
-                                    catcher_id = Some(pid);
-                                    mode = Mode::CatchScatter;
-                                } else {
-                                    // no TZ → SCATTER_BALL
-                                    mode = Mode::Scatter;
-                                }
-                            } else {
-                                // no player → divingCatch → SCATTER_BALL (no Diving Catch for linemen)
-                                mode = Mode::Scatter;
-                            }
-                        }
-                    }
-                }
-                StepOutcome::next()
+                bounce_ball_chain(game, player_coord, rng);
+                StepOutcome::next().with_event(pickup_ev)
             }
 
             // Java StepEndMoving: post-movement stub (no dice for skill-less lineman).
@@ -1180,6 +1119,16 @@ impl Step {
                                     eprintln!("  OPP {} coord={c:?} state={s:?}", p.id);
                                 }
                             }
+                            // Java sendBlitzTargetSelection: no adjacent target → inject EndTurn,
+                            // ending the team's full turn. Mirror via game.turnover so EndPlayerAction
+                            // pushes end_turn_sequence() instead of select_sequence().
+                            let is_blitz = matches!(
+                                game.acting_player.player_action,
+                                Some(PlayerAction::Blitz) | Some(PlayerAction::StandUpBlitz)
+                            );
+                            if is_blitz {
+                                game.turnover = true;
+                            }
                             return StepOutcome::next();
                         }
                         targets[0].clone()
@@ -1199,17 +1148,17 @@ impl Step {
 
 
                 // Roll N dice, always pick index 0 (mirrors Java parity runner §7: always die 0).
+                let mut all_dice: Vec<i32> = Vec::with_capacity(n_dice);
                 let roll = rng.d6();
+                all_dice.push(roll);
                 for _ in 1..n_dice {
-                    let _ = rng.d6(); // consume remaining dice to keep game RNG in sync
+                    all_dice.push(rng.d6());
                 }
                 let result = block_result_for_roll(roll);
                 if std::env::var_os("FFB_TRACE").is_some() {
                     eprintln!("RUST_DOBLOCK_RESULT atk={attacker_id} def={defender_id} roll={roll} result={result:?} rng_after={}", rng.call_count);
                 }
-                // Negative dice_count = defender picks: in Java parity, always pick index 0.
-                // Index 0 = first die rolled. No change needed (we already use the first die).
-                let _ = dice_count;
+                let own_choice = dice_count > 0;
 
                 // Capture ball positions before knockdowns (KO removes player coordinate).
                 let atk_coord_pre = game.field_model.player_coordinate(&attacker_id);
@@ -1218,11 +1167,22 @@ impl Step {
                 let atk_has_ball = atk_coord_pre.zip(ball_coord).map_or(false, |(a, b)| a == b);
                 let def_has_ball = def_coord_pre.zip(ball_coord).map_or(false, |(d, b)| d == b);
 
+                let mut step_evs: Vec<GameEvent> = Vec::new();
+                step_evs.push(GameEvent::BlockRoll {
+                    attacker_id: attacker_id.clone(),
+                    defender_id: defender_id.clone(),
+                    nr_of_dice: dice_count,
+                    dice: all_dice,
+                    selected_index: 0,
+                    own_choice,
+                    rerolled: false,
+                });
+
                 match result {
                     BlockResult::Skull => {
                         // Attacker knocked down = turnover. Java StepDropFallingPlayers publishes
                         // END_TURN=true whenever the acting player's state is FALLING.
-                        apply_knockdown(game, &attacker_id, rng);
+                        step_evs.extend(apply_knockdown(game, &attacker_id, rng));
                         game.turnover = true;
                         // Java StepCatchScatterThrowIn.bounceBall: scatter ball if carrier fell.
                         if atk_has_ball {
@@ -1233,8 +1193,8 @@ impl Step {
                         // Attacker knocked down = turnover (no Block/Wrestle skill for linemen).
                         // Java resolves DEFENDER's armor/injury first, then ATTACKER's,
                         // then scatters ball after both armor rolls (not interleaved).
-                        apply_knockdown(game, &defender_id, rng);
-                        apply_knockdown(game, &attacker_id, rng);
+                        step_evs.extend(apply_knockdown(game, &defender_id, rng));
+                        step_evs.extend(apply_knockdown(game, &attacker_id, rng));
                         game.turnover = true;
                         if atk_has_ball {
                             scatter_ball_from_knockdown(game, atk_coord_pre.unwrap(), rng);
@@ -1245,27 +1205,46 @@ impl Step {
                     BlockResult::Pushback => {
                         // Follow-up DECLINED per §7 of AGENT_CONTRACT: defender pushed,
                         // attacker stays in place (no follow-through move).
-                        auto_push(game, &attacker_id, &defender_id, game.home_playing);
+                        auto_push(game, &attacker_id, &defender_id);
                         // If defender had ball, move it with them (Java FieldModel keeps ball with pusher).
                         if def_has_ball {
                             if let Some(new_dc) = game.field_model.player_coordinate(&defender_id) {
                                 game.field_model.ball_coordinate = Some(new_dc);
+                            }
+                        } else {
+                            // Java StepPushback.pushPlayer: if ball is moving and defender lands on ball
+                            // square, sets SCATTER_BALL mode → StepCatchScatterThrowIn.bounceBall runs.
+                            let def_new_coord = game.field_model.player_coordinate(&defender_id);
+                            let pushed_onto_ball = def_new_coord
+                                .zip(game.field_model.ball_coordinate)
+                                .map_or(false, |(dc, bc)| dc == bc)
+                                && game.field_model.ball_moving;
+                            if pushed_onto_ball {
+                                let from = game.field_model.ball_coordinate.unwrap();
+                                scatter_ball_from_knockdown(game, from, rng);
                             }
                         }
                     }
                     BlockResult::PowPushback => {
                         // Follow-up DECLINED per §7: defender pushed + knocked down,
                         // attacker stays in place.
-                        auto_push(game, &attacker_id, &defender_id, game.home_playing);
+                        auto_push(game, &attacker_id, &defender_id);
+                        let def_new_coord = game.field_model.player_coordinate(&defender_id);
+                        // Java StepPushback.pushPlayer: detect pushed-onto-ball before moving ball with carrier.
+                        let pushed_onto_ball = !def_has_ball
+                            && def_new_coord.zip(game.field_model.ball_coordinate).map_or(false, |(dc, bc)| dc == bc)
+                            && game.field_model.ball_moving;
                         if def_has_ball {
-                            if let Some(new_dc) = game.field_model.player_coordinate(&defender_id) {
+                            if let Some(new_dc) = def_new_coord {
                                 game.field_model.ball_coordinate = Some(new_dc);
                             }
                         }
-                        let def_coord_post_push = game.field_model.player_coordinate(&defender_id);
-                        apply_knockdown(game, &defender_id, rng);
-                        if def_has_ball {
-                            if let Some(dc) = def_coord_post_push {
+                        step_evs.extend(apply_knockdown(game, &defender_id, rng));
+                        // Scatter ball after knockdown: either carrier fell (def_has_ball) or defender
+                        // was knocked onto a loose ball (pushed_onto_ball). Java: StepCatchScatterThrowIn
+                        // runs after StepDropFallingPlayers with the SCATTER_BALL mode set by StepPushback.
+                        if def_has_ball || pushed_onto_ball {
+                            if let Some(dc) = def_new_coord {
                                 scatter_ball_from_knockdown(game, dc, rng);
                             }
                         }
@@ -1273,22 +1252,25 @@ impl Step {
                     BlockResult::Pow => {
                         // Pow also pushes the defender (same as PowPushback, but no dodge option).
                         // Java StepBlockChoice case POW calls initPushback — identical sequence.
-                        auto_push(game, &attacker_id, &defender_id, game.home_playing);
+                        auto_push(game, &attacker_id, &defender_id);
+                        let def_new_coord = game.field_model.player_coordinate(&defender_id);
+                        let pushed_onto_ball = !def_has_ball
+                            && def_new_coord.zip(game.field_model.ball_coordinate).map_or(false, |(dc, bc)| dc == bc)
+                            && game.field_model.ball_moving;
                         if def_has_ball {
-                            if let Some(new_dc) = game.field_model.player_coordinate(&defender_id) {
+                            if let Some(new_dc) = def_new_coord {
                                 game.field_model.ball_coordinate = Some(new_dc);
                             }
                         }
-                        let def_coord_post_push = game.field_model.player_coordinate(&defender_id);
-                        apply_knockdown(game, &defender_id, rng);
-                        if def_has_ball {
-                            if let Some(dc) = def_coord_post_push {
+                        step_evs.extend(apply_knockdown(game, &defender_id, rng));
+                        if def_has_ball || pushed_onto_ball {
+                            if let Some(dc) = def_new_coord {
                                 scatter_ball_from_knockdown(game, dc, rng);
                             }
                         }
                     }
                 }
-                StepOutcome::next()
+                StepOutcome::next().with_events(step_evs)
             }
 
             // Java StepFoul → StepReferee → StepBribes → StepEjectPlayer.
@@ -1302,8 +1284,12 @@ impl Step {
                     Some(id) => id.clone(),
                     None => return StepOutcome::next(),
                 };
-                apply_foul_injury(game, &fouler_id, &target_id, rng);
-                StepOutcome::next()
+                let mut foul_evs = vec![GameEvent::Foul {
+                    attacker_id: fouler_id.clone(),
+                    defender_id: target_id.clone(),
+                }];
+                foul_evs.extend(apply_foul_injury(game, &fouler_id, &target_id, rng));
+                StepOutcome::next().with_events(foul_evs)
             }
 
             // Java StepHandOver (ball placement) + StepCatchScatterThrowIn (catch + bounce).
@@ -1325,27 +1311,90 @@ impl Step {
                 game.field_model.ball_moving = true;
                 game.field_model.ball_coordinate = Some(receiver_coord);
 
-                // Initial catch attempt (CATCH_HAND_OFF). Java: TZ of RECEIVER count as penalty.
-                // CatchModifierFactory.isAffectedByTackleZones → true; base collection has 1-8 TZ mods.
-                let tz_count = count_opponent_tackle_zones_at(game, &receiver_id, receiver_coord);
-                let catch_min = std::cmp::max(2, receiver_ag + tz_count);
-                let catch_roll = rng.d6();
-                if std::env::var_os("FFB_TRACE").is_some() {
-                    eprintln!("RUST_HANDOVER recv={receiver_id} coord={receiver_coord:?} ag={receiver_ag} catch_min={catch_min} roll={catch_roll} rng={}", rng.call_count);
-                }
-                if catch_roll >= catch_min {
+                // Initial catch attempt (CATCH_HAND_OFF).
+                // Java StepCatchScatterThrowIn: only rolls if receiver hasTackleZones().
+                // Prone/stunned receiver (no TZ) → FAILED_CATCH immediately (no roll consumed).
+                let receiver_has_tz = game.field_model.player_state(&receiver_id)
+                    .map(|s| s.has_tacklezones())
+                    .unwrap_or(false);
+                let mut handoff_evs: Vec<GameEvent> = Vec::new();
+                let handoff_catch_ok = if receiver_has_tz {
+                    let tz_count = count_opponent_tackle_zones_at(game, &receiver_id, receiver_coord);
+                    let catch_min = std::cmp::max(2, receiver_ag + tz_count);
+                    let catch_roll = rng.d6();
+                    if std::env::var_os("FFB_TRACE").is_some() {
+                        eprintln!("RUST_HANDOVER recv={receiver_id} coord={receiver_coord:?} ag={receiver_ag} catch_min={catch_min} roll={catch_roll} rng={}", rng.call_count);
+                    }
+                    let ok = is_skill_roll_successful(catch_roll, catch_min);
+                    handoff_evs.push(GameEvent::CatchRoll {
+                        player_id: receiver_id.clone(),
+                        target: catch_min,
+                        roll: catch_roll,
+                        success: ok,
+                        rerolled: false,
+                    });
+                    ok
+                } else {
+                    if std::env::var_os("FFB_TRACE").is_some() {
+                        eprintln!("RUST_HANDOVER recv={receiver_id} coord={receiver_coord:?} no_tz → FAILED_CATCH rng={}", rng.call_count);
+                    }
+                    false
+                };
+                if handoff_catch_ok {
                     game.field_model.ball_moving = false;
-                    return StepOutcome::next();
+                    return StepOutcome::next().with_events(handoff_evs);
                 }
 
-                // Catch failed: bounceBall loop (FAILED_CATCH → SCATTER_BALL → CATCH_SCATTER ...).
+                // Catch failed: bounceBall loop (FAILED_CATCH → SCATTER_BALL → CATCH_THROW_IN ...).
+                // Mirrors Java StepCatchScatterThrowIn with hasHandedOver=true:
+                // - Scatter OOB → throw-in (d6/d3 dir + 2d6 dist), repeat if still OOB.
+                // - After throw-in lands: CATCH_THROW_IN mode (check catch, empty → Scatter, not turnover).
+                // - After normal Scatter lands empty → TURNOVER.
                 let acting_is_home = game.acting_player.player_id.as_ref()
                     .map(|pid| game.team_home.has_player(pid))
                     .unwrap_or(false);
 
                 let mut ball_coord = receiver_coord;
+                // after_throw_in: true right after throw-in lands (CATCH_THROW_IN mode).
+                // Empty square in this mode → Scatter (not turnover), matching Java.
+                let mut after_throw_in = false;
+
                 loop {
-                    // bounceBall(): d8 scatter direction, move ball 1 square.
+                    if after_throw_in {
+                        // CATCH_THROW_IN: try catch at landing spot before scattering.
+                        after_throw_in = false;
+                        let ti_land = ball_coord;
+                        if let Some(pid) = game.field_model.player_at(ti_land).cloned() {
+                            let has_tz = game.field_model.player_state(&pid)
+                                .map(|s| s.has_tacklezones())
+                                .unwrap_or(false);
+                            if has_tz {
+                                let ag = find_player_agility(game, &pid);
+                                let tz = count_opponent_tackle_zones_at(game, &pid, ti_land);
+                                let catch_min = std::cmp::max(2, ag + 1 + tz);
+                                let catch_roll = rng.d6();
+                                let success = is_skill_roll_successful(catch_roll, catch_min);
+                                handoff_evs.push(GameEvent::CatchRoll {
+                                    player_id: pid.clone(),
+                                    target: catch_min,
+                                    roll: catch_roll,
+                                    success,
+                                    rerolled: false,
+                                });
+                                if success {
+                                    game.field_model.ball_moving = false;
+                                    if game.team_home.has_player(&pid) != acting_is_home {
+                                        game.turnover = true;
+                                    }
+                                    return StepOutcome::next().with_events(handoff_evs);
+                                }
+                            }
+                        }
+                        // Nobody or catch failed → SCATTER_BALL from ball_coord.
+                        continue;
+                    }
+
+                    // SCATTER_BALL: bounceBall() — d8 scatter, move 1 square.
                     let dir_roll = rng.d8();
                     let dir = Direction::for_roll(dir_roll).expect("d8 is 1..=8");
                     let (bx, by) = scatter_coordinate(ball_coord.x, ball_coord.y, dir, 1);
@@ -1354,9 +1403,41 @@ impl Step {
                     game.field_model.ball_moving = true;
 
                     if !new_coord.is_on_pitch() {
-                        // OOB: throw-in needed (not yet fully implemented); treat as turnover.
-                        game.turnover = true;
-                        return StepOutcome::next();
+                        // OOB: throw-in. Mirrors Java StepCatchScatterThrowIn.throwInBall.
+                        let mut ti_pos = ball_coord;  // last on-pitch square
+                        loop {
+                            let is_corner = is_corner_square(ti_pos.x, ti_pos.y);
+                            let dir_roll2 = if is_corner { rng.d3() } else { rng.d6() };
+                            let ti_dir = if is_corner {
+                                corner_throw_in_direction_for_roll(corner_direction(ti_pos.x, ti_pos.y), dir_roll2)
+                            } else {
+                                throw_in_direction_for_roll(ti_pos.x, ti_pos.y, dir_roll2)
+                            };
+                            let d1 = rng.d6();
+                            let d2 = rng.d6();
+                            let distance = throw_in_distance(d1, d2, game.rules);
+                            let mut ti_end = ti_pos;
+                            let mut last_valid_ti = ti_pos;
+                            for i in 0..distance {
+                                let (nx, ny) = scatter_coordinate(ti_pos.x, ti_pos.y, ti_dir, i);
+                                let nc = FieldCoordinate::new(nx, ny);
+                                ti_end = nc;
+                                if nc.is_on_pitch() { last_valid_ti = nc; }
+                            }
+                            game.field_model.ball_moving = true;
+                            if ti_end == last_valid_ti {
+                                // Landed on pitch → CATCH_THROW_IN.
+                                game.field_model.ball_coordinate = Some(last_valid_ti);
+                                ball_coord = last_valid_ti;
+                                after_throw_in = true;
+                                break;
+                            } else {
+                                // Still OOB → throw-in again from last valid.
+                                game.field_model.ball_coordinate = None;
+                                ti_pos = last_valid_ti;
+                            }
+                        }
+                        continue;
                     }
 
                     ball_coord = new_coord;
@@ -1365,26 +1446,34 @@ impl Step {
                             .map(|s| s.has_tacklezones())
                             .unwrap_or(false);
                         if has_tz {
-                            // CATCH_SCATTER: +1 mode modifier only. BB2025: no TZ modifier for catch.
-                            // min = max(2, AG + 1).
+                            // CATCH_SCATTER: +1 mode modifier + TZ penalty.
                             let ag = find_player_agility(game, &pid);
-                            let catch_min2 = std::cmp::max(2, ag + 1);
+                            let tz = count_opponent_tackle_zones_at(game, &pid, new_coord);
+                            let catch_min2 = std::cmp::max(2, ag + 1 + tz);
                             let catch_roll2 = rng.d6();
-                            if catch_roll2 >= catch_min2 {
+                            let catch2_success = is_skill_roll_successful(catch_roll2, catch_min2);
+                            handoff_evs.push(GameEvent::CatchRoll {
+                                player_id: pid.clone(),
+                                target: catch_min2,
+                                roll: catch_roll2,
+                                success: catch2_success,
+                                rerolled: false,
+                            });
+                            if catch2_success {
                                 game.field_model.ball_moving = false;
                                 let pid_in_home = game.team_home.has_player(&pid);
                                 if pid_in_home != acting_is_home {
                                     game.turnover = true;
                                 }
-                                return StepOutcome::next();
+                                return StepOutcome::next().with_events(handoff_evs);
                             }
                             // Catch failed: FAILED_CATCH → SCATTER_BALL → loop again.
                         }
                         // No TZ: FAILED_CATCH immediately → SCATTER_BALL → loop again.
                     } else {
-                        // Empty square: catcher==null + hasPassed==true → TURNOVER.
+                        // Empty square after Scatter: catcher==null + hasHandedOver → TURNOVER.
                         game.turnover = true;
-                        return StepOutcome::next();
+                        return StepOutcome::next().with_events(handoff_evs);
                     }
                 }
             }
@@ -1418,6 +1507,8 @@ impl Step {
                     Some(c) => c,
                     None => return StepOutcome::next(),
                 };
+                let pass_dist = passing_distance_bb2025(passer_coord, receiver_coord)
+                    .unwrap_or(PassingDistance::LongBomb);
 
                 // StepPass.executeStep:221 — roll d6 for pass accuracy.
                 // BB2025 PassMechanic.evaluatePass:
@@ -1429,6 +1520,8 @@ impl Step {
                 // Java StepPass line 169: setBallMoving(true) before the roll.
                 game.field_model.ball_moving = true;
 
+                let mut pass_evs: Vec<GameEvent> = Vec::new();
+
                 if pa <= 0 {
                     // No PA: auto-fumble (no d6, ball scatters from thrower, turnover).
                     let dir_roll = rng.d8();
@@ -1436,29 +1529,83 @@ impl Step {
                     let (bx, by) = scatter_coordinate(passer_coord.x, passer_coord.y, dir, 1);
                     game.field_model.ball_coordinate = Some(FieldCoordinate::new(bx, by));
                     game.turnover = true;
-                    return StepOutcome::next();
+                    pass_evs.push(GameEvent::PassRoll {
+                        player_id: passer_id.clone(), target: pa, distance: pass_dist,
+                        roll: 0, result: PassResult::Fumble, rerolled: false,
+                    });
+                    return StepOutcome::next().with_events(pass_evs);
                 }
-                let dist_mod = passing_distance_bb2025(passer_coord, receiver_coord)
-                    .map(|d| d.modifier_2020())
-                    .unwrap_or(0);
+                let dist_mod = pass_dist.modifier_2020();
                 // BB2025 PassMechanic.passModifiers: each adjacent opposing player with TZ = +1 penalty.
                 let tz_penalty = count_opponent_tackle_zones_at(game, &passer_id, passer_coord);
+                // PassModifierCollection.VERY_SUNNY: +1 when weather is Very Sunny (glare).
+                let sunny_penalty = if game.weather == Weather::VerySunny { 1 } else { 0 };
+                if std::env::var_os("FFB_TRACE").is_some() {
+                    let passer_is_home = game.team_home.has_player(&passer_id);
+                    let opponents = if passer_is_home { &game.team_away } else { &game.team_home };
+                    for opp in &opponents.players {
+                        let opp_coord = game.field_model.player_coordinate(&opp.id);
+                        let opp_state = game.field_model.player_state(&opp.id);
+                        let adj = opp_coord.map(|c| c.is_adjacent(passer_coord)).unwrap_or(false);
+                        let has_tz = opp_state.map(|s| s.has_tacklezones()).unwrap_or(false);
+                        if adj { eprintln!("  RUST_TZ_OPP {} coord={opp_coord:?} has_tz={has_tz}", opp.id); }
+                    }
+                }
                 let pass_roll = rng.d6();
-                let effective = pass_roll - dist_mod - tz_penalty;
+                let effective = pass_roll - dist_mod - tz_penalty - sunny_penalty;
                 let fumble = pass_roll == 1 || effective <= 1;
                 let accurate = pass_roll == 6 || effective >= pa;
                 if std::env::var_os("FFB_TRACE").is_some() {
-                    eprintln!("RUST_PASS_ROLL passer={passer_id} recv={receiver_id} pa={pa} dist_mod={dist_mod} tz_penalty={tz_penalty} roll={pass_roll} eff={effective} fumble={fumble} accurate={accurate} rng={}", rng.call_count);
+                    eprintln!("RUST_PASS_ROLL passer={passer_id}@{passer_coord:?} recv={receiver_id}@{receiver_coord:?} pa={pa} dist_mod={dist_mod} tz_penalty={tz_penalty} sunny={sunny_penalty} roll={pass_roll} eff={effective} fumble={fumble} accurate={accurate} rng={}", rng.call_count);
                 }
+                let pass_result = if fumble { PassResult::Fumble } else if accurate { PassResult::Complete } else { PassResult::Inaccurate };
+                pass_evs.push(GameEvent::PassRoll {
+                    player_id: passer_id.clone(), target: pa, distance: pass_dist,
+                    roll: pass_roll, result: pass_result, rerolled: false,
+                });
 
                 if fumble {
-                    // FUMBLE: ball stays at thrower, bounces from thrower, turnover.
-                    let dir_roll = rng.d8();
-                    let dir = Direction::for_roll(dir_roll).expect("d8 is 1..=8");
-                    let (bx, by) = scatter_coordinate(passer_coord.x, passer_coord.y, dir, 1);
-                    game.field_model.ball_coordinate = Some(FieldCoordinate::new(bx, by));
+                    // FUMBLE: ball bounces from thrower via Java's bounceBall loop.
+                    // Java StepCatchScatterThrowIn (SCATTER_BALL mode via goToLabelOnFumble):
+                    // rolls d8, moves ball 1 square; if player with TZ → CATCH_SCATTER (ag+1+tz);
+                    // if catch fails or no TZ → bounce again; empty square → ball rests.
+                    // Natural 6 always succeeds (isSkillRollSuccessful), natural 1 always fails.
                     game.turnover = true;
-                    return StepOutcome::next();
+                    game.field_model.ball_moving = true;
+                    let mut ball_coord = passer_coord;
+                    loop {
+                        let dir_roll = rng.d8();
+                        let dir = Direction::for_roll(dir_roll).expect("d8 is 1..=8");
+                        let (bx, by) = scatter_coordinate(ball_coord.x, ball_coord.y, dir, 1);
+                        let new_coord = FieldCoordinate::new(bx, by);
+                        game.field_model.ball_coordinate = Some(new_coord);
+                        if !new_coord.is_on_pitch() {
+                            return StepOutcome::next().with_events(pass_evs);
+                        }
+                        ball_coord = new_coord;
+                        if let Some(pid) = game.field_model.player_at(new_coord).cloned() {
+                            let has_tz = game.field_model.player_state(&pid)
+                                .map(|s| s.has_tacklezones())
+                                .unwrap_or(false);
+                            if has_tz {
+                                let ag = find_player_agility(game, &pid);
+                                let tz = count_opponent_tackle_zones_at(game, &pid, new_coord);
+                                let catch_min = std::cmp::max(2, ag + 1 + tz);
+                                let catch_roll = rng.d6();
+                                let catch_ok = is_skill_roll_successful(catch_roll, catch_min);
+                                pass_evs.push(GameEvent::CatchRoll { player_id: pid.clone(), target: catch_min, roll: catch_roll, success: catch_ok, rerolled: false });
+                                if catch_ok {
+                                    game.field_model.ball_moving = false;
+                                    return StepOutcome::next().with_events(pass_evs);
+                                }
+                                // catch failed → bounce again
+                            }
+                            // no TZ → bounce again
+                        } else {
+                            // empty square → ball rests
+                            return StepOutcome::next().with_events(pass_evs);
+                        }
+                    }
                 }
 
                 // Helper: whether a player is on the active (passing) team.
@@ -1479,6 +1626,9 @@ impl Step {
                         let dir = Direction::for_roll(dir_roll).expect("d8 is 1..=8");
                         let (nx, ny) = scatter_coordinate(scatter_start.x, scatter_start.y, dir, 1);
                         let next_coord = FieldCoordinate::new(nx, ny);
+                        if std::env::var_os("FFB_TRACE").is_some() {
+                            eprintln!("RUST_INACCURATE_SCATTER from={scatter_start:?} dir_roll={dir_roll} dir={dir:?} to={next_coord:?} on_pitch={} rng={}", next_coord.is_on_pitch(), rng.call_count);
+                        }
                         if next_coord.is_on_pitch() {
                             last_valid = next_coord;
                         }
@@ -1497,14 +1647,17 @@ impl Step {
                             .unwrap_or(false);
                         if has_tz {
                             let ag = find_player_agility(game, &pid);
-                            let catch_min = std::cmp::max(2, ag + 1);
+                            let tz = count_opponent_tackle_zones_at(game, &pid, ball_coord);
+                            let catch_min = std::cmp::max(2, ag + 1 + tz);
                             let catch_roll = rng.d6();
-                            if catch_roll >= catch_min {
+                            let catch_ok = is_skill_roll_successful(catch_roll, catch_min);
+                            pass_evs.push(GameEvent::CatchRoll { player_id: pid.clone(), target: catch_min, roll: catch_roll, success: catch_ok, rerolled: false });
+                            if catch_ok {
                                 game.field_model.ball_moving = false;
                                 if !player_is_active(&pid) {
                                     game.turnover = true;
                                 }
-                                return StepOutcome::next();
+                                return StepOutcome::next().with_events(pass_evs);
                             }
                             // catch failed → SCATTER_BALL → bounceBall loop
                         }
@@ -1516,12 +1669,16 @@ impl Step {
                         let dir = Direction::for_roll(dir_roll).expect("d8 is 1..=8");
                         let (bx, by) = scatter_coordinate(ball_coord.x, ball_coord.y, dir, 1);
                         let new_coord = FieldCoordinate::new(bx, by);
+                        if std::env::var_os("FFB_TRACE").is_some() {
+                            let pid_at = game.field_model.player_at(new_coord).cloned();
+                            eprintln!("RUST_INACCURATE_BOUNCE from={ball_coord:?} dir_roll={dir_roll} dir={dir:?} to={new_coord:?} player_at={pid_at:?} rng={}", rng.call_count);
+                        }
                         game.field_model.ball_coordinate = Some(new_coord);
                         game.field_model.ball_moving = true;
 
                         if !new_coord.is_on_pitch() {
                             game.turnover = true;
-                            return StepOutcome::next();
+                            return StepOutcome::next().with_events(pass_evs);
                         }
 
                         ball_coord = new_coord;
@@ -1531,14 +1688,17 @@ impl Step {
                                 .unwrap_or(false);
                             if has_tz {
                                 let ag = find_player_agility(game, &pid);
-                                let catch_min = std::cmp::max(2, ag + 1);
+                                let tz = count_opponent_tackle_zones_at(game, &pid, new_coord);
+                                let catch_min = std::cmp::max(2, ag + 1 + tz);
                                 let catch_roll = rng.d6();
-                                if catch_roll >= catch_min {
+                                let catch_ok = is_skill_roll_successful(catch_roll, catch_min);
+                                pass_evs.push(GameEvent::CatchRoll { player_id: pid.clone(), target: catch_min, roll: catch_roll, success: catch_ok, rerolled: false });
+                                if catch_ok {
                                     game.field_model.ball_moving = false;
                                     if !player_is_active(&pid) {
                                         game.turnover = true;
                                     }
-                                    return StepOutcome::next();
+                                    return StepOutcome::next().with_events(pass_evs);
                                 }
                                 // catch failed → loop again
                             }
@@ -1546,7 +1706,7 @@ impl Step {
                         } else {
                             // empty square → ball rests, turnover
                             game.turnover = true;
-                            return StepOutcome::next();
+                            return StepOutcome::next().with_events(pass_evs);
                         }
                     }
                 }
@@ -1565,9 +1725,11 @@ impl Step {
                 if receiver_has_tz {
                     let catch_min = std::cmp::max(2, receiver_ag);
                     let catch_roll = rng.d6();
-                    if catch_roll >= catch_min {
+                    let catch_ok = is_skill_roll_successful(catch_roll, catch_min);
+                    pass_evs.push(GameEvent::CatchRoll { player_id: receiver_id.clone(), target: catch_min, roll: catch_roll, success: catch_ok, rerolled: false });
+                    if catch_ok {
                         game.field_model.ball_moving = false;
-                        return StepOutcome::next();
+                        return StepOutcome::next().with_events(pass_evs);
                     }
                 }
 
@@ -1589,7 +1751,7 @@ impl Step {
 
                     if !new_coord.is_on_pitch() {
                         game.turnover = true;
-                        return StepOutcome::next();
+                        return StepOutcome::next().with_events(pass_evs);
                     }
 
                     ball_coord = new_coord;
@@ -1598,16 +1760,19 @@ impl Step {
                             .map(|s| s.has_tacklezones())
                             .unwrap_or(false);
                         if has_tz {
-                            // CATCH_SCATTER: +1 mode modifier only. No TZ modifier in BB2025.
+                            // CATCH_SCATTER: +1 mode modifier + TZ penalty.
                             let ag = find_player_agility(game, &pid);
-                            let catch_min2 = std::cmp::max(2, ag + 1);
+                            let tz = count_opponent_tackle_zones_at(game, &pid, new_coord);
+                            let catch_min2 = std::cmp::max(2, ag + 1 + tz);
                             let catch_roll2 = rng.d6();
-                            if catch_roll2 >= catch_min2 {
+                            let catch_ok = is_skill_roll_successful(catch_roll2, catch_min2);
+                            pass_evs.push(GameEvent::CatchRoll { player_id: pid.clone(), target: catch_min2, roll: catch_roll2, success: catch_ok, rerolled: false });
+                            if catch_ok {
                                 game.field_model.ball_moving = false;
                                 if !player_is_active(&pid) {
                                     game.turnover = true;
                                 }
-                                return StepOutcome::next();
+                                return StepOutcome::next().with_events(pass_evs);
                             }
                             // Catch failed → loop again.
                         }
@@ -1615,8 +1780,54 @@ impl Step {
                     } else {
                         // Empty square: nobody caught → turnover.
                         game.turnover = true;
-                        return StepOutcome::next();
+                        return StepOutcome::next().with_events(pass_evs);
                     }
+                }
+            }
+
+            // Java StepIntercept: find eligible defenders in the pass corridor; if any exist,
+            // emit one Interception prompt. Per parity contract, agent always declines (0 actionRng).
+            Step::Intercept => {
+                let passer_id = match &game.acting_player.player_id {
+                    Some(id) => id.clone(),
+                    None => return StepOutcome::next(),
+                };
+                let receiver_id = match &game.acting_player.defender_id {
+                    Some(id) => id.clone(),
+                    None => return StepOutcome::next(),
+                };
+                let passer_coord = match game.field_model.player_coordinate(&passer_id) {
+                    Some(c) => c,
+                    None => return StepOutcome::next(),
+                };
+                let receiver_coord = match game.field_model.player_coordinate(&receiver_id) {
+                    Some(c) => c,
+                    None => return StepOutcome::next(),
+                };
+                let passer_is_home = game.team_home.has_player(&passer_id);
+                // Collect eligible interceptors: standing opponents with tackle zones in the corridor.
+                let mut eligible: Vec<String> = game.team_home.players.iter().chain(game.team_away.players.iter())
+                    .filter(|p| game.team_home.has_player(&p.id) != passer_is_home)
+                    .filter_map(|p| {
+                        let coord = game.field_model.player_coordinate(&p.id)?;
+                        let has_tz = game.field_model.player_state(&p.id)
+                            .map(|s| s.has_tacklezones()).unwrap_or(false);
+                        if has_tz && can_intercept(passer_coord, receiver_coord, coord) {
+                            Some(p.id.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                eligible.sort(); // deterministic order
+                if let Some(interceptor_id) = eligible.into_iter().next() {
+                    // Interception target for a skill-less lineman: 6 (BB2025 base without modifiers).
+                    StepOutcome::cont().with_prompt(AgentPrompt::Interception {
+                        player_id: interceptor_id,
+                        target_number: 6,
+                    })
+                } else {
+                    StepOutcome::next()
                 }
             }
 
@@ -1694,7 +1905,10 @@ impl Step {
                 // acting_player stays cleared (player_id = None) → EndSelecting → end_turn_sequence
                 StepOutcome::goto("END_SELECTING")
             }
-            // Java StepInitMoving handleCommand: move player step-by-step, rolling dodge in each TZ.
+            // Java StepMove + StepGoForIt + StepMoveDodge (per-step, in that order):
+            // 1. Increment current_move (StepMove).
+            // 2. If current_move > MA: GFI roll d6 ≥ 2 (StepGoForIt).
+            // 3. If src in opponent TZ: dodge roll (StepMoveDodge).
             (Step::InitMoving, Action::Move { path }) => {
                 let player_id = match &game.acting_player.player_id {
                     Some(id) => id.clone(),
@@ -1713,6 +1927,8 @@ impl Step {
                 };
                 let step_path = if src == dest { vec![dest] } else { bfs_path(game, &player_id, src, dest) };
                 let ag = find_player_agility(game, &player_id);
+                let ma = find_player_ma(game, &player_id);
+                let mut move_evs: Vec<GameEvent> = Vec::new();
                 for &step_dest in &step_path {
                     let cur_pos = game.field_model.player_coordinate(&player_id).unwrap_or(src);
                     // Ball moves with its carrier. ball_moving=false means it is held (picked up).
@@ -1722,6 +1938,35 @@ impl Step {
                     if has_ball {
                         game.field_model.ball_coordinate = Some(step_dest);
                     }
+
+                    // StepMove: increment current_move (mirrors Java's currentMove++ before GFI check).
+                    game.acting_player.current_move += 1;
+
+                    // StepGoForIt: GFI roll when current_move > MA (Java: "currentMove > movementWithModifiers").
+                    // Minimum roll = GFI_MINIMUM_ROLL (2) for a skill-less lineman; no reroll offered yet.
+                    if game.acting_player.current_move > ma {
+                        let roll = rng.d6();
+                        let success = roll >= GFI_MINIMUM_ROLL;
+                        move_evs.push(GameEvent::GoForItRoll {
+                            player_id: player_id.clone(),
+                            target: GFI_MINIMUM_ROLL,
+                            roll,
+                            success,
+                            rerolled: false,
+                        });
+                        if !success {
+                            // Java: failGfi → GOTO STEADY_FOOTING → FALL_DOWN (apply_knockdown mirrors this).
+                            game.field_model.set_player_coordinate(&player_id, step_dest);
+                            move_evs.extend(apply_knockdown(game, &player_id, rng));
+                            game.turnover = true;
+                            if has_ball {
+                                scatter_ball_from_knockdown(game, step_dest, rng);
+                            }
+                            return StepOutcome::next().with_events(move_evs);
+                        }
+                    }
+
+                    // StepMoveDodge: roll if leaving a tackle zone.
                     let src_tz = count_opponent_tackle_zones_at(game, &player_id, cur_pos);
                     if src_tz > 0 {
                         let dest_tz = count_opponent_tackle_zones_at(game, &player_id, step_dest);
@@ -1729,20 +1974,35 @@ impl Step {
                             (0..dest_tz).map(|_| DODGE_TACKLE_ZONE).collect();
                         let minimum = minimum_roll_dodge(ag, &modifiers);
                         let roll = rng.d6();
-                        if roll < minimum {
+                        let success = is_skill_roll_successful(roll, minimum);
+                        move_evs.push(GameEvent::DodgeRoll {
+                            player_id: player_id.clone(),
+                            target: minimum,
+                            roll,
+                            success,
+                            rerolled: false,
+                        });
+                        if !success {
                             game.field_model.set_player_coordinate(&player_id, step_dest);
-                            apply_knockdown(game, &player_id, rng);
+                            move_evs.extend(apply_knockdown(game, &player_id, rng));
                             game.turnover = true;
                             // Ball bounces when carrier falls (Java StepCatchScatterThrowIn.bounceBall).
                             if has_ball {
                                 scatter_ball_from_knockdown(game, step_dest, rng);
                             }
-                            return StepOutcome::next();
+                            return StepOutcome::next().with_events(move_evs);
                         }
                     }
                     game.field_model.set_player_coordinate(&player_id, step_dest);
                 }
                 game.field_model.set_player_state(&player_id, PlayerState::new(PS_STANDING));
+                StepOutcome::next().with_events(move_evs)
+            }
+            // Java StepIntercept: agent declined (or attempted but failed). Either way: advance.
+            (Step::Intercept, Action::Intercept { attempt: false }) => StepOutcome::next(),
+            (Step::Intercept, Action::Intercept { attempt: true }) => {
+                // TODO Phase F: roll d6 InterceptionRoll and handle interception success.
+                // For now advance (agent always declines per parity contract).
                 StepOutcome::next()
             }
             // A command the current step does not recognise (Java StepCommandStatus::UNHANDLED):
@@ -1808,6 +2068,7 @@ impl StepOutcome {
         o
     }
     pub fn with_event(mut self, e: GameEvent) -> Self { self.events.push(e); self }
+    pub fn with_events(mut self, evs: Vec<GameEvent>) -> Self { self.events.extend(evs); self }
     pub fn with_prompt(mut self, p: AgentPrompt) -> Self { self.prompt = Some(p); self }
     pub fn push_seq(mut self, seq: Vec<StepEntry>) -> Self { self.pushes.push(seq); self }
     pub fn publish(mut self, p: StepParameter) -> Self { self.published.push(p); self }
@@ -2218,6 +2479,7 @@ fn standup_end_sequence() -> Vec<StepEntry> {
 fn pass_sequence() -> Vec<StepEntry> {
     vec![
         StepEntry::new(Step::PickUp),
+        StepEntry::new(Step::Intercept),
         StepEntry::new(Step::DoPass),
         StepEntry::new(Step::EndPlayerAction),
     ]
@@ -2410,6 +2672,14 @@ fn find_player_agility(game: &Game, player_id: &str) -> i32 {
         .unwrap_or(3)
 }
 
+fn find_player_ma(game: &Game, player_id: &str) -> i32 {
+    game.team_home.players.iter()
+        .chain(game.team_away.players.iter())
+        .find(|p| p.id == player_id)
+        .map(|p| p.movement_with_modifiers())
+        .unwrap_or(6)
+}
+
 fn find_player_passing(game: &Game, player_id: &str) -> i32 {
     game.team_home.players.iter()
         .chain(game.team_away.players.iter())
@@ -2431,6 +2701,59 @@ fn count_opponent_tackle_zones_at(game: &Game, player_id: &str, coord: FieldCoor
     }).count() as i32
 }
 
+/// Java UtilPlayer.findFoulAssists: offensive assists - defensive assists.
+/// Positive = net offense bonus, negative = net defense penalty.
+fn find_foul_assists(game: &Game, fouler_id: &str, target_id: &str) -> i32 {
+    let fouler_is_home = game.team_home.players.iter().any(|p| p.id == fouler_id);
+    let (atk_team, def_team) = if fouler_is_home {
+        (&game.team_home, &game.team_away)
+    } else {
+        (&game.team_away, &game.team_home)
+    };
+    let target_coord = match game.field_model.player_coordinate(target_id) {
+        Some(c) => c,
+        None => return 0,
+    };
+    let fouler_coord = match game.field_model.player_coordinate(fouler_id) {
+        Some(c) => c,
+        None => return 0,
+    };
+
+    // Offensive assists: atk_team players adjacent to TARGET (with TZ), excluding fouler,
+    // that have no def_team player adjacent to them with TZ.
+    let mut offensive = 0i32;
+    for assist in &atk_team.players {
+        if assist.id == fouler_id { continue; }
+        let coord = match game.field_model.player_coordinate(&assist.id) { Some(c) => c, None => continue };
+        let state = match game.field_model.player_state(&assist.id) { Some(s) => s, None => continue };
+        if !state.has_tacklezones() { continue; }
+        if !coord.is_adjacent(target_coord) { continue; }
+        let blocked = def_team.players.iter().any(|dp| {
+            game.field_model.player_coordinate(&dp.id).map(|dc| dc.is_adjacent(coord)).unwrap_or(false)
+                && game.field_model.player_state(&dp.id).map(|ds| ds.has_tacklezones()).unwrap_or(false)
+        });
+        if !blocked { offensive += 1; }
+    }
+
+    // Defensive assists: def_team players adjacent to FOULER (with TZ), excluding target,
+    // that have fewer than 2 atk_team players adjacent with TZ.
+    let mut defensive = 0i32;
+    for assist in &def_team.players {
+        if assist.id == target_id { continue; }
+        let coord = match game.field_model.player_coordinate(&assist.id) { Some(c) => c, None => continue };
+        let state = match game.field_model.player_state(&assist.id) { Some(s) => s, None => continue };
+        if !state.has_tacklezones() { continue; }
+        if !coord.is_adjacent(fouler_coord) { continue; }
+        let adj_atk_count = atk_team.players.iter().filter(|ap| {
+            game.field_model.player_coordinate(&ap.id).map(|ac| ac.is_adjacent(coord)).unwrap_or(false)
+                && game.field_model.player_state(&ap.id).map(|as_| as_.has_tacklezones()).unwrap_or(false)
+        }).count();
+        if adj_atk_count < 2 { defensive += 1; }
+    }
+
+    offensive - defensive
+}
+
 /// Player armour value lookup.
 fn player_armour(game: &Game, player_id: &str) -> i32 {
     game.team_home.players.iter()
@@ -2441,7 +2764,8 @@ fn player_armour(game: &Game, player_id: &str) -> i32 {
 }
 
 /// Knock a player down: set PRONE, then roll armor + injury + casualty chain.
-fn apply_knockdown(game: &mut Game, player_id: &str, rng: &mut GameRng) {
+fn apply_knockdown(game: &mut Game, player_id: &str, rng: &mut GameRng) -> Vec<GameEvent> {
+    let mut evs = Vec::new();
     game.field_model.set_player_state(player_id, PlayerState::new(PS_PRONE));
     let av = player_armour(game, player_id);
     let a1 = rng.d6();
@@ -2449,18 +2773,22 @@ fn apply_knockdown(game: &mut Game, player_id: &str, rng: &mut GameRng) {
     if armor_broken(av, [a1, a2], &[]) {
         let i1 = rng.d6();
         let i2 = rng.d6();
-        match injury_result([i1, i2], &[]) {
+        let outcome = injury_result([i1, i2], &[]);
+        let (was_ko, was_cas) = match outcome {
             InjuryOutcome::Stunned => {
                 game.field_model.set_player_state(player_id, PlayerState::new(PS_STUNNED));
+                (false, false)
             }
             InjuryOutcome::KnockedOut => {
                 game.field_model.player_coordinates.remove(player_id);
                 game.field_model.set_player_state(player_id, PlayerState::new(PS_KNOCKED_OUT));
+                (true, false)
             }
             InjuryOutcome::Casualty | InjuryOutcome::BadlyHurt => {
                 let c1 = rng.die(16);
                 let _c2 = rng.d6();
                 let tier = casualty_tier_bb2025(c1);
+                let serious_injury = serious_injury_kind_bb2025(c1);
                 let ps = match tier {
                     CasualtyTier::BadlyHurt => PS_BADLY_HURT,
                     CasualtyTier::SeriousInjury => PS_SERIOUS_INJURY,
@@ -2468,50 +2796,182 @@ fn apply_knockdown(game: &mut Game, player_id: &str, rng: &mut GameRng) {
                 };
                 game.field_model.player_coordinates.remove(player_id);
                 game.field_model.set_player_state(player_id, PlayerState::new(ps));
+                evs.push(GameEvent::Injury {
+                    player_id: player_id.to_string(),
+                    armor_roll: Some([a1, a2]),
+                    injury_roll: Some([i1, i2]),
+                    serious_injury,
+                    was_ko: false,
+                    was_cas: true,
+                });
+                return evs;
+            }
+        };
+        evs.push(GameEvent::Injury {
+            player_id: player_id.to_string(),
+            armor_roll: Some([a1, a2]),
+            injury_roll: Some([i1, i2]),
+            serious_injury: None,
+            was_ko,
+            was_cas,
+        });
+    } else {
+        evs.push(GameEvent::Injury {
+            player_id: player_id.to_string(),
+            armor_roll: Some([a1, a2]),
+            injury_roll: None,
+            serious_injury: None,
+            was_ko: false,
+            was_cas: false,
+        });
+    }
+    evs
+}
+
+/// Full ball bounce chain: Scatter → (CatchScatter | ThrowIn) → CatchThrowIn → …
+/// Mirrors Java's StepCatchScatterThrowIn state machine.
+/// Called whenever a player falls on a ball square (carried or loose).
+fn bounce_ball_chain(game: &mut Game, _from: FieldCoordinate, rng: &mut GameRng) {
+    enum Mode { Scatter, CatchScatter, ThrowIn, CatchThrowIn }
+    let mut mode = Mode::Scatter;
+    let mut catcher_id: Option<String> = None;
+    let mut throw_in_coord = _from;
+
+    loop {
+        match mode {
+            Mode::Scatter => {
+                let dir_roll = rng.d8();
+                let dir = Direction::for_roll(dir_roll).expect("d8 is 1..=8");
+                let ball_start = game.field_model.ball_coordinate.unwrap_or(_from);
+                let (ex, ey) = scatter_coordinate(ball_start.x, ball_start.y, dir, 1);
+                let ball_end = FieldCoordinate::new(ex, ey);
+                let last_valid = if ball_end.is_on_pitch() { ball_end } else { ball_start };
+                game.field_model.ball_coordinate = Some(ball_end);
+                game.field_model.ball_moving = true;
+                if ball_end.is_on_pitch() {
+                    if let Some(pid) = game.field_model.player_at(ball_end).cloned() {
+                        let ps = game.field_model.player_state(&pid).unwrap_or_default();
+                        if ps.has_tacklezones() {
+                            catcher_id = Some(pid);
+                            mode = Mode::CatchScatter;
+                        }
+                        // no TZ → FAILED_CATCH → stay in Scatter
+                    } else {
+                        break; // empty square → done
+                    }
+                } else {
+                    throw_in_coord = last_valid;
+                    mode = Mode::ThrowIn;
+                }
+            }
+            Mode::CatchScatter => {
+                let pid = catcher_id.take().unwrap();
+                let catch_ag = find_player_agility(game, &pid);
+                let catcher_coord = game.field_model.ball_coordinate.unwrap_or(_from);
+                let tz = count_opponent_tackle_zones_at(game, &pid, catcher_coord);
+                let catch_target = (catch_ag + 1 + tz).max(2);
+                let catch_roll = rng.d6();
+                if is_skill_roll_successful(catch_roll, catch_target) {
+                    game.field_model.ball_moving = false;
+                    break;
+                } else {
+                    mode = Mode::Scatter;
+                }
+            }
+            Mode::ThrowIn => {
+                let ti_start = throw_in_coord;
+                let is_corner = is_corner_square(ti_start.x, ti_start.y);
+                let dir_roll = if is_corner { rng.d3() } else { rng.d6() };
+                let dir = if is_corner {
+                    corner_throw_in_direction_for_roll(corner_direction(ti_start.x, ti_start.y), dir_roll)
+                } else {
+                    throw_in_direction_for_roll(ti_start.x, ti_start.y, dir_roll)
+                };
+                let d1 = rng.d6();
+                let d2 = rng.d6();
+                let distance = throw_in_distance(d1, d2, game.rules);
+                let mut ball_end = ti_start;
+                let mut last_valid_ti = ti_start;
+                for i in 0..distance {
+                    let (nx, ny) = scatter_coordinate(ti_start.x, ti_start.y, dir, i);
+                    let nc = FieldCoordinate::new(nx, ny);
+                    ball_end = nc;
+                    if nc.is_on_pitch() { last_valid_ti = nc; }
+                }
+                game.field_model.ball_moving = true;
+                if ball_end == last_valid_ti {
+                    game.field_model.ball_coordinate = Some(last_valid_ti);
+                    mode = Mode::CatchThrowIn;
+                } else {
+                    game.field_model.ball_coordinate = None;
+                    throw_in_coord = last_valid_ti;
+                }
+            }
+            Mode::CatchThrowIn => {
+                let ball_pos = match game.field_model.ball_coordinate {
+                    Some(c) => c,
+                    None => break,
+                };
+                if let Some(pid) = game.field_model.player_at(ball_pos).cloned() {
+                    let ps = game.field_model.player_state(&pid).unwrap_or_default();
+                    if ps.has_tacklezones() {
+                        catcher_id = Some(pid);
+                        mode = Mode::CatchScatter;
+                    } else {
+                        mode = Mode::Scatter;
+                    }
+                } else {
+                    mode = Mode::Scatter;
+                }
             }
         }
     }
 }
 
-/// Ball scatter when the carrier is knocked down (Java StepCatchScatterThrowIn.bounceBall).
-/// d8 direction, ball moves one square. Catch by a player at landing square is NOT yet
-/// implemented — all current lineman seeds land on empty squares.
 fn scatter_ball_from_knockdown(game: &mut Game, from: FieldCoordinate, rng: &mut GameRng) {
-    let dir_roll = rng.d8();
-    let dir = Direction::for_roll(dir_roll).expect("d8 is 1..=8");
-    let (nx, ny) = scatter_coordinate(from.x, from.y, dir, 1);
-    let new_pos = FieldCoordinate::new(nx, ny);
-    game.field_model.ball_coordinate = Some(new_pos);
-    // Java StepCatchScatterThrowIn.bounceBall: setBallMoving(true) — ball is now loose.
-    game.field_model.ball_moving = true;
+    bounce_ball_chain(game, from, rng);
 }
 
 /// Foul injury: roll 2d6 armor vs AV (no knockdown — target is already prone/stunned).
 /// On break: run injury chain. Then run referee (doubles = ejection) + argue-the-call.
 /// 1:1 with Java StepFoul → StepReferee (SneakyGitBehaviour hook) → StepBribes → StepEjectPlayer.
-fn apply_foul_injury(game: &mut Game, fouler_id: &str, target_id: &str, rng: &mut GameRng) {
+fn apply_foul_injury(game: &mut Game, fouler_id: &str, target_id: &str, rng: &mut GameRng) -> Vec<GameEvent> {
+    let mut evs = Vec::new();
     let av = player_armour(game, target_id);
     let a1 = rng.d6();
     let a2 = rng.d6();
     let armor_doubles = a1 == a2;
-    let broke = armor_broken(av, [a1, a2], &[]);
+    let net_assists = find_foul_assists(game, fouler_id, target_id);
+    let assist_modifier;
+    let armor_mods: &[Modifier] = if net_assists != 0 {
+        assist_modifier = Modifier::new("Foul Assist", net_assists, Rules::Common);
+        std::slice::from_ref(&assist_modifier)
+    } else {
+        &[]
+    };
+    let broke = armor_broken(av, [a1, a2], armor_mods);
     let mut injury_doubles = false;
     if broke {
         let i1 = rng.d6();
         let i2 = rng.d6();
         injury_doubles = i1 == i2;
-        match injury_result([i1, i2], &[]) {
+        let outcome = injury_result([i1, i2], &[]);
+        let mut serious_injury = None;
+        let (was_ko, was_cas) = match outcome {
             InjuryOutcome::Stunned => {
                 game.field_model.set_player_state(target_id, PlayerState::new(PS_STUNNED));
+                (false, false)
             }
             InjuryOutcome::KnockedOut => {
                 game.field_model.player_coordinates.remove(target_id);
                 game.field_model.set_player_state(target_id, PlayerState::new(PS_KNOCKED_OUT));
+                (true, false)
             }
             InjuryOutcome::Casualty | InjuryOutcome::BadlyHurt => {
                 let c1 = rng.die(16);
                 let _c2 = rng.d6();
                 let tier = casualty_tier_bb2025(c1);
+                serious_injury = serious_injury_kind_bb2025(c1);
                 let ps = match tier {
                     CasualtyTier::BadlyHurt => PS_BADLY_HURT,
                     CasualtyTier::SeriousInjury => PS_SERIOUS_INJURY,
@@ -2519,30 +2979,50 @@ fn apply_foul_injury(game: &mut Game, fouler_id: &str, target_id: &str, rng: &mu
                 };
                 game.field_model.player_coordinates.remove(target_id);
                 game.field_model.set_player_state(target_id, PlayerState::new(ps));
+                (false, true)
             }
-        }
+        };
+        evs.push(GameEvent::Injury {
+            player_id: target_id.to_string(),
+            armor_roll: Some([a1, a2]),
+            injury_roll: Some([i1, i2]),
+            serious_injury,
+            was_ko,
+            was_cas,
+        });
+    } else {
+        evs.push(GameEvent::Injury {
+            player_id: target_id.to_string(),
+            armor_roll: Some([a1, a2]),
+            injury_roll: None,
+            serious_injury: None,
+            was_ko: false,
+            was_cas: false,
+        });
     }
     // StepReferee (SneakyGitBehaviour): doubles on armor OR (armor broken and doubles on injury)
     let referee_spots = armor_doubles || (broke && injury_doubles);
     if referee_spots {
         // StepBribes: parity runner always argues with first player; roll 1 d6.
-        // isArgueTheCallSuccessful: roll > 5 (i.e. roll == 6) → argue succeeds, no ejection.
+        // BB2025: when the referee SPOTS a foul, the turn always ends (turnover) regardless
+        // of argue result. Argue only determines whether the fouler is also ejected.
         let argue = rng.d6();
+        game.turnover = true;
         if argue <= 5 {
-            // Argue failed: StepEjectPlayer — fouler sent off (BANNED), turnover.
+            // Argue failed: StepEjectPlayer — fouler sent off (BANNED).
             game.field_model.player_coordinates.remove(fouler_id);
             game.field_model.set_player_state(fouler_id, PlayerState::new(PS_BANNED));
-            game.turnover = true;
         }
-        // If argue == 6: argue succeeds, player stays, no turnover.
+        // If argue == 6: argue succeeds, fouler stays on pitch, but turnover still occurs.
     }
+    evs
 }
 
 /// Push the defender one step away from the attacker.
-/// Replicates Java's MatchRunner.handlePushback + UtilServerPushback.findPushbackSquares:
-/// candidates are ordered [CCW-diagonal, straight, CW-diagonal] relative to push direction;
-/// pick the first with maximum score (home attacking → max x; away attacking → max 25-x).
-fn auto_push(game: &mut Game, attacker_id: &str, defender_id: &str, attacker_is_home: bool) {
+/// Candidates are ordered [CCW-diagonal, straight, CW-diagonal] relative to push direction;
+/// picks the candidate with min canonical-x, then min canonical-y — 1:1 with Java
+/// ParityRunner.sendPushback which always iterates unlocked squares and picks min(x)/min(y).
+fn auto_push(game: &mut Game, attacker_id: &str, defender_id: &str) {
     let def_coord = match game.field_model.player_coordinate(defender_id) {
         Some(c) => c,
         None => return,
@@ -2567,7 +3047,7 @@ fn auto_push(game: &mut Game, attacker_id: &str, defender_id: &str, attacker_is_
         Direction::West      => [(-1, 1), (-1, 0), (-1,-1)], // SW, W, NW
         Direction::Northwest => [(-1, 0), (-1,-1), ( 0,-1)], // W, NW, N
     };
-    // Java ParityRunner.sendPushback: picks the candidate with min(x), then min(y) as tiebreaker.
+    // Java ParityRunner.sendPushback: always min(x) then min(y) in canonical (home-view) coords.
     let mut best: Option<FieldCoordinate> = None;
     for (dx, dy) in offsets {
         let sq = def_coord.add(dx, dy);
@@ -2770,9 +3250,9 @@ mod tests {
         assert_eq!(gs.rng.call_count, 12, "no game dice consumed by EndKickoff/EndTurn/InitSelecting");
     }
 
-    /// auto_push for WEST push (away attacking): Java picks SW=(x-1,y+1) first.
+    /// auto_push for WEST push (away attacking).
     /// Attacker at (13,8), defender at (12,8) → push dir WEST → candidates SW(11,9),W(11,8),NW(11,7).
-    /// All score 25-11=14 equally → first wins → defender lands at (11,9).
+    /// Java sendPushback: min(x) then min(y) → all x=11, min(y)=7 → NW=(11,7).
     #[test]
     fn auto_push_west_away_attacker_picks_sw_first() {
         use ffb_model::model::field_model::FieldModel;
@@ -2786,10 +3266,9 @@ mod tests {
         let def_coord = FieldCoordinate::new(12, 8);
         game.field_model.set_player_coordinate("away_atk", atk_coord);
         game.field_model.set_player_coordinate("home_def", def_coord);
-        // attacker_is_home = false (away team attacking)
-        auto_push(&mut game, "away_atk", "home_def", false);
+        auto_push(&mut game, "away_atk", "home_def");
         let pushed = game.field_model.player_coordinate("home_def").unwrap();
-        // Java sendPushback: min(x) then min(y) on server coords → NW=(11,7)
+        // Java sendPushback: min(x) then min(y) → all x=11, min(y)=7 → NW=(11,7)
         assert_eq!(pushed, FieldCoordinate::new(11, 7),
             "away attacking WEST: defender should push to NW=(11,7), not {:?}", pushed);
     }
@@ -2866,10 +3345,30 @@ mod tests {
         game.field_model.set_player_coordinate("away_atk", FieldCoordinate::new(13, 8));
         game.field_model.set_player_coordinate("home_def", FieldCoordinate::new(12, 8));
         game.field_model.set_player_coordinate("blocker", FieldCoordinate::new(11, 9)); // SW blocked
-        auto_push(&mut game, "away_atk", "home_def", false);
+        auto_push(&mut game, "away_atk", "home_def");
         let pushed = game.field_model.player_coordinate("home_def").unwrap();
         // SW=(11,9) blocked, W=(11,8) and NW=(11,7) remain; Java min(x)/min(y) → NW=(11,7)
         assert_eq!(pushed, FieldCoordinate::new(11, 7),
             "SW blocked → min(x)/min(y) picks NW=(11,7)");
+    }
+
+    /// auto_push for EAST push (home attacking).
+    /// Attacker at (12,8), defender at (13,8) → push dir EAST → candidates NE(14,7),E(14,8),SE(14,9).
+    /// Java sendPushback: min(x) then min(y) → all x=14, min(y)=7 → NE=(14,7).
+    #[test]
+    fn auto_push_east_home_attacker_picks_ne() {
+        use ffb_model::types::FieldCoordinate;
+        let mut game = Game::new(
+            test_team("home", 5),
+            test_team("away", 7),
+            ffb_model::enums::Rules::Bb2025,
+        );
+        game.field_model.set_player_coordinate("home_atk", FieldCoordinate::new(12, 8));
+        game.field_model.set_player_coordinate("away_def", FieldCoordinate::new(13, 8));
+        auto_push(&mut game, "home_atk", "away_def");
+        let pushed = game.field_model.player_coordinate("away_def").unwrap();
+        // Java min(x) then min(y): all x=14, min(y)=7 → NE=(14,7)
+        assert_eq!(pushed, FieldCoordinate::new(14, 7),
+            "home attacking EAST: defender should push to NE=(14,7), not {:?}", pushed);
     }
 }

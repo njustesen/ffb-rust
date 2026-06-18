@@ -11,6 +11,7 @@
 //! shared instance drives BOTH sides (the runner plays both coaches); its two RNG streams are
 //! kept distinct from the game dice by the seed XORs below.
 
+use std::collections::HashSet;
 use rand_xoshiro::Xoshiro256StarStar;
 use rand_core::{RngCore, SeedableRng};
 use ffb_model::prompts::AgentPrompt;
@@ -18,7 +19,7 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::enums::PlayerAction;
 
 use crate::action::{Action, PlayerActionChoice};
-use crate::legal_actions::{legal_block_targets, TeamSide};
+use crate::legal_actions::{legal_block_targets, legal_foul_targets, legal_handoff_receivers, legal_pass_receivers, TeamSide};
 use crate::step::GameState;
 
 /// The step engine's decision-maker. Reads the game state (including the pending prompt) and
@@ -37,6 +38,14 @@ pub struct RandomAgent {
     decision_rng: Xoshiro256StarStar,
     /// Action-diversity RNG — independent of Java's decisions.
     action_rng: Xoshiro256StarStar,
+    /// Players skipped this turn because they are inactive (just recovered from STUNNED).
+    /// Mirrors Java ParityRunner's `usedThisTurn` for rejected-inactive picks.
+    skipped_this_turn: HashSet<String>,
+    /// Turn key (half, turn_nr, home_playing) — detects when a new turn starts so we can
+    /// clear `skipped_this_turn`.
+    last_turn_key: Option<(i32, i32, bool)>,
+    /// Debug: cumulative actionRng call count (for FFB_TRACE divergence diagnosis).
+    action_rng_count: u64,
 }
 
 impl RandomAgent {
@@ -45,6 +54,9 @@ impl RandomAgent {
         RandomAgent {
             decision_rng: Xoshiro256StarStar::seed_from_u64(game_seed ^ 0xDEAD_BEEF_CAFE_0001),
             action_rng: Xoshiro256StarStar::seed_from_u64(game_seed ^ 0xC0FFEE_ACE0_0001),
+            skipped_this_turn: HashSet::new(),
+            last_turn_key: None,
+            action_rng_count: 0,
         }
     }
 
@@ -54,6 +66,9 @@ impl RandomAgent {
         RandomAgent {
             decision_rng: Xoshiro256StarStar::seed_from_u64(seed),
             action_rng: Xoshiro256StarStar::seed_from_u64(seed ^ 0xC0FFEE_ACE0_0001),
+            skipped_this_turn: HashSet::new(),
+            last_turn_key: None,
+            action_rng_count: 0,
         }
     }
 
@@ -69,6 +84,7 @@ impl RandomAgent {
 
     /// Action-RNG uniform index — diversity picks (move target, block/foul target).
     fn pick_action(&mut self, len: usize) -> usize {
+        self.action_rng_count += 1;
         if len == 0 { 0 } else { (self.action_rng.next_u64() as usize) % len }
     }
 
@@ -98,20 +114,73 @@ impl Agent for RandomAgent {
             // AGENT_CONTRACT.md §4-5: 1 decisionRng for player pick over remaining (§4 — EndTurn
             // is automatic when remaining is empty, NOT an explicit pick option),
             // 1 actionRng for action pick, 1 actionRng for block target when Block/Blitz.
+            //
+            // Java inactive-skip (ParityRunner tier>=3): players that are PRONE with active=false
+            // (just recovered from STUNNED this turn) are in the eligible list but rejected when
+            // picked. Each rejection consumes 1 decisionRng call. `skipped_this_turn` tracks
+            // rejected players across multiple InitSelecting calls within the same turn.
             Some(AgentPrompt::ActivatePlayer { eligible_players }) => {
-                let n = eligible_players.len();
-                if n == 0 {
-                    return Action::EndTurn;
+                if std::env::var("FFB_TRACE").is_ok() {
+                    eprintln!("RUST_ACT_START arc={}", self.action_rng_count);
                 }
-                let player_idx = self.pick(n); // pick from [0, n) — no EndTurn slot
-                let (player_id, actions) = &eligible_players[player_idx];
-                let action_idx = self.pick_action(actions.len());
-                let player_action = player_action_to_pac(&actions[action_idx]);
+                // Detect new turn and clear the skip-set.
+                let turn_nr = if gs.game.home_playing {
+                    gs.game.turn_data_home.turn_nr
+                } else {
+                    gs.game.turn_data_away.turn_nr
+                };
+                let turn_key = (gs.game.half, turn_nr, gs.game.home_playing);
+                if self.last_turn_key != Some(turn_key) {
+                    self.last_turn_key = Some(turn_key);
+                    self.skipped_this_turn.clear();
+                }
+
+                // Build `remaining` as indices into eligible_players, excluding already-skipped.
+                let mut remaining: Vec<usize> = (0..eligible_players.len())
+                    .filter(|&i| !self.skipped_this_turn.contains(&eligible_players[i].0))
+                    .collect();
+
+                // Inactive-skip loop (mirrors Java ParityRunner while(true) pick loop).
+                let (player_id, actions) = loop {
+                    if remaining.is_empty() {
+                        return Action::EndTurn;
+                    }
+                    let pick = self.pick(remaining.len()); // consumes 1 decisionRng
+                    let player_list_idx = remaining.remove(pick);
+                    let (pid, acts) = &eligible_players[player_list_idx];
+                    // Check if the player is inactive (PRONE with active=false = just recovered
+                    // from STUNNED this turn). Only PRONE+inactive players are skipped; STANDING
+                    // players should always be active after refreshPlayersForTurnStart.
+                    let ps = gs.game.field_model.player_state(pid);
+                    let is_inactive = ps.map(|s| s.is_prone() && !s.is_active()).unwrap_or(false);
+                    if is_inactive {
+                        // Rejected: decisionRng already consumed; mark as skipped for this turn.
+                        self.skipped_this_turn.insert(pid.clone());
+                        continue;
+                    }
+                    break (pid, acts);
+                };
+                // Filter stale actions: mirrors Java ParityRunner.filterStaleActions — removes
+                // Blitz/Block if blitz_used, Pass if pass_used, etc. The eligible
+                // list was captured at turn start, so single-use actions may already be consumed.
+                let td = if gs.game.home_playing { &gs.game.turn_data_home } else { &gs.game.turn_data_away };
+                let live_actions: Vec<PlayerAction> = actions.iter().filter(|a| match a {
+                    PlayerAction::Block | PlayerAction::Blitz => !td.blitz_used,
+                    PlayerAction::Pass => !td.pass_used,
+                    PlayerAction::HandOver => !td.hand_over_used,
+                    PlayerAction::Foul => !td.foul_used,
+                    _ => true,
+                }).cloned().collect();
+                let action_idx = self.pick_action(live_actions.len());
+                let player_action = player_action_to_pac(&live_actions[action_idx]);
+                if std::env::var("FFB_TRACE").is_ok() {
+                    eprintln!("RUST_ACT_PICK pid={player_id} N={} idx={action_idx} action={player_action:?} arc={}", live_actions.len(), self.action_rng_count);
+                }
                 // For Block/Blitz: pick target from adjacent opponents
+                // For Foul: pick foul target from adjacent prone/stunned opponents (1 actionRng call)
                 let block_defender_id = match player_action {
                     PlayerActionChoice::Block
-                    | PlayerActionChoice::Blitz
-                    | PlayerActionChoice::StandUpBlitz => {
+                    | PlayerActionChoice::Blitz => {
                         let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
                         let targets = legal_block_targets(&gs.game, player_id, side);
                         if targets.is_empty() {
@@ -121,16 +190,55 @@ impl Agent for RandomAgent {
                             Some(targets[tidx].clone())
                         }
                     }
+                    PlayerActionChoice::Foul => {
+                        let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
+                        let targets = legal_foul_targets(&gs.game, player_id, side);
+                        if targets.is_empty() {
+                            None
+                        } else {
+                            let tidx = self.pick_action(targets.len());
+                            Some(targets[tidx].clone())
+                        }
+                    }
+                    PlayerActionChoice::HandOff => {
+                        let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
+                        let receivers = legal_handoff_receivers(&gs.game, player_id, side);
+                        if receivers.is_empty() {
+                            None
+                        } else {
+                            let ridx = self.pick_action(receivers.len());
+                            Some(receivers[ridx].clone())
+                        }
+                    }
+                    PlayerActionChoice::Pass => {
+                        let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
+                        let receivers = legal_pass_receivers(&gs.game, player_id, side);
+                        if receivers.is_empty() {
+                            None
+                        } else {
+                            let ridx = self.pick_action(receivers.len());
+                            Some(receivers[ridx].clone())
+                        }
+                    }
                     _ => None,
                 };
+                if std::env::var("FFB_TRACE").is_ok() {
+                    eprintln!("RUST_ACT_END arc={}", self.action_rng_count);
+                }
                 Action::ActivatePlayer { player_id: player_id.clone(), player_action, block_defender_id }
             }
             // Move prompt: pick destination from legal squares using actionRng.
-            Some(AgentPrompt::Move { squares, .. }) => {
+            Some(AgentPrompt::Move { player_id, squares }) => {
+                if std::env::var("FFB_TRACE").is_ok() {
+                    eprintln!("RUST_SMA pid={} N={}", player_id, squares.len());
+                }
                 if squares.is_empty() {
                     return Action::Move { path: vec![] };
                 }
                 let idx = self.pick_action(squares.len());
+                if std::env::var("FFB_TRACE").is_ok() {
+                    eprintln!("RUST_PICK pid={} N={} idx={} t=({},{})", player_id, squares.len(), idx, squares[idx].x, squares[idx].y);
+                }
                 Action::Move { path: vec![squares[idx]] }
             }
             // Stubs for prompts that the engine currently handles internally (auto-push/follow-up)
@@ -145,13 +253,21 @@ impl Agent for RandomAgent {
             Some(AgentPrompt::FollowUp { .. }) => {
                 Action::FollowUp { follow_up: true }
             }
-            Some(AgentPrompt::BlockChoice { dice, .. }) => {
-                if dice.is_empty() {
-                    return Action::BlockChoice { die_index: 0 };
-                }
-                let idx = self.pick_action(dice.len());
-                Action::BlockChoice { die_index: idx }
+            // Java parity runner §7: always pick die index 0 — deterministic, no actionRng consumed.
+            Some(AgentPrompt::BlockChoice { .. }) => {
+                Action::BlockChoice { die_index: 0 }
             }
+            // Reroll offer: always decline for parity (Java parity runner also declines).
+            Some(AgentPrompt::ReRollOffer { .. }) =>
+                Action::UseReRoll { use_reroll: false },
+            // Apothecary: always decline for parity.
+            Some(AgentPrompt::ApothecaryChoice { player_id, .. }) =>
+                Action::UseApothecary { player_id: player_id.clone(), use_apothecary: false },
+            Some(AgentPrompt::UseApothecary { .. }) =>
+                Action::Acknowledge,
+            // Interception: always decline per parity contract ("agents decline voluntary interference").
+            Some(AgentPrompt::Interception { .. }) =>
+                Action::Intercept { attempt: false },
             // Each remaining prompt is wired as its producing step lands in Phase D; the loud
             // failure here names exactly which handler is still missing.
             other => panic!("RandomAgent::act: no handler yet for prompt {other:?}"),
@@ -170,7 +286,8 @@ fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         PlayerAction::StandUpBlitz => PlayerActionChoice::StandUpBlitz,
         PlayerAction::Foul       => PlayerActionChoice::Foul,
         PlayerAction::Pass       => PlayerActionChoice::Pass,
-        PlayerAction::HandOver   => PlayerActionChoice::HandOff,
+        PlayerAction::HandOver      => PlayerActionChoice::HandOff,
+        PlayerAction::SecureTheBall => PlayerActionChoice::SecureTheBall,
         other => unimplemented!("player_action_to_pac: unhandled {other:?}"),
     }
 }

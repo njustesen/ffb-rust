@@ -3,6 +3,7 @@ use ffb_model::model::game::Game;
 use ffb_model::model::player::PlayerId;
 use ffb_model::types::FieldCoordinate;
 use ffb_mechanics::skills::SkillId;
+use ffb_mechanics::mechanics::STANDARD_GFI_SQUARES;
 use ffb_model::enums::{Rules, PS_PRONE};
 use crate::action::{Action, PlayerActionChoice};
 
@@ -61,7 +62,8 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             continue; // stunned / KO / dead
         }
 
-        // Prone players can stand up (StandUp / StandUpBlitz)
+        // Prone players can stand up (StandUp) or blitz without pre-block move (Blitz).
+        // Java computeEligiblePlayers offers MOVE + BLITZ for prone players — not STAND_UP_BLITZ.
         if is_prone {
             actions.push(Action::ActivatePlayer {
                 player_id: pid.clone(),
@@ -80,7 +82,7 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
                 if adj_opponent {
                     actions.push(Action::ActivatePlayer {
                         player_id: pid.clone(),
-                        player_action: PlayerActionChoice::StandUpBlitz,
+                        player_action: PlayerActionChoice::Blitz,
                         block_defender_id: None,
                     });
                 }
@@ -95,7 +97,9 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             block_defender_id: None,
         });
 
-        // Block / Blitz: require adjacent standing opponent; Block + Blitz both use blitz slot
+        // Block / Blitz: require adjacent standing opponent; Block + Blitz both use blitz slot.
+        // Mirrors Java computeEligiblePlayers: only offered when hasAdjacentBlockTarget().
+        // No standalone move-into-contact Blitz — matches Java parity contract exactly.
         if !turn_data.blitz_used {
             let adj_standing_opponent = opponent_team.players.iter().any(|op| {
                 game.field_model.player_coordinate(&op.id)
@@ -111,12 +115,6 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
                     player_action: PlayerActionChoice::Block,
                     block_defender_id: None,
                 });
-                actions.push(Action::ActivatePlayer {
-                    player_id: pid.clone(),
-                    player_action: PlayerActionChoice::Blitz,
-                    block_defender_id: None,
-                });
-            } else {
                 actions.push(Action::ActivatePlayer {
                     player_id: pid.clone(),
                     player_action: PlayerActionChoice::Blitz,
@@ -250,13 +248,25 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
 
 /// Returns all squares the player can legally move to (BFS, within MA moves, empty squares only).
 /// Excludes the player's current square. Sorted by (x, y).
+/// Returns the 8 adjacent squares of the player that are on-pitch and unoccupied,
+/// sorted by (x, y). Mirrors Java ParityRunner.sendMoveAction: 1-step neighbours only.
+/// Returns empty when the player has exhausted MA + GFI allowance (mirrors Java StepGoForIt cap).
 pub fn legal_move_targets(game: &Game, player_id: &str) -> Vec<FieldCoordinate> {
     let start = match game.field_model.player_coordinate(player_id) {
         Some(c) => c,
         None => return vec![],
     };
+    // Cap: no move offered once current_move has reached MA + GFI (Java: max MA + 2 rush squares).
     let ma = find_player_ma(game, player_id);
-    bfs_reachable_empty(game, player_id, start, ma)
+    let cur = game.acting_player.current_move;
+    if cur >= ma + STANDARD_GFI_SQUARES {
+        return vec![];
+    }
+    let mut targets: Vec<FieldCoordinate> = start.neighbours().into_iter()
+        .filter(|n| n.is_on_pitch() && game.field_model.player_at(*n).is_none())
+        .collect();
+    targets.sort_by_key(|c| (c.x, c.y));
+    targets
 }
 
 /// Returns all squares the blitzing player can legally move to for a BLITZ action:
@@ -371,7 +381,7 @@ pub fn legal_block_targets(game: &Game, player_id: &str, side: TeamSide) -> Vec<
         TeamSide::Away => &game.team_home,
     };
 
-    opponent_team.players.iter()
+    let mut targets: Vec<PlayerId> = opponent_team.players.iter()
         .filter(|p| {
             game.field_model.player_coordinate(&p.id)
                 .map(|c| c.is_adjacent(coord))
@@ -383,7 +393,66 @@ pub fn legal_block_targets(game: &Game, player_id: &str, side: TeamSide) -> Vec<
                 .unwrap_or(false)
         })
         .map(|p| p.id.clone())
-        .collect()
+        .collect();
+    // Java pickBlockTarget sorts by (x, y) before picking — match that order.
+    targets.sort_by_key(|id| {
+        game.field_model.player_coordinate(id)
+            .map(|c| (c.x, c.y))
+            .unwrap_or((i32::MAX, i32::MAX))
+    });
+    targets
+}
+
+/// Returns all adjacent friendly players (valid hand-off receivers), sorted by (x, y).
+/// Mirrors Java ParityRunner.sendHandOverAction which sorts players by coordinate.
+pub fn legal_handoff_receivers(game: &Game, player_id: &str, side: TeamSide) -> Vec<PlayerId> {
+    let coord = match game.field_model.player_coordinate(player_id) {
+        Some(c) => c,
+        None => return vec![],
+    };
+    let team = match side {
+        TeamSide::Home => &game.team_home,
+        TeamSide::Away => &game.team_away,
+    };
+    let mut targets: Vec<PlayerId> = team.players.iter()
+        .filter(|p| p.id != player_id)
+        .filter(|p| {
+            game.field_model.player_coordinate(&p.id)
+                .map(|c| c.is_adjacent(coord))
+                .unwrap_or(false)
+        })
+        .map(|p| p.id.clone())
+        .collect();
+    targets.sort_by_key(|id| {
+        game.field_model.player_coordinate(id)
+            .map(|c| (c.x, c.y))
+            .unwrap_or((i32::MAX, i32::MAX))
+    });
+    targets
+}
+
+/// Returns all on-pitch teammates for the pass-target list (Java ParityRunner.sendPassAction).
+/// Matches Java: all teammates with a valid on-field coordinate, sorted by (x, y), 1 actionRng pick.
+pub fn legal_pass_receivers(game: &Game, player_id: &str, side: TeamSide) -> Vec<PlayerId> {
+    let team = match side {
+        TeamSide::Home => &game.team_home,
+        TeamSide::Away => &game.team_away,
+    };
+    let mut targets: Vec<PlayerId> = team.players.iter()
+        .filter(|p| p.id != player_id)
+        .filter(|p| {
+            game.field_model.player_coordinate(&p.id)
+                .map(|c| c.x >= 0 && c.x <= 25 && c.y >= 0 && c.y <= 14)
+                .unwrap_or(false)
+        })
+        .map(|p| p.id.clone())
+        .collect();
+    targets.sort_by_key(|id| {
+        game.field_model.player_coordinate(id)
+            .map(|c| (c.x, c.y))
+            .unwrap_or((i32::MAX, i32::MAX))
+    });
+    targets
 }
 
 /// Returns all prone/stunned opponent players adjacent to the given player (valid foul targets).
@@ -398,7 +467,7 @@ pub fn legal_foul_targets(game: &Game, player_id: &str, side: TeamSide) -> Vec<P
         TeamSide::Away => &game.team_home,
     };
 
-    opponent_team.players.iter()
+    let mut targets: Vec<PlayerId> = opponent_team.players.iter()
         .filter(|p| {
             game.field_model.player_coordinate(&p.id)
                 .map(|c| c.is_adjacent(coord))
@@ -410,7 +479,14 @@ pub fn legal_foul_targets(game: &Game, player_id: &str, side: TeamSide) -> Vec<P
                 .unwrap_or(false)
         })
         .map(|p| p.id.clone())
-        .collect()
+        .collect();
+    // Java sortPlayersByCoordinate: sort by (x, y)
+    targets.sort_by_key(|id| {
+        game.field_model.player_coordinate(id)
+            .map(|c| (c.x, c.y))
+            .unwrap_or((i32::MAX, i32::MAX))
+    });
+    targets
 }
 
 /// Returns legal kickoff target coordinates (the opponent's half of the field).

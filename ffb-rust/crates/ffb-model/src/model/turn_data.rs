@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::enums::LeaderState;
+use crate::enums::{LeaderState, PlayerAction};
 
 /// Per-team per-half turn state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,6 +36,9 @@ pub struct TurnData {
     pub quick_snap_bonus: i32,
     /// Players who have completed their action this turn (IDs). Cleared each turn.
     pub acted_player_ids: Vec<String>,
+    /// Eligible player list cached at turn start (Java parity: computed once when
+    /// `acted_player_ids` is empty, never updated mid-turn). Cleared each turn.
+    pub turn_eligible_cache: Vec<(String, Vec<PlayerAction>)>,
 }
 
 impl TurnData {
@@ -67,6 +70,7 @@ impl TurnData {
             lord_of_chaos_state: LeaderState::None,
             quick_snap_bonus: 0,
             acted_player_ids: Vec::new(),
+            turn_eligible_cache: Vec::new(),
         }
     }
 
@@ -83,6 +87,7 @@ impl TurnData {
         self.punt_used = false;
         self.quick_snap_bonus = 0;
         self.acted_player_ids.clear();
+        self.turn_eligible_cache.clear();
     }
 }
 

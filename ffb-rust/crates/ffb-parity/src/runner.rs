@@ -13,7 +13,7 @@ use ffb_model::model::roster_position::RosterPosition;
 use ffb_model::model::skill_def::SkillWithValue;
 use ffb_model::model::team::Team;
 use ffb_model::prompts::AgentPrompt;
-use crate::log_format::{GameLog, LogLine, java_log_path_for, rust_log_path_for};
+use crate::log_format::{GameLog, LogLine, java_log_path_for, rust_log_path_for, rust_events_path_for};
 use crate::state_hash::state_hash;
 use ffb_model::util::state_hash::state_string;
 
@@ -164,8 +164,12 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
         let half = engine.game.half;
         let pre_hash = state_hash(&engine.game);
         let active_str = if engine.game.home_playing { "home" } else { "away" };
-        let pre_state_str = if verbose { Some(state_string(&engine.game)) } else { None };
-
+        let pre_rng = engine.rng_call_count();
+        let pre_state_str = if verbose || std::env::var_os("FFB_TRACE").is_some() {
+            Some(state_string(&engine.game))
+        } else {
+            None
+        };
         let probe = (
             pre_hash.clone(),
             engine.rng_call_count(),
@@ -221,6 +225,9 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
         // Tier 3: one step line per player activation (Phase 1 and Phase 2), matching
         // Java's per-activation recordStep().
         let log_step = if tier >= 3 { is_activation } else { is_turn_boundary };
+        if log_step && turn_nr >= 1 && std::env::var_os("FFB_TRACE").is_some() {
+            eprintln!("RUST_STEP i={} rng_calls={} turn={} half={} active={} chosen={} state={}", step_index, pre_rng, turn_nr, half, active_str, chosen, pre_state_str.as_deref().unwrap_or("?"));
+        }
         if log_step && turn_nr >= 1 {
             pending_steps.push(PendingStep {
                 i: step_index,
@@ -268,7 +275,7 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
         state_hash: end_hash,
     });
 
-    // Write to disk
+    // Write step log to disk
     let log = GameLog {
         seed,
         home_roster: home_roster.to_string(),
@@ -277,6 +284,17 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
     };
     if let Err(e) = log.write_to_file(&rust_path) {
         log::warn!("Could not write Rust log for seed {seed}: {e}");
+    }
+
+    // Write events log to disk (one JSON line per GameEvent).
+    let events_path = rust_events_path_for(seed, home_roster, away_roster);
+    if let Ok(mut f) = std::fs::File::create(&events_path) {
+        use std::io::Write;
+        for ev in &all_events {
+            if let Ok(line) = serde_json::to_string(ev) {
+                let _ = writeln!(f, "{}", line);
+            }
+        }
     }
 
     (lines, all_events, score_home, score_away)
