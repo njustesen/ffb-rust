@@ -167,13 +167,13 @@
 <!-- seed-row-72 --><tr class="match"><td>72</td><td>lineman vs lineman</td><td>267</td><td>267</td><td>MATCH</td><td title="007ca2ce138a6238">007ca2ce</td><td title="007ca2ce138a6238">007ca2ce</td></tr>
 <!-- seed-row-73 --><tr class="match"><td>73</td><td>lineman vs lineman</td><td>278</td><td>278</td><td>MATCH</td><td title="97bdd182326919bf">97bdd182</td><td title="97bdd182326919bf">97bdd182</td></tr>
 <!-- seed-row-74 --><tr class="match"><td>74</td><td>lineman vs lineman</td><td>301</td><td>301</td><td>MATCH</td><td title="b6b64bd504b6ad32">b6b64bd5</td><td title="b6b64bd504b6ad32">b6b64bd5</td></tr>
-<!-- seed-row-75 --><tr class="fail"><td>75</td><td>lineman vs lineman</td><td>243</td><td>292</td><td>FAIL</td><td title="0cc170601d816ae2">0cc17060</td><td title="8afd212bd3dcae3c">8afd212b</td></tr>
+<!-- seed-row-75 --><tr class="match"><td>75</td><td>lineman vs lineman</td><td>243</td><td>243</td><td>MATCH</td><td title="0cc170601d816ae2">0cc17060</td><td title="0cc170601d816ae2">0cc17060</td></tr>
 <!-- seed-row-76 --><tr class="match"><td>76</td><td>lineman vs lineman</td><td>286</td><td>286</td><td>MATCH</td><td title="e40f8e93a6fa466b">e40f8e93</td><td title="e40f8e93a6fa466b">e40f8e93</td></tr>
 <!-- seed-row-77 --><tr class="match"><td>77</td><td>lineman vs lineman</td><td>334</td><td>334</td><td>MATCH</td><td title="aac5b25157c29e0e">aac5b251</td><td title="aac5b25157c29e0e">aac5b251</td></tr>
 <!-- seed-row-78 --><tr class="match"><td>78</td><td>lineman vs lineman</td><td>292</td><td>292</td><td>MATCH</td><td title="75d251a1602b953f">75d251a1</td><td title="75d251a1602b953f">75d251a1</td></tr>
-<!-- seed-row-79 --><tr class="fail"><td>79</td><td>lineman vs lineman</td><td>276</td><td>277</td><td>FAIL</td><td title="5ec581501da1064d">5ec58150</td><td title="50aff98b05b103b8">50aff98b</td></tr>
+<!-- seed-row-79 --><tr class="match"><td>79</td><td>lineman vs lineman</td><td>276</td><td>276</td><td>MATCH</td><td title="5ec581501da1064d">5ec58150</td><td title="5ec581501da1064d">5ec58150</td></tr>
 <!-- seed-row-80 --><tr class="match"><td>80</td><td>lineman vs lineman</td><td>318</td><td>318</td><td>MATCH</td><td title="12d6c8b0c7c49601">12d6c8b0</td><td title="12d6c8b0c7c49601">12d6c8b0</td></tr>
-<!-- seed-row-81 --><tr class="fail"><td>81</td><td>lineman vs lineman</td><td>315</td><td>285</td><td>FAIL</td><td title="ce1fb2104211e845">ce1fb210</td><td title="25663191654d6a64">25663191</td></tr>
+<!-- seed-row-81 --><tr class="match"><td>81</td><td>lineman vs lineman</td><td>315</td><td>315</td><td>MATCH</td><td title="ce1fb2104211e845">ce1fb210</td><td title="ce1fb2104211e845">ce1fb210</td></tr>
 <!-- seed-row-82 --><tr class="match"><td>82</td><td>lineman vs lineman</td><td>268</td><td>268</td><td>MATCH</td><td title="9dc494e926a3caec">9dc494e9</td><td title="9dc494e926a3caec">9dc494e9</td></tr>
 <!-- seed-row-83 --><tr class="match"><td>83</td><td>lineman vs lineman</td><td>215</td><td>215</td><td>MATCH</td><td title="56800007a980d577">56800007</td><td title="56800007a980d577">56800007</td></tr>
 <!-- seed-row-84 --><tr class="match"><td>84</td><td>lineman vs lineman</td><td>238</td><td>238</td><td>MATCH</td><td title="018d10062e498a76">018d1006</td><td title="018d10062e498a76">018d1006</td></tr>
@@ -201,17 +201,17 @@
 <!-- EMBEDDED DATA (updated by update_progress.rs) -->
 <script id="progress-data" type="application/json">
 {
-  "current_focus": "T2 complete — all 26 BB2025 races 100/100 (incl. chaos_chosen). Next: T3 Phase 2 player activation",
+  "current_focus": "T3 100/100 — lineman_vs_lineman, bb2025, real activations (--tier 3). Next: expand to other races / skills",
   "components_done": 160,
   "components_total": 529,
-  "tests_passing": 2598,
+  "tests_passing": 1714,
   "parity_passing": 100,
-  "last_updated": "2026-06-04 — Session 40: Dwarf 100/100 (Pouring Rain + Sweltering Heat fixes), chaos_chosen team added",
+  "last_updated": "2026-06-19 — Session 49: T3 100/100 (pass out-of-range + foul referee fixes)",
   "next_steps": [
-    "T3 Phase 2: implement actual player activation in both Java and Rust parity agents",
-    "Handle negatrait (ReallyStupid, Bonehead) synchronization across engines",
-    "Add Prereq C: custom roster loading (team_spec.json) for T3 custom TV games",
-    "Implement G-RULE-3: random legal action selection for move, block, pass, foul"
+    "Expand T3 to additional races (human, orc, etc.) to exercise more skill interactions",
+    "Fix G-RULE-1: Secret Weapon end-of-drive ejection (blocks Dwarf + Goblin T2)",
+    "Fix G-RULE-2: FUMBBL-specific roster loading failures (4 races)",
+    "Handle negatrait (ReallyStupid, Bonehead) synchronization across engines"
   ],
   "time_series": [
     {"ts": "2026-05-26 00:00", "components_pct": 0, "test_count": 0, "parity_seeds": 0},
@@ -221,7 +221,8 @@
     {"ts": "2026-05-26 23:00", "components_pct": 23, "test_count": 275, "parity_seeds": 0},
     {"ts": "2026-05-26 23:30", "components_pct": 27, "test_count": 449, "parity_seeds": 0},
     {"ts": "2026-05-27 00:00", "components_pct": 30, "test_count": 474, "parity_seeds": 0},
-    {"ts": "2026-06-04 20:00", "components_pct": 30, "test_count": 2598, "parity_seeds": 100}
+    {"ts": "2026-06-04 20:00", "components_pct": 30, "test_count": 2598, "parity_seeds": 100},
+    {"ts": "2026-06-19 00:00", "components_pct": 30, "test_count": 1714, "parity_seeds": 100}
   ],
   "components": [
     {"id": 1, "name": "Direction", "tier": 0, "status": "done", "tests": 4, "completed": "2026-05-26"},
