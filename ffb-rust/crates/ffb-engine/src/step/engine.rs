@@ -944,6 +944,18 @@ impl Step {
                             }
                         }
                     }
+                    if std::env::var_os("FFB_TRACE").is_some() {
+                        let side_str = if game.home_playing { "home" } else { "away" };
+                        let turn_nr = if game.home_playing { game.turn_data_home.turn_nr } else { game.turn_data_away.turn_nr };
+                        eprintln!("RUST_ELIGIBLE side={} turn={}: {:?}", side_str, turn_nr,
+                            cache.iter().map(|(id, _)| id.as_str()).collect::<Vec<_>>());
+                        // Also dump is_active for all players on that side
+                        let team = if game.home_playing { &game.team_home } else { &game.team_away };
+                        for p in &team.players {
+                            let st = game.field_model.player_state(&p.id);
+                            eprintln!("  player {} state={:?}", p.id, st);
+                        }
+                    }
                     let turn_data = if game.home_playing {
                         &mut game.turn_data_home
                     } else {
@@ -1233,8 +1245,21 @@ impl Step {
                         }
                     }
                     BlockResult::PowPushback => {
-                        // Follow-up DECLINED per §7: defender pushed + knocked down,
-                        // attacker stays in place.
+                        // "Defender Stumbles" (die=5): defender pushed; if defender has Dodge
+                        // (BB2025 ignoreDefenderStumblesResult) and attacker lacks Tackle, the
+                        // defender is NOT knocked down — Java StepBlockChoice.POW_PUSHBACK branch.
+                        let def_has_dodge = game.team_home.players.iter()
+                            .chain(game.team_away.players.iter())
+                            .find(|p| p.id == defender_id)
+                            .map(|p| p.has_skill(SkillId::Dodge))
+                            .unwrap_or(false);
+                        let atk_has_tackle = game.team_home.players.iter()
+                            .chain(game.team_away.players.iter())
+                            .find(|p| p.id == attacker_id)
+                            .map(|p| p.has_skill(SkillId::Tackle))
+                            .unwrap_or(false);
+                        let dodge_protects = def_has_dodge && !atk_has_tackle;
+                        // Follow-up DECLINED per §7: defender pushed, attacker stays in place.
                         auto_push(game, &attacker_id, &defender_id);
                         let def_new_coord = game.field_model.player_coordinate(&defender_id);
                         // Java StepPushback.pushPlayer: detect pushed-onto-ball before moving ball with carrier.
@@ -1246,13 +1271,15 @@ impl Step {
                                 game.field_model.ball_coordinate = Some(new_dc);
                             }
                         }
-                        step_evs.extend(apply_knockdown(game, &defender_id, rng));
-                        // Scatter ball after knockdown: either carrier fell (def_has_ball) or defender
-                        // was knocked onto a loose ball (pushed_onto_ball). Java: StepCatchScatterThrowIn
-                        // runs after StepDropFallingPlayers with the SCATTER_BALL mode set by StepPushback.
-                        if def_has_ball || pushed_onto_ball {
-                            if let Some(dc) = def_new_coord {
-                                scatter_ball_from_knockdown(game, dc, rng);
+                        if !dodge_protects {
+                            step_evs.extend(apply_knockdown(game, &defender_id, rng));
+                            // Scatter ball after knockdown: either carrier fell (def_has_ball) or defender
+                            // was knocked onto a loose ball (pushed_onto_ball). Java: StepCatchScatterThrowIn
+                            // runs after StepDropFallingPlayers with the SCATTER_BALL mode set by StepPushback.
+                            if def_has_ball || pushed_onto_ball {
+                                if let Some(dc) = def_new_coord {
+                                    scatter_ball_from_knockdown(game, dc, rng);
+                                }
                             }
                         }
                     }
@@ -1904,6 +1931,13 @@ impl Step {
                 let action = pac_to_player_action(*player_action);
                 game.acting_player.set_player(player_id.clone(), action);
                 game.acting_player.defender_id = block_defender_id.clone();
+                // Clear per-activation skill re-rolls (Dodge, SureFeet, etc.) — Java tracks
+                // these on ActingPlayer and clears on deselect; Rust stores on Player directly.
+                if let Some(p) = game.team_home.players.iter_mut().find(|p| &p.id == player_id) {
+                    p.used_skills.clear();
+                } else if let Some(p) = game.team_away.players.iter_mut().find(|p| &p.id == player_id) {
+                    p.used_skills.clear();
+                }
                 // Mark blitz/block slot used
                 let td = if game.home_playing { &mut game.turn_data_home } else { &mut game.turn_data_away };
                 match player_action {
@@ -1980,7 +2014,9 @@ impl Step {
                         }
                     }
 
-                    // StepMoveDodge: roll if leaving a tackle zone.
+                    // StepMoveDodge: roll if leaving a tackle zone (triggered by src TZs).
+                    // Modifier = TZs at DESTINATION (Java DodgeModifierFactory.numberOfTacklezones
+                    // uses context.getTargetCoordinate(), not sourceCoordinate).
                     let src_tz = count_opponent_tackle_zones_at(game, &player_id, cur_pos);
                     if src_tz > 0 {
                         let dest_tz = count_opponent_tackle_zones_at(game, &player_id, step_dest);
@@ -1988,7 +2024,7 @@ impl Step {
                             (0..dest_tz).map(|_| DODGE_TACKLE_ZONE).collect();
                         let minimum = minimum_roll_dodge(ag, &modifiers);
                         let roll = rng.d6();
-                        let success = is_skill_roll_successful(roll, minimum);
+                        let mut success = is_skill_roll_successful(roll, minimum);
                         move_evs.push(GameEvent::DodgeRoll {
                             player_id: player_id.clone(),
                             target: minimum,
@@ -1997,14 +2033,38 @@ impl Step {
                             rerolled: false,
                         });
                         if !success {
-                            game.field_model.set_player_coordinate(&player_id, step_dest);
-                            move_evs.extend(apply_knockdown(game, &player_id, rng));
-                            game.turnover = true;
-                            // Ball bounces when carrier falls (Java StepCatchScatterThrowIn.bounceBall).
-                            if has_ball {
-                                scatter_ball_from_knockdown(game, step_dest, rng);
+                            // Engine-internal Dodge skill re-roll (AGENT_CONTRACT §7: not an agent choice).
+                            let can_reroll = game.team_home.players.iter()
+                                .chain(game.team_away.players.iter())
+                                .find(|p| p.id == player_id)
+                                .map(|p| p.has_skill(SkillId::Dodge) && !p.used_skills.contains(&SkillId::Dodge))
+                                .unwrap_or(false);
+                            if can_reroll {
+                                if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == player_id) {
+                                    p.used_skills.insert(SkillId::Dodge);
+                                } else if let Some(p) = game.team_away.players.iter_mut().find(|p| p.id == player_id) {
+                                    p.used_skills.insert(SkillId::Dodge);
+                                }
+                                let reroll = rng.d6();
+                                success = is_skill_roll_successful(reroll, minimum);
+                                move_evs.push(GameEvent::DodgeRoll {
+                                    player_id: player_id.clone(),
+                                    target: minimum,
+                                    roll: reroll,
+                                    success,
+                                    rerolled: true,
+                                });
                             }
-                            return StepOutcome::next().with_events(move_evs);
+                            if !success {
+                                game.field_model.set_player_coordinate(&player_id, step_dest);
+                                move_evs.extend(apply_knockdown(game, &player_id, rng));
+                                game.turnover = true;
+                                // Ball bounces when carrier falls (Java StepCatchScatterThrowIn.bounceBall).
+                                if has_ball {
+                                    scatter_ball_from_knockdown(game, step_dest, rng);
+                                }
+                                return StepOutcome::next().with_events(move_evs);
+                            }
                         }
                     }
                     game.field_model.set_player_coordinate(&player_id, step_dest);

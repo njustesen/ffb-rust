@@ -10,7 +10,9 @@ A living document tracking parity test coverage between the Java and Rust Blood 
 |-----|-------------|---------|---------|--------------------------|
 | T1a | Lineman vs Lineman (baseline) | Fixed, identical | BB2025 | Core game loop, kickoff, halftime |
 | T1b | Human vs Orc (fixed races) | Fixed, named | BB2025 | Position variety, starting skills |
-| T2  | All 29 races, self-vs-self | Fixed, canonical | BB2025 | All races, SW ejection, argue, Stunty Leeg SW penalty |
+| T2  | All 26 races, self-vs-self | Fixed, canonical | BB2025 | All races, SW ejection, argue, Stunty Leeg SW penalty |
+| T3a | Lineman vs Lineman, real activation | Fixed, identical | BB2025 | Move/Block/Blitz/Pass/Foul/HandOver, GFI, dodge, armor/injury |
+| T3b | All 26 races, self-vs-self, real activation | Fixed, canonical | BB2025 | Position diversity, starting skills, race-specific mechanics |
 | T3  | Random custom TV-matched | Generated, same TV | Random | Extra skills, position diversity, random editions |
 | T3i | Random custom TV-imbalanced | Generated, unequal TV | Random | Inducements, petty cash, journeymen, wizard |
 
@@ -20,13 +22,11 @@ For each tier, test at scale: **1 → 10 → 100 → 1000 seeds** before advanci
 
 ## Current Status
 
-**T1a:** ✓ 100/100 | **T1b:** ✓ 100/100 | **T2:** ✓ 26/26 races × 100/100 seeds (2,600 games)
+**T1a:** ✓ 100/100 | **T1b:** ✓ 100/100 | **T2:** ✓ 26/26 races × 100/100 seeds (2,600 games) | **T3a:** ✓ 100/100 (lineman_vs_lineman, full activation)
 
-**T2 at 100 seeds is complete.** All 26 BB2025 races pass 100/100 seeds — bit-for-bit identical state hashes between Java and Rust for every game. (chaos_chosen added session 40.)
+**T3a complete (session 49, 2026-06-18).** lineman_vs_lineman with real player activation — Move, StandUp, Block, Blitz, Pass, HandOver, Foul all occur; dodge/GFI/armor/injury/argue all verified bit-for-bit identical between Java and Rust.
 
-**Next milestone:** T3 Phase 2 — actual player activation (requires G-RULE-3 + negatrait sync).
-
-**Blocker for T3 being meaningful:** player activation (G-RULE-3). Without real moves and blocks, T3 and T2 test the same mechanics — only kickoff/halftime/ejection logic fires. T3 adds value only after activation is implemented.
+**Next milestone: T3b** — run each of the 26 canonical races self-vs-self at tier 3 (real activation), starting with `amazon_vs_amazon`. Uses existing fixed rosters — no new infrastructure needed. Move to the next race only when the current one hits 100/100. Prereq C (custom roster loading) is deferred until T3b is complete.
 
 ---
 
@@ -39,8 +39,10 @@ Mark each cell: `✓` (all pass), `~` (partial, note failure count), `✗` (all 
 | T1a  | Lineman vs Lineman, BB2025 | ✓ | ✓ | ✓ | — | 100/100 ✓ |
 | T1b  | Human vs Orc, BB2025 | ✓ | ✓ | ✓ | — | 100/100 ✓ |
 | T2   | All 26 races self-vs-self, BB2025 | ✓ | ✓ | ✓ | — | 26/26 races 100/100 ✓ |
-| T3   | Random custom TV-matched, random edition | — | — | — | — | Blocked on G-RULE-3 (activation) + prereq C |
-| T3i  | Random custom TV-imbalanced, random edition | — | — | — | — | Blocked on G-RULE-3 + prereqs C, D |
+| T3a  | Lineman vs Lineman, real activation, BB2025 | ✓ | ✓ | ✓ | — | 100/100 ✓ (session 49) |
+| T3b  | All 26 races self-vs-self, real activation, BB2025 | — | — | — | — | One race at a time; dwarf+goblin after G-RULE-1 fixed |
+| T3   | Random custom TV-matched, random edition | — | — | — | — | Blocked on prereq C (custom rosters) |
+| T3i  | Random custom TV-imbalanced, random edition | — | — | — | — | Blocked on prereqs C, D |
 
 ---
 
@@ -56,16 +58,21 @@ For the current no-activation parity games (T1a/T1b/T2), both agents are in sync
 - `PlayerChoice (DECLARE_DIVING_CATCH)` — ✓ (both decline deterministically)
 - `ConfirmSetup`, `EndTurn` — ✓
 
-**Dialogs needed for activation (T3):**
-- [ ] `ActivatePlayer` — pick a random player + random legal action
-- [ ] `BlockChoice { dice }` — 1 decision RNG call: index into dice list
-- [ ] `BlockChoiceProperties` — 1 call: reroll yes/no
-- [ ] `ReRollOffer` — 1 call: yes/no
-- [ ] `FollowUp` — 1 call: yes/no
-- [ ] `Pushback { squares }` — 1 call: square index
+**Dialogs confirmed working (T3a lineman_vs_lineman):**
+- [x] `ActivatePlayer` — 1 decisionRng player pick + 1 actionRng action pick (Stage B)
+- [x] `BlockChoice { dice }` — index 0 (no extra RNG call)
+- [x] `BlockChoiceProperties` — decline reroll (no RNG call)
+- [x] `ReRollOffer` — decline (no RNG call)
+- [x] `FollowUp` — decline (no RNG call)
+- [x] `Pushback { squares }` — min-(x,y) on-pitch square (no RNG call)
+- [x] `Interception` — decline (no RNG call)
+- [x] `ApothecaryChoice` — decline (no RNG call)
+- [x] `ArgueTheCall` — always argue (1 game d6)
+
+**Dialogs needed for T3 proper (custom rosters / skill variety):**
 - [ ] `HitAndRun`, `TricksterMove` — 1 call each
 - [ ] `SkillUse`, `PilingOn` — 1 call each
-- [ ] `DefenderAction`, `Interception`, `ApothecaryChoice`, `UseApothecary` — 1 call each
+- [ ] `DefenderAction`, `UseApothecary` — 1 call each
 - [ ] `SelectPosition`, `SelectSkill`, `SelectWeather` — 1–2 calls each
 - [ ] `BriberyAndCorruption` — 1 call: yes/no
 - [ ] `WizardSpell` — 2 calls: x, y
@@ -85,7 +92,7 @@ For the current no-activation parity games (T1a/T1b/T2), both agents are in sync
 
 ---
 
-### C — Custom Roster Support (team_spec.json) *(pending)*
+### C — Custom Roster Support (team_spec.json) *(pending — needed for T3, not T3b)*
 
 Both engines must accept a shared JSON team spec so generated rosters (random extra skills, TV budgets) can be compared identically.
 
@@ -203,23 +210,37 @@ python scripts/parity_run.py --tier T3i --seeds 1-100 --custom-roster --tv-imbal
 | 2026-06-03 | T1a | 1–100 | 100/100 | — | Re-verified after G-RULE-6 fix |
 | 2026-06-04 | T2 | 1–100 | 25/25 races | — | All 25 races 100/100 — DP in CSTI, roster name normalization, BaC Pitch Invasion immunity, BRIBES dialog fix |
 | 2026-06-04 | T2 | 1–100 | 26/26 races | — | Session 40: Dwarf fixed (Pouring Rain in kickoff CSTI, Sweltering Heat SW-before-faint ordering, H2 kickoff faint); chaos_chosen team XML added |
+| 2026-06-12 | T3a | 1 | 1/1 | — | Session 44: first T3 seed with real activation (Stage B); all base dialogs wired |
+| 2026-06-18 | T3a | 1–55 | 55/55 | — | Session 48: CSTIN inline catch, GFI, agent stubs (ReRollOffer/ApothecaryChoice/Interception), eligible-list snapshot, pass TZ fixes |
+| 2026-06-18 | T3a | 1–100 | 100/100 | — | Session 49: pass out-of-range early-return, coach ban drive persistence, foul referee argue condition |
 
 ---
 
-## What's Left Before T3
+## What's Left
 
-**T2 is complete (26/26 races × 100/100 seeds).** All no-activation parity mechanics are verified.
+### T3b — Mirror Matchups (next milestone, no new infra)
 
-### Must-have
-1. **G-RULE-3: Player activation** — both agents must activate players, make moves, blocks, passes. Without this, T3 tests the same mechanics as T2 (only kickoff logic). This is the largest remaining piece.
-2. **Prereq C: Custom roster loading** — both engines accept `team_spec.json` with extra skills and custom TV. Needed to test skill interactions.
+Run each canonical race self-vs-self at tier 3 (real activation). Uses existing `--home RACE --away RACE --tier 3` flags — same roster loading as T2, no Prereq C needed.
 
-### Nice-to-have (T3 quality)
-3. **G-LOG-1: Expand state hash** — add reroll counts + ball carrier to hash so reroll-consumption bugs aren't silent.
-4. **G-LOG-2: Sub-turn decision logging** — log every block/push/follow-up decision so mid-turn divergences are diagnosable without print statements.
+**Race order (start simple, skip G-RULE-1 blockers for now):**
+1. **amazon** — AG=3, MA=6, Blitzer/Thrower/Catcher variety, no exotic skills → best first target
+2. **human**, **orc**, **chaos**, **skaven**, **dark_elf**, **elf**, **high_elf**, **wood_elf** — multi-position, mild skills
+3. **norse**, **nurgle**, **undead**, **necromantic**, **vampire**, **chaos_pact**, **chaos_dwarf** — more exotic skills
+4. **halfling**, **ogre**, **lizardman**, **khemri**, **underworld**, **slann** — TTM, big guys, special mechanics
+5. **goblin**, **dwarf** — after G-RULE-1 (Secret Weapon H2 ejection) is fixed
+
+**Run script:** `ffb-rust/run_t3_mirror.ps1`
+
+### T3 proper — Custom Rosters (after T3b complete)
+
+1. **Prereq C: Custom roster loading** — both engines accept `team_spec.json` with extra skills and custom TV.
+
+### Quality improvements (any time)
+2. **G-LOG-1: Expand state hash** — add reroll counts + ball carrier to hash so reroll-consumption bugs aren't silent.
+3. **G-LOG-2: Sub-turn decision logging** — log every block/push/follow-up decision so mid-turn divergences are diagnosable without print statements.
 
 ### T3i only
-5. **Prereq D: Inducement purchasing** — greedy buy-all strategy, deterministic, zero RNG calls.
+4. **Prereq D: Inducement purchasing** — greedy buy-all strategy, deterministic, zero RNG calls.
 
 ---
 

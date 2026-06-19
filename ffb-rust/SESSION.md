@@ -1,12 +1,49 @@
 # FFB-Rust Session State
 
-## Current Status (session 49 end, 2026-06-18)
+## Current Status (session 50 end, 2026-06-19)
 
 **Test counts: 1,714 total (engine, mechanics, model, client, protocol)**
 **Parity: T2 complete — 26/26 races × 100/100 seeds ✓**
-**T3: 100/100 seeds passing ✓** (lineman_vs_lineman, bb2025)
+**T3a complete — lineman_vs_lineman 100/100 seeds ✓** (real activation: Move/StandUp/Block/Blitz/Pass/HandOver/Foul)
+**T3b in progress — amazon_vs_amazon seed 1 ✓** (Dodge/Block/Blitz with PowPushback Defender Stumbles fix)
 
 All tests passing. Zero failures.
+
+**Next session focus:** Continue T3b — fix seed 6 HandOff dice divergence (Rust consumes 4 dice vs Java's 3 for HandOff at step 151). Goal: amazon_vs_amazon 100/100.
+
+---
+
+## Session 50 Summary (2026-06-19) — T3b amazon_vs_amazon seed 1 passing
+
+**Goal:** Start T3b (amazon vs amazon). Reach parity on seed 1 (all Amazon players have Dodge skill).
+
+**Result:** ✓ Seed 1 passes. Seeds 1–5 all pass. Seed 6 failing at step 151 (HandOff dice divergence, deferred).
+
+### Fix applied this session
+
+**PowPushback (Defender Stumbles) Dodge check — `engine.rs` `Step::DoBlock`**
+
+In BB2025, block die value 5 = "Defender Stumbles" (`PowPushback`): the defender is pushed back. If the defender has the Dodge skill (registered via `NamedProperties.ignoreDefenderStumblesResult` in Java) AND the attacker lacks the Tackle skill, the defender is NOT knocked down — they simply move to the pushed square, Standing.
+
+Rust was unconditionally calling `apply_knockdown` for `PowPushback`, consuming 2 armor dice and making the defender Prone. This caused state divergence when any Amazon player (all have Dodge) was pushed via a die=5 block by an attacker without Tackle.
+
+Fix in `BlockResult::PowPushback` arm:
+```rust
+let def_has_dodge = ...; // find defender in player lists, check has_skill(Dodge)
+let atk_has_tackle = ...; // find attacker, check has_skill(Tackle)
+let dodge_protects = def_has_dodge && !atk_has_tackle;
+// ...push...
+if !dodge_protects {
+    step_evs.extend(apply_knockdown(game, &defender_id, rng));
+    // ...scatter ball if needed...
+}
+```
+
+Java reference: `StepBlockChoice.java` line 172 (`case POW_PUSHBACK:`), checks `NamedProperties.ignoreDefenderStumblesResult` on defender, then `UtilCards.getSkillCancelling(...)` for Tackle on attacker. The Dodge skill in `bb2025/Dodge.java` registers `ignoreDefenderStumblesResult`.
+
+### Seed 6 failure (deferred)
+
+Seed 6 diverges at step 151 (HandOff by away_04). Java consumes 3 dice for the HandOff; Rust consumes 4. The 1-die offset causes a different block result at step 153 (home_03 Blitz) → BothDown in Rust (turnover) vs no turnover in Java. Root cause is in the HandOff dice consumption path, not yet investigated.
 
 ---
 

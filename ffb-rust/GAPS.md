@@ -42,23 +42,22 @@ The JSONL step log is emitted only at `AgentPrompt::ActivatePlayer` boundaries. 
 
 ---
 
-### G-LOG-3: `chosen` field is always "EndTurn" — does not reflect actual decisions
-**Found:** 2026-06-02  
-**Severity:** Low (currently correct for "no activation" games; will matter for T3)
+### G-LOG-3: `chosen` field now reflects activation decisions (**RESOLVED for T3a**)
+**Found:** 2026-06-02 | **Resolved:** 2026-06-12 (session 44)
 
-Since `ParityAgent` returns `Confirm → Action::EndTurn` for `ActivatePlayer`, the `chosen` field in every step entry is always `"EndTurn"`. When real activation is added, this field will correctly reflect `"Activate(player_id,action)"`, but mid-turn decisions (block choices, etc.) still won't be logged.
+The `chosen` field now correctly shows actual activation choices, e.g. `"Activate(away_03,Blitz)"`, `"Activate(home_01,Move)"`. This was fixed when Stage B agent activation was implemented.
 
-**Fix needed:** Part of G-LOG-2 fix.
+**Still open:** Mid-turn sub-decisions (block die choice, pushback square, follow-up yes/no) are not logged in the step JSONL — those are part of G-LOG-2.
 
 ---
 
 ### G-LOG-4: `dice` field is always empty `[]`
 **Found:** 2026-06-02  
-**Severity:** Low (no activation yet; important for T3)
+**Severity:** Low
 
-Java's ParityRunner always writes `"dice": []` and so does Rust. Actual dice roll results from the engine are not captured.
+Java's ParityRunner always writes `"dice": []` and so does Rust. Actual dice roll results from the engine are not captured in the step log. Confirmed still `[]` in the T3a 100/100 run — all dice results appear only in `*_events.jsonl`, not in the step JSONL used for parity comparison.
 
-**Fix needed:** When player activation is added, emit dice results (block dice, armour, injury) into this field or a new `dice_log` field. Requires Java changes too.
+**Fix needed:** Emit dice results (block dice, armour, injury) into this field or a new `dice_log` field. Requires Java changes too.
 
 ---
 
@@ -126,27 +125,14 @@ When a hash mismatch occurs, the log only shows two hex strings. To understand w
 
 ---
 
-### G-RULE-3: No player activation — parity is "no-op game" only
-**Found:** 2026-06-02  
-**Severity:** Informational — by design, but constrains what's tested
+### G-RULE-3: No player activation — parity is "no-op game" only (**FIXED 2026-06-18**)
+**Found:** 2026-06-02 | **Fixed:** sessions 44–49 (2026-06-12 to 2026-06-18)
 
-Both Java (`RandomStrategy.respondToDialog()` no-ops INIT_SELECTING) and Rust (`ParityAgent` returns `Confirm` for `ActivatePlayer`) end every turn without activating a player. The current parity tests verify:
-- Kickoff logic (coin flip, receive choice, kick coordinate, scatter, kickoff events)
-- Canonical team setup (player field positions)
-- Game flow (turn counting, halftime, game end)
+Real player activation implemented in both agents per AGENT_CONTRACT.md:
+- Rust `RandomAgent::act()`: Stage B — 1 decisionRng player pick + 1 actionRng action pick; Move/StandUp/Block/Blitz/Pass/HandOver/Foul all occur organically.
+- Java `ParityRunner`: intercepts INIT_SELECTING, picks deterministically from eligible list using `decisionRng`/`actionRng`, sends concrete game commands.
 
-They do NOT verify:
-- Player movement, blocking, passing, or any gameplay mechanics
-- Skill activations (Block, Dodge, Frenzy, etc.)
-- Injury resolution
-- Reroll consumption
-- Any T2+ mechanics like inducements, special rules, kickoff event effects on gameplay
-
-**Fix needed (Phase 2):** Add real player activation to both agents:
-- Rust `ParityAgent`: handle `ActivatePlayer` with a seeded deterministic player+action choice
-- Java `ParityRunner`: intercept INIT_SELECTING and pick a deterministic player+action using `decisionRng`
-- BOTH must make identical choices (same RNG calls, same algorithm)
-- Only after this will T2/T3 tests exercise actual gameplay rules
+**T3a lineman_vs_lineman 100/100** — all gameplay mechanics verified bit-for-bit identical: dodge, GFI, block dice, armor/injury, foul referee, pass rolls, catch, argue the call.
 
 ---
 
@@ -271,11 +257,31 @@ A stale `auto_eject = armor_doubles && broke` condition caused Rust to skip the 
 
 ---
 
+### G-RULE-8: HandOff dice consumption — Rust 4 dice vs Java 3 (T3b seed 6)
+**Found:** 2026-06-19  
+**Severity:** Medium — blocks amazon_vs_amazon seeds 6+ from passing T3b
+
+At step 151 of seed 6, away_04 performs a HandOff. Both engines have `rng_calls=54` at step start. After the HandOff:
+- Java: `rng_calls=57` (consumed 3 dice)
+- Rust: `rng_calls=58` (consumed 4 dice)
+
+The 1-die offset causes step 153's home_03 Blitz to read different block dice: Rust gets BothDown → turnover; Java gets a non-BothDown result → game continues.
+
+**Likely root cause:** Rust's HandOff handler consumes 1 extra die somewhere. Candidates:
+- Catch skill auto-reroll check consuming an extra die (Amazon Catchers have Catch skill)
+- An extra dodge roll for the HandOff movement
+- A tackle-zone penalty calculation triggering an extra die
+
+**Fix needed:** Add `FFB_DICE_TRACE=1` for seed 6, compare Java vs Rust dice stacks at the HandOff step to identify which extra die Rust is rolling.
+
+---
+
 ## Priority Order for Fixes
 
-1. **G-RULE-1** — Secret Weapon end-of-drive (blocks Dwarf + Goblin, common T2 race types)
+1. **G-RULE-8** — HandOff 1-extra-die (blocks amazon T3b seeds 6+; next session priority)
+2. **Prereq C** — Custom roster loading (`team_spec.json` in both engines; blocks T3 proper)
 3. **G-LOG-1** — Expand state hash (catch silent reroll/ball-carrier bugs)
-4. **G-LOG-2/4** — Log sub-turn decisions + dice (required before T3 with real activation)
-5. **G-LOG-5** — Add `--verbose` state string logging (already implemented, see runner.rs)
-6. **G-RULE-3** — Real player activation (large; needed for T3)
-7. **G-RULE-2** — FUMBBL race loading (investigate Java side)
+4. **G-LOG-2/4** — Log sub-turn decisions + dice (mid-turn divergences currently undiagnosable)
+5. **G-RULE-2** — FUMBBL race loading (investigate Java side; blocks 4 races from T2 suite)
+6. **G-RULE-1** — Secret Weapon end-of-drive (Dwarf + Goblin T2, lower priority now that T3a is done)
+7. **G-LOG-5** — `--verbose` state string logging (already implemented, see runner.rs)

@@ -1,4 +1,4 @@
-# T3 lineman coverage — 100 games
+# T3 lineman coverage — 3 games
 
 | Item | Count | Status | Note |
 |---|---:|---|---|
@@ -10,57 +10,51 @@
 | action Foul | 0 | **MISSING** |  |
 | action Pass | 0 | **MISSING** | needs a ball carrier |
 | action HandOver | 0 | **MISSING** | needs carrier + adjacent teammate |
-| dodge success | 422 | ok |  |
-| dodge failure | 356 | ok |  |
+| dodge success | 24 | ok |  |
+| dodge failure | 26 | ok |  |
 | GFI rolls | 0 | **MISSING** |  |
-| pickup success | 63 | ok |  |
-| pickup failure | 31 | ok | turnover + scatter |
-| catch success | 42 | ok |  |
-| catch failure | 44 | ok |  |
+| pickup success | 0 | **MISSING** |  |
+| pickup failure | 3 | ok | turnover + scatter |
+| catch success | 0 | **MISSING** |  |
+| catch failure | 0 | **MISSING** |  |
 | ball scatters | 0 | **MISSING** | failed pickup / dropped ball / bounces |
 | throw-ins | 0 | **MISSING** | ball out of bounds |
-| pass rolls | 89 | ok |  |
+| pass rolls | 0 | **MISSING** |  |
 | pass deviates | 0 | absent (optional) | wildly inaccurate passes only |
 | interceptions | 0 | absent (optional) | contract: agents decline voluntary interference |
-| block 1 die | 790 | ok |  |
-| block 2 dice | 170 | ok |  |
-| block 2 dice against | 82 | ok | defender's choice |
+| block 1 die | 28 | ok |  |
+| block 2 dice | 4 | ok |  |
+| block 2 dice against | 1 | ok | defender's choice |
 | block 3 dice | 0 | absent (optional) | needs ST5+ differential via assists |
-| block result Skull | 182 | ok |  |
-| block result BothDown | 173 | ok |  |
-| block result Pushback | 367 | ok |  |
-| block result PowPushback | 159 | ok |  |
-| block result Pow | 161 | ok |  |
+| block result Skull | 6 | ok |  |
+| block result BothDown | 7 | ok |  |
+| block result Pushback | 11 | ok |  |
+| block result PowPushback | 1 | ok |  |
+| block result Pow | 8 | ok |  |
 | pushbacks | 0 | **MISSING** |  |
 | crowd surfs | 0 | absent (optional) | push off pitch — board-position dependent |
 | players fell | 0 | **MISSING** |  |
-| armor held | 834 | ok |  |
-| stunned | 353 | ok | injury 2-7 |
-| KO | 151 | ok |  |
-| casualty (d16) | 98 | ok |  |
-| death | 10 | ok | d16 = 15-16 only |
-| fouls | 232 | ok |  |
+| armor held | 20 | ok |  |
+| stunned | 14 | ok | injury 2-7 |
+| KO | 6 | ok |  |
+| casualty (d16) | 2 | ok |  |
+| death | 0 | absent (optional) | d16 = 15-16 only |
+| fouls | 6 | ok |  |
 | argue the call | 0 | **MISSING** | referee spotted a foul (doubles) |
 | argue success | 0 | absent (optional) | d6 = 6 only |
 | players ejected | 0 | **MISSING** |  |
 | touchdowns | 0 | **MISSING** |  |
-| half starts | 200 | ok |  |
-| weather changes | 126 | ok | kickoff event roll of 8 only |
-| kickoff events | 200 | ok | per-result table below |
+| half starts | 6 | ok |  |
+| weather changes | 3 | ok | kickoff event roll of 8 only |
+| kickoff events | 6 | ok | per-result table below |
 
 ## Kickoff results
 
-- Brilliant Coaching: 33
-- Charge: 20
-- Cheering Fans: 26
-- Dodgy Snack: 5
-- Get the Ref: 5
-- High Kick: 23
-- Pitch Invasion: 5
-- Quick Snap: 33
-- Solid Defence: 15
-- Time-out: 9
-- Weather Change: 26
+- Brilliant Coaching: 2
+- Cheering Fans: 1
+- Dodgy Snack: 1
+- High Kick: 1
+- Quick Snap: 1
 
 ## Hash-verified (not evented)
 

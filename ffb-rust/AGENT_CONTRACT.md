@@ -62,10 +62,11 @@ Stage B adds one more actionRng call per activation: the **action pick** (§5).
 
 ## 5. Action choice per activated player
 
-- **Stage A (current):** always `actions[0]` of the player's action list —
-  Move for standing players, StandUp for prone players.
-- **Stage B (milestone):** 1 actionRng call: `i = pick_action(actions.len())`,
-  take `actions[i]`. Enables Block/Blitz/Pass/HandOver/Foul organically.
+- **Stage A (historical):** always `actions[0]` — Move for standing players, StandUp for prone.
+  Used in T2/early T3 work before Stage B was wired.
+- **Stage B (current, session 44+):** 1 actionRng call: `i = pick_action(actions.len())`,
+  take `actions[i]`. Move/StandUp/Block/Blitz/Pass/HandOver/Foul all occur organically.
+  Verified across 100 T3a seeds (100/100 passing).
 
 ## 6. Target sorting (CHANGED from player-id sort)
 
@@ -137,10 +138,15 @@ rules.
 | 3 | actionRng | foul-target pick |
 | — | game dice | armor 2d6 (+assists/DP mods); injury 2d6 when broken (2-7 = Stunned); referee spots on armor doubles or (broken) injury doubles → argue 1d6 (§7) → turnover |
 
-### Pass / HandOver
-Not yet exercised by a passing seed: 1 decisionRng (player) + 1 actionRng
-(action pick) + 1 actionRng (teammate/receiver pick, coordinate-sorted);
-pass fallback coordinate per §2.6. Game dice TBD on first occurrence.
+### Pass / HandOver (verified across T3a 100 games — 89 pass rolls observed)
+| # | Channel | Purpose |
+|---|---|---|
+| 1 | decisionRng | player pick (§2.4) |
+| 2 | actionRng | action pick |
+| 3 | actionRng | pass-target pick (coord-sorted teammates on pitch); fallback coord per §2.6 if none |
+| — | game dice | pass roll d6 → ACCURATE/INACCURATE/FUMBLE; catch d6; bounce d8 on drop/miss |
+
+HandOver: same channel sequence; game dice = catch d6, bounce d8 on failure.
 
 ## 9. Known engine-rule divergences being tracked (not agent contract)
 
