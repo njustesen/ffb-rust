@@ -241,14 +241,14 @@ impl Agent for RandomAgent {
                 }
                 Action::Move { path: vec![squares[idx]] }
             }
-            // Stubs for prompts that the engine currently handles internally (auto-push/follow-up)
-            // but may emit in future phases. Handled here to prevent panics during T3 games.
+            // Pushback: pick min-(x, y) square deterministically — no arc consumed.
+            // Java parity runner §7: sendPushback picks the min-(x,y) unlocked square with 0 RNG.
             Some(AgentPrompt::Pushback { squares, .. }) => {
-                if squares.is_empty() {
-                    return Action::Acknowledge;
+                let best = squares.iter().min_by_key(|c| (c.x, c.y));
+                match best {
+                    Some(coord) => Action::PushTo { coord: *coord },
+                    None => Action::Acknowledge,
                 }
-                let idx = self.pick_action(squares.len());
-                Action::PushTo { coord: squares[idx] }
             }
             Some(AgentPrompt::FollowUp { .. }) => {
                 Action::FollowUp { follow_up: true }

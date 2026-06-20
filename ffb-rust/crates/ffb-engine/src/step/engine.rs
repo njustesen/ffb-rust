@@ -35,7 +35,7 @@ use ffb_mechanics::mechanics::{
     scatter_coordinate,
     block_result_for_roll, block_dice_count,
     armor_broken, injury_result, InjuryOutcome, casualty_tier_bb2025, CasualtyTier,
-    minimum_roll_dodge, minimum_roll_catch_bb2016,
+    minimum_roll_dodge, minimum_roll_catch_bb2016, minimum_roll_catch_edition,
     throw_in_distance, throw_in_direction_for_roll,
     corner_throw_in_direction_for_roll, is_corner_square, corner_direction,
     passing_distance_bb2025,
@@ -657,15 +657,29 @@ impl Step {
                             if game.field_model.ball_in_play && game.field_model.ball_moving {
                                 let ps = game.field_model.player_state(&player_id).unwrap_or_default();
                                 if ps.has_tacklezones() {
-                                    // rollSkill() = d6; minimumRollCatch = max(2, AG)
+                                    // rollSkill() = d6; minimumRollCatch = max(2, AG + TZ).
+                                    // TZ count must be computed dynamically (not hardcoded 0).
                                     let catch_roll = rng.d6();
                                     let ag = find_player_agility(game, &player_id);
-                                    // Java parity uses BB2016 catch formula: (7-AG+TZ).max(2).
-                                    let min_roll = minimum_roll_catch_bb2016(ag, 0);
+                                    let tz = count_opponent_tackle_zones_at(game, &player_id, ball);
+                                    let min_roll = minimum_roll_catch_edition(ag, tz, game.rules);
                                     if std::env::var("FFB_KICKOFF_TRACE").is_ok() {
-                                        eprintln!("CSTIN_CATCH half={} at=({},{}) roll={} min={}", game.half, ball.x, ball.y, catch_roll, min_roll);
+                                        eprintln!("CSTIN_CATCH half={} at=({},{}) roll={} min={} tz={}", game.half, ball.x, ball.y, catch_roll, min_roll, tz);
                                     }
-                                    if is_skill_roll_successful(catch_roll, min_roll) {
+                                    let mut catch_ok = is_skill_roll_successful(catch_roll, min_roll);
+                                    // Java StepCatchScatterThrowIn.catchBall: Catch skill auto-rerolls once.
+                                    if !catch_ok {
+                                        let has_catch = game.team_home.players.iter()
+                                            .chain(game.team_away.players.iter())
+                                            .find(|p| p.id == player_id)
+                                            .map(|p| p.has_skill(SkillId::Catch))
+                                            .unwrap_or(false);
+                                        if has_catch {
+                                            let reroll = rng.d6();
+                                            catch_ok = is_skill_roll_successful(reroll, min_roll);
+                                        }
+                                    }
+                                    if catch_ok {
                                         // Catch success: setBallMoving(false), ball stays.
                                         game.field_model.ball_moving = false;
                                     } else {
@@ -717,12 +731,24 @@ impl Step {
                                     if ps2.has_tacklezones() {
                                         let catch_roll = rng.d6();
                                         let ag = find_player_agility(game, &catcher_id);
-                                        // Java parity uses BB2016 catch formula: (7-AG+TZ).max(2).
-                                    let min_roll = minimum_roll_catch_bb2016(ag, 0);
+                                        let tz2 = count_opponent_tackle_zones_at(game, &catcher_id, new_pos);
+                                        let min_roll = minimum_roll_catch_edition(ag, tz2, game.rules);
                                         if std::env::var("FFB_KICKOFF_TRACE").is_ok() {
-                                            eprintln!("CSTIN_CATCH half={} at=({},{}) roll={} min={}", game.half, new_pos.x, new_pos.y, catch_roll, min_roll);
+                                            eprintln!("CSTIN_CATCH half={} at=({},{}) roll={} min={} tz={}", game.half, new_pos.x, new_pos.y, catch_roll, min_roll, tz2);
                                         }
-                                        if is_skill_roll_successful(catch_roll, min_roll) {
+                                        let mut catch_ok2 = is_skill_roll_successful(catch_roll, min_roll);
+                                        if !catch_ok2 {
+                                            let has_catch2 = game.team_home.players.iter()
+                                                .chain(game.team_away.players.iter())
+                                                .find(|p| p.id == catcher_id)
+                                                .map(|p| p.has_skill(SkillId::Catch))
+                                                .unwrap_or(false);
+                                            if has_catch2 {
+                                                let reroll2 = rng.d6();
+                                                catch_ok2 = is_skill_roll_successful(reroll2, min_roll);
+                                            }
+                                        }
+                                        if catch_ok2 {
                                             game.field_model.ball_moving = false;
                                         }
                                         // catch fail: ball stays at new_pos, ball_moving=true (remains loose)
@@ -990,14 +1016,9 @@ impl Step {
                     None => StepOutcome::next().push_seq(end_turn_sequence()),
                     Some(PlayerAction::Move) => StepOutcome::next().push_seq(move_sequence()),
                     Some(PlayerAction::Blitz) => {
-                        // Java: prone player choosing BLITZ gets stood up here (STAND_UP_BLITZ flow).
-                        let pid = game.acting_player.player_id.clone().unwrap_or_default();
-                        let is_prone = game.field_model.player_state(&pid)
-                            .map(|s| s.base() == PS_PRONE)
-                            .unwrap_or(false);
-                        if is_prone {
-                            game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
-                        }
+                        // Stand-up for a Prone blitzer happens in DoBlock, only after confirming a
+                        // valid adjacent target. Java does NOT stand up the player at EndSelecting
+                        // time (if no target is found, the player stays Prone through the turnover).
                         StepOutcome::next().push_seq(blitz_sequence())
                     }
                     Some(PlayerAction::Block) => StepOutcome::next().push_seq(block_sequence()),
@@ -1128,24 +1149,12 @@ impl Step {
                         let side = if game.home_playing { TeamSide::Home } else { TeamSide::Away };
                         let targets = legal_block_targets(game, &attacker_id, side);
                         if targets.is_empty() {
-                            if std::env::var_os("FFB_TRACE").is_some() {
-                                let atk_coord = game.field_model.player_coordinate(&attacker_id);
-                                eprintln!("RUST_BLOCK_SKIP atk={attacker_id} home_playing={} coord={atk_coord:?}", game.home_playing);
-                                let opp_team = if game.home_playing { &game.team_away } else { &game.team_home };
-                                for p in &opp_team.players {
-                                    let c = game.field_model.player_coordinate(&p.id);
-                                    let s = game.field_model.player_state(&p.id);
-                                    eprintln!("  OPP {} coord={c:?} state={s:?}", p.id);
-                                }
-                            }
-                            // Java sendBlitzTargetSelection: no adjacent target → inject EndTurn,
-                            // ending the team's full turn. Mirror via game.turnover so EndPlayerAction
-                            // pushes end_turn_sequence() instead of select_sequence().
-                            let is_blitz = matches!(
-                                game.acting_player.player_action,
-                                Some(PlayerAction::Blitz) | Some(PlayerAction::StandUpBlitz)
-                            );
-                            if is_blitz {
+                            // Java sendBlitzTargetSelection: no adjacent target → injects
+                            // ClientCommandEndTurn → StepSelectBlitzTarget.endTurn=true →
+                            // EndPlayerAction(endTurn=true) → ends the TEAM's turn, not just
+                            // the acting player's activation. Signal via turnover flag so
+                            // EndPlayerAction pushes end_turn_sequence() rather than select_sequence().
+                            if game.acting_player.player_action == Some(ffb_model::enums::PlayerAction::Blitz) {
                                 game.turnover = true;
                             }
                             return StepOutcome::next();
@@ -1153,6 +1162,16 @@ impl Step {
                         targets[0].clone()
                     }
                 };
+                // Prone blitzer: stand up only after confirming a valid adjacent target exists.
+                // Java does NOT stand up the player at EndSelecting time; it happens here.
+                if game.acting_player.player_action == Some(ffb_model::enums::PlayerAction::Blitz) {
+                    let is_prone = game.field_model.player_state(&attacker_id)
+                        .map(|s| s.base() == PS_PRONE)
+                        .unwrap_or(false);
+                    if is_prone {
+                        game.field_model.set_player_state(&attacker_id, PlayerState::new(PS_STANDING));
+                    }
+                }
                 // Effective strengths include assist counting (mirrors Java ServerUtilBlock).
                 let atk_str = effective_attacker_strength(game, &attacker_id, &defender_id);
                 let def_str = effective_defender_strength(game, &attacker_id, &defender_id);
@@ -1209,16 +1228,46 @@ impl Step {
                         }
                     }
                     BlockResult::BothDown => {
-                        // Attacker knocked down = turnover (no Block/Wrestle skill for linemen).
-                        // Java resolves DEFENDER's armor/injury first, then ATTACKER's,
-                        // then scatters ball after both armor rolls (not interleaved).
-                        step_evs.extend(apply_knockdown(game, &defender_id, rng));
-                        step_evs.extend(apply_knockdown(game, &attacker_id, rng));
-                        game.turnover = true;
-                        if atk_has_ball {
-                            scatter_ball_from_knockdown(game, atk_coord_pre.unwrap(), rng);
-                        } else if def_has_ball {
-                            scatter_ball_from_knockdown(game, def_coord_pre.unwrap(), rng);
+                        // Java ParityRunner SKILL_USE handler always uses skills (sendUseSkill=true).
+                        // If attacker has Block: attacker uses it, stays up, only defender falls, no turnover.
+                        // If defender has Block (BB2020 Java behaviour): defender uses it, stays up,
+                        //   only attacker falls, turnover.  Java prompts both players and applies
+                        //   whichever Block fires — attacker's takes precedence (checked first).
+                        // If neither has Block: both knocked down, turnover.
+                        let find_block = |pid: &str| {
+                            game.team_home.players.iter()
+                                .chain(game.team_away.players.iter())
+                                .find(|p| p.id == pid)
+                                .map(|p| p.has_skill(SkillId::Block))
+                                .unwrap_or(false)
+                        };
+                        let atk_has_block = find_block(&attacker_id);
+                        let def_has_block = find_block(&defender_id);
+                        if atk_has_block {
+                            // Attacker uses Block: only defender falls. No turnover.
+                            step_evs.extend(apply_knockdown(game, &defender_id, rng));
+                            if def_has_ball {
+                                scatter_ball_from_knockdown(game, def_coord_pre.unwrap(), rng);
+                            }
+                        } else if def_has_block {
+                            // Defender uses Block: only attacker falls. Turnover.
+                            // Ball scatter only if attacker had ball (defender stays up, keeps ball).
+                            step_evs.extend(apply_knockdown(game, &attacker_id, rng));
+                            game.turnover = true;
+                            if atk_has_ball {
+                                scatter_ball_from_knockdown(game, atk_coord_pre.unwrap(), rng);
+                            }
+                        } else {
+                            // No Block on either: both knocked down, turnover.
+                            // Java resolves DEFENDER's armor/injury first, then ATTACKER's.
+                            step_evs.extend(apply_knockdown(game, &defender_id, rng));
+                            step_evs.extend(apply_knockdown(game, &attacker_id, rng));
+                            game.turnover = true;
+                            if atk_has_ball {
+                                scatter_ball_from_knockdown(game, atk_coord_pre.unwrap(), rng);
+                            } else if def_has_ball {
+                                scatter_ball_from_knockdown(game, def_coord_pre.unwrap(), rng);
+                            }
                         }
                     }
                     BlockResult::Pushback => {
@@ -1367,7 +1416,30 @@ impl Step {
                         success: ok,
                         rerolled: false,
                     });
-                    ok
+                    if ok {
+                        true
+                    } else {
+                        // BB2025 Catch skill: auto-reroll initial failed catch (mirrors Java StepCatchScatterThrowIn.catchBall hook).
+                        let receiver_has_catch = game.team_home.players.iter()
+                            .chain(game.team_away.players.iter())
+                            .find(|p| p.id == receiver_id)
+                            .map(|p| p.has_skill(SkillId::Catch))
+                            .unwrap_or(false);
+                        if receiver_has_catch {
+                            let reroll = rng.d6();
+                            let reroll_ok = is_skill_roll_successful(reroll, catch_min);
+                            handoff_evs.push(GameEvent::CatchRoll {
+                                player_id: receiver_id.clone(),
+                                target: catch_min,
+                                roll: reroll,
+                                success: reroll_ok,
+                                rerolled: true,
+                            });
+                            reroll_ok
+                        } else {
+                            false
+                        }
+                    }
                 } else {
                     if std::env::var_os("FFB_TRACE").is_some() {
                         eprintln!("RUST_HANDOVER recv={receiver_id} coord={receiver_coord:?} no_tz → FAILED_CATCH rng={}", rng.call_count);
@@ -1407,7 +1479,7 @@ impl Step {
                                 let tz = count_opponent_tackle_zones_at(game, &pid, ti_land);
                                 let catch_min = std::cmp::max(2, ag + 1 + tz);
                                 let catch_roll = rng.d6();
-                                let success = is_skill_roll_successful(catch_roll, catch_min);
+                                let mut success = is_skill_roll_successful(catch_roll, catch_min);
                                 handoff_evs.push(GameEvent::CatchRoll {
                                     player_id: pid.clone(),
                                     target: catch_min,
@@ -1415,6 +1487,24 @@ impl Step {
                                     success,
                                     rerolled: false,
                                 });
+                                if !success {
+                                    let ti_has_catch = game.team_home.players.iter()
+                                        .chain(game.team_away.players.iter())
+                                        .find(|p| p.id == pid)
+                                        .map(|p| p.has_skill(SkillId::Catch))
+                                        .unwrap_or(false);
+                                    if ti_has_catch {
+                                        let reroll = rng.d6();
+                                        success = is_skill_roll_successful(reroll, catch_min);
+                                        handoff_evs.push(GameEvent::CatchRoll {
+                                            player_id: pid.clone(),
+                                            target: catch_min,
+                                            roll: reroll,
+                                            success,
+                                            rerolled: true,
+                                        });
+                                    }
+                                }
                                 if success {
                                     game.field_model.ball_moving = false;
                                     if game.team_home.has_player(&pid) != acting_is_home {
@@ -1485,14 +1575,38 @@ impl Step {
                             let tz = count_opponent_tackle_zones_at(game, &pid, new_coord);
                             let catch_min2 = std::cmp::max(2, ag + 1 + tz);
                             let catch_roll2 = rng.d6();
-                            let catch2_success = is_skill_roll_successful(catch_roll2, catch_min2);
+                            let catch2_ok = is_skill_roll_successful(catch_roll2, catch_min2);
                             handoff_evs.push(GameEvent::CatchRoll {
                                 player_id: pid.clone(),
                                 target: catch_min2,
                                 roll: catch_roll2,
-                                success: catch2_success,
+                                success: catch2_ok,
                                 rerolled: false,
                             });
+                            let catch2_success = if catch2_ok {
+                                true
+                            } else {
+                                // BB2025 Catch skill: auto-reroll failed CATCH_SCATTER catch.
+                                let scatter_has_catch = game.team_home.players.iter()
+                                    .chain(game.team_away.players.iter())
+                                    .find(|p| p.id == pid)
+                                    .map(|p| p.has_skill(SkillId::Catch))
+                                    .unwrap_or(false);
+                                if scatter_has_catch {
+                                    let reroll2 = rng.d6();
+                                    let reroll2_ok = is_skill_roll_successful(reroll2, catch_min2);
+                                    handoff_evs.push(GameEvent::CatchRoll {
+                                        player_id: pid.clone(),
+                                        target: catch_min2,
+                                        roll: reroll2,
+                                        success: reroll2_ok,
+                                        rerolled: true,
+                                    });
+                                    reroll2_ok
+                                } else {
+                                    false
+                                }
+                            };
                             if catch2_success {
                                 game.field_model.ball_moving = false;
                                 let pid_in_home = game.team_home.has_player(&pid);
@@ -1594,16 +1708,38 @@ impl Step {
                 }
                 let pass_roll = rng.d6();
                 let effective = pass_roll - dist_mod - tz_penalty - sunny_penalty;
-                let fumble = pass_roll == 1 || effective <= 1;
-                let accurate = pass_roll == 6 || effective >= pa;
+                let mut fumble = pass_roll == 1 || effective <= 1;
+                let mut accurate = pass_roll == 6 || effective >= pa;
                 if std::env::var_os("FFB_TRACE").is_some() {
                     eprintln!("RUST_PASS_ROLL passer={passer_id}@{passer_coord:?} recv={receiver_id}@{receiver_coord:?} pa={pa} dist_mod={dist_mod} tz_penalty={tz_penalty} sunny={sunny_penalty} roll={pass_roll} eff={effective} fumble={fumble} accurate={accurate} rng={}", rng.call_count);
                 }
-                let pass_result = if fumble { PassResult::Fumble } else if accurate { PassResult::Complete } else { PassResult::Inaccurate };
+                let mut pass_result = if fumble { PassResult::Fumble } else if accurate { PassResult::Complete } else { PassResult::Inaccurate };
                 pass_evs.push(GameEvent::PassRoll {
                     player_id: passer_id.clone(), target: pa, distance: pass_dist,
                     roll: pass_roll, result: pass_result, rerolled: false,
                 });
+
+                // Java StepPass: if result is not Complete and passer has Pass skill, auto-reroll
+                // once (parity runner always accepts the DialogSkillUseParameter for Pass).
+                // A natural 1 on the reroll is still a Fumble. Applies to both Inaccurate and Fumble.
+                if pass_result != PassResult::Complete {
+                    let passer_has_pass = game.team_home.players.iter()
+                        .chain(game.team_away.players.iter())
+                        .find(|p| p.id == passer_id)
+                        .map(|p| p.has_skill(SkillId::Pass))
+                        .unwrap_or(false);
+                    if passer_has_pass {
+                        let reroll = rng.d6();
+                        let eff2 = reroll - dist_mod - tz_penalty - sunny_penalty;
+                        fumble = reroll == 1 || eff2 <= 1;
+                        accurate = reroll == 6 || eff2 >= pa;
+                        pass_result = if fumble { PassResult::Fumble } else if accurate { PassResult::Complete } else { PassResult::Inaccurate };
+                        pass_evs.push(GameEvent::PassRoll {
+                            player_id: passer_id.clone(), target: pa, distance: pass_dist,
+                            roll: reroll, result: pass_result, rerolled: true,
+                        });
+                    }
+                }
 
                 if fumble {
                     // FUMBLE: ball bounces from thrower via Java's bounceBall loop.
@@ -1633,8 +1769,21 @@ impl Step {
                                 let tz = count_opponent_tackle_zones_at(game, &pid, new_coord);
                                 let catch_min = std::cmp::max(2, ag + 1 + tz);
                                 let catch_roll = rng.d6();
-                                let catch_ok = is_skill_roll_successful(catch_roll, catch_min);
+                                let mut catch_ok = is_skill_roll_successful(catch_roll, catch_min);
                                 pass_evs.push(GameEvent::CatchRoll { player_id: pid.clone(), target: catch_min, roll: catch_roll, success: catch_ok, rerolled: false });
+                                if !catch_ok {
+                                    // Catch skill auto-rerolls once (Java StepCatchScatterThrowIn.catchBall:581)
+                                    let has_catch = game.team_home.players.iter()
+                                        .chain(game.team_away.players.iter())
+                                        .find(|p| p.id == pid)
+                                        .map(|p| p.has_skill(SkillId::Catch))
+                                        .unwrap_or(false);
+                                    if has_catch {
+                                        let reroll = rng.d6();
+                                        catch_ok = is_skill_roll_successful(reroll, catch_min);
+                                        pass_evs.push(GameEvent::CatchRoll { player_id: pid.clone(), target: catch_min, roll: reroll, success: catch_ok, rerolled: true });
+                                    }
+                                }
                                 if catch_ok {
                                     game.field_model.ball_moving = false;
                                     return StepOutcome::next().with_events(pass_evs);
@@ -1691,8 +1840,20 @@ impl Step {
                             let tz = count_opponent_tackle_zones_at(game, &pid, ball_coord);
                             let catch_min = std::cmp::max(2, ag + 1 + tz);
                             let catch_roll = rng.d6();
-                            let catch_ok = is_skill_roll_successful(catch_roll, catch_min);
+                            let mut catch_ok = is_skill_roll_successful(catch_roll, catch_min);
                             pass_evs.push(GameEvent::CatchRoll { player_id: pid.clone(), target: catch_min, roll: catch_roll, success: catch_ok, rerolled: false });
+                            if !catch_ok {
+                                let has_catch = game.team_home.players.iter()
+                                    .chain(game.team_away.players.iter())
+                                    .find(|p| p.id == pid)
+                                    .map(|p| p.has_skill(SkillId::Catch))
+                                    .unwrap_or(false);
+                                if has_catch {
+                                    let reroll = rng.d6();
+                                    catch_ok = is_skill_roll_successful(reroll, catch_min);
+                                    pass_evs.push(GameEvent::CatchRoll { player_id: pid.clone(), target: catch_min, roll: reroll, success: catch_ok, rerolled: true });
+                                }
+                            }
                             if catch_ok {
                                 game.field_model.ball_moving = false;
                                 if !player_is_active(&pid) {
@@ -1704,8 +1865,49 @@ impl Step {
                         }
                         // no TZ → FAILED_CATCH → SCATTER_BALL → bounceBall loop
                     }
-                    // SCATTER_BALL → bounceBall loop
+                    // SCATTER_BALL → bounceBall loop (with throw-in on OOB).
+                    // after_throw_in: true right after throw-in lands (CATCH_THROW_IN mode).
+                    let mut after_throw_in = false;
                     loop {
+                        if after_throw_in {
+                            // CATCH_THROW_IN: try catch at current ball_coord before scattering.
+                            after_throw_in = false;
+                            if let Some(pid) = game.field_model.player_at(ball_coord).cloned() {
+                                let has_tz = game.field_model.player_state(&pid)
+                                    .map(|s| s.has_tacklezones())
+                                    .unwrap_or(false);
+                                if has_tz {
+                                    let ag = find_player_agility(game, &pid);
+                                    let tz = count_opponent_tackle_zones_at(game, &pid, ball_coord);
+                                    let catch_min = std::cmp::max(2, ag + 1 + tz);
+                                    let catch_roll = rng.d6();
+                                    let mut catch_ok = is_skill_roll_successful(catch_roll, catch_min);
+                                    pass_evs.push(GameEvent::CatchRoll { player_id: pid.clone(), target: catch_min, roll: catch_roll, success: catch_ok, rerolled: false });
+                                    if !catch_ok {
+                                        let has_catch = game.team_home.players.iter()
+                                            .chain(game.team_away.players.iter())
+                                            .find(|p| p.id == pid)
+                                            .map(|p| p.has_skill(SkillId::Catch))
+                                            .unwrap_or(false);
+                                        if has_catch {
+                                            let reroll = rng.d6();
+                                            catch_ok = is_skill_roll_successful(reroll, catch_min);
+                                            pass_evs.push(GameEvent::CatchRoll { player_id: pid.clone(), target: catch_min, roll: reroll, success: catch_ok, rerolled: true });
+                                        }
+                                    }
+                                    if catch_ok {
+                                        game.field_model.ball_moving = false;
+                                        if !player_is_active(&pid) {
+                                            game.turnover = true;
+                                        }
+                                        return StepOutcome::next().with_events(pass_evs);
+                                    }
+                                }
+                            }
+                            // No player, no TZ, or catch failed → SCATTER_BALL from ball_coord.
+                            continue;
+                        }
+
                         let dir_roll = rng.d8();
                         let dir = Direction::for_roll(dir_roll).expect("d8 is 1..=8");
                         let (bx, by) = scatter_coordinate(ball_coord.x, ball_coord.y, dir, 1);
@@ -1718,8 +1920,41 @@ impl Step {
                         game.field_model.ball_moving = true;
 
                         if !new_coord.is_on_pitch() {
-                            game.turnover = true;
-                            return StepOutcome::next().with_events(pass_evs);
+                            // OOB: throw-in. Mirrors Java StepCatchScatterThrowIn.throwInBall.
+                            let mut ti_pos = ball_coord; // last on-pitch square
+                            loop {
+                                let is_corner = is_corner_square(ti_pos.x, ti_pos.y);
+                                let dir_roll2 = if is_corner { rng.d3() } else { rng.d6() };
+                                let ti_dir = if is_corner {
+                                    corner_throw_in_direction_for_roll(corner_direction(ti_pos.x, ti_pos.y), dir_roll2)
+                                } else {
+                                    throw_in_direction_for_roll(ti_pos.x, ti_pos.y, dir_roll2)
+                                };
+                                let d1 = rng.d6();
+                                let d2 = rng.d6();
+                                let distance = throw_in_distance(d1, d2, game.rules);
+                                let mut ti_end = ti_pos;
+                                let mut last_valid_ti = ti_pos;
+                                for i in 0..distance {
+                                    let (nx, ny) = scatter_coordinate(ti_pos.x, ti_pos.y, ti_dir, i);
+                                    let nc = FieldCoordinate::new(nx, ny);
+                                    ti_end = nc;
+                                    if nc.is_on_pitch() { last_valid_ti = nc; }
+                                }
+                                game.field_model.ball_moving = true;
+                                if ti_end == last_valid_ti {
+                                    // Landed on pitch → CATCH_THROW_IN.
+                                    game.field_model.ball_coordinate = Some(last_valid_ti);
+                                    ball_coord = last_valid_ti;
+                                    after_throw_in = true;
+                                    break;
+                                } else {
+                                    // Still OOB → throw-in again from last valid.
+                                    game.field_model.ball_coordinate = None;
+                                    ti_pos = last_valid_ti;
+                                }
+                            }
+                            continue;
                         }
 
                         ball_coord = new_coord;
@@ -1732,8 +1967,20 @@ impl Step {
                                 let tz = count_opponent_tackle_zones_at(game, &pid, new_coord);
                                 let catch_min = std::cmp::max(2, ag + 1 + tz);
                                 let catch_roll = rng.d6();
-                                let catch_ok = is_skill_roll_successful(catch_roll, catch_min);
+                                let mut catch_ok = is_skill_roll_successful(catch_roll, catch_min);
                                 pass_evs.push(GameEvent::CatchRoll { player_id: pid.clone(), target: catch_min, roll: catch_roll, success: catch_ok, rerolled: false });
+                                if !catch_ok {
+                                    let has_catch = game.team_home.players.iter()
+                                        .chain(game.team_away.players.iter())
+                                        .find(|p| p.id == pid)
+                                        .map(|p| p.has_skill(SkillId::Catch))
+                                        .unwrap_or(false);
+                                    if has_catch {
+                                        let reroll = rng.d6();
+                                        catch_ok = is_skill_roll_successful(reroll, catch_min);
+                                        pass_evs.push(GameEvent::CatchRoll { player_id: pid.clone(), target: catch_min, roll: reroll, success: catch_ok, rerolled: true });
+                                    }
+                                }
                                 if catch_ok {
                                     game.field_model.ball_moving = false;
                                     if !player_is_active(&pid) {
@@ -1766,8 +2013,20 @@ impl Step {
                 if receiver_has_tz {
                     let catch_min = std::cmp::max(2, receiver_ag);
                     let catch_roll = rng.d6();
-                    let catch_ok = is_skill_roll_successful(catch_roll, catch_min);
+                    let mut catch_ok = is_skill_roll_successful(catch_roll, catch_min);
                     pass_evs.push(GameEvent::CatchRoll { player_id: receiver_id.clone(), target: catch_min, roll: catch_roll, success: catch_ok, rerolled: false });
+                    if !catch_ok {
+                        let receiver_has_catch = game.team_home.players.iter()
+                            .chain(game.team_away.players.iter())
+                            .find(|p| p.id == receiver_id)
+                            .map(|p| p.has_skill(SkillId::Catch))
+                            .unwrap_or(false);
+                        if receiver_has_catch {
+                            let reroll = rng.d6();
+                            catch_ok = is_skill_roll_successful(reroll, catch_min);
+                            pass_evs.push(GameEvent::CatchRoll { player_id: receiver_id.clone(), target: catch_min, roll: reroll, success: catch_ok, rerolled: true });
+                        }
+                    }
                     if catch_ok {
                         game.field_model.ball_moving = false;
                         return StepOutcome::next().with_events(pass_evs);
@@ -1806,8 +2065,20 @@ impl Step {
                             let tz = count_opponent_tackle_zones_at(game, &pid, new_coord);
                             let catch_min2 = std::cmp::max(2, ag + 1 + tz);
                             let catch_roll2 = rng.d6();
-                            let catch_ok = is_skill_roll_successful(catch_roll2, catch_min2);
+                            let mut catch_ok = is_skill_roll_successful(catch_roll2, catch_min2);
                             pass_evs.push(GameEvent::CatchRoll { player_id: pid.clone(), target: catch_min2, roll: catch_roll2, success: catch_ok, rerolled: false });
+                            if !catch_ok {
+                                let has_catch = game.team_home.players.iter()
+                                    .chain(game.team_away.players.iter())
+                                    .find(|p| p.id == pid)
+                                    .map(|p| p.has_skill(SkillId::Catch))
+                                    .unwrap_or(false);
+                                if has_catch {
+                                    let reroll = rng.d6();
+                                    catch_ok = is_skill_roll_successful(reroll, catch_min2);
+                                    pass_evs.push(GameEvent::CatchRoll { player_id: pid.clone(), target: catch_min2, roll: reroll, success: catch_ok, rerolled: true });
+                                }
+                            }
                             if catch_ok {
                                 game.field_model.ball_moving = false;
                                 if !player_is_active(&pid) {
@@ -3080,9 +3351,19 @@ fn apply_foul_injury(game: &mut Game, fouler_id: &str, target_id: &str, rng: &mu
     let referee_spots = armor_doubles || (broke && injury_doubles);
     if referee_spots {
         game.turnover = true;
+
+        // Save fouler's coordinate and whether they carry the ball BEFORE ejecting them,
+        // since player_coordinates.remove() makes them unfindable afterward.
+        let fouler_coord_before = game.field_model.player_coordinate(fouler_id);
+        let fouler_has_ball = fouler_coord_before
+            .zip(game.field_model.ball_coordinate)
+            .map(|(fc, bc)| fc == bc)
+            .unwrap_or(false);
+
         // StepBribes.askForArgueTheCall: argue offered unless coach already banned for this drive.
         // Java also skips when wasCased (fouler is a casualty), but in normal play the fouler
         // is never in a casualty state, so we only check coach_banned.
+        let fouler_ejected;
         if !game.turn_data().coach_banned {
             // Parity runner always argues; roll 1 d6.
             // DiceInterpreter: isArgueSuccessful = roll>5, isCoachBanned = roll<2.
@@ -3090,15 +3371,69 @@ fn apply_foul_injury(game: &mut Game, fouler_id: &str, target_id: &str, rng: &mu
             if argue < 2 {
                 game.turn_data_mut().coach_banned = true;
             }
-            if argue <= 5 {
+            fouler_ejected = argue <= 5;
+            if fouler_ejected {
                 game.field_model.player_coordinates.remove(fouler_id);
                 game.field_model.set_player_state(fouler_id, PlayerState::new(PS_BANNED));
             }
             // argue==6: argue succeeds, fouler stays on pitch.
         } else {
             // Coach already banned: no argue die, auto-eject fouler.
+            fouler_ejected = true;
             game.field_model.player_coordinates.remove(fouler_id);
             game.field_model.set_player_state(fouler_id, PlayerState::new(PS_BANNED));
+        }
+
+        // If fouler was ejected and had the ball, drop + bounce (Java StepBanPlayer →
+        // StepCatchScatterThrowIn SCATTER_BALL: bounceBall() once, then possible CATCH_SCATTER).
+        if fouler_ejected && fouler_has_ball {
+            if let Some(drop_coord) = fouler_coord_before {
+                game.field_model.ball_moving = true;
+                let dir_roll = rng.d8();
+                let dir = Direction::for_roll(dir_roll).expect("d8 is 1..=8");
+                let (bx, by) = scatter_coordinate(drop_coord.x, drop_coord.y, dir, 1);
+                let new_coord = FieldCoordinate::new(bx, by);
+                if new_coord.is_on_pitch() {
+                    game.field_model.ball_coordinate = Some(new_coord);
+                    // If player with TZ at new_coord → CATCH_SCATTER (ag+1+tz).
+                    if let Some(pid) = game.field_model.player_at(new_coord).cloned() {
+                        let has_tz = game.field_model.player_state(&pid)
+                            .map(|s| s.has_tacklezones())
+                            .unwrap_or(false);
+                        if has_tz {
+                            let ag = find_player_agility(game, &pid);
+                            let tz = count_opponent_tackle_zones_at(game, &pid, new_coord);
+                            let catch_min = std::cmp::max(2, ag + 1 + tz);
+                            let catch_roll = rng.d6();
+                            let mut catch_ok = is_skill_roll_successful(catch_roll, catch_min);
+                            evs.push(GameEvent::CatchRoll { player_id: pid.clone(), target: catch_min, roll: catch_roll, success: catch_ok, rerolled: false });
+                            if !catch_ok {
+                                let has_catch = game.team_home.players.iter()
+                                    .chain(game.team_away.players.iter())
+                                    .find(|p| p.id == pid)
+                                    .map(|p| p.has_skill(SkillId::Catch))
+                                    .unwrap_or(false);
+                                if has_catch {
+                                    let reroll = rng.d6();
+                                    catch_ok = is_skill_roll_successful(reroll, catch_min);
+                                    evs.push(GameEvent::CatchRoll { player_id: pid.clone(), target: catch_min, roll: reroll, success: catch_ok, rerolled: true });
+                                }
+                            }
+                            if catch_ok {
+                                game.field_model.ball_moving = false;
+                            }
+                        }
+                        // No TZ or catch failed → ball stays moving (dropped), no further action here.
+                    } else {
+                        // Empty square → ball rests.
+                        game.field_model.ball_moving = false;
+                    }
+                } else {
+                    // OOB: ball stays at last valid in-bounds position (drop_coord).
+                    game.field_model.ball_coordinate = Some(drop_coord);
+                    game.field_model.ball_moving = false;
+                }
+            }
         }
     }
     evs
