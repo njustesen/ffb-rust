@@ -53,6 +53,15 @@ ffb-model → ffb-protocol → ffb-client
 
 **Edition Support:** Rules that differ between BB2016/BB2020/BB2025 are gated on the `Edition` enum, typically in mechanics modifier code.
 
+## BB2025 Ruleset Reference
+
+`rules/` contains the full Blood Bowl 2025 ruleset as local markdown files, downloaded from bloodbowlbase.ru. Use these when you need to look up rules, skills, or star player stats without hitting the network.
+
+- `rules/core_rules/` — 11 files: game essentials, rules & regulations, the game of Blood Bowl, drafting, league play, matched play, exhibition play, skills & traits, inducements, teams, FAQ
+- `rules/star_players/` — 63 individual files, one per star player (stats, skills, team eligibility)
+
+To refresh: `python scripts/download_rules.py`
+
 ## Data
 
 `data/` contains JSON configs loaded at runtime by `ffb-model/src/data/loader.rs`:
