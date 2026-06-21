@@ -16,7 +16,7 @@ use rand_xoshiro::Xoshiro256StarStar;
 use rand_core::{RngCore, SeedableRng};
 use ffb_model::prompts::AgentPrompt;
 use ffb_model::types::FieldCoordinate;
-use ffb_model::enums::PlayerAction;
+use ffb_model::enums::{PlayerAction, SkillId};
 
 use crate::action::{Action, PlayerActionChoice};
 use crate::legal_actions::{legal_block_targets, legal_foul_targets, legal_handoff_receivers, legal_pass_receivers, TeamSide};
@@ -249,33 +249,142 @@ impl Agent for RandomAgent {
                 }
                 Action::Move { path: vec![squares[idx]] }
             }
-            // Pushback: pick min-(x, y) square deterministically — no arc consumed.
-            // Java parity runner §7: sendPushback picks the min-(x,y) unlocked square with 0 RNG.
+            // Pushback: uniformly sample from available squares (sorted by x,y for canonical
+            // ordering that matches Java ParityRunner's sorted non-locked pushback list).
+            // Consumes 1 decision_rng call — synced with Java ParityRunner PUSHBACK step case.
             Some(AgentPrompt::Pushback { squares, .. }) => {
-                let best = squares.iter().min_by_key(|c| (c.x, c.y));
-                match best {
-                    Some(coord) => Action::PushTo { coord: *coord },
-                    None => Action::Acknowledge,
+                if squares.is_empty() {
+                    return Action::Acknowledge;
                 }
+                let mut sorted = squares.clone();
+                sorted.sort_by_key(|c| (c.x, c.y));
+                let idx = self.pick(sorted.len());
+                Action::PushTo { coord: sorted[idx] }
             }
+            // Follow-up: uniformly sample — consumes 1 decision_rng call.
+            // Synced with Java ParityRunner FOLLOWUP_CHOICE dialog case.
             Some(AgentPrompt::FollowUp { .. }) => {
-                Action::FollowUp { follow_up: true }
+                Action::FollowUp { follow_up: self.pick_bool() }
             }
-            // Java parity runner §7: always pick die index 0 — deterministic, no actionRng consumed.
-            Some(AgentPrompt::BlockChoice { .. }) => {
+            // Block die selection: uniformly sample from available dice — 1 decision_rng call.
+            // Synced with Java ParityRunner BLOCK_ROLL dialog case.
+            Some(AgentPrompt::BlockChoice { dice, .. }) => {
+                let idx = self.pick(dice.len().max(1));
+                Action::BlockChoice { die_index: idx }
+            }
+            // Block choice with re-roll properties: consume 1 decision_rng call for consistency.
+            // Synced with Java ParityRunner BLOCK_ROLL_PROPERTIES case.
+            Some(AgentPrompt::BlockChoiceProperties { .. }) => {
+                let _ = self.pick_bool();
                 Action::BlockChoice { die_index: 0 }
             }
-            // Reroll offer: always decline for parity (Java parity runner also declines).
+            // Re-roll offer: uniformly sample use/decline — 1 decision_rng call.
+            // Synced with Java ParityRunner RE_ROLL dialog case.
             Some(AgentPrompt::ReRollOffer { .. }) =>
-                Action::UseReRoll { use_reroll: false },
-            // Apothecary: always decline for parity.
+                Action::UseReRoll { use_reroll: self.pick_bool() },
+            // Skill use: uniformly sample use/decline — 1 decision_rng call.
+            // Synced with Java ParityRunner SKILL_USE dialog case.
+            // skill_id=Block is a placeholder (engine identifies the skill from step state, not
+            // from the action's skill_id field when responding to a SkillUse prompt).
+            Some(AgentPrompt::SkillUse { .. }) =>
+                Action::UseSkill { skill_id: SkillId::Block, use_skill: self.pick_bool() },
+            // Piling On: uniformly sample — 1 decision_rng call.
+            // Synced with Java ParityRunner PILING_ON dialog case.
+            Some(AgentPrompt::PilingOn { .. }) => {
+                let use_it = self.pick_bool();
+                Action::UseSkill { skill_id: SkillId::Block, use_skill: use_it }
+            }
+            // Apothecary choice: uniformly sample use/decline — 1 decision_rng call.
+            // Synced with Java ParityRunner APOTHECARY_CHOICE dialog case.
             Some(AgentPrompt::ApothecaryChoice { player_id, .. }) =>
-                Action::UseApothecary { player_id: player_id.clone(), use_apothecary: false },
+                Action::UseApothecary { player_id: player_id.clone(), use_apothecary: self.pick_bool() },
             Some(AgentPrompt::UseApothecary { .. }) =>
                 Action::Acknowledge,
-            // Interception: always decline per parity contract ("agents decline voluntary interference").
+            // Interception: always decline — 0 RNG calls.
+            // Java ParityRunner falls through to RandomStrategy which always sends sendInterceptorChoice(null,null).
+            // Keeping both at 0 advances avoids RNG divergence.
             Some(AgentPrompt::Interception { .. }) =>
                 Action::Intercept { attempt: false },
+            // Touchback: pick uniformly from eligible players sorted by PlayerId — 1 decision_rng.
+            // Synced with Java ParityRunner TOUCHBACK dialog case.
+            Some(AgentPrompt::Touchback { eligible_players }) => {
+                if eligible_players.is_empty() {
+                    return Action::Acknowledge;
+                }
+                let mut sorted = eligible_players.clone();
+                sorted.sort_by(|a, b| a.0.cmp(&b.0));
+                let idx = self.pick(sorted.len());
+                Action::Touchback { player_id: sorted[idx].0.clone() }
+            }
+            // Argue the call: uniformly sample — 1 decision_rng call.
+            // Synced with Java ParityRunner ARGUE_THE_CALL dialog case.
+            Some(AgentPrompt::ArgueTheCall { .. }) =>
+                Action::ArgueTheCall { argue: self.pick_bool() },
+            // Player choice: pick uniformly from eligible sorted by PlayerId — 1 decision_rng call.
+            // Synced with Java ParityRunner PLAYER_CHOICE dialog case.
+            Some(AgentPrompt::PlayerChoice { eligible_players, .. }) => {
+                if eligible_players.is_empty() {
+                    return Action::Acknowledge;
+                }
+                let mut sorted = eligible_players.clone();
+                sorted.sort();
+                let idx = self.pick(sorted.len());
+                Action::SelectPlayer { player_id: sorted[idx].clone() }
+            }
+            // Select weather: pick uniformly from options — 1 decision_rng call.
+            Some(AgentPrompt::SelectWeather { options }) => {
+                if options.is_empty() {
+                    return Action::Acknowledge;
+                }
+                let idx = self.pick(options.len());
+                Action::SelectWeather { weather: options[idx] }
+            }
+            // Hit-and-run / trickster: pick square using actionRng (movement diversity).
+            Some(AgentPrompt::HitAndRun { squares, .. }) => {
+                if squares.is_empty() {
+                    return Action::HitAndRun { coord: None };
+                }
+                let idx = self.pick_action(squares.len());
+                Action::HitAndRun { coord: Some(squares[idx]) }
+            }
+            Some(AgentPrompt::TricksterMove { squares, .. }) => {
+                if squares.is_empty() {
+                    return Action::Acknowledge;
+                }
+                let idx = self.pick_action(squares.len());
+                Action::TricksterMove { coord: squares[idx] }
+            }
+            // Select skill: pick uniformly from all available skill IDs — 1 decision_rng call.
+            // The u16 IDs in the prompt can't be directly mapped to SkillId enum variants without
+            // a lookup table, so we consume 1 RNG call and return Acknowledge for now.
+            // SelectSkill doesn't appear in T3 parity tests (no level-up in single game).
+            Some(AgentPrompt::SelectSkill { available, .. }) => {
+                let total: usize = available.iter().map(|(_, ids)| ids.len()).sum();
+                if total > 0 { let _ = self.pick(total); }
+                Action::Acknowledge
+            }
+            // Inducement / pre-game: always decline / acknowledge with no RNG consumed.
+            Some(AgentPrompt::BuyInducements { .. }) =>
+                Action::BuyInducements { purchases: vec![] },
+            Some(AgentPrompt::BuyPrayersAndInducements { .. }) =>
+                Action::BuyInducements { purchases: vec![] },
+            // Confirm-only and informational prompts: single valid response, 0 RNG consumed.
+            Some(AgentPrompt::KickoffReturn { .. })
+            | Some(AgentPrompt::SetupError { .. })
+            | Some(AgentPrompt::ConfirmEndAction { .. })
+            | Some(AgentPrompt::InformationOkay { .. })
+            | Some(AgentPrompt::SwarmingPlayers { .. })
+            | Some(AgentPrompt::StartGame)
+            | Some(AgentPrompt::GameStatistics)
+            | Some(AgentPrompt::DefenderAction { .. })
+            | Some(AgentPrompt::PettyCash { .. })
+            | Some(AgentPrompt::UseInducement { .. })
+            | Some(AgentPrompt::WizardSpell { .. })
+            | Some(AgentPrompt::BriberyAndCorruption { .. })
+            | Some(AgentPrompt::ConcedeGame { .. })
+            | Some(AgentPrompt::Journeymen { .. })
+            | Some(AgentPrompt::SelectPosition { .. }) =>
+                Action::Acknowledge,
             // Each remaining prompt is wired as its producing step lands in Phase D; the loud
             // failure here names exactly which handler is still missing.
             other => panic!("RandomAgent::act: no handler yet for prompt {other:?}"),
