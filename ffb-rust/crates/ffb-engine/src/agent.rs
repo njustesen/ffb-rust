@@ -187,6 +187,14 @@ impl Agent for RandomAgent {
                             None
                         } else {
                             let tidx = self.pick_action(targets.len());
+                            if std::env::var("FFB_TRACE").is_ok() {
+                                let attacker_coord = gs.game.field_model.player_coordinate(player_id).map(|c| format!("({},{})", c.x, c.y)).unwrap_or_default();
+                                let all_targets: Vec<String> = targets.iter().map(|t| {
+                                    let tc = gs.game.field_model.player_coordinate(t).map(|c| format!("({},{})", c.x, c.y)).unwrap_or_default();
+                                    format!("{}@{}", t, tc)
+                                }).collect();
+                                eprintln!("RUST_BLOCK_PICK pid={} attacker={} N={} idx={} def={} all=[{}] arc={}", player_id, attacker_coord, targets.len(), tidx, targets[tidx], all_targets.join(","), self.action_rng_count);
+                            }
                             Some(targets[tidx].clone())
                         }
                     }

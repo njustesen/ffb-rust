@@ -497,9 +497,11 @@ impl Step {
                         let roll_home = rng.d6();
                         let roll_away = rng.d6();
                         let stun_count = rng.d3();
-                        // Fan factor is 0 at game start, so total = roll.
-                        // home team gets stunned if their fans ≤ away fans.
-                        if roll_home <= roll_away {
+                        // Java adds fanFactor (dedicated_fans + spectator roll) to each team's roll.
+                        let total_home = roll_home + game.team_home.fan_factor;
+                        let total_away = roll_away + game.team_away.fan_factor;
+                        // home team gets stunned if their total ≤ away total.
+                        if total_home <= total_away {
                             let mut standing: Vec<String> = {
                                 let mut ps: Vec<(String, i32)> = game.team_home.players.iter()
                                     .filter(|p| game.field_model.player_state(&p.id)
@@ -516,8 +518,8 @@ impl Step {
                                 game.field_model.set_player_state(&pid, PlayerState::new(PS_STUNNED));
                             }
                         }
-                        // away team gets stunned if their fans ≤ home fans.
-                        if roll_away <= roll_home {
+                        // away team gets stunned if their total ≤ home total.
+                        if total_away <= total_home {
                             let mut standing: Vec<String> = {
                                 let mut ps: Vec<(String, i32)> = game.team_away.players.iter()
                                     .filter(|p| game.field_model.player_state(&p.id)
@@ -652,22 +654,28 @@ impl Step {
                 }
                 if let Some(ball) = game.field_model.ball_coordinate {
                     if ball.is_on_pitch() {
-                        if let Some(player_id) = game.field_model.player_at(ball).cloned() {
-                            // Java CSTIN CATCH_KICKOFF: catcher found → catchBall() iff isBallInPlay && isBallMoving.
-                            if game.field_model.ball_in_play && game.field_model.ball_moving {
+                        // Java CSTIN CATCH_KICKOFF: if player with TZ at landing → catchBall().
+                        // On fail (or no player), enter bounceBall() loop (CATCH_SCATTER modifiers).
+                        // The loop repeats until ball rests on empty square or is caught.
+                        let mut needs_bounce = true;
+                        let mut bounce_from = ball;
+
+                        if game.field_model.ball_in_play && game.field_model.ball_moving {
+                            if let Some(player_id) = game.field_model.player_at(ball).cloned() {
                                 let ps = game.field_model.player_state(&player_id).unwrap_or_default();
                                 if ps.has_tacklezones() {
-                                    // rollSkill() = d6; minimumRollCatch = max(2, AG + TZ).
-                                    // TZ count must be computed dynamically (not hardcoded 0).
+                                    // CATCH_KICKOFF modifiers: TZ + PouringRain + BB2020 kickoff bonus.
+                                    // BB2025 CatchModifierCollection does NOT include CATCH_KICKOFF scatter bonus.
                                     let catch_roll = rng.d6();
                                     let ag = find_player_agility(game, &player_id);
                                     let tz = count_opponent_tackle_zones_at(game, &player_id, ball);
-                                    let min_roll = minimum_roll_catch_edition(ag, tz, game.rules);
+                                    let weather_mod = if game.weather == Weather::PouringRain { 1 } else { 0 };
+                                    let kickoff_mod = if game.rules == Rules::Bb2020 { 1 } else { 0 };
+                                    let min_roll = minimum_roll_catch_edition(ag, tz + weather_mod + kickoff_mod, game.rules);
                                     if std::env::var("FFB_KICKOFF_TRACE").is_ok() {
                                         eprintln!("CSTIN_CATCH half={} at=({},{}) roll={} min={} tz={}", game.half, ball.x, ball.y, catch_roll, min_roll, tz);
                                     }
                                     let mut catch_ok = is_skill_roll_successful(catch_roll, min_roll);
-                                    // Java StepCatchScatterThrowIn.catchBall: Catch skill auto-rerolls once.
                                     if !catch_ok {
                                         let has_catch = game.team_home.players.iter()
                                             .chain(game.team_away.players.iter())
@@ -680,42 +688,30 @@ impl Step {
                                         }
                                     }
                                     if catch_ok {
-                                        // Catch success: setBallMoving(false), ball stays.
                                         game.field_model.ball_moving = false;
-                                    } else {
-                                        // Catch fail → SCATTER_BALL → bounceBall()
-                                        let dir_roll = rng.d8();
-                                        let dir = Direction::for_roll(dir_roll).expect("d8 is 1..=8");
-                                        let (x, y) = scatter_coordinate(ball.x, ball.y, dir, 1);
-                                        let new_pos = FieldCoordinate::new(x, y);
-                                        game.field_model.ball_coordinate = Some(new_pos);
-                                        let in_receiving_half = if game.home_playing {
-                                            new_pos.x >= 13 && new_pos.x <= 25 && new_pos.y >= 0 && new_pos.y <= 14
-                                        } else {
-                                            new_pos.x >= 0 && new_pos.x <= 12 && new_pos.y >= 0 && new_pos.y <= 14
-                                        };
-                                        if !in_receiving_half {
-                                            return StepOutcome::next().publish(StepParameter::Touchback(true));
-                                        }
+                                        needs_bounce = false;
                                     }
+                                    // catch failed → needs_bounce stays true → enter bounce loop
                                 }
-                                // else: no tackle zones → SCATTER_BALL; not reached for Standing linemen
+                                // no TZ → needs_bounce stays true → enter bounce loop
                             }
+                            // no player at landing → needs_bounce stays true → enter bounce loop
                         } else {
-                            // No player at initial landing square → bounceBall() then attempt catch at new pos.
-                            // Java CSTIN.executeStep: bounce first (d8), then catchBall() at new square — all
-                            // in a single executeStep call, not a loop.
+                            needs_bounce = false;
+                        }
+
+                        // Bounce loop: mirrors Java bounceBall() + CATCH_SCATTER catchBall() cycle.
+                        // Repeats until ball rests on empty square, is caught, or goes OOB (touchback).
+                        while needs_bounce && game.field_model.ball_in_play {
                             let dir_roll = rng.d8();
-                            let dir = Direction::for_roll(dir_roll).expect("d8 roll is 1..=8");
-                            let (x, y) = scatter_coordinate(ball.x, ball.y, dir, 1);
+                            let dir = Direction::for_roll(dir_roll).expect("d8 is 1..=8");
+                            let (x, y) = scatter_coordinate(bounce_from.x, bounce_from.y, dir, 1);
                             let new_pos = FieldCoordinate::new(x, y);
                             if std::env::var("FFB_KICKOFF_TRACE").is_ok() {
-                                eprintln!("CSTIN_BOUNCE half={} from=({},{}) dir_roll={} dir={:?} to=({},{})", game.half, ball.x, ball.y, dir_roll, dir, x, y);
+                                eprintln!("CSTIN_BOUNCE half={} from=({},{}) dir_roll={} dir={:?} to=({},{})", game.half, bounce_from.x, bounce_from.y, dir_roll, dir, x, y);
                             }
                             game.field_model.ball_coordinate = Some(new_pos);
-                            // Java CSTIN bounceBall() uses fScatterBounds (receiving half during
-                            // kickoff), not the full field. If bounce lands outside receiving half →
-                            // touchback. HALF_AWAY = x 13..=25 (away receives), HALF_HOME = x 0..=12.
+                            // Java bounceBall() uses fScatterBounds (receiving half). OOB → touchback.
                             let in_receiving_half = if game.home_playing {
                                 new_pos.x >= 13 && new_pos.x <= 25 && new_pos.y >= 0 && new_pos.y <= 14
                             } else {
@@ -724,36 +720,42 @@ impl Step {
                             if !in_receiving_half {
                                 return StepOutcome::next().publish(StepParameter::Touchback(true));
                             }
-                            // Ball stayed in bounds — check if a player is at the new square and attempt catch.
-                            if game.field_model.ball_in_play && game.field_model.ball_moving {
-                                if let Some(catcher_id) = game.field_model.player_at(new_pos).cloned() {
-                                    let ps2 = game.field_model.player_state(&catcher_id).unwrap_or_default();
-                                    if ps2.has_tacklezones() {
-                                        let catch_roll = rng.d6();
-                                        let ag = find_player_agility(game, &catcher_id);
-                                        let tz2 = count_opponent_tackle_zones_at(game, &catcher_id, new_pos);
-                                        let min_roll = minimum_roll_catch_edition(ag, tz2, game.rules);
-                                        if std::env::var("FFB_KICKOFF_TRACE").is_ok() {
-                                            eprintln!("CSTIN_CATCH half={} at=({},{}) roll={} min={} tz={}", game.half, new_pos.x, new_pos.y, catch_roll, min_roll, tz2);
-                                        }
-                                        let mut catch_ok2 = is_skill_roll_successful(catch_roll, min_roll);
-                                        if !catch_ok2 {
-                                            let has_catch2 = game.team_home.players.iter()
-                                                .chain(game.team_away.players.iter())
-                                                .find(|p| p.id == catcher_id)
-                                                .map(|p| p.has_skill(SkillId::Catch))
-                                                .unwrap_or(false);
-                                            if has_catch2 {
-                                                let reroll2 = rng.d6();
-                                                catch_ok2 = is_skill_roll_successful(reroll2, min_roll);
-                                            }
-                                        }
-                                        if catch_ok2 {
-                                            game.field_model.ball_moving = false;
-                                        }
-                                        // catch fail: ball stays at new_pos, ball_moving=true (remains loose)
+                            bounce_from = new_pos;
+                            if let Some(catcher_id) = game.field_model.player_at(new_pos).cloned() {
+                                let ps2 = game.field_model.player_state(&catcher_id).unwrap_or_default();
+                                if ps2.has_tacklezones() {
+                                    // CATCH_SCATTER: +1 scatter modifier (BB2020/BB2025 only) + TZ + weather.
+                                    let catch_roll = rng.d6();
+                                    let ag2 = find_player_agility(game, &catcher_id);
+                                    let tz2 = count_opponent_tackle_zones_at(game, &catcher_id, new_pos);
+                                    let weather_mod2 = if game.weather == Weather::PouringRain { 1 } else { 0 };
+                                    let scatter_mod = if game.rules == Rules::Bb2016 { 0 } else { 1 };
+                                    let min_roll2 = minimum_roll_catch_edition(ag2, tz2 + weather_mod2 + scatter_mod, game.rules);
+                                    if std::env::var("FFB_KICKOFF_TRACE").is_ok() {
+                                        eprintln!("CSTIN_CATCH half={} at=({},{}) roll={} min={} tz={}", game.half, new_pos.x, new_pos.y, catch_roll, min_roll2, tz2);
                                     }
+                                    let mut catch_ok2 = is_skill_roll_successful(catch_roll, min_roll2);
+                                    if !catch_ok2 {
+                                        let has_catch2 = game.team_home.players.iter()
+                                            .chain(game.team_away.players.iter())
+                                            .find(|p| p.id == catcher_id)
+                                            .map(|p| p.has_skill(SkillId::Catch))
+                                            .unwrap_or(false);
+                                        if has_catch2 {
+                                            let reroll2 = rng.d6();
+                                            catch_ok2 = is_skill_roll_successful(reroll2, min_roll2);
+                                        }
+                                    }
+                                    if catch_ok2 {
+                                        game.field_model.ball_moving = false;
+                                        needs_bounce = false;
+                                    }
+                                    // catch failed → needs_bounce stays true → loop again
                                 }
+                                // no TZ → needs_bounce stays true → loop again
+                            } else {
+                                // empty square → ball rests
+                                needs_bounce = false;
                             }
                         }
                     }
@@ -3216,7 +3218,20 @@ fn bounce_ball_chain(game: &mut Game, _from: FieldCoordinate, rng: &mut GameRng)
                 let tz = count_opponent_tackle_zones_at(game, &pid, catcher_coord);
                 let catch_target = (catch_ag + 1 + tz).max(2);
                 let catch_roll = rng.d6();
-                if is_skill_roll_successful(catch_roll, catch_target) {
+                let mut catch_ok = is_skill_roll_successful(catch_roll, catch_target);
+                if !catch_ok {
+                    // Catch skill auto-rerolls once (Java StepCatchScatterThrowIn.catchBall:581)
+                    let has_catch = game.team_home.players.iter()
+                        .chain(game.team_away.players.iter())
+                        .find(|p| p.id == pid)
+                        .map(|p| p.has_skill(SkillId::Catch))
+                        .unwrap_or(false);
+                    if has_catch {
+                        let reroll = rng.d6();
+                        catch_ok = is_skill_roll_successful(reroll, catch_target);
+                    }
+                }
+                if catch_ok {
                     game.field_model.ball_moving = false;
                     break;
                 } else {
