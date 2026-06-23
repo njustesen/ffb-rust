@@ -4,12 +4,26 @@ import com.fumbbl.ffb.FieldCoordinate;
 import com.fumbbl.ffb.FieldCoordinateBounds;
 import com.fumbbl.ffb.IDialogParameter;
 import com.fumbbl.ffb.PlayerState;
+import com.fumbbl.ffb.Pushback;
+import com.fumbbl.ffb.PushbackSquare;
+import com.fumbbl.ffb.ReRollSources;
 import com.fumbbl.ffb.TurnMode;
 import com.fumbbl.ffb.ai.simulation.CapturingClientCommunication;
 import com.fumbbl.ffb.ai.simulation.HeadlessFantasyFootballServer;
 import com.fumbbl.ffb.ai.simulation.HeadlessGameSetup;
 import com.fumbbl.ffb.ai.simulation.MatchRunner;
 import com.fumbbl.ffb.ai.strategy.RandomStrategy;
+import com.fumbbl.ffb.dialog.DialogApothecaryChoiceParameter;
+import com.fumbbl.ffb.dialog.DialogArgueTheCallParameter;
+import com.fumbbl.ffb.dialog.DialogBlockRollParameter;
+import com.fumbbl.ffb.dialog.DialogBlockRollPartialReRollParameter;
+import com.fumbbl.ffb.dialog.DialogBlockRollPropertiesParameter;
+import com.fumbbl.ffb.dialog.DialogFollowupChoiceParameter;
+import com.fumbbl.ffb.dialog.DialogInterceptionParameter;
+import com.fumbbl.ffb.dialog.DialogPilingOnParameter;
+import com.fumbbl.ffb.dialog.DialogPlayerChoiceParameter;
+import com.fumbbl.ffb.dialog.DialogReRollParameter;
+import com.fumbbl.ffb.dialog.DialogSkillUseParameter;
 import com.fumbbl.ffb.model.ActingPlayer;
 import com.fumbbl.ffb.model.FieldModel;
 import com.fumbbl.ffb.model.Game;
@@ -20,6 +34,7 @@ import com.fumbbl.ffb.net.commands.ClientCommandActingPlayer;
 import com.fumbbl.ffb.net.commands.ClientCommandCoinChoice;
 import com.fumbbl.ffb.net.commands.ClientCommandEndTurn;
 import com.fumbbl.ffb.net.commands.ClientCommandKickoff;
+import com.fumbbl.ffb.net.commands.ClientCommandPushback;
 import com.fumbbl.ffb.net.commands.ClientCommandReceiveChoice;
 import com.fumbbl.ffb.net.commands.ClientCommandStartGame;
 import com.fumbbl.ffb.net.commands.ClientCommandTouchback;
@@ -34,6 +49,8 @@ import java.io.FileOutputStream;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -247,9 +264,62 @@ public class ParityRunner {
                 MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
                 break;
 
+            case PUSHBACK: {
+                boolean home = game.isHomePlaying();
+                PushbackSquare[] squares = game.getFieldModel().getPushbackSquares();
+                List<PushbackSquare> candidates = new ArrayList<>();
+                if (squares != null) {
+                    for (PushbackSquare sq : squares) {
+                        if (!sq.isLocked()) candidates.add(sq);
+                    }
+                    if (candidates.isEmpty()) {
+                        for (PushbackSquare sq : squares) candidates.add(sq);
+                    }
+                }
+                if (!candidates.isEmpty()) {
+                    candidates.sort(Comparator.comparingInt((PushbackSquare sq) -> sq.getCoordinate().getX())
+                        .thenComparingInt(sq -> sq.getCoordinate().getY()));
+                    decisionRngAdvances++;
+                    int idx = (int) Long.remainderUnsigned(decisionRng.nextLong(), (long) candidates.size());
+                    PushbackSquare chosen = candidates.get(idx);
+                    FieldCoordinate toCoord = chosen.getCoordinate();
+                    Player<?> pushedPlayer = game.getDefender();
+                    if (pushedPlayer == null && game.getDefenderId() != null) {
+                        pushedPlayer = game.getPlayerById(game.getDefenderId());
+                    }
+                    String pid = pushedPlayer != null ? pushedPlayer.getId() : null;
+                    FieldCoordinate sendCoord = home ? toCoord : toCoord.transform();
+                    MatchRunner.inject(gameState, new ClientCommandPushback(new Pushback(pid, sendCoord)));
+                } else {
+                    MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
+                }
+                break;
+            }
+
             default:
                 MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
                 break;
+        }
+    }
+
+    // ── Dialog injection helper ───────────────────────────────────────────────
+
+    private void injectCaptured(IDialogParameter dialog, Game game, GameState gameState) {
+        com.fumbbl.ffb.net.commands.ClientCommand captured = comm.getCapturedCommand();
+        if (captured != null) {
+            String teamId = getDialogTeamId(dialog);
+            try {
+                if (teamId != null) {
+                    MatchRunner.injectForTeam(gameState, captured,
+                        teamId.equals(game.getTeamHome().getId()));
+                } else {
+                    MatchRunner.inject(gameState, captured);
+                }
+            } catch (RuntimeException e) {
+                game.setDialogParameter(null);
+            }
+        } else {
+            game.setDialogParameter(null);
         }
     }
 
@@ -278,33 +348,152 @@ public class ParityRunner {
             }
 
             case TOUCHBACK: {
-                // Canonical: give ball to receiving team's player nearest to kick-from (13,8).
-                // Send from the receiving team's session so StepTouchback uses coord directly.
                 boolean homeReceives = !game.isHomePlaying();
                 Team recvTeam = homeReceives ? game.getTeamHome() : game.getTeamAway();
-                FieldCoordinate kickFrom = new FieldCoordinate(13, 8);
-                FieldCoordinate bestCoord = null;
-                int bestDist = Integer.MAX_VALUE;
+                FieldModel fm = game.getFieldModel();
+                List<Player<?>> eligible = new ArrayList<>();
                 for (Player<?> p : recvTeam.getPlayers()) {
-                    PlayerState ps = game.getFieldModel().getPlayerState(p);
-                    FieldCoordinate coord = game.getFieldModel().getPlayerCoordinate(p);
+                    PlayerState ps = fm.getPlayerState(p);
+                    FieldCoordinate coord = fm.getPlayerCoordinate(p);
                     boolean onPitch = coord != null && coord.getX() >= 0 && coord.getX() <= 25
                                                      && coord.getY() >= 0 && coord.getY() <= 14;
                     if (ps != null && ps.isStanding() && onPitch) {
-                        int dx = coord.getX() - kickFrom.getX();
-                        int dy = coord.getY() - kickFrom.getY();
-                        int dist = dx * dx + dy * dy;
-                        if (dist < bestDist) { bestDist = dist; bestCoord = coord; }
+                        eligible.add(p);
                     }
                 }
-                if (bestCoord != null) {
-                    // Home player: send actual coord (StepTouchback uses directly).
-                    // Away player: send coord.transform() (StepTouchback transforms it back).
-                    FieldCoordinate cmdCoord = homeReceives ? bestCoord : bestCoord.transform();
+                if (!eligible.isEmpty()) {
+                    eligible.sort(Comparator.comparing(Player::getId));
+                    decisionRngAdvances++;
+                    int idx = (int) Long.remainderUnsigned(decisionRng.nextLong(), (long) eligible.size());
+                    Player<?> chosen = eligible.get(idx);
+                    FieldCoordinate coord = fm.getPlayerCoordinate(chosen);
+                    FieldCoordinate cmdCoord = homeReceives ? coord : coord.transform();
                     MatchRunner.injectForTeam(gameState, new ClientCommandTouchback(cmdCoord), homeReceives);
                 } else {
                     game.setDialogParameter(null);
                 }
+                break;
+            }
+
+            case FOLLOWUP_CHOICE: {
+                decisionRngAdvances++;
+                boolean follow = Long.remainderUnsigned(decisionRng.nextLong(), 2L) == 0;
+                comm.clearCaptured();
+                comm.sendFollowupChoice(follow);
+                injectCaptured(dialog, game, gameState);
+                break;
+            }
+
+            case BLOCK_ROLL: {
+                DialogBlockRollParameter block = (DialogBlockRollParameter) dialog;
+                int nDice = Math.max(1, block.getNrOfDice());
+                decisionRngAdvances++;
+                int dieIdx = (int) Long.remainderUnsigned(decisionRng.nextLong(), (long) nDice);
+                comm.clearCaptured();
+                comm.sendBlockChoice(dieIdx);
+                injectCaptured(dialog, game, gameState);
+                break;
+            }
+
+            case BLOCK_ROLL_PARTIAL_RE_ROLL: {
+                DialogBlockRollPartialReRollParameter partialBlock = (DialogBlockRollPartialReRollParameter) dialog;
+                int nDice = Math.max(1, partialBlock.getNrOfDice());
+                decisionRngAdvances++;
+                int dieIdx = (int) Long.remainderUnsigned(decisionRng.nextLong(), (long) nDice);
+                comm.clearCaptured();
+                comm.sendBlockChoice(dieIdx);
+                injectCaptured(dialog, game, gameState);
+                break;
+            }
+
+            case BLOCK_ROLL_PROPERTIES: {
+                // Advance RNG once for sync (same as Rust pick_bool()); always pick die 0.
+                decisionRngAdvances++;
+                Long.remainderUnsigned(decisionRng.nextLong(), 2L);
+                DialogBlockRollPropertiesParameter propsBlock = (DialogBlockRollPropertiesParameter) dialog;
+                int nDice = Math.abs(propsBlock.getNrOfDice());
+                comm.clearCaptured();
+                if (nDice > 0) {
+                    comm.sendBlockChoice(0);
+                }
+                injectCaptured(dialog, game, gameState);
+                break;
+            }
+
+            case RE_ROLL: {
+                DialogReRollParameter rr = (DialogReRollParameter) dialog;
+                decisionRngAdvances++;
+                boolean useRr = Long.remainderUnsigned(decisionRng.nextLong(), 2L) == 0;
+                comm.clearCaptured();
+                if (useRr && rr.isTeamReRollOption()) {
+                    comm.sendUseReRoll(rr.getReRolledAction(), ReRollSources.TEAM_RE_ROLL);
+                } else if (useRr && rr.isProReRollOption()) {
+                    comm.sendUseReRoll(rr.getReRolledAction(), ReRollSources.PRO);
+                } else if (useRr && rr.getSingleUseReRollSource() != null) {
+                    comm.sendUseReRoll(rr.getReRolledAction(), rr.getSingleUseReRollSource());
+                } else if (useRr && rr.getReRollSkill() != null) {
+                    comm.sendUseSkill(rr.getReRollSkill(), true, rr.getPlayerId(), rr.getReRolledAction());
+                } else {
+                    comm.sendUseReRoll(rr.getReRolledAction(), null);
+                }
+                injectCaptured(dialog, game, gameState);
+                break;
+            }
+
+            case SKILL_USE: {
+                DialogSkillUseParameter su = (DialogSkillUseParameter) dialog;
+                decisionRngAdvances++;
+                boolean use = Long.remainderUnsigned(decisionRng.nextLong(), 2L) == 0;
+                comm.clearCaptured();
+                comm.sendUseSkill(su.getSkill(), use, su.getPlayerId());
+                injectCaptured(dialog, game, gameState);
+                break;
+            }
+
+            case PILING_ON: {
+                DialogPilingOnParameter pilingOn = (DialogPilingOnParameter) dialog;
+                decisionRngAdvances++;
+                boolean usePo = Long.remainderUnsigned(decisionRng.nextLong(), 2L) == 0;
+                comm.clearCaptured();
+                Player<?> pilingOnPlayer = game.getPlayerById(pilingOn.getPlayerId());
+                if (pilingOnPlayer != null) {
+                    com.fumbbl.ffb.util.UtilCards.getSkillWithProperty(pilingOnPlayer,
+                        com.fumbbl.ffb.model.property.NamedProperties.canPileOnOpponent)
+                        .ifPresent(skill -> comm.sendUseSkill(skill, usePo, pilingOn.getPlayerId()));
+                }
+                injectCaptured(dialog, game, gameState);
+                break;
+            }
+
+            case APOTHECARY_CHOICE: {
+                DialogApothecaryChoiceParameter ac = (DialogApothecaryChoiceParameter) dialog;
+                decisionRngAdvances++;
+                boolean useApo = Long.remainderUnsigned(decisionRng.nextLong(), 2L) == 0;
+                comm.clearCaptured();
+                if (useApo) {
+                    comm.sendApothecaryChoice(ac.getPlayerId(), ac.getPlayerStateNew(), ac.getSeriousInjuryNew(), ac.getPlayerStateNew());
+                } else {
+                    comm.sendApothecaryChoice(ac.getPlayerId(), ac.getPlayerStateOld(), ac.getSeriousInjuryOld(), ac.getPlayerStateOld());
+                }
+                injectCaptured(dialog, game, gameState);
+                break;
+            }
+
+            case ARGUE_THE_CALL: {
+                DialogArgueTheCallParameter atc = (DialogArgueTheCallParameter) dialog;
+                String[] atcIds = atc.getPlayerIds();
+                int atcN = atcIds != null ? atcIds.length : 0;
+                decisionRngAdvances++;
+                long atcRoll = Long.remainderUnsigned(decisionRng.nextLong(), (long) (atcN + 1));
+                comm.clearCaptured();
+                if (atcN > 0 && atcRoll < atcN) {
+                    String[] sorted = atcIds.clone();
+                    Arrays.sort(sorted);
+                    comm.sendArgueTheCall(sorted[(int) atcRoll]);
+                } else {
+                    comm.sendArgueTheCall((String) null);
+                }
+                injectCaptured(dialog, game, gameState);
                 break;
             }
 
