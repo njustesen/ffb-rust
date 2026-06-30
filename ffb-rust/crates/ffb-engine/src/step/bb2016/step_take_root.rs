@@ -17,8 +17,7 @@
 ///   source which uses `executeStepHooks` without requiring a label init).
 ///   Note: the Java `cancelPlayerAction()` method is defined in StepTakeRoot itself.
 ///
-/// TODO: re-roll path (WAITING_FOR_RE_ROLL) not fully translated.
-/// TODO: UtilServerPlayerMove.updateMoveSquares for MOVE action not translated.
+/// DEFERRED(reroll): re-roll path (WAITING_FOR_RE_ROLL) not fully translated.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2016.StepTakeRoot`.
 use ffb_model::enums::PlayerAction;
@@ -27,6 +26,7 @@ use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::util::UtilServerPlayerMove;
 
 pub struct StepTakeRoot;
 
@@ -98,7 +98,10 @@ impl StepTakeRoot {
                 PlayerAction::KickTeamMateMove => Some(PlayerAction::KickTeamMate),
                 PlayerAction::HandOverMove => Some(PlayerAction::HandOver),
                 PlayerAction::FoulMove => Some(PlayerAction::Foul),
-                // MOVE: updateMoveSquares(gameState, false) — TODO not ported
+                PlayerAction::Move => {
+                    UtilServerPlayerMove::update_move_squares(game, false);
+                    None
+                }
                 _ => None,
             };
             if let Some(new_action) = base_action {

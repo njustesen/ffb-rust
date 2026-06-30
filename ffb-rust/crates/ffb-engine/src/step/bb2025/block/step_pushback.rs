@@ -7,6 +7,7 @@ use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::util_server_injury::handle_injury_by_name;
+use crate::util::UtilServerPlayerMove;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.block.StepPushback.
 /// Handles player pushback and crowd-push. The Java StepState fields are inlined here.
@@ -230,8 +231,7 @@ impl StepPushback {
 fn push_player(game: &mut Game, player_id: &str, coord: FieldCoordinate) {
     // Java: fieldModel.updatePlayerAndBallPosition(pPlayer, pCoordinate)
     game.field_model.set_player_coordinate(player_id, coord);
-    // Java: UtilServerPlayerMove.updateMoveSquares(getGameState(), false)
-    // TODO: UtilServerPlayerMove.updateMoveSquares
+    UtilServerPlayerMove::update_move_squares(game, false);
 
     // Java: if (fieldModel.isBallMoving() && pCoordinate.equals(fieldModel.getBallCoordinate()))
     //   publish CatchScatterThrowInMode.SCATTER_BALL

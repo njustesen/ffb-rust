@@ -5,6 +5,7 @@ use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::util::UtilServerPlayerMove;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.move.StepMove.
 ///
@@ -14,12 +15,10 @@ use crate::step::framework::{StepId, StepParameter};
 ///
 /// Expects: COORDINATE_FROM, COORDINATE_TO, MOVE_STACK (size only) set by preceding step.
 ///
-/// TODO: TrackNumber / field_model.add(trackNumber) not yet ported.
-/// TODO: playerResult.setRushing not yet ported.
-/// TODO: actingPlayer.setGoingForIt(UtilPlayer.isNextMoveGoingForIt) auto GFI not yet ported.
-/// TODO: UtilServerPlayerMove.updateMoveSquares (when fMoveStackSize == 0) not yet ported.
-/// TODO: ServerUtilBlock.updateDiceDecorations not yet ported.
-/// TODO: SoundId.DODGE / SoundId.STEP sound selection not yet ported.
+/// DEFERRED(TrackNumber): field_model.add(trackNumber) not yet ported.
+/// DEFERRED(playerResult): playerResult.setRushing not yet ported.
+/// DEFERRED(ServerUtilBlock): updateDiceDecorations not yet ported.
+/// DEFERRED(SoundId): DODGE/STEP sound selection not yet ported.
 pub struct StepMove {
     /// Java: fCoordinateFrom
     pub coordinate_from: Option<FieldCoordinate>,
@@ -95,11 +94,13 @@ impl StepMove {
             }
         }
         game.field_model.set_player_coordinate(attacker_id, to);
-        // TODO: playerResult.setRushing delta
+        // DEFERRED(playerResult): setRushing not yet ported
         game.acting_player.goes_for_it = UtilPlayer::is_next_move_going_for_it(game);
-        // TODO: if fMoveStackSize == 0 → UtilServerPlayerMove.updateMoveSquares(false)
-        // TODO: ServerUtilBlock.updateDiceDecorations
-        // TODO: sound DODGE or STEP
+        if self.move_stack_size == 0 {
+            UtilServerPlayerMove::update_move_squares(game, false);
+        }
+        // DEFERRED(ServerUtilBlock): updateDiceDecorations not yet ported
+        // DEFERRED(SoundId): DODGE/STEP sound selection not yet ported
 
         StepOutcome::next()
             .publish(StepParameter::PlayerEnteringSquare(attacker_id.clone()))

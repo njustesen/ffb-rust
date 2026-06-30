@@ -29,10 +29,7 @@ use crate::step::generator::bb2016::kick_team_mate::KickTeamMateParams;
 /// thrown_player_id, move_start fields; GAZE (not GazeMove) → Move; KICK_TEAM_MATE → KickTeamMate
 /// generator (not ThrowTeamMate); no Punt branch.
 ///
-/// DEFERRED(ktm): canKickTeamMate / canThrowTeamMate checks not yet ported.
-/// TODO(canKickTeamMate): UtilPlayer::can_kick_team_mate not yet ported.
-/// TODO(canThrowTeamMate): UtilPlayer::can_throw_team_mate not yet ported.
-/// TODO(canGaze): UtilPlayer::can_gaze not yet ported (MOVE && canGaze branch).
+/// DEFERRED(ktm): canKickTeamMate / canThrowTeamMate depend on TtmMechanic, not yet ported.
 pub struct StepEndMoving {
     /// Java: fEndTurn
     pub end_turn: bool,
@@ -183,9 +180,9 @@ impl StepEndMoving {
             || (player_action == Some(PlayerAction::HandOverMove) && UtilPlayer::can_hand_over(game, pid))
             || (player_action == Some(PlayerAction::PassMove) && has_ball)
             || (player_action == Some(PlayerAction::FoulMove) && UtilPlayer::can_foul(game, pid))
-            // DEFERRED(canGaze): (MOVE && canGaze) not yet ported
-            // DEFERRED(ktm): KickTeamMateMove && canKickTeamMate not yet ported
-            // DEFERRED(ktm): ThrowTeamMateMove && canThrowTeamMate not yet ported
+            || (player_action == Some(PlayerAction::Move) && UtilPlayer::can_gaze(game, pid))
+            // DEFERRED(ktm): KickTeamMateMove && canKickTeamMate needs TtmMechanic not yet ported
+            // DEFERRED(ktm): ThrowTeamMateMove && canThrowTeamMate needs TtmMechanic not yet ported
             ;
 
         if can_make_next_move {
@@ -401,5 +398,32 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!out.pushes.is_empty(), "should push EndPlayerAction as fallback");
+    }
+
+    #[test]
+    fn move_action_with_can_gaze_pushes_move_sequence() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::SkillId;
+        let mut game = make_game();
+        // gazer with HypnoticGaze (inflictsConfusion) on home team
+        game.team_home.players.push(Player {
+            id: "gazer".into(), name: "gazer".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue::new(SkillId::HypnoticGaze)],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        game.field_model.set_player_coordinate("gazer", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("gazer", PlayerState::new(PS_STANDING));
+        // adjacent away player with tackle zone (target for gaze)
+        add_player_at(&mut game, false, "target", FieldCoordinate::new(5, 6));
+        game.acting_player.player_id = Some("gazer".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        let mut step = StepEndMoving::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "MOVE + canGaze should push Move sequence");
     }
 }

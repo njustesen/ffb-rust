@@ -8,6 +8,7 @@ use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::util_server_injury::drop_player_no_sph;
+use crate::util::UtilServerPlayerMove;
 
 /// Java: `StepDropDivingTackler` (bb2016).
 pub struct StepDropDivingTackler {
@@ -43,7 +44,7 @@ impl StepDropDivingTackler {
                     for p in params {
                         outcome = outcome.publish(p);
                     }
-                    // TODO: UtilServerPlayerMove.updateMoveSquares
+                    UtilServerPlayerMove::update_move_squares(game, game.acting_player.jumping);
                 }
             }
         }

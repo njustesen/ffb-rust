@@ -8,6 +8,7 @@ use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::util::UtilServerPlayerMove;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.block.StepHitAndRun.
 /// After a block, the attacker may move one adjacent empty square with no opponent tackle zones.
@@ -148,8 +149,8 @@ impl StepHitAndRun {
                 game.last_turn_mode = Some(saved);
             }
         }
-        // TODO: UtilServerPlayerMove.updateMoveSquares
-        // TODO: ServerUtilBlock.updateDiceDecorations
+        UtilServerPlayerMove::update_move_squares(game, game.acting_player.jumping);
+        // DEFERRED(ServerUtilBlock): updateDiceDecorations not yet ported
     }
 }
 

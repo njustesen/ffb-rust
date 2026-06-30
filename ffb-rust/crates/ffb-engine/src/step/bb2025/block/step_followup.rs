@@ -7,6 +7,7 @@ use ffb_mechanics::skills::SkillId;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::util::UtilServerPlayerMove;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.block.StepFollowup.
 /// Handles optional attacker follow-up after a block. Fend (preventOpponentFollowingUp) and
@@ -209,8 +210,8 @@ impl StepFollowup {
                             }
                         }
                         game.field_model.set_player_coordinate(attacker_id, followup_coord);
-                        // TODO: UtilServerPlayerMove.updateMoveSquares
-                        // TODO: TrackNumber for BLITZ action (coordinateFrom / currentMove - 1)
+                        UtilServerPlayerMove::update_move_squares(game, false);
+                        // DEFERRED(TrackNumber): TrackNumber for BLITZ action not yet ported
                         outcome = outcome.publish(StepParameter::PlayerEnteringSquare(attacker_id.clone()));
                     }
                 }
