@@ -19,6 +19,7 @@ use crate::step::generator::bb2016::pass::PassParams;
 use crate::step::generator::bb2016::throw_team_mate::ThrowTeamMateParams;
 use crate::step::generator::bb2016::kick_team_mate::KickTeamMateParams;
 use crate::step::generator::bb2016::select::SelectParams;
+use crate::step::util_server_steps::change_player_action;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2016.move.StepEndSelecting.
 ///
@@ -132,7 +133,29 @@ impl StepEndSelecting {
             return StepOutcome::next().push_seq(seq);
         }
 
-        // TODO(bloodlust): actingPlayer.isSufferingBloodLust() branch not yet ported
+        // Java: else if (actingPlayer.isSufferingBloodLust()) → force action to MOVE if not moving
+        if game.acting_player.suffering_blood_lust {
+            let effective_action = if let Some(da) = self.dispatch_player_action {
+                if !da.is_moving() { PlayerAction::Move } else { da }
+            } else {
+                match game.acting_player.player_action {
+                    Some(a) if !a.is_moving() => {
+                        let pid = game.acting_player.player_id.clone();
+                        let jumping = game.acting_player.jumping;
+                        if let Some(id) = pid.as_deref() {
+                            change_player_action(game, id, PlayerAction::Move, jumping);
+                        }
+                        PlayerAction::Move
+                    }
+                    Some(a) => a,
+                    None => PlayerAction::Move,
+                }
+            };
+            // dispatch without with_parameter
+            let player_action = effective_action;
+            let with_parameter = false;
+            return self.dispatch_to_sequence(game, player_action, with_parameter);
+        }
 
         // ── Dispatch ─────────────────────────────────────────────────────────────
         let player_action = if let Some(da) = self.dispatch_player_action {
@@ -149,19 +172,15 @@ impl StepEndSelecting {
         };
 
         let with_parameter = self.dispatch_player_action.is_some();
+        self.dispatch_to_sequence(game, player_action, with_parameter)
+    }
 
+    fn dispatch_to_sequence(&self, game: &mut Game, player_action: PlayerAction, with_parameter: bool) -> StepOutcome {
         match player_action {
             PlayerAction::Pass
             | PlayerAction::HailMaryPass
             | PlayerAction::HandOver => {
-                let seq = if with_parameter && self.target_coordinate.is_some() {
-                    // Java: Pass.SequenceParams(gameState, fTargetCoordinate)
-                    // Stub: pass with target coord
-                    Pass::build_sequence(&PassParams::default())
-                } else {
-                    Pass::build_sequence(&PassParams::default())
-                };
-                StepOutcome::next().push_seq(seq)
+                StepOutcome::next().push_seq(Pass::build_sequence(&PassParams::default()))
             }
             PlayerAction::ThrowTeamMate => {
                 let seq = ThrowTeamMate::build_sequence(&ThrowTeamMateParams {
@@ -171,8 +190,7 @@ impl StepEndSelecting {
                 StepOutcome::next().push_seq(seq)
             }
             PlayerAction::KickTeamMate => {
-                let seq = KickTeamMate::build_sequence(&KickTeamMateParams::default());
-                StepOutcome::next().push_seq(seq)
+                StepOutcome::next().push_seq(KickTeamMate::build_sequence(&KickTeamMateParams::default()))
             }
             PlayerAction::Blitz => {
                 let seq = if with_parameter {
@@ -199,8 +217,7 @@ impl StepEndSelecting {
                 StepOutcome::next().push_seq(seq)
             }
             PlayerAction::Foul => {
-                let seq = Foul::build_sequence(&FoulParams::default());
-                StepOutcome::next().push_seq(seq)
+                StepOutcome::next().push_seq(Foul::build_sequence(&FoulParams::default()))
             }
             PlayerAction::Move
             | PlayerAction::FoulMove
@@ -398,5 +415,28 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!out.pushes.is_empty());
+    }
+
+    #[test]
+    fn blood_lust_non_moving_action_redirected_to_move_sequence() {
+        // isSufferingBloodLust=true with a non-moving action (Block) → redirected to MOVE sequence
+        let mut game = make_game();
+        game.acting_player.player_action = Some(PlayerAction::Block);
+        game.acting_player.suffering_blood_lust = true;
+        let mut step = StepEndSelecting::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "blood lust should push Move sequence for non-moving action");
+    }
+
+    #[test]
+    fn blood_lust_already_moving_keeps_move_sequence() {
+        let mut game = make_game();
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        game.acting_player.suffering_blood_lust = true;
+        let mut step = StepEndSelecting::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "blood lust should still push Move sequence for moving action");
     }
 }
