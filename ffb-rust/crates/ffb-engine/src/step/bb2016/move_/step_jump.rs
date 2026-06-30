@@ -3,6 +3,7 @@ use ffb_model::enums::ReRollSource;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
+use crate::drop_player_context::SteadyFootingContext;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::abstract_step_with_re_roll::ReRollState;
@@ -27,11 +28,10 @@ use ffb_mechanics::mechanics::minimum_roll_jump;
 /// - Success → clear jumping, NEXT_STEP + JUMPED(true)
 /// - Failure → TRR offer if available, else fail_jump: GOTO_LABEL + COORDINATE_FROM
 ///
-/// TODO(hooks): executeStepHooks infrastructure not yet ported.
-/// TODO(canStillJump): BB2016 JumpMechanic.canStillJump() not yet ported.
-/// TODO(gazeModifiers): JumpModifierFactory not yet ported for BB2016.
-/// TODO(divingTackle): checkDivingTackle dialog not yet ported.
-/// TODO(steadyFootingContext): STEADY_FOOTING_CONTEXT(InjuryTypeDropJump) publish not yet ported.
+/// DEFERRED(hooks): executeStepHooks infrastructure not yet ported.
+/// DEFERRED(canStillJump): BB2016 JumpMechanic.canStillJump() not yet ported.
+/// DEFERRED(gazeModifiers): JumpModifierFactory not yet ported for BB2016.
+/// DEFERRED(divingTackle): checkDivingTackle dialog not yet ported.
 pub struct StepJump {
     /// Java: StepState.goToLabelOnFailure
     pub goto_label_on_failure: String,
@@ -142,9 +142,10 @@ impl StepJump {
 
     fn handle_failure(&mut self, game: &mut Game) -> StepOutcome {
         game.acting_player.jumping = false;
-        // TODO(steadyFootingContext): publish STEADY_FOOTING_CONTEXT(InjuryTypeDropJump)
+        let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeDropJump".into());
         let label = self.goto_label_on_failure.clone();
         StepOutcome::goto(&label)
+            .publish(StepParameter::SteadyFootingContext(Box::new(ctx)))
     }
 }
 
@@ -285,5 +286,18 @@ mod tests {
     fn unrecognised_parameter_returns_false() {
         let mut step = StepJump::new("fail".into());
         assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
+    }
+
+    #[test]
+    fn failure_publishes_steady_footing_context_drop_jump() {
+        let mut game = make_game();
+        add_player_ag3(&mut game, "p1");
+        game.acting_player.jumping = true;
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        let mut step = StepJump::new("fail".into());
+        step.roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))));
     }
 }

@@ -4,6 +4,7 @@ use ffb_model::enums::ReRollSource;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
+use crate::drop_player_context::SteadyFootingContext;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::abstract_step_with_re_roll::ReRollState;
@@ -18,7 +19,7 @@ use ffb_mechanics::mechanics::minimum_roll_jump;
 /// Otherwise logic is identical to BB2025.
 ///
 /// TODO: DivingTackle dialog not yet ported.
-/// TODO: STEADY_FOOTING_CONTEXT(InjuryTypeDropJump) publish not yet ported.
+/// DEFERRED(divingTackle): checkDivingTackle/usingDivingTackle dialog not yet ported.
 pub struct StepJump {
     /// Java: goToLabelOnFailure
     pub goto_label_on_failure: String,
@@ -160,7 +161,9 @@ impl StepJump {
             }
             None
         };
-        let mut out = StepOutcome::goto(&label);
+        let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeDropJump".into());
+        let mut out = StepOutcome::goto(&label)
+            .publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
         if let Some(c) = coord_from {
             out = out.publish(StepParameter::CoordinateFrom(c));
         }
@@ -267,5 +270,16 @@ mod tests {
         let coord = FieldCoordinate::new(4, 4);
         assert!(step.set_parameter(&StepParameter::MoveStart(coord)));
         assert_eq!(step.move_start, Some(coord));
+    }
+
+    #[test]
+    fn failure_publishes_steady_footing_context_drop_jump() {
+        let mut game = make_game_with_leaper();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        let mut step = StepJump::new("fail".into());
+        step.roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))));
     }
 }
