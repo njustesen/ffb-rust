@@ -5,11 +5,10 @@
 /// Init parameters: GOTO_LABEL_ON_DODGE, GOTO_LABEL_ON_JUGGERNAUT, GOTO_LABEL_ON_PUSHBACK.
 /// Expects: DICE_INDEX, BLOCK_RESULT, BLOCK_ROLL, NR_OF_DICE, OLD_DEFENDER_STATE.
 ///
-/// Note: the `POW_PUSHBACK` (Dodge) skill interaction path using `getSkillWithProperty` /
-/// `getSkillCancelling` is not yet ported; it falls through to the simple branch (defender
-/// falls + pushback), which matches the behaviour when the defender has no Dodge skill.
+/// DEFERRED(reportSkillUse): ReportSkillUse for cancel-dodge / cancel-tackle not yet ported.
 use ffb_model::enums::{BlockResult, PlayerState, PS_FALLING};
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -78,18 +77,73 @@ impl StepBlockChoice {
                 StepOutcome::goto(&self.goto_label_on_juggernaut)
             }
             Some(BlockResult::PowPushback) => {
-                // TODO: Java checks getSkillWithProperty(ignoreDefenderStumblesResult) (Dodge)
-                // and getSkillCancelling (Tackle) — not yet ported. Stub: always treat as
-                // "no Dodge on defender" → defender falls + pushback.
-                if let Some(defender_id) = game.defender_id.clone() {
-                    if let Some(state) = game.field_model.player_state(&defender_id) {
-                        game.field_model.set_player_state(&defender_id, state.change_base(PS_FALLING));
+                // Java: check if defender has Dodge (ignoreDefenderStumblesResult).
+                // If so and attacker doesn't cancel it with Tackle (cancelsDodge), goto dodge label.
+                // If attacker has Tackle that's cancelled by defender's Right Stuff (ignoreTackleWhenBlocked)
+                // and RIGHT_STUFF_CANCELS_TACKLE option is set, also goto dodge label.
+                // Otherwise defender falls + pushback.
+                let defender_id = game.defender_id.clone();
+                let acting_player_id = game.acting_player.player_id.clone();
+
+                let defender_has_dodge = defender_id.as_deref()
+                    .and_then(|id| game.player(id))
+                    .map(|p| p.has_skill_property(NamedProperties::IGNORE_DEFENDER_STUMBLES_RESULT))
+                    .unwrap_or(false);
+
+                if defender_has_dodge {
+                    // Java: attackerCanCancelDodgeSkill = getSkillCancelling(attacker, dodgeSkill)
+                    // In Rust: check if attacker has a skill with "cancelsDodge" property (= Tackle)
+                    let attacker_has_tackle = acting_player_id.as_deref()
+                        .and_then(|id| game.player(id))
+                        .map(|p| p.has_skill_property("cancelsDodge"))
+                        .unwrap_or(false);
+                    let attacker_can_block_same_team = acting_player_id.as_deref()
+                        .and_then(|id| game.player(id))
+                        .map(|p| p.has_skill_property(NamedProperties::CAN_BLOCK_SAME_TEAM_PLAYER))
+                        .unwrap_or(false);
+                    let same_team = acting_player_id.as_deref().zip(defender_id.as_deref())
+                        .map(|(a, d)| game.player_team_id(a) == game.player_team_id(d))
+                        .unwrap_or(false);
+                    let tackle_applies = attacker_has_tackle
+                        && (!attacker_can_block_same_team || !same_team);
+
+                    if tackle_applies {
+                        // Java: check RIGHT_STUFF_CANCELS_TACKLE option + defender.ignoreTackleWhenBlocked
+                        let right_stuff_cancels_tackle = game.options.get("rightStuffCancelsTackle") == Some("true");
+                        let defender_has_right_stuff = defender_id.as_deref()
+                            .and_then(|id| game.player(id))
+                            .map(|p| p.has_skill_property(NamedProperties::IGNORE_TACKLE_WHEN_BLOCKED))
+                            .unwrap_or(false);
+                        if right_stuff_cancels_tackle && defender_has_right_stuff {
+                            // Right Stuff cancels Tackle → Dodge still works → goto dodge
+                            return StepOutcome::goto(&self.goto_label_on_dodge);
+                        }
+                        // Tackle cancels Dodge → defender falls + pushback
+                        if let Some(ref did) = defender_id {
+                            if let Some(state) = game.field_model.player_state(did) {
+                                game.field_model.set_player_state(did, state.change_base(PS_FALLING));
+                            }
+                        }
+                        let pushback = init_pushback(game);
+                        let mut outcome = StepOutcome::goto(&self.goto_label_on_pushback);
+                        outcome.published.extend(pushback);
+                        outcome
+                    } else {
+                        // No Tackle (or same-team block) → Dodge works → goto dodge
+                        StepOutcome::goto(&self.goto_label_on_dodge)
                     }
+                } else {
+                    // No Dodge → defender falls + pushback
+                    if let Some(ref did) = defender_id {
+                        if let Some(state) = game.field_model.player_state(did) {
+                            game.field_model.set_player_state(did, state.change_base(PS_FALLING));
+                        }
+                    }
+                    let pushback = init_pushback(game);
+                    let mut outcome = StepOutcome::goto(&self.goto_label_on_pushback);
+                    outcome.published.extend(pushback);
+                    outcome
                 }
-                let pushback = init_pushback(game);
-                let mut outcome = StepOutcome::goto(&self.goto_label_on_pushback);
-                outcome.published.extend(pushback);
-                outcome
             }
             Some(BlockResult::Pow) => {
                 if let Some(defender_id) = game.defender_id.clone() {
@@ -257,5 +311,107 @@ mod tests {
         assert_eq!(step.goto_label_on_dodge, "d");
         assert_eq!(step.goto_label_on_juggernaut, "j");
         assert_eq!(step.goto_label_on_pushback, "p");
+    }
+
+    fn add_away_player(game: &mut Game, id: &str, state_base: u32) {
+        game.team_away.players.push(Player {
+            id: id.into(), name: id.into(), nr: 2, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        game.field_model.set_player_coordinate(id, FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state(id, PlayerState::new(state_base));
+    }
+
+    #[test]
+    fn pow_pushback_defender_no_dodge_falls_and_goto_pushback() {
+        let mut step = StepBlockChoice::new();
+        step.set_parameter(&StepParameter::GotoLabelOnPushback("push".into()));
+        step.set_parameter(&StepParameter::GotoLabelOnDodge("dodge".into()));
+        step.set_parameter(&StepParameter::BlockResult(BlockResult::PowPushback));
+        let mut game = make_game();
+        add_player(&mut game, "att", PS_STANDING);
+        add_away_player(&mut game, "def", PS_STANDING);
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+        let mut rng = GameRng::new(0);
+        let outcome = step.start(&mut game, &mut rng);
+        assert_eq!(outcome.goto_label.as_deref(), Some("push"));
+        assert_eq!(game.field_model.player_state("def").unwrap().base(), PS_FALLING);
+    }
+
+    #[test]
+    fn pow_pushback_defender_has_dodge_and_no_attacker_tackle_goes_to_dodge_label() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::SkillId;
+        let mut step = StepBlockChoice::new();
+        step.set_parameter(&StepParameter::GotoLabelOnPushback("push".into()));
+        step.set_parameter(&StepParameter::GotoLabelOnDodge("dodge".into()));
+        step.set_parameter(&StepParameter::BlockResult(BlockResult::PowPushback));
+        let mut game = make_game();
+        // attacker: no Tackle
+        add_player(&mut game, "att", PS_STANDING);
+        // defender: has Dodge (ignoreDefenderStumblesResult)
+        game.team_away.players.push(Player {
+            id: "def".into(), name: "def".into(), nr: 2, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 4, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue::new(SkillId::Dodge)],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+        let mut rng = GameRng::new(0);
+        let outcome = step.start(&mut game, &mut rng);
+        assert_eq!(outcome.goto_label.as_deref(), Some("dodge"));
+        assert_eq!(game.field_model.player_state("def").unwrap().base(), PS_STANDING, "Dodge should prevent falling");
+    }
+
+    #[test]
+    fn pow_pushback_defender_has_dodge_attacker_has_tackle_goes_to_pushback() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::SkillId;
+        let mut step = StepBlockChoice::new();
+        step.set_parameter(&StepParameter::GotoLabelOnPushback("push".into()));
+        step.set_parameter(&StepParameter::GotoLabelOnDodge("dodge".into()));
+        step.set_parameter(&StepParameter::BlockResult(BlockResult::PowPushback));
+        let mut game = make_game();
+        // attacker: has Tackle
+        game.team_home.players.push(Player {
+            id: "att".into(), name: "att".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue::new(SkillId::Tackle)],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        // defender: has Dodge
+        game.team_away.players.push(Player {
+            id: "def".into(), name: "def".into(), nr: 2, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 4, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue::new(SkillId::Dodge)],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+        let mut rng = GameRng::new(0);
+        let outcome = step.start(&mut game, &mut rng);
+        assert_eq!(outcome.goto_label.as_deref(), Some("push"), "Tackle should cancel Dodge");
+        assert_eq!(game.field_model.player_state("def").unwrap().base(), PS_FALLING);
     }
 }
