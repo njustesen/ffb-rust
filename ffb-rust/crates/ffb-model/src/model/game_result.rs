@@ -21,6 +21,8 @@ pub struct PlayerResult {
     pub blocks: i32,
     /// Set during end-game player loss check when player defects on illegal concession.
     pub defecting: bool,
+    /// Java: PlayerResult.fRushing — rushing yards accumulated (ball-carrying moves).
+    pub rushing: i32,
 }
 
 /// Per-team final game result.

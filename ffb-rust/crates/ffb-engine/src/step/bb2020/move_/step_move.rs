@@ -13,8 +13,7 @@ use crate::step::framework::{StepId, StepParameter};
 /// increments currentMove (×2 for jumping), optionally moves the ball if carried,
 /// publishes PLAYER_ENTERING_SQUARE.
 ///
-/// TODO: TrackNumber / field_model.add(trackNumber) not yet ported.
-/// TODO: playerResult.setRushing not yet ported.
+/// DEFERRED(trackNumber): TrackNumber animation not ported — no Rust FieldModel.track_numbers field.
 pub struct StepMove {
     /// Java: fCoordinateFrom
     pub coordinate_from: Option<FieldCoordinate>,
@@ -76,14 +75,29 @@ impl StepMove {
         game.acting_player.current_move += jump_inc;
 
         let old_pos = game.field_model.player_coordinate(attacker_id);
-        if !game.field_model.ball_moving {
+        let ball_position_updated = if !game.field_model.ball_moving {
             if let (Some(old), Some(ball)) = (old_pos, game.field_model.ball_coordinate) {
                 if old == ball {
                     game.field_model.ball_coordinate = Some(to);
-                }
-            }
-        }
+                    true
+                } else { false }
+            } else { false }
+        } else { false };
         game.field_model.set_player_coordinate(attacker_id, to);
+
+        // Java: if (ballPositionUpdated) { playerResult.setRushing(rushing + deltaX) }
+        if ball_position_updated {
+            let from_x = self.coordinate_from.map(|c| c.x).unwrap_or(to.x);
+            let delta_x = if game.home_playing { to.x - from_x } else { from_x - to.x };
+            let is_home = game.team_home.player(attacker_id).is_some();
+            let pr = if is_home {
+                game.game_result.home.player_results.entry(attacker_id.clone()).or_default()
+            } else {
+                game.game_result.away.player_results.entry(attacker_id.clone()).or_default()
+            };
+            pr.rushing += delta_x;
+        }
+
         game.acting_player.goes_for_it = UtilPlayer::is_next_move_going_for_it(game);
 
         StepOutcome::next()

@@ -42,8 +42,9 @@ impl StepRemoveTargetSelectionState {
             } else {
                 // Java: markSkillsTrackedOutsideOfActivationAndRemoveEffects(game) — not yet ported
                 // Java: if (targetSelectionState.isCommitted()) actingPlayer.setHasTriggeredEffect(true)
-                // TODO: ActingPlayer.set_has_triggered_effect not yet ported
-                let _ = tss.is_committed();
+                if tss.is_committed() {
+                    game.acting_player.has_triggered_effect = true;
+                }
                 // Java: game.getFieldModel().setTargetSelectionState(null)
                 game.field_model.target_selection_state = None;
             }

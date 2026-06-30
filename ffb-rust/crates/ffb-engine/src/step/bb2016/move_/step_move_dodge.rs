@@ -27,11 +27,10 @@ use ffb_mechanics::modifiers::dodge_context::DodgeContext;
 /// Expects: COORDINATE_FROM, COORDINATE_TO, DODGE_ROLL, USING_BREAK_TACKLE,
 ///          USING_DIVING_TACKLE, RE_ROLL_USED published by preceding steps.
 ///
-/// TODO(isDodging): actingPlayer.isDodging() guard not yet ported — always proceeds.
-/// TODO(standFirmNoDropOption): STAND_FIRM_NO_DROP_ON_FAILED_DODGE game option not yet ported.
-/// TODO(usingBreakTackle): Break-Tackle dialog (canAddStrengthToDodge) not yet ported.
-/// TODO(divingTackle): Diving Tackle pre-roll dialog not yet ported.
-/// TODO(armBar): Arm-Bar choice dialog not yet ported.
+/// DEFERRED(standFirmNoDropOption): STAND_FIRM_NO_DROP_ON_FAILED_DODGE game option not yet ported.
+/// DEFERRED(usingBreakTackle): Break-Tackle dialog (canAddStrengthToDodge) not yet ported.
+/// DEFERRED(divingTackle): Diving Tackle pre-roll dialog not yet ported.
+/// DEFERRED(armBar): Arm-Bar choice dialog not yet ported.
 pub struct StepMoveDodge {
     /// Java: fGotoLabelOnFailure
     pub goto_label_on_failure: String,
@@ -105,8 +104,10 @@ impl Step for StepMoveDodge {
 
 impl StepMoveDodge {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // TODO(isDodging): if (!actingPlayer.isDodging()) return NEXT_STEP
-        // actingPlayer.isDodging() not yet ported — always proceed
+        // Java: if (!actingPlayer.isDodging()) { setNextAction(NEXT_STEP); return; }
+        if !game.acting_player.dodging {
+            return StepOutcome::next();
+        }
 
         let player_id = game.acting_player.player_id.clone();
 
@@ -222,6 +223,7 @@ mod tests {
         });
         game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 5));
         game.acting_player.player_id = Some(id.into());
+        game.acting_player.dodging = true;
     }
 
     #[test]
@@ -261,6 +263,7 @@ mod tests {
     #[test]
     fn success_publishes_re_roll_used_false() {
         let mut game = make_game();
+        game.acting_player.dodging = true;
         let mut step = StepMoveDodge::new("fail".into());
         step.dodge_roll = 3;
         let out = step.start(&mut game, &mut GameRng::new(0));
@@ -270,11 +273,23 @@ mod tests {
     #[test]
     fn success_publishes_using_break_tackle() {
         let mut game = make_game();
+        game.acting_player.dodging = true;
         let mut step = StepMoveDodge::new("fail".into());
         step.dodge_roll = 5;
         step.using_break_tackle = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::UsingBreakTackle(true))));
+    }
+
+    #[test]
+    fn not_dodging_returns_next_step_immediately() {
+        let mut game = make_game();
+        game.acting_player.dodging = false;
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 1; // would fail if guard weren't hit
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.published.is_empty());
     }
 
     #[test]

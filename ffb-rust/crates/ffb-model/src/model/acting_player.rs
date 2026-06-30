@@ -38,6 +38,11 @@ pub struct ActingPlayer {
     pub strength: i32,
     /// Java: fellFromRush — true when a Ball & Chain player fell while going for it.
     pub fell_from_rush: bool,
+    /// Java: hasTriggeredEffect — true once an out-of-activation effect (e.g. target-selection
+    /// commitment) has been triggered for this player's turn.
+    pub has_triggered_effect: bool,
+    /// Java: fDodging — true while the player is in the middle of a dodge roll.
+    pub dodging: bool,
 }
 
 impl ActingPlayer {

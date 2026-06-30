@@ -25,14 +25,10 @@ use crate::util::UtilServerPlayerMove;
 ///   (unless standingUp → NEXT_STEP)
 /// - else → prepareStandingUp, then NEXT_STEP if REMOVE_CONFUSION/STAND_UP/STAND_UP_BLITZ
 ///
-/// TODO(updatePersistence): gameCache.queueDbUpdate not yet ported.
-/// TODO(standingUp): actingPlayer.isStandingUp() paths not yet ported.
-/// TODO(removeConfusion): REMOVE_CONFUSION / STAND_UP_BLITZ paths not yet ported.
-/// TODO(timeoutEnforced): game.isTimeoutEnforced() not yet ported.
-/// TODO(foulUsed): isFoulUsed() check in CLIENT_FOUL not yet ported.
-/// TODO(passUsed): isPassUsed() check in CLIENT_PASS not yet ported.
-/// TODO(blitzUsed): isBlitzUsed() check in CLIENT_KICK_TEAM_MATE not yet ported.
-/// TODO(handOverUsed): isHandOverUsed() check in CLIENT_HAND_OVER not yet ported.
+/// DEFERRED(updatePersistence): gameCache.queueDbUpdate not yet ported.
+/// DEFERRED(standingUp): actingPlayer.isStandingUp() paths not yet ported.
+/// DEFERRED(removeConfusion): REMOVE_CONFUSION / STAND_UP_BLITZ paths not yet ported.
+/// DEFERRED(timeoutEnforced): game.isTimeoutEnforced() not yet ported.
 pub struct StepInitSelecting {
     /// Java: fGotoLabelOnEnd (init param)
     pub goto_label_on_end: String,
@@ -85,7 +81,9 @@ impl Step for StepInitSelecting {
                 return out.publish(StepParameter::MoveStack(path.clone()));
             }
             Action::Foul { target_id } => {
-                // TODO(foulUsed): check !game.getTurnData().isFoulUsed()
+                if game.turn_data().foul_used {
+                    return StepOutcome::cont();
+                }
                 change_player_action(game, &acting_pid, PlayerAction::Foul, false);
                 self.dispatch_player_action = Some(PlayerAction::Foul);
                 return self.execute_step(game, rng)
@@ -104,7 +102,12 @@ impl Step for StepInitSelecting {
                     .publish(StepParameter::GazeVictimId(Some(target_id.clone())));
             }
             Action::Pass { coord } => {
-                // TODO(passUsed): check !isPassUsed (unless THROW_BOMB / HAIL_MARY_BOMB)
+                // Java: passAllowed = !isPassUsed || (action == THROW_BOMB || HAIL_MARY_BOMB)
+                let is_bomb_action = matches!(player_action,
+                    Some(PlayerAction::ThrowBomb) | Some(PlayerAction::HailMaryBomb));
+                if game.turn_data().pass_used && !is_bomb_action {
+                    return StepOutcome::cont();
+                }
                 let target = *coord;
                 let dispatch_action = if player_action == Some(PlayerAction::HailMaryPass) {
                     PlayerAction::HailMaryPass
@@ -117,7 +120,9 @@ impl Step for StepInitSelecting {
                     .publish(StepParameter::TargetCoordinate(target));
             }
             Action::HandOff { receiver_id } => {
-                // TODO(handOverUsed): check !isHandOverUsed
+                if game.turn_data().hand_over_used {
+                    return StepOutcome::cont();
+                }
                 let coord_opt = game.field_model.player_coordinate(receiver_id);
                 change_player_action(game, &acting_pid, PlayerAction::HandOver, false);
                 self.dispatch_player_action = Some(PlayerAction::HandOver);
@@ -128,7 +133,9 @@ impl Step for StepInitSelecting {
                 return out;
             }
             Action::ThrowTeamMate { player_id: thrown_id, coord } => {
-                // TODO(passUsed): check !isPassUsed
+                if game.turn_data().pass_used {
+                    return StepOutcome::cont();
+                }
                 change_player_action(game, &acting_pid, PlayerAction::ThrowTeamMate, false);
                 self.dispatch_player_action = Some(PlayerAction::ThrowTeamMate);
                 return self.execute_step(game, rng)
@@ -136,7 +143,9 @@ impl Step for StepInitSelecting {
                     .publish(StepParameter::ThrownPlayerId(Some(thrown_id.clone())));
             }
             Action::KickTeamMate { player_id: kicked_id, coord: _ } => {
-                // TODO(blitzUsed): check !isBlitzUsed
+                if game.turn_data().blitz_used {
+                    return StepOutcome::cont();
+                }
                 change_player_action(game, &acting_pid, PlayerAction::KickTeamMate, false);
                 self.dispatch_player_action = Some(PlayerAction::KickTeamMate);
                 return self.execute_step(game, rng)
@@ -197,8 +206,8 @@ impl StepInitSelecting {
         let player_action = game.acting_player.player_action;
 
         if let Some(action) = player_action {
-            // TODO(blitzBlock): updateDiceDecorations for BLITZ/BLITZ_MOVE/BLOCK/MULTIPLE_BLOCK
-            if matches!(action, PlayerAction::Blitz | PlayerAction::BlitzMove | PlayerAction::Block) {
+            // Java: if (BLITZ || BLITZ_MOVE || BLOCK || MULTIPLE_BLOCK) → updateDiceDecorations
+            if matches!(action, PlayerAction::Blitz | PlayerAction::BlitzMove | PlayerAction::Block | PlayerAction::MultipleBlock) {
                 ServerUtilBlock::update_dice_decorations(game);
             }
 
@@ -274,6 +283,76 @@ mod tests {
     fn unrecognised_parameter_returns_false() {
         let mut step = StepInitSelecting::new("end".into());
         assert!(!step.set_parameter(&StepParameter::DodgeRoll(3)));
+    }
+
+    #[test]
+    fn foul_command_blocked_when_foul_used() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::FoulMove);
+        game.turn_data_home.foul_used = true;
+        let mut step = StepInitSelecting::new("end".into());
+        let out = step.handle_command(
+            &Action::Foul { target_id: "def".into() },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_eq!(out.action, StepAction::Continue, "foul should be blocked when foul_used=true");
+    }
+
+    #[test]
+    fn foul_command_allowed_when_foul_not_used() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::FoulMove);
+        game.turn_data_home.foul_used = false;
+        let mut step = StepInitSelecting::new("end".into());
+        let out = step.handle_command(
+            &Action::Foul { target_id: "def".into() },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_ne!(out.action, StepAction::Continue, "foul should be allowed when foul_used=false");
+    }
+
+    #[test]
+    fn kick_team_mate_blocked_when_blitz_used() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::KickTeamMate);
+        game.turn_data_home.blitz_used = true;
+        let mut step = StepInitSelecting::new("end".into());
+        let out = step.handle_command(
+            &Action::KickTeamMate { player_id: "victim".into(), coord: ffb_model::types::FieldCoordinate::new(5, 5) },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_eq!(out.action, StepAction::Continue, "kick_team_mate should be blocked when blitz_used=true");
+    }
+
+    #[test]
+    fn pass_command_blocked_when_pass_used() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Pass);
+        game.turn_data_home.pass_used = true;
+        let mut step = StepInitSelecting::new("end".into());
+        let out = step.handle_command(
+            &Action::Pass { coord: ffb_model::types::FieldCoordinate::new(7, 5) },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_eq!(out.action, StepAction::Continue, "pass should be blocked when pass_used=true");
+    }
+
+    #[test]
+    fn hand_over_blocked_when_hand_over_used() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::HandOver);
+        game.turn_data_home.hand_over_used = true;
+        let mut step = StepInitSelecting::new("end".into());
+        let out = step.handle_command(
+            &Action::HandOff { receiver_id: "recv".into() },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_eq!(out.action, StepAction::Continue, "hand_off should be blocked when hand_over_used=true");
     }
 
     #[test]

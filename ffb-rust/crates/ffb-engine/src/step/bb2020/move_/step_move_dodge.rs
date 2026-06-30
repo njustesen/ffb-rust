@@ -16,10 +16,9 @@ use ffb_mechanics::modifiers::dodge_context::DodgeContext;
 ///
 /// BB2020 differs from BB2025 only in that DodgeModifierFactory uses BB2020 rules.
 ///
-/// TODO: actingPlayer.isDodging() guard not yet ported.
-/// TODO: Break-Tackle / modifyingSkill dialog not yet ported.
-/// TODO: Arm-Bar not yet ported.
-/// TODO: STEADY_FOOTING_CONTEXT publish on failDodge not yet ported.
+/// DEFERRED(break-tackle): modifyingSkill dialog (Break Tackle / Diving Tackle) not yet ported.
+/// DEFERRED(arm-bar): Arm-Bar multi-target path not yet ported.
+/// DEFERRED(steady-footing): STEADY_FOOTING_CONTEXT publish on failDodge not yet ported.
 pub struct StepMoveDodge {
     /// Java: fGotoLabelOnFailure
     pub goto_label_on_failure: String,
@@ -108,6 +107,11 @@ impl Step for StepMoveDodge {
 
 impl StepMoveDodge {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: if (!actingPlayer.isDodging()) { setNextAction(NEXT_STEP); return; }
+        if !game.acting_player.dodging {
+            return StepOutcome::next();
+        }
+
         let player_id = game.acting_player.player_id.clone();
 
         let already_rerolled = self.re_roll_state.re_rolled_action
@@ -234,11 +238,24 @@ mod tests {
         game.home_playing = true;
         game.turn_data_home.rerolls = 0;
         add_player(&mut game, "p1");
+        game.acting_player.dodging = true;
         let mut step = StepMoveDodge::new("fail".into());
         step.dodge_roll = 1;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("fail"));
+    }
+
+    #[test]
+    fn not_dodging_returns_next_step() {
+        let mut game = make_game();
+        game.home_playing = true;
+        add_player(&mut game, "p1");
+        game.acting_player.dodging = false; // guard fires
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 1; // would fail if guard weren't hit
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
     }
 
     #[test]
@@ -248,6 +265,7 @@ mod tests {
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player(&mut game, "p1");
+        game.acting_player.dodging = true;
         let mut step = StepMoveDodge::new("fail".into());
         step.dodge_roll = 1;
         let out = step.start(&mut game, &mut GameRng::new(0));
@@ -262,6 +280,7 @@ mod tests {
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player(&mut game, "p1");
+        game.acting_player.dodging = true;
         let mut step = StepMoveDodge::new("fail".into());
         step.dodge_roll = 1;
         let _offer = step.start(&mut game, &mut GameRng::new(0));

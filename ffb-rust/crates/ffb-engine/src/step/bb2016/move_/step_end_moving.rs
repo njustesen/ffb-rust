@@ -29,7 +29,7 @@ use crate::step::generator::bb2016::kick_team_mate::KickTeamMateParams;
 /// thrown_player_id, move_start fields; GAZE (not GazeMove) → Move; KICK_TEAM_MATE → KickTeamMate
 /// generator (not ThrowTeamMate); no Punt branch.
 ///
-/// TODO(canHandOver): UtilPlayer::can_hand_over not yet ported.
+/// DEFERRED(ktm): canKickTeamMate / canThrowTeamMate checks not yet ported.
 /// TODO(canKickTeamMate): UtilPlayer::can_kick_team_mate not yet ported.
 /// TODO(canThrowTeamMate): UtilPlayer::can_throw_team_mate not yet ported.
 /// TODO(canGaze): UtilPlayer::can_gaze not yet ported (MOVE && canGaze branch).
@@ -180,12 +180,12 @@ impl StepEndMoving {
         //       || (THROW_TEAM_MATE_MOVE && canThrowTeamMate(false))
         let pid = player_id.as_deref().unwrap_or("");
         let can_make_next_move = UtilPlayer::is_next_move_possible(game, false)
-            // TODO(canHandOver): (HAND_OVER_MOVE && canHandOver) not yet ported
+            || (player_action == Some(PlayerAction::HandOverMove) && UtilPlayer::can_hand_over(game, pid))
             || (player_action == Some(PlayerAction::PassMove) && has_ball)
             || (player_action == Some(PlayerAction::FoulMove) && UtilPlayer::can_foul(game, pid))
-            // TODO(canGaze): (MOVE && canGaze) not yet ported
-            // TODO(canKickTeamMate): (KICK_TEAM_MATE_MOVE && canKickTeamMate) not yet ported
-            // TODO(canThrowTeamMate): (THROW_TEAM_MATE_MOVE && canThrowTeamMate) not yet ported
+            // DEFERRED(canGaze): (MOVE && canGaze) not yet ported
+            // DEFERRED(ktm): KickTeamMateMove && canKickTeamMate not yet ported
+            // DEFERRED(ktm): ThrowTeamMateMove && canThrowTeamMate not yet ported
             ;
 
         if can_make_next_move {
@@ -245,8 +245,11 @@ mod tests {
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::{StepAction, StepParameter};
-    use ffb_model::enums::Rules;
+    use ffb_model::enums::{Rules, PS_STANDING, PlayerState};
+    use ffb_model::model::player::Player;
+    use ffb_model::enums::{PlayerType, PlayerGender};
     use ffb_model::util::rng::GameRng;
+    use std::collections::HashSet;
 
     fn make_game() -> Game {
         let home = test_team("home", 0);
@@ -358,5 +361,45 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!out.pushes.is_empty(), "FOUL should push Foul sequence");
+    }
+
+    fn add_player_at(game: &mut Game, team_is_home: bool, id: &str, coord: FieldCoordinate) {
+        let p = Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 4, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        };
+        if team_is_home { game.team_home.players.push(p) } else { game.team_away.players.push(p) }
+        game.field_model.set_player_coordinate(id, coord);
+        game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+    }
+
+    #[test]
+    fn hand_over_move_with_can_hand_over_pushes_move_sequence() {
+        let mut game = make_game();
+        add_player_at(&mut game, true, "p1", FieldCoordinate::new(5, 5));
+        add_player_at(&mut game, true, "p2", FieldCoordinate::new(5, 6));
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(5, 5));
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::HandOverMove);
+        let mut step = StepEndMoving::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "HandOverMove with can_hand_over=true should push Move");
+    }
+
+    #[test]
+    fn hand_over_move_without_can_hand_over_falls_through_to_end_player_action() {
+        let mut game = make_game();
+        add_player_at(&mut game, true, "p1", FieldCoordinate::new(5, 5));
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::HandOverMove);
+        let mut step = StepEndMoving::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "should push EndPlayerAction as fallback");
     }
 }

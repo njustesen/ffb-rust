@@ -402,6 +402,9 @@ impl StepOutcome {
     pub fn goto(label: &str) -> Self {
         StepOutcome { action: StepAction::GotoLabel, goto_label: Some(label.to_owned()), published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None }
     }
+    pub fn repeat() -> Self {
+        StepOutcome { action: StepAction::Repeat, goto_label: None, published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None }
+    }
     pub fn publish(mut self, p: StepParameter) -> Self {
         self.published.push(p);
         self

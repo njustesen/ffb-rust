@@ -396,6 +396,26 @@ impl UtilPlayer {
         Self::has_adjacent_gaze_target(game, player_id)
     }
 
+    /// Java: UtilPlayer.canHandOver(Game, Player) — BB2020+.
+    ///
+    /// Returns true if the thrower is carrying the ball, the ball is not moving,
+    /// and at least one team-mate with tackle zones is adjacent.
+    pub fn can_hand_over(game: &Game, player_id: &str) -> bool {
+        let coord = match game.field_model.player_coordinate(player_id) {
+            Some(c) => c,
+            None => return false,
+        };
+        // Thrower must be on the ball.
+        if game.field_model.ball_coordinate != Some(coord) || game.field_model.ball_moving {
+            return false;
+        }
+        // Java: !pGame.getTurnData().isHandOverUsed() — deferred; no turnData field.
+        // At least one same-team adjacent player with tackle zones.
+        let is_home = game.team_home.has_player(player_id);
+        let team = if is_home { &game.team_home } else { &game.team_away };
+        !Self::find_adjacent_players_with_tacklezones(game, team, coord, false).is_empty()
+    }
+
     /// Returns all coordinates within `distance` from `coord` that are on the pitch
     /// (Chebyshev distance — matches Java FieldModel.findAdjacentCoordinates).
     fn find_adjacent_coordinates(
