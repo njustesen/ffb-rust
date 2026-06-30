@@ -115,12 +115,16 @@ impl PlayerState {
     pub fn is_hypnotized(self) -> bool { self.has_bit(BIT_HYPNOTIZED) }
     pub fn change_hypnotized(self, v: bool) -> PlayerState { self.change_bit(BIT_HYPNOTIZED, v) }
 
+    /// 1:1 translation of PlayerState.recoverTacklezones().
+    /// Clears hypnotized and confused flags only.
     pub fn recover_tacklezones(self) -> PlayerState {
-        self.change_hypnotized(false).change_confused(false).change_eye_gouged(false)
+        self.change_hypnotized(false).change_confused(false)
     }
 
     pub fn is_eye_gouged(self) -> bool { self.has_bit(BIT_EYE_GOUGED) }
     pub fn change_eye_gouged(self, v: bool) -> PlayerState { self.change_bit(BIT_EYE_GOUGED, v) }
+    /// 1:1 translation of PlayerState.clearEyeGouge().
+    pub fn clear_eye_gouge(self) -> PlayerState { self.change_eye_gouged(false) }
 
     pub fn is_chomped(self) -> bool { self.has_bit(BIT_CHOMPED) }
     pub fn change_chomped(self, v: bool) -> PlayerState { self.change_bit(BIT_CHOMPED, v) }
@@ -372,6 +376,38 @@ impl PlayerAction {
         }
     }
 
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::all().iter().copied().find(|v| v.name().eq_ignore_ascii_case(name))
+    }
+
+    pub fn all() -> &'static [PlayerAction] {
+        &[
+            PlayerAction::Move, PlayerAction::Block, PlayerAction::Blitz,
+            PlayerAction::BlitzMove, PlayerAction::BlitzSelect, PlayerAction::HandOver,
+            PlayerAction::HandOverMove, PlayerAction::Pass, PlayerAction::PassMove,
+            PlayerAction::Foul, PlayerAction::FoulMove, PlayerAction::StandUp,
+            PlayerAction::ThrowTeamMate, PlayerAction::ThrowTeamMateMove,
+            PlayerAction::RemoveConfusion, PlayerAction::Gaze, PlayerAction::GazeSelect,
+            PlayerAction::GazeMove, PlayerAction::MultipleBlock, PlayerAction::HailMaryPass,
+            PlayerAction::DumpOff, PlayerAction::StandUpBlitz, PlayerAction::ThrowBomb,
+            PlayerAction::HailMaryBomb, PlayerAction::Swoop, PlayerAction::KickTeamMateMove,
+            PlayerAction::KickTeamMate, PlayerAction::Treacherous,
+            PlayerAction::WisdomOfTheWhiteDwarf, PlayerAction::ThrowKeg,
+            PlayerAction::RaidingParty, PlayerAction::MaximumCarnage,
+            PlayerAction::LookIntoMyEyes, PlayerAction::BalefulHex,
+            PlayerAction::AllYouCanEat, PlayerAction::PutridRegurgitationMove,
+            PlayerAction::PutridRegurgitationBlitz, PlayerAction::PutridRegurgitationBlock,
+            PlayerAction::KickEmBlock, PlayerAction::KickEmBlitz, PlayerAction::BlackInk,
+            PlayerAction::CatchOfTheDay, PlayerAction::ThenIStartedBlastin,
+            PlayerAction::TheFlashingBlade, PlayerAction::ViciousVines,
+            PlayerAction::FuriousOutburst, PlayerAction::SecureTheBall,
+            PlayerAction::BreatheFire, PlayerAction::Chainsaw, PlayerAction::Stab,
+            PlayerAction::ProjectileVomit, PlayerAction::AutoGazeZoat, PlayerAction::Forgo,
+            PlayerAction::Incorporeal, PlayerAction::Chomp, PlayerAction::Punt,
+            PlayerAction::PuntMove,
+        ]
+    }
+
     pub fn is_moving(self) -> bool {
         matches!(
             self,
@@ -485,8 +521,9 @@ impl PlayerAction {
 // ─── PlayerType ───────────────────────────────────────────────────────────────
 
 /// Classification of the player within a team.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum PlayerType {
+    #[default]
     Regular,
     BigGuy,
     Star,
@@ -531,8 +568,9 @@ impl PlayerType {
 
 // ─── PlayerGender ─────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum PlayerGender {
+    #[default]
     Male,
     Female,
     Nonbinary,
@@ -547,6 +585,11 @@ impl PlayerGender {
             PlayerGender::Nonbinary => "nonbinary",
             PlayerGender::Neutral => "neutral",
         }
+    }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        [PlayerGender::Male, PlayerGender::Female, PlayerGender::Nonbinary, PlayerGender::Neutral]
+            .iter().copied().find(|v| v.name().eq_ignore_ascii_case(name))
     }
 
     pub fn nominative(self) -> &'static str {

@@ -42,6 +42,10 @@ pub enum ModelChangeDataType {
 }
 
 impl ModelChangeDataType {
+    pub fn for_name(name: &str) -> Option<Self> {
+        serde_json::from_str(&format!("\"{}\"", name)).ok()
+    }
+
     pub fn name(self) -> &'static str {
         match self {
             ModelChangeDataType::Null => "null",
@@ -263,6 +267,17 @@ pub enum ModelChangeId {
 }
 
 impl ModelChangeId {
+    pub fn get_name(self) -> String {
+        serde_json::to_string(&self)
+            .unwrap_or_default()
+            .trim_matches('"')
+            .to_owned()
+    }
+
+    pub fn for_name(name: &str) -> Option<Self> {
+        serde_json::from_str(&format!("\"{}\"", name)).ok()
+    }
+
     pub fn data_type(self) -> ModelChangeDataType {
         match self {
             ModelChangeId::ActingPlayerMarkSkillUsed

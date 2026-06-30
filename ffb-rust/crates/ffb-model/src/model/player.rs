@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use crate::enums::{PlayerType, PlayerGender, SeriousInjuryKind};
+use crate::model::property::named_properties::NamedProperties;
 use crate::model::skill_def::{SkillId, SkillWithValue};
 use crate::model::roster_position::RosterPosition;
 
@@ -8,7 +9,7 @@ use crate::model::roster_position::RosterPosition;
 pub type PlayerId = String;
 
 /// A concrete player instance on a team.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Player {
     pub id: PlayerId,
     pub name: String,
@@ -78,6 +79,31 @@ impl Player {
     pub fn has_skill(&self, id: SkillId) -> bool {
         self.all_skill_ids().any(|s| s == id)
     }
+
+    /// 1:1 translation of hasSkillProperty — checks if any of the player's skills has the given property.
+    pub fn has_skill_property(&self, property: &str) -> bool {
+        self.all_skill_ids().any(|id| id.properties().contains(&property))
+    }
+
+    /// 1:1 translation of getSkillIntValue — returns the integer value for a skill with a numeric property.
+    /// TODO: requires full Skill property lookup to be implemented.
+    pub fn get_skill_int_value(&self, _property: &str) -> i32 {
+        0
+    }
+
+    /// 1:1 translation of canBeThrown — true if player has canBeThrown property, or canBeThrownIfStrengthIs3orLess and ST<=3.
+    pub fn can_be_thrown(&self) -> bool {
+        self.has_skill_property(NamedProperties::CAN_BE_THROWN)
+            || (self.has_skill_property(NamedProperties::CAN_BE_THROWN_IF_STRENGTH_IS_3_OR_LESS) && self.strength_with_modifiers() <= 3)
+    }
+
+    /// 1:1 translation of isJourneyman — true if the player has journeyman status (borrowed for the drive).
+    /// TODO: requires PlayerStatus field to be translated.
+    pub fn is_journeyman(&self) -> bool { false }
+
+    /// 1:1 translation of ZappedPlayer check — true if this player was "zapped" by an opponent card.
+    /// TODO: requires ZappedPlayer subclass equivalent (player_status or separate enum).
+    pub fn is_zapped(&self) -> bool { false }
 
     /// Construct a new player instance from a roster position template.
     pub fn from_position(id: impl Into<String>, name: impl Into<String>, nr: i32, pos: &RosterPosition) -> Self {
@@ -264,5 +290,28 @@ mod tests {
         assert_eq!(p.movement, 7);
         assert!(p.has_skill(SkillId::Block));
         assert!(!p.has_skill(SkillId::Tackle));
+    }
+
+    #[test]
+    fn has_skill_property_returns_true_for_matching_skill() {
+        use crate::model::skill_def::SkillWithValue;
+        let mut p = test_player();
+        p.starting_skills.push(SkillWithValue { skill_id: SkillId::Block, value: None });
+        assert!(p.has_skill_property("preventFallOnBothDown"));
+        assert!(!p.has_skill_property("canLeap"));
+    }
+
+    #[test]
+    fn has_skill_property_false_when_no_skills() {
+        let p = test_player();
+        assert!(!p.has_skill_property("preventFallOnBothDown"));
+    }
+
+    #[test]
+    fn has_skill_property_checks_all_skill_lists() {
+        use crate::model::skill_def::SkillWithValue;
+        let mut p = test_player();
+        p.extra_skills.push(SkillWithValue { skill_id: SkillId::Leap, value: None });
+        assert!(p.has_skill_property("canLeap"));
     }
 }

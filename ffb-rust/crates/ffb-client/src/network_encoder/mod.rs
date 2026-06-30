@@ -213,6 +213,28 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
         Action::TricksterMove { coord } => {
             Some(ClientCommand::ClientMove(ClientMove { move_squares: vec![coord] }))
         }
+
+        // Block-specific re-roll actions: not yet encoded in the Java protocol.
+        // Java uses dedicated command types (ClientCommandUseBrawler, etc.) but these
+        // are not yet added to ffb-protocol. The engine handles these internally.
+        Action::UseBrawler => None,
+        Action::UseHatred => None,
+        Action::UseProReRollForBlock { .. } => None,
+        Action::UseConsummateReRollForBlock { .. } => None,
+        Action::UseSingleBlockDieReRoll { .. } => None,
+        Action::UseMultiBlockDiceReRoll { .. } => None,
+
+        // Mixed-edition multi-block / player-choice actions
+        Action::UseReRollForTarget { .. } => None,
+        Action::LordOfChaosChoice { player_id } => {
+            player_id.map(|id| ClientCommand::ClientPlayerChoice(ClientPlayerChoice { player_id: id }))
+        }
+        Action::IndomitableChoice { player_id } => {
+            Some(ClientCommand::ClientPlayerChoice(ClientPlayerChoice { player_id }))
+        }
+        Action::PlayerChoice { player_id, .. } => {
+            player_id.map(|id| ClientCommand::ClientPlayerChoice(ClientPlayerChoice { player_id: id }))
+        }
     }
 }
 

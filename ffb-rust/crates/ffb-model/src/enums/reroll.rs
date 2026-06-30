@@ -29,6 +29,15 @@ impl ReRollProperty {
         }
     }
 
+    pub fn from_name(name: &str) -> Option<Self> {
+        [
+            ReRollProperty::Trr, ReRollProperty::BrilliantCoaching, ReRollProperty::Mascot,
+            ReRollProperty::Pro, ReRollProperty::Loner, ReRollProperty::PumpUpTheCrowd,
+            ReRollProperty::ShowStar,
+        ]
+        .iter().copied().find(|v| v.name().eq_ignore_ascii_case(name))
+    }
+
     /// Whether this source consumes a physical re-roll token.
     pub fn is_actual_reroll(self) -> bool {
         matches!(self, ReRollProperty::Trr | ReRollProperty::Mascot | ReRollProperty::Pro)

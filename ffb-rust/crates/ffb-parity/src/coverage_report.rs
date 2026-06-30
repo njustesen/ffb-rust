@@ -370,6 +370,8 @@ impl CoverageReport {
             | GameEvent::PrayerRoll { .. }
             | GameEvent::SpellEffectRoll { .. }
             | GameEvent::MasterChefRoll { .. }
+            | GameEvent::RefereeSpotsFoul { .. }
+            | GameEvent::BiasedRefRoll { .. }
             => {}
         }
     }

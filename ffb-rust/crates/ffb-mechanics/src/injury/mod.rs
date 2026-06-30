@@ -201,7 +201,7 @@ mod tests {
         let result = casualty_result(Rules::Bb2016, 4).unwrap();
         assert_eq!(result, SeriousInjuryKind::GougedEye);
         use ffb_model::enums::InjuryAttribute;
-        assert_eq!(result.injury_attribute(), Some(InjuryAttribute::Ag));
+        assert_eq!(result.injury_attribute(), Some(InjuryAttribute::AG));
     }
 
     #[test]

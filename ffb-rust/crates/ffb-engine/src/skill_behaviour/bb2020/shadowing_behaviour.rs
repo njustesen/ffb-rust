@@ -1,0 +1,45 @@
+use crate::skill_behaviour::SkillBehaviour;
+
+/// BB2020 Shadowing skill behaviour. StepModifier on StepShadowing: if opposing player has
+/// Shadowing, shows use dialog, rolls agility contest (AG vs AG), handles reroll, if success marks
+/// hasBlocked=true. Mirrors Java
+/// `com.fumbbl.ffb.server.skillbehaviour.bb2020.ShadowingBehaviour`.
+pub struct ShadowingBehaviour;
+
+impl ShadowingBehaviour {
+    pub fn new() -> Self { Self }
+}
+
+impl Default for ShadowingBehaviour {
+    fn default() -> Self { Self::new() }
+}
+
+impl SkillBehaviour for ShadowingBehaviour {
+    fn name(&self) -> &'static str { "ShadowingBehaviour" }
+
+    /// Java `StepModifier<StepShadowing, StepState>.handleExecuteStepHook`: checks if defender
+    /// has Shadowing, shows dialog, rolls AG vs AG, handles reroll. Returns false always.
+    /// TODO(hook-infra): needs state.goToLabelOnFailure, state.usingAction.
+    fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
+        // TODO(hook-infra): step-specific state access (StepState.xxx)
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hook_is_noop_returns_false() {
+        // Without step infra the hook always returns false.
+        let b = ShadowingBehaviour::new();
+        assert_eq!(b.name(), "ShadowingBehaviour");
+    }
+
+    #[test]
+    fn name_is_correct() {
+        let b = ShadowingBehaviour::default();
+        assert_eq!(b.name(), "ShadowingBehaviour");
+    }
+}

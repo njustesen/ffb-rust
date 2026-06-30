@@ -166,6 +166,22 @@ impl SendToBoxReason {
             SendToBoxReason::Sabotaged => "was taken out by a sabotaged weapon",
         }
     }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::all().iter().copied().find(|v| v.name().eq_ignore_ascii_case(name))
+    }
+
+    fn all() -> &'static [Self] {
+        use SendToBoxReason::*;
+        &[
+            Mng, FoulBan, SecretWeaponBan, Fouled, Blocked, CrowdPushed, CrowdKicked,
+            DodgeFail, GfiFail, Kicked, JumpFail, Stabbed, HitByRock, Eaten,
+            HitByThrownPlayer, LandingFail, PiledOn, Chainsaw, Bitten, NurglesRot,
+            Raised, Lightning, Fireball, KoOnPilingOn, Bomb, BallAndChain, PlagueRidden,
+            ProjectileVomit, TrapDoorFall, OficiousRef, ThrownKeg, ThrewTwoBombs,
+            BreatheFire, ThenIStartedBlastin, QuickBite, Saboteur, Sabotaged,
+        ]
+    }
 }
 
 /// Administrative status of a team on FUMBBL.
@@ -203,6 +219,21 @@ impl TeamStatus {
             TeamStatus::WaitingForOpponent => "Waiting for Opponent",
             TeamStatus::SkillRollsPending => "Skill Rolls Pending",
         }
+    }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        [
+            TeamStatus::New,
+            TeamStatus::Active,
+            TeamStatus::PendingApproval,
+            TeamStatus::Blocked,
+            TeamStatus::Retired,
+            TeamStatus::WaitingForOpponent,
+            TeamStatus::SkillRollsPending,
+        ]
+        .iter()
+        .copied()
+        .find(|v| v.name().eq_ignore_ascii_case(name))
     }
 }
 

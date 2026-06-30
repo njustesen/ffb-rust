@@ -52,6 +52,12 @@ impl GameRng {
         self.d6() + self.d6()
     }
 
+    /// Roll weather: returns [die1, die2] so the client report can show both dice.
+    /// 1:1 translation of Java getDiceRoller().rollWeather().
+    pub fn roll_weather(&mut self) -> [i32; 2] {
+        [self.d6(), self.d6()]
+    }
+
     /// Roll a d8 (1–8).
     pub fn d8(&mut self) -> i32 {
         self.die(8)

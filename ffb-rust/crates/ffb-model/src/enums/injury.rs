@@ -1,52 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-/// Which player attribute is reduced by a serious injury.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum InjuryAttribute {
-    Ma,
-    St,
-    Ag,
-    Av,
-    Ni,
-    Pa,
-}
-
-impl InjuryAttribute {
-    pub fn id(self) -> u8 {
-        match self {
-            InjuryAttribute::Ma => 1,
-            InjuryAttribute::St => 2,
-            InjuryAttribute::Ag => 3,
-            InjuryAttribute::Av => 4,
-            InjuryAttribute::Ni => 5,
-            InjuryAttribute::Pa => 6,
-        }
-    }
-
-    pub fn name(self) -> &'static str {
-        match self {
-            InjuryAttribute::Ma => "MA",
-            InjuryAttribute::St => "ST",
-            InjuryAttribute::Ag => "AG",
-            InjuryAttribute::Av => "AV",
-            InjuryAttribute::Ni => "NI",
-            InjuryAttribute::Pa => "PA",
-        }
-    }
-
-    pub fn from_name(name: &str) -> Option<InjuryAttribute> {
-        let clean = name.trim_start_matches(['+', '-']);
-        match clean.to_uppercase().as_str() {
-            "MA" => Some(InjuryAttribute::Ma),
-            "ST" => Some(InjuryAttribute::St),
-            "AG" => Some(InjuryAttribute::Ag),
-            "AV" => Some(InjuryAttribute::Av),
-            "NI" => Some(InjuryAttribute::Ni),
-            "PA" => Some(InjuryAttribute::Pa),
-            _ => None,
-        }
-    }
-}
+pub use crate::model::injury_attribute::InjuryAttribute;
 
 /// Serious injury outcomes — shared across BB2016/BB2020/BB2025.
 /// BB2016 adds a different set vs BB2020; encoded here as a single enum.
@@ -89,26 +43,26 @@ impl SeriousInjuryKind {
 
     pub fn injury_attribute(self) -> Option<InjuryAttribute> {
         match self {
-            SeriousInjuryKind::HeadInjuryAv => Some(InjuryAttribute::Av),
+            SeriousInjuryKind::HeadInjuryAv => Some(InjuryAttribute::AV),
             SeriousInjuryKind::SmashedKneeMa | SeriousInjuryKind::SmashedKneeB2016 => {
-                Some(InjuryAttribute::Ma)
+                Some(InjuryAttribute::MA)
             }
-            SeriousInjuryKind::BrokenArmPa => Some(InjuryAttribute::Pa),
+            SeriousInjuryKind::BrokenArmPa => Some(InjuryAttribute::PA),
             SeriousInjuryKind::NeckInjuryAg
             | SeriousInjuryKind::DislocatedHipAg
-            | SeriousInjuryKind::BrokenNeck => Some(InjuryAttribute::Ag),
-            SeriousInjuryKind::DislocatedShoulderSt => Some(InjuryAttribute::St),
-            SeriousInjuryKind::SeriousInjuryNi => Some(InjuryAttribute::Ni),
-            SeriousInjuryKind::GougedEye => Some(InjuryAttribute::Ag),
+            | SeriousInjuryKind::BrokenNeck => Some(InjuryAttribute::AG),
+            SeriousInjuryKind::DislocatedShoulderSt => Some(InjuryAttribute::ST),
+            SeriousInjuryKind::SeriousInjuryNi => Some(InjuryAttribute::NI),
+            SeriousInjuryKind::GougedEye => Some(InjuryAttribute::AG),
             SeriousInjuryKind::BrokenCollarBone
             | SeriousInjuryKind::SmashedElbow
             | SeriousInjuryKind::ShatteredWrist
-            | SeriousInjuryKind::BrokenShoulder => Some(InjuryAttribute::St),
+            | SeriousInjuryKind::BrokenShoulder => Some(InjuryAttribute::ST),
             SeriousInjuryKind::SmashedHip       // BB2016: -MA (Java: SMASHED_HIP → InjuryAttribute.MA)
             | SeriousInjuryKind::SmashedAnkle
             | SeriousInjuryKind::ThighStrain
-            | SeriousInjuryKind::ThumbSprain => Some(InjuryAttribute::Ma),
-            SeriousInjuryKind::PinchedNerve => Some(InjuryAttribute::Av),
+            | SeriousInjuryKind::ThumbSprain => Some(InjuryAttribute::MA),
+            SeriousInjuryKind::PinchedNerve => Some(InjuryAttribute::AV),
             _ => None,
         }
     }
@@ -121,22 +75,22 @@ mod tests {
     #[test]
     fn injury_attribute_round_trip() {
         let attrs = [
-            InjuryAttribute::Ma,
-            InjuryAttribute::St,
-            InjuryAttribute::Ag,
-            InjuryAttribute::Av,
-            InjuryAttribute::Ni,
-            InjuryAttribute::Pa,
+            InjuryAttribute::MA,
+            InjuryAttribute::ST,
+            InjuryAttribute::AG,
+            InjuryAttribute::AV,
+            InjuryAttribute::NI,
+            InjuryAttribute::PA,
         ];
         for a in &attrs {
-            assert_eq!(InjuryAttribute::from_name(a.name()), Some(*a));
+            assert_eq!(InjuryAttribute::for_name(a.get_name()), Some(*a));
         }
     }
 
     #[test]
     fn injury_attribute_strips_sign() {
-        assert_eq!(InjuryAttribute::from_name("-MA"), Some(InjuryAttribute::Ma));
-        assert_eq!(InjuryAttribute::from_name("+AV"), Some(InjuryAttribute::Av));
+        assert_eq!(InjuryAttribute::for_name("-MA"), Some(InjuryAttribute::MA));
+        assert_eq!(InjuryAttribute::for_name("+AV"), Some(InjuryAttribute::AV));
     }
 
     #[test]
@@ -147,32 +101,32 @@ mod tests {
 
     #[test]
     fn bb2020_head_injury_reduces_av() {
-        assert_eq!(SeriousInjuryKind::HeadInjuryAv.injury_attribute(), Some(InjuryAttribute::Av));
+        assert_eq!(SeriousInjuryKind::HeadInjuryAv.injury_attribute(), Some(InjuryAttribute::AV));
     }
 
     #[test]
     fn bb2020_smashed_knee_reduces_ma() {
-        assert_eq!(SeriousInjuryKind::SmashedKneeMa.injury_attribute(), Some(InjuryAttribute::Ma));
+        assert_eq!(SeriousInjuryKind::SmashedKneeMa.injury_attribute(), Some(InjuryAttribute::MA));
     }
 
     #[test]
     fn bb2020_broken_arm_reduces_pa() {
-        assert_eq!(SeriousInjuryKind::BrokenArmPa.injury_attribute(), Some(InjuryAttribute::Pa));
+        assert_eq!(SeriousInjuryKind::BrokenArmPa.injury_attribute(), Some(InjuryAttribute::PA));
     }
 
     #[test]
     fn bb2020_neck_injury_reduces_ag() {
-        assert_eq!(SeriousInjuryKind::NeckInjuryAg.injury_attribute(), Some(InjuryAttribute::Ag));
+        assert_eq!(SeriousInjuryKind::NeckInjuryAg.injury_attribute(), Some(InjuryAttribute::AG));
     }
 
     #[test]
     fn bb2020_dislocated_hip_reduces_ag() {
-        assert_eq!(SeriousInjuryKind::DislocatedHipAg.injury_attribute(), Some(InjuryAttribute::Ag));
+        assert_eq!(SeriousInjuryKind::DislocatedHipAg.injury_attribute(), Some(InjuryAttribute::AG));
     }
 
     #[test]
     fn bb2020_dislocated_shoulder_reduces_st() {
-        assert_eq!(SeriousInjuryKind::DislocatedShoulderSt.injury_attribute(), Some(InjuryAttribute::St));
+        assert_eq!(SeriousInjuryKind::DislocatedShoulderSt.injury_attribute(), Some(InjuryAttribute::ST));
     }
 
     #[test]
@@ -182,22 +136,22 @@ mod tests {
 
     #[test]
     fn bb2016_smashed_knee_reduces_ma() {
-        assert_eq!(SeriousInjuryKind::SmashedKneeB2016.injury_attribute(), Some(InjuryAttribute::Ma));
+        assert_eq!(SeriousInjuryKind::SmashedKneeB2016.injury_attribute(), Some(InjuryAttribute::MA));
     }
 
     #[test]
     fn bb2016_broken_neck_reduces_ag() {
-        assert_eq!(SeriousInjuryKind::BrokenNeck.injury_attribute(), Some(InjuryAttribute::Ag));
+        assert_eq!(SeriousInjuryKind::BrokenNeck.injury_attribute(), Some(InjuryAttribute::AG));
     }
 
     #[test]
     fn bb2016_broken_collar_bone_reduces_st() {
-        assert_eq!(SeriousInjuryKind::BrokenCollarBone.injury_attribute(), Some(InjuryAttribute::St));
+        assert_eq!(SeriousInjuryKind::BrokenCollarBone.injury_attribute(), Some(InjuryAttribute::ST));
     }
 
     #[test]
     fn bb2016_smashed_hip_reduces_ma() {
-        assert_eq!(SeriousInjuryKind::SmashedHip.injury_attribute(), Some(InjuryAttribute::Ma));
+        assert_eq!(SeriousInjuryKind::SmashedHip.injury_attribute(), Some(InjuryAttribute::MA));
     }
 
     #[test]

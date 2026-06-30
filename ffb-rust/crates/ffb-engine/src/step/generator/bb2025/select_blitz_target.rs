@@ -1,0 +1,58 @@
+/// BB2025 select-blitz-target step sequence.
+/// Mirrors Java `com.fumbbl.ffb.server.step.generator.bb2025.SelectBlitzTarget`.
+use crate::step::framework::{StepId, StepParameter};
+use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
+
+pub struct SelectBlitzTarget;
+
+impl SelectBlitzTarget {
+    pub fn new() -> Self { Self }
+
+    pub fn build_sequence() -> Vec<SequenceStep> {
+        let mut seq = Sequence::new();
+        // 1 SELECT_BLITZ_TARGET [SELECT]
+        seq.add_labelled(StepId::SelectBlitzTarget, labels::SELECT, vec![
+            StepParameter::GotoLabelOnEnd(labels::END_BLITZING.into()),
+        ]);
+        // 2 JUMP_UP
+        seq.add(StepId::JumpUp, vec![
+            StepParameter::GotoLabelOnFailure(labels::END_BLITZING.into()),
+        ]);
+        // 3 STAND_UP
+        seq.add(StepId::StandUp, vec![
+            StepParameter::GotoLabelOnFailure(labels::END_BLITZING.into()),
+        ]);
+        // 4 SELECT_BLITZ_TARGET_END [END_BLITZING]
+        seq.add_labelled(StepId::SelectBlitzTargetEnd, labels::END_BLITZING, vec![]);
+        seq.build()
+    }
+}
+
+impl Default for SelectBlitzTarget {
+    fn default() -> Self { Self::new() }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn select_blitz_target_has_4_steps() {
+        let steps = SelectBlitzTarget::build_sequence();
+        assert_eq!(steps.len(), 4);
+    }
+
+    #[test]
+    fn select_blitz_target_is_labelled_select() {
+        let steps = SelectBlitzTarget::build_sequence();
+        let s = steps.iter().find(|s| s.step_id == StepId::SelectBlitzTarget).unwrap();
+        assert_eq!(s.label.as_deref(), Some(labels::SELECT));
+    }
+
+    #[test]
+    fn select_blitz_target_end_is_labelled_end_blitzing() {
+        let steps = SelectBlitzTarget::build_sequence();
+        let s = steps.iter().find(|s| s.step_id == StepId::SelectBlitzTargetEnd).unwrap();
+        assert_eq!(s.label.as_deref(), Some(labels::END_BLITZING));
+    }
+}

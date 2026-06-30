@@ -1,0 +1,734 @@
+/// Translations of com.fumbbl.ffb.injury.context.InjuryContext (ffb-common)
+/// and com.fumbbl.ffb.server.InjuryResult (ffb-server) and
+/// com.fumbbl.ffb.server.injury.injuryType.InjuryTypeServer (abstract base).
+///
+/// The InjuryTypeServer trait replaces Java's abstract class hierarchy.
+/// Concrete types are in injury/injuryType/*.rs; inline impls below are kept
+/// for backward-compat until the factory is fully switched over.
+pub mod injuryType;
+
+use ffb_model::enums::{
+    ApothecaryMode, ApothecaryStatus, PlayerState, SendToBoxReason, SeriousInjuryKind,
+    PS_PRONE, PS_STUNNED, PS_KNOCKED_OUT, PS_BADLY_HURT, PS_SERIOUS_INJURY, PS_RIP, PS_RESERVE,
+};
+use ffb_model::util::util_box::UtilBox;
+use ffb_model::model::SoundId;
+use ffb_model::types::FieldCoordinate;
+use ffb_model::util::rng::GameRng;
+use ffb_model::model::game::Game;
+use ffb_mechanics::mechanics::{armor_broken as mech_armor_broken, injury_result, InjuryOutcome};
+use ffb_mechanics::modifiers::Modifier;
+
+// ── InjuryContext ─────────────────────────────────────────────────────────────
+
+/// Full translation of com.fumbbl.ffb.injury.context.InjuryContext.
+#[derive(Debug, Clone)]
+pub struct InjuryContext {
+    /// Java: fArmorRoll — the two armor dice, or None if no armor roll was made.
+    pub armor_roll: Option<[i32; 2]>,
+    /// Java: fArmorBroken — whether the armor roll succeeded (armor was broken).
+    pub armor_broken: bool,
+    /// Java: fArmorModifiers — modifiers applied to the armor roll.
+    pub armor_modifiers: Vec<Modifier>,
+    /// Java: fInjuryRoll — the two injury dice, or None if no injury roll was made.
+    pub injury_roll: Option<[i32; 2]>,
+    /// Java: fInjuryModifiers — modifiers applied to the injury roll.
+    pub injury_modifiers: Vec<Modifier>,
+    /// Java: fApothecaryMode — which apothecary slot this context targets.
+    pub apothecary_mode: ApothecaryMode,
+    /// Java: fDefenderId
+    pub defender_id: Option<String>,
+    /// Java: fAttackerId
+    pub attacker_id: Option<String>,
+    /// Java: fDefenderPosition
+    pub defender_coordinate: Option<FieldCoordinate>,
+    /// Java: fInjury — the resulting PlayerState from the injury/casualty roll.
+    pub injury: Option<PlayerState>,
+    /// Java: fApothecaryStatus
+    pub apothecary_status: ApothecaryStatus,
+    /// Java: fSendToBoxTurn
+    pub send_to_box_turn: i32,
+    /// Java: fSendToBoxHalf
+    pub send_to_box_half: i32,
+    /// Java: fSufferedInjury — set by evaluateInjuryContext when KO/casualty.
+    pub suffered_injury: Option<PlayerState>,
+    /// Java: fCasualtyRoll — the d16 casualty die result (set during do_injury_roll).
+    pub casualty_roll: Option<i32>,
+    /// Java: fSeriousInjury — specific SI kind (set by evaluateInjuryContext).
+    pub serious_injury: Option<SeriousInjuryKind>,
+    /// Java: fSeriousInjuryDecay — decay SI kind for players with requiresSecondCasualtyRoll.
+    pub serious_injury_decay: Option<SeriousInjuryKind>,
+    /// Java: fSendToBoxReason — why the player was removed from the field.
+    pub send_to_box_reason: Option<SendToBoxReason>,
+    /// Java: fSound — sound effect associated with this injury.
+    pub sound: Option<SoundId>,
+    /// Java: fModifiedInjuryContext — apothecary's alternate context (second injury context).
+    pub modified_injury_context: Option<Box<InjuryContext>>,
+}
+
+impl InjuryContext {
+    pub fn new(apothecary_mode: ApothecaryMode) -> Self {
+        Self {
+            armor_roll: None,
+            armor_broken: false,
+            armor_modifiers: Vec::new(),
+            injury_roll: None,
+            injury_modifiers: Vec::new(),
+            apothecary_mode,
+            defender_id: None,
+            attacker_id: None,
+            defender_coordinate: None,
+            injury: None,
+            apothecary_status: ApothecaryStatus::NoApothecary,
+            send_to_box_turn: 0,
+            send_to_box_half: 0,
+            suffered_injury: None,
+            casualty_roll: None,
+            serious_injury: None,
+            serious_injury_decay: None,
+            send_to_box_reason: None,
+            sound: None,
+            modified_injury_context: None,
+        }
+    }
+
+    // Backward-compat accessors
+    pub fn is_armor_broken(&self) -> bool { self.armor_broken }
+    pub fn get_armor_roll(&self) -> Option<[i32; 2]> { self.armor_roll }
+    pub fn get_injury_roll(&self) -> Option<[i32; 2]> { self.injury_roll }
+    pub fn get_apothecary_mode(&self) -> ApothecaryMode { self.apothecary_mode }
+
+    // Java: addArmorModifier / addArmorModifiers
+    pub fn add_armor_modifier(&mut self, m: Modifier) { self.armor_modifiers.push(m); }
+    pub fn add_armor_modifiers(&mut self, ms: impl IntoIterator<Item = Modifier>) {
+        self.armor_modifiers.extend(ms);
+    }
+    pub fn clear_armor_modifiers(&mut self) { self.armor_modifiers.clear(); }
+
+    // Java: addInjuryModifier / addInjuryModifiers
+    pub fn add_injury_modifier(&mut self, m: Modifier) { self.injury_modifiers.push(m); }
+    pub fn add_injury_modifiers(&mut self, ms: impl IntoIterator<Item = Modifier>) {
+        self.injury_modifiers.extend(ms);
+    }
+
+    // Outcome helpers (Java: isCasualty(), isKnockedOut(), getPlayerState())
+    pub fn is_knocked_out(&self) -> bool {
+        self.injury.map(|s| s.base() == PS_KNOCKED_OUT).unwrap_or(false)
+    }
+    pub fn is_casualty(&self) -> bool {
+        self.injury.map(|s| s.is_casualty()).unwrap_or(false)
+    }
+    pub fn get_player_state(&self) -> Option<PlayerState> { self.injury }
+    pub fn get_defender_id(&self) -> Option<&str> { self.defender_id.as_deref() }
+    pub fn set_injury(&mut self, state: PlayerState) { self.injury = Some(state); }
+    pub fn set_armor_broken(&mut self, broken: bool) { self.armor_broken = broken; }
+
+    // Java: isSeriousInjury() — true when injury state is SERIOUS_INJURY (casualty needing SI detail)
+    pub fn is_serious_injury(&self) -> bool {
+        self.injury.map(|s| s.base() == PS_SERIOUS_INJURY).unwrap_or(false)
+    }
+
+    // Java: isReserve()
+    pub fn is_reserve(&self) -> bool {
+        self.injury.map(|s| s.base() == PS_RESERVE).unwrap_or(false)
+    }
+
+    pub fn get_modified_injury_context(&self) -> Option<&InjuryContext> {
+        self.modified_injury_context.as_deref()
+    }
+
+    pub fn set_modified_injury_context(&mut self, ctx: Option<Box<InjuryContext>>) {
+        self.modified_injury_context = ctx;
+    }
+}
+
+// ── InjuryResult ──────────────────────────────────────────────────────────────
+
+/// Translation of com.fumbbl.ffb.server.InjuryResult.
+#[derive(Debug, Clone)]
+pub struct InjuryResult {
+    pub injury_context: InjuryContext,
+    /// Java: injury outcome is KNOCKED_OUT (convenience flag, derived from context).
+    pub knocked_out: bool,
+    /// Java: injury outcome is RIP / dead (convenience flag, derived from context).
+    pub rip: bool,
+}
+
+impl InjuryResult {
+    pub fn new(apothecary_mode: ApothecaryMode) -> Self {
+        Self {
+            injury_context: InjuryContext::new(apothecary_mode),
+            knocked_out: false,
+            rip: false,
+        }
+    }
+
+    pub fn injury_context(&self) -> &InjuryContext { &self.injury_context }
+    pub fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.injury_context }
+
+    /// Java: InjuryResult.applyTo(IStep) — applies injury outcome to game state.
+    ///
+    /// 1. Reads the new player state from the injury context.
+    /// 2. Sets player state on the field model, respecting the precedence order:
+    ///    if the current state IS in the precedence list, only set the new state if
+    ///    it has a HIGHER index (worse). If the current state is not in the list
+    ///    (e.g. STANDING, MOVING), always apply.
+    /// 3. If the player is STUNNED and belongs to the currently-acting team, clears
+    ///    the active bit (Java: sets the player inactive so the turn ends).
+    /// 4. If the player is KO, a casualty, or reserve, puts them into the dugout box.
+    pub fn apply_to(&self, game: &mut Game) {
+        // Java: basePrecedenceList — the exact list from InjuryResult.java.
+        // States NOT in this list (STANDING, MOVING, etc.) are always overridden.
+        // States IN this list are only overridden by states with higher index (worse).
+        const PRECEDENCE: &[u32] = &[
+            PS_PRONE, PS_STUNNED, PS_KNOCKED_OUT, PS_BADLY_HURT, PS_SERIOUS_INJURY, PS_RIP, PS_RESERVE,
+        ];
+
+        let ctx = &self.injury_context;
+
+        let defender_id = match ctx.defender_id.as_deref() {
+            Some(id) => id,
+            None => return,
+        };
+        let new_state = match ctx.injury {
+            Some(s) => s,
+            None => return,
+        };
+
+        // 1. Set player state respecting precedence.
+        // Java: !basePrecedenceList.contains(oldState.getBase())
+        //    || basePrecedenceList.indexOf(newState.getBase()) > basePrecedenceList.indexOf(oldState.getBase())
+        let current_state = game.field_model.player_state(defender_id);
+        let should_set = match current_state {
+            None => true,
+            Some(current) => {
+                let current_rank = PRECEDENCE.iter().position(|&b| b == current.base());
+                match current_rank {
+                    None => true, // current not in precedence list → always set (e.g. STANDING)
+                    Some(cr) => {
+                        let new_rank = PRECEDENCE.iter().position(|&b| b == new_state.base());
+                        match new_rank {
+                            Some(nr) => nr > cr, // new must be worse (higher index)
+                            None => false,       // new not in list → don't override a boxed player with a field state
+                        }
+                    }
+                }
+            }
+        };
+
+        if should_set {
+            // Java: playerState.changeBase(newBase) — preserves flag bits, replaces base
+            let existing = game.field_model.player_state(defender_id).unwrap_or(new_state);
+            game.field_model.set_player_state(defender_id, existing.change_base(new_state.base()));
+        }
+
+        // 2. If STUNNED and player belongs to the acting team → set inactive.
+        if new_state.base() == PS_STUNNED && game.is_active_team_player(defender_id) {
+            let state = game.field_model.player_state(defender_id).unwrap_or(new_state);
+            game.field_model.set_player_state(defender_id, state.change_active(false));
+        }
+
+        // 3. If KO, casualty, or reserve → put player into box.
+        let final_state = game.field_model.player_state(defender_id).unwrap_or(new_state);
+        let base = final_state.base();
+        if base == PS_KNOCKED_OUT || final_state.is_casualty() || base == PS_RESERVE {
+            UtilBox::put_player_into_box(game, defender_id);
+        }
+    }
+}
+
+// ── InjuryTypeServer trait ────────────────────────────────────────────────────
+
+/// Rust analogue of Java's abstract `InjuryTypeServer<T>`.
+///
+/// Each concrete implementation:
+///   1. Rolls armor dice (if not pre-broken).
+///   2. Checks armor against defender.armour.
+///   3. If broken: rolls injury dice + interprets outcome.
+///   4. Populates its own `InjuryContext` with the results.
+///
+/// `util_server_injury::handle_injury()` calls this trait, then runs
+/// `evaluate_injury_context()` to set apothecary status and send-to-box data.
+pub trait InjuryTypeServer {
+    fn handle_injury(
+        &mut self,
+        game: &Game,
+        rng: &mut GameRng,
+        attacker_id: Option<&str>,
+        defender_id: &str,
+        coord: FieldCoordinate,
+        from_coord: Option<FieldCoordinate>,
+        old_ctx: Option<&InjuryContext>,
+        apo_mode: ApothecaryMode,
+    );
+    fn injury_context(&self) -> &InjuryContext;
+    fn injury_context_mut(&mut self) -> &mut InjuryContext;
+
+    /// Java: InjuryType.fallingDownCausesTurnover()
+    fn falling_down_causes_turnover(&self) -> bool { true }
+    /// Java: InjuryType.canUseApo()
+    fn can_use_apo(&self) -> bool { true }
+    /// Java: InjuryTypeServer.stunIsTreatedAsKo()
+    fn stun_is_treated_as_ko(&self) -> bool { false }
+    /// Java: InjuryType.failedArmourPlacesProne() — true for most types; ball-and-chain overrides to false
+    fn failed_armour_places_prone(&self) -> bool { true }
+    /// Java: InjuryTypeServer.sendToBoxReason()
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { None }
+    /// Java: InjuryType.shouldPlayFallSound()
+    fn should_play_fall_sound(&self) -> bool { true }
+}
+
+// ── Shared dice helpers ───────────────────────────────────────────────────────
+
+/// Roll 2d6 armor and set `armor_broken` vs the defender's armor value.
+/// Applies any modifiers already stored in `ctx.armor_modifiers`.
+pub fn do_armor_roll(game: &Game, rng: &mut GameRng, ctx: &mut InjuryContext, defender_id: &str) {
+    let d1 = rng.d6();
+    let d2 = rng.d6();
+    ctx.armor_roll = Some([d1, d2]);
+    let armor_value = game.player(defender_id).map(|p| p.armour).unwrap_or(7);
+    ctx.armor_broken = mech_armor_broken(armor_value, [d1, d2], &ctx.armor_modifiers);
+}
+
+/// Recalculate `armor_broken` using the existing `armor_roll` and current modifiers.
+/// Java: DiceInterpreter.isArmourBroken(gameState, injuryContext)
+pub fn recalc_armor_broken(game: &Game, ctx: &mut InjuryContext, defender_id: &str) {
+    if let Some([d1, d2]) = ctx.armor_roll {
+        let armor_value = game.player(defender_id).map(|p| p.armour).unwrap_or(7);
+        ctx.armor_broken = mech_armor_broken(armor_value, [d1, d2], &ctx.armor_modifiers);
+    }
+}
+
+/// Roll 2d6 injury and, if Casualty, roll the BB2025 d16 casualty die.
+/// Applies any modifiers already stored in `ctx.injury_modifiers`.
+pub fn do_injury_roll(rng: &mut GameRng, ctx: &mut InjuryContext) {
+    let d1 = rng.d6();
+    let d2 = rng.d6();
+    ctx.injury_roll = Some([d1, d2]);
+    let outcome = injury_result([d1, d2], &ctx.injury_modifiers);
+    ctx.injury = Some(outcome_to_player_state(rng, ctx, outcome));
+}
+
+fn outcome_to_player_state(rng: &mut GameRng, ctx: &mut InjuryContext, outcome: InjuryOutcome) -> PlayerState {
+    match outcome {
+        InjuryOutcome::Stunned    => PlayerState::new(PS_STUNNED),
+        InjuryOutcome::KnockedOut => PlayerState::new(PS_KNOCKED_OUT),
+        InjuryOutcome::BadlyHurt  => PlayerState::new(PS_BADLY_HURT),
+        InjuryOutcome::Casualty   => {
+            // BB2025 casualty: d16 determines tier — store roll for evaluateInjuryContext
+            let roll = rng.die(16);
+            ctx.casualty_roll = Some(roll);
+            if roll >= 15 {
+                PlayerState::new(PS_RIP)
+            } else if roll >= 9 {
+                PlayerState::new(PS_SERIOUS_INJURY)
+            } else {
+                PlayerState::new(PS_BADLY_HURT)
+            }
+        }
+    }
+}
+
+// ── InjuryTypeDropFall ────────────────────────────────────────────────────────
+
+/// Shared implementation for InjuryTypeDropGFI / InjuryTypeDropDodge / InjuryTypeDropJump.
+///
+/// Java: each is a separate class but all have identical handleInjury():
+///   roll armor vs defender, if broken roll injury, else PRONE.
+pub struct InjuryTypeDropFall {
+    ctx: InjuryContext,
+    causes_turnover: bool,
+}
+
+impl InjuryTypeDropFall {
+    fn new(causes_turnover: bool) -> Self {
+        Self {
+            ctx: InjuryContext::new(ApothecaryMode::Attacker),
+            causes_turnover,
+        }
+    }
+}
+
+impl InjuryTypeServer for InjuryTypeDropFall {
+    fn handle_injury(
+        &mut self, game: &Game, rng: &mut GameRng,
+        _attacker_id: Option<&str>, defender_id: &str,
+        coord: FieldCoordinate, _from_coord: Option<FieldCoordinate>,
+        _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode,
+    ) {
+        self.ctx.defender_id = Some(defender_id.to_owned());
+        self.ctx.defender_coordinate = Some(coord);
+        self.ctx.apothecary_mode = apo_mode;
+
+        if !self.ctx.armor_broken {
+            do_armor_roll(game, rng, &mut self.ctx, defender_id);
+        }
+        if self.ctx.armor_broken {
+            do_injury_roll(rng, &mut self.ctx);
+        } else {
+            self.ctx.injury = Some(PlayerState::new(PS_PRONE));
+        }
+    }
+
+    fn injury_context(&self) -> &InjuryContext { &self.ctx }
+    fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
+    fn falling_down_causes_turnover(&self) -> bool { self.causes_turnover }
+}
+
+// ── InjuryTypeBlock ───────────────────────────────────────────────────────────
+
+/// Java: InjuryTypeBlock — standard block injury involving attacker modifiers.
+/// Simplified: no armor/injury modifier factories yet.
+pub struct InjuryTypeBlockImpl {
+    ctx: InjuryContext,
+    pre_broken: bool,  // armor already forced broken (InjuryTypeBlockProne path)
+}
+
+impl InjuryTypeBlockImpl {
+    fn new(pre_broken: bool) -> Self {
+        Self {
+            ctx: InjuryContext::new(ApothecaryMode::Defender),
+            pre_broken,
+        }
+    }
+}
+
+impl InjuryTypeServer for InjuryTypeBlockImpl {
+    fn handle_injury(
+        &mut self, game: &Game, rng: &mut GameRng,
+        attacker_id: Option<&str>, defender_id: &str,
+        coord: FieldCoordinate, _from_coord: Option<FieldCoordinate>,
+        _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode,
+    ) {
+        self.ctx.defender_id = Some(defender_id.to_owned());
+        self.ctx.attacker_id = attacker_id.map(str::to_owned);
+        self.ctx.defender_coordinate = Some(coord);
+        self.ctx.apothecary_mode = apo_mode;
+
+        if self.pre_broken {
+            self.ctx.armor_broken = true;
+        } else if !self.ctx.armor_broken {
+            do_armor_roll(game, rng, &mut self.ctx, defender_id);
+        }
+
+        if self.ctx.armor_broken {
+            do_injury_roll(rng, &mut self.ctx);
+        } else {
+            self.ctx.injury = Some(PlayerState::new(PS_PRONE));
+        }
+    }
+
+    fn injury_context(&self) -> &InjuryContext { &self.ctx }
+    fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
+}
+
+// ── InjuryTypeChainsaw ────────────────────────────────────────────────────────
+
+/// Java: InjuryTypeChainsaw — armor is always broken (chainsaw special rule).
+pub struct InjuryTypeChainsawImpl {
+    ctx: InjuryContext,
+}
+
+impl InjuryTypeChainsawImpl {
+    pub fn new() -> Self {
+        Self { ctx: InjuryContext::new(ApothecaryMode::Defender) }
+    }
+}
+
+impl InjuryTypeServer for InjuryTypeChainsawImpl {
+    fn handle_injury(
+        &mut self, _game: &Game, rng: &mut GameRng,
+        attacker_id: Option<&str>, defender_id: &str,
+        coord: FieldCoordinate, _from_coord: Option<FieldCoordinate>,
+        _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode,
+    ) {
+        self.ctx.defender_id = Some(defender_id.to_owned());
+        self.ctx.attacker_id = attacker_id.map(str::to_owned);
+        self.ctx.defender_coordinate = Some(coord);
+        self.ctx.apothecary_mode = apo_mode;
+        // Chainsaw always breaks armor
+        self.ctx.armor_broken = true;
+        do_injury_roll(rng, &mut self.ctx);
+    }
+
+    fn injury_context(&self) -> &InjuryContext { &self.ctx }
+    fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
+}
+
+// ── InjuryTypeThrowARock ──────────────────────────────────────────────────────
+
+/// Java: InjuryTypeThrowARock — kickoff event, no turnover, can use apo.
+pub struct InjuryTypeThrowARockImpl {
+    ctx: InjuryContext,
+}
+
+impl InjuryTypeThrowARockImpl {
+    fn new() -> Self {
+        Self { ctx: InjuryContext::new(ApothecaryMode::HitPlayer) }
+    }
+}
+
+impl InjuryTypeServer for InjuryTypeThrowARockImpl {
+    fn handle_injury(
+        &mut self, game: &Game, rng: &mut GameRng,
+        attacker_id: Option<&str>, defender_id: &str,
+        coord: FieldCoordinate, _from_coord: Option<FieldCoordinate>,
+        _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode,
+    ) {
+        self.ctx.defender_id = Some(defender_id.to_owned());
+        self.ctx.attacker_id = attacker_id.map(str::to_owned);
+        self.ctx.defender_coordinate = Some(coord);
+        self.ctx.apothecary_mode = apo_mode;
+
+        if !self.ctx.armor_broken {
+            do_armor_roll(game, rng, &mut self.ctx, defender_id);
+        }
+        if self.ctx.armor_broken {
+            do_injury_roll(rng, &mut self.ctx);
+        } else {
+            self.ctx.injury = Some(PlayerState::new(PS_PRONE));
+        }
+    }
+
+    fn injury_context(&self) -> &InjuryContext { &self.ctx }
+    fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
+    fn falling_down_causes_turnover(&self) -> bool { false }
+}
+
+// ── InjuryTypeTTMLanding ─────────────────────────────────────────────────────
+
+/// Java: InjuryTypeTTMLanding — TTM landing roll, can use apo.
+pub struct InjuryTypeTtmLandingImpl {
+    ctx: InjuryContext,
+}
+
+impl InjuryTypeTtmLandingImpl {
+    fn new() -> Self {
+        Self { ctx: InjuryContext::new(ApothecaryMode::ThrownPlayer) }
+    }
+}
+
+impl InjuryTypeServer for InjuryTypeTtmLandingImpl {
+    fn handle_injury(
+        &mut self, game: &Game, rng: &mut GameRng,
+        attacker_id: Option<&str>, defender_id: &str,
+        coord: FieldCoordinate, _from_coord: Option<FieldCoordinate>,
+        _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode,
+    ) {
+        self.ctx.defender_id = Some(defender_id.to_owned());
+        self.ctx.attacker_id = attacker_id.map(str::to_owned);
+        self.ctx.defender_coordinate = Some(coord);
+        self.ctx.apothecary_mode = apo_mode;
+
+        if !self.ctx.armor_broken {
+            do_armor_roll(game, rng, &mut self.ctx, defender_id);
+        }
+        if self.ctx.armor_broken {
+            do_injury_roll(rng, &mut self.ctx);
+        } else {
+            self.ctx.injury = Some(PlayerState::new(PS_PRONE));
+        }
+    }
+
+    fn injury_context(&self) -> &InjuryContext { &self.ctx }
+    fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
+    fn falling_down_causes_turnover(&self) -> bool { false }
+}
+
+// ── InjuryTypeTTMHitPlayer ────────────────────────────────────────────────────
+
+/// Java: InjuryTypeTTMHitPlayer — when a TTM hits another player on landing.
+pub struct InjuryTypeTtmHitPlayerImpl {
+    ctx: InjuryContext,
+}
+
+impl InjuryTypeTtmHitPlayerImpl {
+    fn new() -> Self {
+        Self { ctx: InjuryContext::new(ApothecaryMode::HitPlayer) }
+    }
+}
+
+impl InjuryTypeServer for InjuryTypeTtmHitPlayerImpl {
+    fn handle_injury(
+        &mut self, game: &Game, rng: &mut GameRng,
+        attacker_id: Option<&str>, defender_id: &str,
+        coord: FieldCoordinate, _from_coord: Option<FieldCoordinate>,
+        _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode,
+    ) {
+        self.ctx.defender_id = Some(defender_id.to_owned());
+        self.ctx.attacker_id = attacker_id.map(str::to_owned);
+        self.ctx.defender_coordinate = Some(coord);
+        self.ctx.apothecary_mode = apo_mode;
+
+        if !self.ctx.armor_broken {
+            do_armor_roll(game, rng, &mut self.ctx, defender_id);
+        }
+        if self.ctx.armor_broken {
+            do_injury_roll(rng, &mut self.ctx);
+        } else {
+            self.ctx.injury = Some(PlayerState::new(PS_PRONE));
+        }
+    }
+
+    fn injury_context(&self) -> &InjuryContext { &self.ctx }
+    fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
+    fn falling_down_causes_turnover(&self) -> bool { false }
+}
+
+// ── Factory ───────────────────────────────────────────────────────────────────
+
+/// Create a boxed `InjuryTypeServer` from the Java class name string.
+/// Used by steps that receive `StepParameter::InjuryTypeName(name)`.
+pub fn make_injury_type(name: &str) -> Box<dyn InjuryTypeServer> {
+    match name {
+        "InjuryTypeDropGFI" | "InjuryTypeDropGfi" =>
+            Box::new(InjuryTypeDropFall::new(true)),
+        "InjuryTypeDropDodge" =>
+            Box::new(InjuryTypeDropFall::new(true)),
+        "InjuryTypeDropDodgeForSpp" =>
+            Box::new(InjuryTypeDropFall::new(true)),
+        "InjuryTypeDropJump" =>
+            Box::new(InjuryTypeDropFall::new(true)),
+        "InjuryTypeBlock" | "InjuryTypeBlockForSpp" =>
+            Box::new(InjuryTypeBlockImpl::new(false)),
+        "InjuryTypeBlockProne" | "InjuryTypeBlockProneForSpp" =>
+            Box::new(InjuryTypeBlockImpl::new(true)),
+        "InjuryTypeChainsaw" | "InjuryTypeChainsawForSpp" =>
+            Box::new(InjuryTypeChainsawImpl::new()),
+        "InjuryTypeThrowARock" | "InjuryTypeThrowARockStalling" =>
+            Box::new(InjuryTypeThrowARockImpl::new()),
+        "InjuryTypeTTMLanding" | "InjuryTypeTtmLanding" =>
+            Box::new(InjuryTypeTtmLandingImpl::new()),
+        "InjuryTypeTTMHitPlayer" | "InjuryTypeTtmHitPlayer" | "InjuryTypeTTMHitPlayerForSpp" =>
+            Box::new(InjuryTypeTtmHitPlayerImpl::new()),
+        // Foul injury: armor roll + injury roll (foul assist modifiers TODO).
+        // InjuryTypeFoul(useChainsaw=true) adds chainsaw armor modifiers — stubbed as normal armor roll.
+        "InjuryTypeFoul" | "InjuryTypeFoulForSpp"
+        | "InjuryTypeFoulChainsaw" | "InjuryTypeFoulChainsawForSpp" =>
+            Box::new(InjuryTypeBlockImpl::new(false)),
+        "InjuryTypeFallDown" | "InjuryTypeFallDownForSpp" =>
+            Box::new(InjuryTypeDropFall::new(false)),
+        "InjuryTypeBreatheFire" | "InjuryTypeBreatheFireForSpp" =>
+            Box::new(InjuryTypeBlockImpl::new(false)),
+        "InjuryTypeCrowdPush" | "InjuryTypeCrowdPushForSpp" =>
+            Box::new(InjuryTypeBlockImpl::new(false)),
+        "InjuryTypeFumbledKtmApoKo" =>
+            Box::new(InjuryTypeDropFall::new(false)),
+        "InjuryTypeBlockStunned" | "InjuryTypeBlockStunnedForSpp" =>
+            Box::new(InjuryTypeBlockImpl::new(true)),
+        _ => {
+            // Unknown type: fall through with generic drop behavior (causes turnover)
+            Box::new(InjuryTypeDropFall::new(true))
+        }
+    }
+}
+
+// ── InjuryResult::apply_to tests ─────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+    use ffb_model::enums::{Rules, PlayerType, PlayerGender, PS_STANDING};
+    use ffb_model::model::game::Game;
+    use ffb_model::model::player::Player;
+    use ffb_model::model::team::Team;
+    use ffb_model::types::{FieldCoordinate, KO_HOME_X};
+
+    fn make_player(id: &str) -> Player {
+        Player {
+            id: id.into(),
+            name: id.into(),
+            nr: 1,
+            position_id: "lineman".into(),
+            player_type: PlayerType::Regular,
+            gender: PlayerGender::Male,
+            movement: 6,
+            strength: 3,
+            agility: 3,
+            passing: 4,
+            armour: 8,
+            starting_skills: vec![],
+            extra_skills: vec![],
+            temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0,
+            stat_injuries: vec![],
+            current_spps: 0,
+            career_spps: 0,
+            race: None,
+        }
+    }
+
+    fn make_game_with_players(home_ids: &[&str], away_ids: &[&str]) -> Game {
+        let make_team = |id: &str, player_ids: &[&str]| -> Team {
+            Team {
+                id: id.into(),
+                name: id.into(),
+                race: "Human".into(),
+                roster_id: "human".into(),
+                coach: "Coach".into(),
+                rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+                prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+                cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
+                team_value: 0, treasury: 0, special_rules: vec![],
+                players: player_ids.iter().map(|pid| make_player(pid)).collect(),
+            }
+        };
+        let home = make_team("home", home_ids);
+        let away = make_team("away", away_ids);
+        Game::new(home, away, Rules::Bb2025)
+    }
+
+    fn make_ir_with_state(defender_id: &str, state: PlayerState) -> InjuryResult {
+        let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+        ir.injury_context.defender_id = Some(defender_id.to_owned());
+        ir.injury_context.set_injury(state);
+        ir
+    }
+
+    /// apply_to sets the player state in the field model.
+    #[test]
+    fn apply_to_sets_player_state() {
+        let mut game = make_game_with_players(&["h1"], &[]);
+        game.field_model.set_player_coordinate("h1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("h1", PlayerState::new(PS_STANDING));
+
+        let ir = make_ir_with_state("h1", PlayerState::new(PS_STUNNED));
+        ir.apply_to(&mut game);
+
+        let state = game.field_model.player_state("h1").unwrap();
+        assert_eq!(state.base(), PS_STUNNED);
+    }
+
+    /// apply_to puts KO player into the dugout box.
+    #[test]
+    fn apply_to_puts_ko_player_in_box() {
+        let mut game = make_game_with_players(&["h1"], &[]);
+        game.field_model.set_player_coordinate("h1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("h1", PlayerState::new(PS_STANDING));
+
+        let ir = make_ir_with_state("h1", PlayerState::new(PS_KNOCKED_OUT));
+        ir.apply_to(&mut game);
+
+        let coord = game.field_model.player_coordinate("h1").expect("player should be placed");
+        assert_eq!(coord.x, KO_HOME_X);
+    }
+
+    /// apply_to does NOT override a worse existing state with a less severe one.
+    #[test]
+    fn apply_to_does_not_override_worse_state() {
+        let mut game = make_game_with_players(&["h1"], &[]);
+        game.field_model.set_player_coordinate("h1", FieldCoordinate::new(5, 5));
+        // Player is already RIP (the worst)
+        game.field_model.set_player_state("h1", PlayerState::new(PS_RIP));
+
+        // Try to apply STUNNED (less severe)
+        let ir = make_ir_with_state("h1", PlayerState::new(PS_STUNNED));
+        ir.apply_to(&mut game);
+
+        // State must remain RIP
+        let state = game.field_model.player_state("h1").unwrap();
+        assert_eq!(state.base(), PS_RIP, "worse state should not be overridden by less severe");
+    }
+}

@@ -130,6 +130,12 @@ pub enum GameEvent {
     // ── Weather effects ────────────────────────────────────────────────────────
     HeatExhaustion { player_id: PlayerId },
 
+    // ── Fouls ──────────────────────────────────────────────────────────────────
+    /// Java: ReportReferee — whether the referee noticed the foul (and under-scrutiny flag).
+    RefereeSpotsFoul { referee_spots_foul: bool, under_scrutiny: bool },
+    /// Java: ReportBiasedRef — result of a biased-ref inducement roll.
+    BiasedRefRoll { roll: i32, referee_spots_foul: bool },
+
     // ── Game flow ──────────────────────────────────────────────────────────────
     CoinThrow { home_won: bool },
     DoubleHiredStarPlayer,

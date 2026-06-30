@@ -1,0 +1,48 @@
+use crate::skill_behaviour::SkillBehaviour;
+
+/// BB2020 Pass skill behaviour. Extends AbstractPassBehaviour; adds StepModifier on
+/// StepHailMaryPass: rolls pass for LONG_BOMB distance, evaluates result, handles fumble reroll
+/// dialog and modifying skill. Mirrors Java
+/// `com.fumbbl.ffb.server.skillbehaviour.bb2020.PassBehaviour`.
+pub struct PassBehaviour;
+
+impl PassBehaviour {
+    pub fn new() -> Self { Self }
+}
+
+impl Default for PassBehaviour {
+    fn default() -> Self { Self::new() }
+}
+
+impl SkillBehaviour for PassBehaviour {
+    fn name(&self) -> &'static str { "PassBehaviour" }
+
+    /// Java extends AbstractPassBehaviour; adds
+    /// `StepModifier<StepHailMaryPass, StepState>.handleExecuteStepHook`: rolls pass for
+    /// LONG_BOMB distance, evaluates result, handles fumble reroll dialog and modifying skill
+    /// (canAddStrengthToPass). Returns false always.
+    /// TODO(hook-infra): needs state.usingModifyingSkill, state.roll, state.result,
+    /// state.minimumRoll, state.passSkillUsed, state.goToLabelOnFailure.
+    fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
+        // TODO(hook-infra): step-specific state access (StepState.xxx)
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hook_is_noop_returns_false() {
+        // Without step infra the hook always returns false.
+        let b = PassBehaviour::new();
+        assert_eq!(b.name(), "PassBehaviour");
+    }
+
+    #[test]
+    fn name_is_correct() {
+        let b = PassBehaviour::default();
+        assert_eq!(b.name(), "PassBehaviour");
+    }
+}

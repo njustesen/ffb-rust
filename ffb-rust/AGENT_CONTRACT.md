@@ -1,4 +1,7 @@
-# Parity Agent Contract (T3 Phase 2)
+# Parity Agent Contract
+
+> **Note:** This contract becomes relevant once the 1:1 Java-to-Rust translation is complete
+> and parity testing resumes. It documents the deterministic agent protocol for both sides.
 
 Single source of truth for the deterministic random agents on both sides:
 

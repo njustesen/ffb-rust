@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FFB Parity Dashboard</title>
+<style>
+  body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 1em; }
+  h1 { color: #569cd6; }
+  table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+  th, td { border: 1px solid #444; padding: 4px 8px; text-align: left; }
+  th { background: #2d2d2d; color: #9cdcfe; }
+  tr.match td { background: #1a3a1a; }
+  tr.fail td { background: #3a1a1a; }
+  .banner { background: #2d2d2d; border-left: 4px solid #569cd6; padding: 0.5em 1em; margin-bottom: 1em; }
+</style>
+</head>
+<body>
+<h1>FFB Parity Dashboard</h1>
+<div class="banner" id="focus">Parity testing in progress...</div>
+<table>
+<thead>
+<tr>
+  <th>Seed</th><th>Matchup</th><th>Java Events</th><th>Rust Events</th>
+  <th>Status</th><th>Java Hash</th><th>Rust Hash</th>
+</tr>
+</thead>
+<tbody>
+<!-- seed-row-31 --><tr class="fail"><td>31</td><td>amazon vs amazon</td><td>232</td><td>229</td><td>FAIL</td><td title="98cfc2e59497afd4">98cfc2e5</td><td title="4ffaed20d8e460b2">4ffaed20</td></tr>
+</tbody>
+</table>
+</body>
+</html>

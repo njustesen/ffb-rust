@@ -21,6 +21,17 @@ pub enum ApothecaryMode {
 }
 
 impl ApothecaryMode {
+    pub fn from_name(name: &str) -> Option<Self> {
+        [
+            ApothecaryMode::Attacker, ApothecaryMode::Away, ApothecaryMode::CrowdPush,
+            ApothecaryMode::Defender, ApothecaryMode::Feeding, ApothecaryMode::Home,
+            ApothecaryMode::SpecialEffect, ApothecaryMode::ThrownPlayer, ApothecaryMode::KickedPlayer,
+            ApothecaryMode::HitPlayer, ApothecaryMode::Catcher, ApothecaryMode::TrapDoor,
+            ApothecaryMode::AnimalSavagery, ApothecaryMode::DroppedByOwnPlayer, ApothecaryMode::QuickBite,
+        ]
+        .iter().copied().find(|v| v.name().eq_ignore_ascii_case(name))
+    }
+
     pub fn name(self) -> &'static str {
         match self {
             ApothecaryMode::Attacker => "attacker",
@@ -59,6 +70,18 @@ pub enum ApothecaryStatus {
 }
 
 impl ApothecaryStatus {
+    pub fn from_name(name: &str) -> Option<Self> {
+        [
+            ApothecaryStatus::NoApothecary, ApothecaryStatus::DoRequest,
+            ApothecaryStatus::WaitForApothecaryUse, ApothecaryStatus::WaitForApothecaryChoice,
+            ApothecaryStatus::UseApothecary, ApothecaryStatus::DoNotUseApothecary,
+            ApothecaryStatus::ResultChoice, ApothecaryStatus::WaitForIgorUse,
+            ApothecaryStatus::UseIgor, ApothecaryStatus::DoNotUseIgor,
+            ApothecaryStatus::WaitForGettingEven,
+        ]
+        .iter().copied().find(|v| v.name().eq_ignore_ascii_case(name))
+    }
+
     pub fn name(self) -> &'static str {
         match self {
             ApothecaryStatus::NoApothecary => "noApothecary",

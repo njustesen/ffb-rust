@@ -1,0 +1,44 @@
+use crate::skill_behaviour::SkillBehaviour;
+
+/// BB2020 TheBallista skill behaviour. StepModifier for TheBallista: extends throw team mate range
+/// by allowing long bomb distance. Mirrors Java
+/// `com.fumbbl.ffb.server.skillbehaviour.bb2020.TheBallistaBehaviour`.
+pub struct TheBallistaBehaviour;
+
+impl TheBallistaBehaviour {
+    pub fn new() -> Self { Self }
+}
+
+impl Default for TheBallistaBehaviour {
+    fn default() -> Self { Self::new() }
+}
+
+impl SkillBehaviour for TheBallistaBehaviour {
+    fn name(&self) -> &'static str { "TheBallistaBehaviour" }
+
+    /// Java `StepModifier` for TheBallista: on throw team mate, allows longer range throw (long
+    /// bomb distance). Returns false always.
+    /// TODO(hook-infra): needs throw team mate state.
+    fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
+        // TODO(hook-infra): step-specific state access (StepState.xxx)
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hook_is_noop_returns_false() {
+        // Without step infra the hook always returns false.
+        let b = TheBallistaBehaviour::new();
+        assert_eq!(b.name(), "TheBallistaBehaviour");
+    }
+
+    #[test]
+    fn name_is_correct() {
+        let b = TheBallistaBehaviour::default();
+        assert_eq!(b.name(), "TheBallistaBehaviour");
+    }
+}

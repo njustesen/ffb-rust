@@ -51,6 +51,20 @@ impl KickoffResult {
         }
     }
 
+    pub fn from_name(name: &str) -> Option<Self> {
+        [
+            KickoffResult::GetTheRef, KickoffResult::HighKick, KickoffResult::CheeringFans,
+            KickoffResult::WeatherChange, KickoffResult::BrilliantCoaching, KickoffResult::QuickSnap,
+            KickoffResult::Blitz, KickoffResult::PitchInvasion, KickoffResult::Riot,
+            KickoffResult::PerfectDefence, KickoffResult::ThrowARock, KickoffResult::TimeOut,
+            KickoffResult::SolidDefence, KickoffResult::OficiousRef, KickoffResult::Charge,
+            KickoffResult::DodgySnack,
+        ]
+        .iter()
+        .copied()
+        .find(|v| v.name().eq_ignore_ascii_case(name))
+    }
+
     pub fn is_fan_reroll(self) -> bool {
         self == KickoffResult::CheeringFans
     }
@@ -75,5 +89,20 @@ mod tests {
             let back: KickoffResult = serde_json::from_str(&json).unwrap();
             assert_eq!(*k, back);
         }
+    }
+
+    #[test]
+    fn from_name_blitz() {
+        assert_eq!(KickoffResult::from_name("Blitz"), Some(KickoffResult::Blitz));
+    }
+
+    #[test]
+    fn from_name_case_insensitive() {
+        assert_eq!(KickoffResult::from_name("blitz"), Some(KickoffResult::Blitz));
+    }
+
+    #[test]
+    fn from_name_unknown() {
+        assert_eq!(KickoffResult::from_name("unknown"), None);
     }
 }

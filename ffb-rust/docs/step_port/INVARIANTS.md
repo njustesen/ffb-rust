@@ -32,10 +32,11 @@ determinism. Treat them as non-negotiable while porting.
   `ffb-protocol`, `ffb-client`, and the parity `RandomAgent`.
 - Java `ParityRunner` (branch `t3-phase2-wip`) = ground-truth oracle/driver.
 
-## Replaced (the monolith)
-`ffb-engine/src/engine/mod.rs` `GameEngine::apply` (47 match arms), the 31 `pending_*` fields,
-the inline `resolve_*`/`apply_*` helpers, and its embedded tests. Becomes `step/` (framework +
-concrete steps) driven by a `GameState`-equivalent loop.
+## Replacing (the monolith — in progress)
+`ffb-engine/src/step/engine.rs` (3,920-line monolith) is being replaced by individual step
+files under `step/bb2025/`, each a 1:1 translation of the corresponding Java step class.
+Once all step files are complete, `engine.rs` is deleted and replaced by a thin `driver.rs`
+(< 300 lines). Steps are written directly from Java source — **never** extracted from engine.rs.
 
 ## Rust representation choices (behaviour-neutral, for perf/idiom)
 Step = enum + match dispatch (no `Box<dyn>`); StepStack = `Vec<Step>` (top = last);

@@ -1,8 +1,8 @@
 # TESTING.md — per-step testing protocol (fundamental, not optional)
 
-Testing is part of the **definition of done** for every ported step/sequence/skill. A step is
-"done" only when its tests pass AND the parity seeds that exercise it pass. Three layers, from
-smallest to largest:
+Testing is part of the **definition of done** for every translated step/sequence/skill. A step is
+"done" only when it is a complete 1:1 translation of the Java source AND its tests pass.
+Verification: `cargo test --workspace`. Three layers, from smallest to largest:
 
 ## Layer 1 — Rust per-step characterization test (MANDATORY, one per step)
 For each step, a `#[test]` that:
@@ -30,6 +30,11 @@ granularity — the authoritative expected values the Rust Layer-1 tests are wri
 `state_hash`. This is the ultimate cross-engine check and the phase gate. The coverage
 checklist (`t3_checklist.rs`) additionally proves every action/event actually occurred.
 
+**Current parity status:** Layer 3 passes against the 3,920-line monolith `engine.rs` (T2: 2,500
+games; T3 Amazon: 100/100). It does **not** yet pass against the step-by-step rewrite — that
+validation is deferred until `engine.rs` is deleted and replaced by `driver.rs`. Until then,
+treat parity as validating the monolith, not the translated step files.
+
 ## How the layers fit the port loop (TDD against the Java oracle)
 For each step, in order:
 1. Read its `20_steps/` entry + the Java class.
@@ -39,6 +44,17 @@ For each step, in order:
 4. Write the Layer-1 Rust test asserting the golden dice/events/hash. Make it green.
 5. Run the seed parity covering that step (Layer 3). Green → tick the spec checkbox with the
    validating seeds.
+
+## Generator testing
+
+Generators have no layer-1 test in the traditional sense (they don't emit events or draw dice
+directly). Instead verify a generator by:
+1. Read `10_sequences.md` for the sequence you implemented.
+2. Add a `#[test]` that creates a minimal `Game` fixture, calls `YourGenerator::push_sequence()`,
+   and asserts the resulting `StepStack` contains the exact steps in the documented order with
+   the correct `StepParameter` values. No dice, no events — just stack contents.
+3. Once driver.rs replaces engine.rs, Layer 3 parity becomes the integration gate for generators
+   as well — the step order differences will surface immediately in the state_hash comparison.
 
 ## What NOT to test (low value)
 - Trivial model getters/setters and serde round-trips (ffb-model). Keep these minimal.

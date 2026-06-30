@@ -45,6 +45,18 @@ pub enum Action {
     MultiBlock { defender1_id: PlayerId, defender2_id: PlayerId },
     /// Choose which block die result to apply.
     BlockChoice { die_index: usize },
+    /// Use Brawler skill to re-roll a BothDown result (CLIENT_USE_BRAWLER).
+    UseBrawler,
+    /// Use Hatred skill to re-roll a Skull result (CLIENT_USE_HATRED).
+    UseHatred,
+    /// Use Pro skill to re-roll a single block die (CLIENT_USE_PRO_RE_ROLL_FOR_BLOCK).
+    UseProReRollForBlock { die_index: usize },
+    /// Use Consummate Professional skill to re-roll a single block die (CLIENT_USE_CONSUMMATE_RE_ROLL_FOR_BLOCK).
+    UseConsummateReRollForBlock { die_index: usize },
+    /// Use a single-die block re-roll skill (CLIENT_USE_SINGLE_BLOCK_DIE_RE_ROLL).
+    UseSingleBlockDieReRoll { re_roll_source: String, die_index: usize },
+    /// Use a multi-die block re-roll (Savage Blow, CLIENT_USE_MULTI_BLOCK_DICE_RE_ROLL).
+    UseMultiBlockDiceReRoll { dice_indexes: Vec<usize> },
     /// Choose where to push the defender.
     PushTo { coord: FieldCoordinate },
     /// Declare whether the attacker follows up.
@@ -123,6 +135,24 @@ pub enum Action {
     SelectWeather { weather: Weather },
     /// Acknowledge an information-only dialog.
     Acknowledge,
+
+    // ── Multi-block re-roll commands ──────────────────────────────────────────
+    /// Use a re-roll for a specific target in a multi-block sequence.
+    /// Java: `ClientCommandUseReRollForTarget`.
+    UseReRollForTarget {
+        re_rolled_action: Option<String>,
+        re_roll_source: Option<String>,
+        target_id: Option<String>,
+    },
+    /// Choose the Lord-of-Chaos player when using a single-use team re-roll.
+    /// Java: `ClientCommandPlayerChoice(LORD_OF_CHAOS)`.
+    LordOfChaosChoice { player_id: Option<String> },
+    /// Choose the Indomitable target when multiple Dauntless targets exist.
+    /// Java: `ClientCommandPlayerChoice(INDOMITABLE)`.
+    IndomitableChoice { player_id: String },
+    /// Player choice from a list dialog (generic — covers PlayerChoiceMode variants not yet specialised).
+    /// Java: `ClientCommandPlayerChoice`.
+    PlayerChoice { player_id: Option<String>, player_ids: Vec<String>, mode: String },
 }
 
 /// Which action type the agent wants to perform when activating a player.

@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use crate::enums::{GameStatus, TurnMode, PlayerAction, Rules, Weather};
 use crate::types::FieldCoordinate;
 use crate::model::acting_player::ActingPlayer;
+use crate::model::blitz_turn_state::BlitzTurnState;
 use crate::model::field_model::FieldModel;
 use crate::model::game_options::GameOptions;
 use crate::model::game_result::GameResult;
@@ -51,6 +52,15 @@ pub struct Game {
     /// Java: GameState.getAdditionalAssist / setTeamIdsAdditionalAssist / removeAdditionalAssist.
     pub home_additional_assists: i32,
     pub away_additional_assists: i32,
+    /// Java: GameState.isStalling() / stallingDetected() / resetStalling().
+    /// Set true when the acting player is detected to be stalling; cleared after consumption.
+    pub stalling: bool,
+    /// Java: game.isAdminMode() / setAdminMode — admin-controlled game allows reconnection.
+    pub admin_mode: bool,
+    /// Java: GameState.getLastDefenderId / setLastDefenderId — stores defender ID for MaximumCarnage second-block.
+    pub last_defender_id: Option<PlayerId>,
+    /// Java: GameState.getBlitzTurnState / setBlitzTurnState — tracks activations during the Blitz! kickoff result.
+    pub blitz_turn_state: Option<BlitzTurnState>,
 }
 
 impl Game {
@@ -88,6 +98,10 @@ impl Game {
             turnover: false,
             home_additional_assists: 0,
             away_additional_assists: 0,
+            stalling: false,
+            admin_mode: false,
+            last_defender_id: None,
+            blitz_turn_state: None,
         }
     }
 
@@ -126,6 +140,44 @@ impl Game {
     /// True if `team` is the home team.
     pub fn is_home_team(&self, team_id: &str) -> bool {
         self.team_home.id == team_id
+    }
+
+    /// Returns the team id that the given player belongs to, or None if not found.
+    pub fn player_team_id(&self, player_id: &str) -> Option<&str> {
+        if self.team_home.player(player_id).is_some() {
+            Some(&self.team_home.id)
+        } else if self.team_away.player(player_id).is_some() {
+            Some(&self.team_away.id)
+        } else {
+            None
+        }
+    }
+
+    /// True if the player belongs to the currently-active team.
+    pub fn is_active_team_player(&self, player_id: &str) -> bool {
+        self.player_team_id(player_id) == Some(self.active_team().id.as_str())
+    }
+
+    /// Returns the current thrower (player with thrower_id), if any.
+    pub fn thrower(&self) -> Option<&crate::model::player::Player> {
+        self.thrower_id.as_deref().and_then(|id| self.player(id))
+    }
+
+    /// Look up a team by its id; returns None if neither team matches.
+    pub fn team_by_id(&self, id: &str) -> Option<&Team> {
+        if self.team_home.id == id {
+            Some(&self.team_home)
+        } else if self.team_away.id == id {
+            Some(&self.team_away)
+        } else {
+            None
+        }
+    }
+
+    /// Stub for Game.isActive(NamedProperties) — checks if any active player has the given skill property.
+    /// TODO: implement when NamedProperties lookup is translated.
+    pub fn is_active(&self, _named_property: &str) -> bool {
+        false
     }
 }
 

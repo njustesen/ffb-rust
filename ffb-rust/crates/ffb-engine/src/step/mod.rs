@@ -7,7 +7,27 @@
 
 #![allow(dead_code)] // scaffold: concrete steps land per 20_steps/ as Phase D progresses
 
-mod framework;
-mod engine;
+pub(crate) mod framework;
+pub mod driver;
+pub mod bb2016;
+pub mod bb2020;
+pub mod bb2025;
+
+// Infrastructure modules used by step implementations
+pub mod util_server_re_roll;
+pub mod util_server_injury;
+pub mod util_server_steps;
+pub mod util_server_catch_scatter_throw_in;
+pub mod abstract_step_with_re_roll;
+pub mod generator;
+pub mod sequences;
+pub mod action;
+
+// Edition-specific modules
+pub mod mixed;
+pub mod phase;
+pub mod game;
+pub mod step_goto_label;
+
 pub use framework::*;
-pub use engine::*;
+pub use driver::*;

@@ -650,6 +650,95 @@ impl SkillId {
         };
         Some(skill)
     }
+
+    /// Returns the NamedProperty string keys this skill grants.
+    /// 1:1 translation of Skill.getSkillProperties() → SkillId lookup table.
+    pub fn properties(self) -> &'static [&'static str] {
+        match self {
+            SkillId::SteadyFooting => &["canAvoidFallingDown"],
+            SkillId::TakeRoot => &["becomesImmovable"],
+            SkillId::Sprint => &["canMakeAnExtraGfi"],
+            SkillId::SureFeet => &["canMakeAnExtraGfiOnce"],
+            SkillId::Block => &["preventFallOnBothDown"],
+            SkillId::Dodge => &["ignoreDefenderStumblesResult", "canRerollDodge"],
+            SkillId::Fend => &["preventOpponentFollowingUp"],
+            SkillId::StandFirm => &["canRefuseToBePushed"],
+            SkillId::SideStep => &["canChooseOwnPushedBackSquare"],
+            SkillId::Sidestep => &["canChooseOwnPushedBackSquare"],
+            SkillId::Shadowing => &["canFollowPlayerLeavingTacklezones"],
+            SkillId::HypnoticGaze => &["inflictsConfusion", "canGazeDuringMove"],
+            SkillId::Leap => &["canLeap"],
+            SkillId::PogoStick => &[
+                "canLeap",
+                "ignoreTacklezonesWhenJumping",
+                "failedRushForJumpAlwaysLandsInTargetSquare",
+            ],
+            SkillId::Pogo => &[
+                "canLeap",
+                "ignoreTacklezonesWhenJumping",
+                "failedRushForJumpAlwaysLandsInTargetSquare",
+            ],
+            SkillId::Juggernaut => &["canConvertBothDownToPush"],
+            SkillId::Frenzy => &["forceFollowup", "forceSecondBlock"],
+            SkillId::Guard => &["assistsBlocksInTacklezones", "assistsFoulsInTacklezones"],
+            SkillId::DivingTackle => &["canAttemptToTackleDodgingPlayer"],
+            SkillId::Tentacles => &["canHoldPlayersLeavingTacklezones"],
+            SkillId::AlwaysHungry => &["mightEatPlayerToThrow"],
+            SkillId::BoneHead => &["appliesConfusion"],
+            SkillId::ReallyStupid => &["appliesConfusion", "needsToRollHighToAvoidConfusion"],
+            SkillId::MightyBlow => &["affectsEitherArmourOrInjuryOnBlock"],
+            SkillId::DirtyPlayer => &["affectsEitherArmourOrInjuryOnFoul"],
+            SkillId::Stab => &[
+                "canPerformArmourRollInsteadOfBlock",
+                "providesBlockAlternative",
+                "providesStabBlockAlternative",
+            ],
+            SkillId::Chainsaw => &[
+                "makesStrengthTestObsolete",
+                "blocksLikeChainsaw",
+                "needsNoDiceDecorations",
+                "providesChainsawBlockAlternative",
+                "providesChainsawFoulingAlternative",
+            ],
+            SkillId::Claw => &["reducesArmourToFixedValue"],
+            SkillId::ThickSkull => &["convertKOToStunOn8"],
+            SkillId::AnimalSavagery => &[
+                "enableStandUpAndEndBlitzAction",
+                "needsToRollForActionBlockingIsEasier",
+            ],
+            SkillId::HitAndRun => &["goForItAfterBlock", "canMoveAfterBlock"],
+            SkillId::QuickFoul => &["canMoveAfterFoul"],
+            SkillId::Pro => &[
+                "canChooseToIgnoreRushModifierAfterRoll",
+                "canChooseToIgnoreDodgeModifierAfterRoll",
+                "canRerollOncePerTurn",
+            ],
+            SkillId::MultipleBlock => &[
+                "providesMultipleBlockAlternative",
+                "canBlockMoreThanOnce",
+                "canBlockTwoAtOnce",
+            ],
+            SkillId::Dauntless => &["canRollToMatchOpponentsStrength"],
+            SkillId::DisturbingPresence => &["inflictsDisturbingPresence"],
+            SkillId::FoulAppearance => &["inflictsFoulAppearance"],
+            SkillId::PrehensileTail => &["canHoldPlayersLeavingTacklezones"],
+            SkillId::Tackle => &["cancelsDodge"],
+            SkillId::Wrestle => &["canChooseToFallDownForBothDown"],
+            SkillId::Swoop => &["ttmScattersInSingleDirection"],
+            SkillId::KickTeamMate => &["canKickTeamMates"],
+            SkillId::ThrowTeamMate => &["canThrowTeamMates"],
+            SkillId::RightStuff => &["canBeThrown"],
+            SkillId::WildAnimal => &["needsToRollForAction"],
+            SkillId::Loner => &["needsToRollForTeamReroll"],
+            SkillId::Decay => &["decaysAfterInjury"],
+            SkillId::Regeneration => &["preventRaiseFromDead", "canRollToSaveFromInjury"],
+            SkillId::GiveAndGo => &["canMoveAfterQuickPass", "canMoveAfterHandOff"],
+            SkillId::RunningPass => &["canMoveAfterQuickPass"],
+            SkillId::DivingCatch => &["canAttemptCatchInAdjacentSquares"],
+            SkillId::NoHands => &["preventCatch"],
+            _ => &[],
+        }
+    }
 }
 
 #[cfg(test)]
@@ -668,5 +757,42 @@ mod tests {
     #[test]
     fn unknown_class_name_returns_none() {
         assert_eq!(SkillId::from_class_name("NonExistentSkill"), None);
+    }
+
+    #[test]
+    fn properties_steady_footing() {
+        assert_eq!(SkillId::SteadyFooting.properties(), &["canAvoidFallingDown"]);
+    }
+
+    #[test]
+    fn properties_dodge_has_two() {
+        let props = SkillId::Dodge.properties();
+        assert!(props.contains(&"ignoreDefenderStumblesResult"));
+        assert!(props.contains(&"canRerollDodge"));
+    }
+
+    #[test]
+    fn properties_block() {
+        assert!(SkillId::Block.properties().contains(&"preventFallOnBothDown"));
+    }
+
+    #[test]
+    fn properties_leap() {
+        assert!(SkillId::Leap.properties().contains(&"canLeap"));
+    }
+
+    #[test]
+    fn properties_pogo_includes_leap() {
+        assert!(SkillId::PogoStick.properties().contains(&"canLeap"));
+    }
+
+    #[test]
+    fn properties_unknown_skill_returns_empty() {
+        assert_eq!(SkillId::Kick.properties(), &[] as &[&str]);
+    }
+
+    #[test]
+    fn properties_chainsaw_has_five() {
+        assert_eq!(SkillId::Chainsaw.properties().len(), 5);
     }
 }

@@ -446,9 +446,9 @@ mod tests {
         assert!(matches!(gs.current_prompt(), Some(AgentPrompt::ActivatePlayer { .. })),
             "engine waits at first ActivatePlayer after the kickoff");
         // The agent's decision RNG must not touch the game dice: the game dice are the pregame
-        // (d3,d3,d6,d6 + coin d2) plus the opening kickoff (scatter d8,d6 + result d6,d6 +
-        // Cheering Fans d6,d6 + bounce d8) = 12.
-        assert_eq!(gs.rng.call_count, 12, "agent decision RNG never perturbs the game-dice stream");
+        // (spectators: d6×4, weather: d6×2, coin: d2) plus the opening kickoff
+        // (scatter: d8+d6, result roll: d6×2=7=BrilliantCoaching, coaching handler: d6×2) = 13.
+        assert_eq!(gs.rng.call_count, 13, "agent decision RNG never perturbs the game-dice stream");
     }
 
     #[test]

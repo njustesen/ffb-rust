@@ -1,0 +1,52 @@
+use crate::skill_behaviour::SkillBehaviour;
+
+/// BB2020 FoulAppearance skill behaviour.
+/// Two StepModifiers: (1) on StepFoulAppearance — rolls 2+ for attacker before block, handles
+/// reroll, on failure marks hasBlocked=true and goes to failure label. (2) on
+/// StepFoulAppearanceMultiple — handles multi-block case with per-target rolls. Mirrors Java
+/// `com.fumbbl.ffb.server.skillbehaviour.bb2020.FoulAppearanceBehaviour`.
+pub struct FoulAppearanceBehaviour;
+
+impl FoulAppearanceBehaviour {
+    pub fn new() -> Self { Self }
+}
+
+impl Default for FoulAppearanceBehaviour {
+    fn default() -> Self { Self::new() }
+}
+
+impl SkillBehaviour for FoulAppearanceBehaviour {
+    fn name(&self) -> &'static str { "FoulAppearanceBehaviour" }
+
+    /// Java registers two StepModifiers:
+    /// (1) `StepModifier<StepFoulAppearance>` — rolls 2+ for attacker before block, handles
+    /// reroll, on failure marks hasBlocked=true and goes to failure label.
+    /// (2) `StepModifier<StepFoulAppearanceMultiple>` — handles multi-block case with
+    /// per-target rolls. Both return false.
+    ///
+    /// TODO(hook-infra): needs state.goToLabelOnFailure, step.getReRolledAction(),
+    /// step.getReRollSource().
+    fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
+        // TODO(hook-infra): step-specific state access (state.goToLabelOnFailure,
+        // step.getReRolledAction(), step.getReRollSource())
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hook_is_noop_returns_false() {
+        // Without step infra the hook always returns false.
+        let b = FoulAppearanceBehaviour::new();
+        assert_eq!(b.name(), "FoulAppearanceBehaviour");
+    }
+
+    #[test]
+    fn name_is_correct() {
+        let b = FoulAppearanceBehaviour::default();
+        assert_eq!(b.name(), "FoulAppearanceBehaviour");
+    }
+}

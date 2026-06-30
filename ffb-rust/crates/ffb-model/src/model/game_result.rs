@@ -10,8 +10,17 @@ pub struct PlayerResult {
     pub casualties: i32,
     pub interceptions: i32,
     pub deflections: i32,
+    pub landings: i32,
+    pub catches_with_additional_spp: i32,
+    pub completions_with_additional_spp: i32,
+    pub casualties_with_additional_spp: i32,
     pub mvp: bool,
     pub spp_gained: i32,
+    pub fouls: i32,
+    /// Java: fBlocks — number of blocks thrown this game.
+    pub blocks: i32,
+    /// Set during end-game player loss check when player defects on illegal concession.
+    pub defecting: bool,
 }
 
 /// Per-team final game result.
@@ -20,7 +29,22 @@ pub struct TeamResult {
     pub score: i32,
     pub winnings: i32,
     pub fan_factor_modifier: i32,
+    pub dedicated_fans_modifier: i32,
+    pub fan_factor: i32,
+    pub fame: i32,
     pub player_results: HashMap<PlayerId, PlayerResult>,
+    /// Set when this team conceded the game.
+    pub conceded: bool,
+    /// Set when this team was considered stalling (reduces winnings by 1).
+    pub stalled: bool,
+    pub raised_dead: i32,
+    /// Java: `TeamResult.teamValue` — the team's current TV at game start.
+    pub team_value: i32,
+    /// Java: `TeamResult.pettyCashFromTvDiff` — petty cash available to the underdog.
+    pub petty_cash_from_tv_diff: i32,
+    /// Java: `TeamResult.penaltyScore` — penalty-shootout goals scored. Default -1 in Java
+    /// (unset); represented as 0 here since Rust uses 0-defaults and -1 has no semantic use.
+    pub penalty_score: i32,
 }
 
 /// Full game result.

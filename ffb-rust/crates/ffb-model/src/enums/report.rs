@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 /// Protocol tag identifying which `GameEvent` variant is serialized.
 /// One variant per Java `Report*` class.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum ReportId {
     AlwaysHungry,
     AnimosityRoll,
@@ -81,4 +82,10 @@ pub enum ReportId {
     AnimalSavagery,
     PrayerRoll,
     ThenIStartedBlastin,
+}
+
+impl ReportId {
+    pub fn from_name(name: &str) -> Option<Self> {
+        serde_json::from_str(&format!("\"{}\"", name)).ok()
+    }
 }

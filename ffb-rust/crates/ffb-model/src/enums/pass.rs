@@ -21,6 +21,14 @@ impl PassingDistance {
         }
     }
 
+    pub fn from_name(name: &str) -> Option<Self> {
+        [
+            PassingDistance::QuickPass, PassingDistance::ShortPass,
+            PassingDistance::LongPass, PassingDistance::LongBomb, PassingDistance::PassToPartner,
+        ]
+        .iter().copied().find(|v| v.name().eq_ignore_ascii_case(name))
+    }
+
     pub fn modifier_2016(self) -> i32 {
         match self {
             PassingDistance::QuickPass => 1,
@@ -50,6 +58,14 @@ impl PassingDistance {
             PassingDistance::PassToPartner => 'R',
         }
     }
+
+    pub fn for_shortcut(c: char) -> Option<Self> {
+        [
+            PassingDistance::QuickPass, PassingDistance::ShortPass,
+            PassingDistance::LongPass, PassingDistance::LongBomb, PassingDistance::PassToPartner,
+        ]
+        .iter().copied().find(|v| v.shortcut() == c)
+    }
 }
 
 /// The overall outcome of a pass attempt.
@@ -73,6 +89,14 @@ impl PassResult {
             PassResult::Caught => "caught",
             PassResult::MissedCatch => "missedCatch",
         }
+    }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        [
+            PassResult::Complete, PassResult::Inaccurate, PassResult::Fumble,
+            PassResult::WildlyInaccurate, PassResult::Caught, PassResult::MissedCatch,
+        ]
+        .iter().copied().find(|v| v.name().eq_ignore_ascii_case(name))
     }
 
     pub fn is_successful(self) -> bool {

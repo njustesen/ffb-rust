@@ -340,6 +340,22 @@ impl ServerStatus {
             ServerStatus::ReplayUnavailable => "The replay for this game is currently unavailable.",
         }
     }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        [
+            ServerStatus::ErrorUnknownCoach,
+            ServerStatus::ErrorWrongPassword,
+            ServerStatus::ErrorGameInUse,
+            ServerStatus::ErrorNotYourTeam,
+            ServerStatus::ErrorUnknownGameId,
+            ServerStatus::ErrorSameTeam,
+            ServerStatus::FumbblError,
+            ServerStatus::ReplayUnavailable,
+        ]
+        .iter()
+        .copied()
+        .find(|v| v.name().eq_ignore_ascii_case(name))
+    }
 }
 
 #[cfg(test)]

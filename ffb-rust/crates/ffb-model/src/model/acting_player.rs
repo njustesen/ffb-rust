@@ -14,6 +14,7 @@ pub struct ActingPlayer {
     pub standing_up: bool,
     pub jumping: bool,
     pub has_acted: bool,
+    pub has_fouled: bool,
     pub held_in_place: bool,
     /// For Blitz/StandUpBlitz activations: true once the block step has been executed.
     pub blitz_blocked: bool,
@@ -25,6 +26,18 @@ pub struct ActingPlayer {
     pub ignore_tackle_zones: bool,
     /// FuryOfTheBloodGod: extra block actions remaining (0 = not active).
     pub fury_of_blood_god_blocks: u8,
+    /// Java: fHasMoved — true once the player has taken at least one move step.
+    pub has_moved: bool,
+    /// Java: fHasBlocked — true once the player has executed a block (StepBlockStatistics).
+    pub has_blocked: bool,
+    /// Java: fSufferingBloodLust — Vampire player must feed this turn or go frenzy.
+    pub suffering_blood_lust: bool,
+    /// Java: forgone — player chose to forgo their action (e.g. held by Take Root or flagged as stalling).
+    pub forgone: bool,
+    /// Java: fStrength — effective strength at block time (with modifiers; 0 = not set).
+    pub strength: i32,
+    /// Java: fellFromRush — true when a Ball & Chain player fell while going for it.
+    pub fell_from_rush: bool,
 }
 
 impl ActingPlayer {
@@ -46,6 +59,8 @@ impl ActingPlayer {
         self.jumping = false;
         self.has_acted = false;
         self.held_in_place = false;
+        self.suffering_blood_lust = false;
+        self.forgone = false;
     }
 
     pub fn is_active(&self) -> bool {
