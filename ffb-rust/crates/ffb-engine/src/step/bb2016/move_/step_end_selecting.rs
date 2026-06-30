@@ -29,11 +29,10 @@ use crate::step::generator::bb2016::select::SelectParams;
 ///          FOUL_DEFENDER_ID, GAZE_VICTIM_ID, HAIL_MARY_PASS, MOVE_STACK,
 ///          TARGET_COORDINATE, THROWN_PLAYER_ID, KICKED_PLAYER_ID, NR_OF_DICE, USING_STAB.
 ///
-/// TODO(bloodlust): isSufferingBloodLust path not yet ported.
-/// TODO(isRooted): playerState.isRooted() check not yet ported.
-/// TODO(removeConfusion): REMOVE_CONFUSION path not yet ported.
-/// TODO(standUp): STAND_UP / STAND_UP_BLITZ paths not yet ported.
-/// TODO(setHasMoved): actingPlayer.setHasMoved(true) for REMOVE_CONFUSION not yet ported.
+/// DEFERRED(bloodlust): isSufferingBloodLust path not yet ported.
+/// DEFERRED(removeConfusion): REMOVE_CONFUSION path not yet ported.
+/// DEFERRED(standUp): STAND_UP / STAND_UP_BLITZ paths not yet ported.
+/// DEFERRED(setHasMoved): actingPlayer.setHasMoved(true) for REMOVE_CONFUSION not yet ported.
 pub struct StepEndSelecting {
     /// Java: fEndTurn
     pub end_turn: bool,
@@ -210,7 +209,21 @@ impl StepEndSelecting {
             | PlayerAction::KickTeamMateMove
             | PlayerAction::HandOverMove
             | PlayerAction::Gaze => {
-                // TODO(isRooted): MOVE + isRooted → EndPlayerAction not yet ported
+                // Java: case MOVE: if (playerState.isRooted()) → EndPlayerAction; else fall through
+                if player_action == PlayerAction::Move {
+                    let is_rooted = game.acting_player.player_id.as_deref()
+                        .and_then(|id| game.field_model.player_state(id))
+                        .map(|s| s.is_rooted())
+                        .unwrap_or(false);
+                    if is_rooted {
+                        let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
+                            feeding_allowed: true,
+                            end_player_action: self.end_player_action,
+                            end_turn: self.end_turn,
+                        });
+                        return StepOutcome::next().push_seq(seq);
+                    }
+                }
                 let seq = if with_parameter {
                     Move::build_sequence(&MoveParams {
                         move_stack: self.move_stack.clone(),
@@ -252,7 +265,7 @@ mod tests {
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::{StepAction, StepParameter};
-    use ffb_model::enums::Rules;
+    use ffb_model::enums::{Rules, PS_STANDING, PlayerState};
     use ffb_model::util::rng::GameRng;
 
     fn make_game() -> Game {
@@ -360,5 +373,30 @@ mod tests {
         let mut step = StepEndSelecting::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn move_action_when_rooted_pushes_end_player_action() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        let rooted_state = PlayerState::new(PS_STANDING).change_rooted(true);
+        game.field_model.set_player_state("p1", rooted_state);
+        let mut step = StepEndSelecting::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "rooted Move player should push EndPlayerAction, not Move");
+    }
+
+    #[test]
+    fn move_action_when_not_rooted_pushes_move_sequence() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+        let mut step = StepEndSelecting::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty());
     }
 }

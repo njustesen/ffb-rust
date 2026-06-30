@@ -16,6 +16,7 @@ use ffb_model::util::rng::GameRng;
 use ffb_mechanics::skills::SkillId;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::util::UtilServerPlayerMove;
 
 /// Java: `StepFollowup` (bb2016/block).
 pub struct StepFollowup {
@@ -164,7 +165,7 @@ impl StepFollowup {
                         }
                     }
                     game.field_model.set_player_coordinate(attacker_id, followup_coord);
-                    // TODO(update-move-squares): UtilServerPlayerMove.updateMoveSquares not called here
+                    UtilServerPlayerMove::update_move_squares(game, false);
                     outcome = outcome.publish(StepParameter::PlayerEnteringSquare(attacker_id.clone()));
                 }
             } else {

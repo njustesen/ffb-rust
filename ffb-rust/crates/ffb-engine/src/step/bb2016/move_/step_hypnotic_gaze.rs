@@ -27,10 +27,9 @@ use crate::dice_interpreter::DiceInterpreter;
 ///
 /// Sets stepParameter END_PLAYER_ACTION for all steps on the stack.
 ///
-/// TODO(gazeModifiers): GazeModifierFactory / modifier collection not yet ported.
-/// TODO(cancelsSkill): UtilCards.hasSkillToCancelProperty not yet ported.
-/// TODO(hypnotizedState): game.getFieldModel().setPlayerState(defender, oldState.changeHypnotized(true)) not yet ported.
-/// TODO(sound): SoundId.HYPNO not yet ported.
+/// DEFERRED(gazeModifiers): GazeModifierFactory / modifier collection not yet ported.
+/// DEFERRED(cancelsSkill): UtilCards.hasSkillToCancelProperty not yet ported.
+/// DEFERRED(sound): SoundId.HYPNO not yet ported.
 pub struct StepHypnoticGaze {
     /// Java: fGotoLabelOnEnd
     pub goto_label_on_end: String,
@@ -131,7 +130,15 @@ impl StepHypnoticGaze {
             let successful = DiceInterpreter::is_skill_roll_successful(roll, minimum_roll);
 
             if successful {
-                // TODO(hypnotizedState): set defender to hypnotized state
+                // Java: if (!oldVictimState.isConfused() && !oldVictimState.isHypnotized())
+                //           setPlayerState(defender, oldState.changeHypnotized(true))
+                if let Some(def_id) = defender_id.as_deref() {
+                    if let Some(old_state) = game.field_model.player_state(def_id) {
+                        if !old_state.is_confused() && !old_state.is_hypnotized() {
+                            game.field_model.set_player_state(def_id, old_state.change_hypnotized(true));
+                        }
+                    }
+                }
             } else if !already_rerolled {
                 use ffb_model::model::re_rolled_action::ReRolledAction;
                 self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("HYPNOTIC_GAZE"));
