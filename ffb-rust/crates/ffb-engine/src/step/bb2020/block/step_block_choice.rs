@@ -73,7 +73,7 @@ impl StepBlockChoice {
             None => return StepOutcome::cont(),
         };
         let old_defender_state = self.old_defender_state.unwrap_or_default();
-        let _dodge_label = self.goto_label_on_dodge.clone();
+        let dodge_label = self.goto_label_on_dodge.clone();
         let juggernaut_label = self.goto_label_on_juggernaut.clone();
         let pushback_label = self.goto_label_on_pushback.clone();
 
@@ -93,11 +93,54 @@ impl StepBlockChoice {
                 StepOutcome::goto(&juggernaut_label)
             }
             BlockResult::PowPushback => {
-                // TODO: check ignoreDefenderStumblesResult (Dodge skill) and skill cancellations
-                // For now: set defender FALLING and go to pushback (conservative path)
-                if let Some(defender_id) = game.defender_id.clone() {
-                    let defender_state = game.field_model.player_state(&defender_id).unwrap_or_default();
-                    game.field_model.set_player_state(&defender_id, defender_state.change_base(PS_FALLING));
+                // Java: check if defender has Dodge (ignoreDefenderStumblesResult).
+                // If Tackle on attacker cancels it, fall + pushback. Otherwise goto dodge.
+                // DEFERRED(reportSkillUse): ReportSkillUse not yet ported.
+                let defender_id = game.defender_id.clone();
+                let acting_player_id = game.acting_player.player_id.clone();
+                let defender_has_dodge = defender_id.as_deref()
+                    .and_then(|id| game.player(id))
+                    .map(|p| p.has_skill_property(NamedProperties::IGNORE_DEFENDER_STUMBLES_RESULT))
+                    .unwrap_or(false);
+                if defender_has_dodge {
+                    let attacker_has_tackle = acting_player_id.as_deref()
+                        .and_then(|id| game.player(id))
+                        .map(|p| p.has_skill_property("cancelsDodge"))
+                        .unwrap_or(false);
+                    let attacker_can_block_same_team = acting_player_id.as_deref()
+                        .and_then(|id| game.player(id))
+                        .map(|p| p.has_skill_property(NamedProperties::CAN_BLOCK_SAME_TEAM_PLAYER))
+                        .unwrap_or(false);
+                    let same_team = acting_player_id.as_deref().zip(defender_id.as_deref())
+                        .map(|(a, d)| game.player_team_id(a) == game.player_team_id(d))
+                        .unwrap_or(false);
+                    let tackle_applies = attacker_has_tackle && (!attacker_can_block_same_team || !same_team);
+                    if tackle_applies {
+                        let right_stuff_cancels_tackle = game.options.get("rightStuffCancelsTackle") == Some("true");
+                        let defender_has_right_stuff = defender_id.as_deref()
+                            .and_then(|id| game.player(id))
+                            .map(|p| p.has_skill_property(NamedProperties::IGNORE_TACKLE_WHEN_BLOCKED))
+                            .unwrap_or(false);
+                        if right_stuff_cancels_tackle && defender_has_right_stuff {
+                            return StepOutcome::goto(&dodge_label);
+                        }
+                        // Tackle cancels Dodge → defender falls + pushback
+                        if let Some(ref did) = defender_id {
+                            let defender_state = game.field_model.player_state(did).unwrap_or_default();
+                            game.field_model.set_player_state(did, defender_state.change_base(PS_FALLING));
+                        }
+                        let (sq, _) = self.init_pushback(game);
+                        let mut out = StepOutcome::goto(&pushback_label);
+                        if let Some(s) = sq { out = out.publish(StepParameter::StartingPushbackSquare(s)); }
+                        return out;
+                    }
+                    // No Tackle → Dodge works
+                    return StepOutcome::goto(&dodge_label);
+                }
+                // No Dodge → defender falls + pushback
+                if let Some(ref did) = defender_id {
+                    let defender_state = game.field_model.player_state(did).unwrap_or_default();
+                    game.field_model.set_player_state(did, defender_state.change_base(PS_FALLING));
                 }
                 let (sq, _) = self.init_pushback(game);
                 let mut out = StepOutcome::goto(&pushback_label);
