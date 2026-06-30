@@ -16,8 +16,8 @@ use ffb_mechanics::modifiers::go_for_it_context::GoForItContext;
 ///
 /// BB2020 is identical to BB2025 except that GoForItModifierFactory uses BB2020 rules.
 ///
-/// TODO: modifier-ignoring skill dialog (canChooseToIgnoreRushModifierAfterRoll) not yet ported.
-/// TODO: fSecondGoForIt / fBallandChainGfi not yet ported.
+/// DEFERRED(modifierIgnoring): canChooseToIgnoreRushModifierAfterRoll dialog not yet ported.
+/// DEFERRED(failedRushSkill): failedRushForJumpAlwaysLandsInTargetSquare skill check not yet ported.
 pub struct StepGoForIt {
     /// Java: fGotoLabelOnFailure
     pub goto_label_on_failure: String,
@@ -146,6 +146,20 @@ impl StepGoForIt {
         let successful = self.roll >= minimum_roll;
 
         if successful {
+            // Java: succeedGfi — if jumping and !secondGfi and currentMove > ma+1 → repeat
+            let jumping = game.acting_player.jumping;
+            let current_move = game.acting_player.current_move;
+            let ma = player_id.as_deref()
+                .and_then(|id| game.player(id))
+                .map(|p| p.movement as i32)
+                .unwrap_or(4);
+            if jumping && !self.second_go_for_it && current_move > ma + 1 {
+                self.second_go_for_it = true;
+                self.using_modifier_ignoring_skill = None;
+                self.re_roll_state.re_rolled_action = None;
+                self.roll = 0;
+                return StepOutcome::repeat();
+            }
             return StepOutcome::next();
         }
 
@@ -177,14 +191,31 @@ impl StepGoForIt {
     }
 
     fn fail_gfi(&mut self, game: &mut Game) -> StepOutcome {
+        // Java: if (jumping && !secondGfi && currentMove > ma+1 && !failedRushForJumpAlwaysLandsInTargetSquare)
+        //           publish COORDINATE_FROM(null), move player back to moveStart
+        // DEFERRED(failedRushSkill): failedRushForJumpAlwaysLandsInTargetSquare skill check not yet ported
+        let jumping = game.acting_player.jumping;
+        let current_move = game.acting_player.current_move;
+        let ma = game.acting_player.player_id.as_deref()
+            .and_then(|id| game.player(id))
+            .map(|p| p.movement as i32)
+            .unwrap_or(4);
+        let mut outcome = StepOutcome::goto(&self.goto_label_on_failure.clone())
+            .publish(StepParameter::EndTurn(true));
+        if jumping && !self.second_go_for_it && current_move > ma + 1 {
+            if let Some(start) = self.move_start {
+                let pid = game.acting_player.player_id.clone();
+                if let Some(id) = pid.as_deref() {
+                    game.field_model.set_player_coordinate(id, start);
+                }
+            }
+            outcome = outcome.publish(StepParameter::CoordinateFrom(FieldCoordinate::new(0, 0)));
+        }
         if self.ball_and_chain_gfi {
             game.acting_player.fell_from_rush = true;
         }
         let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeDropGFI".into());
-        let label = self.goto_label_on_failure.clone();
-        StepOutcome::goto(&label)
-            .publish(StepParameter::EndTurn(true))
-            .publish(StepParameter::SteadyFootingContext(Box::new(ctx)))
+        outcome.publish(StepParameter::SteadyFootingContext(Box::new(ctx)))
     }
 }
 
@@ -293,5 +324,53 @@ mod tests {
         let mut step = StepGoForIt::new("old".into());
         assert!(step.set_parameter(&StepParameter::GotoLabelOnFailure("new".into())));
         assert_eq!(step.goto_label_on_failure, "new");
+    }
+
+    #[test]
+    fn jumping_with_extra_move_on_success_triggers_second_gfi_repeat() {
+        // ma=4, current_move=6 (> ma+1=5), jumping=true, !second_gfi → Repeat
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.goes_for_it = true;
+        game.acting_player.current_move = 6;
+        game.acting_player.jumping = true;
+        let mut step = StepGoForIt::new("fail".into());
+        step.roll = 4; // success
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Repeat);
+        assert!(step.second_go_for_it);
+    }
+
+    #[test]
+    fn second_gfi_success_does_not_repeat_again() {
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.goes_for_it = true;
+        game.acting_player.current_move = 6;
+        game.acting_player.jumping = true;
+        let mut step = StepGoForIt::new("fail".into());
+        step.second_go_for_it = true; // already did first gfi repeat
+        step.roll = 4;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn jumping_with_extra_move_on_failure_moves_player_to_move_start() {
+        let start = FieldCoordinate::new(3, 3);
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 5));
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.goes_for_it = true;
+        game.acting_player.current_move = 6;
+        game.acting_player.jumping = true;
+        let mut step = StepGoForIt::new("fail".into());
+        step.move_start = Some(start);
+        step.roll = 1; // fail
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.field_model.player_coordinate("p1"), Some(start));
     }
 }
