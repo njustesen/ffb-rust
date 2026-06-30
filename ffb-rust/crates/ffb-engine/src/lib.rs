@@ -8,6 +8,22 @@ pub mod action;
 /// steps. Audited against Java as each consuming step is ported.
 pub mod legal_actions;
 
+/// Skill behaviour hooks — Rust analogue of Java's `SkillBehaviour` + `StepModifier` system.
+pub mod skill_behaviour;
+
+/// Partial translations of InjuryContext (ffb-common) and InjuryResult (ffb-server).
+pub mod injury;
+
+/// Port of `com.fumbbl.ffb.server.model.DropPlayerContext` and `SteadyFootingContext`.
+pub mod drop_player_context;
+
+/// 1:1 translation of com.fumbbl.ffb.server.DiceInterpreter.
+pub mod dice_interpreter;
+
+/// Utility helpers — partial translations of com.fumbbl.ffb.server.util.* and mechanic calculators.
+pub mod util;
+
+
 /// Parity debug tracing, enabled by setting the FFB_TRACE env var.
 /// Used to gate stderr diagnostics (dodge rolls, negatrait rolls, agent picks)
 /// that align with the Java ParityRunner's -Dffb.diceTrace output.
