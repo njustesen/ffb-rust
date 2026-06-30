@@ -111,7 +111,13 @@ impl StepInitBlocking {
                 .publish(StepParameter::EndPlayerAction(true));
         }
 
-        // Java: if (actingPlayer.isSufferingBloodLust() && (action==MOVE || action==BLITZ_MOVE)) { EndPlayerAction }
+        let action_is_move = matches!(
+            game.acting_player.player_action,
+            Some(PlayerAction::Move) | Some(PlayerAction::BlitzMove)
+        );
+        if game.acting_player.suffering_blood_lust && action_is_move {
+            return StepOutcome::goto(&label);
+        }
 
         let defender_id = match self.block_defender_id.clone() {
             Some(id) => id,

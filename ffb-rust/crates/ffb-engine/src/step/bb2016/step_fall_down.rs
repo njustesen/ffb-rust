@@ -88,7 +88,7 @@ impl StepFallDown {
                 game.field_model.set_player_state(&player_id, state.change_base(PS_RESERVE));
             }
             // Java: UtilBox.putPlayerIntoBox(game, actingPlayer.getPlayer())
-            // TODO: UtilBox not yet ported — player coordinate not removed from field model until UtilBox is implemented
+            // DEFERRED(UtilBox): putPlayerIntoBox not yet ported — player stays on field model
         }
 
         // Java: if (fInjuryType.fallingDownCausesTurnover() && getTurnMode() != PASS_BLOCK)

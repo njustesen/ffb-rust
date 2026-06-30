@@ -9,8 +9,8 @@
 /// Init parameters: GOTO_LABEL_ON_END (mandatory), BLOCK_DEFENDER_ID (optional),
 ///   USING_STAB (optional), MULTI_BLOCK_DEFENDER_ID (optional).
 ///
-/// Note: `actingPlayer.isSufferingBloodLust()` and `actingPlayer.setStrength()` are not
-/// yet ported to the Rust model — blood lust check is stubbed as `false`.
+/// Note: `actingPlayer.setStrength()` not yet ported (acting_player.strength is set externally).
+/// DEFERRED(setStrength): actingPlayer.setStrength(getPlayer().getStrengthWithModifiers()) not yet ported.
 use ffb_model::enums::{PlayerAction, PS_BLOCKED};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -56,8 +56,7 @@ impl StepInitBlocking {
         }
 
         // Java: actingPlayer.isSufferingBloodLust() && (action == MOVE || BLITZ_MOVE)
-        // TODO: isSufferingBloodLust() not yet in Rust model; stub as false.
-        let is_blood_lust = false;
+        let is_blood_lust = game.acting_player.suffering_blood_lust;
         let action_is_move = matches!(
             game.acting_player.player_action,
             Some(PlayerAction::Move) | Some(PlayerAction::BlitzMove)

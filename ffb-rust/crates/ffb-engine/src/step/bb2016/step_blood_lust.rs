@@ -50,7 +50,7 @@ impl Step for StepBloodLust {
         // Java: commandStatus = super.handleCommand(pReceivedCommand)
         // Java: if (commandStatus == EXECUTE_STEP) { executeStep() }
         // All meaningful commands are handled by AbstractStepWithReRoll's super.handleCommand.
-        // TODO: re-roll commands via AbstractStepWithReRoll (not yet translated)
+        // DEFERRED(reroll): re-roll commands via AbstractStepWithReRoll not yet translated
         self.execute_step(game, rng)
     }
 
@@ -70,8 +70,7 @@ impl StepBloodLust {
         // Java: getGameState().executeStepHooks(this, state)
         // The entire step logic is hook-driven. The hooks inspect state.goToLabelOnFailure,
         // run the blood lust roll, and set state.status to SUCCESS or FAILURE.
-        // TODO: executeStepHooks — hook infrastructure not yet translated.
-        // Stub: always advance to NEXT_STEP (hooks will eventually set the real outcome).
+        // DEFERRED(hooks): executeStepHooks — hook infrastructure not yet translated.
         StepOutcome::next()
     }
 }

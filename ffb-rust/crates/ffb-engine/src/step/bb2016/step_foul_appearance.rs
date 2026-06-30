@@ -13,8 +13,8 @@
 ///
 /// Init params: GOTO_LABEL_ON_FAILURE (mandatory).
 ///
-/// TODO: re-roll path (WAITING_FOR_RE_ROLL / TRR) not translated.
-/// TODO: actual Foul Appearance roll threshold from player skill not translated.
+/// DEFERRED(hooks): entire step is hook-driven (executeStepHooks) — roll threshold and re-roll path
+///   not yet ported; inlined approximation (2d6 ≤ 7 = failure) used until hooks are translated.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2016.StepFoulAppearance`.
 use ffb_model::model::game::Game;
