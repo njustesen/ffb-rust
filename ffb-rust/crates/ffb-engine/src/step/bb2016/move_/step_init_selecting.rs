@@ -1,12 +1,16 @@
 use ffb_model::enums::PlayerAction;
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::util_server_steps::change_player_action;
 use crate::util::ServerUtilBlock;
 use crate::util::UtilServerPlayerMove;
+
+const MINIMUM_MOVE_TO_STAND_UP: i32 = 3;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2016.move.StepInitSelecting.
 ///
@@ -26,8 +30,7 @@ use crate::util::UtilServerPlayerMove;
 /// - else → prepareStandingUp, then NEXT_STEP if REMOVE_CONFUSION/STAND_UP/STAND_UP_BLITZ
 ///
 /// DEFERRED(updatePersistence): gameCache.queueDbUpdate not yet ported.
-/// DEFERRED(standingUp): actingPlayer.isStandingUp() paths not yet ported.
-/// DEFERRED(removeConfusion): REMOVE_CONFUSION / STAND_UP_BLITZ paths not yet ported.
+/// DEFERRED(removeConfusion): REMOVE_CONFUSION / STAND_UP_BLITZ dispatch paths not yet ported.
 /// DEFERRED(timeoutEnforced): game.isTimeoutEnforced() not yet ported.
 pub struct StepInitSelecting {
     /// Java: fGotoLabelOnEnd (init param)
@@ -173,7 +176,7 @@ impl Step for StepInitSelecting {
 }
 
 impl StepInitSelecting {
-    fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    pub fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         let label = self.goto_label_on_end.clone();
 
         // TODO(timeoutEnforced): game.isTimeoutEnforced() not yet ported
@@ -191,7 +194,13 @@ impl StepInitSelecting {
             let player_id = game.acting_player.player_id.clone();
             let player_action = game.acting_player.player_action;
             if player_id.is_some() && player_action.is_some() {
-                // TODO(standingUp): if isStandingUp() → prepareStandingUp() + NEXT_STEP
+                // Java: if (actingPlayer.isStandingUp()) { prepareStandingUp(); NEXT_STEP }
+                //       else { GOTO_LABEL }
+                if game.acting_player.standing_up {
+                    self.prepare_standing_up(game);
+                    return StepOutcome::next()
+                        .publish(StepParameter::DispatchPlayerAction(Some(dispatch_action)));
+                }
                 return StepOutcome::goto(&label)
                     .publish(StepParameter::DispatchPlayerAction(Some(dispatch_action)));
             }
@@ -212,7 +221,23 @@ impl StepInitSelecting {
             }
 
             if action.is_moving() {
-                // TODO(standingUp): isStandingUp + canStandUpForFree path not yet ported
+                // Java: if (isStandingUp && !canStandUpForFree)
+                //           setCurrentMove(min(MINIMUM_MOVE_TO_STAND_UP, movementWithModifiers))
+                //           setGoingForIt(UtilPlayer.isNextMoveGoingForIt)
+                if game.acting_player.standing_up {
+                    let can_stand_up_for_free = game.acting_player.player_id.as_deref()
+                        .and_then(|id| game.player(id))
+                        .map(|p| p.has_skill_property(NamedProperties::CAN_STAND_UP_FOR_FREE))
+                        .unwrap_or(false);
+                    if !can_stand_up_for_free {
+                        let movement_with_modifiers = game.acting_player.player_id.as_deref()
+                            .and_then(|id| game.player(id))
+                            .map(|p| p.movement_with_modifiers())
+                            .unwrap_or(MINIMUM_MOVE_TO_STAND_UP);
+                        game.acting_player.current_move = movement_with_modifiers.min(MINIMUM_MOVE_TO_STAND_UP);
+                        game.acting_player.goes_for_it = UtilPlayer::is_next_move_going_for_it(game);
+                    }
+                }
                 let jumping = game.acting_player.jumping;
                 UtilServerPlayerMove::update_move_squares(game, jumping);
             }
@@ -373,6 +398,55 @@ mod tests {
         let out = step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
         // EndTurn sets end_turn → GotoLabel with EndTurn
         assert_eq!(out.action, StepAction::GotoLabel);
+    }
+
+    #[test]
+    fn standing_up_player_with_dispatch_returns_next_step() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use std::collections::HashSet;
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 4, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        game.acting_player.standing_up = true;
+        let mut step = StepInitSelecting::new("end".into());
+        step.dispatch_player_action = Some(PlayerAction::Move);
+        // standing_up + dispatch → prepareStandingUp + NEXT_STEP
+        let out = step.execute_step(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn standing_up_sets_current_move_to_min_of_ma_and_minimum_stand_up() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use std::collections::HashSet;
+        let mut game = make_game();
+        // Player with MA=4 (> MINIMUM_MOVE_TO_STAND_UP=3)
+        game.team_home.players.push(Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 4, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        game.acting_player.standing_up = true;
+        let mut step = StepInitSelecting::new("end".into());
+        step.dispatch_player_action = Some(PlayerAction::Move);
+        step.execute_step(&mut game, &mut GameRng::new(0));
+        // MA=4 but capped to MINIMUM_MOVE_TO_STAND_UP=3
+        assert_eq!(game.acting_player.current_move, 3);
     }
 
     #[test]
