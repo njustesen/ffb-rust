@@ -1,4 +1,4 @@
-use ffb_model::enums::PlayerAction;
+use ffb_model::enums::{PlayerAction, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
@@ -82,9 +82,12 @@ impl StepHypnoticGaze {
 
         // Java: doGaze = (playerAction==GAZE) && (defender!=null) && (defender.team != actingTeam)
         let defender_id = game.defender_id.clone();
+        let defender_on_other_team = defender_id.as_deref()
+            .map(|def| !game.is_active_team_player(def))
+            .unwrap_or(false);
         let do_gaze_initial = player_action == Some(PlayerAction::Gaze)
-            && defender_id.is_some();
-        // TODO(teamCheck): defender.team != actingTeam check not yet ported
+            && defender_id.is_some()
+            && defender_on_other_team;
 
         if !do_gaze_initial {
             game.defender_id = None;
@@ -117,7 +120,11 @@ impl StepHypnoticGaze {
 
         if do_gaze {
             // Java: actingPlayer.markSkillUsed(gazeSkill)
-            // TODO: markSkillUsed not yet ported
+            if let Some(pid) = player_id.as_deref() {
+                if let Some(p) = game.team_home.player_mut(pid).or_else(|| game.team_away.player_mut(pid)) {
+                    p.used_skills.insert(SkillId::HypnoticGaze);
+                }
+            }
 
             let roll = rng.d6();
 
@@ -167,13 +174,39 @@ mod tests {
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::{StepAction, StepParameter};
-    use ffb_model::enums::Rules;
+    use ffb_model::enums::{Rules, SkillId};
+    use ffb_model::model::player::Player;
+    use ffb_model::model::skill_def::SkillWithValue;
+    use ffb_model::types::FieldCoordinate;
     use ffb_model::util::rng::GameRng;
 
     fn make_game() -> Game {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2016)
+    }
+
+    fn setup_gaze_game() -> (Game, StepHypnoticGaze) {
+        let mut game = make_game();
+        let mut attacker = Player::default();
+        attacker.id = "a1".into();
+        attacker.agility = 3;
+        attacker.starting_skills.push(SkillWithValue::new(SkillId::HypnoticGaze));
+        game.team_home.players.push(attacker);
+        game.field_model.set_player_coordinate("a1", FieldCoordinate::new(5, 5));
+
+        let mut defender = Player::default();
+        defender.id = "d1".into();
+        game.team_away.players.push(defender);
+        game.field_model.set_player_coordinate("d1", FieldCoordinate::new(6, 5));
+
+        game.home_playing = true;
+        game.acting_player.player_id = Some("a1".into());
+        game.acting_player.player_action = Some(PlayerAction::Gaze);
+        game.defender_id = Some("d1".into());
+
+        let step = StepHypnoticGaze::new("end".into());
+        (game, step)
     }
 
     #[test]
@@ -247,5 +280,39 @@ mod tests {
     fn unrecognised_parameter_returns_false() {
         let mut step = StepHypnoticGaze::new("end".into());
         assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
+    }
+
+    #[test]
+    fn defender_on_same_team_skips_gaze() {
+        // Defender is on home team (same as acting player) → do_gaze_initial = false
+        let (mut game, mut step) = setup_gaze_game();
+        // Override defender to be on home team
+        let mut same_team_def = Player::default();
+        same_team_def.id = "d_same".into();
+        game.team_home.players.push(same_team_def);
+        game.field_model.set_player_coordinate("d_same", FieldCoordinate::new(6, 5));
+        game.defender_id = Some("d_same".into());
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn gaze_marks_skill_used_on_gazer() {
+        let (mut game, mut step) = setup_gaze_game();
+        game.turn_data_home.rerolls = 0;
+        step.start(&mut game, &mut GameRng::new(0));
+        let used = game.team_home.player("a1")
+            .map(|p| p.used_skills.contains(&SkillId::HypnoticGaze))
+            .unwrap_or(false);
+        assert!(used);
+    }
+
+    #[test]
+    fn gaze_with_opposite_team_defender_goes_to_end_label() {
+        let (mut game, mut step) = setup_gaze_game();
+        game.turn_data_home.rerolls = 0;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.goto_label.as_deref(), Some("end"));
     }
 }

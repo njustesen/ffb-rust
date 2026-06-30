@@ -1,6 +1,7 @@
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -25,10 +26,7 @@ use crate::util::UtilServerPlayerMove;
 /// - If remaining move stack empty: updateMoveSquares + updateDiceDecorations
 /// - NEXT_STEP
 ///
-/// TODO(trackNumber): addTrackNumber not yet ported.
-/// TODO(rushingStat): rushingStats deltaX update not yet ported.
-/// TODO(goingForIt): actingPlayer.setGoingForIt logic not yet ported.
-/// TODO(gamescore): updateGameScore not yet ported.
+/// DEFERRED(trackNumber): TrackNumber animation not ported — no Rust FieldModel.track_numbers field.
 pub struct StepMove {
     /// Java: fCoordinateFrom
     pub coordinate_from: Option<FieldCoordinate>,
@@ -87,26 +85,44 @@ impl StepMove {
         let move_increment = if jumping { 2 } else { 1 };
         game.acting_player.current_move += move_increment;
 
-        // Java: addTrackNumber(actingPlayer, coordinateTo)
-        // TODO(trackNumber): not yet ported
+        // Java: game.getFieldModel().add(trackNumber)
+        // DEFERRED(trackNumber): TrackNumber animation not ported — no Rust FieldModel.track_numbers field
 
         // Java: updatePlayerAndBallPosition(actingPlayer, coordinateTo)
         if let Some(ref player_id) = game.acting_player.player_id.clone() {
             let old_pos = game.field_model.player_coordinate(player_id);
-            // If player has ball, move ball too
-            if let (Some(ball_pos), Some(old)) = (game.field_model.ball_coordinate, old_pos) {
+            let ball_position_updated = if let (Some(ball_pos), Some(old)) = (game.field_model.ball_coordinate, old_pos) {
                 if ball_pos == old && !game.field_model.ball_moving {
                     game.field_model.ball_coordinate = Some(coordinate_to);
+                    true
+                } else {
+                    false
                 }
-            }
+            } else {
+                false
+            };
             game.field_model.set_player_coordinate(player_id, coordinate_to);
+
+            // Java: if (ballPositionUpdated) { playerResult.setRushing(rushing + deltaX) }
+            if ball_position_updated {
+                let from_x = self.coordinate_from.map(|c| c.x).unwrap_or(coordinate_to.x);
+                let delta_x = if game.home_playing {
+                    coordinate_to.x - from_x
+                } else {
+                    from_x - coordinate_to.x
+                };
+                let is_home = game.team_home.player(player_id).is_some();
+                let pr = if is_home {
+                    game.game_result.home.player_results.entry(player_id.clone()).or_default()
+                } else {
+                    game.game_result.away.player_results.entry(player_id.clone()).or_default()
+                };
+                pr.rushing += delta_x;
+            }
+
+            // Java: actingPlayer.setGoingForIt(UtilPlayer.isNextMoveGoingForIt(game))
+            game.acting_player.goes_for_it = UtilPlayer::is_next_move_going_for_it(game);
         }
-
-        // Java: if rushingStat deltaX not zero → update stat
-        // TODO(rushingStat): not yet ported
-
-        // Java: if (actingPlayer.isGoingForIt()) actingPlayer.setGoesForIt(false)
-        // TODO(goingForIt): isGoingForIt / setGoesForIt not yet ported
 
         // Java: if (fMoveStackSize == 0) updateMoveSquares + updateDiceDecorations
         if self.move_stack_size == 0 {
@@ -274,5 +290,89 @@ mod tests {
     fn unrecognised_parameter_returns_false() {
         let mut step = StepMove::new();
         assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
+    }
+
+    #[test]
+    fn rushing_stat_updated_when_ball_moves_with_player_home_playing() {
+        let mut game = make_game();
+        let from = FieldCoordinate::new(5, 5);
+        let to = FieldCoordinate::new(7, 5); // +2 in x
+        add_player(&mut game, "p1", from);
+        game.home_playing = true;
+        game.field_model.ball_coordinate = Some(from);
+        game.field_model.ball_moving = false;
+        let mut step = StepMove::new();
+        step.coordinate_from = Some(from);
+        step.coordinate_to = Some(to);
+        step.start(&mut game, &mut GameRng::new(0));
+        let rushing = game.game_result.home.player_results.get("p1").map(|pr| pr.rushing).unwrap_or(0);
+        assert_eq!(rushing, 2); // to.x(7) - from.x(5) = 2
+    }
+
+    #[test]
+    fn rushing_stat_uses_from_minus_to_when_away_playing() {
+        let mut game = make_game();
+        let from = FieldCoordinate::new(7, 5);
+        let to = FieldCoordinate::new(5, 5); // moving in negative x direction
+        add_player(&mut game, "p1", from);
+        game.home_playing = false;
+        game.field_model.ball_coordinate = Some(from);
+        game.field_model.ball_moving = false;
+        let mut step = StepMove::new();
+        step.coordinate_from = Some(from);
+        step.coordinate_to = Some(to);
+        step.start(&mut game, &mut GameRng::new(0));
+        // away playing: delta_x = from.x(7) - to.x(5) = 2 → rushing = 2
+        let rushing = game.game_result.home.player_results.get("p1").map(|pr| pr.rushing).unwrap_or(0);
+        assert_eq!(rushing, 2);
+    }
+
+    #[test]
+    fn rushing_stat_not_updated_when_ball_not_at_player_position() {
+        let mut game = make_game();
+        let from = FieldCoordinate::new(5, 5);
+        let to = FieldCoordinate::new(7, 5);
+        add_player(&mut game, "p1", from);
+        game.home_playing = true;
+        // ball is elsewhere — player does not carry it
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(3, 3));
+        game.field_model.ball_moving = false;
+        let mut step = StepMove::new();
+        step.coordinate_from = Some(from);
+        step.coordinate_to = Some(to);
+        step.start(&mut game, &mut GameRng::new(0));
+        let rushing = game.game_result.home.player_results.get("p1").map(|pr| pr.rushing).unwrap_or(0);
+        assert_eq!(rushing, 0);
+    }
+
+    #[test]
+    fn goes_for_it_set_after_move_when_at_ma() {
+        // Player with MA=4, current_move starts at 3 → after +1 = 4 = MA → going for it
+        let mut game = make_game();
+        let from = FieldCoordinate::new(5, 5);
+        let to = FieldCoordinate::new(6, 5);
+        add_player(&mut game, "p1", from);
+        game.acting_player.current_move = 3; // will become 4 after increment
+        let mut step = StepMove::new();
+        step.coordinate_from = Some(from);
+        step.coordinate_to = Some(to);
+        step.start(&mut game, &mut GameRng::new(0));
+        // current_move is now 4 which equals MA(4), so next move is GFI
+        assert!(game.acting_player.goes_for_it);
+    }
+
+    #[test]
+    fn goes_for_it_false_when_well_within_ma() {
+        // Player with MA=4, current_move starts at 0 → after +1 = 1, well below MA
+        let mut game = make_game();
+        let from = FieldCoordinate::new(5, 5);
+        let to = FieldCoordinate::new(6, 5);
+        add_player(&mut game, "p1", from);
+        game.acting_player.current_move = 0;
+        let mut step = StepMove::new();
+        step.coordinate_from = Some(from);
+        step.coordinate_to = Some(to);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.acting_player.goes_for_it);
     }
 }
