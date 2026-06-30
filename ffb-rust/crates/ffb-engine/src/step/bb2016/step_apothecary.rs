@@ -182,8 +182,18 @@ impl StepApothecary {
     /// Java: rollApothecary() — roll new casualty, compare, show choice dialog if needed.
     /// Returns true if a choice dialog was shown (caller must wait), false otherwise.
     fn roll_apothecary(&mut self, game: &mut Game, rng: &mut GameRng) -> bool {
-        // Java: useApothecary() for the correct team
-        // TODO: game.getTurnDataHome/Away().useApothecary()
+        // Java: useApothecary() — decrement the correct team's apothecary count
+        let defender_on_home_team = self.injury_result.as_ref()
+            .and_then(|ir| ir.injury_context.defender_id.as_deref())
+            .map(|id| game.team_home.has_player(id))
+            .unwrap_or(false);
+        if defender_on_home_team {
+            if game.turn_data_home.apothecaries > 0 {
+                game.turn_data_home.apothecaries -= 1;
+            }
+        } else if game.turn_data_away.apothecaries > 0 {
+            game.turn_data_away.apothecaries -= 1;
+        }
 
         let ir = match self.injury_result.as_ref() {
             Some(ir) => ir,
@@ -197,7 +207,7 @@ impl StepApothecary {
 
         if apothecary_choice {
             // Java: roll new casualty, show DialogApothecaryChoiceParameter
-            let _new_roll = rng.d6(); // TODO: rollCasualty uses 2d6
+            let _new_roll = rng.d6() + rng.d6(); // Java: rollCasualty() rolls 2d6
             // TODO: emit ApothecaryRoll event with new result
             // TODO: if new result also not BADLY_HURT → show choice dialog → return true
             // Approximation: always treat as BADLY_HURT (no choice needed)
