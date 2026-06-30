@@ -6,9 +6,9 @@
 
 **engine.rs deleted.** `driver.rs` is now the live code path — `Box<dyn Step>` dispatch via `make_step()`, `DriverGameState` game loop, `GameState` type alias for backward compat.
 
-**Translation progress:** ~1,665/2,521 files formally implemented = **~66.1%**
+**Translation progress:** ~1,693/2,521 files formally implemented = **~67%**
 
-**Tests:** 5,496 passing (1 ignored)
+**Tests:** 5,528 passing (1 ignored)
 
 **Next phase:** Phase R
 
@@ -35,7 +35,15 @@
 - **Phase N** (2026-06-30): 129 skillbehaviour files (bb2025×40, bb2020×39, bb2016×34, mixed×14, common×1) — `execute_step_hook` method + 2 tests per file. SkillBehaviour trait extended with default `execute_step_hook(&self, game) -> bool` → 4,439 tests
 - **Phase O** (2026-06-30): BB2020 block/ (9 files), move_/ (11 files), foul/ (3), gaze/ (2), inducements/ (3), kickoff/ (2), start/ (1), end/ (5), multiblock/ (4) — 40 files total, full Java translation with ≥3 tests per file. StepOutcome extended with `events`/`prompt` fields + `with_event`/`with_prompt`/`with_events` methods. StepParameter variants typed (ApothecaryMode, BlockResult, InjuryResult, SteadyFootingContext, DropPlayerContext, InducementPhase, DispatchPlayerAction). CatchScatterThrowInMode PascalCase→SCREAMING_SNAKE_CASE fixed across all files. StepId::BloodLust/PlayCard added. → 4,828 tests
 - **Phase P** (2026-06-30): BB2020 pass/ (6 files: StepPass, StepEndPassing, StepIntercept, StepHailMaryPass, StepMissedPass, StepResolvePass), BB2020 shared/StepCatchScatterThrowIn (~700 lines, 14 tests), BB2020 ttm/StepAlwaysHungry (17 tests, 4 blockers resolved), mixed/block/ (StepBlockBallAndChain, StepProjectileVomit), mixed/blitz/ (StepRemoveTargetSelectionState, StepSelectBlitzTargetEnd), mixed/inducements/StepPlayCard, mixed/end/StepPenaltyShootout, mixed/special/StepEndBomb, mixed/ttm/ (StepSwoop, TtmToCrowdHandler), mixed/kickoff/ (StepInitKickoff, StepKickoff, StepSwarming), mixed/move_/ (StepMoveBallAndChain, StepResetFumblerooskie, StepTentacles, StepTrapDoor), mixed/pass/ (StepAllYouCanEat, StepInitPassing, StepPassBlock), mixed/multiblock/ (AbstractStepMultiple, StepDauntlessMultiple, StepFoulAppearanceMultiple), mixed/shared/ (StepAnimalSavagery, StepPickMeUp). ffb-model: `penalty_score: i32` added to TeamResult. Action variants added: UseReRollForTarget, LordOfChaosChoice, IndomitableChoice, PlayerChoice. Network encoder updated for new action variants. → 5,045 tests
-- **Phase Q** (2026-06-30): Root generator params (32 files) — abstract class SequenceParams translated to Rust structs. Calc utilities wave 1 (10 files: AgilityCalc, BlockDiceCalc, CatchCalc, FoulCalc, MovementCalc, PassCalc, PassingDistanceCalc, RollCalc, ScatterCalc). Calc utilities wave 2 (7 files: KickoffEventCalc, PostMatchCalc, SpecialRollCalc, StatCalc, ThrowInCalc, WeatherCalc, MarkerLoadingService). Server utilities wave 1 (6 files: UtilServerGame, UtilServerDialog, UtilServerSetup, UtilServerStartGame, UtilServerInducementUse, UtilServerPlayerSwoop). Phase step tests (4 files). Mixed step test gaps (18 tests). BB2020 StepInitBomb improved (5 fields + execute_step logic). BB2020 generators verified against Java source. → 5,496 tests
+- **Phase Q** (2026-06-30): Generator completions + server utility wave
+  - Completed all 15 BB2016 generators + 26 BB2020 generators (unit tests pass, marked ✓)
+  - Implemented 32 root abstract generator param structs
+  - Added 10 calc utility files: agility_calc, block_dice, block_result, catch, foul, movement, pass, passing_distance, roll, scatter
+  - Added 7 more calc utils: kickoff_event, post_match, special_roll, stat, throw_in, weather, marker_loading
+  - Added 6 game/dialog/setup server utils: util_server_game, util_server_dialog, util_server_setup, util_server_start_game, util_server_inducement_use, util_server_player_swoop
+  - Added 4 block/player/pushback utils: server_util_block, server_util_player, util_server_pushback, util_server_player_move
+  - Filled test gaps in mixed steps (3A) and phase steps + StepInitBomb (3B)
+  - +428 new tests (5100 → 5528)
 
 ---
 

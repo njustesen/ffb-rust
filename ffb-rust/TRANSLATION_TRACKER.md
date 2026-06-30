@@ -33,8 +33,8 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 |--------|-------|
 | Total Java files in scope | 2521 |
 | Not started (○) | 0 |
-| Partial (~) | 1201 |
-| Done (✓) | 1320 |
+| Partial (~) | 1197 |
+| Done (✓) | 1324 |
 | Not translating (—) | 458 |
 
 ---
@@ -2604,8 +2604,8 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 | `server/util/rng/NetworkEntropySource.java` | `ffb-engine` | `src/util/rng/network_entropy_source.rs` | ~ |
 | `server/util/RollCalc.java` | `ffb-engine` | `src/util/roll_calc.rs` | ✓ |
 | `server/util/ScatterCalc.java` | `ffb-engine` | `src/util/scatter_calc.rs` | ✓ |
-| `server/util/ServerUtilBlock.java` | `ffb-engine` | `src/util/server_util_block.rs` | ~ |
-| `server/util/ServerUtilPlayer.java` | `ffb-engine` | `src/util/server_util_player.rs` | ~ |
+| `server/util/ServerUtilBlock.java` | `ffb-engine` | `src/util/server_util_block.rs` | ✓ |
+| `server/util/ServerUtilPlayer.java` | `ffb-engine` | `src/util/server_util_player.rs` | ✓ |
 | `server/util/SpecialRollCalc.java` | `ffb-engine` | `src/util/special_roll_calc.rs` | ✓ |
 | `server/util/StatCalc.java` | `ffb-engine` | `src/util/stat_calc.rs` | ✓ |
 | `server/util/ThrowInCalc.java` | `ffb-engine` | `src/util/throw_in_calc.rs` | ✓ |
@@ -2617,9 +2617,9 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 | `server/util/UtilServerHttpClient.java` | `ffb-engine` | `src/util/util_server_http_client.rs` | ~ |
 | `server/util/UtilServerInducementUse.java` | `ffb-engine` | `src/util/util_server_inducement_use.rs` | ✓ |
 | `server/util/UtilServerInjury.java` | `ffb-engine` | `src/util/util_server_injury.rs` | ✓ |
-| `server/util/UtilServerPlayerMove.java` | `ffb-engine` | `src/util/util_server_player_move.rs` | ~ |
+| `server/util/UtilServerPlayerMove.java` | `ffb-engine` | `src/util/util_server_player_move.rs` | ✓ |
 | `server/util/UtilServerPlayerSwoop.java` | `ffb-engine` | `src/util/util_server_player_swoop.rs` | ✓ |
-| `server/util/UtilServerPushback.java` | `ffb-engine` | `src/util/util_server_pushback.rs` | ~ |
+| `server/util/UtilServerPushback.java` | `ffb-engine` | `src/util/util_server_pushback.rs` | ✓ |
 | `server/util/UtilServerReplay.java` | `ffb-engine` | `src/util/util_server_replay.rs` | ~ |
 | `server/util/UtilServerReRoll.java` | `ffb-engine` | `src/util/util_server_re_roll.rs` | ~ |
 | `server/util/UtilServerSetup.java` | `ffb-engine` | `src/util/util_server_setup.rs` | ✓ |
