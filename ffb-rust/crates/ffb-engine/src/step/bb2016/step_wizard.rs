@@ -1,4 +1,5 @@
 use ffb_model::enums::TurnMode;
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::SpecialEffect;
 use ffb_model::types::FieldCoordinate;
@@ -121,15 +122,21 @@ impl StepWizard {
                 // Java: ZAP → 1 player at coord
                 // Java: LIGHTNING → 1 player at coord
                 // Java: FIREBALL → 1 + 8 adjacent players (3×3)
-                // TODO: UtilServerInducementUse.useInducement
-                // TODO: SequenceGeneratorFactory.SpecialEffect.pushSequence for each affected player
+                // DEFERRED(useInducement): UtilServerInducementUse.useInducement not yet ported.
+                // DEFERRED(generator): SequenceGeneratorFactory.SpecialEffect.pushSequence not yet ported.
                 // Restore old turn mode
                 if let Some(old_mode) = self.old_turn_mode {
                     game.turn_mode = old_mode;
                 }
-                // TODO: emit ReportWizardUse event
-                // TODO: push SpecialEffect sequences per affected player
-                return StepOutcome::next();
+                // Java: getResult().addReport(new ReportWizardUse(gameState.getActingTeam().getId(), spell, coord))
+                let team_id = if self.home_team { game.team_home.id.clone() } else { game.team_away.id.clone() };
+                let wizard_event = GameEvent::WizardUse {
+                    team_id,
+                    spell: format!("{:?}", spell),
+                    coord: Some(self.transform_coord(coord, game)),
+                };
+                // DEFERRED(generator): SpecialEffect sequences per player not yet ported.
+                return StepOutcome::next().with_event(wizard_event);
             }
         }
 
@@ -138,7 +145,7 @@ impl StepWizard {
             self.old_turn_mode = Some(game.turn_mode);
         }
         game.turn_mode = TurnMode::Wizard;
-        // TODO: UtilServerDialog.showDialog(DialogWizardSpellParameter)
+        // DEFERRED(dialog): UtilServerDialog.showDialog(DialogWizardSpellParameter) not yet ported.
         StepOutcome::cont()
     }
 }

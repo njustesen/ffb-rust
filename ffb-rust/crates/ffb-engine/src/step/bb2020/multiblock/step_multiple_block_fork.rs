@@ -37,9 +37,9 @@
 ///
 ///   → NEXT_STEP
 ///
-/// TODO(fork-sequence): SequenceStep builder + push_seq deferred until Sequence infrastructure ported.
-/// TODO(fork-block-target): BlockTarget is partially ported (player_id, kind, original_player_state).
-/// TODO(fork-publish): publishParameter for OLD_DEFENDER_STATE / USING_STAB deferred.
+/// DEFERRED(fork-sequence): SequenceStep builder + push_seq deferred until Sequence infrastructure ported.
+/// DEFERRED(fork-block-target): BlockTarget is partially ported (player_id, kind, original_player_state).
+/// DEFERRED(fork-publish): publishParameter for OLD_DEFENDER_STATE / USING_STAB deferred.
 use ffb_model::model::block_kind::BlockKind;
 use ffb_model::model::block_target::BlockTarget;
 use ffb_model::model::game::Game;
@@ -113,7 +113,7 @@ impl StepMultipleBlockFork {
                             .filter_map(|t| t.get_player_id().cloned())
                             .collect(),
                     ),
-                    // TODO(fork-consume-parameter): pass parameterToConsume when ParametersToConsume is wired
+                    // DEFERRED(fork-consume-parameter): pass parameterToConsume when ParametersToConsume is wired
                 ],
             ));
 

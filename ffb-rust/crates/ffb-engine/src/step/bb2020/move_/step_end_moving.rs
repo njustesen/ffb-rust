@@ -4,6 +4,8 @@ use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
+use ffb_mechanics::bb2020::ttm_mechanic::TtmMechanic as Bb2020TtmMechanic;
+use ffb_mechanics::ttm_mechanic::TtmMechanic as TtmMechanicTrait;
 use crate::step::util_server_steps::{change_player_action, check_touchdown};
 use crate::util::{ServerUtilBlock, UtilServerPlayerMove};
 use crate::action::Action;
@@ -24,10 +26,7 @@ use crate::step::generator::bb2020::throw_team_mate::ThrowTeamMateParams;
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2020.move.StepEndMoving.
 ///
 /// Finalises the move action. BB2020 differs from BB2025 only in using BB2020 generators.
-///
-/// TODO(secureTheBall): secureTheBallFailed logic not yet ported.
-/// TODO(ktm): canKickTeamMate / canThrowTeamMate checks not yet ported.
-/// TODO(askBlockKind): GameOption ALLOW_SPECIAL_BLOCKS_WITH_BALL_AND_CHAIN check not yet ported.
+/// allowSpecialBlocksWithBallAndChain option → askForBlockKind wired in ball-and-chain branch.
 pub struct StepEndMoving {
     /// Java: fEndTurn
     pub end_turn: bool,
@@ -154,9 +153,29 @@ impl StepEndMoving {
 
         // ── Branch 2: block defender set (ball-and-chain) ───────────────────────
         if let Some(ref defender_id) = self.block_defender_id.clone() {
+            // Java: askForBlockKind check (GameOptionBoolean ALLOW_SPECIAL_BLOCKS_WITH_BALL_AND_CHAIN)
+            let ask_for_block_kind = if game.options.is_enabled("allowSpecialBlocksWithBallAndChain") {
+                let defender_state = game.field_model.player_state(defender_id);
+                let acting_has_alt = game.acting_player.player_id.as_deref()
+                    .and_then(|id| game.player(id))
+                    .map(|p| p.has_skill_property(NamedProperties::PROVIDES_BLOCK_ALTERNATIVE))
+                    .unwrap_or(false);
+                let defender_not_prone_stunned = defender_state
+                    .map(|s| !s.is_stunned() && !s.is_prone_or_stunned())
+                    .unwrap_or(false);
+                if acting_has_alt && defender_not_prone_stunned {
+                    game.defender_id = Some(defender_id.clone());
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
             let seq = Block::build_sequence(&BlockParams {
                 block_defender_id: Some(defender_id.clone()),
                 using_chainsaw: self.using_chainsaw,
+                ask_for_block_kind,
                 ..Default::default()
             });
             return StepOutcome::next().push_seq(seq);
@@ -220,8 +239,8 @@ impl StepEndMoving {
             || (player_action == Some(PlayerAction::FoulMove) && UtilPlayer::can_foul(game, pid))
             || (player_action == Some(PlayerAction::GazeMove)
                 && UtilPlayer::has_adjacent_gaze_target(game, pid))
-            // DEFERRED(ktm): KickTeamMateMove && canKickTeamMate not yet ported
-            // DEFERRED(ktm): ThrowTeamMateMove && canThrowTeamMate not yet ported
+            || (player_action == Some(PlayerAction::KickTeamMateMove) && can_kick_team_mate(game, pid, true))
+            || (player_action == Some(PlayerAction::ThrowTeamMateMove) && can_throw_team_mate(game, pid, false))
             || (is_blitz_move && adjacent_target)
             || (player_action == Some(PlayerAction::PuntMove) && has_ball);
         if can_make_next_move {
@@ -291,6 +310,25 @@ impl StepEndMoving {
             _ => None,
         }
     }
+}
+
+/// Java: UtilPlayer.canKickTeamMate(game, kicker, checkBlitzUsed).
+fn can_kick_team_mate(game: &Game, player_id: &str, check_blitz_used: bool) -> bool {
+    let player = match game.player(player_id) { Some(p) => p, None => return false };
+    if check_blitz_used && game.turn_data().blitz_used { return false; }
+    use ffb_model::model::property::named_properties::NamedProperties;
+    if !player.has_skill_property(NamedProperties::CAN_KICK_TEAM_MATES) { return false; }
+    let mechanic = Bb2020TtmMechanic::new();
+    !mechanic.find_kickable_team_mates(game, player).is_empty()
+}
+
+/// Java: UtilPlayer.canThrowTeamMate(game, thrower, checkPassUsed).
+fn can_throw_team_mate(game: &Game, player_id: &str, check_pass_used: bool) -> bool {
+    let player = match game.player(player_id) { Some(p) => p, None => return false };
+    let mechanic = Bb2020TtmMechanic::new();
+    if check_pass_used && !mechanic.is_ttm_available(game.turn_data()) { return false; }
+    if !mechanic.can_throw(game, player) { return false; }
+    !mechanic.find_throwable_team_mates(game, player).is_empty()
 }
 
 #[cfg(test)]

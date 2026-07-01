@@ -1,12 +1,11 @@
 /// Root-level abstract base for the Select step sequence generator.
 /// Mirrors Java `com.fumbbl.ffb.server.step.generator.Select`.
-// TODO: replace String placeholder with ffb_model::model::BlockTarget once available
+use ffb_model::model::block_target::BlockTarget;
 
 #[derive(Debug, Clone, Default)]
 pub struct SelectParams {
-    /// BlockTarget list — using String as placeholder until BlockTarget is re-exported
-    /// from ffb_model. TODO: use proper BlockTarget type.
-    pub block_target_ids: Vec<String>,
+    /// BlockTarget list.
+    pub block_targets: Vec<BlockTarget>,
     pub update_persistence: bool,
 }
 
@@ -27,7 +26,7 @@ mod tests {
     #[test]
     fn select_params_default_empty_targets() {
         let p = SelectParams::default();
-        assert!(p.block_target_ids.is_empty());
+        assert!(p.block_targets.is_empty());
     }
 
     #[test]
@@ -39,5 +38,12 @@ mod tests {
     #[test]
     fn select_struct_is_default() {
         let _ = Select::default();
+    }
+
+    #[test]
+    fn select_params_accepts_block_target() {
+        let bt = BlockTarget::default();
+        let p = SelectParams { block_targets: vec![bt], ..Default::default() };
+        assert_eq!(p.block_targets.len(), 1);
     }
 }

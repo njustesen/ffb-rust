@@ -31,6 +31,23 @@ impl UtilCards {
         player.all_skill_ids()
             .find(|id| id.properties().contains(&property) && !player.used_skills.contains(id))
     }
+
+    /// Java: `hasSkillToCancelProperty(Player<?> player, ISkillProperty property)`.
+    ///
+    /// Returns true if the player has any skill with a CancelSkillProperty that cancels
+    /// the given named property. In the Rust skill system, CancelSkillProperty(X) is
+    /// registered as the string `"cancels" + X` (e.g. `"cancelsDodge"` cancels `"canDodge"`).
+    pub fn has_skill_to_cancel_property(player: &Player, property: &str) -> bool {
+        // Build the cancel-property name: "cancels" + property with first char uppercased.
+        let cancel_prop = if property.is_empty() {
+            "cancels".to_string()
+        } else {
+            let mut chars = property.chars();
+            let first = chars.next().unwrap().to_uppercase().to_string();
+            format!("cancels{}{}", first, chars.as_str())
+        };
+        player.has_skill_property(&cancel_prop)
+    }
 }
 
 impl Default for UtilCards {

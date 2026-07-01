@@ -4,18 +4,11 @@
 /// selection was cancelled push Select; if a target was selected push Move (bloodlust) or
 /// Select + change action to GAZE_MOVE; otherwise push EndMoving.
 ///
-/// TODOs:
-///  - TODO(target-selection-state): TargetSelectionState from game.field_model not translated;
-///    the full isCanceled() / isSelected() branching is approximated (see comments).
-///  - TODO(target-selection-state): changePlayerAction(null, null) on cancel path not translated.
-///  - TODO(target-selection-state): setTargetSelectionState(null) on cancel path not translated.
-///  - TODO(target-selection-state): setPlayerState (changeSelectedGazeTarget(false)) on Move path not translated.
-///  - TODO(target-selection-state): setDefenderId(null) on Move path not translated.
-///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2020.gaze.StepSelectGazeTargetEnd`.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::PlayerAction;
+use ffb_model::enums::PlayerState;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -83,51 +76,70 @@ impl StepSelectGazeTargetEnd {
             return StepOutcome::next().push_seq(seq);
         }
 
-        // TODO(target-selection-state): targetSelectionState is not yet exposed on game.field_model.
-        // The full Java logic branches on targetSelectionState.isCanceled() / isSelected() / else.
-        // Since we cannot read TargetSelectionState here, we approximate with the most-common path:
-        // push Select(update_persistence=false) — this matches the isSelected() + non-bloodlust branch
-        // (change action to GAZE_MOVE, push Select). The bloodlust and EndMoving paths require
-        // TargetSelectionState to be implemented.
-        //
-        // Java isCanceled() path:
-        //   changePlayerAction(null, null, false)
-        //   setTargetSelectionState(null)
-        //   Select(update_persistence=false)
-        //
-        // Java isSelected() + bloodlust path:
-        //   setPlayerState(target, changeSelectedGazeTarget(false))
-        //   setDefenderId(null)
-        //   changePlayerAction(actingPlayer, bloodlustAction, false)
-        //   Move.pushSequence()
-        //
-        // Java isSelected() + no bloodlust path:
-        //   changePlayerAction(actingPlayer, GAZE_MOVE, false)
-        //   Select(update_persistence=false)
-        //
-        // Java else (neither canceled nor selected, i.e. targetSelectionState != null but status unknown):
-        //   push Sequence { EndMoving with END_PLAYER_ACTION=true }
+        // Java: TargetSelectionState targetSelectionState = game.getFieldModel().getTargetSelectionState();
+        let is_canceled = game.field_model.target_selection_state.as_ref()
+            .map(|ts| ts.is_canceled())
+            .unwrap_or(false);
+        let is_selected = game.field_model.target_selection_state.as_ref()
+            .map(|ts| ts.is_selected())
+            .unwrap_or(false);
+        let target_player_id = game.field_model.target_selection_state.as_ref()
+            .and_then(|ts| ts.get_selected_player_id().cloned());
 
-        // Approximation: check bloodlust first (can check without TargetSelectionState).
+        let player_id = game.acting_player.player_id.clone();
+
+        // Java isCanceled() path:
+        //   changePlayerAction(null, null, false); setTargetSelectionState(null); Select(false)
+        if is_canceled {
+            game.field_model.target_selection_state = None;
+            if let Some(ref pid) = player_id {
+                util_server_steps::change_player_action(game, pid, PlayerAction::Move, false);
+            }
+            let seq = Select::build_sequence(&SelectParams {
+                update_persistence: false,
+                is_blitz_move: false,
+                block_targets: vec![],
+            });
+            return StepOutcome::next().push_seq(seq);
+        }
+
         let suffering_blood_lust = game.acting_player.suffering_blood_lust;
-        if suffering_blood_lust {
+
+        // Java isSelected() + bloodlust path:
+        //   setPlayerState(target, changeSelectedGazeTarget(false)); setDefenderId(null);
+        //   changePlayerAction(actingPlayer, bloodlustAction, false); Move.pushSequence()
+        if is_selected && suffering_blood_lust {
+            if let Some(ref tid) = target_player_id {
+                if let Some(state) = game.field_model.player_state(tid) {
+                    let new_state: PlayerState = state.change_selected_gaze_target(false);
+                    game.field_model.set_player_state(tid, new_state);
+                }
+            }
+            game.defender_id = None;
             if let Some(action) = self.bloodlust_action {
-                // Java: Move.pushSequence(); changePlayerAction(actingPlayer, bloodlustAction, false)
-                // TODO(target-selection-state): setPlayerState(target, changeSelectedGazeTarget(false)) not translated.
-                // TODO(target-selection-state): setDefenderId(null) not translated.
-                let player_id = game.acting_player.player_id.clone();
                 if let Some(ref pid) = player_id {
                     util_server_steps::change_player_action(game, pid, action, false);
                 }
-                let seq = Move::build_sequence(&MoveParams::default());
-                return StepOutcome::next().push_seq(seq);
             }
+            let seq = Move::build_sequence(&MoveParams::default());
+            return StepOutcome::next().push_seq(seq);
         }
 
-        // Default: non-bloodlust selected path → change action to GAZE_MOVE, push Select(false)
-        // Java: changePlayerAction(actingPlayer, PlayerAction.GAZE_MOVE, false)
-        //       Select(update_persistence=false)
-        let player_id = game.acting_player.player_id.clone();
+        // Java isSelected() + no bloodlust path:
+        //   changePlayerAction(actingPlayer, PlayerAction.GAZE_MOVE, false); Select(false)
+        if is_selected {
+            if let Some(ref pid) = player_id {
+                util_server_steps::change_player_action(game, pid, PlayerAction::GazeMove, false);
+            }
+            let seq = Select::build_sequence(&SelectParams {
+                update_persistence: false,
+                is_blitz_move: false,
+                block_targets: vec![],
+            });
+            return StepOutcome::next().push_seq(seq);
+        }
+
+        // Java else / no target state — fallback to GAZE_MOVE + Select
         if let Some(ref pid) = player_id {
             util_server_steps::change_player_action(game, pid, PlayerAction::GazeMove, false);
         }
@@ -199,9 +211,14 @@ mod tests {
 
     #[test]
     fn bloodlust_with_action_pushes_move_sequence() {
+        use ffb_model::model::target_selection_state::TargetSelectionState;
         let mut game = make_game();
         game.acting_player.player_id = Some("actor".into());
         game.acting_player.suffering_blood_lust = true;
+        // Java: isSelected() branch requires TargetSelectionState with SELECTED status
+        let mut ts = TargetSelectionState::new("opponent");
+        ts.select();
+        game.field_model.target_selection_state = Some(ts);
         let mut step = StepSelectGazeTargetEnd::new();
         step.bloodlust_action = Some(PlayerAction::Move);
         let out = step.start(&mut game, &mut GameRng::new(0));
@@ -255,5 +272,58 @@ mod tests {
         // Default path → Select
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(out.pushes[0][0].step_id, StepId::InitSelecting);
+    }
+
+    #[test]
+    fn canceled_selection_state_clears_state_and_pushes_select() {
+        use ffb_model::model::target_selection_state::TargetSelectionState;
+        let mut game = make_game();
+        game.acting_player.player_id = Some("actor".into());
+        let mut ts = TargetSelectionState::default();
+        ts.cancel();
+        game.field_model.target_selection_state = Some(ts);
+        let mut step = StepSelectGazeTargetEnd::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        // Cancel clears target_selection_state
+        assert!(game.field_model.target_selection_state.is_none());
+        // Pushes Select sequence
+        assert_eq!(out.pushes[0][0].step_id, StepId::InitSelecting);
+    }
+
+    #[test]
+    fn selected_no_bloodlust_changes_action_to_gaze_move_and_pushes_select() {
+        use ffb_model::model::target_selection_state::TargetSelectionState;
+        let mut game = make_game();
+        game.acting_player.player_id = Some("actor".into());
+        game.acting_player.suffering_blood_lust = false;
+        let mut ts = TargetSelectionState::new("opp");
+        ts.select();
+        game.field_model.target_selection_state = Some(ts);
+        let mut step = StepSelectGazeTargetEnd::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(game.acting_player.player_action, Some(PlayerAction::GazeMove));
+        assert_eq!(out.pushes[0][0].step_id, StepId::InitSelecting);
+    }
+
+    #[test]
+    fn selected_bloodlust_clears_defender_and_pushes_move() {
+        use ffb_model::model::target_selection_state::TargetSelectionState;
+        let mut game = make_game();
+        game.acting_player.player_id = Some("actor".into());
+        game.acting_player.suffering_blood_lust = true;
+        game.defender_id = Some("old_defender".into());
+        let mut ts = TargetSelectionState::new("opp2");
+        ts.select();
+        game.field_model.target_selection_state = Some(ts);
+        let mut step = StepSelectGazeTargetEnd::new();
+        step.bloodlust_action = Some(PlayerAction::Move);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        // defender_id cleared
+        assert!(game.defender_id.is_none());
+        // Pushes Move sequence (InitMoving)
+        assert_eq!(out.pushes[0][0].step_id, StepId::InitMoving);
     }
 }

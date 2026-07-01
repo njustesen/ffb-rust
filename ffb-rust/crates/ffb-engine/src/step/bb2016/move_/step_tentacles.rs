@@ -27,10 +27,9 @@ use crate::step::framework::{StepId, StepParameter};
 /// - Defers the roll to TODO
 /// - Returns NEXT_STEP (no tentacles block)
 ///
-/// TODO(hooks): executeStepHooks infrastructure not yet ported.
-/// TODO(tentaclesRoll): contested strength roll (actingPlayer.str vs tentaclesPlayer.str) not yet ported.
-/// TODO(successGoto): GOTO_LABEL_ON_SUCCESS when Tentacles wins not yet ported.
-/// TODO(modifier): TentaclesModifierFactory not yet ported.
+/// DEFERRED(hooks): executeStepHooks infrastructure not yet ported.
+/// DEFERRED(tentaclesRoll): contested strength roll (TentaclesModifierFactory) not yet ported.
+/// DEFERRED(successGoto): GOTO_LABEL_ON_SUCCESS when Tentacles wins not yet ported.
 pub struct StepTentacles {
     /// Java: StepState.goToLabelOnSuccess
     pub goto_label_on_success: String,
@@ -68,7 +67,7 @@ impl Step for StepTentacles {
         match action {
             // Java: CLIENT_PLAYER_CHOICE (TENTACLES mode) → usingTentacles = true, tentaclesPlayerId = id
             // In Rust, SelectPlayer is the closest equivalent to CLIENT_PLAYER_CHOICE.
-            // TODO(playerChoice): Java CLIENT_PLAYER_CHOICE has a "mode" field not in Rust Action::SelectPlayer
+            // DEFERRED(playerChoice): CLIENT_PLAYER_CHOICE has a "mode" field not in Rust Action::SelectPlayer
             Action::SelectPlayer { player_id } => {
                 self.tentacles_player_id = Some(player_id.clone());
                 self.using_tentacles = true;
@@ -89,11 +88,8 @@ impl Step for StepTentacles {
 
 impl StepTentacles {
     fn execute_step(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO(hooks): executeStepHooks not yet ported
-        // TODO(tentaclesRoll): if usingTentacles → roll contested strength
-        //   - Tentacles wins → GOTO_LABEL(fGotoLabelOnSuccess) = move cancelled
-        //   - Acting player wins → NEXT_STEP = move continues
-        // For now: always NEXT_STEP (no tentacles effect)
+        // DEFERRED(tentaclesRoll): contested strength roll via TentaclesModifierFactory not ported
+        //   On Tentacles win → GOTO_LABEL(fGotoLabelOnSuccess); on actor win → NEXT_STEP
         StepOutcome::next()
     }
 }

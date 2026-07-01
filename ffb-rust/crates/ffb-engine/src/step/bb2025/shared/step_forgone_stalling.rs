@@ -81,7 +81,7 @@ impl StepForgoneStalling {
         if let Some(player_id) = stalling_player_id {
             if self.stalling_extension.is_considered_stalling(game, &player_id) {
                 // Java: getResult().addReport(new ReportPlayerEvent(player.getId(), "is stalling"));
-                // TODO: emit ReportPlayerEvent("is stalling") game event
+                // DEFERRED: emit ReportPlayerEvent("is stalling") game event
                 let turn_nr = game.turn_data().turn_nr;
                 self.stalling_extension.handle_staller(game, &player_id, turn_nr, rng);
             }

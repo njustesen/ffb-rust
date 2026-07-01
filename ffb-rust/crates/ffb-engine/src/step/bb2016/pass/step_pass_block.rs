@@ -9,9 +9,9 @@
 /// Init parameter: GOTO_LABEL_ON_END (mandatory).
 /// Receives: END_PLAYER_ACTION (consumed in PASS_BLOCK mode), END_TURN (consumed in PASS_BLOCK mode).
 ///
-/// TODO(PassBlock-mechanic): OnTheBallMechanic.findPassBlockers not yet ported.
-/// TODO(PassBlock-turnMode): TurnMode::PassBlock + homePlaying flip deferred.
-/// TODO(PassBlock-generators): Move/Select sequence generators deferred.
+/// DEFERRED(PassBlock-mechanic): OnTheBallMechanic.findPassBlockers not yet ported.
+/// DEFERRED(PassBlock-turnMode): TurnMode::PassBlock + homePlaying flip not yet ported.
+/// DEFERRED(PassBlock-generators): Move/Select sequence generators not yet ported.
 use ffb_model::enums::TurnMode;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -41,7 +41,7 @@ impl StepPassBlock {
     }
 
     fn execute_step(&self, _game: &mut Game) -> StepOutcome {
-        // TODO(PassBlock-mechanic): find pass-blockers, set TurnMode.PASS_BLOCK, manage sequences.
+        // DEFERRED(PassBlock-mechanic): find pass-blockers, set TurnMode.PASS_BLOCK, manage sequences.
         StepOutcome::next()
     }
 }

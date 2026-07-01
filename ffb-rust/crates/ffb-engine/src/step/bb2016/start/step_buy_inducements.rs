@@ -11,10 +11,10 @@
 ///
 /// Receives: INDUCEMENT_GOLD_HOME, INDUCEMENT_GOLD_AWAY.
 ///
-/// TODO(BuyInducements-inducements): InducementTypeFactory, Inducement, InducementSet deferred.
-/// TODO(BuyInducements-addStarPlayers): RosterPlayer creation + DB update deferred.
-/// TODO(BuyInducements-addMercenaries): Loner skill injection deferred.
-/// TODO(BuyInducements-generators): Inducement / RiotousRookies generators deferred.
+/// DEFERRED(inducements): InducementTypeFactory, Inducement, InducementSet not yet ported.
+/// DEFERRED(addStarPlayers): RosterPlayer creation + DB update not yet ported.
+/// DEFERRED(addMercenaries): Loner skill injection not yet ported.
+/// DEFERRED(generators): Inducement / RiotousRookies generators not yet ported.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -57,7 +57,7 @@ impl StepBuyInducements {
     }
 
     fn execute_step(&mut self, _game: &mut Game) -> StepOutcome {
-        // TODO(BuyInducements-options): check INDUCEMENTS option.
+        // DEFERRED(options): INDUCEMENTS GameOption check not yet ported.
         // Auto-skip if under minimum.
         if self.inducement_gold_home < MINIMUM_PETTY_CASH_FOR_INDUCEMENTS {
             self.inducements_selected_home = true;
@@ -65,8 +65,8 @@ impl StepBuyInducements {
         if self.inducement_gold_away < MINIMUM_PETTY_CASH_FOR_INDUCEMENTS {
             self.inducements_selected_away = true;
         }
-        // TODO(BuyInducements-dialog): show dialog for teams still buying.
-        // TODO(BuyInducements-generators): push Inducement + RiotousRookies sequences.
+        // DEFERRED(dialog): show dialog for teams still buying — not yet ported.
+        // DEFERRED(generators): push Inducement + RiotousRookies sequences — not yet ported.
         if self.inducements_selected_home && self.inducements_selected_away {
             return StepOutcome::next();
         }

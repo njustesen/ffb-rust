@@ -1,16 +1,16 @@
 # FFB-Rust Session State
 
-## Current Status (2026-06-30)
+## Current Status (2026-07-01)
 
 **Approach:** 1:1 Java-to-Rust translation. Every Java class → one Rust file, written directly from Java source. No reactive parity fixes.
 
 **engine.rs deleted.** `driver.rs` is now the live code path — `Box<dyn Step>` dispatch via `make_step()`, `DriverGameState` game loop, `GameState` type alias for backward compat.
 
-**Translation progress:** ~1,693/2,521 files formally implemented = **~67%**
+**Translation progress:** ~1,695/2,521 files formally implemented = **~67%**
 
-**Tests:** 5,528 passing (1 ignored)
+**Tests:** 5,784 passing (1 ignored)
 
-**Next phase:** Phase R
+**Current phase:** Phase U (in progress)
 
 ---
 
@@ -44,6 +44,42 @@
   - Added 4 block/player/pushback utils: server_util_block, server_util_player, util_server_pushback, util_server_player_move
   - Filled test gaps in mixed steps (3A) and phase steps + StepInitBomb (3B)
   - +428 new tests (5100 → 5528)
+- **Phase T** (2026-07-01): Long-tail DEFERRED resolution sweep
+  - **`skill_id.rs`**: Added 3 missing `SkillId::properties()` entries — `PutridRegurgitation` (3 props), `ViolentInnovator` (`grantsSppFromSpecialActionsCas`), `MaximumCarnage` (`canPerformSecondChainsawAttack`). 3 new tests.
+  - **`acting_player.rs`**: Added `has_passed: bool` field (Java: `fHasPassed`) to `ActingPlayer`. No tests needed (covered by downstream step tests).
+  - **`step_pass.rs` (bb2016)**: Full implementation of the BB2016 pass step — resolves thrower/bomb, calls `PassMechanic::evaluate_pass_simple`, branches on `PassResult` (ACCURATE/FUMBLE/SAVED_FUMBLE/INACCURATE/WILDLY_INACCURATE). Added `mech_result: Option<PassResult>` field. 4 new tests.
+  - **`step_init_passing.rs` (bb2016)**: Implemented `has_passed = true`, `concession_possible = false`, `turn_started = true`, `pass_used`/`hand_over_used` TurnData flags. 2 new tests.
+  - **`step_special_effect.rs` (bb2016)**: Extracted `is_special_effect_successful()` function (Java: `DiceInterpreter.isSpecialEffectSuccesful`) — Lightning ≥2, Zap =6 or (>1 and ≥strength), Fireball/Bomb ≥4, None=false. Replaced stub. 4 new tests.
+  - **`step_mvp.rs` (bb2016)**: Wired `player_state.is_killed()` filter to exclude dead players from MVP pool. 1 new test.
+  - **`step_end_passing.rs` (bb2020)**: Fixed misplaced `has_passed = false` / `pass_coordinate = None` — moved inside the `suffering_blood_lust && bloodlust_action.is_some()` if-block, removed duplicate `pass_coordinate = None`. 2 new tests.
+  - **`step_end_passing.rs` (bb2025)**: Implemented the bloodlust if-block that was only a comment — `has_passed = false`, `pass_coordinate = None`, change player action, push Move sequence. 2 new tests.
+  - +87 new tests (5,655 → 5,742)
+- **Phase S** (2026-07-01): DEFERRED resolution sweep
+  - **`step_right_stuff.rs` (bb2016)**: Implemented minimum-roll calculation using `Bb2016RightStuffModifiers`, filtering out TACKLEZONE modifiers (predicates not wired), matching KTM range string via `get_name()`. 2 new tests.
+  - **`step_right_stuff.rs` (bb2020)**: Implemented `RightStuffModifierFactory::for_rules` + `RightStuffContext`, mapped `ModelPassResult` → `MechanicPassResult`. 2 new tests.
+  - **`step_move_ball_and_chain.rs` (bb2016)**: Wired D8 scatter via `Direction::for_roll` + `FieldCoordinate::step`. 1 new test.
+  - **`named_properties.rs`**: Added 3 new Juggernaut cancel constants (`CANCELS_CAN_TAKE_DOWN_PLAYERS_WITH_HIM_ON_BOTH_DOWN`, `CANCELS_CAN_REFUSE_TO_BE_PUSHED`, `CANCELS_PREVENT_OPPONENT_FOLLOWING_UP`).
+  - **`skill_id.rs`**: Added all 3 `CancelSkillProperty` strings to `SkillId::Juggernaut`; added `canBeKicked` to `SkillId::RightStuff` (was missing from Java parity).
+  - **`step_followup.rs` (bb2020 + bb2025)**: Implemented Juggernaut/Fend auto-cancel logic — when attacker has `cancelsPreventOpponentFollowingUp` and action is BLITZ (or MOVE + `blocksDuringMove`), Fend is auto-cancelled. 1 new test each.
+  - **`step_jump.rs` (bb2016)**: Confirmed BB2016 `JumpModifierCollection` is empty (from Java source); changed to `agility_with_modifiers()`.
+  - **`can_kick_team_mate` / `can_throw_team_mate` (bb2016 + bb2020 + bb2025 `step_end_moving.rs`)**: Implemented `UtilPlayer.canKickTeamMate` / `canThrowTeamMate` as free functions using edition-specific `TtmMechanic`. Wired into `can_make_next_move` branch in all 3 editions. 3 new tests in bb2016.
+  - +57 new tests (5,598 → 5,655)
+- **Phase R** (2026-07-01): Step body completions + bulk TODO→DEFERRED sweep
+  - **`step_always_hungry.rs` (bb2016)**: Full implementation — always-hungry roll (2+), skill-usage tracking via `used_skills.insert(SkillId::AlwaysHungry)`, escape roll (2+), publishes `PassResult::Fumble` on escape success, goes to failure label on escape failure. 14 new tests (both `DiceInterpreter::is_always_hungry_successful` and `is_escape_from_always_hungry_successful` were already ported; both return `roll >= 2`).
+  - **`skill_id.rs`**: Added `SkillId::BallAndChain => &["movesRandomly", "blocksLikeChainsaw"]` so `has_skill_property(MOVES_RANDOMLY)` returns true for BallAndChain carriers.
+  - **`step_move_ball_and_chain.rs`**: Fixed 3 broken tests by adding `add_ball_and_chain_player` test helper; all 16 tests pass.
+  - **`step_init_feeding.rs`**: Implemented feed-on-player and bite-spectator paths. 18 tests.
+  - **`step_apothecary.rs`**: Implemented `InjuryResult::apply_to` wiring, cured state computation (KO→Stunned, else Reserve). 39 tests.
+  - **`step_kickoff_scatter_roll.rs`**: Implemented `game.field_model.out_of_bounds = self.touchback`.
+  - **`step_apply_kickoff_result.rs`**: Implemented cheerleaders/coaches bonus in extra-reroll calculation.
+  - **Bulk TODO→DEFERRED sweep**: Converted all `// TODO(...)`, `// TODO:`, and `/// TODO` inline comments to `// DEFERRED(...)` across all step directories (bb2016, bb2020, bb2025, mixed, action, game, phase, generator). Stub placeholder files (`// TODO: full implementation.`) intentionally left unchanged.
+  - +70 new tests (5528 → 5598)
+- **Phase U** (2026-07-01): Event emission, infrastructure stubs, game lifecycle steps
+  - **Sub-Phase U2**: DEFERRED(events) → wired `GameEvent::PassDeviate`/`ScatterBall` in `step_missed_pass.rs` (bb2020); `GameEvent::ApothecaryRoll` in `step_apothecary.rs` (bb2016 + bb2025); `GameEvent::KickoffRiot` in `step_apply_kickoff_result.rs` (bb2016).
+  - **Sub-Phase U2 (gaze/blitz targets)**: `GameEvent::SelectBlitzTarget` in `step_select_blitz_target.rs` (bb2020); `GameEvent::SelectGazeTarget` in `step_select_gaze_target.rs` (bb2020). Added 4 new GameEvent variants: `Block`, `ApothecaryRoll`, `SelectBlitzTarget`, `SelectGazeTarget`.
+  - **Sub-Phase U4**: Infrastructure stubs — `StepIdFactory` full impl (130 name↔id mappings, 6 tests), `StepActionFactory` full impl (6 action mappings, 7 tests), `StepModifierTrait` + `StepCommandStatus` + `sort_by_priority` (4 tests), `HookPoint` enum + `StepHookHandler` trait (3 tests). Created `factory/mod.rs` and `model/mod.rs`.
+  - **Sub-Phase U5**: Game lifecycle steps — `StepInitStartGame` full impl (standalone fast-path: set `GameStatus::Active` on `start()`, handle `Action::StartGame` in `handle_command()`, 8 tests); `StepEndGame` full impl (set `GameStatus::Finished`, 5 tests). Added `Action::StartGame { home: bool }` variant.
+  - +42 new tests (5,742 → 5,784)
 
 ---
 

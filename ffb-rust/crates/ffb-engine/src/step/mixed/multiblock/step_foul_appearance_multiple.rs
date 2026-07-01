@@ -48,7 +48,7 @@ impl StepFoulAppearanceMultiple {
     fn execute_step(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: getGameState().executeStepHooks(this, state)
         // The roll and dialog logic live entirely in step hooks (not yet ported).
-        // TODO(StepHooks port): executeStepHooks — Foul Appearance roll per target,
+        // DEFERRED(StepHooks port): executeStepHooks — Foul Appearance roll per target,
         //   re-roll dialogs, publishParameter(PLAYER_ID_TO_REMOVE) per failed target,
         //   gotoLabel(goto_label_on_failure) if attacker is blocked.
         StepOutcome::next()
@@ -77,7 +77,7 @@ impl Step for StepFoulAppearanceMultiple {
                 if re_rolled_action.as_deref() == Some("FOUL_APPEARANCE") =>
             {
                 self.re_roll_target = target_id.clone();
-                let lords: Vec<String> = vec![]; // TODO: gather from game when property system is ported
+                let lords: Vec<String> = vec![]; // DEFERRED: gather from game when property system is ported
                 let proceed = crate::step::mixed::multiblock::abstract_step_multiple::re_roll_source_successfully(
                     &mut self.base.state,
                     re_roll_source.as_deref().unwrap_or(""),

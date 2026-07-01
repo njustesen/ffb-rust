@@ -44,6 +44,14 @@ impl NamedProperties {
     pub const CAN_BLOCK_OVER_DISTANCE: &'static str = "canBlockOverDistance";
     pub const CAN_BLOCK_SAME_TEAM_PLAYER: &'static str = "canBlockSameTeamPlayer";
     pub const CAN_CANCEL_INTERCEPTIONS: &'static str = "canCancelInterceptions";
+    /// Java: CancelSkillProperty(NamedProperties.canCancelInterceptions) — e.g. VeryLongLegs cancels SafeThrow.
+    pub const CANCELS_CAN_CANCEL_INTERCEPTIONS: &'static str = "cancelsCancelInterceptions";
+    /// Java: CancelSkillProperty(NamedProperties.canTakeDownPlayersWithHimOnBothDown) — Juggernaut cancels Wrestle.
+    pub const CANCELS_CAN_TAKE_DOWN_PLAYERS_WITH_HIM_ON_BOTH_DOWN: &'static str = "cancelsCanTakeDownPlayersWithHimOnBothDown";
+    /// Java: CancelSkillProperty(NamedProperties.canRefuseToBePushed) — Juggernaut cancels Stand Firm.
+    pub const CANCELS_CAN_REFUSE_TO_BE_PUSHED: &'static str = "cancelsCanRefuseToBePushed";
+    /// Java: CancelSkillProperty(NamedProperties.preventOpponentFollowingUp) — Juggernaut cancels Fend.
+    pub const CANCELS_PREVENT_OPPONENT_FOLLOWING_UP: &'static str = "cancelsPreventOpponentFollowingUp";
     pub const CAN_CHOOSE_TO_IGNORE_DODGE_MODIFIER_AFTER_ROLL: &'static str = "canChooseToIgnoreDodgeModifierAfterRoll";
     pub const CAN_CHOOSE_TO_IGNORE_JUMP_MODIFIER_AFTER_ROLL: &'static str = "canChooseToIgnoreJumpModifierAfterRoll";
     pub const CAN_CHOOSE_TO_IGNORE_RUSH_MODIFIER_AFTER_ROLL: &'static str = "canChooseToIgnoreRushModifierAfterRoll";

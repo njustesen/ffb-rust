@@ -17,9 +17,9 @@ use crate::step::framework::{StepId, StepParameter};
 ///          JUMPED (sets usingShadowing = false) set by preceding steps.
 /// Receives via command: CLIENT_PLAYER_CHOICE (SHADOWING mode) → usingShadowing / defenderId.
 ///
-/// TODO: executeStepHooks not yet ported — stub always emits NEXT_STEP.
-/// TODO: shadow eligibility check (UtilPlayer.findEligibleShadowers etc.) not yet ported.
-/// TODO: re-roll (AbstractStepWithReRoll) not yet ported.
+/// DEFERRED: executeStepHooks not yet ported — stub always emits NEXT_STEP.
+/// DEFERRED: shadow eligibility check (UtilPlayer.findEligibleShadowers etc.) not yet ported.
+/// DEFERRED: re-roll (AbstractStepWithReRoll) not yet ported.
 pub struct StepShadowing {
     /// Java: state.coordinateFrom
     pub coordinate_from: Option<FieldCoordinate>,
@@ -62,7 +62,7 @@ impl Step for StepShadowing {
     }
 
     fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // TODO: CLIENT_PLAYER_CHOICE → SHADOWING mode:
+        // DEFERRED: CLIENT_PLAYER_CHOICE → SHADOWING mode:
         //       state.usingShadowing = StringTool.isProvided(playerId)
         //       if defenderId == playerId → state.shadowerWasPreviousDefender = true
         //       else → game.setDefenderId(playerId)
@@ -89,7 +89,7 @@ impl StepShadowing {
     fn execute_step(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: getGameState().executeStepHooks(this, state)
         // All shadowing logic is in hook implementations attached to the game state.
-        // TODO: executeStepHooks — shadow eligibility, opponent selection dialog,
+        // DEFERRED: executeStepHooks — shadow eligibility, opponent selection dialog,
         //       movement of shadower, RE_ROLL_USED publishing
         StepOutcome::next()
     }

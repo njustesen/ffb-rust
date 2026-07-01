@@ -9,10 +9,9 @@
 /// Init parameters: GOTO_LABEL_ON_END (mandatory), TARGET_COORDINATE (opt), CATCHER_ID (opt).
 /// Publishes: CATCHER_ID, END_TURN, END_PLAYER_ACTION, TARGET_COORDINATE.
 ///
-/// TODO(InitPassing-passCoordinate): game.pass_coordinate / thrower / thrower_action fields
-///   partially exist; DUMP_OFF / TurnMode.DUMP_OFF check deferred.
-/// TODO(InitPassing-rangeRuler): UtilRangeRuler.createRangeRuler not yet ported.
-/// TODO(InitPassing-handOver): hand-over turn data flags deferred.
+/// DEFERRED(InitPassing-passCoordinate): DUMP_OFF / TurnMode.DUMP_OFF check not yet ported.
+/// DEFERRED(InitPassing-rangeRuler): UtilRangeRuler.createRangeRuler not yet ported.
+use ffb_model::enums::PlayerAction;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -57,9 +56,30 @@ impl StepInitPassing {
             return StepOutcome::goto(&self.goto_label_on_end)
                 .publish(StepParameter::EndPlayerAction(true));
         }
-        // TODO(InitPassing-bloodlust): check actingPlayer.isSufferingBloodLust + hasFed.
-        // TODO(InitPassing-handOver): set hasPassed, hand_over_used, turn_started for HAND_OVER.
-        // TODO(InitPassing-passFlags): set hasPassed, passUsed, concessionPossible for PASS.
+        // Java: if thrower==actingPlayer && isSufferingBloodLust && !hasFed → goto end
+        let thrower_is_acting = game.thrower_id.is_some()
+            && game.thrower_id == game.acting_player.player_id;
+        if thrower_is_acting
+            && game.acting_player.suffering_blood_lust
+            && !game.acting_player.has_fed
+        {
+            return StepOutcome::goto(&self.goto_label_on_end);
+        }
+        // Java: actingPlayer.setHasPassed(true); turnData flags; game.setConcessionPossible(false)
+        let thrower_action = game.thrower_action;
+        game.acting_player.has_passed = true;
+        game.concession_possible = false;
+        game.turn_data_mut().turn_started = true;
+        match thrower_action {
+            Some(PlayerAction::HandOver) => {
+                game.turn_data_mut().hand_over_used = true;
+            }
+            Some(PlayerAction::Pass) => {
+                game.turn_data_mut().pass_used = true;
+                // DEFERRED(InitPassing-rangeRuler): UtilRangeRuler.createRangeRuler not yet ported.
+            }
+            _ => {} // ThrowBomb, HailMaryBomb etc. — no extra TurnData flag
+        }
         out
     }
 }
@@ -91,7 +111,7 @@ impl Step for StepInitPassing {
             }
             // Java: CLIENT_ACTING_PLAYER (no id) → end player action
             // Note: Action::EndPlayerAction is not in the Rust Action enum — deferred
-            // TODO(InitPassing): EndPlayerAction command path not ported
+            // DEFERRED(InitPassing): EndPlayerAction command path not ported
             _ => StepOutcome::cont(),
         }
     }
@@ -104,7 +124,7 @@ impl Step for StepInitPassing {
             StepParameter::EndPlayerAction(v)=> { self.end_player_action = *v; true }
             StepParameter::TargetCoordinate(c) => {
                 // init-time TARGET_COORDINATE sets pass coordinate directly
-                // TODO(InitPassing-targetCoord): full catcher lookup from field_model
+                // DEFERRED(InitPassing-targetCoord): full catcher lookup from field_model
                 let _ = c;
                 true
             }
@@ -169,5 +189,60 @@ mod tests {
         let mut step = StepInitPassing::new();
         assert!(step.set_parameter(&StepParameter::GotoLabelOnEnd("x".into())));
         assert_eq!(step.goto_label_on_end, "x");
+    }
+
+    #[test]
+    fn blood_lust_thrower_not_fed_goto_label() {
+        let mut game = make_game();
+        game.thrower_id = Some("p1".into());
+        game.thrower_action = Some(ffb_model::enums::PlayerAction::Pass);
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.suffering_blood_lust = true;
+        game.acting_player.has_fed = false;
+        let mut step = StepInitPassing::new();
+        step.goto_label_on_end = "end".into();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.action, StepAction::GotoLabel));
+        assert_eq!(out.goto_label.as_deref(), Some("end"));
+    }
+
+    #[test]
+    fn blood_lust_thrower_already_fed_continues() {
+        let mut game = make_game();
+        game.thrower_id = Some("p1".into());
+        game.thrower_action = Some(ffb_model::enums::PlayerAction::Pass);
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.suffering_blood_lust = true;
+        game.acting_player.has_fed = true;
+        let mut step = StepInitPassing::new();
+        step.goto_label_on_end = "end".into();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // has_fed=true → does NOT goto label; falls through to NextStep
+        assert!(matches!(out.action, StepAction::NextStep));
+    }
+
+    #[test]
+    fn pass_action_sets_has_passed_and_pass_used() {
+        let mut game = make_game();
+        game.thrower_id = Some("p1".into());
+        game.thrower_action = Some(ffb_model::enums::PlayerAction::Pass);
+        let mut step = StepInitPassing::new();
+        step.goto_label_on_end = "end".into();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.acting_player.has_passed);
+        assert!(game.turn_data().pass_used);
+        assert!(!game.concession_possible);
+    }
+
+    #[test]
+    fn hand_over_action_sets_hand_over_used() {
+        let mut game = make_game();
+        game.thrower_id = Some("p1".into());
+        game.thrower_action = Some(ffb_model::enums::PlayerAction::HandOver);
+        let mut step = StepInitPassing::new();
+        step.goto_label_on_end = "end".into();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.acting_player.has_passed);
+        assert!(game.turn_data().hand_over_used);
     }
 }

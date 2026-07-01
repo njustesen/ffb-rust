@@ -17,7 +17,7 @@ use ffb_mechanics::modifiers::go_for_it_context::GoForItContext;
 /// BB2020 is identical to BB2025 except that GoForItModifierFactory uses BB2020 rules.
 ///
 /// DEFERRED(modifierIgnoring): canChooseToIgnoreRushModifierAfterRoll dialog not yet ported.
-/// DEFERRED(failedRushSkill): failedRushForJumpAlwaysLandsInTargetSquare skill check not yet ported.
+/// failedRushForJumpAlwaysLandsInTargetSquare skill check → wired in fail_gfi.
 pub struct StepGoForIt {
     /// Java: fGotoLabelOnFailure
     pub goto_label_on_failure: String,
@@ -191,20 +191,22 @@ impl StepGoForIt {
     }
 
     fn fail_gfi(&mut self, game: &mut Game) -> StepOutcome {
-        // Java: if (jumping && !secondGfi && currentMove > ma+1 && !failedRushForJumpAlwaysLandsInTargetSquare)
-        //           publish COORDINATE_FROM(null), move player back to moveStart
-        // DEFERRED(failedRushSkill): failedRushForJumpAlwaysLandsInTargetSquare skill check not yet ported
         let jumping = game.acting_player.jumping;
         let current_move = game.acting_player.current_move;
-        let ma = game.acting_player.player_id.as_deref()
+        let pid = game.acting_player.player_id.clone();
+        let ma = pid.as_deref()
             .and_then(|id| game.player(id))
             .map(|p| p.movement as i32)
             .unwrap_or(4);
+        // Java: if (jumping && !secondGfi && currentMove > ma+1 && !failedRushForJumpAlwaysLandsInTargetSquare)
+        let always_lands = pid.as_deref()
+            .and_then(|id| game.player(id))
+            .map(|p| p.has_skill_property(NamedProperties::FAILED_RUSH_FOR_JUMP_ALWAYS_LANDS_IN_TARGET_SQUARE))
+            .unwrap_or(false);
         let mut outcome = StepOutcome::goto(&self.goto_label_on_failure.clone())
             .publish(StepParameter::EndTurn(true));
-        if jumping && !self.second_go_for_it && current_move > ma + 1 {
+        if jumping && !self.second_go_for_it && current_move > ma + 1 && !always_lands {
             if let Some(start) = self.move_start {
-                let pid = game.acting_player.player_id.clone();
                 if let Some(id) = pid.as_deref() {
                     game.field_model.set_player_coordinate(id, start);
                 }

@@ -43,6 +43,10 @@ pub struct ActingPlayer {
     pub has_triggered_effect: bool,
     /// Java: fDodging — true while the player is in the middle of a dodge roll.
     pub dodging: bool,
+    /// Java: fHasFed — Vampire has successfully fed this turn (BloodLust satisfied).
+    pub has_fed: bool,
+    /// Java: fHasPassed — true once the player has made a pass/hand-off this turn.
+    pub has_passed: bool,
 }
 
 impl ActingPlayer {

@@ -119,9 +119,25 @@ impl StepFollowup {
                 && !defender_state.is_prone_or_stunned()
                 && !old_defender_state.is_prone_or_stunned()
             {
-                // TODO: check if attacker skill cancels Fend (UtilCards.getSkillCancelling)
-                // TODO: auto-cancel Fend if attacker is Blitz/Move with cancelling skill
-                if self.using_skill_preventing_follow_up.is_none() {
+                // Java: check if attacker has a skill that cancels preventOpponentFollowingUp
+                // (Juggernaut registers CancelSkillProperty(preventOpponentFollowingUp)).
+                // Auto-cancel if action is BLITZ or (MOVE + blocksDuringMove) — Java line 130.
+                let attacker_cancels_fend = acting_player_id.as_deref()
+                    .and_then(|id| game.player(id))
+                    .map(|p| p.has_skill_property(NamedProperties::CANCELS_PREVENT_OPPONENT_FOLLOWING_UP))
+                    .unwrap_or(false);
+                let action_allows_cancel = matches!(
+                    game.acting_player.player_action,
+                    Some(PlayerAction::Blitz)
+                ) || (game.acting_player.player_action == Some(PlayerAction::Move)
+                    && acting_player_id.as_deref()
+                        .and_then(|id| game.player(id))
+                        .map(|p| p.has_skill_property(NamedProperties::BLOCKS_DURING_MOVE))
+                        .unwrap_or(false));
+
+                if attacker_cancels_fend && action_allows_cancel {
+                    self.using_skill_preventing_follow_up = Some(false);
+                } else if self.using_skill_preventing_follow_up.is_none() {
                     if !old_defender_state.has_tacklezones() {
                         // Defender has no tacklezones — Fend fails automatically
                         self.using_skill_preventing_follow_up = Some(false);

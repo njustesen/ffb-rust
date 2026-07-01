@@ -317,6 +317,7 @@ pub enum StepParameter {
     DtRerollAsked(bool),
     Dauntless(bool),
     SuccessfulDauntless(bool),
+    SuccessfulPro(bool),
     // ── card / inducement parameters ─────────────────────────────────────────
     CardId(Option<String>),
     PlayCard(bool),

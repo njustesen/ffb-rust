@@ -124,11 +124,11 @@ impl StepPushback {
                 // (throws if null — we just proceed without the defender check in the stub)
 
                 // Java: executeStepHooks for Side Step / Stand Firm
-                // TODO: Side Step / Stand Firm skill hooks (executeStepHooks not yet translated)
+                // DEFERRED: Side Step / Stand Firm skill hooks (executeStepHooks not yet translated)
 
                 // Java: pushbackSquares = UtilServerPushback.findPushbackSquares(game, startingSq, REGULAR)
                 // Java: fieldModel.add(pushbackSquares)
-                // TODO: UtilServerPushback.findPushbackSquares — not yet translated.
+                // DEFERRED: UtilServerPushback.findPushbackSquares — not yet translated.
                 // For now: find free adjacent squares to approximate.
                 let adjacent_free: Vec<FieldCoordinate> = game.field_model
                     .adjacent_on_pitch(defender_coord)
@@ -197,7 +197,7 @@ impl StepPushback {
                 // (startingPushbackSquare is still set here — this branch is for when it was just cleared above)
 
                 // Add candidate pushback squares to the field model so the client can display them.
-                // TODO: add actual PushbackSquares to field_model.pushback_squares via UtilServerPushback
+                // DEFERRED: add actual PushbackSquares to field_model.pushback_squares via UtilServerPushback
                 // For now, just wait for the agent to call PushTo.
                 return StepOutcome::cont();
             }
@@ -240,14 +240,14 @@ fn push_player(game: &mut Game, player_id: &str, coord: FieldCoordinate) {
     if game.field_model.ball_moving
         && game.field_model.ball_coordinate.map(|bc| bc == coord).unwrap_or(false)
     {
-        // TODO: publish CatchScatterThrowInMode::ScatterBall + PushedOnBall(true)
+        // DEFERRED: publish CatchScatterThrowInMode::ScatterBall + PushedOnBall(true)
         // These are published through the StepOutcome chain but push_player is a free fn.
         // The outer execute_step call would need to collect these — deferred until full
         // publish-from-inner-fn pattern is available.
     }
     // Java: publishParameter(PLAYER_ENTERING_SQUARE, pPlayer.getId())
     // Java: publishParameter(PLAYER_WAS_PUSHED, true)
-    // TODO: publish PlayerEnteringSquare + PlayerWasPushed through caller
+    // DEFERRED: publish PlayerEnteringSquare + PlayerWasPushed through caller
 }
 
 #[cfg(test)]

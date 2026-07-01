@@ -101,7 +101,7 @@ impl StepDispatchScatterPlayer {
     fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: if passResult==FUMBLE && isKickedPlayer: report KickTeamMateFumble; NEXT_STEP
         if self.pass_result == PassResult::Fumble && self.is_kicked_player {
-            // TODO: addReport(ReportKickTeamMateFumble) when event system is ported
+            // DEFERRED: addReport(ReportKickTeamMateFumble) when event system is ported
             return StepOutcome::next();
         }
 

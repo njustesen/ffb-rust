@@ -18,13 +18,15 @@
 ///
 /// Init params: GOTO_LABEL_ON_FAILURE (mandatory).
 ///
-/// TODO: allowStandUpAssists → UtilPlayer.findStandUpAssists(game, player) not yet ported.
-/// TODO: handleFailedStandUp (per-action turn data flags) not yet ported.
+/// allowStandUpAssists → findStandUpAssists wired.
+/// handleFailedStandUp: per-action turn data flags wired (BB2016: KTM+BLITZ share blitz_used, no foul-extra check).
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2016.StepStandUp`.
-use ffb_model::enums::{PS_PRONE, PlayerState, ReRollSource};
+use ffb_model::enums::{PS_PRONE, PlayerAction, PlayerState, ReRollSource};
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
 use crate::step::framework::{Step, StepOutcome};
@@ -128,8 +130,14 @@ impl StepStandUp {
             self.roll = rng.d6();
         }
 
-        // TODO: modifier from allowStandUpAssists
-        let modifier = 0;
+        let modifier = game.acting_player.player_id.as_deref()
+            .and_then(|id| game.player(id))
+            .filter(|p| p.has_skill_property(NamedProperties::ALLOW_STAND_UP_ASSISTS))
+            .map(|_| {
+                let id = game.acting_player.player_id.as_deref().unwrap_or("");
+                UtilPlayer::find_stand_up_assists(game, id)
+            })
+            .unwrap_or(0);
         let successful = DiceInterpreter::is_stand_up_successful(self.roll, modifier);
 
         // Java BB2016: if (successful) { actingPlayer.setStandingUp(false); if rooted → GOTO failure; else NEXT_STEP }
@@ -168,10 +176,38 @@ impl StepStandUp {
         if let Some(pid) = game.acting_player.player_id.clone() {
             game.field_model.set_player_state(&pid, PlayerState::new(PS_PRONE));
         }
-        // TODO(stand_up_bb2016): handleFailedStandUp (per-action turn data flags) not ported.
+        self.handle_failed_stand_up(game);
         let label = self.goto_label_on_failure.clone();
         StepOutcome::goto(&label)
             .publish(StepParameter::EndPlayerAction(true))
+    }
+
+    fn handle_failed_stand_up(&self, game: &mut Game) {
+        // Java BB2016: BLITZ+KTM share blitz_used; no allowsAdditionalFoul check; no SECURE_THE_BALL/PUNT
+        let player_action = game.acting_player.player_action;
+        match player_action {
+            Some(PlayerAction::Blitz)
+            | Some(PlayerAction::BlitzMove)
+            | Some(PlayerAction::KickTeamMate)
+            | Some(PlayerAction::KickTeamMateMove) => {
+                game.turn_data_mut().blitz_used = true;
+            }
+            Some(PlayerAction::Pass)
+            | Some(PlayerAction::PassMove)
+            | Some(PlayerAction::ThrowTeamMate)
+            | Some(PlayerAction::ThrowTeamMateMove) => {
+                game.turn_data_mut().pass_used = true;
+            }
+            Some(PlayerAction::HandOver)
+            | Some(PlayerAction::HandOverMove) => {
+                game.turn_data_mut().hand_over_used = true;
+            }
+            Some(PlayerAction::Foul)
+            | Some(PlayerAction::FoulMove) => {
+                game.turn_data_mut().foul_used = true;
+            }
+            _ => {}
+        }
     }
 }
 
@@ -288,5 +324,45 @@ mod tests {
         step.roll = 6;
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.turn_data_home.turn_started);
+    }
+
+    #[test]
+    fn failed_stand_up_blitz_sets_blitz_used() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        game.acting_player.standing_up = true;
+        game.acting_player.player_action = Some(PlayerAction::Blitz);
+        let mut step = StepStandUp::new("fail".into());
+        step.roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.turn_data_home.blitz_used);
+    }
+
+    #[test]
+    fn failed_stand_up_kick_team_mate_sets_blitz_used_in_bb2016() {
+        // BB2016 groups KickTeamMate with Blitz (both → blitz_used)
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        game.acting_player.standing_up = true;
+        game.acting_player.player_action = Some(PlayerAction::KickTeamMate);
+        let mut step = StepStandUp::new("fail".into());
+        step.roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.turn_data_home.blitz_used);
+    }
+
+    #[test]
+    fn failed_stand_up_foul_sets_foul_used_without_extra_foul_check() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        game.acting_player.standing_up = true;
+        game.acting_player.player_action = Some(PlayerAction::Foul);
+        let mut step = StepStandUp::new("fail".into());
+        step.roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.turn_data_home.foul_used);
     }
 }

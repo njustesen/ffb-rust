@@ -530,7 +530,7 @@ impl StepEndBlocking {
                 let result = if is_home { &mut game.game_result.home } else { &mut game.game_result.away };
                 result.player_results.entry(pid.to_string()).or_default().fouls += 1;
             }
-            // TODO(piledriver): PileDriver.build_sequence — not yet ported, fall through to EndPlayerAction
+            // DEFERRED(piledriver): PileDriver.build_sequence — not yet ported, fall through to EndPlayerAction
             ServerUtilBlock::update_dice_decorations(game);
         }
 

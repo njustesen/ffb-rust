@@ -4,6 +4,7 @@ use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_cards::UtilCards;
 use crate::action::Action;
 use crate::drop_player_context::{DropPlayerContext, SteadyFootingContext};
 use crate::step::framework::{Step, StepOutcome};
@@ -124,8 +125,14 @@ impl StepBreatheFire {
             return StepOutcome::next();
         }
 
-        // Java: actingPlayer.markSkillUsed(NamedProperties.canPerformArmourRollInstead...)
-        // TODO(breathe_fire_bb2020): markSkillUsed by property when infra is available
+        // Java: actingPlayer.markSkillUsed(NamedProperties.canPerformArmourRollInsteadOfBlockThatMightFailWithTurnover)
+        if let Some(skill_id) = game.player(&attacker_id)
+            .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_PERFORM_ARMOUR_ROLL_INSTEAD_OF_BLOCK_THAT_MIGHT_FAIL_WITH_TURNOVER))
+        {
+            if let Some(p) = game.team_home.player_mut(&attacker_id).or_else(|| game.team_away.player_mut(&attacker_id)) {
+                p.used_skills.insert(skill_id);
+            }
+        }
 
         // Java: if (ReRolledActions.BREATHE_FIRE == getReRolledAction()) {
         //   if ((getReRollSource() != null) && UtilServerReRoll.useReRoll(...)) { result = null }
@@ -372,5 +379,34 @@ mod tests {
         // This tests the early-exit guard
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn breathe_fire_marks_skill_used() {
+        use ffb_model::enums::{PlayerGender, PlayerType, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = make_game();
+        let breathe_fire_skill = SkillId::BreatheFire;
+        game.team_home.players.push(Player {
+            id: "att".into(), name: "att".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 4, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue { skill_id: breathe_fire_skill, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        game.acting_player.player_id = Some("att".into());
+        // Pre-set result so we don't need a full roll
+        let mut step = StepBreatheFire::new();
+        step.using_breathe_fire = true;
+        step.result = Some(BreatheFireResult::NO_EFFECT);
+        step.goto_on_end = "end".into();
+        step.start(&mut game, &mut GameRng::new(0));
+        let used = game.team_home.player("att")
+            .map(|p| p.used_skills.contains(&breathe_fire_skill))
+            .unwrap_or(false);
+        assert!(used, "BreatheFireSkill should be in used_skills after executing");
     }
 }

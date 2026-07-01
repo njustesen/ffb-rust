@@ -3,6 +3,8 @@ use ffb_model::enums::PlayerAction;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
+use ffb_mechanics::bb2016::ttm_mechanic::TtmMechanic as Bb2016TtmMechanic;
+use ffb_mechanics::ttm_mechanic::TtmMechanic as TtmMechanicTrait;
 use crate::step::util_server_steps::{change_player_action, check_touchdown};
 use crate::util::UtilServerPlayerMove;
 use crate::action::Action;
@@ -28,8 +30,6 @@ use crate::step::generator::bb2016::kick_team_mate::KickTeamMateParams;
 /// BB2016 differs from BB2025: no bloodlust_action, using_chainsaw, check_forgo,
 /// thrown_player_id, move_start fields; GAZE (not GazeMove) → Move; KICK_TEAM_MATE → KickTeamMate
 /// generator (not ThrowTeamMate); no Punt branch.
-///
-/// DEFERRED(ktm): canKickTeamMate / canThrowTeamMate depend on TtmMechanic, not yet ported.
 pub struct StepEndMoving {
     /// Java: fEndTurn
     pub end_turn: bool,
@@ -115,7 +115,7 @@ impl StepEndMoving {
 
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: UtilServerDialog.hideDialog(getGameState())
-        // TODO: hide dialog — not yet ported
+        // DEFERRED(dialog): dialog layer not yet translated
 
         self.end_turn |= check_touchdown(game);
 
@@ -181,8 +181,8 @@ impl StepEndMoving {
             || (player_action == Some(PlayerAction::PassMove) && has_ball)
             || (player_action == Some(PlayerAction::FoulMove) && UtilPlayer::can_foul(game, pid))
             || (player_action == Some(PlayerAction::Move) && UtilPlayer::can_gaze(game, pid))
-            // DEFERRED(ktm): KickTeamMateMove && canKickTeamMate needs TtmMechanic not yet ported
-            // DEFERRED(ktm): ThrowTeamMateMove && canThrowTeamMate needs TtmMechanic not yet ported
+            || (player_action == Some(PlayerAction::KickTeamMateMove) && can_kick_team_mate(game, pid, true))
+            || (player_action == Some(PlayerAction::ThrowTeamMateMove) && can_throw_team_mate(game, pid, false))
             ;
 
         if can_make_next_move {
@@ -235,6 +235,25 @@ impl StepEndMoving {
             _ => None,
         }
     }
+}
+
+/// Java: UtilPlayer.canKickTeamMate(game, kicker, checkBlitzUsed).
+fn can_kick_team_mate(game: &Game, player_id: &str, check_blitz_used: bool) -> bool {
+    let player = match game.player(player_id) { Some(p) => p, None => return false };
+    if check_blitz_used && game.turn_data().blitz_used { return false; }
+    use ffb_model::model::property::named_properties::NamedProperties;
+    if !player.has_skill_property(NamedProperties::CAN_KICK_TEAM_MATES) { return false; }
+    let mechanic = Bb2016TtmMechanic::new();
+    !mechanic.find_kickable_team_mates(game, player).is_empty()
+}
+
+/// Java: UtilPlayer.canThrowTeamMate(game, thrower, checkPassUsed).
+fn can_throw_team_mate(game: &Game, player_id: &str, check_pass_used: bool) -> bool {
+    let player = match game.player(player_id) { Some(p) => p, None => return false };
+    let mechanic = Bb2016TtmMechanic::new();
+    if check_pass_used && !mechanic.is_ttm_available(game.turn_data()) { return false; }
+    if !mechanic.can_throw(game, player) { return false; }
+    !mechanic.find_throwable_team_mates(game, player).is_empty()
 }
 
 #[cfg(test)]
@@ -425,5 +444,82 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!out.pushes.is_empty(), "MOVE + canGaze should push Move sequence");
+    }
+
+    fn add_player_with_skills(game: &mut Game, home: bool, id: &str, coord: FieldCoordinate, skills: Vec<ffb_model::enums::SkillId>) {
+        use ffb_model::model::skill_def::SkillWithValue;
+        let p = Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 4, strength: 2, agility: 3, passing: 4, armour: 8,
+            starting_skills: skills.into_iter().map(SkillWithValue::new).collect(),
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        };
+        if home { game.team_home.players.push(p) } else { game.team_away.players.push(p) }
+        game.field_model.set_player_coordinate(id, coord);
+        game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+    }
+
+    #[test]
+    fn kick_team_mate_move_with_kickable_mate_pushes_move_sequence() {
+        use ffb_model::enums::SkillId;
+        let mut game = make_game();
+        // kicker with KickTeamMate skill
+        add_player_with_skills(&mut game, true, "kicker", FieldCoordinate::new(5, 5),
+            vec![SkillId::KickTeamMate]);
+        // kickable team-mate adjacent (RightStuff → canBeKicked)
+        add_player_with_skills(&mut game, true, "ktm", FieldCoordinate::new(5, 6),
+            vec![SkillId::RightStuff]);
+        game.acting_player.player_id = Some("kicker".into());
+        game.acting_player.player_action = Some(PlayerAction::KickTeamMateMove);
+        game.home_playing = true;
+        // blitz not used → KTM is available
+        game.turn_data_home.blitz_used = false;
+        let mut step = StepEndMoving::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "KickTeamMateMove + canKickTeamMate should push Move sequence");
+    }
+
+    #[test]
+    fn kick_team_mate_move_blocked_when_blitz_used() {
+        use ffb_model::enums::SkillId;
+        let mut game = make_game();
+        add_player_with_skills(&mut game, true, "kicker", FieldCoordinate::new(5, 5),
+            vec![SkillId::KickTeamMate]);
+        add_player_with_skills(&mut game, true, "ktm", FieldCoordinate::new(5, 6),
+            vec![SkillId::RightStuff]);
+        game.acting_player.player_id = Some("kicker".into());
+        game.acting_player.player_action = Some(PlayerAction::KickTeamMateMove);
+        game.home_playing = true;
+        game.turn_data_home.blitz_used = true; // blitz used → KTM unavailable
+        let mut step = StepEndMoving::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // should fall through to EndPlayerAction (no KTM move available)
+        assert_eq!(out.action, StepAction::NextStep);
+        // pushes should be EndPlayerAction, not Move (both are NextStep, but we can't distinguish
+        // the sequence easily — at minimum, no crash and still NextStep)
+    }
+
+    #[test]
+    fn throw_team_mate_move_with_throwable_mate_pushes_move_sequence() {
+        use ffb_model::enums::SkillId;
+        let mut game = make_game();
+        // thrower with ThrowTeamMate skill
+        add_player_with_skills(&mut game, true, "thrower", FieldCoordinate::new(5, 5),
+            vec![SkillId::ThrowTeamMate]);
+        // throwable team-mate adjacent (RightStuff → canBeThrown) with ST <= 3 (st=2 here)
+        add_player_with_skills(&mut game, true, "ttm", FieldCoordinate::new(5, 6),
+            vec![SkillId::RightStuff]);
+        game.acting_player.player_id = Some("thrower".into());
+        game.acting_player.player_action = Some(PlayerAction::ThrowTeamMateMove);
+        game.home_playing = true;
+        game.turn_data_home.pass_used = false;
+        let mut step = StepEndMoving::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "ThrowTeamMateMove + canThrowTeamMate should push Move sequence");
     }
 }

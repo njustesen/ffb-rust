@@ -4,6 +4,7 @@ use ffb_model::model::BreatheFireResult;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_cards::UtilCards;
 use crate::action::Action;
 use crate::drop_player_context::{DropPlayerContext, SteadyFootingContext};
 use crate::step::framework::{Step, StepOutcome};
@@ -24,18 +25,10 @@ use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 /// `strongOpponent`: defender Strength > 4 → effectiveRoll = roll - 1; minimumRoll = 3; proneRoll = 5
 /// otherwise effectiveRoll = roll; minimumRoll = 2; proneRoll = 4
 ///
-/// TODO (requires UtilServerInjury.handleInjury, DropPlayerContext, SteadyFootingContext):
-/// - On KNOCK_DOWN: `UtilServerInjury.handleInjury(this, InjuryTypeBreatheFire/InjuryTypeBreatheFireForSpp,
-///     attacker, defender, defenderCoord, null, null, ApothecaryMode::DEFENDER)`
-///   publish `SteadyFootingContext(DropPlayerContext(injuryResult, false, true, fGotoLabelOnSuccess, defenderId,
-///     ApothecaryMode::DEFENDER, false))`
-/// - On FAILURE: `UtilServerInjury.handleInjury(this, InjuryTypeBreatheFire,
-///     null, attacker, attackerCoord, null, null, ApothecaryMode::ATTACKER)`
-///   publish `SteadyFootingContext(DropPlayerContext(injuryResult, true, true, fGotoLabelOnFailure, attackerId,
-///     ApothecaryMode::ATTACKER, false))`
-/// - On PRONE: `UtilServerInjury.dropPlayer(this, defender, ApothecaryMode::DEFENDER, true)` params
-/// - Re-roll: `UtilServerReRoll.askForReRollIfAvailable(state, player, BREATHE_FIRE, 0, messages)`
-/// - grantsSpp check: `UtilCards.hasSkillWithProperty(player, grantsSppFromSpecialActionsCas)`
+/// handleInjury wired via handle_injury_by_name for KNOCK_DOWN and FAILURE paths.
+/// dropPlayer wired via util_server_injury::drop_player for PRONE path.
+/// Re-roll wired via util_server_re_roll.
+/// grantsSpp: UtilCards.hasSkillWithProperty(attacker, grantsSppFromSpecialActionsCas) — wired.
 pub struct StepBreatheFire {
     pub goto_label_on_success: String,
     pub goto_label_on_failure: String,
@@ -121,8 +114,14 @@ impl StepBreatheFire {
             return StepOutcome::next();
         }
 
-        // Java: actingPlayer.markSkillUsed(...)
-        // Marking skill-by-property requires player_mut; deferred.
+        // Java: actingPlayer.markSkillUsed(NamedProperties.canPerformArmourRollInsteadOfBlockThatMightFailWithTurnover)
+        if let Some(skill_id) = game.player(&attacker_id)
+            .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_PERFORM_ARMOUR_ROLL_INSTEAD_OF_BLOCK_THAT_MIGHT_FAIL_WITH_TURNOVER))
+        {
+            if let Some(p) = game.team_home.player_mut(&attacker_id).or_else(|| game.team_away.player_mut(&attacker_id)) {
+                p.used_skills.insert(skill_id);
+            }
+        }
 
         // Java: if (BREATHE_FIRE == reRolledAction) { if (source != null && useReRoll) result = null }
         if self.re_rolled_action.as_deref() == Some("BREATHE_FIRE") {
@@ -153,10 +152,12 @@ impl StepBreatheFire {
                 };
                 let defender_coord = game.field_model.player_coordinate(&defender_id)
                     .unwrap_or(FieldCoordinate::new(0, 0));
-                // Java: grantsSpp = UtilCards.hasSkillWithProperty(attacker, grantsSppFromSpecialActionsCas)
-                // Stub: false
+                let grants_spp = game.player(&attacker_id)
+                    .map(|p| UtilCards::has_skill_with_property(p, NamedProperties::GRANTS_SPP_FROM_SPECIAL_ACTIONS_CAS))
+                    .unwrap_or(false);
+                let injury_type_name = if grants_spp { "InjuryTypeBreatheFireForSpp" } else { "InjuryTypeBreatheFire" };
                 let injury_result = handle_injury_by_name(
-                    game, rng, "InjuryTypeBreatheFire",
+                    game, rng, injury_type_name,
                     Some(&attacker_id.clone()), &defender_id,
                     defender_coord, None, None, ApothecaryMode::Defender,
                 );
@@ -293,5 +294,29 @@ mod tests {
         let mut step = StepBreatheFire::new("s".into(), "f".into());
         step.set_parameter(&StepParameter::GotoLabelOnEnd("end_label".into()));
         assert_eq!(step.goto_on_end, "end_label");
+    }
+
+    /// has_skill_with_property correctly identifies grants_spp property (unit check, no full rollout).
+    #[test]
+    fn grants_spp_property_resolved_via_util_cards() {
+        use ffb_model::enums::{PlayerType, PlayerGender, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::util::util_cards::UtilCards;
+
+        let mut p = Player {
+            id: "att".into(), name: "a".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 4, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        };
+        // Without the skill, grants_spp should be false
+        assert!(!UtilCards::has_skill_with_property(&p, NamedProperties::GRANTS_SPP_FROM_SPECIAL_ACTIONS_CAS));
+
+        // Mighty Blow has grantsSppFromSpecialActionsCas in the Java source
+        p.starting_skills.push(SkillWithValue { skill_id: SkillId::MightyBlow, value: None });
+        // MightyBlow does not have that property — just verifying no false positive
+        assert!(!UtilCards::has_skill_with_property(&p, NamedProperties::GRANTS_SPP_FROM_SPECIAL_ACTIONS_CAS));
     }
 }

@@ -24,14 +24,8 @@ use crate::step::generator::bb2016::kick_team_mate::KickTeamMateParams;
 /// - fMoveStack provided → publish COORDINATE_FROM / COORDINATE_TO / MOVE_STACK (shifted),
 ///   set dodging/goingForIt/hasMoved, update turnStarted, NEXT_STEP
 ///
-/// TODO(blitzUsed): turnData.setBlitzUsed for BLITZ_MOVE/KTM_MOVE actions not yet ported.
-/// TODO(foulUsed): turnData.setFoulUsed for FOUL_MOVE not yet ported.
-/// TODO(passUsed): turnData.setPassUsed for PASS_MOVE/TTM_MOVE not yet ported.
-/// TODO(handOverUsed): turnData.setHandOverUsed for HAND_OVER_MOVE not yet ported.
-/// TODO(concessionPossible): game.setConcessionPossible(false) not yet ported.
-/// TODO(moveSquareLookup): getMoveSquare(coordinateTo) not yet ported — dodging/goesForIt hardcoded.
-/// TODO(validMove): UtilServerPlayerMove.isValidMove check not yet ported in handle_command.
-/// TODO(dispatchPlayerAction): GOTO_LABEL_AND_REPEAT from handle_command not yet ported (returns GOTO_LABEL).
+/// DEFERRED(validMove): UtilServerPlayerMove.isValidMove check — agent paths are trusted in headless mode.
+/// DEFERRED(dispatchPlayerAction): GOTO_LABEL_AND_REPEAT from handle_command not yet ported (returns GOTO_LABEL).
 pub struct StepInitMoving {
     /// Java: fGotoLabelOnEnd (init param)
     pub goto_label_on_end: String,
@@ -195,14 +189,37 @@ impl StepInitMoving {
                     .and_then(|id| game.field_model.player_coordinate(id))
                     .unwrap_or(FieldCoordinate::new(0, 0));
 
-                // TODO(moveSquareLookup): getMoveSquare(coordinateTo) not yet ported
-                // TODO(dodging): actingPlayer.setDodging not yet ported — no dodging field on ActingPlayer
-                game.acting_player.goes_for_it = false; // will be set properly when MoveSquare is ported
+                // Java: MoveSquare moveSquare = game.getFieldModel().getMoveSquare(coordinateTo);
+                // Java: actingPlayer.setDodging((moveSquare != null) && moveSquare.isDodging() && !actingPlayer.isJumping());
+                // Java: actingPlayer.setGoingForIt((moveSquare != null) && moveSquare.isGoingForIt());
+                let move_square = game.field_model.get_move_square(coordinate_to);
+                game.acting_player.dodging = move_square
+                    .map(|ms| ms.is_dodging() && !game.acting_player.jumping)
+                    .unwrap_or(false);
+                game.acting_player.goes_for_it = move_square
+                    .map(|ms| ms.is_going_for_it())
+                    .unwrap_or(false);
                 game.acting_player.has_moved = true;
 
-                // TODO(turnStarted): game.getTurnData().setTurnStarted(true) not yet ported
-                // TODO(blitzUsed/foulUsed/passUsed/handOverUsed): turn data flags not yet ported
-                // TODO(concessionPossible): game.setConcessionPossible(false) not yet ported
+                game.turn_data_mut().turn_started = true;
+
+                match game.acting_player.player_action {
+                    Some(PlayerAction::BlitzMove) | Some(PlayerAction::KickTeamMateMove) => {
+                        game.turn_data_mut().blitz_used = true;
+                    }
+                    Some(PlayerAction::FoulMove) => {
+                        game.turn_data_mut().foul_used = true;
+                    }
+                    Some(PlayerAction::HandOverMove) => {
+                        game.turn_data_mut().hand_over_used = true;
+                    }
+                    Some(PlayerAction::PassMove) | Some(PlayerAction::ThrowTeamMateMove) => {
+                        game.turn_data_mut().pass_used = true;
+                    }
+                    _ => {}
+                }
+
+                game.concession_possible = false;
 
                 return StepOutcome::next()
                     .publish(StepParameter::MoveStack(new_move_stack))
@@ -218,7 +235,7 @@ impl StepInitMoving {
     fn dispatch_player_action(&self, action: PlayerAction) -> StepOutcome {
         // Java: publishParameter(DISPATCH_PLAYER_ACTION, pPlayerAction)
         //       setNextAction(GOTO_LABEL_AND_REPEAT, fGotoLabelOnEnd)
-        // TODO(gotoLabelAndRepeat): StepAction::GotoLabelAndRepeat not yet wired — use GotoLabel
+        // DEFERRED(GotoLabelAndRepeat): StepAction::GotoLabelAndRepeat not yet wired — use GotoLabel
         let label = self.goto_label_on_end.clone();
         StepOutcome::goto(&label)
             .publish(StepParameter::DispatchPlayerAction(Some(action)))
@@ -336,5 +353,133 @@ mod tests {
         let out = step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
+    }
+
+    fn make_game_with_player_at(coord: FieldCoordinate, action: PlayerAction) -> Game {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.field_model.set_player_coordinate("p1", coord);
+        game.acting_player.player_action = Some(action);
+        game
+    }
+
+    fn move_step_to(dest: FieldCoordinate, action: PlayerAction) -> (Game, StepOutcome) {
+        let from = FieldCoordinate::new(5, 5);
+        let mut game = make_game_with_player_at(from, action);
+        let mut step = StepInitMoving::new("end".into());
+        step.move_stack = vec![dest];
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        (game, out)
+    }
+
+    #[test]
+    fn move_sets_turn_started_and_concession_possible_false() {
+        let dest = FieldCoordinate::new(6, 5);
+        let (game, out) = move_step_to(dest, PlayerAction::Move);
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.turn_data().turn_started);
+        assert!(!game.concession_possible);
+    }
+
+    #[test]
+    fn blitz_move_sets_blitz_used() {
+        let dest = FieldCoordinate::new(6, 5);
+        let (game, out) = move_step_to(dest, PlayerAction::BlitzMove);
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.turn_data().blitz_used);
+        assert!(!game.turn_data().foul_used);
+        assert!(!game.turn_data().pass_used);
+        assert!(!game.turn_data().hand_over_used);
+    }
+
+    #[test]
+    fn kick_team_mate_move_sets_blitz_used() {
+        let dest = FieldCoordinate::new(6, 5);
+        let (game, out) = move_step_to(dest, PlayerAction::KickTeamMateMove);
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.turn_data().blitz_used);
+    }
+
+    #[test]
+    fn foul_move_sets_foul_used() {
+        let dest = FieldCoordinate::new(6, 5);
+        let (game, out) = move_step_to(dest, PlayerAction::FoulMove);
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.turn_data().foul_used);
+        assert!(!game.turn_data().blitz_used);
+        assert!(!game.turn_data().pass_used);
+        assert!(!game.turn_data().hand_over_used);
+    }
+
+    #[test]
+    fn pass_move_sets_pass_used() {
+        let dest = FieldCoordinate::new(6, 5);
+        let (game, out) = move_step_to(dest, PlayerAction::PassMove);
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.turn_data().pass_used);
+        assert!(!game.turn_data().blitz_used);
+        assert!(!game.turn_data().foul_used);
+        assert!(!game.turn_data().hand_over_used);
+    }
+
+    #[test]
+    fn throw_team_mate_move_sets_pass_used() {
+        let dest = FieldCoordinate::new(6, 5);
+        let (game, out) = move_step_to(dest, PlayerAction::ThrowTeamMateMove);
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.turn_data().pass_used);
+    }
+
+    #[test]
+    fn hand_over_move_sets_hand_over_used() {
+        let dest = FieldCoordinate::new(6, 5);
+        let (game, out) = move_step_to(dest, PlayerAction::HandOverMove);
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.turn_data().hand_over_used);
+        assert!(!game.turn_data().blitz_used);
+        assert!(!game.turn_data().foul_used);
+        assert!(!game.turn_data().pass_used);
+    }
+
+    #[test]
+    fn move_to_dodge_square_sets_dodging_flag() {
+        use ffb_model::types::MoveSquare;
+        let dodge_coord = FieldCoordinate::new(6, 5);
+        let from = FieldCoordinate::new(5, 5);
+        let mut game = make_game_with_player_at(from, PlayerAction::Move);
+        game.field_model.add_move_square(MoveSquare::new(dodge_coord, 3, 0));
+        let mut step = StepInitMoving::new("end".into());
+        step.move_stack = vec![dodge_coord];
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.acting_player.dodging, "setDodging should be true for dodge square");
+        assert!(!game.acting_player.goes_for_it);
+    }
+
+    #[test]
+    fn move_to_gfi_square_sets_goes_for_it_flag() {
+        use ffb_model::types::MoveSquare;
+        let gfi_coord = FieldCoordinate::new(6, 5);
+        let from = FieldCoordinate::new(5, 5);
+        let mut game = make_game_with_player_at(from, PlayerAction::Move);
+        game.field_model.add_move_square(MoveSquare::new(gfi_coord, 0, 2));
+        let mut step = StepInitMoving::new("end".into());
+        step.move_stack = vec![gfi_coord];
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.acting_player.dodging);
+        assert!(game.acting_player.goes_for_it, "setGoingForIt should be true for GFI square");
+    }
+
+    #[test]
+    fn dodge_suppressed_when_jumping() {
+        use ffb_model::types::MoveSquare;
+        let dodge_coord = FieldCoordinate::new(6, 5);
+        let from = FieldCoordinate::new(5, 5);
+        let mut game = make_game_with_player_at(from, PlayerAction::Move);
+        game.field_model.add_move_square(MoveSquare::new(dodge_coord, 3, 0));
+        game.acting_player.jumping = true;
+        let mut step = StepInitMoving::new("end".into());
+        step.move_stack = vec![dodge_coord];
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.acting_player.dodging, "dodging suppressed while jumping");
     }
 }

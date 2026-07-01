@@ -11,6 +11,7 @@ pub mod bb2020;
 pub mod bb2025;
 pub mod common;
 pub mod mixed;
+pub mod step_hook;
 
 /// Marker trait — the Rust analogue of Java's `ISkillBehaviour`.
 /// `execute_step_hook` mirrors Java's `StepModifier.handleExecuteStepHook`.

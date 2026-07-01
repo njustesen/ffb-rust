@@ -9,14 +9,14 @@
 /// `useStarOfTheShow` concept; and `fWithinSecretWeaponHandling` is the gate for
 /// secret-weapon dialogs (identical to BB2020 in that regard).
 ///
-/// TODOs (most of this step requires untranslated utilities):
-///  - checkTouchdown / UtilServerSteps not translated.
-///  - markPlayedAndSecretWeapons not translated.
-///  - KickoffSequence / EndGameSequence push not translated.
-///  - checkEndOfHalf not translated.
-///  - argueTheCall dialogs and bribes dialogs not translated.
-///  - UtilServerCards.deactivateCard() not translated.
-///  - recoverKnockout / heatExhaust not translated.
+/// DEFERRED items (require untranslated utilities):
+///  - checkTouchdown / UtilServerSteps
+///  - markPlayedAndSecretWeapons
+///  - KickoffSequence / EndGameSequence push
+///  - checkEndOfHalf
+///  - argueTheCall dialogs and bribes dialogs
+///  - UtilServerCards.deactivateCard()
+///  - recoverKnockout / heatExhaust
 ///  - UtilServerTimer not translated.
 ///  - FUMBBL request update not translated.
 ///
@@ -136,17 +136,16 @@ impl StepEndTurn {
                 return StepOutcome::next().publish(StepParameter::EndTurn(true));
             }
 
-            // TODO(end_turn_bb2016): checkTouchdown not translated.
-            // TODO(end_turn_bb2016): markPlayedAndSecretWeapons not translated.
-            // TODO(end_turn_bb2016): KickoffSequence / EndGameSequence push not translated.
-            // TODO(end_turn_bb2016): checkEndOfHalf not translated.
-            // TODO(end_turn_bb2016): recoverKnockout / heatExhaust not translated.
-            // TODO(end_turn_bb2016): deactivateCards not translated.
+            // DEFERRED(checkTouchdown): UtilServerSteps.checkTouchdown not yet ported.
+            // DEFERRED(secretWeapons): markPlayedAndSecretWeapons not yet ported.
+            // DEFERRED(kickoffSeq): KickoffSequence / EndGameSequence push not yet ported.
+            // DEFERRED(endOfHalf): checkEndOfHalf not yet ported.
+            // DEFERRED(recover): recoverKnockout / heatExhaust not yet ported.
+            // DEFERRED(cards): deactivateCards not yet ported.
         }
 
-        // TODO(end_turn_bb2016): argueTheCall dialogs not translated.
-        // TODO(end_turn_bb2016): bribes dialogs not translated.
-        // TODO(end_turn_bb2016): argue_the_call_choice / bribes_choice negotiation not translated.
+        // DEFERRED(argueTheCall): argueTheCall dialogs not yet ported.
+        // DEFERRED(bribes): bribes dialogs not yet ported.
 
         // Simplified: advance and publish params.
         StepOutcome::next()

@@ -4,7 +4,7 @@ use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 
-/// TODO: full logic.
+/// DEFERRED: full logic.
 pub struct StepNextStepAndRepeat;
 
 impl StepNextStepAndRepeat {

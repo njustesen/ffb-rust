@@ -1,4 +1,4 @@
-use ffb_model::types::FieldCoordinate;
+use ffb_model::types::{FieldCoordinate, MoveSquare};
 use ffb_model::enums::TurnMode;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
@@ -85,7 +85,10 @@ impl StepHitAndRun {
                     game.last_turn_mode = Some(game.turn_mode);
                     game.turn_mode = TurnMode::HitAndRun;
                 }
-                // TODO: fieldModel.clearMoveSquares + add MoveSquares for eligibles
+                game.field_model.clear_move_squares();
+                for c in &eligible_squares {
+                    game.field_model.add_move_square(MoveSquare::new(*c, 0, 0));
+                }
                 return StepOutcome::cont();
             } else {
                 // Move the player
@@ -100,7 +103,7 @@ impl StepHitAndRun {
                         }
                     }
                     game.field_model.set_player_coordinate(attacker_id, dest);
-                    // TODO: add Direction report (ReportHitAndRun)
+                    // DEFERRED: add Direction report (ReportHitAndRun)
                     // Java: actingPlayer.markSkillUsed(canMoveAfterBlock)
                     let sid = game.player(attacker_id).and_then(|p| UtilCards::get_unused_skill_with_property(
                         p, NamedProperties::CAN_MOVE_AFTER_BLOCK));
@@ -111,7 +114,7 @@ impl StepHitAndRun {
                     }
                 }
                 self.reset_state(game);
-                // TODO: push PickUp + CatchScatterThrowIn sequence onto stack
+                // DEFERRED: push PickUp + CatchScatterThrowIn sequence onto stack
                 StepOutcome::next()
             }
         } else {
@@ -212,5 +215,82 @@ mod tests {
             &mut GameRng::new(0),
         );
         assert_eq!(step.coordinate, Some(coord));
+    }
+
+    /// When eligible squares exist and no coordinate is chosen yet,
+    /// clearMoveSquares + addMoveSquare are called for each eligible square.
+    #[test]
+    fn eligible_squares_populate_move_squares_and_set_hit_and_run_mode() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, PS_STANDING, PlayerState, PlayerAction, SkillId};
+
+        let mut game = make_game();
+
+        let player = Player {
+            id: "attacker".into(), name: "a".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            // HitAndRun skill has "canMoveAfterBlock" property
+            starting_skills: vec![ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::HitAndRun, value: None }], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+        };
+
+        game.team_home.players.push(player);
+        game.field_model.set_player_coordinate("attacker", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("attacker", PlayerState::new(PS_STANDING));
+        game.acting_player.set_player("attacker".into(), PlayerAction::Block);
+
+        // Pre-fill a stale move square so we can verify clear was called
+        game.field_model.add_move_square(MoveSquare::new(FieldCoordinate::new(0, 0), 1, 1));
+
+        let mut step = StepHitAndRun::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        // Step should wait for coordinate selection
+        assert_eq!(out.action, StepAction::Continue);
+        // TurnMode should now be HitAndRun
+        assert_eq!(game.turn_mode, TurnMode::HitAndRun);
+        // Stale move square (0,0) should be gone; eligible squares should be present
+        assert!(game.field_model.get_move_square(FieldCoordinate::new(0, 0)).is_none());
+        // At least one eligible adjacent square should have been added
+        assert!(!game.field_model.move_squares.is_empty());
+    }
+
+    /// Selecting a coordinate causes the player to move to that square (move_squares cleared via reset_state).
+    #[test]
+    fn selecting_coordinate_moves_player_and_clears_hit_and_run_mode() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, PS_STANDING, PlayerState, PlayerAction, SkillId};
+
+        let mut game = make_game();
+
+        let player = Player {
+            id: "attacker".into(), name: "a".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::HitAndRun, value: None }], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+        };
+
+        game.team_home.players.push(player);
+        game.field_model.set_player_coordinate("attacker", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("attacker", PlayerState::new(PS_STANDING));
+        game.acting_player.set_player("attacker".into(), PlayerAction::Block);
+
+        game.turn_mode = TurnMode::HitAndRun;
+
+        let dest = FieldCoordinate::new(6, 5);
+        let mut step = StepHitAndRun::new();
+        step.coordinate = Some(dest);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        // Player should have moved to dest
+        assert_eq!(game.field_model.player_coordinate("attacker"), Some(dest));
+        // TurnMode restored (HitAndRun cleared)
+        assert_ne!(game.turn_mode, TurnMode::HitAndRun);
+        // Step advances
+        assert_eq!(out.action, StepAction::NextStep);
     }
 }

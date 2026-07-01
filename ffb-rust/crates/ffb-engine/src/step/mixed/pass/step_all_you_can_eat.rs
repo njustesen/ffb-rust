@@ -92,7 +92,7 @@ impl StepAllYouCanEat {
 
             // Java: if (!success) push EjectPlayer + Bribes onto stack
             if !success {
-                // TODO: push EjectPlayer + Bribes sub-sequences when sequence generator is wired.
+                // DEFERRED: push EjectPlayer + Bribes sub-sequences when sequence generator is wired.
                 // For now just publish the outcome; the engine will handle the sequences.
                 return outcome_base;
             }
@@ -102,7 +102,7 @@ impl StepAllYouCanEat {
 
         // do_roll == false means re-roll declined → treat as failure
         // Java: if (!success) push EjectPlayer + Bribes
-        // TODO: push sequences
+        // DEFERRED: push sequences
         StepOutcome::next()
     }
 }

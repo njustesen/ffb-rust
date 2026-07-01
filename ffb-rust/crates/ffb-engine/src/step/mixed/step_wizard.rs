@@ -74,7 +74,7 @@ impl StepWizard {
         {
             // Java: report + mark inducement used + collect affected players
             //   + restore old_turn_mode + push SpecialEffect sequences
-            // TODO(InducementSet/SpecialEffect port): mark wizard used, push sequences
+            // DEFERRED(InducementSet/SpecialEffect port): mark wizard used, push sequences
             if let Some(old) = self.old_turn_mode {
                 game.turn_mode = old;
             }

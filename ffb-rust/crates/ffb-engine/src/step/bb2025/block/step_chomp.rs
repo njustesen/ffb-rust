@@ -20,12 +20,8 @@ use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 ///    d. On success: `game.fieldModel.addChomp(attacker, defender)` → keeps GOTO_LABEL.
 ///    e. On failure: if not yet re-rolled, ask for re-roll (TODO). If re-roll available → `CONTINUE`.
 ///
-/// TODO (requires FieldModel.addChomp, AbstractStepWithReRoll, UtilServerReRoll):
-/// - `game.field_model.add_chomp(attacker_id, defender_id)`
-///   Java: `game.getFieldModel().addChomp(actingPlayer.getPlayer(), game.getDefender())`
-///   This sets "chomped" state on the defender in the field model (defender is pinned).
-/// - Re-roll: `UtilServerReRoll.askForReRollIfAvailable(state, player, ReRolledActions.CHOMP, minimumRoll, false)`
-/// - `actingPlayer.isStandingUp()` check (standing-up players cannot use Chomp)
+/// `game.field_model.add_chomp` wired; re-roll wired via util_server_re_roll;
+/// `actingPlayer.standing_up` guard wired.
 pub struct StepChomp {
     pub goto_label_on_end: String,
     pub using_chomp: bool,

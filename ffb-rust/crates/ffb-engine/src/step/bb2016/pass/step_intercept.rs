@@ -10,10 +10,10 @@
 /// Init parameter: GOTO_LABEL_ON_FAILURE (mandatory).
 /// Publishes: INTERCEPTOR_ID.
 ///
-/// TODO(Intercept-possibleInterceptors): UtilPassing.findInterceptors not yet ported.
-/// TODO(Intercept-roll): AgilityMechanic.minimumRollInterception + modifier factory deferred.
-/// TODO(Intercept-reroll): AbstractStepWithReRoll infrastructure deferred.
-/// TODO(Intercept-rangeRuler): UtilRangeRuler.createRangeRuler deferred.
+/// DEFERRED(Intercept-possibleInterceptors): UtilPassing.findInterceptors not yet ported.
+/// DEFERRED(Intercept-roll): AgilityMechanic.minimumRollInterception + modifier factory not yet ported.
+/// DEFERRED(Intercept-reroll): AbstractStepWithReRoll infrastructure not yet ported.
+/// DEFERRED(Intercept-rangeRuler): UtilRangeRuler.createRangeRuler not yet ported.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -39,7 +39,7 @@ impl StepIntercept {
     }
 
     fn execute_step(&self, _game: &mut Game) -> StepOutcome {
-        // TODO(Intercept-possibleInterceptors): find interceptors, show dialog, roll.
+        // DEFERRED(Intercept-possibleInterceptors): find interceptors, show dialog, roll.
         // For now: no interceptors → goto failure immediately (safe default).
         StepOutcome::goto(&self.goto_label_on_failure)
             .publish(StepParameter::InterceptorId(None))

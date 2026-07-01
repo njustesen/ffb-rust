@@ -372,6 +372,10 @@ impl CoverageReport {
             | GameEvent::MasterChefRoll { .. }
             | GameEvent::RefereeSpotsFoul { .. }
             | GameEvent::BiasedRefRoll { .. }
+            | GameEvent::Block { .. }
+            | GameEvent::ApothecaryRoll { .. }
+            | GameEvent::SelectBlitzTarget { .. }
+            | GameEvent::SelectGazeTarget { .. }
             => {}
         }
     }

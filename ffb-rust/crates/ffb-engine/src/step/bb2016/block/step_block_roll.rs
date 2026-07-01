@@ -8,6 +8,7 @@
 /// Sets stepParameter NR_OF_BLOCK_DICE for all steps on the stack.
 use ffb_mechanics::mechanics::block_result_for_roll;
 use ffb_model::enums::{BlockResult, PlayerAction, ReRollSource};
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::re_rolled_action::ReRolledAction;
@@ -94,12 +95,16 @@ impl StepBlockRoll {
 
                 // Java: getResult().addReport(new ReportBlock(game.getDefenderId()))
                 // Java: getResult().setSound(SoundId.BLOCK)
-                // TODO(report-block): ReportBlock not yet ported
+                let block_event = game.defender_id.as_ref().map(|did| {
+                    GameEvent::Block { defender_id: did.clone() }
+                });
 
                 // Java: showBlockRollDialog(doRoll)
                 // → show dialog (CONTINUE) waiting for block choice
                 self.show_block_roll_dialog(game);
-                return StepOutcome::cont();
+                let mut outcome = StepOutcome::cont();
+                if let Some(ev) = block_event { outcome = outcome.with_event(ev); }
+                return outcome;
             } else {
                 // Java: showBlockRollDialog(doRoll) — re-roll path, show dialog
                 self.show_block_roll_dialog(game);
@@ -147,7 +152,7 @@ impl StepBlockRoll {
                 })
                 .unwrap_or(false);
 
-        // TODO(show-dialog): DialogBlockRollParameter not yet ported; waiting for CLIENT_BLOCK_CHOICE action
+        // DEFERRED(dialog): DialogBlockRollParameter not yet ported; CLIENT_BLOCK_CHOICE action not yet added
     }
 }
 

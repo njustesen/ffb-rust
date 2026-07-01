@@ -19,7 +19,10 @@
 /// Java: `StepInitFuriousOutburst extends AbstractStep` (mixed, BB2020 + BB2025).
 use std::collections::HashSet;
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::model::skill_def::SkillWithValue;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_cards::UtilCards;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -59,9 +62,10 @@ impl StepInitFuriousOutburst {
         let prone_or_stunned = player_state.map(|s| s.is_prone_or_stunned()).unwrap_or(false);
 
         if !prone_or_stunned {
-            // Check if acting player has unused canTeleportBeforeAndAfterAvRollAttack skill
-            // (not yet fully ported — defer skill check; assume available for now)
-            // TODO(skill system port): check UtilCards.getUnusedSkillWithProperty
+            // Java: Skill skill = UtilCards.getUnusedSkillWithProperty(actingPlayer, canTeleportBeforeAndAfterAvRollAttack)
+            let skill = game.acting_player.player_id.as_deref()
+                .and_then(|id| game.player(id))
+                .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_TELEPORT_BEFORE_AND_AFTER_AV_ROLL_ATTACK));
 
             if self.end_turn {
                 return StepOutcome::goto(&self.goto_label_on_end)
@@ -70,17 +74,22 @@ impl StepInitFuriousOutburst {
             }
             if self.end_player_action {
                 // Java: fieldModel.setTargetSelectionState(new TargetSelectionState().cancel())
+                let mut ts = ffb_model::model::target_selection_state::TargetSelectionState::default();
+                ts.cancel();
+                game.field_model.target_selection_state = Some(ts);
                 return StepOutcome::goto(&self.goto_label_on_end)
                     .publish(StepParameter::EndPlayerAction(true));
             }
-            if let Some(ref tid) = self.target_id.clone() {
-                // Java: game.fieldModel.setTargetSelectionState(new TargetSelectionState(targetId))
-                // TODO(TargetSelectionState port)
-                let _ = tid;
-                return StepOutcome::next();
+            if skill.is_some() {
+                if let Some(ref tid) = self.target_id.clone() {
+                    // Java: game.fieldModel.setTargetSelectionState(new TargetSelectionState(targetId))
+                    let ts = ffb_model::model::target_selection_state::TargetSelectionState::new(tid.clone());
+                    game.field_model.target_selection_state = Some(ts);
+                    return StepOutcome::next();
+                }
+                // DEFERRED(UtilPlayer port): find eligible players, show dialog
+                // For now if no eligible players found, fall through to goto
             }
-            // TODO(UtilPlayer port): find eligible players, show dialog
-            // For now if no eligible players found, fall through to goto
         }
 
         StepOutcome::goto(&self.goto_label_on_end)
@@ -131,7 +140,7 @@ impl Step for StepInitFuriousOutburst {
 mod tests {
     use super::*;
     use crate::step::framework::{test_team, StepAction};
-    use ffb_model::enums::{Rules, PS_STANDING, PS_PRONE, PlayerAction};
+    use ffb_model::enums::{Rules, PS_STANDING, PS_PRONE, PlayerAction, SkillId};
     use ffb_model::model::game::Game;
     use ffb_model::model::player::Player;
     use ffb_model::enums::{PlayerType, PlayerGender};
@@ -143,12 +152,17 @@ mod tests {
     }
 
     fn add_player(game: &mut Game, id: &str, state: u32) {
+        add_player_with_skills(game, id, state, vec![]);
+    }
+
+    fn add_player_with_skills(game: &mut Game, id: &str, state: u32, skills: Vec<SkillId>) {
         let pos = FieldCoordinate::new(5, 5);
         game.team_home.players.push(Player {
             id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
             player_type: PlayerType::Regular, gender: PlayerGender::Male,
             movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
-            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            starting_skills: skills.into_iter().map(|s| SkillWithValue { skill_id: s, value: None }).collect(),
+            extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
         });
@@ -198,5 +212,44 @@ mod tests {
         assert_eq!(out.action, StepAction::GotoLabel);
         let has_epa = out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true)));
         assert!(has_epa);
+    }
+
+    #[test]
+    fn end_player_action_cancels_target_selection_state() {
+        let mut step = StepInitFuriousOutburst::new("end");
+        step.end_player_action = true;
+        let mut game = make_game();
+        add_player(&mut game, "att", PS_STANDING);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(game.field_model.target_selection_state.as_ref().map(|ts| ts.is_canceled()).unwrap_or(false));
+    }
+
+    #[test]
+    fn target_id_sets_target_selection_state() {
+        let mut step = StepInitFuriousOutburst::new("end");
+        step.target_id = Some("tgt".into());
+        let mut game = make_game();
+        // Player must have FuriousOutburst skill to enter the skill branch
+        add_player_with_skills(&mut game, "att", PS_STANDING, vec![SkillId::FuriousOutburst]);
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep);
+        let player_id = game.field_model.target_selection_state.as_ref()
+            .and_then(|ts| ts.get_selected_player_id().cloned());
+        assert_eq!(player_id.as_deref(), Some("tgt"));
+    }
+
+    #[test]
+    fn no_furious_outburst_skill_goes_to_label() {
+        // Without the FuriousOutburst skill, the step skips to goto even if target_id is set
+        let mut step = StepInitFuriousOutburst::new("end_label");
+        step.target_id = Some("tgt".into());
+        let mut game = make_game();
+        add_player(&mut game, "att", PS_STANDING); // no FuriousOutburst skill
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.goto_label, Some("end_label".into()));
     }
 }

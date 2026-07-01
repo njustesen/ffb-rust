@@ -87,7 +87,7 @@ impl Step for StepThenIStartedBlastin {
                     game.home_playing = !game.home_playing;
                     let hit_id = player_id.clone();
                     let outcome = self.hit_player(game, rng, &hit_id);
-                    // TODO(tisb): ReportThenIStartedBlastin(actingPlayerId, defenderId, 0, true, false)
+                    // DEFERRED(tisb): ReportThenIStartedBlastin(actingPlayerId, defenderId, 0, true, false)
                     return outcome;
                 }
             }
@@ -157,7 +157,7 @@ impl StepThenIStartedBlastin {
         if game.turn_mode != TurnMode::ThenIStartedBlastin {
             self.old_turn_mode = game.last_turn_mode;
             game.turn_mode = TurnMode::ThenIStartedBlastin;
-            // TODO(tisb): ReportThenIStartedBlastin(actingPlayerId, null, 0, false, false)
+            // DEFERRED(tisb): ReportThenIStartedBlastin(actingPlayerId, null, 0, false, false)
             return StepOutcome::cont();
         }
 
@@ -177,7 +177,7 @@ impl StepThenIStartedBlastin {
         self.roll = rng.d6();
         let success = self.roll >= 3;
 
-        // TODO(tisb): ReportThenIStartedBlastin(actingId, defenderId, roll, success, roll==1)
+        // DEFERRED(tisb): ReportThenIStartedBlastin(actingId, defenderId, roll, success, roll==1)
 
         if success {
             if let Some(def_id) = game.defender_id.clone() {
@@ -200,7 +200,7 @@ impl StepThenIStartedBlastin {
     fn fail(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         if self.roll == 1 {
             // Java: hitPlayer(actingPlayer) — fumbled keg hits self
-            // TODO(tisb): setAnimation(FUMBLED_KEG, throwerCoordinate)
+            // DEFERRED(tisb): setAnimation(FUMBLED_KEG, throwerCoordinate)
             if let Some(actor_id) = game.acting_player.player_id.clone() {
                 return self.hit_player(game, rng, &actor_id);
             }
@@ -208,7 +208,7 @@ impl StepThenIStartedBlastin {
         } else {
             // Java: flip home_playing; return Continue (ask for target again)
             game.home_playing = !game.home_playing;
-            // TODO(tisb): setSound(QUESTION)
+            // DEFERRED(tisb): setSound(QUESTION)
             StepOutcome::cont()
         }
     }
@@ -253,8 +253,8 @@ impl StepThenIStartedBlastin {
             ..DropPlayerContext::new()
         };
 
-        // TODO(tisb): setSound(EXPLODE)
-        // TODO(tisb): setAnimation(THEN_I_STARTED_BLASTIN, startCoord, targetCoord)
+        // DEFERRED(tisb): setSound(EXPLODE)
+        // DEFERRED(tisb): setAnimation(THEN_I_STARTED_BLASTIN, startCoord, targetCoord)
 
         self.restore_turn_modes(game);
 

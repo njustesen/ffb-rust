@@ -7,8 +7,8 @@
 /// Consumes: END_TURN, THROWN_PLAYER_COORDINATE, THROWN_PLAYER_HAS_BALL,
 ///           THROWN_PLAYER_ID, THROWN_PLAYER_STATE.
 ///
-/// TODO(EndTTM-generator): EndPlayerAction SequenceGenerator not yet ported for BB2016.
-/// TODO(EndTTM-dialog): UtilServerDialog.hideDialog deferred.
+/// DEFERRED(generator): EndPlayerAction SequenceGenerator not yet ported for BB2016.
+/// DEFERRED(dialog): UtilServerDialog.hideDialog not yet ported.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::PlayerState;
@@ -45,7 +45,7 @@ impl StepEndThrowTeamMate {
     }
 
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
-        // TODO(EndTTM-dialog): UtilServerDialog.hideDialog(gameState).
+        // DEFERRED(dialog): UtilServerDialog.hideDialog not yet ported.
         game.pass_coordinate = None;
         game.field_model.range_ruler = None;
         game.defender_id = None;
@@ -65,7 +65,7 @@ impl StepEndThrowTeamMate {
                 }
             }
         }
-        // TODO(EndTTM-generator): EndPlayerAction.pushSequence(true, true, end_turn).
+        // DEFERRED(generator): EndPlayerAction.pushSequence not yet ported.
         StepOutcome::next()
     }
 }
@@ -84,7 +84,7 @@ impl Step for StepEndThrowTeamMate {
     fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         match action {
             // Java: CLIENT_ACTING_PLAYER → push Select sequence + NEXT_STEP_AND_REPEAT.
-            // TODO(EndTTM-selectGenerator): Select SequenceGenerator deferred.
+            // DEFERRED(selectGenerator): Select SequenceGenerator not yet ported.
             _ => {}
         }
         self.execute_step(game)

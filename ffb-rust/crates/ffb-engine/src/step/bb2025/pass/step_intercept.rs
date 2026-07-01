@@ -25,7 +25,7 @@ use crate::step::framework::{StepId, StepParameter};
 /// Needs init param: `GotoLabelOnFailure`.
 /// Publishes: `InterceptorId` on success.
 ///
-/// TODO: re-roll dialog handling (AbstractStepWithReRoll path), TurnMode=INTERCEPTION dialog,
+/// DEFERRED: re-roll dialog handling (AbstractStepWithReRoll path), TurnMode=INTERCEPTION dialog,
 ///       UtilCards.getRerollSource — those require dialog/reroll infrastructure not yet ported.
 pub struct StepIntercept {
     /// Java: fGotoLabelOnFailure (init param, mandatory)
@@ -229,7 +229,7 @@ impl StepIntercept {
         // Java: if (!state.isInterceptorChosen()) → showDialog, TurnMode=INTERCEPTION, doNextStep=false
         if !self.interceptor_chosen {
             // Java: UtilServerDialog.showDialog → CLIENT_INTERCEPTOR_CHOICE
-            // TODO: emit a prompt / set TurnMode=INTERCEPTION when dialog infra is translated
+            // DEFERRED: emit a prompt / set TurnMode=INTERCEPTION when dialog infra is translated
             // For now: wait for the intercept choice command (CONTINUE)
             return StepOutcome::cont();
         }

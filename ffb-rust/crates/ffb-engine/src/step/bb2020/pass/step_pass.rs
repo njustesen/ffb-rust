@@ -21,8 +21,11 @@ use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 /// Publishes: `PassingDistance`, `PassFumble`, `DontDropFumble`, `CatcherId`,
 ///            `CatchScatterThrowInMode`, `PassResultParam`.
 ///
-/// TODO: PassModifierFactory (findModifiers) — tacklezone/disturbing-presence modifiers.
-/// TODO: re-roll dialog, modifying-skill dialog — require dialog infrastructure.
+/// DEFERRED(pass-modifiers): PassModifierFactory.findModifiers(PassContext) — tacklezone and
+///   disturbing-presence modifier counting requires UtilServerGame.passModifiers() (counts adj.
+///   tacklezone squares from game.field_model) which is not yet translated.
+/// DEFERRED(dialog): modifying-skill dialog (DialogSkillUseParameter for canAddStrengthToPass) and
+///   pass-skill re-roll dialog — waiting for dialog infrastructure.
 pub struct StepPass {
     /// Java: goToLabelOnEnd (init param, mandatory)
     pub goto_label_on_end: String,
@@ -159,7 +162,9 @@ impl StepPass {
         });
 
         // Java: PassModifierFactory.findModifiers(new PassContext(game, thrower, passingDistance, false))
-        // TODO: actual modifier lookup — currently empty
+        // DEFERRED(pass-modifiers): PassContext tacklezone + disturbing-presence counting requires
+        //   UtilServerGame.passModifiers() (counts adj. tacklezone squares) — not yet translated.
+        //   BB2020 also has Very Sunny weather modifier and skill-based modifiers; currently empty.
         let pass_modifiers: Vec<ffb_mechanics::modifiers::PassModifier> = Vec::new();
 
         // Java: usingModifyingSkill != null && usingModifyingSkill → use stat-based modifier path

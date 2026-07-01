@@ -1,6 +1,7 @@
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::{ActingPlayer, Game, Player};
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::util::util_cards::UtilCards;
 use crate::mechanic::{Mechanic, MechanicType};
 use crate::jump_mechanic::JumpMechanic as JumpMechanicTrait;
 
@@ -38,8 +39,7 @@ impl JumpMechanicTrait for JumpMechanic {
             None => return false,
         };
         let coord = game.field_model.player_coordinate(player_id);
-        // TODO: UtilCards::has_unused_skill_with_property(acting_player, canLeap)
-        let has_unused_leap = player.has_skill_property(NamedProperties::CAN_LEAP);
+        let has_unused_leap = UtilCards::has_unused_skill_with_property(player, NamedProperties::CAN_LEAP);
         // BB2020: also can jump if not yet jumped AND there's a prone/stunned adjacent player
         let has_prone_adjacent = coord.map(|c| self.has_prone_or_stunned_players_adjacent(game, c)).unwrap_or(false);
         let can_leap_this_turn = has_unused_leap || (!acting_player.jumping && has_prone_adjacent);

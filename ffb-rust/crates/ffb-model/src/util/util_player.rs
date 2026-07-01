@@ -167,6 +167,33 @@ impl UtilPlayer {
         Self::find_tacklezone_players(game, player_id).len()
     }
 
+    /// 1:1 translation of findStandUpAssists.
+    ///
+    /// Returns number of friendly standing players adjacent to `player_id` who are not
+    /// themselves adjacent to any opposing player with tacklezones.
+    pub fn find_stand_up_assists(game: &Game, player_id: &str) -> i32 {
+        let own_team = if game.team_home.has_player(player_id) {
+            &game.team_home
+        } else {
+            &game.team_away
+        };
+        let opposing_team = Self::find_other_team(game, player_id);
+        let coord = match game.field_model.player_coordinate(player_id) {
+            Some(c) => c,
+            None => return 0,
+        };
+        let mut assists = 0i32;
+        for assist_id in Self::find_adjacent_players_with_tacklezones(game, own_team, coord, false) {
+            if let Some(assist_coord) = game.field_model.player_coordinate(assist_id) {
+                let opponents = Self::find_adjacent_players_with_tacklezones(game, opposing_team, assist_coord, false);
+                if opponents.is_empty() {
+                    assists += 1;
+                }
+            }
+        }
+        assists
+    }
+
     /// 1:1 translation of findTacklezonePlayers.
     pub fn find_tacklezone_players<'a>(game: &'a Game, player_id: &str) -> Vec<&'a PlayerId> {
         let other_team = Self::find_other_team(game, player_id);
@@ -677,5 +704,40 @@ mod tests {
         add_hypnotic_gaze_player(&mut game, true, "h1", FieldCoordinate::new(5, 5), prone);
         add_player(&mut game, false, "a1", FieldCoordinate::new(5, 6), ACTIVE_STANDING);
         assert!(!UtilPlayer::can_gaze(&game, "h1"));
+    }
+
+    #[test]
+    fn find_stand_up_assists_no_friendly_adjacent_returns_zero() {
+        let mut game = minimal_game();
+        add_player(&mut game, true, "h1", FieldCoordinate::new(5, 5), ACTIVE_STANDING);
+        assert_eq!(UtilPlayer::find_stand_up_assists(&game, "h1"), 0);
+    }
+
+    #[test]
+    fn find_stand_up_assists_friendly_not_pressured_counts() {
+        let mut game = minimal_game();
+        add_player(&mut game, true, "h1", FieldCoordinate::new(5, 5), ACTIVE_STANDING);
+        // h2 is adjacent to h1 and has no opposing tacklezones adjacent to h2
+        add_player(&mut game, true, "h2", FieldCoordinate::new(6, 5), ACTIVE_STANDING);
+        assert_eq!(UtilPlayer::find_stand_up_assists(&game, "h1"), 1);
+    }
+
+    #[test]
+    fn find_stand_up_assists_friendly_under_pressure_does_not_count() {
+        let mut game = minimal_game();
+        add_player(&mut game, true, "h1", FieldCoordinate::new(5, 5), ACTIVE_STANDING);
+        add_player(&mut game, true, "h2", FieldCoordinate::new(6, 5), ACTIVE_STANDING);
+        // Opposing player adjacent to h2 — h2 is pressured, should not count
+        add_player(&mut game, false, "a1", FieldCoordinate::new(7, 5), ACTIVE_STANDING);
+        assert_eq!(UtilPlayer::find_stand_up_assists(&game, "h1"), 0);
+    }
+
+    #[test]
+    fn find_stand_up_assists_two_unpressured_friendlies() {
+        let mut game = minimal_game();
+        add_player(&mut game, true, "h1", FieldCoordinate::new(5, 5), ACTIVE_STANDING);
+        add_player(&mut game, true, "h2", FieldCoordinate::new(6, 5), ACTIVE_STANDING);
+        add_player(&mut game, true, "h3", FieldCoordinate::new(5, 6), ACTIVE_STANDING);
+        assert_eq!(UtilPlayer::find_stand_up_assists(&game, "h1"), 2);
     }
 }

@@ -112,15 +112,15 @@ impl Step for StepApothecaryMultiple {
         match action {
             Action::UseApothecary { player_id: _, use_apothecary: _ } => {
                 // CLIENT_USE_APOTHECARY -> mark apo use for the specific player
-                // TODO: find matching injuryResult; update apothecaryStatus
+                // DEFERRED: find matching injuryResult; update apothecaryStatus
             }
             Action::Acknowledge => {
                 // CLIENT_USE_APOTHECARIES (skip all apos)
-                // TODO: set all WAIT_FOR_APOTHECARY_USE results to DO_NOT_USE_APOTHECARY
+                // DEFERRED: set all WAIT_FOR_APOTHECARY_USE results to DO_NOT_USE_APOTHECARY
             }
             Action::UseReRoll { use_reroll: _ } => {
                 // CLIENT_USE_RE_ROLL for regeneration
-                // TODO: find preRegen result; use team re-roll for regeneration
+                // DEFERRED: find preRegen result; use team re-roll for regeneration
             }
             _ => {}
         }
@@ -131,7 +131,7 @@ impl Step for StepApothecaryMultiple {
         match param {
             StepParameter::ActingTeam(_v) => {
                 // Java: ACTING_TEAM boolean -> resolve teamId from actingTeam or otherTeam
-                // TODO: game not available here; defer to start()
+                // DEFERRED: game not available here; defer to start()
                 true
             }
             _ => false,
@@ -146,14 +146,14 @@ impl StepApothecaryMultiple {
             return StepOutcome::next();
         }
 
-        // TODO: hideDialog
-        // TODO: if !regenerationHandled() -> Continue; return
-        // TODO: group regenerationFailedResults by ApothecaryStatus
-        // TODO: DO_REQUEST: show DialogUseApothecariesParameter -> Continue
-        // TODO: USE_APOTHECARY: rollApothecary; if choice needed -> Continue
-        // TODO: apply all results; handle doubleAttackerDown; syncGameModel
-        // TODO: collect Getting Even results; collect dead/raiseable results
-        // TODO: checkRaiseDead / checkGettingEven
+        // DEFERRED: hideDialog
+        // DEFERRED: if !regenerationHandled() -> Continue; return
+        // DEFERRED: group regenerationFailedResults by ApothecaryStatus
+        // DEFERRED: DO_REQUEST: show DialogUseApothecariesParameter -> Continue
+        // DEFERRED: USE_APOTHECARY: rollApothecary; if choice needed -> Continue
+        // DEFERRED: apply all results; handle doubleAttackerDown; syncGameModel
+        // DEFERRED: collect Getting Even results; collect dead/raiseable results
+        // DEFERRED: checkRaiseDead / checkGettingEven
 
         StepOutcome::next()
     }

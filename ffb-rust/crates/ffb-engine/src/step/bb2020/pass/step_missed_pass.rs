@@ -1,5 +1,6 @@
 use ffb_model::enums::{Direction, PlayerAction};
-use ffb_model::types::FieldCoordinate;
+use ffb_model::events::GameEvent;
+use ffb_model::types::{FieldCoordinate, MoveSquare};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -92,11 +93,18 @@ impl Step for StepMissedPass {
         //   report ReportSkillUse(playerId, skill, doRoll, SkillUse.RE_ROLL_DIRECTION)
         //   if used → passState.setUsingBlastIt(true)
         //   if neverUse → passState.setUsingBlastIt(false)
-        // TODO: markSkillUsed, PassState.setUsingBlastIt — not yet wired
+        // DEFERRED(pass-state): PassState.setUsingBlastIt — PassState not yet translated (lives in GameState).
+        // DEFERRED(report): ReportSkillUse — report infrastructure not yet translated.
         match action {
-            Action::UseSkill { skill_id: _, use_skill } => {
+            Action::UseSkill { skill_id, use_skill } => {
                 self.do_roll = *use_skill;
                 self.re_rolling = true;
+                if *use_skill {
+                    // Java: markSkillUsed(playerId, skill) — inserts into player.used_skills
+                    if let Some(pid) = game.acting_player.player_id.clone() {
+                        game.mark_skill_used(&pid, *skill_id);
+                    }
+                }
             }
             _ => {}
         }
@@ -126,6 +134,7 @@ impl Step for StepMissedPass {
 impl StepMissedPass {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         use ffb_mechanics::pass_result::PassResult;
+        let mut events: Vec<GameEvent> = Vec::new();
 
         let is_bomb = matches!(
             game.thrower_action,
@@ -166,7 +175,9 @@ impl StepMissedPass {
                 }
             }
             // Java: getResult().addReport(new ReportPassDeviate(coordinateEnd, direction, directionRoll, distanceRoll, false))
-            // TODO: emit report when report infrastructure is translated
+            if let Some(start) = self.coordinate_start {
+                events.push(GameEvent::PassDeviate { from: start, scatter_directions: vec![direction_roll, distance_roll] });
+            }
 
         } else {
             // INACCURATE: 3×1 scatter loop (same as BB2025 but with Blast-It re-roll check)
@@ -209,10 +220,13 @@ impl StepMissedPass {
                 // Java: Blast-It HMP re-roll dialog check:
                 // if (HAIL_MARY_PASS && ((hasUnusedBlastIt && usingBlastIt==null) || (hasBlastIt && usingBlastIt)) && !reRolling)
                 //     → reportDirectionRoll(); showDialog; reRolling=true; fieldModel.add(MoveSquare); return
-                // TODO: UtilCards.hasUnusedSkillWithProperty, PassState.getUsingBlastIt — not yet translated
+                // DEFERRED(util-cards): UtilCards.hasUnusedSkillWithProperty — waiting for ActingPlayer.used_skills
+                //   set to be wired so hasUnusedSkillWithProperty can be implemented.
+                // DEFERRED(pass-state): PassState.getUsingBlastIt() — PassState not yet translated.
+                // DEFERRED(dialog): UtilServerDialog.showDialog(DialogSkillUseParameter) — dialog infra not translated.
 
                 // Java: if (reRolling && doRoll) reportDirectionRoll()
-                // TODO: emit partial scatter report when report infrastructure is translated
+                // DEFERRED(report): ReportScatterBall (partial direction roll) — report infrastructure not translated.
 
                 // Java: rollList.add(roll); directionList.add(direction);
                 self.roll_list.push(self.roll);
@@ -227,7 +241,9 @@ impl StepMissedPass {
             }
 
             // Java: getResult().addReport(new ReportScatterBall(directions, rolls, false))
-            // TODO: emit full scatter report when report infrastructure is translated
+            if let Some(start) = self.coordinate_start {
+                events.push(GameEvent::ScatterBall { from: start, directions: self.roll_list.clone() });
+            }
         }
 
         // Java: game.setPassCoordinate(lastValidCoordinate)
@@ -264,16 +280,20 @@ impl StepMissedPass {
         game.field_model.move_squares.clear();
 
         // Java: getResult().setNextAction(StepAction.NEXT_STEP)
-        if out_of_bounds {
-            let mut outcome = StepOutcome::next()
+        let mut outcome = if out_of_bounds {
+            let mut o = StepOutcome::next()
                 .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ThrowIn));
             if let Some(lvc) = self.last_valid_coordinate {
-                outcome = outcome.publish(StepParameter::ThrowInCoordinate(lvc));
+                o = o.publish(StepParameter::ThrowInCoordinate(lvc));
             }
-            outcome
+            o
         } else {
             StepOutcome::next()
+        };
+        for ev in events {
+            outcome = outcome.with_event(ev);
         }
+        outcome
     }
 }
 
@@ -333,7 +353,7 @@ mod tests {
     fn clears_move_squares_at_end() {
         let mut game = make_game();
         game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
-        game.field_model.move_squares.insert(FieldCoordinate::new(5, 5));
+        game.field_model.add_move_square(MoveSquare::new(FieldCoordinate::new(5, 5), 0, 0));
         let mut step = StepMissedPass::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.field_model.move_squares.is_empty());
@@ -405,6 +425,28 @@ mod tests {
         for r in 1..=8 {
             let _ = StepMissedPass::direction_for_roll(r);
         }
+    }
+
+    // ── Event emission ────────────────────────────────────────────────────────
+
+    #[test]
+    fn inaccurate_emits_scatter_ball_event() {
+        let mut game = make_game();
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+        let mut step = StepMissedPass::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.events.iter().any(|e| matches!(e, GameEvent::ScatterBall { .. })));
+    }
+
+    #[test]
+    fn wildly_inaccurate_emits_pass_deviate_event() {
+        let mut game = make_game();
+        game.thrower_id = Some("t1".into());
+        game.field_model.set_player_coordinate("t1", FieldCoordinate::new(5, 5));
+        let mut step = StepMissedPass::new();
+        step.pass_result = Some(PassResult::WILDLY_INACCURATE);
+        let out = step.start(&mut game, &mut GameRng::new(42));
+        assert!(out.events.iter().any(|e| matches!(e, GameEvent::PassDeviate { .. })));
     }
 
     // ── Blast-It handle_command path ───────────────────────────────────────────

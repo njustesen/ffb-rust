@@ -14,8 +14,8 @@
 ///
 /// This step does not handle any commands — it runs once on start().
 ///
-/// TODO(report-stab-report): InjuryResult.report() deferred (InjuryResult is a stub).
-/// TODO(report-stab-init-throw): StepException when PLAYER_ID not provided deferred.
+/// DEFERRED(report-stab-report): InjuryResult.report() deferred (InjuryResult is a stub).
+/// DEFERRED(report-stab-init-throw): StepException when PLAYER_ID not provided deferred.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -48,7 +48,7 @@ impl Step for StepReportStabInjury {
 
     fn start(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: if (injuryResult != null) { injuryResult.report(this); }
-        // TODO(report-stab-report): call injuryResult.report() when InjuryResult is fully ported.
+        // DEFERRED(report-stab-report): call injuryResult.report() when InjuryResult is fully ported.
         if self.injury_result.is_some() {
             // report deferred
         }

@@ -21,7 +21,7 @@
 /// Java fields: `eligibleSquares`, `endPlayerAction`, `withBall`,
 ///              `goToLabelOnEnd`, `coordinate`.
 use std::collections::HashSet;
-use ffb_model::types::FieldCoordinate;
+use ffb_model::types::{FieldCoordinate, MoveSquare};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -63,17 +63,43 @@ impl StepFirstMoveFuriousOutburst {
 
     fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
         if self.end_player_action {
-            // Java: if (actingPlayer.hasActed()) report SkillWasted
+            // Java: if (actingPlayer.hasActed()) report SkillWasted (report infra blocked)
             // Java: fieldModel.getTargetSelectionState().cancel()
-            // TODO(TargetSelectionState port): cancel target selection
+            if let Some(ref mut ts) = game.field_model.target_selection_state {
+                ts.cancel();
+            }
             return StepOutcome::goto(&self.goto_label_on_end);
         }
 
         if self.coordinate.is_none() {
             // Java: first pass — set up eligible squares for trickster move
-            // Java: game.setDefenderId(targetId), mark selectedStabTarget, find MoveSquares
-            // TODO(TargetSelectionState port): get selected player id, compute eligible squares
-            // For now wait for coordinate input
+            // Java: String targetId = game.getFieldModel().getTargetSelectionState().getSelectedPlayerId()
+            let target_id = game.field_model.target_selection_state.as_ref()
+                .and_then(|ts| ts.get_selected_player_id().cloned());
+
+            if let Some(ref tid) = target_id {
+                game.defender_id = Some(tid.clone());
+                // Java: fieldModel.setPlayerState(target, state.changeSelectedStabTarget(true))
+                let old_state = game.field_model.player_state(tid)
+                    .unwrap_or_default();
+                game.field_model.set_player_state(tid, old_state.change_selected_stab_target(true));
+                // Java: find empty adjacent squares to target, add as MoveSquares
+                let target_coord = game.field_model.player_coordinate(tid);
+                if let Some(tc) = target_coord {
+                    let adj: Vec<FieldCoordinate> = game.field_model.adjacent_on_pitch(tc)
+                        .into_iter()
+                        .filter(|c| game.field_model.player_at(*c).is_none())
+                        .collect();
+                    self.eligible_squares = adj.iter().cloned().collect();
+                    for c in &adj {
+                        game.field_model.move_squares.insert(*c, MoveSquare::new(*c, 0, 0));
+                    }
+                }
+                // Java: withBall = UtilPlayer.hasBall(game, actingPlayer.getPlayer())
+                self.with_ball = game.acting_player.player_id.as_deref()
+                    .map(|pid| game.field_model.ball_coordinate == game.field_model.player_coordinate(pid))
+                    .unwrap_or(false);
+            }
             return StepOutcome::cont();
         }
 
@@ -85,6 +111,10 @@ impl StepFirstMoveFuriousOutburst {
             if self.with_ball {
                 game.field_model.ball_coordinate = Some(coord);
             }
+        }
+        // Java: fieldModel.getTargetSelectionState().commit(game)
+        if let Some(ref mut ts) = game.field_model.target_selection_state {
+            ts.commit();
         }
 
         let mut outcome = StepOutcome::next()
@@ -221,5 +251,35 @@ mod tests {
         step.start(&mut game, &mut rng);
         let pos = game.field_model.player_coordinate("att");
         assert_eq!(pos, Some(FieldCoordinate::new(7, 7)));
+    }
+
+    #[test]
+    fn end_player_action_cancels_target_selection_state() {
+        use ffb_model::model::target_selection_state::TargetSelectionState;
+        let mut step = StepFirstMoveFuriousOutburst::new("end");
+        step.end_player_action = true;
+        let mut game = make_game();
+        add_player(&mut game, "att", PS_STANDING);
+        let mut ts = TargetSelectionState::new("target");
+        ts.select();
+        game.field_model.target_selection_state = Some(ts);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(game.field_model.target_selection_state.as_ref().map(|ts| ts.is_canceled()).unwrap_or(false));
+    }
+
+    #[test]
+    fn second_pass_commits_target_selection_state() {
+        use ffb_model::model::target_selection_state::TargetSelectionState;
+        let mut step = StepFirstMoveFuriousOutburst::new("end");
+        step.coordinate = Some(FieldCoordinate::new(6, 6));
+        let mut game = make_game();
+        add_player(&mut game, "att", PS_STANDING);
+        let mut ts = TargetSelectionState::new("target");
+        ts.select();
+        game.field_model.target_selection_state = Some(ts);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(game.field_model.target_selection_state.as_ref().map(|ts| ts.is_committed()).unwrap_or(false));
     }
 }

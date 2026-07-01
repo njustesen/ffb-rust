@@ -83,7 +83,7 @@ impl StepBloodLust {
         // Java: getGameState().executeStepHooks(this, state)
         // The Java body is entirely delegated to step hooks (ActionStatus state machine).
         // Hook handlers drive: blood-lust roll, offer bite, handle feeding, goto failure label.
-        // TODO(StepHooks port): executeStepHooks(this, state) — full blood-lust state machine.
+        // DEFERRED(StepHooks port): executeStepHooks(this, state) — full blood-lust state machine.
         //
         // Until hooks are translated, fall through to NEXT_STEP (same as "hooks return false").
         StepOutcome::next()

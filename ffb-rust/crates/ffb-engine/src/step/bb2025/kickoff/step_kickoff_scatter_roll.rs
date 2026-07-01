@@ -113,7 +113,7 @@ impl StepKickoffScatterRoll {
         }
 
         // ── Kick skill dialog ────────────────────────────────────────────────
-        // TODO: if kicking player has canReduceKickDistance and use_kick_choice is None,
+        // DEFERRED: if kicking player has canReduceKickDistance and use_kick_choice is None,
         // show the DialogSkillUseParameter and return Continue.
         // For the random-agent path, default to not using Kick.
         if self.use_kick_choice.is_none() {

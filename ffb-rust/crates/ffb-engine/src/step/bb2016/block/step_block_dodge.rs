@@ -37,7 +37,7 @@ impl StepBlockDodge {
         // Java: getGameState().executeStepHooks(this, state)
         // The hooks infrastructure is not yet ported. BB2016 dodge skill handling
         // is delegated to step hooks that inspect state.usingDodge and state.oldDefenderState.
-        // TODO(step-hooks): executeStepHooks not yet ported — this is a hook-driven step.
+        // DEFERRED(hooks): executeStepHooks not yet ported — this is a hook-driven step.
         // For now, advance immediately (no-op path).
         StepOutcome::next()
     }
@@ -58,7 +58,7 @@ impl Step for StepBlockDodge {
         // Java: if (commandStatus == UNHANDLED_COMMAND && id == CLIENT_USE_SKILL)
         //   commandStatus = handleSkillCommand((ClientCommandUseSkill) command, state)
         // Java: handleSkillCommand sets state.usingDodge from the skill-use command
-        // TODO(skill-command): handleSkillCommand translation deferred with hooks infra
+        // DEFERRED(hooks): handleSkillCommand translation deferred with hooks infra
         match action {
             Action::UseSkill { use_skill, .. } => {
                 // Java: state.usingDodge = useSkillCommand.isSkillUsed()

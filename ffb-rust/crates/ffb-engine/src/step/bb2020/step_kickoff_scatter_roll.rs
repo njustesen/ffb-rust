@@ -93,7 +93,7 @@ impl StepKickoffScatterRoll {
             self.scatter_direction = Some(direction);
             self.scatter_distance = distance;
 
-            // TODO(kickoff): add ReportKickoffScatter event when reports are ported
+            // DEFERRED(kickoff): add ReportKickoffScatter event when reports are ported
 
             // Find kicking player (prefers CENTER_FIELD, falls back to LOS)
             let kicking_player_id = Self::find_kicking_player_id(game);
@@ -121,7 +121,7 @@ impl StepKickoffScatterRoll {
 
             if has_kick_skill {
                 // Java: show DialogKickSkillParameter; wait for client answer.
-                // TODO(kickoff): show dialog when dialogs are ported.
+                // DEFERRED(kickoff): show dialog when dialogs are ported.
                 // Random agent: auto-decline Kick (same as BB2025 path).
                 self.use_kick_choice = Some(false);
             } else {
@@ -167,13 +167,13 @@ impl StepKickoffScatterRoll {
             self.touchback = self.kickoff_bounds.is_none();
 
             if self.touchback {
-                // TODO(kickoff): game.field_model.out_of_bounds = true (field not in worktree model yet)
-                // TODO(kickoff): add ReportEvent("TOUCHBACK") when reports are ported
+                // DEFERRED(kickoff): game.field_model.out_of_bounds = true (field not in worktree model yet)
+                // DEFERRED(kickoff): add ReportEvent("TOUCHBACK") when reports are ported
             }
 
-            // TODO(kickoff): report ReportSkillUse(kick, true, HALVE_KICKOFF_SCATTER) when use_kick
+            // DEFERRED(kickoff): report ReportSkillUse(kick, true, HALVE_KICKOFF_SCATTER) when use_kick
 
-            // TODO(kickoff): handleChefRolls for first drive (turn 0/0)
+            // DEFERRED(kickoff): handleChefRolls for first drive (turn 0/0)
 
             let kicking_coord = self.kicking_player_coordinate.unwrap();
             let touchback = self.touchback;

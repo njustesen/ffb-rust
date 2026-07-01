@@ -53,7 +53,7 @@ impl StepBlitzTurn {
         } else {
             // Java: Team blitzingTeam = game.isHomePlaying() ? game.getTeamHome() : game.getTeamAway()
             // Java: SetupMechanic mechanic = ...; mechanic.pinPlayersInTacklezones(getGameState(), blitzingTeam, true)
-            // TODO(blitz_turn): call SetupMechanic.pinPlayersInTacklezones when mechanics layer is available
+            // DEFERRED(blitz_turn): call SetupMechanic.pinPlayersInTacklezones when mechanics layer is available
 
             // Java: int availablePlayers = Arrays.stream(blitzingTeam.getPlayers())
             //   .filter(player -> game.getFieldModel().getPlayerState(player).isActive()).count()
@@ -61,7 +61,7 @@ impl StepBlitzTurn {
 
             if available_players == 0 {
                 // Java: getResult().addReport(new ReportKickoffSequenceActivationsExhausted(false))
-                // TODO(blitz_turn): emit ReportKickoffSequenceActivationsExhausted event
+                // DEFERRED(blitz_turn): emit ReportKickoffSequenceActivationsExhausted event
             } else {
                 // Java: int roll = getGameState().getDiceRoller().rollDice(3)
                 // Java: int limit = roll + 3
@@ -74,23 +74,23 @@ impl StepBlitzTurn {
                 game.blitz_turn_state = Some(BlitzTurnState::new(limit, available_players));
 
                 // Java: if (game.isTurnTimeEnabled()) { UtilServerTimer.stopTurnTimer(...); ... startTurnTimer(...) }
-                // TODO(blitz_turn): timer management when server timer infra is available
+                // DEFERRED(blitz_turn): timer management when server timer infra is available
 
                 // Java: game.startTurn()
-                // TODO(blitz_turn): call game.startTurn() when method is available
+                // DEFERRED(blitz_turn): call game.startTurn() when method is available
 
                 // Java: UtilServerGame.updatePlayerStateDependentProperties(this)
-                // TODO(blitz_turn): updatePlayerStateDependentProperties when UtilServerGame is available
+                // DEFERRED(blitz_turn): updatePlayerStateDependentProperties when UtilServerGame is available
 
                 // Java: getGameState().pushCurrentStepOnStack()
                 // Java: ((Select) factory.forName(SequenceGenerator.Type.Select.name()))
                 //   .pushSequence(new Select.SequenceParams(getGameState(), true))
                 // In Rust: push the Select sequence via the generator stub
-                // TODO(blitz_turn): Select.push_sequence needs full implementation
+                // DEFERRED(blitz_turn): Select.push_sequence needs full implementation
                 let _ = Select::new();
 
                 // Java: getResult().addReport(new ReportBlitzRoll(blitzingTeam.getId(), roll, limit))
-                // TODO(blitz_turn): emit ReportBlitzRoll event
+                // DEFERRED(blitz_turn): emit ReportBlitzRoll event
                 let _ = (roll, limit);
             }
         }

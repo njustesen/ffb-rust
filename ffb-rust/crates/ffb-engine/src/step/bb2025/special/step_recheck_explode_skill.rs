@@ -13,7 +13,7 @@ use crate::step::framework::{StepId, StepParameter};
 /// unused canForceBombExplosion skill; if so, show the dialog again; else
 /// proceed to the next step.
 ///
-/// TODO: Explode skill re-check dialog not yet ported.
+/// DEFERRED: Explode skill re-check dialog not yet ported.
 ///   Java path: if actingPlayer has unused canForceBombExplosion skill -> show dialog
 ///   else -> NEXT_STEP
 pub struct StepRecheckExplodeSkill;
@@ -30,14 +30,14 @@ impl Step for StepRecheckExplodeSkill {
     fn id(&self) -> StepId { StepId::RecheckExplodeSkill }
 
     fn start(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO: check actingPlayer.hasUnusedSkillWithProperty(canForceBombExplosion)
+        // DEFERRED: check actingPlayer.hasUnusedSkillWithProperty(canForceBombExplosion)
         //   if true -> showDialog(DialogSkillUseParameter) -> Continue
         //   else -> NEXT_STEP
         StepOutcome::next()
     }
 
     fn handle_command(&mut self, _action: &Action, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO: CLIENT_USE_SKILL -> store decision -> EXECUTE_STEP -> check and proceed
+        // DEFERRED: CLIENT_USE_SKILL -> store decision -> EXECUTE_STEP -> check and proceed
         StepOutcome::next()
     }
 

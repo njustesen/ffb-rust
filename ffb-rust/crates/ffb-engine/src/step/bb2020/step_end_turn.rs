@@ -5,7 +5,7 @@
 /// then the full pipeline for normal turn-end (touchdowns, stallers, secret weapons,
 /// knockouts, half/game-end, prayers, argue-the-call, bribes).
 ///
-/// TODOs (most of this step requires untranslated utilities):
+/// DEFERRED items (most of this step requires untranslated utilities):
 ///  - checkTouchdown / UtilServerSteps not translated.
 ///  - handleStallers / markPlayedAndSecretWeapons not translated.
 ///  - KickoffSequence / EndGameSequence push not translated.
@@ -89,7 +89,7 @@ impl Step for StepEndTurn {
                 self.within_secret_weapon_handling = true;
             }
             Action::UseSkill { skill_id: _, use_skill } => {
-                // TODO(end_turn): canGrantReRollAfterTouchdown detection not translated.
+                // DEFERRED(end_turn): canGrantReRollAfterTouchdown detection not translated.
                 // For now, treat any UseSkill as StarOfTheShow toggle.
                 self.use_star_of_the_show = Some(*use_skill);
             }
@@ -116,8 +116,10 @@ impl Step for StepEndTurn {
 
 impl StepEndTurn {
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO(end_turn): game.field_model.clear_multi_block_targets() not translated.
-        // TODO(end_turn): pass_state.reset() not translated.
+        // Java: game.getFieldModel().clearMultiBlockTargets()
+        game.field_model.clear_multi_block_targets();
+        // DEFERRED(pass-state): getGameState().getPassState().reset() — PassState lives in engine crate,
+        //   cannot access from step_end_turn without a Game field (model crate). Deferred pending refactor.
 
         // Java: if (turnNr == 0) { turnNr = game.getTurnData().getTurnNr(); half = game.getHalf(); }
         if self.turn_nr == 0 {
@@ -140,17 +142,17 @@ impl StepEndTurn {
                 return StepOutcome::next().publish(StepParameter::EndTurn(true));
             }
 
-            // TODO(end_turn): checkTouchdown not translated.
-            // TODO(end_turn): handleStallers not translated.
-            // TODO(end_turn): markPlayedAndSecretWeapons not translated.
-            // TODO(end_turn): kickoff / endGame sequence push not translated.
-            // TODO(end_turn): checkEndOfHalf not translated.
+            // DEFERRED(end_turn): checkTouchdown not translated.
+            // DEFERRED(end_turn): handleStallers not translated.
+            // DEFERRED(end_turn): markPlayedAndSecretWeapons not translated.
+            // DEFERRED(end_turn): kickoff / endGame sequence push not translated.
+            // DEFERRED(end_turn): checkEndOfHalf not translated.
         }
 
-        // TODO(end_turn): argueTheCall dialogs not translated.
-        // TODO(end_turn): bribes dialogs not translated.
-        // TODO(end_turn): argue_the_call_choice / bribes_choice negotiation not translated.
-        // TODO(end_turn): getFaintingCount / deactivateCardsAndPrayers not translated.
+        // DEFERRED(end_turn): argueTheCall dialogs not translated.
+        // DEFERRED(end_turn): bribes dialogs not translated.
+        // DEFERRED(end_turn): argue_the_call_choice / bribes_choice negotiation not translated.
+        // DEFERRED(end_turn): getFaintingCount / deactivateCardsAndPrayers not translated.
 
         // Simplified: advance and publish params.
         StepOutcome::next()

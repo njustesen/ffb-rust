@@ -18,7 +18,7 @@ use ffb_mechanics::modifiers::dodge_context::DodgeContext;
 ///
 /// DEFERRED(break-tackle): modifyingSkill dialog (Break Tackle / Diving Tackle) not yet ported.
 /// DEFERRED(arm-bar): Arm-Bar multi-target path not yet ported.
-/// DEFERRED(steady-footing): STEADY_FOOTING_CONTEXT publish on failDodge not yet ported.
+/// failDodge: SteadyFootingContext(InjuryTypeDropDodge) published — corrected from InjuryTypeFallDown.
 pub struct StepMoveDodge {
     /// Java: fGotoLabelOnFailure
     pub goto_label_on_failure: String,
@@ -185,7 +185,8 @@ impl StepMoveDodge {
     }
 
     fn fail_dodge(&self) -> StepOutcome {
-        let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeFallDown".into());
+        // Java: new InjuryTypeDropDodge(game.getDefender())
+        let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeDropDodge".into());
         let label = self.goto_label_on_failure.clone();
         StepOutcome::goto(&label)
             .publish(StepParameter::SteadyFootingContext(Box::new(ctx)))

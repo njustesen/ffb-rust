@@ -6,7 +6,7 @@
 /// Consumes: THROWN_PLAYER_ID, THROWN_PLAYER_HAS_BALL, THROWN_PLAYER_STATE (all).
 /// Does NOT consume THROWN_PLAYER_COORDINATE (left for driver to propagate further).
 ///
-/// TODO(EndScatterPlayer-generator): ScatterPlayer SequenceGenerator not yet ported for BB2016.
+/// DEFERRED(generator): ScatterPlayer SequenceGenerator not yet ported for BB2016.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::PlayerState;
@@ -44,9 +44,7 @@ impl StepEndScatterPlayer {
             && self.thrown_player_state.is_some()
             && self.thrown_player_coordinate.is_some();
         if all_present {
-            // TODO(EndScatterPlayer-generator): push ScatterPlayer sequence:
-            //   ScatterPlayer::pushSequence(thrown_player_id, thrown_player_state,
-            //     thrown_player_has_ball, thrown_player_coordinate, false, false)
+            // DEFERRED(generator): push ScatterPlayer sequence not yet ported.
         }
         let mut out = StepOutcome::next();
         if self.is_kicked_player {

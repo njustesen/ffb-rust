@@ -53,7 +53,7 @@ impl StallingExtension {
             return false;
         }
         // Guard 4: open path to end-zone.
-        // TODO: PathFinderWithPassBlockSupport not yet translated; conservatively return false.
+        // DEFERRED: PathFinderWithPassBlockSupport not yet translated; conservatively return false.
         false
     }
 
@@ -86,8 +86,8 @@ impl StallingExtension {
             game.game_result.away.stalled = true;
         }
 
-        // TODO: emit ReportThrowAtStallingPlayer event (roll, successful).
-        // TODO: if successful { apply InjuryTypeThrowARockStalling injury and animation }
+        // DEFERRED: emit ReportThrowAtStallingPlayer event (roll, successful).
+        // DEFERRED: if successful { apply InjuryTypeThrowARockStalling injury and animation }
         let _ = (roll, successful);
     }
 }

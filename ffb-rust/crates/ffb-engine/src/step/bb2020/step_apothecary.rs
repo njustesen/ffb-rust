@@ -5,7 +5,7 @@ use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 
 /// Applies apothecary to an injured player (BB2020).
-/// TODO: full logic.
+/// DEFERRED: full logic.
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2020.StepApothecary`.
 pub struct StepApothecary;
 

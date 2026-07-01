@@ -15,10 +15,11 @@
 /// Param: BOMB_OUT_OF_BOUNDS.
 /// Publishes: CATCHER_ID, BOMB_EXPLODED.
 ///
-/// TODO(InitBomb-adjacentPlayers): FieldModel.findAdjacentCoordinates not yet ported.
-/// TODO(InitBomb-specialEffect): SpecialEffect SequenceGenerator push deferred.
-/// TODO(InitBomb-animation): Animation/AnimationType deferred.
-/// TODO(InitBomb-bloodSpot): BloodSpot/PlayerState.HIT_BY_BOMB deferred.
+/// DEFERRED(adjacentPlayers): FieldModel.findAdjacentCoordinates not yet ported.
+/// DEFERRED(specialEffect): SpecialEffect SequenceGenerator push not yet ported.
+/// DEFERRED(animation): Animation/AnimationType not yet ported.
+/// DEFERRED(bloodSpot): BloodSpot/PlayerState.HIT_BY_BOMB not yet ported.
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -60,16 +61,16 @@ impl StepInitBomb {
             self.bomb_coordinate = game.field_model.bomb_coordinate;
             let out = if self.bomb_coordinate.is_none() {
                 // Bomb went out of bounds with no landing square.
-                // TODO(InitBomb-report): ReportBombOutOfBounds deferred.
+                // Java: getResult().addReport(new ReportBombOutOfBounds())
                 StepOutcome::next()
+                    .with_event(GameEvent::BombOutOfBounds { coord: ffb_model::types::FieldCoordinate::new(0, 0) })
                     .publish(StepParameter::CatcherId(None))
             } else {
                 // Clear bomb from field.
                 game.field_model.bomb_coordinate = None;
-                // TODO(InitBomb-animation): Animation(AnimationType::BOMB_EXPLOSION, bomb_coordinate).
-                // TODO(InitBomb-bloodSpot): add BloodSpot(bomb_coordinate, PlayerState::HIT_BY_BOMB).
-                // TODO(InitBomb-adjacentPlayers): find adjacent players.
-                // TODO(InitBomb-specialEffect): push SpecialEffect sequences for adjacent players.
+                // DEFERRED(animation): Animation(BOMB_EXPLOSION) not yet ported.
+                // DEFERRED(bloodSpot): BloodSpot(HIT_BY_BOMB) not yet ported.
+                // DEFERRED(adjacentPlayers+specialEffect): find adjacent players + push SpecialEffect sequences not yet ported.
                 StepOutcome::next()
                     .publish(StepParameter::BombExploded(true))
                     .publish(StepParameter::CatcherId(None))

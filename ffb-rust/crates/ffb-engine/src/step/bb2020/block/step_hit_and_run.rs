@@ -85,7 +85,7 @@ impl StepHitAndRun {
                     game.last_turn_mode = Some(game.turn_mode);
                     game.turn_mode = TurnMode::HitAndRun;
                 }
-                // TODO: fieldModel.clearMoveSquares + add MoveSquares for eligibles
+                // DEFERRED: fieldModel.clearMoveSquares + add MoveSquares for eligibles
                 return StepOutcome::cont();
             } else {
                 // Move the player
@@ -100,7 +100,7 @@ impl StepHitAndRun {
                         }
                     }
                     game.field_model.set_player_coordinate(attacker_id, dest);
-                    // TODO: add Direction report (ReportHitAndRun)
+                    // DEFERRED: add Direction report (ReportHitAndRun)
                     // Java: actingPlayer.markSkillUsed(canMoveAfterBlock)
                     let sid = game.player(attacker_id).and_then(|p| UtilCards::get_unused_skill_with_property(
                         p, NamedProperties::CAN_MOVE_AFTER_BLOCK));
@@ -111,7 +111,7 @@ impl StepHitAndRun {
                     }
                 }
                 self.reset_state(game);
-                // TODO: push PickUp + CatchScatterThrowIn sequence onto stack
+                // DEFERRED: push PickUp + CatchScatterThrowIn sequence onto stack
                 StepOutcome::next()
             }
         } else {

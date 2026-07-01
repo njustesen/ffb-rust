@@ -20,10 +20,10 @@ use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 /// Publishes: `PassingDistance`, `PassFumble`, `DontDropFumble`, `CatcherId`,
 ///            `CatchScatterThrowInMode`, `PassResultParam`.
 ///
-/// TODO: PassModifierFactory (findModifiers) — tacklezone/disturbing-presence modifiers
+/// DEFERRED: PassModifierFactory (findModifiers) — tacklezone/disturbing-presence modifiers
 ///       on the pass roll. Not yet translated; uses empty modifier list.
-/// TODO: re-roll dialog, Safe Pass (dontDropFumbles) dialog — require dialog/reroll infra.
-/// TODO: usingModifyingSkill path (canAddStrengthToPass) — requires SkillProperty lookup.
+/// DEFERRED: re-roll dialog, Safe Pass (dontDropFumbles) dialog — require dialog/reroll infra.
+/// DEFERRED: usingModifyingSkill path (canAddStrengthToPass) — requires SkillProperty lookup.
 pub struct StepPass {
     /// Java: goToLabelOnEnd (init param, mandatory)
     pub goto_label_on_end: String,
@@ -164,7 +164,7 @@ impl StepPass {
         });
 
         // Java: PassModifierFactory.findModifiers(new PassContext(game, thrower, passingDistance, false))
-        // TODO: actual modifier lookup — currently empty (no tacklezone/weather modifiers applied)
+        // DEFERRED: actual modifier lookup — currently empty (no tacklezone/weather modifiers applied)
         // This means the roll is pure PA-based without any context modifiers.
         let pass_modifiers: Vec<ffb_mechanics::modifiers::PassModifier> = Vec::new();
 
@@ -230,7 +230,7 @@ impl StepPass {
             }
             PassResult::SAVED_FUMBLE => {
                 // Java: handleSafePass → usingSafePass dialog / goto goToLabelOnSavedFumble
-                // TODO: Safe Pass dialog (dontDropFumbles). Currently treat as "saved" directly.
+                // DEFERRED: Safe Pass dialog (dontDropFumbles). Currently treat as "saved" directly.
                 if is_bomb {
                     game.field_model.bomb_coordinate = None;
                     game.field_model.bomb_moving = false;

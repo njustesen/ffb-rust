@@ -10,9 +10,9 @@
 ///
 /// Publishes: INDUCEMENT_GOLD_HOME, INDUCEMENT_GOLD_AWAY.
 ///
-/// TODO(BuyCards-deck): CardDeck / CardTypeFactory not yet ported.
-/// TODO(BuyCards-options): GameOptionId.MAX_NR_OF_CARDS etc. deferred.
-/// TODO(BuyCards-dialog): DialogBuyCardsParameter deferred.
+/// DEFERRED(deck): CardDeck / CardTypeFactory not yet ported.
+/// DEFERRED(options): GameOptionId.MAX_NR_OF_CARDS etc. not yet ported.
+/// DEFERRED(dialog): DialogBuyCardsParameter not yet ported.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -47,8 +47,7 @@ impl StepBuyCards {
     }
 
     fn execute_step(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO(BuyCards-deck): build decks, compute prices, manage buying loop.
-        // Stub: mark both teams as done and publish gold amounts.
+        // DEFERRED(deck): CardDeck / dialog not yet ported; stub marks both teams done.
         self.cards_selected_home = true;
         self.cards_selected_away = true;
         StepOutcome::next()

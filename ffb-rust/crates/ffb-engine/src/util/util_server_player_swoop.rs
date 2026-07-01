@@ -12,7 +12,7 @@
 // Correct once has_skill_property / NamedProperties are added.
 
 use ffb_model::model::game::Game;
-use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
+use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds, MoveSquare};
 
 pub struct UtilServerPlayerSwoop;
 
@@ -68,7 +68,7 @@ impl UtilServerPlayerSwoop {
     ///
     /// Inserts `coord` into `game.field_model.move_squares`.
     pub fn add_swoop_square(game: &mut Game, coord: FieldCoordinate) {
-        game.field_model.move_squares.insert(coord);
+        game.field_model.add_move_square(MoveSquare::new(coord, 0, 0));
     }
 }
 
@@ -85,7 +85,7 @@ mod tests {
     use ffb_model::model::game::Game;
     use ffb_model::model::player::Player;
     use ffb_model::model::team::Team;
-    use ffb_model::types::FieldCoordinate;
+    use ffb_model::types::{FieldCoordinate, MoveSquare};
 
     fn make_team(id: &str, players: Vec<Player>) -> Team {
         Team {
@@ -149,8 +149,8 @@ mod tests {
     #[test]
     fn update_swoop_squares_clears_existing_move_squares() {
         let mut game = game_with_player_at("p1", FieldCoordinate::new(10, 7));
-        game.field_model.move_squares.insert(FieldCoordinate::new(0, 0));
-        game.field_model.move_squares.insert(FieldCoordinate::new(1, 1));
+        game.field_model.add_move_square(MoveSquare::new(FieldCoordinate::new(0, 0), 0, 0));
+        game.field_model.add_move_square(MoveSquare::new(FieldCoordinate::new(1, 1), 0, 0));
         UtilServerPlayerSwoop::update_swoop_squares(&mut game, "p1");
         // Property not available → clears squares, adds none.
         assert!(game.field_model.move_squares.is_empty());
@@ -190,7 +190,7 @@ mod tests {
         let mut game = game_with_player_at("p1", FieldCoordinate::new(5, 5));
         let coord = FieldCoordinate::new(6, 5);
         UtilServerPlayerSwoop::add_swoop_square(&mut game, coord);
-        assert!(game.field_model.move_squares.contains(&coord));
+        assert!(game.field_model.get_move_square(coord).is_some());
     }
 
     #[test]
@@ -201,7 +201,7 @@ mod tests {
         UtilServerPlayerSwoop::add_swoop_square(&mut game, c1);
         UtilServerPlayerSwoop::add_swoop_square(&mut game, c2);
         assert_eq!(game.field_model.move_squares.len(), 2);
-        assert!(game.field_model.move_squares.contains(&c1));
-        assert!(game.field_model.move_squares.contains(&c2));
+        assert!(game.field_model.get_move_square(c1).is_some());
+        assert!(game.field_model.get_move_square(c2).is_some());
     }
 }

@@ -24,8 +24,8 @@
 ///
 /// Sets stepParameter KICKOFF_RESULT for all steps on the stack.
 ///
-/// TODO(KickoffResultRoll-overtime): GameOptionId::OVERTIME_KICK_OFF_RESULTS handling deferred.
-/// TODO(KickoffResultRoll-dialog): CLIENT_KICK_OFF_RESULT_CHOICE dialog path deferred.
+/// DEFERRED(KickoffResultRoll-overtime): GameOptionId::OVERTIME_KICK_OFF_RESULTS handling deferred.
+/// DEFERRED(KickoffResultRoll-dialog): CLIENT_KICK_OFF_RESULT_CHOICE dialog path deferred.
 use ffb_model::enums::KickoffResult;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -47,7 +47,7 @@ impl StepKickoffResultRoll {
         // Java: UtilServerDialog.hideDialog(getGameState())
 
         if self.kickoff_result.is_none() {
-            // TODO(KickoffResultRoll-overtime): check game.half < 3 and
+            // DEFERRED(KickoffResultRoll-overtime): check game.half < 3 and
             // GameOptionId::OVERTIME_KICK_OFF_RESULTS to select the overtime path:
             //   - OVERTIME_KICK_OFF_RANDOM_BLITZ_OR_SOLID_DEFENCE: roll d6, use validRolls[index].
             //   - OVERTIME_KICK_OFF_BLITZ: fKickoffResult = KickoffResult::BLITZ; goto NextStep.
@@ -90,7 +90,7 @@ impl Step for StepKickoffResultRoll {
         //   commandStatus = EXECUTE_STEP
         // Java: if commandStatus == EXECUTE_STEP: executeStep()
         //
-        // TODO(KickoffResultRoll-dialog): When Action::KickoffResultChoice is added,
+        // DEFERRED(KickoffResultRoll-dialog): When Action::KickoffResultChoice is added,
         // match it here to set self.kickoff_result before calling execute_step.
         self.execute_step(game, rng)
     }

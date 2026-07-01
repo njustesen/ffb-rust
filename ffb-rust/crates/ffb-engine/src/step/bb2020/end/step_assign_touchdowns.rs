@@ -12,9 +12,12 @@
 /// - When touchdowns <= 0 → NEXT_STEP, zero the other team's player touchdowns.
 /// - While touchdowns remain → show ASSIGN_TOUCHDOWN dialog → Continue.
 ///
-/// TODO(assign-td-dialog): DialogPlayerChoiceParameter + UtilServerDialog.showDialog deferred.
-/// TODO(assign-td-field-model): filter killed/recoveringInjury players via field_model.
-/// TODO(assign-td-report): ReportPlayerEvent("is awarded a touchdown") deferred.
+/// DEFERRED(assign-td-dialog): DialogPlayerChoiceParameter(ASSIGN_TOUCHDOWN) + UtilServerDialog.showDialog —
+///   waiting for dialog infrastructure to be ported.
+/// isKilled() filter wired; recoveringInjury filter DEFERRED(assign-td-recover) — not yet ported.
+///   (Player.getRecoveringInjury() != null) players — PlayerResult/injury tracking not yet fully wired.
+/// DEFERRED(assign-td-report): ReportPlayerEvent("is awarded a touchdown") —
+///   report infrastructure not yet translated.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -47,14 +50,20 @@ impl StepAssignTouchdowns {
         };
 
         // Java: List<Player> players = findPlayers(game, game.getTeamById(winningTeamId))
-        // Collect surviving players on the winning team.
-        // TODO(assign-td-field-model): filter player.getRecoveringInjury() == null
-        //   && !game.getFieldModel().getPlayerState(player).isKilled()
-        let players: Vec<String> = if game.team_home.id == winning_team_id {
+        // Filter: player.getRecoveringInjury() == null && !playerState.isKilled()
+        // DEFERRED(assign-td-recover): recoveringInjury tracking not yet ported — isKilled() check wired.
+        let all_player_ids: Vec<String> = if game.team_home.id == winning_team_id {
             game.team_home.players.iter().map(|p| p.id.clone()).collect()
         } else {
             game.team_away.players.iter().map(|p| p.id.clone()).collect()
         };
+        let players: Vec<String> = all_player_ids.into_iter()
+            .filter(|id| {
+                game.field_model.player_state(id)
+                    .map(|s| !s.is_killed())
+                    .unwrap_or(true)
+            })
+            .collect();
 
         // Java: if (players.isEmpty()) { touchdowns = 0; }
         if players.is_empty() {
@@ -75,7 +84,7 @@ impl StepAssignTouchdowns {
                 if !players.is_empty() {
                     let idx = rng.range(players.len());
                     let pid = players[idx].clone();
-                    // TODO(assign-td-report): emit ReportPlayerEvent(pid, "is awarded a touchdown")
+                    // DEFERRED(assign-td-report): ReportPlayerEvent(pid, "is awarded a touchdown") — report infra not translated.
                     let result = if game.team_home.id == winning_team_id {
                         game.game_result.home.player_results.entry(pid).or_default()
                     } else {
@@ -91,7 +100,7 @@ impl StepAssignTouchdowns {
         // }
         if let Some(pid) = self.player_id.take() {
             if !pid.is_empty() {
-                // TODO(assign-td-report): emit ReportPlayerEvent(pid, "is awarded a touchdown")
+                // DEFERRED(assign-td-report): ReportPlayerEvent(pid, "is awarded a touchdown") — report infra not translated.
                 let result = if game.team_home.id == winning_team_id {
                     game.game_result.home.player_results.entry(pid).or_default()
                 } else {
@@ -133,7 +142,7 @@ impl StepAssignTouchdowns {
 
         // Java: DialogPlayerChoiceParameter(winningTeamId, ASSIGN_TOUCHDOWN, playerIds, null, 1, 1)
         // UtilServerDialog.showDialog(getGameState(), dialogParameter, false) → wait for player choice.
-        // TODO(assign-td-dialog): show ASSIGN_TOUCHDOWN dialog to winning team coach.
+        // DEFERRED(assign-td-dialog): show ASSIGN_TOUCHDOWN dialog — waiting for dialog infrastructure.
         StepOutcome::cont()
     }
 }

@@ -99,7 +99,7 @@ impl Step for StepBlockRollMultiple {
         match action {
             Action::BlockChoice { die_index } => {
                 // CLIENT_BLOCK_OR_RE_ROLL_CHOICE_FOR_TARGET substitute
-                // TODO: map die_index to a BlockRollProperties.selectedIndex for the selectedTarget
+                // DEFERRED: map die_index to a BlockRollProperties.selectedIndex for the selectedTarget
                 let _ = die_index;
             }
             _ => {}
@@ -112,14 +112,14 @@ impl StepBlockRollMultiple {
     fn execute_step(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         if self.first_run {
             self.first_run = false;
-            // TODO: clearDiceDecorations
-            // TODO: for each block_roll entry:
+            // DEFERRED: clearDiceDecorations
+            // DEFERRED: for each block_roll entry:
             //   nrOfDice = ServerUtilBlock.findNrOfBlockDice(gameState, actingPlayer, defender, ...)
             //   roll block dice; addReRollData; setSound(BLOCK); syncGameModel
-            // TODO: decideNextStep -> show dialog or push evaluation sequences
+            // DEFERRED: decideNextStep -> show dialog or push evaluation sequences
         } else {
-            // TODO: if selectedTarget is set: apply re-roll if reRollSource set
-            // TODO: decideNextStep
+            // DEFERRED: if selectedTarget is set: apply re-roll if reRollSource set
+            // DEFERRED: decideNextStep
         }
         // Stub: no dice infrastructure ported yet -> advance immediately.
         StepOutcome::next()

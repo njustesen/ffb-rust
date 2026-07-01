@@ -13,6 +13,7 @@ use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_cards::UtilCards;
 use ffb_mechanics::skills::SkillId;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -83,12 +84,25 @@ impl StepFollowup {
                 && !defender_state.is_prone_or_stunned()
                 && !old_defender_state.is_prone_or_stunned()
             {
-                // Java: boolean cancelSkillUsed = false
-                // Java: Skill skillCancelsSkillPreventingFollow = UtilCards.getSkillCancelling(...)
-                // Java: if (usingSkillPreventingFollowUp == null) {
-                //   if (BLITZ || (MOVE && blocksDuringMove)) && skillCancelsSkillPreventingFollow != null {
-                //     usingSkillPreventingFollowUp = false; cancelSkillUsed = true; report CANCEL_FEND } }
-                // TODO(cancel-fend): UtilCards.getSkillCancelling not yet ported — skip cancel check
+                // Java: Skill skillCancelsSkillPreventingFollow = UtilCards.getSkillCancelling(actingPlayer, fendSkill)
+                // Check if attacker has a skill (e.g. Juggernaut) that cancels the fend property.
+                let attacker_cancels_fend = acting_player_id.as_deref()
+                    .and_then(|id| game.player(id))
+                    .map(|p| UtilCards::has_skill_to_cancel_property(p, NamedProperties::PREVENT_OPPONENT_FOLLOWING_UP))
+                    .unwrap_or(false);
+                if self.using_skill_preventing_follow_up.is_none() && attacker_cancels_fend {
+                    let action = game.acting_player.player_action.unwrap_or(PlayerAction::Block);
+                    let is_blitz_or_blocks_during_move = action == PlayerAction::Blitz
+                        || action == PlayerAction::BlitzMove
+                        || (action == PlayerAction::Move && acting_player_id.as_deref()
+                            .and_then(|id| game.player(id))
+                            .map(|p| p.has_skill_property(NamedProperties::BLOCKS_DURING_MOVE))
+                            .unwrap_or(false));
+                    if is_blitz_or_blocks_during_move {
+                        // Java: usingSkillPreventingFollowUp = false; cancelSkillUsed = true; report CANCEL_FEND
+                        self.using_skill_preventing_follow_up = Some(false);
+                    }
+                }
 
                 // Java: boolean defenderHasTacklezones = oldDefenderState.hasTacklezones()
                 let defender_had_tacklezones = old_defender_state.has_tacklezones();
@@ -322,5 +336,46 @@ mod tests {
         let mut game = make_game();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn juggernaut_cancels_fend_on_blitz() {
+        use ffb_model::enums::{PlayerType, PlayerGender, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        // Setup: defender has Fend, attacker has Juggernaut on a Blitz action.
+        let mut step = StepFollowup::new();
+        step.old_defender_state = Some(PlayerState::new(PS_STANDING)); // PS_STANDING has tacklezones
+        let mut game = make_game();
+        // Add attacker with Juggernaut
+        game.team_home.players.push(Player {
+            id: "att".into(), name: "att".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Juggernaut, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        game.acting_player.player_id = Some("att".into());
+        game.acting_player.player_action = Some(PlayerAction::Blitz);
+        // Add defender with Fend
+        game.team_away.players.push(Player {
+            id: "def".into(), name: "def".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Fend, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.defender_id = Some("def".into());
+        // Juggernaut should auto-cancel Fend → using_skill_preventing_follow_up = Some(false)
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(step.using_skill_preventing_follow_up, Some(false));
     }
 }

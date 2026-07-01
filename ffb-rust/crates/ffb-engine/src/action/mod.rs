@@ -126,6 +126,13 @@ pub enum Action {
     /// CatchOfTheDay: attempt to grab the ball off the ground at activation (D6 >= 3).
     CatchOfTheDay,
 
+    // ── Apothecary ────────────────────────────────────────────────────────────
+    /// Choose the injury result when the apothecary rolls an alternative (CLIENT_APOTHECARY_CHOICE).
+    /// Java: `ClientCommandApothecaryChoice` — carries PlayerState bitmask and SeriousInjury name.
+    /// `player_state`: Java PlayerState bitmask (0 = keep original, non-zero = use alternative).
+    /// `serious_injury`: alternative serious injury name (None = no serious injury).
+    ApothecaryChoice { player_state: u32, serious_injury: Option<String> },
+
     // ── Misc ─────────────────────────────────────────────────────────────────
     /// Select a player from a list prompt.
     SelectPlayer { player_id: PlayerId },
@@ -153,6 +160,11 @@ pub enum Action {
     /// Player choice from a list dialog (generic — covers PlayerChoiceMode variants not yet specialised).
     /// Java: `ClientCommandPlayerChoice`.
     PlayerChoice { player_id: Option<String>, player_ids: Vec<String>, mode: String },
+
+    // ── Game lifecycle ────────────────────────────────────────────────────────
+    /// Coach signals readiness to start the game.
+    /// Java: `CLIENT_START_GAME` command. `home = true` → home coach, `false` → away coach.
+    StartGame { home: bool },
 }
 
 /// Which action type the agent wants to perform when activating a player.
@@ -255,5 +267,15 @@ mod tests {
     fn trickster_move_round_trips() {
         use ffb_model::types::FieldCoordinate;
         rt(Action::TricksterMove { coord: FieldCoordinate::new(13, 8) });
+    }
+
+    #[test]
+    fn apothecary_choice_round_trips() {
+        rt(Action::ApothecaryChoice { player_state: 0x100, serious_injury: Some("BrokenRibs".into()) });
+    }
+
+    #[test]
+    fn apothecary_choice_no_si_round_trips() {
+        rt(Action::ApothecaryChoice { player_state: 0, serious_injury: None });
     }
 }

@@ -1,5 +1,6 @@
 use ffb_model::enums::PassingDistance;
 use ffb_model::model::{Game, Player};
+use ffb_model::model::property::named_properties::NamedProperties;
 use crate::mechanic::{Mechanic, MechanicType};
 use crate::modifiers::{PassModifier, StatBasedRollModifier};
 use crate::pass_result::PassResult;
@@ -81,10 +82,11 @@ impl PassMechanicTrait for PassMechanic {
         } else if roll == 1 {
             PassResult::FUMBLE
         } else if self.is_modified_fumble(roll, distance, modifiers) {
-            if !bomb_action {
-                // TODO: thrower.has_skill_property(NamedProperties.dontDropFumbles) → SAVED_FUMBLE
+            if !bomb_action && thrower.has_skill_property(NamedProperties::DONT_DROP_FUMBLES) {
+                PassResult::SAVED_FUMBLE
+            } else {
+                PassResult::FUMBLE
             }
-            PassResult::FUMBLE
         } else if roll < minimum_roll {
             PassResult::INACCURATE
         } else {
@@ -129,5 +131,62 @@ impl PassMechanic {
 
     fn is_modified_fumble(&self, roll: i32, distance: PassingDistance, modifiers: &[PassModifier]) -> bool {
         (roll + distance.modifier_2016() - self.calculate_modifiers(modifiers)) <= 1
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::enums::{PlayerGender, PlayerType, SkillId};
+    use ffb_model::model::player::Player;
+    use ffb_model::model::skill_def::SkillWithValue;
+
+    fn make_thrower() -> Player {
+        Player {
+            id: "t".into(), name: "t".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 5, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        }
+    }
+
+    #[test]
+    fn natural_one_without_safe_pass_is_fumble() {
+        // Natural 1 always fumbles regardless of SafePass
+        let m = PassMechanic::new();
+        let thrower = make_thrower();
+        let result = m.evaluate_pass(&thrower, 1, PassingDistance::ShortPass, &[], false, None);
+        assert_eq!(result, PassResult::FUMBLE);
+    }
+
+    #[test]
+    fn modified_fumble_with_safe_pass_is_saved_fumble() {
+        let m = PassMechanic::new();
+        let mut thrower = make_thrower();
+        thrower.starting_skills.push(SkillWithValue::new(SkillId::SafePass));
+        // LongPass modifier_2016=-1: roll=2 → 2+(-1)-0=1 <= 1 → modified fumble → SAVED_FUMBLE
+        let result = m.evaluate_pass(&thrower, 2, PassingDistance::LongPass, &[], false, None);
+        assert_eq!(result, PassResult::SAVED_FUMBLE);
+    }
+
+    #[test]
+    fn modified_fumble_without_safe_pass_is_fumble() {
+        let m = PassMechanic::new();
+        let thrower = make_thrower();
+        // LongPass modifier_2016=-1: roll=2 → modified fumble, no SafePass → FUMBLE
+        let result = m.evaluate_pass(&thrower, 2, PassingDistance::LongPass, &[], false, None);
+        assert_eq!(result, PassResult::FUMBLE);
+    }
+
+    #[test]
+    fn bomb_action_modified_fumble_is_fumble_even_with_safe_pass() {
+        let m = PassMechanic::new();
+        let mut thrower = make_thrower();
+        thrower.starting_skills.push(SkillWithValue::new(SkillId::SafePass));
+        // bomb_action=true → SafePass doesn't apply to modified fumble
+        let result = m.evaluate_pass(&thrower, 2, PassingDistance::LongPass, &[], true, None);
+        assert_eq!(result, PassResult::FUMBLE);
     }
 }

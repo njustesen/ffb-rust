@@ -63,7 +63,7 @@ impl Step for StepMultipleBlockFork {
 
 impl StepMultipleBlockFork {
     fn execute_step(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO: build and push per-target sequence:
+        // DEFERRED: build and push per-target sequence:
         //   sequence.add(DAUNTLESS_MULTIPLE, BLOCK_TARGETS=targets)
         //   sequence.add(DOUBLE_STRENGTH)
         //   for target in targets:

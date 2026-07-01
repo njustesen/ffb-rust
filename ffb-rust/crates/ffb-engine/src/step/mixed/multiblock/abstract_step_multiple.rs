@@ -66,7 +66,7 @@ pub fn re_roll_source_successfully(
                 true
             }
             _ => {
-                // TODO(dialog port): showDialog(DialogPlayerChoiceParameter / LORD_OF_CHAOS)
+                // DEFERRED(dialog port): showDialog(DialogPlayerChoiceParameter / LORD_OF_CHAOS)
                 false
             }
         }

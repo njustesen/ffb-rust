@@ -10,8 +10,8 @@
 /// - If PETTY_CASH_AFFECTS_TV: add petty_cash_transferred to team_value.
 /// - Reports ReportPettyCash once per team.
 ///
-/// TODO(PettyCash-options): GameOptionId.PETTY_CASH etc. deferred.
-/// TODO(PettyCash-dialog): DialogPettyCashParameter deferred.
+/// DEFERRED(options): GameOptionId.PETTY_CASH etc. not yet ported.
+/// DEFERRED(dialog): DialogPettyCashParameter not yet ported.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -50,10 +50,7 @@ impl StepPettyCash {
         game.game_result.home.team_value = game.game_result.home.team_value.max(home_tv);
         game.game_result.away.team_value = game.game_result.away.team_value.max(away_tv);
 
-        // TODO(PettyCash-options): check PETTY_CASH option; if disabled → NEXT_STEP.
-        // TODO(PettyCash-force): FORCE_TREASURY_TO_PETTY_CASH auto-fill.
-        // TODO(PettyCash-pettyCashTransferred): petty_cash_from_tv_diff is the available field;
-        //   Java uses pettyCashTransferred which tracks how much was actually moved.
+        // DEFERRED(options): PETTY_CASH GameOption / FORCE_TREASURY_TO_PETTY_CASH not yet ported.
         // Auto-select teams with treasury < 50,000.
         let home_treasury = game.team_home.treasury;
         let away_treasury = game.team_away.treasury;
@@ -63,7 +60,7 @@ impl StepPettyCash {
         if away_treasury < 50_000 {
             self.petty_cash_selected_away = true;
         }
-        // TODO(PettyCash-dialog): show dialog for teams still deciding.
+        // DEFERRED(dialog): DialogPettyCashParameter not yet ported.
         if self.petty_cash_selected_home && self.petty_cash_selected_away {
             return StepOutcome::next();
         }
@@ -83,7 +80,7 @@ impl Step for StepPettyCash {
     }
 
     fn handle_command(&mut self, _action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO(PettyCash-command): CLIENT_PETTY_CASH not yet mapped in Action enum.
+        // DEFERRED(command): CLIENT_PETTY_CASH not yet mapped in Action enum.
         self.execute_step(game)
     }
 

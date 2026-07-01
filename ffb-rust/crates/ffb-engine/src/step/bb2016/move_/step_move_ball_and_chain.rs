@@ -1,7 +1,10 @@
+use ffb_model::enums::Direction;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
+use crate::drop_player_context::SteadyFootingContext;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 
@@ -27,10 +30,7 @@ use crate::step::framework::{StepId, StepParameter};
 /// 5. Else:
 ///    - NEXT_STEP
 ///
-/// TODO(movesRandomly): NamedProperties.MOVES_RANDOMLY check not yet ported.
-/// TODO(throwInMechanic): scatter direction from player movement direction not yet ported.
-/// TODO(injuryTypeCrowdPush): InjuryTypeCrowdPush publish not yet ported.
-/// TODO(blockDefenderId): getPlayerAt(coordinateTo) not yet ported.
+/// ThrowInMechanic.scatter → D8 roll mapped via Direction::for_roll + FieldCoordinate::step → wired.
 pub struct StepMoveBallAndChain {
     /// Java: fGotoLabelOnEnd
     pub goto_label_on_end: String,
@@ -80,39 +80,39 @@ impl Step for StepMoveBallAndChain {
 }
 
 impl StepMoveBallAndChain {
-    fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO(movesRandomly): check actingPlayer MOVES_RANDOMLY property
-        // For now, always proceed (Ball-and-Chain carrier is always moving randomly)
-        let moves_randomly = true;
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: if (!actingPlayer.getPlayer().hasSkillProperty(MOVES_RANDOMLY)) NEXT_STEP
+        let moves_randomly = game.acting_player.player_id.as_deref()
+            .and_then(|id| game.player(id))
+            .map(|p| p.has_skill_property(NamedProperties::MOVES_RANDOMLY))
+            .unwrap_or(false);
 
         if !moves_randomly {
             return StepOutcome::next();
         }
 
-        // Java: ThrowInMechanic.scatter(coordinateFrom, direction_roll) → coordinateTo
-        // TODO(throwInMechanic): scatter from movement direction not yet ported
-        // For now, use the pre-set coordinateTo if available
         let coordinate_from = match self.coordinate_from {
             Some(c) => c,
             None => return StepOutcome::next(),
         };
 
-        let coordinate_to = match self.coordinate_to {
-            Some(c) => c,
-            None => {
-                // TODO(throwInMechanic): scatter direction from movement direction not yet ported
-                // Java: ThrowInMechanic.scatter(coordinateFrom, directionRoll)
-                // For stub: no pre-set coordinate → return next step
-                return StepOutcome::next();
-            }
+        // Java: ThrowInMechanic.scatter(coordinateFrom, directionRoll) → coordinateTo
+        // Roll D8, map to scatter direction, step one square.
+        let coordinate_to = if let Some(pre_set) = self.coordinate_to {
+            pre_set
+        } else {
+            let roll = rng.d8();
+            let direction = Direction::for_roll(roll).unwrap_or(Direction::North);
+            coordinate_from.step(direction, 1)
         };
 
         // Check if out of bounds
         if !FieldCoordinateBounds::FIELD.is_in_bounds(coordinate_to) {
-            // Java: INJURY_TYPE(InjuryTypeCrowdPush) + GOTO_LABEL_ON_FALL_DOWN
-            // TODO(injuryTypeCrowdPush): publish InjuryTypeCrowdPush not yet ported
+            // Java: publishParameter(INJURY_TYPE, InjuryTypeCrowdPush) + GOTO_LABEL_ON_FALL_DOWN
             let label = self.goto_label_on_fall_down.clone();
-            return StepOutcome::goto(&label);
+            let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeCrowdPush".into());
+            return StepOutcome::goto(&label)
+                .publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
         }
 
         // Check if there is a blocking defender at coordinateTo
@@ -160,6 +160,22 @@ mod tests {
         game.field_model.set_player_coordinate(id, coord);
     }
 
+    fn add_ball_and_chain_player(game: &mut Game, id: &str, coord: FieldCoordinate) {
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::SkillId;
+        game.team_home.players.push(Player {
+            id: id.into(), name: id.into(), nr: 2, position_id: "ballchain".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 2, strength: 5, agility: 1, passing: 6, armour: 9,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::BallAndChain, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        game.field_model.set_player_coordinate(id, coord);
+        game.acting_player.player_id = Some(id.into());
+    }
+
     #[test]
     fn empty_target_square_returns_next_step() {
         let mut game = make_game();
@@ -176,8 +192,8 @@ mod tests {
     fn out_of_bounds_target_gotos_fall_down_label() {
         let mut game = make_game();
         let from = FieldCoordinate::new(0, 5);
-        // FieldCoordinate x=-1 or x=26 is OOB — use a coordinate known to be OOB
         let oob = FieldCoordinate::new(26, 5);
+        add_ball_and_chain_player(&mut game, "carrier", from);
         let mut step = StepMoveBallAndChain::new("end".into(), "fall".into());
         step.coordinate_from = Some(from);
         step.coordinate_to = Some(oob);
@@ -191,6 +207,7 @@ mod tests {
         let mut game = make_game();
         let from = FieldCoordinate::new(5, 5);
         let to = FieldCoordinate::new(6, 5);
+        add_ball_and_chain_player(&mut game, "carrier", from);
         add_player(&mut game, "defender", to);
         let mut step = StepMoveBallAndChain::new("end".into(), "fall".into());
         step.coordinate_from = Some(from);
@@ -205,6 +222,7 @@ mod tests {
         let mut game = make_game();
         let from = FieldCoordinate::new(5, 5);
         let to = FieldCoordinate::new(6, 5);
+        add_ball_and_chain_player(&mut game, "carrier", from);
         add_player(&mut game, "defender", to);
         let mut step = StepMoveBallAndChain::new("end".into(), "fall".into());
         step.coordinate_from = Some(from);
@@ -256,6 +274,20 @@ mod tests {
         let mut step = StepMoveBallAndChain::new("end".into(), "fall".into());
         step.coordinate_from = None;
         let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn scatter_without_preset_coordinate_to_moves_player() {
+        // Without a preset coordinate_to, the step rolls D8 to scatter.
+        // Any D8 roll from center (12, 6) stays in bounds → NextStep.
+        let mut game = make_game();
+        let from = FieldCoordinate::new(12, 6);
+        let mut step = StepMoveBallAndChain::new("end".into(), "fall".into());
+        step.coordinate_from = Some(from);
+        step.coordinate_to = None;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // D8 roll of 1 (seed 0) → North → (12,5) — in bounds → NextStep.
         assert_eq!(out.action, StepAction::NextStep);
     }
 }

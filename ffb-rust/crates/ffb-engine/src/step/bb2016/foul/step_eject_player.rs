@@ -11,9 +11,9 @@
 /// Receives: FOULER_HAS_BALL, ARGUE_THE_CALL_SUCCESSFUL.
 /// Publishes: END_TURN, CATCH_SCATTER_THROW_IN_MODE.
 ///
-/// TODO(EjectPlayer-box): UtilBox.putPlayerIntoBox / refreshBoxes not yet ported.
-/// TODO(EjectPlayer-wastedSkills): UtilServerGame.checkForWastedSkills deferred.
-/// TODO(EjectPlayer-hooks): executeStepHooks deferred.
+/// DEFERRED(EjectPlayer-box): UtilBox.putPlayerIntoBox / refreshBoxes not yet ported.
+/// DEFERRED(EjectPlayer-wastedSkills): UtilServerGame.checkForWastedSkills not yet ported.
+/// DEFERRED(EjectPlayer-hooks): executeStepHooks not yet ported.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -39,8 +39,8 @@ impl StepEjectPlayer {
     }
 
     fn execute_step(&self, _game: &mut Game) -> StepOutcome {
-        // TODO(EjectPlayer-box): put acting player into box.
-        // TODO(EjectPlayer-wastedSkills): check wasted skills.
+        // DEFERRED(EjectPlayer-box): UtilBox.putPlayerIntoBox — player stays on field model.
+        // DEFERRED(EjectPlayer-wastedSkills): UtilServerGame.checkForWastedSkills not yet ported.
         let has_ball = self.fouler_has_ball.unwrap_or(false);
         if has_ball {
             StepOutcome::next()

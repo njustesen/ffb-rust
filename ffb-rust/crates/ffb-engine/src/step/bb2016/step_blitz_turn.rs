@@ -57,16 +57,16 @@ impl StepBlitzTurn {
             StepOutcome::next()
         } else {
             // First entry: set up the blitz turn.
-            // TODO: SetupMechanic.pinPlayersInTacklezones(gameState, blitzingTeam)
+            // DEFERRED(SetupMechanic): pinPlayersInTacklezones not yet ported
             game.turn_mode = TurnMode::Blitz;
-            // TODO: UtilServerTimer.stopTurnTimer / startTurnTimer
-            // TODO: game.startTurn()
+            // DEFERRED(timer): UtilServerTimer.stopTurnTimer / startTurnTimer not yet ported
+            // DEFERRED(startTurn): game.startTurn() not yet ported
 
             // Java: pushCurrentStepOnStack() — push self back; then push Select on top.
             // Push order: self first (bottom), Select on top (runs first).
             let self_seq = vec![SequenceStep::new(StepId::BlitzTurn)];
             let select_seq = Select::build_sequence(&SelectParams { update_persistence: true });
-            // TODO: UtilServerGame.updatePlayerStateDependentProperties
+            // DEFERRED(UtilServerGame): updatePlayerStateDependentProperties not yet ported
             StepOutcome::next()
                 .push_seq(self_seq)
                 .push_seq(select_seq)

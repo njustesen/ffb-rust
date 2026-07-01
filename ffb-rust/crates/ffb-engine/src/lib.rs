@@ -11,6 +11,12 @@ pub mod legal_actions;
 /// Skill behaviour hooks — Rust analogue of Java's `SkillBehaviour` + `StepModifier` system.
 pub mod skill_behaviour;
 
+/// Step factory infrastructure — `StepIdFactory` (name↔id mapping), `StepActionFactory` (step instantiation).
+pub mod factory;
+
+/// Engine-level model types — `StepModifier` trait and related infrastructure.
+pub mod model;
+
 /// Partial translations of InjuryContext (ffb-common) and InjuryResult (ffb-server).
 pub mod injury;
 

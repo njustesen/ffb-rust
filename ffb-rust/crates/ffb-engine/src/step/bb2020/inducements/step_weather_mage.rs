@@ -53,7 +53,7 @@ impl Step for StepWeatherMage {
 impl StepWeatherMage {
     fn execute_step(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: useMage() — marks the CHANGE_WEATHER inducement as used.
-        // TODO: implement when Usage enum is fully ported from Java.
+        // DEFERRED: implement when Usage enum is fully ported from Java.
 
         let roll = rng.roll_weather();
         let sum = roll[0] + roll[1];

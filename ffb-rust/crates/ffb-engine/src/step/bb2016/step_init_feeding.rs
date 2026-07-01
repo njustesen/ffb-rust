@@ -1,8 +1,13 @@
+use ffb_model::enums::ApothecaryMode;
+use ffb_model::enums::{PlayerState, PS_KNOCKED_OUT, PS_RESERVE};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
-use crate::step::framework::{Step, StepOutcome};
+use crate::step::framework::{CatchScatterThrowInMode, Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::injury::injuryType::injury_type_bitten::InjuryTypeBitten;
+use crate::step::util_server_injury::{handle_injury, drop_player};
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2016.StepInitFeeding.
 ///
@@ -84,24 +89,18 @@ impl Step for StepInitFeeding {
 }
 
 impl StepInitFeeding {
-    fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // Java: UtilServerDialog.hideDialog(getGameState())
-        // TODO: dialog hiding (no-op in headless)
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // DEFERRED(dialog): UtilServerDialog.hideDialog — no-op in headless
 
         let goto_label = match &self.goto_label_on_end {
             Some(l) => l.clone(),
-            None => return StepOutcome::next(), // misconfigured — guard
+            None => return StepOutcome::next(),
         };
 
-        // Java: ActingPlayer actingPlayer = game.getActingPlayer()
-        // Java: if ((actingPlayer.getPlayer() == null) || !actingPlayer.isSufferingBloodLust() || actingPlayer.hasFed())
-        //   → goto label
-        // Simplification: check acting_player hasFed / not blood-lusting
+        // Java: if (actingPlayer.getPlayer() == null || !isSufferingBloodLust || hasFed) → goto label
         let player_exists = game.acting_player.player_id.is_some();
         let is_blood_lusting = game.acting_player.suffering_blood_lust;
-        // Java: actingPlayer.hasFed() — ActingPlayer doesn't have has_fed yet; use has_acted as proxy
-        // TODO: add has_fed field to ActingPlayer when Blood Lust is fully integrated
-        let has_fed = false; // stub — hooks will supply the real check
+        let has_fed = game.acting_player.has_fed;
 
         if !player_exists || !is_blood_lusting || has_fed {
             return StepOutcome::goto(&goto_label)
@@ -114,57 +113,82 @@ impl StepInitFeeding {
             self.feed_on_player_choice = Some(false);
         }
 
-        // Java: check playerState.hasTacklezones() && fFeedOnPlayerChoice == null
-        // → find adjacent victims, show dialog or set choice=false
-        // TODO: UtilPlayer.findAdjacentPlayersToFeedOn / dialog logic
-        // Stub: if choice not yet made, show dialog prompt (Continue)
-        if self.feed_on_player_choice.is_none() {
-            // TODO: show DialogPlayerChoiceParameter(FEED mode)
+        // Java: if (playerState.hasTacklezones() && fFeedOnPlayerChoice == null) → find victims or set false
+        let acting_id = game.acting_player.player_id.clone().unwrap_or_default();
+        let player_state: Option<PlayerState> = game.field_model.player_state(&acting_id);
+        let has_tackle_zones = player_state.map(|s| s.has_tacklezones()).unwrap_or(false);
+
+        if has_tackle_zones && self.feed_on_player_choice.is_none() {
+            // DEFERRED(findAdjacentPlayersToFeedOn): UtilPlayer.findAdjacentPlayersToFeedOn not yet ported
+            // Stub: return cont() to wait for CLIENT_PLAYER_CHOICE dialog response
             return StepOutcome::cont();
         }
 
-        let do_next_step;
+        let mut outcome = StepOutcome::next();
+
         if self.feed_on_player_choice == Some(true) && game.defender_id.is_some() {
-            // Java: handleInjury(InjuryTypeBitten, ...)
-            // Java: fEndTurn = UtilPlayer.hasBall(game, game.getDefender())
-            // Java: publishParameter INJURY_RESULT
-            // Java: publishParameters dropPlayer
-            // Java: actingPlayer.setSufferingBloodLust(false)
-            // TODO: UtilServerInjury.handleInjury with InjuryTypeBitten
+            // Java: feed on player — handleInjury(InjuryTypeBitten, ...)
             let defender_id = game.defender_id.clone().unwrap_or_default();
-            // Approximate: mark feeding complete, use InjuryTypeBitten stub
-            let _ = defender_id;
-            game.acting_player.suffering_blood_lust = false;
-            do_next_step = true;
-        } else {
-            // Java: biting spectator path
-            // Java: fEndTurn = true; remove ball from field if carrying, move to RESERVE
-            self.end_turn = true;
-            // TODO: scatter ball if acting player is ball carrier
-            if let Some(pid) = game.acting_player.player_id.clone() {
-                if game.field_model.ball_coordinate
-                    .and_then(|bc| game.field_model.player_at(bc))
-                    .map(|id| id == &pid)
-                    .unwrap_or(false)
-                {
-                    game.field_model.ball_moving = true;
-                    // publish scatter
-                }
-                // TODO: move player to RESERVE / box (UtilBox.putPlayerIntoBox)
+            let defender_coord = game.field_model.player_coordinate(&defender_id)
+                .unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
+            let acting_player_obj = game.player(&acting_id).map(|p| p.id.clone());
+
+            let mut injury_type = InjuryTypeBitten::new();
+            let injury_result = handle_injury(
+                game, rng, &mut injury_type,
+                acting_player_obj.as_deref(), &defender_id,
+                defender_coord, None, None, ApothecaryMode::Feeding,
+            );
+
+            // Java: fEndTurn = UtilPlayer.hasBall(game, game.getDefender())
+            self.end_turn = UtilPlayer::has_ball(game, &defender_id);
+
+            // Java: publishParameter(INJURY_RESULT, injuryResultFeeding)
+            outcome = outcome.publish(StepParameter::InjuryResult(Box::new(injury_result)));
+
+            // Java: publishParameters(UtilServerInjury.dropPlayer(this, defender, ApothecaryMode.FEEDING))
+            let drop_params = drop_player(game, &defender_id, false);
+            for p in drop_params {
+                outcome = outcome.publish(p);
             }
-            do_next_step = true;
+
+            // DEFERRED(sound): SoundId.SLURP
+            game.acting_player.suffering_blood_lust = false;
+        } else {
+            // Java: bite spectator path
+            self.end_turn = true;
+
+            // Java: if (!isCasualty && base != KNOCKED_OUT && base != RESERVE)
+            let is_eligible = player_state.map(|s| {
+                !s.is_casualty() && s.base() != PS_KNOCKED_OUT && s.base() != PS_RESERVE
+            }).unwrap_or(false);
+
+            if is_eligible {
+                let player_coord = game.field_model.player_coordinate(&acting_id);
+                let ball_coord = game.field_model.ball_coordinate;
+
+                // Java: if (playerCoordinate.equals(ballCoordinate)) → ball scatter
+                if player_coord.is_some() && player_coord == ball_coord {
+                    game.field_model.ball_moving = true;
+                    outcome = outcome.publish(StepParameter::CatchScatterThrowInMode(
+                        CatchScatterThrowInMode::ScatterBall,
+                    ));
+                }
+
+                // Java: setPlayerState(actor, state.changeBase(RESERVE))
+                if let Some(s) = player_state {
+                    game.field_model.set_player_state(&acting_id, s.change_base(PS_RESERVE));
+                }
+                // DEFERRED(UtilBox): UtilBox.putPlayerIntoBox not yet ported
+                // DEFERRED(reports): ReportBiteSpectator not yet ported
+            }
         }
 
-        if do_next_step {
-            // Java: actingPlayer.setHasFed(true)
-            // TODO: add has_fed field to ActingPlayer
-            game.acting_player.has_acted = true;
-            StepOutcome::next()
-                .publish(StepParameter::EndPlayerAction(self.end_player_action))
-                .publish(StepParameter::EndTurn(self.end_turn))
-        } else {
-            StepOutcome::cont()
-        }
+        game.acting_player.has_fed = true;
+        game.acting_player.has_acted = true;
+        outcome
+            .publish(StepParameter::EndPlayerAction(self.end_player_action))
+            .publish(StepParameter::EndTurn(self.end_turn))
     }
 }
 
@@ -172,13 +196,31 @@ impl StepInitFeeding {
 mod tests {
     use super::*;
     use crate::step::framework::test_team;
-    use crate::step::framework::StepAction;
-    use ffb_model::enums::Rules;
+    use crate::step::framework::{StepAction, StepParameter};
+    use ffb_model::enums::{Rules, PS_RESERVE, PS_STANDING};
+    use ffb_model::enums::PlayerState;
+    use ffb_model::model::player::Player;
+    use ffb_model::enums::{PlayerType, PlayerGender};
+    use ffb_model::types::FieldCoordinate;
+    use std::collections::HashSet;
 
     fn make_game() -> Game {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2016)
+    }
+
+    fn add_player(game: &mut Game, id: &str, coord: FieldCoordinate) {
+        game.team_home.players.push(Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 4, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        game.field_model.set_player_coordinate(id, coord);
+        game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
     }
 
     #[test]
@@ -246,19 +288,15 @@ mod tests {
 
     #[test]
     fn already_fed_goes_to_label() {
-        // TODO: this test is a stub — ActingPlayer.has_fed not yet added.
-        // When has_fed is added, this test should set it true and assert GotoLabel.
-        // For now just verify the step doesn't panic.
         let mut step = StepInitFeeding::new();
         step.goto_label_on_end = Some("label_end".to_string());
         step.feeding_allowed = Some(true);
         let mut game = make_game();
         game.acting_player.player_id = Some("p1".to_string());
         game.acting_player.suffering_blood_lust = true;
-        // has_fed not available yet — will be cont (waiting for victim choice)
+        game.acting_player.has_fed = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
-        // Either GotoLabel (has_fed logic) or Continue (victim dialog) — don't panic
-        assert!(matches!(out.action, StepAction::GotoLabel | StepAction::Continue));
+        assert_eq!(out.action, StepAction::GotoLabel);
     }
 
     #[test]
@@ -269,12 +307,63 @@ mod tests {
         let mut game = make_game();
         game.acting_player.player_id = Some("p1".to_string());
         game.acting_player.suffering_blood_lust = true;
-        // Note: has_fed not yet on ActingPlayer; feeding_allowed=false bypasses that check
         let out = step.start(&mut game, &mut GameRng::new(0));
-        // Should bite spectator → fEndTurn=true → NextStep
         assert_eq!(out.action, StepAction::NextStep);
-        // end_turn should be published as true
         let has_end_turn = out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true)));
         assert!(has_end_turn);
+    }
+
+    #[test]
+    fn bite_spectator_sets_actor_to_reserve() {
+        let mut step = StepInitFeeding::new();
+        step.goto_label_on_end = Some("end".to_string());
+        step.feeding_allowed = Some(false);
+        let mut game = make_game();
+        let actor_coord = FieldCoordinate::new(5, 5);
+        add_player(&mut game, "vampire", actor_coord);
+        game.acting_player.player_id = Some("vampire".to_string());
+        game.acting_player.suffering_blood_lust = true;
+        let _ = step.start(&mut game, &mut GameRng::new(0));
+        let state = game.field_model.player_state("vampire");
+        assert_eq!(state.map(|s| s.base()), Some(PS_RESERVE));
+    }
+
+    #[test]
+    fn feed_on_player_clears_blood_lust_and_publishes_injury_result() {
+        let mut step = StepInitFeeding::new();
+        step.goto_label_on_end = Some("end".to_string());
+        step.feeding_allowed = Some(true);
+        step.feed_on_player_choice = Some(true);
+        let mut game = make_game();
+        let actor_coord = FieldCoordinate::new(5, 5);
+        let victim_coord = FieldCoordinate::new(6, 5);
+        add_player(&mut game, "vampire", actor_coord);
+        add_player(&mut game, "victim", victim_coord);
+        game.acting_player.player_id = Some("vampire".to_string());
+        game.acting_player.suffering_blood_lust = true;
+        game.defender_id = Some("victim".to_string());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!game.acting_player.suffering_blood_lust);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))));
+    }
+
+    #[test]
+    fn bite_spectator_at_ball_sets_ball_moving() {
+        let mut step = StepInitFeeding::new();
+        step.goto_label_on_end = Some("end".to_string());
+        step.feeding_allowed = Some(false);
+        let mut game = make_game();
+        let actor_coord = FieldCoordinate::new(5, 5);
+        add_player(&mut game, "vampire", actor_coord);
+        game.acting_player.player_id = Some("vampire".to_string());
+        game.acting_player.suffering_blood_lust = true;
+        game.field_model.ball_coordinate = Some(actor_coord);
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = false;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.field_model.ball_moving);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(_))));
     }
 }

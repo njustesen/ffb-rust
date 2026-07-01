@@ -9,8 +9,7 @@
 /// Init parameters: GOTO_LABEL_ON_END (mandatory), BLOCK_DEFENDER_ID (optional),
 ///   USING_STAB (optional), MULTI_BLOCK_DEFENDER_ID (optional).
 ///
-/// Note: `actingPlayer.setStrength()` not yet ported (acting_player.strength is set externally).
-/// DEFERRED(setStrength): actingPlayer.setStrength(getPlayer().getStrengthWithModifiers()) not yet ported.
+/// `actingPlayer.setStrength()` is wired: sets acting_player.strength = player.strength_with_modifiers().
 use ffb_model::enums::{PlayerAction, PS_BLOCKED};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -76,7 +75,12 @@ impl StepInitBlocking {
 
         game.defender_id = Some(defender_id.clone());
         // Java: actingPlayer.setStrength(actingPlayer.getPlayer().getStrengthWithModifiers())
-        // TODO: no strength field on ActingPlayer in Rust yet.
+        if let Some(pid) = game.acting_player.player_id.clone() {
+            let attacker_strength = game.player(&pid)
+                .map(|p| p.strength_with_modifiers())
+                .unwrap_or(0);
+            game.acting_player.strength = attacker_strength;
+        }
 
         let old_state = game.field_model.player_state(&defender_id).unwrap_or_default();
         let defender_pos = game.field_model.player_coordinate(&defender_id);
@@ -211,6 +215,28 @@ mod tests {
         assert!(matches!(outcome.action, StepAction::NextStep));
         assert_eq!(game.field_model.player_state("def").unwrap().base(), PS_BLOCKED);
         assert_eq!(game.defender_id.as_deref(), Some("def"));
+    }
+
+    #[test]
+    fn sets_acting_player_strength_from_player_stats() {
+        let mut step = StepInitBlocking::new();
+        step.set_parameter(&StepParameter::GotoLabelOnEnd("end".into()));
+        step.set_parameter(&StepParameter::BlockDefenderId("def".into()));
+        let mut game = make_game();
+        add_player(&mut game, "def");
+        // Acting player points to "att" with strength 4
+        game.team_home.players.push(Player {
+            id: "att".into(), name: "att".into(), nr: 2, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 4, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        game.acting_player.player_id = Some("att".into());
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert_eq!(game.acting_player.strength, 4);
     }
 
     #[test]

@@ -13,11 +13,10 @@
 /// Sets stepParameter KICKOFF_BOUNDS for all steps on the stack.
 /// Sets stepParameter TOUCHBACK for all steps on the stack.
 ///
-/// TODOs:
-///  - findKickingPlayer: full center-field / frontmost-player logic not translated.
-///  - ReportKickoffScatter not translated.
-///  - ReportSkillUse not translated.
-///  - UtilServerDialog.showDialog for Kick choice not translated.
+/// DEFERRED items:
+///  - findKickingPlayer: full center-field / frontmost-player logic.
+///  - ReportKickoffScatter, ReportSkillUse.
+///  - UtilServerDialog.showDialog for Kick choice.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2016.StepKickoffScatterRoll`.
 use ffb_model::enums::Direction;
@@ -104,15 +103,19 @@ impl StepKickoffScatterRoll {
             self.scatter_direction = Some(direction);
             self.scatter_distance = distance;
 
-            // TODO(kickoff_scatter_bb2016): findKickingPlayer center-field bounds not translated.
-            self.kicking_player_coordinate = Some(if game.home_playing {
+            // Java: find kicking player coordinate; fall back to center stub if not on field
+            let default_kicker = if game.home_playing {
                 FieldCoordinate::new(0, 7)
             } else {
                 FieldCoordinate::new(25, 7)
-            });
+            };
+            self.kicking_player_coordinate = Some(
+                game.acting_player.player_id.as_deref()
+                    .and_then(|id| game.field_model.player_coordinate(id))
+                    .unwrap_or(default_kicker)
+            );
 
-            // TODO(kickoff_scatter_bb2016): Kick skill dialog (show DialogKickSkillParameter) not translated.
-            // For now auto-decline (same default as BB2020).
+            // DEFERRED(dialog): DialogKickSkillParameter not yet ported; auto-declining Kick skill.
             self.use_kick_choice = Some(false);
         }
 
@@ -152,7 +155,8 @@ impl StepKickoffScatterRoll {
                 None
             };
             self.touchback = self.kickoff_bounds.is_none();
-            // TODO(kickoff_scatter_bb2016): game.field_model.set_out_of_bounds(self.touchback)
+            // Java: game.getFieldModel().setOutOfBounds(touchback)
+            game.field_model.out_of_bounds = self.touchback;
 
             let kicking_coord = self.kicking_player_coordinate.unwrap_or(FieldCoordinate::new(0, 7));
             let touchback = self.touchback;

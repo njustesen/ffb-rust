@@ -69,7 +69,7 @@ impl Step for StepThrowTeamMate {
 
     fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: CLIENT_USE_SKILL -> handleSkillCommand (re-roll / Bullseye) -> executeStep
-        // TODO: detect UseSkill action, update using_bullseye / re-roll fields
+        // DEFERRED: detect UseSkill action, update using_bullseye / re-roll fields
         self.execute_step(game, rng)
     }
 
@@ -85,7 +85,7 @@ impl Step for StepThrowTeamMate {
 
 impl StepThrowTeamMate {
     fn execute_step(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO: executeStepHooks(this, state) — hooks perform throw roll and routing.
+        // DEFERRED: executeStepHooks(this, state) — hooks perform throw roll and routing.
         //
         // Hook logic summary (StepThrowTeamMateHook):
         //   thrower = game.actingPlayer.player

@@ -31,12 +31,12 @@
 ///   - CLIENT_USE_APOTHECARY → mark specific player's apo; decrement remaining apos
 ///   - CLIENT_USE_IGORS → process igor selections
 ///
-/// TODO(apo-multiple-injury): InjuryResult, ApothecaryStatus, ApothecaryType fully deferred.
-/// TODO(apo-multiple-dialog): All dialog parameters (DialogUseApothecariesParameter etc.) deferred.
-/// TODO(apo-multiple-roll): rollApothecary(), remainingApos(), useApo() deferred.
-/// TODO(apo-multiple-regen): UtilServerInjury.handleRegeneration() / side effects deferred.
-/// TODO(apo-multiple-igor): DialogUseMortuaryAssistantsParameter / Igor inducement handling deferred.
-/// TODO(apo-multiple-init): ACTING_TEAM → teamId resolution from game state deferred.
+/// DEFERRED(apo-multiple-injury): InjuryResult, ApothecaryStatus, ApothecaryType fully deferred.
+/// DEFERRED(apo-multiple-dialog): All dialog parameters (DialogUseApothecariesParameter etc.) deferred.
+/// DEFERRED(apo-multiple-roll): rollApothecary(), remainingApos(), useApo() deferred.
+/// DEFERRED(apo-multiple-regen): UtilServerInjury.handleRegeneration() / side effects deferred.
+/// DEFERRED(apo-multiple-igor): DialogUseMortuaryAssistantsParameter / Igor inducement handling deferred.
+/// DEFERRED(apo-multiple-init): ACTING_TEAM → teamId resolution from game state deferred.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -76,16 +76,16 @@ impl StepApothecaryMultiple {
             return StepOutcome::next();
         }
 
-        // TODO(apo-multiple-dialog): UtilServerDialog.hideDialog(getGameState())
-        // TODO(apo-multiple-injury): group injuryResults by ApothecaryStatus
-        // TODO(apo-multiple-injury): DO_REQUEST → report; syncGameModel; build descriptions
+        // DEFERRED(apo-multiple-dialog): UtilServerDialog.hideDialog(getGameState())
+        // DEFERRED(apo-multiple-injury): group injuryResults by ApothecaryStatus
+        // DEFERRED(apo-multiple-injury): DO_REQUEST → report; syncGameModel; build descriptions
         //   if remainingApos > 0 → WAIT_FOR_APOTHECARY_USE → showDialog → Continue
-        // TODO(apo-multiple-roll): USE_APOTHECARY → rollApothecary → if choice → Continue
-        // TODO(apo-multiple-injury): DO_NOT_USE_APOTHECARY → addReport(ReportApothecaryRoll)
-        // TODO(apo-multiple-injury): NO_APOTHECARY → injuryResult.report(this)
-        // TODO(apo-multiple-regen): regeneration inducement types; igor/mortuary-assistants dialog
-        // TODO(apo-multiple-injury): apply all non-igor results; doubleAttackerDown edge case
-        // TODO(apo-multiple-regen): UtilServerInjury.handleInjurySideEffects
+        // DEFERRED(apo-multiple-roll): USE_APOTHECARY → rollApothecary → if choice → Continue
+        // DEFERRED(apo-multiple-injury): DO_NOT_USE_APOTHECARY → addReport(ReportApothecaryRoll)
+        // DEFERRED(apo-multiple-injury): NO_APOTHECARY → injuryResult.report(this)
+        // DEFERRED(apo-multiple-regen): regeneration inducement types; igor/mortuary-assistants dialog
+        // DEFERRED(apo-multiple-injury): apply all non-igor results; doubleAttackerDown edge case
+        // DEFERRED(apo-multiple-regen): UtilServerInjury.handleInjurySideEffects
 
         // Stub: advance immediately until injury infrastructure is ported.
         StepOutcome::next()
@@ -102,13 +102,13 @@ impl Step for StepApothecaryMultiple {
     fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: init(StepParameterSet) runs at construction; we resolve teamId here at start()
         // since we need the game state.
-        // TODO(apo-multiple-init): resolve teamId from acting_team flag + game.getActingTeam()
+        // DEFERRED(apo-multiple-init): resolve teamId from acting_team flag + game.getActingTeam()
         if self.team_id.is_none() {
             if let Some(acting) = self.acting_team {
                 if acting {
-                    // TODO: self.team_id = Some(game.acting_team_id().clone())
+                    // DEFERRED: self.team_id = Some(game.acting_team_id().clone())
                 } else {
-                    // TODO: self.team_id = Some(game.other_team_id().clone())
+                    // DEFERRED: self.team_id = Some(game.other_team_id().clone())
                 }
             }
         }
@@ -122,14 +122,14 @@ impl Step for StepApothecaryMultiple {
         // Java: CLIENT_USE_IGORS → process igor injury descriptions
         match action {
             Action::UseApothecary { player_id, use_apothecary } => {
-                // TODO(apo-multiple-injury): find matching injury result by player_id;
+                // DEFERRED(apo-multiple-injury): find matching injury result by player_id;
                 //   if use_apothecary: check remainingApos; set USE_APOTHECARY / DO_NOT_USE_APOTHECARY
                 //   else: set DO_NOT_USE_APOTHECARY
                 let _ = (player_id, use_apothecary);
             }
             Action::Acknowledge => {
                 // Java: CLIENT_USE_APOTHECARIES → all WAIT_FOR_APOTHECARY_USE → DO_NOT_USE_APOTHECARY
-                // TODO(apo-multiple-injury): update all matching injury results
+                // DEFERRED(apo-multiple-injury): update all matching injury results
             }
             _ => {}
         }
@@ -145,7 +145,7 @@ impl Step for StepApothecaryMultiple {
             }
             // Java: StepParameterKey.INJURY_RESULT → add if player belongs to teamId
             StepParameter::InjuryResult(r) => {
-                // TODO(apo-multiple-injury): check r.injuryContext().getDefenderId() ∈ teamId's players
+                // DEFERRED(apo-multiple-injury): check r.injuryContext().getDefenderId() ∈ teamId's players
                 self.injury_results.push(r.clone());
                 true
             }

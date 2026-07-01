@@ -7,7 +7,7 @@
 /// Init parameter: GOTO_LABEL_ON_FAILURE (mandatory).
 /// Sets stepParameter PASS_FUMBLE for all steps on the stack.
 ///
-/// TODO(HailMaryPass-hooks): executeStepHooks infrastructure not yet ported — roll logic deferred.
+/// DEFERRED(hooks): executeStepHooks infrastructure not yet ported — roll logic deferred.
 use ffb_model::enums::PassResult;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -34,7 +34,7 @@ impl StepHailMaryPass {
     }
 
     fn execute_step(&self, _game: &mut Game) -> StepOutcome {
-        // TODO(HailMaryPass-hooks): executeStepHooks not yet ported;
+        // DEFERRED(hooks): executeStepHooks not yet ported;
         // the hooks roll the pass, handle re-rolls, publish PASS_FUMBLE, and goto on failure.
         StepOutcome::next()
     }

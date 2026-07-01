@@ -15,9 +15,9 @@ use crate::step::framework::{StepId, StepParameter};
 /// Delegates to `executeStepHooks(this, state)` in Java, meaning all logic lives in
 /// hook implementations (not in the step itself).
 ///
-/// TODO: executeStepHooks not yet ported — stub always emits NEXT_STEP.
-/// TODO: shadow eligibility check (UtilPlayer.findEligibleShadowers etc.) not yet ported.
-/// TODO: re-roll (AbstractStepWithReRoll) not yet ported.
+/// DEFERRED(executeStepHooks): all shadowing logic lives in hook implementations attached to the
+/// game state (eligibility check, shadower movement, RE_ROLL_USED publishing). The hook dispatch
+/// system is not yet ported — stub always emits NEXT_STEP.
 pub struct StepShadowing {
     /// Java: state.coordinateFrom
     pub coordinate_from: Option<FieldCoordinate>,
@@ -59,11 +59,27 @@ impl Step for StepShadowing {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // TODO: CLIENT_PLAYER_CHOICE → SHADOWING mode:
-        //       state.usingShadowing = StringTool.isProvided(playerId)
-        //       if defenderId == playerId → state.shadowerWasPreviousDefender = true
-        //       else → game.setDefenderId(playerId)
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: case CLIENT_PLAYER_CHOICE:
+        //   if PlayerChoiceMode.SHADOWING == playerChoiceMode:
+        //     state.usingShadowing = StringTool.isProvided(playerId)
+        //     if defenderId provided && defenderId == playerId → shadowerWasPreviousDefender = true
+        //     else → game.setDefenderId(playerId)
+        if let Action::PlayerChoice { player_id, mode, .. } = action {
+            if mode == "SHADOWING" {
+                self.using_shadowing = Some(player_id.is_some());
+                if let Some(ref pid) = player_id {
+                    let is_previous_defender = game.defender_id.as_deref()
+                        .map(|did| did == pid.as_str())
+                        .unwrap_or(false);
+                    if is_previous_defender {
+                        self.shadower_was_previous_defender = true;
+                    } else {
+                        game.defender_id = Some(pid.clone());
+                    }
+                }
+            }
+        }
         self.execute_step(game, rng)
     }
 
@@ -87,8 +103,7 @@ impl StepShadowing {
     fn execute_step(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: getGameState().executeStepHooks(this, state)
         // All shadowing logic is in hook implementations attached to the game state.
-        // TODO: executeStepHooks — shadow eligibility, opponent selection dialog,
-        //       movement of shadower, RE_ROLL_USED publishing
+        // DEFERRED(executeStepHooks): hook dispatch system not yet ported.
         StepOutcome::next()
     }
 }

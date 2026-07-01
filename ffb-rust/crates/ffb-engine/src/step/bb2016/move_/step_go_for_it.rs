@@ -4,7 +4,6 @@ use ffb_model::enums::PlayerAction;
 use ffb_model::enums::ReRollSource;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
-use crate::drop_player_context::SteadyFootingContext;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::abstract_step_with_re_roll::{ReRollState, find_skill_reroll_source};
@@ -25,10 +24,6 @@ use ffb_mechanics::modifiers::go_for_it_context::GoForItContext;
 ///   pushCurrentStepOnStack (Repeat) for a second GFI.
 /// - Publishes INJURY_TYPE(InjuryTypeDropGFI) instead of STEADY_FOOTING_CONTEXT.
 ///
-/// TODO(blitzUsed): game.getTurnData().setBlitzUsed(true) and currentMove increment not yet ported.
-/// TODO(isNextMoveGoingForIt): actingPlayer.setGoingForIt(isNextMoveGoingForIt) not yet ported.
-/// TODO(secondGoForIt): succeedGfi second-GFI-for-jumping push not yet ported.
-/// TODO(injuryType): failGfi publishes INJURY_TYPE not STEADY_FOOTING_CONTEXT (ported as InjuryTypeName).
 pub struct StepGoForIt {
     /// Java: fGotoLabelOnFailure
     pub goto_label_on_failure: String,
@@ -100,8 +95,22 @@ impl StepGoForIt {
             return StepOutcome::next();
         }
 
-        // TODO(blitzUsed): if BLITZ && reRolledAction==null → setBlitzUsed(true), increment currentMove
-        // TODO(isNextMoveGoingForIt): actingPlayer.setGoingForIt(UtilPlayer.isNextMoveGoingForIt)
+        // Java: if (BLITZ == actingPlayer.getPlayerAction()) && (getReRolledAction() == null)
+        //         → setBlitzUsed(true), increment currentMove, recompute goingForIt
+        let is_blitz = game.acting_player.player_action == Some(PlayerAction::Blitz);
+        let not_rerolled = self.re_roll_state.re_rolled_action.is_none();
+        if is_blitz && not_rerolled {
+            game.turn_data_mut().blitz_used = true;
+            game.acting_player.current_move += 1;
+            // Java: actingPlayer.setGoingForIt(UtilPlayer.isNextMoveGoingForIt(game))
+            let ma = player_id.as_deref()
+                .and_then(|id| game.player(id))
+                .map(|p| p.movement as i32)
+                .unwrap_or(4);
+            use crate::util::movement_calc::MovementCalc;
+            game.acting_player.goes_for_it =
+                MovementCalc::is_next_move_going_for_it(game.acting_player.current_move, ma);
+        }
 
         let going_for_it = game.acting_player.goes_for_it;
         let current_move = game.acting_player.current_move;
@@ -154,8 +163,19 @@ impl StepGoForIt {
         let successful = self.roll >= minimum_roll;
 
         if successful {
-            // TODO(secondGoForIt): if jumping && currentMove > MA+1 && !secondGoForIt
-            //   → secondGoForIt=true, setReRolledAction(null), pushCurrentStepOnStack (Repeat)
+            // Java: if (actingPlayer.isJumping() && currentMove > MA+1 && !fSecondGoForIt)
+            //         → fSecondGoForIt=true, setReRolledAction(null), pushCurrentStepOnStack (Repeat)
+            let jumping = game.acting_player.jumping;
+            let current_move = game.acting_player.current_move;
+            let ma = player_id.as_deref()
+                .and_then(|id| game.player(id))
+                .map(|p| p.movement as i32)
+                .unwrap_or(4);
+            if jumping && current_move > ma + 1 && !self.second_go_for_it {
+                self.second_go_for_it = true;
+                self.re_roll_state.re_rolled_action = None;
+                return StepOutcome::repeat();
+            }
             return StepOutcome::next();
         }
 
@@ -193,12 +213,10 @@ impl StepGoForIt {
             game.acting_player.fell_from_rush = true;
         }
         // Java: publishParameter(INJURY_TYPE, new InjuryTypeDropGFI())
-        // We publish as InjuryTypeName per the Rust convention, wrapped in SteadyFootingContext
-        let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeDropGFI".into());
         let label = self.goto_label_on_failure.clone();
         StepOutcome::goto(&label)
             .publish(StepParameter::EndTurn(true))
-            .publish(StepParameter::SteadyFootingContext(Box::new(ctx)))
+            .publish(StepParameter::InjuryTypeName("InjuryTypeDropGFI".into()))
     }
 }
 
@@ -371,5 +389,68 @@ mod tests {
     fn unrecognised_parameter_returns_false() {
         let mut step = StepGoForIt::new("fail".into());
         assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
+    }
+
+    #[test]
+    fn blitz_action_sets_blitz_used_and_increments_current_move() {
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Blitz);
+        game.acting_player.goes_for_it = true;
+        game.acting_player.current_move = 10; // well past MA(4)+1 → GFI
+        let mut step = StepGoForIt::new("fail".into());
+        step.roll = 4; // success
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.turn_data().blitz_used, "blitz_used should be set on BLITZ action");
+    }
+
+    #[test]
+    fn blitz_action_does_not_set_blitz_used_when_already_rerolled() {
+        // Java: only sets blitzUsed if reRolledAction == null
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Blitz);
+        game.acting_player.goes_for_it = true;
+        game.acting_player.current_move = 10;
+        let mut step = StepGoForIt::new("fail".into());
+        step.roll = 4;
+        use ffb_model::model::re_rolled_action::ReRolledAction;
+        step.re_roll_state.re_rolled_action = Some(ReRolledAction::new("GFI"));
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.turn_data().blitz_used, "blitz_used should NOT be set when already rerolled");
+    }
+
+    #[test]
+    fn second_go_for_it_repeat_on_jumping_player() {
+        // Java: if jumping && currentMove > MA+1 && !secondGoForIt → Repeat
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.goes_for_it = true;
+        game.acting_player.jumping = true;
+        game.acting_player.current_move = 6; // MA=4, so 6 > 4+1=5 → second GFI
+        let mut step = StepGoForIt::new("fail".into());
+        step.roll = 4; // success
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Repeat, "jumping player should trigger second GFI on first success");
+        assert!(step.second_go_for_it, "second_go_for_it flag should be set");
+    }
+
+    #[test]
+    fn second_go_for_it_not_triggered_if_already_set() {
+        // Once secondGoForIt is set, the next success returns NEXT_STEP
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.goes_for_it = true;
+        game.acting_player.jumping = true;
+        game.acting_player.current_move = 6;
+        let mut step = StepGoForIt::new("fail".into());
+        step.roll = 4;
+        step.second_go_for_it = true; // already done first repeat
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
     }
 }

@@ -55,12 +55,12 @@ impl StepBlitzTurn {
             game.turn_mode = TurnMode::Kickoff;
         } else {
             // First entry: set up the blitz turn for the kicking team.
-            // TODO: SetupMechanic.pinPlayersInTacklezones(gameState, blitzingTeam, true)
-            // TODO: UtilServerTimer.stopTurnTimer / startTurnTimer
-            // TODO: game.startTurn()
+            // DEFERRED: SetupMechanic.pinPlayersInTacklezones(gameState, blitzingTeam, true)
+            // DEFERRED: UtilServerTimer.stopTurnTimer / startTurnTimer
+            // DEFERRED: game.startTurn()
             game.turn_mode = TurnMode::Blitz;
-            // TODO: push self back onto the stack (StepStack::pushCurrentStep).
-            // TODO: push Select sequence for the blitzing team via SequenceGenerator::Select.
+            // DEFERRED: push self back onto the stack (StepStack::pushCurrentStep).
+            // DEFERRED: push Select sequence for the blitzing team via SequenceGenerator::Select.
         }
         StepOutcome::next()
     }

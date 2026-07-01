@@ -45,7 +45,7 @@ impl StepQuickBite {
     fn execute_step(&mut self, _game: &mut Game) -> StepOutcome {
         // Java: full logic requires UtilPlayer.findAdjacentOpposingPlayersWithProperty,
         //   UtilServerInjury.handleInjury, and dialog utilities.
-        // TODO(skill/injury port):
+        // DEFERRED(skill/injury port):
         //   1. Find adjacent opponents with canAttackOpponentForBallAfterCatch
         //   2. Show appropriate dialog
         //   3. If use_skill=true: run injury, publish DropPlayerContext

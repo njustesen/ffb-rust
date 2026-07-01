@@ -6,7 +6,7 @@ use crate::step::framework::{StepId, StepParameter};
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.shared.StepGettingEven.
 /// Opposing team may use their apothecary after a casualty (Getting Even apothecary rule).
-/// TODO: opposing apo dialog not yet ported.
+/// DEFERRED: opposing apo dialog not yet ported.
 pub struct StepGettingEven {
     /// Java: playerId
     pub player_id: Option<String>,
@@ -48,7 +48,7 @@ impl Step for StepGettingEven {
 
 impl StepGettingEven {
     fn execute_step(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO: offer opposing apothecary, handle choice.
+        // DEFERRED: offer opposing apothecary, handle choice.
         StepOutcome::next()
     }
 }

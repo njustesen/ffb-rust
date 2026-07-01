@@ -54,9 +54,9 @@ impl StepInitKickoff {
             game.home_playing = if game.home_first_offense { game.half % 2 == 0 } else { game.half % 2 > 0 };
             game.field_model.ball_coordinate = None;
             game.field_model.ball_in_play = false;
-            // TODO: apothecaries, rerolls, leader state, special skills, inducements reset
+            // DEFERRED: apothecaries, rerolls, leader state, special skills, inducements reset
             game.turn_mode = TurnMode::Setup;
-            // TODO: startTurn(), prepareForSetup()
+            // DEFERRED: startTurn(), prepareForSetup()
         }
 
         // Java: push Inducement(BEFORE_SETUP, !home_playing) then Inducement(BEFORE_SETUP, home_playing).

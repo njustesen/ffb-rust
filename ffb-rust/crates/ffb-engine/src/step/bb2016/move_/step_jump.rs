@@ -8,6 +8,8 @@ use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::abstract_step_with_re_roll::ReRollState;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use ffb_mechanics::bb2016::jump_mechanic::JumpMechanic;
+use ffb_mechanics::jump_mechanic::JumpMechanic as JumpMechanicTrait;
 use ffb_mechanics::mechanics::minimum_roll_jump;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2016.move.StepJump.
@@ -28,9 +30,10 @@ use ffb_mechanics::mechanics::minimum_roll_jump;
 /// - Success → clear jumping, NEXT_STEP + JUMPED(true)
 /// - Failure → TRR offer if available, else fail_jump: GOTO_LABEL + COORDINATE_FROM
 ///
+/// BB2016 JumpModifierCollection is empty (confirmed Java source) → &[] is correct.
+/// BB2016 agility_with_modifiers() == agility (no stat-injury pipeline yet).
 /// DEFERRED(hooks): executeStepHooks infrastructure not yet ported.
-/// DEFERRED(canStillJump): BB2016 JumpMechanic.canStillJump() not yet ported.
-/// DEFERRED(gazeModifiers): JumpModifierFactory not yet ported for BB2016.
+/// canStillJump: wired via BB2016 JumpMechanic.
 /// DEFERRED(divingTackle): checkDivingTackle dialog not yet ported.
 pub struct StepJump {
     /// Java: StepState.goToLabelOnFailure
@@ -66,7 +69,7 @@ impl Step for StepJump {
         if let Action::UseReRoll { use_reroll: false } = action {
             self.re_roll_state.re_roll_source = None;
         }
-        // TODO(divingTackle): CLIENT_PLAYER_CHOICE DIVING_TACKLE mode not yet ported.
+        // DEFERRED(divingTackle): CLIENT_PLAYER_CHOICE DIVING_TACKLE mode not yet ported.
         self.execute_step(game, rng)
     }
 
@@ -80,9 +83,10 @@ impl Step for StepJump {
 
 impl StepJump {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // Java: doLeap = actingPlayer.isJumping()
-        // TODO(canStillJump): mechanic.canStillJump(game, actingPlayer) not yet ported
-        let do_leap = game.acting_player.jumping;
+        // Java: doLeap = actingPlayer.isJumping() && mechanic.canStillJump(game, actingPlayer)
+        let mechanic = JumpMechanic::new();
+        let do_leap = game.acting_player.jumping
+            && mechanic.can_still_jump(game, &game.acting_player.clone());
 
         if !do_leap {
             return StepOutcome::next();
@@ -108,13 +112,12 @@ impl StepJump {
         }
 
         let player_id = game.acting_player.player_id.clone();
-        // TODO(gazeModifiers): use BB2016 JumpModifierFactory — for now use plain agility
+        // BB2016 JumpModifierCollection is empty → no modifiers apply.
+        // agility_with_modifiers() == agility in current model.
         let agility = player_id.as_deref()
             .and_then(|id| game.player(id))
-            .map(|p| p.agility as i32)
+            .map(|p| p.agility_with_modifiers())
             .unwrap_or(3);
-
-        // TODO(agilityWithModifiers): BB2016 uses agility, not agility_with_modifiers
         let minimum_roll = minimum_roll_jump(agility, &[]);
         let successful = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
 
@@ -154,8 +157,9 @@ mod tests {
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::{StepAction, StepParameter};
-    use ffb_model::enums::{Rules, TurnMode};
+    use ffb_model::enums::{Rules, SkillId, TurnMode};
     use ffb_model::model::player::Player;
+    use ffb_model::model::skill_def::SkillWithValue;
     use ffb_model::enums::{PlayerType, PlayerGender};
     use ffb_model::types::FieldCoordinate;
     use ffb_model::util::rng::GameRng;
@@ -172,7 +176,8 @@ mod tests {
             id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
             player_type: PlayerType::Regular, gender: PlayerGender::Male,
             movement: 4, strength: 3, agility: 3, passing: 4, armour: 8,
-            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            starting_skills: vec![SkillWithValue::new(SkillId::Leap)],
+            extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
         });
@@ -184,6 +189,27 @@ mod tests {
     fn not_jumping_returns_next_step() {
         let mut game = make_game();
         game.acting_player.jumping = false;
+        let mut step = StepJump::new("fail".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn jumping_without_leap_skill_returns_next_step() {
+        // canStillJump requires unused Leap skill — no skill → skip jump
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 4, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], // no Leap skill
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 5));
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.jumping = true;
         let mut step = StepJump::new("fail".into());
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);

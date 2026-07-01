@@ -18,11 +18,15 @@
 ///   3. While away_choices < nr_of_away_mvps: show dialog → coach picks N; engine picks 1.
 ///   4. After all choices → award + report + NEXT_STEP.
 ///
-/// TODO(mvp-options): GameOptionId.EXTRA_MVP, MVP_NOMINATIONS deferred (options not yet ported).
-/// TODO(mvp-dialog): DialogPlayerChoiceParameter + UtilServerDialog.showDialog deferred.
-/// TODO(mvp-filter): PlayerType (STAR/MERCENARY/INFAMOUS_STAFF) filter deferred.
-/// TODO(mvp-filter-state): PlayerState.isKilled() / base == MISSING filter deferred.
-/// TODO(mvp-report): ReportMostValuablePlayers deferred.
+/// extraMvp option → wired (+1 each per team). mvpNominations option → wired (get_int).
+///   defaulting to 1 MVP per team, 0 nominations.
+/// DEFERRED(mvp-dialog): DialogPlayerChoiceParameter(MVP) + UtilServerDialog.showDialog —
+///   waiting for dialog infrastructure.
+/// PlayerType (STAR/MERCENARY/INFAMOUS_STAFF) filter → wired. isKilled()/MISSING filter → wired.
+/// DEFERRED(mvp-dialog): DialogPlayerChoiceParameter(MVP) + UtilServerDialog.showDialog —
+///   waiting for dialog infrastructure.
+/// DEFERRED(mvp-report): ReportMostValuablePlayers — report infrastructure not yet translated.
+use ffb_model::enums::{PlayerType, PS_RIP, PS_MISSING};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -67,7 +71,11 @@ impl StepMvp {
         if self.nr_of_home_mvps == 0 && self.nr_of_away_mvps == 0 {
             self.nr_of_home_mvps = 1;
             self.nr_of_away_mvps = 1;
-            // TODO(mvp-options): if (UtilGameOption.isOptionEnabled(game, GameOptionId.EXTRA_MVP)) { +=1 each }
+            // Java: if (UtilGameOption.isOptionEnabled(game, GameOptionId.EXTRA_MVP)) { +=1 each }
+            if game.options.is_enabled("extraMvp") {
+                self.nr_of_home_mvps += 1;
+                self.nr_of_away_mvps += 1;
+            }
 
             // Java: if (gameResult.getTeamResultHome().hasConceded() && !game.isConcededLegally()) { home=0 }
             if game.game_result.home.conceded && !game.conceded_legally {
@@ -80,11 +88,11 @@ impl StepMvp {
         }
 
         // Java: int mvpNominations = UtilGameOption.getIntOption(game, GameOptionId.MVP_NOMINATIONS)
-        // TODO(mvp-options): retrieve actual MVP_NOMINATIONS option value; default 0 for now.
-        let mvp_nominations: i32 = 0;
+        let mvp_nominations: i32 = game.options.get_int("mvpNominations").unwrap_or(0);
 
         if mvp_nominations > 0 && !game.admin_mode {
-            // TODO(mvp-dialog): nominations flow — show dialog, handle CLIENT_PLAYER_CHOICE
+            // DEFERRED(mvp-dialog): nominations flow — show DialogPlayerChoiceParameter(MVP) —
+            //   waiting for dialog infrastructure.
 
             // Java: if (fHomePlayersNominated != null) { pick random; fNrOfHomeChoices++; clear nominated }
             if let Some(nominated) = self.home_players_nominated.take() {
@@ -111,7 +119,7 @@ impl StepMvp {
                         self.home_players_mvp.push(players[0].clone());
                         self.nr_of_home_choices += 1;
                     } else {
-                        // TODO(mvp-dialog): show DialogPlayerChoiceParameter(home, MVP, players, null, maxSelects, maxSelects)
+                        // DEFERRED(mvp-dialog): show DialogPlayerChoiceParameter(home, MVP, ...) — dialog infra not translated.
                         return StepOutcome::cont();
                     }
                 } else {
@@ -130,7 +138,7 @@ impl StepMvp {
                         self.away_players_mvp.push(players[0].clone());
                         self.nr_of_away_choices += 1;
                     } else {
-                        // TODO(mvp-dialog): show DialogPlayerChoiceParameter(away, MVP, players, null, maxSelects, maxSelects)
+                        // DEFERRED(mvp-dialog): show DialogPlayerChoiceParameter(away, MVP, ...) — dialog infra not translated.
                         return StepOutcome::cont();
                     }
                 } else {
@@ -169,7 +177,7 @@ impl StepMvp {
             // Java: for each home MVP: playerResultHome.setPlayerAwards(playerAwards + 1); mvpReport.addPlayerIdHome
             for pid in &self.home_players_mvp {
                 if !pid.is_empty() {
-                    // TODO(mvp-report): ReportMostValuablePlayers – add player id home
+                    // DEFERRED(mvp-report): ReportMostValuablePlayers – add player id home — report infra not translated.
                     let result = game.game_result.home.player_results.entry(pid.clone()).or_default();
                     result.mvp = true;
                 }
@@ -177,12 +185,12 @@ impl StepMvp {
             // Java: for each away MVP: playerResultAway.setPlayerAwards(playerAwards + 1); mvpReport.addPlayerIdAway
             for pid in &self.away_players_mvp {
                 if !pid.is_empty() {
-                    // TODO(mvp-report): ReportMostValuablePlayers – add player id away
+                    // DEFERRED(mvp-report): ReportMostValuablePlayers – add player id away — report infra not translated.
                     let result = game.game_result.away.player_results.entry(pid.clone()).or_default();
                     result.mvp = true;
                 }
             }
-            // TODO(mvp-report): getResult().addReport(mvpReport)
+            // DEFERRED(mvp-report): getResult().addReport(ReportMostValuablePlayers) — report infra not translated.
             return StepOutcome::next();
         }
 
@@ -190,16 +198,28 @@ impl StepMvp {
     }
 
     /// Java: `findPlayerIdsForMvp(game.getTeamHome())`
-    /// TODO(mvp-filter): filter STAR/MERCENARY/INFAMOUS_STAFF player types.
-    /// TODO(mvp-filter-state): filter isKilled() / base == MISSING.
     fn find_player_ids_for_mvp_home(&self, game: &Game) -> Vec<String> {
-        game.team_home.players.iter().map(|p| p.id.clone()).collect()
+        find_eligible_player_ids(game, true)
     }
 
     /// Java: `findPlayerIdsForMvp(game.getTeamAway())`
     fn find_player_ids_for_mvp_away(&self, game: &Game) -> Vec<String> {
-        game.team_away.players.iter().map(|p| p.id.clone()).collect()
+        find_eligible_player_ids(game, false)
     }
+}
+
+fn find_eligible_player_ids(game: &Game, home: bool) -> Vec<String> {
+    let team = if home { &game.team_home } else { &game.team_away };
+    team.players.iter()
+        .filter(|p| {
+            !matches!(p.player_type, PlayerType::Star | PlayerType::Mercenary | PlayerType::InfamousStaff)
+        })
+        .filter(|p| {
+            let state = game.field_model.player_state(&p.id);
+            !matches!(state.map(|s| s.base()), Some(b) if b == PS_RIP || b == PS_MISSING)
+        })
+        .map(|p| p.id.clone())
+        .collect()
 }
 
 impl Default for StepMvp {
@@ -216,7 +236,7 @@ impl Step for StepMvp {
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: CLIENT_PLAYER_CHOICE (PlayerChoiceMode.MVP) → sets home/away nominated players.
         // Rust: SelectPlayer is the closest available action; treat as home nomination for simplicity.
-        // TODO(mvp-dialog): properly route home vs away based on which side sent the command.
+        // DEFERRED(mvp-dialog): properly route home vs away based on which side sent the command.
         if let Action::SelectPlayer { player_id } = action {
             // Java: if (checkCommandIsFromHomePlayer) { fHomePlayersNominated = playerIds }
             //       else { fAwayPlayersNominated = playerIds }
@@ -313,5 +333,26 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         assert!(step.home_players_mvp.is_empty());
         assert!(step.away_players_mvp.is_empty());
+    }
+
+    #[test]
+    fn star_player_excluded_from_eligibility() {
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerGender};
+        use ffb_model::model::player::Player;
+        let mut game = make_game();
+        // Add a Star player — should be excluded from MVP candidates.
+        game.team_home.players.push(Player {
+            id: "star1".into(), name: "Star".into(), nr: 0, position_id: "star".into(),
+            player_type: PlayerType::Star, gender: PlayerGender::Male,
+            movement: 6, strength: 4, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        let mut step = StepMvp::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        // Star player should not be selected as MVP.
+        assert!(!step.home_players_mvp.contains(&"star1".to_string()));
     }
 }

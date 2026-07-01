@@ -115,7 +115,7 @@ mod tests {
     use ffb_model::enums::{Rules, PS_STANDING, PS_RESERVE};
     use ffb_model::model::player::Player;
     use ffb_model::enums::{PlayerType, PlayerGender};
-    use ffb_model::types::FieldCoordinate;
+    use ffb_model::types::{FieldCoordinate, MoveSquare};
     use ffb_model::util::rng::GameRng;
     use std::collections::HashSet;
 
@@ -194,7 +194,7 @@ mod tests {
     fn blood_lust_clears_move_squares() {
         let mut game = make_game();
         add_acting_player(&mut game, "p1");
-        game.field_model.move_squares.insert(FieldCoordinate::new(3, 3));
+        game.field_model.add_move_square(MoveSquare::new(FieldCoordinate::new(3, 3), 0, 0));
         game.acting_player.suffering_blood_lust = true;
         let mut step = StepFallDown::new();
         step.injury_type_name = Some("InjuryTypeDropGFI".into());

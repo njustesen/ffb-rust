@@ -27,7 +27,7 @@ use ffb_mechanics::modifiers::dodge_context::DodgeContext;
 /// Expects: COORDINATE_FROM, COORDINATE_TO, DODGE_ROLL, USING_BREAK_TACKLE,
 ///          USING_DIVING_TACKLE, RE_ROLL_USED published by preceding steps.
 ///
-/// DEFERRED(standFirmNoDropOption): STAND_FIRM_NO_DROP_ON_FAILED_DODGE game option not yet ported.
+/// standFirmNoDropOnFailedDodge game option → wired (NEXT_STEP + EndPlayerAction instead of failDodge).
 /// DEFERRED(usingBreakTackle): Break-Tackle dialog (canAddStrengthToDodge) not yet ported.
 /// DEFERRED(divingTackle): Diving Tackle pre-roll dialog not yet ported.
 /// DEFERRED(armBar): Arm-Bar choice dialog not yet ported.
@@ -82,8 +82,8 @@ impl Step for StepMoveDodge {
                 self.re_roll_state.re_roll_source = None;
                 self.execute_step(game, rng)
             }
-            // TODO(clientUseSkill): canAddStrengthToDodge / canChooseToIgnoreDodgeModifierAfterRoll not yet ported
-            // TODO(clientPlayerChoice): ARM_BAR mode not yet ported
+            // DEFERRED(BreakTackle): canAddStrengthToDodge not yet ported — skill use dialog skipped
+            // DEFERRED(ArmBar): CLIENT_PLAYER_CHOICE ARM_BAR mode not yet ported
             _ => self.execute_step(game, rng),
         }
     }
@@ -149,7 +149,6 @@ impl StepMoveDodge {
         let successful = DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll);
 
         if successful {
-            // TODO(standFirmNoDropOption): if STAND_FIRM_NO_DROP_ON_FAILED_DODGE option active → don't drop on next fail
             let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
                 .map(|a| a.name == "DODGE").unwrap_or(false)
                 && self.re_roll_state.re_roll_source.is_some();
@@ -181,12 +180,17 @@ impl StepMoveDodge {
             }
         }
 
+        // Java: if (UtilGameOption.isOptionEnabled(game, GameOptionId.STAND_FIRM_NO_DROP_ON_FAILED_DODGE))
+        if game.options.is_enabled("standFirmNoDropOnFailedDodge") {
+            return StepOutcome::next()
+                .publish(StepParameter::EndPlayerAction(true));
+        }
         self.fail_dodge()
     }
 
     fn fail_dodge(&self) -> StepOutcome {
         // Java: BB2016 uses InjuryTypeDropDodge (not InjuryTypeFallDown)
-        // TODO(armBar): Arm-Bar dialog can override injuryType to InjuryTypeArmBar
+        // DEFERRED(ArmBar): Arm-Bar dialog can override injuryType to InjuryTypeArmBar
         let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeDropDodge".into());
         let label = self.goto_label_on_failure.clone();
         StepOutcome::goto(&label)
@@ -353,5 +357,32 @@ mod tests {
     fn unrecognised_parameter_returns_false() {
         let mut step = StepMoveDodge::new("fail".into());
         assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
+    }
+
+    #[test]
+    fn stand_firm_no_drop_option_returns_next_step_on_failure() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        game.options.set("standFirmNoDropOnFailedDodge", "true");
+        add_player(&mut game, "p1");
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 1; // guaranteed fail
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))));
+    }
+
+    #[test]
+    fn stand_firm_no_drop_option_disabled_still_goes_to_failure_label() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        game.options.set("standFirmNoDropOnFailedDodge", "false");
+        add_player(&mut game, "p1");
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
     }
 }

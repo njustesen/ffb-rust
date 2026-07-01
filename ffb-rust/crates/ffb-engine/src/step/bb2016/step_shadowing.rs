@@ -93,7 +93,7 @@ impl StepShadowing {
     fn execute_step(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: getGameState().executeStepHooks(this, state)
         // All logic (AG check, position comparison, DivingTackle modifier) is in hooks.
-        // TODO: executeStepHooks — hook infrastructure not yet translated.
+        // DEFERRED(hooks): executeStepHooks (ShadowingHook — AG check, position, DivingTackle) not yet ported.
         StepOutcome::next()
     }
 }

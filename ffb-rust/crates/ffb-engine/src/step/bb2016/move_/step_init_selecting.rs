@@ -3,7 +3,7 @@ use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
-use crate::action::Action;
+use crate::action::{Action, PlayerActionChoice};
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::util_server_steps::change_player_action;
@@ -30,7 +30,7 @@ const MINIMUM_MOVE_TO_STAND_UP: i32 = 3;
 /// - else → prepareStandingUp, then NEXT_STEP if REMOVE_CONFUSION/STAND_UP/STAND_UP_BLITZ
 ///
 /// DEFERRED(updatePersistence): gameCache.queueDbUpdate not yet ported.
-/// DEFERRED(removeConfusion): REMOVE_CONFUSION / STAND_UP_BLITZ dispatch paths not yet ported.
+/// REMOVE_CONFUSION / STAND_UP / STAND_UP_BLITZ → NEXT_STEP path implemented.
 /// DEFERRED(timeoutEnforced): game.isTimeoutEnforced() not yet ported.
 pub struct StepInitSelecting {
     /// Java: fGotoLabelOnEnd (init param)
@@ -66,7 +66,7 @@ impl Step for StepInitSelecting {
 
     fn start(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: if (fUpdatePersistence) { fUpdatePersistence=false; gameCache.queueDbUpdate(...); }
-        // TODO(updatePersistence): queueDbUpdate not yet ported
+        // DEFERRED(persistence): gameCache.queueDbUpdate — persistence layer not yet ported
         self.update_persistence = false;
         // start() does NOT call executeStep — waits for a client command
         StepOutcome::cont()
@@ -158,6 +158,17 @@ impl Step for StepInitSelecting {
                 self.end_turn = true;
                 return self.execute_step(game, rng);
             }
+            // Java: CLIENT_ACTING_PLAYER — changePlayerAction then executeStep (no dispatchPlayerAction)
+            // This path fires for STAND_UP / STAND_UP_BLITZ / REMOVE_CONFUSION → NEXT_STEP in executeStep
+            Action::ActivatePlayer { player_id, player_action, .. } => {
+                let pa = pac_to_player_action(*player_action);
+                if game.is_active_team_player(player_id) {
+                    change_player_action(game, player_id, pa, false);
+                } else {
+                    self.end_player_action = true;
+                }
+                return self.execute_step(game, rng);
+            }
             _ => {}
         }
         StepOutcome::cont()
@@ -179,7 +190,7 @@ impl StepInitSelecting {
     pub fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         let label = self.goto_label_on_end.clone();
 
-        // TODO(timeoutEnforced): game.isTimeoutEnforced() not yet ported
+        // DEFERRED(timeout): game.isTimeoutEnforced() — timeout enforcement not yet ported
         if self.end_turn {
             return StepOutcome::goto(&label)
                 .publish(StepParameter::EndTurn(true));
@@ -206,9 +217,14 @@ impl StepInitSelecting {
             }
         }
 
-        // Java: prepareStandingUp() + NEXT_STEP for REMOVE_CONFUSION/STAND_UP/STAND_UP_BLITZ
+        // Java: prepareStandingUp(); then NEXT_STEP if REMOVE_CONFUSION/STAND_UP/STAND_UP_BLITZ
         self.prepare_standing_up(game);
-        StepOutcome::cont()
+        let action = game.acting_player.player_action;
+        if matches!(action, Some(PlayerAction::RemoveConfusion) | Some(PlayerAction::StandUp) | Some(PlayerAction::StandUpBlitz)) {
+            StepOutcome::next()
+        } else {
+            StepOutcome::cont()
+        }
     }
 
     fn prepare_standing_up(&self, game: &mut Game) {
@@ -245,9 +261,33 @@ impl StepInitSelecting {
     }
 }
 
+fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
+    match pac {
+        PlayerActionChoice::Move => PlayerAction::Move,
+        PlayerActionChoice::Blitz => PlayerAction::Blitz,
+        PlayerActionChoice::Block => PlayerAction::Block,
+        PlayerActionChoice::Stab => PlayerAction::Stab,
+        PlayerActionChoice::Foul => PlayerAction::Foul,
+        PlayerActionChoice::Pass => PlayerAction::Pass,
+        PlayerActionChoice::HandOff => PlayerAction::HandOver,
+        PlayerActionChoice::StandUp => PlayerAction::StandUp,
+        PlayerActionChoice::StandUpBlitz => PlayerAction::StandUpBlitz,
+        PlayerActionChoice::ThrowTeamMate => PlayerAction::ThrowTeamMate,
+        PlayerActionChoice::KickTeamMate => PlayerAction::KickTeamMate,
+        PlayerActionChoice::HypnoticGaze => PlayerAction::Gaze,
+        PlayerActionChoice::ThrowBomb => PlayerAction::ThrowBomb,
+        PlayerActionChoice::Swoop => PlayerAction::Swoop,
+        PlayerActionChoice::Punt => PlayerAction::Punt,
+        PlayerActionChoice::BreatheFire => PlayerAction::BreatheFire,
+        PlayerActionChoice::ProjectileVomit => PlayerAction::ProjectileVomit,
+        PlayerActionChoice::SecureTheBall => PlayerAction::SecureTheBall,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::action::PlayerActionChoice;
     use crate::step::framework::test_team;
     use crate::step::framework::{StepAction, StepParameter};
     use ffb_model::enums::Rules;
@@ -459,5 +499,60 @@ mod tests {
         let out = step.handle_command(&action, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::BlockDefenderId(_))));
+    }
+
+    fn activate_player_action(game: &mut Game, step: &mut StepInitSelecting, pac: PlayerActionChoice) -> StepOutcome {
+        let rng = &mut GameRng::new(0);
+        let action = Action::ActivatePlayer { player_id: "p1".into(), player_action: pac, block_defender_id: None };
+        step.handle_command(&action, game, rng)
+    }
+
+    #[test]
+    fn stand_up_action_returns_next_step() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("p1".into());
+        game.team_home.players.push(ffb_model::model::player::Player { id: "p1".into(), ..Default::default() });
+        let mut step = StepInitSelecting::new("end".into());
+        let out = activate_player_action(&mut game, &mut step, PlayerActionChoice::StandUp);
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn remove_confusion_via_activate_returns_next_step() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("p1".into());
+        game.team_home.players.push(ffb_model::model::player::Player { id: "p1".into(), ..Default::default() });
+        let mut step = StepInitSelecting::new("end".into());
+        // RemoveConfusion doesn't have a PlayerActionChoice variant — use StandUp as a proxy
+        // for the else-NEXT_STEP branch; RemoveConfusion is set via set_parameter
+        game.acting_player.player_action = Some(PlayerAction::RemoveConfusion);
+        let rng = &mut GameRng::new(0);
+        let out = step.execute_step(&mut game, rng);
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn stand_up_blitz_action_returns_next_step() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("p1".into());
+        game.team_home.players.push(ffb_model::model::player::Player { id: "p1".into(), ..Default::default() });
+        let mut step = StepInitSelecting::new("end".into());
+        let out = activate_player_action(&mut game, &mut step, PlayerActionChoice::StandUpBlitz);
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn move_action_via_activate_returns_cont_waiting_for_move_command() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("p1".into());
+        game.team_home.players.push(ffb_model::model::player::Player { id: "p1".into(), ..Default::default() });
+        let mut step = StepInitSelecting::new("end".into());
+        let out = activate_player_action(&mut game, &mut step, PlayerActionChoice::Move);
+        // MOVE via ActivatePlayer → executeStep with no dispatch → cont (waits for CLIENT_MOVE)
+        assert_eq!(out.action, StepAction::Continue);
     }
 }

@@ -92,7 +92,7 @@ impl StepDumpOff {
         if using {
             // Java: save old turn mode, switch to DumpOff, set thrower, push Pass sequence.
             // Stub: emit SkillUse(true), set turn mode / thrower fields, return NEXT_STEP.
-            // TODO: push Pass sequence via SequenceGenerator when step stack is translated.
+            // DEFERRED: push Pass sequence via SequenceGenerator when step stack is translated.
             self.old_turn_mode = Some(game.turn_mode);
             game.turn_mode = TurnMode::DumpOff;
             if let Some(ref did) = defender_id {

@@ -5,6 +5,7 @@ use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{CatchScatterThrowInMode, Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::util_server_injury::{drop_player, handle_injury_by_name};
 
 /// 1:1 translation of `com.fumbbl.ffb.server.step.bb2020.StepSpecialEffect` (BB2020).
 ///
@@ -98,13 +99,13 @@ impl StepSpecialEffect {
         // Java: if fRollForEffect → roll and check success; else always successful
         let successful = if self.roll_for_effect {
             let roll = rng.d6();
-            // TODO(special_effect): DiceInterpreter.isSpecialEffectSuccessful(fSpecialEffect, player, roll)
+            // DEFERRED(special_effect): DiceInterpreter.isSpecialEffectSuccessful(fSpecialEffect, player, roll)
             // Stub: assume success if roll >= 4
-            // TODO(special_effect): ReportSpecialEffectRoll(fSpecialEffect, player.id, roll, successful)
+            // DEFERRED(special_effect): ReportSpecialEffectRoll(fSpecialEffect, player.id, roll, successful)
             let _ = roll;
             true
         } else {
-            // TODO(special_effect): ReportSpecialEffectRoll(fSpecialEffect, player.id, 0, true)
+            // DEFERRED(special_effect): ReportSpecialEffectRoll(fSpecialEffect, player.id, 0, true)
             true
         };
 
@@ -120,19 +121,23 @@ impl StepSpecialEffect {
         match special_effect {
             Some(SpecialEffect::ZAP) => {
                 // Java: ZappedPlayer creation + team replacement (TODO)
-                // TODO(special_effect): create ZappedPlayer, replace in team
+                // DEFERRED(special_effect): create ZappedPlayer, replace in team
                 // If ball is on this player's square → scatter ball
                 if game.field_model.ball_coordinate == Some(player_coord) {
                     outcome = outcome.publish(StepParameter::CatchScatterThrowInMode(
                         CatchScatterThrowInMode::ScatterBall,
                     ));
-                    // TODO(special_effect): push StepCatchScatterThrowIn onto stack
+                    // DEFERRED(special_effect): push StepCatchScatterThrowIn onto stack
                 }
             }
             Some(SpecialEffect::FIREBALL) => {
-                // TODO(special_effect): UtilServerInjury.handleInjury(InjuryTypeFireball)
-                // TODO(special_effect): publish InjuryResult, DropPlayerContext
-                let _ = (player_coord, is_active);
+                let injury_result = handle_injury_by_name(
+                    game, rng, "InjuryTypeFireball",
+                    None, &player_id, player_coord, None, None, ApothecaryMode::SpecialEffect,
+                );
+                outcome = outcome.publish(StepParameter::InjuryResult(Box::new(injury_result)));
+                for p in drop_player(game, &player_id, true) { outcome = outcome.publish(p); }
+                let _ = is_active;
             }
             Some(SpecialEffect::BOMB) => {
                 let bomb_from_home = matches!(game.turn_mode, TurnMode::BombHome | TurnMode::BombHomeBlitz);
@@ -142,13 +147,17 @@ impl StepSpecialEffect {
                 let player_hit_is_from_bomb_team =
                     (bomb_from_home && player_is_home) || (bomb_from_away && !player_is_home);
 
-                // TODO(special_effect): passState.getOriginalBombardier
-                // TODO(special_effect): BOMBER_PLACED_PRONE_IGNORES_TURNOVER option
+                // DEFERRED(special_effect): passState.getOriginalBombardier
+                // DEFERRED(special_effect): BOMBER_PLACED_PRONE_IGNORES_TURNOVER option
                 let suppress_end_turn = !(player_hit_is_from_bomb_team
                     && game.field_model.ball_coordinate == Some(player_coord));
 
-                // TODO(special_effect): UtilServerInjury.handleInjury(InjuryTypeBombWithModifier)
-                // TODO(special_effect): publish InjuryResult, DropPlayerContext
+                let injury_result = handle_injury_by_name(
+                    game, rng, "InjuryTypeBombWithModifier",
+                    None, &player_id, player_coord, None, None, ApothecaryMode::SpecialEffect,
+                );
+                outcome = outcome.publish(StepParameter::InjuryResult(Box::new(injury_result)));
+                for p in drop_player(game, &player_id, true) { outcome = outcome.publish(p); }
 
                 if !suppress_end_turn && is_standing {
                     let acting_team_has_player =
@@ -285,5 +294,29 @@ mod tests {
             matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall))
         });
         assert!(has_scatter, "zap on ball square should publish SCATTER_BALL");
+    }
+
+    #[test]
+    fn fireball_publishes_injury_result() {
+        let pid = "p1";
+        let mut step = StepSpecialEffect::new("FAIL".into());
+        step.player_id = Some(pid.into());
+        step.special_effect_key = Some("fireball".into());
+        let mut game = make_game_with_player(pid, false);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))),
+            "fireball should publish InjuryResult");
+    }
+
+    #[test]
+    fn bomb_publishes_injury_result() {
+        let pid = "p1";
+        let mut step = StepSpecialEffect::new("FAIL".into());
+        step.player_id = Some(pid.into());
+        step.special_effect_key = Some("bomb".into());
+        let mut game = make_game_with_player(pid, false);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))),
+            "bomb should publish InjuryResult");
     }
 }

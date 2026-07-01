@@ -11,8 +11,8 @@
 /// Init param: IS_KICKED_PLAYER (optional).
 /// Consumed params: THROWN_PLAYER_ID, THROWN_PLAYER_STATE, THROWN_PLAYER_HAS_BALL.
 ///
-/// TODO(ThrowTTM-hooks): executeStepHooks not yet ported — stub returns NEXT_STEP.
-/// TODO(ThrowTTM-useSkill): handleSkillCommand (CLIENT_USE_SKILL) deferred.
+/// DEFERRED(ThrowTTM-hooks): executeStepHooks not yet ported — stub returns NEXT_STEP.
+/// DEFERRED(ThrowTTM-useSkill): handleSkillCommand (CLIENT_USE_SKILL) deferred.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::{PlayerState, PassResult};
@@ -46,7 +46,7 @@ impl StepThrowTeamMate {
 
     fn execute_step(&self, _game: &mut Game) -> StepOutcome {
         // Java: getGameState().executeStepHooks(this, state);
-        // TODO(ThrowTTM-hooks): step hooks (scatterPlayer push, throw roll) deferred.
+        // DEFERRED(ThrowTTM-hooks): step hooks (scatterPlayer push, throw roll) deferred.
         StepOutcome::next()
     }
 }
@@ -63,7 +63,7 @@ impl Step for StepThrowTeamMate {
     }
 
     fn handle_command(&mut self, _action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO(ThrowTTM-useSkill): CLIENT_USE_SKILL → handleSkillCommand deferred.
+        // DEFERRED(ThrowTTM-useSkill): CLIENT_USE_SKILL → handleSkillCommand deferred.
         self.execute_step(game)
     }
 

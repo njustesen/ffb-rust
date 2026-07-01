@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 use crate::enums::Weather;
-use crate::types::{FieldCoordinate, PushbackSquare, RangeRuler};
+use crate::types::{FieldCoordinate, MoveSquare, PushbackSquare, RangeRuler};
 use crate::enums::PlayerState;
 use crate::model::player::PlayerId;
 use crate::model::target_selection_state::TargetSelectionState;
@@ -28,7 +28,8 @@ pub struct FieldModel {
     pub player_states: HashMap<PlayerId, PlayerState>,
 
     pub range_ruler: Option<RangeRuler>,
-    pub move_squares: HashSet<FieldCoordinate>,
+    /// Java: FieldModel.fMoveSquares — keyed by coordinate for O(1) lookup via get_move_square.
+    pub move_squares: HashMap<FieldCoordinate, MoveSquare>,
     pub pushback_squares: Vec<PushbackSquare>,
 
     /// Stadium trap door locations. Players landing here roll D6; on 1 they fall through.
@@ -73,7 +74,7 @@ impl FieldModel {
             player_coordinates: HashMap::new(),
             player_states: HashMap::new(),
             range_ruler: None,
-            move_squares: HashSet::new(),
+            move_squares: HashMap::new(),
             pushback_squares: Vec::new(),
             trap_doors: Vec::new(),
             target_selection_state: None,
@@ -149,6 +150,18 @@ impl FieldModel {
         self.multi_block_target_coordinates.contains(&coord)
     }
 
+    /// Java: FieldModel.replaceMultiBlockTargetCoordinate — replaces old with new if present.
+    pub fn replace_multi_block_target_coordinate(&mut self, old: FieldCoordinate, new: FieldCoordinate) {
+        if self.multi_block_target_coordinates.remove(&old) {
+            self.multi_block_target_coordinates.insert(new);
+        }
+    }
+
+    /// Java: FieldModel.isBlockedForTrickster
+    pub fn is_blocked_for_trickster(&self, coord: FieldCoordinate) -> bool {
+        self.blocked_for_trickster_coordinates.contains(&coord)
+    }
+
     /// Java: FieldModel.clearMultiBlockTargets — clears all multi-block state and resets player state bits.
     pub fn clear_multi_block_targets(&mut self) {
         let targets: Vec<PlayerId> = self.multi_block_targets.clone();
@@ -198,6 +211,16 @@ impl FieldModel {
     /// Java: FieldModel.clearMoveSquares
     pub fn clear_move_squares(&mut self) {
         self.move_squares.clear();
+    }
+
+    /// Java: FieldModel.getMoveSquare(FieldCoordinate)
+    pub fn get_move_square(&self, coord: FieldCoordinate) -> Option<MoveSquare> {
+        self.move_squares.get(&coord).copied()
+    }
+
+    /// Java: FieldModel.add(MoveSquare) — inserts with coordinate as key.
+    pub fn add_move_square(&mut self, ms: MoveSquare) {
+        self.move_squares.insert(ms.coordinate, ms);
     }
 
     /// Adjacent coordinates within the field bounds.

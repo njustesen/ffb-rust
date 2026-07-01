@@ -113,7 +113,7 @@ impl StepTakeRoot {
         if let Some(state) = game.field_model.player_state(&player_id) {
             game.field_model.set_player_state(&player_id, state.change_rooted(true));
         }
-        // TODO(take_root_bb2016): SoundId.ROOT not translated.
+        // DEFERRED(sound): SoundId.ROOT not yet ported.
     }
 }
 

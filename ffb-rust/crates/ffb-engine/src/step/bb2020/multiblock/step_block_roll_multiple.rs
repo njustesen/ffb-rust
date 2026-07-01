@@ -39,11 +39,11 @@
 ///   for each blockRoll (reversed): generateBlockEvaluationSequence → push to stack
 ///   NEXT_STEP
 ///
-/// TODO(brm-dice): ServerUtilBlock.findNrOfBlockDice, BlockRoll struct, dice rolling deferred.
-/// TODO(brm-reroll): UtilServerReRoll.isTeamReRollAvailable / useReRoll / Brawler handling deferred.
-/// TODO(brm-dialog): DialogReRollBlockForTargetsParameter, DialogOpponentBlockSelectionParameter deferred.
-/// TODO(brm-sequence): generateBlockEvaluationSequence (push per-target evaluation sequences) deferred.
-/// TODO(brm-sound): SoundId.BLOCK deferred.
+/// DEFERRED(brm-dice): ServerUtilBlock.findNrOfBlockDice, BlockRoll struct, dice rolling deferred.
+/// DEFERRED(brm-reroll): UtilServerReRoll.isTeamReRollAvailable / useReRoll / Brawler handling deferred.
+/// DEFERRED(brm-dialog): DialogReRollBlockForTargetsParameter, DialogOpponentBlockSelectionParameter deferred.
+/// DEFERRED(brm-sequence): generateBlockEvaluationSequence (push per-target evaluation sequences) deferred.
+/// DEFERRED(brm-sound): SoundId.BLOCK deferred.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -82,24 +82,24 @@ impl StepBlockRollMultiple {
     fn execute_step(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         if self.first_run {
             self.first_run = false;
-            // TODO(brm-dice): clearDiceDecorations
-            // TODO(brm-dice): teamReRollAvailable / singleUseReRollAvailable / proReRollAvailable / brawlerAvailable
-            // TODO(brm-dice): for each blockRoll entry:
+            // DEFERRED(brm-dice): clearDiceDecorations
+            // DEFERRED(brm-dice): teamReRollAvailable / singleUseReRollAvailable / proReRollAvailable / brawlerAvailable
+            // DEFERRED(brm-dice): for each blockRoll entry:
             //   nrOfDice = ServerUtilBlock.findNrOfBlockDice(gameState, actingPlayer, defender, ...)
             //   roll.setNrOfDice(abs(nrOfDice)); roll.setOwnChoice(nrOfDice > 0)
             //   roll(roll, false, actingPlayer, singleDieReRollSource) [roll dice]
             //   add re-roll sources; setSound(BLOCK); syncGameModel
-            // TODO(brm-dialog): decideNextStep → show dialog or push evaluation sequences
+            // DEFERRED(brm-dialog): decideNextStep → show dialog or push evaluation sequences
         } else {
             if self.selected_target.is_some() {
-                // TODO(brm-reroll): find roll for selectedTarget
-                // TODO(brm-reroll): if reRollSource == BRAWLER: handleBrawler
+                // DEFERRED(brm-reroll): find roll for selectedTarget
+                // DEFERRED(brm-reroll): if reRollSource == BRAWLER: handleBrawler
                 //   else if UtilServerReRoll.useReRoll(...): roll(roll, true, ...)
                 //   else if PRO: adjustRollForIndexedReRoll(...)
                 //   clear or update re-roll sources
-                // TODO(brm-dice): addReport(ReportBlock); setSound(BLOCK)
+                // DEFERRED(brm-dice): addReport(ReportBlock); setSound(BLOCK)
             }
-            // TODO(brm-dialog): decideNextStep
+            // DEFERRED(brm-dialog): decideNextStep
         }
         // Stub: advance immediately until dice/dialog infrastructure is ported.
         StepOutcome::next()
@@ -126,13 +126,13 @@ impl Step for StepBlockRollMultiple {
         match action {
             Action::BlockChoice { die_index } => {
                 // Substitute for CLIENT_BLOCK_OR_RE_ROLL_CHOICE_FOR_TARGET
-                // TODO(brm-command): map die_index to selected roll index for selectedTarget.
+                // DEFERRED(brm-command): map die_index to selected roll index for selectedTarget.
                 let _ = die_index;
             }
             Action::UseBrawler => {
                 // CLIENT_USE_BRAWLER
                 self.re_roll_source = Some("BRAWLER".into());
-                // TODO(brm-command): extract targetId from context or game state
+                // DEFERRED(brm-command): extract targetId from context or game state
             }
             _ => {}
         }
@@ -148,13 +148,13 @@ impl Step for StepBlockRollMultiple {
             }
             // Java: PLAYER_ID_DAUNTLESS_SUCCESS → set successfulDauntless on matching roll; consume
             StepParameter::PlayerIdDauntlessSuccess(id) => {
-                // TODO(brm-dauntless): set successfulDauntless flag on BlockRoll when BlockRoll is ported
+                // DEFERRED(brm-dauntless): set successfulDauntless flag on BlockRoll when BlockRoll is ported
                 let _ = id;
                 true
             }
             // Java: DOUBLE_TARGET_STRENGTH_FOR_PLAYER → set doubleTargetStrength on matching roll
             StepParameter::DoubleTargetStrengthForPlayer(id) => {
-                // TODO(brm-dauntless): set doubleTargetStrength on BlockRoll when BlockRoll is ported
+                // DEFERRED(brm-dauntless): set doubleTargetStrength on BlockRoll when BlockRoll is ported
                 let _ = id;
                 false // Java: no return true; falls through to super
             }

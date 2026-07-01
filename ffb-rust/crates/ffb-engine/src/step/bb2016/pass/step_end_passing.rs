@@ -51,11 +51,11 @@ impl StepEndPassing {
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
         game.field_model.range_ruler = None;
         game.field_model.out_of_bounds = false;
-        // TODO(EndPassing-bomb): check game.turn_mode.is_bomb_turn(), push Bomb sequence.
-        // TODO(EndPassing-animosity): handle animosity re-selection (pass sequence push).
-        // TODO(EndPassing-completions): record completions / passing yards on thrower result.
-        // TODO(EndPassing-intercept): set ball coordinate to interceptor, record interceptions.
-        // TODO(EndPassing-endPlayerAction): push EndPlayerAction sequence.
+        // DEFERRED(BombSequence): bomb turn → push Bomb sequence — TurnMode.BOMB not yet wired.
+        // DEFERRED(Animosity): animosity re-selection pass sequence push not yet ported.
+        // DEFERRED(completions): record completions / passing yards on thrower result — SPP tracking deferred.
+        // DEFERRED(intercept): set ball coordinate to interceptor, record interceptions — state tracking deferred.
+        // DEFERRED(EndPlayerAction): push EndPlayerAction sequence — sequence infrastructure deferred.
         StepOutcome::next()
     }
 }

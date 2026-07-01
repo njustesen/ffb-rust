@@ -15,10 +15,10 @@
 ///
 /// Mandatory init param: `GOTO_LABEL_ON_END` (used by the generator, stored here for JSON).
 ///
-/// TODO(StepSetup-mechanic): SetupMechanic.checkSetup port deferred; always accepts for now.
-/// TODO(StepSetup-boxes): UtilBox.refreshBoxes deferred.
-/// TODO(StepSetup-turnmode): game.setTurnMode(TurnMode.KICKOFF) deferred.
-/// TODO(StepSetup-teamsetup): CLIENT_TEAM_SETUP_LOAD/SAVE/DELETE deferred.
+/// DEFERRED(StepSetup-mechanic): SetupMechanic.checkSetup port deferred; always accepts for now.
+/// DEFERRED(StepSetup-boxes): UtilBox.refreshBoxes deferred.
+/// DEFERRED(StepSetup-turnmode): game.setTurnMode(TurnMode.KICKOFF) deferred.
+/// DEFERRED(StepSetup-teamsetup): CLIENT_TEAM_SETUP_LOAD/SAVE/DELETE deferred.
 use ffb_model::enums::InducementPhase;
 use ffb_model::model::game::Game;
 use ffb_model::prompts::AgentPrompt;
@@ -64,7 +64,7 @@ impl StepSetup {
 
         // Java: getResult().setSound(SoundId.DING)
         // Java: SetupMechanic.checkSetup(gameState, game.isHomePlaying())
-        // TODO(StepSetup-mechanic): port SetupMechanic.checkSetup. Always accept for now.
+        // DEFERRED(StepSetup-mechanic): port SetupMechanic.checkSetup. Always accept for now.
         let setup_valid = true;
 
         if setup_valid {
@@ -77,11 +77,11 @@ impl StepSetup {
             game.turn_data_mut().first_turn_after_kickoff = false;
 
             // Java: UtilBox.refreshBoxes(game)
-            // TODO(StepSetup-boxes): port refreshBoxes.
+            // DEFERRED(StepSetup-boxes): port refreshBoxes.
 
             if game.setup_offense {
                 // Java: game.setTurnMode(TurnMode.KICKOFF)
-                // TODO(StepSetup-turnmode): set turn mode to KICKOFF here.
+                // DEFERRED(StepSetup-turnmode): set turn mode to KICKOFF here.
                 // Java: getResult().setNextAction(StepAction.NEXT_STEP)
                 self.end_setup = false;
                 StepOutcome::next()

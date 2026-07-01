@@ -8,10 +8,12 @@ use crate::drop_player_context::SteadyFootingContext;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::abstract_step_with_re_roll::ReRollState;
+use crate::step::abstract_step_with_re_roll::find_skill_reroll_source;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 use ffb_mechanics::bb2025::jump_mechanic::JumpMechanic;
 use ffb_mechanics::jump_mechanic::JumpMechanic as JumpMechanicTrait;
 use ffb_mechanics::mechanics::minimum_roll_jump;
+use crate::util::util_server_player_move::UtilServerPlayerMove;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.move.StepJump.
 ///
@@ -30,13 +32,14 @@ use ffb_mechanics::mechanics::minimum_roll_jump;
 /// canStillJump (JumpMechanic) is wired; minimum roll uses player agility (BB2025: ag + modifiers).
 /// DiceInterpreter.is_skill_roll_successful used for success check.
 ///
-/// TODO: JumpModifierFactory / modifier collection for minimumRollJump not yet ported.
-/// TODO: DivingTackle dialog (checkDivingTackle, usingDivingTackle) not yet ported.
-/// TODO: canChooseToIgnoreJumpModifierAfterRoll skill dialog not yet ported.
-/// TODO: canIgnoreJumpModifiers (useIgnoreModifierSkill) not yet ported.
-/// TODO: handleFailure → COORDINATE_FROM(null if roll==1) + updatePlayerAndBallPosition not yet ported.
+/// Skill re-roll for JUMP (Leap canRerollJump source) → wired via find_skill_reroll_source.
+/// DEFERRED: JumpModifierFactory / modifier collection for minimumRollJump not yet ported.
+/// DEFERRED: DivingTackle dialog (checkDivingTackle, usingDivingTackle) not yet ported.
+/// DEFERRED: canChooseToIgnoreJumpModifierAfterRoll skill dialog not yet ported.
+/// DEFERRED: canIgnoreJumpModifiers (useIgnoreModifierSkill) not yet ported.
+/// handleFailure: COORDINATE_FROM(null if roll==1), updatePlayerAndBallPosition, updateMoveSquares — all implemented.
 /// DEFERRED(divingTackle): checkDivingTackle/usingDivingTackle dialog not yet ported.
-/// TODO: fSecondGoForIt (succeedGfi push for jumping players) not yet ported.
+/// DEFERRED: fSecondGoForIt (succeedGfi push for jumping players) not yet ported.
 pub struct StepJump {
     /// Java: goToLabelOnFailure
     pub goto_label_on_failure: String,
@@ -85,8 +88,8 @@ impl Step for StepJump {
         if let Action::UseReRoll { use_reroll: false } = action {
             self.re_roll_state.re_roll_source = None;
         }
-        // TODO: CLIENT_PLAYER_CHOICE → DIVING_TACKLE mode → usingDivingTackle / setDefenderId
-        // TODO: CLIENT_USE_SKILL → canChooseToIgnoreJumpModifierAfterRoll → useIgnoreModifierAfterRollSkill
+        // DEFERRED: CLIENT_PLAYER_CHOICE → DIVING_TACKLE mode → usingDivingTackle / setDefenderId
+        // DEFERRED: CLIENT_USE_SKILL → canChooseToIgnoreJumpModifierAfterRoll → useIgnoreModifierAfterRollSkill
         self.execute_step(game, rng)
     }
 
@@ -152,7 +155,15 @@ impl StepJump {
                 use ffb_model::model::re_rolled_action::ReRolledAction;
                 self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("JUMP"));
 
-                // TODO: skill re-roll for JUMP (Leap re-roll source) not yet in property mapping
+                // Java: skillReRollSource = UtilCards.getUnusedRerollSource(actingPlayer, JUMP)
+                let skill_source = find_skill_reroll_source(game, "JUMP");
+                if let Some(source) = skill_source {
+                    let pid = player_id.as_deref().unwrap_or("").to_owned();
+                    use_reroll(game, &source, &pid);
+                    self.re_roll_state.re_roll_source = Some(source);
+                    self.roll = 0;
+                    return self.execute_step(game, rng);
+                }
                 // TRR offer
                 if let Some(prompt) = ask_for_reroll_if_available(game, "JUMP", minimum_roll, false) {
                     self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
@@ -189,6 +200,8 @@ impl StepJump {
                 }
                 game.field_model.set_player_coordinate(&pid, start);
             }
+            // Java: UtilServerPlayerMove.updateMoveSquares(getGameState(), actingPlayer.isJumping())
+            UtilServerPlayerMove::update_move_squares(game, false);
             None
         };
         let mut out = StepOutcome::goto(&label)

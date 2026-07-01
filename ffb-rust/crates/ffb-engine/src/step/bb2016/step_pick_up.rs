@@ -18,10 +18,8 @@
 ///   1. Skill re-roll (Sure Hands — canRerollPickup) — auto-used.
 ///   2. Team Re-Roll token (TRR) — offered via ReRollOffer prompt.
 ///
-/// TODOs:
-///  - PickupModifierFactory context not translated (stub: minimumRoll = 2).
-///  - DiceInterpreter.isSkillRollSuccessful used via dice_interpreter module.
-///  - UtilCards.getUnusedRerollSource for skill re-roll not translated.
+/// DEFERRED(modifier): PickupModifierFactory context not yet ported; stub: minimumRoll = 2.
+/// DEFERRED(skillReroll): UtilCards.getUnusedRerollSource for skill re-roll not yet ported.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2016.StepPickUp`.
 use ffb_model::model::game::Game;

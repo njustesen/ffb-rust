@@ -80,9 +80,12 @@ impl Step for StepSwoop {
         match action {
             Action::Pass { coord } => {
                 // CLIENT_SWOOP — target square selected
-                // TODO: transform coordinate for away team
-                self.coordinate_to = Some(*coord);
-                // TODO: executeSwoop() hooks
+                // Java: if command NOT from home player, transform coordinate
+                let is_home_player = self.thrown_player_id.as_deref()
+                    .map(|id| game.team_home.player(id).is_some())
+                    .unwrap_or(game.home_playing);
+                self.coordinate_to = Some(if is_home_player { *coord } else { coord.transform() });
+                // DEFERRED: executeSwoop() hooks
                 return StepOutcome::next();
             }
             _ => {}
@@ -109,7 +112,7 @@ impl StepSwoop {
         // Java: if throwScatter → animate + move player (TODO: field model + animation)
         // Java: if coordinateTo == null → updateSwoopSquares (TODO) → wait
         if self.coordinate_to.is_none() {
-            // TODO: UtilServerPlayerSwoop.updateSwoopSquares
+            // DEFERRED: UtilServerPlayerSwoop.updateSwoopSquares
             return StepOutcome::cont();
         }
 
@@ -186,5 +189,51 @@ mod tests {
     fn unrecognised_parameter_returns_false() {
         let mut step = StepSwoop::default();
         assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
+    }
+
+    #[test]
+    fn away_player_swoop_transforms_coordinate() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, PS_STANDING, PlayerState};
+        use ffb_model::util::rng::GameRng;
+        let mut game = make_game();
+        // Add player to away team
+        game.team_away.players.push(Player {
+            id: "away_p".into(), name: "away_p".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+        });
+        let mut step = StepSwoop::new("fall".into());
+        step.thrown_player_id = Some("away_p".into());
+        step.thrown_player_coordinate = Some(FieldCoordinate { x: 5, y: 5 });
+        let original_coord = FieldCoordinate { x: 3, y: 4 };
+        let transformed = original_coord.transform();
+        step.handle_command(&Action::Pass { coord: original_coord }, &mut game, &mut GameRng::new(0));
+        assert_eq!(step.coordinate_to, Some(transformed), "away player coord must be transformed");
+    }
+
+    #[test]
+    fn home_player_swoop_does_not_transform_coordinate() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, PS_STANDING, PlayerState};
+        use ffb_model::util::rng::GameRng;
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "home_p".into(), name: "home_p".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+        });
+        let mut step = StepSwoop::new("fall".into());
+        step.thrown_player_id = Some("home_p".into());
+        step.thrown_player_coordinate = Some(FieldCoordinate { x: 5, y: 5 });
+        let original_coord = FieldCoordinate { x: 3, y: 4 };
+        step.handle_command(&Action::Pass { coord: original_coord }, &mut game, &mut GameRng::new(0));
+        assert_eq!(step.coordinate_to, Some(original_coord), "home player coord must not be transformed");
     }
 }

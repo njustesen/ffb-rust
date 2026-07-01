@@ -17,12 +17,15 @@
 ///
 /// Note: `findDodgeChoice` and `UtilServerPushback` are not yet fully ported.
 /// The step stores the fields faithfully; the complex pushback-square scan is stubbed
-/// (`// TODO: pushback squares`) while the set_parameter and structural logic are correct.
+/// (`// DEFERRED: pushback squares`) while the set_parameter and structural logic are correct.
 use ffb_model::enums::{PlayerState, PS_FALLING};
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::util::util_server_pushback::UtilServerPushback;
 
 /// Java: `StepBlockDodge` (mixed, BB2020 + BB2025).
 pub struct StepBlockDodge {
@@ -45,14 +48,74 @@ impl StepBlockDodge {
 
     /// Java: `findDodgeChoice()` — determines if a dodge-choice dialog is needed.
     ///
-    /// True when any regular or grab pushback square is occupied (chain-push risk),
-    /// near a sideline, or would cross the midfield line on the first turn.
-    /// Full implementation requires `UtilServerPushback` (not yet ported); returns
-    /// false (conservative/safe default = no dialog) until that helper is ported.
-    fn find_dodge_choice(_game: &Game) -> bool {
-        // TODO(UtilServerPushback port): scan regularPushbackSquares / grabPushbackSquares
-        // for chain-push, sideline-push, and attacker-half conditions.
-        false
+    /// True when any regular pushback square is occupied (chain-push risk),
+    /// any grab-mode square is near a sideline/endzone, or would cross the midfield
+    /// line on the first turn after kickoff.
+    fn find_dodge_choice(game: &Game) -> bool {
+        let attacker_id = match &game.acting_player.player_id {
+            Some(id) => id.clone(),
+            None => return false,
+        };
+        let defender_id = match &game.defender_id {
+            Some(id) => id.clone(),
+            None => return false,
+        };
+        let attacker_coord = match game.field_model.player_coordinate(&attacker_id) {
+            Some(c) => c,
+            None => return false,
+        };
+        let defender_coord = match game.field_model.player_coordinate(&defender_id) {
+            Some(c) => c,
+            None => return false,
+        };
+
+        let starting_square = match UtilServerPushback::find_starting_square(attacker_coord, defender_coord, game.home_playing) {
+            Some(sq) => sq,
+            None => return false,
+        };
+
+        let home_choice = game.home_playing;
+        // Java: findPushbackSquares returns all candidate squares (including occupied ones).
+        // Use the candidates function (no occupancy filtering) for dodge-choice detection.
+        let regular_squares = UtilServerPushback::find_pushback_squares_candidates(starting_square, home_choice);
+
+        let chain_push = regular_squares.iter().any(|sq| game.field_model.player_at(sq.coordinate).is_some());
+
+        // Java: grabPushbackSquares defaults to regularPushbackSquares, overridden with GRAB
+        // mode if: block action + attacker has canPushBackToAnySquare + defender lacks SideStep.
+        // GRAB mode not fully ported — use regular squares as conservative fallback.
+        let action_is_block = game.acting_player.player_action
+            .map(|a| a.is_block_action())
+            .unwrap_or(false);
+        let attacker_can_grab = game.player(&attacker_id)
+            .map(|p| p.has_skill_property(NamedProperties::CAN_PUSH_BACK_TO_ANY_SQUARE))
+            .unwrap_or(false);
+        let defender_has_side_step = game.player(&defender_id)
+            .map(|p| p.has_skill_property(NamedProperties::CAN_CHOOSE_OWN_PUSHED_BACK_SQUARE))
+            .unwrap_or(false);
+        let _use_grab = action_is_block && attacker_can_grab && !defender_has_side_step;
+        // DEFERRED(GRAB-mode): UtilServerPushback GRAB mode not ported; grab_squares = regular.
+        let grab_squares = &regular_squares;
+
+        let sideline_push = grab_squares.iter().any(|sq| {
+            let c = sq.coordinate;
+            FieldCoordinateBounds::SIDELINE_LOWER.is_in_bounds(c)
+                || FieldCoordinateBounds::SIDELINE_UPPER.is_in_bounds(c)
+                || FieldCoordinateBounds::ENDZONE_HOME.is_in_bounds(c)
+                || FieldCoordinateBounds::ENDZONE_AWAY.is_in_bounds(c)
+        });
+
+        let attacker_home = game.team_home.players.iter().any(|p| p.id == attacker_id);
+        let attacker_half_push = grab_squares.iter().any(|sq| {
+            let c = sq.coordinate;
+            if attacker_home {
+                FieldCoordinateBounds::HALF_HOME.is_in_bounds(c) && game.turn_data_home.first_turn_after_kickoff
+            } else {
+                FieldCoordinateBounds::HALF_AWAY.is_in_bounds(c) && game.turn_data_away.first_turn_after_kickoff
+            }
+        });
+
+        chain_push || sideline_push || attacker_half_push
     }
 
     fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
@@ -192,5 +255,49 @@ mod tests {
         let mut rng = GameRng::new(0);
         let out = step.start(&mut game, &mut rng);
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn find_dodge_choice_returns_false_when_no_actors() {
+        let game = make_game();
+        assert!(!StepBlockDodge::find_dodge_choice(&game));
+    }
+
+    #[test]
+    fn find_dodge_choice_chain_push_detected() {
+        let mut game = make_game();
+        // Attacker at (10,7), defender at (10,8) → pushed South → candidates (9,9),(10,9),(11,9)
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(10, 7));
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(10, 8));
+        // Place a blocker at (10,9) — directly south of defender — causes chain push
+        game.field_model.set_player_coordinate("blocker", FieldCoordinate::new(10, 9));
+        assert!(StepBlockDodge::find_dodge_choice(&game));
+    }
+
+    #[test]
+    fn find_dodge_choice_sideline_push_detected() {
+        let mut game = make_game();
+        // Attacker at (10,2), defender at (10,1) → delta_y = 2-1 = 1 > 0 → direction North
+        // → candidates at y=0 (SIDELINE_UPPER)
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(10, 2));
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(10, 1));
+        // Candidates: (9,0),(10,0),(11,0) — all on SIDELINE_UPPER → sideline_push = true
+        assert!(StepBlockDodge::find_dodge_choice(&game));
+    }
+
+    #[test]
+    fn find_dodge_choice_no_risk_mid_field() {
+        let mut game = make_game();
+        // Attacker at (12,7), defender at (13,7) → pushed East → candidates open, no sideline
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(12, 7));
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(13, 7));
+        // No players on push squares, not near sideline, not first turn after kickoff
+        assert!(!StepBlockDodge::find_dodge_choice(&game));
     }
 }

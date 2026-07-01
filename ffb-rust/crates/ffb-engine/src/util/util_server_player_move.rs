@@ -11,7 +11,7 @@
 /// the core coordinate-transformation logic and the move-square scan, with
 /// TODO stubs for the mechanics-dependent parts.
 use ffb_model::model::game::Game;
-use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
+use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds, MoveSquare};
 
 pub struct UtilServerPlayerMove;
 
@@ -98,7 +98,7 @@ impl UtilServerPlayerMove {
 
         for coord in adjacent {
             if game.field_model.player_at(coord).is_none() {
-                game.field_model.move_squares.insert(coord);
+                game.field_model.add_move_square(MoveSquare::new(coord, 0, 0));
             }
         }
     }
@@ -242,7 +242,7 @@ mod tests {
         game.field_model.set_player_coordinate("blocker", blocker_coord);
         game.acting_player.player_action = Some(PlayerAction::Move);
         UtilServerPlayerMove::update_move_squares(&mut game, false);
-        assert!(!game.field_model.move_squares.contains(&blocker_coord));
+        assert!(game.field_model.get_move_square(blocker_coord).is_none());
     }
 
     #[test]
@@ -254,9 +254,9 @@ mod tests {
         game.field_model.set_player_state("p1", PlayerState(PS_STANDING));
         game.acting_player.player_action = Some(PlayerAction::Move);
         // Add a stale square.
-        game.field_model.move_squares.insert(FieldCoordinate::new(0, 0));
+        game.field_model.add_move_square(MoveSquare::new(FieldCoordinate::new(0, 0), 0, 0));
         UtilServerPlayerMove::update_move_squares(&mut game, false);
         // Stale (0,0) is not adjacent to (10,7), so it should be gone.
-        assert!(!game.field_model.move_squares.contains(&FieldCoordinate::new(0, 0)));
+        assert!(game.field_model.get_move_square(FieldCoordinate::new(0, 0)).is_none());
     }
 }

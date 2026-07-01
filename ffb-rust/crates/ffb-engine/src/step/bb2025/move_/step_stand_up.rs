@@ -1,14 +1,16 @@
-use ffb_model::enums::{PS_PRONE, PlayerState};
+use ffb_model::enums::{PS_PRONE, PlayerAction, PlayerState};
 use ffb_model::enums::ReRollSource;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::abstract_step_with_re_roll::ReRollState;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use ffb_model::model::target_selection_state::TargetSelectionState;
 
 /// Minimum MA to stand up for free. Java: Constant.MINIMUM_MOVE_TO_STAND_UP = 3.
 const MINIMUM_MOVE_TO_STAND_UP: i32 = 3;
@@ -29,11 +31,10 @@ const MINIMUM_MOVE_TO_STAND_UP: i32 = 3;
 /// Init params: GOTO_LABEL_ON_FAILURE (mandatory).
 ///
 /// setTurnStarted(true) and setConcessionPossible(false) are wired; isPinned() guard is wired.
-/// DiceInterpreter::is_stand_up_successful is wired; modifier = 0 until stand-up assists are ported.
+/// DiceInterpreter::is_stand_up_successful is wired; allowStandUpAssists → findStandUpAssists wired.
 ///
-/// TODO: allowStandUpAssists → UtilPlayer.findStandUpAssists(game, player) not yet ported.
-/// TODO: handleFailedStandUp (per-action turn data flags) not yet ported.
-/// TODO: commitTargetSelection not yet ported.
+/// handleFailedStandUp: per-action turn data flags wired (BB2025: separate pass/ttm, adds punt).
+/// TargetSelectionState.failed() wired in Blitz/BlitzMove/KickEmBlitz branch.
 pub struct StepStandUp {
     /// Java: fGotoLabelOnFailure
     pub goto_label_on_failure: String,
@@ -127,9 +128,15 @@ impl StepStandUp {
             self.roll = rng.d6();
         }
 
-        // Java: DiceInterpreter.isStandUpSuccessful(roll, modifier)
-        // TODO: modifier from allowStandUpAssists
-        let modifier = 0;
+        // Java: if (player.hasSkillProperty(allowStandUpAssists)) modifier = findStandUpAssists(game, player)
+        let modifier = game.acting_player.player_id.as_deref()
+            .and_then(|id| game.player(id))
+            .filter(|p| p.has_skill_property(NamedProperties::ALLOW_STAND_UP_ASSISTS))
+            .map(|_| {
+                let id = game.acting_player.player_id.as_deref().unwrap_or("");
+                UtilPlayer::find_stand_up_assists(game, id)
+            })
+            .unwrap_or(0);
         let successful = DiceInterpreter::is_stand_up_successful(self.roll, modifier);
 
         // Java: if playerState.isPinned() → GOTO failure label (even on success)
@@ -169,10 +176,60 @@ impl StepStandUp {
         if let Some(pid) = game.acting_player.player_id.clone() {
             game.field_model.set_player_state(&pid, PlayerState::new(PS_PRONE));
         }
-        // TODO: handleFailedStandUp (per-action turn data flags)
+        self.handle_failed_stand_up(game);
         let label = self.goto_label_on_failure.clone();
         StepOutcome::goto(&label)
             .publish(StepParameter::EndPlayerAction(true))
+    }
+
+    fn handle_failed_stand_up(&self, game: &mut Game) {
+        let player_action = game.acting_player.player_action;
+        match player_action {
+            Some(PlayerAction::Blitz)
+            | Some(PlayerAction::BlitzMove)
+            | Some(PlayerAction::KickEmBlitz) => {
+                game.turn_data_mut().blitz_used = true;
+                // Java: if (getFieldModel().getTargetSelectionState() != null) → .failed()
+                if let Some(ref mut ts) = game.field_model.target_selection_state {
+                    ts.failed();
+                }
+            }
+            Some(PlayerAction::KickTeamMate)
+            | Some(PlayerAction::KickTeamMateMove) => {
+                game.turn_data_mut().ktm_used = true;
+            }
+            Some(PlayerAction::Pass)
+            | Some(PlayerAction::PassMove) => {
+                game.turn_data_mut().pass_used = true;
+            }
+            Some(PlayerAction::ThrowTeamMate)
+            | Some(PlayerAction::ThrowTeamMateMove) => {
+                game.turn_data_mut().ttm_used = true;
+            }
+            Some(PlayerAction::HandOver)
+            | Some(PlayerAction::HandOverMove) => {
+                game.turn_data_mut().hand_over_used = true;
+            }
+            Some(PlayerAction::Foul)
+            | Some(PlayerAction::FoulMove) => {
+                let pid = game.acting_player.player_id.clone();
+                let allows_extra_foul = pid.as_deref()
+                    .and_then(|id| game.player(id))
+                    .map(|p| p.has_skill_property(NamedProperties::ALLOWS_ADDITIONAL_FOUL))
+                    .unwrap_or(false);
+                if !allows_extra_foul {
+                    game.turn_data_mut().foul_used = true;
+                }
+            }
+            Some(PlayerAction::SecureTheBall) => {
+                game.turn_data_mut().secure_the_ball_used = true;
+            }
+            Some(PlayerAction::Punt)
+            | Some(PlayerAction::PuntMove) => {
+                game.turn_data_mut().punt_used = true;
+            }
+            _ => {}
+        }
     }
 }
 
@@ -286,5 +343,59 @@ mod tests {
         let mut step = StepStandUp::new("old".into());
         assert!(step.set_parameter(&StepParameter::GotoLabelOnFailure("new".into())));
         assert_eq!(step.goto_label_on_failure, "new");
+    }
+
+    #[test]
+    fn failed_stand_up_blitz_sets_blitz_used() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        game.acting_player.standing_up = true;
+        game.acting_player.player_action = Some(PlayerAction::Blitz);
+        let mut step = StepStandUp::new("fail".into());
+        step.roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.turn_data_home.blitz_used);
+    }
+
+    #[test]
+    fn failed_stand_up_pass_sets_pass_used() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        game.acting_player.standing_up = true;
+        game.acting_player.player_action = Some(PlayerAction::Pass);
+        let mut step = StepStandUp::new("fail".into());
+        step.roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.turn_data_home.pass_used);
+        assert!(!game.turn_data_home.ttm_used);
+    }
+
+    #[test]
+    fn failed_stand_up_throw_team_mate_sets_ttm_used() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        game.acting_player.standing_up = true;
+        game.acting_player.player_action = Some(PlayerAction::ThrowTeamMate);
+        let mut step = StepStandUp::new("fail".into());
+        step.roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.turn_data_home.ttm_used);
+        assert!(!game.turn_data_home.pass_used);
+    }
+
+    #[test]
+    fn failed_stand_up_punt_sets_punt_used() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        game.acting_player.standing_up = true;
+        game.acting_player.player_action = Some(PlayerAction::Punt);
+        let mut step = StepStandUp::new("fail".into());
+        step.roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.turn_data_home.punt_used);
     }
 }

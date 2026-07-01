@@ -53,8 +53,7 @@ impl StepInitThrowTeamMate {
             if let Some(target) = self.target_coordinate {
                 // Phase 2: target chosen → set pass coordinate.
                 game.pass_coordinate = Some(target);
-                // TODO: UtilRangeRuler.createRangeRuler not yet ported;
-                // Java only calls NEXT_STEP if rangeRuler != null (always true when ported).
+                // DEFERRED(rangeRuler): UtilRangeRuler.createRangeRuler not yet ported.
                 return StepOutcome::next();
             } else {
                 // Phase 1: player chosen — set up defender, publish parameters.

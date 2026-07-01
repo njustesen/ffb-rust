@@ -142,7 +142,7 @@ impl StepApplyKickoffResult {
             KickoffResult::PerfectDefence   |
             KickoffResult::ThrowARock       |
             KickoffResult::OficiousRef      => {
-                // TODO: implement full result handling.
+                // DEFERRED: implement full result handling.
                 StepOutcome::goto(&self.goto_label_on_end.clone())
             }
         }
@@ -152,7 +152,7 @@ impl StepApplyKickoffResult {
 
     fn handle_get_the_ref(&self, _game: &mut Game) -> StepOutcome {
         // Java: both teams receive +1 bribe (InducementSet mutation).
-        // TODO: port bribe increment (InducementTypeFactory / InducementSet not yet ported).
+        // DEFERRED: port bribe increment (InducementTypeFactory / InducementSet not yet ported).
         StepOutcome::next()
     }
 
@@ -259,7 +259,7 @@ impl StepApplyKickoffResult {
                 return StepOutcome::next();
             }
 
-            // TODO: show DialogPlayerChoiceParameter(CHARGE) and wait for response.
+            // DEFERRED: show DialogPlayerChoiceParameter(CHARGE) and wait for response.
             // For now (random-agent stub): no players selected → skip blitz.
             game.turn_mode = TurnMode::Kickoff;
             return StepOutcome::next();

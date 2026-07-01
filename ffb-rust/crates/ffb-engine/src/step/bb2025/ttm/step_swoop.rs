@@ -122,15 +122,15 @@ impl Step for StepSwoop {
             }
             Action::Pass { coord } => {
                 // CLIENT_SWOOP -> coordinateTo (Swoop target square selection)
-                // TODO: transform coordinate for away team
+                // DEFERRED: transform coordinate for away team
                 self.coordinate_to = Some(*coord);
-                // TODO: executeSwoop() (hooks)
+                // DEFERRED: executeSwoop() (hooks)
                 return StepOutcome::next();
             }
             Action::UseReRoll { use_reroll: _ } => {
                 // CLIENT_USE_RE_ROLL -> update reRollSource/reRolledAction -> executeSwoop
-                // TODO: extract ReRollSource/ReRolledAction from command
-                // TODO: executeSwoop() (hooks)
+                // DEFERRED: extract ReRollSource/ReRolledAction from command
+                // DEFERRED: executeSwoop() (hooks)
                 return StepOutcome::next();
             }
             _ => {}
@@ -154,26 +154,26 @@ impl StepSwoop {
             return StepOutcome::next();
         }
 
-        // TODO: if using_swoop == None: show DialogSkillUseParameter -> wait (Continue)
+        // DEFERRED: if using_swoop == None: show DialogSkillUseParameter -> wait (Continue)
         if self.using_swoop.is_none() {
             return StepOutcome::cont();
         }
 
         if !self.using_swoop.unwrap_or(false) {
-            // TODO: publish USING_SWOOP=false
+            // DEFERRED: publish USING_SWOOP=false
             return StepOutcome::next();
         }
 
         // usingSwoop==true
-        // TODO: if throwScatter: animate + move player + update movement points
-        // TODO: if coordinateTo==None: updateSwoopSquares + publish USING_SWOOP=true -> wait
+        // DEFERRED: if throwScatter: animate + move player + update movement points
+        // DEFERRED: if coordinateTo==None: updateSwoopSquares + publish USING_SWOOP=true -> wait
         if self.coordinate_to.is_none() {
-            // TODO: UtilServerPlayerSwoop.updateSwoopSquares; publish USING_SWOOP=true
+            // DEFERRED: UtilServerPlayerSwoop.updateSwoopSquares; publish USING_SWOOP=true
             return StepOutcome::cont();
         }
 
         // coordinateTo known -> executeSwoop hook handles the rest
-        // TODO: executeStepHooks(this, state)
+        // DEFERRED: executeStepHooks(this, state)
         StepOutcome::next()
     }
 }

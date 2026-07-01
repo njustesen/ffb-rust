@@ -17,7 +17,7 @@ use crate::step::framework::{StepId, StepParameter};
 /// IGNORE_ACTED_FLAG is handled via set_parameter.
 ///
 /// Note: StepParameter::IgnoreActedFlag does not yet exist in the Rust framework.
-/// TODO(stalling): wire IgnoreActedFlag once added to StepParameter enum.
+/// DEFERRED(stalling): wire IgnoreActedFlag once added to StepParameter enum.
 pub struct StepCheckStalling {
     /// Java: fIgnoreActedFlag (default true in Java init)
     pub ignore_acted_flag: bool,
@@ -39,7 +39,7 @@ impl Step for StepCheckStalling {
     fn id(&self) -> StepId { StepId::CheckStalling }
 
     fn start(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO(stalling): full stalling check requires prayer state, pathfinding infrastructure
+        // DEFERRED(stalling): full stalling check requires prayer state, pathfinding infrastructure
         StepOutcome::next()
     }
 
@@ -48,7 +48,7 @@ impl Step for StepCheckStalling {
     }
 
     fn set_parameter(&mut self, _param: &StepParameter) -> bool {
-        // TODO(stalling): handle StepParameter::IgnoreActedFlag once added to the enum.
+        // DEFERRED(stalling): handle StepParameter::IgnoreActedFlag once added to the enum.
         // match param {
         //     StepParameter::IgnoreActedFlag(v) => { self.ignore_acted_flag = *v; true }
         //     _ => false,

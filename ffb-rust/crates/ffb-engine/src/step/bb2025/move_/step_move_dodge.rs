@@ -26,13 +26,12 @@ use ffb_mechanics::modifiers::dodge_context::DodgeContext;
 ///   1. Skill re-roll (Dodge — property canRerollDodge) — auto-used
 ///   2. Team Re-Roll token (TRR) — offered via ReRollOffer prompt
 ///
-/// TODO: actingPlayer.isDodging() guard not yet ported.
-/// TODO: Break-Tackle / modifyingSkill (canAddStrengthToDodge) dialog not yet ported.
-/// TODO: usingModifierIgnoringSkill (canChooseToIgnoreDodgeModifierAfterRoll) not yet ported.
-/// TODO: Arm-Bar (DialogPlayerChoiceParameter / ARM_BAR) not yet ported.
-/// TODO: Diving Tackle pre-roll check / dtRerollAsked not yet ported.
-/// TODO: UtilGameOption.STAND_FIRM_NO_DROP_ON_FAILED_DODGE not yet ported.
-/// TODO: STEADY_FOOTING_CONTEXT publish on failDodge not yet ported.
+/// DEFERRED(dialog): Break-Tackle / canAddStrengthToDodge dialog not yet ported.
+/// DEFERRED(dialog): canChooseToIgnoreDodgeModifierAfterRoll dialog not yet ported.
+/// DEFERRED(dialog): Arm-Bar (DialogPlayerChoiceParameter / ARM_BAR) not yet ported.
+/// DEFERRED(dialog): Diving Tackle pre-roll check / dtRerollAsked not yet ported.
+/// STAND_FIRM_NO_DROP_ON_FAILED_DODGE game option → wired in execute_step (final fail path only).
+/// isDodging guard, SteadyFootingContext publish on failDodge, re-roll infra, and DodgeModifierFactory are wired.
 pub struct StepMoveDodge {
     /// Java: fGotoLabelOnFailure
     pub goto_label_on_failure: String,
@@ -98,9 +97,9 @@ impl Step for StepMoveDodge {
                 self.re_roll_state.re_roll_source = None;
                 self.execute_step(game, rng)
             }
-            // TODO: CLIENT_USE_SKILL → canAddStrengthToDodge / canChooseToIgnoreDodgeModifierAfterRoll /
+            // DEFERRED: CLIENT_USE_SKILL → canAddStrengthToDodge / canChooseToIgnoreDodgeModifierAfterRoll /
             //       canRerollDodge handling.
-            // TODO: CLIENT_PLAYER_CHOICE → ARM_BAR mode.
+            // DEFERRED: CLIENT_PLAYER_CHOICE → ARM_BAR mode.
             _ => self.execute_step(game, rng),
         }
     }
@@ -204,13 +203,18 @@ impl StepMoveDodge {
                 }
             }
 
+            // Java: if (UtilGameOption.isOptionEnabled(game, GameOptionId.STAND_FIRM_NO_DROP_ON_FAILED_DODGE))
+            if game.options.is_enabled("standFirmNoDropOnFailedDodge") {
+                return StepOutcome::next()
+                    .publish(StepParameter::EndPlayerAction(true));
+            }
             self.fail_dodge()
         }
     }
 
     fn fail_dodge(&self) -> StepOutcome {
         // Java: failDodge → findAdjacentOpposingPlayersWithProperty(armBar), show dialog if multiple
-        // TODO: Arm-Bar dialog not yet ported
+        // DEFERRED: Arm-Bar dialog not yet ported
         // Java: injuryType = options → InjuryTypeFallDown (Arm-Bar dialog can override to InjuryTypeArmBar)
         // Stub: always InjuryTypeFallDown (InjuryTypeName variant — no injury roll at this step)
         let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeFallDown".into());
@@ -353,6 +357,31 @@ mod tests {
         step.dodge_roll = 1;
         let _offer = step.start(&mut game, &mut GameRng::new(0));
         let out = step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+    }
+
+    #[test]
+    fn stand_firm_no_drop_option_returns_next_step_on_failure() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        game.options.set("standFirmNoDropOnFailedDodge", "true");
+        add_player(&mut game, "p1");
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn stand_firm_no_drop_option_disabled_still_goes_to_failure_label() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        add_player(&mut game, "p1");
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
     }
 }

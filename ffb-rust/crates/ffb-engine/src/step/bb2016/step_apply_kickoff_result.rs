@@ -11,19 +11,18 @@
 ///   GetTheRef, Riot, PerfectDefence, HighKick, CheeringFans, WeatherChange,
 ///   BrilliantCoaching, QuickSnap, Blitz, ThrowARock, PitchInvasion.
 ///
-/// TODOs (require untranslated infrastructure):
-///  - handleGetTheRef: InducementTypeFactory not translated.
-///  - handlePerfectDefense: SetupMechanic.checkSetup not translated.
-///  - handleHighKick: SetupMechanic.pinPlayersInTacklezones / dialog not translated.
-///  - handleExtraReRoll: fan-favourite / coach count not translated.
-///  - handleWeatherChange: scatter on NICE not translated.
-///  - handleQuickSnap: SetupMechanic dialog path not translated.
-///  - handleThrowARock: UtilServerInjury.handleInjury / dropPlayer not translated here.
-///  - handlePitchInvasion: UtilServerInjury.stunPlayer not translated.
+/// DEFERRED items (require untranslated infrastructure):
+///  - handleGetTheRef: InducementTypeFactory
+///  - handlePerfectDefense: SetupMechanic.checkSetup
+///  - handleHighKick: SetupMechanic.pinPlayersInTacklezones
+///  - handleWeatherChange: DiceInterpreter.interpretRollWeather + scatter on NICE
+///  - handleThrowARock: UtilServerInjury.handleInjury / dropPlayer
+///  - handlePitchInvasion: UtilServerInjury.stunPlayer
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2016.StepApplyKickoffResult`.
 use ffb_model::enums::{KickoffResult, TurnMode};
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -115,7 +114,7 @@ impl StepApplyKickoffResult {
     }
 
     fn handle_get_the_ref(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO(apply_kickoff_result): InducementTypeFactory.allTypes() not translated.
+        // DEFERRED(InducementTypeFactory): InducementTypeFactory.allTypes() not yet ported.
         // Java: each team gets +1 bribes inducement.
         StepOutcome::next()
     }
@@ -134,7 +133,7 @@ impl StepApplyKickoffResult {
             turn_modifier = -1;
         }
         if turn_modifier == 0 {
-            // TODO(apply_kickoff_result): DiceInterpreter.interpretRiotRoll not translated — use d6 stub
+            // DEFERRED(DiceInterpreter): interpretRiotRoll not yet ported; using d6 stub (1-3=-1, 4-6=+1)
             riot_roll = rng.d6();
             // Java: turn_modifier = DiceInterpreter.interpretRiotRoll(roll)
             // 1-3 → -1 (time wasted), 4-6 → +1 (riot speeds up)
@@ -144,20 +143,22 @@ impl StepApplyKickoffResult {
         game.turn_data_home.turn_nr = (game.turn_data_home.turn_nr + turn_modifier).max(0);
         game.turn_data_away.turn_nr = (game.turn_data_away.turn_nr + turn_modifier).max(0);
 
-        let _ = riot_roll; // TODO: ReportKickoffRiot
+        let _ = riot_roll;
+        // Java: getResult().addReport(new ReportKickoffRiot(turnModifier, riotRoll))
+        let riot_event = GameEvent::KickoffRiot;
 
         if game.turn_data_home.turn_nr > 8 || game.turn_data_away.turn_nr > 8 {
             let label = self.goto_label_on_end.clone();
-            StepOutcome::goto(&label)
+            StepOutcome::goto(&label).with_event(riot_event)
         } else {
-            StepOutcome::next()
+            StepOutcome::next().with_event(riot_event)
         }
     }
 
     fn handle_perfect_defense(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         if game.turn_mode == TurnMode::PerfectDefence {
             if self.end_kickoff {
-                // TODO(apply_kickoff_result): SetupMechanic.checkSetup not translated.
+                // DEFERRED(SetupMechanic): checkSetup not yet ported.
                 game.turn_mode = TurnMode::Kickoff;
                 StepOutcome::next()
             } else {
@@ -167,7 +168,7 @@ impl StepApplyKickoffResult {
         } else {
             // Java: setAnimation(KICKOFF_PERFECT_DEFENSE); setTurnMode(PERFECT_DEFENCE)
             game.turn_mode = TurnMode::PerfectDefence;
-            // TODO(apply_kickoff_result): setAnimation not translated.
+            // DEFERRED(animation): setAnimation not yet ported.
             StepOutcome::cont()
         }
     }
@@ -190,7 +191,7 @@ impl StepApplyKickoffResult {
             } else {
                 game.home_playing = !game.home_playing;
                 game.turn_mode = TurnMode::HighKick;
-                // TODO(apply_kickoff_result): pinPlayersInTacklezones not translated.
+                // DEFERRED(SetupMechanic): pinPlayersInTacklezones not yet ported.
                 StepOutcome::cont()
             }
         }
@@ -201,9 +202,15 @@ impl StepApplyKickoffResult {
         let roll_home = rng.d6();
         let roll_away = rng.d6();
 
-        // TODO(apply_kickoff_result): fan_favourites, cheerleaders, assistant_coaches, fame not fully translated.
-        let total_home = roll_home + game.game_result.home.fame;
-        let total_away = roll_away + game.game_result.away.fame;
+        // Java: total = roll + fame + cheerleaders + assistantCoaches
+        let home_bonus = game.game_result.home.fame
+            + game.team_home.cheerleaders
+            + game.team_home.assistant_coaches;
+        let away_bonus = game.game_result.away.fame
+            + game.team_away.cheerleaders
+            + game.team_away.assistant_coaches;
+        let total_home = roll_home + home_bonus;
+        let total_away = roll_away + away_bonus;
 
         if total_home >= total_away {
             game.turn_data_home.rerolls += 1;
@@ -216,10 +223,8 @@ impl StepApplyKickoffResult {
     }
 
     fn handle_weather_change(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // TODO(apply_kickoff_result): DiceInterpreter.interpretRollWeather not translated.
-        // Java: roll 2d6, interpret as weather.
+        // DEFERRED(weather): DiceInterpreter.interpretRollWeather and weather state not yet ported.
         let _ = (rng.d6(), rng.d6());
-        // TODO: set weather, handle NICE scatter.
 
         // Java: publishParameter(TOUCHBACK, fTouchback)
         StepOutcome::next()
@@ -238,7 +243,7 @@ impl StepApplyKickoffResult {
         } else {
             game.home_playing = !game.home_playing;
             game.turn_mode = TurnMode::QuickSnap;
-            // TODO(apply_kickoff_result): animation not translated.
+            // DEFERRED(animation): setAnimation not yet ported.
             StepOutcome::cont()
         }
     }
@@ -249,12 +254,12 @@ impl StepApplyKickoffResult {
     }
 
     fn handle_throw_a_rock(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO(apply_kickoff_result): rollThrowARock, randomPlayer, handleInjury, dropPlayer not translated.
+        // DEFERRED(throwARock): rollThrowARock, randomPlayer, handleInjury, dropPlayer not yet ported.
         StepOutcome::next()
     }
 
     fn handle_pitch_invasion(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO(apply_kickoff_result): rollPitchInvasion, stunPlayer not translated.
+        // DEFERRED(pitchInvasion): rollPitchInvasion, stunPlayer not yet ported.
         StepOutcome::next()
     }
 }

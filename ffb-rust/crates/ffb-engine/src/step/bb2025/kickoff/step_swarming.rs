@@ -110,12 +110,12 @@ impl StepSwarming {
                 };
 
                 if placed > self.rolled_amount {
-                    // TODO: show DialogSwarmingErrorParameter and wait.
+                    // DEFERRED: show DialogSwarmingErrorParameter and wait.
                     // For now: reject and continue.
                     return StepOutcome::cont();
                 }
 
-                // TODO: SetupMechanic.checkSetup, then call leave().
+                // DEFERRED: SetupMechanic.checkSetup, then call leave().
                 // Stub: always proceed.
                 self.leave(game);
             }
@@ -126,7 +126,7 @@ impl StepSwarming {
 
         // Reset kicking-swarmers counter if we are handling the kicking team.
         // (Java: if !handleReceivingTeam → gameState.setKickingSwarmers(0).)
-        // TODO: kicking_swarmers field on GameState not yet ported.
+        // DEFERRED: kicking_swarmers field on GameState not yet ported.
 
         // Determine the swarming team.
         let team_id = self.swarming_team_id(game);
@@ -160,8 +160,8 @@ impl StepSwarming {
 
         game.turn_mode = TurnMode::Swarming;
 
-        // TODO: push self back onto stack (StepStack::pushCurrentStepOnStack).
-        // TODO: show DialogSwarmingPlayersParameter.
+        // DEFERRED: push self back onto stack (StepStack::pushCurrentStepOnStack).
+        // DEFERRED: show DialogSwarmingPlayersParameter.
 
         StepOutcome::cont()
     }
@@ -169,13 +169,13 @@ impl StepSwarming {
     fn leave(&mut self, game: &mut Game) {
         // Java: restore PRONE → RESERVE, set TurnMode::Kickoff, refreshPlayersForTurnStart,
         //       clearTrackNumbers, handle receiving-team flip / kicking-swarmers count.
-        // TODO: restore player states (PRONE → RESERVE).
-        // TODO: UtilPlayer.refreshPlayersForTurnStart, fieldModel.clearTrackNumbers.
+        // DEFERRED: restore player states (PRONE → RESERVE).
+        // DEFERRED: UtilPlayer.refreshPlayersForTurnStart, fieldModel.clearTrackNumbers.
 
         if self.handle_receiving_team {
             game.home_playing = !game.home_playing;
         }
-        // TODO: else gameState.setKickingSwarmers(placedSwarmingPlayers).
+        // DEFERRED: else gameState.setKickingSwarmers(placedSwarmingPlayers).
 
         game.turn_mode = TurnMode::Kickoff;
     }

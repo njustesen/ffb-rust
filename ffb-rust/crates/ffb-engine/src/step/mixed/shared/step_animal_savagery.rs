@@ -60,7 +60,7 @@ impl StepAnimalSavagery {
     fn execute_step(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: getGameState().executeStepHooks(this, state)
         // The full logic lives in step hooks (ActionStatus state machine).
-        // TODO(StepHooks port): executeStepHooks — Animal Savagery roll, lash-out attack,
+        // DEFERRED(StepHooks port): executeStepHooks — Animal Savagery roll, lash-out attack,
         //   publish(GOTO_LABEL_ON_FAILURE) or NEXT_STEP based on roll result.
         StepOutcome::next()
     }
@@ -90,7 +90,7 @@ impl Step for StepAnimalSavagery {
                 if *use_skill {
                     // Java: game.getPlayerById(commandUseSkill.getPlayerId()).markUsed(skill, game)
                     // + ReportSkillUse(LASH_OUT_AGAINST_OPPONENT)
-                    // TODO: mark skill used on player when NamedProperties system is ported
+                    // DEFERRED: mark skill used on player when NamedProperties system is ported
                 }
                 self.execute_step(game, rng)
             }
@@ -108,7 +108,7 @@ impl Step for StepAnimalSavagery {
                 // Java: Player catcher = game.getFieldModel().getPlayer(coord); state.catcherId = catcher.getId()
                 // The coordinate-to-player lookup requires the game reference which set_parameter
                 // doesn't receive.  Store as a pending resolve.
-                // TODO: resolve coordinate → player id when game is available (e.g. in start()).
+                // DEFERRED: resolve coordinate → player id when game is available (e.g. in start()).
                 let _ = coord;
                 true
             }

@@ -6,7 +6,7 @@ use crate::step::framework::{StepId, StepParameter};
 
 /// Initialises a Nurgle Rotspawn feeding turn.
 /// Needs `GotoLabelOnEnd`. Handles forced vs. chosen feeding.
-/// TODO: feeding target selection not yet ported.
+/// DEFERRED: feeding target selection not yet ported.
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.shared.StepInitFeeding`.
 pub struct StepInitFeeding {
     pub goto_label_on_end: String,
@@ -53,7 +53,7 @@ impl Step for StepInitFeeding {
 
 impl StepInitFeeding {
     fn execute_step(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO: set up feeding target selection sequence.
+        // DEFERRED: set up feeding target selection sequence.
         StepOutcome::cont()
     }
 }

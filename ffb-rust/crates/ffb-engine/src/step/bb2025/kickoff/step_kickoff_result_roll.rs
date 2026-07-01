@@ -49,7 +49,7 @@ impl Step for StepKickoffResultRoll {
 
     fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java CLIENT_KICK_OFF_RESULT_CHOICE: set fKickoffResult from the command.
-        // TODO: handle overtime kickoff choice dialog (GameOptionId::OVERTIME_KICK_OFF_RESULTS).
+        // DEFERRED: handle overtime kickoff choice dialog (GameOptionId::OVERTIME_KICK_OFF_RESULTS).
         self.execute_step(game, rng)
     }
 

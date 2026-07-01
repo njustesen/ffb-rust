@@ -235,6 +235,14 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
         Action::PlayerChoice { player_id, .. } => {
             player_id.map(|id| ClientCommand::ClientPlayerChoice(ClientPlayerChoice { player_id: id }))
         }
+
+        // Apothecary choice: maps to ClientUseApothecary with no player_id (server resolves from context).
+        // Java: ClientCommandApothecaryChoice — no direct protocol equivalent yet; use confirm as fallback.
+        Action::ApothecaryChoice { .. } => Some(ClientCommand::ClientConfirm(ClientConfirm)),
+
+        // Game lifecycle: CLIENT_START_GAME — not yet wired to a protocol command.
+        // DEFERRED(protocol): add ClientCommandStartGame to ffb-protocol and map here.
+        Action::StartGame { .. } => None,
     }
 }
 

@@ -102,7 +102,7 @@ impl Step for StepInitBomb {
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // CLIENT_USE_SKILL with canForceBombExplosion skill
         if let Action::UseSkill { use_skill, .. } = action {
-            // TODO: addReport(ReportSkillUse)
+            // DEFERRED: addReport(ReportSkillUse)
             if *use_skill {
                 // Java: actingPlayer.markSkillUsed(skill)
                 if let Some(pid) = game.acting_player.player_id.clone() {
@@ -162,12 +162,12 @@ impl StepInitBomb {
         }
 
         if self.catcher_id.is_none() {
-            // TODO: fBombCoordinate = fieldModel.getBombCoordinate()
-            // TODO: bounce logic (BOMB_BOUNCES_ON_EMPTY_SQUARES option)
-            // TODO: publish CATCHER_ID=null
+            // DEFERRED: fBombCoordinate = fieldModel.getBombCoordinate()
+            // DEFERRED: bounce logic (BOMB_BOUNCES_ON_EMPTY_SQUARES option)
+            // DEFERRED: publish CATCHER_ID=null
             StepOutcome::next()
         } else {
-            // TODO: publish CATCHER_ID=catcher_id
+            // DEFERRED: publish CATCHER_ID=catcher_id
             StepOutcome::goto(&self.goto_label_on_end)
         }
     }

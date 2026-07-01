@@ -34,7 +34,7 @@ impl StepEjectPlayer {
 
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
         // Java: UtilBox.putPlayerIntoBox(game, actingPlayer.getPlayer())
-        // TODO: UtilBox not yet ported — player remains on field until UtilBox is implemented
+        // DEFERRED: UtilBox not yet ported — player remains on field until UtilBox is implemented
         // Java: UtilBox.refreshBoxes(game) — also deferred
         // Java: UtilServerGame.updatePlayerStateDependentProperties(this) — deferred
         let _ = game;

@@ -113,14 +113,36 @@ impl StepTrapDoor {
 
     /// Java: `trapDoorTriggered` — apply injury, remove player, scatter ball if needed.
     fn trap_door_triggered(&mut self, game: &mut Game, rng: &mut GameRng, player_id: String, coord: FieldCoordinate) -> StepOutcome {
+        // Java: eligibleForSpp = playerWasPushed && attacker != null && prayerState.hasFanInteraction(attacker.getTeam())
+        // DEFERRED(prayerState): hasFanInteraction not yet ported — always false.
+        let eligible_for_spp = false;
+        let attacker_id = if eligible_for_spp {
+            game.acting_player.player_id.clone()
+        } else {
+            None
+        };
+        let ir = if eligible_for_spp {
+            let mut injury_type = crate::injury::injuryType::injury_type_trap_door_fall_for_spp::InjuryTypeTrapDoorFallForSpp::new();
+            crate::step::util_server_injury::handle_injury(
+                game, rng, &mut injury_type,
+                attacker_id.as_deref(), &player_id, coord, None, None,
+                ApothecaryMode::TrapDoor,
+            )
+        } else {
+            let mut injury_type = crate::injury::injuryType::injury_type_trap_door_fall::InjuryTypeTrapDoorFall::new();
+            crate::step::util_server_injury::handle_injury(
+                game, rng, &mut injury_type,
+                None, &player_id, coord, None, None,
+                ApothecaryMode::TrapDoor,
+            )
+        };
+        ir.apply_to(game);
         let mut outcome = StepOutcome::next();
         for p in self.trap_door_triggered_params(game, coord) {
             outcome = outcome.publish(p);
         }
         // Java: game.getFieldModel().remove(player)
         game.field_model.remove_player(&player_id);
-        // TODO: call UtilServerInjury.handleInjury with TrapDoorFall / TrapDoorFallForSpp
-        // when InjuryType registry is complete.
         outcome
     }
 

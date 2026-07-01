@@ -25,7 +25,7 @@ pub enum GameEvent {
     CatchRoll { player_id: PlayerId, target: i32, roll: i32, success: bool, rerolled: bool },
     PickupRoll { player_id: PlayerId, target: i32, roll: i32, success: bool, rerolled: bool },
     BalefulHexRoll { attacker_id: PlayerId, target_id: PlayerId, roll: i32, success: bool, rerolled: bool },
-    ChainsawRoll { player_id: PlayerId, roll: i32 },
+    ChainsawRoll { player_id: PlayerId, roll: i32, minimum_roll: i32, success: bool, rerolled: bool },
     LookIntoMyEyesRoll { player_id: PlayerId, roll: i32, success: bool, rerolled: bool },
     PickMeUpRoll { player_id: PlayerId, roll: i32, success: bool },
     ConfusionRoll { player_id: PlayerId, roll: i32, confused: bool },
@@ -55,6 +55,8 @@ pub enum GameEvent {
     TrapDoor { player_id: PlayerId, roll: i32, escaped: bool },
 
     // ── Block ──────────────────────────────────────────────────────────────────
+    /// Java: ReportBlock — signals the start of a block action against a defender.
+    Block { defender_id: PlayerId },
     BlockRoll {
         attacker_id: PlayerId,
         defender_id: PlayerId,
@@ -111,7 +113,13 @@ pub enum GameEvent {
     ThenIStartedBlastin { player_id: PlayerId },
 
     // ── Inducements & cards ────────────────────────────────────────────────────
+    /// Java: ReportApothecaryRoll — apo re-rolls the casualty die.
+    ApothecaryRoll { player_id: PlayerId, roll: i32, new_state: u16, new_serious_injury: Option<SeriousInjuryKind> },
     ApothecaryChoice { player_id: PlayerId, healed: bool },
+    /// Java: ReportSelectBlitzTarget (BB2020/BB2025) — attacker selects a blitz target.
+    SelectBlitzTarget { attacker_id: PlayerId, defender_id: PlayerId },
+    /// Java: ReportSelectGazeTarget (BB2020/BB2025) — attacker selects a gaze target.
+    SelectGazeTarget { attacker_id: PlayerId, defender_id: PlayerId },
     CardDeactivated { card_id: String },
     CardEffectRoll { card_id: String, roll: i32, effect: String },
     DefectingPlayers { player_ids: Vec<PlayerId> },

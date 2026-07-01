@@ -9,9 +9,9 @@
 ///
 /// Init parameter: GOTO_LABEL_ON_END (mandatory).
 ///
-/// TODO(Bribes-inducementSet): InducementSet.AVOID_BAN / UtilServerInducementUse deferred.
-/// TODO(Bribes-argueTheCall): GameOptionId.ARGUE_THE_CALL + DiceInterpreter deferred.
-/// TODO(Bribes-dialog): UtilServerDialog deferred.
+/// DEFERRED(Bribes-inducementSet): InducementSet.AVOID_BAN / UtilServerInducementUse not yet ported.
+/// DEFERRED(Bribes-argueTheCall): GameOptionId.ARGUE_THE_CALL + DiceInterpreter not yet ported.
+/// DEFERRED(Bribes-dialog): UtilServerDialog not yet ported.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -44,13 +44,13 @@ impl StepBribes {
 
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let _ = rng;
-        // TODO(Bribes-inducementSet): check for AVOID_BAN inducements.
+        // DEFERRED(Bribes-inducementSet): check for AVOID_BAN inducements.
         if self.bribes_choice.is_none() {
             // No bribes available → skip straight to argue-the-call.
             self.bribes_choice = Some(false);
         }
-        // TODO(Bribes-bribeRoll): if bribes_choice == true, roll bribes.
-        // TODO(Bribes-argueTheCall): if bribes_choice set and argue_the_call_choice is_none, ask.
+        // DEFERRED(Bribes-bribeRoll): if bribes_choice == true, roll bribes.
+        // DEFERRED(Bribes-argueTheCall): if bribes_choice set and argue_the_call_choice is_none, ask.
         if self.bribes_choice == Some(false) && self.argue_the_call_choice.is_none() {
             // No bribe available — also no argue-the-call by default.
             self.argue_the_call_choice = Some(false);

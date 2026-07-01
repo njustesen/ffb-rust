@@ -13,9 +13,9 @@
 /// Consumes: END_TURN, END_PLAYER_ACTION, THROWN_PLAYER_COORDINATE, THROWN_PLAYER_HAS_BALL,
 ///           THROWN_PLAYER_ID, THROWN_PLAYER_STATE, OLD_DEFENDER_STATE, BLOOD_LUST_ACTION.
 ///
-/// TODO(EndTTM-generator): EndPlayerAction / Move SequenceGenerator not yet ported for BB2020.
-/// TODO(EndTTM-dialog): UtilServerDialog.hideDialog deferred.
-/// TODO(EndTTM-bloodlust): UtilServerGame.syncGameModel / UtilServerSteps.changePlayerAction deferred.
+/// DEFERRED(EndTTM-generator): EndPlayerAction / Move SequenceGenerator not yet ported for BB2020.
+/// DEFERRED(EndTTM-dialog): UtilServerDialog.hideDialog deferred.
+/// DEFERRED(EndTTM-bloodlust): UtilServerGame.syncGameModel / UtilServerSteps.changePlayerAction deferred.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::{PlayerState, PlayerAction};
@@ -58,13 +58,13 @@ impl StepEndThrowTeamMate {
     }
 
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
-        // TODO(EndTTM-dialog): UtilServerDialog.hideDialog(gameState).
+        // DEFERRED(EndTTM-dialog): UtilServerDialog.hideDialog(gameState).
         game.pass_coordinate = None;
         game.field_model.range_ruler = None;
         game.defender_id = None;
         game.thrower_id = None;
 
-        // TODO(EndTTM-bloodlust): BB2020 bloodlust check: actingPlayer.isSufferingBloodLust() && bloodlustAction != null.
+        // DEFERRED(EndTTM-bloodlust): BB2020 bloodlust check: actingPlayer.isSufferingBloodLust() && bloodlustAction != null.
         let move_due_to_bloodlust = false; // stub — bloodlust detection deferred
 
         // Reset thrown player to pre-throw coordinate/state if all values present.
@@ -93,9 +93,9 @@ impl StepEndThrowTeamMate {
         }
 
         if move_due_to_bloodlust {
-            // TODO(EndTTM-bloodlust): syncGameModel; changePlayerAction; push Move sequence.
+            // DEFERRED(EndTTM-bloodlust): syncGameModel; changePlayerAction; push Move sequence.
         } else {
-            // TODO(EndTTM-generator): EndPlayerAction.pushSequence(true, true, end_turn).
+            // DEFERRED(EndTTM-generator): EndPlayerAction.pushSequence(true, true, end_turn).
         }
         StepOutcome::next()
     }
@@ -113,7 +113,7 @@ impl Step for StepEndThrowTeamMate {
     }
 
     fn handle_command(&mut self, _action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO(EndTTM-selectGenerator): CLIENT_ACTING_PLAYER → push Select sequence + NEXT_STEP_AND_REPEAT.
+        // DEFERRED(EndTTM-selectGenerator): CLIENT_ACTING_PLAYER → push Select sequence + NEXT_STEP_AND_REPEAT.
         self.execute_step(game)
     }
 

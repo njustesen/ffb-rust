@@ -12,11 +12,13 @@ use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::re_rolled_action::ReRolledAction;
 use ffb_model::util::rng::GameRng;
+use ffb_model::events::GameEvent;
 use crate::action::Action;
 use crate::injury::InjuryTypeChainsawImpl;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::abstract_step_with_re_roll::ReRollState;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use crate::step::util_server_injury::drop_player;
 
 /// Java: `StepBlockChainsaw` (bb2016/block).
 pub struct StepBlockChainsaw {
@@ -54,6 +56,7 @@ impl StepBlockChainsaw {
         }
 
         let mut drop_chainsaw_player = false;
+        let mut pending_event: Option<GameEvent> = None;
 
         // Java: if (ReRolledActions.CHAINSAW == getReRolledAction()) {
         //         if ((getReRollSource() == null) || !UtilServerReRoll.useReRoll(...))
@@ -76,7 +79,6 @@ impl StepBlockChainsaw {
             // Java: boolean reRolled = ((getReRolledAction() == CHAINSAW) && (getReRollSource() != null))
             let re_rolled = is_chainsaw_reroll && self.re_roll.re_roll_source.is_some();
             // Java: if (!reRolled) getResult().setSound(SoundId.CHAINSAW) — not ported
-            let _ = re_rolled;
 
             // Java: int roll = getGameState().getDiceRoller().rollChainsaw()  (rolls d8)
             let roll = rng.d8();
@@ -84,8 +86,14 @@ impl StepBlockChainsaw {
             let minimum_roll = 4;
             let successful = roll >= minimum_roll;
 
-            // Java: getResult().addReport(new ReportChainsawRoll(...))
-            // TODO(chainsaw-report): ReportChainsawRoll not yet ported
+            // Java: getResult().addReport(new ReportChainsawRoll(actingPlayer.getPlayerId(), successful, roll, minimumRoll, reRolled, null))
+            let chainsaw_event = GameEvent::ChainsawRoll {
+                player_id: acting_id.clone(),
+                roll,
+                minimum_roll,
+                success: successful,
+                rerolled: re_rolled,
+            };
 
             if successful {
                 let defender_id = game.defender_id.clone().unwrap_or_default();
@@ -102,13 +110,13 @@ impl StepBlockChainsaw {
                     defender_coord, None, None, ApothecaryMode::Defender,
                 );
 
-                let mut outcome = StepOutcome::goto(&self.goto_label_on_success);
+                let mut outcome = StepOutcome::goto(&self.goto_label_on_success)
+                    .with_event(chainsaw_event);
 
                 // Java: if (injuryResultDefender.injuryContext().isArmorBroken()) {
                 //         publishParameters(UtilServerInjury.dropPlayer(this, game.getDefender(), DEFENDER)); }
                 if injury_result.injury_context().armor_broken {
-                    // TODO(drop-player): UtilServerInjury.dropPlayer parameters not yet fully ported
-                    outcome = outcome.publish(StepParameter::EndTurn(false));
+                    for p in drop_player(game, &defender_id, true) { outcome = outcome.publish(p); }
                 }
                 // Java: publishParameter(new StepParameter(INJURY_RESULT, injuryResultDefender))
                 // Java: getResult().setNextAction(StepAction.GOTO_LABEL, fGotoLabelOnSuccess)
@@ -119,8 +127,9 @@ impl StepBlockChainsaw {
                 if let Some(prompt) = ask_for_reroll_if_available(game, "CHAINSAW", minimum_roll, false) {
                     self.re_roll.set_re_rolled_action(ReRolledAction::new("CHAINSAW"));
                     self.re_roll.re_roll_source = Some(ReRollSource::new("TRR"));
-                    return StepOutcome::cont().with_prompt(prompt);
+                    return StepOutcome::cont().with_event(chainsaw_event).with_prompt(prompt);
                 } else {
+                    pending_event = Some(chainsaw_event);
                     drop_chainsaw_player = true;
                 }
             }
@@ -141,12 +150,13 @@ impl StepBlockChainsaw {
             );
 
             let mut outcome = StepOutcome::goto(&self.goto_label_on_failure);
+            if let Some(ev) = pending_event { outcome = outcome.with_event(ev); }
 
             // Java: if (injuryResultAttacker.injuryContext().isArmorBroken()) {
             //         publishParameters(UtilServerInjury.dropPlayer(this, actingPlayer.getPlayer(), ATTACKER))
             //         publishParameter(new StepParameter(END_TURN, true)) }
             if injury_result.injury_context().armor_broken {
-                // TODO(drop-player): UtilServerInjury.dropPlayer parameters not yet fully ported
+                for p in drop_player(game, &acting_id, false) { outcome = outcome.publish(p); }
                 outcome = outcome.publish(StepParameter::EndTurn(true));
             }
             // Java: publishParameter(new StepParameter(INJURY_RESULT, injuryResultAttacker))

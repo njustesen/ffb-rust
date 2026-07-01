@@ -1,5 +1,6 @@
 use ffb_model::enums::PassingDistance;
 use ffb_model::model::{Game, Player};
+use ffb_model::model::property::named_properties::NamedProperties;
 use crate::mechanic::{Mechanic, MechanicType};
 use crate::modifiers::{PassModifier, StatBasedRollModifier};
 use crate::pass_result::PassResult;
@@ -79,8 +80,11 @@ impl PassMechanicTrait for PassMechanic {
             result_after_modifiers += sbm.get_modifier();
         }
         if pa <= 0 || roll == 1 {
-            // TODO: thrower.has_skill_property(NamedProperties.dontDropFumbles) → SAVED_FUMBLE
-            PassResult::FUMBLE
+            if thrower.has_skill_property(NamedProperties::DONT_DROP_FUMBLES) {
+                PassResult::SAVED_FUMBLE
+            } else {
+                PassResult::FUMBLE
+            }
         } else if roll == 6 || result_after_modifiers >= pa {
             PassResult::ACCURATE
         } else if result_after_modifiers <= 1 {
@@ -134,4 +138,60 @@ impl PassMechanicTrait for PassMechanic {
 
 impl PassMechanic {
     pub fn new() -> Self { PassMechanic }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::enums::{PlayerGender, PlayerType, SkillId};
+    use ffb_model::model::player::Player;
+    use ffb_model::model::skill_def::SkillWithValue;
+
+    fn make_thrower() -> Player {
+        Player {
+            id: "t".into(), name: "t".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 5, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        }
+    }
+
+    #[test]
+    fn roll_one_without_safe_pass_is_fumble() {
+        let m = PassMechanic::new();
+        let thrower = make_thrower();
+        let result = m.evaluate_pass(&thrower, 1, PassingDistance::ShortPass, &[], false, None);
+        assert_eq!(result, PassResult::FUMBLE);
+    }
+
+    #[test]
+    fn roll_one_with_safe_pass_is_saved_fumble() {
+        let m = PassMechanic::new();
+        let mut thrower = make_thrower();
+        thrower.starting_skills.push(SkillWithValue::new(SkillId::SafePass));
+        let result = m.evaluate_pass(&thrower, 1, PassingDistance::ShortPass, &[], false, None);
+        assert_eq!(result, PassResult::SAVED_FUMBLE);
+    }
+
+    #[test]
+    fn no_passing_ability_with_safe_pass_is_saved_fumble() {
+        let m = PassMechanic::new();
+        let mut thrower = make_thrower();
+        thrower.passing = -1;
+        thrower.starting_skills.push(SkillWithValue::new(SkillId::SafePass));
+        // pa <= 0 branch applies SafePass check
+        let result = m.evaluate_pass(&thrower, 3, PassingDistance::ShortPass, &[], false, None);
+        assert_eq!(result, PassResult::SAVED_FUMBLE);
+    }
+
+    #[test]
+    fn no_passing_ability_without_safe_pass_is_fumble() {
+        let m = PassMechanic::new();
+        let mut thrower = make_thrower();
+        thrower.passing = -1;
+        let result = m.evaluate_pass(&thrower, 3, PassingDistance::ShortPass, &[], false, None);
+        assert_eq!(result, PassResult::FUMBLE);
+    }
 }

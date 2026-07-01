@@ -3,6 +3,7 @@ use ffb_model::enums::TurnMode;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_cards::UtilCards;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -68,7 +69,7 @@ impl Step for StepTrickster {
             // Waiting for pick-up choice (ball on destination square)
             if let Action::Acknowledge = action {
                 // Java: CLIENT_PICK_UP_CHOICE → attemptPickUp
-                self.attempt_pick_up = Some(true); // TODO: decode from action
+                self.attempt_pick_up = Some(true); // DEFERRED: decode from action
             }
         } else {
             match action {
@@ -121,7 +122,10 @@ impl StepTrickster {
                 .map(|p| p.has_skill_property(NamedProperties::CAN_MOVE_BEFORE_BEING_BLOCKED))
                 .unwrap_or(false);
 
-            let attacker_cancels = false; // TODO: UtilCards.cancelsSkill check
+            let attacker_cancels = game.acting_player.player_id.as_deref()
+                .and_then(|id| game.player(id))
+                .map(|p| UtilCards::has_skill_to_cancel_property(p, NamedProperties::CAN_MOVE_BEFORE_BEING_BLOCKED))
+                .unwrap_or(false);
 
             if defender_has_trickster
                 && (self.using_chainsaw || self.using_vomit || self.using_stab
@@ -135,7 +139,7 @@ impl StepTrickster {
                         .adjacent_on_pitch(att_coord)
                         .into_iter()
                         .filter(|&c| game.field_model.player_at(c).is_none())
-                        // TODO: filter !isBlockedForTrickster(coord)
+                        // DEFERRED: filter !isBlockedForTrickster(coord)
                         .collect();
                 }
 
@@ -157,7 +161,7 @@ impl StepTrickster {
                 game.turn_mode = TurnMode::Trickster;
                 // Java: game.setHomePlaying(!game.isHomePlaying()) — switch acting team
                 game.home_playing = !game.home_playing;
-                // TODO: fieldModel.clearMoveSquares + add MoveSquares for eligibles
+                // DEFERRED: fieldModel.clearMoveSquares + add MoveSquares for eligibles
                 return StepOutcome::cont();
             } else if self.action_status == TricksterPhase::WaitingForSkillUse {
                 // Java: move defender and update state — then push current step for pick-up
@@ -165,7 +169,7 @@ impl StepTrickster {
                 let to = self.to_coordinate.unwrap();
 
                 // Update multi-block target coordinate if applicable
-                // TODO: fieldModel.replaceMultiBlockTargetCoordinate
+                // DEFERRED: fieldModel.replaceMultiBlockTargetCoordinate
 
                 // Check if defender has ball
                 self.with_ball = game.field_model.ball_coordinate
@@ -200,9 +204,9 @@ impl StepTrickster {
                         self.attempt_pick_up = Some(false);
                     }
                     if let Some(true) = self.attempt_pick_up {
-                        // TODO: publish AttemptPickUp + PlayerOnBallId + PickUpOptional
+                        // DEFERRED: publish AttemptPickUp + PlayerOnBallId + PickUpOptional
                     } else {
-                        // TODO: publish CatchScatterThrowInMode::ScatterBall
+                        // DEFERRED: publish CatchScatterThrowInMode::ScatterBall
                     }
                 }
 
@@ -216,7 +220,7 @@ impl StepTrickster {
     }
 
     fn leave(&mut self, game: &mut Game) -> StepOutcome {
-        game.field_model.ball_moving = false; // TODO: fieldModel.clearMoveSquares
+        game.field_model.clear_move_squares();
         // Java: game.setHomePlaying(!game.isHomePlaying()) — switch back
         game.home_playing = !game.home_playing;
         if let Some(mode) = self.last_turn_mode {
@@ -226,7 +230,7 @@ impl StepTrickster {
     }
 
     fn leave_outcome(&mut self, game: &mut Game, base: StepOutcome) -> StepOutcome {
-        game.field_model.ball_moving = false; // TODO: fieldModel.clearMoveSquares
+        game.field_model.clear_move_squares();
         // Java: game.setHomePlaying(!game.isHomePlaying()) — switch back
         game.home_playing = !game.home_playing;
         if let Some(mode) = self.last_turn_mode {

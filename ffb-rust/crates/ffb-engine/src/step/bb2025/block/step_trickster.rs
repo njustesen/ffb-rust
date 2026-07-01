@@ -1,8 +1,9 @@
-use ffb_model::types::FieldCoordinate;
+use ffb_model::types::{FieldCoordinate, MoveSquare};
 use ffb_model::enums::TurnMode;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_cards::UtilCards;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -70,7 +71,7 @@ impl Step for StepTrickster {
             // Waiting for pick-up choice (ball on destination square)
             if let Action::Acknowledge = action {
                 // Java: CLIENT_PICK_UP_CHOICE → attemptPickUp
-                self.attempt_pick_up = Some(true); // TODO: decode from action
+                self.attempt_pick_up = Some(true); // DEFERRED: decode from action
             }
         } else {
             match action {
@@ -124,7 +125,10 @@ impl StepTrickster {
                 .map(|p| p.has_skill_property(NamedProperties::CAN_MOVE_BEFORE_BEING_BLOCKED))
                 .unwrap_or(false);
 
-            let attacker_cancels = false; // TODO: UtilCards.cancelsSkill check
+            let attacker_cancels = game.acting_player.player_id.as_deref()
+                .and_then(|id| game.player(id))
+                .map(|p| UtilCards::has_skill_to_cancel_property(p, NamedProperties::CAN_MOVE_BEFORE_BEING_BLOCKED))
+                .unwrap_or(false);
 
             if defender_has_trickster
                 && (self.using_chainsaw || self.using_vomit || self.using_stab
@@ -138,7 +142,7 @@ impl StepTrickster {
                         .adjacent_on_pitch(att_coord)
                         .into_iter()
                         .filter(|&c| game.field_model.player_at(c).is_none())
-                        // TODO: filter !isBlockedForTrickster(coord)
+                        .filter(|&c| !game.field_model.is_blocked_for_trickster(c))
                         .collect();
                 }
 
@@ -160,15 +164,20 @@ impl StepTrickster {
                 game.turn_mode = TurnMode::Trickster;
                 // Java: game.setHomePlaying(!game.isHomePlaying()) — switch acting team
                 game.home_playing = !game.home_playing;
-                // TODO: fieldModel.clearMoveSquares + add MoveSquares for eligibles
+                game.field_model.clear_move_squares();
+                for &c in &self.eligible_squares {
+                    game.field_model.add_move_square(MoveSquare::new(c, 0, 0));
+                }
                 return StepOutcome::cont();
             } else if self.action_status == TricksterPhase::WaitingForSkillUse {
                 // Java: move defender and update state — then push current step for pick-up
                 let def_id = defender_id.clone().unwrap_or_default();
                 let to = self.to_coordinate.unwrap();
 
-                // Update multi-block target coordinate if applicable
-                // TODO: fieldModel.replaceMultiBlockTargetCoordinate
+                // Java: fieldModel.replaceMultiBlockTargetCoordinate(defCoordinate, toCoordinate)
+                if let Some(old_coord) = game.field_model.player_coordinate(&def_id) {
+                    game.field_model.replace_multi_block_target_coordinate(old_coord, to);
+                }
 
                 // Check if defender has ball
                 self.with_ball = game.field_model.ball_coordinate
@@ -203,9 +212,9 @@ impl StepTrickster {
                         self.attempt_pick_up = Some(false);
                     }
                     if let Some(true) = self.attempt_pick_up {
-                        // TODO: publish AttemptPickUp + PlayerOnBallId + PickUpOptional
+                        // DEFERRED: publish AttemptPickUp + PlayerOnBallId + PickUpOptional
                     } else {
-                        // TODO: publish CatchScatterThrowInMode::ScatterBall
+                        // DEFERRED: publish CatchScatterThrowInMode::ScatterBall
                     }
                 }
 
@@ -219,7 +228,7 @@ impl StepTrickster {
     }
 
     fn leave(&mut self, game: &mut Game) -> StepOutcome {
-        game.field_model.ball_moving = false; // TODO: fieldModel.clearMoveSquares
+        game.field_model.clear_move_squares();
         // Java: game.setHomePlaying(!game.isHomePlaying()) — switch back
         game.home_playing = !game.home_playing;
         if let Some(mode) = self.last_turn_mode {
@@ -229,7 +238,7 @@ impl StepTrickster {
     }
 
     fn leave_outcome(&mut self, game: &mut Game, base: StepOutcome) -> StepOutcome {
-        game.field_model.ball_moving = false; // TODO: fieldModel.clearMoveSquares
+        game.field_model.clear_move_squares();
         // Java: game.setHomePlaying(!game.isHomePlaying()) — switch back
         game.home_playing = !game.home_playing;
         if let Some(mode) = self.last_turn_mode {
@@ -321,5 +330,76 @@ mod tests {
             &mut GameRng::new(0),
         );
         assert_eq!(step.to_coordinate, Some(coord));
+    }
+
+    /// blocked_for_trickster squares are filtered out of eligible squares.
+    #[test]
+    fn blocked_for_trickster_squares_excluded_from_eligibles() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, PS_STANDING, PlayerState, PlayerAction, SkillId};
+
+        let mut game = make_game();
+
+        // Attacker at (5,5)
+        let attacker = Player {
+            id: "att".into(), name: "a".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        };
+        let defender = Player {
+            id: "def".into(), name: "d".into(), nr: 2, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            // Trickster skill = canMoveBeforeBeingBlocked
+            starting_skills: vec![ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::Trickster, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        };
+        game.team_home.players.push(attacker);
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        game.acting_player.set_player("att".into(), PlayerAction::Block);
+
+        game.team_away.players.push(defender);
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.defender_id = Some("def".into());
+
+        // Block (6,6) for trickster
+        game.field_model.blocked_for_trickster_coordinates.insert(FieldCoordinate::new(6, 6));
+
+        let mut step = StepTrickster::new();
+        let _out = step.start(&mut game, &mut GameRng::new(0));
+
+        // No eligible square should be (6,6)
+        assert!(!step.eligible_squares.contains(&FieldCoordinate::new(6, 6)));
+    }
+
+    /// After leave(), move_squares are cleared.
+    #[test]
+    fn leave_clears_move_squares() {
+        let mut step = StepTrickster::new();
+        step.using_trickster = Some(true);
+        step.last_turn_mode = Some(TurnMode::Regular);
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Trickster;
+        // Populate a stale move square
+        game.field_model.add_move_square(MoveSquare::new(FieldCoordinate::new(3, 3), 0, 0));
+        step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
+        assert!(game.field_model.move_squares.is_empty());
+    }
+
+    /// replace_multi_block_target_coordinate replaces old coord with new.
+    #[test]
+    fn replace_multi_block_target_coord_works() {
+        let mut game = make_game();
+        let old = FieldCoordinate::new(3, 3);
+        let new = FieldCoordinate::new(4, 4);
+        game.field_model.multi_block_target_coordinates.insert(old);
+        game.field_model.replace_multi_block_target_coordinate(old, new);
+        assert!(!game.field_model.multi_block_target_coordinates.contains(&old));
+        assert!(game.field_model.multi_block_target_coordinates.contains(&new));
     }
 }

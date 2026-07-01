@@ -79,7 +79,7 @@ impl StepStallingPlayer {
         let successful = roll >= 5;
 
         // Java: getResult().addReport(new ReportThrowAtStallingPlayer(playerId, roll, successful))
-        // TODO(stalling_player): emit ReportThrowAtStallingPlayer event
+        // DEFERRED(stalling_player): emit ReportThrowAtStallingPlayer event
         let _ = (roll, successful);
 
         if successful {
@@ -106,15 +106,15 @@ impl StepStallingPlayer {
             };
 
             // Java: getResult().setAnimation(new Animation(AnimationType.THROW_A_ROCK, startCoordinate, playerCoordinate))
-            // TODO(stalling_player): emit animation event
+            // DEFERRED(stalling_player): emit animation event
 
             // Java: UtilServerGame.syncGameModel(this)
-            // TODO(stalling_player): syncGameModel when infra is available
+            // DEFERRED(stalling_player): syncGameModel when infra is available
 
             // Java: StepParameterSet pParameterSet = UtilServerInjury.dropPlayer(this, player, ApothecaryMode.HIT_PLAYER, true)
             // Java: pParameterSet.remove(StepParameterKey.END_TURN)
             // Java: publishParameters(pParameterSet)
-            // TODO(stalling_player): publish drop_player parameters when UtilServerInjury.dropPlayer is available for HIT_PLAYER mode
+            // DEFERRED(stalling_player): publish drop_player parameters when UtilServerInjury.dropPlayer is available for HIT_PLAYER mode
 
             // Java: publishParameter(new StepParameter(StepParameterKey.INJURY_RESULT,
             //   UtilServerInjury.handleInjury(this, new InjuryTypeThrowARockStalling(),

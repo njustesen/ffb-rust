@@ -34,7 +34,7 @@ impl Step for StepEndKickoff {
 impl StepEndKickoff {
     fn execute_step(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: pushes EndTurnSequence + InducementPhase::AfterKickoffToOpponent.
-        // TODO: push Inducement(AfterKickoffToOpponent) sequence.
+        // DEFERRED: push Inducement(AfterKickoffToOpponent) sequence.
         StepOutcome::next().push_seq(end_turn_sequence(false))
     }
 }

@@ -149,25 +149,25 @@ impl StepInitScatterPlayer {
             return StepOutcome::next();
         }
 
-        // TODO: let swooping = swoop_direction.is_some() && using_swoop;
+        // DEFERRED: let swooping = swoop_direction.is_some() && using_swoop;
         //
-        // TODO: if !swooping && thrownPlayerState.base == PICKED_UP:
+        // DEFERRED: if !swooping && thrownPlayerState.base == PICKED_UP:
         //   thrownPlayerState = changeBase(IN_THE_AIR)
         //   fieldModel.setPlayerState(thrownPlayer, thrownPlayerState)
         //
-        // TODO: if using_bullseye:
+        // DEFERRED: if using_bullseye:
         //   endCoordinate = game.passCoordinate
         //   animation; handleLanding(thrownPlayer, endCoordinate); return
         //
-        // TODO: startCoordinate = if throwScatter { game.passCoordinate } else { thrownPlayerCoordinate }
+        // DEFERRED: startCoordinate = if throwScatter { game.passCoordinate } else { thrownPlayerCoordinate }
         //
-        // TODO: if swooping:
+        // DEFERRED: if swooping:
         //   doRoll check; scatterResult = swoop(startCoord, swoopDirection, distanceOption)
         //   thrownPlayerState = changeBase(IN_THE_AIR)
         // else:
         //   scatterResult = UtilThrowTeamMateSequence.scatterPlayer(...)
         //
-        // TODO: if scatterResult.inBounds: handleLanding
+        // DEFERRED: if scatterResult.inBounds: handleLanding
         //   else: TtmToCrowdHandler; publish params; NEXT_STEP
 
         StepOutcome::next()

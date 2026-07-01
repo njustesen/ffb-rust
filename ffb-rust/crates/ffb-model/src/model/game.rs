@@ -133,6 +133,22 @@ impl Game {
         self.team_home.player(id).or_else(|| self.team_away.player(id))
     }
 
+    /// Find a player mutably by id (searches both teams).
+    pub fn player_mut(&mut self, id: &str) -> Option<&mut crate::model::player::Player> {
+        if self.team_home.player(id).is_some() {
+            self.team_home.player_mut(id)
+        } else {
+            self.team_away.player_mut(id)
+        }
+    }
+
+    /// Mark a skill as used for the given player (Java: actingPlayer.markSkillUsed / player.addUsedSkill).
+    pub fn mark_skill_used(&mut self, player_id: &str, skill_id: crate::enums::SkillId) {
+        if let Some(player) = self.player_mut(player_id) {
+            player.used_skills.insert(skill_id);
+        }
+    }
+
     pub fn is_finished(&self) -> bool {
         matches!(self.status, GameStatus::Finished)
     }
@@ -299,5 +315,32 @@ mod tests {
         assert_eq!(g.player("h1").map(|p| p.name.as_str()), Some("HomePlayer"));
         assert_eq!(g.player("a1").map(|p| p.name.as_str()), Some("AwayPlayer"));
         assert!(g.player("x99").is_none());
+    }
+
+    #[test]
+    fn mark_skill_used_inserts_into_player_used_skills() {
+        use std::collections::HashSet;
+        use crate::enums::{PlayerType, PlayerGender, SkillId, Rules};
+        use crate::model::player::Player;
+        let mut home = empty_team("home");
+        home.players.push(Player {
+            id: "p1".into(), name: "P".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        let mut g = Game::new(home, empty_team("away"), Rules::Bb2020);
+        assert!(!g.player("p1").unwrap().used_skills.contains(&SkillId::BlastIt));
+        g.mark_skill_used("p1", SkillId::BlastIt);
+        assert!(g.player("p1").unwrap().used_skills.contains(&SkillId::BlastIt));
+    }
+
+    #[test]
+    fn mark_skill_used_unknown_player_is_noop() {
+        let mut g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2020);
+        // Should not panic
+        g.mark_skill_used("nonexistent", crate::enums::SkillId::BlastIt);
     }
 }

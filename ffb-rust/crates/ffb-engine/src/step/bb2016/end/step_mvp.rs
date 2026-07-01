@@ -8,10 +8,9 @@
 /// - Otherwise: auto-rolls random MVP for each team.
 /// - Records player awards and emits ReportMostValuablePlayers.
 ///
-/// TODO(Mvp-options): GameOptionId.EXTRA_MVP, MVP_NOMINATIONS deferred.
-/// TODO(Mvp-dialog): DialogPlayerChoiceParameter deferred.
-/// TODO(Mvp-randomPlayerId): DiceRoller.randomPlayerId deferred.
-/// TODO(Mvp-findPlayers): player state filtering (killed, recovering injury, NurglesRot) deferred.
+/// extraMvp option → wired (+1 each per team). mvpNominations option → wired (get_int).
+/// DEFERRED(Mvp-dialog): DialogPlayerChoiceParameter not yet ported.
+/// DEFERRED(Mvp-findPlayers): recovering_injury and NurglesRot player result filtering not yet ported.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -56,7 +55,11 @@ impl StepMvp {
         if self.nr_of_home_mvps == 0 && self.nr_of_away_mvps == 0 {
             self.nr_of_home_mvps = 1;
             self.nr_of_away_mvps = 1;
-            // TODO(Mvp-options): EXTRA_MVP → +1 each.
+            // Java: if (UtilGameOption.isOptionEnabled(game, GameOptionId.EXTRA_MVP)) { +=1 each }
+            if game.options.is_enabled("extraMvp") {
+                self.nr_of_home_mvps += 1;
+                self.nr_of_away_mvps += 1;
+            }
             // Illegal concession bonus.
             if game.game_result.home.conceded && !game.conceded_legally {
                 self.nr_of_home_mvps = 0;
@@ -67,23 +70,31 @@ impl StepMvp {
                 self.nr_of_away_mvps = 0;
             }
         }
-        // TODO(Mvp-nominations): MVP_NOMINATIONS dialog loop.
+        // Java: int mvpNominations = UtilGameOption.getIntOption(game, GameOptionId.MVP_NOMINATIONS)
+        let mvp_nominations: i32 = game.options.get_int("mvpNominations").unwrap_or(0);
+        let _ = mvp_nominations; // DEFERRED(mvp-dialog): nominations dialog loop not yet ported.
         // Auto-roll: pick one random player per side using rng.
+        // Java: DiceRoller.randomPlayerId(findPlayerIdsForMvp(team)) — filter killed players.
+        // DEFERRED(Mvp-findPlayers): recovering_injury and NurglesRot result filtering not yet ported.
         if self.nr_of_home_choices < self.nr_of_home_mvps {
-            let players: Vec<String> = game.team_home.players.iter().map(|p| p.id.clone()).collect();
+            let players: Vec<String> = game.team_home.players.iter()
+                .filter(|p| !game.field_model.player_state(&p.id).map(|s| s.is_killed()).unwrap_or(false))
+                .map(|p| p.id.clone())
+                .collect();
             if !players.is_empty() {
                 let idx = rng.range(players.len());
-                let mvp_id = players[idx].clone();
-                self.home_players_mvp.push(mvp_id);
+                self.home_players_mvp.push(players[idx].clone());
             }
             self.nr_of_home_choices += 1;
         }
         if self.nr_of_away_choices < self.nr_of_away_mvps {
-            let players: Vec<String> = game.team_away.players.iter().map(|p| p.id.clone()).collect();
+            let players: Vec<String> = game.team_away.players.iter()
+                .filter(|p| !game.field_model.player_state(&p.id).map(|s| s.is_killed()).unwrap_or(false))
+                .map(|p| p.id.clone())
+                .collect();
             if !players.is_empty() {
                 let idx = rng.range(players.len());
-                let mvp_id = players[idx].clone();
-                self.away_players_mvp.push(mvp_id);
+                self.away_players_mvp.push(players[idx].clone());
             }
             self.nr_of_away_choices += 1;
         }
@@ -144,6 +155,16 @@ mod tests {
     }
 
     #[test]
+    fn extra_mvp_option_adds_one_to_each_team() {
+        let mut game = make_game();
+        game.options.set("extraMvp", "true");
+        let mut step = StepMvp::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(step.nr_of_home_mvps, 2);
+        assert_eq!(step.nr_of_away_mvps, 2);
+    }
+
+    #[test]
     fn home_concede_gives_away_extra_mvp() {
         let mut game = make_game();
         game.game_result.home.conceded = true;
@@ -163,5 +184,27 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(step.nr_of_home_mvps, 2);
         assert_eq!(step.nr_of_away_mvps, 0);
+    }
+
+    #[test]
+    fn killed_player_is_not_eligible_for_mvp() {
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_RIP};
+        use ffb_model::model::player::Player;
+        use std::collections::HashSet;
+        let mut game = make_game();
+        // Add one killed player to home team.
+        game.team_home.players.push(Player {
+            id: "dead1".into(), name: "Dead".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        game.field_model.set_player_state("dead1", PlayerState::new(PS_RIP));
+        let mut step = StepMvp::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        // dead1 must not appear in home_players_mvp.
+        assert!(!step.home_players_mvp.contains(&"dead1".to_string()));
     }
 }

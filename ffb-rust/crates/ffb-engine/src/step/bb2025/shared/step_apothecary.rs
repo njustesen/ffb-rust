@@ -12,6 +12,7 @@ use ffb_model::enums::{
     PlayerState, PS_BADLY_HURT, PS_KNOCKED_OUT, PS_RESERVE, PS_SERIOUS_INJURY, PS_STUNNED,
     SeriousInjuryKind,
 };
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::prompts::AgentPrompt;
@@ -79,7 +80,7 @@ impl StepApothecary {
             ApothecaryStatus::UseApothecary => {
                 // Java: if (rollApothecary()) { setStatus(WAIT_FOR_APOTHECARY_USE); doNextStep=false }
                 //       else { setStatus(RESULT_CHOICE) }
-                let showed_dialog = self.roll_apothecary(rng);
+                let (showed_dialog, apo_roll_event) = self.roll_apothecary(rng);
                 if showed_dialog {
                     let defender_id = self.injury_result.as_ref()
                         .and_then(|ir| ir.injury_context.defender_id.clone())
@@ -87,13 +88,16 @@ impl StepApothecary {
                     self.injury_result.as_mut().unwrap().injury_context.apothecary_status =
                         ApothecaryStatus::WaitForApothecaryUse;
                     do_next_step = false;
-                    return StepOutcome::cont().with_prompt(AgentPrompt::ApothecaryChoice {
+                    let mut out = StepOutcome::cont().with_prompt(AgentPrompt::ApothecaryChoice {
                         player_id: defender_id,
                         can_heal: true,
                     });
+                    if let Some(ev) = apo_roll_event { out = out.with_event(ev); }
+                    return out;
                 } else {
                     self.injury_result.as_mut().unwrap().injury_context.apothecary_status =
                         ApothecaryStatus::ResultChoice;
+                    // apo_roll_event is None in the no-dialog path (no roll taken for BADLY_HURT/KO)
                 }
             }
             ApothecaryStatus::DoNotUseApothecary => {
@@ -116,7 +120,7 @@ impl StepApothecary {
                 }
                 ApothecaryStatus::UseIgor => {
                     // Java: find Igor/plague-doctor inducement, useInducement, handleRegeneration
-                    // TODO(inducement): UtilServerInducementUse.useInducement + handleRegeneration
+                    // DEFERRED(inducement): UtilServerInducementUse.useInducement + handleRegeneration
                 }
                 _ => {
                     // Java: fInjuryResult.applyTo(this)
@@ -129,14 +133,14 @@ impl StepApothecary {
                     //     if (!UtilServerInjury.handleRegeneration(this, player)) { ... Igor dialog ... }
                     //     else { curePoison() }
                     // }
-                    // TODO(regen): handleRegeneration + Igor dialog + curePoison
+                    // DEFERRED(regen): handleRegeneration + Igor dialog + curePoison
                 }
             }
         }
 
         if do_next_step {
             // Java: UtilServerInjury.handleInjurySideEffects(this, fInjuryResult)
-            // TODO(sideEffects): kick player, MVP, SPP, getting-even, raise-dead
+            // DEFERRED(sideEffects): kick player, MVP, SPP, getting-even, raise-dead
             StepOutcome::next()
         } else {
             StepOutcome::cont()
@@ -147,20 +151,22 @@ impl StepApothecary {
     ///
     /// Marks the apothecary used, rolls a new casualty die.
     /// Returns true if a choice dialog is needed (two meaningfully different outcomes).
-    fn roll_apothecary(&mut self, rng: &mut GameRng) -> bool {
+    fn roll_apothecary(&mut self, rng: &mut GameRng) -> (bool, Option<GameEvent>) {
         // Java: use_apo(turnData, apothecaryType)
-        // TODO(TurnData): TurnData.useApothecary not yet ported
+        // DEFERRED(TurnData): TurnData.useApothecary not yet ported
 
         let ir = match self.injury_result.as_ref() {
             Some(ir) => ir,
-            None => return false,
+            None => return (false, None),
         };
         let player_state_base = ir.injury_context.injury.map(|s| s.base()).unwrap_or(PS_BADLY_HURT);
+        let player_id = ir.injury_context.defender_id.clone().unwrap_or_default();
 
         // Java: apothecaryChoice = !(BADLY_HURT || KNOCKED_OUT)
         let mut apothecary_choice =
             player_state_base != PS_BADLY_HURT && player_state_base != PS_KNOCKED_OUT;
 
+        let mut apo_event: Option<GameEvent> = None;
         if apothecary_choice {
             // Java: newInjuryResult = roll new casualty die + interpret
             // Java: apothecaryChoice = (newState != BADLY_HURT)
@@ -170,7 +176,12 @@ impl StepApothecary {
                 else { PS_BADLY_HURT };
             apothecary_choice = new_state_base != PS_BADLY_HURT;
             // Java: addReport(new ReportApothecaryRoll(defender, casualtyRoll, newState, newSI, origSI, mods))
-            // TODO(report): ReportApothecaryRoll not yet ported
+            apo_event = Some(GameEvent::ApothecaryRoll {
+                player_id,
+                roll,
+                new_state: new_state_base as u16,
+                new_serious_injury: None,
+            });
         }
 
         if !apothecary_choice {
@@ -180,17 +191,17 @@ impl StepApothecary {
             ir.injury_context.serious_injury = None;
             if player_state_base == PS_KNOCKED_OUT {
                 // Java: injuryType.canApoKoIntoStun() — most types return false; default to STUNNED for safety
-                // TODO(injuryType): check can_apo_ko_into_stun on the injury type
+                // DEFERRED(injuryType): check can_apo_ko_into_stun on the injury type
                 ir.injury_context.set_injury(PlayerState::new(PS_STUNNED));
             } else {
                 // Java: curePoison(); setInjury(RESERVE)
-                // TODO(CardEffect): curePoison — remove POISONED card effect from field model
+                // DEFERRED(CardEffect): curePoison — remove POISONED card effect from field model
                 ir.injury_context.set_injury(PlayerState::new(PS_RESERVE));
             }
             // Java: addReport(new ReportApothecaryChoice(defenderId, playerState, null))
         }
 
-        apothecary_choice
+        (apothecary_choice, apo_event)
     }
 
     /// Java: private void handleApothecaryChoice(PlayerState pPlayerState, SeriousInjury pSeriousInjury)
@@ -241,8 +252,15 @@ impl Step for StepApothecary {
                 }
             }
             // Java: CLIENT_APOTHECARY_CHOICE → handleApothecaryChoice(state, seriousInjury)
-            // TODO(Action): add Action::ApothecaryChoice { player_id, player_state, serious_injury }
-            //   for now, handled via UseSkill { skill_id: fake, use_skill: true/false } as a placeholder.
+            Action::ApothecaryChoice { player_state, serious_injury } => {
+                if self.injury_result.is_some() {
+                    let ps = PlayerState::new(*player_state);
+                    let si: Option<SeriousInjuryKind> = serious_injury.as_deref().and_then(|s| {
+                        serde_json::from_str(&format!("\"{}\"", s)).ok()
+                    });
+                    self.handle_apothecary_choice(ps, si);
+                }
+            }
             _ => {}
         }
         self.execute_step(game, rng)
@@ -513,5 +531,73 @@ mod tests {
         step.roll_apothecary(&mut GameRng::new(0));
         let result = step.injury_result.as_ref().unwrap().injury_context.injury.unwrap().base();
         assert_eq!(result, PS_RESERVE);
+    }
+
+    #[test]
+    fn apothecary_choice_action_badly_hurt_cures_to_reserve() {
+        let mut game = make_game();
+        let mut step = StepApothecary::default();
+        step.apothecary_mode = Some(ApothecaryMode::Defender);
+        let mut ir = make_ir(ApothecaryMode::Defender, ApothecaryStatus::WaitForApothecaryUse);
+        ir.injury_context.set_injury(PlayerState::new(PS_BADLY_HURT));
+        step.injury_result = Some(ir);
+        let action = Action::ApothecaryChoice { player_state: PS_BADLY_HURT, serious_injury: None };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        let result = step.injury_result.as_ref().unwrap();
+        assert_eq!(result.injury_context.injury.unwrap().base(), PS_RESERVE);
+        assert_eq!(result.injury_context.apothecary_status, ApothecaryStatus::ResultChoice);
+    }
+
+    #[test]
+    fn apothecary_choice_action_serious_injury_name_parsed() {
+        let mut game = make_game();
+        let mut step = StepApothecary::default();
+        step.apothecary_mode = Some(ApothecaryMode::Defender);
+        step.injury_result = Some(make_ir(ApothecaryMode::Defender, ApothecaryStatus::WaitForApothecaryUse));
+        let action = Action::ApothecaryChoice {
+            player_state: PS_SERIOUS_INJURY,
+            serious_injury: Some("HeadInjuryAv".into()),
+        };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        let result = step.injury_result.as_ref().unwrap();
+        assert_eq!(result.injury_context.serious_injury, Some(SeriousInjuryKind::HeadInjuryAv));
+        assert_eq!(result.injury_context.apothecary_status, ApothecaryStatus::ResultChoice);
+    }
+
+    #[test]
+    fn apothecary_choice_action_no_injury_result_noop() {
+        let mut game = make_game();
+        let mut step = StepApothecary::default();
+        let action = Action::ApothecaryChoice { player_state: 0, serious_injury: None };
+        // Should not panic
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(step.injury_result.is_none());
+    }
+
+    #[test]
+    fn roll_apothecary_serious_injury_emits_apothecary_roll_event() {
+        let mut step = StepApothecary::default();
+        step.apothecary_mode = Some(ApothecaryMode::Defender);
+        let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+        ir.injury_context.defender_id = Some("d1".to_string());
+        ir.injury_context.set_injury(PlayerState::new(PS_SERIOUS_INJURY));
+        step.injury_result = Some(ir);
+        let (showed_dialog, event) = step.roll_apothecary(&mut GameRng::new(0));
+        // Serious injury triggers a real roll → event should be Some
+        assert!(event.is_some());
+        assert!(matches!(event.unwrap(), GameEvent::ApothecaryRoll { .. }));
+    }
+
+    #[test]
+    fn roll_apothecary_ko_emits_no_event() {
+        let mut step = StepApothecary::default();
+        step.apothecary_mode = Some(ApothecaryMode::Defender);
+        let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+        ir.injury_context.defender_id = Some("d1".to_string());
+        ir.injury_context.set_injury(PlayerState::new(PS_KNOCKED_OUT));
+        step.injury_result = Some(ir);
+        let (_showed_dialog, event) = step.roll_apothecary(&mut GameRng::new(0));
+        // KO → no roll taken → no event
+        assert!(event.is_none());
     }
 }

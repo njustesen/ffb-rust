@@ -1,3 +1,4 @@
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::enums::PlayerAction;
 use ffb_model::model::game::Game;
@@ -30,10 +31,9 @@ use crate::step::util_server_steps::change_player_action;
 ///          FOUL_DEFENDER_ID, GAZE_VICTIM_ID, HAIL_MARY_PASS, MOVE_STACK,
 ///          TARGET_COORDINATE, THROWN_PLAYER_ID, KICKED_PLAYER_ID, NR_OF_DICE, USING_STAB.
 ///
-/// DEFERRED(bloodlust): isSufferingBloodLust path not yet ported.
-/// DEFERRED(removeConfusion): REMOVE_CONFUSION path not yet ported.
-/// DEFERRED(standUp): STAND_UP / STAND_UP_BLITZ paths not yet ported.
-/// DEFERRED(setHasMoved): actingPlayer.setHasMoved(true) for REMOVE_CONFUSION not yet ported.
+/// isSufferingBloodLust, REMOVE_CONFUSION (with setHasMoved), STAND_UP / STAND_UP_BLITZ are all wired.
+/// DEFERRED(dialog): UtilServerDialog.hideDialog not yet ported (client-side only).
+/// DEFERRED(updatePersistence): gameCache.queueDbUpdate not yet ported.
 pub struct StepEndSelecting {
     /// Java: fEndTurn
     pub end_turn: bool,
@@ -121,7 +121,7 @@ impl Step for StepEndSelecting {
 impl StepEndSelecting {
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: UtilServerDialog.hideDialog(getGameState())
-        // TODO: hide dialog — not yet ported
+        // DEFERRED(dialog): dialog layer not yet translated
 
         // ── Branch 1: end turn or end player action ─────────────────────────────
         if self.end_turn || self.end_player_action {
@@ -263,9 +263,48 @@ impl StepEndSelecting {
                 };
                 StepOutcome::next().push_seq(seq)
             }
-            // TODO(removeConfusion): REMOVE_CONFUSION + STAND_UP + STAND_UP_BLITZ paths not yet ported
+            PlayerAction::RemoveConfusion => {
+                // Java: actingPlayer.setHasMoved(true); endGenerator.pushSequence(endParams)
+                game.acting_player.has_moved = true;
+                let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
+                    feeding_allowed: true,
+                    end_player_action: false,
+                    end_turn: false,
+                });
+                StepOutcome::next().push_seq(seq)
+            }
+            PlayerAction::StandUp => {
+                // Java: if inflictsConfusion → move seq; else → end seq
+                let has_gaze = game.acting_player.player_id.as_deref()
+                    .and_then(|id| game.player(id))
+                    .map(|p| p.has_skill_property(NamedProperties::INFLICTS_CONFUSION))
+                    .unwrap_or(false);
+                let seq = if has_gaze {
+                    Move::build_sequence(&MoveParams {
+                        move_stack: self.move_stack.clone(),
+                        gaze_victim_id: self.gaze_victim_id.clone(),
+                        ..Default::default()
+                    })
+                } else {
+                    EndPlayerAction::build_sequence(&EndPlayerActionParams {
+                        feeding_allowed: true,
+                        end_player_action: false,
+                        end_turn: false,
+                    })
+                };
+                StepOutcome::next().push_seq(seq)
+            }
+            PlayerAction::StandUpBlitz => {
+                // Java: game.getTurnData().setBlitzUsed(true); endGenerator.pushSequence(endParams)
+                game.turn_data_mut().blitz_used = true;
+                let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
+                    feeding_allowed: true,
+                    end_player_action: false,
+                    end_turn: false,
+                });
+                StepOutcome::next().push_seq(seq)
+            }
             _ => {
-                // Fallback: EndPlayerAction
                 let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
                     feeding_allowed: true,
                     end_player_action: false,
@@ -438,5 +477,38 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!out.pushes.is_empty(), "blood lust should still push Move sequence for moving action");
+    }
+
+    #[test]
+    fn remove_confusion_sets_has_moved_and_pushes_end_player_action() {
+        let mut game = make_game();
+        let mut step = StepEndSelecting::new();
+        step.dispatch_player_action = Some(PlayerAction::RemoveConfusion);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "RemoveConfusion should push EndPlayerAction sequence");
+        assert!(game.acting_player.has_moved, "RemoveConfusion must set has_moved=true");
+    }
+
+    #[test]
+    fn stand_up_without_gaze_pushes_end_player_action() {
+        let mut game = make_game();
+        let mut step = StepEndSelecting::new();
+        step.dispatch_player_action = Some(PlayerAction::StandUp);
+        // acting_player has no player_id set → no gaze skill → EndPlayerAction path
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "StandUp without HypnoticGaze should push EndPlayerAction");
+    }
+
+    #[test]
+    fn stand_up_blitz_sets_blitz_used_and_pushes_end_player_action() {
+        let mut game = make_game();
+        let mut step = StepEndSelecting::new();
+        step.dispatch_player_action = Some(PlayerAction::StandUpBlitz);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "StandUpBlitz should push EndPlayerAction sequence");
+        assert!(game.turn_data().blitz_used, "StandUpBlitz must set blitz_used=true");
     }
 }

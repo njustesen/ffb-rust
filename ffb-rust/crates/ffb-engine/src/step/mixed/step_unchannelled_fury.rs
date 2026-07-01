@@ -49,7 +49,7 @@ impl StepUnchannelledFury {
 
     fn execute_step(&mut self, _game: &mut Game) -> StepOutcome {
         // Java: getGameState().executeStepHooks(this, state)
-        // TODO(StepHooks port): roll D6 for Unchannelled Fury; on failure:
+        // DEFERRED(StepHooks port): roll D6 for Unchannelled Fury; on failure:
         //   publish END_PLAYER_ACTION=true and goto(goto_label_on_failure).
         //   If status==YES (using "canPerformTwoBlocksAfterFailedFury" skill), skip the goto.
         StepOutcome::next()

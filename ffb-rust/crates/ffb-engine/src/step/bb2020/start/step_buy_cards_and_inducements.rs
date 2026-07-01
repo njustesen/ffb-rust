@@ -14,22 +14,22 @@
 /// In "parallel" mode (equal-TV games with allowEvenCTV option set) both teams buy
 /// simultaneously: BuyInducements commands are buffered and applied in leaveStep().
 ///
-/// TODO(BuyCardsAndInducements-options): GameOptionId checks (INDUCEMENTS, USE_PREDEFINED_INDUCEMENTS,
+/// DEFERRED(BuyCardsAndInducements-options): GameOptionId checks (INDUCEMENTS, USE_PREDEFINED_INDUCEMENTS,
 ///   FREE_INDUCEMENT_CASH, FREE_CARD_CASH, INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV,
 ///   INDUCEMENTS_ALLOW_OVERDOG_SPENDING, INDUCEMENTS_ALWAYS_USE_TREASURY, CARDS_SPECIAL_PLAY_COST,
 ///   MAX_NR_OF_CARDS, ALLOW_STAR_ON_BOTH_TEAMS, ALLOW_STAFF_ON_BOTH_TEAMS,
 ///   INDUCEMENT_MERCENARIES_EXTRA_COST, INDUCEMENT_MERCENARIES_SKILL_COST,
 ///   INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG) all deferred.
-/// TODO(BuyCardsAndInducements-decks): CardTypeFactory / CardDeck / card-choice randomisation deferred.
-/// TODO(BuyCardsAndInducements-addStarPlayers): RosterPlayer creation + sendAddedPlayers deferred.
-/// TODO(BuyCardsAndInducements-addMercenaries): RosterPlayer mercenary creation / Loner skill injection deferred.
-/// TODO(BuyCardsAndInducements-addStaff): InfamousStaff RosterPlayer creation deferred.
-/// TODO(BuyCardsAndInducements-inducementCosts): InducementTypeFactory cost calculation deferred.
-/// TODO(BuyCardsAndInducements-briberyAndCorruption): SpecialRule::BriberyAndCorruption handling deferred.
-/// TODO(BuyCardsAndInducements-rerollOnesOnKOs): NamedProperties::canReRollOnesOnKORecovery handling deferred.
-/// TODO(BuyCardsAndInducements-generators): Kickoff + Inducement(AFTER_INDUCEMENTS_PURCHASED) sequence
+/// DEFERRED(BuyCardsAndInducements-decks): CardTypeFactory / CardDeck / card-choice randomisation deferred.
+/// DEFERRED(BuyCardsAndInducements-addStarPlayers): RosterPlayer creation + sendAddedPlayers deferred.
+/// DEFERRED(BuyCardsAndInducements-addMercenaries): RosterPlayer mercenary creation / Loner skill injection deferred.
+/// DEFERRED(BuyCardsAndInducements-addStaff): InfamousStaff RosterPlayer creation deferred.
+/// DEFERRED(BuyCardsAndInducements-inducementCosts): InducementTypeFactory cost calculation deferred.
+/// DEFERRED(BuyCardsAndInducements-briberyAndCorruption): SpecialRule::BriberyAndCorruption handling deferred.
+/// DEFERRED(BuyCardsAndInducements-rerollOnesOnKOs): NamedProperties::canReRollOnesOnKORecovery handling deferred.
+/// DEFERRED(BuyCardsAndInducements-generators): Kickoff + Inducement(AFTER_INDUCEMENTS_PURCHASED) sequence
 ///   push in leaveStep deferred until Kickoff.build_sequence() is implemented.
-/// TODO(BuyCardsAndInducements-dialog): DialogBuyCardsAndInducementsParameter / CLIENT_SELECT_CARD_TO_BUY
+/// DEFERRED(BuyCardsAndInducements-dialog): DialogBuyCardsAndInducementsParameter / CLIENT_SELECT_CARD_TO_BUY
 ///   / CLIENT_BUY_INDUCEMENTS dialog path deferred.
 use ffb_model::enums::InducementPhase;
 use ffb_model::model::game::Game;
@@ -124,35 +124,35 @@ impl StepBuyCardsAndInducements {
         if self.phase == Phase::Done {
             self.leave_step(game, rng)
         } else {
-            // TODO(BuyCardsAndInducements-dialog): return Continue when the dialog is shown.
+            // DEFERRED(BuyCardsAndInducements-dialog): return Continue when the dialog is shown.
             StepOutcome::cont()
         }
     }
 
     /// Java: `init(Game game)` — determine who has petty cash and set initial phase.
     fn init(&mut self, game: &mut Game) {
-        // TODO(BuyCardsAndInducements-options): check GameOptionId::INDUCEMENTS.
-        // TODO(BuyCardsAndInducements-options): check USE_PREDEFINED_INDUCEMENTS.
-        // TODO(BuyCardsAndInducements-decks): buildDecks().
-        // TODO(BuyCardsAndInducements-options): read FREE_INDUCEMENT_CASH + FREE_CARD_CASH.
+        // DEFERRED(BuyCardsAndInducements-options): check GameOptionId::INDUCEMENTS.
+        // DEFERRED(BuyCardsAndInducements-options): check USE_PREDEFINED_INDUCEMENTS.
+        // DEFERRED(BuyCardsAndInducements-decks): buildDecks().
+        // DEFERRED(BuyCardsAndInducements-options): read FREE_INDUCEMENT_CASH + FREE_CARD_CASH.
 
         let petty_home = game.game_result.home.petty_cash_from_tv_diff;
         let petty_away = game.game_result.away.petty_cash_from_tv_diff;
 
-        // TODO(BuyCardsAndInducements-options): check INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV.
-        // TODO(BuyCardsAndInducements-options): check INDUCEMENTS_ALLOW_OVERDOG_SPENDING.
+        // DEFERRED(BuyCardsAndInducements-options): check INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV.
+        // DEFERRED(BuyCardsAndInducements-options): check INDUCEMENTS_ALLOW_OVERDOG_SPENDING.
         // For now: use petty_cash_from_tv_diff to decide who is the underdog.
         if petty_home > 0 {
             // Away is the overdog; home team (underdog) shops first.
             self.phase = Phase::Home;
             self.available_inducement_gold_home = Some(petty_home);
-            // TODO(BuyCardsAndInducements-dialog): showDialog for home.
+            // DEFERRED(BuyCardsAndInducements-dialog): showDialog for home.
             // Fall through to swap_team / leave if no dialog triggered.
         } else if petty_away > 0 {
             // Home is the overdog; away team (underdog) shops first.
             self.phase = Phase::Away;
             self.available_inducement_gold_away = Some(petty_away);
-            // TODO(BuyCardsAndInducements-dialog): showDialog for away.
+            // DEFERRED(BuyCardsAndInducements-dialog): showDialog for away.
         } else {
             // Equal TV and no treasury spending: skip.
             self.available_inducement_gold_home = Some(0);
@@ -163,7 +163,7 @@ impl StepBuyCardsAndInducements {
 
     /// Java: `handleCard()` — apply the selected card and refresh choices.
     fn handle_card(&mut self) {
-        // TODO(BuyCardsAndInducements-decks): full card handling deferred.
+        // DEFERRED(BuyCardsAndInducements-decks): full card handling deferred.
         // Java: deduct cardPrice from gold, add chosen card to inducement set,
         //       call updateChoices() to draw next pair for the coach.
         self.current_selection = None;
@@ -177,13 +177,13 @@ impl StepBuyCardsAndInducements {
         match self.phase {
             Phase::Home if self.available_inducement_gold_away.is_none() => {
                 self.phase = Phase::Away;
-                // TODO(BuyCardsAndInducements-dialog): showDialog for away if gold > min.
+                // DEFERRED(BuyCardsAndInducements-dialog): showDialog for away if gold > min.
                 // If dialog not shown: DONE.
                 self.phase = Phase::Done;
             }
             Phase::Away if self.available_inducement_gold_home.is_none() => {
                 self.phase = Phase::Home;
-                // TODO(BuyCardsAndInducements-dialog): showDialog for home.
+                // DEFERRED(BuyCardsAndInducements-dialog): showDialog for home.
                 self.phase = Phase::Done;
             }
             _ => {
@@ -194,7 +194,7 @@ impl StepBuyCardsAndInducements {
 
     /// Java: `leaveStep()` — push sequences, record gold spent, NEXT_STEP.
     fn leave_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO(BuyCardsAndInducements-generators): apply buffered buyInducementCommands.
+        // DEFERRED(BuyCardsAndInducements-generators): apply buffered buyInducementCommands.
 
         let new_tv_home = game.team_home.team_value
             + self.used_inducement_gold_home;
@@ -202,10 +202,10 @@ impl StepBuyCardsAndInducements {
             + self.used_inducement_gold_away;
 
         // Java: if parallel → addReport for both teams now (serial: already reported per-command).
-        // TODO(BuyCardsAndInducements-report): ReportCardsAndInducementsBought deferred.
+        // DEFERRED(BuyCardsAndInducements-report): ReportCardsAndInducementsBought deferred.
 
         // Java: push Kickoff sequence (always first).
-        // TODO(BuyCardsAndInducements-generators): push Kickoff.build_sequence() when implemented.
+        // DEFERRED(BuyCardsAndInducements-generators): push Kickoff.build_sequence() when implemented.
         //   Kickoff::build_sequence(game.rules)
 
         // Java: push Inducement(AFTER_INDUCEMENTS_PURCHASED) × 2.
@@ -230,16 +230,16 @@ impl StepBuyCardsAndInducements {
         let seq_riotous = RiotousRookies::build_sequence();
 
         // Java: check INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG option → push PRAYERS step.
-        // TODO(BuyCardsAndInducements-prayers): prayers step push deferred.
+        // DEFERRED(BuyCardsAndInducements-prayers): prayers step push deferred.
 
         // Java: record treasury_spent_on_inducements / petty_cash_used for both teams.
-        // TODO(BuyCardsAndInducements-accounting): TeamResult treasury/petty-cash accounting deferred.
+        // DEFERRED(BuyCardsAndInducements-accounting): TeamResult treasury/petty-cash accounting deferred.
 
         // Java: BriberyAndCorruption special rule handling.
-        // TODO(BuyCardsAndInducements-briberyAndCorruption): deferred.
+        // DEFERRED(BuyCardsAndInducements-briberyAndCorruption): deferred.
 
         // Java: canReRollOnesOnKORecovery handling.
-        // TODO(BuyCardsAndInducements-rerollOnesOnKOs): deferred.
+        // DEFERRED(BuyCardsAndInducements-rerollOnesOnKOs): deferred.
 
         // Java: publishParameter(INDUCEMENT_GOLD_HOME, newTvHome)
         // Java: publishParameter(INDUCEMENT_GOLD_AWAY, newTvAway)
@@ -275,7 +275,7 @@ impl Step for StepBuyCardsAndInducements {
         //     EXECUTE_STEP
         match action {
             Action::BuyInducements { .. } => {
-                // TODO(BuyCardsAndInducements-dialog): handle BuyInducements action when ported.
+                // DEFERRED(BuyCardsAndInducements-dialog): handle BuyInducements action when ported.
                 // In parallel mode: buffer; in serial mode: apply immediately and generate report.
             }
             _ => {}

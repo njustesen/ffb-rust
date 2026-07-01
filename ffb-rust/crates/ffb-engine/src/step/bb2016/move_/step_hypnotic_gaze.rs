@@ -2,12 +2,15 @@ use ffb_model::enums::{PlayerAction, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_cards::UtilCards;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::abstract_step_with_re_roll::ReRollState;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
-use ffb_mechanics::mechanics::minimum_roll_hypnotic_gaze;
+use ffb_mechanics::mechanics::minimum_roll_base_bb2016;
+use ffb_mechanics::modifiers::bb2016::gaze_modifier_collection::GazeModifierCollection;
+use ffb_mechanics::modifiers::gaze_modifier_context::GazeModifierContext;
 use crate::dice_interpreter::DiceInterpreter;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2016.move.StepHypnoticGaze.
@@ -27,8 +30,6 @@ use crate::dice_interpreter::DiceInterpreter;
 ///
 /// Sets stepParameter END_PLAYER_ACTION for all steps on the stack.
 ///
-/// DEFERRED(gazeModifiers): GazeModifierFactory / modifier collection not yet ported.
-/// DEFERRED(cancelsSkill): UtilCards.hasSkillToCancelProperty not yet ported.
 /// DEFERRED(sound): SoundId.HYPNO not yet ported.
 pub struct StepHypnoticGaze {
     /// Java: fGotoLabelOnEnd
@@ -109,13 +110,16 @@ impl StepHypnoticGaze {
                 .unwrap_or(false);
             consumed
         } else {
-            // Java: gazeSkill.isPresent() && !hasSkillToCancelProperty
-            // TODO(cancelsSkill): hasSkillToCancelProperty not yet ported
+            // Java: gazeSkill.isPresent() && !hasSkillToCancelProperty(actingPlayer, inflictsConfusion)
             let has_gaze_skill = player_id.as_deref()
                 .and_then(|id| game.player(id))
                 .map(|p| p.has_skill_property(NamedProperties::INFLICTS_CONFUSION))
                 .unwrap_or(false);
-            has_gaze_skill
+            let has_cancel = player_id.as_deref()
+                .and_then(|id| game.player(id))
+                .map(|p| UtilCards::has_skill_to_cancel_property(p, NamedProperties::INFLICTS_CONFUSION))
+                .unwrap_or(false);
+            has_gaze_skill && !has_cancel
         };
 
         if do_gaze {
@@ -128,12 +132,16 @@ impl StepHypnoticGaze {
 
             let roll = rng.d6();
 
-            // TODO(gazeModifiers): use GazeModifierFactory — stub minimum roll
-            let agility = player_id.as_deref()
-                .and_then(|id| game.player(id))
-                .map(|p| p.agility as i32)
-                .unwrap_or(3);
-            let minimum_roll = minimum_roll_hypnotic_gaze(agility, &[]);
+            let player = player_id.as_deref().and_then(|id| game.player(id));
+            let agility = player.map(|p| p.agility_with_modifiers()).unwrap_or(3);
+            let gaze_col = GazeModifierCollection::new();
+            let modifier_total: i32 = if let Some(p) = player {
+                let ctx = GazeModifierContext::new(game, p);
+                gaze_col.find_applicable(&ctx).iter().map(|m| m.get_modifier()).sum()
+            } else {
+                0
+            };
+            let minimum_roll = minimum_roll_base_bb2016(agility, modifier_total);
             let successful = DiceInterpreter::is_skill_roll_successful(roll, minimum_roll);
 
             if successful {
@@ -312,6 +320,19 @@ mod tests {
     fn gaze_with_opposite_team_defender_goes_to_end_label() {
         let (mut game, mut step) = setup_gaze_game();
         game.turn_data_home.rerolls = 0;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.goto_label.as_deref(), Some("end"));
+    }
+
+    #[test]
+    fn ball_and_chain_cancels_hypnotic_gaze() {
+        // BallAndChain has cancelsInflictsConfusion — player with both skills cannot gaze.
+        // Since do_gaze=false but do_gaze_initial=true, gaze is attempted but fails skill check,
+        // goto_end_label=true → GotoLabel (end player action).
+        let (mut game, mut step) = setup_gaze_game();
+        game.turn_data_home.rerolls = 0;
+        game.team_home.player_mut("a1").unwrap()
+            .starting_skills.push(SkillWithValue::new(SkillId::BallAndChain));
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.goto_label.as_deref(), Some("end"));
     }

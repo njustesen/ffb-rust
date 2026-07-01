@@ -42,7 +42,7 @@ impl StepThrowKeg {
 
     fn execute_step(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: full logic requires UtilCards.getUnusedSkillWithProperty, DiceRoller, injury pipeline.
-        // TODO(skills/injury port):
+        // DEFERRED(skills/injury port):
         //   1. Check actingPlayer.hasUnusedSkillWithProperty(canThrowKeg)
         //   2. Roll D6, report ReportThrownKeg
         //   3. On success: animate + hitPlayer(target, false)

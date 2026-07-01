@@ -83,7 +83,7 @@ impl StepStallingPlayer {
 
         if no_stalling || is_prone_or_stunned {
             // Java: if (gotRid || scored) { addReport(new ReportPlayerEvent(id, "did not stall after all")) }
-            // TODO: emit ReportPlayerEvent("did not stall after all") game event
+            // DEFERRED: emit ReportPlayerEvent("did not stall after all") game event
             let _ = (got_rid, scored);
             return StepOutcome::next();
         }

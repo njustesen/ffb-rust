@@ -17,7 +17,7 @@
 ///
 /// Init params: GOTO_LABEL_ON_FAILURE (mandatory).
 ///
-/// TODO: re-roll path (WAITING_FOR_RE_ROLL / TRR) for Wild Animal not translated.
+/// DEFERRED(wildAnimalReroll): re-roll path via executeStepHooks (WildAnimalHook) not yet ported.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2016.StepWildAnimal`.
 use ffb_model::model::game::Game;

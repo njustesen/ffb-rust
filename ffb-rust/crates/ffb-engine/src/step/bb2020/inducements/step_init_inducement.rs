@@ -7,7 +7,7 @@ use crate::step::framework::{StepId, StepParameter};
 
 /// Initializes the inducement sequence: checks which inducements can be used at the given
 /// phase, shows dialog, then routes to the appropriate sub-sequence generator.
-/// TODO: InducementType handling and sequence generator routing not yet ported.
+/// DEFERRED: InducementType handling and sequence generator routing not yet ported.
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2020.inducements.StepInitInducement`.
 pub struct StepInitInducement {
     /// Java: fInducementPhase (init param)
@@ -54,7 +54,7 @@ impl Step for StepInitInducement {
     }
 
     fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // TODO: handle CLIENT_USE_INDUCEMENT command once Action::UseInducement is ported.
+        // DEFERRED: handle CLIENT_USE_INDUCEMENT command once Action::UseInducement is ported.
         self.end_inducement_phase = true;
         self.execute_step(game, rng)
     }
@@ -70,7 +70,7 @@ impl Step for StepInitInducement {
 
 impl StepInitInducement {
     fn execute_step(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO: InducementType routing, sequence generators (Wizard/ThrowARock/WeatherMage).
+        // DEFERRED: InducementType routing, sequence generators (Wizard/ThrowARock/WeatherMage).
         let phase = match self.inducement_phase {
             Some(p) => p,
             None => return StepOutcome::next(),

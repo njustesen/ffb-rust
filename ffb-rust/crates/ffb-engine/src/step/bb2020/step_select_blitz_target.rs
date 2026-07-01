@@ -3,15 +3,17 @@
 /// Prompts the active coach to select a target for the blitz action, or handles special-skill
 /// sequences (Treacherous, RaidingParty, etc.) and WisdomOfTheWhiteDwarf.
 ///
-/// TODOs:
+/// DEFERRED items:
 ///  - EndPlayerAction / EndTurn cancel path (clear stack + EndPlayerAction sequence) not translated.
 ///  - TargetSelectionState (skip / cancel) not translated.
-///  - ReportSelectBlitzTarget not translated.
+///  - ReportSelectBlitzTarget: now wired as GameEvent::SelectBlitzTarget.
 ///  - usedSkill skill-enhancement sequences not translated (Treacherous, RaidingParty,
 ///    BalefulHex, LookIntoMyEyes, BlackInk, ThenIStartedBlastin, CatchOfTheDay, AutoGazeZoat).
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2020.StepSelectBlitzTarget`.
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::model::target_selection_state::TargetSelectionState;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::TurnMode;
 use crate::action::Action;
@@ -63,7 +65,7 @@ impl Step for StepSelectBlitzTarget {
             }
             Action::UseSkill { skill_id, use_skill } if *use_skill => {
                 let skill_name = format!("{skill_id:?}");
-                // TODO(select_blitz_target): skill-enhancement generators not translated.
+                // DEFERRED(select_blitz_target): skill-enhancement generators not translated.
                 // Treacherous, RaidingParty, BalefulHex, LookIntoMyEyes, BlackInk,
                 // ThenIStartedBlastin, CatchOfTheDay, AutoGazeZoat all push sequences
                 // here and return StepAction::Repeat. For now fall through to execute_step.
@@ -76,7 +78,7 @@ impl Step for StepSelectBlitzTarget {
                 self.confirmed = true;
             }
             // CLIENT_USE_TEAM_MATES_WISDOM → push WisdomOfTheWhiteDwarf sequence + Repeat
-            // TODO(select_blitz_target): No dedicated Action variant for this yet.
+            // DEFERRED(select_blitz_target): No dedicated Action variant for this yet.
             _ => {}
         }
         self.execute_step(game, rng)
@@ -97,7 +99,7 @@ impl StepSelectBlitzTarget {
         // Case 1: End player action or end turn triggered
         if self.end_player_action || self.end_turn {
             game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
-            // TODO(select_blitz_target): clear stack and push EndPlayerAction sequence not translated.
+            // DEFERRED(select_blitz_target): clear stack and push EndPlayerAction sequence not translated.
             return StepOutcome::next();
         }
 
@@ -107,10 +109,14 @@ impl StepSelectBlitzTarget {
         if self.selected_player_id.is_none() {
             if self.has_standing_opponents(game) {
                 game.turn_mode = TurnMode::SelectBlitzTarget;
-                // TODO(select_blitz_target): dialog prompt not translated.
+                // DEFERRED(select_blitz_target): dialog prompt not translated.
                 return StepOutcome::cont();
             } else {
-                // TODO(select_blitz_target): TargetSelectionState::skip() not translated.
+                // Java: setTargetSelectionState(new TargetSelectionState(null).skip()) — no targets available
+                // TargetSelectionState has no skip() method; use cancel() as the closest equivalent.
+                let mut ts = TargetSelectionState::default();
+                ts.cancel();
+                game.field_model.target_selection_state = Some(ts);
                 return StepOutcome::next();
             }
         }
@@ -123,12 +129,15 @@ impl StepSelectBlitzTarget {
             // Selected the acting player itself
             let has_acted = game.acting_player.has_acted;
             if has_acted && !self.confirmed {
-                // TODO(select_blitz_target): confirm dialog not translated.
+                // DEFERRED(select_blitz_target): confirm dialog not translated.
                 return StepOutcome::cont();
             } else {
                 // Cancel blitz target: restore last turn mode and goto end label
                 game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
-                // TODO(select_blitz_target): TargetSelectionState::cancel() not translated.
+                // Java: setTargetSelectionState(new TargetSelectionState(actingPlayerId).cancel())
+                let mut ts = TargetSelectionState::default();
+                ts.cancel();
+                game.field_model.target_selection_state = Some(ts);
                 if self.goto_label_on_end.is_empty() {
                     return StepOutcome::next();
                 }
@@ -145,11 +154,18 @@ impl StepSelectBlitzTarget {
         if is_on_inactive_team {
             // Selected an opponent → valid blitz target
             game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
-            // TODO(select_blitz_target): add SelectedBlitzTarget state bit not translated.
-            // TODO(select_blitz_target): TargetSelectionState update not translated.
-            // TODO(select_blitz_target): ReportSelectBlitzTarget not translated.
-            // TODO(select_blitz_target): usedSkill skill-enhancements not translated.
-            StepOutcome::next()
+            // DEFERRED(select_blitz_target): add SelectedBlitzTarget state bit not translated.
+            // Java: setTargetSelectionState(new TargetSelectionState(selectedPlayerId).select().commit())
+            let mut ts = TargetSelectionState::new(selected_id.clone());
+            ts.select();
+            ts.commit();
+            game.field_model.target_selection_state = Some(ts);
+            // DEFERRED(select_blitz_target): usedSkill skill-enhancements not translated.
+            let attacker_id = game.acting_player.player_id.clone().unwrap_or_default();
+            StepOutcome::next().with_event(GameEvent::SelectBlitzTarget {
+                attacker_id,
+                defender_id: selected_id,
+            })
         } else {
             // Selected own teammate (not acting player): restore last turn mode
             game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
@@ -342,5 +358,90 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         // No blockable opponent -> NextStep
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn no_opponents_sets_target_selection_state_canceled() {
+        use ffb_model::model::target_selection_state::TargetSelectionState;
+        let mut game = make_game();
+        game.home_playing = true;
+        let mut step = StepSelectBlitzTarget::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        // No opponents → cancel path → target_selection_state should be Some(canceled)
+        let ts = game.field_model.target_selection_state.as_ref().unwrap();
+        assert!(ts.is_canceled());
+    }
+
+    #[test]
+    fn selecting_opponent_sets_target_selection_state_selected() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::model::target_selection_state::TargetSelectionState;
+
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("home_p1".into());
+
+        let pid = "away_p1".to_string();
+        game.team_away.players.push(Player {
+            id: pid.clone(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+        });
+        game.field_model.set_player_coordinate(&pid, FieldCoordinate::new(10, 7));
+        game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
+
+        let mut step = StepSelectBlitzTarget::new();
+        step.selected_player_id = Some(pid.clone());
+        step.start(&mut game, &mut GameRng::new(0));
+
+        let ts = game.field_model.target_selection_state.as_ref().unwrap();
+        assert!(ts.is_selected());
+        assert!(ts.is_committed());
+        assert_eq!(ts.get_selected_player_id().map(|id| id.as_str()), Some(pid.as_str()));
+    }
+
+    #[test]
+    fn selecting_self_sets_target_selection_state_canceled() {
+        use ffb_model::model::target_selection_state::TargetSelectionState;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("actor".into());
+        game.acting_player.has_acted = false;
+        let mut step = StepSelectBlitzTarget::new();
+        step.goto_label_on_end = "END".into();
+        step.selected_player_id = Some("actor".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        let ts = game.field_model.target_selection_state.as_ref().unwrap();
+        assert!(ts.is_canceled());
+    }
+
+    #[test]
+    fn selecting_opponent_emits_select_blitz_target_event() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use std::collections::HashSet;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("attacker".into());
+        game.team_away.players.push(Player {
+            id: "defender".into(), name: "Defender".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        game.field_model.set_player_coordinate("defender", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("defender", PlayerState::new(PS_STANDING));
+        let mut step = StepSelectBlitzTarget::new();
+        step.selected_player_id = Some("defender".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.events.iter().any(|e| matches!(e, GameEvent::SelectBlitzTarget {
+            defender_id, ..
+        } if defender_id == "defender")));
     }
 }

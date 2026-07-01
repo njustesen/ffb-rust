@@ -48,12 +48,10 @@ impl InjuryMechanicTrait for InjuryMechanic {
         team_result: &TeamResult,
         dead_player: &Player,
     ) -> bool {
-        // TODO: dead_player.has_skill_property(NamedProperties.preventRaiseFromDead)
-        let _ = dead_player;
         team.special_rules.iter().any(|r| r == SpecialRule::MASTERS_OF_UNDEATH.get_rule_name())
             && team_result.raised_dead == 0
-            // TODO: dead_player.strength_with_modifiers() <= 4 (needs modifier support)
-            // TODO: !dead_player.has_skill_property(preventRaiseFromDead)
+            && dead_player.strength_with_modifiers() <= 4
+            && !dead_player.has_skill_property(NamedProperties::PREVENT_RAISE_FROM_DEAD)
     }
 
     fn raised_nurgle_type(&self) -> PlayerType { PlayerType::PlagueRidden }

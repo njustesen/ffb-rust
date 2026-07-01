@@ -3,7 +3,7 @@
 /// Determines how many Prayers to Nuffle the lower-TV team receives, builds a sequence of
 /// StepPrayer steps (one per prayer), and pushes them onto the stack.
 ///
-/// TODOs:
+/// DEFERRED items:
 ///  - PrayerFactory.availablePrayerRolls() not translated → uses fixed rolls 1..=16.
 ///  - ReportPrayerAmount event not translated.
 ///
@@ -66,13 +66,13 @@ impl StepPrayers {
         if prayer_amount > 0 {
             let home_team_receives = self.tv_home < self.tv_away;
 
-            // TODO(prayers): PrayerFactory.availablePrayerRolls() not translated.
+            // DEFERRED(prayers): PrayerFactory.availablePrayerRolls() not translated.
             // Use a fixed pool of rolls 1..=16.
             let mut available_rolls: Vec<i32> = (1..=16).collect();
 
             prayer_amount = prayer_amount.min(available_rolls.len() as i32);
 
-            // TODO(prayers): ReportPrayerAmount event not translated.
+            // DEFERRED(prayers): ReportPrayerAmount event not translated.
 
             let praying_team_id = if home_team_receives {
                 game.team_home.id.clone()

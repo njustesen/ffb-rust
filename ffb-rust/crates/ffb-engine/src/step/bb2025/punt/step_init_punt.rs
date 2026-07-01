@@ -93,7 +93,7 @@ impl StepInitPunt {
 
         if let Some(coord) = self.coordinate_to {
             let from = player_coord;
-            // TODO: game.field_model.clear_move_squares() once MoveSquare model is ported.
+            game.field_model.clear_move_squares();
             return StepOutcome::next()
                 .publish(StepParameter::CoordinateTo(coord))
                 .publish(StepParameter::CoordinateFrom(from));

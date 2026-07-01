@@ -352,7 +352,7 @@ impl StepCatchScatterThrowIn {
                 .map(|id| id.clone());
             catcher_id = catcher_at_ball;
             // Java: check QuickBite adjacents
-            // TODO: QuickBite sequence when NamedProperties::CAN_ATTACK_OPPONENT_FOR_BALL_AFTER_CATCH is implemented
+            // DEFERRED: QuickBite sequence when NamedProperties::CAN_ATTACK_OPPONENT_FOR_BALL_AFTER_CATCH is implemented
         }
 
         let mut out = StepOutcome::next().with_events(events);
@@ -457,7 +457,7 @@ impl StepCatchScatterThrowIn {
         // Java: spiked-ball check (UtilGameOption.isOptionEnabled(SPIKED_BALL)
         //        || game.isActive(NamedProperties.droppedBallCausesArmourRoll))
         // When triggered: push SpikedBallApo sub-sequence, set mode, then return.
-        // TODO: SPIKED_BALL game option and droppedBallCausesArmourRoll skill — no-op for now
+        // DEFERRED: SPIKED_BALL game option and droppedBallCausesArmourRoll skill — no-op for now
         if player_under_ball.is_some() && ball_in_play {
             // Spiked ball path — skipped (TODO)
         }
@@ -655,9 +655,9 @@ impl StepCatchScatterThrowIn {
     }
 
     /// Java: deactivateCards() — deactivate WHILE_HOLDING_THE_BALL cards for non-carriers.
-    /// TODO: card system not yet fully implemented in ffb-model (no-op currently).
+    /// DEFERRED: card system not yet fully implemented in ffb-model (no-op currently).
     fn deactivate_cards(&self, _game: &mut Game) {
-        // TODO: iterate game.all_players(), deactivate cards with InducementDuration::WHILE_HOLDING_THE_BALL
+        // DEFERRED: iterate game.all_players(), deactivate cards with InducementDuration::WHILE_HOLDING_THE_BALL
         //        for players where !UtilPlayer::has_ball(game, player)
     }
 
@@ -706,7 +706,7 @@ impl StepCatchScatterThrowIn {
                 if self.re_roll_state.re_roll_source.is_none() && !self.evaluate {
                     self.re_roll_state.re_rolled_action = None;
                     // Java: addReport(ReportSkillUse for canAttemptCatchInAdjacentSquares)
-                    // TODO: emit skill-use event
+                    // DEFERRED: emit skill-use event
                 }
                 let mode = self.catch_ball(game, rng);
                 let current_mode = self.catch_scatter_throw_in_mode;
@@ -833,7 +833,7 @@ impl StepCatchScatterThrowIn {
             // Java BB2020: no Blast-it (grantsCatchBonusToReceiver) check here
             // Java BB2020: state.rerollCatch check via executeStepHooks (if not already rerolled)
             if !already_rerolled {
-                // TODO: state.rerollCatch (from executeStepHooks) — skip for now
+                // DEFERRED: state.rerollCatch (from executeStepHooks) — skip for now
                 if let Some(prompt) = ask_for_reroll_if_available(game, "CATCH", min_roll, false) {
                     self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("CATCH"));
                     self.re_roll_state.re_roll_source = Some(ffb_model::enums::ReRollSource::new("TRR"));

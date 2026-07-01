@@ -74,7 +74,7 @@ impl Step for StepInitInducement {
             }
         }
         // Java: CLIENT_USE_INDUCEMENT with spell type
-        // TODO: dedicated Action::UseInducement variant (mapped from WizardSpell for now)
+        // DEFERRED(action): dedicated Action::UseInducement variant not yet ported.
         if let Action::WizardSpell { spell: _, coord: _ } = action {
             // Treat as a spell-type inducement — push Wizard sequence
             self.inducement_type = Some("SPELL".to_string());
@@ -114,21 +114,19 @@ impl StepInitInducement {
             // Java: fTouchdownOrEndOfHalf = UtilServerSteps.checkTouchdown(getGameState())
             // Java: find playable cards + useable inducements
             // Java: if any → show dialog; else → leaveStep(true)
-            // TODO: UtilServerSteps.checkTouchdown, card/inducement lookup
-            // Stub: check if dialog was pending; if not yet prompted, show (Continue)
-            // For now advance — hooks will inject actual logic
+            // DEFERRED(checkTouchdown+lookup): UtilServerSteps.checkTouchdown, card/inducement lookup not yet ported.
             return self.leave_step(true);
         }
 
         if self.inducement_type.as_deref() == Some("SPELL") {
             // Java: push Wizard sequence
-            // TODO: SequenceGeneratorFactory.Wizard.pushSequence(...)
+            // DEFERRED(generator): SequenceGeneratorFactory.Wizard.pushSequence not yet ported.
             return self.leave_step(false);
         }
 
         if self.card.is_some() {
             // Java: push Card sequence
-            // TODO: SequenceGeneratorFactory.Card.pushSequence(...)
+            // DEFERRED(generator): SequenceGeneratorFactory.Card.pushSequence not yet ported.
             return self.leave_step(false);
         }
 

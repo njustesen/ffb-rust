@@ -8,6 +8,7 @@ use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::util_server_injury::handle_injury_by_name;
 use crate::util::UtilServerPlayerMove;
+use crate::util::util_server_pushback::UtilServerPushback;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.block.StepPushback.
 /// Handles player pushback and crowd-push. The Java StepState fields are inlined here.
@@ -124,19 +125,17 @@ impl StepPushback {
                 // (throws if null — we just proceed without the defender check in the stub)
 
                 // Java: executeStepHooks for Side Step / Stand Firm
-                // TODO: Side Step / Stand Firm skill hooks (executeStepHooks not yet translated)
+                // DEFERRED: Side Step / Stand Firm skill hooks (executeStepHooks not yet translated)
 
                 // Java: pushbackSquares = UtilServerPushback.findPushbackSquares(game, startingSq, REGULAR)
                 // Java: fieldModel.add(pushbackSquares)
-                // TODO: UtilServerPushback.findPushbackSquares — not yet translated.
-                // For now: find free adjacent squares to approximate.
-                let adjacent_free: Vec<FieldCoordinate> = game.field_model
-                    .adjacent_on_pitch(defender_coord)
-                    .into_iter()
-                    .filter(|&c| game.field_model.player_at(c).is_none())
-                    .collect();
+                let home_choice = game.home_playing;
+                let occupied = |c: FieldCoordinate| game.field_model.player_at(c).is_some();
+                let pushback_squares = UtilServerPushback::find_pushback_squares_standard(
+                    starting_sq, &occupied, home_choice,
+                );
 
-                let pushback_squares_found = !adjacent_free.is_empty();
+                let pushback_squares_found = !pushback_squares.is_empty();
 
                 // Java: if (!ArrayTool.isProvided(state.pushbackSquares)) → Crowd push
                 if !pushback_squares_found {
@@ -196,9 +195,9 @@ impl StepPushback {
                 // Java: if (state.startingPushbackSquare == null) addReport(ReportPushback(...))
                 // (startingPushbackSquare is still set here — this branch is for when it was just cleared above)
 
-                // Add candidate pushback squares to the field model so the client can display them.
-                // TODO: add actual PushbackSquares to field_model.pushback_squares via UtilServerPushback
-                // For now, just wait for the agent to call PushTo.
+                // Java: fieldModel.add(state.pushbackSquares)
+                game.field_model.pushback_squares.clear();
+                game.field_model.pushback_squares.extend(pushback_squares);
                 return StepOutcome::cont();
             }
         }
@@ -239,14 +238,14 @@ fn push_player(game: &mut Game, player_id: &str, coord: FieldCoordinate) {
     if game.field_model.ball_moving
         && game.field_model.ball_coordinate.map(|bc| bc == coord).unwrap_or(false)
     {
-        // TODO: publish CatchScatterThrowInMode::ScatterBall + PushedOnBall(true)
+        // DEFERRED: publish CatchScatterThrowInMode::ScatterBall + PushedOnBall(true)
         // These are published through the StepOutcome chain but push_player is a free fn.
         // The outer execute_step call would need to collect these — deferred until full
         // publish-from-inner-fn pattern is available.
     }
     // Java: publishParameter(PLAYER_ENTERING_SQUARE, pPlayer.getId())
     // Java: publishParameter(PLAYER_WAS_PUSHED, true)
-    // TODO: publish PlayerEnteringSquare + PlayerWasPushed through caller
+    // DEFERRED: publish PlayerEnteringSquare + PlayerWasPushed through caller
 }
 
 #[cfg(test)]
@@ -437,5 +436,22 @@ mod tests {
         step.handle_command(&Action::PushTo { coord }, &mut game, &mut GameRng::new(0));
         // After a successful push the square should be cleared
         assert!(step.starting_pushback_square.is_none());
+    }
+
+    /// find_pushback_squares_standard populates field_model.pushback_squares (not just adjacent).
+    #[test]
+    fn starting_square_populates_field_model_pushback_squares() {
+        let mut step = StepPushback::new();
+        // Defender at (10,7) — ample room for all three pushback directions (North push → NW/N/NE)
+        let coord = FieldCoordinate::new(10, 7);
+        step.starting_pushback_square = Some(PushbackSquare::new(coord, Direction::North, true));
+        let mut game = make_game();
+        game.defender_id = Some("p1".into());
+        // No players blocking adjacent squares
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // Should wait for client (squares were found)
+        assert_eq!(out.action, StepAction::Continue);
+        // Field model should now have 3 pushback squares (NW, N, NE of (10,7))
+        assert_eq!(game.field_model.pushback_squares.len(), 3);
     }
 }

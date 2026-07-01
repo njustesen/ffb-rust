@@ -16,10 +16,10 @@
 ///   THROWN_PLAYER_HAS_BALL, THROWN_PLAYER_COORDINATE, THROW_SCATTER.
 /// Optional init: IS_KICKED_PLAYER, PASS_DEVIATES, CRASH_LANDING, DIRECTION.
 ///
-/// TODO(InitScatterPlayer-scatter): UtilThrowTeamMateSequence.scatterPlayer/kickPlayer deferred.
-/// TODO(InitScatterPlayer-deviate): deviate() / swoop() paths deferred.
-/// TODO(InitScatterPlayer-injury): UtilServerInjury.handleInjury deferred.
-/// TODO(InitScatterPlayer-animation): Animation/syncGameModel deferred.
+/// DEFERRED(InitScatterPlayer-scatter): UtilThrowTeamMateSequence.scatterPlayer/kickPlayer deferred.
+/// DEFERRED(InitScatterPlayer-deviate): deviate() / swoop() paths deferred.
+/// DEFERRED(InitScatterPlayer-injury): UtilServerInjury.handleInjury deferred.
+/// DEFERRED(InitScatterPlayer-animation): Animation/syncGameModel deferred.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::{PlayerState, PS_PICKED_UP, PS_IN_THE_AIR};
@@ -78,15 +78,15 @@ impl StepInitScatterPlayer {
             return StepOutcome::next();
         }
 
-        // TODO(InitScatterPlayer-deviate): if deviate → call deviate() (direction+distance roll from thrower).
-        // TODO(InitScatterPlayer-swoop): if swoopDirection.is_some() → call swoop().
-        // TODO(InitScatterPlayer-scatter): call UtilThrowTeamMateSequence::scatterPlayer / kickPlayer
+        // DEFERRED(InitScatterPlayer-deviate): if deviate → call deviate() (direction+distance roll from thrower).
+        // DEFERRED(InitScatterPlayer-swoop): if swoopDirection.is_some() → call swoop().
+        // DEFERRED(InitScatterPlayer-scatter): call UtilThrowTeamMateSequence::scatterPlayer / kickPlayer
         //   to get the landing FieldCoordinate.
-        // TODO(InitScatterPlayer-inBounds+hit): if in-bounds + player → injury + continue loop +
+        // DEFERRED(InitScatterPlayer-inBounds+hit): if in-bounds + player → injury + continue loop +
         //   set DROP_THROWN_PLAYER, crashLanding=false.
-        // TODO(InitScatterPlayer-crashLanding): if in-bounds + empty + crash_landing → drop player.
-        // TODO(InitScatterPlayer-empty): if in-bounds empty + no crash → place player + end loop.
-        // TODO(InitScatterPlayer-outOfBounds): crowd injury (TtmToCrowdHandler).
+        // DEFERRED(InitScatterPlayer-crashLanding): if in-bounds + empty + crash_landing → drop player.
+        // DEFERRED(InitScatterPlayer-empty): if in-bounds empty + no crash → place player + end loop.
+        // DEFERRED(InitScatterPlayer-outOfBounds): crowd injury (TtmToCrowdHandler).
 
         // Always publish the carried parameters so downstream steps can consume them.
         StepOutcome::next()

@@ -17,10 +17,9 @@ use crate::step::framework::{StepAction, StepId, StepParameter};
 ///
 /// Command dispatch (Move/Block/Foul/Pass/HandOff/ThrowTeamMate/KickTeamMate/Gaze/EndTurn) ported.
 /// CLIENT_USE_FUMBLEROOSKIE / CLIENT_USE_SKILL (canAddBlockDie) not yet ported.
-/// TODO: UtilServerPlayerMove.isValidMove path validation not yet ported (agent paths trusted).
-/// TODO: getMoveSquare → actingPlayer.setDodging/setGoingForIt not yet ported.
-/// TODO: commitTargetSelection not yet ported.
-/// setTurnStarted, concessionPossible, per-action TurnData flags are wired.
+/// DEFERRED: UtilServerPlayerMove.isValidMove path validation not yet ported (agent paths trusted).
+/// DEFERRED: commitTargetSelection not yet ported.
+/// setDodging/setGoingForIt, setTurnStarted, concessionPossible, per-action TurnData flags are wired.
 pub struct StepInitMoving {
     /// Java: fGotoLabelOnEnd
     pub goto_label_on_end: String,
@@ -210,8 +209,17 @@ impl StepInitMoving {
             if !FieldCoordinateBounds::FIELD.is_in_bounds(coordinate_to) {
                 return StepOutcome::cont();
             }
-            // TODO: getMoveSquare → actingPlayer.setDodging / setGoingForIt / setHasMoved
-            // TODO: commitTargetSelection
+            // Java: MoveSquare moveSquare = game.getFieldModel().getMoveSquare(coordinateTo);
+            // Java: actingPlayer.setDodging((moveSquare != null) && moveSquare.isDodging() && !actingPlayer.isJumping());
+            // Java: actingPlayer.setGoingForIt((moveSquare != null) && moveSquare.isGoingForIt());
+            let move_square = game.field_model.get_move_square(coordinate_to);
+            game.acting_player.dodging = move_square
+                .map(|ms| ms.is_dodging() && !game.acting_player.jumping)
+                .unwrap_or(false);
+            game.acting_player.goes_for_it = move_square
+                .map(|ms| ms.is_going_for_it())
+                .unwrap_or(false);
+            // DEFERRED: commitTargetSelection
             game.acting_player.has_moved = true;
             game.turn_data_mut().turn_started = true;
             // Java: per-PlayerAction TurnData flags
@@ -437,5 +445,60 @@ mod tests {
         // execute_step with gaze_victim_id set → NextStep
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(step.gaze_victim_id.as_deref(), Some("victim1"));
+    }
+
+    #[test]
+    fn move_to_dodge_square_sets_dodging_flag() {
+        use ffb_model::types::MoveSquare;
+        let mut game = make_game();
+        let dodge_coord = FieldCoordinate::new(5, 5);
+        // Register as a dodging move square (minimum_roll_dodge > 0)
+        game.field_model.add_move_square(MoveSquare::new(dodge_coord, 3, 0));
+        let mut step = StepInitMoving::new("end".into());
+        step.move_stack = vec![dodge_coord];
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.acting_player.dodging, "actingPlayer.setDodging should be true");
+        assert!(!game.acting_player.goes_for_it, "setGoingForIt should be false");
+    }
+
+    #[test]
+    fn move_to_gfi_square_sets_goes_for_it_flag() {
+        use ffb_model::types::MoveSquare;
+        let mut game = make_game();
+        let gfi_coord = FieldCoordinate::new(6, 5);
+        game.field_model.add_move_square(MoveSquare::new(gfi_coord, 0, 2));
+        let mut step = StepInitMoving::new("end".into());
+        step.move_stack = vec![gfi_coord];
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.acting_player.dodging, "setDodging should be false for GFI square");
+        assert!(game.acting_player.goes_for_it, "setGoingForIt should be true");
+    }
+
+    #[test]
+    fn move_to_unknown_square_clears_dodging_and_goes_for_it() {
+        let mut game = make_game();
+        // No move square registered for this coord
+        let coord = FieldCoordinate::new(7, 5);
+        game.acting_player.dodging = true;
+        game.acting_player.goes_for_it = true;
+        let mut step = StepInitMoving::new("end".into());
+        step.move_stack = vec![coord];
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.acting_player.dodging, "unknown square clears dodging");
+        assert!(!game.acting_player.goes_for_it, "unknown square clears goes_for_it");
+    }
+
+    #[test]
+    fn dodge_square_not_set_when_jumping() {
+        use ffb_model::types::MoveSquare;
+        let mut game = make_game();
+        let dodge_coord = FieldCoordinate::new(5, 5);
+        game.field_model.add_move_square(MoveSquare::new(dodge_coord, 3, 0));
+        game.acting_player.jumping = true;
+        let mut step = StepInitMoving::new("end".into());
+        step.move_stack = vec![dodge_coord];
+        step.start(&mut game, &mut GameRng::new(0));
+        // Java: setDodging(moveSquare.isDodging() && !actingPlayer.isJumping()) → false when jumping
+        assert!(!game.acting_player.dodging, "dodging suppressed while jumping");
     }
 }

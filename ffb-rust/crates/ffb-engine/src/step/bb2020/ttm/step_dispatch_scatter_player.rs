@@ -7,9 +7,9 @@
 /// BB2020-only step (no BB2016 equivalent). Reads: THROWN_PLAYER_ID, THROWN_PLAYER_STATE,
 /// THROWN_PLAYER_HAS_BALL, PASS_RESULT, IS_KICKED_PLAYER, OLD_DEFENDER_STATE.
 ///
-/// TODO(DispatchScatterPlayer-generator): ScatterPlayer SequenceGenerator not yet ported.
-/// TODO(DispatchScatterPlayer-fumbleReport): ReportKickTeamMateFumble deferred.
-/// TODO(DispatchScatterPlayer-scattersSingleDirection): NamedProperties.ttmScattersInSingleDirection deferred.
+/// DEFERRED(DispatchScatterPlayer-generator): ScatterPlayer SequenceGenerator not yet ported.
+/// DEFERRED(DispatchScatterPlayer-fumbleReport): ReportKickTeamMateFumble deferred.
+/// DEFERRED(DispatchScatterPlayer-scattersSingleDirection): NamedProperties.ttmScattersInSingleDirection deferred.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::{PlayerState, PassResult};
@@ -46,15 +46,15 @@ impl StepDispatchScatterPlayer {
 
     fn execute_step(&self, _game: &mut Game) -> StepOutcome {
         if self.pass_result == PassResult::Fumble && self.is_kicked_player {
-            // TODO(DispatchScatterPlayer-fumbleReport): add ReportKickTeamMateFumble report.
+            // DEFERRED(DispatchScatterPlayer-fumbleReport): add ReportKickTeamMateFumble report.
             return StepOutcome::next();
         }
 
-        // TODO(DispatchScatterPlayer-generator): determine scatter flags from pass_result:
+        // DEFERRED(DispatchScatterPlayer-generator): determine scatter flags from pass_result:
         //   FUMBLE            → throwScatter=false, deviate=false, scattersSingleDirection=false
         //   WILDLY_INACCURATE → throwScatter=false, deviate=true, scattersSingleDirection=false
         //   INACCURATE/ACCURATE → throwScatter=true, deviate=false
-        // TODO(DispatchScatterPlayer-generator): push ScatterPlayer sequence with
+        // DEFERRED(DispatchScatterPlayer-generator): push ScatterPlayer sequence with
         //   (thrownPlayerId, thrownPlayerState, thrownPlayerHasBall, throwerCoordinate,
         //    scattersSingleDirection, throwScatter, deviate, !oldPlayerState.hasTacklezones()).
 

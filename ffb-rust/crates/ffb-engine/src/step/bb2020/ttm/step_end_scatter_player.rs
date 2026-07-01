@@ -9,7 +9,7 @@
 /// Consumes: THROWN_PLAYER_ID, THROWN_PLAYER_HAS_BALL, THROWN_PLAYER_STATE.
 /// Does NOT consume THROWN_PLAYER_COORDINATE.
 ///
-/// TODO(EndScatterPlayer-generator): ScatterPlayer SequenceGenerator not yet ported for BB2020.
+/// DEFERRED(EndScatterPlayer-generator): ScatterPlayer SequenceGenerator not yet ported for BB2020.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::PlayerState;
@@ -50,7 +50,7 @@ impl StepEndScatterPlayer {
             && self.thrown_player_state.is_some()
             && self.thrown_player_coordinate.is_some();
         if all_present {
-            // TODO(EndScatterPlayer-generator): push ScatterPlayer sequence:
+            // DEFERRED(EndScatterPlayer-generator): push ScatterPlayer sequence:
             //   ScatterPlayer::pushSequence(thrownPlayerId, thrownPlayerState,
             //     thrownPlayerHasBall, thrownPlayerCoordinate, false, false, false, crashLanding)
         }

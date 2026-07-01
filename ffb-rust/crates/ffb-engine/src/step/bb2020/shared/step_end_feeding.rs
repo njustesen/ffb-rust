@@ -46,7 +46,7 @@ impl Step for StepEndFeeding {
 
 impl StepEndFeeding {
     fn execute_step(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO(generators): full BB2020 StepEndFeeding logic requires sequence generators.
+        // DEFERRED(generators): full BB2020 StepEndFeeding logic requires sequence generators.
         // BB2020 end_turn in PASS_BLOCK mode → use EndTurn generator;
         // otherwise more complex inducement/select sequence. Stubbed for now.
         StepOutcome::next()

@@ -13,14 +13,16 @@
 /// Publishes: CATCHER_ID, PASS_ACCURATE, PASS_FUMBLE, DONT_DROP_FUMBLE,
 ///            CATCH_SCATTER_THROW_IN_MODE, PASS_DEVIATES.
 ///
-/// TODO(Pass-roll): PassMechanic.findPassingDistance + evaluatePass not yet wired.
-/// TODO(Pass-reroll): AbstractStepWithReRoll, UtilServerReRoll deferred.
-/// TODO(Pass-skillDialog): DialogSkillUseParameter for passing skill reroll deferred.
-use ffb_model::enums::PassResult;
+/// DEFERRED(Pass-reroll): AbstractStepWithReRoll, UtilServerReRoll not yet ported.
+/// DEFERRED(Pass-skillDialog): DialogSkillUseParameter for passing skill reroll not yet ported.
+use ffb_model::enums::{PassResult as ModelPassResult, PlayerAction};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_mechanics::bb2016::pass_mechanic::PassMechanic;
+use ffb_mechanics::pass_mechanic::PassMechanic as PassMechanicTrait;
+use ffb_mechanics::pass_result::PassResult;
 use crate::action::Action;
-use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::step::framework::{Step, StepOutcome, StepId, StepParameter, CatchScatterThrowInMode};
 
 /// Java: `StepPass` (bb2016/pass).
 pub struct StepPass {
@@ -32,8 +34,10 @@ pub struct StepPass {
     catcher_id: Option<String>,
     /// Java: `state.passSkillUsed`
     pass_skill_used: bool,
-    /// Java: `state.result`
-    result: Option<PassResult>,
+    /// Java: `state.result` — mechanics PassResult from evaluatePass
+    mech_result: Option<PassResult>,
+    /// Model-level PassResult set via StepParameter (for test/replay).
+    result: Option<ModelPassResult>,
 }
 
 impl StepPass {
@@ -43,14 +47,134 @@ impl StepPass {
             goto_label_on_missed_pass: String::new(),
             catcher_id: None,
             pass_skill_used: false,
+            mech_result: None,
             result: None,
         }
     }
 
-    fn execute_step(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // TODO(Pass-roll): roll pass, evaluate result, set ball/bomb coordinate.
-        // Stub: accurate pass assumed (safe-default for tests).
-        StepOutcome::next()
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        let (thrower_id, thrower_action) = match (game.thrower_id.clone(), game.thrower_action) {
+            (Some(id), Some(action)) => (id, action),
+            _ => return StepOutcome::next(),
+        };
+        let is_bomb = thrower_action == PlayerAction::ThrowBomb;
+        if is_bomb {
+            game.field_model.bomb_moving = true;
+        } else {
+            game.field_model.ball_moving = true;
+        }
+
+        let thrower = match game.player(&thrower_id) {
+            Some(p) => p.clone(),
+            None => return StepOutcome::next(),
+        };
+
+        let mechanic = PassMechanic::new();
+        let thrower_coord = game.field_model.player_coordinate(&thrower_id);
+        let pass_coord = game.pass_coordinate;
+        let passing_distance = match mechanic.find_passing_distance(game, thrower_coord, pass_coord, false) {
+            Some(d) => d,
+            None => return StepOutcome::next(),
+        };
+
+        // DEFERRED(Pass-modifiers): PassModifierFactory not yet ported; using empty modifiers.
+        let roll = rng.d6();
+        let result = mechanic.evaluate_pass_simple(&thrower, roll, passing_distance, &[], is_bomb);
+        self.mech_result = Some(result);
+
+        if result == PassResult::ACCURATE {
+            game.field_model.range_ruler = None;
+            let pass_coordinate = match pass_coord {
+                Some(c) => c,
+                None => return StepOutcome::next(),
+            };
+            let catcher_has_tacklezones = self.catcher_id.as_deref()
+                .and_then(|id| game.field_model.player_state(id))
+                .map(|s| s.has_tacklezones())
+                .unwrap_or(false);
+            if is_bomb {
+                game.field_model.bomb_coordinate = Some(pass_coordinate);
+                let mode = if catcher_has_tacklezones {
+                    CatchScatterThrowInMode::CatchAccurateBomb
+                } else if self.catcher_id.is_some() {
+                    CatchScatterThrowInMode::CatchBomb
+                } else {
+                    CatchScatterThrowInMode::CatchAccurateBombEmptySquare
+                };
+                StepOutcome::next()
+                    .publish(StepParameter::PassFumble(false))
+                    .publish(StepParameter::CatchScatterThrowInMode(mode))
+            } else {
+                game.field_model.ball_coordinate = Some(pass_coordinate);
+                let mode = if catcher_has_tacklezones {
+                    CatchScatterThrowInMode::CatchAccuratePass
+                } else if self.catcher_id.is_some() {
+                    CatchScatterThrowInMode::CatchMissedPass
+                } else {
+                    CatchScatterThrowInMode::CatchAccuratePassEmptySquare
+                };
+                let mut out = StepOutcome::next()
+                    .publish(StepParameter::PassFumble(false))
+                    .publish(StepParameter::CatchScatterThrowInMode(mode));
+                if catcher_has_tacklezones {
+                    out = out.publish(StepParameter::PassAccurate(true));
+                }
+                out
+            }
+        } else {
+            // Non-accurate: publish DONT_DROP_FUMBLE then go to failed pass.
+            // DEFERRED(Pass-reroll): UtilServerReRoll check not yet ported; proceed directly.
+            let dont_drop = result == PassResult::SAVED_FUMBLE;
+            self.handle_failed_pass(game, is_bomb, thrower_coord, pass_coord, dont_drop)
+                .publish(StepParameter::DontDropFumble(dont_drop))
+        }
+    }
+
+    fn handle_failed_pass(
+        &mut self,
+        game: &mut Game,
+        is_bomb: bool,
+        thrower_coord: Option<ffb_model::types::FieldCoordinate>,
+        pass_coord: Option<ffb_model::types::FieldCoordinate>,
+        saved_fumble: bool,
+    ) -> StepOutcome {
+        game.field_model.range_ruler = None;
+        let result = self.mech_result.unwrap_or(PassResult::FUMBLE);
+        let is_fumble = result == PassResult::FUMBLE;
+        let is_wildly_inaccurate = result == PassResult::WILDLY_INACCURATE;
+        if saved_fumble {
+            if is_bomb {
+                game.field_model.bomb_coordinate = None;
+                game.field_model.bomb_moving = false;
+                return StepOutcome::goto(&self.goto_label_on_end)
+                    .publish(StepParameter::CatcherId(None))
+                    .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::CatchAccurateBomb));
+            } else {
+                game.field_model.ball_coordinate = thrower_coord;
+                game.field_model.ball_moving = false;
+                return StepOutcome::goto(&self.goto_label_on_end);
+            }
+        }
+        if is_fumble {
+            if is_bomb {
+                game.field_model.bomb_coordinate = thrower_coord;
+            } else {
+                game.field_model.ball_coordinate = thrower_coord;
+            }
+            return StepOutcome::next()
+                .publish(StepParameter::PassFumble(true))
+                .publish(StepParameter::CatcherId(None))
+                .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall));
+        }
+        // INACCURATE or WILDLY_INACCURATE
+        if is_bomb {
+            game.field_model.bomb_coordinate = pass_coord;
+        } else {
+            game.field_model.ball_coordinate = pass_coord;
+        }
+        StepOutcome::goto(&self.goto_label_on_missed_pass)
+            .publish(StepParameter::CatcherId(None))
+            .publish(StepParameter::PassDeviates(is_wildly_inaccurate))
     }
 }
 
@@ -74,7 +198,7 @@ impl Step for StepPass {
             StepParameter::GotoLabelOnEnd(s)       => { self.goto_label_on_end = s.clone(); true }
             StepParameter::GotoLabelOnMissedPass(s) => { self.goto_label_on_missed_pass = s.clone(); true }
             StepParameter::CatcherId(v)            => { self.catcher_id = v.clone(); true }
-            StepParameter::PassResultParam(r)      => { self.result = Some(*r); true }
+            StepParameter::PassResultParam(r)      => { self.result = Some(*r); true } // model-level, for test/replay
             _ => false,
         }
     }
@@ -126,10 +250,90 @@ mod tests {
     }
 
     #[test]
-    fn start_returns_next_step() {
+    fn start_returns_next_step_when_no_thrower() {
         let mut game = make_game();
         let mut step = StepPass::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(matches!(out.action, StepAction::NextStep));
+    }
+
+    fn make_thrower_game() -> (Game, ffb_model::types::FieldCoordinate) {
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerAction, Rules};
+        use ffb_model::model::player::Player;
+        use ffb_model::types::FieldCoordinate;
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(Player {
+            id: "t1".into(), name: "T".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        let mut game = Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2016);
+        game.thrower_id = Some("t1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        let thrower_coord = ffb_model::types::FieldCoordinate::new(13, 7);
+        game.field_model.set_player_coordinate("t1", thrower_coord);
+        game.pass_coordinate = Some(ffb_model::types::FieldCoordinate::new(14, 7));
+        (game, thrower_coord)
+    }
+
+    #[test]
+    fn with_thrower_sets_ball_moving() {
+        let (mut game, _) = make_thrower_game();
+        let mut step = StepPass::new();
+        step.goto_label_on_end = "end".into();
+        step.goto_label_on_missed_pass = "miss".into();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.field_model.ball_moving);
+    }
+
+    #[test]
+    fn with_thrower_publishes_parameters() {
+        let (mut game, _) = make_thrower_game();
+        let mut step = StepPass::new();
+        step.goto_label_on_end = "end".into();
+        step.goto_label_on_missed_pass = "miss".into();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // Must publish at least one parameter regardless of roll result.
+        assert!(!out.published.is_empty());
+    }
+
+    #[test]
+    fn mech_result_is_set_after_roll() {
+        let (mut game, _) = make_thrower_game();
+        let mut step = StepPass::new();
+        step.goto_label_on_end = "end".into();
+        step.goto_label_on_missed_pass = "miss".into();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(step.mech_result.is_some());
+    }
+
+    #[test]
+    fn throw_bomb_sets_bomb_moving() {
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerAction, Rules};
+        use ffb_model::model::player::Player;
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(Player {
+            id: "b1".into(), name: "B".into(), nr: 2, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        let mut game = Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2016);
+        game.thrower_id = Some("b1".into());
+        game.thrower_action = Some(PlayerAction::ThrowBomb);
+        game.field_model.set_player_coordinate("b1", ffb_model::types::FieldCoordinate::new(13, 7));
+        game.pass_coordinate = Some(ffb_model::types::FieldCoordinate::new(14, 7));
+        let mut step = StepPass::new();
+        step.goto_label_on_end = "end".into();
+        step.goto_label_on_missed_pass = "miss".into();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.field_model.bomb_moving);
     }
 }

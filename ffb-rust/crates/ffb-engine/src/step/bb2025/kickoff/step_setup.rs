@@ -85,7 +85,7 @@ impl StepSetup {
         }
 
         // Java: SetupMechanic.checkSetup — validate placement counts, LOS, etc.
-        // TODO: port SetupMechanic.checkSetup.  For now always accept.
+        // DEFERRED: port SetupMechanic.checkSetup.  For now always accept.
         let setup_valid = true;
 
         if setup_valid {
@@ -97,7 +97,7 @@ impl StepSetup {
             game.turn_data_mut().first_turn_after_kickoff = false;
 
             // Java: UtilBox.refreshBoxes(game) — reconcile dugout box contents.
-            // TODO: port refreshBoxes.
+            // DEFERRED: port refreshBoxes.
 
             if !game.setup_offense {
                 // Java: push Inducement(BEFORE_SETUP, home_playing) + Inducement(BEFORE_SETUP, !home_playing)

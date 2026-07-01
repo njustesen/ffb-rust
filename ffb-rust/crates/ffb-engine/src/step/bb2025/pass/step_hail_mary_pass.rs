@@ -118,14 +118,14 @@ impl StepHailMaryPass {
             self.roll = rng.d6();
         }
 
-        // TODO: if usingModifyingSkill == null && modifyingSkill exists → showDialog → CONTINUE
-        // TODO: PassMechanic.evaluatePass with statBasedModifier when usingModifyingSkill==true
+        // DEFERRED: if usingModifyingSkill == null && modifyingSkill exists → showDialog → CONTINUE
+        // DEFERRED: PassMechanic.evaluatePass with statBasedModifier when usingModifyingSkill==true
 
         let is_fumble = self.roll == 1;
         let is_accurate = self.roll >= self.minimum_roll;
 
-        // TODO: Safe Pass dialog: if result == SAVED_FUMBLE && usingSafePass == null → showDialog
-        // TODO: if !usingSafePass → result = FUMBLE
+        // DEFERRED: Safe Pass dialog: if result == SAVED_FUMBLE && usingSafePass == null → showDialog
+        // DEFERRED: if !usingSafePass → result = FUMBLE
 
         // Java: publishParameter(PASS_FUMBLE, PassResult.FUMBLE == state.result)
         // Java: if ACCURATE/SAVED_FUMBLE → NEXT_STEP

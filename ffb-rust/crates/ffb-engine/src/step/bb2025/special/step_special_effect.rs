@@ -108,11 +108,11 @@ impl StepSpecialEffect {
             return StepOutcome::next();
         }
 
-        // TODO: roll = diceRoller.rollWizardSpell() if roll_for_effect
-        // TODO: successful = DiceInterpreter.isSpecialEffectSuccessful(special_effect, player, roll)
-        // TODO: report ReportSpecialEffectRoll
+        // DEFERRED: roll = diceRoller.rollWizardSpell() if roll_for_effect
+        // DEFERRED: successful = DiceInterpreter.isSpecialEffectSuccessful(special_effect, player, roll)
+        // DEFERRED: report ReportSpecialEffectRoll
         //
-        // TODO: if successful:
+        // DEFERRED: if successful:
         //   ZAP path: ZappedPlayer + scatter ball if on ball
         //   FIREBALL path: handleInjury(InjuryTypeFireball); publish SteadyFootingContext
         //   BOMB path: handleInjury(InjuryTypeBombWithModifier/ForSpp); publish SteadyFootingContext

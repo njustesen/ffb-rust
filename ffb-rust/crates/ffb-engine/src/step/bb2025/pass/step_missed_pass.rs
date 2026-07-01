@@ -1,5 +1,5 @@
 use ffb_model::enums::{Direction, PlayerAction};
-use ffb_model::types::FieldCoordinate;
+use ffb_model::types::{FieldCoordinate, MoveSquare};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -87,13 +87,18 @@ impl Step for StepMissedPass {
         //   report ReportSkillUse(playerId, skill, doRoll, SkillUse.RE_ROLL_DIRECTION)
         //   if used → getGameState().getPassState().setUsingBlastIt(true)
         //   if neverUse → getGameState().getPassState().setUsingBlastIt(false)
-        // TODO: game.acting_player.mark_skill_used(skill) — skill registry not translated
-        // TODO: PassState.set_using_blast_it — PassState not yet in Game struct
+        // DEFERRED: PassState.set_using_blast_it — PassState not yet in Game struct
         match action {
-            Action::UseSkill { skill_id: _, use_skill } => {
+            Action::UseSkill { skill_id, use_skill } => {
                 // Blast-It answer: if used → re-roll the direction; else keep current
                 self.do_roll = *use_skill;
                 self.re_rolling = true;
+                if *use_skill {
+                    // Java: game.getActingPlayer().markSkillUsed(skill) — inserts into player.used_skills
+                    if let Some(pid) = game.acting_player.player_id.clone() {
+                        game.mark_skill_used(&pid, *skill_id);
+                    }
+                }
             }
             _ => {}
         }
@@ -155,13 +160,13 @@ impl StepMissedPass {
             // if (HAIL_MARY_PASS && ((hasUnusedBlastIt && usingBlastIt==null) || (hasBlastIt && usingBlastIt)) && !reRolling)
             //     → reportDirectionRoll(); showDialog(DialogSkillUseParameter(...)); reRolling=true;
             //       fieldModel.add(MoveSquare(coordinateEnd, 0, 0)); return StepAction.CONTINUE
-            // TODO: UtilCards.hasUnusedSkillWithProperty, PassState.getUsingBlastIt — not yet translated
+            // DEFERRED: UtilCards.hasUnusedSkillWithProperty, PassState.getUsingBlastIt — not yet translated
             // The Blast-It dialog path is reached when handle_command delivers USE_SKILL with re_rolling=false.
             // With no skill registry, we conservatively skip the dialog (safe for non-Goblin rosters).
 
             // Java: if (reRolling && doRoll) reportDirectionRoll()
             // Java: getResult().addReport(new ReportScatterBall(new Direction[]{direction}, new int[]{roll}, false))
-            // TODO: emit partial scatter report when report infrastructure is translated
+            // DEFERRED: emit partial scatter report when report infrastructure is translated
 
             // Java: rollList.add(roll); directionList.add(direction);
             self.roll_list.push(self.roll);
@@ -175,7 +180,7 @@ impl StepMissedPass {
         }
 
         // Java: getResult().addReport(new ReportScatterBall(directions, rolls, false))
-        // TODO: emit full scatter report when report infrastructure is translated
+        // DEFERRED: emit full scatter report when report infrastructure is translated
 
         // Java: game.setPassCoordinate(lastValidCoordinate)
         game.pass_coordinate = self.last_valid_coordinate;
@@ -296,7 +301,7 @@ mod tests {
     fn clears_move_squares_at_end() {
         let mut game = make_game();
         game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
-        game.field_model.move_squares.insert(FieldCoordinate::new(5, 5));
+        game.field_model.add_move_square(MoveSquare::new(FieldCoordinate::new(5, 5), 0, 0));
         let mut step = StepMissedPass::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.field_model.move_squares.is_empty());

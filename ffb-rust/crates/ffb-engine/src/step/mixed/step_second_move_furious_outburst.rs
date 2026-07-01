@@ -19,7 +19,7 @@
 /// Java fields: `eligibleSquares`, `endPlayerAction`, `endTurn`, `withBall`,
 ///              `goToLabelOnEnd`, `coordinate`.
 use std::collections::HashSet;
-use ffb_model::types::FieldCoordinate;
+use ffb_model::types::{FieldCoordinate, MoveSquare};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -68,10 +68,39 @@ impl StepSecondMoveFuriousOutburst {
         }
 
         if self.coordinate.is_none() {
-            // Java: clear selectedStabTarget, compute eligible squares (radius 3, empty)
-            // TODO(TargetSelectionState port): clear selected stab target flag
-            // TODO(UtilServerSteps port): stayInEndzone check
-            // For now wait for coordinate selection
+            // Java: clear selectedStabTarget on the previously selected player
+            let selected_id = game.field_model.target_selection_state.as_ref()
+                .and_then(|ts| ts.get_selected_player_id().cloned());
+            if let Some(ref sid) = selected_id {
+                let old = game.field_model.player_state(sid).unwrap_or_default();
+                game.field_model.set_player_state(sid, old.change_selected_stab_target(false));
+            }
+            // DEFERRED(UtilServerSteps): stayInEndzone = checkTouchdown(gameState) — not yet ported; stub false
+            // Java: find adjacent coordinates within radius 3 (empty squares on pitch)
+            if let Some(pid) = game.acting_player.player_id.as_deref() {
+                if let Some(origin) = game.field_model.player_coordinate(pid) {
+                    let adj: Vec<FieldCoordinate> = {
+                        let mut v = Vec::new();
+                        for dx in -3_i32..=3 {
+                            for dy in -3_i32..=3 {
+                                if dx == 0 && dy == 0 { continue; }
+                                let c = FieldCoordinate::new(origin.x + dx, origin.y + dy);
+                                if c.is_on_pitch() && game.field_model.player_at(c).is_none() {
+                                    v.push(c);
+                                }
+                            }
+                        }
+                        v
+                    };
+                    self.eligible_squares = adj.iter().cloned().collect();
+                    for c in &adj {
+                        game.field_model.move_squares.insert(*c, MoveSquare::new(*c, 0, 0));
+                    }
+                }
+            }
+            self.with_ball = game.acting_player.player_id.as_deref()
+                .map(|pid| game.field_model.ball_coordinate == game.field_model.player_coordinate(pid))
+                .unwrap_or(false);
             return StepOutcome::cont();
         }
 
@@ -206,5 +235,28 @@ mod tests {
         assert!(step.set_parameter(&StepParameter::EndTurn(true)));
         assert!(step.set_parameter(&StepParameter::GotoLabelOnEnd("y".into())));
         assert!(!step.set_parameter(&StepParameter::HomeTeam(false)));
+    }
+
+    #[test]
+    fn no_coordinate_clears_selected_stab_target() {
+        use ffb_model::model::target_selection_state::TargetSelectionState;
+        use ffb_model::enums::PlayerState;
+        let mut game = make_game();
+        add_player(&mut game, "att", PS_STANDING);
+        add_player(&mut game, "target", PS_STANDING);
+        // Mark "target" as selected stab target
+        let old = game.field_model.player_state("target").unwrap();
+        game.field_model.set_player_state("target", old.change_selected_stab_target(true));
+        assert!(game.field_model.player_state("target").unwrap().is_selected_stab_target());
+        // Set TargetSelectionState with "target" selected
+        let mut ts = TargetSelectionState::new("target");
+        ts.select();
+        game.field_model.target_selection_state = Some(ts);
+        let mut step = StepSecondMoveFuriousOutburst::new("end");
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        // selectedStabTarget should be cleared
+        let after = game.field_model.player_state("target").unwrap();
+        assert!(!after.is_selected_stab_target());
     }
 }

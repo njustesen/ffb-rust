@@ -133,14 +133,15 @@ impl StepEndPassing {
         }
 
         // Java path 2: BloodLust + bloodlustAction → reset hasPassed, pass_coordinate, change action, Move
-        // Java: actingPlayer.setHasPassed(false); game.setPassCoordinate(null);
-        // Java: UtilServerSteps.changePlayerAction(..., bloodlustAction, false);
-        // Java: moveGenerator.pushSequence(...)
         if game.acting_player.suffering_blood_lust && self.bloodlust_action.is_some() {
+            // Java: actingPlayer.setHasPassed(false); game.setPassCoordinate(null);
+            game.acting_player.has_passed = false;
             game.pass_coordinate = None;
+            // Java: UtilServerSteps.changePlayerAction(..., bloodlustAction, false);
             if let Some(action) = self.bloodlust_action {
                 game.acting_player.player_action = Some(action);
             }
+            // Java: moveGenerator.pushSequence(...)
             let seq = Move::build_sequence(&MoveParams::default());
             return StepOutcome::next().push_seq(seq);
         }
@@ -179,10 +180,13 @@ impl StepEndPassing {
 
         // Java path 4: animosity re-try → Pass generator
         // Java: actingPlayer.isSufferingAnimosity() && !fEndPlayerAction && passCoordinate == null
-        // TODO: isSufferingAnimosity not yet in ActingPlayer struct — skip this path for now
+        // DEFERRED(animosity): isSufferingAnimosity not yet in ActingPlayer struct — waiting for ActingPlayer
+        //   to grow a suffering_animosity field (BB2020 Animosity behaviour port).
 
         // Java: completions and passing statistics (SPP, deltaX)
-        // TODO: SppMechanic.addCompletion, throwerResult.setPassing — require GameResult/PlayerResult
+        // DEFERRED(spp): SppMechanic.addCompletion + throwerResult.setPassing(deltaX) —
+        //   requires: (a) PrayerState.additional_completion_spp_teams (PrayerState is a stub);
+        //   (b) PlayerResult.passing field (not yet added to GameResult); (c) isSufferingAnimosity.
 
         // Java path 5: main branch — determine end_turn from thrower == actingPlayer
         let thrower_is_acting = game.thrower_id.is_some()
@@ -454,5 +458,32 @@ mod tests {
         let mut step = StepEndPassing::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn bloodlust_action_pushes_move_sequence_and_resets_has_passed() {
+        let mut game = make_game();
+        game.acting_player.suffering_blood_lust = true;
+        game.acting_player.has_passed = true;
+        game.pass_coordinate = Some(ffb_model::types::FieldCoordinate::new(5, 5));
+        let mut step = StepEndPassing::new();
+        step.bloodlust_action = Some(PlayerAction::Move);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.acting_player.has_passed);
+        assert!(game.pass_coordinate.is_none());
+        assert_eq!(game.acting_player.player_action, Some(PlayerAction::Move));
+        assert_eq!(out.pushes.len(), 1);
+    }
+
+    #[test]
+    fn bloodlust_not_suffering_does_not_reset_has_passed() {
+        let mut game = make_game();
+        game.acting_player.suffering_blood_lust = false;
+        game.acting_player.has_passed = true;
+        let mut step = StepEndPassing::new();
+        step.bloodlust_action = Some(PlayerAction::Move);
+        step.start(&mut game, &mut GameRng::new(0));
+        // has_passed should remain true when not suffering blood lust
+        assert!(game.acting_player.has_passed);
     }
 }

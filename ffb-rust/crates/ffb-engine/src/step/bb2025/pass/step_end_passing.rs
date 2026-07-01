@@ -132,9 +132,18 @@ impl StepEndPassing {
         }
 
         // Java path 2: BloodLust + bloodlustAction → Move generator
-        // Java: actingPlayer.setHasPassed(false); game.setPassCoordinate(null);
-        // Java: UtilServerSteps.changePlayerAction(this, actingPlayer.getPlayerId(), bloodlustAction, false);
-        // Java: moveGenerator.pushSequence(new Move.SequenceParams(getGameState()));
+        if game.acting_player.suffering_blood_lust && self.bloodlust_action.is_some() {
+            // Java: actingPlayer.setHasPassed(false); game.setPassCoordinate(null);
+            game.acting_player.has_passed = false;
+            game.pass_coordinate = None;
+            // Java: UtilServerSteps.changePlayerAction(this, actingPlayer.getPlayerId(), bloodlustAction, false);
+            if let Some(action) = self.bloodlust_action {
+                game.acting_player.player_action = Some(action);
+            }
+            // Java: moveGenerator.pushSequence(new Move.SequenceParams(getGameState()));
+            let seq = Move::build_sequence(&MoveParams::default());
+            return StepOutcome::next().push_seq(seq);
+        }
 
         // Java: allowMoveAfterPass: QuickPass distance + canMoveAfterQuickPass skill + !pass_fumble
         // Java: allowMoveAfterHandOff: HAND_OVER action + canMoveAfterHandOff skill
@@ -179,14 +188,14 @@ impl StepEndPassing {
 
         // Java path 4: animosity re-try → Pass generator
         // Java: actingPlayer.isSufferingAnimosity() && !fEndPlayerAction && game.getPassCoordinate() == null
-        // TODO: actingPlayer.is_suffering_animosity() — not yet translated in ActingPlayer
+        // DEFERRED: actingPlayer.is_suffering_animosity() — not yet translated in ActingPlayer
         // Stub: if pass_coordinate is None and end_player_action is false, treat as animosity re-try
         // This matches Java's guard: "failed animosity may try to choose a new target"
         // Conservative: only trigger if no coordinate set (pass was never aimed)
         // (Full implementation requires ActingPlayer.is_suffering_animosity)
 
         // Java: SPP completions / catches
-        // TODO: SppMechanic.addCatch, SppMechanic.addCompletion, throwerResult.setPassing(deltaX)
+        // DEFERRED: SppMechanic.addCatch, SppMechanic.addCompletion, throwerResult.setPassing(deltaX)
         // These require GameResult/PlayerResult + SppMechanic translation.
 
         // Java path 5 (main branch): determine end_turn from thrower == actingPlayer
@@ -222,7 +231,7 @@ impl StepEndPassing {
             // Java: if (!isBomb && state.isInterceptionSuccessful() && !ballWasSnatched)
             //           field.setBallCoordinate(interceptorCoordinate); field.setBallMoving(false)
             // Java: game.setDefenderAction(null) -- reset dump-off action
-            // TODO: GameResult/PlayerResult.set_interceptions — not yet wired
+            // DEFERRED: GameResult/PlayerResult.set_interceptions — not yet wired
             if let Some(ref interceptor_id) = self.interceptor_id.clone() {
                 if let Some(coord) = game.field_model.player_coordinate(interceptor_id) {
                     if !is_bomb {
@@ -264,7 +273,7 @@ impl StepEndPassing {
         // Java: UtilServerGame.changeActingPlayer(this, actingPlayerId, PlayerAction.MOVE, actingPlayer.isJumping())
         // Java: UtilServerPlayerMove.updateMoveSquares(getGameState(), actingPlayer.isJumping())
         // Java: moveGenerator.pushSequence(new Move.SequenceParams(getGameState()))
-        // TODO: changeActingPlayer, updateMoveSquares — require more Game infrastructure
+        // DEFERRED: changeActingPlayer, updateMoveSquares — require more Game infrastructure
         if game.acting_player.player_id.is_some() {
             game.acting_player.player_action = Some(PlayerAction::Move);
         }
@@ -534,5 +543,31 @@ mod tests {
         let mut step = StepEndPassing::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn bloodlust_action_pushes_move_sequence_and_resets_has_passed() {
+        let mut game = make_game();
+        game.acting_player.suffering_blood_lust = true;
+        game.acting_player.has_passed = true;
+        game.pass_coordinate = Some(ffb_model::types::FieldCoordinate::new(5, 5));
+        let mut step = StepEndPassing::new();
+        step.bloodlust_action = Some(PlayerAction::Move);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.acting_player.has_passed);
+        assert!(game.pass_coordinate.is_none());
+        assert_eq!(game.acting_player.player_action, Some(PlayerAction::Move));
+        assert_eq!(out.pushes.len(), 1);
+    }
+
+    #[test]
+    fn bloodlust_not_suffering_does_not_reset_has_passed() {
+        let mut game = make_game();
+        game.acting_player.suffering_blood_lust = false;
+        game.acting_player.has_passed = true;
+        let mut step = StepEndPassing::new();
+        step.bloodlust_action = Some(PlayerAction::Move);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.acting_player.has_passed);
     }
 }

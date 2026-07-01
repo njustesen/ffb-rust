@@ -2,9 +2,11 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::enums::PlayerAction;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::util_server_steps::change_player_action;
 use crate::step::generator::bb2020::{
     Block, BlitzBlock, BlitzMove, EndPlayerAction, Foul, Move, Pass, ThrowTeamMate,
     Select, SelectBlitzTarget, SelectGazeTarget, MultiBlock,
@@ -39,8 +41,6 @@ use crate::step::generator::bb2020::treacherous::TreacherousParams;
 ///          USING_CHAINSAW, USING_VOMIT, USING_BREATHE_FIRE, BLOCK_TARGETS, BLOOD_LUST_ACTION,
 ///          BALL_AND_CHAIN_RE_ROLL_SETTING, TARGET_PLAYER_ID.
 ///
-/// TODO(bloodlust): isSufferingBloodLust path not yet fully ported.
-/// TODO(isRooted): playerState.isRooted() check not yet ported.
 pub struct StepEndSelecting {
     /// Java: fEndTurn
     pub end_turn: bool,
@@ -175,25 +175,76 @@ impl StepEndSelecting {
             return StepOutcome::next().push_seq(seq);
         }
 
-        // TODO(bloodlust): actingPlayer.isSufferingBloodLust() branch not yet fully ported
-
-        // ── Dispatch ─────────────────────────────────────────────────────────────
-        let player_action = if let Some(da) = self.dispatch_player_action {
-            da
-        } else {
-            match game.acting_player.player_action {
-                Some(a) => a,
-                None => {
-                    let seq = Select::build_sequence(&SelectParams {
-                        update_persistence: false,
-                        ..Default::default()
-                    });
-                    return StepOutcome::next().push_seq(seq);
+        // ── Branch 2: isSufferingBloodLust ──────────────────────────────────────
+        // Java: } else if (actingPlayer.isSufferingBloodLust()) {
+        if game.acting_player.suffering_blood_lust {
+            if self.dispatch_player_action.is_some() || self.bloodlust_action.is_some() {
+                if let Some(ba) = self.bloodlust_action {
+                    self.dispatch_player_action = Some(ba);
+                    if ba == PlayerAction::Move {
+                        if let Some(ref pid) = game.acting_player.player_id.clone() {
+                            change_player_action(game, pid, ba, false);
+                        }
+                    }
+                } else if self.dispatch_player_action == Some(PlayerAction::Blitz) {
+                    let jumping = game.acting_player.jumping;
+                    if let Some(ref pid) = game.acting_player.player_id.clone() {
+                        change_player_action(game, pid, PlayerAction::Blitz, jumping);
+                    }
                 }
+                // Java: dispatchPlayerAction(fDispatchPlayerAction, bloodlustAction == null || !fDispatchPlayerAction.isMoving())
+                let with_parameter = self.bloodlust_action.is_none()
+                    || !self.dispatch_player_action.map(|a| a.is_moving()).unwrap_or(false);
+                return self.dispatch_action(game, self.dispatch_player_action, with_parameter);
+            } else {
+                // Java: if (actingPlayer.getPlayerAction() != null && !actingPlayer.getPlayerAction().isMoving())
+                //           → changePlayerAction(MOVE, jumping)
+                //       dispatchPlayerAction(actingPlayer.getPlayerAction(), false)
+                if let Some(action) = game.acting_player.player_action {
+                    if !action.is_moving() {
+                        let jumping = game.acting_player.jumping;
+                        if let Some(ref pid) = game.acting_player.player_id.clone() {
+                            change_player_action(game, pid, PlayerAction::Move, jumping);
+                        }
+                    }
+                }
+                let current_action = game.acting_player.player_action;
+                return self.dispatch_action(game, current_action, false);
             }
-        };
+        }
 
-        let with_parameter = self.dispatch_player_action.is_some();
+        // ── Branch 3: dispatch_player_action set (non-bloodlust) ────────────────
+        if self.dispatch_player_action.is_some() {
+            return self.dispatch_action(game, self.dispatch_player_action, true);
+        }
+
+        // ── Branch 4: fall through to acting player's current action ─────────────
+        let current_action = game.acting_player.player_action;
+        self.dispatch_action(game, current_action, false)
+    }
+
+    fn dispatch_action(&self, game: &mut Game, player_action: Option<PlayerAction>, with_parameter: bool) -> StepOutcome {
+        // ── Null / isRooted + canGaze guard ──────────────────────────────────────
+        // Java: if (pPlayerAction == null ||
+        //           (pPlayerAction == MOVE && playerState.isRooted() && UtilPlayer.canGaze(...)))
+        let player_state = game.acting_player.player_id.as_deref()
+            .and_then(|id| game.field_model.player_state(id));
+
+        let rooted_and_can_gaze = player_action == Some(PlayerAction::Move)
+            && player_state.map(|s| s.is_rooted()).unwrap_or(false)
+            && game.acting_player.player_id.as_deref()
+                .map(|id| UtilPlayer::can_gaze(game, id))
+                .unwrap_or(false);
+
+        if player_action.is_none() || rooted_and_can_gaze {
+            let seq = Select::build_sequence(&SelectParams {
+                update_persistence: false,
+                ..Default::default()
+            });
+            return StepOutcome::next().push_seq(seq);
+        }
+
+        let player_action = player_action.unwrap();
 
         match player_action {
             PlayerAction::BlitzSelect => {
@@ -280,7 +331,22 @@ impl StepEndSelecting {
             | PlayerAction::KickTeamMateMove
             | PlayerAction::HandOverMove
             | PlayerAction::Gaze => {
-                // TODO(isRooted): MOVE + isRooted → EndPlayerAction not yet ported
+                // Java: case MOVE: if (playerState.isRooted()) { endGenerator.pushSequence(endParams); break; }
+                // (fall through to FOUL_MOVE etc. if not rooted)
+                if player_action == PlayerAction::Move {
+                    let is_rooted = game.acting_player.player_id.as_deref()
+                        .and_then(|id| game.field_model.player_state(id))
+                        .map(|s| s.is_rooted())
+                        .unwrap_or(false);
+                    if is_rooted {
+                        let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
+                            feeding_allowed: true,
+                            end_player_action: true,
+                            end_turn: false,
+                        });
+                        return StepOutcome::next().push_seq(seq);
+                    }
+                }
                 let seq = if with_parameter {
                     Move::build_sequence(&MoveParams {
                         move_stack: self.move_stack.clone(),
@@ -315,7 +381,17 @@ impl StepEndSelecting {
                 });
                 StepOutcome::next().push_seq(seq)
             }
-            PlayerAction::StandUp | PlayerAction::StandUpBlitz => {
+            PlayerAction::StandUp => {
+                let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
+                    feeding_allowed: true,
+                    end_player_action: true,
+                    end_turn: false,
+                });
+                StepOutcome::next().push_seq(seq)
+            }
+            PlayerAction::StandUpBlitz => {
+                // Java: game.getTurnData().setBlitzUsed(true); endGenerator.pushSequence(endParams)
+                game.turn_data_mut().blitz_used = true;
                 let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
                     feeding_allowed: true,
                     end_player_action: true,

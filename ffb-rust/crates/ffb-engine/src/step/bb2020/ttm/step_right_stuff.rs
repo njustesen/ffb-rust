@@ -19,17 +19,23 @@
 ///  - On fumbled KTM → InjuryTypeFumbledKtm instead of InjuryTypeTTMLanding.
 ///  - Uses `playerCoordinate.isBoxCoordinate()` guard (trapdoor).
 ///
-/// TODO(RightStuff-modifier): RightStuffModifierFactory deferred.
-/// TODO(RightStuff-mechanic): AgilityMechanic.minimumRollRightStuff deferred.
-/// TODO(RightStuff-reroll): AbstractStepWithReRoll / UtilServerReRoll deferred.
-/// TODO(RightStuff-injury): UtilServerInjury.handleInjury(InjuryTypeTTMLanding/FumbledKtm) deferred.
-/// TODO(RightStuff-touchdown): UtilServerSteps.checkTouchdown deferred.
-/// TODO(RightStuff-spp): SppMechanic.addCompletion (accurate pass) deferred.
+/// RightStuffModifierFactory + AgilityMechanic.minimumRollRightStuff → wired.
+/// DEFERRED(RightStuff-reroll): AbstractStepWithReRoll / UtilServerReRoll deferred.
+/// DEFERRED(RightStuff-injury): UtilServerInjury.handleInjury(InjuryTypeTTMLanding/FumbledKtm) deferred.
+/// DEFERRED(RightStuff-touchdown): UtilServerSteps.checkTouchdown deferred.
+/// DEFERRED(RightStuff-spp): SppMechanic.addCompletion (accurate pass) deferred.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
-use ffb_model::enums::{PlayerState, PassResult, PS_FALLING};
+use ffb_model::enums::{PlayerState, PassResult as ModelPassResult, PS_FALLING, ApothecaryMode};
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter, CatchScatterThrowInMode};
+use ffb_mechanics::modifiers::right_stuff_modifier_factory::RightStuffModifierFactory;
+use ffb_mechanics::modifiers::right_stuff_context::RightStuffContext;
+use ffb_mechanics::pass_result::PassResult as MechanicPassResult;
+use crate::dice_interpreter::DiceInterpreter;
+use crate::injury::injuryType::injury_type_ttm_landing::InjuryTypeTTMLanding;
+use crate::injury::injuryType::injury_type_fumbled_ktm::InjuryTypeFumbledKtm;
+use crate::step::util_server_injury;
 
 /// Java: `StepRightStuff` (bb2020/ttm).
 pub struct StepRightStuff {
@@ -40,7 +46,7 @@ pub struct StepRightStuff {
     /// Java: `fDropThrownPlayer`
     drop_thrown_player: bool,
     /// Java: `passResult` — BB2020 addition.
-    pass_result: Option<PassResult>,
+    pass_result: Option<ModelPassResult>,
     /// Java: `kickedPlayer` — BB2020 addition.
     kicked_player: bool,
     /// Java: `goToOnSuccess` — BB2020 addition.
@@ -74,7 +80,7 @@ impl StepRightStuff {
         let is_falling = game.field_model.player_state(&player_id)
             .map(|s| s.base() == PS_FALLING)
             .unwrap_or(false);
-        // TODO(RightStuff-boxCoord): FieldCoordinate.isBoxCoordinate() not yet ported.
+        // DEFERRED(RightStuff-boxCoord): FieldCoordinate.isBoxCoordinate() not yet ported.
         let is_box_coord = false; // stub
 
         if is_falling || is_box_coord {
@@ -98,30 +104,65 @@ impl StepRightStuff {
         }
 
         // BB2020: fumbled KTM path.
-        let fumbled_ktm = self.pass_result == Some(PassResult::Fumble) && self.kicked_player;
+        let fumbled_ktm = self.pass_result == Some(ModelPassResult::Fumble) && self.kicked_player;
 
         let do_roll = !self.drop_thrown_player && !fumbled_ktm;
 
         if do_roll {
-            // TODO(RightStuff-mechanic): roll and evaluate landing; for now stub → success.
-            let _ = rng.d6();
-            // Stub: landing succeeds.
-            let success_label = self.goto_on_success.as_deref().unwrap_or("");
-            let mut out = StepOutcome::goto(success_label)
-                .publish(StepParameter::ThrownPlayerState(out_state))
-                .publish(StepParameter::ThrownPlayerCoordinate(None));
-            if !has_ball {
-                // Check if player landed on ball square.
-                let ball_coord = game.field_model.ball_coordinate;
-                if player_coord.is_some() && player_coord == ball_coord {
-                    out = out.publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall));
+            let minimum_roll = if let Some(player) = game.player(&player_id) {
+                let factory = RightStuffModifierFactory::for_rules(game.rules);
+                let mechanic_pass_result = self.pass_result.map(|r| match r {
+                    ModelPassResult::Fumble | ModelPassResult::MissedCatch => MechanicPassResult::FUMBLE,
+                    ModelPassResult::Inaccurate => MechanicPassResult::INACCURATE,
+                    ModelPassResult::WildlyInaccurate => MechanicPassResult::WILDLY_INACCURATE,
+                    _ => MechanicPassResult::ACCURATE,
+                });
+                let ctx = RightStuffContext::new_full(game, player, mechanic_pass_result, None);
+                let mods = factory.find_applicable(&ctx);
+                RightStuffModifierFactory::minimum_roll(player.agility as i32, &mods)
+            } else {
+                4
+            };
+            let roll = rng.d6();
+            let successful = DiceInterpreter::is_skill_roll_successful(roll, minimum_roll);
+            // DEFERRED(RightStuff-reroll): offer re-roll not yet wired.
+            if successful {
+                // DEFERRED(RightStuff-touchdown): checkTouchdown on landing not yet ported.
+                let success_label = self.goto_on_success.as_deref().unwrap_or("");
+                let mut out = StepOutcome::goto(success_label)
+                    .publish(StepParameter::ThrownPlayerState(out_state))
+                    .publish(StepParameter::ThrownPlayerCoordinate(None));
+                if !has_ball {
+                    let ball_coord = game.field_model.ball_coordinate;
+                    if player_coord.is_some() && player_coord == ball_coord {
+                        out = out.publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall));
+                    }
                 }
+                return out;
             }
-            return out;
+            // Failed roll falls through to drop path below.
         }
 
-        // Drop path (drop_thrown_player == true OR fumbled_ktm).
-        // TODO(RightStuff-injury): UtilServerInjury.handleInjury(fumbledKtm → FumbledKtm else TTMLanding).
+        // Drop path (drop_thrown_player == true OR fumbled_ktm OR failed roll).
+        // Java: UtilServerInjury.handleInjury(fumbledKtm → FumbledKtm else TTMLanding).
+        let coord = game.field_model.player_coordinate(&player_id)
+            .unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
+        let ir = if fumbled_ktm {
+            let mut injury_type = InjuryTypeFumbledKtm::new();
+            util_server_injury::handle_injury(
+                game, rng, &mut injury_type,
+                None, &player_id, coord, None, None,
+                ApothecaryMode::Defender,
+            )
+        } else {
+            let mut injury_type = InjuryTypeTTMLanding::new();
+            util_server_injury::handle_injury(
+                game, rng, &mut injury_type,
+                None, &player_id, coord, None, None,
+                ApothecaryMode::ThrownPlayer,
+            )
+        };
+        ir.apply_to(game);
         let mut out = StepOutcome::next()
             .publish(StepParameter::ThrownPlayerState(out_state))
             .publish(StepParameter::ThrownPlayerCoordinate(None));
@@ -208,8 +249,8 @@ mod tests {
     #[test]
     fn set_parameter_pass_result() {
         let mut step = StepRightStuff::new();
-        assert!(step.set_parameter(&StepParameter::PassResultParam(PassResult::Fumble)));
-        assert_eq!(step.pass_result, Some(PassResult::Fumble));
+        assert!(step.set_parameter(&StepParameter::PassResultParam(ModelPassResult::Fumble)));
+        assert_eq!(step.pass_result, Some(ModelPassResult::Fumble));
     }
 
     #[test]
@@ -226,7 +267,7 @@ mod tests {
         let mut game = make_game();
         let mut step = StepRightStuff::new();
         step.thrown_player_id = Some("p1".into());
-        step.pass_result = Some(PassResult::Fumble);
+        step.pass_result = Some(ModelPassResult::Fumble);
         step.kicked_player = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
         // Fumbled KTM → no landing roll → drop path → NEXT_STEP.

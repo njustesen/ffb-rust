@@ -59,10 +59,7 @@ pub fn check_touchdown(game: &Game) -> bool {
     let allow_movement_in_endzone = matches!(game.rules, Rules::Bb2016);
     let acting_player_id = game.acting_player.player_id.as_deref();
     let is_acting_player = acting_player_id == Some(carrier_id);
-    // TODO: `is_suffering_blood_lust` not yet tracked on ActingPlayer.
-    // For now we conservatively treat blood-lust as false (never suffering it),
-    // which is correct for BB2025 (allow_movement_in_endzone = false makes the check a no-op).
-    let suffering_blood_lust = false;
+    let suffering_blood_lust = game.acting_player.suffering_blood_lust;
     if is_acting_player && suffering_blood_lust && allow_movement_in_endzone {
         return false;
     }

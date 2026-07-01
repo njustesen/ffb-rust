@@ -51,7 +51,7 @@ impl Step for StepSetup {
             // In Rust: these are no-ops (the engine processes them transparently)
             Action::PlacePlayer { player_id, coord } => {
                 // Java: UtilServerSetup.setupPlayer(getGameState(), playerId, coordinate)
-                // TODO: UtilServerSetup.setupPlayer
+                // DEFERRED(setupPlayer): UtilServerSetup.setupPlayer not yet ported.
                 let _ = (player_id, coord);
                 return StepOutcome::cont(); // SKIP_STEP → stay in setup
             }
@@ -91,15 +91,11 @@ impl StepSetup {
         if self.end_setup {
             // Java: getResult().setSound(SoundId.DING)
             // Java: SetupMechanic.checkSetup(getGameState(), game.isHomePlaying())
-            // TODO: SetupMechanic.checkSetup — validate formation
-            // Stub: assume setup is always valid
+            // DEFERRED(checkSetup): SetupMechanic.checkSetup not yet ported; stub: always valid.
             let setup_valid = true;
             if setup_valid {
                 game.home_playing = !game.home_playing;
-                // Java: game.getTurnData().setTurnStarted(false)
-                // Java: game.getTurnData().setFirstTurnAfterKickoff(false)
-                // Java: UtilBox.refreshBoxes(game)
-                // TODO: box refresh, turn data updates
+                // DEFERRED(boxRefresh): UtilBox.refreshBoxes + turn data updates not yet ported.
 
                 if game.setup_offense {
                     // Java: game.setTurnMode(TurnMode.KICKOFF)
@@ -108,7 +104,7 @@ impl StepSetup {
                     // Java: game.setSetupOffense(true)
                     game.setup_offense = true;
                     // Java: push Inducement sequences for BEFORE_SETUP phase (home + away)
-                    // TODO: SequenceGeneratorFactory.Inducement.pushSequence(...)
+                    // DEFERRED(generator): SequenceGeneratorFactory.Inducement.pushSequence not yet ported.
                 }
                 return StepOutcome::next();
             } else {
@@ -124,8 +120,7 @@ impl StepSetup {
     /// Java: checkNoPlayersInBoxOrField() — awards TD if one team has no eligible players.
     fn check_no_players_in_box_or_field(&self, game: &mut Game) -> bool {
         // Java: findPlayersInReserveOrField(game, teamHome) / (game, teamAway)
-        // TODO: actual player count lookup via field model
-        // Stub: always return false (no auto-TD)
+        // DEFERRED(fieldModel): findPlayersInReserveOrField not yet ported; stub: always false.
         let _ = game;
         false
     }

@@ -9,9 +9,9 @@
 ///   THROWN_PLAYER_HAS_BALL, THROWN_PLAYER_COORDINATE, THROW_SCATTER.
 /// Optional init: IS_KICKED_PLAYER.
 ///
-/// TODO(InitScatterPlayer-scatter): UtilThrowTeamMateSequence.scatterPlayer/kickPlayer deferred.
-/// TODO(InitScatterPlayer-injury): UtilServerInjury.handleInjury deferred.
-/// TODO(InitScatterPlayer-animation): Animation/syncGameModel deferred.
+/// DEFERRED(scatter): UtilThrowTeamMateSequence.scatterPlayer/kickPlayer not yet ported.
+/// DEFERRED(injury): UtilServerInjury.handleInjury for hit player not yet ported.
+/// DEFERRED(animation): Animation/syncGameModel not yet ported.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::PlayerState;
@@ -52,11 +52,7 @@ impl StepInitScatterPlayer {
         if self.thrown_player_id.is_none() || self.thrown_player_coordinate.is_none() {
             return StepOutcome::next();
         }
-        // TODO(InitScatterPlayer-scatter): call UtilThrowTeamMateSequence::scatterPlayer / kickPlayer
-        //   to get the landing FieldCoordinate.
-        // TODO(InitScatterPlayer-inBounds): if in-bounds + player → injury + continue loop.
-        // TODO(InitScatterPlayer-empty): if in-bounds empty → place player + end loop.
-        // TODO(InitScatterPlayer-outOfBounds): crowd injury + THROW_IN publish if has ball.
+        // DEFERRED(scatter): UtilThrowTeamMateSequence scatter / kickPlayer / in-bounds / out-of-bounds logic not yet ported.
         // Always publish the carried parameters so downstream steps can consume them.
         StepOutcome::next()
             .publish(StepParameter::ThrownPlayerId(self.thrown_player_id.clone()))

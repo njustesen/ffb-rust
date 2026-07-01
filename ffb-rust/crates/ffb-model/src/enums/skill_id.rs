@@ -678,7 +678,13 @@ impl SkillId {
                 "ignoreTacklezonesWhenJumping",
                 "failedRushForJumpAlwaysLandsInTargetSquare",
             ],
-            SkillId::Juggernaut => &["canConvertBothDownToPush"],
+            // Java mixed/Juggernaut: canConvertBothDownToPush + 3 CancelSkillProperty registrations.
+            SkillId::Juggernaut => &[
+                "canConvertBothDownToPush",
+                "cancelsCanTakeDownPlayersWithHimOnBothDown",
+                "cancelsCanRefuseToBePushed",
+                "cancelsPreventOpponentFollowingUp",
+            ],
             SkillId::Frenzy => &["forceFollowup", "forceSecondBlock"],
             SkillId::Guard => &["assistsBlocksInTacklezones", "assistsFoulsInTacklezones"],
             SkillId::DivingTackle => &["canAttemptToTackleDodgingPlayer"],
@@ -727,7 +733,11 @@ impl SkillId {
             SkillId::Swoop => &["ttmScattersInSingleDirection"],
             SkillId::KickTeamMate => &["canKickTeamMates"],
             SkillId::ThrowTeamMate => &["canThrowTeamMates"],
-            SkillId::RightStuff => &["canBeThrown"],
+            SkillId::RightStuff => &["canBeThrown", "canBeKicked"],
+            // Java: BB2020 BallAndChain registers CancelSkillProperty(inflictsConfusion) and CancelSkillProperty(canMoveBeforeBeingBlocked)
+            SkillId::BallAndChain => &["movesRandomly", "blocksLikeChainsaw", "cancelsInflictsConfusion", "cancelsCanMoveBeforeBeingBlocked"],
+            // Java: BreatheFire.postConstruct registers canPerformArmourRollInsteadOfBlockThatMightFailWithTurnover
+            SkillId::BreatheFire => &["canPerformArmourRollInsteadOfBlockThatMightFailWithTurnover"],
             SkillId::WildAnimal => &["needsToRollForAction"],
             SkillId::Loner => &["needsToRollForTeamReroll"],
             SkillId::Decay => &["decaysAfterInjury"],
@@ -736,6 +746,28 @@ impl SkillId {
             SkillId::RunningPass => &["canMoveAfterQuickPass"],
             SkillId::DivingCatch => &["canAttemptCatchInAdjacentSquares"],
             SkillId::NoHands => &["preventCatch"],
+            // Java: SafeThrow.postConstruct registers NamedProperties.canCancelInterceptions
+            SkillId::SafeThrow => &["canCancelInterceptions"],
+            // Java: VeryLongLegs.postConstruct registers CancelSkillProperty(canCancelInterceptions)
+            SkillId::VeryLongLegs => &["cancelsCancelInterceptions"],
+            // Java: FuriousOutburst.postConstruct registers canTeleportBeforeAndAfterAvRollAttack
+            SkillId::FuriousOutburst => &["canTeleportBeforeAndAfterAvRollAttack"],
+            // Java: SafePass.postConstruct registers NamedProperties.dontDropFumbles
+            SkillId::SafePass => &["dontDropFumbles"],
+            // Java: Trickster.postConstruct registers NamedProperties.canMoveBeforeBeingBlocked
+            SkillId::Trickster => &["canMoveBeforeBeingBlocked"],
+            // Java: BlastIt.postConstruct registers NamedProperties.canReRollHmpScatter
+            SkillId::BlastIt => &["canReRollHmpScatter"],
+            // Java: PutridRegurgitation.postConstruct registers canUseVomitAfterBlock, providesBlockAlternative, canPerformArmourRollInsteadOfBlockThatMightFail
+            SkillId::PutridRegurgitation => &[
+                "canUseVomitAfterBlock",
+                "providesBlockAlternative",
+                "canPerformArmourRollInsteadOfBlockThatMightFail",
+            ],
+            // Java: ViolentInnovator.postConstruct registers grantsSppFromSpecialActionsCas
+            SkillId::ViolentInnovator => &["grantsSppFromSpecialActionsCas"],
+            // Java: MaximumCarnage.postConstruct registers canPerformSecondChainsawAttack
+            SkillId::MaximumCarnage => &["canPerformSecondChainsawAttack"],
             _ => &[],
         }
     }
@@ -794,5 +826,43 @@ mod tests {
     #[test]
     fn properties_chainsaw_has_five() {
         assert_eq!(SkillId::Chainsaw.properties().len(), 5);
+    }
+
+    #[test]
+    fn properties_trickster_has_can_move_before_being_blocked() {
+        assert!(SkillId::Trickster.properties().contains(&"canMoveBeforeBeingBlocked"));
+    }
+
+    #[test]
+    fn properties_safe_pass_has_dont_drop_fumbles() {
+        assert!(SkillId::SafePass.properties().contains(&"dontDropFumbles"));
+    }
+
+    #[test]
+    fn properties_ball_and_chain_cancels_trickster() {
+        assert!(SkillId::BallAndChain.properties().contains(&"cancelsCanMoveBeforeBeingBlocked"));
+    }
+
+    #[test]
+    fn properties_blast_it_has_can_reroll_hmp_scatter() {
+        assert!(SkillId::BlastIt.properties().contains(&"canReRollHmpScatter"));
+    }
+
+    #[test]
+    fn properties_putrid_regurgitation_has_three() {
+        let props = SkillId::PutridRegurgitation.properties();
+        assert!(props.contains(&"canUseVomitAfterBlock"));
+        assert!(props.contains(&"providesBlockAlternative"));
+        assert!(props.contains(&"canPerformArmourRollInsteadOfBlockThatMightFail"));
+    }
+
+    #[test]
+    fn properties_violent_innovator_grants_spp() {
+        assert!(SkillId::ViolentInnovator.properties().contains(&"grantsSppFromSpecialActionsCas"));
+    }
+
+    #[test]
+    fn properties_maximum_carnage_second_chainsaw() {
+        assert!(SkillId::MaximumCarnage.properties().contains(&"canPerformSecondChainsawAttack"));
     }
 }

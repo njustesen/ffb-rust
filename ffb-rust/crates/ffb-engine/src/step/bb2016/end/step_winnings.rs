@@ -6,9 +6,9 @@
 /// - If team conceded illegally: transfer their winnings to the opposing team.
 /// - Emits ReportWinningsRoll twice (initial + concede adjustment).
 ///
-/// TODO(Winnings-dialog): DialogWinningsReRollParameter / UtilServerDialog deferred.
-/// TODO(Winnings-reroll): AbstractStepWithReRoll / WINNINGS re-roll deferred.
-/// TODO(Winnings-report): ReportWinningsRoll (currently just applies arithmetic).
+/// DEFERRED(Winnings-dialog): DialogWinningsReRollParameter / UtilServerDialog not yet ported.
+/// DEFERRED(Winnings-reroll): AbstractStepWithReRoll / WINNINGS re-roll not yet ported.
+/// DEFERRED(Winnings-report): ReportWinningsRoll game event not yet ported (arithmetic applied directly).
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -48,7 +48,7 @@ impl StepWinnings {
 
     fn execute_step(game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         Self::roll_winnings(game, rng);
-        // TODO(Winnings-dialog): show re-roll dialog for winner.
+        // DEFERRED(Winnings-dialog): show re-roll dialog for winner — dialog layer not yet ported.
         Self::concede_winnings(game);
         StepOutcome::next()
     }

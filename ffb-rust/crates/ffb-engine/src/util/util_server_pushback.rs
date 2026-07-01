@@ -108,6 +108,45 @@ impl UtilServerPushback {
             .map(|(c, d)| PushbackSquare::new(c, d, home_choice))
             .collect()
     }
+
+    /// Returns all in-bounds candidate pushback squares without filtering by occupancy.
+    ///
+    /// Java: `UtilServerPushback.findPushbackSquares` returns all 3 candidates (including
+    /// occupied ones) — used by `StepBlockDodge.findDodgeChoice` to detect chain-push /
+    /// sideline-push risks before the actual pushback happens.
+    pub fn find_pushback_squares_candidates(
+        starting_square: PushbackSquare,
+        home_choice: bool,
+    ) -> Vec<PushbackSquare> {
+        let coord = starting_square.coordinate;
+        let dir = starting_square.direction;
+
+        let nw = FieldCoordinate::new(coord.x - 1, coord.y - 1);
+        let n  = FieldCoordinate::new(coord.x,     coord.y - 1);
+        let ne = FieldCoordinate::new(coord.x + 1, coord.y - 1);
+        let e  = FieldCoordinate::new(coord.x + 1, coord.y);
+        let se = FieldCoordinate::new(coord.x + 1, coord.y + 1);
+        let s  = FieldCoordinate::new(coord.x,     coord.y + 1);
+        let sw = FieldCoordinate::new(coord.x - 1, coord.y + 1);
+        let w  = FieldCoordinate::new(coord.x - 1, coord.y);
+
+        let candidates: [(FieldCoordinate, Direction); 3] = match dir {
+            Direction::North     => [(nw, Direction::Northwest), (n,  Direction::North),     (ne, Direction::Northeast)],
+            Direction::Northeast => [(n,  Direction::North),     (ne, Direction::Northeast), (e,  Direction::East)],
+            Direction::East      => [(ne, Direction::Northeast), (e,  Direction::East),       (se, Direction::Southeast)],
+            Direction::Southeast => [(e,  Direction::East),       (se, Direction::Southeast), (s,  Direction::South)],
+            Direction::South     => [(se, Direction::Southeast), (s,  Direction::South),     (sw, Direction::Southwest)],
+            Direction::Southwest => [(s,  Direction::South),     (sw, Direction::Southwest), (w,  Direction::West)],
+            Direction::West      => [(sw, Direction::Southwest), (w,  Direction::West),      (nw, Direction::Northwest)],
+            Direction::Northwest => [(w,  Direction::West),      (nw, Direction::Northwest), (n,  Direction::North)],
+        };
+
+        candidates
+            .into_iter()
+            .filter(|(c, _)| FieldCoordinateBounds::FIELD.is_in_bounds(*c))
+            .map(|(c, d)| PushbackSquare::new(c, d, home_choice))
+            .collect()
+    }
 }
 
 impl Default for UtilServerPushback {

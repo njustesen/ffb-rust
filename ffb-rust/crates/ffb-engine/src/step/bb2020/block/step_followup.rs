@@ -119,9 +119,26 @@ impl StepFollowup {
                 && !defender_state.is_prone_or_stunned()
                 && !old_defender_state.is_prone_or_stunned()
             {
-                // TODO: check if attacker skill cancels Fend (UtilCards.getSkillCancelling)
-                // TODO: auto-cancel Fend if attacker is Blitz/Move with cancelling skill
-                if self.using_skill_preventing_follow_up.is_none() {
+                // Java: check if attacker has a skill that cancels preventOpponentFollowingUp
+                // (Juggernaut registers CancelSkillProperty(preventOpponentFollowingUp)).
+                // Auto-cancel if action is BLITZ or (MOVE + blocksDuringMove) — Java line 130.
+                let attacker_cancels_fend = acting_player_id.as_deref()
+                    .and_then(|id| game.player(id))
+                    .map(|p| p.has_skill_property(NamedProperties::CANCELS_PREVENT_OPPONENT_FOLLOWING_UP))
+                    .unwrap_or(false);
+                let action_allows_cancel = matches!(
+                    game.acting_player.player_action,
+                    Some(PlayerAction::Blitz)
+                ) || (game.acting_player.player_action == Some(PlayerAction::Move)
+                    && acting_player_id.as_deref()
+                        .and_then(|id| game.player(id))
+                        .map(|p| p.has_skill_property(NamedProperties::BLOCKS_DURING_MOVE))
+                        .unwrap_or(false));
+
+                if attacker_cancels_fend && action_allows_cancel {
+                    // Juggernaut auto-cancels Fend — no dialog needed.
+                    self.using_skill_preventing_follow_up = Some(false);
+                } else if self.using_skill_preventing_follow_up.is_none() {
                     if !old_defender_state.has_tacklezones() {
                         // Defender has no tacklezones — Fend fails automatically
                         self.using_skill_preventing_follow_up = Some(false);
@@ -322,5 +339,44 @@ mod tests {
         let coord = FieldCoordinate::new(3, 7);
         step.set_parameter(&StepParameter::DefenderPosition(coord));
         assert_eq!(step.defender_position, Some(coord));
+    }
+
+    #[test]
+    fn juggernaut_on_blitz_auto_cancels_fend() {
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerGender, PlayerType, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = make_game();
+        // Attacker (home) has Juggernaut, doing a Blitz.
+        game.team_home.players.push(Player {
+            id: "attacker".into(), name: "attacker".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 4, strength: 4, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Juggernaut, value: None }],
+            extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        // Defender (away) has Fend, standing (has tacklezones).
+        game.team_away.players.push(Player {
+            id: "defender".into(), name: "defender".into(), nr: 2, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 4, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Fend, value: None }],
+            extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+        });
+        let standing = PlayerState::new(PS_STANDING);
+        game.field_model.set_player_state("defender", standing);
+        game.acting_player.player_id = Some("attacker".into());
+        game.acting_player.player_action = Some(PlayerAction::Blitz);
+        game.defender_id = Some("defender".into());
+        let mut step = StepFollowup::new();
+        step.old_defender_state = Some(standing);
+        step.using_skill_forcing_follow_up = Some(false);
+        // Juggernaut on Blitz should auto-cancel Fend → no dialog wait → reaches followup choice dialog.
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // Fend is cancelled, step proceeds to followup choice (None → Continue).
+        assert_eq!(out.action, StepAction::Continue);
     }
 }

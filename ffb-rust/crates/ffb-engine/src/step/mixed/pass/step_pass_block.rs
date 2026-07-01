@@ -98,7 +98,7 @@ impl StepPassBlock {
                 }
             } else if self.end_player_action {
                 // Player finished — switch to next pass blocker or end
-                // TODO: sequence generator integration
+                // DEFERRED: sequence generator integration
                 self.end_player_action = false;
             }
 

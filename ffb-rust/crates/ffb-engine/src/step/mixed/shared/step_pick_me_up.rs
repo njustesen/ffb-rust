@@ -17,6 +17,7 @@
 ///
 /// Java: `com.fumbbl.ffb.server.step.mixed.shared.StepPickMeUp` extends `AbstractStep`.
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::{PS_STANDING, PS_PRONE};
 use crate::action::Action;
@@ -55,23 +56,20 @@ impl StepPickMeUp {
             }
 
             // Java: hideDialog; find opposing team; find pick-me-up players on pitch with tacklezones
-            // For each pick-me-up player: find prone team-mates within 3 steps.
-            // TODO(NamedProperties port): filter by NamedProperties.canStandUpTeamMates
-            // Until the property system is ported, collect all prone players on the non-acting team
-            // within 3 steps of any standing player on that team (conservative stub).
-            let other_team_id = game.inactive_team().id.clone();
+            // For each pick-me-up player (canStandUpTeamMates): find prone team-mates within 3 steps.
             let player_ids_on_other_team: Vec<String> = {
                 let team = game.inactive_team();
                 team.players.iter().map(|p| p.id.clone()).collect()
             };
-            // Find prone players adjacent to a standing teammate (within 3 steps)
             let mut eligible: std::collections::HashSet<String> = std::collections::HashSet::new();
-            let _ = other_team_id;
             for picker_id in &player_ids_on_other_team {
                 let picker_state = game.field_model.player_state(picker_id);
                 let picker_coord = game.field_model.player_coordinate(picker_id);
+                let has_skill = game.player(picker_id)
+                    .map(|p| p.has_skill_property(NamedProperties::CAN_STAND_UP_TEAM_MATES))
+                    .unwrap_or(false);
                 if let (Some(state), Some(coord)) = (picker_state, picker_coord) {
-                    if !state.has_tacklezones() { continue; }
+                    if !state.has_tacklezones() || !has_skill { continue; }
                     // Find prone teammates within 3 steps
                     for teammate_id in &player_ids_on_other_team {
                         if teammate_id == picker_id { continue; }
@@ -103,7 +101,7 @@ impl StepPickMeUp {
                         );
                     }
                 }
-                // TODO(Report port): addReport(ReportPickMeUp(id, roll, success))
+                // DEFERRED(Report port): addReport(ReportPickMeUp(id, roll, success))
             }
         }
 

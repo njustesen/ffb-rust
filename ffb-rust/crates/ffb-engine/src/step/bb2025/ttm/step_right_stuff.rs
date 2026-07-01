@@ -206,11 +206,11 @@ impl StepRightStuff {
             };
             let successful = DiceInterpreter::is_skill_roll_successful(roll, minimum_roll);
             if successful {
-                // TODO: SppMechanic.addLanding; checkTouchdown
+                // DEFERRED: SppMechanic.addLanding; checkTouchdown
                 return StepOutcome::goto(&self.goto_on_success)
                     .publish(StepParameter::ThrownPlayerCoordinate(None));
             }
-            // TODO: re-roll handling (useReRoll / askForReRoll / usingSwoop REPEAT path)
+            // DEFERRED: re-roll handling (useReRoll / askForReRoll / usingSwoop REPEAT path)
         }
 
         // Java: !doRoll or failed roll → handleInjury; NEXT_STEP

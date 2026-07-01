@@ -36,6 +36,7 @@ use ffb_mechanics::mechanics::{
     block_result_for_roll, block_dice_count,
     armor_broken, injury_result, InjuryOutcome, casualty_tier_bb2025, CasualtyTier,
     minimum_roll_dodge, minimum_roll_catch_bb2016, minimum_roll_catch_edition,
+    minimum_roll_intercept_edition,
     throw_in_distance, throw_in_direction_for_roll,
     corner_throw_in_direction_for_roll, is_corner_square, corner_direction,
     passing_distance_bb2025,
@@ -2348,9 +2349,63 @@ impl Step {
             // Java StepIntercept: agent declined (or attempted but failed). Either way: advance.
             (Step::Intercept, Action::Intercept { attempt: false }) => StepOutcome::next(),
             (Step::Intercept, Action::Intercept { attempt: true }) => {
-                // TODO Phase F: roll d6 InterceptionRoll and handle interception success.
-                // For now advance (agent always declines per parity contract).
-                StepOutcome::next()
+                // Java StepIntercept.intercept(): roll d6 vs minimum, move ball on success.
+                let passer_id = match &game.acting_player.player_id {
+                    Some(id) => id.clone(),
+                    None => return StepOutcome::next(),
+                };
+                let receiver_id = match &game.acting_player.defender_id {
+                    Some(id) => id.clone(),
+                    None => return StepOutcome::next(),
+                };
+                let passer_coord = match game.field_model.player_coordinate(&passer_id) {
+                    Some(c) => c,
+                    None => return StepOutcome::next(),
+                };
+                let receiver_coord = match game.field_model.player_coordinate(&receiver_id) {
+                    Some(c) => c,
+                    None => return StepOutcome::next(),
+                };
+                let passer_is_home = game.team_home.has_player(&passer_id);
+                let mut eligible: Vec<String> = game.team_home.players.iter().chain(game.team_away.players.iter())
+                    .filter(|p| game.team_home.has_player(&p.id) != passer_is_home)
+                    .filter_map(|p| {
+                        let coord = game.field_model.player_coordinate(&p.id)?;
+                        let has_tz = game.field_model.player_state(&p.id)
+                            .map(|s| s.has_tacklezones()).unwrap_or(false);
+                        if has_tz && can_intercept(passer_coord, receiver_coord, coord) {
+                            Some(p.id.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                eligible.sort();
+                let interceptor_id = match eligible.into_iter().next() {
+                    Some(id) => id,
+                    None => return StepOutcome::next(),
+                };
+                let ag = game.team_home.players.iter().chain(game.team_away.players.iter())
+                    .find(|p| p.id == interceptor_id)
+                    .map(|p| p.agility_with_modifiers())
+                    .unwrap_or(3);
+                let target = minimum_roll_intercept_edition(ag, 0, game.rules);
+                let roll = rng.d6();
+                let success = is_skill_roll_successful(roll, target);
+                let interceptor_coord = game.field_model.player_coordinate(&interceptor_id);
+                if success {
+                    if let Some(coord) = interceptor_coord {
+                        game.field_model.ball_coordinate = Some(coord);
+                    }
+                    game.field_model.ball_moving = false;
+                    game.turnover = true;
+                }
+                StepOutcome::next().with_events(vec![GameEvent::InterceptionRoll {
+                    player_id: interceptor_id,
+                    target,
+                    roll,
+                    success,
+                }])
             }
             // A command the current step does not recognise (Java StepCommandStatus::UNHANDLED):
             // stay put and keep waiting. (The harness never sends one in the parity path.)

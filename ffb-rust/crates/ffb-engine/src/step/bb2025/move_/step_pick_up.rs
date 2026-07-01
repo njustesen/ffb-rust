@@ -26,7 +26,7 @@ use ffb_mechanics::modifiers::pickup_context::PickupContext;
 ///   2. Team Re-Roll token (TRR) — offered via ReRollOffer prompt
 ///
 /// secureTheBall: set from PlayerAction::SecureTheBall — uses agility 2 for minimum roll, skips skill reroll, publishes EndPlayerAction(true) on success.
-/// TODO: CLIENT_PICK_UP_CHOICE command handling (Trickster optional path) not yet ported.
+/// DEFERRED: CLIENT_PICK_UP_CHOICE command handling (Trickster optional path) not yet ported.
 pub struct StepPickUp {
     /// Java: fGotoLabelOnFailure
     pub goto_label_on_failure: String,

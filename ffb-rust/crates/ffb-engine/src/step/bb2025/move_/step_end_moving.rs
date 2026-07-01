@@ -4,6 +4,8 @@ use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
+use ffb_mechanics::bb2025::ttm_mechanic::TtmMechanic as Bb2025TtmMechanic;
+use ffb_mechanics::ttm_mechanic::TtmMechanic as TtmMechanicTrait;
 use crate::step::util_server_steps::{change_player_action, check_touchdown};
 use crate::util::{ServerUtilBlock, UtilServerPlayerMove};
 use crate::action::Action;
@@ -35,10 +37,7 @@ use crate::step::generator::bb2025::throw_team_mate::ThrowTeamMateParams;
 ///               CLIENT_THROW_TEAM_MATE / CLIENT_KICK_TEAM_MATE / CLIENT_ACTING_PLAYER commands.
 ///
 /// checkTouchdown is wired via util_server_steps::check_touchdown.
-/// TODO(secureTheBall): secureTheBallFailed logic not yet ported.
-/// DEFERRED(ktm): canKickTeamMate / canThrowTeamMate checks not yet ported.
-/// TODO(ktm): canKickTeamMate / canThrowTeamMate checks not yet ported.
-/// TODO(askBlockKind): GameOption ALLOW_SPECIAL_BLOCKS_WITH_BALL_AND_CHAIN check not yet ported.
+/// allowSpecialBlocksWithBallAndChain option → askForBlockKind wired in ball-and-chain branch.
 pub struct StepEndMoving {
     /// Java: fEndTurn
     pub end_turn: bool,
@@ -154,14 +153,21 @@ impl StepEndMoving {
 
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: UtilServerDialog.hideDialog(gameState)
-        // TODO: hide dialog — not yet ported
+        // DEFERRED: hide dialog — not yet ported
 
         // Java: triesToSecureBall = playerAction == SECURE_THE_BALL && !(isSufferingBloodLust && bloodlustAction == MOVE)
         // Java: secureTheBallFailed = endPlayerAction && triesToSecureBall && !UtilPlayer.hasBall(...)
-        // TODO: secureTheBallFailed not yet ported (hasBall not ported)
+        let player_action = game.acting_player.player_action;
+        let tries_to_secure_ball = player_action == Some(PlayerAction::SecureTheBall)
+            && !(game.acting_player.suffering_blood_lust
+                && self.bloodlust_action == Some(PlayerAction::Move));
+        let has_ball = game.acting_player.player_id.as_deref()
+            .map(|id| UtilPlayer::has_ball(game, id))
+            .unwrap_or(false);
+        let secure_the_ball_failed = self.end_player_action && tries_to_secure_ball && !has_ball;
 
         // Java: fEndTurn |= checkTouchdown(gameState) || secureTheBallFailed
-        self.end_turn |= check_touchdown(game);
+        self.end_turn |= check_touchdown(game) || secure_the_ball_failed;
 
         // Java: if (fFeedingAllowed == null) fFeedingAllowed = true
         let feeding_allowed = self.feeding_allowed.unwrap_or(true);
@@ -180,10 +186,28 @@ impl StepEndMoving {
         // ── Branch 2: block defender set (ball-and-chain) ───────────────────────
         if let Some(ref defender_id) = self.block_defender_id.clone() {
             // Java: askForBlockKind check (GameOptionBoolean ALLOW_SPECIAL_BLOCKS_WITH_BALL_AND_CHAIN)
-            // TODO: askForBlockKind not yet ported — stub as false
+            let ask_for_block_kind = if game.options.is_enabled("allowSpecialBlocksWithBallAndChain") {
+                let defender_state = game.field_model.player_state(defender_id);
+                let acting_has_alt = game.acting_player.player_id.as_deref()
+                    .and_then(|id| game.player(id))
+                    .map(|p| p.has_skill_property(NamedProperties::PROVIDES_BLOCK_ALTERNATIVE))
+                    .unwrap_or(false);
+                let defender_not_prone_stunned = defender_state
+                    .map(|s| !s.is_stunned() && !s.is_prone_or_stunned())
+                    .unwrap_or(false);
+                if acting_has_alt && defender_not_prone_stunned {
+                    game.defender_id = Some(defender_id.clone());
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
             let seq = Block::build_sequence(&BlockParams {
                 block_defender_id: Some(defender_id.clone()),
                 using_chainsaw: self.using_chainsaw,
+                ask_for_block_kind,
                 ..Default::default()
             });
             return StepOutcome::next().push_seq(seq);
@@ -253,8 +277,8 @@ impl StepEndMoving {
             || (player_action == Some(PlayerAction::FoulMove) && UtilPlayer::can_foul(game, pid))
             || (player_action == Some(PlayerAction::GazeMove)
                 && UtilPlayer::has_adjacent_gaze_target(game, pid))
-            // DEFERRED(ktm): KickTeamMateMove && canKickTeamMate not yet ported
-            // DEFERRED(ktm): ThrowTeamMateMove && canThrowTeamMate not yet ported
+            || (player_action == Some(PlayerAction::KickTeamMateMove) && can_kick_team_mate(game, pid, true))
+            || (player_action == Some(PlayerAction::ThrowTeamMateMove) && can_throw_team_mate(game, pid, false))
             || (is_blitz_move && adjacent_target)
             || (player_action == Some(PlayerAction::PuntMove) && has_ball);
         if can_make_next_move {
@@ -349,6 +373,25 @@ impl StepEndMoving {
             _ => None,
         }
     }
+}
+
+/// Java: UtilPlayer.canKickTeamMate(game, kicker, checkBlitzUsed).
+fn can_kick_team_mate(game: &Game, player_id: &str, check_blitz_used: bool) -> bool {
+    let player = match game.player(player_id) { Some(p) => p, None => return false };
+    if check_blitz_used && game.turn_data().blitz_used { return false; }
+    use ffb_model::model::property::named_properties::NamedProperties;
+    if !player.has_skill_property(NamedProperties::CAN_KICK_TEAM_MATES) { return false; }
+    let mechanic = Bb2025TtmMechanic::new();
+    !mechanic.find_kickable_team_mates(game, player).is_empty()
+}
+
+/// Java: UtilPlayer.canThrowTeamMate(game, thrower, checkPassUsed).
+fn can_throw_team_mate(game: &Game, player_id: &str, check_pass_used: bool) -> bool {
+    let player = match game.player(player_id) { Some(p) => p, None => return false };
+    let mechanic = Bb2025TtmMechanic::new();
+    if check_pass_used && !mechanic.is_ttm_available(game.turn_data()) { return false; }
+    if !mechanic.can_throw(game, player) { return false; }
+    !mechanic.find_throwable_team_mates(game, player).is_empty()
 }
 
 #[cfg(test)]
@@ -697,5 +740,63 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!out.pushes.is_empty(), "should push EndPlayerAction as fallback");
+    }
+
+    #[test]
+    fn secure_the_ball_failed_triggers_end_turn() {
+        // Java: secureTheBallFailed = endPlayerAction && triesSecure && !hasBall
+        // Player has SecureTheBall action but does NOT have the ball → endTurn is forced
+        let mut game = make_game();
+        add_player_at(&mut game, true, "p1", FieldCoordinate::new(5, 5));
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::SecureTheBall);
+        // Ball is elsewhere — player does not have it
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(10, 5));
+        let mut step = StepEndMoving::new();
+        step.end_player_action = true;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // secureTheBallFailed → end_turn → push EndPlayerAction with end_turn=true
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty());
+    }
+
+    #[test]
+    fn secure_the_ball_succeeded_does_not_trigger_end_turn() {
+        // Player has SecureTheBall and has the ball → normal end_player_action path
+        let mut game = make_game();
+        add_player_at(&mut game, true, "p1", FieldCoordinate::new(5, 5));
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::SecureTheBall);
+        // Ball IS at player's square
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(5, 5));
+        game.field_model.ball_in_play = true;
+        let mut step = StepEndMoving::new();
+        step.end_player_action = true;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn block_defender_without_option_does_not_set_defender_id() {
+        let mut game = make_game();
+        // option disabled (default)
+        let mut step = StepEndMoving::new();
+        step.block_defender_id = Some("def1".into());
+        let _out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.defender_id.is_none(), "defender_id must not be set when option is disabled");
+    }
+
+    #[test]
+    fn block_defender_with_option_enabled_but_player_lacks_alt_skill_does_not_set_defender_id() {
+        let mut game = make_game();
+        game.options.set("allowSpecialBlocksWithBallAndChain", "true");
+        // acting player has NO PROVIDES_BLOCK_ALTERNATIVE skill
+        add_player_at(&mut game, true, "atk", FieldCoordinate::new(5, 5));
+        game.acting_player.player_id = Some("atk".into());
+        add_player_at(&mut game, false, "def1", FieldCoordinate::new(6, 5));
+        let mut step = StepEndMoving::new();
+        step.block_defender_id = Some("def1".into());
+        let _out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.defender_id.is_none(), "defender_id must not be set when player lacks providesBlockAlternative");
     }
 }
