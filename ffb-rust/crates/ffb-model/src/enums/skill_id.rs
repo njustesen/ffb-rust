@@ -768,6 +768,8 @@ impl SkillId {
             SkillId::ViolentInnovator => &["grantsSppFromSpecialActionsCas"],
             // Java: MaximumCarnage.postConstruct registers canPerformSecondChainsawAttack
             SkillId::MaximumCarnage => &["canPerformSecondChainsawAttack"],
+            // Java: BeerBarrelBash.postConstruct registers canThrowKeg
+            SkillId::BeerBarrelBash => &["canThrowKeg"],
             _ => &[],
         }
     }

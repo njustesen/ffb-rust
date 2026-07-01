@@ -68,6 +68,12 @@ impl GameRng {
         self.die(3)
     }
 
+    /// Roll riotous rookies count: returns [d3, d3].
+    /// Java: `DiceRoller.rollRiotousRookies()` → `{ rollDice(3), rollDice(3) }`.
+    pub fn roll_riotous_rookies(&mut self) -> [i32; 2] {
+        [self.d3(), self.d3()]
+    }
+
     /// Roll in range [0, n) using rejection sampling.
     pub fn range(&mut self, n: usize) -> usize {
         if n == 0 {

@@ -82,7 +82,7 @@ impl StepFirstMoveFuriousOutburst {
                 // Java: fieldModel.setPlayerState(target, state.changeSelectedStabTarget(true))
                 let old_state = game.field_model.player_state(tid)
                     .unwrap_or_default();
-                game.field_model.set_player_state(tid, old_state.change_selected_stab_target(true));
+                game.field_model.set_player_state(tid, old_state.change_selected_stab_target(true).remove_selected_blitz_target());
                 // Java: find empty adjacent squares to target, add as MoveSquares
                 let target_coord = game.field_model.player_coordinate(tid);
                 if let Some(tc) = target_coord {

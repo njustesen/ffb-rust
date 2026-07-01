@@ -47,6 +47,10 @@ pub struct TeamResult {
     /// Java: `TeamResult.penaltyScore` — penalty-shootout goals scored. Default -1 in Java
     /// (unset); represented as 0 here since Rust uses 0-defaults and -1 has no semantic use.
     pub penalty_score: i32,
+    /// Java: `TeamResult.fPettyCashTransferred` — amount of petty cash the team chose to spend.
+    pub petty_cash_transferred: i32,
+    /// Java: `TeamResult.fPettyCashUsed` — petty cash actually spent on inducements.
+    pub petty_cash_used: i32,
 }
 
 /// Full game result.
