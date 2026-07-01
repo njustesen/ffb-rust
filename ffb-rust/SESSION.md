@@ -8,9 +8,9 @@
 
 **Translation progress:** ~1,695/2,521 files formally implemented = **~67%**
 
-**Tests:** 5,784 passing (1 ignored)
+**Tests:** 5,815 passing (1 ignored)
 
-**Current phase:** Phase U (in progress)
+**Current phase:** Phase V (in progress)
 
 ---
 
@@ -80,6 +80,16 @@
   - **Sub-Phase U4**: Infrastructure stubs — `StepIdFactory` full impl (130 name↔id mappings, 6 tests), `StepActionFactory` full impl (6 action mappings, 7 tests), `StepModifierTrait` + `StepCommandStatus` + `sort_by_priority` (4 tests), `HookPoint` enum + `StepHookHandler` trait (3 tests). Created `factory/mod.rs` and `model/mod.rs`.
   - **Sub-Phase U5**: Game lifecycle steps — `StepInitStartGame` full impl (standalone fast-path: set `GameStatus::Active` on `start()`, handle `Action::StartGame` in `handle_command()`, 8 tests); `StepEndGame` full impl (set `GameStatus::Finished`, 5 tests). Added `Action::StartGame { home: bool }` variant.
   - +42 new tests (5,742 → 5,784)
+- **Phase V** (2026-07-01): Root mixed steps, phase/game step audit, model additions
+  - **`step_throw_keg.rs` (mixed)**: Full implementation — `execute_step`, `hit_player`, `fail()` with fumble path, re-roll cycle. 10 tests.
+  - **`SkillId::BeerBarrelBash`**: Added `canThrowKeg` property (was missing from Java parity).
+  - **`step_riotous_rookies.rs` (phase/inducement)**: Implemented from stub — `start()`, `hire_riotous_rookies_for_team`, `roll_riotous_rookies`; core player-creation DEFERRED on InducementSet/RosterPlayer. 7 tests.
+  - **`util_inducement_sequence.rs` (game/start)**: Implemented `calculate_inducement_gold` (TV-diff + petty-cash logic). 7 tests.
+  - **`TeamResult`**: Added `petty_cash_transferred` + `petty_cash_used` fields (Java: `fPettyCashTransferred`/`fPettyCashUsed`).
+  - **`GameRng`**: Added `roll_riotous_rookies()` method (Java: `DiceRoller.rollRiotousRookies`).
+  - **`step_first_move_furious_outburst.rs`**: Added `.remove_selected_blitz_target()` to state chain (Java parity fix).
+  - Phase R-U uncommitted work committed as single commit.
+  - +31 new tests (5,784 → 5,815)
 
 ---
 
