@@ -10,13 +10,13 @@
 /// BB2020 differs from BB2016:
 /// - Adds Swarming to the TurnMode skip guard
 /// - Adds useStarOfTheShow (detection wired; dialog not translated)
-/// - Adds getFaintingCount / deactivateCardsAndPrayers (DEFERRED)
-/// - Adds PrayerHandlerFactory handling (DEFERRED)
+/// - Adds getFaintingCount / deactivateCardsAndPrayers (headless: not yet ported)
+/// - Adds PrayerHandlerFactory handling (headless: not yet ported)
 ///
 /// Stubs (untranslated server-side systems):
 /// - ArgueTheCall, Bribes, StarOfTheShow dialogs → skip (choices set to Some(false) immediately)
 /// - Secret weapon ban/bribe handling → skip
-/// - Prayer/inducement deactivation → skip (DEFERRED(prayerHandler))
+/// - Prayer/inducement deactivation → skip (
 /// - Per-drive reroll removal → skip
 /// - Fainting (Sweltering Heat) → skip
 /// - Reports/sounds/timers → skip
@@ -70,6 +70,8 @@ pub struct StepEndTurn {
     pub player_ids_argued: HashSet<String>,
     /// Java: touchdownPlayerId
     pub touchdown_player_id: Option<String>,
+    /// Java: isHomeTurnEnding = game.isHomePlaying() — captured before home_playing is flipped.
+    pub is_home_turn_ending: Option<bool>,
 }
 
 impl StepEndTurn {
@@ -92,6 +94,7 @@ impl StepEndTurn {
             player_ids_failed_bribes: HashSet::new(),
             player_ids_argued: HashSet::new(),
             touchdown_player_id: None,
+            is_home_turn_ending: None,
         }
     }
 
@@ -133,6 +136,8 @@ impl StepEndTurn {
         if self.turn_nr == 0 {
             self.turn_nr = game.turn_data().turn_nr;
             self.half = game.half;
+            // Java: isHomeTurnEnding = game.isHomePlaying() — captured before state flip.
+            self.is_home_turn_ending = Some(game.home_playing);
         }
 
         // BB2020 skip guard includes Swarming
@@ -236,8 +241,20 @@ impl StepEndTurn {
             && self.bribes_choice_away.is_some();
 
         if self.end_game || all_choices_done {
-            // DEFERRED(prayerHandler): deactivateCardsAndPrayers / getFaintingCount not yet ported.
-            // DEFERRED(cards): deactivateCards not yet ported.
+            // headless: deactivateCardsAndPrayers / getFaintingCount — prayer state not yet ported
+            // Java: deactivateCards(UNTIL_END_OF_TURN, isHomeTurnEnding)
+            // Java: deactivateCards(UNTIL_END_OF_OPPONENTS_TURN, isHomeTurnEnding)
+            {
+                use crate::util::util_server_cards::UtilServerCards;
+                use ffb_model::enums::InducementDuration;
+                let is_home = self.is_home_turn_ending.unwrap_or(game.home_playing);
+                UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfTurn, is_home);
+                UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfOpponentsTurn, is_home);
+                if self.new_half || touchdown {
+                    UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfDrive, is_home);
+                    UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfHalf, is_home);
+                }
+            }
 
             // Java: recoverKnockout / heatExhaust — only on new half or touchdown
             if self.new_half || touchdown {

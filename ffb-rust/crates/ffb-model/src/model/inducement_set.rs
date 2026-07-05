@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
+use crate::inducement::card::Card;
 use crate::inducement::inducement::Inducement;
 use crate::inducement::usage::Usage;
 
@@ -11,8 +12,8 @@ pub struct InducementSet {
     inducements: HashMap<String, Inducement>,
     /// Java: `fCardsAvailable` — card names drawn but not yet played.
     cards_available: HashSet<String>,
-    /// Java: `fCardsActive` — card names currently in play.
-    cards_active: HashSet<String>,
+    /// Java: `fCardsActive` — cards currently in play, keyed by card name.
+    cards_active: HashMap<String, Card>,
     /// Java: `fCardsDeactivated` — card names that have been used.
     cards_deactivated: HashSet<String>,
     /// Java: `prayers` — prayer names available this drive.
@@ -138,23 +139,40 @@ impl InducementSet {
         self.cards_available.contains(card_name)
     }
 
-    /// Java: `InducementSet.activateCard(Card)` — moves from available → active.
+    /// Java: `InducementSet.activateCard(Card)` — moves from available → active (name-only path).
     pub fn activate_card(&mut self, card_name: &str) {
         if self.cards_available.remove(card_name) {
-            self.cards_active.insert(card_name.to_string());
+            self.cards_active.insert(card_name.to_string(), Card::new(card_name, None::<&str>));
         }
+    }
+
+    /// Activate with a full Card object (preserves duration and other fields).
+    pub fn activate_card_full(&mut self, card: Card) {
+        let name = card.name.clone();
+        self.cards_available.remove(&name);
+        self.cards_active.insert(name, card);
     }
 
     /// Java: `InducementSet.deactivateCard(Card)` — moves from active → deactivated.
     pub fn deactivate_card(&mut self, card_name: &str) {
-        if self.cards_active.remove(card_name) {
+        if self.cards_active.remove(card_name).is_some() {
             self.cards_deactivated.insert(card_name.to_string());
         }
     }
 
-    /// Java: `InducementSet.getActiveCards()`.
+    /// Java: `InducementSet.getActiveCards()` — names only (backwards-compatible).
     pub fn get_active_cards(&self) -> Vec<&str> {
-        self.cards_active.iter().map(|s| s.as_str()).collect()
+        self.cards_active.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Returns full Card objects for all active cards.
+    pub fn get_active_card_objects(&self) -> Vec<&Card> {
+        self.cards_active.values().collect()
+    }
+
+    /// Returns a reference to the active card with the given name, if present.
+    pub fn get_active_card(&self, card_name: &str) -> Option<&Card> {
+        self.cards_active.get(card_name)
     }
 
     /// Java: `InducementSet.getDeactivatedCards()`.
@@ -169,7 +187,7 @@ impl InducementSet {
 
     /// Java: `InducementSet.isActive(Card)`.
     pub fn is_active(&self, card_name: &str) -> bool {
-        self.cards_active.contains(card_name)
+        self.cards_active.contains_key(card_name)
     }
 
     /// Java: `InducementSet.getAllCards()` — available + active + deactivated.
@@ -372,5 +390,49 @@ mod tests {
         a.add(&b);
         assert!(a.get("BRIBE").is_some());
         assert!(a.get("EXTRA_CHEERLEADER").is_some());
+    }
+
+    #[test]
+    fn activate_card_full_stores_duration() {
+        use crate::inducement::card::Card;
+        use crate::enums::InducementDuration;
+        let mut s = InducementSet::new();
+        let card = Card::new("Witch Brew", Some("WITCH_BREW"))
+            .with_duration(InducementDuration::UntilEndOfTurn);
+        s.add_available_card("Witch Brew");
+        s.activate_card_full(card);
+        assert!(s.is_active("Witch Brew"));
+        let obj = s.get_active_card("Witch Brew").unwrap();
+        assert_eq!(obj.get_duration(), Some(InducementDuration::UntilEndOfTurn));
+    }
+
+    #[test]
+    fn get_active_card_objects_returns_full_cards() {
+        use crate::inducement::card::Card;
+        use crate::enums::InducementDuration;
+        let mut s = InducementSet::new();
+        let card = Card::new("Chop Block", Some("CHOP_BLOCK"))
+            .with_duration(InducementDuration::UntilEndOfOpponentsTurn);
+        s.add_available_card("Chop Block");
+        s.activate_card_full(card);
+        let objects = s.get_active_card_objects();
+        assert_eq!(objects.len(), 1);
+        assert_eq!(objects[0].get_duration(), Some(InducementDuration::UntilEndOfOpponentsTurn));
+    }
+
+    #[test]
+    fn activate_card_full_without_available_still_activates() {
+        use crate::inducement::card::Card;
+        let mut s = InducementSet::new();
+        let card = Card::new("Force Shield", Some("FORCE_SHIELD"));
+        // activate_card_full doesn't require pre-adding to available
+        s.activate_card_full(card);
+        assert!(s.is_active("Force Shield"));
+    }
+
+    #[test]
+    fn get_active_card_returns_none_for_unknown() {
+        let s = InducementSet::new();
+        assert!(s.get_active_card("Unknown Card").is_none());
     }
 }

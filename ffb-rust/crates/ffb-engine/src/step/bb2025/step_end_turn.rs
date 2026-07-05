@@ -65,6 +65,8 @@ pub struct StepEndTurn {
     pub player_ids_argued: HashSet<String>,
     /// Java: touchdownPlayerId
     pub touchdown_player_id: Option<String>,
+    /// Java: isHomeTurnEnding = game.isHomePlaying() — captured before home_playing is flipped.
+    pub is_home_turn_ending: Option<bool>,
 }
 
 impl StepEndTurn {
@@ -87,6 +89,7 @@ impl StepEndTurn {
             player_ids_failed_bribes: HashSet::new(),
             player_ids_argued: HashSet::new(),
             touchdown_player_id: None,
+            is_home_turn_ending: None,
         }
     }
 
@@ -129,6 +132,8 @@ impl StepEndTurn {
         if self.turn_nr == 0 {
             self.turn_nr = game.turn_data().turn_nr;
             self.half = game.half;
+            // Java: isHomeTurnEnding = game.isHomePlaying() — captured before state flip.
+            self.is_home_turn_ending = Some(game.home_playing);
         }
 
         // Skip guard: non-player-turn modes just propagate END_TURN and exit
@@ -243,7 +248,18 @@ impl StepEndTurn {
             && self.bribes_choice_away.is_some();
 
         if self.end_game || all_choices_done {
-            // Java: deactivateEffectsAndPrayers → stub
+            // Java: deactivateEffectsAndPrayers / deactivateCards
+            {
+                use crate::util::util_server_cards::UtilServerCards;
+                use ffb_model::enums::InducementDuration;
+                let is_home = self.is_home_turn_ending.unwrap_or(game.home_playing);
+                UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfTurn, is_home);
+                UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfOpponentsTurn, is_home);
+                if self.new_half || touchdown {
+                    UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfDrive, is_home);
+                    UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfHalf, is_home);
+                }
+            }
             // Java: ReportTurnEnd → stub
             // Java: removeReRollsLastingForDrive → stub
             // Java: prepareForSetup, updatePlayerStateDependentProperties → stub

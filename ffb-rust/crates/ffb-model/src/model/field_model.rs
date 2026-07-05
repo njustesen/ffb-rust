@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 use crate::enums::{CardEffect, Weather};
+use crate::inducement::card::Card;
 use crate::types::{FieldCoordinate, MoveSquare, PushbackSquare, RangeRuler};
 use crate::enums::PlayerState;
 use crate::model::player::PlayerId;
@@ -67,6 +68,10 @@ pub struct FieldModel {
     /// Java: addPrayerEnhancements / removePrayerEnhancements — prayer name → player IDs with that prayer active.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub prayer_enhancements: HashMap<String, HashSet<PlayerId>>,
+
+    /// Java: FieldModel.fCardsByPlayerId — cards currently assigned to players.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub player_cards: HashMap<PlayerId, Vec<Card>>,
 }
 
 impl FieldModel {
@@ -93,6 +98,7 @@ impl FieldModel {
             dice_decorations: Vec::new(),
             card_effects: HashMap::new(),
             prayer_enhancements: HashMap::new(),
+            player_cards: HashMap::new(),
         }
     }
 
@@ -357,6 +363,51 @@ impl FieldModel {
             .filter(|(_, effects)| effects.contains(&effect))
             .map(|(id, _)| id.as_str())
             .collect()
+    }
+
+    /// Java: FieldModel.addCard(Player, Card) — assigns a card to a player on the field.
+    pub fn add_card(&mut self, player_id: &str, card: Card) {
+        self.player_cards
+            .entry(player_id.to_string())
+            .or_default()
+            .push(card);
+    }
+
+    /// Java: FieldModel.removeCard(Player, Card) — removes a card from a player.
+    pub fn remove_card(&mut self, player_id: &str, card_name: &str) -> Option<Card> {
+        if let Some(cards) = self.player_cards.get_mut(player_id) {
+            if let Some(pos) = cards.iter().position(|c| c.name == card_name) {
+                let removed = cards.remove(pos);
+                if cards.is_empty() {
+                    self.player_cards.remove(player_id);
+                }
+                return Some(removed);
+            }
+        }
+        None
+    }
+
+    /// Java: FieldModel.getCards(Player) — returns all cards assigned to a player.
+    pub fn get_cards(&self, player_id: &str) -> &[Card] {
+        self.player_cards
+            .get(player_id)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Java: FieldModel.findPlayer(Card) — finds which player holds a given card.
+    pub fn find_player_with_card(&self, card_name: &str) -> Option<&str> {
+        self.player_cards
+            .iter()
+            .find(|(_, cards)| cards.iter().any(|c| c.name == card_name))
+            .map(|(id, _)| id.as_str())
+    }
+
+    /// Java: FieldModel.keepDeactivatedCard(Player, Card) — card stays on field after deactivation.
+    pub fn keep_deactivated_card(&mut self, player_id: &str, card_name: &str) {
+        // Card already in player_cards — mark it deactivated (it stays assigned).
+        // In the headless engine the distinction doesn't affect game state.
+        let _ = (player_id, card_name);
     }
 
     /// Java: FieldModel.addPrayerEnhancements(Player, Prayer) — marks the prayer as active on the player.
@@ -627,5 +678,57 @@ mod tests {
         assert_eq!(distracted, vec!["p1", "p2"]);
         let sedated = fm.find_players_with_card_effect(CardEffect::Sedative);
         assert_eq!(sedated, vec!["p3"]);
+    }
+
+    #[test]
+    fn add_card_assigns_to_player() {
+        let mut fm = FieldModel::new();
+        let card = Card::new("Chop Block", Some("CHOP_BLOCK"));
+        fm.add_card("p1", card);
+        let cards = fm.get_cards("p1");
+        assert_eq!(cards.len(), 1);
+        assert_eq!(cards[0].get_name(), "Chop Block");
+    }
+
+    #[test]
+    fn get_cards_empty_returns_empty_slice() {
+        let fm = FieldModel::new();
+        assert!(fm.get_cards("nobody").is_empty());
+    }
+
+    #[test]
+    fn remove_card_removes_and_returns_it() {
+        let mut fm = FieldModel::new();
+        fm.add_card("p1", Card::new("Witch Brew", Some("WITCH_BREW")));
+        fm.add_card("p1", Card::new("Distract", Some("DISTRACT")));
+        let removed = fm.remove_card("p1", "Witch Brew");
+        assert!(removed.is_some());
+        assert_eq!(removed.unwrap().get_name(), "Witch Brew");
+        assert_eq!(fm.get_cards("p1").len(), 1);
+    }
+
+    #[test]
+    fn remove_card_unknown_returns_none() {
+        let mut fm = FieldModel::new();
+        assert!(fm.remove_card("p1", "No Such Card").is_none());
+    }
+
+    #[test]
+    fn find_player_with_card_finds_correct_player() {
+        let mut fm = FieldModel::new();
+        fm.add_card("p1", Card::new("Chop Block", Some("CHOP_BLOCK")));
+        fm.add_card("p2", Card::new("Distract", Some("DISTRACT")));
+        assert_eq!(fm.find_player_with_card("Chop Block"), Some("p1"));
+        assert_eq!(fm.find_player_with_card("Distract"), Some("p2"));
+        assert!(fm.find_player_with_card("Unknown").is_none());
+    }
+
+    #[test]
+    fn remove_card_removes_player_entry_when_empty() {
+        let mut fm = FieldModel::new();
+        fm.add_card("p1", Card::new("Chop Block", Some("CHOP_BLOCK")));
+        fm.remove_card("p1", "Chop Block");
+        assert!(fm.get_cards("p1").is_empty());
+        assert!(fm.find_player_with_card("Chop Block").is_none());
     }
 }

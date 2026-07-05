@@ -14,7 +14,9 @@ use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
 use crate::step::abstract_step_with_re_roll::ReRollState;
 use crate::step::framework::{Step, StepAction, StepOutcome};
-use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter};
+use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter, SequenceStep};
+use crate::step::generator::common::SpikedBallApo;
+use ffb_model::option::game_option_id;
 use crate::step::util_server_catch_scatter_throw_in::UtilServerCatchScatterThrowIn;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
@@ -82,6 +84,8 @@ pub struct StepCatchScatterThrowIn {
     pending_events: Vec<GameEvent>,
     /// Parameters to publish accumulated during this invocation.
     pending_published: Vec<StepParameter>,
+    /// Set when SPIKED_BALL triggers in handle_failed_catch — push SpikedBallApo before scatter.
+    pending_spiked_ball: bool,
 }
 
 impl StepCatchScatterThrowIn {
@@ -104,6 +108,7 @@ impl StepCatchScatterThrowIn {
             pending_prompt: None,
             pending_events: Vec::new(),
             pending_published: Vec::new(),
+            pending_spiked_ball: false,
         }
     }
 }
@@ -322,6 +327,22 @@ impl StepCatchScatterThrowIn {
             };
         }
 
+        // Java: spiked-ball path → push SpikedBallApo then re-push CatchScatterThrowIn with next mode
+        if self.pending_spiked_ball {
+            self.pending_spiked_ball = false;
+            let next_mode = self.catch_scatter_throw_in_mode.take()
+                .unwrap_or(CatchScatterThrowInMode::ScatterBall);
+            let scatter_seq = vec![SequenceStep {
+                step_id: StepId::CatchScatterThrowIn,
+                params: vec![StepParameter::CatchScatterThrowInMode(next_mode)],
+                label: None,
+            }];
+            let mut out = StepOutcome::next().with_events(events);
+            for p in published { out = out.publish(p); }
+            out = out.push_seq(scatter_seq).push_seq(SpikedBallApo::build_sequence());
+            return out;
+        }
+
         // Java: if (fCatchScatterThrowInMode != null) pushCurrentStepOnStack → NEXT_STEP
         // Rust: StepAction::Repeat re-calls start() on the same instance (equivalent)
         if self.catch_scatter_throw_in_mode.is_some() {
@@ -354,7 +375,7 @@ impl StepCatchScatterThrowIn {
                 .map(|id| id.clone());
             catcher_id = catcher_at_ball;
             // Java: check QuickBite adjacents
-            // DEFERRED: QuickBite sequence when NamedProperties::CAN_ATTACK_OPPONENT_FOR_BALL_AFTER_CATCH is implemented
+            // headless: QuickBite sequence — NamedProperties::CAN_ATTACK_OPPONENT_FOR_BALL_AFTER_CATCH not yet ported
         }
 
         let mut out = StepOutcome::next().with_events(events);
@@ -451,17 +472,23 @@ impl StepCatchScatterThrowIn {
     /// Java BB2020: handle FAILED_CATCH / FAILED_PICK_UP / FAILED_DEFLECTION_CONVERSION
     ///
     /// BB2020 includes spiked-ball check (SPIKED_BALL option or droppedBallCausesArmourRoll skill).
-    /// The sub-sequence push is TODO pending full injury pipeline integration.
     fn handle_failed_catch(&mut self, game: &mut Game, deflected_pass: bool, player_under_ball: &Option<String>) {
         self.bomb_mode = false;
         let ball_in_play = game.field_model.ball_in_play;
 
         // Java: spiked-ball check (UtilGameOption.isOptionEnabled(SPIKED_BALL)
         //        || game.isActive(NamedProperties.droppedBallCausesArmourRoll))
-        // When triggered: push SpikedBallApo sub-sequence, set mode, then return.
-        // DEFERRED: SPIKED_BALL game option and droppedBallCausesArmourRoll skill — no-op for now
-        if player_under_ball.is_some() && ball_in_play {
-            // Spiked ball path — skipped (TODO)
+        if player_under_ball.is_some() && ball_in_play
+            && (game.options.is_enabled(game_option_id::SPIKED_BALL)
+                || game.is_active(NamedProperties::DROPPED_BALL_CAUSES_ARMOUR_ROLL))
+        {
+            self.pending_spiked_ball = true;
+            self.catch_scatter_throw_in_mode = if deflected_pass {
+                Some(CatchScatterThrowInMode::ThreeSquareScatter)
+            } else {
+                Some(CatchScatterThrowInMode::ScatterBall)
+            };
+            return;
         }
 
         if deflected_pass {
@@ -657,10 +684,8 @@ impl StepCatchScatterThrowIn {
     }
 
     /// Java: deactivateCards() — deactivate WHILE_HOLDING_THE_BALL cards for non-carriers.
-    /// DEFERRED: card system not yet fully implemented in ffb-model (no-op currently).
-    fn deactivate_cards(&self, _game: &mut Game) {
-        // DEFERRED: iterate game.all_players(), deactivate cards with InducementDuration::WHILE_HOLDING_THE_BALL
-        //        for players where !UtilPlayer::has_ball(game, player)
+    fn deactivate_cards(&self, game: &mut Game) {
+        crate::util::util_server_cards::UtilServerCards::deactivate_while_holding_ball(game);
     }
 
     /// Java: divingCatch(pCoordinate) — 3-phase ASK_HOME → ASK_AWAY → PROCESS.
@@ -838,7 +863,7 @@ impl StepCatchScatterThrowIn {
             // Java BB2020: no Blast-it (grantsCatchBonusToReceiver) check here
             // Java BB2020: state.rerollCatch check via executeStepHooks (if not already rerolled)
             if !already_rerolled {
-                // DEFERRED: state.rerollCatch (from executeStepHooks) — skip for now
+                // headless: state.rerollCatch (from executeStepHooks) — SkillBehaviour registry not ported
                 if let Some(prompt) = ask_for_reroll_if_available(game, "CATCH", min_roll, false) {
                     self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("CATCH"));
                     self.re_roll_state.re_roll_source = Some(ffb_model::enums::ReRollSource::new("TRR"));
@@ -1096,5 +1121,43 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         // Mode became CatchScatter (the player-under-ball path)
         assert_eq!(step.catch_scatter_throw_in_mode, Some(CatchScatterThrowInMode::CatchScatter));
+    }
+
+    #[test]
+    fn spiked_ball_option_enabled_with_player_pushes_sequences() {
+        let mut game = make_game();
+        let coord = FieldCoordinate::new(12, 7);
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_in_play = true;
+        game.options.set(ffb_model::option::game_option_id::SPIKED_BALL, "true");
+        let p = make_player("p1", 3);
+        game.team_home.players.push(p);
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+
+        let mut step = StepCatchScatterThrowIn::new();
+        step.catch_scatter_throw_in_mode = Some(CatchScatterThrowInMode::FailedCatch);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(out.pushes.len(), 2);
+    }
+
+    #[test]
+    fn spiked_ball_option_disabled_no_push() {
+        let mut game = make_game();
+        let coord = FieldCoordinate::new(12, 7);
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_in_play = true;
+        let p = make_player("p1", 3);
+        game.team_home.players.push(p);
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+
+        let mut step = StepCatchScatterThrowIn::new();
+        step.catch_scatter_throw_in_mode = Some(CatchScatterThrowInMode::FailedCatch);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert_eq!(out.pushes.len(), 0);
     }
 }

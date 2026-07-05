@@ -60,6 +60,8 @@ pub struct StepEndTurn {
     pub half: i32,
     /// Java: touchdownPlayerId
     pub touchdown_player_id: Option<String>,
+    /// Java: isHomeTurnEnding = game.isHomePlaying() — captured before home_playing is flipped.
+    pub is_home_turn_ending: Option<bool>,
 }
 
 impl StepEndTurn {
@@ -78,6 +80,7 @@ impl StepEndTurn {
             turn_nr: 0,
             half: 0,
             touchdown_player_id: None,
+            is_home_turn_ending: None,
         }
     }
 
@@ -116,6 +119,8 @@ impl StepEndTurn {
         if self.turn_nr == 0 {
             self.turn_nr = game.turn_data().turn_nr;
             self.half = game.half;
+            // Java: isHomeTurnEnding = game.isHomePlaying() — captured before any state flip.
+            self.is_home_turn_ending = Some(game.home_playing);
         }
 
         // BB2016 skip guard: no Swarming (BB2020/BB2025 addition)
@@ -253,7 +258,18 @@ impl StepEndTurn {
                 }
                 UtilBox::put_all_players_into_box(game);
             }
-            // DEFERRED(cards): deactivateCards not yet ported.
+            // Java: deactivateCards(UNTIL_END_OF_TURN, isHomeTurnEnding)
+            // Java: deactivateCards(UNTIL_END_OF_OPPONENTS_TURN, isHomeTurnEnding)
+            {
+                use crate::util::util_server_cards::UtilServerCards;
+                use ffb_model::enums::InducementDuration;
+                let is_home = self.is_home_turn_ending.unwrap_or(game.home_playing);
+                UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfTurn, is_home);
+                UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfOpponentsTurn, is_home);
+                if self.new_half || touchdown {
+                    UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfDrive, is_home);
+                }
+            }
 
             // Java: game.startTurn() — reset per-turn flags for both teams
             game.turn_data_home.reset_for_turn();
