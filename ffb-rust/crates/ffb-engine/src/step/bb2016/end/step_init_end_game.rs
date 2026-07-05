@@ -4,12 +4,40 @@
 /// - If the game is already finished → goto label.
 /// - Adjusts scores for illegal concession: winning team gets at least 1 point more.
 /// - Sets TurnMode::EndGame, disables concession.
-/// - `handlePoisonedPlayers` deferred (SeriousInjuryFactory not yet ported).
+/// - Calls `handlePoisonedPlayers`: removes POISONED card effect from all players;
+///   sets SeriousInjuryKind::Poisoned on players that had no prior serious injury.
 use ffb_model::enums::TurnMode;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+
+/// Java: `StepInitEndGame.handlePoisonedPlayers()` — removes POISONED card effect from all
+/// players; sets SeriousInjuryKind::Poisoned if no prior serious injury was recorded.
+fn handle_poisoned_players(game: &mut Game) {
+    use ffb_model::enums::{CardEffect, SeriousInjuryKind};
+    // Collect (player_id, is_home) to avoid simultaneous borrows
+    let poisoned: Vec<(String, bool)> = game.team_home.players.iter()
+        .filter(|p| game.field_model.has_card_effect(&p.id, CardEffect::Poisoned))
+        .map(|p| (p.id.clone(), true))
+        .chain(
+            game.team_away.players.iter()
+                .filter(|p| game.field_model.has_card_effect(&p.id, CardEffect::Poisoned))
+                .map(|p| (p.id.clone(), false))
+        )
+        .collect();
+    for (player_id, is_home) in poisoned {
+        let team_result = game.game_result.team_result_mut(is_home);
+        if team_result.player_result(&player_id)
+            .map(|pr| pr.serious_injury.is_none())
+            .unwrap_or(true)
+        {
+            team_result.player_result_mut(&player_id).serious_injury =
+                Some(SeriousInjuryKind::Poisoned);
+        }
+        game.field_model.remove_card_effect(&player_id, CardEffect::Poisoned);
+    }
+}
 
 /// Java: `StepInitEndGame` (bb2016/end).
 pub struct StepInitEndGame {
@@ -46,7 +74,7 @@ impl StepInitEndGame {
         game.turn_mode = TurnMode::EndGame;
         game.concession_possible = false;
         game.admin_mode = self.admin_mode;
-        // headless: handlePoisonedPlayers requires SeriousInjuryFactory + CardEffect::POISONED not yet ported
+        handle_poisoned_players(game);
 
         StepOutcome::next()
     }
@@ -147,5 +175,45 @@ mod tests {
         assert_eq!(step.goto_label_on_end, "lbl");
         assert!(step.set_parameter(&StepParameter::AdminMode(true)));
         assert!(step.admin_mode);
+    }
+
+    fn add_player(game: &mut Game, player_id: &str, is_home: bool) {
+        use ffb_model::model::Player;
+        let player = Player { id: player_id.into(), ..Player::default() };
+        if is_home {
+            game.team_home.players.push(player);
+        } else {
+            game.team_away.players.push(player);
+        }
+    }
+
+    #[test]
+    fn handle_poisoned_players_removes_effect_and_sets_injury() {
+        use ffb_model::enums::{CardEffect, SeriousInjuryKind};
+        let mut game = make_game();
+        add_player(&mut game, "h1", true);
+        game.field_model.add_card_effect("h1", CardEffect::Poisoned);
+        let mut step = StepInitEndGame::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        // POISONED card effect should be removed
+        assert!(!game.field_model.has_card_effect("h1", CardEffect::Poisoned));
+        // Serious injury should be set to Poisoned
+        let pr = game.game_result.team_result(true).player_result("h1");
+        assert_eq!(pr.map(|r| r.serious_injury), Some(Some(SeriousInjuryKind::Poisoned)));
+    }
+
+    #[test]
+    fn handle_poisoned_players_does_not_override_existing_injury() {
+        use ffb_model::enums::{CardEffect, SeriousInjuryKind};
+        let mut game = make_game();
+        add_player(&mut game, "h1", true);
+        game.field_model.add_card_effect("h1", CardEffect::Poisoned);
+        game.game_result.team_result_mut(true).player_result_mut("h1").serious_injury =
+            Some(SeriousInjuryKind::SmashedKneeMa);
+        let mut step = StepInitEndGame::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        // Existing serious injury should NOT be overwritten
+        let pr = game.game_result.team_result(true).player_result("h1");
+        assert_eq!(pr.map(|r| r.serious_injury), Some(Some(SeriousInjuryKind::SmashedKneeMa)));
     }
 }

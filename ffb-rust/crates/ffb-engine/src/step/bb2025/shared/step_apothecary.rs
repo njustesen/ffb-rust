@@ -150,8 +150,7 @@ impl StepApothecary {
                                 game, rng, &defender_id,
                             );
                             if regenerated {
-                                // Java: curePoison()
-                                // headless: curePoison removes POISONED card effects — blocked on CardEffect port
+                                self.cure_poison(game);
                             } else {
                                 // Java: Igor dialog if USE_IGOR
                                 // headless: UtilServerInducementUse.useInducement (Igor) not yet ported
@@ -226,6 +225,10 @@ impl StepApothecary {
         }
 
         if !apothecary_choice {
+            // Java: curePoison() before modifying injury_result (cure_poison borrows self)
+            if player_state_base != PS_KNOCKED_OUT {
+                self.cure_poison(game);
+            }
             // Java: fInjuryResult.injuryContext().setSeriousInjury(null)
             // Java: if (KO && canApoKoIntoStun) → STUNNED else RESERVE
             let ir = self.injury_result.as_mut().unwrap();
@@ -235,8 +238,6 @@ impl StepApothecary {
                 // headless: default to STUNNED (correct for all standard types)
                 ir.injury_context.set_injury(PlayerState::new(PS_STUNNED));
             } else {
-                // Java: curePoison(); setInjury(RESERVE)
-                // headless: curePoison — remove POISONED card effect; CardEffect system not yet ported
                 ir.injury_context.set_injury(PlayerState::new(PS_RESERVE));
             }
             // Java: addReport(new ReportApothecaryChoice(defenderId, playerState, null))
@@ -248,6 +249,20 @@ impl StepApothecary {
         }
 
         (apothecary_choice, events)
+    }
+
+    /// Java: private void curePoison() — removes POISONED card effect from the injured player.
+    fn cure_poison(&self, game: &mut Game) {
+        use ffb_model::enums::CardEffect;
+        let player_id = self.injury_result.as_ref()
+            .and_then(|ir| ir.injury_context.defender_id.clone());
+        let player_id = match player_id { Some(id) => id, None => return };
+        let mode = match &self.apothecary_mode { Some(m) => *m, None => return };
+        let should_cure = matches!(mode, ApothecaryMode::Defender) && self.defender_poisoned
+            || matches!(mode, ApothecaryMode::Attacker) && self.attacker_poisoned;
+        if should_cure {
+            game.field_model.remove_card_effect(&player_id, CardEffect::Poisoned);
+        }
     }
 
     /// Java: private void handleApothecaryChoice(PlayerState pPlayerState, SeriousInjury pSeriousInjury)

@@ -263,8 +263,23 @@ impl StepApothecary {
     }
 
     /// Java: curePoison() — remove POISONED CardEffect based on mode.
-    fn cure_poison(&self, _game: &mut Game) {
-        // headless: removeCardEffect(CardEffect.POISONED) — card effect system not yet ported
+    fn cure_poison(&self, game: &mut Game) {
+        use ffb_model::enums::CardEffect;
+        let player_id = self.injury_result.as_ref()
+            .and_then(|ir| ir.injury_context.defender_id.clone());
+        let player_id = match player_id {
+            Some(id) => id,
+            None => return,
+        };
+        let mode = match &self.apothecary_mode {
+            Some(m) => *m,
+            None => return,
+        };
+        let should_cure = matches!(mode, ApothecaryMode::Defender) && self.defender_poisoned
+            || matches!(mode, ApothecaryMode::Attacker) && self.attacker_poisoned;
+        if should_cure {
+            game.field_model.remove_card_effect(&player_id, CardEffect::Poisoned);
+        }
     }
 
     /// Java: handleApothecaryChoice(pPlayerState, pSeriousInjury).
