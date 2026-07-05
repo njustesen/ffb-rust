@@ -162,7 +162,7 @@ pub fn make_step(id: StepId) -> Box<dyn Step> {
         StepId::ForgoneStalling        => Box::new(step_forgone_stalling::StepForgoneStalling::new()),
         StepId::GettingEven            => Box::new(step_getting_even::StepGettingEven::new()),
         StepId::HandleDropPlayerContext => Box::new(step_handle_drop_player_context::StepHandleDropPlayerContext::new()),
-        StepId::InitFeeding            => Box::new(step_init_feeding::StepInitFeeding::new(String::new())),
+        StepId::InitFeeding            => Box::new(step_init_feeding::StepInitFeeding::new()),
         StepId::StallingPlayer         => Box::new(StepStallingPlayer::new()),
         StepId::SteadyFooting          => Box::new(step_steady_footing::StepSteadyFooting::new(String::new(), String::new())),
         StepId::TakeRoot               => Box::new(step_take_root::StepTakeRoot::new()),
