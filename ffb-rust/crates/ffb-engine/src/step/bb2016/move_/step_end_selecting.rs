@@ -32,8 +32,8 @@ use crate::step::util_server_steps::change_player_action;
 ///          TARGET_COORDINATE, THROWN_PLAYER_ID, KICKED_PLAYER_ID, NR_OF_DICE, USING_STAB.
 ///
 /// isSufferingBloodLust, REMOVE_CONFUSION (with setHasMoved), STAND_UP / STAND_UP_BLITZ are all wired.
-/// DEFERRED(dialog): UtilServerDialog.hideDialog not yet ported (client-side only).
-/// DEFERRED(updatePersistence): gameCache.queueDbUpdate not yet ported.
+/// client-only: UtilServerDialog.hideDialog
+/// headless: gameCache.queueDbUpdate — no database layer in headless engine.
 pub struct StepEndSelecting {
     /// Java: fEndTurn
     pub end_turn: bool,
@@ -120,8 +120,7 @@ impl Step for StepEndSelecting {
 
 impl StepEndSelecting {
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // Java: UtilServerDialog.hideDialog(getGameState())
-        // DEFERRED(dialog): dialog layer not yet translated
+        // client-only: UtilServerDialog.hideDialog
 
         // ── Branch 1: end turn or end player action ─────────────────────────────
         if self.end_turn || self.end_player_action {

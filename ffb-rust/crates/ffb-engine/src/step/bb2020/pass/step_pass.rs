@@ -27,8 +27,7 @@ use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 ///
 /// NOTE(pass-modifiers): PassModifierFactory now wired; tacklezone + disturbing-presence computed
 ///   via UtilPlayer::find_tacklezone_players and UtilDisturbingPresence.
-/// DEFERRED(dialog): modifying-skill dialog (DialogSkillUseParameter for canAddStrengthToPass) and
-///   pass-skill re-roll dialog — waiting for dialog infrastructure.
+/// client-only: DialogSkillUseParameter for canAddStrengthToPass — headless skips skill dialog
 pub struct StepPass {
     /// Java: goToLabelOnEnd (init param, mandatory)
     pub goto_label_on_end: String,

@@ -93,7 +93,7 @@ impl Step for StepInitFeeding {
 
 impl StepInitFeeding {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // DEFERRED(dialog): UtilServerDialog.hideDialog — no-op in headless
+        // client-only: UtilServerDialog.hideDialog
 
         let goto_label = match &self.goto_label_on_end {
             Some(l) => l.clone(),
@@ -129,7 +129,7 @@ impl StepInitFeeding {
             if victims.is_empty() {
                 self.feed_on_player_choice = Some(false);
             } else {
-                // DEFERRED(dialog): UtilServerDialog.showDialog(VAMPIRE_FEEDING) — dialog infra not yet ported
+                // client-only: DialogVampireFeeding — headless skips feeding choice dialog
                 return StepOutcome::cont();
             }
         }
@@ -162,7 +162,7 @@ impl StepInitFeeding {
                 outcome = outcome.publish(p);
             }
 
-            // DEFERRED(sound): SoundId.SLURP
+            // client-only: SoundId.SLURP
             game.acting_player.suffering_blood_lust = false;
         } else {
             // Java: bite spectator path

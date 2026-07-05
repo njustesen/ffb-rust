@@ -26,7 +26,7 @@ use crate::util::UtilServerPlayerMove;
 /// - If remaining move stack empty: updateMoveSquares + updateDiceDecorations
 /// - NEXT_STEP
 ///
-/// DEFERRED(trackNumber): TrackNumber animation not ported — no Rust FieldModel.track_numbers field.
+/// client-only: TrackNumber animation — field_model.track_numbers is client-side display only.
 pub struct StepMove {
     /// Java: fCoordinateFrom
     pub coordinate_from: Option<FieldCoordinate>,
@@ -86,7 +86,7 @@ impl StepMove {
         game.acting_player.current_move += move_increment;
 
         // Java: game.getFieldModel().add(trackNumber)
-        // DEFERRED(trackNumber): TrackNumber animation not ported — no Rust FieldModel.track_numbers field
+        // client-only: TrackNumber animation — field_model.track_numbers is client-side display only
 
         // Java: updatePlayerAndBallPosition(actingPlayer, coordinateTo)
         if let Some(ref player_id) = game.acting_player.player_id.clone() {

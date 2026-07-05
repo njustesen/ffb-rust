@@ -5,7 +5,7 @@
 /// (in non-test standalone mode) saves a replay file.
 ///
 /// Rust: sets `game.status = GameStatus::Finished` and returns `NextStep`.
-/// Replay saving and dialog display are DEFERRED (no file I/O in engine).
+/// Replay saving and dialog display are headless (no file I/O in engine).
 use ffb_model::enums::GameStatus;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -38,8 +38,8 @@ impl StepEndGame {
     /// Java: `executeStep()` — sets the game finished and transitions to FINISHED status.
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
         game.status = GameStatus::Finished;
-        // DEFERRED(dialog-client): show GameStatistics dialog (requires dialog infra)
-        // DEFERRED(replay-server): save replay file (requires file I/O infra)
+        // client-only: show GameStatistics dialog
+        // headless: replay file save (requires file I/O) — headless engine has no file system access
         StepOutcome::next()
     }
 }

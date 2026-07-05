@@ -580,37 +580,52 @@ impl UtilPlayer {
     ///   PRONE / STANDING → setActive only
     ///   STUNNED (new active team) → PRONE + active=false
     ///
-    /// DEFERRED(enhancement-removal): FieldModel.removeSkillEnhancements + Player.resetUsedSkills
-    /// are not yet ported; enhancement removal at end-of-turn is skipped.
+    /// headless: FieldModel.removeSkillEnhancements not yet ported;
+    /// skill stat bonuses from WisdomOfTheWhiteDwarf etc. are not removed at end-of-turn.
     pub fn refresh_players_for_turn_start(game: &mut Game) {
         use crate::enums::{PS_BLOCKED, PS_FALLING, PS_HIT_ON_GROUND, PS_MOVING, PS_PRONE, PS_STANDING, PS_STUNNED};
-        let home_ids: Vec<String> = game.team_home.players.iter().map(|p| p.id.clone()).collect();
-        let away_ids: Vec<String> = game.team_away.players.iter().map(|p| p.id.clone()).collect();
+        use crate::enums::SkillUsageType;
+        use crate::model::property::NamedProperties;
         let home_playing = game.home_playing;
-        for (id, is_home) in home_ids.iter().map(|id| (id, true))
-            .chain(away_ids.iter().map(|id| (id, false)))
-        {
-            let Some(ps) = game.field_model.player_state(id) else { continue };
+
+        // First pass: collect per-player data (avoids holding borrows across mutable ops).
+        struct PlayerEntry { id: String, is_home: bool, has_to_miss_turn: bool }
+        let entries: Vec<PlayerEntry> = game.team_home.players.iter()
+            .map(|p| PlayerEntry {
+                id: p.id.clone(),
+                is_home: true,
+                has_to_miss_turn: p.has_skill_property(NamedProperties::HAS_TO_MISS_TURN),
+            })
+            .chain(game.team_away.players.iter().map(|p| PlayerEntry {
+                id: p.id.clone(),
+                is_home: false,
+                has_to_miss_turn: p.has_skill_property(NamedProperties::HAS_TO_MISS_TURN),
+            }))
+            .collect();
+
+        // Reset once-per-turn skill usage for all players.
+        for p in game.team_home.players.iter_mut().chain(game.team_away.players.iter_mut()) {
+            p.reset_used_skills(SkillUsageType::OncePerTurn);
+            p.reset_used_skills(SkillUsageType::OncePerTurnByTeamMate);
+        }
+
+        // Second pass: update player states.
+        for entry in &entries {
+            let Some(ps) = game.field_model.player_state(&entry.id) else { continue };
             let base = ps.base();
-            // Java: setActive = playerOnTeamFromLastTurn || !player.hasSkillProperty(hasToMissTurn)
-            // Simplified: no hasToMissTurn check (DEFERRED(enhancement-removal))
-            let player_on_team_from_last_turn = is_home != home_playing;
-            let set_active = player_on_team_from_last_turn; // simplified; full check DEFERRED
+            let player_on_team_from_last_turn = entry.is_home != home_playing;
+            let set_active = player_on_team_from_last_turn || !entry.has_to_miss_turn;
             let new_ps = if base == PS_BLOCKED || base == PS_MOVING || base == PS_FALLING || base == PS_HIT_ON_GROUND {
-                Some(ps.change_base(PS_STANDING).change_active(true))
+                Some(ps.change_base(PS_STANDING).change_active(set_active))
             } else if base == PS_STANDING || base == PS_PRONE {
-                if ps.is_active() != set_active || (!is_home == home_playing) {
-                    Some(ps.change_active(true))
-                } else {
-                    None
-                }
-            } else if base == PS_STUNNED && is_home == home_playing {
+                Some(ps.change_active(set_active))
+            } else if base == PS_STUNNED && entry.is_home == home_playing {
                 Some(ps.change_base(PS_PRONE).change_active(false))
             } else {
                 None
             };
             if let Some(new_ps) = new_ps {
-                game.field_model.set_player_state(id, new_ps);
+                game.field_model.set_player_state(&entry.id, new_ps);
             }
         }
     }

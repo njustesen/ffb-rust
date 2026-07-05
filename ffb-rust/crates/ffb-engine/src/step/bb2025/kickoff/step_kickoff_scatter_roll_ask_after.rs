@@ -113,7 +113,7 @@ impl StepKickoffScatterRollAskAfter {
             };
             self.kicking_player_coordinate = Some(found.unwrap_or(default_kicker));
 
-            // DEFERRED: if kicking player has canReduceKickDistance, show DialogKickSkillParameter
+            // client-only: if kicking player has canReduceKickDistance, show DialogKickSkillParameter
             // (with the two possible landing squares) and return Continue.
             // For the random-agent path there is no Kick player, so fall through.
             self.use_kick_choice = Some(false);

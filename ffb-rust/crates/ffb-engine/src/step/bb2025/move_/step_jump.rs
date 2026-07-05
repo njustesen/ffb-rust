@@ -33,13 +33,13 @@ use crate::util::util_server_player_move::UtilServerPlayerMove;
 /// DiceInterpreter.is_skill_roll_successful used for success check.
 ///
 /// Skill re-roll for JUMP (Leap canRerollJump source) → wired via find_skill_reroll_source.
-/// DEFERRED: JumpModifierFactory / modifier collection for minimumRollJump not yet ported.
-/// DEFERRED: DivingTackle dialog (checkDivingTackle, usingDivingTackle) not yet ported.
-/// DEFERRED: canChooseToIgnoreJumpModifierAfterRoll skill dialog not yet ported.
-/// DEFERRED: canIgnoreJumpModifiers (useIgnoreModifierSkill) not yet ported.
+/// headless: JumpModifierFactory / modifier collection for minimumRollJump not yet ported.
+/// client-only: DivingTackle dialog (checkDivingTackle, usingDivingTackle) — client-side.
+/// client-only: canChooseToIgnoreJumpModifierAfterRoll skill dialog — client-side.
+/// headless: canIgnoreJumpModifiers (useIgnoreModifierSkill) — skill property not ported.
 /// handleFailure: COORDINATE_FROM(null if roll==1), updatePlayerAndBallPosition, updateMoveSquares — all implemented.
-/// DEFERRED(divingTackle): checkDivingTackle/usingDivingTackle dialog not yet ported.
-/// DEFERRED: fSecondGoForIt (succeedGfi push for jumping players) not yet ported.
+/// client-only: checkDivingTackle/usingDivingTackle dialog — headless auto-skips diving tackle activation.
+/// headless: fSecondGoForIt (succeedGfi push for jumping players) not yet ported.
 pub struct StepJump {
     /// Java: goToLabelOnFailure
     pub goto_label_on_failure: String,
@@ -88,8 +88,8 @@ impl Step for StepJump {
         if let Action::UseReRoll { use_reroll: false } = action {
             self.re_roll_state.re_roll_source = None;
         }
-        // DEFERRED: CLIENT_PLAYER_CHOICE → DIVING_TACKLE mode → usingDivingTackle / setDefenderId
-        // DEFERRED: CLIENT_USE_SKILL → canChooseToIgnoreJumpModifierAfterRoll → useIgnoreModifierAfterRollSkill
+        // headless: CLIENT_PLAYER_CHOICE → DIVING_TACKLE mode → usingDivingTackle / setDefenderId
+        // headless: CLIENT_USE_SKILL → canChooseToIgnoreJumpModifierAfterRoll → useIgnoreModifierAfterRollSkill
         self.execute_step(game, rng)
     }
 

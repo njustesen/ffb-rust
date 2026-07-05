@@ -13,7 +13,7 @@
 /// Publishes: CATCHER_ID, PASS_ACCURATE, PASS_FUMBLE, DONT_DROP_FUMBLE,
 ///            CATCH_SCATTER_THROW_IN_MODE, PASS_DEVIATES.
 ///
-/// DEFERRED(Pass-skillDialog): DialogSkillUseParameter for passing skill reroll not yet ported.
+/// client-only: DialogSkillUseParameter for passing skill re-roll — dialog is client-only.
 /// NOTE(Pass-modifiers): PassModifierFactory wired; individual modifier reporting deferred to reporting layer.
 use ffb_model::enums::{PassResult as ModelPassResult, PlayerAction, ReRollSource};
 use ffb_model::model::game::Game;
@@ -165,7 +165,7 @@ impl StepPass {
             let dont_drop = result == PassResult::SAVED_FUMBLE;
             if !dont_drop && self.re_rolled_action.is_none() {
                 // Java: mechanic.eligibleToReRoll → askForReRollIfAvailable
-                // DEFERRED(Pass-skillDialog): skill-based re-roll dialog (DialogSkillUseParameter)
+                // client-only: DialogSkillUseParameter for pass skill re-roll — headless uses auto re-roll logic
                 let is_fumble = result == PassResult::FUMBLE;
                 if let Some(prompt) = ask_for_reroll_if_available(game, "PASS", self.minimum_roll, is_fumble) {
                     self.re_rolled_action = Some("PASS".into());

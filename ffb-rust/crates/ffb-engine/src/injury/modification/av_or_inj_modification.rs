@@ -52,7 +52,7 @@ impl InjuryContextModification for AvOrInjModification {
         // In Java: Collections.disjoint(ctx.armorModifiers, skill.armorModifiers)
         // Rust: we don't have direct skill armour-modifier access; skip this check
         // (the skill will simply not be offered in the dialog in that case — correct
-        // behaviour is enforced by the game flow, not here). DEFERRED until skill
+        // behaviour is enforced by the game flow, not here). headless: until skill
         // armour modifier registry is fully wired.
         ctx.set_skill_use_modification(SkillUse::ADD_INJURY_MODIFIER);
         let old_injury = ctx.injury;

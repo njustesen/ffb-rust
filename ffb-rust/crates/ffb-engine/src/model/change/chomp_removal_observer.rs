@@ -4,7 +4,7 @@
 /// Handles FIELD_MODEL_SET_PLAYER_COORDINATE and FIELD_MODEL_SET_PLAYER_STATE model changes
 /// to remove or update Chomp markers on the field model.
 ///
-/// DEFERRED(report): ReportChompRemoved not yet ported — chomp removal updates field state
+/// headless: ReportChompRemoved not yet ported — chomp removal updates field state
 /// but does not emit reports until the report system is in place.
 use ffb_model::enums::ModelChangeId;
 use ffb_model::model::game::Game;
@@ -31,7 +31,7 @@ impl ConditionalModelChangeObserver for ChompRemovalObserver {
     /// FIELD_MODEL_SET_PLAYER_STATE: if player no longer has tackle zones → removeChomps
     /// (prone/stunned/KO players can't maintain a chomp).
     ///
-    /// Reports ReportChompRemoved for each evicted chompee — DEFERRED(report).
+    /// Reports ReportChompRemoved for each evicted chompee — headless: report system not yet ported.
     fn next(&self, key: Option<&str>, change_id: ModelChangeId, game: &mut Game) {
         let player_id = match key {
             Some(id) => id,
@@ -64,7 +64,7 @@ impl ConditionalModelChangeObserver for ChompRemovalObserver {
             _ => return,
         };
 
-        // DEFERRED(report): emit ReportChompRemoved for each chompee_id in removed.
+        // headless: emit ReportChompRemoved for each chompee_id in removed — report system not yet ported
         let _ = removed;
     }
 }

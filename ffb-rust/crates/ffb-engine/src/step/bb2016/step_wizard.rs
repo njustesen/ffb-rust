@@ -172,7 +172,7 @@ impl StepWizard {
             self.old_turn_mode = Some(game.turn_mode);
         }
         game.turn_mode = TurnMode::Wizard;
-        // DEFERRED(dialog): UtilServerDialog.showDialog(DialogWizardSpellParameter) not yet ported.
+        // client-only: DialogWizardSpellParameter — headless skips spell selection dialog
         StepOutcome::cont()
     }
 }

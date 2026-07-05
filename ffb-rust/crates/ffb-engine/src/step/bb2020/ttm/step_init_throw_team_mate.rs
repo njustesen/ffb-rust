@@ -16,7 +16,7 @@
 /// Init parameters: GOTO_LABEL_ON_END (mandatory), TARGET_COORDINATE (opt),
 ///   THROWN_PLAYER_ID (opt), IS_KICKED_PLAYER (opt).
 ///
-/// DEFERRED(InitTTM-rangeRuler): UtilRangeRuler.createRangeRuler not yet ported; stub always NEXT_STEP.
+/// client-only: UtilRangeRuler.createRangeRuler — range ruler is client-side display only.
 use ffb_model::enums::{PlayerAction, PS_PICKED_UP};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
@@ -66,8 +66,7 @@ impl StepInitThrowTeamMate {
             if let Some(target) = self.target_coordinate {
                 // Phase 2: target chosen → set pass coordinate.
                 game.pass_coordinate = Some(target);
-                // DEFERRED(InitTTM-rangeRuler): UtilRangeRuler.createRangeRuler not yet ported;
-                // Java only calls NEXT_STEP if rangeRuler != null (always true when ported).
+                // client-only: UtilRangeRuler.createRangeRuler — client display only; always proceeds
                 return StepOutcome::next();
             } else {
                 // Phase 1: player chosen — set up defender, publish parameters.

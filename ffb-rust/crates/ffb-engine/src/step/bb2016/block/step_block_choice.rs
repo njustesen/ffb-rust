@@ -92,10 +92,10 @@ impl StepBlockChoice {
 
                 if defender_has_dodge {
                     // Java: attackerCanCancelDodgeSkill = getSkillCancelling(attacker, dodgeSkill)
-                    // In Rust: check if attacker has a skill with "cancelsDodge" property (= Tackle)
+                    // Rust: attacker has "cancelsIgnoreDefenderStumblesResult" (= Tackle)
                     let attacker_has_tackle = acting_player_id.as_deref()
                         .and_then(|id| game.player(id))
-                        .map(|p| p.has_skill_property("cancelsDodge"))
+                        .map(|p| p.has_skill_property(NamedProperties::CANCELS_IGNORE_DEFENDER_STUMBLES_RESULT))
                         .unwrap_or(false);
                     let attacker_can_block_same_team = acting_player_id.as_deref()
                         .and_then(|id| game.player(id))

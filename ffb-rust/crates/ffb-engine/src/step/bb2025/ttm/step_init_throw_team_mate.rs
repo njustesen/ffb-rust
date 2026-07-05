@@ -144,7 +144,7 @@ impl StepInitThrowTeamMate {
             if let Some(target) = &self.target_coordinate {
                 // Java: game.setPassCoordinate(target)
                 game.pass_coordinate = Some(*target);
-                // DEFERRED: game.fieldModel.setRangeRuler(UtilRangeRuler.createRangeRuler(...))
+                // client-only: game.fieldModel.setRangeRuler(UtilRangeRuler.createRangeRuler(...)) — range ruler is client-side display
                 return StepOutcome::next();
             }
             // Player selected, no target yet: wire up thrown player state

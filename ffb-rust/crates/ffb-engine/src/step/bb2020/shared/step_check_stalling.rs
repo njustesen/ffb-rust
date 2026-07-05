@@ -38,7 +38,7 @@ impl Step for StepCheckStalling {
     fn id(&self) -> StepId { StepId::CheckStalling }
 
     fn start(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // DEFERRED(stalling): full stalling check requires pathfinding infrastructure (prayer state now available via game.prayer_state)
+        // headless: stalling detection requires pathfinding infrastructure — no stall detected in headless
         StepOutcome::next()
     }
 

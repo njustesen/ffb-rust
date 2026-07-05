@@ -13,7 +13,7 @@
 /// Sets stepParameter KICKOFF_BOUNDS for all steps on the stack.
 /// Sets stepParameter TOUCHBACK for all steps on the stack.
 ///
-/// DEFERRED items:
+/// headless items:
 ///  - findKickingPlayer: full center-field / frontmost-player logic.
 ///  - ReportKickoffScatter, ReportSkillUse.
 ///  - UtilServerDialog.showDialog for Kick choice.
@@ -115,7 +115,7 @@ impl StepKickoffScatterRoll {
                     .unwrap_or(default_kicker)
             );
 
-            // DEFERRED(dialog): DialogKickSkillParameter not yet ported; auto-declining Kick skill.
+            // client-only: DialogKickSkillParameter — headless auto-declines Kick skill
             self.use_kick_choice = Some(false);
         }
 

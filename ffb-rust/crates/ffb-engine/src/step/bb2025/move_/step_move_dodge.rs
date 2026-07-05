@@ -26,10 +26,10 @@ use ffb_mechanics::modifiers::dodge_context::DodgeContext;
 ///   1. Skill re-roll (Dodge — property canRerollDodge) — auto-used
 ///   2. Team Re-Roll token (TRR) — offered via ReRollOffer prompt
 ///
-/// DEFERRED(dialog): Break-Tackle / canAddStrengthToDodge dialog not yet ported.
-/// DEFERRED(dialog): canChooseToIgnoreDodgeModifierAfterRoll dialog not yet ported.
-/// DEFERRED(dialog): Arm-Bar (DialogPlayerChoiceParameter / ARM_BAR) not yet ported.
-/// DEFERRED(dialog): Diving Tackle pre-roll check / dtRerollAsked not yet ported.
+/// client-only: BreakTackle / canAddStrengthToDodge dialog — headless skips
+/// client-only: canChooseToIgnoreDodgeModifierAfterRoll dialog — headless skips
+/// client-only: ArmBar (DialogPlayerChoiceParameter) — headless skips
+/// client-only: DivingTackle pre-roll check / dtRerollAsked — headless skips
 /// STAND_FIRM_NO_DROP_ON_FAILED_DODGE game option → wired in execute_step (final fail path only).
 /// isDodging guard, SteadyFootingContext publish on failDodge, re-roll infra, and DodgeModifierFactory are wired.
 pub struct StepMoveDodge {
@@ -97,9 +97,9 @@ impl Step for StepMoveDodge {
                 self.re_roll_state.re_roll_source = None;
                 self.execute_step(game, rng)
             }
-            // DEFERRED: CLIENT_USE_SKILL → canAddStrengthToDodge / canChooseToIgnoreDodgeModifierAfterRoll /
+            // headless: CLIENT_USE_SKILL → canAddStrengthToDodge / canChooseToIgnoreDodgeModifierAfterRoll /
             //       canRerollDodge handling.
-            // DEFERRED: CLIENT_PLAYER_CHOICE → ARM_BAR mode.
+            // headless: CLIENT_PLAYER_CHOICE → ARM_BAR mode
             _ => self.execute_step(game, rng),
         }
     }
@@ -214,7 +214,7 @@ impl StepMoveDodge {
 
     fn fail_dodge(&self) -> StepOutcome {
         // Java: failDodge → findAdjacentOpposingPlayersWithProperty(armBar), show dialog if multiple
-        // DEFERRED: Arm-Bar dialog not yet ported
+        // client-only: Arm-Bar dialog — client-side
         // Java: injuryType = options → InjuryTypeFallDown (Arm-Bar dialog can override to InjuryTypeArmBar)
         // Stub: always InjuryTypeFallDown (InjuryTypeName variant — no injury roll at this step)
         let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeFallDown".into());

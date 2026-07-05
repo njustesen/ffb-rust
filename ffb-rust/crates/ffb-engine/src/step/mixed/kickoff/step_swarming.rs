@@ -7,6 +7,7 @@ use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::util::util_server_setup::UtilServerSetup;
 
 /// 1:1 translation of `com.fumbbl.ffb.server.step.mixed.kickoff.StepSwarming`.
 ///
@@ -68,14 +69,11 @@ impl Step for StepSwarming {
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
             Action::EndTurn => {
-                // Java: CLIENT_END_TURN — setPlayerCoordinates + state.endTurn = true + executeStep
-                // DEFERRED(kickoff): persist playerCoordinates from ClientCommandEndTurn
+                // headless: no-op — player positions tracked directly in field_model
                 self.end_turn = true;
             }
             Action::PlacePlayer { player_id, coord } => {
-                // Java: CLIENT_SETUP_PLAYER → UtilServerSetup.setupPlayer
-                // DEFERRED(kickoff): UtilServerSetup.setupPlayer — placement validation
-                game.field_model.set_player_coordinate(player_id, *coord);
+                UtilServerSetup::setup_player(game, player_id, *coord);
                 return StepOutcome::cont();
             }
             _ => {}
@@ -101,8 +99,7 @@ impl StepSwarming {
                 // Count active non-box players in the swarming team.
                 let placed = self.count_placed_active_players(game);
                 if placed > self.allowed_amount {
-                    // DEFERRED(dialog): show DialogSwarmingErrorParameter
-                    // Java: UtilServerDialog.showDialog(new DialogSwarmingErrorParameter(...))
+                    // client-only: DialogSwarmingErrorParameter
                     return StepOutcome::cont();
                 }
                 self.leave(game, placed);
@@ -202,8 +199,7 @@ impl StepSwarming {
             return StepOutcome::next().with_event(event);
         }
 
-        // DEFERRED(dialog): show DialogSwarmingPlayersParameter(allowedAmount)
-        // Java: UtilServerDialog.showDialog(new DialogSwarmingPlayersParameter(state.allowedAmount))
+        // client-only: DialogSwarmingPlayersParameter(allowedAmount)
         StepOutcome::cont().with_event(event)
     }
 
@@ -383,7 +379,7 @@ mod tests {
         step.allowed_amount = 0; // 0 allowed but 1 placed
 
         let out = step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
-        // Placed (1) > allowed (0) → dialog DEFERRED → Continue
+        // Placed (1) > allowed (0) → client-only: dialog → Continue
         assert_eq!(out.action, StepAction::Continue);
         assert_eq!(game.turn_mode, TurnMode::Swarming);
     }
@@ -406,6 +402,9 @@ mod tests {
         let mut step = StepSwarming::new();
         let mut game = make_game();
         game.turn_mode = TurnMode::Swarming;
+        // Player must belong to the active team for UtilServerSetup::setup_player to accept it.
+        game.team_home.players.push(make_player("p1", 1));
+        game.field_model.set_player_state("p1", ffb_model::enums::PlayerState::new(PS_RESERVE));
         let coord = FieldCoordinate::new(5, 3);
         let out = step.handle_command(
             &Action::PlacePlayer { player_id: "p1".into(), coord },

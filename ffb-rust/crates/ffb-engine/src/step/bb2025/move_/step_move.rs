@@ -16,8 +16,8 @@ use crate::util::server_util_block::ServerUtilBlock;
 ///
 /// Expects: COORDINATE_FROM, COORDINATE_TO, MOVE_STACK (size only) set by preceding step.
 ///
-/// DEFERRED(TrackNumber): field_model.add(trackNumber) not yet ported.
-/// DEFERRED(SoundId): DODGE/STEP sound selection not yet ported.
+/// client-only: field_model.add(trackNumber) — TrackNumber animation is client-side display only.
+/// client-only: SoundId assignment for DODGE/STEP — sound playback is client-only.
 pub struct StepMove {
     /// Java: fCoordinateFrom
     pub coordinate_from: Option<FieldCoordinate>,
@@ -106,7 +106,7 @@ impl StepMove {
             UtilServerPlayerMove::update_move_squares(game, false);
         }
         ServerUtilBlock::update_dice_decorations(game);
-        // DEFERRED(SoundId): DODGE/STEP sound selection not yet ported
+        // client-only: SoundId DODGE/STEP — sound playback is client-only
 
         StepOutcome::next()
             .publish(StepParameter::PlayerEnteringSquare(attacker_id.clone()))

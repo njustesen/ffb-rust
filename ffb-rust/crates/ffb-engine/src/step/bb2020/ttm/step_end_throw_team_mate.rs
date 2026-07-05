@@ -13,7 +13,7 @@
 /// Consumes: END_TURN, END_PLAYER_ACTION, THROWN_PLAYER_COORDINATE, THROWN_PLAYER_HAS_BALL,
 ///           THROWN_PLAYER_ID, THROWN_PLAYER_STATE, OLD_DEFENDER_STATE, BLOOD_LUST_ACTION.
 ///
-/// DEFERRED(EndTTM-dialog): UtilServerDialog.hideDialog deferred (dialog-client).
+/// client-only: UtilServerDialog.hideDialog — dialog management is client-side only.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::{PlayerState, PlayerAction};
@@ -60,7 +60,7 @@ impl StepEndThrowTeamMate {
     }
 
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
-        // DEFERRED(EndTTM-dialog): UtilServerDialog.hideDialog(gameState).
+        // client-only: UtilServerDialog.hideDialog — dialog management is client-side only
         game.pass_coordinate = None;
         game.field_model.range_ruler = None;
         game.defender_id = None;

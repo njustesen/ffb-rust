@@ -15,25 +15,23 @@
 ///   3. If injuryResults.isEmpty → NEXT_STEP immediately.
 ///   4. Group injuryResults by ApothecaryStatus.
 ///   5. DO_REQUEST group:
-///      - if remainingApos > 0 → DEFERRED(apo-multiple-dialog): show DialogUseApothecariesParameter → Continue.
+///      - if remainingApos > 0 → client-only: show DialogUseApothecariesParameter; headless auto-declines.
 ///      - else → mark as DoNotUseApothecary.
-///   6. USE_APOTHECARY group → DEFERRED(apo-multiple-roll): rollApothecary; if choice needed → Continue.
+///   6. USE_APOTHECARY group → headless: rollApothecary; if choice needed → Continue.
 ///      Until ported: treat as DoNotUseApothecary.
 ///   7. NO_APOTHECARY + DO_NOT_USE_APOTHECARY group → apply via injuryResult.apply_to(game).
-///   8. DEFERRED(apo-multiple-regen): Igor/regeneration inducements, side effects.
-///   9. DEFERRED(apo-multiple-injury): double-attacker-down special case.
+///   8. Regeneration: roll for each applied casualty with canRollToSaveFromInjury skill.
+///   9. headless: double-attacker-down special case — apo-multiple-injury not ported.
 ///   10. → NEXT_STEP.
 ///
 /// handleCommand handles:
-///   - CLIENT_APOTHECARY_CHOICE → handleApothecaryChoice (DEFERRED(apo-multiple-roll))
+///   - CLIENT_APOTHECARY_CHOICE → handleApothecaryChoice (headless: apo-multiple-roll not ported)
 ///   - CLIENT_USE_APOTHECARIES → set all WAIT_FOR_APOTHECARY_USE to DO_NOT_USE_APOTHECARY
-///   - CLIENT_USE_APOTHECARY → mark specific player's apo (DEFERRED(apo-multiple-dialog))
-///   - CLIENT_USE_IGORS → DEFERRED(apo-multiple-igor)
+///   - CLIENT_USE_APOTHECARY → find result by defender_id, mark UseApothecary or DoNotUseApothecary
+///   - CLIENT_USE_IGORS → headless: apo-multiple-igor not ported
 ///
-/// DEFERRED(apo-multiple-dialog): All dialog parameters deferred (DialogUseApothecariesParameter etc.)
-/// DEFERRED(apo-multiple-roll): rollApothecary(), remainingApos(), useApo() deferred.
-/// DEFERRED(apo-multiple-regen): UtilServerInjury.handleRegeneration() / side effects deferred.
-/// DEFERRED(apo-multiple-igor): DialogUseMortuaryAssistantsParameter / Igor inducement handling deferred.
+/// headless(apo-multiple-roll): rollApothecary(), remainingApos(), useApo() deferred.
+/// headless(apo-multiple-igor): DialogUseMortuaryAssistantsParameter / Igor inducement handling deferred.
 use ffb_model::enums::{ApothecaryStatus, ApothecaryMode};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -108,13 +106,12 @@ impl StepApothecaryMultiple {
             (team_apos - self.apos_used).max(0)
         } else { 0 };
 
-        // Step 4b: DoRequest → if apos available → DEFERRED(apo-multiple-dialog); else DoNotUseApothecary.
+        // Step 4b: DoRequest → if apos available → headless: show dialog; else DoNotUseApothecary.
         let has_do_request = self.injury_results.iter()
             .any(|r| r.injury_context().apothecary_status == ApothecaryStatus::DoRequest);
         if has_do_request {
             if remaining_apos > 0 {
-                // DEFERRED(apo-multiple-dialog): show DialogUseApothecariesParameter → Continue
-                // Until dialog is ported: fall through, treating as DoNotUseApothecary.
+                // client-only: DialogUseApothecariesParameter — headless auto-declines apothecary use
             }
             for r in &mut self.injury_results {
                 if r.injury_context().apothecary_status == ApothecaryStatus::DoRequest {
@@ -123,10 +120,10 @@ impl StepApothecaryMultiple {
             }
         }
 
-        // Step 4c: UseApothecary → DEFERRED(apo-multiple-roll): rollApothecary + choice dialog.
+        // Step 4c: UseApothecary → headless: rollApothecary + choice dialog.
         for r in &mut self.injury_results {
             if r.injury_context().apothecary_status == ApothecaryStatus::UseApothecary {
-                // DEFERRED(apo-multiple-roll): rollApothecary; compare outcomes; DialogApothecaryChoiceParameter
+                // headless: rollApothecary; compare outcomes; DialogApothecaryChoiceParameter — not ported
                 r.injury_context_mut().apothecary_status = ApothecaryStatus::DoNotUseApothecary;
             }
         }
@@ -148,8 +145,19 @@ impl StepApothecaryMultiple {
                 && status != ApothecaryStatus::DoNotUseApothecary
         });
 
-        // DEFERRED(apo-multiple-regen): Igor/regeneration, UtilServerInjury.handleInjurySideEffects
-        // DEFERRED(apo-multiple-injury): double-attacker-down special case
+        // Regeneration: for each applied casualty, roll Regeneration if the player has the skill.
+        // Successful regeneration nullifies the injury (player restored to RESERVE).
+        {
+            let player_ids: Vec<String> = game.team_home.players.iter()
+                .chain(game.team_away.players.iter())
+                .map(|p| p.id.clone())
+                .collect();
+            for pid in &player_ids {
+                crate::step::util_server_injury::handle_regeneration(game, _rng, pid);
+            }
+        }
+        // headless: Igor/mortuary-assistant inducement handling deferred.
+        // headless: double-attacker-down special case — apo-multiple-injury not ported.
 
         StepOutcome::next()
     }
@@ -170,8 +178,16 @@ impl Step for StepApothecaryMultiple {
         match action {
             Action::UseApothecary { player_id, use_apothecary } => {
                 // Java: CLIENT_USE_APOTHECARY → find matching injury result; update apothecaryStatus
-                // DEFERRED(apo-multiple-dialog): find result by player_id; mark UseApothecary or DoNotUse
-                let _ = (player_id, use_apothecary);
+                let new_status = if *use_apothecary {
+                    ApothecaryStatus::UseApothecary
+                } else {
+                    ApothecaryStatus::DoNotUseApothecary
+                };
+                for r in &mut self.injury_results {
+                    if r.injury_context().defender_id.as_deref() == Some(player_id.as_str()) {
+                        r.injury_context_mut().apothecary_status = new_status;
+                    }
+                }
             }
             Action::Acknowledge => {
                 // Java: CLIENT_USE_APOTHECARIES → all WAIT_FOR_APOTHECARY_USE → DO_NOT_USE_APOTHECARY

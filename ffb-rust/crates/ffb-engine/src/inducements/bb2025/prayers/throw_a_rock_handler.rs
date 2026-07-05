@@ -1,7 +1,7 @@
 /// 1:1 translation of `com.fumbbl.ffb.server.inducements.bb2025.prayers.ThrowARockHandler`.
 /// BB2025: initEffect adds a THROW_ROCK inducement to the praying team's InducementSet.
 /// Java lines 22–36: factory.allTypes().stream().filter(hasUsage(THROW_ROCK))... add to inducementSet.
-/// DEFERRED(prayer-throw-a-rock-bb2025): requires InducementSet + InducementTypeFactory port.
+/// headless: throw-a-rock sequence requires InducementSet + InducementTypeFactory not yet ported.
 use ffb_model::model::animation_type::AnimationType;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -23,7 +23,7 @@ impl PrayerHandler for ThrowARockHandler {
     fn animation_type(&self) -> AnimationType { AnimationType::PRAYER_THROW_A_ROCK }
     fn get_name(&self) -> &'static str { "ThrowARockHandler" }
     fn init_effect(&self, _prayer_state: &mut PrayerState, _game: &mut Game, _rng: &mut GameRng, _team_id: &str) -> bool {
-        // DEFERRED(prayer-throw-a-rock): trigger the throw-a-rock sequence against a random opponent player.
+        // headless: throw-a-rock sequence against a random opponent — requires InducementSet lookup not yet ported
         true
     }
     fn remove_effect_internal(&self, _prayer_state: &mut PrayerState, _game: &mut Game, _team_id: &str) {

@@ -1,6 +1,7 @@
 use ffb_model::enums::{ApothecaryMode, PlayerAction, ReRollSource};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::option::game_option_id;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_cards::UtilCards;
@@ -11,6 +12,22 @@ use crate::step::framework::{Step, StepOutcome, StepParameter};
 use crate::step::framework::StepId;
 use crate::step::util_server_injury::handle_injury_by_name;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+
+const CHAINSAW_TURNOVER_NEVER: &str = "never";
+const CHAINSAW_TURNOVER_KICKBACK: &str = "kickback";
+const CHAINSAW_TURNOVER_ALL_AV_BREAKS: &str = "allAvBreaks";
+
+fn causes_turn_over_chainsaw(player_has_ball: bool, chainsaw_option: &str, armor_broken: bool) -> bool {
+    if armor_broken {
+        if chainsaw_option.eq_ignore_ascii_case(CHAINSAW_TURNOVER_NEVER) {
+            player_has_ball
+        } else {
+            true
+        }
+    } else {
+        chainsaw_option == CHAINSAW_TURNOVER_KICKBACK
+    }
+}
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2020.block.StepBlockChainsaw.
 ///
@@ -149,7 +166,8 @@ impl StepBlockChainsaw {
             );
 
             let armor_broken = injury_result_defender.injury_context().is_armor_broken();
-            let causes_turn_over = armor_broken; // CHAINSAW_TURNOVER_ALL_AV_BREAKS default
+            let chainsaw_option = game.options.get(game_option_id::CHAINSAW_TURNOVER).unwrap_or(CHAINSAW_TURNOVER_ALL_AV_BREAKS);
+            let causes_turn_over = chainsaw_option.eq_ignore_ascii_case(CHAINSAW_TURNOVER_ALL_AV_BREAKS) && armor_broken;
 
             let dpc = DropPlayerContext {
                 injury_result: Some(Box::new(injury_result_defender)),
@@ -193,25 +211,14 @@ impl StepBlockChainsaw {
             attacker_coord, None, None, ApothecaryMode::Attacker,
         );
 
-        // Java: causesTurnOver(hasBall, chainsawOption, injuryContext)
-        // Stub: chainsawOption = "all_av_breaks" default
+        let chainsaw_option = game.options.get(game_option_id::CHAINSAW_TURNOVER).unwrap_or(CHAINSAW_TURNOVER_ALL_AV_BREAKS);
         let armor_broken = injury_result_attacker.injury_context().is_armor_broken();
-        let causes_turn_over = if armor_broken {
-            // CHAINSAW_TURNOVER_NEVER → only if has ball; otherwise true
-            // Stub (not never): always true when armor broken
-            true
-        } else {
-            // CHAINSAW_TURNOVER_KICKBACK → true; others → false
-            false
-        };
-        let _ = player_has_ball; // used by CHAINSAW_TURNOVER_NEVER case; suppressed until options ported
+        let causes_turn_over = causes_turn_over_chainsaw(player_has_ball, chainsaw_option, armor_broken);
 
         // Java: modifiedInjuryCausesTurnover — requires ModifiedInjuryContext (not yet ported)
         let modified_injury_causes_turnover = false;
 
-        // Java: endTurnWithoutKnockdown = GameOptionString.CHAINSAW_TURNOVER_KICKBACK.equals(chainsawOption)
-        // Stub: not KICKBACK → false
-        let end_turn_without_knockdown = false;
+        let end_turn_without_knockdown = chainsaw_option == CHAINSAW_TURNOVER_KICKBACK;
 
         let dpc = DropPlayerContext {
             injury_result: Some(Box::new(injury_result_attacker)),

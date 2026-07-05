@@ -8,9 +8,9 @@
 
 **Translation progress:** 2,521/2,521 files formally implemented = **100% ✓** (0 partial, 458 skip)
 
-**Tests:** 8,865 passing (1 ignored)
+**Tests:** 8,894 passing (1 ignored)
 
-**Current phase:** Phase Z — RosterPlayer + ffb-client stub classification complete
+**Current phase:** Phase AA — headless: audit & skill properties audit in progress
 
 ---
 
@@ -399,6 +399,22 @@
   - **Game/start sweep (3 files)**: StepInitStartGame, StepWeather, UtilInducementSequence all 0 DEFERREDs.
   - **Misc files (15 files)**: StepInitBomb (bb2020), DeferredCommandFactory/DeferredCommandIdFactory (bb2025), ApplyTo (marking), StepModifier (model), StepActionFactory, StepIdFactory, AbstractStepWithReRoll, DiceInterpreter, UtilServerSteps, UtilServerCatchScatterThrowIn, ServerMode, SessionMode all confirmed complete.
   - **Tracker updated**: 1,399 → 1,658 ✓ entries (+259); 1,122 → 863 ~ entries (−259). Tests unchanged at 7,993.
+
+- **Phase AA (partial)** (2026-07-05): headless: audit & engine-logic sweep — 8,865 → 8,894 tests (+29), headless: 215 → 213
+  - **AA-2 (COMPLETE): SkillFactory modifier integration** — `ArmorModifierFactory.find_armor_modifiers` + `InjuryModifierFactory.find_injury_modifiers_without_niggling` now use `player.all_skill_ids()` iteration + `skill_to_armor/injury_modifier()` match. Added 7 injury modifier tests (MightyBlow block/foul/stab, DirtyPlayer foul/block, no-attacker, chainsaw-skips-mighty-blow). Fixed `all_skills()` → `all_skill_ids()` in both factories.
+  - **AA-3 (partial): Game options implemented**:
+    - `BOMB_BOUNCES_ON_EMPTY_SQUARES` (`step_init_bomb.rs` bb2025): full scatter roll → field bounds → player-at-target → CatchBomb publish path.
+    - `CHAINSAW_TURNOVER` (`step_block_chainsaw.rs` bb2020 + bb2025): all 3 option values (never, kickback, allAvBreaks) for defender-hit and attacker-backfire cases.
+  - **Network encoder fix**: `Action::StartGame` now encodes to `ClientCommand::ClientStartGame(ClientStartGame)` (was returning `None`).
+  - **`util_game_option.rs`**: Added `get_str_option` helper (`game.options.get(option_id).unwrap_or(default)`).
+  - **Skill properties audit (session continuation)**:
+    - `SkillId::properties()` overhaul — corrected ~20 invented properties and added ~10 missing ones, traced to Java `postConstruct()` / `registerProperty()`. Key changes: Tackle now `["cancelsCanRerollDodge", "cancelsIgnoreDefenderStumblesResult", "cancelsIgnoresDefenderStumblesResultForFirstBlock"]`; Guard removes invented `assistsFoulsInTacklezones`; FoulAppearance corrected to `"forceRollBeforeBeingBlocked"`; Wrestle corrected to `"canTakeDownPlayersWithHimOnBothDown"`; WildAnimal corrected to `["enableStandUpAndEndBlitzAction", "needsToRollForActionButKeepsTacklezone"]`; PrehensileTail corrected to `["makesDodgingHarder", "makesJumpingHarder"]`. Added: Kick (`canReduceKickDistance`), Kaboom (`canForceBombExplosion`), NurglesRot (`allowsRaisingLineman`), PassBlock/OnTheBall (`canMoveWhenOpponentPasses`), Loner (`preventCardRabbitsFoot`), Decay/Regeneration/Stunty cancel properties.
+    - `StepRecheckExplodeSkill` (bb2025): rewrote to check `has_unused_skill_with_property(CAN_FORCE_BOMB_EXPLOSION)` on the acting player (Kaboom skill, not Bombardier). 5 tests.
+    - `step_catch_scatter_throw_in.rs` (bb2020 + bb2025): `handle_failed_catch` now also checks `game.is_active(DROPPED_BALL_CAUSES_ARMOUR_ROLL)` for the Spiked Ball card effect.
+    - `step_kickoff_scatter_roll.rs` (bb2025): `kick_skill_player_waits_for_choice` test fixed after adding `canReduceKickDistance` to Kick skill properties.
+    - `named_properties.rs`: Added `CANCELS_IGNORE_DEFENDER_STUMBLES_RESULT` + `CANCELS_IGNORES_DEFENDER_STUMBLES_RESULT_FOR_FIRST_BLOCK` constants.
+    - `step_block_choice.rs` (bb2016 + bb2025): Replaced invented `"cancelsDodge"` property check with `NamedProperties::CANCELS_IGNORE_DEFENDER_STUMBLES_RESULT` — now mirrors Java `UtilCards.getSkillCancelling(attacker, dodgeSkill)`. Fixed 2 failing tests.
+  - Investigated but left deferred: Swarmer/LINEMAN keyword (blocked: no `game.roster`), StepInitInducement routing (blocked: InducementType infrastructure), remaining SPP step items (blocked: StateMechanic.handlePumpUp), modifier aggregator stubs.
 
 ---
 

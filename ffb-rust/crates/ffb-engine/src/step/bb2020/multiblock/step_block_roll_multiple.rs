@@ -239,10 +239,10 @@ impl StepBlockRollMultiple {
         }
 
         // Java: if attackerTeamSelects && (ownChoice unselected || anyReRollLeft) → showDialog(attacker)
-        // DEFERRED(brm-dialog): attacker dialog deferred.
+        // client-only: DialogBlockRollMultipleParameter for attacker — headless auto-selects index 0
 
         // Java: else if defender rolls need selection → showDialog(defender)
-        // DEFERRED(brm-dialog): defender dialog deferred.
+        // client-only: DialogBlockRollMultipleParameter for defender — headless auto-selects index 0
 
         // Fallback: if all unselected rolls have no ownChoice (defender's) and no re-rolls, advance.
         // In a full implementation, we'd show the defender dialog here.

@@ -25,7 +25,7 @@ use ffb_mechanics::modifiers::go_for_it_context::GoForItContext;
 ///   1. Skill re-roll (e.g. Sprint / GoForIt — property canMakeAnExtraGfi) — auto-used
 ///   2. Team Re-Roll token (TRR) — offered via ReRollOffer prompt
 ///
-/// DEFERRED(modifierIgnoring): canChooseToIgnoreRushModifierAfterRoll dialog not yet ported.
+/// client-only: canChooseToIgnoreRushModifierAfterRoll dialog — headless never ignores rush modifier.
 /// failedRushForJumpAlwaysLandsInTargetSquare skill check → wired in fail_gfi.
 pub struct StepGoForIt {
     /// Java: fGotoLabelOnFailure

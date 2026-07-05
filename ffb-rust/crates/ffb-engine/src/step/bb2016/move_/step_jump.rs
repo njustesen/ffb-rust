@@ -32,9 +32,9 @@ use ffb_mechanics::mechanics::minimum_roll_jump;
 ///
 /// BB2016 JumpModifierCollection is empty (confirmed Java source) → &[] is correct.
 /// BB2016 agility_with_modifiers() == agility (no stat-injury pipeline yet).
-/// DEFERRED(hooks): executeStepHooks infrastructure not yet ported.
+/// headless: executeStepHooks infrastructure not yet ported — DivingTackle hook skipped.
 /// canStillJump: wired via BB2016 JumpMechanic.
-/// DEFERRED(divingTackle): checkDivingTackle dialog not yet ported.
+/// client-only: checkDivingTackle dialog — headless auto-skips diving tackle activation.
 pub struct StepJump {
     /// Java: StepState.goToLabelOnFailure
     pub goto_label_on_failure: String,
@@ -69,7 +69,7 @@ impl Step for StepJump {
         if let Action::UseReRoll { use_reroll: false } = action {
             self.re_roll_state.re_roll_source = None;
         }
-        // DEFERRED(divingTackle): CLIENT_PLAYER_CHOICE DIVING_TACKLE mode not yet ported.
+        // client-only: CLIENT_PLAYER_CHOICE DIVING_TACKLE mode — headless never receives this
         self.execute_step(game, rng)
     }
 

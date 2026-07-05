@@ -64,6 +64,7 @@ mod tests {
 
     fn add_player_reserve(game: &mut Game, team_id: &str, id: &str) {
         use ffb_model::model::player::Player;
+        use ffb_model::model::player_status::PlayerStatus;
         let p = Player {
             id: id.into(), name: id.into(), nr: 1,
             position_id: "pos".into(),
@@ -74,6 +75,7 @@ mod tests {
             used_skills: std::collections::HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
             race: None,
+            player_status: PlayerStatus::ACTIVE,
             ..Default::default()
 };
         if team_id == "home" {

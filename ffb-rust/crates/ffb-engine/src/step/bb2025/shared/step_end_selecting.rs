@@ -169,7 +169,7 @@ impl Step for StepEndSelecting {
 impl StepEndSelecting {
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: UtilServerDialog.hideDialog(getGameState())
-        // DEFERRED(dialog-client): hide_dialog — dialog layer not yet translated
+        // client-only: hide_dialog
 
         // Java: if (fEndTurn || fEndPlayerAction) {
         //   game.getFieldModel().clearMultiBlockTargets()

@@ -17,7 +17,7 @@ use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter};
 /// Rust step-rewrite they are expected to arrive via published StepParameters
 /// (`PassAccurate`, `InterceptorId`, `CatcherId`).
 ///
-/// DEFERRED: Animation / syncGameModel infrastructure not yet translated.
+/// headless: Animation / syncGameModel infrastructure not yet translated.
 ///       PassState.isInterceptionSuccessful / getResult() not yet wired — interceptor
 ///       path and full accurate routing require PassState translation.
 pub struct StepResolvePass {
@@ -72,7 +72,7 @@ impl StepResolvePass {
         // Java: AnimationType animationType = getAnimationType(throwerAction)
         // Java: getResult().setAnimation(new Animation(animationType, throwerCoord, passCoord, interceptorCoord))
         // Java: UtilServerGame.syncGameModel(this)
-        // DEFERRED: Animation + syncGameModel infrastructure not translated
+        // client-only: Animation + syncGameModel infrastructure — client-side
 
         let is_bomb = matches!(
             game.thrower_action,

@@ -5,32 +5,32 @@
 /// - stopTurnTimer: saves elapsed turn time, resets start marker
 /// - syncTime: updates game_time and turn_time from system clock; sets timeout_possible flag
 ///
-/// DEFERRED: all methods require GameState (not yet ported). Method signatures are declared
-/// so callers can compile; bodies are DEFERRED until GameState is translated.
+/// headless: all methods require GameState (not yet ported). Method signatures are declared
+/// so callers can compile; bodies are no-ops until GameState is translated.
 pub struct UtilServerTimer;
 
 impl UtilServerTimer {
     pub fn new() -> Self { Self }
 
     /// Java: startTurnTimer(GameState, long currentTimeMillis).
-    /// DEFERRED: GameState.getTurnTimeStarted(), game.isTurnTimeEnabled() not yet ported.
+    /// headless: GameState.getTurnTimeStarted(), game.isTurnTimeEnabled() not yet ported.
     pub fn start_turn_timer(_current_time_millis: i64) {
-        // DEFERRED: if gameState.turn_time_started == 0 && game.is_turn_time_enabled()
+        // headless: if gameState.turn_time_started == 0 && game.is_turn_time_enabled()
         //   then gameState.turn_time_started = current_time_millis - game.turn_time
     }
 
     /// Java: stopTurnTimer(GameState, long currentTimeMillis).
-    /// DEFERRED: GameState not yet ported.
+    /// headless: GameState not yet ported.
     pub fn stop_turn_timer(_current_time_millis: i64) {
-        // DEFERRED: if gameState.turn_time_started > 0 && game.is_turn_time_enabled()
+        // headless: if gameState.turn_time_started > 0 && game.is_turn_time_enabled()
         //   then game.turn_time = current_time_millis - gameState.turn_time_started
         //   gameState.turn_time_started = 0
     }
 
     /// Java: syncTime(GameState, long currentTimeMillis).
-    /// DEFERRED: GameState + game.started + game.finished not yet ported.
+    /// headless: GameState + game.started + game.finished not yet ported.
     pub fn sync_time(_current_time_millis: i64) {
-        // DEFERRED: update game.game_time and game.turn_time from clock,
+        // headless: update game.game_time and game.turn_time from clock — GameState not ported
         // set game.timeout_possible if configured turntime exceeded
     }
 }

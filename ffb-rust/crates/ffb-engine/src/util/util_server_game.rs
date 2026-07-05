@@ -9,14 +9,14 @@
 //   prepare_for_setup_team(game, team_id)              — per-team RESERVE/SETUP_PREVENTED logic
 //   update_single_use_rerolls(turn_data, team, fm)     — count single-use reroll providers
 //   update_player_state_dependent_properties(game)     — leader re-rolls + single-use re-rolls
-//                                                         (checkForMissingPartners DEFERRED)
+//                                                         (checkForMissingPartners headless)
 //   mark_played_and_secret_weapons(game)               — per-drive turns_played + has_used_secret_weapon
 //
 // Skipped (touch IStep / server / WebSocket):
 //   syncGameModel, changeActingPlayer, handleChefRolls, rollMasterChef,
 //   checkForWastedSkills, addPartnerEnhancement, closeGame, handleInvalidTeam
 //
-// Partially implemented (checkForMissingPartners is DEFERRED: needs addSkillEnhancements):
+// Partially implemented (checkForMissingPartners is headless: needs addSkillEnhancements):
 //   updatePlayerStateDependentProperties, checkForMissingPartners
 
 use ffb_model::enums::{PlayerState, PS_BANNED, PS_RESERVE, PS_SETUP_PREVENTED, TurnMode};
@@ -96,13 +96,13 @@ impl UtilServerGame {
     /// Three sub-steps (in Java order):
     ///   1. `mechanic.updateLeaderReRollsForTeam` — both teams
     ///   2. `checkForMissingPartners` — both teams
-    ///      DEFERRED: requires `FieldModel.addSkillEnhancements` (TwoForOne skill pair)
+    /// headless: requires FieldModel.addSkillEnhancements (TwoForOne skill pair)
     ///   3. `updateSingleUseReRolls` — both teams
     pub fn update_player_state_dependent_properties(game: &mut Game) {
         let mechanic = state_mechanic_for(game.rules);
         mechanic.update_leader_re_rolls_for_team(game, true);
         mechanic.update_leader_re_rolls_for_team(game, false);
-        // DEFERRED: checkForMissingPartners — requires FieldModel.addSkillEnhancements (TwoForOne)
+        // headless: checkForMissingPartners — requires FieldModel.addSkillEnhancements (TwoForOne)
         Self::update_single_use_rerolls_for_game(game, true);
         Self::update_single_use_rerolls_for_game(game, false);
     }

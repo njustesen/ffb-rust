@@ -9,7 +9,7 @@
 ///
 /// Init parameter: GOTO_LABEL_ON_END (mandatory).
 ///
-/// DEFERRED(Bribes-dialog): Dialog-based bribe/argue-the-call choices use auto-true/false headless fallback.
+/// client-only: Dialog-based bribe/argue-the-call choices — headless auto-decides (bribe if available, decline argue).
 use ffb_model::events::GameEvent;
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
@@ -60,7 +60,7 @@ impl StepBribes {
                         game.turn_data_away.inducement_set.for_usage(Usage::AVOID_BAN).unwrap()
                     )
             };
-            // DEFERRED(Bribes-dialog): headless auto-uses bribe if available (Java shows dialog).
+            // client-only: DialogBribesParameter — headless auto-uses bribe if available
             self.bribes_choice = Some(has_bribe);
         }
 
@@ -77,8 +77,7 @@ impl StepBribes {
             self.bribe_successful = Some(DiceInterpreter::is_bribes_successful(roll));
             pending_events.push(GameEvent::BribesRoll { player_id, roll, success: self.bribe_successful.unwrap_or(false) });
             if !self.bribe_successful.unwrap_or(false) {
-                // Failed — headless: no more retry attempt (dialog would ask again if bribes remain)
-                // DEFERRED(Bribes-dialog): headless treats failed bribe as ejection
+                // client-only: dialog would ask to retry if more bribes remain; headless treats failure as ejection
                 self.bribes_choice = Some(false);
             }
         }
@@ -91,7 +90,7 @@ impl StepBribes {
             return out;
         }
 
-        // DEFERRED(dialog): askForArgueTheCall dialog
+        // client-only: DialogArgueTheCall — headless auto-declines
         if self.bribes_choice == Some(false) && self.argue_the_call_choice.is_none() {
             // No dialog infrastructure — skip argue-the-call
             self.argue_the_call_choice = Some(false);

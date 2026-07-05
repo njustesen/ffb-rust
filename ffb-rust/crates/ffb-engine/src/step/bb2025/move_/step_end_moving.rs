@@ -153,7 +153,7 @@ impl StepEndMoving {
 
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: UtilServerDialog.hideDialog(gameState)
-        // DEFERRED: hide dialog — not yet ported
+        // client-only: hide dialog — dialog is client-side
 
         // Java: triesToSecureBall = playerAction == SECURE_THE_BALL && !(isSufferingBloodLust && bloodlustAction == MOVE)
         // Java: secureTheBallFailed = endPlayerAction && triesToSecureBall && !UtilPlayer.hasBall(...)

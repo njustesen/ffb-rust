@@ -1,10 +1,11 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypePilingOnArmour.
-/// Piling On armor roll: standard armor roll + game option PILING_ON_ARMOR modifier (stub).
+/// Piling On armor roll: standard armor roll + ARMOR_PILING_ON (+2) modifier.
 /// If broken: injury roll. Else: PRONE. turnover=false, no apo, stun treated as KO = false.
 use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
+use ffb_mechanics::modifiers::ARMOR_PILING_ON;
 use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
 
 pub struct InjuryTypePilingOnArmour { ctx: InjuryContext }
@@ -19,7 +20,7 @@ impl InjuryTypeServer for InjuryTypePilingOnArmour {
         self.ctx.defender_coordinate = Some(coord);
         self.ctx.apothecary_mode = apo_mode;
         if !self.ctx.armor_broken {
-            // TODO: add PILING_ON_ARMOR game option modifier when option factory is ported
+            self.ctx.add_armor_modifier(ARMOR_PILING_ON);
             do_armor_roll(game, rng, &mut self.ctx, defender_id);
         }
         if self.ctx.armor_broken { do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id); }
@@ -64,4 +65,13 @@ mod tests {
     }
     #[test]
     fn no_apo() { assert!(!InjuryTypePilingOnArmour::new().can_use_apo()); }
+
+    #[test]
+    fn piling_on_armor_modifier_applied() {
+        let mut t = InjuryTypePilingOnArmour::new();
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game_with_armor(7), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert!(t.ctx.armor_modifiers.contains(&ARMOR_PILING_ON),
+            "ARMOR_PILING_ON (+2) must be in armor_modifiers");
+    }
 }

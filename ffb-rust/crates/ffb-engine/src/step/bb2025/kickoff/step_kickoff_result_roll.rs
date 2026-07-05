@@ -24,7 +24,7 @@ use crate::step::framework::{StepId, StepParameter};
 ///  12 → Pitch Invasion
 ///
 /// Overtime options (GameOptionId::OVERTIME_KICK_OFF_RESULTS) implemented for all
-/// non-dialog paths. DEFERRED: `blitzOrSolidDefence` dialog path.
+/// non-dialog paths. headless: blitzOrSolidDefence dialog path — client-only.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.kickoff.StepKickoffResultRoll`.
 pub struct StepKickoffResultRoll {
@@ -51,7 +51,7 @@ impl Step for StepKickoffResultRoll {
 
     fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java CLIENT_KICK_OFF_RESULT_CHOICE: set fKickoffResult from the command.
-        // DEFERRED(KickoffResultRoll-dialog): blitzOrSolidDefence dialog choice not yet ported.
+        // client-only: Action::KickoffResultChoice arrives from dialog; headless never receives this
         self.execute_step(game, rng)
     }
 
@@ -75,7 +75,7 @@ impl StepKickoffResultRoll {
             } else if overtime_option == "solidDefence" {
                 self.kickoff_result = Some(KickoffResult::SolidDefence);
             } else {
-                // DEFERRED(KickoffResultRoll-dialog): blitzOrSolidDefence requires CLIENT_KICK_OFF_RESULT_CHOICE dialog.
+                // client-only: DialogKickOffResultChoice for blitzOrSolidDefence — headless auto-rolls
                 let roll = rng.d6_two();
                 self.kickoff_result = Some(kickoff_result_for_roll(roll));
             }

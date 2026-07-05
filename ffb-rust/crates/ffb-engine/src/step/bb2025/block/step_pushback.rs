@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use ffb_model::enums::{ApothecaryMode, PlayerState};
+use ffb_model::enums::{ApothecaryMode, PlayerState, SkillId};
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::types::{FieldCoordinate, PushbackSquare};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -43,6 +44,136 @@ impl StepPushback {
             standing_firm: HashMap::new(),
             pushback_stack: Vec::new(),
         }
+    }
+
+    /// Java: StandFirmBehaviour.handleExecuteStepHook (priority 2).
+    ///
+    /// Returns `true` (stopProcessing) if Stand Firm was applied.
+    /// If stand firm used: sets `do_push = true` and clears the stack (push is cancelled).
+    fn apply_stand_firm_hook(
+        &mut self,
+        game: &mut Game,
+        defender_id: &str,
+        do_push: &mut bool,
+        _home_choice: bool,
+    ) -> bool {
+        let has_stand_firm = game.player(defender_id)
+            .map(|p| p.has_skill(SkillId::StandFirm))
+            .unwrap_or(false);
+
+        if !has_stand_firm {
+            return false;
+        }
+
+        let defender_state = game.field_model.player_state(defender_id);
+
+        // Java: auto-stand-firm if Rooted
+        if defender_state.map(|s| s.is_rooted()).unwrap_or(false) {
+            self.standing_firm.insert(defender_id.to_owned(), true);
+        }
+
+        // Java: auto NOT stand firm if no tackle zones (out of the play)
+        let has_tacklezones = defender_state.map(|s| s.has_tacklezones()).unwrap_or(true);
+        let old_has_tacklezones = self.old_defender_state.map(|s| s.has_tacklezones()).unwrap_or(true);
+        if !has_tacklezones || (self.pushback_stack.is_empty() && !old_has_tacklezones) {
+            self.standing_firm.insert(defender_id.to_owned(), false);
+        }
+
+        // Java: auto NOT stand firm if Blitz + cancelling skill (Juggernaut cancels Stand Firm)
+        let attacker_cancels = game.acting_player.player_id.as_deref()
+            .and_then(|id| game.player(id))
+            .map(|p| p.has_skill_property(NamedProperties::CANCELS_CAN_REFUSE_TO_BE_PUSHED))
+            .unwrap_or(false);
+        let is_blitz = game.acting_player.player_action
+            .map(|a| a.is_blitzing())
+            .unwrap_or(false);
+        if is_blitz && attacker_cancels {
+            self.standing_firm.insert(defender_id.to_owned(), false);
+        }
+
+        // Java: if hasSkill && standingFirm.getOrDefault(id, true)
+        let using_stand_firm = *self.standing_firm.get(defender_id).unwrap_or(&true);
+        if !using_stand_firm {
+            return false;
+        }
+
+        if !self.standing_firm.contains_key(defender_id) {
+            // Dialog would be shown here; headless: auto-decide = false (don't use)
+            self.standing_firm.insert(defender_id.to_owned(), false);
+            return false;
+        }
+
+        // Decided to stand firm: cancel the push
+        *do_push = true;
+        self.pushback_stack.clear();
+        self.starting_pushback_square = None;
+        true
+    }
+
+    /// Java: SidestepBehaviour.handleExecuteStepHook (priority 4).
+    ///
+    /// Returns `Some(squares)` with new SIDE_STEP squares if Side Step was applied.
+    /// Returns `None` if Side Step was not used or not applicable.
+    fn apply_side_step_hook(
+        &mut self,
+        game: &Game,
+        defender_id: &str,
+        starting_sq: PushbackSquare,
+        free_square_around_defender: bool,
+        home_choice: bool,
+    ) -> Option<Vec<PushbackSquare>> {
+        let has_side_step = game.player(defender_id)
+            .map(|p| p.has_skill_property(NamedProperties::CAN_CHOOSE_OWN_PUSHED_BACK_SQUARE))
+            .unwrap_or(false);
+
+        if !has_side_step {
+            return None;
+        }
+
+        // Java: check if cancelling skill exists on attacker (for defender only)
+        // (simplified: attacker with Grab cancels SideStep)
+        let attacker_cancels = game.acting_player.player_id.as_deref()
+            .and_then(|id| game.player(id))
+            .map(|p| p.has_skill_property(NamedProperties::CAN_PUSH_BACK_TO_ANY_SQUARE))
+            .unwrap_or(false);
+
+        let defender_state = game.field_model.player_state(defender_id);
+        let has_tacklezones = defender_state.map(|s| s.has_tacklezones()).unwrap_or(true);
+        let old_has_tacklezones = self.old_defender_state.map(|s| s.has_tacklezones()).unwrap_or(true);
+        let in_tacklezone = if self.pushback_stack.is_empty() {
+            old_has_tacklezones
+        } else {
+            has_tacklezones
+        };
+
+        // Java: side step conditions
+        let using_side_step_default = *self.side_stepping.get(defender_id).unwrap_or(&true);
+        if !using_side_step_default || !free_square_around_defender || !in_tacklezone || attacker_cancels {
+            return None;
+        }
+
+        if !self.side_stepping.contains_key(defender_id) {
+            // Dialog would be shown; headless: auto-decide = false (don't use)
+            self.side_stepping.insert(defender_id.to_owned(), false);
+            return None;
+        }
+
+        if !self.side_stepping[defender_id] {
+            return None;
+        }
+
+        // Used Side Step: recalculate squares in SIDE_STEP mode (all adjacent free squares)
+        let side_step_squares = UtilServerPushback::find_pushback_squares_grab(
+            starting_sq,
+            &|c| game.field_model.player_at(c).is_some(),
+            &|_c| true,
+            home_choice,
+        );
+
+        // Java: set homeChoice based on whether defender is home team
+        let _defender_home = game.team_home.players.iter().any(|p| p.id == defender_id);
+        self.starting_pushback_square = None;
+        Some(side_step_squares)
     }
 }
 
@@ -115,23 +246,46 @@ impl StepPushback {
                 let defender_coord = starting_sq.coordinate;
 
                 // Java: state.defender = fieldModel.getPlayer(defenderCoordinate)
-                // (throws if null — we just proceed without the defender check in the stub)
+                let defender_id = game.defender_id.clone().unwrap_or_default();
 
-                // Java: executeStepHooks for Side Step / Stand Firm
-                // DEFERRED: Side Step / Stand Firm skill hooks (executeStepHooks not yet translated)
-
-                // Java: pushbackSquares = UtilServerPushback.findPushbackSquares(game, startingSq, REGULAR)
-                // Java: fieldModel.add(pushbackSquares)
+                // Java: pushbackMode = REGULAR; findPushbackSquares; fieldModel.add
                 let home_choice = game.home_playing;
                 let occupied = |c: FieldCoordinate| game.field_model.player_at(c).is_some();
-                let pushback_squares = UtilServerPushback::find_pushback_squares_standard(
+                let mut pushback_squares = UtilServerPushback::find_pushback_squares_standard(
                     starting_sq, &occupied, home_choice,
                 );
 
-                let pushback_squares_found = !pushback_squares.is_empty();
+                // Java: compute freeSquareAroundDefender (used by SideStep condition)
+                let adjacent_squares = game.field_model.adjacent_on_pitch(defender_coord);
+                let free_square_around_defender = adjacent_squares.iter()
+                    .any(|c| game.field_model.player_at(*c).is_none());
+
+                // ── StandFirm hook (priority 2) ─────────────────────────────────────
+                // Java: StandFirmBehaviour.handleExecuteStepHook — stop processing if stand firm used.
+                let stop_processing = self.apply_stand_firm_hook(
+                    game, &defender_id, &mut do_push, home_choice,
+                );
+
+                // ── SideStep hook (priority 4) ────────────────────────────────────
+                // Java: SidestepBehaviour.handleExecuteStepHook — recalculate squares in SIDE_STEP mode.
+                if !stop_processing {
+                    if let Some(new_squares) = self.apply_side_step_hook(
+                        game, &defender_id, starting_sq, free_square_around_defender, home_choice,
+                    ) {
+                        pushback_squares = new_squares;
+                    }
+                }
+
+                let pushback_squares_found = !pushback_squares.is_empty() || stop_processing;
+
+                // If StandFirm was used (stop_processing = true), push is cancelled — already handled.
+                if stop_processing {
+                    // StandFirm resolved the push: do_push = true, stack cleared, return next.
+                    // Fall through to the do_push path below.
+                }
 
                 // Java: if (!ArrayTool.isProvided(state.pushbackSquares)) → Crowd push
-                if !pushback_squares_found {
+                if !pushback_squares_found && !stop_processing {
                     // Java: determine injuryType and attacker based on prayerState
                     // Stub: prayerState.hasFanInteraction → false → always InjuryTypeCrowdPush, no attacker
                     let crowd_push_coord = self.starting_pushback_square

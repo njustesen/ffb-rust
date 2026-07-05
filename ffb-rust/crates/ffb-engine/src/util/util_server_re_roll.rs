@@ -29,7 +29,7 @@ impl UtilServerReRoll {
         mechanic.is_team_re_roll_available(game, player)
     }
 
-    // Java: `useReRoll` and `askForReRollIfAvailable` — DEFERRED (require IStep/dialog infra).
+    // headless: useReRoll and askForReRollIfAvailable — require IStep/dialog infra not yet ported
     // The step-layer equivalents live in `crate::step::util_server_re_roll`.
 }
 

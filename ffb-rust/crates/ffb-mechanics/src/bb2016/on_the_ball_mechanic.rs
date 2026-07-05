@@ -80,10 +80,8 @@ impl OnTheBallMechanicTrait for OnTheBallMechanic {
     }
 }
 
-/// Stub for UtilPassing.findValidPassBlockEndCoordinates(game).
-/// TODO: full implementation requires translating UtilPassing.
-fn util_passing_find_valid_pass_block_end_coordinates(_game: &Game) -> HashSet<FieldCoordinate> {
-    HashSet::new()
+fn util_passing_find_valid_pass_block_end_coordinates(game: &Game) -> HashSet<FieldCoordinate> {
+    ffb_model::util::passing::find_valid_pass_block_end_coordinates(game)
 }
 
 /// Stub for ArrayTool.isProvided(PathFinderWithPassBlockSupport.INSTANCE.allowPassBlockMove(...)).

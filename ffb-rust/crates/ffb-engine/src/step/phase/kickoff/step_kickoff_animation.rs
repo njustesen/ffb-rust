@@ -68,7 +68,7 @@ impl StepKickoffAnimation {
         // Java: game.getFieldModel().setBallInPlay(true)
         game.field_model.ball_in_play = true;
         // Java: getResult().setAnimation(new Animation(AnimationType.KICK, ...))
-        // DEFERRED: animation reporting (client-side only, no game state effect)
+        // client-only: animation reporting — no game state effect
         // Java: if (!fTouchback) publishParameter(CATCH_SCATTER_THROW_IN_MODE, CATCH_KICKOFF)
         let mut outcome = StepOutcome::next();
         if !self.touchback {

@@ -136,8 +136,7 @@ impl StepUnchannelledFury {
             if self.has_unused_fury_of_blood_god(game, &player_id)
                 && player_action.map(|a| a.is_block_action()).unwrap_or(false)
             {
-                // DEFERRED(dialog): show DialogSkillUseParameter for FuryOfTheBloodGod
-                // Java: UtilServerDialog.showDialog(... new DialogSkillUseParameter(playerId, furySkill, 0) ...)
+                // client-only: DialogSkillUseParameter for FuryOfTheBloodGod
                 return StepOutcome::cont(); // wait for UseSkill response
             }
             cancel_unchannelled_fury_action(game, &player_id);
@@ -185,7 +184,7 @@ impl StepUnchannelledFury {
         if self.has_unused_fury_of_blood_god(game, &player_id)
             && player_action.map(|a| a.is_block_action()).unwrap_or(false)
         {
-            // DEFERRED(dialog): show DialogSkillUseParameter for FuryOfTheBloodGod
+            // client-only: DialogSkillUseParameter for FuryOfTheBloodGod
             return StepOutcome::cont().with_event(event);
         }
 
@@ -248,7 +247,7 @@ fn cancel_unchannelled_fury_action(game: &mut Game, player_id: &str) {
     if let Some(ref mut ts) = game.field_model.target_selection_state {
         ts.failed();
     }
-    // Java: setSound(SoundId.ROAR) — DEFERRED(sound)
+    // Java: setSound(SoundId.ROAR) — client-only
 }
 
 /// Java: goodConditions = BlitzMove | isKickingDowned | Blitz | isBlockAction | MultipleBlock | StandUpBlitz

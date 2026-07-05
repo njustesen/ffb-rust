@@ -79,6 +79,7 @@ mod tests {
             used_skills: std::collections::HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
             race: None,
+            player_status: ffb_model::model::player_status::PlayerStatus::ACTIVE,
             ..Default::default()
 });
         game.field_model.set_player_state("a1", PlayerState::new(PS_RESERVE));

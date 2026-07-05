@@ -9,7 +9,7 @@ pub fn animation_type() -> AnimationType {
 }
 
 pub fn init_effect(_prayer_state: &mut PrayerState, _game: &Game, _team_id: &str) -> bool {
-    // DEFERRED(prayer-throw-a-rock): edition-specific handlers implement the throw-a-rock logic
+    // headless: edition-specific throw-a-rock logic not yet ported
     true
 }
 

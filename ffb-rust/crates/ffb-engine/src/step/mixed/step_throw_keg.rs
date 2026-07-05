@@ -8,7 +8,7 @@
 ///      a. On re-roll: consume re-roll source; if unavailable → fail().
 ///      b. Otherwise: markSkillUsed(skill).
 ///      c. Roll D6; success = roll >= 3.
-///      d. Report ReportThrownKeg (DEFERRED: report framework).
+///      d. Report ReportThrownKeg (headless: report framework not yet ported).
 ///      e. On success: animate + hitPlayer(target, false).
 ///      f. On failure (not re-rolling): ask for re-roll; if available → CONTINUE.
 ///         Otherwise → fail().
@@ -164,7 +164,7 @@ impl StepThrowKeg {
         ctx.end_turn = end_turn;
 
         // Java: getResult().setSound(SoundId.EXPLODE)
-        // DEFERRED(sound): SoundId.EXPLODE not yet ported.
+        // client-only: SoundId.EXPLODE
 
         StepOutcome::next()
             .publish(StepParameter::DropPlayerContext(Box::new(ctx)))

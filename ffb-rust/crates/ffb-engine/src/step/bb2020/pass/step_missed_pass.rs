@@ -50,6 +50,8 @@ pub struct StepMissedPass {
     pub re_rolling: bool,
     /// PassResult from StepPass — determines which scatter path to use
     pub pass_result: Option<ffb_mechanics::pass_result::PassResult>,
+    /// Java: PassState.fUsingBlastIt — set when coach chooses to use/decline Blast-It re-roll
+    pub using_blast_it: Option<bool>,
 }
 
 impl StepMissedPass {
@@ -65,6 +67,7 @@ impl StepMissedPass {
             do_roll: true,
             re_rolling: false,
             pass_result: None,
+            using_blast_it: None,
         }
     }
 
@@ -93,14 +96,14 @@ impl Step for StepMissedPass {
         //   report ReportSkillUse(playerId, skill, doRoll, SkillUse.RE_ROLL_DIRECTION)
         //   if used → passState.setUsingBlastIt(true)
         //   if neverUse → passState.setUsingBlastIt(false)
-        // DEFERRED(pass-state): PassState.setUsingBlastIt — PassState not yet translated (lives in GameState).
         let skill_event = match action {
             Action::UseSkill { skill_id, use_skill } => {
                 self.do_roll = *use_skill;
                 self.re_rolling = true;
+                // Java: passState.setUsingBlastIt(true/false) — stored on step directly (no separate PassState)
+                self.using_blast_it = Some(*use_skill);
                 let player_id = game.acting_player.player_id.clone().unwrap_or_default();
                 if *use_skill {
-                    // Java: markSkillUsed(playerId, skill) — inserts into player.used_skills
                     game.mark_skill_used(&player_id, *skill_id);
                 }
                 Some(GameEvent::SkillUse { player_id, skill_id: *skill_id as u16, used: *use_skill })
@@ -220,13 +223,11 @@ impl StepMissedPass {
                 // Java: Blast-It HMP re-roll dialog check:
                 // if (HAIL_MARY_PASS && ((hasUnusedBlastIt && usingBlastIt==null) || (hasBlastIt && usingBlastIt)) && !reRolling)
                 //     → reportDirectionRoll(); showDialog; reRolling=true; fieldModel.add(MoveSquare); return
-                // DEFERRED(util-cards): UtilCards.hasUnusedSkillWithProperty — waiting for ActingPlayer.used_skills
-                //   set to be wired so hasUnusedSkillWithProperty can be implemented.
-                // DEFERRED(pass-state): PassState.getUsingBlastIt() — PassState not yet translated.
-                // DEFERRED(dialog): UtilServerDialog.showDialog(DialogSkillUseParameter) — dialog infra not translated.
+                // client-only: Blast-It scatter re-roll dialog (DialogSkillUseParameter) — headless always falls through
+                // headless: using_blast_it stays None; ActingPlayer.used_skills wiring deferred
 
                 // Java: if (reRolling && doRoll) reportDirectionRoll()
-                // DEFERRED(report): ReportScatterBall (partial direction roll) — report infrastructure not translated.
+                // headless: ReportScatterBall (partial direction roll) — report infrastructure not translated.
 
                 // Java: rollList.add(roll); directionList.add(direction);
                 self.roll_list.push(self.roll);

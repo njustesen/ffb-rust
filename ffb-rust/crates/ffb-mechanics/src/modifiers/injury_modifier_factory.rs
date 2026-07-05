@@ -1,4 +1,4 @@
-use ffb_model::enums::Rules;
+use ffb_model::enums::{Rules, SkillId};
 use ffb_model::model::SpecialEffect;
 use ffb_model::model::{Game, Player};
 use crate::modifiers::injury_modifier::InjuryModifier;
@@ -8,6 +8,7 @@ use crate::modifiers::bb2016::injury_modifiers::Bb2016InjuryModifiers;
 use crate::modifiers::bb2020::injury_modifiers::Bb2020InjuryModifiers;
 use crate::modifiers::bb2025::injury_modifiers::Bb2025InjuryModifiers;
 use crate::modifiers::modifier_aggregator::ModifierAggregator;
+use crate::modifiers::static_injury_modifier_attacker::StaticInjuryModifierAttacker;
 
 /// 1:1 translation of com.fumbbl.ffb.factory.InjuryModifierFactory.
 pub struct InjuryModifierFactory {
@@ -30,27 +31,28 @@ impl InjuryModifierFactory {
             .find(|m| m.get_name() == name);
         if from_collection.is_some() { return from_collection; }
 
-        // DEFERRED: modifier_aggregator.get_injury_modifiers() always empty (SkillFactory not ported)
+        // headless: modifier_aggregator.get_injury_modifiers() always empty — SkillFactory not ported
         self.modifier_aggregator.get_injury_modifiers()
             .into_iter()
             .find(|m| m.get_name() == name)
     }
 
     /// Java: findInjuryModifiersWithoutNiggling — scans attacker then defender skills.
-    /// DEFERRED: skill.getInjuryModifiers() requires SkillFactory (not ported).
     pub fn find_injury_modifiers_without_niggling(
         &self,
-        _game: &Game,
-        _attacker: Option<&Player>,
-        _defender: &Player,
-        _is_stab: bool,
-        _is_foul: bool,
-        _is_vomit_like: bool,
-        _is_chainsaw: bool,
+        game: &Game,
+        attacker: Option<&Player>,
+        defender: &Player,
+        is_stab: bool,
+        is_foul: bool,
+        is_vomit_like: bool,
+        is_chainsaw: bool,
     ) -> Vec<Box<dyn InjuryModifier>> {
-        // DEFERRED: UtilCards.findAllSkills(attacker/defender).flatMap(skill.getInjuryModifiers)
-        // requires SkillFactory — returns empty for now.
-        vec![]
+        let mut context = InjuryModifierContext::new(game, attacker, defender, is_stab, is_foul, is_vomit_like, is_chainsaw);
+        let mut modifiers = get_injury_modifiers_from_skills(attacker, &context);
+        context.set_defender_mode();
+        modifiers.extend(get_injury_modifiers_from_skills(Some(defender), &context));
+        modifiers
     }
 
     /// Java: findInjuryModifiers — without-niggling + getNigglingInjuryModifier.
@@ -117,10 +119,64 @@ fn make_injury_modifiers(rules: Rules) -> Box<dyn InjuryModifiers> {
     }
 }
 
+/// Java: InjuryModifierFactory.getInjuryModifiers — iterates player skills in current mode.
+fn get_injury_modifiers_from_skills(
+    player: Option<&Player>,
+    context: &InjuryModifierContext,
+) -> Vec<Box<dyn InjuryModifier>> {
+    let Some(player) = player else { return vec![]; };
+    player
+        .all_skill_ids()
+        .filter_map(|skill_id| skill_to_injury_modifier(skill_id, context))
+        .collect()
+}
+
+/// Maps a SkillId to its injury modifier for the given context.
+/// Translates Java `Skill.getInjuryModifiers()` + `appliesToContext` per-skill logic.
+/// Note: the Java "either/or" check (InjuryContext.getArmorModifiers) is not yet ported;
+/// both armor and injury modifiers are offered independently.
+fn skill_to_injury_modifier(
+    skill_id: SkillId,
+    context: &InjuryModifierContext,
+) -> Option<Box<dyn InjuryModifier>> {
+    if context.is_defender_mode() { return None; }
+    match skill_id {
+        SkillId::MightyBlow => {
+            if context.is_foul || context.is_stab || context.is_vomit_like || context.is_chainsaw {
+                return None;
+            }
+            // BB2025: attacker must not be distracted.
+            if context.game.rules == Rules::Bb2025 {
+                if let Some(a) = context.attacker {
+                    if context.game.field_model.player_state(&a.id)
+                        .map_or(false, |s| s.is_distracted()) { return None; }
+                }
+            }
+            Some(Box::new(StaticInjuryModifierAttacker::new("Mighty Blow", 1, false)))
+        }
+        SkillId::DirtyPlayer => {
+            if context.is_foul {
+                Some(Box::new(StaticInjuryModifierAttacker::new("Dirty Player", 1, false)))
+            } else {
+                None
+            }
+        }
+        SkillId::LethalFlight => {
+            if !context.is_ttm { return None; }
+            let attacker = context.attacker?;
+            let attacker_team = context.game.player_team_id(&attacker.id);
+            let defender_team = context.game.player_team_id(&context.defender.id);
+            if attacker_team.is_none() || attacker_team == defender_team { return None; }
+            Some(Box::new(StaticInjuryModifierAttacker::new("Lethal Flight", 1, false)))
+        }
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffb_model::enums::{PlayerType, PlayerGender};
+    use ffb_model::enums::{PlayerType, PlayerGender, SkillId};
 
     fn dummy_player_with_nigglings(id: &str, count: i32) -> Player {
         Player {
@@ -181,5 +237,101 @@ mod tests {
         let mut f = InjuryModifierFactory::new(Rules::Bb2020);
         f.set_use_all(true);
         assert!(!f.special_effect_injury_modifiers(SpecialEffect::BOMB).is_empty());
+    }
+
+    fn bare_player(id: &str) -> Player {
+        dummy_player_with_nigglings(id, 0)
+    }
+
+    fn player_with_skill(id: &str, skill_id: SkillId) -> Player {
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut p = bare_player(id);
+        p.starting_skills = vec![SkillWithValue { skill_id, value: None }];
+        p
+    }
+
+    fn make_game(rules: Rules) -> Game {
+        use ffb_model::model::team::Team;
+        let home = Team {
+            id: "home".into(), name: "home".into(), race: "human".into(),
+            roster_id: "human".into(), coach: "c".into(),
+            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+            prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+            cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
+            team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
+        };
+        let away = home.clone();
+        Game::new(home, away, rules)
+    }
+
+    #[test]
+    fn find_injury_modifiers_mighty_blow_applies_on_block() {
+        let f = InjuryModifierFactory::new(Rules::Bb2025);
+        let game = make_game(Rules::Bb2025);
+        let attacker = player_with_skill("a", SkillId::MightyBlow);
+        let defender = bare_player("d");
+        let mods = f.find_injury_modifiers_without_niggling(&game, Some(&attacker), &defender, false, false, false, false);
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].get_name(), "Mighty Blow");
+    }
+
+    #[test]
+    fn find_injury_modifiers_mighty_blow_ignores_foul() {
+        let f = InjuryModifierFactory::new(Rules::Bb2025);
+        let game = make_game(Rules::Bb2025);
+        let attacker = player_with_skill("a", SkillId::MightyBlow);
+        let defender = bare_player("d");
+        let mods = f.find_injury_modifiers_without_niggling(&game, Some(&attacker), &defender, false, true, false, false);
+        assert!(mods.is_empty());
+    }
+
+    #[test]
+    fn find_injury_modifiers_mighty_blow_ignores_stab() {
+        let f = InjuryModifierFactory::new(Rules::Bb2025);
+        let game = make_game(Rules::Bb2025);
+        let attacker = player_with_skill("a", SkillId::MightyBlow);
+        let defender = bare_player("d");
+        let mods = f.find_injury_modifiers_without_niggling(&game, Some(&attacker), &defender, true, false, false, false);
+        assert!(mods.is_empty());
+    }
+
+    #[test]
+    fn find_injury_modifiers_dirty_player_applies_on_foul() {
+        let f = InjuryModifierFactory::new(Rules::Bb2025);
+        let game = make_game(Rules::Bb2025);
+        let attacker = player_with_skill("a", SkillId::DirtyPlayer);
+        let defender = bare_player("d");
+        let mods = f.find_injury_modifiers_without_niggling(&game, Some(&attacker), &defender, false, true, false, false);
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].get_name(), "Dirty Player");
+    }
+
+    #[test]
+    fn find_injury_modifiers_dirty_player_ignores_block() {
+        let f = InjuryModifierFactory::new(Rules::Bb2025);
+        let game = make_game(Rules::Bb2025);
+        let attacker = player_with_skill("a", SkillId::DirtyPlayer);
+        let defender = bare_player("d");
+        let mods = f.find_injury_modifiers_without_niggling(&game, Some(&attacker), &defender, false, false, false, false);
+        assert!(mods.is_empty());
+    }
+
+    #[test]
+    fn find_injury_modifiers_no_attacker_returns_empty() {
+        let f = InjuryModifierFactory::new(Rules::Bb2025);
+        let game = make_game(Rules::Bb2025);
+        let defender = bare_player("d");
+        let mods = f.find_injury_modifiers_without_niggling(&game, None, &defender, false, false, false, false);
+        assert!(mods.is_empty());
+    }
+
+    #[test]
+    fn find_injury_modifiers_chainsaw_skips_mighty_blow() {
+        let f = InjuryModifierFactory::new(Rules::Bb2025);
+        let game = make_game(Rules::Bb2025);
+        let attacker = player_with_skill("a", SkillId::MightyBlow);
+        let defender = bare_player("d");
+        let mods = f.find_injury_modifiers_without_niggling(&game, Some(&attacker), &defender, false, false, false, true);
+        assert!(mods.is_empty());
     }
 }

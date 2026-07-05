@@ -15,7 +15,7 @@
 /// Param: BOMB_OUT_OF_BOUNDS.
 /// Publishes: CATCHER_ID, BOMB_EXPLODED.
 ///
-/// DEFERRED(bloodSpot): BloodSpot/PlayerState.HIT_BY_BOMB not yet ported.
+/// client-only: BloodSpot / PS_HIT_BY_BOMB — field model visual decoration, client display only.
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -67,7 +67,7 @@ impl StepInitBomb {
                 // Clear bomb from field.
                 let coord = self.bomb_coordinate.unwrap();
                 game.field_model.bomb_coordinate = None;
-                // DEFERRED(bloodSpot): BloodSpot(HIT_BY_BOMB) not yet ported.
+                // client-only: BloodSpot(HIT_BY_BOMB) — field model visual decoration, client display only
 
                 // Collect affected players: the bomb square + all 8 adjacent squares.
                 let mut coords = vec![coord];

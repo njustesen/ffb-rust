@@ -218,7 +218,7 @@ impl StepThenIStartedBlastin {
     fn fail(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         if self.roll == 1 {
             // Java: hitPlayer(actingPlayer) — fumbled keg hits self
-            // DEFERRED(tisb): setAnimation(FUMBLED_KEG, throwerCoordinate)
+            // client-only: setAnimation(FUMBLED_KEG, throwerCoordinate)
             if let Some(actor_id) = game.acting_player.player_id.clone() {
                 return self.hit_player(game, rng, &actor_id);
             }
@@ -226,7 +226,7 @@ impl StepThenIStartedBlastin {
         } else {
             // Java: flip home_playing; return Continue (ask for target again)
             game.home_playing = !game.home_playing;
-            // DEFERRED(tisb): setSound(QUESTION)
+            // client-only: setSound(QUESTION)
             StepOutcome::cont()
         }
     }
@@ -271,8 +271,8 @@ impl StepThenIStartedBlastin {
             ..DropPlayerContext::new()
         };
 
-        // DEFERRED(tisb): setSound(EXPLODE)
-        // DEFERRED(tisb): setAnimation(THEN_I_STARTED_BLASTIN, startCoord, targetCoord)
+        // client-only: setSound(EXPLODE)
+        // client-only: setAnimation(THEN_I_STARTED_BLASTIN, startCoord, targetCoord)
 
         self.restore_turn_modes(game);
 

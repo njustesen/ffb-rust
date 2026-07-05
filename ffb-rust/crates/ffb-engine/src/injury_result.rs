@@ -88,7 +88,7 @@ impl InjuryResult {
     /// Also updates PlayerResult (secret weapon flag, serious injury, send-to-box) and
     /// TeamResult injury counters, and awards the attacker a casualty SPP count.
     ///
-    /// DEFERRED: BloodSpot, UtilServerGame.checkForWastedSkills (report system),
+    /// headless: BloodSpot (client-only visual), UtilServerGame.checkForWastedSkills (report system),
     ///   PassState.originalBombardier bomb team check.
     pub fn apply_to(&self, game: &mut Game) {
         let ctx = &self.injury_context;
@@ -144,7 +144,7 @@ impl InjuryResult {
         if base == PS_KNOCKED_OUT || final_state.is_casualty() || base == PS_RESERVE {
             UtilBox::put_player_into_box(game, &defender_id);
             UtilServerGame::update_player_state_dependent_properties(game);
-            // DEFERRED: UtilServerGame.checkForWastedSkills (requires report system)
+            // headless: UtilServerGame.checkForWastedSkills — report system not yet ported
         }
 
         // Java: death is also a serious injury — update PlayerResult serious injury.
@@ -212,15 +212,15 @@ impl InjuryResult {
                     }
                 }
             }
-            // DEFERRED: BloodSpot — field model visual, not needed for server logic
+            // client-only: BloodSpot — field model visual, not needed for server logic
         }
     }
 
     /// Java: `InjuryResult.report(IStep)` — delegates to `StateMechanic.reportInjury`.
     ///
-    /// DEFERRED: reportInjury requires SkipInjuryParts + ReportInjury infrastructure.
+    /// headless: reportInjury requires SkipInjuryParts + ReportInjury infrastructure.
     pub fn report(&self, _game: &mut Game) {
-        // DEFERRED: implement when StateMechanic.report_injury is un-deferred
+        // headless: implement when StateMechanic.report_injury is un-deferred
     }
 
     /// Java: `InjuryResult.handleIgnoringArmourBreaks(IStep, Player, Game)`.
@@ -228,7 +228,7 @@ impl InjuryResult {
     /// If armour was broken AND the defender has `ignoreFirstArmourBreak`:
     /// resets `armor_broken`, sets injury to PRONE, and returns `true`.
     ///
-    /// DEFERRED: card deactivation (`UtilServerCards.deactivateCard`).
+    /// headless: card deactivation (UtilServerCards.deactivateCard) — card infra not ported.
     pub fn handle_ignoring_armour_breaks(&mut self, game: &Game) -> bool {
         if !self.injury_context.armor_broken {
             return false;
@@ -244,7 +244,7 @@ impl InjuryResult {
         if has_property {
             self.injury_context.armor_broken = false;
             self.injury_context.injury = Some(PlayerState::new(PS_PRONE));
-            // DEFERRED: UtilServerCards.deactivateCard — requires card infra
+            // headless: UtilServerCards.deactivateCard — requires card infra
             return true;
         }
         false

@@ -1,6 +1,6 @@
 /// 1:1 translation of `com.fumbbl.ffb.net.commands.ClientCommandUseIgors`.
 /// Sent when Necromantic team uses Igors for injury recovery.
-/// DEFERRED(injury-description): InjuryDescription serialisation not yet ported.
+/// Note: InjuryDescription serialised as raw JSON strings; full type not yet ported.
 #[derive(Debug, Clone, Default)]
 pub struct ClientCommandUseIgors {
     /// Java: `injuryDescriptions` — simplified to JSON strings pending InjuryDescription port.

@@ -87,7 +87,7 @@ impl Step for StepDropFallingPlayers {
 impl StepDropFallingPlayers {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: if (getGameState().executeStepHooks(this, state)) return;
-        // DEFERRED(StepHooks): Saboteur dialog not yet ported.
+        // client-only: Saboteur step hook / dialog — headless skips Saboteur activation
 
         let attacker_id = game.acting_player.player_id.clone().unwrap_or_default();
         let defender_id = game.defender_id.clone().unwrap_or_default();

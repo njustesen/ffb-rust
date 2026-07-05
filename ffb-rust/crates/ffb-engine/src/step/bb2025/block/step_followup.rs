@@ -227,7 +227,7 @@ impl StepFollowup {
                         }
                         game.field_model.set_player_coordinate(attacker_id, followup_coord);
                         UtilServerPlayerMove::update_move_squares(game, false);
-                        // DEFERRED(animation-client): TrackNumber for BLITZ action not yet ported
+                        // client-only: TrackNumber for BLITZ action
                         outcome = outcome.publish(StepParameter::PlayerEnteringSquare(attacker_id.clone()));
                     }
                 }

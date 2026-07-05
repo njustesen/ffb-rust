@@ -1,6 +1,6 @@
 /// 1:1 translation of `com.fumbbl.ffb.net.commands.ClientCommandUpdatePlayerMarkings`.
 /// Sent to update automatic player marking settings.
-/// DEFERRED(sort-mode): SortMode not re-exported from ffb_model root; use name string.
+/// Note: SortMode stored as name string (ffb_model::marking::sort_mode::SortMode available if needed).
 #[derive(Debug, Clone, Default)]
 pub struct ClientCommandUpdatePlayerMarkings {
     /// Java: `auto`

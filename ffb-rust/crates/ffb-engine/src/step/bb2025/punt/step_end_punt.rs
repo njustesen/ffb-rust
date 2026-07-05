@@ -49,7 +49,7 @@ impl Step for StepEndPunt {
 
 impl StepEndPunt {
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // DEFERRED: UtilServerDialog.hideDialog(gameState)
+        // client-only: UtilServerDialog.hideDialog(gameState)
         // Java: endTurn |= UtilServerSteps.checkTouchdown(gameState)
         self.end_turn |= check_touchdown(game);
 

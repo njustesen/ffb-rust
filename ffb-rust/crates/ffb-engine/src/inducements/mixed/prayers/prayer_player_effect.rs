@@ -56,6 +56,7 @@ mod tests {
     use super::*;
     use ffb_model::enums::Rules;
     use ffb_model::model::player::Player;
+    use ffb_model::model::player_status::PlayerStatus;
     use ffb_model::enums::{PlayerType, PlayerGender};
     use crate::step::framework::test_team;
 
@@ -70,6 +71,7 @@ mod tests {
             player_type: PlayerType::Regular,
             gender: PlayerGender::Male,
             movement, strength: 3, agility: 3, passing: 4, armour,
+            player_status: PlayerStatus::ACTIVE,
             ..Default::default()
         };
         if team_id == "home" { game.team_home.players.push(p); }

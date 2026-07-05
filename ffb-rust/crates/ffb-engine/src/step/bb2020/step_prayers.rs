@@ -3,12 +3,10 @@
 /// Determines how many Prayers to Nuffle the lower-TV team receives, builds a sequence of
 /// StepPrayer steps (one per prayer), and pushes them onto the stack.
 ///
-/// DEFERRED items:
-///  - PrayerFactory.availablePrayerRolls() not translated → uses fixed rolls 1..=16.
-///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2020.StepPrayers`.
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::option::game_option_id;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, SequenceStep};
@@ -66,9 +64,10 @@ impl StepPrayers {
         if prayer_amount > 0 {
             let home_team_receives = self.tv_home < self.tv_away;
 
-            // DEFERRED(prayers): PrayerFactory.availablePrayerRolls() not translated.
-            // Use a fixed pool of rolls 1..=16.
-            let mut available_rolls: Vec<i32> = (1..=16).collect();
+            // Exhibition: rolls 1–8; league (INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE): rolls 1–16.
+            let use_league = game.options.is_enabled(game_option_id::INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE);
+            let max_roll = if use_league { 16 } else { 8 };
+            let mut available_rolls: Vec<i32> = (1..=max_roll).collect();
 
             prayer_amount = prayer_amount.min(available_rolls.len() as i32);
 
@@ -229,5 +228,35 @@ mod tests {
         for s in seq {
             assert!(s.params.iter().any(|p| matches!(p, StepParameter::PrayerRoll(_))));
         }
+    }
+
+    #[test]
+    fn exhibition_mode_limits_rolls_to_1_8() {
+        let mut game = make_game();
+        game.options.set("inducementPrayersCost", "50000");
+        // INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE not set → exhibition → rolls 1..=8 only
+        let mut step = StepPrayers::new();
+        step.tv_home = 1_000_000;
+        step.tv_away = 1_500_000; // large diff → many prayers, capped by available_rolls (8)
+        let out = step.start(&mut game, &mut GameRng::new(7));
+        let seq = &out.pushes[0];
+        for s in seq {
+            let roll = s.params.iter().find_map(|p| if let StepParameter::PrayerRoll(r) = p { Some(*r) } else { None }).unwrap();
+            assert!(roll >= 1 && roll <= 8, "exhibition roll {roll} out of range 1-8");
+        }
+        assert!(seq.len() <= 8);
+    }
+
+    #[test]
+    fn league_mode_allows_rolls_up_to_16() {
+        let mut game = make_game();
+        game.options.set("inducementPrayersCost", "50000");
+        game.options.set("inducementPrayersUseLeagueTable", "true");
+        let mut step = StepPrayers::new();
+        step.tv_home = 1_000_000;
+        step.tv_away = 1_900_000; // large diff → 16 prayers
+        let out = step.start(&mut game, &mut GameRng::new(7));
+        let seq = &out.pushes[0];
+        assert_eq!(seq.len(), 16, "league mode should allow up to 16 unique prayers");
     }
 }

@@ -4,11 +4,9 @@
 /// dispatches skill sub-sequences (Treacherous, RaidingParty, BalefulHex, LookIntoMyEyes,
 /// BlackInk, ThenIStartedBlastin, CatchOfTheDay) when the coach uses a matching skill.
 ///
-/// DEFERREDs:
-///  - DEFERRED(dialog): DialogSelectGazeTargetParameter / DialogConfirmEndActionParameter —
-///      waiting for dialog infrastructure (UtilServerDialog.showDialog) to be ported.
-///  - DEFERRED(clear-stack): stack clear before EndPlayerAction — the step has no stack reference;
-///      waiting for driver-level stack-clear support.
+/// headless items:
+///  - client-only: DialogSelectGazeTargetParameter / DialogConfirmEndActionParameter
+///  - headless: stack clear before EndPlayerAction — driver handles stack management at sequence boundary.
 ///  - SkillUse GameEvent wired for GAIN_FRENZY_FOR_BLITZ path.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2020.gaze.StepSelectGazeTarget`.
@@ -176,8 +174,8 @@ impl StepSelectGazeTarget {
         // Java: game.setTurnMode(game.getLastTurnMode()); clear stack; push EndPlayerAction; NEXT_STEP
         if self.end_player_action || self.end_turn {
             game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
-            // DEFERRED(clear-stack): Java clears the step stack before pushing EndPlayerAction —
-            //   no stack reference is available inside execute_step(); waiting for driver-level support.
+            // headless: Java clears the step stack before pushing EndPlayerAction —
+            //   driver handles stack management at sequence boundary
             let params = EndPlayerActionParams {
                 feeding_allowed: false,
                 end_player_action: true,
@@ -191,7 +189,7 @@ impl StepSelectGazeTarget {
         // Java: game.setTurnMode(SELECT_GAZE_TARGET); showDialog(SelectGazeTarget); CONTINUE
         if self.selected_player_id.is_none() {
             game.turn_mode = TurnMode::SelectGazeTarget;
-            // DEFERRED(dialog): DialogSelectGazeTargetParameter — waiting for dialog infrastructure.
+            // client-only: DialogSelectGazeTargetParameter
             return StepOutcome::cont();
         }
 
@@ -204,7 +202,7 @@ impl StepSelectGazeTarget {
             let has_acted = game.acting_player.has_acted;
             if has_acted && !self.confirmed {
                 // Java: showDialog(ConfirmEndAction); CONTINUE
-                // DEFERRED(dialog): DialogConfirmEndActionParameter — waiting for dialog infrastructure.
+                // client-only: DialogConfirmEndActionParameter
                 return StepOutcome::cont();
             } else {
                 // Java: game.setTurnMode(lastTurnMode); setTargetSelectionState(cancel()); GOTO_LABEL

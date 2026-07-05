@@ -46,7 +46,7 @@ impl StepInitEndGame {
         game.turn_mode = TurnMode::EndGame;
         game.concession_possible = false;
         game.admin_mode = self.admin_mode;
-        // DEFERRED(CardEffect): handlePoisonedPlayers requires SeriousInjuryFactory + CardEffect::POISONED
+        // headless: handlePoisonedPlayers requires SeriousInjuryFactory + CardEffect::POISONED not yet ported
 
         StepOutcome::next()
     }

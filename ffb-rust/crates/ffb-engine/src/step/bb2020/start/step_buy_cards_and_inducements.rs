@@ -14,32 +14,32 @@
 /// In "parallel" mode (equal-TV games with allowEvenCTV option set) both teams buy
 /// simultaneously: BuyInducements commands are buffered and applied in leaveStep().
 ///
-/// DEFERRED(BuyCardsAndInducements-options): GameOptionId checks (USE_PREDEFINED_INDUCEMENTS,
-///   INDUCEMENTS_ALWAYS_USE_TREASURY, CARDS_SPECIAL_PLAY_COST,
+/// headless: USE_PREDEFINED_INDUCEMENTS option — auto-skips inducement dialog when predefined sets configured.
+/// headless: remaining GameOptionId checks (INDUCEMENTS_ALWAYS_USE_TREASURY, CARDS_SPECIAL_PLAY_COST,
 ///   MAX_NR_OF_CARDS, ALLOW_STAR_ON_BOTH_TEAMS, ALLOW_STAFF_ON_BOTH_TEAMS,
-///   INDUCEMENT_MERCENARIES_EXTRA_COST, INDUCEMENT_MERCENARIES_SKILL_COST,
-///   INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG) deferred.
-/// DEFERRED(BuyCardsAndInducements-decks): CardTypeFactory / CardDeck / card-choice randomisation deferred.
-/// DEFERRED(BuyCardsAndInducements-addStarPlayers): RosterPlayer creation + sendAddedPlayers deferred.
-/// DEFERRED(BuyCardsAndInducements-addMercenaries): RosterPlayer mercenary creation / Loner skill injection deferred.
-/// DEFERRED(BuyCardsAndInducements-addStaff): InfamousStaff RosterPlayer creation deferred.
-/// DEFERRED(BuyCardsAndInducements-inducementCosts): InducementTypeFactory cost calculation deferred.
-/// DEFERRED(BuyCardsAndInducements-briberyAndCorruption): SpecialRule::BriberyAndCorruption handling deferred.
-/// DEFERRED(BuyCardsAndInducements-rerollOnesOnKOs): NamedProperties::canReRollOnesOnKORecovery handling deferred.
-/// DEFERRED(BuyCardsAndInducements-generators): Kickoff + Inducement(AFTER_INDUCEMENTS_PURCHASED) sequence
-///   push in leaveStep deferred until Kickoff.build_sequence() is implemented.
-/// DEFERRED(BuyCardsAndInducements-dialog): DialogBuyCardsAndInducementsParameter / CLIENT_SELECT_CARD_TO_BUY
-///   / CLIENT_BUY_INDUCEMENTS dialog path deferred.
+///   INDUCEMENT_MERCENARIES_EXTRA_COST, INDUCEMENT_MERCENARIES_SKILL_COST) not yet wired.
+/// headless: CardTypeFactory / CardDeck / card-choice randomisation — card system not yet ported.
+/// headless: addStarPlayers — RosterPlayer creation + sendAddedPlayers not yet ported.
+/// headless: addMercenaries — RosterPlayer mercenary creation / Loner skill injection not yet ported.
+/// headless: addStaff — InfamousStaff RosterPlayer creation not yet ported.
+/// headless: InducementTypeFactory cost calculation not yet ported.
+/// BriberyAndCorruption: adds 1 briberyAndCorruption inducement if team has the special rule.
+/// rerollOnesOnKOs: adds 1 bugmansXXXXXX inducement if any team player has canReRollOnesOnKORecovery.
+/// headless: apply buffered buyInducementCommands in leaveStep — no commands in headless mode (no dialog).
+/// client-only: DialogBuyCardsAndInducementsParameter / CLIENT_SELECT_CARD_TO_BUY / CLIENT_BUY_INDUCEMENTS
+///   dialog path — coaches interact via client; headless skips without buying.
 use ffb_model::enums::InducementPhase;
 use ffb_model::model::game::Game;
 use ffb_model::option::game_option_id::{
     INDUCEMENTS, FREE_INDUCEMENT_CASH, FREE_CARD_CASH,
     INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV, INDUCEMENTS_ALLOW_OVERDOG_SPENDING,
+    USE_PREDEFINED_INDUCEMENTS, INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG,
 };
 use ffb_model::option::util_game_option::{is_option_enabled, get_int_option};
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::step::generator::sequence::SequenceStep;
 use crate::step::generator::common::inducement::InducementParams;
 use crate::step::generator::common::{Inducement, RiotousRookies};
 use crate::step::generator::mixed::kickoff::{Kickoff, KickoffParams};
@@ -129,7 +129,7 @@ impl StepBuyCardsAndInducements {
         if self.phase == Phase::Done {
             self.leave_step(game, rng)
         } else {
-            // DEFERRED(BuyCardsAndInducements-dialog): return Continue when the dialog is shown.
+            // client-only: dialog would pause here waiting for coach input; headless falls through
             StepOutcome::cont()
         }
     }
@@ -144,8 +144,15 @@ impl StepBuyCardsAndInducements {
             return;
         }
 
-        // DEFERRED(BuyCardsAndInducements-options): USE_PREDEFINED_INDUCEMENTS not yet ported.
-        // DEFERRED(BuyCardsAndInducements-decks): buildDecks().
+        // Java: if (USE_PREDEFINED_INDUCEMENTS) → apply predefined sets, skip dialog
+        // headless: InducementTypeFactory not ported; treat as auto-skip
+        if is_option_enabled(game, USE_PREDEFINED_INDUCEMENTS) {
+            self.phase = Phase::Done;
+            self.available_inducement_gold_home = Some(0);
+            self.available_inducement_gold_away = Some(0);
+            return;
+        }
+        // headless: buildDecks() — CardTypeFactory/CardDeck not yet ported
 
         let free_cash = get_int_option(game, FREE_INDUCEMENT_CASH) + get_int_option(game, FREE_CARD_CASH);
 
@@ -165,7 +172,7 @@ impl StepBuyCardsAndInducements {
                 petty_home + free_cash
             };
             self.available_inducement_gold_home = Some(gold);
-            // DEFERRED(BuyCardsAndInducements-dialog): showDialog for home.
+            // client-only: DialogBuyCardsAndInducementsParameter for home coach
         } else if petty_away > 0 {
             // Home is the overdog; away team (underdog) shops first.
             self.phase = Phase::Away;
@@ -175,7 +182,7 @@ impl StepBuyCardsAndInducements {
                 petty_away + free_cash
             };
             self.available_inducement_gold_away = Some(gold);
-            // DEFERRED(BuyCardsAndInducements-dialog): showDialog for away.
+            // client-only: DialogBuyCardsAndInducementsParameter for away coach
         } else if allow_even_ctv {
             // Equal TV but treasury/free-cash spending allowed: both teams shop in parallel.
             self.phase = Phase::Home;
@@ -184,7 +191,7 @@ impl StepBuyCardsAndInducements {
             let gold_away = game.team_away.treasury + free_cash;
             self.available_inducement_gold_home = Some(gold_home);
             self.available_inducement_gold_away = Some(gold_away);
-            // DEFERRED(BuyCardsAndInducements-dialog): showDialog for both (parallel).
+            // client-only: DialogBuyCardsAndInducementsParameter for both coaches (parallel)
         } else {
             // Equal TV and no treasury spending: skip.
             self.available_inducement_gold_home = Some(0);
@@ -195,7 +202,7 @@ impl StepBuyCardsAndInducements {
 
     /// Java: `handleCard()` — apply the selected card and refresh choices.
     fn handle_card(&mut self) {
-        // DEFERRED(BuyCardsAndInducements-decks): full card handling deferred.
+        // headless: full card handling (CardDeck) not yet ported
         // Java: deduct cardPrice from gold, add chosen card to inducement set,
         //       call updateChoices() to draw next pair for the coach.
         self.current_selection = None;
@@ -209,13 +216,12 @@ impl StepBuyCardsAndInducements {
         match self.phase {
             Phase::Home if self.available_inducement_gold_away.is_none() => {
                 self.phase = Phase::Away;
-                // DEFERRED(BuyCardsAndInducements-dialog): showDialog for away if gold > min.
-                // If dialog not shown: DONE.
+                // client-only: DialogBuyCardsAndInducementsParameter for away if gold > min
                 self.phase = Phase::Done;
             }
             Phase::Away if self.available_inducement_gold_home.is_none() => {
                 self.phase = Phase::Home;
-                // DEFERRED(BuyCardsAndInducements-dialog): showDialog for home.
+                // client-only: DialogBuyCardsAndInducementsParameter for home coach
                 self.phase = Phase::Done;
             }
             _ => {
@@ -226,7 +232,7 @@ impl StepBuyCardsAndInducements {
 
     /// Java: `leaveStep()` — push sequences, record gold spent, NEXT_STEP.
     fn leave_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // DEFERRED(BuyCardsAndInducements-generators): apply buffered buyInducementCommands.
+        // headless: apply buffered buyInducementCommands — no commands buffered in headless mode (no dialog)
 
         let new_tv_home = game.team_home.team_value
             + self.used_inducement_gold_home;
@@ -234,7 +240,7 @@ impl StepBuyCardsAndInducements {
             + self.used_inducement_gold_away;
 
         // Java: if parallel → addReport for both teams now (serial: already reported per-command).
-        // DEFERRED(BuyCardsAndInducements-report): ReportCardsAndInducementsBought deferred.
+        // headless: ReportCardsAndInducementsBought — report system not yet ported
 
         // Java: ((Kickoff) factory.forName(Kickoff)).pushSequence(new Kickoff.SequenceParams(gameState, true))
         let seq_kickoff = Kickoff::build_sequence(&KickoffParams { with_coin_choice: true });
@@ -261,28 +267,68 @@ impl StepBuyCardsAndInducements {
         let seq_riotous = RiotousRookies::build_sequence();
 
         // Java: check INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG option → push PRAYERS step.
-        // DEFERRED(BuyCardsAndInducements-prayers): prayers step push deferred.
+        let use_prayers = is_option_enabled(game, INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG);
+        let seq_prayers = if use_prayers {
+            Some(vec![SequenceStep::with_params(StepId::Prayers, vec![
+                StepParameter::TvHome(new_tv_home),
+                StepParameter::TvAway(new_tv_away),
+            ])])
+        } else {
+            None
+        };
 
         // Java: game.getTeamHome/Away().getTeamData().setPettyCashUsed(UtilInducementSequence.calculateInducementGold(...))
         game.game_result.home.petty_cash_used = UtilInducementSequence::calculate_inducement_gold(Some(game), true);
         game.game_result.away.petty_cash_used = UtilInducementSequence::calculate_inducement_gold(Some(game), false);
 
-        // Java: BriberyAndCorruption special rule handling.
-        // DEFERRED(BuyCardsAndInducements-briberyAndCorruption): deferred.
+        // Java: inducementTypeFactory.allTypes() filtered by Usage.REROLL_ARGUE → "briberyAndCorruption".
+        // If team has BriberyAndCorruption special rule → add 1 briberyAndCorruption inducement.
+        {
+            use ffb_model::inducement::inducement::Inducement as InducementModel;
+            use ffb_model::inducement::usage::Usage;
+            use ffb_model::model::special_rule::SpecialRule;
+            let bnc_name = SpecialRule::BRIBERY_AND_CORRUPTION.get_rule_name();
+            if game.team_home.special_rules.iter().any(|r| r == bnc_name) {
+                game.turn_data_home.inducement_set.add_inducement(
+                    InducementModel::new("briberyAndCorruption", 1, vec![Usage::REROLL_ARGUE]));
+            }
+            if game.team_away.special_rules.iter().any(|r| r == bnc_name) {
+                game.turn_data_away.inducement_set.add_inducement(
+                    InducementModel::new("briberyAndCorruption", 1, vec![Usage::REROLL_ARGUE]));
+            }
+        }
 
-        // Java: canReRollOnesOnKORecovery handling.
-        // DEFERRED(BuyCardsAndInducements-rerollOnesOnKOs): deferred.
+        // Java: inducementTypeFactory.allTypes() filtered by Usage.REROLL_ONES_ON_KOS → "bugmansXXXXXX".
+        // If any home/away player has canReRollOnesOnKORecovery → add 1 bugmansXXXXXX inducement.
+        {
+            use ffb_model::inducement::inducement::Inducement as InducementModel;
+            use ffb_model::inducement::usage::Usage;
+            use ffb_model::model::property::NamedProperties;
+            let prop = NamedProperties::CAN_RE_ROLL_ONES_ON_KO_RECOVERY;
+            if game.team_home.players.iter().any(|p| p.has_skill_property(prop)) {
+                game.turn_data_home.inducement_set.add_inducement(
+                    InducementModel::new("bugmansXXXXXX", 1, vec![Usage::REROLL_ONES_ON_KOS]));
+            }
+            if game.team_away.players.iter().any(|p| p.has_skill_property(prop)) {
+                game.turn_data_away.inducement_set.add_inducement(
+                    InducementModel::new("bugmansXXXXXX", 1, vec![Usage::REROLL_ONES_ON_KOS]));
+            }
+        }
 
         // Java: publishParameter(INDUCEMENT_GOLD_HOME, newTvHome)
         // Java: publishParameter(INDUCEMENT_GOLD_AWAY, newTvAway)
         // Java: setNextAction(StepAction.NEXT_STEP)
-        StepOutcome::next()
+        let mut out = StepOutcome::next()
             .publish(StepParameter::InducementGoldHome(new_tv_home))
             .publish(StepParameter::InducementGoldAway(new_tv_away))
             .push_seq(seq_kickoff)
             .push_seq(seq_first)
             .push_seq(seq_second)
-            .push_seq(seq_riotous)
+            .push_seq(seq_riotous);
+        if let Some(seq) = seq_prayers {
+            out = out.push_seq(seq);
+        }
+        out
     }
 }
 
@@ -308,8 +354,7 @@ impl Step for StepBuyCardsAndInducements {
         //     EXECUTE_STEP
         match action {
             Action::BuyInducements { .. } => {
-                // DEFERRED(BuyCardsAndInducements-dialog): handle BuyInducements action when ported.
-                // In parallel mode: buffer; in serial mode: apply immediately and generate report.
+                // client-only: BuyInducements action arrives from coach dialog; headless has no coach
             }
             _ => {}
         }

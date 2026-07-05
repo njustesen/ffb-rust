@@ -9,8 +9,8 @@
 ///   THROWN_PLAYER_HAS_BALL, THROWN_PLAYER_COORDINATE, THROW_SCATTER.
 /// Optional init: IS_KICKED_PLAYER.
 ///
-/// DEFERRED(scatter): UtilThrowTeamMateSequence.scatterPlayer/kickPlayer not yet ported.
-/// DEFERRED(injury): UtilServerInjury.handleInjury for hit player not yet ported.
+/// headless: UtilThrowTeamMateSequence.scatterPlayer/kickPlayer not yet ported.
+/// headless: UtilServerInjury.handleInjury for hit player — TTM scatter injury not yet implemented.
 /// Animation/syncGameModel are client-side only; no server state change.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -52,7 +52,7 @@ impl StepInitScatterPlayer {
         if self.thrown_player_id.is_none() || self.thrown_player_coordinate.is_none() {
             return StepOutcome::next();
         }
-        // DEFERRED(scatter): UtilThrowTeamMateSequence scatter / kickPlayer / in-bounds / out-of-bounds logic not yet ported.
+        // headless: UtilThrowTeamMateSequence scatter/kickPlayer/in-bounds/out-of-bounds logic not yet ported
         // Always publish the carried parameters so downstream steps can consume them.
         StepOutcome::next()
             .publish(StepParameter::ThrownPlayerId(self.thrown_player_id.clone()))

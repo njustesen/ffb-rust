@@ -43,7 +43,7 @@ impl StepQuickBite {
         }
     }
 
-    fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let catcher_id = match &self.catcher_id {
             Some(id) => id.clone(),
             None => return StepOutcome::next(),
@@ -72,10 +72,8 @@ impl StepQuickBite {
 
             self.player_ids.extend(opponents);
 
-            // DEFERRED(dialog port): UtilServerDialog.showDialog
-            //   - 1 opponent: DialogSkillUseParameter(firstOpponent.getId(), skill, 0) → CONTINUE
-            //   - 2+ opponents: DialogPlayerChoiceParameter(team_id, QUICK_BITE, opponents, null, 1) → CONTINUE
-            // Until dialog is ported, fall through to NEXT_STEP so we don't block the game.
+            // client-only: DialogSkillUseParameter / DialogPlayerChoiceParameter for QuickBite —
+            //   headless falls through without dialog interaction
             return StepOutcome::next();
         } else if self.use_skill == Some(true) {
             // Java: player.markUsed(skill, game)
@@ -83,15 +81,42 @@ impl StepQuickBite {
                 game.mark_skill_used(pid, ffb_model::enums::SkillId::QuickBite);
             }
 
-            // DEFERRED(UtilServerInjury port): UtilServerInjury.handleInjury(this, InjuryTypeQuickBite,
-            //   player, catcher, fieldModel.getPlayerCoordinate(catcher), null, null, ApothecaryMode.QUICK_BITE)
-            // publishParameter(DROP_PLAYER_CONTEXT, new DropPlayerContext(injuryResult, false, false, null,
-            //   catcherId, ApothecaryMode.QUICK_BITE, true))
-            // if (injuryResult.injuryContext().isArmorBroken()) {
-            //   game.fieldModel.setBallCoordinate(game.fieldModel.getPlayerCoordinate(player))
-            //   if (touchback) → publish TOUCHBACK
-            //   else → publish PLAYER_ID(playerId) + REVERT_END_TURN(true if player.team == actingTeam)
-            // }
+            if let Some(ref player_id) = self.player_id.clone() {
+                let catcher_coord = game.field_model.player_coordinate(&catcher_id)
+                    .unwrap_or(ffb_model::types::FieldCoordinate::new(5, 5));
+                let injury_result = crate::step::util_server_injury::handle_injury_by_name(
+                    game,
+                    rng,
+                    "quickBite",
+                    Some(player_id),
+                    &catcher_id,
+                    catcher_coord,
+                    None,
+                    None,
+                    ffb_model::enums::ApothecaryMode::QuickBite,
+                );
+                let is_armor_broken = injury_result.injury_context.armor_broken;
+                let drop_ctx = crate::drop_player_context::DropPlayerContext::with_injury(
+                    injury_result,
+                    catcher_id.clone(),
+                    ffb_model::enums::ApothecaryMode::QuickBite,
+                    true,
+                );
+                let mut outcome = StepOutcome::next()
+                    .publish(StepParameter::DropPlayerContext(Box::new(drop_ctx)));
+
+                if is_armor_broken {
+                    // Java: setBallCoordinate to player's coordinate + PLAYER_ID + REVERT_END_TURN
+                    if let Some(player_coord) = game.field_model.player_coordinate(player_id) {
+                        game.field_model.ball_coordinate = Some(player_coord);
+                    }
+                    let attacker_on_acting_team = game.home_playing == game.team_home.has_player(player_id);
+                    outcome = outcome
+                        .publish(StepParameter::PlayerId(player_id.clone()))
+                        .publish(StepParameter::RevertEndTurn(attacker_on_acting_team));
+                }
+                return outcome;
+            }
         }
 
         StepOutcome::next()
@@ -105,11 +130,11 @@ impl Default for StepQuickBite {
 impl Step for StepQuickBite {
     fn id(&self) -> StepId { StepId::QuickBite }
 
-    fn start(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game)
+    fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
             // Java: CLIENT_PLAYER_CHOICE — array of selected player IDs
             Action::PlayerChoice { player_ids, .. } => {
@@ -130,7 +155,7 @@ impl Step for StepQuickBite {
             }
             _ => {}
         }
-        self.execute_step(game)
+        self.execute_step(game, rng)
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {

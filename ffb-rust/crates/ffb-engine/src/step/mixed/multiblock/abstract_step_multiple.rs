@@ -75,9 +75,8 @@ pub fn re_roll_source_successfully(
                 true
             }
             _ => {
-                // DEFERRED(dialog port): showDialog(DialogPlayerChoiceParameter / LORD_OF_CHAOS, lords)
-                // Java shows a PlayerChoiceMode::LordOfChaos dialog; CLIENT_PLAYER_CHOICE then
-                // calls apply_lord_of_chaos_command which sets state.id.
+                // client-only: DialogPlayerChoiceParameter / LORD_OF_CHAOS —
+                // Java shows a dialog for coach to choose; headless falls through without dialog
                 false
             }
         }

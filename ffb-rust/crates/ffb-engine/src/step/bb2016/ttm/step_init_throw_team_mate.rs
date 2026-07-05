@@ -53,7 +53,7 @@ impl StepInitThrowTeamMate {
             if let Some(target) = self.target_coordinate {
                 // Phase 2: target chosen → set pass coordinate.
                 game.pass_coordinate = Some(target);
-                // DEFERRED(rangeRuler): UtilRangeRuler.createRangeRuler not yet ported.
+                // client-only: UtilRangeRuler.createRangeRuler — range ruler is client-side display only
                 return StepOutcome::next();
             } else {
                 // Phase 1: player chosen — set up defender, publish parameters.

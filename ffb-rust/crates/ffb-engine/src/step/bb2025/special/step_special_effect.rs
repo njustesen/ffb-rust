@@ -6,12 +6,12 @@
 /// BB2025 differences vs BB2016:
 ///   - FIREBALL: publishes SteadyFootingContext(InjuryResult) instead of InjuryResult directly.
 ///   - BOMB: complex suppressEndTurn logic + SteadyFootingContext; SPP tracking via
-///     InjuryTypeBombWithModifierForSpp when bombardier gets SPPs (DEFERRED: PassState.originalBombardier).
+///     InjuryTypeBombWithModifierForSpp when bombardier gets SPPs (headless: PassState.originalBombardier not ported).
 ///   - END_TURN guard: only published if `isStanding` (not prone/stunned).
-///   - ZAP: ZappedPlayer substitution still DEFERRED (ZappedPlayer not yet ported).
+///   - ZAP: ZappedPlayer substitution still headless (ZappedPlayer not yet ported).
 ///
-/// DEFERRED(ZAP): ZappedPlayer substitution not yet ported.
-/// DEFERRED(bombardier-spp): InjuryTypeBombWithModifierForSpp path blocked by PassState.originalBombardier.
+/// headless(ZAP): ZappedPlayer substitution not yet ported.
+/// headless(bombardier-spp): InjuryTypeBombWithModifierForSpp needs original_bombardier wired as init param.
 use ffb_model::enums::{ApothecaryMode, TurnMode};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
@@ -134,7 +134,7 @@ impl StepSpecialEffect {
                 for p in drop_player(game, &player_id, true) { outcome = outcome.publish(p); }
             }
             SpecialEffect::ZAP => {
-                // DEFERRED(ZAP): ZappedPlayer substitution not yet ported.
+                // headless: ZappedPlayer substitution not yet ported
                 // Java: create ZappedPlayer, add to team, sendZapPlayer, scatter ball if on ball.
                 let ball_coord = game.field_model.ball_coordinate;
                 let on_ball = ball_coord.map(|b| b == coord).unwrap_or(false);
@@ -168,12 +168,10 @@ impl StepSpecialEffect {
                     suppress_end_turn = !(player_hit_from_bomb_team && has_ball);
                 }
                 // Java: if player == originalBombardier && !bomberTurnoverIgnored → suppressEndTurn=false
-                // DEFERRED(bombardier-spp): PassState.originalBombardier not yet in model.
-                // Without it, we conservatively leave suppress_end_turn as-is.
-                // (The bomberTurnoverIgnored path: if !bomberTurnoverIgnored → suppressEndTurn=false)
+                // headless: original_bombardier not wired as init param — PassState not ported
                 let _ = is_option_enabled(game, BOMBER_PLACED_PRONE_IGNORES_TURNOVER);
 
-                // DEFERRED(bombardier-spp): use ForSpp variant when bombardier != player's team.
+                // headless: use InjuryTypeBombWithModifierForSpp when bombardier != player's team — PassState not ported
                 let ir = handle_injury_by_name(
                     game, rng, "InjuryTypeBombWithModifier",
                     None, &player_id, coord, None, None, ApothecaryMode::SpecialEffect,

@@ -1,12 +1,15 @@
 use ffb_model::events::GameEvent;
-use ffb_model::types::FieldCoordinate;
+use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_cards::UtilCards;
+use ffb_model::enums::Direction;
+use ffb_model::option::game_option_id;
 use crate::action::Action;
-use crate::step::framework::{Step, StepOutcome};
+use crate::step::framework::{Step, StepOutcome, CatchScatterThrowInMode};
 use crate::step::framework::{StepAction, StepId, StepParameter};
+use crate::util::util_server_catch_scatter_throw_in::UtilServerCatchScatterThrowIn;
 
 /// Initialises the bomb sequence for Bombardier/bomb-carrying players.
 ///
@@ -137,7 +140,7 @@ impl Step for StepInitBomb {
 }
 
 impl StepInitBomb {
-    fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         game.turn_data_mut().bomb_used = true;
         game.field_model.range_ruler = None;
 
@@ -176,20 +179,39 @@ impl StepInitBomb {
             if self.bomb_coordinate.is_none() && !self.dont_drop_fumble {
                 bomb_out = true;
             }
-            // DEFERRED: bounce logic (BOMB_BOUNCES_ON_EMPTY_SQUARES option requires GameOptions system)
+            let mut catch_bomb = false;
+            if let Some(bomb_coord) = self.bomb_coordinate {
+                let bounce_enabled = game.options.is_enabled(game_option_id::BOMB_BOUNCES_ON_EMPTY_SQUARES);
+                if !self.pass_fumble && bounce_enabled && game.field_model.player_at(bomb_coord).is_none() {
+                    let scatter_roll = rng.d8();
+                    let direction = Direction::for_roll(scatter_roll).unwrap_or(Direction::North);
+                    let bounce_to = UtilServerCatchScatterThrowIn::find_scatter_coordinate(bomb_coord, direction, 1);
+                    if !FieldCoordinateBounds::FIELD.is_in_bounds(bounce_to) {
+                        bomb_out = true;
+                    } else if game.field_model.player_at(bounce_to).is_some() {
+                        game.field_model.bomb_coordinate = Some(bounce_to);
+                        game.field_model.bomb_moving = true;
+                        catch_bomb = true;
+                    } else {
+                        self.bomb_coordinate = Some(bounce_to);
+                        game.field_model.bomb_coordinate = Some(bounce_to);
+                        game.field_model.bomb_moving = false;
+                    }
+                }
+            }
             let mut out_event: Option<GameEvent> = None;
             if bomb_out {
                 game.field_model.bomb_coordinate = None;
                 game.field_model.bomb_moving = false;
-                // Java: getResult().addReport(new ReportBombOutOfBounds())
-                // ReportBombOutOfBounds has no fields; Rust GameEvent::BombOutOfBounds carries the
-                // last-known bomb coordinate (before clearance) for client-side animation.
                 out_event = Some(GameEvent::BombOutOfBounds {
-                    coord: self.bomb_coordinate.unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0)),
+                    coord: self.bomb_coordinate.unwrap_or(FieldCoordinate::new(0, 0)),
                 });
             }
             // Java: leaveStep(null) → publishParameter(CATCHER_ID=null); NEXT_STEP
             let mut outcome = StepOutcome::next().publish(StepParameter::CatcherId(None));
+            if catch_bomb {
+                outcome = outcome.publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::CatchBomb));
+            }
             if let Some(ev) = out_event {
                 outcome = outcome.with_event(ev);
             }

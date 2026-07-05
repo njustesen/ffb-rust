@@ -10,7 +10,7 @@
 /// - If PETTY_CASH_AFFECTS_TV: add petty_cash_transferred to team_value.
 /// - Reports ReportPettyCash once per team.
 ///
-/// DEFERRED(dialog): DialogPettyCashParameter not yet ported.
+/// client-only: DialogPettyCashParameter — headless skips petty cash dialog
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::option::game_option_id::{PETTY_CASH, FORCE_TREASURY_TO_PETTY_CASH, PETTY_CASH_AFFECTS_TV};
@@ -116,7 +116,7 @@ impl StepPettyCash {
         let mut out = if self.petty_cash_selected_home && self.petty_cash_selected_away {
             StepOutcome::next()
         } else {
-            // DEFERRED(dialog): DialogPettyCashParameter not yet ported — would show dialog here.
+            // client-only: DialogPettyCashParameter — headless auto-skips
             StepOutcome::next()
         };
         for ev in pending_events { out = out.with_event(ev); }

@@ -173,6 +173,8 @@ impl NamedProperties {
     pub const IGNORES_ARMOUR_MODIFIERS_FROM_SPECIAL_EFFECTS: &'static str = "ignoresArmourModifiersFromSpecialEffects";
     pub const IGNORE_BLOCK_ASSISTS: &'static str = "ignoreBlockAssists";
     pub const IGNORE_DEFENDER_STUMBLES_RESULT: &'static str = "ignoreDefenderStumblesResult";
+    pub const CANCELS_IGNORE_DEFENDER_STUMBLES_RESULT: &'static str = "cancelsIgnoreDefenderStumblesResult";
+    pub const CANCELS_IGNORES_DEFENDER_STUMBLES_RESULT_FOR_FIRST_BLOCK: &'static str = "cancelsIgnoresDefenderStumblesResultForFirstBlock";
     pub const IGNORE_FIRST_ARMOUR_BREAK: &'static str = "ignoreFirstArmourBreak";
     pub const IGNORE_FIRST_SECRET_WEAPON_SENT_OFF: &'static str = "ignoreFirstSecretWeaponSentOff";
     pub const IGNORE_TACKLE_WHEN_BLOCKED: &'static str = "ignoreTackleWhenBlocked";

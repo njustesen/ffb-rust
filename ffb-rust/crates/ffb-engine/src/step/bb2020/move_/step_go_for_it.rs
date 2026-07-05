@@ -16,7 +16,7 @@ use ffb_mechanics::modifiers::go_for_it_context::GoForItContext;
 ///
 /// BB2020 is identical to BB2025 except that GoForItModifierFactory uses BB2020 rules.
 ///
-/// DEFERRED(modifierIgnoring): canChooseToIgnoreRushModifierAfterRoll dialog not yet ported.
+/// client-only: canChooseToIgnoreRushModifierAfterRoll dialog — headless never ignores rush modifier.
 /// failedRushForJumpAlwaysLandsInTargetSquare skill check → wired in fail_gfi.
 pub struct StepGoForIt {
     /// Java: fGotoLabelOnFailure

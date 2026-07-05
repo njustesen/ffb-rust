@@ -5,8 +5,7 @@
 ///
 /// Rust: each generator is a standalone module with different parameter types, so they cannot
 /// share a single trait easily. This factory validates known generator names per edition.
-/// DEFERRED(sequence-generator-dispatch): full generator dispatch requires a common dispatch
-/// mechanism — likely an enum-based dispatcher or wrapping each generator in a uniform type.
+/// headless: full generator dispatch via enum-based dispatcher not yet implemented — name validation only.
 use std::collections::HashSet;
 use ffb_model::enums::Rules;
 

@@ -1,6 +1,6 @@
 /// 1:1 translation of `com.fumbbl.ffb.server.inducements.mixed.prayers.SelectPlayerPrayerHandler`.
 /// Abstract handler that shows a dialog for the coach to pick a player.
-/// DEFERRED — dialog system not yet ported.
+/// client-only: dialog system not yet ported.
 use ffb_model::model::game::Game;
 use crate::prayer_state::PrayerState;
 
@@ -11,7 +11,7 @@ pub fn init_effect_select_player(
     _team_id: &str,
     _prayer_name: &str,
 ) -> bool {
-    // DEFERRED(prayer-dialog): needs UtilServerDialog.showDialog + player candidate list
+    // client-only: DialogPrayerParameter — abstract handler; concrete handlers use random selection
     false
 }
 
@@ -21,7 +21,7 @@ pub fn apply_selection_select_player(
     _player_id: &str,
     _prayer_name: &str,
 ) {
-    // DEFERRED(prayer-dialog): needs fieldModel.addPrayerEnhancements
+    // client-only: apply_selection called by concrete handlers after dialog choice; abstract stub is no-op
 }
 
 #[cfg(test)]

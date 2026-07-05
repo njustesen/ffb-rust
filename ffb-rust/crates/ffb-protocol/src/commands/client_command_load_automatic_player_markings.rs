@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.net.commands.ClientCommandLoadAutomaticPlayerMarkings.
 ///
-/// Java: `game` field is the full Game object — DEFERRED(game-field): Game is very complex.
+/// Java: `game` field is the full Game object — omitted; Game serialisation not yet ported.
 /// Only `index` and `coach` are stored for now.
 
 #[derive(Debug, Clone, Default)]
@@ -9,8 +9,7 @@ pub struct ClientCommandLoadAutomaticPlayerMarkings {
     pub index: i32,
     /// Java: `coach`
     pub coach: Option<String>,
-    // DEFERRED(game-field): Java `game` field omitted — Game is a complex object requiring
-    // full model translation. Will be added when Game struct is available.
+    // Java `game` field omitted — Game serialisation requires full model port (not yet done)
 }
 
 impl ClientCommandLoadAutomaticPlayerMarkings {

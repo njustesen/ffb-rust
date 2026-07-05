@@ -86,7 +86,7 @@ impl StepSetup {
         }
 
         let setup_valid = SetupMechanic::new().check_setup(game, game.home_playing);
-        // DEFERRED(dialog): show setup error dialog when !setup_valid
+        // client-only: show setup error dialog when !setup_valid
 
         if setup_valid {
             // Java: flip home_playing so the other team sets up next.

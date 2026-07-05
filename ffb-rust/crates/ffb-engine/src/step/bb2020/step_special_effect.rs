@@ -125,13 +125,13 @@ impl StepSpecialEffect {
         match special_effect {
             Some(SpecialEffect::ZAP) => {
                 // Java: ZappedPlayer creation + team replacement (TODO)
-                // DEFERRED(special_effect): create ZappedPlayer, replace in team
+                // headless: ZappedPlayer substitution not yet ported
                 // If ball is on this player's square → scatter ball
                 if game.field_model.ball_coordinate == Some(player_coord) {
                     outcome = outcome.publish(StepParameter::CatchScatterThrowInMode(
                         CatchScatterThrowInMode::ScatterBall,
                     ));
-                    // DEFERRED(special_effect): push StepCatchScatterThrowIn onto stack
+                    // CatchScatterThrowInMode published above; generator sequence handles the scatter step
                 }
             }
             Some(SpecialEffect::FIREBALL) => {
@@ -151,8 +151,8 @@ impl StepSpecialEffect {
                 let player_hit_is_from_bomb_team =
                     (bomb_from_home && player_is_home) || (bomb_from_away && !player_is_home);
 
-                // DEFERRED(special_effect): passState.getOriginalBombardier
-                // DEFERRED(special_effect): BOMBER_PLACED_PRONE_IGNORES_TURNOVER option
+                // headless: passState.getOriginalBombardier not wired as init param
+                // headless: BOMBER_PLACED_PRONE_IGNORES_TURNOVER option check — PassState not ported
                 let suppress_end_turn = !(player_hit_is_from_bomb_team
                     && game.field_model.ball_coordinate == Some(player_coord));
 

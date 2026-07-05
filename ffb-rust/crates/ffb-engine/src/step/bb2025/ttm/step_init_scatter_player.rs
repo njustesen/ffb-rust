@@ -3,11 +3,11 @@
 /// Scatters the thrown/kicked player to their landing square (BB2025).
 ///
 /// BB2025 differences vs BB2020:
-///  - Extends `AbstractStepWithReRoll` — supports Swoop distance re-rolls (DEFERRED).
+///  - Extends AbstractStepWithReRoll — supports Swoop distance re-rolls (headless: not ported).
 ///  - `usingBullseye` flag: when set, land at `game.passCoordinate` directly (no scatter roll).
-///  - `usingSwoop` flag: Swoop movement with optional re-roll (DEFERRED).
-///  - `SteadyFootingContext` — published for hit-player scenarios (DeferredCommands DEFERRED).
-///  - `SppMechanic` — grants SPP on TTM hit for skilled players (DEFERRED).
+///  - usingSwoop flag: Swoop movement with optional re-roll (headless: not ported).
+///  - SteadyFootingContext — published for hit-player scenarios (headless: not ported).
+///  - SppMechanic — grants SPP on TTM hit for skilled players (headless: not ported).
 ///  - Always uses `InjuryTypeCrowdPush` (no InjuryTypeKTMCrowd) for OOB.
 ///  - No `deviate` / `crashLanding` flags (BB2020-only).
 ///  - Publishes `USING_SWOOP` and `OLD_DEFENDER_STATE` from `handleLanding`.
@@ -120,7 +120,7 @@ impl StepInitScatterPlayer {
         let mut swoop_event: Option<GameEvent> = None;
         if swooping {
             // Java: doRoll = reRolledAction != SWOOP_DISTANCE || (reRollSource != null && useReRoll)
-            // DEFERRED(InitScatterPlayer-reroll): re-roll availability check deferred.
+            // client-only: re-roll availability check requires dialog; headless proceeds without re-roll offer
             scatter_result = self.swoop_scatter(game, rng, start_coord);
             // Java: addReport(new ReportSwoopPlayer(thrownPlayer, thrownPlayerCoordinate))
             if let Some(coord) = self.thrown_player_coordinate {
@@ -131,7 +131,7 @@ impl StepInitScatterPlayer {
             }
             // Java: clearMoveSquares(); if inBounds: add(MoveSquare) — client-side display only.
             // Java: if distance==0 && reRolledAction==null → askForReRollIfAvailable → CONTINUE
-            // DEFERRED(InitScatterPlayer-reroll): re-roll offer for distance==0 deferred.
+            // client-only: distance==0 re-roll offer requires dialog; headless proceeds
 
             // Java: thrownPlayerState = changeBase(IN_THE_AIR)
             if let Some(state) = self.thrown_player_state {
@@ -221,7 +221,7 @@ impl StepInitScatterPlayer {
                     ApothecaryMode::HitPlayer,
                 );
                 // Java: if (lethalSpp && violentSpp && injuryResultHitPlayer.injuryContext().isCasualty())
-                //         spp.addCasualty(...) — SppMechanic.addCasualty DEFERRED (requires prayer state)
+                //         spp.addCasualty(...) — headless: SppMechanic.addCasualty not ported
                 result.apply_to(game);
                 result
             } else {
@@ -338,7 +338,7 @@ impl Step for StepInitScatterPlayer {
 
     fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // AbstractStepWithReRoll: EXECUTE_STEP → executeStep()
-        // DEFERRED(InitScatterPlayer-reroll): re-roll command dispatch deferred.
+        // client-only: re-roll command arrives from dialog; headless always executes immediately
         self.execute_step(game, rng)
     }
 

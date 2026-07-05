@@ -6,8 +6,8 @@
 /// - If team conceded illegally: transfer their winnings to the opposing team.
 /// - Emits ReportWinningsRoll twice (initial + concede adjustment).
 ///
-/// DEFERRED(Winnings-dialog): DialogWinningsReRollParameter / UtilServerDialog not yet ported.
-/// DEFERRED(Winnings-reroll): AbstractStepWithReRoll / WINNINGS re-roll not yet ported.
+/// client-only: DialogWinningsReRollParameter — winner re-roll choice requires dialog; headless skips.
+/// client-only: WINNINGS re-roll (AbstractStepWithReRoll) — coach triggers re-roll via dialog; headless skips.
 /// WinningsRoll GameEvent wired.
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
@@ -56,7 +56,7 @@ impl StepWinnings {
         let winnings_away_initial = game.game_result.away.winnings;
         let fame_home = game.game_result.home.fame;
         let fame_away = game.game_result.away.fame;
-        // DEFERRED(Winnings-dialog): show re-roll dialog for winner — dialog layer not yet ported.
+        // client-only: DialogWinningsReRollParameter shown to winning coach — headless skips re-roll
         Self::concede_winnings(game);
         // Java: addReport(new ReportWinningsRoll(home.id, fame, roll, total)) x2 (initial + concede)
         StepOutcome::next()

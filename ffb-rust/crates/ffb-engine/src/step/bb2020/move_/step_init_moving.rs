@@ -16,7 +16,7 @@ use crate::step::framework::{StepAction, StepId, StepParameter};
 ///
 /// Init params: GOTO_LABEL_ON_END (mandatory).
 ///
-/// DEFERRED: UtilServerPlayerMove.isValidMove path validation not yet ported.
+/// headless: UtilServerPlayerMove.isValidMove path validation not yet ported.
 pub struct StepInitMoving {
     /// Java: fGotoLabelOnEnd
     pub goto_label_on_end: String,

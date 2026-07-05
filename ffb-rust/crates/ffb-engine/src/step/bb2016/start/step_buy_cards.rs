@@ -10,10 +10,11 @@
 ///
 /// Publishes: INDUCEMENT_GOLD_HOME, INDUCEMENT_GOLD_AWAY.
 ///
-/// DEFERRED(deck): CardDeck / CardTypeFactory not yet ported.
-/// DEFERRED(options): GameOptionId.MAX_NR_OF_CARDS etc. not yet ported.
-/// DEFERRED(dialog): DialogBuyCardsParameter not yet ported.
+/// headless: CardDeck / CardTypeFactory not yet ported.
+/// client-only: DialogBuyCardsParameter — headless skips card purchasing dialog
 use ffb_model::model::game::Game;
+use ffb_model::option::game_option_id::{MAX_NR_OF_CARDS, USE_PREDEFINED_INDUCEMENTS};
+use ffb_model::option::util_game_option::{get_int_option, is_option_enabled};
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -46,8 +47,14 @@ impl StepBuyCards {
         }
     }
 
-    fn execute_step(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // DEFERRED(deck): CardDeck / dialog not yet ported; stub marks both teams done.
+    fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        // Java: if (MAX_NR_OF_CARDS == 0 || USE_PREDEFINED_INDUCEMENTS) → skip card buying
+        if get_int_option(game, MAX_NR_OF_CARDS) == 0 || is_option_enabled(game, USE_PREDEFINED_INDUCEMENTS) {
+            return StepOutcome::next()
+                .publish(StepParameter::InducementGoldHome(self.inducement_gold_home))
+                .publish(StepParameter::InducementGoldAway(self.inducement_gold_away));
+        }
+        // headless: CardDeck / CardTypeFactory not yet ported — both teams treated as done
         self.cards_selected_home = true;
         self.cards_selected_away = true;
         StepOutcome::next()

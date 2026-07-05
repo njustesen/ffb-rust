@@ -20,7 +20,7 @@ impl CardHandler for WitchBrewHandler {
     fn get_name(&self) -> &'static str { "WitchBrewHandler" }
 
     /// Java: rollCardEffect() → interpretWitchBrewRoll(roll) → addCardEffect(player, effect).
-    /// DEFERRED(card-activate-witch-brew-dice): CardHandler::activate_on_game has no RNG parameter;
+    /// headless: WitchBrew dice roll requires RNG not in CardHandler trait;
     /// dice rolling (DiceRoller.rollCardEffect + DiceInterpreter.interpretWitchBrewRoll) requires
     /// IStep context. This activation path must be handled by StepPlayCard when wiring card effects.
     fn activate_on_game(&self, _game: &mut Game, _card: &Card, _player_id: &str) -> bool {

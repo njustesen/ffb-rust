@@ -1,6 +1,6 @@
 /// 1:1 translation of `com.fumbbl.ffb.server.inducements.mixed.prayers.DialogPrayerHandler`.
 /// Abstract handler for prayers that require a coach dialog before taking effect.
-/// DEFERRED — dialog system not yet ported.
+/// client-only: dialog system not yet ported.
 use ffb_model::model::game::Game;
 use crate::prayer_state::PrayerState;
 
@@ -11,7 +11,7 @@ pub fn init_effect_dialog(
     _team_id: &str,
     _prayer_name: &str,
 ) -> bool {
-    // DEFERRED(prayer-dialog): needs dialog creation + candidate player listing
+    // client-only: DialogPrayerParameter — abstract handler; concrete handlers override with auto-selection
     false
 }
 

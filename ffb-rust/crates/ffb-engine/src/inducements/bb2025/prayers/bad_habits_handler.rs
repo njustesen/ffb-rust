@@ -70,6 +70,7 @@ mod tests {
         use ffb_model::enums::{PS_RESERVE, PlayerState};
         use ffb_model::model::player::Player;
         use ffb_model::enums::PlayerType;
+        use ffb_model::model::player_status::PlayerStatus;
         let mut game = make_game();
         // Add an away player in RESERVE
         game.team_away.players.push(Player {
@@ -82,6 +83,7 @@ mod tests {
             used_skills: std::collections::HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
             race: None,
+            player_status: PlayerStatus::ACTIVE,
             ..Default::default()
 });
         game.field_model.set_player_state("a1", PlayerState::new(PS_RESERVE));

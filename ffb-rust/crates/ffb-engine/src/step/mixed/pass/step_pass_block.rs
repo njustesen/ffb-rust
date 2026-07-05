@@ -98,7 +98,7 @@ impl StepPassBlock {
                 }
             } else if self.end_player_action {
                 // Player finished — switch to next pass blocker or end
-                // DEFERRED: sequence generator integration
+                // headless: sequence generator integration — PassBlock move/select sequences not ported
                 self.end_player_action = false;
             }
 

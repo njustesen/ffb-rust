@@ -113,13 +113,13 @@ impl StepSwarming {
                 };
 
                 if placed > self.rolled_amount {
-                    // DEFERRED: show DialogSwarmingErrorParameter and wait.
+                    // client-only: show DialogSwarmingErrorParameter — dialog is client-side
                     // For now: reject and continue.
                     return StepOutcome::cont();
                 }
 
                 let setup_valid = SetupMechanic::new().check_setup(game, game.home_playing);
-                // DEFERRED(dialog): show setup error when !setup_valid
+                // client-only: show setup error dialog when !setup_valid
                 if setup_valid {
                     self.leave(game, placed);
                 }
@@ -166,8 +166,8 @@ impl StepSwarming {
 
         game.turn_mode = TurnMode::Swarming;
 
-        // DEFERRED: push self back onto stack (StepStack::pushCurrentStepOnStack).
-        // DEFERRED: show DialogSwarmingPlayersParameter.
+        // headless: push self back onto stack (StepStack not ported)
+        // client-only: show DialogSwarmingPlayersParameter — dialog is client-side
 
         StepOutcome::cont()
     }

@@ -3,8 +3,7 @@
 /// Prompts the active coach to select a target for the blitz action, or handles special-skill
 /// sequences (Treacherous, RaidingParty, etc.) and WisdomOfTheWhiteDwarf.
 ///
-/// DEFERRED items:
-///  - EndPlayerAction / EndTurn cancel path (clear stack + EndPlayerAction sequence) not translated.
+/// headless items:
 ///  - TargetSelectionState (skip / cancel) not translated.
 ///  - ReportSelectBlitzTarget: now wired as GameEvent::SelectBlitzTarget.
 ///  - usedSkill skill-enhancement sequences not translated (Treacherous, RaidingParty,
@@ -19,6 +18,8 @@ use ffb_model::enums::TurnMode;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::generator::bb2020::EndPlayerAction;
+use crate::step::generator::bb2020::end_player_action::EndPlayerActionParams;
 
 pub struct StepSelectBlitzTarget {
     pub goto_label_on_end: String,
@@ -65,10 +66,8 @@ impl Step for StepSelectBlitzTarget {
             }
             Action::UseSkill { skill_id, use_skill } if *use_skill => {
                 let skill_name = format!("{skill_id:?}");
-                // DEFERRED(select_blitz_target): skill-enhancement generators not translated.
-                // Treacherous, RaidingParty, BalefulHex, LookIntoMyEyes, BlackInk,
-                // ThenIStartedBlastin, CatchOfTheDay, AutoGazeZoat all push sequences
-                // here and return StepAction::Repeat. For now fall through to execute_step.
+                // client-only: skill-enhancement generators (Treacherous, RaidingParty, BalefulHex, etc.)
+                // push sequences from dialog — headless falls through
                 self.used_skill = Some(skill_name);
             }
             Action::UseSkill { .. } => {
@@ -78,7 +77,7 @@ impl Step for StepSelectBlitzTarget {
                 self.confirmed = true;
             }
             // CLIENT_USE_TEAM_MATES_WISDOM → push WisdomOfTheWhiteDwarf sequence + Repeat
-            // DEFERRED(select_blitz_target): No dedicated Action variant for this yet.
+            // client-only: WisdomOfTheWhiteDwarf action arrives from dialog; headless skips
             _ => {}
         }
         self.execute_step(game, rng)
@@ -99,8 +98,12 @@ impl StepSelectBlitzTarget {
         // Case 1: End player action or end turn triggered
         if self.end_player_action || self.end_turn {
             game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
-            // DEFERRED(select_blitz_target): clear stack and push EndPlayerAction sequence not translated.
-            return StepOutcome::next();
+            let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
+                feeding_allowed: false,
+                end_player_action: true,
+                end_turn: self.end_turn,
+            });
+            return StepOutcome::next().push_seq(seq);
         }
 
         let acting_player_id = game.acting_player.player_id.clone();
@@ -109,7 +112,7 @@ impl StepSelectBlitzTarget {
         if self.selected_player_id.is_none() {
             if self.has_standing_opponents(game) {
                 game.turn_mode = TurnMode::SelectBlitzTarget;
-                // DEFERRED(select_blitz_target): dialog prompt not translated.
+                // client-only: DialogSelectBlitzTarget shown to coach — headless waits for action
                 return StepOutcome::cont();
             } else {
                 // Java: setTargetSelectionState(new TargetSelectionState(null).skip()) — no targets available
@@ -129,7 +132,7 @@ impl StepSelectBlitzTarget {
             // Selected the acting player itself
             let has_acted = game.acting_player.has_acted;
             if has_acted && !self.confirmed {
-                // DEFERRED(select_blitz_target): confirm dialog not translated.
+                // client-only: confirmation dialog — headless awaits Acknowledge action
                 return StepOutcome::cont();
             } else {
                 // Cancel blitz target: restore last turn mode and goto end label
@@ -165,7 +168,7 @@ impl StepSelectBlitzTarget {
             }
             ts.select();
             game.field_model.target_selection_state = Some(ts);
-            // DEFERRED(select_blitz_target): usedSkill skill-enhancements not translated.
+            // client-only: used-skill enhancement sequences triggered from dialog; headless skips
             let attacker_id = game.acting_player.player_id.clone().unwrap_or_default();
             StepOutcome::next().with_event(GameEvent::SelectBlitzTarget {
                 attacker_id,
@@ -250,21 +253,23 @@ mod tests {
     }
 
     #[test]
-    fn end_turn_returns_next() {
+    fn end_turn_pushes_end_player_action_sequence() {
         let mut game = make_game();
         let mut step = StepSelectBlitzTarget::new();
         step.end_turn = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "end_turn should push EndPlayerAction sequence");
     }
 
     #[test]
-    fn end_player_action_returns_next() {
+    fn end_player_action_pushes_end_player_action_sequence() {
         let mut game = make_game();
         let mut step = StepSelectBlitzTarget::new();
         step.end_player_action = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "end_player_action should push EndPlayerAction sequence");
     }
 
     #[test]

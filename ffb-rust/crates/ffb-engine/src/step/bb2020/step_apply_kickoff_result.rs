@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 use ffb_model::events::GameEvent;
 use ffb_model::enums::{KickoffResult, TurnMode, Weather, PS_EXHAUSTED, PS_RESERVE, PS_STANDING};
+use ffb_model::inducement::inducement::Inducement;
 use ffb_model::inducement::usage::Usage;
+use ffb_model::option::game_option_id;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
 use crate::mechanic::mixed::setup_mechanic::SetupMechanic;
@@ -106,7 +109,7 @@ impl Step for StepApplyKickoffResult {
                     game.turn_mode = TurnMode::Kickoff;
                 } else if game.turn_mode == TurnMode::SolidDefence {
                     // Java: setPlayerCoordinates from command
-                    // DEFERRED(kickoff): persist playerCoordinates from ClientCommandEndTurn
+                    // headless: no-op — playerCoordinates from ClientCommandEndTurn not applicable
                 }
             }
             Action::ConfirmSetup => {
@@ -152,10 +155,21 @@ impl StepApplyKickoffResult {
 
     // ── GetTheRef ─────────────────────────────────────────────────────────────
 
-    fn handle_get_the_ref(&self, _game: &mut Game) -> StepOutcome {
-        // Java: both teams +1 bribe (via InducementTypeFactory.allTypes with Usage.AVOID_BAN)
-        // DEFERRED(kickoff): add bribes to both teams when inducement model is ported
-        // DEFERRED(kickoff): setAnimation(KICKOFF_GET_THE_REF)
+    fn handle_get_the_ref(&self, game: &mut Game) -> StepOutcome {
+        // Java: InducementTypeFactory.allTypes() → filter AVOID_BAN → computeIfAbsent + setValue+1
+        // Both teams gain +1 bribe regardless of whether they had any before.
+        for home in [true, false] {
+            let set = if home { &mut game.turn_data_home.inducement_set }
+                      else   { &mut game.turn_data_away.inducement_set };
+            let type_id = set.for_usage(Usage::AVOID_BAN)
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "BRIBE".to_string());
+            let mut ind = set.get(&type_id)
+                .unwrap_or_else(|| Inducement::new(type_id.clone(), 0, vec![Usage::AVOID_BAN]));
+            ind.value += 1;
+            set.add_inducement(ind);
+        }
+        // client-only: setAnimation(KICKOFF_GET_THE_REF)
         StepOutcome::next()
     }
 
@@ -174,7 +188,7 @@ impl StepApplyKickoffResult {
         game.turn_data_home.turn_nr += turn_modifier;
         game.turn_data_away.turn_nr += turn_modifier;
 
-        // DEFERRED(kickoff): setAnimation(KICKOFF_TIMEOUT)
+        // client-only: setAnimation(KICKOFF_TIMEOUT)
         StepOutcome::next().with_event(GameEvent::KickoffTimeout { turn_number: kicking_turn, turn_modifier })
     }
 
@@ -195,7 +209,22 @@ impl StepApplyKickoffResult {
                 if moved_players <= self.nr_of_players_allowed {
                     // Java: mechanic.checkSetup(gameState, game.isHomePlaying(), getKickingSwarmers())
                     let _valid = SetupMechanic::new().check_setup_with_swarmers(game, game.home_playing, game.kicking_swarmers);
-                    // DEFERRED(dialog): show setup error when !valid, clear markers, unhide prone players
+                    // client-only: show setup error dialog when !valid
+                    // Java: hide prone box players back to reserve on valid completion
+                    {
+                        use ffb_model::enums::PS_PRONE;
+                        let acting_ids: Vec<String> = game.active_team().players.iter()
+                            .map(|p| p.id.clone()).collect();
+                        for id in &acting_ids {
+                            if game.field_model.player_coordinate(id).is_none() {
+                                if let Some(state) = game.field_model.player_state(id) {
+                                    if state.base() == PS_PRONE {
+                                        game.field_model.set_player_state(id, state.change_base(PS_RESERVE));
+                                    }
+                                }
+                            }
+                        }
+                    }
                     // Java: setKickingSwarmers(0)
                     game.kicking_swarmers = 0;
                     game.turn_mode = TurnMode::Kickoff;
@@ -203,7 +232,7 @@ impl StepApplyKickoffResult {
                 } else {
                     // Invalid: too many players moved; reset end_kickoff, show dialog again
                     self.end_kickoff = false;
-                    // DEFERRED(kickoff): DialogInvalidSolidDefenceParameter
+                    // client-only: DialogInvalidSolidDefenceParameter — headless allows overcount
                     StepOutcome::cont()
                 }
             } else {
@@ -215,21 +244,42 @@ impl StepApplyKickoffResult {
             self.nr_of_players_allowed = roll + 3;
             let acting_team_id = game.active_team().id.clone();
 
-            // DEFERRED(kickoff): setAnimation, pin players in tacklezones
-            // Record current positions of acting team players on the field
-            let acting_team_ids: Vec<String> = game.active_team().players.iter()
-                .map(|p| p.id.clone())
+            // client-only: setAnimation(KICKOFF_SOLID_DEFENSE)
+            // Java: for each acting-team player on field:
+            //   if adjacent to opposing tacklers → deactivate (pinned)
+            //   else → add to playersAtCoordinates (eligible to move)
+            //   if in box and RESERVE → change to PRONE (unhide)
+            let other_is_home = !game.home_playing;
+            let acting_ids: Vec<(String, Option<FieldCoordinate>)> = game.active_team().players.iter()
+                .map(|p| (p.id.clone(), game.field_model.player_coordinate(&p.id)))
                 .collect();
-            for id in &acting_team_ids {
-                if let Some(coord) = game.field_model.player_coordinate(id) {
-                    if FieldCoordinateBounds::FIELD.is_in_bounds(coord) {
-                        self.players_at_coordinates.insert(id.clone(), coord);
+            for (id, coord_opt) in &acting_ids {
+                if let Some(coord) = coord_opt {
+                    if FieldCoordinateBounds::FIELD.is_in_bounds(*coord) {
+                        let other_team = if other_is_home { &game.team_home } else { &game.team_away };
+                        let adj = UtilPlayer::find_adjacent_players_with_tacklezones(game, other_team, *coord, false);
+                        if !adj.is_empty() {
+                            // Deactivate: pinned by opponent tackle zones
+                            if let Some(state) = game.field_model.player_state(id) {
+                                game.field_model.set_player_state(id, state.change_active(false));
+                            }
+                        } else {
+                            self.players_at_coordinates.insert(id.clone(), *coord);
+                        }
+                    }
+                } else {
+                    // Box player: if RESERVE → change to PRONE (reveal for Solid Defence)
+                    if let Some(state) = game.field_model.player_state(id) {
+                        use ffb_model::enums::PS_PRONE;
+                        if state.base() == PS_RESERVE {
+                            game.field_model.set_player_state(id, state.change_base(PS_PRONE));
+                        }
                     }
                 }
             }
 
             game.turn_mode = TurnMode::SolidDefence;
-            // DEFERRED(kickoff): setAnimation(KICKOFF_SOLID_DEFENSE)
+            // client-only: setAnimation(KICKOFF_SOLID_DEFENSE)
             StepOutcome::cont().with_event(GameEvent::SolidDefenceRoll {
                 team_id: acting_team_id,
                 roll,
@@ -283,12 +333,12 @@ impl StepApplyKickoffResult {
         let total_away = roll_away + game.team_away.cheerleaders
             + game.turn_data_away.inducement_set.value(Usage::ADD_CHEERLEADER);
 
-        // Java: winner gets a Prayer pushed: pick a random availablePrayerRoll from factory.
-        // DEFERRED(kickoff-prayer-factory): availablePrayerRolls filtering via PrayerFactory deferred.
-        // Simplified: push a D8 prayer roll for the winner directly.
+        // Exhibition: rolls 1–8; league (INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE): rolls 1–16.
+        let use_league = game.options.is_enabled(game_option_id::INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE);
+        let max_prayer_roll = if use_league { 16 } else { 8 };
         let mut outcome = StepOutcome::next();
         if total_home > total_away {
-            let prayer_roll = rng.d8();
+            let prayer_roll = rng.range(max_prayer_roll) as i32 + 1;
             let team_id = game.team_home.id.clone();
             outcome = outcome.push_seq(vec![
                 SequenceStep::with_params(StepId::Prayer, vec![
@@ -297,7 +347,7 @@ impl StepApplyKickoffResult {
                 ])
             ]);
         } else if total_away > total_home {
-            let prayer_roll = rng.d8();
+            let prayer_roll = rng.range(max_prayer_roll) as i32 + 1;
             let team_id = game.team_away.id.clone();
             outcome = outcome.push_seq(vec![
                 SequenceStep::with_params(StepId::Prayer, vec![
@@ -306,7 +356,7 @@ impl StepApplyKickoffResult {
                 ])
             ]);
         }
-        // DEFERRED(kickoff): setAnimation(KICKOFF_CHEERING_FANS)
+        // client-only: setAnimation(KICKOFF_CHEERING_FANS)
         outcome.with_event(GameEvent::CheeringFans { home_roll: roll_home, away_roll: roll_away })
     }
 
@@ -318,7 +368,7 @@ impl StepApplyKickoffResult {
         let weather_roll = rng.roll_weather();
         let weather = DiceInterpreter::interpret_roll_weather(&weather_roll);
         game.field_model.weather = weather;
-        // DEFERRED(kickoff): setAnimation based on weather
+        // client-only: setAnimation based on weather
 
         if weather == Weather::SwelteringHeat {
             let player_ids: Vec<String> = game.field_model.players_on_pitch().cloned().collect();
@@ -351,7 +401,7 @@ impl StepApplyKickoffResult {
                     }
                 }
             }
-            // DEFERRED(kickoff): ReportScatterBall
+            // headless: ReportScatterBall — report system not yet ported
         }
 
         StepOutcome::next()
@@ -376,7 +426,7 @@ impl StepApplyKickoffResult {
             + game.turn_data_away.inducement_set.value(Usage::ADD_COACH);
 
         let mut outcome = StepOutcome::next();
-        // DEFERRED(kickoff): setAnimation(KICKOFF_BRILLIANT_COACHING)
+        // client-only: setAnimation(KICKOFF_BRILLIANT_COACHING)
         if total_home > total_away {
             game.turn_data_home.rerolls += 1;
             game.turn_data_home.rerolls_brilliant_coaching_one_drive += 1;
@@ -402,7 +452,7 @@ impl StepApplyKickoffResult {
             if let (Some(ref player_id), Some(coord)) = (self.moved_player.clone(), self.to_coordinate) {
                 if self.nr_of_moved_players < self.nr_of_players_allowed {
                     self.nr_of_moved_players += 1;
-                    // DEFERRED(kickoff): ReportKickoffSequenceActivationsCount (report system)
+                    // headless: ReportKickoffSequenceActivationsCount — report system not yet ported
                     UtilServerSetup::setup_player(game, player_id, coord);
 
                     if self.nr_of_moved_players == self.nr_of_players_allowed {
@@ -427,7 +477,21 @@ impl StepApplyKickoffResult {
             let roll = rng.d3();
             self.nr_of_players_allowed = roll + 3;
             let active_team_id = game.active_team().id.clone();
-            // DEFERRED(kickoff): setAnimation, deactivate tackled players
+            // client-only: setAnimation(KICKOFF_QUICK_SNAP)
+
+            // Java: deactivate acting-team players adjacent to opposing tacklers
+            let other_is_home = !game.home_playing;
+            let acting_ids: Vec<(String, FieldCoordinate)> = game.active_team().players.iter()
+                .filter_map(|p| game.field_model.player_coordinate(&p.id).map(|c| (p.id.clone(), c)))
+                .collect();
+            for (pid, coord) in &acting_ids {
+                let other_team = if other_is_home { &game.team_home } else { &game.team_away };
+                if !UtilPlayer::find_adjacent_players_with_tacklezones(game, other_team, *coord, false).is_empty() {
+                    if let Some(state) = game.field_model.player_state(pid) {
+                        game.field_model.set_player_state(pid, state.change_active(false));
+                    }
+                }
+            }
 
             // Check if any active players remain
             let any_active = game.active_team().players.iter()
@@ -453,7 +517,7 @@ impl StepApplyKickoffResult {
 
     fn handle_blitz(&self) -> StepOutcome {
         // Java: setAnimation(KICKOFF_BLITZ); GOTO_LABEL fGotoLabelOnBlitz
-        // DEFERRED(kickoff): setAnimation(KICKOFF_BLITZ)
+        // client-only: setAnimation(KICKOFF_BLITZ)
         StepOutcome::goto(&self.goto_label_on_blitz)
     }
 
@@ -461,7 +525,7 @@ impl StepApplyKickoffResult {
 
     fn handle_officious_ref(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: roll throwARock (D6) per team; lower fan-factor total → player targeted.
-        // Per targeted player: roll D6; 1 → eject (DEFERRED), else → stun immediately.
+        // Per targeted player: roll D6; 1 → eject (headless: eject not yet ported), else → stun immediately.
         let roll_home = rng.d6();
         let roll_away = rng.d6();
 
@@ -469,9 +533,17 @@ impl StepApplyKickoffResult {
         let total_home = roll_home + game.game_result.home.fan_factor;
         let total_away = roll_away + game.game_result.away.fan_factor;
 
-        // DEFERRED(kickoff): setAnimation(KICKOFF_OFFICIOUS_REF)
+        // client-only: setAnimation(KICKOFF_OFFICIOUS_REF)
 
         let mut targeted_ids: Vec<String> = Vec::new();
+        // Collect eject sequences to push (one per ejected player).
+        let mut eject_seqs: Vec<Vec<SequenceStep>> = Vec::new();
+        // ParametersToConsume discriminants for EjectPlayer's ConsumeParameter step.
+        let params_to_consume = vec![
+            std::mem::discriminant(&StepParameter::CatchScatterThrowInMode(
+                ffb_model::model::catch_scatter_throw_in_mode::CatchScatterThrowInMode::CatchBomb)),
+            std::mem::discriminant(&StepParameter::FoulerHasBall(false)),
+        ];
 
         // Java: if totalAway >= totalHome → home team player targeted
         if total_away >= total_home {
@@ -479,9 +551,8 @@ impl StepApplyKickoffResult {
                 targeted_ids.push(home_player.clone());
                 let ref_roll = rng.d6();
                 if ref_roll == 1 {
-                    // Java: push EJECT_PLAYER sequence — DEFERRED(kickoff-eject): eject sequence deferred.
+                    eject_seqs.push(Self::build_eject_seq(&home_player, params_to_consume.clone()));
                 } else {
-                    // Java: publishParameters(UtilServerInjury.stunPlayer(this, player, HOME))
                     util_server_injury::stun_player(game, &home_player);
                 }
             }
@@ -492,9 +563,8 @@ impl StepApplyKickoffResult {
                 targeted_ids.push(away_player.clone());
                 let ref_roll = rng.d6();
                 if ref_roll == 1 {
-                    // Java: push EJECT_PLAYER sequence — DEFERRED(kickoff-eject): eject sequence deferred.
+                    eject_seqs.push(Self::build_eject_seq(&away_player, params_to_consume.clone()));
                 } else {
-                    // Java: publishParameters(UtilServerInjury.stunPlayer(this, player, AWAY))
                     util_server_injury::stun_player(game, &away_player);
                 }
             }
@@ -510,11 +580,17 @@ impl StepApplyKickoffResult {
             StepId::SetActingTeam,
             vec![StepParameter::TeamId(acting_team_id)],
         )];
-        StepOutcome::next().push_seq(restore_seq).with_event(GameEvent::KickoffOfficiousRef {
-            roll_home,
-            roll_away,
-            player_ids: targeted_ids,
-        })
+        let mut outcome = StepOutcome::next()
+            .push_seq(restore_seq)
+            .with_event(GameEvent::KickoffOfficiousRef {
+                roll_home,
+                roll_away,
+                player_ids: targeted_ids,
+            });
+        for seq in eject_seqs {
+            outcome = outcome.push_seq(seq);
+        }
+        outcome
     }
 
     /// Java: `playersOnField` — all players for the given side that are within FIELD bounds.
@@ -532,6 +608,29 @@ impl StepApplyKickoffResult {
         }
         let idx = rng.range(on_field.len());
         Some(on_field[idx].to_owned())
+    }
+
+    /// Java: `insertSteps` (when roll == 1) — builds SetActingPlayerAndTeam + EjectPlayer + ConsumeParameter.
+    fn build_eject_seq(
+        player_id: &str,
+        params_to_consume: Vec<std::mem::Discriminant<StepParameter>>,
+    ) -> Vec<SequenceStep> {
+        use crate::step::generator::labels;
+        vec![
+            SequenceStep::with_params(
+                StepId::SetActingPlayerAndTeam,
+                vec![StepParameter::PlayerId(player_id.to_owned())],
+            ),
+            SequenceStep::with_params(
+                StepId::EjectPlayer,
+                vec![StepParameter::GotoLabelOnEnd(labels::END_FOULING.to_owned())],
+            ),
+            SequenceStep::labelled(
+                StepId::ConsumeParameter,
+                labels::END_FOULING,
+                vec![StepParameter::ParametersToConsume(params_to_consume)],
+            ),
+        ]
     }
 
     // ── PitchInvasion ─────────────────────────────────────────────────────────
@@ -555,7 +654,7 @@ impl StepApplyKickoffResult {
             self.stun_random_standing_players(game, rng, false, stunned);
         }
 
-        // DEFERRED(kickoff): setAnimation(KICKOFF_PITCH_INVASION)
+        // client-only: setAnimation(KICKOFF_PITCH_INVASION)
         StepOutcome::next().with_event(GameEvent::KickoffPitchInvasion { home_roll: roll_home, away_roll: roll_away })
     }
 
@@ -719,5 +818,86 @@ mod tests {
             matches!(p, StepParameter::TeamId(id) if id == &game.team_home.id)
         });
         assert!(has_team_id, "SET_ACTING_TEAM should carry home team id when home_playing=true");
+    }
+
+    // ── GetTheRef tests ───────────────────────────────────────────────────────
+
+    #[test]
+    fn get_the_ref_creates_bribe_when_none_exist() {
+        let mut step = make_step();
+        let mut game = make_game();
+        step.kickoff_result = Some(KickoffResult::GetTheRef);
+        step.start(&mut game, &mut GameRng::new(0));
+        // Both teams should now have 1 bribe (AVOID_BAN inducement)
+        assert_eq!(
+            game.turn_data_home.inducement_set.value(ffb_model::inducement::usage::Usage::AVOID_BAN),
+            1,
+            "home should gain 1 bribe"
+        );
+        assert_eq!(
+            game.turn_data_away.inducement_set.value(ffb_model::inducement::usage::Usage::AVOID_BAN),
+            1,
+            "away should gain 1 bribe"
+        );
+    }
+
+    #[test]
+    fn get_the_ref_increments_existing_bribes() {
+        use ffb_model::inducement::inducement::Inducement;
+        use ffb_model::inducement::usage::Usage;
+        let mut step = make_step();
+        let mut game = make_game();
+        game.turn_data_home.inducement_set.add_inducement(Inducement::new("BRIBE", 2, vec![Usage::AVOID_BAN]));
+        game.turn_data_away.inducement_set.add_inducement(Inducement::new("BRIBE", 1, vec![Usage::AVOID_BAN]));
+        step.kickoff_result = Some(KickoffResult::GetTheRef);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.turn_data_home.inducement_set.value(Usage::AVOID_BAN), 3, "home bribe +1");
+        assert_eq!(game.turn_data_away.inducement_set.value(Usage::AVOID_BAN), 2, "away bribe +1");
+    }
+
+    // ── QuickSnap deactivation test ────────────────────────────────────────────
+
+    #[test]
+    fn quick_snap_deactivates_players_in_tackle_zones() {
+        use ffb_model::enums::{PS_STANDING, PlayerState, PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+
+        let mut step = make_step();
+        let mut game = make_game();
+        // home_playing = true → after flip, active = away = receiving team
+        game.home_playing = true;
+
+        // Add an away player (receiving) at (5,5)
+        let away_player = Player {
+            id: "away1".into(), name: "a".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None, ..Default::default()
+        };
+        game.team_away.players.push(away_player);
+        game.field_model.set_player_coordinate("away1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("away1", PlayerState::new(PS_STANDING));
+
+        // Add a home player (kicking) adjacent at (6,5) WITH tackle zones
+        let home_player = Player {
+            id: "home1".into(), name: "h".into(), nr: 2, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None, ..Default::default()
+        };
+        game.team_home.players.push(home_player);
+        game.field_model.set_player_coordinate("home1", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("home1", PlayerState::new(PS_STANDING));
+
+        step.kickoff_result = Some(KickoffResult::QuickSnap);
+        step.start(&mut game, &mut GameRng::new(0));
+
+        // away1 is adjacent to home1 (kicking team with TZ), so should be deactivated
+        let away1_state = game.field_model.player_state("away1").expect("state");
+        assert!(!away1_state.is_active(), "away player in tackle zone should be deactivated by QuickSnap");
     }
 }

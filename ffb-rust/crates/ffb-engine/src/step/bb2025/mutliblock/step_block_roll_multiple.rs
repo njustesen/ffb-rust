@@ -243,11 +243,11 @@ impl StepBlockRollMultiple {
 
         // Java: if attackerTeamSelects && (ownChoice unselected || anyReRollLeft)
         //   → showDialog(DialogReRollBlockForTargetsPropertiesParameter)
-        // DEFERRED(brm-dialog): attacker dialog deferred.
+        // client-only: attacker block-roll dialog — headless auto-selects index 0
 
         // Java: else if defender rolls need selection
         //   → showDialog(DialogOpponentBlockSelectionPropertiesParameter)
-        // DEFERRED(brm-dialog): defender dialog deferred.
+        // client-only: defender block-roll dialog — headless auto-selects index 0
 
         // Fallback: auto-select index 0 for unselected rolls and proceed.
         for roll in &mut self.block_rolls {

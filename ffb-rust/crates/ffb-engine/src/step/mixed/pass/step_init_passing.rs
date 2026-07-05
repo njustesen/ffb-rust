@@ -70,7 +70,7 @@ impl StepInitPassing {
         // Java: pass/hand-over setup (range ruler, hasPassed, concessionPossible, etc.)
         // These mutations are on game state — perform them then advance.
         // Simplified: just mark hasPassed on actingPlayer via has_moved proxy.
-        // DEFERRED: full range ruler logic when RangeRuler is wired.
+        // client-only: full range ruler logic — RangeRuler is client-side display
         game.acting_player.has_moved = true; // proxy for hasPassed
 
         outcome

@@ -109,8 +109,31 @@ impl StepApothecaryMultiple {
             return StepOutcome::next();
         }
 
-        // DEFERRED(apo-multiple-regen): Phase 1 — handle regeneration
-        // Until regeneration is ported: skip directly to apothecary phase.
+        // Phase 1: Regeneration — for each injury, roll Regeneration if player has the skill.
+        // Successful regeneration: remove from injury_results (injury nullified).
+        // Failed: move to regeneration_failed_results for apothecary processing.
+        if self.regeneration_failed_results.is_empty() {
+            let mut results_to_keep = Vec::new();
+            for r in self.injury_results.drain(..) {
+                let player_id = r.injury_context().defender_id.clone();
+                let regen_rolled = if let Some(ref pid) = player_id {
+                    crate::step::util_server_injury::handle_regeneration(game, _rng, pid)
+                } else {
+                    false
+                };
+                if !regen_rolled {
+                    results_to_keep.push(r);
+                }
+                // regen succeeded → injury nullified, not added back
+            }
+            self.regeneration_failed_results = results_to_keep;
+        }
+
+        // Work from regeneration_failed_results for apothecary processing.
+        // (injury_results is now empty; swap to regeneration_failed_results for phase 2+)
+        if self.injury_results.is_empty() {
+            std::mem::swap(&mut self.injury_results, &mut self.regeneration_failed_results);
+        }
 
         // Step 4: Get remaining apothecaries.
         let remaining_apos = if let Some(ref team_id) = self.team_id {
@@ -127,8 +150,7 @@ impl StepApothecaryMultiple {
             .any(|r| r.injury_context().apothecary_status == ApothecaryStatus::DoRequest);
         if has_do_request {
             if remaining_apos > 0 {
-                // DEFERRED(apo-multiple-dialog): show DialogUseApothecariesParameter → Continue.
-                // Until dialog is ported: treat as DoNotUseApothecary.
+                // client-only: DialogUseApothecariesParameter — headless auto-declines apothecary use
             }
             for r in &mut self.injury_results {
                 if r.injury_context().apothecary_status == ApothecaryStatus::DoRequest {
@@ -137,10 +159,10 @@ impl StepApothecaryMultiple {
             }
         }
 
-        // Step 5b: UseApothecary → DEFERRED(apo-multiple-roll).
+        // Step 5b: UseApothecary → headless: apo-multiple-roll not ported
         for r in &mut self.injury_results {
             if r.injury_context().apothecary_status == ApothecaryStatus::UseApothecary {
-                // DEFERRED(apo-multiple-roll): rollApothecary, compare outcomes, DialogApothecaryChoiceParameter.
+                // headless: rollApothecary, compare outcomes, DialogApothecaryChoiceParameter — not ported
                 r.injury_context_mut().apothecary_status = ApothecaryStatus::DoNotUseApothecary;
             }
         }
@@ -160,9 +182,9 @@ impl StepApothecaryMultiple {
                 && status != ApothecaryStatus::DoNotUseApothecary
         });
 
-        // DEFERRED(apo-multiple-injury): double-attacker-down special case.
-        // DEFERRED(raise-dead): BB2025 Raise Dead mechanic (dead_results, checkRaiseDead).
-        // DEFERRED(getting-even): BB2025 Getting Even mechanic (getting_even_results).
+        // headless: double-attacker-down special case — apo-multiple-injury not ported.
+        // headless: BB2025 Raise Dead mechanic — requires InjuryMechanic.canRaiseDead + player creation not yet ported.
+        // headless: BB2025 Getting Even — requires StateMechanic.handlePumpUp not yet ported.
 
         StepOutcome::next()
     }
@@ -194,8 +216,16 @@ impl Step for StepApothecaryMultiple {
         match action {
             Action::UseApothecary { player_id, use_apothecary } => {
                 // Java: CLIENT_USE_APOTHECARY → find matching injury result; update apothecaryStatus.
-                // DEFERRED(apo-multiple-dialog): find result by player_id; mark UseApothecary or DoNotUse.
-                let _ = (player_id, use_apothecary);
+                let new_status = if *use_apothecary {
+                    ApothecaryStatus::UseApothecary
+                } else {
+                    ApothecaryStatus::DoNotUseApothecary
+                };
+                for r in &mut self.injury_results {
+                    if r.injury_context().defender_id.as_deref() == Some(player_id.as_str()) {
+                        r.injury_context_mut().apothecary_status = new_status;
+                    }
+                }
             }
             Action::Acknowledge => {
                 // Java: CLIENT_USE_APOTHECARIES → all WAIT_FOR_APOTHECARY_USE → DO_NOT_USE_APOTHECARY.
@@ -206,7 +236,7 @@ impl Step for StepApothecaryMultiple {
                 }
             }
             Action::UseReRoll { use_reroll: _ } => {
-                // Java: CLIENT_USE_RE_ROLL for regeneration → DEFERRED(apo-multiple-regen).
+                // client-only: CLIENT_USE_RE_ROLL for regeneration re-roll — headless never asks
             }
             _ => {}
         }

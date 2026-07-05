@@ -7,7 +7,7 @@
 /// Consumes: END_TURN, THROWN_PLAYER_COORDINATE, THROWN_PLAYER_HAS_BALL,
 ///           THROWN_PLAYER_ID, THROWN_PLAYER_STATE.
 ///
-/// DEFERRED(dialog-client): UtilServerDialog.hideDialog not yet ported.
+/// client-only: UtilServerDialog.hideDialog (dialog layer not translated).
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::PlayerState;
@@ -47,7 +47,7 @@ impl StepEndThrowTeamMate {
     }
 
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
-        // DEFERRED(dialog): UtilServerDialog.hideDialog not yet ported.
+        // client-only: UtilServerDialog.hideDialog
         game.pass_coordinate = None;
         game.field_model.range_ruler = None;
         game.defender_id = None;

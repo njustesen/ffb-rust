@@ -16,6 +16,6 @@ pub trait ArmorModifier: Send + Sync {
     fn get_special_effect(&self) -> Option<SpecialEffect> { None }
 
     /// Java: isRegisteredToSkillWithProperty — checks if registered_to skill has property.
-    /// DEFERRED: requires skill property lookup (SkillFactory not yet ported).
+    /// headless: requires SkillFactory not yet ported
     fn is_registered_to_skill_with_property(&self, _property: &str) -> bool { false }
 }

@@ -21,8 +21,10 @@ use std::collections::HashSet;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::skill_def::SkillWithValue;
+use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_cards::UtilCards;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -87,12 +89,39 @@ impl StepInitFuriousOutburst {
                     game.field_model.target_selection_state = Some(ts);
                     return StepOutcome::next();
                 }
-                // DEFERRED(UtilPlayer port): find eligible players, show dialog
-                // For now if no eligible players found, fall through to goto
+                // Java: findEligiblePlayers() — opponents within 3 with an empty adjacent square
+                let found = Self::find_eligible_players(game, &acting_id);
+                if !found.is_empty() {
+                    self.eligible_players.extend(found);
+                    // client-only: DialogPlayerChoiceParameter(FURIOUS_OUTBURST) — headless falls through
+                    return StepOutcome::cont();
+                }
             }
         }
 
         StepOutcome::goto(&self.goto_label_on_end)
+    }
+
+    /// Java: findEligiblePlayers — opponents within 3 squares of acting player that have an empty adjacent square.
+    fn find_eligible_players(game: &Game, acting_id: &str) -> Vec<String> {
+        let Some(coord) = game.field_model.player_coordinate(acting_id) else {
+            return Vec::new();
+        };
+        let opponent_team = game.inactive_team();
+        UtilPlayer::find_blockable_players(game, opponent_team, coord, 3)
+            .into_iter()
+            .filter(|pid| Self::has_empty_adjacent_square(game, pid))
+            .map(|pid| pid.clone())
+            .collect()
+    }
+
+    fn has_empty_adjacent_square(game: &Game, player_id: &str) -> bool {
+        let Some(coord) = game.field_model.player_coordinate(player_id) else {
+            return false;
+        };
+        game.field_model.adjacent_on_pitch(coord)
+            .into_iter()
+            .any(|c| game.field_model.player_at(c).is_none())
     }
 }
 

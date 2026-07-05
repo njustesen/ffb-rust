@@ -23,15 +23,15 @@ use crate::util::util_server_player_swoop::UtilServerPlayerSwoop;
 ///   passCoordinate = game.passCoordinate
 ///   if throwScatter:
 ///     game.fieldModel.setRangeRuler(null); clearMoveSquares
-///     // DEFERRED: render animation(thrownPlayerCoordinate -> passCoordinate)
-///     // DEFERRED: syncGameModel
+///     // client-only: render animation(thrownPlayerCoordinate -> passCoordinate)
+///     // client-only: syncGameModel
 ///     setPlayerCoordinate(thrownPlayer, passCoordinate)
-///     // DEFERRED: changeActingPlayer(thrownPlayerId, SWOOP)
-///     // DEFERRED: if blitzTurnState: blitzTurnState.changeActingPlayer()
+///     // headless: changeActingPlayer(thrownPlayerId, SWOOP) — ActingPlayer infra
+///     // headless: if blitzTurnState: blitzTurnState.changeActingPlayer()
 ///     if thrownPlayerHasBall: setBallCoordinate(passCoordinate)
 ///     setCurrentMove(thrownPlayer.movementWithModifiers - 3)
 ///     publish THROWN_PLAYER_ID, THROWN_PLAYER_STATE, THROWN_PLAYER_HAS_BALL
-///     // DEFERRED: syncGameModel
+///     // client-only: syncGameModel
 ///
 ///   if coordinateTo==null:
 ///     UtilServerPlayerSwoop.updateSwoopSquares(thrownPlayer)
@@ -124,17 +124,17 @@ impl Step for StepSwoop {
             Action::Pass { coord } => {
                 // Java: CLIENT_SWOOP -> coordinateTo = swoopCommand.getTargetCoordinate()
                 // Java: if !checkCommandIsFromHomePlayer: coordinateTo = coordinateTo.transform()
-                // DEFERRED: away-team coordinate transform
+                // headless: away-team coordinate transform not ported
                 self.coordinate_to = Some(*coord);
                 // Java: executeSwoop() = executeStepHooks(this, state)
-                // DEFERRED: executeSwoop hook
+                // headless: executeSwoop hook — SkillBehaviour registry not ported
                 return StepOutcome::next();
             }
             Action::UseReRoll { .. } => {
                 // Java: CLIENT_USE_RE_ROLL -> state.reRollSource = command.reRollSource
                 //                             state.reRolledAction = command.reRolledAction
                 //                             executeSwoop()
-                // DEFERRED: extract ReRollSource/ReRolledAction from command; executeSwoop
+                // headless: extract ReRollSource/ReRolledAction from command; executeSwoop
                 return StepOutcome::next();
             }
             _ => {}
@@ -166,7 +166,7 @@ impl StepSwoop {
         // Java: if (state.usingSwoop == null):
         //   UtilServerDialog.showDialog(gameState, DialogSkillUseParameter(...))
         //   return  // wait for CLIENT_USE_SKILL
-        // DEFERRED: UtilServerDialog.showDialog — return Continue to wait
+        // client-only: UtilServerDialog.showDialog — dialog is client-side
         if self.using_swoop.is_none() {
             return StepOutcome::cont();
         }
@@ -181,15 +181,15 @@ impl StepSwoop {
         // Java: if (state.throwScatter):
         //   fieldModel.setRangeRuler(null); fieldModel.clearMoveSquares()
         //   passCoordinate = game.getPassCoordinate()
-        //   [animation — DEFERRED]
-        //   [syncGameModel — DEFERRED]
+        //   [animation — client-only]
+        //   [syncGameModel — client-only]
         //   fieldModel.setPlayerCoordinate(thrownPlayer, passCoordinate)
-        //   [UtilActingPlayer.changeActingPlayer — DEFERRED]
-        //   [blitzTurnState.changeActingPlayer — DEFERRED]
+        //   [UtilActingPlayer.changeActingPlayer — headless: ActingPlayer infra]
+        //   [blitzTurnState.changeActingPlayer — headless: BlitzTurnState not ported]
         //   if thrownPlayerHasBall: setBallCoordinate(passCoordinate)
         //   actingPlayer.setCurrentMove(thrownPlayer.movementWithModifiers - 3)
         //   publish THROWN_PLAYER_ID, THROWN_PLAYER_STATE, THROWN_PLAYER_HAS_BALL
-        //   [syncGameModel — DEFERRED]
+        //   [syncGameModel — client-only]
         let mut outcome = StepOutcome::cont();
         if self.throw_scatter {
             game.field_model.range_ruler = None;
@@ -197,8 +197,8 @@ impl StepSwoop {
             if let Some(pass_coord) = game.pass_coordinate {
                 // Move player to the pass coordinate
                 game.field_model.set_player_coordinate(&player_id, pass_coord);
-                // DEFERRED: UtilActingPlayer.changeActingPlayer(game, thrownPlayerId, SWOOP, false)
-                // DEFERRED: blitzTurnState.changeActingPlayer()
+                // headless: UtilActingPlayer.changeActingPlayer(game, thrownPlayerId, SWOOP, false)
+                // headless: blitzTurnState.changeActingPlayer()
                 if self.thrown_player_has_ball {
                     game.field_model.ball_coordinate = Some(pass_coord);
                 }
@@ -225,7 +225,7 @@ impl StepSwoop {
         }
 
         // coordinateTo is known -> executeSwoop hook handles the rest
-        // DEFERRED: executeStepHooks(this, state)
+        // headless: executeStepHooks — SkillBehaviour registry not ported
         StepOutcome::next()
     }
 }

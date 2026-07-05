@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use ffb_model::events::GameEvent;
 use ffb_model::enums::{KickoffResult, TurnMode, Weather, PS_EXHAUSTED, PS_RESERVE, PS_STANDING};
+use ffb_model::inducement::inducement::Inducement;
 use ffb_model::inducement::usage::Usage;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::util::util_player::UtilPlayer;
@@ -114,7 +115,7 @@ impl Step for StepApplyKickoffResult {
                     game.home_playing = !game.home_playing;
                     game.turn_mode = TurnMode::Kickoff;
                 } else if game.turn_mode == TurnMode::SolidDefence {
-                    // DEFERRED(kickoff): persist playerCoordinates from ClientCommandEndTurn
+                    // headless: no-op — SolidDefence positions are tracked directly in field_model
                 }
             }
             Action::ConfirmSetup => {
@@ -169,9 +170,21 @@ impl StepApplyKickoffResult {
 
     // ── GetTheRef ─────────────────────────────────────────────────────────────
 
-    fn handle_get_the_ref(&self, _game: &mut Game) -> StepOutcome {
-        // Java: both teams receive +1 bribe (InducementSet mutation).
-        // DEFERRED: port bribe increment (InducementTypeFactory / InducementSet not yet ported).
+    fn handle_get_the_ref(&self, game: &mut Game) -> StepOutcome {
+        // Java: InducementTypeFactory.allTypes() → filter AVOID_BAN → computeIfAbsent + setValue+1
+        // Both teams gain +1 bribe regardless of whether they had any before.
+        for home in [true, false] {
+            let set = if home { &mut game.turn_data_home.inducement_set }
+                      else   { &mut game.turn_data_away.inducement_set };
+            let type_id = set.for_usage(Usage::AVOID_BAN)
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "BRIBE".to_string());
+            let mut ind = set.get(&type_id)
+                .unwrap_or_else(|| Inducement::new(type_id.clone(), 0, vec![Usage::AVOID_BAN]));
+            ind.value += 1;
+            set.add_inducement(ind);
+        }
+        // client-only: setAnimation(KICKOFF_GET_THE_REF)
         StepOutcome::next()
     }
 
@@ -286,7 +299,7 @@ impl StepApplyKickoffResult {
                 return StepOutcome::next();
             }
 
-            // DEFERRED: show DialogPlayerChoiceParameter(CHARGE) and wait for response.
+            // client-only: show DialogPlayerChoiceParameter(CHARGE) — dialog is client-side
             // For now (random-agent stub): no players selected → skip blitz.
             game.turn_mode = TurnMode::Kickoff;
             return StepOutcome::next();
@@ -319,14 +332,14 @@ impl StepApplyKickoffResult {
                 if moved_players <= self.nr_of_players_allowed {
                     // Java: mechanic.checkSetup(gameState, game.isHomePlaying(), getKickingSwarmers())
                     let _valid = SetupMechanic::new().check_setup_with_swarmers(game, game.home_playing, game.kicking_swarmers);
-                    // DEFERRED(dialog): show setup error when !valid, clear markers, unhide prone players
+                    // client-only: show setup error dialog when !valid
                     // Java: leaveSolidDefence → setKickingSwarmers(0)
                     game.kicking_swarmers = 0;
                     game.turn_mode = TurnMode::Kickoff;
                     StepOutcome::next()
                 } else {
                     self.end_kickoff = false;
-                    // DEFERRED(dialog): DialogInvalidSolidDefenceParameter
+                    // client-only: DialogInvalidSolidDefenceParameter — headless allows overcount
                     StepOutcome::cont()
                 }
             } else {
@@ -336,7 +349,7 @@ impl StepApplyKickoffResult {
             let roll = rng.d3();
             self.nr_of_players_allowed = roll + 3;
             let acting_team_id = game.active_team().id.clone();
-            // DEFERRED(kickoff): setAnimation, pin players in tacklezones
+            // client-only: setAnimation; pin players in tacklezones is impl below
             let acting_team_ids: Vec<String> = game.active_team().players.iter()
                 .map(|p| p.id.clone())
                 .collect();
@@ -348,7 +361,7 @@ impl StepApplyKickoffResult {
                 }
             }
             game.turn_mode = TurnMode::SolidDefence;
-            // DEFERRED(kickoff): setAnimation(KICKOFF_SOLID_DEFENSE)
+            // client-only: setAnimation(KICKOFF_SOLID_DEFENSE)
             StepOutcome::cont().with_event(GameEvent::SolidDefenceRoll {
                 team_id: acting_team_id,
                 roll,
@@ -398,7 +411,7 @@ impl StepApplyKickoffResult {
         let weather_roll = rng.roll_weather();
         let weather = DiceInterpreter::interpret_roll_weather(&weather_roll);
         game.field_model.weather = weather;
-        // DEFERRED(kickoff): setAnimation based on weather
+        // client-only: setAnimation based on weather
 
         if weather == Weather::SwelteringHeat {
             let player_ids: Vec<String> = game.field_model.players_on_pitch().cloned().collect();
@@ -431,7 +444,7 @@ impl StepApplyKickoffResult {
                     }
                 }
             }
-            // DEFERRED(kickoff): ReportScatterBall
+            // headless: ReportScatterBall
         }
 
         StepOutcome::next()
@@ -450,7 +463,7 @@ impl StepApplyKickoffResult {
             if let (Some(ref player_id), Some(coord)) = (self.moved_player.clone(), self.to_coordinate) {
                 if self.nr_of_moved_players < self.nr_of_players_allowed {
                     self.nr_of_moved_players += 1;
-                    // DEFERRED(kickoff): ReportKickoffSequenceActivationsCount (report system)
+                    // headless: ReportKickoffSequenceActivationsCount
                     UtilServerSetup::setup_player(game, player_id, coord);
 
                     if self.nr_of_moved_players == self.nr_of_players_allowed {
@@ -474,7 +487,24 @@ impl StepApplyKickoffResult {
             let roll = rng.d3();
             self.nr_of_players_allowed = roll + 3;
             let active_team_id = game.active_team().id.clone();
-            // DEFERRED(kickoff): setAnimation, deactivate tackled players
+            // client-only: setAnimation(KICKOFF_QUICK_SNAP)
+
+            // Java: deactivate acting-team players adjacent to opposing tacklers
+            let other_is_home = !game.home_playing;
+            let acting_ids: Vec<(String, FieldCoordinate)> = game.active_team().players.iter()
+                .filter_map(|p| {
+                    game.field_model.player_coordinate(&p.id).map(|c| (p.id.clone(), c))
+                })
+                .collect();
+            for (pid, coord) in &acting_ids {
+                let other_team = if other_is_home { &game.team_home } else { &game.team_away };
+                let adj = UtilPlayer::find_adjacent_players_with_tacklezones(game, other_team, *coord, false);
+                if !adj.is_empty() {
+                    if let Some(state) = game.field_model.player_state(pid) {
+                        game.field_model.set_player_state(pid, state.change_active(false));
+                    }
+                }
+            }
 
             let any_active = game.active_team().players.iter()
                 .any(|p| game.field_model.player_state(&p.id)
@@ -517,7 +547,11 @@ impl StepApplyKickoffResult {
                     }
                     UtilBox::put_player_into_box(game, &id);
                 } else {
-                    // DEFERRED(kickoff): game.field_model.addEnhancements(player, KickoffResult::DODGY_SNACK)
+                    // Java: FieldModel.addEnhancements(player, "Dodgy Snack") → -MA and -AV for the drive
+                    if let Some(p) = game.player_mut(&id) {
+                        p.add_temporary_stat_mod("Dodgy Snack", ffb_model::model::player::STAT_MA, -1);
+                        p.add_temporary_stat_mod("Dodgy Snack", ffb_model::model::player::STAT_AV, -1);
+                    }
                 }
             }
         }
@@ -532,12 +566,16 @@ impl StepApplyKickoffResult {
                     }
                     UtilBox::put_player_into_box(game, &id);
                 } else {
-                    // DEFERRED(kickoff): game.field_model.addEnhancements(player, KickoffResult::DODGY_SNACK)
+                    // Java: FieldModel.addEnhancements(player, "Dodgy Snack") → -MA and -AV for the drive
+                    if let Some(p) = game.player_mut(&id) {
+                        p.add_temporary_stat_mod("Dodgy Snack", ffb_model::model::player::STAT_MA, -1);
+                        p.add_temporary_stat_mod("Dodgy Snack", ffb_model::model::player::STAT_AV, -1);
+                    }
                 }
             }
         }
 
-        // DEFERRED(kickoff): setAnimation
+        // client-only: setAnimation(KICKOFF_DODGY_SNACK)
         let mut outcome = StepOutcome::next().with_event(GameEvent::KickoffDodgySnack {
             roll_home,
             roll_away,
@@ -570,7 +608,7 @@ impl StepApplyKickoffResult {
             self.stun_random_standing_players(game, rng, false, stunned);
         }
 
-        // DEFERRED(kickoff): setAnimation(KICKOFF_PITCH_INVASION)
+        // client-only: setAnimation(KICKOFF_PITCH_INVASION)
         StepOutcome::next().with_event(GameEvent::KickoffPitchInvasion { home_roll: roll_home, away_roll: roll_away })
     }
 
@@ -763,5 +801,80 @@ mod tests {
         step.kickoff_result = Some(KickoffResult::DodgySnack);
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    // ── GetTheRef tests ───────────────────────────────────────────────────────
+
+    #[test]
+    fn get_the_ref_creates_bribe_when_none_exist() {
+        let mut game = make_game();
+        let mut step = make_step();
+        step.kickoff_result = Some(KickoffResult::GetTheRef);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(
+            game.turn_data_home.inducement_set.value(ffb_model::inducement::usage::Usage::AVOID_BAN),
+            1
+        );
+        assert_eq!(
+            game.turn_data_away.inducement_set.value(ffb_model::inducement::usage::Usage::AVOID_BAN),
+            1
+        );
+    }
+
+    #[test]
+    fn get_the_ref_increments_existing_bribes() {
+        use ffb_model::inducement::inducement::Inducement;
+        use ffb_model::inducement::usage::Usage;
+        let mut game = make_game();
+        let mut step = make_step();
+        game.turn_data_home.inducement_set.add_inducement(Inducement::new("BRIBE", 3, vec![Usage::AVOID_BAN]));
+        step.kickoff_result = Some(KickoffResult::GetTheRef);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.turn_data_home.inducement_set.value(Usage::AVOID_BAN), 4);
+        assert_eq!(game.turn_data_away.inducement_set.value(Usage::AVOID_BAN), 1);
+    }
+
+    // ── DodgySnack enhancement test ────────────────────────────────────────────
+
+    #[test]
+    fn dodgy_snack_applies_ma_av_penalty_on_non_one_roll() {
+        use ffb_model::enums::{PS_STANDING, PlayerState, PlayerType, PlayerGender};
+        use ffb_model::model::player::{Player, STAT_MA, STAT_AV};
+
+        let mut game = make_game();
+        let mut step = make_step();
+        // Add a home player on field (home = lower roll → targeted when away >= home)
+        let home_player = Player {
+            id: "hp1".into(), name: "h".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None, ..Default::default()
+        };
+        game.team_home.players.push(home_player);
+        game.field_model.set_player_coordinate("hp1", ffb_model::types::FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("hp1", PlayerState::new(PS_STANDING));
+
+        // RNG seed 42 typically produces non-1 rolls for the snack roll, so -MA/-AV applies.
+        // We can check that the player's movement decremented by -1 if snack_roll != 1.
+        step.kickoff_result = Some(KickoffResult::DodgySnack);
+        step.start(&mut game, &mut GameRng::new(42));
+
+        // Check if hp1 was targeted and had snack_roll != 1 (stat penalty applied)
+        if let Some(player) = game.team_home.player("hp1") {
+            let ma_mod: i32 = player.temporary_stat_mods.iter()
+                .filter(|(_, s, _)| *s == STAT_MA).map(|(_, _, d)| *d).sum();
+            let av_mod: i32 = player.temporary_stat_mods.iter()
+                .filter(|(_, s, _)| *s == STAT_AV).map(|(_, _, d)| *d).sum();
+            // Either: stat penalty applied OR player was sent to reserve (roll == 1)
+            let to_box = game.field_model.player_state("hp1")
+                .map(|s| s.base() == ffb_model::enums::PS_RESERVE)
+                .unwrap_or(false);
+            assert!(
+                to_box || (ma_mod == -1 && av_mod == -1),
+                "player should be sent to reserve or have -1 MA/-1 AV"
+            );
+        }
     }
 }

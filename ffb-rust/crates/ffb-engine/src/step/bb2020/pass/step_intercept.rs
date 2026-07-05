@@ -197,9 +197,7 @@ impl StepIntercept {
 
         // Java: if (!state.isInterceptorChosen()) → showDialog, TurnMode=INTERCEPTION, doNextStep=false
         if !self.interceptor_chosen {
-            // DEFERRED(dialog): show DialogInterceptionParameter + set TurnMode::Interception —
-            //   waiting for dialog infrastructure (UtilServerDialog.showDialog) to be translated.
-            //   Currently returns Continue so the driver waits for a CLIENT_INTERCEPTOR_CHOICE command.
+            // client-only: DialogInterceptionParameter — headless waits for CLIENT_INTERCEPTOR_CHOICE command
             return StepOutcome::cont();
         }
 

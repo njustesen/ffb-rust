@@ -20,8 +20,8 @@
 ///  - Uses `playerCoordinate.isBoxCoordinate()` guard (trapdoor).
 ///
 /// RightStuffModifierFactory + AgilityMechanic.minimumRollRightStuff → wired.
-/// DEFERRED(RightStuff-injury): UtilServerInjury.handleInjury(InjuryTypeTTMLanding/FumbledKtm) deferred.
-/// DEFERRED(RightStuff-spp): SppMechanic.addCompletion (accurate pass) deferred.
+/// UtilServerInjury.handleInjury wired for both TTMLanding and FumbledKtm paths.
+/// headless: SppMechanic.addCompletion for accurate TTM pass — SPP tracking not yet ported.
 /// `isBoxCoordinate()` guard wired — skips landing roll when player is in the dugout.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;

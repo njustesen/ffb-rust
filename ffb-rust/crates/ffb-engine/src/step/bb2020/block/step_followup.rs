@@ -229,7 +229,7 @@ impl StepFollowup {
                         game.field_model.set_player_coordinate(attacker_id, followup_coord);
                         // Java: UtilServerPlayerMove.updateMoveSquares(getGameState(), jumping)
                         UtilServerPlayerMove::update_move_squares(game, game.acting_player.jumping);
-                        // DEFERRED(animation-client): TrackNumber animation not ported
+                        // client-only: TrackNumber animation
                         outcome = outcome.publish(StepParameter::PlayerEnteringSquare(attacker_id.clone()));
                     }
                 }

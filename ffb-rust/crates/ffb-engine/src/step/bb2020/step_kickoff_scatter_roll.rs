@@ -4,6 +4,7 @@ use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
+use crate::mechanic::mixed::state_mechanic::StateMechanic;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 
@@ -128,8 +129,7 @@ impl StepKickoffScatterRoll {
 
             if has_kick_skill {
                 // Java: show DialogKickSkillParameter; wait for client answer.
-                // DEFERRED(kickoff): show dialog when dialogs are ported.
-                // Random agent: auto-decline Kick (same as BB2025 path).
+                // client-only: DialogKickSkillParameter — headless auto-declines Kick skill
                 self.use_kick_choice = Some(false);
             } else {
                 self.use_kick_choice = Some(false);
@@ -175,7 +175,7 @@ impl StepKickoffScatterRoll {
 
             if self.touchback {
                 game.field_model.out_of_bounds = true;
-                // DEFERRED(kickoff): add ReportEvent("TOUCHBACK") when reports are ported
+                // headless: ReportTouchback — report system not yet ported
             }
 
             // Java: addReport(new ReportSkillUse(kick, true, SkillUse.HALVE_KICKOFF_SCATTER))
@@ -187,7 +187,13 @@ impl StepKickoffScatterRoll {
                 })
             } else { None };
 
-            // DEFERRED(kickoff): handleChefRolls for first drive (turn 0/0)
+            // Java: UtilServerGame.handleChefRolls — BB2020 runs chef rolls at first kickoff
+            let first_turn = game.turn_data_home.first_turn_after_kickoff
+                || game.turn_data_away.first_turn_after_kickoff;
+            if game.half < 3 && first_turn {
+                let _chef_events = StateMechanic::new().handle_chef_rolls(game, rng);
+                // headless: emit MasterChefRoll events when report system is ported
+            }
 
             let kicking_coord = self.kicking_player_coordinate.unwrap();
             let touchback = self.touchback;

@@ -87,7 +87,7 @@ impl Step for StepMissedPass {
         //   report ReportSkillUse(playerId, skill, doRoll, SkillUse.RE_ROLL_DIRECTION)
         //   if used → getGameState().getPassState().setUsingBlastIt(true)
         //   if neverUse → getGameState().getPassState().setUsingBlastIt(false)
-        // DEFERRED: PassState.set_using_blast_it — PassState not yet in Game struct
+        // headless: PassState.set_using_blast_it — PassState not yet in Game struct
         match action {
             Action::UseSkill { skill_id, use_skill } => {
                 // Blast-It answer: if used → re-roll the direction; else keep current
@@ -160,13 +160,13 @@ impl StepMissedPass {
             // if (HAIL_MARY_PASS && ((hasUnusedBlastIt && usingBlastIt==null) || (hasBlastIt && usingBlastIt)) && !reRolling)
             //     → reportDirectionRoll(); showDialog(DialogSkillUseParameter(...)); reRolling=true;
             //       fieldModel.add(MoveSquare(coordinateEnd, 0, 0)); return StepAction.CONTINUE
-            // DEFERRED: UtilCards.hasUnusedSkillWithProperty, PassState.getUsingBlastIt — not yet translated
+            // headless: UtilCards.hasUnusedSkillWithProperty, PassState.getUsingBlastIt — not yet translated
             // The Blast-It dialog path is reached when handle_command delivers USE_SKILL with re_rolling=false.
             // With no skill registry, we conservatively skip the dialog (safe for non-Goblin rosters).
 
             // Java: if (reRolling && doRoll) reportDirectionRoll()
             // Java: getResult().addReport(new ReportScatterBall(new Direction[]{direction}, new int[]{roll}, false))
-            // DEFERRED: emit partial scatter report when report infrastructure is translated
+            // headless: emit partial scatter report — report infrastructure not yet translated
 
             // Java: rollList.add(roll); directionList.add(direction);
             self.roll_list.push(self.roll);
@@ -180,7 +180,7 @@ impl StepMissedPass {
         }
 
         // Java: getResult().addReport(new ReportScatterBall(directions, rolls, false))
-        // DEFERRED: emit full scatter report when report infrastructure is translated
+        // headless: emit full scatter report — report infrastructure not yet translated
 
         // Java: game.setPassCoordinate(lastValidCoordinate)
         game.pass_coordinate = self.last_valid_coordinate;

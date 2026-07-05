@@ -16,8 +16,8 @@ use ffb_mechanics::modifiers::dodge_context::DodgeContext;
 ///
 /// BB2020 differs from BB2025 only in that DodgeModifierFactory uses BB2020 rules.
 ///
-/// DEFERRED(break-tackle): modifyingSkill dialog (Break Tackle / Diving Tackle) not yet ported.
-/// DEFERRED(arm-bar): Arm-Bar multi-target path not yet ported.
+/// client-only: modifyingSkill dialog (Break Tackle / Diving Tackle) — headless skips skill use choice.
+/// client-only: Arm-Bar multi-target path — headless skips arm-bar activation.
 /// failDodge: SteadyFootingContext(InjuryTypeDropDodge) published — corrected from InjuryTypeFallDown.
 pub struct StepMoveDodge {
     /// Java: fGotoLabelOnFailure

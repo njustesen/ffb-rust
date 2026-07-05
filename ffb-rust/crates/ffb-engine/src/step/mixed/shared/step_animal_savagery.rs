@@ -63,10 +63,8 @@ impl StepAnimalSavagery {
     }
 
     fn execute_step(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // Java: getGameState().executeStepHooks(this, state)
-        // The full logic lives in step hooks (ActionStatus state machine).
-        // DEFERRED(StepHooks port): executeStepHooks — Animal Savagery roll, lash-out attack,
-        //   publish(GOTO_LABEL_ON_FAILURE) or NEXT_STEP based on roll result.
+        // Java: getGameState().executeStepHooks(this, state) — entire logic is in step hooks
+        // headless: executeStepHooks infrastructure not yet ported — Animal Savagery no-ops
         StepOutcome::next()
     }
 }

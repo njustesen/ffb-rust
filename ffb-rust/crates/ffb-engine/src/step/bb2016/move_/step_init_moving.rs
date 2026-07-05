@@ -24,7 +24,7 @@ use crate::step::generator::bb2016::kick_team_mate::KickTeamMateParams;
 /// - fMoveStack provided → publish COORDINATE_FROM / COORDINATE_TO / MOVE_STACK (shifted),
 ///   set dodging/goingForIt/hasMoved, update turnStarted, NEXT_STEP
 ///
-/// DEFERRED(validMove): UtilServerPlayerMove.isValidMove check — agent paths are trusted in headless mode.
+/// headless: UtilServerPlayerMove.isValidMove check — agent paths are trusted in headless mode.
 pub struct StepInitMoving {
     /// Java: fGotoLabelOnEnd (init param)
     pub goto_label_on_end: String,

@@ -242,9 +242,7 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
         // Java: ClientCommandApothecaryChoice — no direct protocol equivalent yet; use confirm as fallback.
         Action::ApothecaryChoice { .. } => Some(ClientCommand::ClientConfirm(ClientConfirm)),
 
-        // Game lifecycle: CLIENT_START_GAME — not yet wired to a protocol command.
-        // DEFERRED(protocol): add ClientCommandStartGame to ffb-protocol and map here.
-        Action::StartGame { .. } => None,
+        Action::StartGame { .. } => Some(ClientCommand::ClientStartGame(ClientStartGame)),
 
         // Java: ClientCommandBloodlustAction — maps to ClientConfirm as a fallback.
         Action::BloodlustAction { .. } => Some(ClientCommand::ClientConfirm(ClientConfirm)),

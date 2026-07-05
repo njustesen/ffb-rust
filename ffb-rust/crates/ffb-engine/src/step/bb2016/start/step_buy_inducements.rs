@@ -11,12 +11,12 @@
 ///
 /// Receives: INDUCEMENT_GOLD_HOME, INDUCEMENT_GOLD_AWAY.
 ///
-/// DEFERRED(inducements): InducementTypeFactory, Inducement, InducementSet not yet ported.
-/// DEFERRED(addStarPlayers): RosterPlayer creation + DB update not yet ported.
-/// DEFERRED(addMercenaries): Loner skill injection not yet ported.
+/// headless: InducementTypeFactory, Inducement, InducementSet not yet ported.
+/// headless: addStarPlayers — RosterPlayer creation + DB update not yet ported.
+/// headless: addMercenaries — Loner skill injection not yet ported.
 use ffb_model::enums::InducementPhase;
 use ffb_model::model::game::Game;
-use ffb_model::option::game_option_id::INDUCEMENTS;
+use ffb_model::option::game_option_id::{INDUCEMENTS, USE_PREDEFINED_INDUCEMENTS};
 use ffb_model::option::util_game_option::is_option_enabled;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -69,7 +69,13 @@ impl StepBuyInducements {
             return self.leave_step(game);
         }
 
-        // DEFERRED(options): USE_PREDEFINED_INDUCEMENTS not yet ported.
+        // Java: if (USE_PREDEFINED_INDUCEMENTS) → apply predefined sets, skip dialog
+        // headless: InducementTypeFactory not ported; treat as auto-skip
+        if is_option_enabled(game, USE_PREDEFINED_INDUCEMENTS) {
+            self.inducements_selected_home = true;
+            self.inducements_selected_away = true;
+            return self.leave_step(game);
+        }
         // Auto-skip if under minimum.
         if self.inducement_gold_home < MINIMUM_PETTY_CASH_FOR_INDUCEMENTS {
             self.inducements_selected_home = true;
@@ -77,7 +83,7 @@ impl StepBuyInducements {
         if self.inducement_gold_away < MINIMUM_PETTY_CASH_FOR_INDUCEMENTS {
             self.inducements_selected_away = true;
         }
-        // DEFERRED(dialog): show dialog for teams still buying — not yet ported.
+        // client-only: show inducement buying dialog — headless auto-skips
         if self.inducements_selected_home && self.inducements_selected_away {
             return self.leave_step(game);
         }

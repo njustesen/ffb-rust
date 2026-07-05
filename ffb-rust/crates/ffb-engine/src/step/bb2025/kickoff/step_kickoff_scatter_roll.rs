@@ -2,6 +2,7 @@ use ffb_model::enums::{Direction, SkillId};
 use ffb_model::events::GameEvent;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -122,10 +123,16 @@ impl StepKickoffScatterRoll {
         }
 
         // ── Kick skill dialog ────────────────────────────────────────────────
-        // DEFERRED: if kicking player has canReduceKickDistance and use_kick_choice is None,
-        // show the DialogSkillUseParameter and return Continue.
-        // For the random-agent path, default to not using Kick.
+        // Java: if kicking player has canReduceKickDistance and use_kick_choice is None → show dialog.
         if self.use_kick_choice.is_none() {
+            let has_kick = self.kicking_player_id.as_deref()
+                .and_then(|pid| game.player(pid))
+                .map(|p| p.has_skill_property(NamedProperties::CAN_REDUCE_KICK_DISTANCE))
+                .unwrap_or(false);
+            if has_kick {
+                // Wait for agent decision via Action::UseSkill.
+                return StepOutcome::cont();
+            }
             self.use_kick_choice = Some(false);
         }
 
@@ -279,5 +286,37 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         // Regardless of outcome, touchback state must match bounds.
         assert_eq!(step.touchback, step.kickoff_bounds.is_none());
+    }
+
+    #[test]
+    fn kick_skill_player_waits_for_choice() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, SkillId, PlayerState, PS_STANDING};
+        use ffb_model::model::skill_def::SkillWithValue;
+
+        let mut game = make_game();
+        // Add a home player with the Kick skill
+        let p = Player {
+            id: "kicker".into(), name: "kicker".into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Kick, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        };
+        game.team_home.players.push(p);
+        game.field_model.set_player_coordinate("kicker", FieldCoordinate::new(13, 7));
+        game.field_model.set_player_state("kicker", PlayerState::new(PS_STANDING));
+        game.home_playing = true;
+
+        let mut step = StepKickoffScatterRoll::new();
+        step.kickoff_start_coordinate = Some(FieldCoordinate::new(13, 7));
+        step.kicking_player_id = Some("kicker".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // Should wait for agent to choose whether to use Kick skill
+        assert_eq!(out.action, StepAction::Continue, "player with Kick skill should wait for choice");
     }
 }

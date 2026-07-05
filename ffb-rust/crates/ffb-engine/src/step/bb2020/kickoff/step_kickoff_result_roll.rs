@@ -25,7 +25,7 @@
 /// Sets stepParameter KICKOFF_RESULT for all steps on the stack.
 ///
 /// Overtime option handling: all paths implemented except `blitzOrSolidDefence` (requires dialog).
-/// DEFERRED(KickoffResultRoll-dialog): CLIENT_KICK_OFF_RESULT_CHOICE dialog for blitzOrSolidDefence deferred.
+/// client-only: CLIENT_KICK_OFF_RESULT_CHOICE dialog for blitzOrSolidDefence — headless auto-rolls.
 use ffb_model::enums::KickoffResult;
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
@@ -65,8 +65,7 @@ impl StepKickoffResultRoll {
             } else if overtime_option == "solidDefence" {
                 self.kickoff_result = Some(KickoffResult::SolidDefence);
             } else {
-                // DEFERRED(KickoffResultRoll-dialog): blitzOrSolidDefence requires CLIENT_KICK_OFF_RESULT_CHOICE dialog.
-                // Fall back to normal roll to avoid blocking.
+                // client-only: DialogKickOffResultChoice for blitzOrSolidDefence — headless auto-rolls
                 let roll = rng.d6_two();
                 self.kickoff_result = Some(kickoff_result_for_roll(roll));
             }
@@ -101,8 +100,7 @@ impl Step for StepKickoffResultRoll {
         //   commandStatus = EXECUTE_STEP
         // Java: if commandStatus == EXECUTE_STEP: executeStep()
         //
-        // DEFERRED(KickoffResultRoll-dialog): When Action::KickoffResultChoice is added,
-        // match it here to set self.kickoff_result before calling execute_step.
+        // client-only: Action::KickoffResultChoice arrives from dialog; headless never receives this
         self.execute_step(game, rng)
     }
 

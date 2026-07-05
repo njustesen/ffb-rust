@@ -1,7 +1,6 @@
 /// 1:1 translation of `com.fumbbl.ffb.net.commands.ClientCommandUseInducement`.
 /// Sent when a coach activates an inducement during the game.
-/// DEFERRED(inducement-type): InducementType is a unit struct; full lookup deferred.
-/// DEFERRED(card): Card object serialisation deferred.
+/// Note: InducementType stored as name string; Card stored as name string (full serialisation not yet ported).
 #[derive(Debug, Clone, Default)]
 pub struct ClientCommandUseInducement {
     /// Java: `fInducementType` — stored as name string.

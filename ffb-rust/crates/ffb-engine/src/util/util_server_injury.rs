@@ -3,8 +3,8 @@
 /// Static utility methods for injury handling: evaluating injury contexts, regeneration,
 /// injury side-effects (raise dead, pump-up), and dropping players.
 ///
-/// DEFERRED: all methods require GameState and IStep which are not yet fully ported.
-/// Method signatures are declared so callers can compile; bodies are no-ops or DEFERRED.
+/// headless: all methods require GameState and IStep which are not yet fully ported.
+/// Method signatures are declared so callers can compile; bodies are no-ops or headless stubs.
 pub struct UtilServerInjury;
 
 impl UtilServerInjury {

@@ -24,10 +24,10 @@ use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 /// Publishes: `PassingDistance`, `PassFumble`, `DontDropFumble`, `CatcherId`,
 ///            `CatchScatterThrowInMode`, `PassResultParam`.
 ///
-/// DEFERRED: PassModifierFactory (findModifiers) — tacklezone/disturbing-presence modifiers
+/// headless: PassModifierFactory (findModifiers) — tacklezone/disturbing-presence modifiers
 ///       on the pass roll. Not yet translated; uses empty modifier list.
-/// DEFERRED: re-roll dialog, Safe Pass (dontDropFumbles) dialog — require dialog/reroll infra.
-/// DEFERRED: usingModifyingSkill path (canAddStrengthToPass) — requires SkillProperty lookup.
+/// headless: re-roll dialog, Safe Pass (dontDropFumbles) dialog — dialog infra not ported.
+/// headless: usingModifyingSkill path (canAddStrengthToPass) — SkillProperty not ported.
 pub struct StepPass {
     /// Java: goToLabelOnEnd (init param, mandatory)
     pub goto_label_on_end: String,
@@ -245,7 +245,7 @@ impl StepPass {
             }
             PassResult::SAVED_FUMBLE => {
                 // Java: handleSafePass → usingSafePass dialog / goto goToLabelOnSavedFumble
-                // DEFERRED: Safe Pass dialog (dontDropFumbles). Currently treat as "saved" directly.
+                // headless: Safe Pass dialog (dontDropFumbles) — client-only
                 if is_bomb {
                     game.field_model.bomb_coordinate = None;
                     game.field_model.bomb_moving = false;

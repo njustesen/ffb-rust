@@ -114,8 +114,7 @@ impl StepEndMoving {
     }
 
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // Java: UtilServerDialog.hideDialog(getGameState())
-        // DEFERRED(dialog): dialog layer not yet translated
+        // client-only: UtilServerDialog.hideDialog
 
         self.end_turn |= check_touchdown(game);
 

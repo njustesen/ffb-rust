@@ -9,6 +9,10 @@ pub fn get_int_option(game: &Game, option_id: &str) -> i32 {
     game.options.get_int(option_id).unwrap_or(0)
 }
 
+pub fn get_str_option<'a>(game: &'a Game, option_id: &str, default: &'a str) -> &'a str {
+    game.options.get(option_id).unwrap_or(default)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

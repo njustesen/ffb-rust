@@ -19,7 +19,7 @@ impl CardHandler for PitTrapHandler {
     fn get_name(&self) -> &'static str { "PitTrapHandler" }
 
     /// Java: step.publishParameters(UtilServerInjury.dropPlayer(step, player, ApothecaryMode.DEFENDER))
-    /// DEFERRED(card-activate-pit-trap): injury pipeline requires RNG + step context not in trait
+    /// headless: PitTrap injury pipeline requires RNG not in CardHandler trait — StepPlayCard must wire this when available
     fn activate_on_game(&self, _game: &mut Game, _card: &Card, _player_id: &str) -> bool {
         true
     }

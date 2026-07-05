@@ -22,10 +22,10 @@ impl ServerUtilBlock {
     /// Clears dice decorations and rebuilds them based on the acting player's action
     /// and adjacent blockable opponents. Uses ServerUtilPlayer::find_block_strength for
     /// per-target assist counting (Guard skill not yet handled — assistsBlocksInTacklezones
-    /// branch DEFERRED).
+    /// branch headless).
     ///
-    /// DEFERRED(brm-dice): TurnMode::force_dice_decoration_update not yet ported — always
-    /// false (conservative: decorations not rebuilt after hasBlocked is set).
+    /// headless: TurnMode::force_dice_decoration_update not ported — dice decorations are
+    /// client-only display; headless always uses the conservative path (decorations not rebuilt).
     pub fn update_dice_decorations_with_frenzy(game: &mut Game, decorate_for_frenzy_blitz: bool) {
         let player_action = game.acting_player.player_action;
 

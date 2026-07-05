@@ -16,7 +16,7 @@
 /// Also publishes END_TURN = true when the acting team includes the target player
 /// (for LIGHTNING and BOMB, not FIREBALL).
 ///
-/// DEFERRED(ZAP): ZappedPlayer substitution not yet ported.
+/// headless(ZAP): ZappedPlayer substitution not yet ported.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2016.StepSpecialEffect`.
 use ffb_model::enums::{ApothecaryMode, TurnMode};
@@ -139,7 +139,7 @@ impl StepSpecialEffect {
                 for p in drop_player(game, &player_id, true) { outcome = outcome.publish(p); }
             }
             SpecialEffect::Zap => {
-                // DEFERRED(ZAP): ZappedPlayer substitution not yet ported.
+                // headless: ZappedPlayer substitution not yet ported
             }
             SpecialEffect::Fireball => {
                 let injury_result = handle_injury_by_name(

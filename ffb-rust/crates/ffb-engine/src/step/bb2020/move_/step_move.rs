@@ -13,7 +13,7 @@ use crate::step::framework::{StepId, StepParameter};
 /// increments currentMove (×2 for jumping), optionally moves the ball if carried,
 /// publishes PLAYER_ENTERING_SQUARE.
 ///
-/// DEFERRED(animation-client): TrackNumber animation not ported — no Rust FieldModel.track_numbers field.
+/// client-only: TrackNumber animation not ported — no Rust FieldModel.track_numbers field.
 pub struct StepMove {
     /// Java: fCoordinateFrom
     pub coordinate_from: Option<FieldCoordinate>,

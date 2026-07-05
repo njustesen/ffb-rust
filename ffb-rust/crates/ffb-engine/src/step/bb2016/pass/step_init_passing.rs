@@ -9,9 +9,8 @@
 /// Init parameters: GOTO_LABEL_ON_END (mandatory), TARGET_COORDINATE (opt), CATCHER_ID (opt).
 /// Publishes: CATCHER_ID, END_TURN, END_PLAYER_ACTION, TARGET_COORDINATE.
 ///
-/// DEFERRED(InitPassing-passCoordinate): DUMP_OFF / TurnMode.DUMP_OFF check not yet ported.
-/// DEFERRED(InitPassing-rangeRuler): UtilRangeRuler.createRangeRuler not yet ported.
-use ffb_model::enums::PlayerAction;
+/// client-only: UtilRangeRuler.createRangeRuler — range ruler is client-side display only.
+use ffb_model::enums::{PlayerAction, TurnMode};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -79,7 +78,14 @@ impl StepInitPassing {
             }
             Some(PlayerAction::Pass) => {
                 game.turn_data_mut().pass_used = true;
-                // DEFERRED(InitPassing-rangeRuler): UtilRangeRuler.createRangeRuler not yet ported.
+                // client-only: UtilRangeRuler.createRangeRuler — client display only
+            }
+            Some(PlayerAction::DumpOff) => {
+                // Java: DumpOff treated same as ThrowBomb; thrower.setHasPassed only if thrower==actingPlayer
+                if game.thrower_id == game.acting_player.player_id {
+                    game.acting_player.has_passed = true;
+                }
+                // client-only: range ruler not set for DumpOff
             }
             _ => {} // ThrowBomb, HailMaryBomb etc. — no extra TurnData flag
         }
@@ -111,8 +117,16 @@ impl Step for StepInitPassing {
                 game.pass_coordinate = Some(*coord);
                 let catcher = game.field_model.player_at(*coord).map(|id| id.clone());
                 self.catcher_id = catcher.clone();
-                game.thrower_id = game.acting_player.player_id.clone();
-                game.thrower_action = game.acting_player.player_action;
+                // Java: if defender != null && defenderAction == DUMP_OFF → thrower = defender
+                if game.defender_id.is_some()
+                    && matches!(game.defender_action, Some(PlayerAction::DumpOff))
+                {
+                    game.thrower_id = game.defender_id.clone();
+                    game.thrower_action = game.defender_action;
+                } else {
+                    game.thrower_id = game.acting_player.player_id.clone();
+                    game.thrower_action = game.acting_player.player_action;
+                }
                 self.execute_step(game)
             }
             Action::EndTurn => {
@@ -255,5 +269,35 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.acting_player.has_passed);
         assert!(game.turn_data().hand_over_used);
+    }
+
+    #[test]
+    fn dump_off_defender_becomes_thrower() {
+        let mut game = make_game();
+        game.turn_mode = TurnMode::DumpOff;
+        game.defender_id = Some("d1".into());
+        game.defender_action = Some(ffb_model::enums::PlayerAction::DumpOff);
+        let mut step = StepInitPassing::new();
+        step.goto_label_on_end = "end".into();
+        use ffb_model::types::FieldCoordinate;
+        let action = crate::action::Action::Pass { coord: FieldCoordinate::new(8, 7) };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        // Thrower should be the defender, not the acting player
+        assert_eq!(game.thrower_id.as_deref(), Some("d1"));
+        assert_eq!(game.thrower_action, Some(ffb_model::enums::PlayerAction::DumpOff));
+    }
+
+    #[test]
+    fn pass_action_non_dump_off_uses_acting_player() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(ffb_model::enums::PlayerAction::Pass);
+        game.defender_id = None;
+        let mut step = StepInitPassing::new();
+        step.goto_label_on_end = "end".into();
+        use ffb_model::types::FieldCoordinate;
+        let action = crate::action::Action::Pass { coord: FieldCoordinate::new(10, 7) };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert_eq!(game.thrower_id.as_deref(), Some("p1"));
     }
 }

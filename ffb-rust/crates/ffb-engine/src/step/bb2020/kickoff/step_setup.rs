@@ -15,8 +15,8 @@
 ///
 /// Mandatory init param: `GOTO_LABEL_ON_END` (used by the generator, stored here for JSON).
 ///
-/// DEFERRED(StepSetup-dialog): setup error dialog deferred.
-/// DEFERRED(StepSetup-teamsetup): CLIENT_TEAM_SETUP_LOAD/SAVE/DELETE deferred.
+/// client-only: setup error dialog — invalid setup errors shown via dialog; headless rejects silently.
+/// client-only: CLIENT_TEAM_SETUP_LOAD/SAVE/DELETE — saved setup management is client-side only.
 use ffb_model::enums::{InducementPhase, TurnMode};
 use ffb_model::model::game::Game;
 use ffb_model::prompts::AgentPrompt;
@@ -66,7 +66,7 @@ impl StepSetup {
 
         // Java: getResult().setSound(SoundId.DING)
         let setup_valid = SetupMechanic::new().check_setup(game, game.home_playing);
-        // DEFERRED(dialog): show setup error dialog when !setup_valid
+        // client-only: show setup error dialog when !setup_valid
 
         if setup_valid {
             // Java: game.setHomePlaying(!game.isHomePlaying())

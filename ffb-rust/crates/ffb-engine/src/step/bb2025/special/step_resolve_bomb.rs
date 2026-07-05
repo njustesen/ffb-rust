@@ -60,8 +60,8 @@ impl StepResolveBomb {
         // Java: fieldModel.setBombMoving(false); fieldModel.setBombCoordinate(null)
         game.field_model.bomb_moving = false;
         game.field_model.bomb_coordinate = None;
-        // DEFERRED: setAnimation(AnimationType.BOMB_EXPLOSION, fBombCoordinate)
-        // DEFERRED: syncGameModel, fieldModel.add(BloodSpot(fBombCoordinate, HIT_BY_BOMB))
+        // client-only: setAnimation(AnimationType.BOMB_EXPLOSION, fBombCoordinate)
+        // client-only: syncGameModel, fieldModel.add(BloodSpot) — client-side display
 
         // Java: targetCoordinates = fieldModel.findAdjacentCoordinates(fBombCoordinate, FIELD, 1, true)
         // This includes the bomb square itself (true = include center).

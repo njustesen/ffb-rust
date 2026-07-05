@@ -59,6 +59,7 @@ mod tests {
     #[test]
     fn allows_player_true_for_player_without_prevent_property() {
         use ffb_model::model::player::Player;
+        use ffb_model::model::player_status::PlayerStatus;
         use ffb_model::types::FieldCoordinate;
         let h = RabbitsFootHandler;
         let mut game = make_game();
@@ -72,6 +73,7 @@ mod tests {
             used_skills: std::collections::HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
             race: None,
+            player_status: PlayerStatus::ACTIVE,
             ..Default::default()
 };
         game.team_home.players.push(player);

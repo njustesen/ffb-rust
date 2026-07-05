@@ -69,7 +69,7 @@ impl Step for StepTrickster {
             // Waiting for pick-up choice (ball on destination square)
             if let Action::Acknowledge = action {
                 // Java: CLIENT_PICK_UP_CHOICE → attemptPickUp
-                self.attempt_pick_up = Some(true); // DEFERRED: decode from action
+                self.attempt_pick_up = Some(true); // headless: decode from action — command parsing not yet ported
             }
         } else {
             match action {
@@ -139,7 +139,7 @@ impl StepTrickster {
                         .adjacent_on_pitch(att_coord)
                         .into_iter()
                         .filter(|&c| game.field_model.player_at(c).is_none())
-                        // DEFERRED: filter !isBlockedForTrickster(coord)
+                        // headless: filter !isBlockedForTrickster(coord) — blocked by pathfinding
                         .collect();
                 }
 

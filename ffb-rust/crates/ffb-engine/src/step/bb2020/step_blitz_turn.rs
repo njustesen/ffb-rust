@@ -83,7 +83,7 @@ impl StepBlitzTurn {
                 game.blitz_turn_state = Some(BlitzTurnState::new(limit, available_players));
 
                 // Java: if (game.isTurnTimeEnabled()) { UtilServerTimer.stopTurnTimer(...); ... startTurnTimer(...) }
-                // DEFERRED(blitz_turn): timer management when server timer infra is available
+                // headless: UtilServerTimer.stopTurnTimer / startTurnTimer — no timer in headless engine
 
                 // Java: game.startTurn()
                 game.start_turn();

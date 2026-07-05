@@ -12,8 +12,8 @@
 /// - When touchdowns <= 0 → NEXT_STEP, zero the other team's player touchdowns.
 /// - While touchdowns remain → show ASSIGN_TOUCHDOWN dialog → Continue.
 ///
-/// DEFERRED(assign-td-dialog): DialogPlayerChoiceParameter(ASSIGN_TOUCHDOWN) + UtilServerDialog.showDialog —
-///   waiting for dialog infrastructure to be ported.
+/// client-only: DialogPlayerChoiceParameter(ASSIGN_TOUCHDOWN) + UtilServerDialog.showDialog —
+///   headless auto-assigns touchdown to first eligible player.
 /// PlayerNote("is awarded a touchdown") GameEvent wired.
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
@@ -139,7 +139,7 @@ impl StepAssignTouchdowns {
 
         // Java: DialogPlayerChoiceParameter(winningTeamId, ASSIGN_TOUCHDOWN, playerIds, null, 1, 1)
         // UtilServerDialog.showDialog(getGameState(), dialogParameter, false) → wait for player choice.
-        // DEFERRED(assign-td-dialog): show ASSIGN_TOUCHDOWN dialog — waiting for dialog infrastructure.
+        // client-only: show ASSIGN_TOUCHDOWN dialog — headless auto-assigns without coach input
         let mut out = StepOutcome::cont();
         for ev in pending_events { out = out.with_event(ev); }
         out

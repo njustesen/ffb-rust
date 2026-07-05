@@ -91,7 +91,7 @@ impl StepTouchback {
                 let coord = self.touchback_coordinate.unwrap();
                 // Java: game.getFieldModel().setOutOfBounds(false)
                 game.field_model.out_of_bounds = false;
-                // Java: UtilServerDialog.hideDialog(getGameState()) — DEFERRED (client only)
+                // client-only: UtilServerDialog.hideDialog(getGameState())
                 // Java: game.getFieldModel().setBallCoordinate(fTouchbackCoordinate)
                 game.field_model.ball_coordinate = Some(coord);
                 // Java: Player<?> player = game.getFieldModel().getPlayer(fTouchbackCoordinate)
@@ -108,7 +108,7 @@ impl StepTouchback {
                     if !prevents_hold && has_tz {
                         // Java: game.getFieldModel().setBallMoving(false)
                         game.field_model.ball_moving = false;
-                        // Java: getResult().setSound(SoundId.CATCH) — DEFERRED (client only)
+                        // client-only: getResult().setSound(SoundId.CATCH)
                     } else {
                         // Java: publishParameter(CATCH_SCATTER_THROW_IN_MODE, CATCH_KICKOFF)
                         return StepOutcome::next().publish(StepParameter::CatchScatterThrowInMode(

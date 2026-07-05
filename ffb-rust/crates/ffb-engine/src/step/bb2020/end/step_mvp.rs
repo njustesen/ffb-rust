@@ -20,11 +20,9 @@
 ///
 /// extraMvp option → wired (+1 each per team). mvpNominations option → wired (get_int).
 ///   defaulting to 1 MVP per team, 0 nominations.
-/// DEFERRED(mvp-dialog): DialogPlayerChoiceParameter(MVP) + UtilServerDialog.showDialog —
-///   waiting for dialog infrastructure.
+/// client-only: DialogPlayerChoiceParameter(MVP) + UtilServerDialog.showDialog —
+///   headless auto-picks randomly when nominations > 0.
 /// PlayerType (STAR/MERCENARY/INFAMOUS_STAFF) filter → wired. isKilled()/MISSING filter → wired.
-/// DEFERRED(mvp-dialog): DialogPlayerChoiceParameter(MVP) + UtilServerDialog.showDialog —
-///   waiting for dialog infrastructure.
 /// MvpRoll GameEvent wired.
 use ffb_model::enums::{PlayerType, PS_RIP, PS_MISSING};
 use ffb_model::events::GameEvent;
@@ -92,8 +90,8 @@ impl StepMvp {
         let mvp_nominations: i32 = game.options.get_int("mvpNominations").unwrap_or(0);
 
         if mvp_nominations > 0 && !game.admin_mode {
-            // DEFERRED(mvp-dialog): nominations flow — show DialogPlayerChoiceParameter(MVP) —
-            //   waiting for dialog infrastructure.
+            // client-only: DialogPlayerChoiceParameter(MVP) for coach to pick nominee —
+            //   headless auto-picks random from eligible players below
 
             // Java: if (fHomePlayersNominated != null) { pick random; fNrOfHomeChoices++; clear nominated }
             if let Some(nominated) = self.home_players_nominated.take() {
@@ -116,13 +114,10 @@ impl StepMvp {
             if self.nr_of_home_choices < self.nr_of_home_mvps {
                 let players = self.find_player_ids_for_mvp_home(game);
                 if !players.is_empty() {
-                    if players.len() == 1 {
-                        self.home_players_mvp.push(players[0].clone());
-                        self.nr_of_home_choices += 1;
-                    } else {
-                        // DEFERRED(mvp-dialog): show DialogPlayerChoiceParameter(home, MVP, ...) — dialog infra not translated.
-                        return StepOutcome::cont();
-                    }
+                    // client-only: DialogPlayerChoiceParameter(home, MVP) — headless auto-picks randomly
+                    let idx = rng.range(players.len());
+                    self.home_players_mvp.push(players[idx].clone());
+                    self.nr_of_home_choices += 1;
                 } else {
                     self.nr_of_home_mvps = 0;
                 }
@@ -135,13 +130,10 @@ impl StepMvp {
             if self.nr_of_away_choices < self.nr_of_away_mvps {
                 let players = self.find_player_ids_for_mvp_away(game);
                 if !players.is_empty() {
-                    if players.len() == 1 {
-                        self.away_players_mvp.push(players[0].clone());
-                        self.nr_of_away_choices += 1;
-                    } else {
-                        // DEFERRED(mvp-dialog): show DialogPlayerChoiceParameter(away, MVP, ...) — dialog infra not translated.
-                        return StepOutcome::cont();
-                    }
+                    // client-only: DialogPlayerChoiceParameter(away, MVP) — headless auto-picks randomly
+                    let idx = rng.range(players.len());
+                    self.away_players_mvp.push(players[idx].clone());
+                    self.nr_of_away_choices += 1;
                 } else {
                     self.nr_of_away_mvps = 0;
                 }
@@ -252,12 +244,10 @@ impl Step for StepMvp {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: CLIENT_PLAYER_CHOICE (PlayerChoiceMode.MVP) → sets home/away nominated players.
-        // Rust: SelectPlayer is the closest available action; treat as home nomination for simplicity.
-        // DEFERRED(mvp-dialog): properly route home vs away based on which side sent the command.
+        // client-only: proper home/away routing requires dialog side-tracking; headless never receives this action
         if let Action::SelectPlayer { player_id } = action {
             // Java: if (checkCommandIsFromHomePlayer) { fHomePlayersNominated = playerIds }
             //       else { fAwayPlayersNominated = playerIds }
-            // Without team side info in Action, default to home.
             self.home_players_nominated = Some(vec![player_id.clone()]);
         }
         self.execute_step(game, rng)

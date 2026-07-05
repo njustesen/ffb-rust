@@ -99,7 +99,7 @@ impl StepSetup {
         if self.end_setup {
             // Java: getResult().setSound(SoundId.DING)
             let setup_valid = SetupMechanic::new().check_setup(game, game.home_playing);
-            // DEFERRED(dialog): show setup error when !setup_valid
+            // client-only: show setup error dialog when !setup_valid
             if setup_valid {
                 game.home_playing = !game.home_playing;
                 UtilBox::refresh_boxes(game);

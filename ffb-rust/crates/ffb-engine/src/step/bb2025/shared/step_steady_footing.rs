@@ -186,7 +186,7 @@ impl StepSteadyFooting {
 
         // Java: if (useSkill == null) → show dialog, CONTINUE
         if self.use_skill.is_none() {
-            // DEFERRED: publish dialog prompt for canAvoidFallingDown skill use.
+            // client-only: publish dialog prompt for canAvoidFallingDown skill use
             // For now: auto-accept (use_skill = true) so the random agent rolls.
             self.use_skill = Some(true);
         }

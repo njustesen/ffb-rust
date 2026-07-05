@@ -28,9 +28,9 @@ use ffb_mechanics::modifiers::dodge_context::DodgeContext;
 ///          USING_DIVING_TACKLE, RE_ROLL_USED published by preceding steps.
 ///
 /// standFirmNoDropOnFailedDodge game option → wired (NEXT_STEP + EndPlayerAction instead of failDodge).
-/// DEFERRED(usingBreakTackle): Break-Tackle dialog (canAddStrengthToDodge) not yet ported.
-/// DEFERRED(divingTackle): Diving Tackle pre-roll dialog not yet ported.
-/// DEFERRED(armBar): Arm-Bar choice dialog not yet ported.
+/// client-only: Break-Tackle dialog (canAddStrengthToDodge) — headless auto-skips strength bonus offer.
+/// client-only: Diving Tackle pre-roll dialog — headless auto-skips diving tackle activation.
+/// client-only: Arm-Bar choice dialog — headless skips arm-bar activation.
 pub struct StepMoveDodge {
     /// Java: fGotoLabelOnFailure
     pub goto_label_on_failure: String,
@@ -82,8 +82,8 @@ impl Step for StepMoveDodge {
                 self.re_roll_state.re_roll_source = None;
                 self.execute_step(game, rng)
             }
-            // DEFERRED(BreakTackle): canAddStrengthToDodge not yet ported — skill use dialog skipped
-            // DEFERRED(ArmBar): CLIENT_PLAYER_CHOICE ARM_BAR mode not yet ported
+            // client-only: canAddStrengthToDodge (BreakTackle) — skill use dialog skipped in headless
+            // client-only: CLIENT_PLAYER_CHOICE ARM_BAR mode — defender uses arm bar via dialog; headless skips
             _ => self.execute_step(game, rng),
         }
     }
@@ -190,7 +190,7 @@ impl StepMoveDodge {
 
     fn fail_dodge(&self) -> StepOutcome {
         // Java: BB2016 uses InjuryTypeDropDodge (not InjuryTypeFallDown)
-        // DEFERRED(ArmBar): Arm-Bar dialog can override injuryType to InjuryTypeArmBar
+        // client-only: Arm-Bar dialog can override injuryType to InjuryTypeArmBar — headless uses default injury type
         let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeDropDodge".into());
         let label = self.goto_label_on_failure.clone();
         StepOutcome::goto(&label)

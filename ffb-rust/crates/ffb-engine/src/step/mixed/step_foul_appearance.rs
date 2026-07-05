@@ -12,8 +12,6 @@
 ///    d. On failure: ask for re-roll, or → handleFailure
 /// 3. Else: NEXT_STEP immediately
 ///
-/// DEFERRED(handleFailure-standingUp): StandingUp + BLITZ_MOVE/block-action state handling deferred.
-///
 /// Java: `StepFoulAppearance extends AbstractStepWithReRoll` (mixed, BB2020 + BB2025).
 use ffb_model::model::game::Game;
 use ffb_model::enums::{SkillId, ReRollSource, PlayerAction, PS_PRONE};

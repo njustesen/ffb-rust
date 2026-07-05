@@ -106,11 +106,9 @@ impl StepHailMaryPass {
             self.roll = rng.d6();
         }
 
-        // DEFERRED(dialog): if usingModifyingSkill == null && thrower has canAddStrengthToPass skill →
-        //   showDialog(DialogSkillUseParameter) → CONTINUE — waiting for dialog infrastructure.
-        // DEFERRED(stat-modifier): PassMechanic.evaluatePass with statBasedModifier when
-        //   usingModifyingSkill==true — waiting for ActingPlayer.stat_based_modifier()
-        //   (StatBasedRollModifier) to be ported.
+        // client-only: DialogSkillUseParameter for canAddStrengthToPass — headless skips
+        // headless: PassMechanic.evaluatePass with statBasedModifier blocked on
+        //   ActingPlayer.stat_based_modifier() (StatBasedRollModifier) not yet ported
 
         let is_fumble = self.roll == 1;
         let is_accurate = self.roll >= self.minimum_roll;

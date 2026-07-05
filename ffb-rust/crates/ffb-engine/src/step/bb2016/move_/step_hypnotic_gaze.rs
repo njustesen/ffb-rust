@@ -30,7 +30,7 @@ use crate::dice_interpreter::DiceInterpreter;
 ///
 /// Sets stepParameter END_PLAYER_ACTION for all steps on the stack.
 ///
-/// DEFERRED(sound-client): SoundId.HYPNO not yet ported.
+/// client-only: SoundId.HYPNO — sound playback is client-side only.
 pub struct StepHypnoticGaze {
     /// Java: fGotoLabelOnEnd
     pub goto_label_on_end: String,

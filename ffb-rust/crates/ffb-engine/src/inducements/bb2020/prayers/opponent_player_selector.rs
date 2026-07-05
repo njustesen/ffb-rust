@@ -67,6 +67,7 @@ mod tests {
     use super::*;
     use ffb_model::enums::{Rules, PS_RESERVE, PS_STANDING};
     use ffb_model::enums::PlayerState;
+    use ffb_model::model::player_status::PlayerStatus;
     use ffb_model::types::FieldCoordinate;
     use ffb_model::util::rng::GameRng;
     use crate::step::framework::test_team;
@@ -88,6 +89,7 @@ mod tests {
             used_skills: std::collections::HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
             race: None,
+            player_status: PlayerStatus::ACTIVE,
             ..Default::default()
 };
         if team_id == "home" {

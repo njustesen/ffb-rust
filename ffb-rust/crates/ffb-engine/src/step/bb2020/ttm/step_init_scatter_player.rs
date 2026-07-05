@@ -258,7 +258,7 @@ impl StepInitScatterPlayer {
         // Java: publishParameter(THROWN_PLAYER_COORDINATE, lastValidCoordinate)
         self.thrown_player_coordinate = Some(last_valid);
         // Java: addReport(new ReportPassDeviate(coordinateEnd, direction, directionRoll, distanceRoll, true))
-        // DEFERRED(InitScatterPlayer-report): ReportPassDeviate deferred.
+        // headless: ReportPassDeviate — blocked on report system infrastructure
 
         ScatterResult::new(last_valid, coord_end.is_on_pitch())
     }

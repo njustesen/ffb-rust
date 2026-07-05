@@ -88,8 +88,8 @@ impl AgilityMechanicTrait for AgilityMechanic {
     }
 
     fn format_dodge_result(&self, roll_modifiers: &[RollModifier], player: &Player, _stat_based_roll_modifier: Option<&StatBasedRollModifier>) -> String {
-        // DEFERRED(break-tackle-format): RollModifier doesn't carry is_use_strength flag;
-        // Break Tackle reporting deferred until format interface carries DodgeModifier directly.
+        // headless: Break Tackle format — RollModifier doesn't carry is_use_strength flag;
+        // blocked until format interface carries DodgeModifier directly for report generation.
         let uses_strength = false;
         let mut result = String::new();
         if uses_strength {

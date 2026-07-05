@@ -53,7 +53,7 @@ impl StallingExtension {
             return false;
         }
         // Guard 4: open path to end-zone.
-        // DEFERRED: PathFinderWithPassBlockSupport not yet translated; conservatively return false.
+        // headless: PathFinderWithPassBlockSupport not yet translated; conservatively returns false
         false
     }
 
@@ -86,7 +86,7 @@ impl StallingExtension {
             game.game_result.away.stalled = true;
         }
 
-        // DEFERRED: if successful { apply InjuryTypeThrowARockStalling injury and animation }
+        // headless: apply InjuryTypeThrowARockStalling injury — client-only: animation
         ffb_model::events::GameEvent::ThrowAtStallingPlayer {
             player_id: player_id.to_string(),
             roll,

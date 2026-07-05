@@ -11,7 +11,7 @@
 ///   GetTheRef, Riot, PerfectDefence, HighKick, CheeringFans, WeatherChange,
 ///   BrilliantCoaching, QuickSnap, Blitz, ThrowARock, PitchInvasion.
 ///
-/// DEFERRED items (require untranslated infrastructure):
+/// headless items (require untranslated infrastructure):
 ///  - handleGetTheRef: InducementTypeFactory
 ///  - handlePerfectDefense: SetupMechanic.checkSetup
 ///  - handleHighKick: SetupMechanic.pinPlayersInTacklezones
@@ -123,9 +123,20 @@ impl StepApplyKickoffResult {
         }
     }
 
-    fn handle_get_the_ref(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // DEFERRED(InducementTypeFactory): InducementTypeFactory.allTypes() not yet ported.
-        // Java: each team gets +1 bribes inducement.
+    fn handle_get_the_ref(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        // Java: InducementTypeFactory.allTypes() → filter AVOID_BAN → computeIfAbsent + setValue+1
+        use ffb_model::inducement::inducement::Inducement;
+        for home in [true, false] {
+            let set = if home { &mut game.turn_data_home.inducement_set }
+                      else   { &mut game.turn_data_away.inducement_set };
+            let type_id = set.for_usage(Usage::AVOID_BAN)
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "BRIBE".to_string());
+            let mut ind = set.get(&type_id)
+                .unwrap_or_else(|| Inducement::new(type_id.clone(), 0, vec![Usage::AVOID_BAN]));
+            ind.value += 1;
+            set.add_inducement(ind);
+        }
         StepOutcome::next()
     }
 
@@ -166,7 +177,7 @@ impl StepApplyKickoffResult {
             if self.end_kickoff {
                 // Java: mechanic.checkSetup(gameState, game.isHomePlaying(), getKickingSwarmers())
                 let _valid = SetupMechanic::new().check_setup_with_swarmers(game, game.home_playing, game.kicking_swarmers);
-                // DEFERRED(dialog): show setup error dialog when !valid
+                // client-only: show setup error dialog when !valid
                 // Java: setKickingSwarmers(0)
                 game.kicking_swarmers = 0;
                 game.turn_mode = TurnMode::Kickoff;

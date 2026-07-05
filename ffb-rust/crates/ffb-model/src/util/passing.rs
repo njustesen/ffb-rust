@@ -1,5 +1,7 @@
+use std::collections::HashSet;
+use crate::model::Game;
 use crate::types::FieldCoordinate;
-use crate::enums::PassingDistance;
+use crate::enums::{PassingDistance, PlayerAction};
 
 /// Width of the pass ruler in field units (matches Java's RULER_WIDTH).
 pub const RULER_WIDTH: f64 = 1.74;
@@ -30,6 +32,104 @@ pub fn can_intercept(
     let sqrt_c = c.sqrt();
 
     c > a && c > b && RULER_WIDTH > (2.0 * d_min / sqrt_c)
+}
+
+/// Java: `UtilPassing.findValidPassBlockEndCoordinates(game)`.
+///
+/// Returns the set of coordinates that are valid end-positions for a Pass Block move:
+/// squares in the thrower's TZ, squares in the intercept corridor, and squares in the
+/// target's TZ (or the target square itself if unoccupied).
+pub fn find_valid_pass_block_end_coordinates(game: &Game) -> HashSet<FieldCoordinate> {
+    let mut valid = HashSet::new();
+
+    let thrower_id = match &game.thrower_id {
+        Some(id) => id.clone(),
+        None => return valid,
+    };
+    let thrower_coord = match game.field_model.player_coordinate(&thrower_id) {
+        Some(c) => c,
+        None => return valid,
+    };
+    let pass_coord = match game.pass_coordinate {
+        Some(c) => c,
+        None => return valid,
+    };
+
+    let acting_player_id = game.acting_player.player_id.clone();
+
+    // Add thrower's tackle zone squares (empty or acting player only)
+    for adj in game.field_model.adjacent_on_pitch(thrower_coord) {
+        let occupant = game.field_model.player_at(adj).map(|s| s.as_str());
+        let free = occupant.is_none() || occupant == acting_player_id.as_deref();
+        if free {
+            valid.insert(adj);
+        }
+    }
+
+    if matches!(game.thrower_action, Some(PlayerAction::HailMaryPass)) {
+        // HailMaryPass: only add target square if there's a player there
+        if game.field_model.player_at(pass_coord).is_some() {
+            valid.insert(pass_coord);
+        }
+    } else {
+        // Add all intercept corridor coordinates
+        valid.extend(find_intercept_coordinates(game, thrower_coord, pass_coord, acting_player_id.as_deref()));
+
+        // Add target's TZ or target square
+        let target_player = game.field_model.player_at(pass_coord);
+        if target_player.is_some() {
+            for adj in game.field_model.adjacent_on_pitch(pass_coord) {
+                let occupant = game.field_model.player_at(adj).map(|s| s.as_str());
+                let free = occupant.is_none() || occupant == acting_player_id.as_deref();
+                if free {
+                    valid.insert(adj);
+                }
+            }
+        } else {
+            valid.insert(pass_coord);
+        }
+    }
+
+    valid
+}
+
+/// Java: `UtilPassing.findInterceptCoordinates(game)` — BFS expansion of all squares from
+/// which an interception could be attempted. Squares occupied by non-acting players are excluded.
+fn find_intercept_coordinates(
+    game: &Game,
+    thrower_coord: FieldCoordinate,
+    pass_coord: FieldCoordinate,
+    acting_player_id: Option<&str>,
+) -> HashSet<FieldCoordinate> {
+    let mut eligible: HashSet<FieldCoordinate> = HashSet::new();
+    let mut closed: HashSet<FieldCoordinate> = HashSet::new();
+    let mut open: Vec<FieldCoordinate> = vec![thrower_coord];
+
+    while let Some(current) = open.first().cloned() {
+        open.remove(0);
+        if closed.contains(&current) {
+            continue;
+        }
+        if current == thrower_coord || can_intercept(thrower_coord, pass_coord, current) {
+            eligible.insert(current);
+            for adj in game.field_model.adjacent_on_pitch(current) {
+                if !closed.contains(&adj) {
+                    open.push(adj);
+                }
+            }
+        }
+        closed.insert(current);
+    }
+
+    // Remove squares occupied by non-acting players
+    let occupied: HashSet<FieldCoordinate> = game.field_model.player_coordinates
+        .iter()
+        .filter(|(id, _)| Some(id.as_str()) != acting_player_id)
+        .map(|(_, &coord)| coord)
+        .collect();
+
+    eligible.retain(|c| !occupied.contains(c));
+    eligible
 }
 
 /// Passing distance lookup table indexed by [delta_y][delta_x], matching Java's BB2020 PassMechanic.
@@ -92,10 +192,111 @@ pub fn passing_distance(from: FieldCoordinate, to: FieldCoordinate) -> Option<Pa
 mod tests {
     use super::*;
     use crate::types::FieldCoordinate;
-    use crate::enums::PassingDistance;
+    use crate::enums::{PassingDistance, Rules};
+    use crate::model::{Game, Team};
 
     fn c(x: i32, y: i32) -> FieldCoordinate {
         FieldCoordinate::new(x, y)
+    }
+
+    fn empty_team(id: &str) -> Team {
+        Team {
+            id: id.into(),
+            name: id.into(),
+            race: "Human".into(),
+            roster_id: "human".into(),
+            coach: "Coach".into(),
+            rerolls: 0,
+            apothecaries: 0,
+            bribes: 0,
+            fan_factor: 0,
+            dedicated_fans: 0,
+            assistant_coaches: 0,
+            cheerleaders: 0,
+            treasury: 0,
+            team_value: 0,
+            master_chefs: 0,
+            prayers_to_nuffle: 0,
+            bloodweiser_kegs: 0,
+            riotous_rookies: 0,
+            special_rules: vec![],
+            players: vec![],
+        }
+    }
+
+    fn make_game() -> Game {
+        Game::new(empty_team("home"), empty_team("away"), Rules::Bb2016)
+    }
+
+    // ── find_valid_pass_block_end_coordinates ─────────────────────────────────
+
+    #[test]
+    fn pass_block_empty_when_no_thrower() {
+        let game = make_game();
+        assert!(find_valid_pass_block_end_coordinates(&game).is_empty());
+    }
+
+    #[test]
+    fn pass_block_empty_when_no_pass_coord() {
+        let mut game = make_game();
+        game.thrower_id = Some("h1".into());
+        game.field_model.set_player_coordinate("h1", c(5, 7));
+        assert!(find_valid_pass_block_end_coordinates(&game).is_empty());
+    }
+
+    #[test]
+    fn pass_block_includes_thrower_adjacent_squares() {
+        let mut game = make_game();
+        game.thrower_id = Some("h1".into());
+        game.pass_coordinate = Some(c(12, 7));
+        game.field_model.set_player_coordinate("h1", c(5, 7));
+        let coords = find_valid_pass_block_end_coordinates(&game);
+        // Thrower at (5,7) should have adjacent squares in the valid set
+        assert!(coords.contains(&c(4, 7)) || coords.contains(&c(6, 7)) || coords.contains(&c(5, 6)));
+    }
+
+    #[test]
+    fn pass_block_includes_intercept_corridor() {
+        let mut game = make_game();
+        game.thrower_id = Some("h1".into());
+        game.pass_coordinate = Some(c(15, 7));
+        game.field_model.set_player_coordinate("h1", c(1, 7));
+        let coords = find_valid_pass_block_end_coordinates(&game);
+        // Corridor along y=7 between x=1 and x=15 should be in the set
+        assert!(coords.contains(&c(8, 7)));
+    }
+
+    #[test]
+    fn pass_block_hail_mary_only_adds_target_if_occupied() {
+        let mut game = make_game();
+        game.thrower_id = Some("h1".into());
+        game.pass_coordinate = Some(c(12, 7));
+        game.thrower_action = Some(PlayerAction::HailMaryPass);
+        game.field_model.set_player_coordinate("h1", c(5, 7));
+        let coords = find_valid_pass_block_end_coordinates(&game);
+        // No player at target → target coord NOT added
+        assert!(!coords.contains(&c(12, 7)));
+    }
+
+    #[test]
+    fn pass_block_hail_mary_adds_target_when_occupied() {
+        let mut game = make_game();
+        game.thrower_id = Some("h1".into());
+        game.pass_coordinate = Some(c(12, 7));
+        game.thrower_action = Some(PlayerAction::HailMaryPass);
+        game.field_model.set_player_coordinate("h1", c(5, 7));
+        game.field_model.set_player_coordinate("a1", c(12, 7));
+        let coords = find_valid_pass_block_end_coordinates(&game);
+        assert!(coords.contains(&c(12, 7)));
+    }
+
+    #[test]
+    fn find_intercept_coordinates_empty_when_no_thrower_coord() {
+        let game = make_game();
+        // No thrower coord registered → find_intercept_coordinates returns empty
+        let result = find_intercept_coordinates(&game, c(0, 0), c(10, 0), None);
+        // thrower coord itself is always eligible → must include (0,0) if on pitch
+        assert!(result.is_empty() || result.contains(&c(0, 0)));
     }
 
     #[test]

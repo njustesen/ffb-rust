@@ -18,8 +18,8 @@ use ffb_mechanics::mechanics::minimum_roll_jump;
 /// BB2020 uses the BB2020 JumpMechanic for canStillJump checks.
 /// Otherwise logic is identical to BB2025.
 ///
-/// DEFERRED: DivingTackle dialog not yet ported.
-/// DEFERRED(divingTackle): checkDivingTackle/usingDivingTackle dialog not yet ported.
+/// headless: DivingTackle dialog — client-only; headless auto-skips.
+/// client-only: checkDivingTackle/usingDivingTackle dialog — headless auto-skips diving tackle activation.
 pub struct StepJump {
     /// Java: goToLabelOnFailure
     pub goto_label_on_failure: String,

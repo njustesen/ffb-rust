@@ -14,6 +14,8 @@ use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::generator::bb2025::EndPlayerAction;
+use crate::step::generator::bb2025::end_player_action::EndPlayerActionParams;
 
 pub struct StepSelectBlitzTarget {
     /// Java: gotoLabelOnEnd — GOTO_LABEL_ON_END init parameter.
@@ -51,8 +53,7 @@ impl Step for StepSelectBlitzTarget {
     fn id(&self) -> StepId { StepId::SelectBlitzTarget }
 
     fn start(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // Stub: sequence generators not translated → NEXT_STEP
-        StepOutcome::next()
+        self.execute_step()
     }
 
     fn handle_command(&mut self, action: &Action, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
@@ -66,7 +67,7 @@ impl Step for StepSelectBlitzTarget {
             }
             _ => {}
         }
-        StepOutcome::next()
+        self.execute_step()
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
@@ -77,6 +78,22 @@ impl Step for StepSelectBlitzTarget {
             StepParameter::GotoLabelOnEnd(v)    => { self.goto_label_on_end = v.clone(); true }
             _ => false,
         }
+    }
+}
+
+impl StepSelectBlitzTarget {
+    fn execute_step(&self) -> StepOutcome {
+        if self.end_player_action || self.end_turn {
+            let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
+                feeding_allowed: false,
+                end_player_action: true,
+                end_turn: self.end_turn,
+                check_forgo: self.check_forgo,
+            });
+            return StepOutcome::next().push_seq(seq);
+        }
+        // Stub: skill-based sequence generators (BlackInk, BalefulHex, etc.) not translated
+        StepOutcome::next()
     }
 }
 
@@ -108,6 +125,26 @@ mod tests {
         let action = Action::SelectPlayer { player_id: "p1".into() };
         step.handle_command(&action, &mut game, &mut GameRng::new(0));
         assert_eq!(step.selected_player_id.as_deref(), Some("p1"));
+    }
+
+    #[test]
+    fn end_turn_pushes_end_player_action_sequence() {
+        let mut game = make_game();
+        let mut step = StepSelectBlitzTarget::new();
+        step.end_turn = true;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "end_turn should push EndPlayerAction sequence");
+    }
+
+    #[test]
+    fn end_player_action_pushes_sequence() {
+        let mut game = make_game();
+        let mut step = StepSelectBlitzTarget::new();
+        step.end_player_action = true;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "end_player_action should push EndPlayerAction sequence");
     }
 
     #[test]

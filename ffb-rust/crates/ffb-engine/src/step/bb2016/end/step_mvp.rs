@@ -9,7 +9,7 @@
 /// - Records player awards and emits ReportMostValuablePlayers.
 ///
 /// extraMvp option → wired (+1 each per team). mvpNominations option → wired (get_int).
-/// DEFERRED(Mvp-dialog): DialogPlayerChoiceParameter not yet ported.
+/// client-only: MVP dialog (DialogPlayerChoiceParameter) — headless auto-selects MVP without dialog.
 use ffb_model::enums::SendToBoxReason;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -73,7 +73,7 @@ impl StepMvp {
         }
         // Java: int mvpNominations = UtilGameOption.getIntOption(game, GameOptionId.MVP_NOMINATIONS)
         let mvp_nominations: i32 = game.options.get_int("mvpNominations").unwrap_or(0);
-        let _ = mvp_nominations; // DEFERRED(mvp-dialog): nominations dialog loop not yet ported.
+        let _ = mvp_nominations; // client-only: nominations dialog — headless always auto-picks randomly
         // Auto-roll: pick one random player per side using rng.
         // Java: DiceRoller.randomPlayerId(findPlayerIdsForMvp(team)) — filter killed players.
         if self.nr_of_home_choices < self.nr_of_home_mvps {

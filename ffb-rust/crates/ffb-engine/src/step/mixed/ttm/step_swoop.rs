@@ -85,7 +85,7 @@ impl Step for StepSwoop {
                     .map(|id| game.team_home.player(id).is_some())
                     .unwrap_or(game.home_playing);
                 self.coordinate_to = Some(if is_home_player { *coord } else { coord.transform() });
-                // DEFERRED: executeSwoop() hooks
+                // headless: executeSwoop() hooks — SkillBehaviour registry not ported
                 return StepOutcome::next();
             }
             _ => {}
@@ -112,7 +112,7 @@ impl StepSwoop {
         // Java: if throwScatter → animate + move player (TODO: field model + animation)
         // Java: if coordinateTo == null → updateSwoopSquares (TODO) → wait
         if self.coordinate_to.is_none() {
-            // DEFERRED: UtilServerPlayerSwoop.updateSwoopSquares
+            // headless: UtilServerPlayerSwoop.updateSwoopSquares — TTM swoop coordinate calc not ported
             return StepOutcome::cont();
         }
 
