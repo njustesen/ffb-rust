@@ -16,3 +16,19 @@ impl IDialogParameter for DialogBriberyAndCorruptionParameter {
     fn get_id(&self) -> DialogId { DialogId::BRIBERY_AND_CORRUPTION_RE_ROLL }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dialog_id_is_bribery_and_corruption() {
+        assert_eq!(DialogBriberyAndCorruptionParameter::default().get_id(), DialogId::BRIBERY_AND_CORRUPTION_RE_ROLL);
+    }
+
+    #[test]
+    fn stores_team_id() {
+        let p = DialogBriberyAndCorruptionParameter { team_id: Some("t1".into()) };
+        assert_eq!(p.get_team_id(), Some("t1"));
+    }
+}

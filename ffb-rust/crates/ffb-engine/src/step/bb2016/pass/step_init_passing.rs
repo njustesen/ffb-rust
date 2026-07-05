@@ -27,6 +27,8 @@ pub struct StepInitPassing {
     end_turn: bool,
     /// Java: `fEndPlayerAction`
     end_player_action: bool,
+    /// Stores the TARGET_COORDINATE init param for resolution in start() when game is available.
+    pending_target_coordinate: Option<ffb_model::types::FieldCoordinate>,
 }
 
 impl StepInitPassing {
@@ -36,6 +38,7 @@ impl StepInitPassing {
             catcher_id: None,
             end_turn: false,
             end_player_action: false,
+            pending_target_coordinate: None,
         }
     }
 
@@ -92,6 +95,13 @@ impl Step for StepInitPassing {
     fn id(&self) -> StepId { StepId::InitPassing }
 
     fn start(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        // Java init(): if TARGET_COORDINATE set, resolve pass coordinate + catcher + thrower
+        if let Some(coord) = self.pending_target_coordinate.take() {
+            game.pass_coordinate = Some(coord);
+            self.catcher_id = game.field_model.player_at(coord).map(|id| id.clone());
+            game.thrower_id = game.acting_player.player_id.clone();
+            game.thrower_action = game.acting_player.player_action;
+        }
         self.execute_step(game)
     }
 
@@ -109,9 +119,11 @@ impl Step for StepInitPassing {
                 self.end_turn = true;
                 self.execute_step(game)
             }
-            // Java: CLIENT_ACTING_PLAYER (no id) → end player action
-            // Note: Action::EndPlayerAction is not in the Rust Action enum — deferred
-            // DEFERRED(InitPassing): EndPlayerAction command path not ported
+            // Java: CLIENT_ACTING_PLAYER with no player_id → fEndPlayerAction = true → executeStep
+            Action::ActivatePlayer { player_id, .. } if player_id.is_empty() => {
+                self.end_player_action = true;
+                self.execute_step(game)
+            }
             _ => StepOutcome::cont(),
         }
     }
@@ -123,9 +135,8 @@ impl Step for StepInitPassing {
             StepParameter::EndTurn(v)        => { self.end_turn = *v; true }
             StepParameter::EndPlayerAction(v)=> { self.end_player_action = *v; true }
             StepParameter::TargetCoordinate(c) => {
-                // init-time TARGET_COORDINATE sets pass coordinate directly
-                // DEFERRED(InitPassing-targetCoord): full catcher lookup from field_model
-                let _ = c;
+                // Store for resolution in start() when game is available.
+                self.pending_target_coordinate = Some(*c);
                 true
             }
             _ => false,

@@ -39,3 +39,29 @@ impl RightStuffModifierCollection {
 impl Default for RightStuffModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_starts_empty() {
+        let col = RightStuffModifierCollection::new();
+        assert!(col.get_modifiers().is_empty());
+    }
+
+    #[test]
+    fn add_increases_modifier_count() {
+        let mut col = RightStuffModifierCollection::new();
+        col.add(RightStuffModifier::new("test", 1, ModifierType::REGULAR));
+        assert_eq!(col.get_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn get_modifiers_by_type_returns_matching() {
+        let mut col = RightStuffModifierCollection::new();
+        col.add(RightStuffModifier::new("tz1", 1, ModifierType::TACKLEZONE));
+        col.add(RightStuffModifier::new("reg", 1, ModifierType::REGULAR));
+        assert_eq!(col.get_modifiers_by_type(ModifierType::TACKLEZONE).len(), 1);
+    }
+}

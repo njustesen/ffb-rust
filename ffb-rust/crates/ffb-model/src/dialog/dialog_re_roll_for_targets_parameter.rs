@@ -36,3 +36,18 @@ impl IDialogParameter for DialogReRollForTargetsParameter {
     fn get_id(&self) -> DialogId { DialogId::RE_ROLL_FOR_TARGETS }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_re_roll_for_targets() {
+        assert_eq!(DialogReRollForTargetsParameter::default().get_id(), DialogId::RE_ROLL_FOR_TARGETS);
+    }
+    #[test]
+    fn boolean_flags_propagate() {
+        let p = DialogReRollForTargetsParameter { pro_re_roll_available: true, team_re_roll_available: false, ..Default::default() };
+        assert!(p.is_pro_re_roll_available());
+        assert!(!p.is_team_re_roll_available());
+    }
+}

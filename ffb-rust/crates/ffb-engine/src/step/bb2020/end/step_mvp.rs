@@ -25,8 +25,9 @@
 /// PlayerType (STAR/MERCENARY/INFAMOUS_STAFF) filter → wired. isKilled()/MISSING filter → wired.
 /// DEFERRED(mvp-dialog): DialogPlayerChoiceParameter(MVP) + UtilServerDialog.showDialog —
 ///   waiting for dialog infrastructure.
-/// DEFERRED(mvp-report): ReportMostValuablePlayers — report infrastructure not yet translated.
+/// MvpRoll GameEvent wired.
 use ffb_model::enums::{PlayerType, PS_RIP, PS_MISSING};
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -175,23 +176,39 @@ impl StepMvp {
             || self.away_players_mvp.len() as i32 >= self.nr_of_away_mvps
         {
             // Java: for each home MVP: playerResultHome.setPlayerAwards(playerAwards + 1); mvpReport.addPlayerIdHome
+            let mvp_spp = crate::mechanic::spp_calc::SppCalc::mvp_spp(game.rules);
+            let mut out = StepOutcome::next();
+            let home_team_id = game.team_home.id.clone();
+            let away_team_id = game.team_away.id.clone();
             for pid in &self.home_players_mvp {
                 if !pid.is_empty() {
-                    // DEFERRED(mvp-report): ReportMostValuablePlayers – add player id home — report infra not translated.
                     let result = game.game_result.home.player_results.entry(pid.clone()).or_default();
                     result.mvp = true;
+                    result.player_awards += 1;
+                    result.spp_gained += mvp_spp;
+                    // Java: ReportMostValuablePlayers (per-player MVP roll report)
+                    out = out.with_event(GameEvent::MvpRoll {
+                        team_id: home_team_id.clone(),
+                        player_id: pid.clone(),
+                        spp: mvp_spp,
+                    });
                 }
             }
-            // Java: for each away MVP: playerResultAway.setPlayerAwards(playerAwards + 1); mvpReport.addPlayerIdAway
             for pid in &self.away_players_mvp {
                 if !pid.is_empty() {
-                    // DEFERRED(mvp-report): ReportMostValuablePlayers – add player id away — report infra not translated.
                     let result = game.game_result.away.player_results.entry(pid.clone()).or_default();
                     result.mvp = true;
+                    result.player_awards += 1;
+                    result.spp_gained += mvp_spp;
+                    // Java: ReportMostValuablePlayers (per-player MVP roll report)
+                    out = out.with_event(GameEvent::MvpRoll {
+                        team_id: away_team_id.clone(),
+                        player_id: pid.clone(),
+                        spp: mvp_spp,
+                    });
                 }
             }
-            // DEFERRED(mvp-report): getResult().addReport(ReportMostValuablePlayers) — report infra not translated.
-            return StepOutcome::next();
+            return out;
         }
 
         StepOutcome::next()
@@ -349,6 +366,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         let mut step = StepMvp::new();
         step.start(&mut game, &mut GameRng::new(0));

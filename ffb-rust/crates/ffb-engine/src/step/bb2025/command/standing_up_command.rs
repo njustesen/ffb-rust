@@ -35,4 +35,12 @@ mod tests {
         assert!(!game.acting_player.standing_up);
         assert!(params.is_empty());
     }
+
+    #[test]
+    fn noop_when_already_not_standing_up() {
+        let mut game = make_game();
+        game.acting_player.standing_up = false;
+        StandingUpCommand.execute(&mut game);
+        assert!(!game.acting_player.standing_up);
+    }
 }

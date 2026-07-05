@@ -50,3 +50,42 @@ pub trait PassMechanic: Mechanic {
         Some(distance)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::modifiers::modifier_type::ModifierType;
+    use crate::pass_result::PassResult;
+
+    struct MinimalPass;
+    impl Mechanic for MinimalPass {
+        fn get_type(&self) -> MechanicType { MechanicType::PASS }
+    }
+    impl PassMechanic for MinimalPass {
+        fn throwing_range_table(&self) -> Vec<String> { vec![] }
+        fn minimum_roll(&self, _: &Player, _: PassingDistance, _: &[PassModifier], _: Option<&StatBasedRollModifier>) -> Option<i32> { None }
+        fn minimum_roll_simple(&self, _: &Player, _: PassingDistance, _: &[PassModifier]) -> Option<i32> { None }
+        fn evaluate_pass(&self, _: &Player, _: i32, _: PassingDistance, _: &[PassModifier], _: bool, _: Option<&StatBasedRollModifier>) -> PassResult { PassResult::FUMBLE }
+        fn evaluate_pass_simple(&self, _: &Player, _: i32, _: PassingDistance, _: &[PassModifier], _: bool) -> PassResult { PassResult::FUMBLE }
+        fn format_report_roll(&self, _: i32, _: &Player) -> String { String::new() }
+        fn format_roll_requirement(&self, _: PassingDistance, _: &str, _: &Player) -> String { String::new() }
+        fn eligible_to_re_roll(&self, _: &str, _: &Player) -> bool { false }
+        fn pass_modifiers(&self, _: &Game, _: &Player) -> i32 { 0 }
+    }
+
+    #[test]
+    fn calculate_modifiers_sums_all_modifiers() {
+        let m = MinimalPass;
+        let mods = vec![
+            PassModifier::new("TZ1", 1, ModifierType::TACKLEZONE),
+            PassModifier::new("TZ2", 2, ModifierType::TACKLEZONE),
+        ];
+        assert_eq!(m.calculate_modifiers(&mods), 3);
+    }
+
+    #[test]
+    fn calculate_modifiers_empty_returns_zero() {
+        let m = MinimalPass;
+        assert_eq!(m.calculate_modifiers(&[]), 0);
+    }
+}

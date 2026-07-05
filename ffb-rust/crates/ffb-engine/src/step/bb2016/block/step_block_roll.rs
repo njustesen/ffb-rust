@@ -7,6 +7,7 @@
 /// Sets stepParameter BLOCK_ROLL for all steps on the stack.
 /// Sets stepParameter NR_OF_BLOCK_DICE for all steps on the stack.
 use ffb_mechanics::mechanics::block_result_for_roll;
+use ffb_model::dialog::dialog_id::DialogId;
 use ffb_model::enums::{BlockResult, PlayerAction, ReRollSource};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
@@ -17,6 +18,7 @@ use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::abstract_step_with_re_roll::ReRollState;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use crate::util::util_server_dialog::UtilServerDialog;
 use crate::util::ServerUtilBlock;
 
 /// Java: `StepBlockRoll` (bb2016/block).
@@ -127,7 +129,7 @@ impl StepBlockRoll {
 
     /// Java: showBlockRollDialog(boolean pDoRoll)
     /// Determines which team gets the re-roll option and shows the dialog.
-    fn show_block_roll_dialog(&self, game: &Game) {
+    fn show_block_roll_dialog(&self, game: &mut Game) {
         let _team_id = if game.home_playing {
             game.team_home.id.clone()
         } else {
@@ -152,7 +154,9 @@ impl StepBlockRoll {
                 })
                 .unwrap_or(false);
 
-        // DEFERRED(dialog): DialogBlockRollParameter not yet ported; CLIENT_BLOCK_CHOICE action not yet added
+        // Java: UtilServerDialog.showDialog(gameState, new DialogBlockRollParameter(teamId, fNrOfDice, fBlockRoll,
+        //     teamReRollOption, proReRollOption), true)
+        UtilServerDialog::show_dialog(game, DialogId::BLOCK_ROLL, true);
     }
 }
 
@@ -172,7 +176,7 @@ impl Step for StepBlockRoll {
         // Java: if (commandStatus == UNHANDLED_COMMAND) {
         //   case CLIENT_BLOCK_CHOICE: fDiceIndex = ...; fBlockResult = forRoll(fBlockRoll[fDiceIndex]) }
         match action {
-            Action::BlockChoice { die_index } => {
+            Action::BlockChoice { die_index, .. } => {
                 // Java: fDiceIndex = blockChoiceCommand.getDiceIndex()
                 self.dice_index = *die_index;
                 // Java: fBlockResult = game.getRules().<BlockResultFactory>getFactory(BLOCK_RESULT).forRoll(fBlockRoll[fDiceIndex])
@@ -253,7 +257,7 @@ mod tests {
         step.nr_of_dice = 3;
         let mut game = make_game();
         let out = step.handle_command(
-            &Action::BlockChoice { die_index: 1 },
+            &Action::BlockChoice { die_index: 1, target_id: None },
             &mut game,
             &mut GameRng::new(0),
         );

@@ -61,3 +61,36 @@ impl PassModifierCollection {
 impl Default for PassModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_initializes_with_base_modifiers() {
+        let col = PassModifierCollection::new();
+        assert!(!col.get_modifiers().is_empty());
+    }
+
+    #[test]
+    fn get_modifiers_by_type_tacklezone_returns_8_entries() {
+        let col = PassModifierCollection::new();
+        let tzones = col.get_modifiers_by_type(ModifierType::TACKLEZONE);
+        assert_eq!(tzones.len(), 8);
+    }
+
+    #[test]
+    fn get_modifiers_by_type_disturbing_presence_returns_11_entries() {
+        let col = PassModifierCollection::new();
+        let dp = col.get_modifiers_by_type(ModifierType::DISTURBING_PRESENCE);
+        assert_eq!(dp.len(), 11);
+    }
+
+    #[test]
+    fn add_increases_modifier_count() {
+        let mut col = PassModifierCollection::new();
+        let count_before = col.get_modifiers().len();
+        col.add(PassModifier::new("extra", 1, ModifierType::REGULAR));
+        assert_eq!(col.get_modifiers().len(), count_before + 1);
+    }
+}

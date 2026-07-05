@@ -18,3 +18,15 @@ impl KickTeamMateRange {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_name_returns_lowercase() {
+        assert_eq!(KickTeamMateRange::LONG.get_name(), "long");
+        assert_eq!(KickTeamMateRange::MEDIUM.get_name(), "medium");
+        assert_eq!(KickTeamMateRange::SHORT.get_name(), "short");
+    }
+}

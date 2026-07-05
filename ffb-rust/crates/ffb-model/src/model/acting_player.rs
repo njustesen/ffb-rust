@@ -47,6 +47,9 @@ pub struct ActingPlayer {
     pub has_fed: bool,
     /// Java: fHasPassed — true once the player has made a pass/hand-off this turn.
     pub has_passed: bool,
+    /// Java: fSufferingAnimosity — true when the player failed an Animosity check
+    /// and must re-select a passing target.
+    pub suffering_animosity: bool,
 }
 
 impl ActingPlayer {

@@ -1,10 +1,15 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
+/// 1:1 translation of `com.fumbbl.ffb.net.commands.ClientCommandClearSketches`.
+/// Sent when a client clears all field sketches (no payload).
+#[derive(Debug, Clone, Default)]
 pub struct ClientCommandClearSketches;
 
 impl ClientCommandClearSketches {
     pub fn new() -> Self { Self }
 }
 
-impl Default for ClientCommandClearSketches {
-    fn default() -> Self { Self::new() }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn can_construct() { let _ = ClientCommandClearSketches::new(); }
 }

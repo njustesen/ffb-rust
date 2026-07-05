@@ -16,6 +16,7 @@
 ///     - If more players remain, show dialog again; else NEXT_STEP.
 ///
 /// Java: `com.fumbbl.ffb.server.step.mixed.shared.StepPickMeUp` extends `AbstractStep`.
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
@@ -90,6 +91,7 @@ impl StepPickMeUp {
             self.first_run = false;
         } else {
             // Java: for each selected player: roll D6; success → STANDING; add report
+            let mut events: Vec<GameEvent> = vec![];
             for id in self.player_ids_selected.drain(..).collect::<Vec<_>>() {
                 let roll = rng.d6();
                 let success = Self::interpret_pick_me_up(roll);
@@ -101,7 +103,14 @@ impl StepPickMeUp {
                         );
                     }
                 }
-                // DEFERRED(Report port): addReport(ReportPickMeUp(id, roll, success))
+                // Java: addReport(ReportPickMeUp(id, roll, success))
+                events.push(GameEvent::PickMeUpRoll { player_id: id, roll, success });
+            }
+
+            if self.player_ids.is_empty() {
+                let mut out = StepOutcome::next();
+                for ev in events { out = out.with_event(ev); }
+                return out;
             }
         }
 

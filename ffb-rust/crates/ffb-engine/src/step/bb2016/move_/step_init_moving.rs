@@ -3,7 +3,7 @@ use ffb_model::enums::PlayerAction;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
-use crate::step::framework::{Step, StepOutcome};
+use crate::step::framework::{Step, StepOutcome, StepAction};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::bb2016::KickTeamMate;
 use crate::step::generator::bb2016::kick_team_mate::KickTeamMateParams;
@@ -25,7 +25,6 @@ use crate::step::generator::bb2016::kick_team_mate::KickTeamMateParams;
 ///   set dodging/goingForIt/hasMoved, update turnStarted, NEXT_STEP
 ///
 /// DEFERRED(validMove): UtilServerPlayerMove.isValidMove check — agent paths are trusted in headless mode.
-/// DEFERRED(dispatchPlayerAction): GOTO_LABEL_AND_REPEAT from handle_command not yet ported (returns GOTO_LABEL).
 pub struct StepInitMoving {
     /// Java: fGotoLabelOnEnd (init param)
     pub goto_label_on_end: String,
@@ -235,10 +234,16 @@ impl StepInitMoving {
     fn dispatch_player_action(&self, action: PlayerAction) -> StepOutcome {
         // Java: publishParameter(DISPATCH_PLAYER_ACTION, pPlayerAction)
         //       setNextAction(GOTO_LABEL_AND_REPEAT, fGotoLabelOnEnd)
-        // DEFERRED(GotoLabelAndRepeat): StepAction::GotoLabelAndRepeat not yet wired — use GotoLabel
         let label = self.goto_label_on_end.clone();
-        StepOutcome::goto(&label)
-            .publish(StepParameter::DispatchPlayerAction(Some(action)))
+        StepOutcome {
+            action: StepAction::GotoLabelAndRepeat,
+            goto_label: Some(label),
+            published: vec![StepParameter::DispatchPlayerAction(Some(action))],
+            pushes: vec![],
+            events: vec![],
+            prompt: None,
+            clear_stack: false,
+        }
     }
 }
 

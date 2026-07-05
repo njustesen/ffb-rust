@@ -18,3 +18,20 @@ impl IDialogParameter for DialogBuyInducementsParameter {
     fn get_id(&self) -> DialogId { DialogId::BUY_INDUCEMENTS }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dialog_id_is_buy_inducements() {
+        assert_eq!(DialogBuyInducementsParameter::default().get_id(), DialogId::BUY_INDUCEMENTS);
+    }
+
+    #[test]
+    fn stores_team_id_and_gold() {
+        let p = DialogBuyInducementsParameter { team_id: Some("team1".into()), available_gold: 150_000 };
+        assert_eq!(p.get_team_id(), Some("team1"));
+        assert_eq!(p.get_available_gold(), 150_000);
+    }
+}

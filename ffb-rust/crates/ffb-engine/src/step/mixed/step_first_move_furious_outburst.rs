@@ -150,7 +150,8 @@ impl Step for StepFirstMoveFuriousOutburst {
                 }
             }
             // Java: CLIENT_ACTING_PLAYER with null action → endPlayerAction
-            Action::ActivatePlayer { player_action: _, .. } => {
+            Action::ActivatePlayer { player_action: _, ..
+} => {
                 // Java: if clientCommandActingPlayer.getPlayerAction() == null → endPlayerAction
                 // In Rust we use EndTurn as the cancel signal
             }
@@ -195,7 +196,8 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+            ..Default::default()
+});
         game.field_model.set_player_coordinate(id, pos);
         game.field_model.set_player_state(id, ffb_model::enums::PlayerState::new(state));
         game.acting_player.set_player(id.into(), PlayerAction::Block);

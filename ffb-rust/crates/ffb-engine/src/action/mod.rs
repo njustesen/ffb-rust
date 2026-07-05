@@ -44,9 +44,11 @@ pub enum Action {
     /// Declare Multiple Block against two adjacent targets (BB2020+, requires MultipleBlock skill).
     MultiBlock { defender1_id: PlayerId, defender2_id: PlayerId },
     /// Choose which block die result to apply.
-    BlockChoice { die_index: usize },
+    /// `target_id` is `Some` in multi-block sequences (CLIENT_BLOCK_OR_RE_ROLL_CHOICE_FOR_TARGET).
+    BlockChoice { die_index: usize, target_id: Option<String> },
     /// Use Brawler skill to re-roll a BothDown result (CLIENT_USE_BRAWLER).
-    UseBrawler,
+    /// `target_id` is `Some` in multi-block sequences.
+    UseBrawler { target_id: Option<String> },
     /// Use Hatred skill to re-roll a Skull result (CLIENT_USE_HATRED).
     UseHatred,
     /// Use Pro skill to re-roll a single block die (CLIENT_USE_PRO_RE_ROLL_FOR_BLOCK).
@@ -113,6 +115,13 @@ pub enum Action {
     BuyInducements { purchases: Vec<InducementPurchase> },
     /// Play a card from the hand, optionally targeting a player.
     PlayCard { card_id: String, target_player_id: Option<PlayerId> },
+    /// Use a purchased inducement during the game (Java: CLIENT_USE_INDUCEMENT).
+    /// `inducement_type` is the InducementType name (e.g. "WIZARD"); `card_id` is set for cards.
+    UseInducement {
+        inducement_type: Option<String>,
+        card_id: Option<String>,
+        player_ids: Vec<PlayerId>,
+    },
 
     // ── Star-player special attacks ───────────────────────────────────────
     /// PrimalSavagery: lash out against an adjacent opponent (D6+ST vs D6+AV).
@@ -161,10 +170,20 @@ pub enum Action {
     /// Java: `ClientCommandPlayerChoice`.
     PlayerChoice { player_id: Option<String>, player_ids: Vec<String>, mode: String },
 
+    // ── Blood lust ────────────────────────────────────────────────────────────
+    /// BB2020: Vampire chose whether to change action after failing blood lust.
+    /// Java: `ClientCommandBloodlustAction` — `change = true` means switch to alternate action to feed.
+    BloodlustAction { change: bool },
+
     // ── Game lifecycle ────────────────────────────────────────────────────────
     /// Coach signals readiness to start the game.
     /// Java: `CLIENT_START_GAME` command. `home = true` → home coach, `false` → away coach.
     StartGame { home: bool },
+
+    // ── Petty cash ────────────────────────────────────────────────────────────
+    /// Coach chooses how much petty cash to spend on inducements.
+    /// Java: `ClientCommandPettyCash` — `home` identifies which team's coach sent it.
+    PettyCash { home: bool, amount: i32 },
 }
 
 /// Which action type the agent wants to perform when activating a player.
@@ -277,5 +296,23 @@ mod tests {
     #[test]
     fn apothecary_choice_no_si_round_trips() {
         rt(Action::ApothecaryChoice { player_state: 0, serious_injury: None });
+    }
+
+    #[test]
+    fn use_inducement_with_type_round_trips() {
+        rt(Action::UseInducement {
+            inducement_type: Some("WIZARD".into()),
+            card_id: None,
+            player_ids: vec!["p1".into()],
+        });
+    }
+
+    #[test]
+    fn use_inducement_with_card_round_trips() {
+        rt(Action::UseInducement {
+            inducement_type: None,
+            card_id: Some("distract".into()),
+            player_ids: vec![],
+        });
     }
 }

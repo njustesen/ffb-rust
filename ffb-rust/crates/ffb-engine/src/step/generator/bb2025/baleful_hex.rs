@@ -37,4 +37,19 @@ mod tests {
         assert_eq!(steps[0].step_id, StepId::BalefulHex);
         assert_eq!(steps[0].label.as_deref(), Some(labels::END));
     }
+
+    #[test]
+    fn failure_label_in_params() {
+        let steps = BalefulHex::build_sequence(&BalefulHexParams { failure_label: "theLabel".into() });
+        let has = steps[0].params.iter().any(|p| {
+            matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "theLabel")
+        });
+        assert!(has);
+    }
+
+    #[test]
+    fn baleful_hex_step_count_is_one() {
+        let steps = BalefulHex::build_sequence(&BalefulHexParams::default());
+        assert_eq!(steps.len(), 1);
+    }
 }

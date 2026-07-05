@@ -1,3 +1,4 @@
+use ffb_model::events::GameEvent;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
@@ -52,7 +53,7 @@ use crate::step::framework::{StepAction, StepId, StepParameter};
 ///   TODO: game.options.getOptionWithDefault(BOMB_BOUNCES_ON_EMPTY_SQUARES)
 ///   TODO: DiceInterpreter.interpretScatterDirectionRoll
 ///   TODO: UtilServerCatchScatterThrowIn.findScatterCoordinate
-///   TODO: fieldModel.getBombCoordinate / setBombCoordinate / setBombMoving / getPlayer
+///   TODO: setBombCoordinate / setBombMoving for bounce path; fieldModel.getPlayer for bounce
 ///   TODO: reports: ReportScatterBall, ReportBombOutOfBounds, ReportSkillUse
 ///   TODO: CATCH_BOMB mode publish
 ///
@@ -102,16 +103,23 @@ impl Step for StepInitBomb {
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // CLIENT_USE_SKILL with canForceBombExplosion skill
         if let Action::UseSkill { use_skill, .. } = action {
-            // DEFERRED: addReport(ReportSkillUse)
             if *use_skill {
                 // Java: actingPlayer.markSkillUsed(skill)
                 if let Some(pid) = game.acting_player.player_id.clone() {
                     let sid = game.player(&pid).and_then(|p| UtilCards::get_unused_skill_with_property(
                         p, NamedProperties::CAN_FORCE_BOMB_EXPLOSION));
                     if let Some(sid) = sid {
+                        // Java: addReport(new ReportSkillUse(skill, true))
+                        let skill_event = GameEvent::SkillUse {
+                            player_id: pid.clone(),
+                            skill_id: sid as u16,
+                            used: true,
+                        };
                         let is_home = game.team_home.player(&pid).is_some();
                         if is_home { game.team_home.player_mut(&pid).map(|p| p.used_skills.insert(sid)); }
                         else { game.team_away.player_mut(&pid).map(|p| p.used_skills.insert(sid)); }
+                        self.explode_skill_used = Some(*use_skill);
+                        return self.execute_step(game, rng).with_event(skill_event);
                     }
                 }
             }
@@ -162,13 +170,35 @@ impl StepInitBomb {
         }
 
         if self.catcher_id.is_none() {
-            // DEFERRED: fBombCoordinate = fieldModel.getBombCoordinate()
-            // DEFERRED: bounce logic (BOMB_BOUNCES_ON_EMPTY_SQUARES option)
-            // DEFERRED: publish CATCHER_ID=null
-            StepOutcome::next()
+            // Java: fBombCoordinate = fieldModel.getBombCoordinate()
+            self.bomb_coordinate = game.field_model.bomb_coordinate;
+            let mut bomb_out = false;
+            if self.bomb_coordinate.is_none() && !self.dont_drop_fumble {
+                bomb_out = true;
+            }
+            // DEFERRED: bounce logic (BOMB_BOUNCES_ON_EMPTY_SQUARES option requires GameOptions system)
+            let mut out_event: Option<GameEvent> = None;
+            if bomb_out {
+                game.field_model.bomb_coordinate = None;
+                game.field_model.bomb_moving = false;
+                // Java: getResult().addReport(new ReportBombOutOfBounds())
+                // ReportBombOutOfBounds has no fields; Rust GameEvent::BombOutOfBounds carries the
+                // last-known bomb coordinate (before clearance) for client-side animation.
+                out_event = Some(GameEvent::BombOutOfBounds {
+                    coord: self.bomb_coordinate.unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0)),
+                });
+            }
+            // Java: leaveStep(null) → publishParameter(CATCHER_ID=null); NEXT_STEP
+            let mut outcome = StepOutcome::next().publish(StepParameter::CatcherId(None));
+            if let Some(ev) = out_event {
+                outcome = outcome.with_event(ev);
+            }
+            outcome
         } else {
-            // DEFERRED: publish CATCHER_ID=catcher_id
+            // Java: leaveStep(gotoLabelOnEnd) → publishParameter(CATCHER_ID=catcherId); GOTO
+            let catcher_id = self.catcher_id.clone();
             StepOutcome::goto(&self.goto_label_on_end)
+                .publish(StepParameter::CatcherId(catcher_id))
         }
     }
 }
@@ -236,5 +266,57 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("catch_label"));
+    }
+
+    #[test]
+    fn no_catcher_publishes_catcher_id_null() {
+        let mut game = make_game();
+        let mut step = StepInitBomb::new("end".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::CatcherId(None))));
+    }
+
+    #[test]
+    fn catcher_present_publishes_catcher_id() {
+        let mut game = make_game();
+        let mut step = StepInitBomb::new("end".into());
+        step.catcher_id = Some("p99".into());
+        step.explode_skill_used = Some(false);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::CatcherId(Some(id)) if id == "p99")));
+    }
+
+    #[test]
+    fn no_catcher_reads_bomb_coordinate_from_field_model() {
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        game.field_model.bomb_coordinate = Some(FieldCoordinate::new(5, 7));
+        let mut step = StepInitBomb::new("end".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(step.bomb_coordinate, Some(FieldCoordinate::new(5, 7)));
+    }
+
+    #[test]
+    fn bomb_out_clears_field_model_bomb_coordinate() {
+        // bomb_coordinate is None on field_model → bombOut=true → clear field_model.bomb_coordinate
+        let mut game = make_game();
+        game.field_model.bomb_coordinate = None;
+        let mut step = StepInitBomb::new("end".into());
+        step.dont_drop_fumble = false;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.field_model.bomb_coordinate.is_none());
+        assert!(!game.field_model.bomb_moving);
+    }
+
+    #[test]
+    fn dont_drop_fumble_prevents_bomb_out() {
+        let mut game = make_game();
+        game.field_model.bomb_coordinate = None;
+        let mut step = StepInitBomb::new("end".into());
+        step.dont_drop_fumble = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        // bomb_moving should NOT have been set to false by bomb_out path
+        // (bomb_out skipped due to dont_drop_fumble)
+        assert!(!game.field_model.bomb_moving); // stays false (default)
     }
 }

@@ -167,4 +167,20 @@ mod tests {
         // KICKED_PLAYER_COORDINATE(null) sentinel is always published
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::KickedPlayerCoordinate(_))));
     }
+
+    #[test]
+    fn set_parameter_kicked_player_id_accepted() {
+        let mut step = StepKickTeamMateDoubleRolled::new();
+        assert!(step.set_parameter(&StepParameter::KickedPlayerId(Some("kp".into()))));
+        assert_eq!(step.kicked_player_id.as_deref(), Some("kp"));
+    }
+
+    #[test]
+    fn set_parameter_kicked_player_state_accepted() {
+        use ffb_model::enums::PS_STANDING;
+        let mut step = StepKickTeamMateDoubleRolled::new();
+        let state = PlayerState::new(PS_STANDING);
+        assert!(step.set_parameter(&StepParameter::KickedPlayerState(state)));
+        assert_eq!(step.kicked_player_state, Some(state));
+    }
 }

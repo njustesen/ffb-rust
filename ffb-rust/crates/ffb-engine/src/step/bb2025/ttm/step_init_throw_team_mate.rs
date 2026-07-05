@@ -112,7 +112,8 @@ impl Step for StepInitThrowTeamMate {
                     self.thrown_player_id = Some(player_id.clone());
                 }
             }
-            Action::SelectPlayer { player_id } => {
+            Action::SelectPlayer { player_id
+} => {
                 // CLIENT_ACTING_PLAYER with playerId -> change action (not relevant for random agent)
                 let _ = player_id;
             }

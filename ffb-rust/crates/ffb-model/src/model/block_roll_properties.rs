@@ -14,3 +14,19 @@ impl BlockRollProperties {
         self.re_roll_sources.push(source);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn new_starts_empty() {
+        assert!(BlockRollProperties::new().re_roll_sources.is_empty());
+    }
+    #[test]
+    fn add_re_roll_source_accumulates() {
+        let mut p = BlockRollProperties::new();
+        let source = ReRollSource::new("teamReRoll");
+        p.add_re_roll_source(source);
+        assert_eq!(p.re_roll_sources.len(), 1);
+    }
+}

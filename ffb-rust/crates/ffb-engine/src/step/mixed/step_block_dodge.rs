@@ -24,6 +24,7 @@ use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
+use crate::step::action::block::util_block_sequence::init_pushback;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::util::util_server_pushback::UtilServerPushback;
 
@@ -93,9 +94,21 @@ impl StepBlockDodge {
         let defender_has_side_step = game.player(&defender_id)
             .map(|p| p.has_skill_property(NamedProperties::CAN_CHOOSE_OWN_PUSHED_BACK_SQUARE))
             .unwrap_or(false);
-        let _use_grab = action_is_block && attacker_can_grab && !defender_has_side_step;
-        // DEFERRED(GRAB-mode): UtilServerPushback GRAB mode not ported; grab_squares = regular.
-        let grab_squares = &regular_squares;
+        let use_grab = action_is_block && attacker_can_grab && !defender_has_side_step;
+        let grab_squares_owned: Vec<_>;
+        let grab_squares: &Vec<_>;
+        if use_grab {
+            // Java: GRAB mode — all adjacent empty, valid pushback squares
+            grab_squares_owned = UtilServerPushback::find_pushback_squares_grab(
+                starting_square,
+                &|c| game.field_model.player_at(c).is_some(),
+                &|c| !game.field_model.was_multi_block_target_square(c),
+                home_choice,
+            );
+            grab_squares = &grab_squares_owned;
+        } else {
+            grab_squares = &regular_squares;
+        }
 
         let sideline_push = grab_squares.iter().any(|sq| {
             let c = sq.coordinate;
@@ -141,8 +154,13 @@ impl StepBlockDodge {
             }
         }
 
-        // Java: publishParameters(UtilBlockSequence.initPushback(this)) — TODO pushback port.
-        StepOutcome::next()
+        // Java: publishParameters(UtilBlockSequence.initPushback(this))
+        let pushback_params = init_pushback(game);
+        let mut outcome = StepOutcome::next();
+        for p in pushback_params {
+            outcome = outcome.publish(p);
+        }
+        outcome
     }
 }
 
@@ -200,6 +218,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.field_model.set_player_coordinate(id, pos);
         game.field_model.set_player_state(id, ffb_model::enums::PlayerState::new(state));
@@ -290,6 +309,49 @@ mod tests {
     }
 
     #[test]
+    fn execute_step_publishes_starting_pushback_square() {
+        // Verify that init_pushback is wired: attacker + defender both set →
+        // StartingPushbackSquare is published in the outcome.
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        let mut game = make_game();
+        game.home_playing = true;
+        // Attacker (home)
+        game.team_home.players.push(Player {
+            id: "att".into(), name: "att".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 5, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.acting_player.player_id = Some("att".into());
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(10, 6));
+        // Defender (away)
+        game.team_away.players.push(Player {
+            id: "def".into(), name: "def".into(), nr: 2, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 5, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(10, 7));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.defender_id = Some("def".into());
+
+        let mut step = StepBlockDodge::new();
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert!(
+            out.published.iter().any(|p| matches!(p, StepParameter::StartingPushbackSquare(Some(_)))),
+            "init_pushback should publish StartingPushbackSquare when attacker and defender are placed"
+        );
+    }
+
+    #[test]
     fn find_dodge_choice_no_risk_mid_field() {
         let mut game = make_game();
         // Attacker at (12,7), defender at (13,7) → pushed East → candidates open, no sideline
@@ -299,5 +361,45 @@ mod tests {
         game.field_model.set_player_coordinate("def", FieldCoordinate::new(13, 7));
         // No players on push squares, not near sideline, not first turn after kickoff
         assert!(!StepBlockDodge::find_dodge_choice(&game));
+    }
+
+    #[test]
+    fn find_dodge_choice_grab_mode_near_sideline_detected() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerAction, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        // Attacker has Grab (canPushBackToAnySquare), defender lacks SideStep.
+        // Place defender near the upper sideline (y=1) so GRAB squares include sideline.
+        let mut game = make_game();
+        game.acting_player.player_id = Some("att".into());
+        game.acting_player.player_action = Some(PlayerAction::Block);
+        game.defender_id = Some("def".into());
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(12, 2));
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(12, 1));
+        // Add attacker with Grab skill to team_home
+        game.team_home.players.push(Player {
+            id: "att".into(), name: "att".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 5, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Grab, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        // Defender with no SideStep
+        game.team_away.players.push(Player {
+            id: "def".into(), name: "def".into(), nr: 2, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 5, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        // With GRAB mode, all adjacent empty squares are considered.
+        // Defender at y=1, GRAB squares include y=0 (sideline) → sideline push detected.
+        assert!(StepBlockDodge::find_dodge_choice(&game));
     }
 }

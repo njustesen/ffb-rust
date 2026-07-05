@@ -2,8 +2,12 @@ use ffb_model::enums::TurnMode;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
-use crate::step::framework::{Step, StepOutcome};
+use crate::mechanic::mixed::setup_mechanic::SetupMechanic;
+use crate::mechanic::setup_mechanic::SetupMechanic as SetupMechanicTrait;
+use crate::step::framework::{Step, StepOutcome, SequenceStep};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::generator::bb2025::Select;
+use crate::step::generator::bb2025::select::SelectParams;
 
 /// Executes the Charge/Blitz! kickoff result turn.
 ///
@@ -15,13 +19,12 @@ use crate::step::framework::{StepId, StepParameter};
 ///     - Call SetupMechanic.pinPlayersInTacklezones to deactivate pinned players.
 ///     - Set TurnMode = BLITZ.
 ///     - Start the blitz turn timer (TODO — timer infrastructure not ported).
-///     - game.startTurn() (TODO — TurnData.startTurn not yet ported).
+///     - game.startTurn() — now implemented.
 ///     - Push `this` step back onto the stack (so we re-enter on the second call).
-///     - Push a Select sequence for the blitzing team (TODO — generator not wired here).
+///     - Push a Select sequence for the blitzing team.
 ///     - NEXT_STEP.
 ///
-/// The `pinPlayersInTacklezones` call, `startTurn()`, and the Select-sequence push
-/// are TODO stubs.  The TurnMode transitions are implemented.
+/// TurnMode transitions, `pinPlayersInTacklezones`, `startTurn()`, and Select push all implemented.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.kickoff.StepBlitzTurn`.
 pub struct StepBlitzTurn;
@@ -55,12 +58,22 @@ impl StepBlitzTurn {
             game.turn_mode = TurnMode::Kickoff;
         } else {
             // First entry: set up the blitz turn for the kicking team.
-            // DEFERRED: SetupMechanic.pinPlayersInTacklezones(gameState, blitzingTeam, true)
-            // DEFERRED: UtilServerTimer.stopTurnTimer / startTurnTimer
-            // DEFERRED: game.startTurn()
+            let blitzing_team_id = if game.home_playing {
+                game.team_home.id.clone()
+            } else {
+                game.team_away.id.clone()
+            };
+            SetupMechanic::new().pin_players_in_tacklezones_chain(game, &blitzing_team_id, true);
+            // DEFERRED(timer): UtilServerTimer.stopTurnTimer / startTurnTimer
+            game.start_turn();
             game.turn_mode = TurnMode::Blitz;
-            // DEFERRED: push self back onto the stack (StepStack::pushCurrentStep).
-            // DEFERRED: push Select sequence for the blitzing team via SequenceGenerator::Select.
+            // Java: pushCurrentStepOnStack(); Select.pushSequence(gameState, true)
+            let self_seq = vec![SequenceStep::new(StepId::BlitzTurn)];
+            let select_seq = Select::build_sequence(&SelectParams {
+                update_persistence: true,
+                is_blitz_move: false,
+            });
+            return StepOutcome::next().push_seq(self_seq).push_seq(select_seq);
         }
         StepOutcome::next()
     }
@@ -118,5 +131,16 @@ mod tests {
     fn set_parameter_returns_false() {
         let mut step = StepBlitzTurn::new();
         assert!(!step.set_parameter(&StepParameter::EndTurn(false)));
+    }
+
+    #[test]
+    fn first_entry_pushes_self_seq_and_select_seq() {
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Kickoff;
+        let mut step = StepBlitzTurn::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // Java: pushCurrentStepOnStack() + Select.pushSequence → two pushed sequences
+        assert_eq!(out.pushes.len(), 2, "must push self_seq + select_seq");
+        assert_eq!(out.pushes[0][0].step_id, StepId::BlitzTurn);
     }
 }

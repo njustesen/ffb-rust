@@ -28,6 +28,7 @@ pub mod mixed;
 pub mod phase;
 pub mod game;
 pub mod step_goto_label;
+pub mod step_reset_to_move;
 
 pub use framework::*;
 pub use driver::*;

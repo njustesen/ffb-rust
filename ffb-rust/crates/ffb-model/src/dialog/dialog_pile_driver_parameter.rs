@@ -22,3 +22,21 @@ impl IDialogParameter for DialogPileDriverParameter {
     fn get_id(&self) -> DialogId { DialogId::PILE_DRIVER }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_knocked_down_player_appends_nonempty() {
+        let mut p = DialogPileDriverParameter::default();
+        p.add_knocked_down_player("p1");
+        p.add_knocked_down_player("");
+        assert_eq!(p.get_knocked_down_players(), &["p1"]);
+    }
+
+    #[test]
+    fn dialog_id_is_pile_driver() {
+        assert_eq!(DialogPileDriverParameter::default().get_id(), DialogId::PILE_DRIVER);
+    }
+}

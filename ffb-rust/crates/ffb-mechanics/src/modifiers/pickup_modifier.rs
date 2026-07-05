@@ -64,3 +64,26 @@ impl Default for PickupModifier {
         PickupModifier::new("", 0, ModifierType::REGULAR)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_stores_fields() {
+        let m = PickupModifier::new("1 Tacklezone", 1, ModifierType::TACKLEZONE);
+        assert_eq!(m.get_name(), "1 Tacklezone");
+        assert_eq!(m.get_modifier(), 1);
+        assert_eq!(m.get_type(), ModifierType::TACKLEZONE);
+    }
+
+    #[test]
+    fn tacklezone_is_modifier_included() {
+        assert!(PickupModifier::new("tz", 1, ModifierType::TACKLEZONE).is_modifier_included());
+    }
+
+    #[test]
+    fn regular_is_not_modifier_included() {
+        assert!(!PickupModifier::new("x", 0, ModifierType::REGULAR).is_modifier_included());
+    }
+}

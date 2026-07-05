@@ -57,4 +57,29 @@ mod tests {
         assert_eq!(last.step_id, StepId::EndGame);
         assert_eq!(last.label.as_deref(), Some(labels::END_GAME));
     }
+
+    #[test]
+    fn first_step_is_init_end_game() {
+        let steps = EndGame::build_sequence(&EndGameParams::default());
+        assert_eq!(steps[0].step_id, StepId::InitEndGame);
+    }
+
+    #[test]
+    fn admin_mode_param_set_in_first_step() {
+        let steps = EndGame::build_sequence(&EndGameParams { admin_mode: true });
+        let init = &steps[0];
+        assert!(init.params.iter().any(|p| matches!(p, StepParameter::AdminMode(true))));
+    }
+
+    #[test]
+    fn contains_mvp_step() {
+        let steps = EndGame::build_sequence(&EndGameParams::default());
+        assert!(steps.iter().any(|s| s.step_id == StepId::Mvp));
+    }
+
+    #[test]
+    fn contains_winnings_step() {
+        let steps = EndGame::build_sequence(&EndGameParams::default());
+        assert!(steps.iter().any(|s| s.step_id == StepId::Winnings));
+    }
 }

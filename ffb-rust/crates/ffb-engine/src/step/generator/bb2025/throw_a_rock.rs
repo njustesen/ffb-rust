@@ -57,4 +57,22 @@ mod tests {
         let steps = ThrowARock::build_sequence(&ThrowARockParams::default());
         assert_eq!(steps[0].step_id, StepId::ThrowARock);
     }
+
+    #[test]
+    fn home_team_param_passed_to_first_step() {
+        let steps = ThrowARock::build_sequence(&ThrowARockParams { home_team: true });
+        assert!(steps[0].params.iter().any(|p| matches!(p, StepParameter::HomeTeam(true))));
+    }
+
+    #[test]
+    fn away_team_param_passed_to_first_step() {
+        let steps = ThrowARock::build_sequence(&ThrowARockParams { home_team: false });
+        assert!(steps[0].params.iter().any(|p| matches!(p, StepParameter::HomeTeam(false))));
+    }
+
+    #[test]
+    fn contains_catch_scatter_throw_in_as_last() {
+        let steps = ThrowARock::build_sequence(&ThrowARockParams::default());
+        assert_eq!(steps.last().unwrap().step_id, StepId::CatchScatterThrowIn);
+    }
 }

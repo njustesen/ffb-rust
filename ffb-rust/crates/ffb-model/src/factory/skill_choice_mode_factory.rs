@@ -14,3 +14,19 @@ impl SkillChoiceModeFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_mode() {
+        let f = SkillChoiceModeFactory::default();
+        assert_eq!(f.for_name("intensiveTraining"), Some(SkillChoiceMode::INTENSIVE_TRAINING));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(SkillChoiceModeFactory::default().for_name("invalid"), None);
+    }
+}

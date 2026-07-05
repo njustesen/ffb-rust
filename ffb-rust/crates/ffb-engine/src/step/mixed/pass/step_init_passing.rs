@@ -117,7 +117,7 @@ impl Step for StepInitPassing {
                 self.end_turn = true;
                 self.execute_step(game)
             }
-            Action::ActivatePlayer { player_id, .. } if player_id.is_empty() => {
+            Action::ActivatePlayer {player_id, .. } if player_id.is_empty() => {
                 // Java: CLIENT_ACTING_PLAYER with null playerId → fEndPlayerAction = true
                 self.end_player_action = true;
                 self.execute_step(game)
@@ -191,11 +191,9 @@ mod tests {
         let mut rng = GameRng::new(0);
         // Java: CLIENT_ACTING_PLAYER with null playerId → endPlayerAction
         let out = step.handle_command(
-            &Action::ActivatePlayer {
-                player_id: "".into(),
+            &Action::ActivatePlayer {player_id: "".into(),
                 player_action: crate::action::PlayerActionChoice::Move,
-                block_defender_id: None,
-            },
+                block_defender_id: None },
             &mut game,
             &mut rng,
         );

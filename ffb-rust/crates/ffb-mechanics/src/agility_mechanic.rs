@@ -56,3 +56,64 @@ pub trait AgilityMechanic: Mechanic {
         modifiers
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+    use crate::modifiers::RollModifier;
+    use crate::wording::Wording;
+
+    struct MinimalAgility;
+
+    impl Mechanic for MinimalAgility {
+        fn get_type(&self) -> MechanicType { MechanicType::AGILITY }
+    }
+
+    impl AgilityMechanic for MinimalAgility {
+        fn minimum_roll_jump_up(&self, _: &Player, _: &HashSet<JumpUpModifier>) -> i32 { 2 }
+        fn minimum_roll_dodge(&self, _: &Game, _: &Player, _: &HashSet<DodgeModifier>) -> i32 { 2 }
+        fn minimum_roll_dodge_with_stat(&self, _: &Game, _: &Player, _: &HashSet<DodgeModifier>, _: Option<&StatBasedRollModifier>) -> i32 { 2 }
+        fn minimum_roll_pickup(&self, _: &Player, _: &HashSet<PickupModifier>) -> i32 { 2 }
+        fn minimum_roll_interception(&self, _: &Player, _: &HashSet<InterceptionModifier>) -> i32 { 6 }
+        fn minimum_roll_jump(&self, _: &Player, _: &HashSet<JumpModifier>) -> i32 { 4 }
+        fn minimum_roll_hypnotic_gaze(&self, _: &Player, _: &HashSet<GazeModifier>) -> i32 { 3 }
+        fn minimum_roll_catch(&self, _: &Player, _: &HashSet<CatchModifier>) -> i32 { 3 }
+        fn minimum_roll_right_stuff(&self, _: &Player, _: &HashSet<RightStuffModifier>) -> i32 { 4 }
+        fn minimum_roll_safe_throw(&self, _: &Player) -> i32 { 2 }
+        fn minimum_roll(&self, base: i32, _: &HashSet<RollModifier>) -> i32 { base }
+        fn format_dodge_result(&self, _: &[RollModifier], _: &Player, _: Option<&StatBasedRollModifier>) -> String { String::new() }
+        fn format_jump_result(&self, _: &[RollModifier], _: &Player) -> String { String::new() }
+        fn format_jump_up_result(&self, _: &[RollModifier], _: &Player) -> String { String::new() }
+        fn format_safe_throw_result(&self, _: &Player) -> String { String::new() }
+        fn format_right_stuff_result(&self, _: &[RollModifier], _: &Player) -> String { String::new() }
+        fn format_catch_result(&self, _: &[RollModifier], _: &Player) -> String { String::new() }
+        fn format_interception_result(&self, _: &[RollModifier], _: &Player) -> String { String::new() }
+        fn format_hypnotic_gaze_result(&self, _: &[RollModifier], _: &Player) -> String { String::new() }
+        fn format_pickup_result(&self, _: &[RollModifier], _: &Player, _: bool) -> String { String::new() }
+        fn interception_wording(&self, _: bool) -> Wording { Wording::new("", "", "", "") }
+    }
+
+    #[test]
+    fn format_roll_modifiers_empty_returns_empty_string() {
+        let m = MinimalAgility;
+        assert_eq!(m.format_roll_modifiers(&[]), "");
+    }
+
+    #[test]
+    fn format_roll_modifiers_positive_modifier_prefixed_with_minus() {
+        let m = MinimalAgility;
+        let rm = RollModifier::new("Tacklezone", 1);
+        let result = m.format_roll_modifiers(&[rm]);
+        assert!(result.contains(" - "));
+        assert!(result.contains("Tacklezone"));
+    }
+
+    #[test]
+    fn format_roll_modifiers_negative_modifier_prefixed_with_plus() {
+        let m = MinimalAgility;
+        let rm = RollModifier::new("Sure Feet", -1);
+        let result = m.format_roll_modifiers(&[rm]);
+        assert!(result.contains(" + "));
+    }
+}

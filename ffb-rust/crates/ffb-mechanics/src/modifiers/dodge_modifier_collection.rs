@@ -46,3 +46,24 @@ impl DodgeModifierCollection {
 impl Default for DodgeModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_eight_base_modifiers() {
+        assert_eq!(DodgeModifierCollection::new().get_modifiers().len(), 8);
+    }
+
+    #[test]
+    fn includes_single_tacklezone_modifier() {
+        assert!(DodgeModifierCollection::new().get_modifiers().iter().any(|m| m.get_name() == "1 Tacklezone"));
+    }
+
+    #[test]
+    fn all_base_modifiers_are_tacklezone_type() {
+        let col = DodgeModifierCollection::new();
+        assert!(col.get_modifiers().iter().all(|m| m.get_type() == ModifierType::TACKLEZONE));
+    }
+}

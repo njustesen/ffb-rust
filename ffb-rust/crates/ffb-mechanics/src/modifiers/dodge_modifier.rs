@@ -89,3 +89,31 @@ impl DodgeModifier {
         self.applies_to_context.as_ref().map(|f| f(context)).unwrap_or(true)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_stores_name_modifier_type() {
+        let m = DodgeModifier::new("1 Tacklezone", 1, ModifierType::TACKLEZONE);
+        assert_eq!(m.get_name(), "1 Tacklezone");
+        assert_eq!(m.get_modifier(), 1);
+        assert_eq!(m.get_type(), ModifierType::TACKLEZONE);
+    }
+
+    #[test]
+    fn tacklezone_type_is_modifier_included() {
+        assert!(DodgeModifier::new("tz", 1, ModifierType::TACKLEZONE).is_modifier_included());
+    }
+
+    #[test]
+    fn prehensile_tail_is_modifier_included() {
+        assert!(DodgeModifier::new("pt", 1, ModifierType::PREHENSILE_TAIL).is_modifier_included());
+    }
+
+    #[test]
+    fn regular_type_is_not_modifier_included() {
+        assert!(!DodgeModifier::new("rain", -1, ModifierType::REGULAR).is_modifier_included());
+    }
+}

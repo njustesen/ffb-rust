@@ -12,23 +12,23 @@
 ///
 /// RightStuffModifierFactory (non-tacklezone only) → wired.
 /// AgilityMechanic.minimumRollRightStuff → wired (bb2016::AgilityMechanic).
-/// DEFERRED(modifier-tacklezone): RightStuffModifier tacklezone predicates require adjacent-opponent
-///   counting in FieldModel; skipped until FieldModel.count_tacklezones_on() is ported.
-/// DEFERRED(reroll): AbstractStepWithReRoll / UtilServerReRoll not yet ported.
-/// DEFERRED(injury): UtilServerInjury.handleInjury(InjuryTypeTTMLanding) not yet ported.
-/// DEFERRED(touchdown): UtilServerSteps.checkTouchdown not yet ported.
+/// RightStuffModifierFactory tacklezone modifiers: UtilPlayer::find_tacklezones wired.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
-use ffb_model::enums::{PS_FALLING, ApothecaryMode};
+use ffb_model::enums::{PS_FALLING, ApothecaryMode, ReRollSource};
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::CatchScatterThrowInMode;
+use crate::step::util_server_steps::check_touchdown;
 use ffb_model::model::kick_team_mate_range::KickTeamMateRange;
+use ffb_model::util::util_player::UtilPlayer;
 use ffb_mechanics::modifiers::modifier_type::ModifierType;
 use ffb_mechanics::modifiers::bb2016::right_stuff_modifier_collection::RightStuffModifierCollection as Bb2016RightStuffModifiers;
 use crate::dice_interpreter::DiceInterpreter;
 use crate::injury::injuryType::injury_type_ttm_landing::InjuryTypeTTMLanding;
 use crate::step::util_server_injury;
+use crate::step::abstract_step_with_re_roll::{ReRollState, find_skill_reroll_source};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
 /// Java: `StepRightStuff` (bb2016/ttm).
 pub struct StepRightStuff {
@@ -40,6 +40,10 @@ pub struct StepRightStuff {
     drop_thrown_player: bool,
     /// Java: `ktmRange`
     ktm_range: Option<KickTeamMateRange>,
+    /// Java: AbstractStepWithReRoll fields
+    re_roll_state: ReRollState,
+    /// Cached roll value (0 = not yet rolled).
+    roll: i32,
 }
 
 impl StepRightStuff {
@@ -49,10 +53,12 @@ impl StepRightStuff {
             thrown_player_id: None,
             drop_thrown_player: false,
             ktm_range: None,
+            re_roll_state: ReRollState::new(),
+            roll: 0,
         }
     }
 
-    fn execute_step(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let player_id = match &self.thrown_player_id {
             Some(id) => id.clone(),
             None     => return StepOutcome::next(),
@@ -91,67 +97,104 @@ impl StepRightStuff {
                 .publish(StepParameter::ThrownPlayerCoordinate(None));
         }
 
-        // Compute minimum roll using AgilityMechanic + non-tacklezone modifiers.
-        // DEFERRED(modifier-tacklezone): tacklezone predicates not wired; skip TACKLEZONE modifiers.
+        // Java: if (reRolledAction == RIGHT_STUFF) { if (source == null || !useReRoll) doRoll = false; }
+        let already_rerolled = self.re_roll_state.re_rolled_action
+            .as_ref().map(|a| a.name == "RIGHT_STUFF").unwrap_or(false);
+        if already_rerolled {
+            let source_opt = self.re_roll_state.re_roll_source.clone();
+            let consumed = source_opt
+                .as_ref()
+                .map(|s| use_reroll(game, s, &player_id))
+                .unwrap_or(false);
+            if !consumed {
+                return self.land_injury(game, rng, &player_id);
+            }
+        }
+
+        // Compute minimum roll using AgilityMechanic + all modifiers including tacklezones.
         let ktm_str = self.ktm_range.map(|r| r.get_name().to_string());
         let minimum_roll = {
             let player_agility = game.player(&player_id).map(|p| p.agility_with_modifiers());
             if let Some(agility) = player_agility {
-                // Build a dummy context for modifier lookup (ktm_range only; game ref not needed for non-tacklezone).
-                let modifier_total: i32 = Bb2016RightStuffModifiers::new()
+                let regular_total: i32 = Bb2016RightStuffModifiers::new()
                     .get_modifiers()
                     .iter()
                     .filter(|m| m.get_type() != ModifierType::TACKLEZONE)
-                    .filter(|m| {
-                        // Apply ktm predicate: "medium" → +1, "long" → +2.
-                        match m.get_name() {
-                            "Medium Kick" => ktm_str.as_deref() == Some("medium"),
-                            "Long Kick"   => ktm_str.as_deref() == Some("long"),
-                            _             => true,
-                        }
+                    .filter(|m| match m.get_name() {
+                        "Medium Kick" => ktm_str.as_deref() == Some("medium"),
+                        "Long Kick"   => ktm_str.as_deref() == Some("long"),
+                        _             => true,
                     })
                     .map(|m| m.get_modifier())
                     .sum();
-                // Agility roll base: 7 - min(agility, 6)
+                // Java: GenerifiedModifierFactory.getTacklezoneModifier → count = findTacklezones
+                // BB2016 has "N Tacklezones" → +N per adjacent opponent tacklezone.
+                let tacklezone_modifier = UtilPlayer::find_tacklezones(game, &player_id) as i32;
                 let base = 7 - agility.min(6);
-                (base + modifier_total).max(2)
-            } else {
-                2
-            }
+                (base + regular_total + tacklezone_modifier).max(2)
+            } else { 2 }
         };
 
-        let roll = rng.d6();
-        let successful = DiceInterpreter::is_skill_roll_successful(roll, minimum_roll);
+        if self.roll == 0 {
+            self.roll = rng.d6();
+        }
+        let successful = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
 
-        if !successful {
-            // DEFERRED(reroll): offer TRR / skill re-roll not yet wired.
-            // Java: handleInjury(InjuryTypeTTMLanding, actingPlayerId, playerId, coord, null, null, THROWN_PLAYER)
-            let coord = game.field_model.player_coordinate(&player_id)
-                .unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
-            let mut injury_type = InjuryTypeTTMLanding::new();
-            let ir = util_server_injury::handle_injury(
-                game, rng, &mut injury_type,
-                None, &player_id, coord, None, None,
-                ApothecaryMode::ThrownPlayer,
-            );
-            ir.apply_to(game);
-            return StepOutcome::next()
+        if successful {
+            let mut out = StepOutcome::next()
                 .publish(StepParameter::ThrownPlayerCoordinate(None));
+            if has_ball {
+                if check_touchdown(game) {
+                    out = out.publish(StepParameter::EndTurn(true));
+                }
+            } else {
+                let player_coord = game.field_model.player_coordinate(&player_id);
+                let ball_coord   = game.field_model.ball_coordinate;
+                if player_coord.is_some() && player_coord == ball_coord {
+                    game.field_model.ball_moving = true;
+                    out = out.publish(StepParameter::CatchScatterThrowInMode(
+                        CatchScatterThrowInMode::ScatterBall));
+                }
+            }
+            return out;
         }
 
-        // DEFERRED(touchdown): checkTouchdown on landing not yet ported.
-        let mut out = StepOutcome::next()
-            .publish(StepParameter::ThrownPlayerCoordinate(None));
-        if !has_ball {
-            // Check if player landed on ball square.
-            let player_coord = game.field_model.player_coordinate(&player_id);
-            let ball_coord   = game.field_model.ball_coordinate;
-            if player_coord.is_some() && player_coord == ball_coord {
-                out = out.publish(StepParameter::CatchScatterThrowInMode(
-                    CatchScatterThrowInMode::ScatterBall));
+        // Failure: try re-roll if not yet re-rolled
+        if !already_rerolled {
+            use ffb_model::model::re_rolled_action::ReRolledAction;
+            self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("RIGHT_STUFF"));
+
+            // Skill re-roll (auto-use, e.g. Pro — not currently in the map, but future-proof)
+            let skill_source = find_skill_reroll_source(game, "RIGHT_STUFF");
+            if let Some(source) = skill_source {
+                use_reroll(game, &source, &player_id);
+                self.re_roll_state.re_roll_source = Some(source);
+                self.roll = 0;
+                return self.execute_step(game, rng);
+            }
+
+            // TRR offer
+            if let Some(prompt) = ask_for_reroll_if_available(game, "RIGHT_STUFF", minimum_roll, false) {
+                self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
+                self.roll = 0;
+                return StepOutcome::cont().with_prompt(prompt);
             }
         }
-        out
+
+        self.land_injury(game, rng, &player_id)
+    }
+
+    fn land_injury(&self, game: &mut Game, rng: &mut GameRng, player_id: &str) -> StepOutcome {
+        let coord = game.field_model.player_coordinate(player_id)
+            .unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
+        let mut injury_type = InjuryTypeTTMLanding::new();
+        let ir = util_server_injury::handle_injury(
+            game, rng, &mut injury_type,
+            None, player_id, coord, None, None,
+            ApothecaryMode::ThrownPlayer,
+        );
+        ir.apply_to(game);
+        StepOutcome::next().publish(StepParameter::ThrownPlayerCoordinate(None))
     }
 }
 
@@ -166,8 +209,17 @@ impl Step for StepRightStuff {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game, rng)
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        match action {
+            Action::UseReRoll { use_reroll: true } => {
+                self.execute_step(game, rng)
+            }
+            Action::UseReRoll { use_reroll: false } => {
+                self.re_roll_state.re_roll_source = None;
+                self.execute_step(game, rng)
+            }
+            _ => self.execute_step(game, rng),
+        }
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
@@ -245,6 +297,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         };
         game.team_home.players.push(p);
         let mut step = StepRightStuff::new();
@@ -271,6 +324,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         };
         game.team_home.players.push(p);
         let mut step = StepRightStuff::new();

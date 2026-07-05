@@ -1,10 +1,14 @@
 use ffb_model::enums::{InducementPhase, TurnMode};
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
+use crate::mechanic::bb2025::state_mechanic::StateMechanic;
+use crate::mechanic::state_mechanic::StateMechanic as StateMechanicTrait;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::sequences::inducement_sequence;
+use crate::util::util_server_game::UtilServerGame;
 
 /// Initialises the kickoff sequence.
 ///
@@ -14,8 +18,8 @@ use crate::step::sequences::inducement_sequence;
 ///  2. Push two Inducement sequences (InducementPhase::BEFORE_SETUP) for each team.
 ///  3. NEXT_STEP.
 ///
-/// Rust: step 1 (`startHalf`, `prepareForSetup`) and step 2 (Inducement sequence generator)
-/// are stubs — they require infrastructure not yet ported.  The TurnMode transition and
+/// Rust: step 1 fully implemented (`startHalf`, `update_player_state_dependent_properties`,
+/// `prepare_for_setup`). Step 2 (Inducement sequence generator) wired. The TurnMode transition and
 /// NEXT_STEP are implemented.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.kickoff.StepInitKickoff`.
@@ -45,18 +49,15 @@ impl Step for StepInitKickoff {
 
 impl StepInitKickoff {
     fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        let mut events: Vec<GameEvent> = Vec::new();
         if game.turn_mode == TurnMode::StartGame {
-            // Java: stateMechanic.startHalf(this, 1)
-            game.half = 1;
-            game.turn_data_home.turn_nr = 0;
-            game.turn_data_away.turn_nr = 0;
-            // Java: homePlaying = homeFirstOffense ? (half % 2 == 0) : (half % 2 > 0)
-            game.home_playing = if game.home_first_offense { game.half % 2 == 0 } else { game.half % 2 > 0 };
-            game.field_model.ball_coordinate = None;
-            game.field_model.ball_in_play = false;
-            // DEFERRED: apothecaries, rerolls, leader state, special skills, inducements reset
+            StateMechanic::new().start_half(game, 1);
+            // Java: getResult().addReport(new ReportStartHalf(game.getHalf()))
+            events.push(GameEvent::StartHalf { half: game.half });
             game.turn_mode = TurnMode::Setup;
-            // DEFERRED: startTurn(), prepareForSetup()
+            game.start_turn();
+            UtilServerGame::update_player_state_dependent_properties(game);
+            UtilServerGame::prepare_for_setup(game);
         }
 
         // Java: push Inducement(BEFORE_SETUP, !home_playing) then Inducement(BEFORE_SETUP, home_playing).
@@ -66,6 +67,7 @@ impl StepInitKickoff {
         StepOutcome::next()
             .push_seq(seq_opponent)
             .push_seq(seq_own)
+            .with_events(events)
     }
 }
 
@@ -93,8 +95,10 @@ mod tests {
     }
 
     #[test]
-    fn start_game_mode_transitions_to_setup() {
+    fn start_game_mode_transitions_to_setup_and_calls_start_half() {
         let mut game = make_game();
+        game.team_home.rerolls = 2;
+        game.team_away.rerolls = 1;
         game.turn_mode = TurnMode::StartGame;
         let mut step = StepInitKickoff::new();
         step.start(&mut game, &mut GameRng::new(0));
@@ -102,6 +106,9 @@ mod tests {
         assert_eq!(game.half, 1);
         assert_eq!(game.turn_data_home.turn_nr, 0);
         assert_eq!(game.turn_data_away.turn_nr, 0);
+        // start_half wires up rerolls from team
+        assert_eq!(game.turn_data_home.rerolls, 2);
+        assert_eq!(game.turn_data_away.rerolls, 1);
     }
 
     #[test]

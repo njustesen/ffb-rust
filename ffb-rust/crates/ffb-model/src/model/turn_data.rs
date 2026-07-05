@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use crate::enums::{LeaderState, PlayerAction};
+use crate::enums::{ApothecaryType, LeaderState, PlayerAction};
+use crate::model::inducement_set::InducementSet;
 
 /// Per-team per-half turn state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,6 +40,8 @@ pub struct TurnData {
     /// Eligible player list cached at turn start (Java parity: computed once when
     /// `acted_player_ids` is empty, never updated mid-turn). Cleared each turn.
     pub turn_eligible_cache: Vec<(String, Vec<PlayerAction>)>,
+    /// Java: `TurnData.getInducementSet()` — inducements, cards, and prayers for this team.
+    pub inducement_set: InducementSet,
 }
 
 impl TurnData {
@@ -71,6 +74,25 @@ impl TurnData {
             quick_snap_bonus: 0,
             acted_player_ids: Vec::new(),
             turn_eligible_cache: Vec::new(),
+            inducement_set: InducementSet::new(),
+        }
+    }
+
+    /// Java: TurnData.useApothecary(ApothecaryType) — consume one apothecary slot.
+    pub fn use_apothecary(&mut self, apothecary_type: ApothecaryType) {
+        if apothecary_type == ApothecaryType::Plague {
+            if self.plague_doctors > 0 {
+                self.plague_doctors -= 1;
+            }
+            return;
+        }
+        if (self.apothecaries <= self.wandering_apothecaries || apothecary_type == ApothecaryType::Wandering)
+            && self.wandering_apothecaries > 0
+        {
+            self.wandering_apothecaries -= 1;
+        }
+        if self.apothecaries > 0 {
+            self.apothecaries -= 1;
         }
     }
 
@@ -139,6 +161,54 @@ mod tests {
         assert_eq!(td.rerolls, 3);
         assert_eq!(td.apothecaries, 1);
         assert!(!td.blitz_used);
+    }
+
+    #[test]
+    fn use_apothecary_team_decrements_team() {
+        let mut td = TurnData::new();
+        td.apothecaries = 2;
+        td.use_apothecary(ApothecaryType::Team);
+        assert_eq!(td.apothecaries, 1);
+        assert_eq!(td.wandering_apothecaries, 0);
+    }
+
+    #[test]
+    fn use_apothecary_team_uses_wandering_when_wandering_ge_team() {
+        let mut td = TurnData::new();
+        td.apothecaries = 1;
+        td.wandering_apothecaries = 2;
+        td.use_apothecary(ApothecaryType::Team);
+        // wandering >= team → decrement wandering, also decrement team
+        assert_eq!(td.wandering_apothecaries, 1);
+        assert_eq!(td.apothecaries, 0);
+    }
+
+    #[test]
+    fn use_apothecary_wandering_always_decrements_wandering_and_team() {
+        let mut td = TurnData::new();
+        td.apothecaries = 1;
+        td.wandering_apothecaries = 1;
+        td.use_apothecary(ApothecaryType::Wandering);
+        assert_eq!(td.wandering_apothecaries, 0);
+        assert_eq!(td.apothecaries, 0);
+    }
+
+    #[test]
+    fn use_apothecary_plague_decrements_plague_doctors_only() {
+        let mut td = TurnData::new();
+        td.apothecaries = 1;
+        td.plague_doctors = 2;
+        td.use_apothecary(ApothecaryType::Plague);
+        assert_eq!(td.plague_doctors, 1);
+        assert_eq!(td.apothecaries, 1);
+    }
+
+    #[test]
+    fn use_apothecary_noop_when_none_available() {
+        let mut td = TurnData::new();
+        td.use_apothecary(ApothecaryType::Team);
+        assert_eq!(td.apothecaries, 0);
+        assert_eq!(td.wandering_apothecaries, 0);
     }
 
     #[test]

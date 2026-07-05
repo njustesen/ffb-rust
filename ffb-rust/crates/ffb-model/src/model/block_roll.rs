@@ -71,6 +71,9 @@ impl BlockRoll {
     pub fn clear_re_roll_sources(&mut self) { self.re_roll_sources.clear(); }
     pub fn has_re_roll_source(&self, source: &ReRollSource) -> bool { self.re_roll_sources.contains(source) }
     pub fn has_re_rolls_left(&self) -> bool { !self.re_roll_sources.is_empty() }
+    /// Java: needsSelection() — true when no die has been chosen yet.
+    pub fn needs_selection(&self) -> bool { self.selected_index < 0 }
+    pub fn get_old_player_state(&self) -> Option<PlayerState> { self.old_player_state }
 }
 
 #[cfg(test)]

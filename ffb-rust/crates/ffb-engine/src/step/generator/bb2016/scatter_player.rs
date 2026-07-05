@@ -105,4 +105,20 @@ mod tests {
         let apo = steps.iter().find(|s| s.label.as_deref() == Some(labels::APOTHECARY_HIT_PLAYER)).unwrap();
         assert_eq!(apo.step_id, StepId::Apothecary);
     }
+
+    #[test]
+    fn thrown_player_id_passed_to_init_scatter_player() {
+        let params = ScatterPlayerParams { thrown_player_id: Some("tpid".into()), ..Default::default() };
+        let steps = ScatterPlayer::build_sequence(&params);
+        let has = steps[0].params.iter().any(|p| matches!(p, StepParameter::ThrownPlayerId(Some(id)) if id == "tpid"));
+        assert!(has);
+    }
+
+    #[test]
+    fn throw_scatter_param_passed() {
+        let params = ScatterPlayerParams { throw_scatter: true, ..Default::default() };
+        let steps = ScatterPlayer::build_sequence(&params);
+        let has = steps[0].params.iter().any(|p| matches!(p, StepParameter::ThrowScatter(true)));
+        assert!(has);
+    }
 }

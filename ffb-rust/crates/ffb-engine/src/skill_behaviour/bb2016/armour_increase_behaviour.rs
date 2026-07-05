@@ -1,7 +1,10 @@
 use crate::skill_behaviour::SkillBehaviour;
+use ffb_model::model::player::Player;
+use ffb_model::model::roster_position::RosterPosition;
 
-/// Handles armour stat increase on level-up.
-/// Mirrors Java `com.fumbbl.ffb.server.skillbehaviour.bb2016.ArmourIncreaseBehaviour`.
+/// 1:1 translation of `com.fumbbl.ffb.server.skillbehaviour.bb2016.ArmourIncreaseBehaviour`.
+///
+/// Java: `registerModifier(player -> player.setArmour(min(min(10, pos.getArmour()+2), player.getArmour()+1)))`.
 pub struct ArmourIncreaseBehaviour;
 
 impl ArmourIncreaseBehaviour {
@@ -15,13 +18,8 @@ impl Default for ArmourIncreaseBehaviour {
 impl SkillBehaviour for ArmourIncreaseBehaviour {
     fn name(&self) -> &'static str { "ArmourIncreaseBehaviour" }
 
-    /// Player-modifier-only behaviour — no step hook in Java source.
-    ///
-    /// Java `ArmourIncreaseBehaviour` only registers a player modifier:
-    ///   `player.setArmour(min(min(10, position.getArmour() + 2), player.getArmour() + 1))`
-    /// There is no `StepModifier` registered, so this method is a no-op.
-    fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
-        false
+    fn apply_modifier(&self, player: &mut Player, position: &RosterPosition) {
+        player.armour = (position.armour + 2).min(10).min(player.armour + 1);
     }
 }
 
@@ -29,15 +27,37 @@ impl SkillBehaviour for ArmourIncreaseBehaviour {
 mod tests {
     use super::*;
 
-    #[test]
-    fn name_returns_correct_string() {
-        let b = ArmourIncreaseBehaviour::new();
-        assert_eq!(b.name(), "ArmourIncreaseBehaviour");
+    fn pos(armour: i32) -> RosterPosition {
+        RosterPosition { armour, ..Default::default() }
     }
 
     #[test]
-    fn default_has_correct_name() {
-        let b = ArmourIncreaseBehaviour::default();
-        assert_eq!(b.name(), "ArmourIncreaseBehaviour");
+    fn apply_increases_by_one() {
+        let b = ArmourIncreaseBehaviour::new();
+        let mut player = Player { armour: 7, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(7));
+        assert_eq!(player.armour, 8);
+    }
+
+    #[test]
+    fn apply_capped_at_ten() {
+        let b = ArmourIncreaseBehaviour::new();
+        let mut player = Player { armour: 10, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(9));
+        assert_eq!(player.armour, 10);
+    }
+
+    #[test]
+    fn apply_capped_by_position_plus_two() {
+        // pos.av=8, cap=10; player.av=10 → already at cap
+        let b = ArmourIncreaseBehaviour::new();
+        let mut player = Player { armour: 10, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(8));
+        assert_eq!(player.armour, 10);
+    }
+
+    #[test]
+    fn name_is_correct() {
+        assert_eq!(ArmourIncreaseBehaviour::new().name(), "ArmourIncreaseBehaviour");
     }
 }

@@ -99,3 +99,33 @@ impl ISeriousInjury for SeriousInjury {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dead_is_dead() {
+        assert!(SeriousInjury::DEAD.is_dead());
+    }
+
+    #[test]
+    fn seriously_hurt_is_not_dead() {
+        assert!(!SeriousInjury::SERIOUSLY_HURT.is_dead());
+    }
+
+    #[test]
+    fn dislocated_hip_has_ag_attribute() {
+        assert_eq!(SeriousInjury::DISLOCATED_HIP.get_injury_attribute(), Some(InjuryAttribute::AG));
+    }
+
+    #[test]
+    fn seriously_hurt_has_no_attribute() {
+        assert_eq!(SeriousInjury::SERIOUSLY_HURT.get_injury_attribute(), None);
+    }
+
+    #[test]
+    fn dead_name_contains_rip() {
+        assert!(SeriousInjury::DEAD.get_name().contains("RIP"));
+    }
+}

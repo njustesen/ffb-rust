@@ -50,3 +50,24 @@ impl CatchModifierCollection {
 impl Default for CatchModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_twenty_base_modifiers() {
+        // 8 tacklezone + 11 disturbing_presence + 1 pouring_rain = 20
+        assert_eq!(CatchModifierCollection::new().get_modifiers().len(), 20);
+    }
+
+    #[test]
+    fn includes_single_tacklezone_modifier() {
+        assert!(CatchModifierCollection::new().get_modifiers().iter().any(|m| m.get_name() == "1 Tacklezone"));
+    }
+
+    #[test]
+    fn includes_pouring_rain_modifier() {
+        assert!(CatchModifierCollection::new().get_modifiers().iter().any(|m| m.get_name() == "Pouring Rain"));
+    }
+}

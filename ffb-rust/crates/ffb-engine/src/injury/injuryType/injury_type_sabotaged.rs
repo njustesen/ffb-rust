@@ -39,7 +39,8 @@ mod tests {
             gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
             passing: 4, armour, starting_skills: vec![], extra_skills: vec![],
             temporary_skills: vec![], used_skills: HashSet::new(),
-            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None });
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+    ..Default::default() });
         Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2025)
     }
     fn coord() -> FieldCoordinate { FieldCoordinate::new(5, 5) }

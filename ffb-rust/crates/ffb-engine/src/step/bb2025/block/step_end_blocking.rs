@@ -19,6 +19,7 @@ use crate::step::generator::bb2025::BlitzBlock;
 use crate::step::generator::bb2025::blitz_block::BlitzBlockParams;
 use crate::step::generator::bb2025::Move;
 use crate::step::generator::bb2025::move_::MoveParams;
+use crate::step::generator::mixed::pile_driver::{PileDriver, PileDriverParams};
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.block.StepEndBlocking.
 ///
@@ -530,8 +531,12 @@ impl StepEndBlocking {
                 let result = if is_home { &mut game.game_result.home } else { &mut game.game_result.away };
                 result.player_results.entry(pid.to_string()).or_default().fouls += 1;
             }
-            // DEFERRED(piledriver): PileDriver.build_sequence — not yet ported, fall through to EndPlayerAction
+            // Java: pileDriver.pushSequence(new PileDriver.SequenceParams(getGameState(), targetPlayerId))
+            let seq = PileDriver::build_sequence(&PileDriverParams {
+                target_player_id: self.target_player_id.clone(),
+            });
             ServerUtilBlock::update_dice_decorations(game);
+            return StepOutcome::next().push_seq(seq);
         }
 
         // ── Final movement / second-block routing ────────────────────────────
@@ -855,7 +860,8 @@ mod tests {
         let mut step = StepEndBlocking::new();
         let mut game = make_game();
         step.handle_command(
-            &Action::SelectPlayer { player_id: "p5".into() },
+            &Action::SelectPlayer { player_id: "p5".into()
+            },
             &mut game,
             &mut GameRng::new(0),
         );
@@ -868,7 +874,8 @@ mod tests {
         let mut step = StepEndBlocking::new();
         let mut game = make_game();
         step.handle_command(
-            &Action::SelectPlayer { player_id: "".into() },
+            &Action::SelectPlayer { player_id: "".into()
+            },
             &mut game,
             &mut GameRng::new(0),
         );
@@ -927,6 +934,7 @@ mod tests {
             temporary_skills: vec![], used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
             career_spps: 0, race: None,
+            ..Default::default()
         });
     }
 
@@ -992,5 +1000,64 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(step.use_pile_driver, Some(false));
+    }
+
+    #[test]
+    fn pile_driver_true_pushes_pile_driver_sequence_and_returns_early() {
+        use ffb_model::model::skill_def::{SkillId, SkillWithValue};
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, PS_PRONE};
+        use ffb_model::types::FieldCoordinate;
+        use std::collections::HashSet;
+
+        let mut game = make_game();
+        game.home_playing = true; // home team is acting; away is inactive
+
+        // Attacker: home player with PileDriver.
+        let atk_id = "home_atk".to_string();
+        let mut atk = Player { id: atk_id.clone(), name: "Attacker".into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 8, position_movement: 6, position_strength: 3,
+            position_agility: 3, position_passing: 4, position_armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, is_thrall: false, race: None,
+            temporary_stat_mods: vec![], temporary_skill_sources: vec![],
+            recovering_injury: None,
+        };
+        atk.starting_skills.push(SkillWithValue { skill_id: SkillId::PileDriver, value: None });
+        game.team_home.players.push(atk);
+        game.field_model.set_player_state(&atk_id, PlayerState::new(PS_MOVING));
+        game.field_model.set_player_coordinate(&atk_id, FieldCoordinate::new(10, 5));
+        game.acting_player.player_id = Some(atk_id.clone());
+
+        // Defender: away player PRONE at (11,5).
+        let def_id = "away_def".to_string();
+        let def = Player { id: def_id.clone(), name: "Defender".into(), nr: 2,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 8, position_movement: 6, position_strength: 3,
+            position_agility: 3, position_passing: 4, position_armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, is_thrall: false, race: None,
+            temporary_stat_mods: vec![], temporary_skill_sources: vec![],
+            recovering_injury: None,
+        };
+        game.team_away.players.push(def);
+        game.field_model.set_player_state(&def_id, PlayerState::new(PS_PRONE));
+        game.field_model.set_player_coordinate(&def_id, FieldCoordinate::new(11, 5));
+
+        let mut step = StepEndBlocking::new();
+        step.use_pile_driver = Some(true);
+        // old_defender_state Some but not prone/stunned so canFoulAfterBlock = regularBlock && true.
+        step.old_defender_state = Some(PlayerState::new(PS_STANDING));
+        step.knocked_down_players = vec![def_id.clone()];
+        step.target_player_id = Some(def_id);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "expected PileDriver sequence to be pushed");
+        assert_eq!(out.pushes[0][0].step_id, StepId::PileDriver);
     }
 }

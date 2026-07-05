@@ -3,7 +3,7 @@ use crate::enums::{PlayerType, PlayerGender, SkillCategory};
 use crate::model::skill_def::SkillWithValue;
 
 /// A position template within a team roster.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RosterPosition {
     pub id: String,
     pub name: String,
@@ -87,5 +87,17 @@ mod tests {
         let back: RosterPosition = serde_json::from_str(&json).unwrap();
         assert_eq!(pos.id, back.id);
         assert_eq!(pos.movement, back.movement);
+    }
+
+    #[test]
+    fn is_star_player_false_for_regular() {
+        assert!(!minimal().is_star_player());
+    }
+
+    #[test]
+    fn is_star_player_true_for_star_type() {
+        let mut pos = minimal();
+        pos.player_type = PlayerType::Star;
+        assert!(pos.is_star_player());
     }
 }

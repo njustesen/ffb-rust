@@ -4,7 +4,9 @@ use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
-use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll};
+use ffb_model::model::property::NamedProperties;
+use ffb_mechanics::modifiers::ARMOR_CHAINSAW_3;
+use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
 
 pub struct InjuryTypeDropDodge {
     ctx: InjuryContext,
@@ -31,12 +33,23 @@ impl InjuryTypeServer for InjuryTypeDropDodge {
         self.ctx.defender_coordinate = Some(coord);
         self.ctx.apothecary_mode = apo_mode;
         if !self.ctx.armor_broken {
-            // TODO: add arm bar armor modifier when ArmorModifierFactory is ported
+            let defender_ignores = game.player(defender_id)
+                .map(|p| p.has_unused_skill_with_property(NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS))
+                .unwrap_or(false);
+            if !defender_ignores {
+                if game.player(defender_id)
+                    .map(|p| p.has_skill_property(NamedProperties::BLOCKS_LIKE_CHAINSAW))
+                    .unwrap_or(false)
+                {
+                    self.ctx.add_armor_modifier(ARMOR_CHAINSAW_3);
+                }
+            }
+            // TODO: add affectsEitherArmourOrInjuryOnDodge modifier (arm bar / diving tackle) — needs UtilPlayer.findAdjacentPlayersWithTacklezones
             let _ = self.arm_bar_player_id.as_deref();
             let _ = self.use_arm_bar_modifiers;
             do_armor_roll(game, rng, &mut self.ctx, defender_id);
         }
-        if self.ctx.armor_broken { do_injury_roll(rng, &mut self.ctx); }
+        if self.ctx.armor_broken { do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id); }
         else { self.ctx.injury = Some(PlayerState::new(PS_PRONE)); }
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
@@ -58,7 +71,8 @@ mod tests {
             gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
             passing: 4, armour, starting_skills: vec![], extra_skills: vec![],
             temporary_skills: vec![], used_skills: HashSet::new(),
-            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None });
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+    ..Default::default() });
         Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2025)
     }
     fn coord() -> FieldCoordinate { FieldCoordinate::new(5, 5) }

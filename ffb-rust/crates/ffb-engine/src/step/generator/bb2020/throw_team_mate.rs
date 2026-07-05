@@ -140,4 +140,22 @@ mod tests {
         let rp = steps.iter().find(|s| s.label.as_deref() == Some(labels::RESOLVE_PASS)).unwrap();
         assert_eq!(rp.step_id, StepId::DispatchScatterPlayer);
     }
+
+    #[test]
+    fn thrown_player_id_passed_to_init() {
+        let params = ThrowTeamMateParams { thrown_player_id: Some("thrown1".into()), ..Default::default() };
+        let steps = ThrowTeamMate::build_sequence(&params);
+        let init = steps.iter().find(|s| s.step_id == StepId::InitThrowTeamMate).unwrap();
+        let has = init.params.iter().any(|p| matches!(p, StepParameter::ThrownPlayerId(Some(id)) if id == "thrown1"));
+        assert!(has);
+    }
+
+    #[test]
+    fn is_kicked_passed_to_always_hungry() {
+        let params = ThrowTeamMateParams { is_kicked: true, ..Default::default() };
+        let steps = ThrowTeamMate::build_sequence(&params);
+        let ah = steps.iter().find(|s| s.step_id == StepId::AlwaysHungry).unwrap();
+        let has = ah.params.iter().any(|p| matches!(p, StepParameter::IsKickedPlayer(true)));
+        assert!(has);
+    }
 }

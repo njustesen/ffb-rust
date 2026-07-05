@@ -14,3 +14,19 @@ impl SendToBoxReasonFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_reason() {
+        assert_eq!(SendToBoxReasonFactory::default().for_name("mng"), Some(SendToBoxReason::Mng));
+        assert_eq!(SendToBoxReasonFactory::default().for_name("foulBan"), Some(SendToBoxReason::FoulBan));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(SendToBoxReasonFactory::default().for_name("invalid"), None);
+    }
+}

@@ -1,10 +1,27 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct ClientCommandPuntToCrowd;
-
-impl ClientCommandPuntToCrowd {
-    pub fn new() -> Self { Self }
+/// 1:1 translation of `com.fumbbl.ffb.net.commands.ClientCommandPuntToCrowd`.
+/// Sent when a player punts the ball to the crowd.
+#[derive(Debug, Clone, Default)]
+pub struct ClientCommandPuntToCrowd {
+    /// Java: `puntToCrowd`
+    pub punt_to_crowd: bool,
 }
 
-impl Default for ClientCommandPuntToCrowd {
-    fn default() -> Self { Self::new() }
+impl ClientCommandPuntToCrowd {
+    pub fn new(punt_to_crowd: bool) -> Self { Self { punt_to_crowd } }
+    pub fn is_punt_to_crowd(&self) -> bool { self.punt_to_crowd }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn true_stored() {
+        let cmd = ClientCommandPuntToCrowd::new(true);
+        assert!(cmd.is_punt_to_crowd());
+    }
+    #[test]
+    fn default_false() {
+        let cmd = ClientCommandPuntToCrowd::default();
+        assert!(!cmd.punt_to_crowd);
+    }
 }

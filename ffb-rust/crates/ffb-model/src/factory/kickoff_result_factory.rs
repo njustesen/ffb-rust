@@ -14,3 +14,19 @@ impl KickoffResultFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_result() {
+        assert_eq!(KickoffResultFactory::default().for_name("Blitz"), Some(KickoffResult::Blitz));
+        assert_eq!(KickoffResultFactory::default().for_name("Riot"), Some(KickoffResult::Riot));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(KickoffResultFactory::default().for_name("invalid"), None);
+    }
+}

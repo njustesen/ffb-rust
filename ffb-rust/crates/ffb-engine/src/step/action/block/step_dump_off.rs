@@ -4,9 +4,6 @@
 /// DumpOff lets the defender make a pass when they are about to be blocked.
 /// The defender must have the DumpOff skill, be holding the ball, and not be confused/hypnotized.
 ///
-/// Stub: random agent always declines DumpOff → NEXT_STEP.  The "use" path stubs the pass
-/// sequence push (TODO: full SequenceGenerator integration required).
-///
 /// Expects DEFENDER_POSITION parameter from a preceding step.
 use ffb_model::enums::{PlayerAction, SkillId, TurnMode};
 use ffb_model::events::GameEvent;
@@ -16,6 +13,7 @@ use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::sequences::pass_sequence;
 
 pub struct StepDumpOff {
     /// Java: state.usingDumpOff — None = not asked, Some = decided.
@@ -91,8 +89,6 @@ impl StepDumpOff {
 
         if using {
             // Java: save old turn mode, switch to DumpOff, set thrower, push Pass sequence.
-            // Stub: emit SkillUse(true), set turn mode / thrower fields, return NEXT_STEP.
-            // DEFERRED: push Pass sequence via SequenceGenerator when step stack is translated.
             self.old_turn_mode = Some(game.turn_mode);
             game.turn_mode = TurnMode::DumpOff;
             if let Some(ref did) = defender_id {
@@ -105,7 +101,7 @@ impl StepDumpOff {
                 skill_id: skill_num,
                 used: true,
             };
-            StepOutcome::next().with_event(event)
+            StepOutcome::next().with_event(event).push_seq(pass_sequence())
         } else {
             // Java: addReport(SkillUse false if skill present); NEXT_STEP.
             let defender_has = defender_id.as_deref()
@@ -186,6 +182,7 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
+            ..Default::default()
         });
     }
 

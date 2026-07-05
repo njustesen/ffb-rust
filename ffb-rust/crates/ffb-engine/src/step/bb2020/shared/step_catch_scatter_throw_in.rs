@@ -1,4 +1,4 @@
-use ffb_model::enums::{Direction, TurnMode};
+use ffb_model::enums::{Direction, SkillId, TurnMode};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
@@ -121,7 +121,7 @@ impl Step for StepCatchScatterThrowIn {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
-            Action::SelectPlayer { player_id } => {
+            Action::SelectPlayer {player_id } => {
                 // Java BB2020: CLIENT_PLAYER_CHOICE delivers List<String> selected.
                 // In single-player-selection form (one ID or empty string):
                 match self.phase {
@@ -247,7 +247,7 @@ impl StepCatchScatterThrowIn {
                 self.bomb_mode = false;
                 if player_under_ball.is_some() {
                     self.catch_scatter_throw_in_mode = Some(CatchScatterThrowInMode::CatchScatter);
-                } else if let Some(coord) = game.field_model.ball_coordinate {
+} else if let Some(coord) = game.field_model.ball_coordinate {
                     let new_mode = self.diving_catch(game, rng, coord);
                     self.catch_scatter_throw_in_mode = new_mode;
                 }
@@ -318,6 +318,7 @@ impl StepCatchScatterThrowIn {
                 pushes: vec![],
                 published,
                 prompt: None,
+                clear_stack: false,
             };
         }
 
@@ -331,6 +332,7 @@ impl StepCatchScatterThrowIn {
                 pushes: vec![],
                 published,
                 prompt: None,
+                clear_stack: false,
             };
         }
 
@@ -705,8 +707,11 @@ impl StepCatchScatterThrowIn {
                 self.diving_catchers.retain(|id| id != &cid);
                 if self.re_roll_state.re_roll_source.is_none() && !self.evaluate {
                     self.re_roll_state.re_rolled_action = None;
-                    // Java: addReport(ReportSkillUse for canAttemptCatchInAdjacentSquares)
-                    // DEFERRED: emit skill-use event
+                    self.pending_events.push(GameEvent::SkillUse {
+                        player_id: cid.clone(),
+                        skill_id: SkillId::DivingCatch as u16,
+                        used: true,
+                    });
                 }
                 let mode = self.catch_ball(game, rng);
                 let current_mode = self.catch_scatter_throw_in_mode;
@@ -890,6 +895,7 @@ mod tests {
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         }
     }
 
@@ -1061,11 +1067,11 @@ mod tests {
         step.catch_scatter_throw_in_mode = Some(CatchScatterThrowInMode::CatchKickoff);
         assert_eq!(step.phase, DivingCatchPhase::AskHome);
 
-        step.handle_command(&Action::SelectPlayer { player_id: "p1".into() }, &mut game, &mut GameRng::new(0));
+        step.handle_command(&Action::SelectPlayer {player_id: "p1".into() }, &mut game, &mut GameRng::new(0));
         assert_eq!(step.phase, DivingCatchPhase::AskAway);
         assert!(step.diving_catchers.contains(&"p1".to_string()));
 
-        step.handle_command(&Action::SelectPlayer { player_id: "".into() }, &mut game, &mut GameRng::new(0));
+        step.handle_command(&Action::SelectPlayer {player_id: "".into() }, &mut game, &mut GameRng::new(0));
         assert_eq!(step.phase, DivingCatchPhase::Process);
     }
 

@@ -79,6 +79,27 @@ impl UtilBox {
     pub fn refresh_boxes(_game: &mut Game) {
         // TODO(refreshBoxes): full implementation — clear then re-pack each dugout column.
     }
+
+    /// Java: UtilBox.putAllPlayersIntoBox(game).
+    /// Moves all canBeSetUpNextDrive players to RESERVE and places them in the box.
+    pub fn put_all_players_into_box(game: &mut Game) {
+        UtilBox::refresh_boxes(game);
+        let all_ids: Vec<String> = game.team_home.players.iter()
+            .chain(game.team_away.players.iter())
+            .map(|p| p.id.clone())
+            .collect();
+        for id in all_ids {
+            let can_setup = game.field_model.player_state(&id)
+                .map(|s| s.can_be_set_up_next_drive())
+                .unwrap_or(false);
+            if can_setup {
+                if let Some(state) = game.field_model.player_state(&id) {
+                    game.field_model.set_player_state(&id, state.change_base(PS_RESERVE));
+                }
+                UtilBox::put_player_into_box(game, &id);
+            }
+        }
+    }
 }
 
 impl Default for UtilBox {
@@ -115,6 +136,7 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
+            ..Default::default()
         }
     }
 

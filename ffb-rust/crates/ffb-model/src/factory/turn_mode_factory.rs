@@ -14,3 +14,19 @@ impl TurnModeFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_mode() {
+        let f = TurnModeFactory::default();
+        assert_eq!(f.for_name("regular"), Some(TurnMode::Regular));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(TurnModeFactory::default().for_name("invalid"), None);
+    }
+}

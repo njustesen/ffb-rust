@@ -12,3 +12,21 @@ pub enum ModifierType {
     TACKLEZONE,
     STAT_BASED,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn variants_distinct() {
+        assert_ne!(ModifierType::REGULAR, ModifierType::TACKLEZONE);
+        assert_ne!(ModifierType::DISTURBING_PRESENCE, ModifierType::DIVING_TACKLE);
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let v = ModifierType::DISTURBING_PRESENCE;
+        let json = serde_json::to_string(&v).unwrap();
+        assert_eq!(serde_json::from_str::<ModifierType>(&json).unwrap(), v);
+    }
+}

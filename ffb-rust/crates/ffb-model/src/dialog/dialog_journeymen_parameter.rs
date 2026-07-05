@@ -24,3 +24,27 @@ impl IDialogParameter for DialogJourneymenParameter {
     fn get_id(&self) -> DialogId { DialogId::JOURNEYMEN }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_position_id_appends_nonempty_strings() {
+        let mut p = DialogJourneymenParameter::default();
+        p.add_position_id("pos1");
+        p.add_position_id("");
+        assert_eq!(p.get_position_ids(), &["pos1"]);
+    }
+
+    #[test]
+    fn dialog_id_is_journeymen() {
+        assert_eq!(DialogJourneymenParameter::default().get_id(), DialogId::JOURNEYMEN);
+    }
+
+    #[test]
+    fn stores_nr_of_slots() {
+        let p = DialogJourneymenParameter { nr_of_slots: 3, ..Default::default() };
+        assert_eq!(p.get_nr_of_slots(), 3);
+    }
+}

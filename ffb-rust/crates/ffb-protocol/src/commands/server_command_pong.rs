@@ -1,10 +1,29 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct ServerCommandPong;
-
-impl ServerCommandPong {
-    pub fn new() -> Self { Self }
+/// 1:1 translation of `com.fumbbl.ffb.net.commands.ServerCommandPong`.
+/// Server-to-client heartbeat pong response.
+#[derive(Debug, Clone, Default)]
+pub struct ServerCommandPong {
+    /// Java: `fTimestamp` — echoed client timestamp.
+    pub timestamp: i64,
 }
 
-impl Default for ServerCommandPong {
-    fn default() -> Self { Self::new() }
+impl ServerCommandPong {
+    pub fn new(timestamp: i64) -> Self { Self { timestamp } }
+    pub fn get_timestamp(&self) -> i64 { self.timestamp }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn timestamp_stored() {
+        let cmd = ServerCommandPong::new(99999);
+        assert_eq!(cmd.get_timestamp(), 99999);
+    }
+
+    #[test]
+    fn default_zero() {
+        let cmd = ServerCommandPong::default();
+        assert_eq!(cmd.timestamp, 0);
+    }
 }

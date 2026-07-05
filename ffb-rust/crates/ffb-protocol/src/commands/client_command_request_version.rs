@@ -1,10 +1,24 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
+/// 1:1 translation of ClientCommandRequestVersion (Java: no fields).
+#[derive(Debug, Clone, Default)]
 pub struct ClientCommandRequestVersion;
 
 impl ClientCommandRequestVersion {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
-impl Default for ClientCommandRequestVersion {
-    fn default() -> Self { Self::new() }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn can_construct() {
+        let _cmd = ClientCommandRequestVersion::new();
+    }
+
+    #[test]
+    fn default_works() {
+        let _cmd = ClientCommandRequestVersion::default();
+    }
 }

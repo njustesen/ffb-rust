@@ -1,4 +1,5 @@
-use ffb_model::enums::Direction;
+use ffb_model::enums::{Direction, SkillId};
+use ffb_model::events::GameEvent;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -31,6 +32,8 @@ pub struct StepKickoffScatterRoll {
     pub scatter_distance: Option<i32>,
     /// Java: fKickingPlayerCoordinate — published downstream.
     pub kicking_player_coordinate: Option<FieldCoordinate>,
+    /// Kicking player ID, derived from coordinate in phase 1; stored for SkillUse event in phase 2.
+    pub kicking_player_id: Option<String>,
     /// Java: fKickoffBounds — the half the ball must land in; None → touchback.
     pub kickoff_bounds: Option<FieldCoordinateBounds>,
     /// Java: fTouchback — true when ball lands outside the receiving half.
@@ -45,6 +48,7 @@ impl StepKickoffScatterRoll {
             scatter_direction: None,
             scatter_distance: None,
             kicking_player_coordinate: None,
+            kicking_player_id: None,
             kickoff_bounds: None,
             touchback: false,
         }
@@ -99,7 +103,7 @@ impl StepKickoffScatterRoll {
             let found = kicking_team.players.iter().find_map(|p| {
                 let coord = game.field_model.player_coordinate(&p.id)?;
                 if center_bounds.is_in_bounds(coord) || los_bounds.is_in_bounds(coord) {
-                    Some(coord)
+                    Some((p.id.clone(), coord))
                 } else {
                     None
                 }
@@ -109,7 +113,12 @@ impl StepKickoffScatterRoll {
             } else {
                 FieldCoordinate::new(25, 7)
             };
-            self.kicking_player_coordinate = Some(found.unwrap_or(default_kicker));
+            if let Some((id, coord)) = found {
+                self.kicking_player_id = Some(id);
+                self.kicking_player_coordinate = Some(coord);
+            } else {
+                self.kicking_player_coordinate = Some(default_kicker);
+            }
         }
 
         // ── Kick skill dialog ────────────────────────────────────────────────
@@ -165,15 +174,29 @@ impl StepKickoffScatterRoll {
             self.kickoff_bounds = None;
         }
         self.touchback = self.kickoff_bounds.is_none();
+        game.field_model.out_of_bounds = self.touchback;
 
-        // ── Publish parameters ────────────────────────────────────────────────
+        // ── Publish parameters and events ────────────────────────────────────
         let kicking_coord = self.kicking_player_coordinate.unwrap();
         let touchback = self.touchback;
         let bounds = self.kickoff_bounds;
+        let kick_event = if use_kick {
+            self.kicking_player_id.as_ref().map(|pid| GameEvent::SkillUse {
+                player_id: pid.clone(),
+                skill_id: SkillId::Kick as u16,
+                used: true,
+            })
+        } else { None };
 
         let mut outcome = StepOutcome::next()
+            .with_event(GameEvent::KickoffScatter {
+                start: kicking_coord,
+                direction: dir_roll,
+                distance,
+            })
             .publish(StepParameter::KickingPlayerCoordinate(kicking_coord))
             .publish(StepParameter::Touchback(touchback));
+        if let Some(ev) = kick_event { outcome = outcome.with_event(ev); }
         if let Some(b) = bounds {
             outcome = outcome.publish(StepParameter::KickoffBounds(b));
         }

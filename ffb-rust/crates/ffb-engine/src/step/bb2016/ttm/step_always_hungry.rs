@@ -6,16 +6,17 @@
 /// Init params: GOTO_LABEL_ON_FAILURE (mandatory), GOTO_LABEL_ON_SUCCESS (mandatory).
 /// Consumed param: THROWN_PLAYER_ID.
 ///
-/// DEFERRED(reroll): AbstractStepWithReRoll / UtilServerReRoll re-roll ask not yet ported;
-///   always-hungry and escape re-rolls are skipped (single roll only).
+/// Re-roll order: skill re-roll first (auto-use), then TRR offer.
+/// Single re_roll_state tracks re-rolled action (ALWAYS_HUNGRY or ESCAPE).
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
-use ffb_model::enums::SkillId;
-use ffb_model::enums::PassResult;
+use ffb_model::enums::{SkillId, PassResult, ReRollSource};
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::step::abstract_step_with_re_roll::{ReRollState, find_skill_reroll_source};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
 /// Java: `StepAlwaysHungry` (bb2016/ttm).
 pub struct StepAlwaysHungry {
@@ -25,6 +26,12 @@ pub struct StepAlwaysHungry {
     goto_label_on_success: String,
     /// Java: `fThrownPlayerId`
     thrown_player_id: Option<String>,
+    /// Java: AbstractStepWithReRoll fields (shared between AH and Escape phases).
+    re_roll_state: ReRollState,
+    /// Cached always-hungry roll (0 = not yet rolled).
+    roll_ah: i32,
+    /// Cached escape roll (0 = not yet rolled).
+    roll_escape: i32,
 }
 
 impl StepAlwaysHungry {
@@ -33,6 +40,9 @@ impl StepAlwaysHungry {
             goto_label_on_failure: String::new(),
             goto_label_on_success: String::new(),
             thrown_player_id: None,
+            re_roll_state: ReRollState::new(),
+            roll_ah: 0,
+            roll_escape: 0,
         }
     }
 
@@ -63,27 +73,54 @@ impl StepAlwaysHungry {
         // Java: boolean doEscape = hasSkillWithProperty && !doAlwaysHungry
         let mut do_escape = has_property && !do_always_hungry;
 
-        if do_always_hungry {
-            // Java: game.getTurnData().setPassUsed(true)
-            game.turn_data_mut().pass_used = true;
-
-            // DEFERRED(reroll): re-roll ask after failure not ported (UtilServerReRoll).
-
-            // Java: int roll = rollSkill(); boolean successful = isAlwaysHungrySuccessful(roll)
-            let roll = rng.d6();
-            let successful = DiceInterpreter::is_always_hungry_successful(roll);
-
-            if successful {
-                return StepOutcome::next();
-            } else {
+        // Java: if (reRolledAction == ALWAYS_HUNGRY) { if (source == null || !useReRoll) doAlwaysHungry = false }
+        let already_rerolled_ah = self.re_roll_state.re_rolled_action
+            .as_ref().map(|a| a.name == "ALWAYS_HUNGRY").unwrap_or(false);
+        let mut do_always_hungry = do_always_hungry;
+        if do_always_hungry && already_rerolled_ah {
+            let source_opt = self.re_roll_state.re_roll_source.clone();
+            let consumed = source_opt.as_ref().map(|s| use_reroll(game, s, &acting_id)).unwrap_or(false);
+            if !consumed {
+                do_always_hungry = false;
                 do_escape = true;
-                // DEFERRED(reroll): setReRolledAction(ALWAYS_HUNGRY) / askForReRollIfAvailable not ported.
             }
         }
 
+        if do_always_hungry {
+            game.turn_data_mut().pass_used = true;
+
+            if self.roll_ah == 0 {
+                self.roll_ah = rng.d6();
+            }
+            let successful = DiceInterpreter::is_always_hungry_successful(self.roll_ah);
+
+            if successful {
+                return StepOutcome::next();
+            }
+
+            // Failure: try re-roll
+            if !already_rerolled_ah {
+                use ffb_model::model::re_rolled_action::ReRolledAction;
+                self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("ALWAYS_HUNGRY"));
+
+                let skill_source = find_skill_reroll_source(game, "ALWAYS_HUNGRY");
+                if let Some(source) = skill_source {
+                    use_reroll(game, &source, &acting_id);
+                    self.re_roll_state.re_roll_source = Some(source);
+                    self.roll_ah = 0;
+                    return self.execute_step(game, rng);
+                }
+
+                if let Some(prompt) = ask_for_reroll_if_available(game, "ALWAYS_HUNGRY", 2, false) {
+                    self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
+                    self.roll_ah = 0;
+                    return StepOutcome::cont().with_prompt(prompt);
+                }
+            }
+            do_escape = true;
+        }
+
         if do_escape {
-            // Java: Skill skill = UtilCards.getUnusedSkillWithProperty(actingPlayer, mightEatPlayerToThrow)
-            // Java: actingPlayer.markSkillUsed(skill) — only skill with mightEatPlayerToThrow is AlwaysHungry
             let player_in_home = game.team_home.player(&acting_id).is_some();
             if player_in_home {
                 if let Some(p) = game.team_home.player_mut(&acting_id) {
@@ -93,25 +130,55 @@ impl StepAlwaysHungry {
                 p.used_skills.insert(SkillId::AlwaysHungry);
             }
 
-            // DEFERRED(reroll): re-roll ask after escape failure not ported.
+            // Java: if (reRolledAction == ESCAPE) { if (source == null || !useReRoll) doEscape = false }
+            let already_rerolled_escape = self.re_roll_state.re_rolled_action
+                .as_ref().map(|a| a.name == "ESCAPE").unwrap_or(false);
+            if already_rerolled_escape {
+                let source_opt = self.re_roll_state.re_roll_source.clone();
+                let consumed = source_opt.as_ref().map(|s| use_reroll(game, s, &acting_id)).unwrap_or(false);
+                if !consumed {
+                    do_escape = false;
+                }
+            }
 
-            // Java: int roll = rollSkill(); boolean successful = isEscapeFromAlwaysHungrySuccessful(roll)
-            let roll = rng.d6();
-            let successful = DiceInterpreter::is_escape_from_always_hungry_successful(roll);
+            if do_escape {
+                if self.roll_escape == 0 {
+                    self.roll_escape = rng.d6();
+                }
+                let successful = DiceInterpreter::is_escape_from_always_hungry_successful(self.roll_escape);
 
-            if successful {
-                // Java: publishParameter(PASS_RESULT, PassResult.FUMBLE); goto success
-                let label = self.goto_label_on_success.clone();
-                return StepOutcome::goto(&label)
-                    .publish(StepParameter::PassResultParam(PassResult::Fumble));
-            } else {
-                // Java: goto failure
+                if successful {
+                    let label = self.goto_label_on_success.clone();
+                    return StepOutcome::goto(&label)
+                        .publish(StepParameter::PassResultParam(PassResult::Fumble));
+                }
+
+                // Failure: try re-roll
+                if !already_rerolled_escape {
+                    use ffb_model::model::re_rolled_action::ReRolledAction;
+                    self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("ESCAPE"));
+                    self.re_roll_state.re_roll_source = None;
+
+                    let skill_source = find_skill_reroll_source(game, "ESCAPE");
+                    if let Some(source) = skill_source {
+                        use_reroll(game, &source, &acting_id);
+                        self.re_roll_state.re_roll_source = Some(source);
+                        self.roll_escape = 0;
+                        return self.execute_step(game, rng);
+                    }
+
+                    if let Some(prompt) = ask_for_reroll_if_available(game, "ESCAPE", 2, false) {
+                        self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
+                        self.roll_escape = 0;
+                        return StepOutcome::cont().with_prompt(prompt);
+                    }
+                }
+
                 let label = self.goto_label_on_failure.clone();
                 return StepOutcome::goto(&label);
             }
         }
 
-        // Java: if (!doAlwaysHungry && !doEscape) { setNextAction(NEXT_STEP) }
         StepOutcome::next()
     }
 }
@@ -127,8 +194,15 @@ impl Step for StepAlwaysHungry {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game, rng)
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        match action {
+            Action::UseReRoll { use_reroll: true } => self.execute_step(game, rng),
+            Action::UseReRoll { use_reroll: false } => {
+                self.re_roll_state.re_roll_source = None;
+                self.execute_step(game, rng)
+            }
+            _ => self.execute_step(game, rng),
+        }
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
@@ -164,6 +238,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
     }
 
@@ -176,6 +251,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.acting_player.player_id = Some(id.into());
     }
@@ -188,6 +264,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
     }
 

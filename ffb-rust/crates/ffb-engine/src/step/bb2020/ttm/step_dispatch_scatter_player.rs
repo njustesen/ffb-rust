@@ -6,15 +6,14 @@
 ///
 /// BB2020-only step (no BB2016 equivalent). Reads: THROWN_PLAYER_ID, THROWN_PLAYER_STATE,
 /// THROWN_PLAYER_HAS_BALL, PASS_RESULT, IS_KICKED_PLAYER, OLD_DEFENDER_STATE.
-///
-/// DEFERRED(DispatchScatterPlayer-generator): ScatterPlayer SequenceGenerator not yet ported.
-/// DEFERRED(DispatchScatterPlayer-fumbleReport): ReportKickTeamMateFumble deferred.
-/// DEFERRED(DispatchScatterPlayer-scattersSingleDirection): NamedProperties.ttmScattersInSingleDirection deferred.
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::model::property::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::{PlayerState, PassResult};
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::step::generator::bb2020::scatter_player::{ScatterPlayer, ScatterPlayerParams};
 
 /// Java: `StepDispatchScatterPlayer` (bb2020/ttm).
 pub struct StepDispatchScatterPlayer {
@@ -44,21 +43,44 @@ impl StepDispatchScatterPlayer {
         }
     }
 
-    fn execute_step(&self, _game: &mut Game) -> StepOutcome {
+    fn execute_step(&self, game: &mut Game) -> StepOutcome {
         if self.pass_result == PassResult::Fumble && self.is_kicked_player {
-            // DEFERRED(DispatchScatterPlayer-fumbleReport): add ReportKickTeamMateFumble report.
-            return StepOutcome::next();
+            return StepOutcome::next().with_event(GameEvent::KickTeamMateFumble);
         }
 
-        // DEFERRED(DispatchScatterPlayer-generator): determine scatter flags from pass_result:
-        //   FUMBLE            → throwScatter=false, deviate=false, scattersSingleDirection=false
-        //   WILDLY_INACCURATE → throwScatter=false, deviate=true, scattersSingleDirection=false
-        //   INACCURATE/ACCURATE → throwScatter=true, deviate=false
-        // DEFERRED(DispatchScatterPlayer-generator): push ScatterPlayer sequence with
-        //   (thrownPlayerId, thrownPlayerState, thrownPlayerHasBall, throwerCoordinate,
-        //    scattersSingleDirection, throwScatter, deviate, !oldPlayerState.hasTacklezones()).
+        // Java: thrower = game.getActingPlayer().getPlayer(); throwerCoordinate = game.getFieldModel().getPlayerCoordinate(thrower)
+        let thrower_coordinate = game.acting_player.player_id.as_deref()
+            .and_then(|id| game.field_model.player_coordinate(id));
 
-        StepOutcome::next()
+        // Java: scattersSingleDirection = thrownPlayer.hasSkillProperty(NamedProperties.ttmScattersInSingleDirection)
+        let base_scatters_single_direction = self.thrown_player_id.as_deref()
+            .and_then(|id| game.player(id))
+            .map(|p| p.has_skill_property(NamedProperties::TTM_SCATTERS_IN_SINGLE_DIRECTION))
+            .unwrap_or(false);
+
+        let (throw_scatter, deviate, scatters_single_direction) = match self.pass_result {
+            PassResult::Fumble          => (false, false, false),
+            PassResult::WildlyInaccurate => (false, true, false),
+            PassResult::Inaccurate | PassResult::Complete => (true, false, base_scatters_single_direction),
+            _ => (false, false, false),
+        };
+
+        let crash_landing = self.old_player_state
+            .map(|s| !s.has_tacklezones())
+            .unwrap_or(false);
+
+        let seq = ScatterPlayer::build_sequence(&ScatterPlayerParams {
+            thrown_player_id: self.thrown_player_id.clone(),
+            thrown_player_state: self.thrown_player_state,
+            thrown_player_has_ball: self.thrown_player_has_ball,
+            thrown_player_coordinate: thrower_coordinate,
+            throw_scatter,
+            has_swoop: scatters_single_direction,
+            deviates: deviate,
+            crash_landing,
+        });
+
+        StepOutcome::next().push_seq(seq)
     }
 }
 
@@ -118,13 +140,32 @@ mod tests {
     }
 
     #[test]
-    fn non_kicked_fumble_returns_next() {
+    fn non_kicked_fumble_pushes_scatter_sequence() {
+        use ffb_model::enums::{PlayerState, PS_STANDING};
         let mut game = make_game();
         let mut step = StepDispatchScatterPlayer::new();
         step.pass_result = PassResult::Fumble;
         step.is_kicked_player = false;
+        step.thrown_player_id = Some("p1".into());
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        step.old_player_state = Some(PlayerState::new(PS_STANDING));
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(matches!(out.action, StepAction::NextStep));
+        assert!(!out.pushes.is_empty());
+    }
+
+    #[test]
+    fn wildly_inaccurate_pushes_sequence_with_deviate() {
+        use ffb_model::enums::{PlayerState, PS_STANDING};
+        let mut game = make_game();
+        let mut step = StepDispatchScatterPlayer::new();
+        step.pass_result = PassResult::WildlyInaccurate;
+        step.thrown_player_id = Some("p1".into());
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        step.old_player_state = Some(PlayerState::new(PS_STANDING));
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.action, StepAction::NextStep));
+        assert!(!out.pushes.is_empty());
     }
 
     #[test]

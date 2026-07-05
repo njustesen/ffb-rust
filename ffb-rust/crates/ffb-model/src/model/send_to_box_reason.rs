@@ -115,3 +115,33 @@ impl SendToBoxReason {
         ]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mng_get_name_returns_camel_case() {
+        assert_eq!(SendToBoxReason::MNG.get_name(), "mng");
+        assert_eq!(SendToBoxReason::FOUL_BAN.get_name(), "foulBan");
+        assert_eq!(SendToBoxReason::SECRET_WEAPON_BAN.get_name(), "secretWeaponBan");
+    }
+
+    #[test]
+    fn for_name_case_insensitive() {
+        assert_eq!(SendToBoxReason::for_name("mng"), Some(SendToBoxReason::MNG));
+        assert_eq!(SendToBoxReason::for_name("MNG"), Some(SendToBoxReason::MNG));
+        assert_eq!(SendToBoxReason::for_name("foulBan"), Some(SendToBoxReason::FOUL_BAN));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(SendToBoxReason::for_name("NOT_VALID"), None);
+    }
+
+    #[test]
+    fn get_reason_returns_non_empty_string() {
+        assert!(!SendToBoxReason::MNG.get_reason().is_empty());
+        assert!(!SendToBoxReason::FOULED.get_reason().is_empty());
+    }
+}

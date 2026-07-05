@@ -31,3 +31,48 @@ impl StatsDrawingModifier {
     pub fn is_impairment(&self) -> bool { self.impairment }
     pub fn get_absolute_modifier(&self) -> i32 { self.absolute_modifier }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn positive_improves_positive_is_improvement() {
+        let m = StatsDrawingModifier::positive_improves(2);
+        assert!(m.is_improvement());
+        assert!(!m.is_impairment());
+        assert_eq!(m.get_absolute_modifier(), 2);
+    }
+
+    #[test]
+    fn positive_improves_negative_is_impairment() {
+        let m = StatsDrawingModifier::positive_improves(-1);
+        assert!(!m.is_improvement());
+        assert!(m.is_impairment());
+        assert_eq!(m.get_absolute_modifier(), 1);
+    }
+
+    #[test]
+    fn positive_improves_zero_is_neutral() {
+        let m = StatsDrawingModifier::positive_improves(0);
+        assert!(!m.is_improvement());
+        assert!(!m.is_impairment());
+        assert_eq!(m.get_absolute_modifier(), 0);
+    }
+
+    #[test]
+    fn positive_impairs_positive_is_impairment() {
+        let m = StatsDrawingModifier::positive_impairs(3);
+        assert!(!m.is_improvement());
+        assert!(m.is_impairment());
+        assert_eq!(m.get_absolute_modifier(), 3);
+    }
+
+    #[test]
+    fn positive_impairs_negative_is_improvement() {
+        let m = StatsDrawingModifier::positive_impairs(-2);
+        assert!(m.is_improvement());
+        assert!(!m.is_impairment());
+        assert_eq!(m.get_absolute_modifier(), 2);
+    }
+}

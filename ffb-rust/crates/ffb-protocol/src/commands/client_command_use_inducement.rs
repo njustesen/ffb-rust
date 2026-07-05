@@ -1,10 +1,38 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct ClientCommandUseInducement;
-
-impl ClientCommandUseInducement {
-    pub fn new() -> Self { Self }
+/// 1:1 translation of `com.fumbbl.ffb.net.commands.ClientCommandUseInducement`.
+/// Sent when a coach activates an inducement during the game.
+/// DEFERRED(inducement-type): InducementType is a unit struct; full lookup deferred.
+/// DEFERRED(card): Card object serialisation deferred.
+#[derive(Debug, Clone, Default)]
+pub struct ClientCommandUseInducement {
+    /// Java: `fInducementType` — stored as name string.
+    pub inducement_type_name: Option<String>,
+    /// Java: `fCard` — stored as card name string.
+    pub card_name: Option<String>,
+    /// Java: `fPlayerIds`
+    pub player_ids: Vec<String>,
 }
 
-impl Default for ClientCommandUseInducement {
-    fn default() -> Self { Self::new() }
+impl ClientCommandUseInducement {
+    pub fn new() -> Self { Self::default() }
+    pub fn add_player_id(&mut self, id: impl Into<String>) { self.player_ids.push(id.into()); }
+    pub fn get_inducement_type_name(&self) -> Option<&str> { self.inducement_type_name.as_deref() }
+    pub fn get_card_name(&self) -> Option<&str> { self.card_name.as_deref() }
+    pub fn get_player_ids(&self) -> &[String] { &self.player_ids }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn player_ids_stored() {
+        let mut cmd = ClientCommandUseInducement::new();
+        cmd.add_player_id("p1");
+        assert_eq!(cmd.get_player_ids(), &["p1"]);
+    }
+    #[test]
+    fn default_all_none() {
+        let cmd = ClientCommandUseInducement::new();
+        assert!(cmd.inducement_type_name.is_none());
+        assert!(cmd.player_ids.is_empty());
+    }
 }

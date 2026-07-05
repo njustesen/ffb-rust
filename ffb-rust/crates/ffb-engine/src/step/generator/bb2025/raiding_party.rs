@@ -42,4 +42,20 @@ mod tests {
         assert_eq!(steps[0].step_id, StepId::RaidingParty);
         assert_eq!(steps[0].label.as_deref(), Some(labels::END));
     }
+
+    #[test]
+    fn failure_label_wired() {
+        let steps = RaidingParty::build_sequence(&RaidingPartyParams {
+            failure_label: "FAIL_LABEL".into(), success_label: "OK".into()
+        });
+        assert!(steps[0].params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "FAIL_LABEL")));
+    }
+
+    #[test]
+    fn success_label_wired() {
+        let steps = RaidingParty::build_sequence(&RaidingPartyParams {
+            failure_label: "F".into(), success_label: "SUCCESS_LABEL".into()
+        });
+        assert!(steps[0].params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnSuccess(l) if l == "SUCCESS_LABEL")));
+    }
 }

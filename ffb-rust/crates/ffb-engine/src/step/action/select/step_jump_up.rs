@@ -198,7 +198,8 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
-        });
+                    ..Default::default()
+});
     }
 
     fn make_game_block_standing_up(skills: Vec<SkillId>, agility: i32) -> (Game, String) {

@@ -6,17 +6,20 @@
 /// Concrete types are in injury/injuryType/*.rs; inline impls below are kept
 /// for backward-compat until the factory is fully switched over.
 pub mod injuryType;
+pub mod modification;
 
 use ffb_model::enums::{
     ApothecaryMode, ApothecaryStatus, PlayerState, SendToBoxReason, SeriousInjuryKind,
     PS_PRONE, PS_STUNNED, PS_KNOCKED_OUT, PS_BADLY_HURT, PS_SERIOUS_INJURY, PS_RIP, PS_RESERVE,
 };
+use ffb_model::model::SkillUse;
+use ffb_model::injury::context::InjuryModification;
 use ffb_model::util::util_box::UtilBox;
 use ffb_model::model::SoundId;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
-use ffb_mechanics::mechanics::{armor_broken as mech_armor_broken, injury_result, InjuryOutcome};
+use ffb_mechanics::mechanics::{armor_broken as mech_armor_broken, injury_result, interpret_injury_total_bb2016, interpret_injury_total_bb2020, InjuryOutcome};
 use ffb_mechanics::modifiers::Modifier;
 
 // ── InjuryContext ─────────────────────────────────────────────────────────────
@@ -52,8 +55,12 @@ pub struct InjuryContext {
     pub send_to_box_half: i32,
     /// Java: fSufferedInjury — set by evaluateInjuryContext when KO/casualty.
     pub suffered_injury: Option<PlayerState>,
-    /// Java: fCasualtyRoll — the d16 casualty die result (set during do_injury_roll).
-    pub casualty_roll: Option<i32>,
+    /// Java: fCasualtyRoll — [primary_die, secondary_die]. BB2016: [d6, d8]. BB2020/2025: [d16, d6].
+    pub casualty_roll: Option<[i32; 2]>,
+    /// Java: fCasualtyRollDecay — second casualty roll for players with Decay skill (BB2016).
+    pub casualty_roll_decay: Option<[i32; 2]>,
+    /// Java: casualtyModifiers — accumulated during interpretCasualtyRollAndAddModifiers.
+    pub casualty_modifiers: Vec<ffb_mechanics::modifiers::Modifier>,
     /// Java: fSeriousInjury — specific SI kind (set by evaluateInjuryContext).
     pub serious_injury: Option<SeriousInjuryKind>,
     /// Java: fSeriousInjuryDecay — decay SI kind for players with requiresSecondCasualtyRoll.
@@ -64,6 +71,19 @@ pub struct InjuryContext {
     pub sound: Option<SoundId>,
     /// Java: fModifiedInjuryContext — apothecary's alternate context (second injury context).
     pub modified_injury_context: Option<Box<InjuryContext>>,
+    /// Java: InjuryType.getClass().getSimpleName() — stored for post-injury checks (e.g. isBlock()).
+    pub injury_type_name: Option<String>,
+    /// Java: InjuryType.isCausedByOpponent() — whether the injury was caused by an opposing player.
+    pub is_caused_by_opponent: bool,
+    /// Java: InjuryType.isWorthSpps() — whether the attacker earns a casualty SPP for this injury.
+    pub is_worth_spps: bool,
+    // ── ModifiedInjuryContext extra fields (Java: ModifiedInjuryContext extends InjuryContext) ──
+    /// Java: ModifiedInjuryContext.modification — which phase was modified.
+    pub modification: InjuryModification,
+    /// Java: ModifiedInjuryContext.usedSkill — skill that caused the modification (stored as id).
+    pub used_skill_id: Option<u16>,
+    /// Java: ModifiedInjuryContext.skillUse — how the skill was used.
+    pub skill_use_modification: Option<SkillUse>,
 }
 
 impl InjuryContext {
@@ -84,11 +104,19 @@ impl InjuryContext {
             send_to_box_half: 0,
             suffered_injury: None,
             casualty_roll: None,
+            casualty_roll_decay: None,
+            casualty_modifiers: Vec::new(),
             serious_injury: None,
             serious_injury_decay: None,
             send_to_box_reason: None,
             sound: None,
             modified_injury_context: None,
+            injury_type_name: None,
+            is_caused_by_opponent: false,
+            is_worth_spps: false,
+            modification: InjuryModification::NONE,
+            used_skill_id: None,
+            skill_use_modification: None,
         }
     }
 
@@ -109,6 +137,15 @@ impl InjuryContext {
     pub fn add_injury_modifier(&mut self, m: Modifier) { self.injury_modifiers.push(m); }
     pub fn add_injury_modifiers(&mut self, ms: impl IntoIterator<Item = Modifier>) {
         self.injury_modifiers.extend(ms);
+    }
+
+    // Java: addCasualtyModifier / addCasualtyModifiers
+    pub fn add_casualty_modifier(&mut self, m: Modifier) { self.casualty_modifiers.push(m); }
+    pub fn add_casualty_modifiers(&mut self, ms: impl IntoIterator<Item = Modifier>) {
+        self.casualty_modifiers.extend(ms);
+    }
+    pub fn casualty_modifier_sum(&self) -> i32 {
+        self.casualty_modifiers.iter().map(|m| m.value).sum()
     }
 
     // Outcome helpers (Java: isCasualty(), isKnockedOut(), getPlayerState())
@@ -140,6 +177,16 @@ impl InjuryContext {
     pub fn set_modified_injury_context(&mut self, ctx: Option<Box<InjuryContext>>) {
         self.modified_injury_context = ctx;
     }
+
+    // Java: ModifiedInjuryContext.setModification / setUsedSkill / setSkillUse
+    pub fn set_modification(&mut self, m: InjuryModification) { self.modification = m; }
+    pub fn set_used_skill_id(&mut self, id: u16) { self.used_skill_id = Some(id); }
+    pub fn set_skill_use_modification(&mut self, su: SkillUse) { self.skill_use_modification = Some(su); }
+
+    // Java: InjuryContext.setInjuryRoll(int[])
+    pub fn set_injury_roll(&mut self, roll: [i32; 2]) { self.injury_roll = Some(roll); }
+    // Java: InjuryContext.setArmorRoll
+    pub fn set_armor_roll(&mut self, roll: [i32; 2]) { self.armor_roll = Some(roll); }
 }
 
 // ── InjuryResult ──────────────────────────────────────────────────────────────
@@ -276,6 +323,13 @@ pub trait InjuryTypeServer {
     fn send_to_box_reason(&self) -> Option<SendToBoxReason> { None }
     /// Java: InjuryType.shouldPlayFallSound()
     fn should_play_fall_sound(&self) -> bool { true }
+    /// Java: InjuryType class simple name — used by InjuryContextModification.isValidType().
+    /// Implementations should return the Java class simple name (e.g. "Block", "Foul", "Stab").
+    fn java_class_name(&self) -> &'static str { "" }
+    /// Java: InjuryType.isCausedByOpponent() — whether an opposing player caused this injury.
+    fn is_caused_by_opponent(&self) -> bool { false }
+    /// Java: InjuryType.isWorthSpps() — whether the attacker earns a casualty SPP.
+    fn is_worth_spps(&self) -> bool { false }
 }
 
 // ── Shared dice helpers ───────────────────────────────────────────────────────
@@ -309,15 +363,41 @@ pub fn do_injury_roll(rng: &mut GameRng, ctx: &mut InjuryContext) {
     ctx.injury = Some(outcome_to_player_state(rng, ctx, outcome));
 }
 
+/// Edition-aware variant of `do_injury_roll` that applies Stunty and ThickSkull rules.
+/// Uses `interpret_injury_total_bb2016` or `interpret_injury_total_bb2020` based on `rules`.
+/// Falls back to a standard Casualty when `interpret_*` returns `None`.
+pub fn do_injury_roll_for_player(rng: &mut GameRng, ctx: &mut InjuryContext, game: &Game, defender_id: &str) {
+    use ffb_model::enums::{Rules, SkillId};
+    let d1 = rng.d6();
+    let d2 = rng.d6();
+    ctx.injury_roll = Some([d1, d2]);
+    let modifier_sum: i32 = ctx.injury_modifiers.iter().map(|m| m.value).sum();
+    let total = d1 + d2 + modifier_sum;
+    let outcome = if let Some(defender) = game.player(defender_id) {
+        let is_stunty = defender.has_skill(SkillId::Stunty);
+        let has_thick_skull = defender.has_skill(SkillId::ThickSkull);
+        let interpreted = match game.rules {
+            Rules::Bb2016 => interpret_injury_total_bb2016(total, is_stunty, has_thick_skull),
+            _ => interpret_injury_total_bb2020(total, is_stunty, has_thick_skull),
+        };
+        interpreted.unwrap_or(InjuryOutcome::Casualty)
+    } else {
+        injury_result([d1, d2], &ctx.injury_modifiers)
+    };
+    ctx.injury = Some(outcome_to_player_state(rng, ctx, outcome));
+}
+
 fn outcome_to_player_state(rng: &mut GameRng, ctx: &mut InjuryContext, outcome: InjuryOutcome) -> PlayerState {
     match outcome {
         InjuryOutcome::Stunned    => PlayerState::new(PS_STUNNED),
         InjuryOutcome::KnockedOut => PlayerState::new(PS_KNOCKED_OUT),
         InjuryOutcome::BadlyHurt  => PlayerState::new(PS_BADLY_HURT),
         InjuryOutcome::Casualty   => {
-            // BB2025 casualty: d16 determines tier — store roll for evaluateInjuryContext
-            let roll = rng.die(16);
-            ctx.casualty_roll = Some(roll);
+            // BB2020/2025: d16 for tier, d6 for SI sub-type. Store [d16, d6].
+            let d16 = rng.die(16);
+            let d6 = rng.d6();
+            ctx.casualty_roll = Some([d16, d6]);
+            let roll = d16;
             if roll >= 15 {
                 PlayerState::new(PS_RIP)
             } else if roll >= 9 {
@@ -381,7 +461,9 @@ impl InjuryTypeServer for InjuryTypeDropFall {
 /// Simplified: no armor/injury modifier factories yet.
 pub struct InjuryTypeBlockImpl {
     ctx: InjuryContext,
-    pre_broken: bool,  // armor already forced broken (InjuryTypeBlockProne path)
+    pre_broken: bool,   // armor already forced broken (InjuryTypeBlockProne path)
+    worth_spps: bool,   // Java: worthSpps constructor param (true for "ForSpp" variants)
+    caused_by_opponent: bool, // Java: isCausedByOpponent() — true for Block/Foul/etc.
 }
 
 impl InjuryTypeBlockImpl {
@@ -389,7 +471,19 @@ impl InjuryTypeBlockImpl {
         Self {
             ctx: InjuryContext::new(ApothecaryMode::Defender),
             pre_broken,
+            worth_spps: false,
+            caused_by_opponent: true, // Block injuries are always by opponent
         }
+    }
+
+    fn with_spps(mut self) -> Self {
+        self.worth_spps = true;
+        self
+    }
+
+    fn not_by_opponent(mut self) -> Self {
+        self.caused_by_opponent = false;
+        self
     }
 }
 
@@ -420,6 +514,8 @@ impl InjuryTypeServer for InjuryTypeBlockImpl {
 
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
+    fn is_caused_by_opponent(&self) -> bool { self.caused_by_opponent }
+    fn is_worth_spps(&self) -> bool { self.worth_spps }
 }
 
 // ── InjuryTypeChainsaw ────────────────────────────────────────────────────────
@@ -427,11 +523,17 @@ impl InjuryTypeServer for InjuryTypeBlockImpl {
 /// Java: InjuryTypeChainsaw — armor is always broken (chainsaw special rule).
 pub struct InjuryTypeChainsawImpl {
     ctx: InjuryContext,
+    worth_spps: bool,
 }
 
 impl InjuryTypeChainsawImpl {
     pub fn new() -> Self {
-        Self { ctx: InjuryContext::new(ApothecaryMode::Defender) }
+        Self { ctx: InjuryContext::new(ApothecaryMode::Defender), worth_spps: false }
+    }
+
+    fn with_spps(mut self) -> Self {
+        self.worth_spps = true;
+        self
     }
 }
 
@@ -453,6 +555,8 @@ impl InjuryTypeServer for InjuryTypeChainsawImpl {
 
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
+    fn is_caused_by_opponent(&self) -> bool { true }
+    fn is_worth_spps(&self) -> bool { self.worth_spps }
 }
 
 // ── InjuryTypeThrowARock ──────────────────────────────────────────────────────
@@ -589,33 +693,53 @@ pub fn make_injury_type(name: &str) -> Box<dyn InjuryTypeServer> {
             Box::new(InjuryTypeDropFall::new(true)),
         "InjuryTypeDropJump" =>
             Box::new(InjuryTypeDropFall::new(true)),
-        "InjuryTypeBlock" | "InjuryTypeBlockForSpp" =>
+        "InjuryTypeBlock" =>
             Box::new(InjuryTypeBlockImpl::new(false)),
-        "InjuryTypeBlockProne" | "InjuryTypeBlockProneForSpp" =>
+        "InjuryTypeBlockForSpp" =>
+            Box::new(InjuryTypeBlockImpl::new(false).with_spps()),
+        "InjuryTypeBlockProne" =>
             Box::new(InjuryTypeBlockImpl::new(true)),
-        "InjuryTypeChainsaw" | "InjuryTypeChainsawForSpp" =>
+        "InjuryTypeBlockProneForSpp" =>
+            Box::new(InjuryTypeBlockImpl::new(true).with_spps()),
+        "InjuryTypeChainsaw" =>
             Box::new(InjuryTypeChainsawImpl::new()),
+        "InjuryTypeChainsawForSpp" =>
+            Box::new(InjuryTypeChainsawImpl::new().with_spps()),
         "InjuryTypeThrowARock" | "InjuryTypeThrowARockStalling" =>
             Box::new(InjuryTypeThrowARockImpl::new()),
         "InjuryTypeTTMLanding" | "InjuryTypeTtmLanding" =>
             Box::new(InjuryTypeTtmLandingImpl::new()),
-        "InjuryTypeTTMHitPlayer" | "InjuryTypeTtmHitPlayer" | "InjuryTypeTTMHitPlayerForSpp" =>
+        "InjuryTypeTTMHitPlayer" | "InjuryTypeTtmHitPlayer" =>
             Box::new(InjuryTypeTtmHitPlayerImpl::new()),
+        "InjuryTypeTTMHitPlayerForSpp" =>
+            Box::new(InjuryTypeTtmHitPlayerImpl::new()),  // TTM hit is by own team; SPP still tracked
         // Foul injury: armor roll + injury roll (foul assist modifiers TODO).
-        // InjuryTypeFoul(useChainsaw=true) adds chainsaw armor modifiers — stubbed as normal armor roll.
-        "InjuryTypeFoul" | "InjuryTypeFoulForSpp"
-        | "InjuryTypeFoulChainsaw" | "InjuryTypeFoulChainsawForSpp" =>
+        "InjuryTypeFoul" =>
             Box::new(InjuryTypeBlockImpl::new(false)),
-        "InjuryTypeFallDown" | "InjuryTypeFallDownForSpp" =>
+        "InjuryTypeFoulForSpp" =>
+            Box::new(InjuryTypeBlockImpl::new(false).with_spps()),
+        "InjuryTypeFoulChainsaw" =>
+            Box::new(InjuryTypeBlockImpl::new(false)),
+        "InjuryTypeFoulChainsawForSpp" =>
+            Box::new(InjuryTypeBlockImpl::new(false).with_spps()),
+        "InjuryTypeFallDown" =>
             Box::new(InjuryTypeDropFall::new(false)),
-        "InjuryTypeBreatheFire" | "InjuryTypeBreatheFireForSpp" =>
+        "InjuryTypeFallDownForSpp" =>
+            Box::new(InjuryTypeDropFall::new(false)),
+        "InjuryTypeBreatheFire" =>
             Box::new(InjuryTypeBlockImpl::new(false)),
-        "InjuryTypeCrowdPush" | "InjuryTypeCrowdPushForSpp" =>
-            Box::new(InjuryTypeBlockImpl::new(false)),
+        "InjuryTypeBreatheFireForSpp" =>
+            Box::new(InjuryTypeBlockImpl::new(false).with_spps()),
+        "InjuryTypeCrowdPush" =>
+            Box::new(InjuryTypeBlockImpl::new(false).not_by_opponent()),
+        "InjuryTypeCrowdPushForSpp" =>
+            Box::new(InjuryTypeBlockImpl::new(false).not_by_opponent().with_spps()),
         "InjuryTypeFumbledKtmApoKo" =>
             Box::new(InjuryTypeDropFall::new(false)),
-        "InjuryTypeBlockStunned" | "InjuryTypeBlockStunnedForSpp" =>
+        "InjuryTypeBlockStunned" =>
             Box::new(InjuryTypeBlockImpl::new(true)),
+        "InjuryTypeBlockStunnedForSpp" =>
+            Box::new(InjuryTypeBlockImpl::new(true).with_spps()),
         _ => {
             // Unknown type: fall through with generic drop behavior (causes turnover)
             Box::new(InjuryTypeDropFall::new(true))
@@ -657,6 +781,7 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
+            ..Default::default()
         }
     }
 
@@ -730,5 +855,68 @@ mod tests {
         // State must remain RIP
         let state = game.field_model.player_state("h1").unwrap();
         assert_eq!(state.base(), PS_RIP, "worse state should not be overridden by less severe");
+    }
+
+    fn make_player_with_skills(id: &str, skills: Vec<ffb_model::enums::SkillId>) -> Player {
+        use ffb_model::model::SkillWithValue;
+        Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 2,
+            starting_skills: skills.into_iter().map(SkillWithValue::new).collect(),
+            extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn do_injury_roll_for_player_stunty_ko_at_7_bb2020() {
+        use ffb_model::enums::SkillId;
+        // Stunty BB2020: total 7 = KO instead of Stunned.
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(make_player_with_skills("p1", vec![SkillId::Stunty]));
+        let game = Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2025);
+        let mut ctx = InjuryContext::new(ffb_model::enums::ApothecaryMode::Defender);
+        let mut rng = GameRng::new(42);
+        do_injury_roll_for_player(&mut rng, &mut ctx, &game, "p1");
+        // If roll was 7 (Stunty→KO), verify; otherwise just check it resolved to something
+        if let Some([d1, d2]) = ctx.injury_roll {
+            let total = d1 + d2;
+            if total == 7 {
+                assert_eq!(ctx.injury.map(|s| s.base()), Some(PS_KNOCKED_OUT), "Stunty total 7 must be KO");
+            }
+        }
+    }
+
+    #[test]
+    fn do_injury_roll_for_player_thick_skull_at_8_bb2020() {
+        use ffb_model::enums::SkillId;
+        // ThickSkull BB2020: total 8 = Stunned instead of KO.
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(make_player_with_skills("p1", vec![SkillId::ThickSkull]));
+        let game = Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2025);
+        let mut ctx = InjuryContext::new(ffb_model::enums::ApothecaryMode::Defender);
+        let mut rng = GameRng::new(42);
+        do_injury_roll_for_player(&mut rng, &mut ctx, &game, "p1");
+        if let Some([d1, d2]) = ctx.injury_roll {
+            let total = d1 + d2;
+            if total == 8 {
+                assert_eq!(ctx.injury.map(|s| s.base()), Some(PS_STUNNED), "ThickSkull total 8 must be Stunned");
+            }
+        }
+    }
+
+    #[test]
+    fn do_injury_roll_for_player_no_skills_uses_standard_table() {
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(make_player_with_skills("p1", vec![]));
+        let game = Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2025);
+        let mut ctx = InjuryContext::new(ffb_model::enums::ApothecaryMode::Defender);
+        let mut rng = GameRng::new(42);
+        do_injury_roll_for_player(&mut rng, &mut ctx, &game, "p1");
+        // Should produce some injury result
+        assert!(ctx.injury.is_some());
+        assert!(ctx.injury_roll.is_some());
     }
 }

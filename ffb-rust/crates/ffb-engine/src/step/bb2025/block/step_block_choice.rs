@@ -6,6 +6,7 @@ use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::util::util_server_pushback::UtilServerPushback;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.block.StepBlockChoice.
 /// Routes block die result to dodge/juggernaut/pushback sequence labels.
@@ -49,7 +50,7 @@ impl Step for StepBlockChoice {
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        if let Action::BlockChoice { die_index } = action {
+        if let Action::BlockChoice { die_index, .. } = action {
             self.dice_index = *die_index;
         }
         self.execute_step(game, rng)
@@ -143,7 +144,7 @@ impl StepBlockChoice {
                         if let Some(ref did) = defender_id {
                             out = out.with_event(GameEvent::SkillUse { player_id: did.clone(), skill_id: SkillId::Dodge as u16, used: false });
                         }
-                        if let Some(s) = sq { out = out.publish(StepParameter::StartingPushbackSquare(s)); }
+                        out = out.publish(StepParameter::StartingPushbackSquare(sq));
                         return out;
                     }
                     // No Tackle → Dodge works
@@ -160,7 +161,7 @@ impl StepBlockChoice {
                 }
                 let (sq, _) = self.init_pushback(game);
                 let mut out = StepOutcome::goto(&pushback_label);
-                if let Some(s) = sq { out = out.publish(StepParameter::StartingPushbackSquare(s)); }
+                out = out.publish(StepParameter::StartingPushbackSquare(sq));
                 out
             }
             BlockResult::Pow => {
@@ -170,7 +171,7 @@ impl StepBlockChoice {
                 }
                 let (sq, _) = self.init_pushback(game);
                 let mut out = StepOutcome::goto(&pushback_label);
-                if let Some(s) = sq { out = out.publish(StepParameter::StartingPushbackSquare(s)); }
+                out = out.publish(StepParameter::StartingPushbackSquare(sq));
                 out
             }
             BlockResult::Pushback => {
@@ -180,7 +181,7 @@ impl StepBlockChoice {
                 }
                 let (sq, _) = self.init_pushback(game);
                 let mut out = StepOutcome::goto(&pushback_label);
-                if let Some(s) = sq { out = out.publish(StepParameter::StartingPushbackSquare(s)); }
+                out = out.publish(StepParameter::StartingPushbackSquare(sq));
                 out
             }
             _ => StepOutcome::next(),
@@ -189,18 +190,21 @@ impl StepBlockChoice {
 
     /// Returns (starting_pushback_square, scatter_ball).
     /// Java: UtilBlockSequence.initPushback(step) — clears pushback squares, finds direction.
-    fn init_pushback(&self, game: &mut Game) -> (Option<ffb_model::types::FieldCoordinate>, bool) {
+    fn init_pushback(&self, game: &mut Game) -> (Option<ffb_model::types::PushbackSquare>, bool) {
         game.field_model.pushback_squares.clear();
-        let _attacker_coord = game.acting_player.player_id.as_deref()
+        let attacker_coord = game.acting_player.player_id.as_deref()
             .and_then(|id| game.field_model.player_coordinate(id));
         let defender_coord = game.defender_id.as_deref()
             .and_then(|id| game.field_model.player_coordinate(id));
+        let starting_sq = attacker_coord.zip(defender_coord)
+            .map(|(ac, dc)| UtilServerPushback::find_starting_square(ac, dc, game.home_playing))
+            .flatten();
         // Java: scatter_ball = attacker.hasSkillProperty(forceOpponentToDropBallOnPushback)
         let scatter_ball = game.acting_player.player_id.as_deref()
             .and_then(|id| game.player(id))
             .map(|p| p.has_skill_property(NamedProperties::FORCE_OPPONENT_TO_DROP_BALL_ON_PUSHBACK))
             .unwrap_or(false);
-        (defender_coord, scatter_ball)
+        (starting_sq, scatter_ball)
     }
 }
 
@@ -221,6 +225,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 5));
         game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
@@ -234,6 +239,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.field_model.set_player_coordinate(id, FieldCoordinate::new(6, 5));
         game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
@@ -337,6 +343,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
         game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
@@ -362,6 +369,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.field_model.set_player_coordinate("att", FieldCoordinate::new(5, 5));
         game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
@@ -373,6 +381,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
         game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));

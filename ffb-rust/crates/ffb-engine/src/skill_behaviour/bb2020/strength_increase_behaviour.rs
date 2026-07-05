@@ -1,8 +1,11 @@
 use crate::skill_behaviour::SkillBehaviour;
+use ffb_model::model::player::Player;
+use ffb_model::model::roster_position::RosterPosition;
 
-/// Handles strength stat increase on level-up (BB2020 edition). Registers a player modifier that
-/// adds +1 strength on level-up. Mirrors Java
-/// `com.fumbbl.ffb.server.skillbehaviour.bb2020.StrengthIncreaseBehaviour`.
+/// 1:1 translation of `com.fumbbl.ffb.server.skillbehaviour.bb2020.StrengthIncreaseBehaviour`.
+///
+/// Java: `registerModifier(player -> player.setStrength(min(min(8, pos.getStrength()+2), player.getStrength()+1)))`.
+/// BB2020: strength cap is 8 (vs BB2016's 10).
 pub struct StrengthIncreaseBehaviour;
 
 impl StrengthIncreaseBehaviour {
@@ -16,10 +19,8 @@ impl Default for StrengthIncreaseBehaviour {
 impl SkillBehaviour for StrengthIncreaseBehaviour {
     fn name(&self) -> &'static str { "StrengthIncreaseBehaviour" }
 
-    /// No step modifier hook — this behaviour only registers a player modifier. Increments player
-    /// strength by 1 on level-up.
-    fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
-        false
+    fn apply_modifier(&self, player: &mut Player, position: &RosterPosition) {
+        player.strength = (position.strength + 2).min(8).min(player.strength + 1);
     }
 }
 
@@ -27,16 +28,37 @@ impl SkillBehaviour for StrengthIncreaseBehaviour {
 mod tests {
     use super::*;
 
+    fn pos(strength: i32) -> RosterPosition {
+        RosterPosition { strength, ..Default::default() }
+    }
+
     #[test]
-    fn hook_is_noop_returns_false() {
-        // StrengthIncreaseBehaviour only registers a player modifier; execute_step_hook is a no-op.
+    fn apply_increases_by_one() {
         let b = StrengthIncreaseBehaviour::new();
-        assert_eq!(b.name(), "StrengthIncreaseBehaviour");
+        let mut player = Player { strength: 3, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(3));
+        assert_eq!(player.strength, 4);
+    }
+
+    #[test]
+    fn apply_capped_at_eight_not_ten() {
+        let b = StrengthIncreaseBehaviour::new();
+        let mut player = Player { strength: 8, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(9));
+        assert_eq!(player.strength, 8);
+    }
+
+    #[test]
+    fn apply_capped_by_position_plus_two() {
+        // pos.st=3, cap=5; player.st=5 → min(5, 6) = 5 (no change)
+        let b = StrengthIncreaseBehaviour::new();
+        let mut player = Player { strength: 5, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(3));
+        assert_eq!(player.strength, 5);
     }
 
     #[test]
     fn name_is_correct() {
-        let b = StrengthIncreaseBehaviour::default();
-        assert_eq!(b.name(), "StrengthIncreaseBehaviour");
+        assert_eq!(StrengthIncreaseBehaviour::new().name(), "StrengthIncreaseBehaviour");
     }
 }

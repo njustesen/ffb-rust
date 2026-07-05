@@ -1,10 +1,35 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct ServerCommandRemoveSketches;
-
-impl ServerCommandRemoveSketches {
-    pub fn new() -> Self { Self }
+/// 1:1 translation of `com.fumbbl.ffb.net.commands.ServerCommandRemoveSketches`.
+/// Instructs clients to remove specific sketches by ID.
+#[derive(Debug, Clone, Default)]
+pub struct ServerCommandRemoveSketches {
+    /// Java: `coach` — the coach whose sketches are being removed.
+    pub coach: String,
+    /// Java: `ids` — sketch IDs to remove.
+    pub ids: Vec<String>,
 }
 
-impl Default for ServerCommandRemoveSketches {
-    fn default() -> Self { Self::new() }
+impl ServerCommandRemoveSketches {
+    pub fn new(coach: impl Into<String>, ids: Vec<String>) -> Self {
+        Self { coach: coach.into(), ids }
+    }
+    pub fn get_coach(&self) -> &str { &self.coach }
+    pub fn get_ids(&self) -> &[String] { &self.ids }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fields_stored() {
+        let cmd = ServerCommandRemoveSketches::new("Bob", vec!["id1".into()]);
+        assert_eq!(cmd.get_coach(), "Bob");
+        assert_eq!(cmd.get_ids(), &["id1"]);
+    }
+
+    #[test]
+    fn default_empty() {
+        let cmd = ServerCommandRemoveSketches::default();
+        assert!(cmd.ids.is_empty());
+    }
 }

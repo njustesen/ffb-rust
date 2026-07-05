@@ -19,3 +19,20 @@ impl ReRollSourceFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_source() {
+        let f = ReRollSourceFactory::default();
+        assert!(f.for_name("Pro").is_some());
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        let f = ReRollSourceFactory::default();
+        assert!(f.for_name("NOT_VALID").is_none());
+    }
+}

@@ -32,10 +32,6 @@ impl InjuryMechanicTrait for InjuryMechanic {
         attacker: Option<&Player>,
         dead_player: &Player,
     ) -> bool {
-        // attacker.hasSkillProperty(allowsRaisingLineman) && dead_player.strength <= 4
-        // && !dead_player.hasSkillProperty(preventRaiseFromDead)
-        // && !dead_player.hasSkillProperty(requiresSecondCasualtyRoll)
-        // TODO: has_skill_property is a stub until SkillFactory is translated
         attacker.is_some()
             && attacker.unwrap().has_skill_property(NamedProperties::ALLOWS_RAISING_LINEMAN)
             && dead_player.strength_with_modifiers() <= 4
@@ -80,4 +76,26 @@ impl InjuryMechanicTrait for InjuryMechanic {
 
 impl InjuryMechanic {
     pub fn new() -> Self { InjuryMechanic }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::enums::SendToBoxReason;
+    use crate::injury_mechanic::InjuryMechanic as InjuryTrait;
+
+    #[test]
+    fn raised_by_nurgle_reason_is_nurgles_rot() {
+        assert_eq!(InjuryMechanic.raised_by_nurgle_reason(), SendToBoxReason::NurglesRot);
+    }
+
+    #[test]
+    fn infected_goes_to_reserves_is_false() {
+        assert!(!InjuryMechanic.infected_goes_to_reserves());
+    }
+
+    #[test]
+    fn raised_nurgle_type_is_raised_from_dead() {
+        assert_eq!(InjuryMechanic.raised_nurgle_type(), PlayerType::RaisedFromDead);
+    }
 }

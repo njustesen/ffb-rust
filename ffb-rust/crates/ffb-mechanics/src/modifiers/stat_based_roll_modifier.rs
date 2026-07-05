@@ -20,3 +20,27 @@ impl Default for StatBasedRollModifier {
         StatBasedRollModifier { name: String::new(), value: 0 }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_stores_name_and_value() {
+        let m = StatBasedRollModifier::new("Strength Bonus", 2);
+        assert_eq!(m.get_report_string(), "Strength Bonus");
+        assert_eq!(m.get_modifier(), 2);
+    }
+
+    #[test]
+    fn is_modifier_included_always_false() {
+        assert!(!StatBasedRollModifier::new("x", 5).is_modifier_included());
+    }
+
+    #[test]
+    fn default_is_zero_empty() {
+        let m = StatBasedRollModifier::default();
+        assert_eq!(m.get_modifier(), 0);
+        assert!(m.name.is_empty());
+    }
+}

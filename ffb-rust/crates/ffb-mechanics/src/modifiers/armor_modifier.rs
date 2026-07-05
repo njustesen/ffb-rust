@@ -1,4 +1,4 @@
-use ffb_model::model::Player;
+use ffb_model::model::{Player, SpecialEffect};
 use crate::modifiers::armor_modifier_context::ArmorModifierContext;
 
 /// 1:1 translation of com.fumbbl.ffb.modifiers.ArmorModifier (Java interface → Rust trait).
@@ -10,4 +10,12 @@ pub trait ArmorModifier: Send + Sync {
 
     fn registered_to(&self) -> Option<&str> { None }
     fn set_registered_to(&mut self, _skill_id: Option<String>) {}
+
+    /// Returns the SpecialEffect this modifier is tied to, if any.
+    /// Overridden by SpecialEffectArmourModifier; all others return None.
+    fn get_special_effect(&self) -> Option<SpecialEffect> { None }
+
+    /// Java: isRegisteredToSkillWithProperty — checks if registered_to skill has property.
+    /// DEFERRED: requires skill property lookup (SkillFactory not yet ported).
+    fn is_registered_to_skill_with_property(&self, _property: &str) -> bool { false }
 }

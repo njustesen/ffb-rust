@@ -5,7 +5,7 @@ use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
-use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll};
+use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
 
 pub struct InjuryTypePilingOnArmour { ctx: InjuryContext }
 impl InjuryTypePilingOnArmour { pub fn new() -> Self { Self { ctx: InjuryContext::new(ApothecaryMode::Defender) } } }
@@ -22,7 +22,7 @@ impl InjuryTypeServer for InjuryTypePilingOnArmour {
             // TODO: add PILING_ON_ARMOR game option modifier when option factory is ported
             do_armor_roll(game, rng, &mut self.ctx, defender_id);
         }
-        if self.ctx.armor_broken { do_injury_roll(rng, &mut self.ctx); }
+        if self.ctx.armor_broken { do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id); }
         else { self.ctx.injury = Some(PlayerState::new(PS_PRONE)); }
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
@@ -45,7 +45,8 @@ mod tests {
             gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
             passing: 4, armour, starting_skills: vec![], extra_skills: vec![],
             temporary_skills: vec![], used_skills: HashSet::new(),
-            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None });
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+    ..Default::default() });
         Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2025)
     }
     fn coord() -> FieldCoordinate { FieldCoordinate::new(5, 5) }

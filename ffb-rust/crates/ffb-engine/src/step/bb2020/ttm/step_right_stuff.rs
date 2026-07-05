@@ -20,13 +20,12 @@
 ///  - Uses `playerCoordinate.isBoxCoordinate()` guard (trapdoor).
 ///
 /// RightStuffModifierFactory + AgilityMechanic.minimumRollRightStuff → wired.
-/// DEFERRED(RightStuff-reroll): AbstractStepWithReRoll / UtilServerReRoll deferred.
 /// DEFERRED(RightStuff-injury): UtilServerInjury.handleInjury(InjuryTypeTTMLanding/FumbledKtm) deferred.
-/// DEFERRED(RightStuff-touchdown): UtilServerSteps.checkTouchdown deferred.
 /// DEFERRED(RightStuff-spp): SppMechanic.addCompletion (accurate pass) deferred.
+/// `isBoxCoordinate()` guard wired — skips landing roll when player is in the dugout.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
-use ffb_model::enums::{PlayerState, PassResult as ModelPassResult, PS_FALLING, ApothecaryMode};
+use ffb_model::enums::{PlayerState, PassResult as ModelPassResult, PS_FALLING, ApothecaryMode, ReRollSource};
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter, CatchScatterThrowInMode};
 use ffb_mechanics::modifiers::right_stuff_modifier_factory::RightStuffModifierFactory;
@@ -36,6 +35,9 @@ use crate::dice_interpreter::DiceInterpreter;
 use crate::injury::injuryType::injury_type_ttm_landing::InjuryTypeTTMLanding;
 use crate::injury::injuryType::injury_type_fumbled_ktm::InjuryTypeFumbledKtm;
 use crate::step::util_server_injury;
+use crate::step::util_server_steps::check_touchdown;
+use crate::step::abstract_step_with_re_roll::{ReRollState, find_skill_reroll_source};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
 /// Java: `StepRightStuff` (bb2020/ttm).
 pub struct StepRightStuff {
@@ -53,6 +55,10 @@ pub struct StepRightStuff {
     goto_on_success: Option<String>,
     /// Java: `oldPlayerState` (OLD_DEFENDER_STATE) — BB2020 addition.
     old_player_state: Option<PlayerState>,
+    /// Java: AbstractStepWithReRoll fields
+    re_roll_state: ReRollState,
+    /// Cached roll value (0 = not yet rolled).
+    roll: i32,
 }
 
 impl StepRightStuff {
@@ -65,10 +71,12 @@ impl StepRightStuff {
             kicked_player: false,
             goto_on_success: None,
             old_player_state: None,
+            re_roll_state: ReRollState::new(),
+            roll: 0,
         }
     }
 
-    fn execute_step(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let player_id = match &self.thrown_player_id {
             Some(id) => id.clone(),
             None     => return StepOutcome::next(),
@@ -80,8 +88,7 @@ impl StepRightStuff {
         let is_falling = game.field_model.player_state(&player_id)
             .map(|s| s.base() == PS_FALLING)
             .unwrap_or(false);
-        // DEFERRED(RightStuff-boxCoord): FieldCoordinate.isBoxCoordinate() not yet ported.
-        let is_box_coord = false; // stub
+        let is_box_coord = player_coord.map(|c| c.is_box_coordinate()).unwrap_or(false);
 
         if is_falling || is_box_coord {
             return StepOutcome::next()
@@ -106,7 +113,18 @@ impl StepRightStuff {
         // BB2020: fumbled KTM path.
         let fumbled_ktm = self.pass_result == Some(ModelPassResult::Fumble) && self.kicked_player;
 
-        let do_roll = !self.drop_thrown_player && !fumbled_ktm;
+        let already_rerolled = self.re_roll_state.re_rolled_action
+            .as_ref().map(|a| a.name == "RIGHT_STUFF").unwrap_or(false);
+        let mut do_roll = !self.drop_thrown_player && !fumbled_ktm;
+
+        // Java: if (reRolledAction == RIGHT_STUFF) { if (source == null || !useReRoll) doRoll = false; }
+        if do_roll && already_rerolled {
+            let source_opt = self.re_roll_state.re_roll_source.clone();
+            let consumed = source_opt.as_ref().map(|s| use_reroll(game, s, &player_id)).unwrap_or(false);
+            if !consumed {
+                do_roll = false;
+            }
+        }
 
         if do_roll {
             let minimum_roll = if let Some(player) = game.player(&player_id) {
@@ -123,24 +141,49 @@ impl StepRightStuff {
             } else {
                 4
             };
-            let roll = rng.d6();
-            let successful = DiceInterpreter::is_skill_roll_successful(roll, minimum_roll);
-            // DEFERRED(RightStuff-reroll): offer re-roll not yet wired.
+            if self.roll == 0 {
+                self.roll = rng.d6();
+            }
+            let successful = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
             if successful {
-                // DEFERRED(RightStuff-touchdown): checkTouchdown on landing not yet ported.
                 let success_label = self.goto_on_success.as_deref().unwrap_or("");
                 let mut out = StepOutcome::goto(success_label)
                     .publish(StepParameter::ThrownPlayerState(out_state))
                     .publish(StepParameter::ThrownPlayerCoordinate(None));
-                if !has_ball {
+                if has_ball {
+                    if check_touchdown(game) {
+                        out = out.publish(StepParameter::EndTurn(true));
+                    }
+                } else {
                     let ball_coord = game.field_model.ball_coordinate;
                     if player_coord.is_some() && player_coord == ball_coord {
+                        game.field_model.ball_moving = true;
                         out = out.publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall));
                     }
                 }
                 return out;
             }
-            // Failed roll falls through to drop path below.
+
+            // Failure: offer re-roll if not yet re-rolled
+            if !already_rerolled {
+                use ffb_model::model::re_rolled_action::ReRolledAction;
+                self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("RIGHT_STUFF"));
+
+                let skill_source = find_skill_reroll_source(game, "RIGHT_STUFF");
+                if let Some(source) = skill_source {
+                    use_reroll(game, &source, &player_id);
+                    self.re_roll_state.re_roll_source = Some(source);
+                    self.roll = 0;
+                    return self.execute_step(game, rng);
+                }
+
+                if let Some(prompt) = ask_for_reroll_if_available(game, "RIGHT_STUFF", minimum_roll, false) {
+                    self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
+                    self.roll = 0;
+                    return StepOutcome::cont().with_prompt(prompt);
+                }
+            }
+            // Failed roll, no re-roll available: fall through to drop path.
         }
 
         // Drop path (drop_thrown_player == true OR fumbled_ktm OR failed roll).
@@ -184,8 +227,17 @@ impl Step for StepRightStuff {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game, rng)
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        match action {
+            Action::UseReRoll { use_reroll: true } => {
+                self.execute_step(game, rng)
+            }
+            Action::UseReRoll { use_reroll: false } => {
+                self.re_roll_state.re_roll_source = None;
+                self.execute_step(game, rng)
+            }
+            _ => self.execute_step(game, rng),
+        }
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {

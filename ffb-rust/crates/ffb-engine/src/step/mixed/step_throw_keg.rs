@@ -19,6 +19,7 @@
 ///
 /// Java: `StepThrowKeg extends AbstractStepWithReRoll` (mixed, BB2020 + BB2025).
 use ffb_model::enums::ApothecaryMode;
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
@@ -95,16 +96,22 @@ impl StepThrowKeg {
         let success = self.roll >= MINIMUM_THROW_KEG_ROLL;
 
         // Java: getResult().addReport(new ReportThrownKeg(actingPlayer.getPlayerId(), playerId, roll, success, roll == 1))
-        // DEFERRED(report framework): ReportThrownKeg not yet ported.
+        let keg_event = GameEvent::KegThrow {
+            thrower_id: acting_player_id.clone(),
+            target_id: self.player_id.clone(),
+            roll: self.roll,
+            success,
+            fumble: self.roll == 1,
+        };
 
         if success {
             // Java: getResult().setAnimation(new Animation(AnimationType.THROW_KEG, throwerCoord, targetCoord))
-            // DEFERRED(animation): AnimationType.THROW_KEG not yet ported.
+            // Animation is client-side only.
             // Java: hitPlayer(game.getPlayerById(playerId), false)
             if let Some(ref target_id) = self.player_id.clone() {
-                return self.hit_player(game, rng, target_id, false);
+                return self.hit_player(game, rng, target_id, false).with_event(keg_event);
             }
-            return StepOutcome::next();
+            return StepOutcome::next().with_event(keg_event);
         }
 
         // Java: if (getReRolledAction() != ReRolledActions.THROW_KEG
@@ -113,17 +120,17 @@ impl StepThrowKeg {
         if !is_re_rolling {
             if let Some(prompt) = ask_for_reroll_if_available(game, THROW_KEG, MINIMUM_THROW_KEG_ROLL, false) {
                 self.re_roll.re_rolled_action = Some(ffb_model::model::re_rolled_action::ReRolledAction::new(THROW_KEG));
-                return StepOutcome::cont().with_prompt(prompt);
+                return StepOutcome::cont().with_prompt(prompt).with_event(keg_event);
             }
         }
-        self.fail(game, rng)
+        self.fail(game, rng).with_event(keg_event)
     }
 
     /// Java: `fail()` — if roll == 1 → animate fumbled keg + hitPlayer(thrower, true).
     fn fail(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         if self.roll == 1 {
             // Java: getResult().setAnimation(new Animation(AnimationType.FUMBLED_KEG, throwerCoordinate))
-            // DEFERRED(animation): AnimationType.FUMBLED_KEG not yet ported.
+            // Animation is client-side only.
             let thrower_id = game.acting_player.player_id.clone();
             if let Some(ref tid) = thrower_id {
                 let tid = tid.clone();
@@ -225,7 +232,8 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+            ..Default::default()
+});
         game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 5));
         game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
     }

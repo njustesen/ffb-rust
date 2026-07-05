@@ -16,7 +16,7 @@
 ///
 /// Java: `StepFoulAppearance extends AbstractStepWithReRoll` (mixed, BB2020 + BB2025).
 use ffb_model::model::game::Game;
-use ffb_model::enums::{SkillId, ReRollSource};
+use ffb_model::enums::{SkillId, ReRollSource, PlayerAction, PS_PRONE};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -125,13 +125,52 @@ impl StepFoulAppearance {
     }
 
     fn fail_fa(&mut self, game: &mut Game) -> StepOutcome {
-        // Java: handleFailure — actingPlayer.setHasBlocked(true); game.getTurnData().setTurnStarted(true)
-        // DEFERRED(handleFailure-standingUp): StandingUp + BLITZ_MOVE/block-action prone-state handling deferred
-        // DEFERRED(handleFailure-targetSelectionState): targetSelectionState.failed() + blitzUsed deferred
+        let player_action = game.acting_player.player_action;
+
+        // Java: if (actingPlayer.isStandingUp() && (BLITZ_MOVE || blockAction || GAZE_MOVE || kickingDowned))
+        //         setPlayerState(player, state.changeBase(PRONE).changeActive(false))
+        if game.acting_player.standing_up {
+            let set_prone = player_action.map(|pa|
+                pa == PlayerAction::BlitzMove
+                || pa.is_block_action()
+                || pa == PlayerAction::GazeMove
+                || pa.is_kicking_downed()
+            ).unwrap_or(false);
+            if set_prone {
+                if let Some(pid) = game.acting_player.player_id.clone() {
+                    if let Some(state) = game.field_model.player_state(&pid) {
+                        game.field_model.set_player_state(&pid, state.change_base(PS_PRONE).change_active(false));
+                    }
+                }
+            }
+        }
+
         game.acting_player.has_blocked = true;
         game.turn_data_mut().turn_started = true;
+
+        // Java: targetSelectionState.failed(); if blitzing → blitzUsed = true
+        if let Some(ref mut ts) = game.field_model.target_selection_state {
+            ts.failed();
+            if player_action.map(|pa| pa.is_blitzing()).unwrap_or(false) {
+                game.turn_data_mut().blitz_used = true;
+            }
+        }
+
+        // Java: if (GAZE || blockAction) → publishParameter(END_PLAYER_ACTION, true)
+        let end_action = player_action.map(|pa|
+            pa.is_gaze() || pa.is_block_action()
+        ).unwrap_or(false);
+
+        // Java: game.setDefenderId(null)
+        game.defender_id = None;
+
         let label = self.goto_label_on_failure.clone();
-        StepOutcome::goto(&label)
+        let out = StepOutcome::goto(&label);
+        if end_action {
+            out.publish(StepParameter::EndPlayerAction(true))
+        } else {
+            out
+        }
     }
 }
 
@@ -171,7 +210,7 @@ impl Step for StepFoulAppearance {
 mod tests {
     use super::*;
     use crate::step::framework::{test_team, StepAction};
-    use ffb_model::enums::{Rules, SkillId, PlayerType, PlayerGender, TurnMode};
+    use ffb_model::enums::{Rules, SkillId, PlayerType, PlayerGender, TurnMode, PlayerState};
     use ffb_model::model::game::Game;
     use ffb_model::model::player::Player;
     use ffb_model::model::skill_def::SkillWithValue;
@@ -191,7 +230,8 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+            ..Default::default()
+});
     }
 
     #[test]
@@ -280,5 +320,74 @@ mod tests {
         let mut step = StepFoulAppearance::new("fail");
         let rejected = !step.set_parameter(&StepParameter::EndTurn(true));
         assert!(rejected);
+    }
+
+    #[test]
+    fn failed_with_standing_up_blitz_move_sets_player_prone() {
+        use ffb_model::enums::{PlayerAction, PS_PRONE, PS_STANDING};
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        add_player(&mut game, "atk", vec![]);
+        add_player(&mut game, "def", vec![SkillId::FoulAppearance]);
+        game.acting_player.player_id = Some("atk".into());
+        game.acting_player.player_action = Some(PlayerAction::BlitzMove);
+        game.acting_player.standing_up = true;
+        game.acting_player.has_blocked = false;
+        game.field_model.set_player_state("atk", PlayerState::new(PS_STANDING));
+        game.defender_id = Some("def".into());
+        let mut step = StepFoulAppearance::new("fa_fail");
+        step.roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        // Player should be set to PRONE + inactive
+        let state = game.field_model.player_state("atk").unwrap();
+        assert_eq!(state.base(), PS_PRONE);
+        assert!(!state.is_active());
+    }
+
+    #[test]
+    fn failed_with_blitzing_action_sets_blitz_used_and_target_selection_failed() {
+        use ffb_model::enums::PlayerAction;
+        use ffb_model::model::target_selection_state::{TargetSelectionState, TargetSelectionStatus};
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        add_player(&mut game, "atk", vec![]);
+        add_player(&mut game, "def", vec![SkillId::FoulAppearance]);
+        game.acting_player.player_id = Some("atk".into());
+        game.acting_player.player_action = Some(PlayerAction::Blitz);
+        game.defender_id = Some("def".into());
+        let ts = TargetSelectionState::new("def");
+        game.field_model.target_selection_state = Some(ts);
+        let mut step = StepFoulAppearance::new("fa_fail");
+        step.roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.turn_data().blitz_used);
+        assert_eq!(
+            game.field_model.target_selection_state.as_ref().map(|ts| ts.status),
+            Some(TargetSelectionStatus::FAILED)
+        );
+        assert!(game.defender_id.is_none());
+    }
+
+    #[test]
+    fn failed_with_block_action_publishes_end_player_action() {
+        use ffb_model::enums::PlayerAction;
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        add_player(&mut game, "atk", vec![]);
+        add_player(&mut game, "def", vec![SkillId::FoulAppearance]);
+        game.acting_player.player_id = Some("atk".into());
+        game.acting_player.player_action = Some(PlayerAction::Block);
+        game.defender_id = Some("def".into());
+        let mut step = StepFoulAppearance::new("fa_fail");
+        step.roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))));
     }
 }

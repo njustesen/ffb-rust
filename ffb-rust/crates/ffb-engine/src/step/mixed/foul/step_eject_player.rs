@@ -3,12 +3,14 @@
 /// Removes the spotted fouler from the field (puts them in the box) and ends the turn.
 /// If the fouler had the ball, also scatters it.
 ///
-/// Java: `executeStepHooks` is deferred; `UtilBox.putPlayerIntoBox` / `refreshBoxes`
-/// are stubs (UtilBox not yet ported).
+/// Java: `executeStepHooks` is deferred (no hooks registered for this step in practice).
+/// `UtilServerGame.updatePlayerStateDependentProperties` is deferred.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_box::UtilBox;
 use crate::action::Action;
 use crate::step::framework::{CatchScatterThrowInMode, Step, StepOutcome, StepId, StepParameter};
+use crate::util::util_server_game::UtilServerGame;
 
 /// Java: `StepEjectPlayer` (mixed/foul, BB2020 + BB2025).
 pub struct StepEjectPlayer {
@@ -33,11 +35,11 @@ impl StepEjectPlayer {
     }
 
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
-        // Java: UtilBox.putPlayerIntoBox(game, actingPlayer.getPlayer())
-        // DEFERRED: UtilBox not yet ported — player remains on field until UtilBox is implemented
-        // Java: UtilBox.refreshBoxes(game) — also deferred
-        // Java: UtilServerGame.updatePlayerStateDependentProperties(this) — deferred
-        let _ = game;
+        if let Some(player_id) = game.acting_player.player_id.clone() {
+            UtilBox::put_player_into_box(game, &player_id);
+        }
+        UtilBox::refresh_boxes(game);
+        UtilServerGame::update_player_state_dependent_properties(game);
 
         if self.fouler_has_ball == Some(true) {
             // Java: setNextAction(StepAction.NEXT_STEP)
@@ -83,10 +85,28 @@ impl Step for StepEjectPlayer {
 mod tests {
     use super::*;
     use crate::step::framework::{StepAction, test_team};
-    use ffb_model::enums::Rules;
+    use ffb_model::enums::{Rules, PS_BANNED};
+    use ffb_model::model::player::Player;
+    use ffb_model::model::team::Team;
+    use ffb_model::types::{FieldCoordinate, BAN_HOME_X};
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+    }
+
+    fn make_game_with_fouler(player_id: &str, state_base: u32) -> Game {
+        let mut team = test_team("home", 0);
+        team.players.push(Player {
+            id: player_id.into(),
+            name: player_id.into(),
+            nr: 99,
+            ..Default::default()
+        });
+        let mut game = Game::new(team, test_team("away", 0), Rules::Bb2025);
+        game.acting_player.player_id = Some(player_id.into());
+        game.field_model.set_player_coordinate(player_id, FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state(player_id, ffb_model::enums::PlayerState::new(state_base));
+        game
     }
 
     #[test]
@@ -145,5 +165,16 @@ mod tests {
         // Java: init() stores it but does NOT consume → return false
         let consumed = step.set_parameter(&StepParameter::GotoLabelOnEnd("end".into()));
         assert!(!consumed);
+    }
+
+    #[test]
+    fn puts_fouler_into_box_on_execute() {
+        let mut step = StepEjectPlayer::new();
+        step.set_parameter(&StepParameter::GotoLabelOnEnd("end".into()));
+        let mut game = make_game_with_fouler("fouler1", PS_BANNED);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        let coord = game.field_model.player_coordinate("fouler1").expect("fouler should be boxed");
+        assert_eq!(coord.x, BAN_HOME_X, "banned fouler should land in ban box");
     }
 }

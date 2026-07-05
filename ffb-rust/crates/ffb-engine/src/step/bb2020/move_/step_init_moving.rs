@@ -17,8 +17,6 @@ use crate::step::framework::{StepAction, StepId, StepParameter};
 /// Init params: GOTO_LABEL_ON_END (mandatory).
 ///
 /// DEFERRED: UtilServerPlayerMove.isValidMove path validation not yet ported.
-/// DEFERRED: getMoveSquare → actingPlayer.setDodging/setGoingForIt not yet ported.
-/// DEFERRED: commitTargetSelection not yet ported.
 pub struct StepInitMoving {
     /// Java: fGotoLabelOnEnd
     pub goto_label_on_end: String,
@@ -186,6 +184,16 @@ impl StepInitMoving {
             if !FieldCoordinateBounds::FIELD.is_in_bounds(coordinate_to) {
                 return StepOutcome::cont();
             }
+            // Java: getMoveSquare → actingPlayer.setDodging/setGoingForIt
+            if let Some(ms) = game.field_model.get_move_square(coordinate_to) {
+                game.acting_player.dodging = ms.is_dodging() && !game.acting_player.jumping;
+                game.acting_player.goes_for_it = ms.is_going_for_it();
+            } else {
+                game.acting_player.dodging = false;
+                game.acting_player.goes_for_it = false;
+            }
+            // Java: commitTargetSelection()
+            game.field_model.target_selection_state.as_mut().map(|t| t.commit());
             game.acting_player.has_moved = true;
             game.turn_data_mut().turn_started = true;
             let player_action = game.acting_player.player_action;
@@ -238,6 +246,7 @@ impl StepInitMoving {
                     StepParameter::CoordinateFrom(coordinate_from),
                     StepParameter::CoordinateTo(coordinate_to),
                 ],
+                clear_stack: false,
             };
         }
         StepOutcome::cont()
@@ -326,5 +335,43 @@ mod tests {
         let out = step.handle_command(&crate::action::Action::EndTurn, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("end"));
+    }
+
+    #[test]
+    fn move_to_dodge_square_sets_dodging_flag() {
+        use ffb_model::types::MoveSquare;
+        let mut game = make_game();
+        let target = FieldCoordinate::new(5, 5);
+        game.field_model.add_move_square(MoveSquare::new(target, 3, 0));
+        let mut step = StepInitMoving::new("end".into());
+        step.move_stack = vec![target];
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.acting_player.dodging, "setDodging should be true");
+        assert!(!game.acting_player.goes_for_it);
+    }
+
+    #[test]
+    fn move_to_gfi_square_sets_goes_for_it_flag() {
+        use ffb_model::types::MoveSquare;
+        let mut game = make_game();
+        let target = FieldCoordinate::new(5, 5);
+        game.field_model.add_move_square(MoveSquare::new(target, 0, 2));
+        let mut step = StepInitMoving::new("end".into());
+        step.move_stack = vec![target];
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.acting_player.dodging);
+        assert!(game.acting_player.goes_for_it, "setGoingForIt should be true");
+    }
+
+    #[test]
+    fn commit_target_selection_called_on_move() {
+        use ffb_model::model::target_selection_state::TargetSelectionState;
+        let mut game = make_game();
+        let target = FieldCoordinate::new(5, 5);
+        game.field_model.target_selection_state = Some(TargetSelectionState::default());
+        let mut step = StepInitMoving::new("end".into());
+        step.move_stack = vec![target];
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.field_model.target_selection_state.as_ref().unwrap().is_committed());
     }
 }

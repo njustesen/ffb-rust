@@ -1,10 +1,291 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct StateMechanic;
+/// 1:1 translation of com.fumbbl.ffb.server.mechanic.StateMechanic (abstract base).
+///
+/// Java abstract class → Rust trait. Concrete edition implementations:
+///   bb2025::StateMechanic (BB2025), mixed::StateMechanic (BB2016/BB2020).
+///
+/// Java methods take `IStep` for report emission + game state access.
+/// In Rust the methods take `&mut Game` directly.
+/// DEFERRED (require IStep / report infra):
+///   - add_apothecaries / add_re_rolls (require InducementSet on TurnData)
+///   - report_injury (requires SkipInjuryParts / ReportInjury)
+///   - report emission inside update_leader_re_rolls_for_team / handle_pump_up
+use ffb_model::enums::LeaderState;
+use ffb_model::model::game::Game;
+use ffb_model::model::team::Team;
+use ffb_model::model::field_model::FieldModel;
+use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::inducement::usage::Usage;
+use crate::injury_result::InjuryResult;
 
-impl StateMechanic {
-    pub fn new() -> Self { Self }
+pub trait StateMechanic: Send + Sync {
+    // ── Abstract (edition-specific) ───────────────────────────────────────────
+
+    /// Java: updateLeaderReRollsForTeam(TurnData, Team, FieldModel, IStep).
+    /// `home_team` selects which TurnData + Team to use.
+    /// Returns Some(new_state) when the leader state changed (caller adds ReportLeader).
+    /// Returns None when no change.
+    fn update_leader_re_rolls_for_team(
+        &self,
+        game: &mut Game,
+        home_team: bool,
+    ) -> Option<LeaderState>;
+
+    /// Java: startHalf(IStep, int).
+    /// Mutates game state: half counter, turn numbers, home_playing, ball cleared,
+    /// leader state reset. DEFERRED: reports, add_apothecaries/re_rolls, skill resets.
+    fn start_half(&self, game: &mut Game, half: i32);
+
+    /// Java: reportInjury(IStep, InjuryResult).
+    /// DEFERRED: SkipInjuryParts, ReportInjury, ReportFactory infrastructure.
+    fn report_injury(&self, _game: &Game, _injury_result: &mut InjuryResult) {
+        // DEFERRED: implement when SkipInjuryParts + ReportInjury are translated
+    }
+
+    /// Java: handlePumpUp(IStep, InjuryResult).
+    /// Returns true if a pump-up re-roll was granted.
+    /// DEFERRED: report emission, mark_used call.
+    fn handle_pump_up(&self, game: &mut Game, injury_result: &InjuryResult) -> bool;
+
+    // ── Concrete helpers (shared, from base class) ────────────────────────────
+
+    /// Java: `addApothecaries(IStep, boolean)`.
+    /// Sets apothecaries from team, then adds wandering apothecaries and plague doctors
+    /// from InducementSet (if any).
+    ///
+    /// DEFERRED: report emission for wandering apo (requires step result infra).
+    fn add_apothecaries(&self, game: &mut Game, home_team: bool) {
+        if home_team {
+            let apo = game.team_home.apothecaries;
+            game.turn_data_home.apothecaries = apo;
+            let wandering = game.turn_data_home.inducement_set.get_inducements()
+                .into_iter()
+                .find(|ind| ind.has_usage(Usage::APOTHECARY))
+                .filter(|ind| ind.value > 0);
+            if let Some(w) = wandering {
+                game.turn_data_home.apothecaries += w.value;
+                game.turn_data_home.wandering_apothecaries = w.value;
+            }
+            let plague = game.turn_data_home.inducement_set.get_inducements()
+                .into_iter()
+                .find(|ind| ind.has_usage(Usage::APOTHECARY_JOURNEYMEN))
+                .filter(|ind| ind.value > 0);
+            if let Some(p) = plague {
+                game.turn_data_home.plague_doctors = p.value;
+            }
+        } else {
+            let apo = game.team_away.apothecaries;
+            game.turn_data_away.apothecaries = apo;
+            let wandering = game.turn_data_away.inducement_set.get_inducements()
+                .into_iter()
+                .find(|ind| ind.has_usage(Usage::APOTHECARY))
+                .filter(|ind| ind.value > 0);
+            if let Some(w) = wandering {
+                game.turn_data_away.apothecaries += w.value;
+                game.turn_data_away.wandering_apothecaries = w.value;
+            }
+            let plague = game.turn_data_away.inducement_set.get_inducements()
+                .into_iter()
+                .find(|ind| ind.has_usage(Usage::APOTHECARY_JOURNEYMEN))
+                .filter(|ind| ind.value > 0);
+            if let Some(p) = plague {
+                game.turn_data_away.plague_doctors = p.value;
+            }
+        }
+        // DEFERRED: ReportInducement emission (requires step result infra)
+    }
+
+    /// Java: `addReRolls(IStep, boolean)`.
+    /// Sets rerolls from team, then adds extra training re-rolls from InducementSet (if any).
+    ///
+    /// DEFERRED: report emission for extra training (requires step result infra).
+    fn add_re_rolls(&self, game: &mut Game, home_team: bool) {
+        if home_team {
+            let rr = game.team_home.rerolls;
+            game.turn_data_home.rerolls = rr;
+            let extra = game.turn_data_home.inducement_set.get_inducements()
+                .into_iter()
+                .find(|ind| ind.has_usage(Usage::REROLL))
+                .filter(|ind| ind.value > 0);
+            if let Some(e) = extra {
+                game.turn_data_home.rerolls += e.value;
+            }
+        } else {
+            let rr = game.team_away.rerolls;
+            game.turn_data_away.rerolls = rr;
+            let extra = game.turn_data_away.inducement_set.get_inducements()
+                .into_iter()
+                .find(|ind| ind.has_usage(Usage::REROLL))
+                .filter(|ind| ind.value > 0);
+            if let Some(e) = extra {
+                game.turn_data_away.rerolls += e.value;
+            }
+        }
+        // DEFERRED: ReportInducement emission (requires step result infra)
+    }
+
+    /// Java: resetSpecialSkillAtEndOfDrive(Game).
+    fn reset_special_skill_at_end_of_drive(&self, game: &mut Game) {
+        use ffb_model::enums::SkillUsageType;
+        for p in game.team_home.players.iter_mut().chain(game.team_away.players.iter_mut()) {
+            p.reset_used_skills(SkillUsageType::OncePerDrive);
+        }
+    }
+
+    // ── Shared utility ────────────────────────────────────────────────────────
+
+    /// True if any player from `team` is on the playing field (not in the box)
+    /// and has the `grantsTeamReRollWhenOnPitch` skill property.
+    fn team_has_leader_on_field(&self, team: &Team, field_model: &FieldModel) -> bool {
+        team.players.iter().any(|p| {
+            field_model
+                .player_coordinate(&p.id)
+                .map(|c| !c.is_box_coordinate())
+                .unwrap_or(false)
+                && p.has_skill_property(NamedProperties::GRANTS_TEAM_RE_ROLL_WHEN_ON_PITCH)
+        })
+    }
 }
 
-impl Default for StateMechanic {
-    fn default() -> Self { Self::new() }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::enums::{LeaderState, Rules};
+    use ffb_model::model::game::Game;
+    use ffb_model::types::FieldCoordinate;
+    use ffb_model::types::RSV_HOME_X;
+
+    struct TestMechanic;
+    impl StateMechanic for TestMechanic {
+        fn update_leader_re_rolls_for_team(&self, _g: &mut Game, _home: bool) -> Option<LeaderState> { None }
+        fn start_half(&self, _g: &mut Game, _half: i32) {}
+        fn handle_pump_up(&self, _g: &mut Game, _ir: &InjuryResult) -> bool { false }
+    }
+
+    fn make_game() -> Game {
+        Game::new(
+            crate::step::framework::test_team("home", 0),
+            crate::step::framework::test_team("away", 0),
+            Rules::Bb2025,
+        )
+    }
+
+    #[test]
+    fn report_injury_default_does_not_panic() {
+        let m = TestMechanic;
+        let g = make_game();
+        let mut ir = InjuryResult::new();
+        m.report_injury(&g, &mut ir);
+    }
+
+    #[test]
+    fn reset_special_skill_does_not_panic() {
+        let m = TestMechanic;
+        let mut g = make_game();
+        m.reset_special_skill_at_end_of_drive(&mut g);
+    }
+
+    #[test]
+    fn add_apothecaries_sets_from_team() {
+        let m = TestMechanic;
+        let mut g = make_game();
+        g.team_home.apothecaries = 2;
+        m.add_apothecaries(&mut g, true);
+        assert_eq!(g.turn_data_home.apothecaries, 2);
+    }
+
+    #[test]
+    fn add_apothecaries_away_team() {
+        let m = TestMechanic;
+        let mut g = make_game();
+        g.team_away.apothecaries = 1;
+        m.add_apothecaries(&mut g, false);
+        assert_eq!(g.turn_data_away.apothecaries, 1);
+    }
+
+    #[test]
+    fn add_re_rolls_sets_from_team() {
+        let m = TestMechanic;
+        let mut g = make_game();
+        g.team_home.rerolls = 3;
+        m.add_re_rolls(&mut g, true);
+        assert_eq!(g.turn_data_home.rerolls, 3);
+    }
+
+    #[test]
+    fn add_apothecaries_adds_wandering_from_inducement_set() {
+        use ffb_model::inducement::inducement::Inducement;
+        let m = TestMechanic;
+        let mut g = make_game();
+        g.team_home.apothecaries = 1;
+        // Add a wandering apothecary inducement
+        g.turn_data_home.inducement_set.add_inducement(
+            Inducement::new("wanderingApothecary", 1, vec![Usage::APOTHECARY])
+        );
+        m.add_apothecaries(&mut g, true);
+        assert_eq!(g.turn_data_home.apothecaries, 2);
+        assert_eq!(g.turn_data_home.wandering_apothecaries, 1);
+    }
+
+    #[test]
+    fn add_apothecaries_adds_plague_doctors() {
+        use ffb_model::inducement::inducement::Inducement;
+        let m = TestMechanic;
+        let mut g = make_game();
+        g.turn_data_home.inducement_set.add_inducement(
+            Inducement::new("plagueDoctor", 2, vec![Usage::APOTHECARY_JOURNEYMEN])
+        );
+        m.add_apothecaries(&mut g, true);
+        assert_eq!(g.turn_data_home.plague_doctors, 2);
+    }
+
+    #[test]
+    fn add_re_rolls_adds_extra_training() {
+        use ffb_model::inducement::inducement::Inducement;
+        let m = TestMechanic;
+        let mut g = make_game();
+        g.team_home.rerolls = 2;
+        g.turn_data_home.inducement_set.add_inducement(
+            Inducement::new("extraTraining", 1, vec![Usage::REROLL])
+        );
+        m.add_re_rolls(&mut g, true);
+        assert_eq!(g.turn_data_home.rerolls, 3);
+    }
+
+    #[test]
+    fn add_re_rolls_away_with_extra_training() {
+        use ffb_model::inducement::inducement::Inducement;
+        let m = TestMechanic;
+        let mut g = make_game();
+        g.team_away.rerolls = 1;
+        g.turn_data_away.inducement_set.add_inducement(
+            Inducement::new("extraTraining", 2, vec![Usage::REROLL])
+        );
+        m.add_re_rolls(&mut g, false);
+        assert_eq!(g.turn_data_away.rerolls, 3);
+    }
+
+    #[test]
+    fn team_has_leader_on_field_no_players() {
+        let m = TestMechanic;
+        let g = make_game();
+        assert!(!m.team_has_leader_on_field(&g.team_home, &g.field_model));
+    }
+
+    #[test]
+    fn team_has_leader_on_field_with_player_in_box() {
+        let m = TestMechanic;
+        let mut g = make_game();
+        // Box coordinate → not on field
+        g.field_model.set_player_coordinate("p1", FieldCoordinate::new(RSV_HOME_X, 1));
+        assert!(!m.team_has_leader_on_field(&g.team_home, &g.field_model));
+    }
+
+    #[test]
+    fn team_has_leader_on_field_no_leader_skill() {
+        let m = TestMechanic;
+        let mut g = make_game();
+        // Player on pitch but no leader skill
+        g.field_model.set_player_coordinate("p1", FieldCoordinate::new(8, 5));
+        assert!(!m.team_has_leader_on_field(&g.team_home, &g.field_model));
+    }
 }

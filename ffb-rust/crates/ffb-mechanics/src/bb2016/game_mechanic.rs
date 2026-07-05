@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use ffb_model::enums::{PlayerAction, TurnMode, Weather};
 use ffb_model::model::{Game, Player, PlayerStats, Roster, RosterPosition, Team, TeamResult};
+use ffb_model::util::util_player::UtilPlayer;
 use crate::mechanic::{Mechanic, MechanicType};
 use crate::game_mechanic::GameMechanic as GameMechanicTrait;
 
@@ -64,9 +65,8 @@ impl GameMechanicTrait for GameMechanic {
         None
     }
 
-    fn is_legal_concession(&self, _game: &Game, _team: &Team) -> bool {
-        // TODO: UtilPlayer::find_players_in_reserve_or_field(game, team).len() <= 2
-        false
+    fn is_legal_concession(&self, game: &Game, team: &Team) -> bool {
+        UtilPlayer::find_players_in_reserve_or_field(game, team).len() <= 2
     }
 
     fn fan_modification_name(&self) -> String { "Fan Factor".into() }
@@ -107,4 +107,63 @@ impl GameMechanicTrait for GameMechanic {
 
 impl GameMechanic {
     pub fn new() -> Self { GameMechanic }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::enums::{Weather, TurnMode};
+    use ffb_model::model::Team;
+    use crate::game_mechanic::GameMechanic as GameTrait;
+
+    fn bare_team(id: &str) -> Team {
+        Team {
+            id: id.into(), name: id.into(), race: "human".into(), roster_id: "human".into(), coach: "c".into(),
+            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0,
+            bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
+            fan_factor: 5, dedicated_fans: 0, team_value: 0, treasury: 0,
+            special_rules: vec![], players: vec![],
+        }
+    }
+
+    #[test]
+    fn concession_dialog_legal_has_two_messages() {
+        let msgs = GameMechanic.concession_dialog_messages(true);
+        assert_eq!(msgs.len(), 2);
+        assert!(msgs[0].contains("concede"));
+    }
+
+    #[test]
+    fn concession_dialog_illegal_has_four_messages() {
+        let msgs = GameMechanic.concession_dialog_messages(false);
+        assert_eq!(msgs.len(), 4);
+    }
+
+    #[test]
+    fn is_foul_always_allowed() {
+        assert!(GameMechanic.is_foul_action_allowed(TurnMode::Regular));
+        assert!(GameMechanic.is_foul_action_allowed(TurnMode::Blitz));
+    }
+
+    #[test]
+    fn fan_modification_name_is_fan_factor() {
+        assert_eq!(GameMechanic.fan_modification_name(), "Fan Factor");
+    }
+
+    #[test]
+    fn fans_returns_team_fan_factor() {
+        let team = bare_team("home");
+        assert_eq!(GameMechanic.fans(&team), 5);
+    }
+
+    #[test]
+    fn weather_description_nice_is_perfect() {
+        let desc = GameMechanic.weather_description(Weather::Nice);
+        assert!(desc.contains("Perfect"));
+    }
+
+    #[test]
+    fn roll_for_chef_at_start_of_half_is_true() {
+        assert!(GameMechanic.roll_for_chef_at_start_of_half());
+    }
 }

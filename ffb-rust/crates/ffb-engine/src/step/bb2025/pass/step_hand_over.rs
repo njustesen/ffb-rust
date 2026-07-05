@@ -1,3 +1,4 @@
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
@@ -81,11 +82,10 @@ impl StepHandOver {
             if tc.is_adjacent(cc) {
                 // Java: fieldModel.setBallCoordinate(catcherCoordinate)
                 game.field_model.ball_coordinate = Some(cc);
-                // Java: addReport(new ReportHandOver(fCatcherId)) — report infra not yet translated
-                // Java: publishParameter(CATCH_SCATTER_THROW_IN_MODE, CATCH_HAND_OFF)
-                outcome = outcome.publish(
-                    StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::CatchHandOff)
-                );
+                let from_id = game.acting_player.player_id.clone().unwrap_or_default();
+                outcome = outcome
+                    .with_event(GameEvent::HandOver { from_id, to_id: self.catcher_id.clone().unwrap_or_default() })
+                    .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::CatchHandOff));
             }
         }
 

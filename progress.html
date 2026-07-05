@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FFB Parity Dashboard</title>
+<style>
+  body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 1em; }
+  h1 { color: #569cd6; }
+  table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+  th, td { border: 1px solid #444; padding: 4px 8px; text-align: left; }
+  th { background: #2d2d2d; color: #9cdcfe; }
+  tr.match td { background: #1a3a1a; }
+  tr.fail td { background: #3a1a1a; }
+  .banner { background: #2d2d2d; border-left: 4px solid #569cd6; padding: 0.5em 1em; margin-bottom: 1em; }
+</style>
+</head>
+<body>
+<h1>FFB Parity Dashboard</h1>
+<div class="banner" id="focus">Parity testing in progress...</div>
+<table>
+<thead>
+<tr>
+  <th>Seed</th><th>Matchup</th><th>Java Events</th><th>Rust Events</th>
+  <th>Status</th><th>Java Hash</th><th>Rust Hash</th>
+</tr>
+</thead>
+<tbody>
+<!-- seed-row-1 --><tr class="match"><td>1</td><td>lineman vs lineman</td><td>282</td><td>282</td><td>MATCH</td><td title="830dbccc0d8e0b02">830dbccc</td><td title="830dbccc0d8e0b02">830dbccc</td></tr>
+<!-- seed-row-2 --><tr class="match"><td>2</td><td>lineman vs lineman</td><td>282</td><td>282</td><td>MATCH</td><td title="e962040f042bb35e">e962040f</td><td title="e962040f042bb35e">e962040f</td></tr>
+<!-- seed-row-3 --><tr class="match"><td>3</td><td>lineman vs lineman</td><td>241</td><td>241</td><td>MATCH</td><td title="d15eadbb4a213cf2">d15eadbb</td><td title="d15eadbb4a213cf2">d15eadbb</td></tr>
+<!-- seed-row-4 --><tr class="match"><td>4</td><td>lineman vs lineman</td><td>318</td><td>318</td><td>MATCH</td><td title="ef7bcfc9608e568f">ef7bcfc9</td><td title="ef7bcfc9608e568f">ef7bcfc9</td></tr>
+<!-- seed-row-5 --><tr class="match"><td>5</td><td>lineman vs lineman</td><td>272</td><td>272</td><td>MATCH</td><td title="8cf084b28e79f5c7">8cf084b2</td><td title="8cf084b28e79f5c7">8cf084b2</td></tr>
+<!-- seed-row-6 --><tr class="match"><td>6</td><td>lineman vs lineman</td><td>270</td><td>270</td><td>MATCH</td><td title="23b38cad66c6c4dc">23b38cad</td><td title="23b38cad66c6c4dc">23b38cad</td></tr>
+<!-- seed-row-7 --><tr class="match"><td>7</td><td>lineman vs lineman</td><td>299</td><td>299</td><td>MATCH</td><td title="bcca9fbf6b961da3">bcca9fbf</td><td title="bcca9fbf6b961da3">bcca9fbf</td></tr>
+<!-- seed-row-8 --><tr class="fail"><td>8</td><td>lineman vs lineman</td><td>260</td><td>273</td><td>FAIL</td><td title="7b900017cf1e2715">7b900017</td><td title="ac1870721b747aee">ac187072</td></tr>
+</tbody>
+</table>
+</body>
+</html>

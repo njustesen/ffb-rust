@@ -1,4 +1,5 @@
 use ffb_model::enums::ApothecaryMode;
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::util::rng::GameRng;
@@ -77,8 +78,7 @@ impl StepThrowARock {
         let roll = rng.d6();
         let successful = roll >= 4;
 
-        // Java: addReport(new ReportThrowAtPlayer(player.getId(), roll, successful))
-        // Events not yet tracked for this step.
+        let throw_event = GameEvent::ThrowAtPlayer { player_id: target_id.clone(), roll, successful };
 
         // Java: FieldCoordinate startCoordinate (animation origin — not tracked in Rust)
         // Java: UtilServerGame.syncGameModel(this)
@@ -114,10 +114,11 @@ impl StepThrowARock {
             // Java: publishParameter(new StepParameter(STEADY_FOOTING_CONTEXT, new SteadyFootingContext(dropPlayerContext)))
             let ctx = SteadyFootingContext::from_drop_player(dpc);
             return StepOutcome::next()
+                .with_event(throw_event)
                 .publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
         }
 
-        StepOutcome::next()
+        StepOutcome::next().with_event(throw_event)
     }
 }
 
@@ -145,6 +146,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         }
     }
 

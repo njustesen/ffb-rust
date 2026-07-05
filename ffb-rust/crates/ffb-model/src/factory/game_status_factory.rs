@@ -14,3 +14,19 @@ impl GameStatusFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_status() {
+        assert_eq!(GameStatusFactory::default().for_name("active"), Some(GameStatus::Active));
+        assert_eq!(GameStatusFactory::default().for_name("scheduled"), Some(GameStatus::Scheduled));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(GameStatusFactory::default().for_name("invalid"), None);
+    }
+}

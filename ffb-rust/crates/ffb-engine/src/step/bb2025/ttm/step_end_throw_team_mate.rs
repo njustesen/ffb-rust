@@ -64,7 +64,8 @@ impl Step for StepEndThrowTeamMate {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
-            Action::SelectPlayer { .. } => {
+            Action::SelectPlayer { ..
+} => {
                 // Java: CLIENT_ACTING_PLAYER → push Select sequence → NEXT_STEP_AND_REPEAT (SKIP_STEP)
                 let seq = Select::build_sequence(&SelectParams { update_persistence: false, is_blitz_move: false });
                 return StepOutcome {
@@ -74,6 +75,7 @@ impl Step for StepEndThrowTeamMate {
                     pushes: vec![seq],
                     published: vec![],
                     prompt: None,
+                    clear_stack: false,
                 };
             }
             _ => {}

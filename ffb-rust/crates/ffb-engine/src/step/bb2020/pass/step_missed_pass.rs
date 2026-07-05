@@ -94,21 +94,21 @@ impl Step for StepMissedPass {
         //   if used → passState.setUsingBlastIt(true)
         //   if neverUse → passState.setUsingBlastIt(false)
         // DEFERRED(pass-state): PassState.setUsingBlastIt — PassState not yet translated (lives in GameState).
-        // DEFERRED(report): ReportSkillUse — report infrastructure not yet translated.
-        match action {
+        let skill_event = match action {
             Action::UseSkill { skill_id, use_skill } => {
                 self.do_roll = *use_skill;
                 self.re_rolling = true;
+                let player_id = game.acting_player.player_id.clone().unwrap_or_default();
                 if *use_skill {
                     // Java: markSkillUsed(playerId, skill) — inserts into player.used_skills
-                    if let Some(pid) = game.acting_player.player_id.clone() {
-                        game.mark_skill_used(&pid, *skill_id);
-                    }
+                    game.mark_skill_used(&player_id, *skill_id);
                 }
+                Some(GameEvent::SkillUse { player_id, skill_id: *skill_id as u16, used: *use_skill })
             }
-            _ => {}
-        }
-        self.execute_step(game, rng)
+            _ => None,
+        };
+        let out = self.execute_step(game, rng);
+        if let Some(ev) = skill_event { out.with_event(ev) } else { out }
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {

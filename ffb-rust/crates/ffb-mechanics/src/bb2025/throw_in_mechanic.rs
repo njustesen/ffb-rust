@@ -90,3 +90,34 @@ impl ThrowInMechanic {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::throw_in_mechanic::ThrowInMechanic as ThrowInTrait;
+
+    #[test]
+    fn distance_sums_two_dice() {
+        assert_eq!(ThrowInMechanic.distance(&[2, 5]), 7);
+    }
+
+    #[test]
+    fn is_corner_throw_in_for_corner_coords() {
+        assert!(ThrowInMechanic.is_corner_throw_in(FieldCoordinate::new(0, 0)));
+        assert!(ThrowInMechanic.is_corner_throw_in(FieldCoordinate::new(25, 14)));
+        assert!(!ThrowInMechanic.is_corner_throw_in(FieldCoordinate::new(0, 7)));
+    }
+
+    #[test]
+    fn corner_northwest_roll_1_is_east() {
+        let dir = ThrowInMechanic.interpret_throw_in_direction_roll(FieldCoordinate::new(0, 0), 1);
+        assert_eq!(dir, Direction::East);
+    }
+
+    #[test]
+    fn sideline_south_roll_3_is_east() {
+        // y < 1 → template South; roll 1 or 2 → Southeast, 3 or 4 → South, 5 or 6 → Southwest
+        let dir = ThrowInMechanic.interpret_throw_in_direction_roll(FieldCoordinate::new(12, 0), 3);
+        assert_eq!(dir, Direction::South);
+    }
+}

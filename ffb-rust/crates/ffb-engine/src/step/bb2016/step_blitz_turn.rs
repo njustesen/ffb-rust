@@ -2,10 +2,13 @@ use ffb_model::enums::TurnMode;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
+use crate::mechanic::mixed::setup_mechanic::SetupMechanic;
+use crate::mechanic::setup_mechanic::SetupMechanic as SetupMechanicTrait;
 use crate::step::framework::{Step, StepOutcome, SequenceStep};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::bb2016::Select;
 use crate::step::generator::bb2016::select::SelectParams;
+use crate::util::util_server_game::UtilServerGame;
 
 /// Executes the Charge/Blitz! kickoff result turn (BB2016).
 ///
@@ -13,7 +16,6 @@ use crate::step::generator::bb2016::select::SelectParams;
 ///  - Entry 1 (non-BLITZ): pin players, set TurnMode=BLITZ, push self + Select onto stack.
 ///  - Entry 2 (BLITZ): if fEndTurn → set TurnMode=KICKOFF; NEXT_STEP.
 ///
-/// `pinPlayersInTacklezones` and `startTurn` are TODO stubs.
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2016.StepBlitzTurn`.
 pub struct StepBlitzTurn {
     /// Java: fEndTurn
@@ -57,16 +59,21 @@ impl StepBlitzTurn {
             StepOutcome::next()
         } else {
             // First entry: set up the blitz turn.
-            // DEFERRED(SetupMechanic): pinPlayersInTacklezones not yet ported
+            let blitzing_team_id = if game.home_playing {
+                game.team_home.id.clone()
+            } else {
+                game.team_away.id.clone()
+            };
+            SetupMechanic::new().pin_players_in_tacklezones_chain(game, &blitzing_team_id, true);
             game.turn_mode = TurnMode::Blitz;
             // DEFERRED(timer): UtilServerTimer.stopTurnTimer / startTurnTimer not yet ported
-            // DEFERRED(startTurn): game.startTurn() not yet ported
+            game.start_turn();
 
             // Java: pushCurrentStepOnStack() — push self back; then push Select on top.
             // Push order: self first (bottom), Select on top (runs first).
             let self_seq = vec![SequenceStep::new(StepId::BlitzTurn)];
             let select_seq = Select::build_sequence(&SelectParams { update_persistence: true });
-            // DEFERRED(UtilServerGame): updatePlayerStateDependentProperties not yet ported
+            UtilServerGame::update_player_state_dependent_properties(game);
             StepOutcome::next()
                 .push_seq(self_seq)
                 .push_seq(select_seq)

@@ -21,3 +21,23 @@ impl IDialogParameter for DialogConfirmEndActionParameter {
     fn get_id(&self) -> DialogId { DialogId::CONFIRM_END_ACTION }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::enums::PlayerAction;
+
+    #[test]
+    fn dialog_id_is_confirm_end_action() {
+        assert_eq!(DialogConfirmEndActionParameter::default().get_id(), DialogId::CONFIRM_END_ACTION);
+    }
+
+    #[test]
+    fn set_team_id_and_player_action() {
+        let mut p = DialogConfirmEndActionParameter::default();
+        p.set_team_id("team1");
+        p.set_player_action(PlayerAction::Move);
+        assert_eq!(p.get_team_id(), Some("team1"));
+        assert_eq!(p.get_player_action(), Some(PlayerAction::Move));
+    }
+}

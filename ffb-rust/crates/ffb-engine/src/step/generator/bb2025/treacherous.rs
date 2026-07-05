@@ -58,4 +58,24 @@ mod tests {
         let t = steps.iter().find(|s| s.step_id == StepId::Treacherous).unwrap();
         assert_eq!(t.label.as_deref(), Some(labels::END));
     }
+
+    #[test]
+    fn failure_label_wired_to_treacherous_step() {
+        let steps = Treacherous::build_sequence(&TreacherousParams { failure_label: "MY_END".into() });
+        let t = steps.iter().find(|s| s.step_id == StepId::Treacherous).unwrap();
+        assert!(t.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "MY_END")));
+    }
+
+    #[test]
+    fn first_step_is_jump_up() {
+        let steps = Treacherous::build_sequence(&TreacherousParams::default());
+        assert_eq!(steps[0].step_id, StepId::JumpUp);
+    }
+
+    #[test]
+    fn contains_apothecary_step_with_defender_mode() {
+        let steps = Treacherous::build_sequence(&TreacherousParams::default());
+        let apo = steps.iter().find(|s| s.step_id == StepId::Apothecary).unwrap();
+        assert!(apo.params.iter().any(|p| matches!(p, StepParameter::ApothecaryMode(ApothecaryMode::Defender))));
+    }
 }

@@ -120,4 +120,18 @@ mod tests {
         assert!(step.set_parameter(&StepParameter::GotoLabelOnFailure("x".into())));
         assert_eq!(step.goto_label_on_failure, "x");
     }
+
+    #[test]
+    fn set_parameter_interceptor_id_accepted() {
+        let mut step = StepIntercept::new();
+        assert!(step.set_parameter(&StepParameter::InterceptorId(Some("p1".into()))));
+        assert_eq!(step.interceptor_id.as_deref(), Some("p1"));
+    }
+
+    #[test]
+    fn set_parameter_interceptor_id_none_accepted() {
+        let mut step = StepIntercept::new();
+        assert!(step.set_parameter(&StepParameter::InterceptorId(None)));
+        assert!(step.interceptor_id.is_none());
+    }
 }

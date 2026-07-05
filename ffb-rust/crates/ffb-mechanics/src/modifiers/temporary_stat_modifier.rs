@@ -27,3 +27,28 @@ impl TemporaryStatModifier {
 
     pub fn get_limit(&self) -> &PlayerStatLimit { &self.limit }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn apply_fn_is_called_with_value() {
+        let m = TemporaryStatModifier::new(PlayerStatKey::MA, PlayerStatLimit::new(1, 9), |v| v + 2);
+        assert_eq!(m.apply(4), 6);
+    }
+
+    #[test]
+    fn applies_to_matching_stat() {
+        let m = TemporaryStatModifier::new(PlayerStatKey::ST, PlayerStatLimit::new(1, 9), |v| v);
+        assert!(m.applies_to(PlayerStatKey::ST));
+        assert!(!m.applies_to(PlayerStatKey::MA));
+    }
+
+    #[test]
+    fn get_limit_returns_correct_bounds() {
+        let m = TemporaryStatModifier::new(PlayerStatKey::AV, PlayerStatLimit::new(2, 13), |v| v);
+        assert_eq!(m.get_limit().get_min(), 2);
+        assert_eq!(m.get_limit().get_max(), 13);
+    }
+}

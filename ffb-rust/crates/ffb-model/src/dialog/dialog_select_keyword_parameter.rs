@@ -25,3 +25,18 @@ impl IDialogParameter for DialogSelectKeywordParameter {
     fn get_id(&self) -> DialogId { DialogId::SELECT_KEYWORD }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_select_keyword() {
+        assert_eq!(DialogSelectKeywordParameter::default().get_id(), DialogId::SELECT_KEYWORD);
+    }
+    #[test]
+    fn stores_min_max_select() {
+        let p = DialogSelectKeywordParameter { min_select: 1, max_select: 3, ..Default::default() };
+        assert_eq!(p.get_min_select(), 1);
+        assert_eq!(p.get_max_select(), 3);
+    }
+}

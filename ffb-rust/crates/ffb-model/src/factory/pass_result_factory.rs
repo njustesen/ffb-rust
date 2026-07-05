@@ -14,3 +14,20 @@ impl PassResultFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_result() {
+        let f = PassResultFactory::default();
+        assert_eq!(f.for_name("complete"), Some(PassResult::Complete));
+        assert_eq!(f.for_name("fumble"), Some(PassResult::Fumble));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(PassResultFactory::default().for_name("invalid"), None);
+    }
+}

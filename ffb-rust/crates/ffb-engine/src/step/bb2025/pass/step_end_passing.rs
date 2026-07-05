@@ -1,9 +1,11 @@
-use ffb_model::enums::{PassingDistance, PlayerAction};
+use ffb_model::enums::{PassingDistance, PlayerAction, TurnMode};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
+use crate::mechanic::spp_calc::SppCalc;
 use crate::step::util_server_steps::check_touchdown;
+use crate::util::util_server_player_move::UtilServerPlayerMove;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -20,7 +22,7 @@ use crate::step::generator::bb2025::pass::{Pass, PassParams};
 ///  • EndPlayerAction + bomb → EndPlayerAction generator (feeding_allowed=true, end_player_action=true, end_turn).
 ///  • BloodLust action       → Move generator (not yet fully wired — ActingPlayer.suffering_blood_lust not translated).
 ///  • Bomb turn              → Bomb generator.
-///  • Animosity re-try       → Pass generator (not yet fully wired — ActingPlayer.suffering_animosity not translated).
+///  • Animosity re-try       → Pass generator.
 ///  • Otherwise: compute SPP (completions/catches — TODO: SppMechanic), determine whether
 ///    turn/player-action ends, and push EndPlayerAction or Move generator.
 pub struct StepEndPassing {
@@ -188,15 +190,56 @@ impl StepEndPassing {
 
         // Java path 4: animosity re-try → Pass generator
         // Java: actingPlayer.isSufferingAnimosity() && !fEndPlayerAction && game.getPassCoordinate() == null
-        // DEFERRED: actingPlayer.is_suffering_animosity() — not yet translated in ActingPlayer
-        // Stub: if pass_coordinate is None and end_player_action is false, treat as animosity re-try
-        // This matches Java's guard: "failed animosity may try to choose a new target"
-        // Conservative: only trigger if no coordinate set (pass was never aimed)
-        // (Full implementation requires ActingPlayer.is_suffering_animosity)
+        if game.acting_player.suffering_animosity
+            && !self.end_player_action
+            && game.pass_coordinate.is_none()
+        {
+            let seq = Pass::build_sequence(&PassParams::default());
+            return StepOutcome::next().push_seq(seq);
+        }
 
-        // Java: SPP completions / catches
-        // DEFERRED: SppMechanic.addCatch, SppMechanic.addCompletion, throwerResult.setPassing(deltaX)
-        // These require GameResult/PlayerResult + SppMechanic translation.
+        // Java: completions SPP and passing yards — accurate, non-intercepted pass.
+        if self.pass_accurate && !self.pass_fumble && self.interceptor_id.is_none()
+            && !game.acting_player.suffering_animosity
+        {
+            if let Some(ref thrower_id) = game.thrower_id.clone() {
+                let is_home = game.team_home.has_player(thrower_id);
+                let thrower_team_id = if is_home {
+                    game.team_home.id.clone()
+                } else {
+                    game.team_away.id.clone()
+                };
+                // Java: spp.addCompletion(prayerState.getAdditionalCompletionSppTeams(), throwerResult)
+                let has_prayer_bonus = game.prayer_state
+                    .get_additional_completion_spp_teams()
+                    .contains(&thrower_team_id);
+                let team_result = if is_home { &mut game.game_result.home } else { &mut game.game_result.away };
+                let pr = team_result.player_results.entry(thrower_id.clone()).or_default();
+                pr.completions += 1;
+                pr.spp_gained += SppCalc::completion_spp();
+                if has_prayer_bonus {
+                    pr.completions_with_additional_spp += 1;
+                    pr.spp_gained += SppCalc::additional_spp(game.rules);
+                }
+                // Java: deltaX = endCoord.x - startCoord.x (east=forward), reversed for dump-off
+                if let (Some(thrower_coord), Some(end_coord)) = (
+                    game.field_model.player_coordinate(thrower_id),
+                    game.pass_coordinate,
+                ) {
+                    let east_is_forward = if game.turn_mode == TurnMode::DumpOff {
+                        !game.home_playing
+                    } else {
+                        game.home_playing
+                    };
+                    let delta_x = if east_is_forward {
+                        end_coord.x - thrower_coord.x
+                    } else {
+                        thrower_coord.x - end_coord.x
+                    };
+                    pr.passing += delta_x;
+                }
+            }
+        }
 
         // Java path 5 (main branch): determine end_turn from thrower == actingPlayer
         // Java: boolean throwerIsActingPlayer = game.getThrower() == actingPlayer.getPlayer()
@@ -210,9 +253,10 @@ impl StepEndPassing {
             //   || (catcher == null && !actingPlayer.isSufferingAnimosity() && !actingPlayer.isSufferingBloodLust() && actingPlayer.hasPassed())
             //   || UtilPlayer.findOtherTeam(game, game.getThrower()).hasPlayer(catcher) && !actingPlayer.isSufferingBloodLust()
             //   || fPassFumble)
-            // Java also: isSufferingAnimosity, isSufferingBloodLust, hasPassed — not yet wired
+            let no_suffering = !game.acting_player.suffering_animosity
+                && !game.acting_player.suffering_blood_lust;
             self.end_turn |= check_touchdown(game)
-                || self.catcher_id.is_none()
+                || (self.catcher_id.is_none() && no_suffering && game.acting_player.has_passed)
                 || self.pass_fumble;
             // Java: endGenerator.pushSequence(new EndPlayerAction.SequenceParams(gs, true, fEndPlayerAction, fEndTurn))
             let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
@@ -231,8 +275,12 @@ impl StepEndPassing {
             // Java: if (!isBomb && state.isInterceptionSuccessful() && !ballWasSnatched)
             //           field.setBallCoordinate(interceptorCoordinate); field.setBallMoving(false)
             // Java: game.setDefenderAction(null) -- reset dump-off action
-            // DEFERRED: GameResult/PlayerResult.set_interceptions — not yet wired
             if let Some(ref interceptor_id) = self.interceptor_id.clone() {
+                // Java: catcherResult.setInterceptions(+1)
+                let is_home = game.team_home.player(interceptor_id).is_some();
+                game.game_result.team_result_mut(is_home)
+                    .player_result_mut(interceptor_id)
+                    .interceptions += 1;
                 if let Some(coord) = game.field_model.player_coordinate(interceptor_id) {
                     if !is_bomb {
                         game.field_model.ball_coordinate = Some(coord);
@@ -273,10 +321,10 @@ impl StepEndPassing {
         // Java: UtilServerGame.changeActingPlayer(this, actingPlayerId, PlayerAction.MOVE, actingPlayer.isJumping())
         // Java: UtilServerPlayerMove.updateMoveSquares(getGameState(), actingPlayer.isJumping())
         // Java: moveGenerator.pushSequence(new Move.SequenceParams(getGameState()))
-        // DEFERRED: changeActingPlayer, updateMoveSquares — require more Game infrastructure
         if game.acting_player.player_id.is_some() {
             game.acting_player.player_action = Some(PlayerAction::Move);
         }
+        UtilServerPlayerMove::update_move_squares(game, game.acting_player.jumping);
         let seq = Move::build_sequence(&MoveParams::default());
         StepOutcome::next().push_seq(seq)
     }
@@ -569,5 +617,87 @@ mod tests {
         step.bloodlust_action = Some(PlayerAction::Move);
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.acting_player.has_passed);
+    }
+
+    fn make_game_with_home_thrower(thrower_id: &str) -> Game {
+        let mut game = make_game();
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: thrower_id.into(), nr: 1, name: thrower_id.into(),
+            position_id: "pos".into(),
+            player_type: ffb_model::enums::PlayerType::Regular,
+            gender: ffb_model::enums::PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.thrower_id = Some(thrower_id.into());
+        game.acting_player.player_id = Some(thrower_id.into());
+        game
+    }
+
+    #[test]
+    fn accurate_pass_awards_completion_spp() {
+        let mut game = make_game_with_home_thrower("t1");
+        let mut step = StepEndPassing::new();
+        step.pass_accurate = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        let pr = game.game_result.home.player_results.get("t1").unwrap();
+        assert_eq!(pr.completions, 1);
+        assert_eq!(pr.spp_gained, 1);
+    }
+
+    #[test]
+    fn prayer_spp_grants_extra_spp_and_increments_counter() {
+        let mut game = make_game_with_home_thrower("t1");
+        game.prayer_state.add_get_additional_completion_spp(&game.team_home.id.clone());
+        let mut step = StepEndPassing::new();
+        step.pass_accurate = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        let pr = game.game_result.home.player_results.get("t1").unwrap();
+        assert_eq!(pr.completions_with_additional_spp, 1);
+        assert_eq!(pr.spp_gained, 2);
+    }
+
+    #[test]
+    fn passing_yards_calculated_on_accurate_pass() {
+        let mut game = make_game_with_home_thrower("t1");
+        game.field_model.set_player_coordinate("t1", ffb_model::types::FieldCoordinate::new(5, 7));
+        game.pass_coordinate = Some(ffb_model::types::FieldCoordinate::new(12, 7));
+        game.home_playing = true;
+        let mut step = StepEndPassing::new();
+        step.pass_accurate = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        let pr = game.game_result.home.player_results.get("t1").unwrap();
+        assert_eq!(pr.passing, 7);
+    }
+
+    #[test]
+    fn interception_increments_player_result() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+
+        // Thrower on home team; interceptor on away team (inactive)
+        let mut game = make_game_with_home_thrower("thrower");
+        game.home_playing = true;
+        // Distinct acting player (thrower) — set up so thrower_is_acting is false
+        // For path 6 (interception dump-off): thrower != acting player
+        game.acting_player.player_id = Some("other".into());
+        let interceptor_id = "interceptor".to_string();
+        game.team_away.players.push(Player {
+            id: interceptor_id.clone(), name: "ic".into(), nr: 2, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        let mut step = StepEndPassing::new();
+        step.interceptor_id = Some(interceptor_id.clone());
+        step.start(&mut game, &mut GameRng::new(0));
+        let pr = game.game_result.away.player_results.get(&interceptor_id).unwrap();
+        assert_eq!(pr.interceptions, 1);
     }
 }

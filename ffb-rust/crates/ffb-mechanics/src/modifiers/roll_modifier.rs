@@ -39,3 +39,30 @@ impl Default for RollModifier {
         RollModifier::new("", 0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_stores_name_and_modifier() {
+        let m = RollModifier::new("Block", 1);
+        assert_eq!(m.name, "Block");
+        assert_eq!(m.get_modifier(), 1);
+        assert!(!m.is_modifier_included());
+    }
+
+    #[test]
+    fn with_report_sets_all_fields() {
+        let m = RollModifier::with_report("Block", "Blocked!", 2, true);
+        assert_eq!(m.get_report_string(), "Blocked!");
+        assert_eq!(m.get_modifier(), 2);
+        assert!(m.is_modifier_included());
+    }
+
+    #[test]
+    fn get_multiplier_equals_modifier() {
+        let m = RollModifier::new("x", 3);
+        assert_eq!(m.get_multiplier(), 3);
+    }
+}

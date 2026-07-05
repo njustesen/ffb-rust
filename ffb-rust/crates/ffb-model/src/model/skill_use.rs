@@ -205,3 +205,25 @@ impl SkillUse {
         ]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_name_returns_camel_case() {
+        assert_eq!(SkillUse::WOULD_NOT_HELP.get_name(), "wouldNotHelp");
+    }
+
+    #[test]
+    fn for_name_case_insensitive() {
+        assert_eq!(SkillUse::for_name("wouldNotHelp"), Some(SkillUse::WOULD_NOT_HELP));
+        assert_eq!(SkillUse::for_name("WOULDNOTHELP"), Some(SkillUse::WOULD_NOT_HELP));
+        assert_eq!(SkillUse::for_name("invalid"), None);
+    }
+
+    #[test]
+    fn get_description_returns_non_empty() {
+        assert!(!SkillUse::WOULD_NOT_HELP.get_description().is_empty());
+    }
+}

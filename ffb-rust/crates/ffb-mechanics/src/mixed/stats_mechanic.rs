@@ -60,3 +60,47 @@ impl StatsMechanicTrait for StatsMechanic {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::enums::PlayerStatKey;
+    use crate::stats_mechanic::StatsMechanic as StatsTrait;
+
+    #[test]
+    fn draw_passing_is_true() {
+        assert!(StatsMechanic.draw_passing());
+    }
+
+    #[test]
+    fn stat_suffix_is_plus() {
+        assert_eq!(StatsMechanic.stat_suffix(), "+");
+    }
+
+    #[test]
+    fn improvement_increases_value_is_false() {
+        assert!(!StatsMechanic.improvement_increases_value());
+    }
+
+    #[test]
+    fn apply_in_game_agility_injury_increments_in_mixed() {
+        // mixed uses inverse agility — injury increases the stored value
+        assert_eq!(StatsMechanic.apply_in_game_agility_injury(3, 1), 4);
+    }
+
+    #[test]
+    fn apply_lasting_injury_increments_ag_capped_at_6() {
+        assert_eq!(StatsMechanic.apply_lasting_injury(5, PlayerStatKey::Ag), 6);
+        assert_eq!(StatsMechanic.apply_lasting_injury(6, PlayerStatKey::Ag), 6);
+    }
+
+    #[test]
+    fn apply_lasting_injury_decrements_ma() {
+        assert_eq!(StatsMechanic.apply_lasting_injury(5, PlayerStatKey::Ma), 4);
+    }
+
+    #[test]
+    fn stat_can_be_reduced_always_true() {
+        assert!(StatsMechanic.stat_can_be_reduced_by_injury(5, 5));
+    }
+}

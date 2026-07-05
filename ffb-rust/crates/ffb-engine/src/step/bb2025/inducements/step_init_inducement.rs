@@ -53,8 +53,15 @@ impl Step for StepInitInducement {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // DEFERRED: handle CLIENT_USE_INDUCEMENT command once Action::UseInducement is ported.
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: CLIENT_USE_INDUCEMENT — store inducement type for routing in execute_step.
+        if let Action::UseInducement { inducement_type, card_id: _, player_ids: _ } = action {
+            if let Some(itype) = inducement_type {
+                self.inducement_type = Some(itype.clone());
+                self.end_inducement_phase = false;
+                return self.execute_step(game, rng);
+            }
+        }
         self.end_inducement_phase = true;
         self.execute_step(game, rng)
     }

@@ -1,10 +1,10 @@
 use crate::skill_behaviour::SkillBehaviour;
+use ffb_model::model::player::Player;
+use ffb_model::model::roster_position::RosterPosition;
 
-/// Handles movement stat increase on level-up.
-/// Mirrors Java `com.fumbbl.ffb.server.skillbehaviour.bb2016.MovementIncreaseBehaviour`.
+/// 1:1 translation of `com.fumbbl.ffb.server.skillbehaviour.bb2016.MovementIncreaseBehaviour`.
 ///
-/// Player modifier only: `player.setMovement(min(min(10, position.getMovement()+2), player.getMovement()+1))`.
-/// No step-hook logic — `execute_step_hook` is a no-op.
+/// Java: `registerModifier(player -> player.setMovement(min(min(10, pos.getMovement()+2), player.getMovement()+1)))`.
 pub struct MovementIncreaseBehaviour;
 
 impl MovementIncreaseBehaviour {
@@ -18,26 +18,50 @@ impl Default for MovementIncreaseBehaviour {
 impl SkillBehaviour for MovementIncreaseBehaviour {
     fn name(&self) -> &'static str { "MovementIncreaseBehaviour" }
 
-    /// No-op: MovementIncreaseBehaviour is a player-modifier-only behaviour.
-    /// The Java class only overrides `getPlayerModifiers()`, not `handleExecuteStepHook`.
-    fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
-        false
+    fn apply_modifier(&self, player: &mut Player, position: &RosterPosition) {
+        player.movement = (position.movement + 2).min(10).min(player.movement + 1);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ffb_model::model::roster_position::RosterPosition;
 
-    #[test]
-    fn name_returns_correct_string() {
-        let b = MovementIncreaseBehaviour::new();
-        assert_eq!(b.name(), "MovementIncreaseBehaviour");
+    fn pos(movement: i32) -> RosterPosition {
+        RosterPosition { movement, strength: 3, agility: 3, passing: 0, armour: 8, ..Default::default() }
     }
 
     #[test]
-    fn default_has_correct_name() {
-        let b = MovementIncreaseBehaviour::default();
-        assert_eq!(b.name(), "MovementIncreaseBehaviour");
+    fn apply_increases_by_one() {
+        let b = MovementIncreaseBehaviour::new();
+        let p_pos = pos(6);
+        let mut player = Player { movement: 6, ..Default::default() };
+        b.apply_modifier(&mut player, &p_pos);
+        assert_eq!(player.movement, 7);
+    }
+
+    #[test]
+    fn apply_capped_at_ten() {
+        let b = MovementIncreaseBehaviour::new();
+        let p_pos = pos(9);
+        let mut player = Player { movement: 10, ..Default::default() };
+        b.apply_modifier(&mut player, &p_pos);
+        assert_eq!(player.movement, 10);
+    }
+
+    #[test]
+    fn apply_capped_by_position_plus_two() {
+        // pos.ma=6, cap=8; player.ma=8 → min(8, 9) = 8 (no change)
+        let b = MovementIncreaseBehaviour::new();
+        let p_pos = pos(6);
+        let mut player = Player { movement: 8, ..Default::default() };
+        b.apply_modifier(&mut player, &p_pos);
+        assert_eq!(player.movement, 8);
+    }
+
+    #[test]
+    fn name_is_correct() {
+        assert_eq!(MovementIncreaseBehaviour::new().name(), "MovementIncreaseBehaviour");
     }
 }

@@ -12,11 +12,12 @@
 ///   - Next step always.
 ///
 /// Java fields: `catcherId`, `playerId`, `playerIds`, `useSkill`.
-/// Injury pipeline / UtilServerInjury not yet fully ported — stubbed.
 ///
 /// Java: `StepQuickBite extends AbstractStep` (mixed, BB2020 + BB2025).
 use ffb_model::model::game::Game;
+use ffb_model::model::property::NamedProperties;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -42,14 +43,57 @@ impl StepQuickBite {
         }
     }
 
-    fn execute_step(&mut self, _game: &mut Game) -> StepOutcome {
-        // Java: full logic requires UtilPlayer.findAdjacentOpposingPlayersWithProperty,
-        //   UtilServerInjury.handleInjury, and dialog utilities.
-        // DEFERRED(skill/injury port):
-        //   1. Find adjacent opponents with canAttackOpponentForBallAfterCatch
-        //   2. Show appropriate dialog
-        //   3. If use_skill=true: run injury, publish DropPlayerContext
-        //   4. If armor broken: publish Touchback or PlayerId+RevertEndTurn
+    fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
+        let catcher_id = match &self.catcher_id {
+            Some(id) => id.clone(),
+            None => return StepOutcome::next(),
+        };
+
+        if self.use_skill.is_none() {
+            // Java: Player<?>[] opponents = UtilPlayer.findAdjacentOpposingPlayersWithProperty(
+            //   game, catcher, game.getFieldModel().getBallCoordinate(),
+            //   NamedProperties.canAttackOpponentForBallAfterCatch, false, true)
+            let ball_coord = match game.field_model.ball_coordinate {
+                Some(c) => c,
+                None => return StepOutcome::next(),
+            };
+            let opponents: Vec<String> = UtilPlayer::find_adjacent_opposing_players_with_property_ext(
+                game,
+                &catcher_id,
+                ball_coord,
+                NamedProperties::CAN_ATTACK_OPPONENT_FOR_BALL_AFTER_CATCH,
+                false,
+                true, // requireUnusedSkill
+            ).into_iter().cloned().collect();
+
+            if opponents.is_empty() {
+                return StepOutcome::next();
+            }
+
+            self.player_ids.extend(opponents);
+
+            // DEFERRED(dialog port): UtilServerDialog.showDialog
+            //   - 1 opponent: DialogSkillUseParameter(firstOpponent.getId(), skill, 0) → CONTINUE
+            //   - 2+ opponents: DialogPlayerChoiceParameter(team_id, QUICK_BITE, opponents, null, 1) → CONTINUE
+            // Until dialog is ported, fall through to NEXT_STEP so we don't block the game.
+            return StepOutcome::next();
+        } else if self.use_skill == Some(true) {
+            // Java: player.markUsed(skill, game)
+            if let Some(pid) = &self.player_id {
+                game.mark_skill_used(pid, ffb_model::enums::SkillId::QuickBite);
+            }
+
+            // DEFERRED(UtilServerInjury port): UtilServerInjury.handleInjury(this, InjuryTypeQuickBite,
+            //   player, catcher, fieldModel.getPlayerCoordinate(catcher), null, null, ApothecaryMode.QUICK_BITE)
+            // publishParameter(DROP_PLAYER_CONTEXT, new DropPlayerContext(injuryResult, false, false, null,
+            //   catcherId, ApothecaryMode.QUICK_BITE, true))
+            // if (injuryResult.injuryContext().isArmorBroken()) {
+            //   game.fieldModel.setBallCoordinate(game.fieldModel.getPlayerCoordinate(player))
+            //   if (touchback) → publish TOUCHBACK
+            //   else → publish PLAYER_ID(playerId) + REVERT_END_TURN(true if player.team == actingTeam)
+            // }
+        }
+
         StepOutcome::next()
     }
 }

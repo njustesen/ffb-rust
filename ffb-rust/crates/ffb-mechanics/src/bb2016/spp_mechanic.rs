@@ -43,3 +43,44 @@ impl SppMechanicTrait for SppMechanic {
 impl SppMechanic {
     pub fn new() -> Self { SppMechanic }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mvp_spp_is_5() {
+        assert_eq!(SppMechanic.mvp_spp(), 5);
+    }
+
+    #[test]
+    fn touchdown_spp_is_3() {
+        use ffb_model::enums::Rules;
+        use ffb_model::model::Team;
+        let team = Team {
+            id: "t".into(), name: "T".into(), race: "human".into(),
+            roster_id: "human".into(), coach: "C".into(),
+            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+            prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+            cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
+            team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
+        };
+        assert_eq!(SppMechanic.touchdown_spp(&team), 3);
+    }
+
+    #[test]
+    fn add_completion_increments_completions() {
+        use ffb_model::model::PlayerResult;
+        let mut pr = PlayerResult::default();
+        SppMechanic.add_completion(&Default::default(), &mut pr, "t");
+        assert_eq!(pr.completions, 1);
+    }
+
+    #[test]
+    fn add_casualty_increments_casualties() {
+        use ffb_model::model::PlayerResult;
+        let mut pr = PlayerResult::default();
+        SppMechanic.add_casualty(&Default::default(), &mut pr, "t");
+        assert_eq!(pr.casualties, 1);
+    }
+}

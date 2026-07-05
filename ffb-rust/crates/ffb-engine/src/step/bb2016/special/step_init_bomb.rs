@@ -15,15 +15,13 @@
 /// Param: BOMB_OUT_OF_BOUNDS.
 /// Publishes: CATCHER_ID, BOMB_EXPLODED.
 ///
-/// DEFERRED(adjacentPlayers): FieldModel.findAdjacentCoordinates not yet ported.
-/// DEFERRED(specialEffect): SpecialEffect SequenceGenerator push not yet ported.
-/// DEFERRED(animation): Animation/AnimationType not yet ported.
 /// DEFERRED(bloodSpot): BloodSpot/PlayerState.HIT_BY_BOMB not yet ported.
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::step::generator::bb2016::special_effect::{SpecialEffect as SpecialEffectGenerator, SpecialEffectParams};
 
 /// Java: `StepInitBomb` (bb2016/special).
 pub struct StepInitBomb {
@@ -67,13 +65,29 @@ impl StepInitBomb {
                     .publish(StepParameter::CatcherId(None))
             } else {
                 // Clear bomb from field.
+                let coord = self.bomb_coordinate.unwrap();
                 game.field_model.bomb_coordinate = None;
-                // DEFERRED(animation): Animation(BOMB_EXPLOSION) not yet ported.
                 // DEFERRED(bloodSpot): BloodSpot(HIT_BY_BOMB) not yet ported.
-                // DEFERRED(adjacentPlayers+specialEffect): find adjacent players + push SpecialEffect sequences not yet ported.
-                StepOutcome::next()
+
+                // Collect affected players: the bomb square + all 8 adjacent squares.
+                let mut coords = vec![coord];
+                coords.extend(game.field_model.adjacent_on_pitch(coord));
+                let affected: Vec<String> = coords.iter()
+                    .filter_map(|c| game.field_model.player_at(*c).cloned())
+                    .collect();
+
+                let mut out = StepOutcome::next()
                     .publish(StepParameter::BombExploded(true))
-                    .publish(StepParameter::CatcherId(None))
+                    .publish(StepParameter::CatcherId(None));
+                for player_id in affected {
+                    let seq = SpecialEffectGenerator::build_sequence(&SpecialEffectParams {
+                        special_effect: Some("BOMB".to_string()),
+                        player_id: Some(player_id),
+                        roll_for_effect: true,
+                    });
+                    out = out.push_seq(seq);
+                }
+                out
             };
             return out;
         }
@@ -176,5 +190,30 @@ mod tests {
         let mut step = StepInitBomb::new();
         assert!(step.set_parameter(&StepParameter::GotoLabelOnEnd("x".into())));
         assert_eq!(step.goto_label_on_end, "x");
+    }
+
+    #[test]
+    fn bomb_on_occupied_square_pushes_special_effect_sequence() {
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+        use std::collections::HashSet;
+        let mut game = make_game();
+        let coord = FieldCoordinate::new(10, 7);
+        game.field_model.bomb_coordinate = Some(coord);
+        // Place a player at the bomb square.
+        game.team_home.players.push(Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+                    ..Default::default()
+});
+        game.field_model.set_player_coordinate("p1", coord);
+        let mut step = StepInitBomb::new();
+        step.goto_label_on_end = "catch".into();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(!out.pushes.is_empty(), "should push SpecialEffect sequence for player at bomb square");
     }
 }

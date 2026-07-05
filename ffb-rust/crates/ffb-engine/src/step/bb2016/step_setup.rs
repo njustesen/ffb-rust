@@ -1,9 +1,16 @@
-use ffb_model::enums::TurnMode;
+use ffb_model::enums::{TurnMode, InducementPhase};
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_box::UtilBox;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
+use crate::mechanic::mixed::setup_mechanic::SetupMechanic;
+use crate::mechanic::setup_mechanic::SetupMechanic as SetupMechanicTrait;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::generator::common::inducement::{Inducement, InducementParams};
+use crate::util::util_server_setup::UtilServerSetup;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2016.StepSetup.
 ///
@@ -50,9 +57,7 @@ impl Step for StepSetup {
             // Java: CLIENT_TEAM_SETUP_LOAD/SAVE/DELETE, CLIENT_SETUP_PLAYER → SKIP_STEP
             // In Rust: these are no-ops (the engine processes them transparently)
             Action::PlacePlayer { player_id, coord } => {
-                // Java: UtilServerSetup.setupPlayer(getGameState(), playerId, coordinate)
-                // DEFERRED(setupPlayer): UtilServerSetup.setupPlayer not yet ported.
-                let _ = (player_id, coord);
+                UtilServerSetup::setup_player(game, player_id, *coord);
                 return StepOutcome::cont(); // SKIP_STEP → stay in setup
             }
             Action::ConfirmSetup => {
@@ -83,19 +88,21 @@ impl StepSetup {
         };
 
         // Java: checkNoPlayersInBoxOrField()
-        if self.check_no_players_in_box_or_field(game) {
+        let (no_players, no_players_events) = self.check_no_players_in_box_or_field(game);
+        if no_players {
             game.turn_mode = TurnMode::NoPlayersToField;
-            return StepOutcome::goto(&goto_label);
+            let mut out = StepOutcome::goto(&goto_label);
+            for ev in no_players_events { out = out.with_event(ev); }
+            return out;
         }
 
         if self.end_setup {
             // Java: getResult().setSound(SoundId.DING)
-            // Java: SetupMechanic.checkSetup(getGameState(), game.isHomePlaying())
-            // DEFERRED(checkSetup): SetupMechanic.checkSetup not yet ported; stub: always valid.
-            let setup_valid = true;
+            let setup_valid = SetupMechanic::new().check_setup(game, game.home_playing);
+            // DEFERRED(dialog): show setup error when !setup_valid
             if setup_valid {
                 game.home_playing = !game.home_playing;
-                // DEFERRED(boxRefresh): UtilBox.refreshBoxes + turn data updates not yet ported.
+                UtilBox::refresh_boxes(game);
 
                 if game.setup_offense {
                     // Java: game.setTurnMode(TurnMode.KICKOFF)
@@ -104,7 +111,17 @@ impl StepSetup {
                     // Java: game.setSetupOffense(true)
                     game.setup_offense = true;
                     // Java: push Inducement sequences for BEFORE_SETUP phase (home + away)
-                    // DEFERRED(generator): SequenceGeneratorFactory.Inducement.pushSequence not yet ported.
+                    let seq_home = Inducement::build_sequence(&InducementParams {
+                        inducement_phase: InducementPhase::BeforeSetup,
+                        home_team: game.home_playing,
+                        check_forgo: false,
+                    });
+                    let seq_away = Inducement::build_sequence(&InducementParams {
+                        inducement_phase: InducementPhase::BeforeSetup,
+                        home_team: !game.home_playing,
+                        check_forgo: false,
+                    });
+                    return StepOutcome::next().push_seq(seq_home).push_seq(seq_away);
                 }
                 return StepOutcome::next();
             } else {
@@ -118,11 +135,33 @@ impl StepSetup {
     }
 
     /// Java: checkNoPlayersInBoxOrField() — awards TD if one team has no eligible players.
-    fn check_no_players_in_box_or_field(&self, game: &mut Game) -> bool {
-        // Java: findPlayersInReserveOrField(game, teamHome) / (game, teamAway)
-        // DEFERRED(fieldModel): findPlayersInReserveOrField not yet ported; stub: always false.
-        let _ = game;
-        false
+    fn check_no_players_in_box_or_field(&self, game: &mut Game) -> (bool, Vec<GameEvent>) {
+        let team_home = game.team_home.clone();
+        let team_away = game.team_away.clone();
+        let home_players = UtilPlayer::find_players_in_reserve_or_field(game, &team_home);
+        let away_players = UtilPlayer::find_players_in_reserve_or_field(game, &team_away);
+        let home_empty = home_players.is_empty();
+        let away_empty = away_players.is_empty();
+        if home_empty || away_empty {
+            let event_team_id = if !home_empty && away_empty {
+                // Away has no players — home scores
+                game.home_playing = true;
+                game.game_result.home.score += 1;
+                Some(game.team_away.id.clone())
+            } else if home_empty && !away_empty {
+                // Home has no players — away scores
+                game.home_playing = false;
+                game.game_result.away.score += 1;
+                Some(game.team_home.id.clone())
+            } else {
+                // Both empty — no team id
+                None
+            };
+            let events = vec![GameEvent::NoPlayersToField { team_id: event_team_id }];
+            (true, events)
+        } else {
+            (false, vec![])
+        }
     }
 }
 
@@ -131,12 +170,35 @@ mod tests {
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::StepAction;
-    use ffb_model::enums::Rules;
+    use ffb_model::enums::{Rules, PlayerState, PS_RESERVE, PlayerType, PlayerGender};
+    use ffb_model::model::player::Player;
 
     fn make_game() -> Game {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2016)
+    }
+
+    /// Creates a game with one reserve player on each team so check_no_players_in_box_or_field = false.
+    fn make_game_with_reserves() -> Game {
+        let mut game = make_game();
+        let p_home = Player {
+            id: "h1".into(), name: "h1".into(), nr: 1,
+            position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 3, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+                    ..Default::default()
+};
+        let p_away = Player { id: "a1".into(), name: "a1".into(), ..p_home.clone()
+        };
+        game.team_home.players.push(p_home);
+        game.team_away.players.push(p_away);
+        game.field_model.set_player_state("h1", PlayerState::new(PS_RESERVE));
+        game.field_model.set_player_state("a1", PlayerState::new(PS_RESERVE));
+        game
     }
 
     #[test]
@@ -166,19 +228,30 @@ mod tests {
     fn start_with_label_waits_for_client() {
         let mut step = StepSetup::new();
         step.goto_label_on_end = Some("end".to_string());
-        let mut game = make_game();
+        let mut game = make_game_with_reserves();
         let out = step.start(&mut game, &mut GameRng::new(0));
         // Not end_setup yet → Continue
         assert_eq!(out.action, StepAction::Continue);
     }
 
     #[test]
+    fn no_players_on_either_team_gotos_label() {
+        let mut step = StepSetup::new();
+        step.goto_label_on_end = Some("end".to_string());
+        let mut game = make_game(); // empty rosters
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // Both teams empty → goto label
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.goto_label.as_deref(), Some("end"));
+    }
+
+    #[test]
     fn confirm_setup_transitions_to_next() {
         let mut step = StepSetup::new();
         step.goto_label_on_end = Some("end".to_string());
-        let mut game = make_game();
+        let mut game = make_game_with_reserves();
         let out = step.handle_command(&Action::ConfirmSetup, &mut game, &mut GameRng::new(0));
-        // Stub: setup always valid → NextStep
+        // Setup valid → NextStep
         assert_eq!(out.action, StepAction::NextStep);
     }
 
@@ -186,7 +259,7 @@ mod tests {
     fn confirm_setup_toggles_home_playing() {
         let mut step = StepSetup::new();
         step.goto_label_on_end = Some("end".to_string());
-        let mut game = make_game();
+        let mut game = make_game_with_reserves();
         game.home_playing = true;
         step.handle_command(&Action::ConfirmSetup, &mut game, &mut GameRng::new(0));
         assert!(!game.home_playing);
@@ -196,7 +269,7 @@ mod tests {
     fn confirm_setup_sets_kickoff_when_setup_offense() {
         let mut step = StepSetup::new();
         step.goto_label_on_end = Some("end".to_string());
-        let mut game = make_game();
+        let mut game = make_game_with_reserves();
         game.setup_offense = true;
         step.handle_command(&Action::ConfirmSetup, &mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::Kickoff);

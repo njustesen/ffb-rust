@@ -78,6 +78,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.team_away.players.push(Player {
             id: "a1".into(), name: "a1".into(), nr: 1, position_id: "lineman".into(),
@@ -86,6 +87,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.field_model.set_player_coordinate("h1", FieldCoordinate::new(5, 5));
         game.field_model.set_player_state("h1", ffb_model::enums::PlayerState::new(PS_STANDING));

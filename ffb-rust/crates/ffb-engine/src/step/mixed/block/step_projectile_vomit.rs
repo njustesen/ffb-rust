@@ -7,6 +7,7 @@
 ///
 /// Expects stepParameter USING_VOMIT to be set by a preceding step.
 use ffb_model::enums::ApothecaryMode;
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::re_rolled_action::ReRolledAction;
@@ -56,6 +57,7 @@ impl StepProjectileVomit {
         // (skill marking not yet fully ported)
 
         let mut drop_self = false;
+        let mut vomit_event: Option<GameEvent> = None;
 
         // Java: if (ReRolledActions.PROJECTILE_VOMIT == getReRolledAction()) {
         //         if ((getReRollSource() == null) || !UtilServerReRoll.useReRoll(...))
@@ -80,10 +82,16 @@ impl StepProjectileVomit {
             let minimum_roll = DiceInterpreter::minimum_roll_projectile_vomit();
             let successful = roll >= minimum_roll;
 
-            // Java: getResult().addReport(new ReportProjectileVomit(...)) — not yet ported
+            let defender_id = game.defender_id.clone().unwrap_or_default();
+            vomit_event = Some(GameEvent::ProjectileVomitRoll {
+                attacker_id: acting_id.clone(),
+                defender_id: defender_id.clone(),
+                roll,
+                success: successful,
+                rerolled: is_vomit_reroll,
+            });
 
             if successful {
-                let defender_id = game.defender_id.clone().unwrap_or_default();
                 let defender_coord = game.field_model.player_coordinate(&defender_id)
                     .unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
 
@@ -105,15 +113,17 @@ impl StepProjectileVomit {
                     apothecary_mode: Some(ApothecaryMode::Defender),
                     ..DropPlayerContext::new()
                 };
-                return StepOutcome::next()
+                let out = StepOutcome::next()
                     .publish(StepParameter::DropPlayerContext(Box::new(ctx)));
+                return if let Some(ev) = vomit_event { out.with_event(ev) } else { out };
             } else {
                 // Java: if (getReRolledAction() == PROJECTILE_VOMIT || !askForReRollIfAvailable(...))
                 if is_vomit_reroll {
                     drop_self = true;
                 } else if let Some(prompt) = ask_for_reroll_if_available(game, "PROJECTILE_VOMIT", minimum_roll, false) {
                     self.re_roll.set_re_rolled_action(ReRolledAction::new("PROJECTILE_VOMIT"));
-                    return StepOutcome::cont().with_prompt(prompt);
+                    let out = StepOutcome::cont().with_prompt(prompt);
+                    return if let Some(ev) = vomit_event { out.with_event(ev) } else { out };
                 } else {
                     drop_self = true;
                 }
@@ -141,8 +151,9 @@ impl StepProjectileVomit {
                 apothecary_mode: Some(ApothecaryMode::Attacker),
                 ..DropPlayerContext::new()
             };
-            return StepOutcome::next()
+            let out = StepOutcome::next()
                 .publish(StepParameter::DropPlayerContext(Box::new(ctx)));
+            return if let Some(ev) = vomit_event { out.with_event(ev) } else { out };
         }
 
         StepOutcome::cont()
@@ -202,7 +213,8 @@ mod tests {
             starting_skills: skills.iter().map(|&s| SkillWithValue { skill_id: s, value: None }).collect(),
             extra_skills: vec![], temporary_skills: vec![], used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+            ..Default::default()
+});
         game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 5));
         game.field_model.set_player_state(id, ffb_model::enums::PlayerState::new(state_bits));
     }

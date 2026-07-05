@@ -20,6 +20,7 @@ use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::util::util_server_pushback::UtilServerPushback;
 
 pub struct StepJuggernaut {
     /// Java: state.goToLabelOnSuccess — GOTO_LABEL_ON_SUCCESS init parameter.
@@ -98,17 +99,19 @@ impl StepJuggernaut {
                 game.field_model.set_player_state(&defender_id, old_state);
             }
 
-            // initPushback stub: starting pushback square = defender coordinate
-            let starting_sq = game.defender_id.as_deref()
-                .and_then(|id| game.field_model.player_coordinate(id));
             game.field_model.pushback_squares.clear();
+            let attacker_coord = game.acting_player.player_id.as_deref()
+                .and_then(|id| game.field_model.player_coordinate(id));
+            let defender_coord = game.defender_id.as_deref()
+                .and_then(|id| game.field_model.player_coordinate(id));
+            let starting_sq = attacker_coord.zip(defender_coord)
+                .map(|(ac, dc)| UtilServerPushback::find_starting_square(ac, dc, game.home_playing))
+                .flatten();
 
             let mut outcome = StepOutcome::goto(&self.goto_label_on_success)
                 .with_event(GameEvent::SkillUse { player_id, skill_id: skill_num, used: true })
                 .publish(StepParameter::BlockResult(BlockResult::Pushback));
-            if let Some(sq) = starting_sq {
-                outcome = outcome.publish(StepParameter::StartingPushbackSquare(sq));
-            }
+            outcome = outcome.publish(StepParameter::StartingPushbackSquare(starting_sq));
             outcome
         } else {
             // Java: addReport(SkillUse false); NEXT_STEP
@@ -154,6 +157,7 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
+            ..Default::default()
         });
     }
 

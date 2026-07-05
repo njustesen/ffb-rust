@@ -98,3 +98,20 @@ impl Factory {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn application_factories_return_application_context() {
+        assert_eq!(Factory::NET_COMMAND_ID.get_context(), FactoryContext::APPLICATION);
+        assert_eq!(Factory::GAME_STATUS.get_context(), FactoryContext::APPLICATION);
+    }
+
+    #[test]
+    fn game_factories_return_game_context() {
+        assert_eq!(Factory::SKILL.get_context(), FactoryContext::GAME);
+        assert_eq!(Factory::ANIMATION_TYPE.get_context(), FactoryContext::GAME);
+    }
+}

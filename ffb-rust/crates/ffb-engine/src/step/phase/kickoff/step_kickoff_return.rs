@@ -82,8 +82,10 @@ impl StepKickoffReturn {
                 game.home_playing = !game.home_playing;
                 // Java: game.setTurnMode(TurnMode.KICKOFF)
                 game.turn_mode = TurnMode::Kickoff;
-                // Java: UtilPlayer.refreshPlayersForTurnStart(game) — DEFERRED: full impl
-                // Java: game.getFieldModel().clearTrackNumbers() — DEFERRED: track_numbers not ported
+                // Java: UtilPlayer.refreshPlayersForTurnStart(game)
+                UtilPlayer::refresh_players_for_turn_start(game);
+                // Java: game.getFieldModel().clearTrackNumbers()
+                game.field_model.clear_track_numbers();
             }
         } else {
             // Java: determine receiving/kicking teams

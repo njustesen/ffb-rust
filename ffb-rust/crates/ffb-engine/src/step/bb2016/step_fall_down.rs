@@ -2,6 +2,7 @@ use ffb_model::enums::{ApothecaryMode, TurnMode, PS_RESERVE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_box::UtilBox;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -87,8 +88,7 @@ impl StepFallDown {
             if let Some(state) = game.field_model.player_state(&player_id) {
                 game.field_model.set_player_state(&player_id, state.change_base(PS_RESERVE));
             }
-            // Java: UtilBox.putPlayerIntoBox(game, actingPlayer.getPlayer())
-            // DEFERRED(UtilBox): putPlayerIntoBox not yet ported — player stays on field model
+            UtilBox::put_player_into_box(game, &player_id);
         }
 
         // Java: if (fInjuryType.fallingDownCausesTurnover() && getTurnMode() != PASS_BLOCK)
@@ -131,7 +131,8 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+                    ..Default::default()
+});
         game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 5));
         game.field_model.set_player_state(id, ffb_model::enums::PlayerState::new(PS_STANDING));
         game.acting_player.player_id = Some(id.into());

@@ -38,3 +38,26 @@ impl InterceptionModifierCollection {
 impl Default for InterceptionModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_twenty_four_modifiers() {
+        // base 11 disturbing_presence + 1 pouring_rain + 3 pass_result + 8 tacklezone + 1 stunty = 24
+        assert_eq!(InterceptionModifierCollection::new().get_modifiers().len(), 24);
+    }
+
+    #[test]
+    fn includes_accurate_pass_modifier() {
+        let col = InterceptionModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Accurate Pass"));
+    }
+
+    #[test]
+    fn includes_stunty_modifier() {
+        let col = InterceptionModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Thrower has Stunty"));
+    }
+}

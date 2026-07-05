@@ -19,3 +19,17 @@ impl IDialogParameter for DialogReRollBlockForTargetsParameter {
     fn get_id(&self) -> DialogId { DialogId::RE_ROLL_BLOCK_FOR_TARGETS }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_re_roll_block_for_targets() {
+        assert_eq!(DialogReRollBlockForTargetsParameter::default().get_id(), DialogId::RE_ROLL_BLOCK_FOR_TARGETS);
+    }
+    #[test]
+    fn stores_player_id() {
+        let p = DialogReRollBlockForTargetsParameter { player_id: Some("p1".into()), ..Default::default() };
+        assert_eq!(p.get_player_id(), Some("p1"));
+    }
+}

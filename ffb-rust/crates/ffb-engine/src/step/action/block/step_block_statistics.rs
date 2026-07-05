@@ -99,7 +99,8 @@ mod tests {
             starting_skills: vec![SkillWithValue { skill_id: SkillId::Block, value: None }],
             extra_skills: vec![], temporary_skills: vec![], used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+                    ..Default::default()
+});
         let away = test_team("away", 0);
         let mut game = Game::new(home, away, Rules::Bb2025);
         game.home_playing = true;

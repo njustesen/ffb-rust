@@ -1,10 +1,15 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
+/// 1:1 translation of `com.fumbbl.ffb.net.commands.ClientCommandCloseSession`.
+/// Sent when a client disconnects or closes their session (no payload).
+#[derive(Debug, Clone, Default)]
 pub struct ClientCommandCloseSession;
 
 impl ClientCommandCloseSession {
     pub fn new() -> Self { Self }
 }
 
-impl Default for ClientCommandCloseSession {
-    fn default() -> Self { Self::new() }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn can_construct() { let _ = ClientCommandCloseSession::new(); }
 }

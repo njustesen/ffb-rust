@@ -14,3 +14,18 @@ impl PlayerTypeFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_type() {
+        assert_eq!(PlayerTypeFactory::default().for_name("Regular"), Some(PlayerType::Regular));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(PlayerTypeFactory::default().for_name("invalid"), None);
+    }
+}

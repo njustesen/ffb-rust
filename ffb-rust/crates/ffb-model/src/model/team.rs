@@ -113,7 +113,8 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
-        });
+            ..Default::default()
+});
         assert!(t.player("p1").is_some());
         assert!(t.player("p2").is_none());
         assert!(t.has_player("p1"));
@@ -143,7 +144,8 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
-        });
+            ..Default::default()
+});
         assert_eq!(t.player_by_nr(5).map(|p| p.id.as_str()), Some("p1"));
         assert!(t.player_by_nr(99).is_none());
     }
@@ -159,7 +161,8 @@ mod tests {
             temporary_skills: vec![], used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
             career_spps: 0, race: None,
-        });
+            ..Default::default()
+});
         t.player_mut("p1").unwrap().current_spps = 10;
         assert_eq!(t.player("p1").unwrap().current_spps, 10);
     }
@@ -191,7 +194,8 @@ mod tests {
                 temporary_skills: vec![], used_skills: HashSet::new(),
                 niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
                 career_spps: 0, race: None,
-            });
+                ..Default::default()
+});
         }
         assert_eq!(t.players.len(), 3);
         assert_eq!(t.player("p2").map(|p| p.nr), Some(2));
@@ -223,7 +227,8 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
-        });
+            ..Default::default()
+});
         assert_eq!(t.players.len(), 1);
     }
 }

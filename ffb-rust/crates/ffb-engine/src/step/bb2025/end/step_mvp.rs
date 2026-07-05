@@ -97,15 +97,18 @@ impl StepMvp {
             self.nr_of_away_choices += 1;
         }
 
+        let mvp_spp = crate::mechanic::spp_calc::SppCalc::mvp_spp(game.rules);
         for pid in &self.home_players_mvp {
-            if let Some(pr) = game.game_result.home.player_results.get_mut(pid) {
-                pr.mvp = true;
-            }
+            let pr = game.game_result.home.player_results.entry(pid.clone()).or_default();
+            pr.mvp = true;
+            pr.player_awards += 1;
+            pr.spp_gained += mvp_spp;
         }
         for pid in &self.away_players_mvp {
-            if let Some(pr) = game.game_result.away.player_results.get_mut(pid) {
-                pr.mvp = true;
-            }
+            let pr = game.game_result.away.player_results.entry(pid.clone()).or_default();
+            pr.mvp = true;
+            pr.player_awards += 1;
+            pr.spp_gained += mvp_spp;
         }
 
         StepOutcome::next()
@@ -155,6 +158,7 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
+            ..Default::default()
         }
     }
 

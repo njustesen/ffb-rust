@@ -13,16 +13,21 @@
 /// Publishes: CATCHER_ID, PASS_ACCURATE, PASS_FUMBLE, DONT_DROP_FUMBLE,
 ///            CATCH_SCATTER_THROW_IN_MODE, PASS_DEVIATES.
 ///
-/// DEFERRED(Pass-reroll): AbstractStepWithReRoll, UtilServerReRoll not yet ported.
 /// DEFERRED(Pass-skillDialog): DialogSkillUseParameter for passing skill reroll not yet ported.
-use ffb_model::enums::{PassResult as ModelPassResult, PlayerAction};
+/// NOTE(Pass-modifiers): PassModifierFactory wired; individual modifier reporting deferred to reporting layer.
+use ffb_model::enums::{PassResult as ModelPassResult, PlayerAction, ReRollSource};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_mechanics::bb2016::pass_mechanic::PassMechanic;
+use ffb_mechanics::modifiers::modifier_type::ModifierType;
+use ffb_mechanics::modifiers::pass_context::PassContext;
+use ffb_mechanics::modifiers::pass_modifier::PassModifier;
+use ffb_mechanics::modifiers::pass_modifier_factory::PassModifierFactory;
 use ffb_mechanics::pass_mechanic::PassMechanic as PassMechanicTrait;
 use ffb_mechanics::pass_result::PassResult;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter, CatchScatterThrowInMode};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
 /// Java: `StepPass` (bb2016/pass).
 pub struct StepPass {
@@ -38,6 +43,12 @@ pub struct StepPass {
     mech_result: Option<PassResult>,
     /// Model-level PassResult set via StepParameter (for test/replay).
     result: Option<ModelPassResult>,
+    /// Java: fReRolledAction — set when a re-roll is in progress.
+    re_rolled_action: Option<String>,
+    /// Java: fReRollSource — the re-roll source name.
+    re_roll_source: Option<String>,
+    /// Java: minimumRoll — stored for re-roll prompt.
+    minimum_roll: i32,
 }
 
 impl StepPass {
@@ -49,6 +60,9 @@ impl StepPass {
             pass_skill_used: false,
             mech_result: None,
             result: None,
+            re_rolled_action: None,
+            re_roll_source: None,
+            minimum_roll: 0,
         }
     }
 
@@ -69,6 +83,24 @@ impl StepPass {
             None => return StepOutcome::next(),
         };
 
+        // Java: if (ReRolledActions.PASS == getReRolledAction()) → useReRoll or handleFailedPass
+        if self.re_rolled_action.as_deref() == Some("PASS") {
+            if let Some(ref source_name) = self.re_roll_source.clone() {
+                let source = ReRollSource::new(source_name.as_str());
+                if !use_reroll(game, &source, &thrower_id) {
+                    let thrower_coord = game.field_model.player_coordinate(&thrower_id);
+                    let pass_coord = game.pass_coordinate;
+                    return self.handle_failed_pass(game, is_bomb, thrower_coord, pass_coord, false)
+                        .publish(StepParameter::DontDropFumble(false));
+                }
+            } else {
+                let thrower_coord = game.field_model.player_coordinate(&thrower_id);
+                let pass_coord = game.pass_coordinate;
+                return self.handle_failed_pass(game, is_bomb, thrower_coord, pass_coord, false)
+                    .publish(StepParameter::DontDropFumble(false));
+            }
+        }
+
         let mechanic = PassMechanic::new();
         let thrower_coord = game.field_model.player_coordinate(&thrower_id);
         let pass_coord = game.pass_coordinate;
@@ -77,9 +109,17 @@ impl StepPass {
             None => return StepOutcome::next(),
         };
 
-        // DEFERRED(Pass-modifiers): PassModifierFactory not yet ported; using empty modifiers.
+        let factory = PassModifierFactory::for_rules(game.rules);
+        let ctx = PassContext::new(game, &thrower, passing_distance, false);
+        let modifier_total: i32 = factory.find_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum();
+        let modifiers_vec: Vec<PassModifier> = if modifier_total != 0 {
+            vec![PassModifier::new("pass_mods", modifier_total, ModifierType::REGULAR)]
+        } else {
+            vec![]
+        };
+        self.minimum_roll = mechanic.minimum_roll_simple(&thrower, passing_distance, &modifiers_vec).unwrap_or(0);
         let roll = rng.d6();
-        let result = mechanic.evaluate_pass_simple(&thrower, roll, passing_distance, &[], is_bomb);
+        let result = mechanic.evaluate_pass_simple(&thrower, roll, passing_distance, &modifiers_vec, is_bomb);
         self.mech_result = Some(result);
 
         if result == PassResult::ACCURATE {
@@ -122,9 +162,17 @@ impl StepPass {
                 out
             }
         } else {
-            // Non-accurate: publish DONT_DROP_FUMBLE then go to failed pass.
-            // DEFERRED(Pass-reroll): UtilServerReRoll check not yet ported; proceed directly.
             let dont_drop = result == PassResult::SAVED_FUMBLE;
+            if !dont_drop && self.re_rolled_action.is_none() {
+                // Java: mechanic.eligibleToReRoll → askForReRollIfAvailable
+                // DEFERRED(Pass-skillDialog): skill-based re-roll dialog (DialogSkillUseParameter)
+                let is_fumble = result == PassResult::FUMBLE;
+                if let Some(prompt) = ask_for_reroll_if_available(game, "PASS", self.minimum_roll, is_fumble) {
+                    self.re_rolled_action = Some("PASS".into());
+                    self.re_roll_source = Some("TRR".into());
+                    return StepOutcome::cont().with_prompt(prompt);
+                }
+            }
             self.handle_failed_pass(game, is_bomb, thrower_coord, pass_coord, dont_drop)
                 .publish(StepParameter::DontDropFumble(dont_drop))
         }
@@ -189,7 +237,14 @@ impl Step for StepPass {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        match action {
+            Action::UseReRoll { use_reroll: false } => {
+                self.re_rolled_action = None;
+                self.re_roll_source = None;
+            }
+            _ => {}
+        }
         self.execute_step(game, rng)
     }
 
@@ -270,7 +325,8 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+                    ..Default::default()
+});
         let mut game = Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2016);
         game.thrower_id = Some("t1".into());
         game.thrower_action = Some(PlayerAction::Pass);
@@ -324,7 +380,8 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+                    ..Default::default()
+});
         let mut game = Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2016);
         game.thrower_id = Some("b1".into());
         game.thrower_action = Some(PlayerAction::ThrowBomb);

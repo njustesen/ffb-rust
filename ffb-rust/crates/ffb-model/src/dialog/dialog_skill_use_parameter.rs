@@ -34,3 +34,18 @@ impl IDialogParameter for DialogSkillUseParameter {
     fn get_id(&self) -> DialogId { DialogId::SKILL_USE }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_skill_use() {
+        assert_eq!(DialogSkillUseParameter::default().get_id(), DialogId::SKILL_USE);
+    }
+    #[test]
+    fn stores_player_id_and_minimum_roll() {
+        let p = DialogSkillUseParameter { player_id: Some("p1".into()), minimum_roll: 4, ..Default::default() };
+        assert_eq!(p.get_player_id(), Some("p1"));
+        assert_eq!(p.get_minimum_roll(), 4);
+    }
+}

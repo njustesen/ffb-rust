@@ -14,3 +14,20 @@ impl AnimationTypeFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_variant() {
+        let f = AnimationTypeFactory::default();
+        assert_eq!(f.for_name("pass"), Some(AnimationType::PASS));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        let f = AnimationTypeFactory::default();
+        assert_eq!(f.for_name("invalid"), None);
+    }
+}

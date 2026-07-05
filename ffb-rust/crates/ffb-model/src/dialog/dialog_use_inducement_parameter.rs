@@ -25,3 +25,22 @@ impl IDialogParameter for DialogUseInducementParameter {
     fn get_id(&self) -> DialogId { DialogId::USE_INDUCEMENT }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_use_inducement() {
+        assert_eq!(DialogUseInducementParameter::default().get_id(), DialogId::USE_INDUCEMENT);
+    }
+    #[test]
+    fn stores_team_id_and_cards() {
+        let p = DialogUseInducementParameter {
+            team_id: Some("home".into()),
+            cards: vec!["CARD_A".into()],
+            ..Default::default()
+        };
+        assert_eq!(p.get_team_id(), Some("home"));
+        assert_eq!(p.get_cards().len(), 1);
+    }
+}

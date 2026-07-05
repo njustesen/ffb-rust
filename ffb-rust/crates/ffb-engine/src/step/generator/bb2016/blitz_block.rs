@@ -50,4 +50,19 @@ mod tests {
         let steps = BlitzBlock::build_sequence(&BlitzBlockParams::default());
         assert!(steps.iter().any(|s| s.label.as_deref() == Some(labels::APOTHECARY_DEFENDER)));
     }
+
+    #[test]
+    fn blitz_block_delegates_to_block_sequence() {
+        use crate::step::generator::bb2016::block::Block;
+        let params = BlitzBlockParams { frenzy_block: false, ..Default::default() };
+        let blitz = BlitzBlock::build_sequence(&params);
+        let block = Block::build_sequence(&params);
+        assert_eq!(blitz.len(), block.len());
+    }
+
+    #[test]
+    fn blitz_block_has_block_roll() {
+        let steps = BlitzBlock::build_sequence(&BlitzBlockParams::default());
+        assert!(steps.iter().any(|s| s.step_id == StepId::BlockRoll));
+    }
 }

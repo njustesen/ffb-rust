@@ -1,7 +1,11 @@
 use crate::skill_behaviour::SkillBehaviour;
+use ffb_model::model::player::Player;
+use ffb_model::model::roster_position::RosterPosition;
 
-/// Handles agility stat increase on level-up.
-/// Mirrors Java `com.fumbbl.ffb.server.skillbehaviour.bb2016.AgilityIncreaseBehaviour`.
+/// 1:1 translation of `com.fumbbl.ffb.server.skillbehaviour.bb2016.AgilityIncreaseBehaviour`.
+///
+/// Java: `registerModifier(player -> player.setAgility(min(min(10, pos.getAgility()+2), player.getAgility()+1)))`.
+/// BB2016: agility stored as direct value (higher = better), so increase = +1.
 pub struct AgilityIncreaseBehaviour;
 
 impl AgilityIncreaseBehaviour {
@@ -15,13 +19,8 @@ impl Default for AgilityIncreaseBehaviour {
 impl SkillBehaviour for AgilityIncreaseBehaviour {
     fn name(&self) -> &'static str { "AgilityIncreaseBehaviour" }
 
-    /// Player-modifier-only behaviour — no step hook in Java source.
-    ///
-    /// Java `AgilityIncreaseBehaviour` only registers a player modifier:
-    ///   `player.setAgility(min(min(8, position.getAgility() + 2), player.getAgility() + 1))`
-    /// There is no `StepModifier` registered, so this method is a no-op.
-    fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
-        false
+    fn apply_modifier(&self, player: &mut Player, position: &RosterPosition) {
+        player.agility = (position.agility + 2).min(10).min(player.agility + 1);
     }
 }
 
@@ -29,15 +28,37 @@ impl SkillBehaviour for AgilityIncreaseBehaviour {
 mod tests {
     use super::*;
 
-    #[test]
-    fn name_returns_correct_string() {
-        let b = AgilityIncreaseBehaviour::new();
-        assert_eq!(b.name(), "AgilityIncreaseBehaviour");
+    fn pos(agility: i32) -> RosterPosition {
+        RosterPosition { agility, ..Default::default() }
     }
 
     #[test]
-    fn default_has_correct_name() {
-        let b = AgilityIncreaseBehaviour::default();
-        assert_eq!(b.name(), "AgilityIncreaseBehaviour");
+    fn apply_increases_by_one() {
+        let b = AgilityIncreaseBehaviour::new();
+        let mut player = Player { agility: 3, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(3));
+        assert_eq!(player.agility, 4);
+    }
+
+    #[test]
+    fn apply_capped_at_ten() {
+        let b = AgilityIncreaseBehaviour::new();
+        let mut player = Player { agility: 10, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(9));
+        assert_eq!(player.agility, 10);
+    }
+
+    #[test]
+    fn apply_capped_by_position_plus_two() {
+        // pos.ag=4, cap=6; player.ag=6 → min(6, 7) = 6 (no change)
+        let b = AgilityIncreaseBehaviour::new();
+        let mut player = Player { agility: 6, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(4));
+        assert_eq!(player.agility, 6);
+    }
+
+    #[test]
+    fn name_is_correct() {
+        assert_eq!(AgilityIncreaseBehaviour::new().name(), "AgilityIncreaseBehaviour");
     }
 }

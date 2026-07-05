@@ -65,3 +65,26 @@ impl Default for PassModifier {
         PassModifier::new("", 0, ModifierType::REGULAR)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_stores_fields() {
+        let m = PassModifier::new("Very Sunny", 1, ModifierType::REGULAR);
+        assert_eq!(m.get_name(), "Very Sunny");
+        assert_eq!(m.get_modifier(), 1);
+        assert_eq!(m.get_type(), ModifierType::REGULAR);
+    }
+
+    #[test]
+    fn tacklezone_is_modifier_included() {
+        assert!(PassModifier::new("tz", 1, ModifierType::TACKLEZONE).is_modifier_included());
+    }
+
+    #[test]
+    fn regular_is_not_modifier_included() {
+        assert!(!PassModifier::new("x", 0, ModifierType::REGULAR).is_modifier_included());
+    }
+}

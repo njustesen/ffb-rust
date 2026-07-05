@@ -1,10 +1,32 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct ClientCommandUseConsummateReRollForBlock;
-
-impl ClientCommandUseConsummateReRollForBlock {
-    pub fn new() -> Self { Self }
+/// 1:1 translation of ClientCommandUseConsummateReRollForBlock (Java field: proIndex).
+#[derive(Debug, Clone, Default)]
+pub struct ClientCommandUseConsummateReRollForBlock {
+    pub pro_index: i32,
 }
 
-impl Default for ClientCommandUseConsummateReRollForBlock {
-    fn default() -> Self { Self::new() }
+impl ClientCommandUseConsummateReRollForBlock {
+    pub fn new(pro_index: i32) -> Self {
+        Self { pro_index }
+    }
+
+    pub fn get_pro_index(&self) -> i32 {
+        self.pro_index
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_stores_index() {
+        let cmd = ClientCommandUseConsummateReRollForBlock::new(3);
+        assert_eq!(cmd.get_pro_index(), 3);
+    }
+
+    #[test]
+    fn default_is_zero() {
+        let cmd = ClientCommandUseConsummateReRollForBlock::default();
+        assert_eq!(cmd.get_pro_index(), 0);
+    }
 }

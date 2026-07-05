@@ -22,3 +22,21 @@ impl IDialogParameter for DialogPettyCashParameter {
     fn get_id(&self) -> DialogId { DialogId::PETTY_CASH }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dialog_id_is_petty_cash() {
+        assert_eq!(DialogPettyCashParameter::default().get_id(), DialogId::PETTY_CASH);
+    }
+
+    #[test]
+    fn stores_treasury_and_team_values() {
+        let p = DialogPettyCashParameter { treasury: 50_000, team_value: 1_000_000, opponent_team_value: 1_100_000, team_id: None };
+        assert_eq!(p.get_treasury(), 50_000);
+        assert_eq!(p.get_team_value(), 1_000_000);
+        assert_eq!(p.get_opponent_team_value(), 1_100_000);
+    }
+}

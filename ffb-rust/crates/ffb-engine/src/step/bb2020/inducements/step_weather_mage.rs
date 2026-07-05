@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use ffb_model::enums::Weather;
+use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
 use ffb_model::prompts::AgentPrompt;
 use ffb_model::util::rng::GameRng;
@@ -52,8 +53,7 @@ impl Step for StepWeatherMage {
 
 impl StepWeatherMage {
     fn execute_step(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // Java: useMage() — marks the CHANGE_WEATHER inducement as used.
-        // DEFERRED: implement when Usage enum is fully ported from Java.
+        Self::use_mage(game);
 
         let roll = rng.roll_weather();
         let sum = roll[0] + roll[1];
@@ -87,6 +87,22 @@ impl StepWeatherMage {
                     .with_prompt(AgentPrompt::InformationOkay { message: msg })
             }
             None => StepOutcome::next(),
+        }
+    }
+
+    fn use_mage(game: &mut Game) {
+        let set = if game.home_playing {
+            &mut game.turn_data_home.inducement_set
+        } else {
+            &mut game.turn_data_away.inducement_set
+        };
+        if let Some(type_id) = set.for_usage(Usage::CHANGE_WEATHER).map(|s| s.to_string()) {
+            if let Some(mut ind) = set.get(&type_id) {
+                if ind.get_uses_left() >= 1 {
+                    ind.set_uses(ind.get_uses() + 1);
+                    set.add_inducement(ind);
+                }
+            }
         }
     }
 }
@@ -193,5 +209,18 @@ mod tests {
         add_weather_option(&mut seen, &mut opts, 10, -2);
         // 10=Nice, 11=PouringRain, 12=Blizzard, 9=Nice(dup), 8=Nice(dup) → 3 distinct
         assert!(opts.len() > 1);
+    }
+
+    #[test]
+    fn use_mage_increments_uses_on_active_team_inducement() {
+        use ffb_model::inducement::inducement::Inducement;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.inducement_set.add_inducement(
+            Inducement::new("weatherMage", 1, vec![Usage::CHANGE_WEATHER])
+        );
+        StepWeatherMage::use_mage(&mut game);
+        let ind = game.turn_data_home.inducement_set.get("weatherMage").unwrap();
+        assert_eq!(ind.get_uses(), 1);
     }
 }

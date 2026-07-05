@@ -47,3 +47,26 @@ impl SkillChoiceMode {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_name_is_camel_case() {
+        assert_eq!(SkillChoiceMode::INTENSIVE_TRAINING.get_name(), "intensiveTraining");
+        assert_eq!(SkillChoiceMode::WISDOM_OF_THE_WHITE_DWARF.get_name(), "wisdomOfTheWhiteDwarf");
+    }
+
+    #[test]
+    fn for_name_round_trips() {
+        assert_eq!(SkillChoiceMode::for_name("intensiveTraining"), Some(SkillChoiceMode::INTENSIVE_TRAINING));
+        assert_eq!(SkillChoiceMode::for_name("invalid"), None);
+    }
+
+    #[test]
+    fn get_dialog_header_includes_player_name() {
+        let header = SkillChoiceMode::INTENSIVE_TRAINING.get_dialog_header("Bob");
+        assert!(header.contains("Bob"));
+    }
+}

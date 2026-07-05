@@ -1,7 +1,11 @@
 use crate::skill_behaviour::SkillBehaviour;
+use ffb_model::model::player::Player;
+use ffb_model::model::roster_position::RosterPosition;
 
-/// Agility Increase advancement: re-roll one agility stat increase per level-up.
-/// No StepModifier -- execute_step_hook is a no-op (returns the default false).
+/// 1:1 translation of `com.fumbbl.ffb.server.skillbehaviour.bb2025.AgilityIncreaseBehaviour`.
+///
+/// Java: `registerModifier(player -> player.setAgility(max(max(1, pos.getAgility()-2), player.getAgility()-1)))`.
+/// BB2025: same formula as BB2020; agility stored as minimum roll needed (lower = better).
 pub struct AgilityIncreaseBehaviour;
 
 impl AgilityIncreaseBehaviour {
@@ -14,36 +18,47 @@ impl Default for AgilityIncreaseBehaviour {
 
 impl SkillBehaviour for AgilityIncreaseBehaviour {
     fn name(&self) -> &'static str { "AgilityIncreaseBehaviour" }
+
+    fn apply_modifier(&self, player: &mut Player, position: &RosterPosition) {
+        player.agility = (position.agility - 2).max(1).max(player.agility - 1);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn test_game() -> ffb_model::model::game::Game {
-        let home = ffb_model::model::team::Team {
-            id: "home".into(), name: "Home".into(), race: "human".into(),
-            roster_id: "human".into(), coach: "Coach".into(),
-            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
-            prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
-            cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
-            team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
-        };
-        let away = home.clone();
-        ffb_model::model::game::Game::new(home, away, ffb_model::enums::Rules::Bb2025)
+    fn pos(agility: i32) -> RosterPosition {
+        RosterPosition { agility, ..Default::default() }
     }
 
     #[test]
-    fn hook_is_noop_returns_false() {
-        let behaviour = AgilityIncreaseBehaviour::new();
-        let mut game = test_game();
-        assert!(!behaviour.execute_step_hook(&mut game));
+    fn apply_decreases_by_one() {
+        let b = AgilityIncreaseBehaviour::new();
+        let mut player = Player { agility: 3, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(3));
+        assert_eq!(player.agility, 2);
     }
 
     #[test]
-    fn execute_step_hook_returns_bool() {
-        let behaviour = AgilityIncreaseBehaviour::new();
-        let mut game = test_game();
-        let _result: bool = behaviour.execute_step_hook(&mut game);
+    fn apply_capped_at_one() {
+        let b = AgilityIncreaseBehaviour::new();
+        let mut player = Player { agility: 1, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(3));
+        assert_eq!(player.agility, 1);
+    }
+
+    #[test]
+    fn apply_capped_by_position_minus_two() {
+        // pos.ag=5, floor=3; player.ag=3 → max(3, 2) = 3 (no change)
+        let b = AgilityIncreaseBehaviour::new();
+        let mut player = Player { agility: 3, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(5));
+        assert_eq!(player.agility, 3);
+    }
+
+    #[test]
+    fn name_is_correct() {
+        assert_eq!(AgilityIncreaseBehaviour::new().name(), "AgilityIncreaseBehaviour");
     }
 }

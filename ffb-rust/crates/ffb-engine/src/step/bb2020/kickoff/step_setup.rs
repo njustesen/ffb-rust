@@ -15,18 +15,20 @@
 ///
 /// Mandatory init param: `GOTO_LABEL_ON_END` (used by the generator, stored here for JSON).
 ///
-/// DEFERRED(StepSetup-mechanic): SetupMechanic.checkSetup port deferred; always accepts for now.
-/// DEFERRED(StepSetup-boxes): UtilBox.refreshBoxes deferred.
-/// DEFERRED(StepSetup-turnmode): game.setTurnMode(TurnMode.KICKOFF) deferred.
+/// DEFERRED(StepSetup-dialog): setup error dialog deferred.
 /// DEFERRED(StepSetup-teamsetup): CLIENT_TEAM_SETUP_LOAD/SAVE/DELETE deferred.
-use ffb_model::enums::InducementPhase;
+use ffb_model::enums::{InducementPhase, TurnMode};
 use ffb_model::model::game::Game;
 use ffb_model::prompts::AgentPrompt;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_box::UtilBox;
 use crate::action::Action;
+use crate::mechanic::mixed::setup_mechanic::SetupMechanic;
+use crate::mechanic::setup_mechanic::SetupMechanic as SetupMechanicTrait;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::generator::common::Inducement;
 use crate::step::generator::common::inducement::InducementParams;
+use crate::util::util_server_setup::UtilServerSetup;
 
 /// Java: `StepSetup` (bb2020/kickoff).
 pub struct StepSetup {
@@ -63,9 +65,8 @@ impl StepSetup {
         }
 
         // Java: getResult().setSound(SoundId.DING)
-        // Java: SetupMechanic.checkSetup(gameState, game.isHomePlaying())
-        // DEFERRED(StepSetup-mechanic): port SetupMechanic.checkSetup. Always accept for now.
-        let setup_valid = true;
+        let setup_valid = SetupMechanic::new().check_setup(game, game.home_playing);
+        // DEFERRED(dialog): show setup error dialog when !setup_valid
 
         if setup_valid {
             // Java: game.setHomePlaying(!game.isHomePlaying())
@@ -76,13 +77,10 @@ impl StepSetup {
             game.turn_data_mut().turn_started = false;
             game.turn_data_mut().first_turn_after_kickoff = false;
 
-            // Java: UtilBox.refreshBoxes(game)
-            // DEFERRED(StepSetup-boxes): port refreshBoxes.
+            UtilBox::refresh_boxes(game);
 
             if game.setup_offense {
-                // Java: game.setTurnMode(TurnMode.KICKOFF)
-                // DEFERRED(StepSetup-turnmode): set turn mode to KICKOFF here.
-                // Java: getResult().setNextAction(StepAction.NEXT_STEP)
+                game.turn_mode = TurnMode::Kickoff;
                 self.end_setup = false;
                 StepOutcome::next()
             } else {
@@ -138,8 +136,7 @@ impl Step for StepSetup {
                 self.end_setup = true;
             }
             Action::PlacePlayer { player_id, coord } => {
-                // Java: CLIENT_SETUP_PLAYER → UtilServerSetup.setupPlayer(...); SKIP_STEP
-                game.field_model.set_player_coordinate(player_id, *coord);
+                UtilServerSetup::setup_player(game, player_id, *coord);
                 return StepOutcome::cont();
             }
             _ => {}
@@ -212,7 +209,19 @@ mod tests {
 
     #[test]
     fn place_player_returns_cont_without_advancing() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
         let mut game = make_game();
+        // Add player "p1" to home team so UtilServerSetup can find and place them.
+        game.team_home.players.push(Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
         let mut step = StepSetup::new();
         let coord = ffb_model::types::FieldCoordinate::new(5, 7);
         let out = step.handle_command(

@@ -14,10 +14,11 @@
 /// SafeThrow skill → canCancelInterceptions property wired.
 /// VeryLongLegs interceptor cancel → cancelsCancelInterceptions property wired.
 /// AgilityMechanic.minimumRollSafeThrow → wired (bb2016::AgilityMechanic).
-/// DEFERRED(SafeThrow-report): ReportSafeThrowRoll not yet ported.
+/// SafeThrowRoll GameEvent wired.
 use ffb_mechanics::bb2016::agility_mechanic::AgilityMechanic as Bb2016AgilityMechanic;
 use ffb_mechanics::agility_mechanic::AgilityMechanic as AgilityMechanicTrait;
 use ffb_model::enums::ReRollSource;
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
@@ -99,7 +100,8 @@ impl StepSafeThrow {
             .map(|p| Bb2016AgilityMechanic::default().minimum_roll_safe_throw(p))
             .unwrap_or(2);
         let successful = DiceInterpreter::is_skill_roll_successful(roll, minimum_roll);
-        // DEFERRED(SafeThrow-report): ReportSafeThrowRoll not yet ported.
+        let player_id = game.acting_player.player_id.clone().unwrap_or_default();
+        let safe_throw_event = GameEvent::SafeThrowRoll { player_id, roll, success: successful };
 
         // Java: if (!safeThrowSuccessful && getReRolledAction() != SAFE_THROW
         //         && askForReRollIfAvailable(...)) doNextStep = false
@@ -107,16 +109,17 @@ impl StepSafeThrow {
             if let Some(prompt) = ask_for_reroll_if_available(game, SAFE_THROW_ACTION, minimum_roll, false) {
                 self.re_rolled_action = Some(SAFE_THROW_ACTION.to_string());
                 self.re_roll_source = Some(ReRollSource::new("TRR"));
-                return StepOutcome::cont().with_prompt(prompt);
+                return StepOutcome::cont().with_event(safe_throw_event).with_prompt(prompt);
             }
         }
 
         if successful {
             return StepOutcome::next()
+                .with_event(safe_throw_event)
                 .publish(StepParameter::InterceptorId(None));
         }
 
-        self.fail_safe_throw(game, &interceptor_id)
+        self.fail_safe_throw(game, &interceptor_id).with_event(safe_throw_event)
     }
 
     fn fail_safe_throw(&self, game: &mut Game, interceptor_id: &str) -> StepOutcome {
@@ -181,6 +184,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         };
         if team_home {
             game.team_home.players.push(p.clone());

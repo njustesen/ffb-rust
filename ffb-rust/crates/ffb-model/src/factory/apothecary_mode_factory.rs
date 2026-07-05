@@ -14,3 +14,17 @@ impl ApothecaryModeFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn for_name_returns_variant() {
+        let f = ApothecaryModeFactory;
+        assert_eq!(f.for_name("attacker"), Some(ApothecaryMode::Attacker));
+    }
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert!(ApothecaryModeFactory.for_name("NOT_VALID").is_none());
+    }
+}

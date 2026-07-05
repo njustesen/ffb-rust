@@ -103,7 +103,10 @@ impl StepBoneHead {
                 .publish(StepParameter::EndPlayerAction(true));
         }
 
-        // Java: step.commitTargetSelection(); int roll = rollSkill();
+        // Java: step.commitTargetSelection() → targetSelectionState.commit()
+        if let Some(ref mut ts) = game.field_model.target_selection_state {
+            ts.commit();
+        }
         let roll = rng.d6();
         // Java: minimumRollConfusion(true) — BoneHead always uses good-conditions threshold (2+)
         let min_roll = minimum_roll_confusion(true);
@@ -176,6 +179,7 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
+            ..Default::default()
         });
         let away = test_team("away", 0);
         let mut game = Game::new(home, away, Rules::Bb2025);

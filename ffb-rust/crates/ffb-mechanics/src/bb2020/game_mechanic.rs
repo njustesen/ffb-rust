@@ -140,3 +140,57 @@ impl GameMechanicTrait for GameMechanic {
 impl GameMechanic {
     pub fn new() -> Self { GameMechanic }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::enums::Weather;
+    use ffb_model::model::Team;
+    use crate::game_mechanic::GameMechanic as GameTrait;
+
+    fn bare_team(id: &str) -> Team {
+        Team {
+            id: id.into(), name: id.into(), race: "human".into(), roster_id: "human".into(), coach: "c".into(),
+            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0,
+            bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
+            fan_factor: 3, dedicated_fans: 7, team_value: 0, treasury: 0,
+            special_rules: vec![], players: vec![],
+        }
+    }
+
+    #[test]
+    fn is_foul_not_allowed_during_blitz() {
+        assert!(!GameMechanic.is_foul_action_allowed(TurnMode::Blitz));
+    }
+
+    #[test]
+    fn is_foul_allowed_during_regular() {
+        assert!(GameMechanic.is_foul_action_allowed(TurnMode::Regular));
+    }
+
+    #[test]
+    fn fan_modification_name_is_dedicated_fans() {
+        assert_eq!(GameMechanic.fan_modification_name(), "Dedicated Fans");
+    }
+
+    #[test]
+    fn fans_returns_dedicated_fans() {
+        let team = bare_team("home");
+        assert_eq!(GameMechanic.fans(&team), 7);
+    }
+
+    #[test]
+    fn audience_name_is_fan_factor() {
+        assert_eq!(GameMechanic.audience_name(), "Fan Factor");
+    }
+
+    #[test]
+    fn roll_for_chef_is_false() {
+        assert!(!GameMechanic.roll_for_chef_at_start_of_half());
+    }
+
+    #[test]
+    fn weather_description_nice_is_perfect() {
+        assert!(GameMechanic.weather_description(Weather::Nice).contains("Perfect"));
+    }
+}

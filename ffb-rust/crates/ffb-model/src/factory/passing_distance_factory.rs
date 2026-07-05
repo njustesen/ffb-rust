@@ -14,3 +14,19 @@ impl PassingDistanceFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_distance() {
+        let f = PassingDistanceFactory::default();
+        assert!(f.for_name("Quick Pass").is_some());
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(PassingDistanceFactory::default().for_name("invalid"), None);
+    }
+}

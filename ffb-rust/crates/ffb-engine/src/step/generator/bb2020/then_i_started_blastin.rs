@@ -76,4 +76,16 @@ mod tests {
         let steps = ThenIStartedBlastin::build_sequence();
         assert!(!steps.iter().any(|s| s.step_id == StepId::SteadyFooting));
     }
+
+    #[test]
+    fn then_i_started_blastin_step_count() {
+        let steps = ThenIStartedBlastin::build_sequence();
+        assert_eq!(steps.len(), 16);
+    }
+
+    #[test]
+    fn then_i_started_blastin_has_then_i_started_blastin_step() {
+        let steps = ThenIStartedBlastin::build_sequence();
+        assert!(steps.iter().any(|s| s.step_id == StepId::ThenIStartedBlastin));
+    }
 }

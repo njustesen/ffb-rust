@@ -15,3 +15,14 @@ impl JumpModifierCollection {
 impl Default for JumpModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_zero_modifiers() {
+        // bb2016 adds no extra jump modifiers on top of empty base
+        assert_eq!(JumpModifierCollection::new().get_modifiers().len(), 0);
+    }
+}

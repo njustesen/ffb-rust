@@ -1,11 +1,12 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeFireball.
-/// Armor roll. If not broken: try special effect armor modifier (stub).
-/// If broken: injury roll with special effect injury modifier (stub). Else: PRONE.
+/// Armor roll with Fireball +1 armor modifier. If broken: injury roll with Fireball +1.
+/// If not broken: PRONE. falling_down_causes_turnover=false.
 use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
-use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll};
+use ffb_mechanics::modifiers::{ARMOR_FIREBALL, INJURY_FIREBALL};
+use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
 
 pub struct InjuryTypeFireball { ctx: InjuryContext }
 impl InjuryTypeFireball { pub fn new() -> Self { Self { ctx: InjuryContext::new(ApothecaryMode::Defender) } } }
@@ -19,14 +20,12 @@ impl InjuryTypeServer for InjuryTypeFireball {
         self.ctx.defender_coordinate = Some(coord);
         self.ctx.apothecary_mode = apo_mode;
         if !self.ctx.armor_broken {
+            self.ctx.add_armor_modifier(ARMOR_FIREBALL);
             do_armor_roll(game, rng, &mut self.ctx, defender_id);
-            if !self.ctx.armor_broken {
-                // TODO: add specialEffectArmourModifiers and recalc when factory is ported
-            }
         }
         if self.ctx.armor_broken {
-            do_injury_roll(rng, &mut self.ctx);
-            // TODO: add specialEffectInjuryModifiers when InjuryModifierFactory is ported
+            self.ctx.add_injury_modifier(INJURY_FIREBALL);
+            do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
         } else {
             self.ctx.injury = Some(PlayerState::new(PS_PRONE));
         }
@@ -50,7 +49,8 @@ mod tests {
             gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
             passing: 4, armour, starting_skills: vec![], extra_skills: vec![],
             temporary_skills: vec![], used_skills: HashSet::new(),
-            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None });
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+    ..Default::default() });
         Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2025)
     }
     fn coord() -> FieldCoordinate { FieldCoordinate::new(5, 5) }

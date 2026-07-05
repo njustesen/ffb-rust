@@ -14,3 +14,21 @@ impl ModelChangeIdFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_id() {
+        assert_eq!(
+            ModelChangeIdFactory::default().for_name("actingPlayerMarkSkillUsed"),
+            Some(ModelChangeId::ActingPlayerMarkSkillUsed)
+        );
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(ModelChangeIdFactory::default().for_name("invalid"), None);
+    }
+}

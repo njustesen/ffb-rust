@@ -83,4 +83,19 @@ mod tests {
         let last = steps.last().unwrap();
         assert_eq!(last.step_id, StepId::Apothecary);
     }
+
+    #[test]
+    fn failure_label_passed_to_treacherous_step() {
+        let params = TreacherousParams { failure_label: "fail_here".into() };
+        let steps = Treacherous::build_sequence(&params);
+        let t = steps.iter().find(|s| s.step_id == StepId::Treacherous).unwrap();
+        let has = t.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "fail_here"));
+        assert!(has);
+    }
+
+    #[test]
+    fn treacherous_step_count() {
+        let steps = Treacherous::build_sequence(&TreacherousParams::default());
+        assert_eq!(steps.len(), 16);
+    }
 }

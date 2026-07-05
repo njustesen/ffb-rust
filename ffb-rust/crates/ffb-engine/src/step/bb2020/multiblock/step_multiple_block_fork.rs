@@ -37,15 +37,31 @@
 ///
 ///   → NEXT_STEP
 ///
-/// DEFERRED(fork-sequence): SequenceStep builder + push_seq deferred until Sequence infrastructure ported.
-/// DEFERRED(fork-block-target): BlockTarget is partially ported (player_id, kind, original_player_state).
-/// DEFERRED(fork-publish): publishParameter for OLD_DEFENDER_STATE / USING_STAB deferred.
+/// parameterToConsume is wired: passed to BLOCK_ROLL_MULTIPLE and each stab CONSUME_PARAMETER step.
+///
+use ffb_model::enums::{BlockResult, PlayerState};
 use ffb_model::model::block_kind::BlockKind;
 use ffb_model::model::block_target::BlockTarget;
 use ffb_model::model::game::Game;
+use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{SequenceStep, Step, StepId, StepOutcome, StepParameter};
+
+/// Java: parameterToConsume fixed set — passed to BLOCK_ROLL_MULTIPLE and stab CONSUME_PARAMETER steps.
+fn params_to_consume() -> Vec<std::mem::Discriminant<StepParameter>> {
+    vec![
+        std::mem::discriminant(&StepParameter::BlockRoll(vec![])),
+        std::mem::discriminant(&StepParameter::BlockResult(BlockResult::Pushback)),
+        std::mem::discriminant(&StepParameter::DiceIndex(0)),
+        std::mem::discriminant(&StepParameter::NrOfDice(0)),
+        std::mem::discriminant(&StepParameter::StartingPushbackSquare(None)),
+        std::mem::discriminant(&StepParameter::DefenderPushed(false)),
+        std::mem::discriminant(&StepParameter::FollowupChoice(false)),
+        std::mem::discriminant(&StepParameter::UsingStab(false)),
+        std::mem::discriminant(&StepParameter::OldDefenderState(PlayerState::new(0))),
+    ]
+}
 
 /// Java: `StepMultipleBlockFork` (bb2020/multiblock).
 pub struct StepMultipleBlockFork {
@@ -113,7 +129,7 @@ impl StepMultipleBlockFork {
                             .filter_map(|t| t.get_player_id().cloned())
                             .collect(),
                     ),
-                    // DEFERRED(fork-consume-parameter): pass parameterToConsume when ParametersToConsume is wired
+                    StepParameter::ParametersToConsume(params_to_consume()),
                 ],
             ));
 
@@ -139,6 +155,10 @@ impl StepMultipleBlockFork {
                 ));
                 seq.push(SequenceStep::new(StepId::HandleDropPlayerContext));
                 seq.push(SequenceStep::labelled(StepId::ReportStabInjury, "NEXT", vec![]));
+                seq.push(SequenceStep::with_params(
+                    StepId::ConsumeParameter,
+                    vec![StepParameter::ParametersToConsume(params_to_consume())],
+                ));
 
                 outcome = outcome.push_seq(seq);
 

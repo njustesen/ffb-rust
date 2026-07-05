@@ -85,4 +85,22 @@ mod tests {
         let bl = steps.iter().find(|s| s.step_id == StepId::BloodLust).unwrap();
         assert!(!bl.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(_))));
     }
+
+    #[test]
+    fn failure_label_passed_to_black_ink_step() {
+        let steps = BlackInk::build_sequence(&BlackInkParams { failure_label: "theLabel".into(), old_player_state: None });
+        let ink = steps.iter().find(|s| s.step_id == StepId::BlackInk).unwrap();
+        let has = ink.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "theLabel"));
+        assert!(has);
+    }
+
+    #[test]
+    fn old_player_state_added_when_some() {
+        use ffb_model::enums::{PlayerState, PS_STANDING};
+        let state = PlayerState::new(PS_STANDING);
+        let steps = BlackInk::build_sequence(&BlackInkParams { failure_label: "X".into(), old_player_state: Some(state) });
+        let ink = steps.iter().find(|s| s.step_id == StepId::BlackInk).unwrap();
+        let has = ink.params.iter().any(|p| matches!(p, StepParameter::OldPlayerState(_)));
+        assert!(has);
+    }
 }

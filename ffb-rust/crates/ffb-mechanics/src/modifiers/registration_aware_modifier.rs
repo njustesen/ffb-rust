@@ -1,3 +1,4 @@
+use ffb_model::enums::SkillId;
 use crate::modifiers::i_registration_aware_modifier::IRegistrationAwareModifier;
 
 /// 1:1 translation of com.fumbbl.ffb.modifiers.RegistrationAwareModifier (Java abstract class).
@@ -22,8 +23,35 @@ impl IRegistrationAwareModifier for RegistrationAwareModifier {
     fn set_registered_to(&mut self, skill_id: Option<String>) {
         self.registered_to = skill_id;
     }
-    fn is_registered_to_skill_with_property(&self, _property: &str) -> bool {
-        // TODO: requires full Skill property lookup
-        false
+    fn is_registered_to_skill_with_property(&self, property: &str) -> bool {
+        self.registered_to.as_deref()
+            .and_then(|name| SkillId::from_class_name(name))
+            .map(|id| id.properties().contains(&property))
+            .unwrap_or(false)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_registered_to_skill_with_property_false_when_unregistered() {
+        let m = RegistrationAwareModifier::new();
+        assert!(!m.is_registered_to_skill_with_property("canLeap"));
+    }
+
+    #[test]
+    fn is_registered_to_skill_with_property_true_for_leap_property() {
+        let mut m = RegistrationAwareModifier::new();
+        m.set_registered_to(Some("Leap".into()));
+        assert!(m.is_registered_to_skill_with_property("canLeap"));
+    }
+
+    #[test]
+    fn is_registered_to_skill_with_property_false_for_wrong_property() {
+        let mut m = RegistrationAwareModifier::new();
+        m.set_registered_to(Some("Leap".into()));
+        assert!(!m.is_registered_to_skill_with_property("canAvoidFallingDown"));
     }
 }

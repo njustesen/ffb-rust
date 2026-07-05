@@ -18,13 +18,17 @@
 /// - Reports/sounds/timers → skip
 /// - FumbblGame update → skip
 use std::collections::HashSet;
-use ffb_model::enums::TurnMode;
+use ffb_model::enums::{TurnMode, Weather, PS_KNOCKED_OUT, PS_EXHAUSTED, PS_RESERVE};
+use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
 use ffb_model::types::FIELD_WIDTH;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_box::UtilBox;
 use crate::action::Action;
+use crate::dice_interpreter::DiceInterpreter;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::util::util_server_game::UtilServerGame;
 
 pub struct StepEndTurn {
     /// Java: fTouchdown (Boolean tristate — None = unchecked)
@@ -120,7 +124,7 @@ impl StepEndTurn {
         game.turn_data_home.turn_nr >= 8 && game.turn_data_away.turn_nr >= 8
     }
 
-    fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: if (turnNr == 0) capture turnNr + half for later send-to-box use
         if self.turn_nr == 0 {
             self.turn_nr = game.turn_data().turn_nr;
@@ -151,7 +155,7 @@ impl StepEndTurn {
             self.use_star_of_the_show = Some(false);
         }
 
-        // Java: markPlayedAndSecretWeapons() → stub (requires NamedProperties + PlayerResult)
+        UtilServerGame::mark_played_and_secret_weapons(game);
 
         self.new_half = Self::check_end_of_half(game);
 
@@ -240,11 +244,50 @@ impl StepEndTurn {
 
         if self.end_game || all_choices_done {
             // Java: deactivateEffectsAndPrayers → stub
-            // Java: getFaintingCount / heatExhaustions / KO recovery → stub
             // Java: ReportTurnEnd → stub
             // Java: removeReRollsLastingForDrive → stub
             // Java: prepareForSetup, updatePlayerStateDependentProperties → stub
             // Java: startHalf → stub
+
+            // Java: getFaintingCount / heatExhaustions / KO recovery — only on new half or touchdown
+            if self.new_half || touchdown {
+                let all_player_ids: Vec<String> = game.team_home.players.iter()
+                    .chain(game.team_away.players.iter())
+                    .map(|p| p.id.clone())
+                    .collect();
+                for player_id in &all_player_ids {
+                    let player_state = match game.field_model.player_state(player_id) {
+                        Some(s) => s,
+                        None => continue,
+                    };
+                    let base = player_state.base();
+                    if base == PS_KNOCKED_OUT {
+                        let is_home = game.team_home.has_player(player_id);
+                        let bloodweiser_keg = if is_home {
+                            game.turn_data_home.inducement_set.value(Usage::KNOCKOUT_RECOVERY)
+                        } else {
+                            game.turn_data_away.inducement_set.value(Usage::KNOCKOUT_RECOVERY)
+                        };
+                        let roll = rng.d6();
+                        if DiceInterpreter::is_recovering_from_knockout(roll, bloodweiser_keg) {
+                            game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
+                        }
+                    }
+                    if base == PS_EXHAUSTED {
+                        game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
+                    }
+                    if let Some(coord) = game.field_model.player_coordinate(player_id) {
+                        if game.field_model.weather == Weather::SwelteringHeat && !coord.is_box_coordinate() {
+                            let roll = rng.d6();
+                            if DiceInterpreter::is_exhausted(roll) {
+                                let cur = game.field_model.player_state(player_id).unwrap_or_default();
+                                game.field_model.set_player_state(player_id, cur.change_base(PS_EXHAUSTED));
+                            }
+                        }
+                    }
+                }
+                UtilBox::put_all_players_into_box(game);
+            }
 
             // Java: game.startTurn() — reset per-turn flags for both teams
             game.turn_data_home.reset_for_turn();
@@ -295,12 +338,12 @@ impl Default for StepEndTurn {
 impl Step for StepEndTurn {
     fn id(&self) -> StepId { StepId::EndTurn }
 
-    fn start(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game)
+    fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game)
+    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        self.execute_step(game, rng)
     }
 
     // Java StepEndTurn does not override setParameter.
@@ -325,6 +368,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         }
     }
 

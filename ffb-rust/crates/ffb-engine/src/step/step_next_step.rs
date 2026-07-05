@@ -4,7 +4,8 @@ use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 
-/// DEFERRED: full logic.
+/// 1:1 translation of com.fumbbl.ffb.server.step.StepNextStep.
+/// Advances to the next step unconditionally.
 pub struct StepNextStep;
 
 impl StepNextStep {
@@ -20,4 +21,13 @@ impl Step for StepNextStep {
     fn start(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome { StepOutcome::next() }
     fn handle_command(&mut self, _action: &Action, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome { StepOutcome::next() }
     fn set_parameter(&mut self, _param: &StepParameter) -> bool { false }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn id_is_next_step() { assert_eq!(StepNextStep::new().id(), StepId::NextStep); }
+    #[test]
+    fn set_parameter_returns_false() { assert!(!StepNextStep::new().set_parameter(&StepParameter::EndTurn(true))); }
 }

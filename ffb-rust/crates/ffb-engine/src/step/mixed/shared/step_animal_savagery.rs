@@ -10,7 +10,9 @@
 ///
 /// Java: `com.fumbbl.ffb.server.step.mixed.shared.StepAnimalSavagery`
 ///        extends `AbstractStepWithReRoll`.
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::SkillId;
 use crate::action::Action;
@@ -43,6 +45,8 @@ pub struct StepAnimalSavagery {
     // AbstractStepWithReRoll stubs
     pub re_rolled_action: Option<String>,
     pub re_roll_source: Option<String>,
+    /// Pending coordinate from TARGET_COORDINATE init param; resolved to catcher_id in start().
+    pending_target_coordinate: Option<FieldCoordinate>,
 }
 
 impl StepAnimalSavagery {
@@ -54,6 +58,7 @@ impl StepAnimalSavagery {
             },
             re_rolled_action: None,
             re_roll_source: None,
+            pending_target_coordinate: None,
         }
     }
 
@@ -74,6 +79,10 @@ impl Step for StepAnimalSavagery {
     fn id(&self) -> StepId { StepId::AnimalSavagery }
 
     fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: init() resolves TARGET_COORDINATE → catcherId via FieldModel.getPlayer(coord)
+        if let Some(coord) = self.pending_target_coordinate.take() {
+            self.state.catcher_id = game.field_model.player_at(coord).cloned();
+        }
         self.execute_step(game, rng)
     }
 
@@ -89,8 +98,22 @@ impl Step for StepAnimalSavagery {
                 self.state.attack_opponent = Some(*use_skill);
                 if *use_skill {
                     // Java: game.getPlayerById(commandUseSkill.getPlayerId()).markUsed(skill, game)
-                    // + ReportSkillUse(LASH_OUT_AGAINST_OPPONENT)
-                    // DEFERRED: mark skill used on player when NamedProperties system is ported
+                    if let Some(ref pid) = self.state.player_id {
+                        let is_home = game.team_home.player(pid).is_some();
+                        if is_home { game.team_home.player_mut(pid).map(|p| p.used_skills.insert(SkillId::PrimalSavagery)); }
+                        else { game.team_away.player_mut(pid).map(|p| p.used_skills.insert(SkillId::PrimalSavagery)); }
+                    }
+                    // Java: addReport(new ReportSkillUse(ANIMAL_SAVAGERY/PrimalSavagery, true))
+                    let skill_event = self.state.player_id.as_ref().map(|pid| {
+                        GameEvent::SkillUse {
+                            player_id: pid.clone(),
+                            skill_id: SkillId::PrimalSavagery as u16,
+                            used: true,
+                        }
+                    });
+                    let out = self.execute_step(game, rng);
+                    if let Some(ev) = skill_event { return out.with_event(ev); }
+                    return out;
                 }
                 self.execute_step(game, rng)
             }
@@ -106,10 +129,8 @@ impl Step for StepAnimalSavagery {
             }
             StepParameter::TargetCoordinate(coord) => {
                 // Java: Player catcher = game.getFieldModel().getPlayer(coord); state.catcherId = catcher.getId()
-                // The coordinate-to-player lookup requires the game reference which set_parameter
-                // doesn't receive.  Store as a pending resolve.
-                // DEFERRED: resolve coordinate → player id when game is available (e.g. in start()).
-                let _ = coord;
+                // set_parameter has no game reference; store and resolve in start().
+                self.pending_target_coordinate = Some(*coord);
                 true
             }
             StepParameter::BlockDefenderId(v) => {
@@ -198,6 +219,30 @@ mod tests {
             &mut rng,
         );
         assert_eq!(step.state.player_id.as_deref(), Some("p1"));
+    }
+
+    #[test]
+    fn target_coordinate_resolves_to_catcher_id_in_start() {
+        use ffb_model::types::FieldCoordinate;
+        use ffb_model::model::player::Player;
+
+        let mut step = StepAnimalSavagery::new("fail");
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+
+        // Place a player at a known coordinate
+        let player = Player { id: "catcher1".into(), ..Default::default() };
+        game.team_home.players.push(player);
+        let coord = FieldCoordinate::new(5, 5);
+        game.field_model.set_player_coordinate("catcher1", coord);
+
+        // Provide the coordinate via set_parameter
+        assert!(step.set_parameter(&StepParameter::TargetCoordinate(coord)));
+        // Before start(), catcher_id is not yet resolved
+        assert!(step.state.catcher_id.is_none());
+
+        step.start(&mut game, &mut rng);
+        assert_eq!(step.state.catcher_id.as_deref(), Some("catcher1"));
     }
 
     #[test]

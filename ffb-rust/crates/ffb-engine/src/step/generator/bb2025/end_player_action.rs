@@ -91,4 +91,28 @@ mod tests {
         let sp = steps.iter().find(|s| s.step_id == StepId::StallingPlayer).unwrap();
         assert_eq!(sp.label.as_deref(), Some(labels::END_FEEDING));
     }
+
+    #[test]
+    fn total_step_count_is_eleven() {
+        let steps = EndPlayerAction::build_sequence(&EndPlayerActionParams::default());
+        assert_eq!(steps.len(), 11);
+    }
+
+    #[test]
+    fn check_forgo_param_flows_to_end_feeding() {
+        let params = EndPlayerActionParams { check_forgo: true, ..Default::default() };
+        let steps = EndPlayerAction::build_sequence(&params);
+        let end_feeding = steps.iter().find(|s| s.step_id == StepId::EndFeeding).unwrap();
+        let has_check_forgo = end_feeding.params.iter().any(|p| matches!(p, StepParameter::CheckForgo(true)));
+        assert!(has_check_forgo);
+    }
+
+    #[test]
+    fn feeding_allowed_param_flows_to_init_feeding() {
+        let params = EndPlayerActionParams { feeding_allowed: true, ..Default::default() };
+        let steps = EndPlayerAction::build_sequence(&params);
+        let init_feeding = steps.iter().find(|s| s.step_id == StepId::InitFeeding).unwrap();
+        let has_feeding = init_feeding.params.iter().any(|p| matches!(p, StepParameter::FeedingAllowed(true)));
+        assert!(has_feeding);
+    }
 }

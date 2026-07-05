@@ -287,6 +287,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.field_model.set_player_coordinate(id, coord);
         game.field_model.ball_coordinate = Some(coord);
@@ -305,6 +306,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.field_model.set_player_coordinate(id, coord);
         game.field_model.ball_coordinate = Some(coord);

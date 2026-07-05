@@ -1,11 +1,12 @@
 /// 1:1 translation of com.fumbbl.ffb.server.step.phase.kickoff.StepEndKickoff.
 ///
-/// Pushes endTurnSequence (and InducementPhase::AfterKickoffToOpponent — TODO) on the stack.
+/// Pushes EndTurnSequence then Inducement(AfterKickoffToOpponent) on the stack.
+use ffb_model::enums::InducementPhase;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepId, StepOutcome, StepParameter};
-use crate::step::sequences::end_turn_sequence;
+use crate::step::sequences::{end_turn_sequence, inducement_sequence};
 
 pub struct StepEndKickoff;
 
@@ -32,10 +33,10 @@ impl Step for StepEndKickoff {
 }
 
 impl StepEndKickoff {
-    fn execute_step(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // Java: pushes EndTurnSequence + InducementPhase::AfterKickoffToOpponent.
-        // DEFERRED: push Inducement(AfterKickoffToOpponent) sequence.
-        StepOutcome::next().push_seq(end_turn_sequence(false))
+    fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        let end_turn_seq = end_turn_sequence(false);
+        let inducement_seq = inducement_sequence(InducementPhase::AfterKickoffToOpponent, game.home_playing);
+        StepOutcome::next().push_seq(end_turn_seq).push_seq(inducement_seq)
     }
 }
 
@@ -51,11 +52,31 @@ mod tests {
     }
 
     #[test]
-    fn start_pushes_end_turn_sequence() {
+    fn start_pushes_end_turn_and_inducement_sequences() {
         let mut game = make_game();
         let mut step = StepEndKickoff::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
-        assert!(!out.pushes.is_empty(), "should push end_turn_sequence");
+        assert_eq!(out.pushes.len(), 2, "should push end_turn + inducement sequences");
+    }
+
+    #[test]
+    fn id_is_end_kickoff() {
+        assert_eq!(StepEndKickoff::new().id(), StepId::EndKickoff);
+    }
+
+    #[test]
+    fn handle_command_also_pushes_sequences() {
+        let mut game = make_game();
+        let mut step = StepEndKickoff::new();
+        let out = step.handle_command(&Action::Acknowledge, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(out.pushes.len(), 2);
+    }
+
+    #[test]
+    fn set_parameter_always_returns_false() {
+        let mut step = StepEndKickoff::new();
+        assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
     }
 }

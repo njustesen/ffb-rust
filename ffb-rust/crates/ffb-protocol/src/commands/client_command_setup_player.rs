@@ -1,10 +1,48 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct ClientCommandSetupPlayer;
+use ffb_model::types::FieldCoordinate;
 
-impl ClientCommandSetupPlayer {
-    pub fn new() -> Self { Self }
+/// 1:1 translation of `com.fumbbl.ffb.net.commands.ClientCommandSetupPlayer`.
+/// Sent when a player is placed during the setup phase.
+#[derive(Debug, Clone, Default)]
+pub struct ClientCommandSetupPlayer {
+    /// Java: `fPlayerId`
+    pub player_id: Option<String>,
+    /// Java: `fCoordinate`
+    pub coordinate: Option<FieldCoordinate>,
 }
 
-impl Default for ClientCommandSetupPlayer {
-    fn default() -> Self { Self::new() }
+impl ClientCommandSetupPlayer {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn with_placement(
+        player_id: impl Into<String>,
+        coordinate: FieldCoordinate,
+    ) -> Self {
+        Self {
+            player_id: Some(player_id.into()),
+            coordinate: Some(coordinate),
+        }
+    }
+
+    pub fn get_player_id(&self) -> Option<&str> { self.player_id.as_deref() }
+    pub fn get_coordinate(&self) -> Option<FieldCoordinate> { self.coordinate }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fields_stored_correctly() {
+        let coord = FieldCoordinate::new(5, 5);
+        let cmd = ClientCommandSetupPlayer::with_placement("p1", coord);
+        assert_eq!(cmd.get_player_id(), Some("p1"));
+        assert_eq!(cmd.get_coordinate(), Some(coord));
+    }
+
+    #[test]
+    fn default_both_none() {
+        let cmd = ClientCommandSetupPlayer::new();
+        assert!(cmd.player_id.is_none());
+        assert!(cmd.coordinate.is_none());
+    }
 }

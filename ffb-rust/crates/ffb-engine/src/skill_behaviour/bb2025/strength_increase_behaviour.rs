@@ -1,7 +1,11 @@
 use crate::skill_behaviour::SkillBehaviour;
+use ffb_model::model::player::Player;
+use ffb_model::model::roster_position::RosterPosition;
 
-/// Strength Increase advancement: re-roll one strength stat increase per level-up.
-/// No StepModifier -- execute_step_hook is a no-op (returns the default false).
+/// 1:1 translation of `com.fumbbl.ffb.server.skillbehaviour.bb2025.StrengthIncreaseBehaviour`.
+///
+/// Java: `registerModifier(player -> player.setStrength(min(min(8, pos.getStrength()+2), player.getStrength()+1)))`.
+/// BB2025: same formula as BB2020, strength cap is 8.
 pub struct StrengthIncreaseBehaviour;
 
 impl StrengthIncreaseBehaviour {
@@ -14,36 +18,47 @@ impl Default for StrengthIncreaseBehaviour {
 
 impl SkillBehaviour for StrengthIncreaseBehaviour {
     fn name(&self) -> &'static str { "StrengthIncreaseBehaviour" }
+
+    fn apply_modifier(&self, player: &mut Player, position: &RosterPosition) {
+        player.strength = (position.strength + 2).min(8).min(player.strength + 1);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn test_game() -> ffb_model::model::game::Game {
-        let home = ffb_model::model::team::Team {
-            id: "home".into(), name: "Home".into(), race: "human".into(),
-            roster_id: "human".into(), coach: "Coach".into(),
-            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
-            prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
-            cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
-            team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
-        };
-        let away = home.clone();
-        ffb_model::model::game::Game::new(home, away, ffb_model::enums::Rules::Bb2025)
+    fn pos(strength: i32) -> RosterPosition {
+        RosterPosition { strength, ..Default::default() }
     }
 
     #[test]
-    fn hook_is_noop_returns_false() {
-        let behaviour = StrengthIncreaseBehaviour::new();
-        let mut game = test_game();
-        assert!(!behaviour.execute_step_hook(&mut game));
+    fn apply_increases_by_one() {
+        let b = StrengthIncreaseBehaviour::new();
+        let mut player = Player { strength: 3, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(3));
+        assert_eq!(player.strength, 4);
     }
 
     #[test]
-    fn execute_step_hook_returns_bool() {
-        let behaviour = StrengthIncreaseBehaviour::new();
-        let mut game = test_game();
-        let _result: bool = behaviour.execute_step_hook(&mut game);
+    fn apply_capped_at_eight() {
+        let b = StrengthIncreaseBehaviour::new();
+        let mut player = Player { strength: 8, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(9));
+        assert_eq!(player.strength, 8);
+    }
+
+    #[test]
+    fn apply_capped_by_position_plus_two() {
+        // pos.st=3, cap=5; player.st=5 → min(5, 6) = 5 (no change)
+        let b = StrengthIncreaseBehaviour::new();
+        let mut player = Player { strength: 5, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(3));
+        assert_eq!(player.strength, 5);
+    }
+
+    #[test]
+    fn name_is_correct() {
+        assert_eq!(StrengthIncreaseBehaviour::new().name(), "StrengthIncreaseBehaviour");
     }
 }

@@ -87,6 +87,23 @@ impl Direction {
         }
     }
 
+    /// Compute the direction from one coordinate to another (Java: FieldCoordinate.getDirection).
+    pub fn from_coords(from_x: i32, from_y: i32, to_x: i32, to_y: i32) -> Option<Direction> {
+        let dx = to_x - from_x;
+        let dy = to_y - from_y;
+        match (dx.signum(), dy.signum()) {
+            (-1, -1) => Some(Direction::Northwest),
+            (-1,  1) => Some(Direction::Southwest),
+            (-1,  0) => Some(Direction::West),
+            ( 1, -1) => Some(Direction::Northeast),
+            ( 1,  1) => Some(Direction::Southeast),
+            ( 1,  0) => Some(Direction::East),
+            ( 0, -1) => Some(Direction::North),
+            ( 0,  1) => Some(Direction::South),
+            _ => None,
+        }
+    }
+
     pub fn all() -> &'static [Direction] {
         &[
             Direction::North,

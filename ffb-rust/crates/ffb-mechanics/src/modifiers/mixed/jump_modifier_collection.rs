@@ -28,3 +28,26 @@ impl JumpModifierCollection {
 impl Default for JumpModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_sixteen_modifiers() {
+        // 8 prehensile_tail + 8 tacklezone = 16
+        assert_eq!(JumpModifierCollection::new().get_modifiers().len(), 16);
+    }
+
+    #[test]
+    fn includes_prehensile_tail_modifier() {
+        let col = JumpModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "1 Prehensile Tail"));
+    }
+
+    #[test]
+    fn includes_tacklezone_modifier() {
+        let col = JumpModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "1 Tacklezone"));
+    }
+}

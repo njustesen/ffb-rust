@@ -22,17 +22,24 @@ pub enum SeriousInjuryKind {
     Groin,
     GougedEye,
     BrokenJaw,
-    BrokenNeck,
-    SmashedAnkle,
-    SmashedHip,
-    BrokenCollarBone,
+    FracturedArm,
+    FracturedLeg,
+    SmashedHand,
+    PinchedNerve,
+    DamagedBack,
     SmashedKneeB2016,
+    SmashedHip,
+    SmashedAnkle,
+    SeriousConcussion,
+    FracturedSkull,
+    BrokenNeck,
+    BrokenCollarBone,
+    Poisoned,
     ThighStrain,
     ThumbSprain,
     BrokenShoulder,
     ShatteredWrist,
     SmashedElbow,
-    PinchedNerve,
     BrokenNose,
 }
 
@@ -44,9 +51,8 @@ impl SeriousInjuryKind {
     pub fn injury_attribute(self) -> Option<InjuryAttribute> {
         match self {
             SeriousInjuryKind::HeadInjuryAv => Some(InjuryAttribute::AV),
-            SeriousInjuryKind::SmashedKneeMa | SeriousInjuryKind::SmashedKneeB2016 => {
-                Some(InjuryAttribute::MA)
-            }
+            SeriousInjuryKind::SmashedKneeMa => Some(InjuryAttribute::MA),
+            SeriousInjuryKind::SmashedKneeB2016 => Some(InjuryAttribute::NI),
             SeriousInjuryKind::BrokenArmPa => Some(InjuryAttribute::PA),
             SeriousInjuryKind::NeckInjuryAg
             | SeriousInjuryKind::DislocatedHipAg
@@ -58,11 +64,14 @@ impl SeriousInjuryKind {
             | SeriousInjuryKind::SmashedElbow
             | SeriousInjuryKind::ShatteredWrist
             | SeriousInjuryKind::BrokenShoulder => Some(InjuryAttribute::ST),
-            SeriousInjuryKind::SmashedHip       // BB2016: -MA (Java: SMASHED_HIP → InjuryAttribute.MA)
+            SeriousInjuryKind::SmashedHip
             | SeriousInjuryKind::SmashedAnkle
             | SeriousInjuryKind::ThighStrain
             | SeriousInjuryKind::ThumbSprain => Some(InjuryAttribute::MA),
-            SeriousInjuryKind::PinchedNerve => Some(InjuryAttribute::AV),
+            SeriousInjuryKind::SeriousConcussion | SeriousInjuryKind::FracturedSkull => {
+                Some(InjuryAttribute::AV)
+            }
+            SeriousInjuryKind::DamagedBack => Some(InjuryAttribute::NI),
             _ => None,
         }
     }
@@ -135,8 +144,8 @@ mod tests {
     }
 
     #[test]
-    fn bb2016_smashed_knee_reduces_ma() {
-        assert_eq!(SeriousInjuryKind::SmashedKneeB2016.injury_attribute(), Some(InjuryAttribute::MA));
+    fn bb2016_smashed_knee_is_niggling() {
+        assert_eq!(SeriousInjuryKind::SmashedKneeB2016.injury_attribute(), Some(InjuryAttribute::NI));
     }
 
     #[test]

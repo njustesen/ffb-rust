@@ -8,7 +8,8 @@
 ///
 /// DEFERRED(Winnings-dialog): DialogWinningsReRollParameter / UtilServerDialog not yet ported.
 /// DEFERRED(Winnings-reroll): AbstractStepWithReRoll / WINNINGS re-roll not yet ported.
-/// DEFERRED(Winnings-report): ReportWinningsRoll game event not yet ported (arithmetic applied directly).
+/// WinningsRoll GameEvent wired.
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -47,10 +48,30 @@ impl StepWinnings {
     }
 
     fn execute_step(game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        Self::roll_winnings(game, rng);
+        let (roll_home, roll_away) = Self::roll_winnings(game, rng);
+        // Capture winnings after roll, before concession transfer
+        let home_id = game.team_home.id.clone();
+        let away_id = game.team_away.id.clone();
+        let winnings_home_initial = game.game_result.home.winnings;
+        let winnings_away_initial = game.game_result.away.winnings;
+        let fame_home = game.game_result.home.fame;
+        let fame_away = game.game_result.away.fame;
         // DEFERRED(Winnings-dialog): show re-roll dialog for winner — dialog layer not yet ported.
         Self::concede_winnings(game);
+        // Java: addReport(new ReportWinningsRoll(home.id, fame, roll, total)) x2 (initial + concede)
         StepOutcome::next()
+            .with_event(GameEvent::WinningsRoll {
+                team_id: home_id.clone(),
+                base: fame_home,
+                roll: roll_home,
+                total: winnings_home_initial,
+            })
+            .with_event(GameEvent::WinningsRoll {
+                team_id: away_id.clone(),
+                base: fame_away,
+                roll: roll_away,
+                total: winnings_away_initial,
+            })
     }
 }
 

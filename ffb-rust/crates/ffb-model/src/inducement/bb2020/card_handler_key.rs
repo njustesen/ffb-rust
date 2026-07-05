@@ -1,10 +1,62 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct CardHandlerKey;
-
-impl CardHandlerKey {
-    pub fn new() -> Self { Self }
+/// 1:1 translation of `com.fumbbl.ffb.inducement.bb2020.CardHandlerKey`.
+/// Identifies which CardHandler is responsible for a given card.
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CardHandlerKey {
+    CHOP_BLOCK,
+    CUSTARD_PIE,
+    DISTRACT,
+    FORCE_SHIELD,
+    ILLEGAL_SUBSTITUTION,
+    PIT_TRAP,
+    RABBITS_FOOT,
+    WITCH_BREW,
 }
 
-impl Default for CardHandlerKey {
-    fn default() -> Self { Self::new() }
+impl CardHandlerKey {
+    pub fn get_name(self) -> &'static str {
+        match self {
+            CardHandlerKey::CHOP_BLOCK => "CHOP_BLOCK",
+            CardHandlerKey::CUSTARD_PIE => "CUSTARD_PIE",
+            CardHandlerKey::DISTRACT => "DISTRACT",
+            CardHandlerKey::FORCE_SHIELD => "FORCE_SHIELD",
+            CardHandlerKey::ILLEGAL_SUBSTITUTION => "ILLEGAL_SUBSTITUTION",
+            CardHandlerKey::PIT_TRAP => "PIT_TRAP",
+            CardHandlerKey::RABBITS_FOOT => "RABBITS_FOOT",
+            CardHandlerKey::WITCH_BREW => "WITCH_BREW",
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn all_variants_have_names() {
+        let variants = [
+            CardHandlerKey::CHOP_BLOCK,
+            CardHandlerKey::CUSTARD_PIE,
+            CardHandlerKey::DISTRACT,
+            CardHandlerKey::FORCE_SHIELD,
+            CardHandlerKey::ILLEGAL_SUBSTITUTION,
+            CardHandlerKey::PIT_TRAP,
+            CardHandlerKey::RABBITS_FOOT,
+            CardHandlerKey::WITCH_BREW,
+        ];
+        for v in &variants {
+            assert!(!v.get_name().is_empty());
+        }
+    }
+
+    #[test]
+    fn force_shield_has_correct_name() {
+        assert_eq!(CardHandlerKey::FORCE_SHIELD.get_name(), "FORCE_SHIELD");
+    }
+
+    #[test]
+    fn equality_holds() {
+        assert_eq!(CardHandlerKey::WITCH_BREW, CardHandlerKey::WITCH_BREW);
+        assert_ne!(CardHandlerKey::WITCH_BREW, CardHandlerKey::DISTRACT);
+    }
 }

@@ -37,4 +37,19 @@ mod tests {
         assert_eq!(steps[0].step_id, StepId::CatchOfTheDay);
         assert_eq!(steps[0].label.as_deref(), Some(labels::END));
     }
+
+    #[test]
+    fn failure_label_in_params() {
+        let steps = CatchOfTheDay::build_sequence(&CatchOfTheDayParams { failure_label: "lbl".into() });
+        let has = steps[0].params.iter().any(|p| {
+            matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "lbl")
+        });
+        assert!(has);
+    }
+
+    #[test]
+    fn step_id_is_catch_of_the_day() {
+        let steps = CatchOfTheDay::build_sequence(&CatchOfTheDayParams::default());
+        assert_eq!(steps[0].step_id, StepId::CatchOfTheDay);
+    }
 }

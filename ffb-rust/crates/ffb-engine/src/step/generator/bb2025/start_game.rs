@@ -53,4 +53,17 @@ mod tests {
         let steps = StartGame::build_sequence();
         assert_eq!(steps.last().unwrap().step_id, StepId::BuyInducements);
     }
+
+    #[test]
+    fn start_game_has_weather_and_spectators() {
+        let steps = StartGame::build_sequence();
+        assert!(steps.iter().any(|s| s.step_id == StepId::Weather));
+        assert!(steps.iter().any(|s| s.step_id == StepId::Spectators));
+    }
+
+    #[test]
+    fn start_game_has_petty_cash() {
+        let steps = StartGame::build_sequence();
+        assert!(steps.iter().any(|s| s.step_id == StepId::PettyCash));
+    }
 }

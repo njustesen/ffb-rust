@@ -25,3 +25,27 @@ impl GazeModifierCollection {
 impl Default for GazeModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_eight_modifiers() {
+        // 8 tacklezone modifiers (1..=8)
+        assert_eq!(GazeModifierCollection::new().get_modifiers().len(), 8);
+    }
+
+    #[test]
+    fn includes_single_tacklezone_modifier() {
+        let col = GazeModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "1 Tacklezone"));
+    }
+
+    #[test]
+    fn all_modifiers_are_tacklezone_type() {
+        let col = GazeModifierCollection::new();
+        use crate::modifiers::modifier_type::ModifierType;
+        assert!(col.get_modifiers().iter().all(|m| m.get_type() == ModifierType::TACKLEZONE));
+    }
+}

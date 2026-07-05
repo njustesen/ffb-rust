@@ -80,4 +80,19 @@ mod tests {
         let steps = EndPlayerAction::build_sequence(&EndPlayerActionParams::default());
         assert!(!steps.iter().any(|s| s.step_id == StepId::SteadyFooting));
     }
+
+    #[test]
+    fn feeding_allowed_param_flows_to_init_feeding() {
+        let params = EndPlayerActionParams { feeding_allowed: true, ..Default::default() };
+        let steps = EndPlayerAction::build_sequence(&params);
+        let init_feeding = steps.iter().find(|s| s.step_id == StepId::InitFeeding).unwrap();
+        let has = init_feeding.params.iter().any(|p| matches!(p, StepParameter::FeedingAllowed(true)));
+        assert!(has);
+    }
+
+    #[test]
+    fn end_player_action_total_step_count() {
+        let steps = EndPlayerAction::build_sequence(&EndPlayerActionParams::default());
+        assert_eq!(steps.len(), 7);
+    }
 }

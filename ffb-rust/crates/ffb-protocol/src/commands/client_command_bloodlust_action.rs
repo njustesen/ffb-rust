@@ -1,10 +1,29 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct ClientCommandBloodlustAction;
-
-impl ClientCommandBloodlustAction {
-    pub fn new() -> Self { Self }
+/// 1:1 translation of `com.fumbbl.ffb.net.commands.ClientCommandBloodlustAction`.
+/// Sent when a vampire player chooses to change their blood lust action.
+#[derive(Debug, Clone, Default)]
+pub struct ClientCommandBloodlustAction {
+    /// Java: `change` — whether the player wants to change their action.
+    pub change: bool,
 }
 
-impl Default for ClientCommandBloodlustAction {
-    fn default() -> Self { Self::new() }
+impl ClientCommandBloodlustAction {
+    pub fn new(change: bool) -> Self { Self { change } }
+    pub fn is_change(&self) -> bool { self.change }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn change_true_stored() {
+        let cmd = ClientCommandBloodlustAction::new(true);
+        assert!(cmd.is_change());
+    }
+
+    #[test]
+    fn default_is_false() {
+        let cmd = ClientCommandBloodlustAction::default();
+        assert!(!cmd.change);
+    }
 }

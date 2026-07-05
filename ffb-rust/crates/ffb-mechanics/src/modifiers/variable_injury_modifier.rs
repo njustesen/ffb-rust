@@ -37,3 +37,27 @@ impl InjuryModifier for VariableInjuryModifier {
     fn registered_to(&self) -> Option<&str> { self.registered_to.as_deref() }
     fn set_registered_to(&mut self, skill_id: Option<String>) { self.registered_to = skill_id; }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_attacker_stores_name_and_niggling_flag() {
+        let m = VariableInjuryModifier::new_attacker("Mighty Blow", false);
+        assert_eq!(m.get_name(), "Mighty Blow");
+        assert!(!m.is_niggling_injury_modifier());
+    }
+
+    #[test]
+    fn new_defender_niggling_flag_propagates() {
+        let m = VariableInjuryModifier::new_defender("Niggling", true);
+        assert!(m.is_niggling_injury_modifier());
+    }
+
+    #[test]
+    fn registered_to_defaults_none() {
+        let m = VariableInjuryModifier::new_attacker("x", false);
+        assert!(m.registered_to().is_none());
+    }
+}

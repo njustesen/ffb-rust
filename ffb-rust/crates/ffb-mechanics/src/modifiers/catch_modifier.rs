@@ -55,3 +55,28 @@ impl CatchModifier {
         self.applies_to_context.as_ref().map(|f| f(context)).unwrap_or(true)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_stores_name_and_modifier() {
+        let m = CatchModifier::new("Rain", -1, ModifierType::REGULAR);
+        assert_eq!(m.get_name(), "Rain");
+        assert_eq!(m.get_modifier(), -1);
+        assert_eq!(m.get_type(), ModifierType::REGULAR);
+    }
+
+    #[test]
+    fn tacklezone_type_is_modifier_included() {
+        let m = CatchModifier::new("1 Tacklezone", 1, ModifierType::TACKLEZONE);
+        assert!(m.is_modifier_included());
+    }
+
+    #[test]
+    fn regular_type_is_not_modifier_included() {
+        let m = CatchModifier::new("Rain", -1, ModifierType::REGULAR);
+        assert!(!m.is_modifier_included());
+    }
+}

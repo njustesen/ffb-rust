@@ -20,3 +20,19 @@ impl IDialogParameter for DialogOpponentBlockSelectionParameter {
     fn get_id(&self) -> DialogId { DialogId::OPPONENT_BLOCK_SELECTION }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dialog_id_is_opponent_block_selection() {
+        assert_eq!(DialogOpponentBlockSelectionParameter::default().get_id(), DialogId::OPPONENT_BLOCK_SELECTION);
+    }
+
+    #[test]
+    fn stores_team_id() {
+        let p = DialogOpponentBlockSelectionParameter { team_id: Some("t1".into()), block_rolls: vec![] };
+        assert_eq!(p.get_team_id(), Some("t1"));
+    }
+}

@@ -79,4 +79,20 @@ mod tests {
         let apo = steps.iter().find(|s| s.step_id == StepId::Apothecary).unwrap();
         assert!(apo.params.iter().any(|p| matches!(p, StepParameter::ApothecaryMode(ApothecaryMode::SpecialEffect))));
     }
+
+    #[test]
+    fn special_effect_key_passed_when_some() {
+        let params = SpecialEffectParams { special_effect: Some("FIREBALL".into()), ..Default::default() };
+        let steps = SpecialEffect::build_sequence(&params);
+        let has = steps[0].params.iter().any(|p| matches!(p, StepParameter::SpecialEffectKey(k) if k == "FIREBALL"));
+        assert!(has);
+    }
+
+    #[test]
+    fn player_id_passed_when_some() {
+        let params = SpecialEffectParams { player_id: Some("pX".into()), ..Default::default() };
+        let steps = SpecialEffect::build_sequence(&params);
+        let has = steps[0].params.iter().any(|p| matches!(p, StepParameter::PlayerId(id) if id == "pX"));
+        assert!(has);
+    }
 }

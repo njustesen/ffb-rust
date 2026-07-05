@@ -8,6 +8,7 @@ use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::util_server_injury::handle_injury_by_name;
 use crate::util::UtilServerPlayerMove;
+use crate::util::util_server_pushback::UtilServerPushback;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2020.block.StepPushback.
 /// Handles player pushback and crowd-push. The Java StepState fields are inlined here.
@@ -77,14 +78,7 @@ impl Step for StepPushback {
         match param {
             StepParameter::OldDefenderState(v) => { self.old_defender_state = Some(*v); true }
             StepParameter::StartingPushbackSquare(v) => {
-                // Java: startingPushbackSquare is a full PushbackSquare with coordinate + direction.
-                // StepParameter::StartingPushbackSquare carries a FieldCoordinate (the centre square).
-                // We wrap it into a PushbackSquare with a placeholder direction.
-                self.starting_pushback_square = Some(PushbackSquare::new(
-                    *v,
-                    ffb_model::enums::Direction::North, // placeholder direction
-                    true, // home_choice placeholder
-                ));
+                self.starting_pushback_square = *v;
                 true
             }
             _ => false,
@@ -128,15 +122,13 @@ impl StepPushback {
 
                 // Java: pushbackSquares = UtilServerPushback.findPushbackSquares(game, startingSq, REGULAR)
                 // Java: fieldModel.add(pushbackSquares)
-                // DEFERRED: UtilServerPushback.findPushbackSquares — not yet translated.
-                // For now: find free adjacent squares to approximate.
-                let adjacent_free: Vec<FieldCoordinate> = game.field_model
-                    .adjacent_on_pitch(defender_coord)
-                    .into_iter()
-                    .filter(|&c| game.field_model.player_at(c).is_none())
-                    .collect();
+                let pushback_squares = UtilServerPushback::find_pushback_squares_standard(
+                    starting_sq,
+                    &|c| game.field_model.player_at(c).is_some(),
+                    game.home_playing,
+                );
 
-                let pushback_squares_found = !adjacent_free.is_empty();
+                let pushback_squares_found = !pushback_squares.is_empty();
 
                 // Java: if (!ArrayTool.isProvided(state.pushbackSquares)) → Crowd push
                 if !pushback_squares_found {
@@ -171,7 +163,7 @@ impl StepPushback {
                         .publish(StepParameter::InjuryResult(Box::new(injury_result)))
                         .publish(StepParameter::DefenderPushed(true))
                         // Java: publishParameter(STARTING_PUSHBACK_SQUARE, null)
-                        .publish(StepParameter::StartingPushbackSquare(FieldCoordinate::new(0, 0)));
+                        .publish(StepParameter::StartingPushbackSquare(None));
 
                     if ball_at_defender {
                         game.field_model.ball_coordinate = None;
@@ -197,8 +189,9 @@ impl StepPushback {
                 // (startingPushbackSquare is still set here — this branch is for when it was just cleared above)
 
                 // Add candidate pushback squares to the field model so the client can display them.
-                // DEFERRED: add actual PushbackSquares to field_model.pushback_squares via UtilServerPushback
-                // For now, just wait for the agent to call PushTo.
+                for sq in pushback_squares {
+                    game.field_model.pushback_squares.push(sq);
+                }
                 return StepOutcome::cont();
             }
         }
@@ -208,8 +201,9 @@ impl StepPushback {
             // Java: publishParameter(StepParameterKey.DEFENDER_PUSHED, true)
             // Java: while (!pushbackStack.isEmpty()) { pop + pushPlayer }
             let pushes: Vec<(String, FieldCoordinate)> = self.pushback_stack.drain(..).collect();
+            let mut extra: Vec<StepParameter> = Vec::new();
             for (player_id, coord) in pushes {
-                push_player(game, &player_id, coord);
+                extra.extend(push_player(game, &player_id, coord));
             }
             // Java: fieldModel.clearPushbackSquares()
             game.field_model.pushback_squares.clear();
@@ -218,9 +212,11 @@ impl StepPushback {
             // Java: game.setWaitingForOpponent(false)
             // Java: getResult().setNextAction(StepAction.NEXT_STEP)
 
-            StepOutcome::next()
+            let mut outcome = StepOutcome::next()
                 .publish(StepParameter::DefenderPushed(true))
-                .publish(StepParameter::StartingPushbackSquare(FieldCoordinate::new(0, 0)))
+                .publish(StepParameter::StartingPushbackSquare(None));
+            for p in extra { outcome = outcome.publish(p); }
+            outcome
         } else {
             StepOutcome::cont()
         }
@@ -228,26 +224,28 @@ impl StepPushback {
 }
 
 /// Java: StepPushback.pushPlayer — moves player to coordinate, handles ball interaction.
-fn push_player(game: &mut Game, player_id: &str, coord: FieldCoordinate) {
+/// Returns parameters to publish (Java calls publishParameter() directly; we collect them here).
+fn push_player(game: &mut Game, player_id: &str, coord: FieldCoordinate) -> Vec<StepParameter> {
     // Java: fieldModel.updatePlayerAndBallPosition(pPlayer, pCoordinate)
     game.field_model.set_player_coordinate(player_id, coord);
     // Java: UtilServerPlayerMove.updateMoveSquares(getGameState(), false)
     UtilServerPlayerMove::update_move_squares(game, false);
 
+    let mut params: Vec<StepParameter> = Vec::new();
     // Java: if (fieldModel.isBallMoving() && pCoordinate.equals(fieldModel.getBallCoordinate()))
     //   publish CatchScatterThrowInMode.SCATTER_BALL
-    //   publish PushedOnBall(true)
     if game.field_model.ball_moving
         && game.field_model.ball_coordinate.map(|bc| bc == coord).unwrap_or(false)
     {
-        // DEFERRED: publish CatchScatterThrowInMode::ScatterBall + PushedOnBall(true)
-        // These are published through the StepOutcome chain but push_player is a free fn.
-        // The outer execute_step call would need to collect these — deferred until full
-        // publish-from-inner-fn pattern is available.
+        params.push(StepParameter::CatchScatterThrowInMode(
+            crate::step::CatchScatterThrowInMode::ScatterBall,
+        ));
     }
     // Java: publishParameter(PLAYER_ENTERING_SQUARE, pPlayer.getId())
     // Java: publishParameter(PLAYER_WAS_PUSHED, true)
-    // DEFERRED: publish PlayerEnteringSquare + PlayerWasPushed through caller
+    params.push(StepParameter::PlayerEnteringSquare(player_id.to_owned()));
+    params.push(StepParameter::PlayerWasPushed(true));
+    params
 }
 
 #[cfg(test)]
@@ -279,7 +277,8 @@ mod tests {
     fn set_parameter_starting_pushback_square_accepted() {
         let mut step = StepPushback::new();
         let coord = FieldCoordinate::new(5, 5);
-        let accepted = step.set_parameter(&StepParameter::StartingPushbackSquare(coord));
+        let sq = PushbackSquare::new(coord, Direction::North, true);
+        let accepted = step.set_parameter(&StepParameter::StartingPushbackSquare(Some(sq)));
         assert!(accepted);
         assert!(step.starting_pushback_square.is_some());
         assert_eq!(step.starting_pushback_square.unwrap().coordinate, coord);

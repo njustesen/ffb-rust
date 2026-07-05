@@ -156,6 +156,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         };
         let coord = FieldCoordinate::new(12, 7); // interior
         game.team_home.players.push(player);
@@ -184,6 +185,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         };
         game.team_home.players.push(player);
         game.field_model.set_player_coordinate("punter2", FieldCoordinate::new(5, 5));
@@ -212,6 +214,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         };
         let from = FieldCoordinate::new(8, 7);
         let to = FieldCoordinate::new(9, 7);

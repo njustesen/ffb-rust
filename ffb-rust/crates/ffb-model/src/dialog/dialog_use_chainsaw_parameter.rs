@@ -16,3 +16,17 @@ impl IDialogParameter for DialogUseChainsawParameter {
     fn get_id(&self) -> DialogId { DialogId::USE_CHAINSAW }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_use_chainsaw() {
+        assert_eq!(DialogUseChainsawParameter::default().get_id(), DialogId::USE_CHAINSAW);
+    }
+    #[test]
+    fn stores_team_id() {
+        let p = DialogUseChainsawParameter { team_id: Some("home".into()) };
+        assert_eq!(p.get_team_id(), Some("home"));
+    }
+}

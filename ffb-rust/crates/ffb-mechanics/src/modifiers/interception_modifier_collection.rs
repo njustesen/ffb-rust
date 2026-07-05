@@ -58,3 +58,24 @@ impl InterceptionModifierCollection {
 impl Default for InterceptionModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_twelve_base_modifiers() {
+        // 11 disturbing_presence + 1 pouring_rain = 12
+        assert_eq!(InterceptionModifierCollection::new().get_modifiers().len(), 12);
+    }
+
+    #[test]
+    fn includes_pouring_rain_modifier() {
+        assert!(InterceptionModifierCollection::new().get_modifiers().iter().any(|m| m.get_name() == "Pouring Rain"));
+    }
+
+    #[test]
+    fn includes_disturbing_presence_modifier() {
+        assert!(InterceptionModifierCollection::new().get_modifiers().iter().any(|m| m.get_name() == "1 Disturbing Presence"));
+    }
+}

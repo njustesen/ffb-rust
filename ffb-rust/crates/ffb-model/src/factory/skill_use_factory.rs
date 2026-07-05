@@ -14,3 +14,19 @@ impl SkillUseFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_skill_use() {
+        let f = SkillUseFactory::default();
+        assert_eq!(f.for_name("wouldNotHelp"), Some(SkillUse::WOULD_NOT_HELP));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(SkillUseFactory::default().for_name("invalid"), None);
+    }
+}

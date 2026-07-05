@@ -24,3 +24,26 @@ impl DodgeModifierCollection {
 impl Default for DodgeModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_sixteen_modifiers() {
+        // base 8 tacklezone + 8 prehensile_tail = 16
+        assert_eq!(DodgeModifierCollection::new().get_modifiers().len(), 16);
+    }
+
+    #[test]
+    fn includes_prehensile_tail_modifier() {
+        let col = DodgeModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "1 Prehensile Tail"));
+    }
+
+    #[test]
+    fn plural_prehensile_tails_for_count_above_one() {
+        let col = DodgeModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "3 Prehensile Tails"));
+    }
+}

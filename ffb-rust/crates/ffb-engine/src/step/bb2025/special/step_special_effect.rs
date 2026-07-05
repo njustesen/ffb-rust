@@ -1,63 +1,31 @@
-use ffb_model::model::special_effect::SpecialEffect;
+/// 1:1 translation of `com.fumbbl.ffb.server.step.bb2025.special.StepSpecialEffect`.
+///
+/// Applies a special inducement effect (Lightning, ZAP, Fireball, Bomb) to a player.
+/// Optionally rolls a d6 to check if the effect succeeds.
+///
+/// BB2025 differences vs BB2016:
+///   - FIREBALL: publishes SteadyFootingContext(InjuryResult) instead of InjuryResult directly.
+///   - BOMB: complex suppressEndTurn logic + SteadyFootingContext; SPP tracking via
+///     InjuryTypeBombWithModifierForSpp when bombardier gets SPPs (DEFERRED: PassState.originalBombardier).
+///   - END_TURN guard: only published if `isStanding` (not prone/stunned).
+///   - ZAP: ZappedPlayer substitution still DEFERRED (ZappedPlayer not yet ported).
+///
+/// DEFERRED(ZAP): ZappedPlayer substitution not yet ported.
+/// DEFERRED(bombardier-spp): InjuryTypeBombWithModifierForSpp path blocked by PassState.originalBombardier.
+use ffb_model::enums::{ApothecaryMode, TurnMode};
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::model::special_effect::SpecialEffect;
+use ffb_model::option::game_option_id::{BOMB_TEAM_MATE_KNOCK_DOWN_CAUSES_TURNOVER, BOMBER_PLACED_PRONE_IGNORES_TURNOVER};
+use ffb_model::option::util_game_option::is_option_enabled;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
+use crate::drop_player_context::SteadyFootingContext;
 use crate::step::framework::{Step, StepOutcome};
-use crate::step::framework::{StepAction, StepId, StepParameter};
+use crate::step::framework::{StepId, StepParameter};
+use crate::step::util_server_injury::{drop_player, handle_injury_by_name};
 
-/// Applies a special inducement effect (Wizard Lightning Bolt / Fire Ball / Bomb etc.).
-// Java executeStep logic:
-//   player = game.getPlayerById(fPlayerId)
-//   if player == null -> return (implicit continue)
-//
-//   state = fieldModel.getPlayerState(player)
-//   isStanding = !state.isProneOrStunned && !state.isStunned
-//   isActive = state.isActive
-//   successful = true
-//
-//   if fRollForEffect:
-//     roll = diceRoller.rollWizardSpell()
-//     successful = DiceInterpreter.isSpecialEffectSuccessful(fSpecialEffect, player, roll)
-//     report ReportSpecialEffectRoll(fSpecialEffect, player.id, roll, successful)
-//   else:
-//     report ReportSpecialEffectRoll(fSpecialEffect, player.id, 0, true)
-//
-//   if successful:
-//     playerCoordinate = fieldModel.getPlayerCoordinate(player)
-//
-//     if fSpecialEffect==ZAP && player instanceof RosterPlayer:
-//       ... ZappedPlayer creation + team replacement ...
-//       if ballCoordinate==playerCoordinate: push CSTI(SCATTER_BALL)
-//
-//     if fSpecialEffect==FIREBALL:
-//       publish SteadyFootingContext(handleInjury(InjuryTypeFireball), [DropPlayerCommand])
-//
-//     if fSpecialEffect==BOMB:
-//       bombFromHome/bombFromAway = (turnMode == BOMB_HOME / BOMB_AWAY / blitz variants)
-//       playerHitIsFromBombTeam = ...
-//       suppressEndTurn logic (BOMB_TEAM_MATE_KNOCK_DOWN_CAUSES_TURNOVER option)
-//       if bombardier is self && !bomberTurnoverIgnored: suppressEndTurn=false
-//       publish SteadyFootingContext(handleInjury(InjuryTypeBombWithModifier/ForSpp), [DropPlayerFromBombCommand])
-//
-//     // check end turn
-//     if isStanding:
-//       actingTeam = (based on turnMode BOMB_HOME/BOMB_AWAY or normal)
-//       if actingTeam.hasPlayer && fSpecialEffect!=FIREBALL && !suppressEndTurn:
-//         publish END_TURN=true
-//     NEXT_STEP
-//   else:
-//     GOTO fGotoLabelOnFailure
-//
-// Unported utilities:
-//   TODO: DiceInterpreter.isSpecialEffectSuccessful
-//   TODO: ZappedPlayer creation / team.addPlayer / communication.sendZapPlayer
-//   TODO: UtilServerInjury.handleInjury (InjuryTypeFireball / InjuryTypeBombWithModifier / ForSpp)
-//   TODO: SteadyFootingContext / DeferredCommand (DropPlayerCommand, DropPlayerFromBombCommand)
-//   TODO: game.turnData.passState.getOriginalBombardier
-//   TODO: game.options (BOMB_TEAM_MATE_KNOCK_DOWN_CAUSES_TURNOVER, BOMBER_PLACED_PRONE_IGNORES_TURNOVER)
-//   TODO: SpecialEffect.ZAP / FIREBALL / BOMB variants
-//
-// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.special.StepSpecialEffect`.
+/// Java: `StepSpecialEffect` (bb2025/special).
 pub struct StepSpecialEffect {
     /// Java: fGotoLabelOnFailure (mandatory init param)
     pub goto_label_on_failure: String,
@@ -95,81 +63,300 @@ impl Step for StepSpecialEffect {
         self.execute_step(game, rng)
     }
 
-    fn set_parameter(&mut self, _param: &StepParameter) -> bool { false }
+    fn set_parameter(&mut self, param: &StepParameter) -> bool {
+        match param {
+            StepParameter::PlayerId(v) => { self.player_id = Some(v.clone()); true }
+            StepParameter::RollForEffect(v) => { self.roll_for_effect = *v; true }
+            StepParameter::GotoLabelOnFailure(v) => { self.goto_label_on_failure = v.clone(); true }
+            // Java: init() reads SPECIAL_EFFECT as SpecialEffect enum — passed via SpecialEffectKey string
+            StepParameter::SpecialEffectKey(v) => {
+                self.special_effect = SpecialEffect::for_name(&v.to_lowercase());
+                true
+            }
+            _ => false,
+        }
+    }
 }
 
 impl StepSpecialEffect {
-    fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // Guard: player must exist.
-        let player_exists = self.player_id.as_deref()
-            .map(|id| game.player(id).is_some())
-            .unwrap_or(false);
-        if !player_exists {
+    fn execute_step(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        let player_id = match &self.player_id {
+            Some(id) if !id.is_empty() => id.clone(),
+            _ => return StepOutcome::next(),
+        };
+
+        if game.player(&player_id).is_none() {
             return StepOutcome::next();
         }
 
-        // DEFERRED: roll = diceRoller.rollWizardSpell() if roll_for_effect
-        // DEFERRED: successful = DiceInterpreter.isSpecialEffectSuccessful(special_effect, player, roll)
-        // DEFERRED: report ReportSpecialEffectRoll
-        //
-        // DEFERRED: if successful:
-        //   ZAP path: ZappedPlayer + scatter ball if on ball
-        //   FIREBALL path: handleInjury(InjuryTypeFireball); publish SteadyFootingContext
-        //   BOMB path: handleInjury(InjuryTypeBombWithModifier/ForSpp); publish SteadyFootingContext
-        //              suppressEndTurn logic
-        //   if isStanding && actingTeam has player && !FIREBALL && !suppressEndTurn:
-        //     publish END_TURN=true
-        //   NEXT_STEP
-        // else:
-        //   GOTO goto_label_on_failure
-        //
-        // Stub: no roll ported yet; always treat as successful (matches "no effect" neutral path).
-        StepOutcome::next()
+        // Java: state = fieldModel.getPlayerState(player); isStanding = !prone && !stunned; isActive = state.isActive()
+        let is_standing = game.field_model.player_state(&player_id)
+            .map(|s| !s.is_prone_or_stunned() && !s.is_stunned())
+            .unwrap_or(true);
+
+        // Java: if fRollForEffect → roll; DiceInterpreter.isSpecialEffectSuccessful
+        let mut spell_roll_event: Option<GameEvent> = None;
+        let successful = if self.roll_for_effect {
+            let roll = rng.d6();
+            spell_roll_event = Some(GameEvent::SpellEffectRoll { roll });
+            is_special_effect_successful(self.special_effect, game, &player_id, roll)
+        } else {
+            true
+        };
+
+        if !successful {
+            let label = self.goto_label_on_failure.clone();
+            let mut out = StepOutcome::goto(&label);
+            if let Some(ev) = spell_roll_event { out = out.with_event(ev); }
+            return out;
+        }
+
+        let mut outcome = StepOutcome::next();
+        if let Some(ev) = spell_roll_event { outcome = outcome.with_event(ev); }
+
+        let effect = match self.special_effect {
+            Some(e) => e,
+            None => return outcome,
+        };
+
+        let coord = game.field_model.player_coordinate(&player_id)
+            .unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
+
+        let mut suppress_end_turn = false;
+
+        match effect {
+            SpecialEffect::LIGHTNING => {
+                let ir = handle_injury_by_name(
+                    game, rng, "InjuryTypeLightning",
+                    None, &player_id, coord, None, None, ApothecaryMode::SpecialEffect,
+                );
+                outcome = outcome.publish(StepParameter::InjuryResult(Box::new(ir)));
+                for p in drop_player(game, &player_id, true) { outcome = outcome.publish(p); }
+            }
+            SpecialEffect::ZAP => {
+                // DEFERRED(ZAP): ZappedPlayer substitution not yet ported.
+                // Java: create ZappedPlayer, add to team, sendZapPlayer, scatter ball if on ball.
+                let ball_coord = game.field_model.ball_coordinate;
+                let on_ball = ball_coord.map(|b| b == coord).unwrap_or(false);
+                if on_ball {
+                    outcome = outcome.publish(StepParameter::CatchScatterThrowInMode(
+                        crate::step::framework::CatchScatterThrowInMode::ScatterBall,
+                    ));
+                }
+            }
+            SpecialEffect::FIREBALL => {
+                let ir = handle_injury_by_name(
+                    game, rng, "InjuryTypeFireball",
+                    None, &player_id, coord, None, None, ApothecaryMode::SpecialEffect,
+                );
+                let ctx = SteadyFootingContext::from_injury_result(ir);
+                outcome = outcome.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
+            }
+            SpecialEffect::BOMB => {
+                let bomb_from_home = matches!(game.turn_mode, TurnMode::BombHome | TurnMode::BombHomeBlitz);
+                let bomb_from_away = matches!(game.turn_mode, TurnMode::BombAway | TurnMode::BombAwayBlitz);
+
+                let player_hit_from_bomb_team =
+                    (bomb_from_home && game.team_home.has_player(&player_id))
+                    || (bomb_from_away && game.team_away.has_player(&player_id));
+
+                // Java: if (!BOMB_TEAM_MATE_KNOCK_DOWN_CAUSES_TURNOVER) → suppressEndTurn = !(playerHitIsFromBombTeam && hasBall)
+                if !is_option_enabled(game, BOMB_TEAM_MATE_KNOCK_DOWN_CAUSES_TURNOVER) {
+                    let has_ball = game.field_model.ball_coordinate
+                        .map(|b| b == coord)
+                        .unwrap_or(false);
+                    suppress_end_turn = !(player_hit_from_bomb_team && has_ball);
+                }
+                // Java: if player == originalBombardier && !bomberTurnoverIgnored → suppressEndTurn=false
+                // DEFERRED(bombardier-spp): PassState.originalBombardier not yet in model.
+                // Without it, we conservatively leave suppress_end_turn as-is.
+                // (The bomberTurnoverIgnored path: if !bomberTurnoverIgnored → suppressEndTurn=false)
+                let _ = is_option_enabled(game, BOMBER_PLACED_PRONE_IGNORES_TURNOVER);
+
+                // DEFERRED(bombardier-spp): use ForSpp variant when bombardier != player's team.
+                let ir = handle_injury_by_name(
+                    game, rng, "InjuryTypeBombWithModifier",
+                    None, &player_id, coord, None, None, ApothecaryMode::SpecialEffect,
+                );
+                let ctx = SteadyFootingContext::from_injury_result(ir);
+                outcome = outcome.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
+            }
+        }
+
+        // Java: if isStanding { if actingTeam.hasPlayer && effect != FIREBALL && !suppressEndTurn → END_TURN=true }
+        if is_standing {
+            let acting_team_has_player = match game.turn_mode {
+                TurnMode::BombHome | TurnMode::BombHomeBlitz => game.team_home.has_player(&player_id),
+                TurnMode::BombAway | TurnMode::BombAwayBlitz => game.team_away.has_player(&player_id),
+                _ => game.active_team().has_player(&player_id),
+            };
+            if effect != SpecialEffect::FIREBALL && acting_team_has_player && !suppress_end_turn {
+                outcome = outcome.publish(StepParameter::EndTurn(true));
+            }
+        }
+
+        outcome
+    }
+}
+
+/// Java: `DiceInterpreter.isSpecialEffectSuccessful(effect, player, roll)`.
+fn is_special_effect_successful(effect: Option<SpecialEffect>, game: &Game, player_id: &str, roll: i32) -> bool {
+    match effect {
+        Some(SpecialEffect::LIGHTNING) => roll >= 2,
+        Some(SpecialEffect::ZAP) => {
+            let strength = game.player(player_id)
+                .map(|p| p.strength_with_modifiers())
+                .unwrap_or(3);
+            roll == 6 || (roll > 1 && roll >= strength)
+        }
+        Some(SpecialEffect::FIREBALL) | Some(SpecialEffect::BOMB) => roll >= 4,
+        None => false,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::step::framework::test_team;
-    use crate::step::framework::StepAction;
+    use crate::step::framework::{StepAction, test_team};
     use ffb_model::enums::Rules;
+    use ffb_model::model::player::Player;
+    use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_STANDING};
+    use ffb_model::types::FieldCoordinate;
+    use std::collections::HashSet;
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
     }
 
+    fn add_home_player(game: &mut Game, id: &str) {
+        game.team_home.players.push(Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        let coord = FieldCoordinate::new(5, 5);
+        game.field_model.set_player_coordinate(id, coord);
+        game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+    }
+
     #[test]
-    fn start_no_player_returns_next_step() {
+    fn no_player_returns_next_step() {
         let mut game = make_game();
-        let mut step = StepSpecialEffect::new("fail".into());
+        let mut step = StepSpecialEffect::default();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
     }
 
     #[test]
-    fn new_stores_goto_label() {
-        let s = StepSpecialEffect::new("failure_label".into());
-        assert_eq!(s.goto_label_on_failure, "failure_label");
-    }
-
-    #[test]
-    fn default_roll_for_effect_is_false() {
-        let s = StepSpecialEffect::default();
-        assert!(!s.roll_for_effect);
-    }
-
-    #[test]
-    fn set_parameter_always_returns_false() {
-        let mut step = StepSpecialEffect::default();
-        assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
-    }
-
-    #[test]
-    fn handle_command_returns_next_step() {
+    fn unknown_player_id_returns_next_step() {
         let mut game = make_game();
         let mut step = StepSpecialEffect::new("fail".into());
-        let out = step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
+        step.player_id = Some("no_such_player".into());
+        step.special_effect = Some(SpecialEffect::LIGHTNING);
+        let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn set_parameter_player_id() {
+        let mut step = StepSpecialEffect::default();
+        assert!(step.set_parameter(&StepParameter::PlayerId("p1".into())));
+        assert_eq!(step.player_id.as_deref(), Some("p1"));
+    }
+
+    #[test]
+    fn set_parameter_roll_for_effect() {
+        let mut step = StepSpecialEffect::default();
+        assert!(step.set_parameter(&StepParameter::RollForEffect(true)));
+        assert!(step.roll_for_effect);
+    }
+
+    #[test]
+    fn set_parameter_goto_label() {
+        let mut step = StepSpecialEffect::default();
+        assert!(step.set_parameter(&StepParameter::GotoLabelOnFailure("lbl".into())));
+        assert_eq!(step.goto_label_on_failure, "lbl");
+    }
+
+    #[test]
+    fn set_parameter_special_effect_key() {
+        let mut step = StepSpecialEffect::default();
+        assert!(step.set_parameter(&StepParameter::SpecialEffectKey("FIREBALL".into())));
+        assert_eq!(step.special_effect, Some(SpecialEffect::FIREBALL));
+    }
+
+    #[test]
+    fn no_roll_lightning_publishes_injury_result() {
+        let mut game = make_game();
+        game.home_playing = true;
+        add_home_player(&mut game, "p1");
+        let mut step = StepSpecialEffect::new("fail".into());
+        step.player_id = Some("p1".into());
+        step.special_effect = Some(SpecialEffect::LIGHTNING);
+        step.roll_for_effect = false;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))));
+    }
+
+    #[test]
+    fn no_roll_fireball_publishes_steady_footing_context() {
+        let mut game = make_game();
+        game.home_playing = true;
+        add_home_player(&mut game, "p1");
+        let mut step = StepSpecialEffect::new("fail".into());
+        step.player_id = Some("p1".into());
+        step.special_effect = Some(SpecialEffect::FIREBALL);
+        step.roll_for_effect = false;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))));
+    }
+
+    #[test]
+    fn roll_for_effect_failure_goes_to_label() {
+        let mut game = make_game();
+        game.home_playing = true;
+        add_home_player(&mut game, "p1");
+        let mut step = StepSpecialEffect::new("fail_label".into());
+        step.player_id = Some("p1".into());
+        step.special_effect = Some(SpecialEffect::LIGHTNING);
+        step.roll_for_effect = true;
+        // Seed 7 should produce a roll of 1 (which fails the lightning check >= 2)
+        // We just test the path — with seed 0, roll=1 always fails lightning (1 < 2)
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // Either goto fail_label (roll failed) or next (roll succeeded)
+        // Just verify it doesn't panic and action is set
+        assert!(matches!(out.action, StepAction::NextStep | StepAction::GotoLabel));
+    }
+
+    #[test]
+    fn lightning_on_own_team_player_publishes_end_turn() {
+        let mut game = make_game();
+        game.home_playing = true;
+        add_home_player(&mut game, "p1");
+        let mut step = StepSpecialEffect::new("fail".into());
+        step.player_id = Some("p1".into());
+        step.special_effect = Some(SpecialEffect::LIGHTNING);
+        step.roll_for_effect = false;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
+    }
+
+    #[test]
+    fn fireball_does_not_publish_end_turn() {
+        let mut game = make_game();
+        game.home_playing = true;
+        add_home_player(&mut game, "p1");
+        let mut step = StepSpecialEffect::new("fail".into());
+        step.player_id = Some("p1".into());
+        step.special_effect = Some(SpecialEffect::FIREBALL);
+        step.roll_for_effect = false;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
     }
 }

@@ -89,3 +89,22 @@ impl ReportId {
         serde_json::from_str(&format!("\"{}\"", name)).ok()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn from_name_returns_known_variant() {
+        assert_eq!(ReportId::from_name("blockRoll"), Some(ReportId::BlockRoll));
+    }
+    #[test]
+    fn from_name_unknown_returns_none() {
+        assert!(ReportId::from_name("notAReport").is_none());
+    }
+    #[test]
+    fn camel_case_serialization_round_trips() {
+        let id = ReportId::DodgeRoll;
+        let s = serde_json::to_string(&id).unwrap();
+        assert_eq!(s, "\"dodgeRoll\"");
+    }
+}

@@ -56,4 +56,17 @@ mod tests {
         let cst = steps.iter().find(|s| s.step_id == StepId::CatchScatterThrowIn).unwrap();
         assert_eq!(cst.label.as_deref(), Some(labels::SCATTER_BALL));
     }
+
+    #[test]
+    fn punt_starts_with_init_punt() {
+        let steps = Punt::build_sequence();
+        assert_eq!(steps[0].step_id, StepId::InitPunt);
+    }
+
+    #[test]
+    fn punt_has_punt_direction_and_punt_distance() {
+        let steps = Punt::build_sequence();
+        assert!(steps.iter().any(|s| s.step_id == StepId::PuntDirection));
+        assert!(steps.iter().any(|s| s.step_id == StepId::PuntDistance));
+    }
 }

@@ -80,4 +80,12 @@ mod tests {
         assert!(step.set_parameter(&StepParameter::PlayerId("p1".into())));
         assert_eq!(step.player_id.as_deref(), Some("p1"));
     }
+
+    #[test]
+    fn handle_command_returns_next() {
+        let mut game = make_game();
+        let mut step = StepGettingEven::new();
+        let out = step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+    }
 }

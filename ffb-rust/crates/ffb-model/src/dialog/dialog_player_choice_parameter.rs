@@ -36,3 +36,31 @@ impl IDialogParameter for DialogPlayerChoiceParameter {
     fn get_id(&self) -> DialogId { DialogId::PLAYER_CHOICE }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_player_id_appends_nonempty() {
+        let mut p = DialogPlayerChoiceParameter::default();
+        p.add_player_id("p1");
+        p.add_player_id("");
+        assert_eq!(p.get_player_ids(), &["p1"]);
+    }
+
+    #[test]
+    fn add_description_appends_nonempty() {
+        let mut p = DialogPlayerChoiceParameter::default();
+        p.add_description("Select a target");
+        p.add_description("");
+        assert_eq!(p.get_descriptions(), &["Select a target"]);
+    }
+
+    #[test]
+    fn stores_min_max_selects() {
+        let p = DialogPlayerChoiceParameter { min_selects: 1, max_selects: 3, ..Default::default() };
+        assert_eq!(p.get_min_selects(), 1);
+        assert_eq!(p.get_max_selects(), 3);
+    }
+}

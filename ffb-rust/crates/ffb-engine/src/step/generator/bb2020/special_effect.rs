@@ -70,4 +70,20 @@ mod tests {
         let steps = SpecialEffect::build_sequence(&SpecialEffectParams::default());
         assert_eq!(steps[0].step_id, StepId::SpecialEffect);
     }
+
+    #[test]
+    fn special_effect_key_passed_to_first_step() {
+        let params = SpecialEffectParams { special_effect_key: "LIGHTNING".into(), player_id: "p1".into(), ..Default::default() };
+        let steps = SpecialEffect::build_sequence(&params);
+        let has = steps[0].params.iter().any(|p| matches!(p, StepParameter::SpecialEffectKey(k) if k == "LIGHTNING"));
+        assert!(has);
+    }
+
+    #[test]
+    fn player_id_passed_to_first_step() {
+        let params = SpecialEffectParams { special_effect_key: "ZAP".into(), player_id: "player42".into(), ..Default::default() };
+        let steps = SpecialEffect::build_sequence(&params);
+        let has = steps[0].params.iter().any(|p| matches!(p, StepParameter::PlayerId(id) if id == "player42"));
+        assert!(has);
+    }
 }

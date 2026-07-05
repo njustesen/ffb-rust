@@ -21,3 +21,23 @@ impl IDialogParameter for DialogKickSkillParameter {
     fn get_id(&self) -> DialogId { DialogId::KICK_SKILL }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::FieldCoordinate;
+    #[test]
+    fn dialog_id_is_kick_skill() {
+        assert_eq!(DialogKickSkillParameter::default().get_id(), DialogId::KICK_SKILL);
+    }
+    #[test]
+    fn stores_player_id_and_ball_coordinate() {
+        let p = DialogKickSkillParameter {
+            player_id: Some("p1".into()),
+            ball_coordinate: Some(FieldCoordinate::new(3, 5)),
+            ..Default::default()
+        };
+        assert_eq!(p.get_player_id(), Some("p1"));
+        assert_eq!(p.get_ball_coordinate(), Some(FieldCoordinate::new(3, 5)));
+    }
+}

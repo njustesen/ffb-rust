@@ -1,4 +1,5 @@
 use ffb_model::enums::{ApothecaryMode, TurnMode};
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::special_effect::SpecialEffect;
 use ffb_model::util::rng::GameRng;
@@ -96,25 +97,28 @@ impl StepSpecialEffect {
         let is_standing = !state.is_prone() && !state.is_stunned();
         let is_active = state.is_active();
 
+        let special_effect = self.special_effect_key.as_deref()
+            .and_then(SpecialEffect::for_name);
+
         // Java: if fRollForEffect → roll and check success; else always successful
-        let successful = if self.roll_for_effect {
+        let effect_name = self.special_effect_key.clone().unwrap_or_default();
+        let (successful, effect_roll, effect_success) = if self.roll_for_effect {
             let roll = rng.d6();
-            // DEFERRED(special_effect): DiceInterpreter.isSpecialEffectSuccessful(fSpecialEffect, player, roll)
-            // Stub: assume success if roll >= 4
-            // DEFERRED(special_effect): ReportSpecialEffectRoll(fSpecialEffect, player.id, roll, successful)
-            let _ = roll;
-            true
+            let success = is_special_effect_successful(special_effect, game, &player_id, roll);
+            (success, roll, success)
         } else {
-            // DEFERRED(special_effect): ReportSpecialEffectRoll(fSpecialEffect, player.id, 0, true)
-            true
+            (true, 0, true)
+        };
+        let special_effect_event = GameEvent::SpecialEffectRoll {
+            effect: effect_name,
+            player_id: player_id.clone(),
+            roll: effect_roll,
+            success: effect_success,
         };
 
         if !successful {
-            return StepOutcome::goto(&self.goto_label_on_failure);
+            return StepOutcome::goto(&self.goto_label_on_failure).with_event(special_effect_event);
         }
-
-        let special_effect = self.special_effect_key.as_deref()
-            .and_then(SpecialEffect::for_name);
 
         let mut outcome = StepOutcome::next();
 
@@ -186,7 +190,22 @@ impl StepSpecialEffect {
             }
         }
 
-        outcome
+        outcome.with_event(special_effect_event)
+    }
+}
+
+/// 1:1 translation of `DiceInterpreter.isSpecialEffectSuccessful`.
+fn is_special_effect_successful(effect: Option<SpecialEffect>, game: &Game, player_id: &str, roll: i32) -> bool {
+    match effect {
+        Some(SpecialEffect::LIGHTNING) => roll >= 2,
+        Some(SpecialEffect::ZAP) => {
+            let strength = game.player(player_id)
+                .map(|p| p.strength_with_modifiers())
+                .unwrap_or(3);
+            roll == 6 || (roll > 1 && roll >= strength)
+        }
+        Some(SpecialEffect::FIREBALL) | Some(SpecialEffect::BOMB) => roll >= 4,
+        None => false,
     }
 }
 
@@ -207,6 +226,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         }
     }
 
@@ -318,5 +338,58 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))),
             "bomb should publish InjuryResult");
+    }
+
+    #[test]
+    fn roll_for_effect_lightning_fail_goto_label() {
+        use ffb_model::util::rng::GameRng;
+        let pid = "p1";
+        let mut step = StepSpecialEffect::new("FAIL".into());
+        step.player_id = Some(pid.into());
+        step.roll_for_effect = true;
+        step.special_effect_key = Some("lightning".into());
+        let mut game = make_game_with_player(pid, true);
+        // Lightning requires roll >= 2; seed 0 produces roll=1 on first d6
+        let mut rng = GameRng::new(0);
+        let first_roll = rng.d6();
+        let should_fail = first_roll < 2;
+        let mut rng2 = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng2);
+        if should_fail {
+            assert_eq!(out.action, StepAction::GotoLabel,
+                "lightning roll<2 should goto failure label");
+        } else {
+            assert_eq!(out.action, StepAction::NextStep);
+        }
+    }
+
+    #[test]
+    fn is_special_effect_successful_lightning_threshold() {
+        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        assert!(is_special_effect_successful(Some(SpecialEffect::LIGHTNING), &game, "x", 2));
+        assert!(is_special_effect_successful(Some(SpecialEffect::LIGHTNING), &game, "x", 6));
+        assert!(!is_special_effect_successful(Some(SpecialEffect::LIGHTNING), &game, "x", 1));
+    }
+
+    #[test]
+    fn is_special_effect_successful_fireball_threshold() {
+        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        assert!(is_special_effect_successful(Some(SpecialEffect::FIREBALL), &game, "x", 4));
+        assert!(!is_special_effect_successful(Some(SpecialEffect::FIREBALL), &game, "x", 3));
+        assert!(is_special_effect_successful(Some(SpecialEffect::BOMB), &game, "x", 4));
+        assert!(!is_special_effect_successful(Some(SpecialEffect::BOMB), &game, "x", 3));
+    }
+
+    #[test]
+    fn is_special_effect_successful_zap_strength_based() {
+        let mut game = make_game_with_player("p1", true); // str=3
+        // roll==6 always succeeds
+        assert!(is_special_effect_successful(Some(SpecialEffect::ZAP), &game, "p1", 6));
+        // roll >= strength (3) succeeds
+        assert!(is_special_effect_successful(Some(SpecialEffect::ZAP), &game, "p1", 3));
+        // roll < strength fails
+        assert!(!is_special_effect_successful(Some(SpecialEffect::ZAP), &game, "p1", 2));
+        // roll==1 always fails (roll > 1 guard)
+        assert!(!is_special_effect_successful(Some(SpecialEffect::ZAP), &game, "p1", 1));
     }
 }

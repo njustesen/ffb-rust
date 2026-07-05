@@ -9,8 +9,9 @@ use ffb_model::model::game::Game;
 use ffb_model::model::re_rolled_action::ReRolledAction;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
-use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::step::framework::{Step, StepOutcome, StepId, StepParameter, SequenceStep};
 use crate::step::abstract_step_with_re_roll::ReRollState;
+use crate::step::generator::sequence::labels;
 
 /// Java: `ReRolledActions.ALL_YOU_CAN_EAT` equivalent.
 const RE_ROLLED_ACTION: &str = "ALL_YOU_CAN_EAT";
@@ -69,13 +70,11 @@ impl StepAllYouCanEat {
             let roll = rng.d6();
             success = roll >= MINIMUM_ROLL;
 
-            // Java: getResult().addReport(new ReportAllYouCanEatRoll(...))
             let outcome_base = StepOutcome::next()
-                .with_event(ffb_model::events::GameEvent::GoForItRoll {
-                    // Reuse GoForItRoll as a proxy (no AllYouCanEat event yet).
+                .with_event(ffb_model::events::GameEvent::AllYouCanEatRoll {
                     player_id: player_id.clone(),
-                    target: MINIMUM_ROLL,
                     roll,
+                    minimum_roll: MINIMUM_ROLL,
                     success,
                     rerolled,
                 });
@@ -92,9 +91,15 @@ impl StepAllYouCanEat {
 
             // Java: if (!success) push EjectPlayer + Bribes onto stack
             if !success {
-                // DEFERRED: push EjectPlayer + Bribes sub-sequences when sequence generator is wired.
-                // For now just publish the outcome; the engine will handle the sequences.
-                return outcome_base;
+                // Java: stack.push(EJECT_PLAYER(GOTO_LABEL_ON_END=END_BOMB))
+                //       stack.push(BRIBES(GOTO_LABEL_ON_END=END_BOMB))
+                // LIFO: Bribes executes first, then EjectPlayer.
+                let label_param = vec![StepParameter::GotoLabelOnEnd(labels::END_BOMB.into())];
+                let seq = vec![
+                    SequenceStep::with_params(StepId::EjectPlayer, label_param.clone()),
+                    SequenceStep::with_params(StepId::Bribes, label_param),
+                ];
+                return outcome_base.push_seq(seq);
             }
 
             return outcome_base;
@@ -102,8 +107,12 @@ impl StepAllYouCanEat {
 
         // do_roll == false means re-roll declined → treat as failure
         // Java: if (!success) push EjectPlayer + Bribes
-        // DEFERRED: push sequences
-        StepOutcome::next()
+        let label_param = vec![StepParameter::GotoLabelOnEnd(labels::END_BOMB.into())];
+        let seq = vec![
+            SequenceStep::with_params(StepId::EjectPlayer, label_param.clone()),
+            SequenceStep::with_params(StepId::Bribes, label_param),
+        ];
+        StepOutcome::next().push_seq(seq)
     }
 }
 
@@ -185,5 +194,27 @@ mod tests {
         let mut rng = GameRng::new(0);
         step.start(&mut game, &mut rng);
         assert_eq!(step.original_bombardier.as_deref(), Some("bard1"));
+    }
+
+    #[test]
+    fn low_roll_pushes_bribes_and_eject_player_sequences() {
+        // Find a seed that produces a failing roll (1-3 for a 4+ target).
+        let mut game = make_game();
+        game.thrower_id = Some("bard".into());
+        // Try seeds until we get a failure (push non-empty)
+        let mut pushed_seq = None;
+        for seed in 0u64..100 {
+            let mut step = StepAllYouCanEat::new();
+            let mut rng = GameRng::new(seed);
+            let out = step.start(&mut game, &mut rng);
+            if !out.pushes.is_empty() {
+                pushed_seq = Some(out.pushes[0].clone());
+                break;
+            }
+        }
+        let seq = pushed_seq.expect("expected at least one failing roll in 100 seeds");
+        assert_eq!(seq.len(), 2);
+        assert_eq!(seq[0].step_id, StepId::EjectPlayer);
+        assert_eq!(seq[1].step_id, StepId::Bribes);
     }
 }

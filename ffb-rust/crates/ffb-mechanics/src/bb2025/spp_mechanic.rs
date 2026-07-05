@@ -66,3 +66,58 @@ impl SppMechanic {
 fn has_brawlin_brutes(team: &Team) -> bool {
     team.special_rules.iter().any(|r| r == SpecialRule::BRAWLIN_BRUTES.get_rule_name())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+    use ffb_model::model::{PlayerResult, Team};
+
+    fn bare_team() -> Team {
+        Team {
+            id: "t".into(), name: "T".into(), race: "human".into(),
+            roster_id: "human".into(), coach: "C".into(),
+            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+            prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+            cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
+            team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
+        }
+    }
+
+    fn brutes_team() -> Team {
+        let mut t = bare_team();
+        t.special_rules.push(SpecialRule::BRAWLIN_BRUTES.get_rule_name().to_string());
+        t
+    }
+
+    #[test]
+    fn touchdown_spp_normal_team_is_3() {
+        assert_eq!(SppMechanic.touchdown_spp(&bare_team()), 3);
+    }
+
+    #[test]
+    fn touchdown_spp_brutes_team_is_2() {
+        assert_eq!(SppMechanic.touchdown_spp(&brutes_team()), 2);
+    }
+
+    #[test]
+    fn casualty_spp_brutes_team_is_3() {
+        assert_eq!(SppMechanic.casualty_spp(&brutes_team()), 3);
+    }
+
+    #[test]
+    fn add_landing_increments_landings() {
+        let mut pr = PlayerResult::default();
+        SppMechanic.add_landing(&mut pr);
+        assert_eq!(pr.landings, 1);
+    }
+
+    #[test]
+    fn add_catch_with_extra_team_increments_extra_catches() {
+        let mut pr = PlayerResult::default();
+        let mut extra: HashSet<String> = HashSet::new();
+        extra.insert("t".to_string());
+        SppMechanic.add_catch(&extra, &mut pr, "t");
+        assert_eq!(pr.catches_with_additional_spp, 1);
+    }
+}

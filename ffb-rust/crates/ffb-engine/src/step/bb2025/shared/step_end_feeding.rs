@@ -69,7 +69,8 @@ impl StepEndFeeding {
                     return StepOutcome::next().push_seq(seq);
                 }
                 TurnMode::Regular => {
-                    // Java: changePlayerAction(null, null, false)
+                    // Java: changePlayerAction(null, null, false) → clear acting player
+                    game.acting_player.player_id = None;
                     // Java: Inducement(EndOfOpponentTurn, !home, checkForgo)
                     // Java: Inducement(EndOfOwnTurn, home)
                     // Java: push PickMeUp step
@@ -114,6 +115,7 @@ impl StepEndFeeding {
         }
 
         // Java: else → changePlayerAction(null, null, false); Select.pushSequence(false)
+        game.acting_player.player_id = None;
         let seq = Select::build_sequence(&SelectParams { update_persistence: false, is_blitz_move: false });
         StepOutcome::next().push_seq(seq)
     }

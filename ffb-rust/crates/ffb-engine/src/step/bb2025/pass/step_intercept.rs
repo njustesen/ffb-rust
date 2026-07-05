@@ -171,7 +171,7 @@ impl Step for StepIntercept {
         // Java: CLIENT_INTERCEPTOR_CHOICE → passState.setInterceptorId, setInterceptorChosen(true),
         //       interceptionSkill = command.getInterceptionSkill()
         match action {
-            Action::SelectPlayer { player_id } => {
+            Action::SelectPlayer {player_id } => {
                 // Intercept dialog reply: chosen player id is the interceptor (or empty = decline)
                 self.interceptor_id = if player_id.is_empty() { None } else { Some(player_id.clone()) };
                 self.interceptor_chosen = true;
@@ -325,7 +325,7 @@ mod tests {
         game.thrower_id = Some("t1".into());
         game.thrower_action = Some(PlayerAction::Pass);
         let mut step = StepIntercept::new("fail".into());
-        let action = Action::SelectPlayer { player_id: "p2".into() };
+        let action = Action::SelectPlayer {player_id: "p2".into() };
         step.handle_command(&action, &mut game, &mut GameRng::new(0));
         assert!(step.interceptor_chosen);
         assert_eq!(step.interceptor_id.as_deref(), Some("p2"));

@@ -19,3 +19,17 @@ impl IDialogParameter for DialogUseApothecariesParameter {
     fn get_id(&self) -> DialogId { DialogId::USE_APOTHECARIES }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_use_apothecaries() {
+        assert_eq!(DialogUseApothecariesParameter::default().get_id(), DialogId::USE_APOTHECARIES);
+    }
+    #[test]
+    fn stores_team_id() {
+        let p = DialogUseApothecariesParameter { team_id: Some("home".into()), ..Default::default() };
+        assert_eq!(p.get_team_id(), Some("home"));
+    }
+}

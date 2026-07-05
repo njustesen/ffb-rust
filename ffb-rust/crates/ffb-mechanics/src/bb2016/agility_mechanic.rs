@@ -88,10 +88,9 @@ impl AgilityMechanicTrait for AgilityMechanic {
     }
 
     fn format_dodge_result(&self, roll_modifiers: &[RollModifier], player: &Player, _stat_based_roll_modifier: Option<&StatBasedRollModifier>) -> String {
-        let uses_strength = roll_modifiers.iter().any(|_m| {
-            // TODO: check DodgeModifier::isUseStrength when DodgeModifier is fully translated
-            false
-        });
+        // DEFERRED(break-tackle-format): RollModifier doesn't carry is_use_strength flag;
+        // Break Tackle reporting deferred until format interface carries DodgeModifier directly.
+        let uses_strength = false;
         let mut result = String::new();
         if uses_strength {
             result.push_str(&format!(" using Break Tackle (ST {}", player.strength_with_modifiers().min(6)));
@@ -152,5 +151,77 @@ impl AgilityMechanicTrait for AgilityMechanic {
 
     fn interception_wording(&self, _easy_intercept: bool) -> Wording {
         Wording::new("Interception", "intercept", "intercepts", "interceptor")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::agility_mechanic::AgilityMechanic as Trait;
+
+    fn player_with_agility(ag: i32) -> Player {
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        Player {
+            id: "p".into(), name: "p".into(), nr: 1,
+            position_id: "pos".into(),
+            player_type: PlayerType::Regular,
+            gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: ag, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn minimum_roll_catch_ag3_no_modifiers() {
+        // agility_roll_base(3) = 7 - 3 = 4; no modifier → 4
+        let m = AgilityMechanic::new();
+        let p = player_with_agility(3);
+        assert_eq!(m.minimum_roll_catch(&p, &HashSet::new()), 4);
+    }
+
+    #[test]
+    fn minimum_roll_dodge_ag3_no_modifiers() {
+        // base = 7 - 3 = 4; dodge gets -1 → 3
+        let m = AgilityMechanic::new();
+        let p = player_with_agility(3);
+        let game = ffb_model::model::Game::new(
+            ffb_model::model::Team { id: "h".into(), name: "h".into(), race: "H".into(), roster_id: "r".into(), coach: "c".into(), rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0, special_rules: vec![], players: vec![] },
+            ffb_model::model::Team { id: "a".into(), name: "a".into(), race: "H".into(), roster_id: "r".into(), coach: "c".into(), rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0, special_rules: vec![], players: vec![] },
+            ffb_model::enums::Rules::Bb2016,
+        );
+        assert_eq!(m.minimum_roll_dodge(&game, &p, &HashSet::new()), 3);
+    }
+
+    #[test]
+    fn minimum_roll_interception_ag3_no_modifiers() {
+        // base = 7 - 3 = 4; +2 interception → 6
+        let m = AgilityMechanic::new();
+        let p = player_with_agility(3);
+        assert_eq!(m.minimum_roll_interception(&p, &HashSet::new()), 6);
+    }
+
+    #[test]
+    fn minimum_roll_safe_throw_ag3() {
+        // base = 7 - 3 = 4; safe throw = base → 4
+        let m = AgilityMechanic::new();
+        let p = player_with_agility(3);
+        assert_eq!(m.minimum_roll_safe_throw(&p), 4);
+    }
+
+    #[test]
+    fn minimum_roll_never_below_two() {
+        // AG 6 → base = 1; dodge = 1 - 1 = 0 → clamped to 2
+        let m = AgilityMechanic::new();
+        let p = player_with_agility(6);
+        let game = ffb_model::model::Game::new(
+            ffb_model::model::Team { id: "h".into(), name: "h".into(), race: "H".into(), roster_id: "r".into(), coach: "c".into(), rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0, special_rules: vec![], players: vec![] },
+            ffb_model::model::Team { id: "a".into(), name: "a".into(), race: "H".into(), roster_id: "r".into(), coach: "c".into(), rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0, special_rules: vec![], players: vec![] },
+            ffb_model::enums::Rules::Bb2016,
+        );
+        assert_eq!(m.minimum_roll_dodge(&game, &p, &HashSet::new()), 2);
     }
 }

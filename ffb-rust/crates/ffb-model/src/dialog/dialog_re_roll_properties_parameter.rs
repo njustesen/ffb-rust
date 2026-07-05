@@ -36,3 +36,18 @@ impl IDialogParameter for DialogReRollPropertiesParameter {
     fn get_id(&self) -> DialogId { DialogId::RE_ROLL_PROPERTIES }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_re_roll_properties() {
+        assert_eq!(DialogReRollPropertiesParameter::default().get_id(), DialogId::RE_ROLL_PROPERTIES);
+    }
+    #[test]
+    fn stores_minimum_roll_and_fumble() {
+        let p = DialogReRollPropertiesParameter { minimum_roll: 3, fumble: true, ..Default::default() };
+        assert_eq!(p.get_minimum_roll(), 3);
+        assert!(p.is_fumble());
+    }
+}

@@ -51,4 +51,24 @@ mod tests {
         let s = steps.iter().find(|s| s.step_id == StepId::LookIntoMyEyes).unwrap();
         assert_eq!(s.label.as_deref(), Some(labels::END));
     }
+
+    #[test]
+    fn push_select_param_wired() {
+        let steps = LookIntoMyEyes::build_sequence(&LookIntoMyEyesParams { push_select: true, goto_on_end: String::new() });
+        let s = steps.iter().find(|s| s.step_id == StepId::LookIntoMyEyes).unwrap();
+        assert!(s.params.iter().any(|p| matches!(p, StepParameter::PushSelect(true))));
+    }
+
+    #[test]
+    fn goto_on_end_wired() {
+        let steps = LookIntoMyEyes::build_sequence(&LookIntoMyEyesParams { push_select: false, goto_on_end: "MY_LABEL".into() });
+        let s = steps.iter().find(|s| s.step_id == StepId::LookIntoMyEyes).unwrap();
+        assert!(s.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnEnd(l) if l == "MY_LABEL")));
+    }
+
+    #[test]
+    fn first_step_is_init_look_into_my_eyes() {
+        let steps = LookIntoMyEyes::build_sequence(&LookIntoMyEyesParams::default());
+        assert_eq!(steps[0].step_id, StepId::InitLookIntoMyEyes);
+    }
 }

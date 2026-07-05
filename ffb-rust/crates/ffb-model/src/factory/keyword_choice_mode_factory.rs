@@ -14,3 +14,18 @@ impl KeywordChoiceModeFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_mode() {
+        assert!(KeywordChoiceModeFactory::default().for_name("gettingEven").is_some());
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(KeywordChoiceModeFactory::default().for_name("invalid"), None);
+    }
+}

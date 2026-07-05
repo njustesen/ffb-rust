@@ -1,30 +1,21 @@
 // 1:1 translation of com.fumbbl.ffb.server.util.UtilServerDialog.
 //
-// Both Java methods (showDialog / hideDialog) call UtilServerTimer which
-// reaches into the live server's WebSocket timer layer.  The pure-model
-// side-effects — setting `game.waiting_for_opponent` — are translated here.
-// The timer calls are skipped because the Rust engine has no WebSocket layer.
-// The `dialog_parameter` field has not yet been added to the Rust Game struct;
-// the corresponding logic is left as a TODO comment.
-//
 // Translated:
-//   show_dialog(game, stop_turn_timer: bool)
+//   show_dialog(game, dialog_id, stop_turn_timer: bool)
 //   hide_dialog(game)
 //
 // Skipped (touch WebSocket timer):
 //   UtilServerTimer.stopTurnTimer, UtilServerTimer.startTurnTimer
 
+use ffb_model::dialog::dialog_id::DialogId;
 use ffb_model::model::game::Game;
 
 pub struct UtilServerDialog;
 
 impl UtilServerDialog {
     /// Java: UtilServerDialog.showDialog(GameState, IDialogParameter, boolean stopTurnTimer)
-    ///
-    /// Sets `game.waiting_for_opponent` when `stop_turn_timer` is true.
-    /// (The `dialog_parameter` field is not yet modelled in the Rust Game struct.)
-    pub fn show_dialog(game: &mut Game, stop_turn_timer: bool) {
-        // game.dialog_parameter = Some(dialog_parameter);  // TODO: add field
+    pub fn show_dialog(game: &mut Game, dialog_id: DialogId, stop_turn_timer: bool) {
+        game.dialog_id = Some(dialog_id);
         if stop_turn_timer {
             game.waiting_for_opponent = true;
             // UtilServerTimer::stop_turn_timer — skipped (WebSocket layer)
@@ -32,10 +23,8 @@ impl UtilServerDialog {
     }
 
     /// Java: UtilServerDialog.hideDialog(GameState)
-    ///
-    /// Clears `dialog_parameter` and resets `waiting_for_opponent`.
     pub fn hide_dialog(game: &mut Game) {
-        // game.dialog_parameter = None;  // TODO: add field
+        game.dialog_id = None;
         game.waiting_for_opponent = false;
         // UtilServerTimer::start_turn_timer — skipped (WebSocket layer)
     }
@@ -84,43 +73,53 @@ mod tests {
     }
 
     #[test]
+    fn show_dialog_sets_dialog_id() {
+        let mut game = empty_game();
+        assert!(game.dialog_id.is_none());
+        UtilServerDialog::show_dialog(&mut game, DialogId::RE_ROLL, false);
+        assert_eq!(game.dialog_id, Some(DialogId::RE_ROLL));
+    }
+
+    #[test]
     fn show_dialog_with_stop_timer_sets_waiting_for_opponent() {
         let mut game = empty_game();
-        assert!(!game.waiting_for_opponent);
-        UtilServerDialog::show_dialog(&mut game, true);
+        UtilServerDialog::show_dialog(&mut game, DialogId::SKILL_USE, true);
         assert!(game.waiting_for_opponent);
+        assert_eq!(game.dialog_id, Some(DialogId::SKILL_USE));
     }
 
     #[test]
     fn show_dialog_without_stop_timer_leaves_waiting_for_opponent_unchanged() {
         let mut game = empty_game();
         game.waiting_for_opponent = false;
-        UtilServerDialog::show_dialog(&mut game, false);
+        UtilServerDialog::show_dialog(&mut game, DialogId::SKILL_USE, false);
         assert!(!game.waiting_for_opponent);
     }
 
     #[test]
-    fn hide_dialog_clears_waiting_for_opponent() {
+    fn hide_dialog_clears_dialog_id_and_waiting() {
         let mut game = empty_game();
-        game.waiting_for_opponent = true;
+        UtilServerDialog::show_dialog(&mut game, DialogId::RE_ROLL, true);
         UtilServerDialog::hide_dialog(&mut game);
+        assert!(game.dialog_id.is_none());
         assert!(!game.waiting_for_opponent);
     }
 
     #[test]
-    fn hide_dialog_idempotent_when_already_false() {
+    fn hide_dialog_idempotent_when_already_hidden() {
         let mut game = empty_game();
-        game.waiting_for_opponent = false;
         UtilServerDialog::hide_dialog(&mut game);
+        assert!(game.dialog_id.is_none());
         assert!(!game.waiting_for_opponent);
     }
 
     #[test]
-    fn show_then_hide_round_trips_waiting_for_opponent() {
+    fn show_then_hide_round_trips() {
         let mut game = empty_game();
-        UtilServerDialog::show_dialog(&mut game, true);
+        UtilServerDialog::show_dialog(&mut game, DialogId::USE_APOTHECARY, true);
         assert!(game.waiting_for_opponent);
         UtilServerDialog::hide_dialog(&mut game);
         assert!(!game.waiting_for_opponent);
+        assert!(game.dialog_id.is_none());
     }
 }

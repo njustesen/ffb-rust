@@ -1,8 +1,15 @@
+use ffb_model::enums::{InducementPhase, TurnMode};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::generator::bb2020::pass::{Pass, PassParams};
+use crate::step::generator::bb2020::select::{Select, SelectParams};
+use crate::step::generator::common::inducement::{Inducement, InducementParams};
+use crate::step::generator::mixed::end_turn::EndTurn;
+use crate::step::generator::sequence::{Sequence, SequenceStep};
+use crate::step::util_server_steps::check_touchdown;
 
 /// Final step of the feed sequence. Consumes EndPlayerAction/EndTurn.
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2020.shared.StepEndFeeding.
@@ -45,10 +52,59 @@ impl Step for StepEndFeeding {
 }
 
 impl StepEndFeeding {
-    fn execute_step(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // DEFERRED(generators): full BB2020 StepEndFeeding logic requires sequence generators.
-        // BB2020 end_turn in PASS_BLOCK mode → use EndTurn generator;
-        // otherwise more complex inducement/select sequence. Stubbed for now.
+    fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        self.end_turn |= check_touchdown(game);
+        game.defender_id = None;
+
+        if self.end_turn {
+            if game.turn_mode == TurnMode::PassBlock {
+                // Java: EndTurn.pushSequence(getGameState(), false)
+                return StepOutcome::next().push_seq(EndTurn::build_sequence());
+            } else {
+                // Java: UtilServerSteps.changePlayerAction(this, null, null, false) → clear acting player
+                game.acting_player.player_id = None;
+            }
+
+            if game.turn_mode == TurnMode::Regular {
+                // Java: Inducement(END_OF_OPPONENT_TURN, !home_playing) + Inducement(END_OF_OWN_TURN, home_playing) + PickMeUp
+                let seq_opp = Inducement::build_sequence(&InducementParams {
+                    inducement_phase: InducementPhase::EndOfOpponentTurn,
+                    home_team: !game.home_playing,
+                    check_forgo: false,
+                });
+                let seq_own = Inducement::build_sequence(&InducementParams {
+                    inducement_phase: InducementPhase::EndOfOwnTurn,
+                    home_team: game.home_playing,
+                    check_forgo: false,
+                });
+                let mut seq_pick = Sequence::new();
+                seq_pick.add(StepId::PickMeUp, vec![]);
+                return StepOutcome::next()
+                    .push_seq(seq_opp)
+                    .push_seq(seq_own)
+                    .push_seq(seq_pick.build());
+            } else if game.turn_mode == TurnMode::KickoffReturn {
+                return StepOutcome::next().push_seq(EndTurn::build_sequence());
+            }
+        } else if !self.end_player_action {
+            // Check if thrower action is passing
+            let is_passing = game.thrower_action.map(|a| a.is_passing()).unwrap_or(false);
+            if is_passing {
+                let coord = game.pass_coordinate;
+                return StepOutcome::next().push_seq(Pass::build_sequence(&PassParams {
+                    target_coordinate: coord,
+                }));
+            } else if game.turn_mode == TurnMode::KickoffReturn || game.turn_mode == TurnMode::PassBlock {
+                // Java: publishParameter(END_PLAYER_ACTION, true)
+                return StepOutcome::next().publish(StepParameter::EndPlayerAction(true));
+            } else {
+                game.pass_coordinate = None;
+                // Java: UtilServerSteps.changePlayerAction(this, null, null, false) → clear acting player
+                game.acting_player.player_id = None;
+                return StepOutcome::next().push_seq(Select::build_sequence(&SelectParams::default()));
+            }
+        }
+
         StepOutcome::next()
     }
 }
@@ -93,5 +149,44 @@ mod tests {
         // BB2020 StepEndFeeding does not accept CheckForgo (unlike BB2025).
         let mut step = StepEndFeeding::new();
         assert!(!step.set_parameter(&StepParameter::CheckForgo(true)));
+    }
+
+    #[test]
+    fn end_turn_pass_block_pushes_end_turn_sequence() {
+        let mut game = make_game();
+        game.turn_mode = TurnMode::PassBlock;
+        let mut step = StepEndFeeding::new();
+        step.end_turn = true;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(!out.pushes.is_empty());
+    }
+
+    #[test]
+    fn end_turn_regular_pushes_three_sequences() {
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        let mut step = StepEndFeeding::new();
+        step.end_turn = true;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.pushes.len(), 3);
+    }
+
+    #[test]
+    fn default_pushes_select_sequence() {
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        let mut step = StepEndFeeding::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(!out.pushes.is_empty());
+    }
+
+    #[test]
+    fn clears_defender_id_on_execute() {
+        let mut game = make_game();
+        game.defender_id = Some("p1".into());
+        game.turn_mode = TurnMode::Regular;
+        let mut step = StepEndFeeding::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.defender_id.is_none());
     }
 }

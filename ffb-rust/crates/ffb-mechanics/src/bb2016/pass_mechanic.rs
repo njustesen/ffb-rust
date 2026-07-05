@@ -1,6 +1,7 @@
 use ffb_model::enums::PassingDistance;
 use ffb_model::model::{Game, Player};
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::mechanic::{Mechanic, MechanicType};
 use crate::modifiers::{PassModifier, StatBasedRollModifier};
 use crate::pass_result::PassResult;
@@ -112,9 +113,8 @@ impl PassMechanicTrait for PassMechanic {
         re_rolled_action_name != "pass"
     }
 
-    fn pass_modifiers(&self, _game: &Game, _player: &Player) -> i32 {
-        // TODO: UtilPlayer::find_tacklezones(game, player)
-        0
+    fn pass_modifiers(&self, game: &Game, player: &Player) -> i32 {
+        UtilPlayer::find_tacklezones(game, &player.id) as i32
     }
 }
 
@@ -149,6 +149,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         }
     }
 

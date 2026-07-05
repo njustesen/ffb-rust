@@ -31,3 +31,21 @@ impl GoForItModifierCollection {
 impl Default for GoForItModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn base_collection_is_empty() {
+        assert_eq!(GoForItModifierCollection::new().get_modifiers().len(), 0);
+    }
+
+    #[test]
+    fn can_add_and_retrieve_modifier() {
+        let mut col = GoForItModifierCollection::new();
+        col.add(GoForItModifier::new("Blizzard", -1));
+        assert_eq!(col.get_modifiers().len(), 1);
+        assert_eq!(col.get_modifiers()[0].get_name(), "Blizzard");
+    }
+}

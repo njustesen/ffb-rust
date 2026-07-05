@@ -6,16 +6,13 @@
 /// the Loner skill, `PlayerStatus::JOURNEYMAN`, and a randomly generated name via an HTTP call to
 /// the FUMBBL name-generator service.
 ///
-/// DEFERRED dependencies (all gated on infra not yet ported):
-/// - `TurnData::inducement_set` / `InducementSet` stub — finding ADD_LINEMEN inducements.
+/// DEFERRED dependencies (gated on infra not yet ported):
 /// - `GameMechanic::riotousRookiesPosition()` — finding the correct roster position.
 /// - `RosterPlayer` creation / `Team::addPlayer()` — dynamic player creation.
 /// - HTTP name-generator (`UtilServerHttpClient`) — `rookieName()`.
 /// - `UtilBox::putPlayerIntoBox()` — box placement.
 /// - Server communication (`sendAddPlayer`) — network I/O.
-///
-/// When all DEFERRED items are resolved, `hire_riotous_rookies()` and `riotous_player()` can
-/// be fully implemented. Until then the step calls `start()` and immediately returns `NextStep`.
+use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -51,15 +48,23 @@ impl StepRiotousRookies {
     /// Java: `hireRiotousRookies(TurnData, Team)`.
     ///
     /// Finds the ADD_LINEMEN inducement (if any) in the team's InducementSet and hires rookies.
-    ///
-    /// DEFERRED: requires `TurnData::inducement_set`, `InducementSet::inducement_mapping`,
-    /// `InducementType::has_usage(Usage::ADD_LINEMEN)`, and `GameMechanic::riotousRookiesPosition()`.
-    fn hire_riotous_rookies_for_team(&self, _game: &mut Game, _rng: &mut GameRng, _home: bool) {
-        // DEFERRED(inducement_set): iterate TurnData.inducement_set.inducement_mapping
-        //   to find an InducementType with Usage::ADD_LINEMEN.
-        // DEFERRED(mechanic): call GameMechanic::riotousRookiesPosition(team.roster).
-        // DEFERRED(player_creation): call self.riotous_player() for each rookie.
-        // DEFERRED(report): push ReportRiotousRookies event.
+    fn hire_riotous_rookies_for_team(&self, game: &mut Game, rng: &mut GameRng, home: bool) {
+        let turn_data = if home { &game.turn_data_home } else { &game.turn_data_away };
+        // Java: turnData.getInducementSet().getInducementMapping().keySet()
+        //   .stream().filter(type -> type.hasUsage(Usage.ADD_LINEMEN)).findFirst()
+        let add_linemen = turn_data.inducement_set.for_usage(Usage::ADD_LINEMEN).map(|s| s.to_string());
+        if let Some(type_id) = add_linemen {
+            let value = turn_data.inducement_set.get(&type_id).map_or(0, |i| i.get_value());
+            let mut rookie_counter = 0;
+            for _ in 0..value {
+                let rookies = Self::roll_rookies_count(rng);
+                // DEFERRED(mechanic): GameMechanic::riotousRookiesPosition(team.roster).
+                // DEFERRED(player_creation): self.riotous_player() for each rookie.
+                // DEFERRED(report): push ReportRiotousRookies event.
+                let _ = (home, rookie_counter); // suppress unused warning until impl
+                rookie_counter += rookies;
+            }
+        }
     }
 
     /// Java: `riotousPlayer(Game, Team, int index, RosterPosition)`.

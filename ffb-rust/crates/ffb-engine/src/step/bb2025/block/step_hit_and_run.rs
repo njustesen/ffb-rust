@@ -1,5 +1,6 @@
+use ffb_model::events::GameEvent;
+use ffb_model::enums::{Direction, TurnMode};
 use ffb_model::types::{FieldCoordinate, MoveSquare};
-use ffb_model::enums::TurnMode;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::util_cards::UtilCards;
@@ -8,7 +9,9 @@ use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::sequences::pick_up_catch_scatter_sequence;
 use crate::util::UtilServerPlayerMove;
+use crate::util::server_util_block::ServerUtilBlock;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.block.StepHitAndRun.
 /// After a block, the attacker may move one adjacent empty square with no opponent tackle zones.
@@ -92,6 +95,7 @@ impl StepHitAndRun {
                 return StepOutcome::cont();
             } else {
                 // Move the player
+                let mut hit_and_run_event: Option<GameEvent> = None;
                 if let (Some(ref attacker_id), Some(dest)) = (acting_player_id, self.coordinate) {
                     // Java: updatePlayerAndBallPosition — ball follows player if at old coord.
                     let old_pos = game.field_model.player_coordinate(attacker_id);
@@ -102,8 +106,11 @@ impl StepHitAndRun {
                             }
                         }
                     }
+                    let direction = old_pos
+                        .and_then(|o| Direction::from_coords(o.x, o.y, dest.x, dest.y))
+                        .unwrap_or(Direction::North);
                     game.field_model.set_player_coordinate(attacker_id, dest);
-                    // DEFERRED: add Direction report (ReportHitAndRun)
+                    hit_and_run_event = Some(GameEvent::HitAndRun { player_id: attacker_id.clone(), direction });
                     // Java: actingPlayer.markSkillUsed(canMoveAfterBlock)
                     let sid = game.player(attacker_id).and_then(|p| UtilCards::get_unused_skill_with_property(
                         p, NamedProperties::CAN_MOVE_AFTER_BLOCK));
@@ -114,8 +121,9 @@ impl StepHitAndRun {
                     }
                 }
                 self.reset_state(game);
-                // DEFERRED: push PickUp + CatchScatterThrowIn sequence onto stack
-                StepOutcome::next()
+                // Java: push PickUp(goto SCATTER_BALL on fail) + CatchScatterThrowIn sequence
+                let out = StepOutcome::next().push_seq(pick_up_catch_scatter_sequence());
+                if let Some(ev) = hit_and_run_event { out.with_event(ev) } else { out }
             }
         } else {
             StepOutcome::next()
@@ -153,7 +161,7 @@ impl StepHitAndRun {
             }
         }
         UtilServerPlayerMove::update_move_squares(game, game.acting_player.jumping);
-        // DEFERRED(ServerUtilBlock): updateDiceDecorations not yet ported
+        ServerUtilBlock::update_dice_decorations(game);
     }
 }
 
@@ -234,6 +242,7 @@ mod tests {
             starting_skills: vec![ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::HitAndRun, value: None }], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         };
 
         game.team_home.players.push(player);
@@ -272,6 +281,7 @@ mod tests {
             starting_skills: vec![ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::HitAndRun, value: None }], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         };
 
         game.team_home.players.push(player);

@@ -18,7 +18,6 @@ use crate::step::framework::{StepAction, StepId, StepParameter};
 /// Command dispatch (Move/Block/Foul/Pass/HandOff/ThrowTeamMate/KickTeamMate/Gaze/EndTurn) ported.
 /// CLIENT_USE_FUMBLEROOSKIE / CLIENT_USE_SKILL (canAddBlockDie) not yet ported.
 /// DEFERRED: UtilServerPlayerMove.isValidMove path validation not yet ported (agent paths trusted).
-/// DEFERRED: commitTargetSelection not yet ported.
 /// setDodging/setGoingForIt, setTurnStarted, concessionPossible, per-action TurnData flags are wired.
 pub struct StepInitMoving {
     /// Java: fGotoLabelOnEnd
@@ -219,7 +218,7 @@ impl StepInitMoving {
             game.acting_player.goes_for_it = move_square
                 .map(|ms| ms.is_going_for_it())
                 .unwrap_or(false);
-            // DEFERRED: commitTargetSelection
+            game.field_model.target_selection_state.as_mut().map(|t| t.commit());
             game.acting_player.has_moved = true;
             game.turn_data_mut().turn_started = true;
             // Java: per-PlayerAction TurnData flags
@@ -273,6 +272,7 @@ impl StepInitMoving {
                     StepParameter::CoordinateFrom(coordinate_from),
                     StepParameter::CoordinateTo(coordinate_to),
                 ],
+                clear_stack: false,
             };
         }
         // Empty move stack — wait for client command

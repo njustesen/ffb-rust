@@ -439,3 +439,28 @@ impl CommonProperty {
         ]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_key_returns_dot_separated_string() {
+        assert_eq!(CommonProperty::CLIENT_COMMAND_COMPRESSION.get_key(), "client.command.compression");
+        assert_eq!(CommonProperty::SETTING_SOUND_MODE.get_key(), "setting.sound.mode");
+    }
+
+    #[test]
+    fn for_key_round_trips() {
+        assert_eq!(
+            CommonProperty::for_key("client.command.compression"),
+            Some(CommonProperty::CLIENT_COMMAND_COMPRESSION)
+        );
+        assert_eq!(CommonProperty::for_key("invalid.key"), None);
+    }
+
+    #[test]
+    fn all_is_non_empty() {
+        assert!(!CommonProperty::all().is_empty());
+    }
+}

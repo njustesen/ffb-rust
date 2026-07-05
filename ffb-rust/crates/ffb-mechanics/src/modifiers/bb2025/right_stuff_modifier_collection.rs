@@ -29,3 +29,26 @@ impl RightStuffModifierCollection {
 impl Default for RightStuffModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_ten_modifiers() {
+        // 2 pass result (subpar + fumbled) + 8 tacklezone = 10
+        assert_eq!(RightStuffModifierCollection::new().get_modifiers().len(), 10);
+    }
+
+    #[test]
+    fn includes_subpar_throw_modifier() {
+        let col = RightStuffModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Subpar Throw"));
+    }
+
+    #[test]
+    fn includes_fumbled_throw_modifier() {
+        let col = RightStuffModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Fumbled Throw"));
+    }
+}

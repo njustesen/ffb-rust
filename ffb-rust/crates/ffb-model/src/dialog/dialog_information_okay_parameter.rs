@@ -20,3 +20,25 @@ impl IDialogParameter for DialogInformationOkayParameter {
     fn get_id(&self) -> DialogId { DialogId::INFORMATION_OKAY }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dialog_id_is_information_okay() {
+        assert_eq!(DialogInformationOkayParameter::default().get_id(), DialogId::INFORMATION_OKAY);
+    }
+
+    #[test]
+    fn stores_title_messages_and_confirm() {
+        let p = DialogInformationOkayParameter {
+            title: Some("Info".into()),
+            messages: vec!["msg1".into()],
+            confirm: true,
+        };
+        assert_eq!(p.get_title(), Some("Info"));
+        assert_eq!(p.get_messages(), &["msg1"]);
+        assert!(p.is_confirm());
+    }
+}

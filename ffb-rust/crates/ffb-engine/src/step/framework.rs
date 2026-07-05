@@ -234,7 +234,7 @@ pub enum StepParameter {
     NumDice(i32),
     AskForBlockKind(bool),
     FollowupChoice(bool),
-    StartingPushbackSquare(ffb_model::types::FieldCoordinate),
+    StartingPushbackSquare(Option<ffb_model::types::PushbackSquare>),
     DefenderPosition(ffb_model::types::FieldCoordinate),
     DefenderPushed(bool),
     AttackerAlreadyDown(bool),
@@ -260,6 +260,12 @@ pub enum StepParameter {
     DoubleTargetStrength(bool),
     UsingStab(bool),
     PlayerOnBallId(String),
+    /// Java: BLOCK_ROLL_ID — identifies which BlockRoll entry this evaluation sequence belongs to.
+    BlockRollId(i32),
+    /// Java: SUPPRESS_EXTRA_EFFECT_HANDLING — suppresses extra effect processing in StepBlockChoice.
+    SuppressExtraEffectHandling(bool),
+    /// Java: SHOW_NAME_IN_REPORT — show defender name in block report.
+    ShowNameInReport(bool),
     // ── movement parameters ───────────────────────────────────────────────────
     AllowMoveAfterPass(bool),
     AllowSecondBlockAction(bool),
@@ -335,6 +341,7 @@ pub enum StepParameter {
     Retain(bool),
     InSelect(bool),
     PlayerEnteringSquare(String),
+    PlayerWasPushed(bool),
     PlayerLoss(bool),
     RiotousRookies(bool),
     FeedingAllowed(bool),
@@ -343,6 +350,9 @@ pub enum StepParameter {
     StateMultipleRolls(bool),
     SteadyFootingContext(Box<crate::drop_player_context::SteadyFootingContext>),
     BloodLustAction(Option<ffb_model::enums::PlayerAction>),
+    /// Java: RESET_PLAYER_ACTION — when set, StepResetToMove clears the stack and pushes
+    /// a Move sequence with the given action. The parameter is consumed by the step.
+    ResetPlayerAction(ffb_model::enums::PlayerAction),
     ShadowerWasPreviousDefender(bool),
     GotoLabelOnBlitz(String),
     GotoLabelOnDodge(String),
@@ -391,20 +401,30 @@ pub struct StepOutcome {
     pub events: Vec<ffb_model::events::GameEvent>,
     /// Prompt to display to the agent (set when action == Continue).
     pub prompt: Option<ffb_model::prompts::AgentPrompt>,
+    /// When true, the driver must clear the entire step stack before processing
+    /// `pushes`. Mirrors Java `GameState.getStepStack().clear()` called from within
+    /// a step (e.g. `StepResetToMove`, `StepSelectGazeTarget`).
+    pub clear_stack: bool,
 }
 
 impl StepOutcome {
     pub fn next() -> Self {
-        StepOutcome { action: StepAction::NextStep, goto_label: None, published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None }
+        StepOutcome { action: StepAction::NextStep, goto_label: None, published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None, clear_stack: false }
     }
     pub fn cont() -> Self {
-        StepOutcome { action: StepAction::Continue, goto_label: None, published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None }
+        StepOutcome { action: StepAction::Continue, goto_label: None, published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None, clear_stack: false }
     }
     pub fn goto(label: &str) -> Self {
-        StepOutcome { action: StepAction::GotoLabel, goto_label: Some(label.to_owned()), published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None }
+        StepOutcome { action: StepAction::GotoLabel, goto_label: Some(label.to_owned()), published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None, clear_stack: false }
     }
     pub fn repeat() -> Self {
-        StepOutcome { action: StepAction::Repeat, goto_label: None, published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None }
+        StepOutcome { action: StepAction::Repeat, goto_label: None, published: Vec::new(), pushes: Vec::new(), events: Vec::new(), prompt: None, clear_stack: false }
+    }
+    /// Mark this outcome to clear the entire step stack before pushing sub-sequences.
+    /// Java: `getGameState().getStepStack().clear()`.
+    pub fn with_clear_stack(mut self) -> Self {
+        self.clear_stack = true;
+        self
     }
     pub fn publish(mut self, p: StepParameter) -> Self {
         self.published.push(p);
@@ -476,6 +496,41 @@ mod tests {
         assert!(StepAction::NextStepAndRepeat.forward_command());
         assert!(StepAction::GotoLabelAndRepeat.forward_command() && StepAction::GotoLabelAndRepeat.trigger_goto());
         assert!(!StepAction::Continue.trigger_next_step() && !StepAction::Continue.trigger_repeat());
+    }
+
+    #[test]
+    fn step_outcome_next_has_next_step_action() {
+        let out = StepOutcome::next();
+        assert!(matches!(out.action, StepAction::NextStep));
+        assert!(out.published.is_empty());
+    }
+
+    #[test]
+    fn step_outcome_cont_has_continue_action() {
+        assert!(matches!(StepOutcome::cont().action, StepAction::Continue));
+    }
+
+    #[test]
+    fn step_outcome_goto_stores_label() {
+        let out = StepOutcome::goto("MY_LABEL");
+        assert!(matches!(out.action, StepAction::GotoLabel));
+        assert_eq!(out.goto_label.as_deref(), Some("MY_LABEL"));
+    }
+
+    #[test]
+    fn step_outcome_publish_accumulates_params() {
+        let out = StepOutcome::next()
+            .publish(StepParameter::EndTurn(true))
+            .publish(StepParameter::EndTurn(false));
+        assert_eq!(out.published.len(), 2);
+    }
+
+    #[test]
+    fn sequence_step_new_has_no_label_or_params() {
+        let s = SequenceStep::new(StepId::Apothecary);
+        assert_eq!(s.step_id, StepId::Apothecary);
+        assert!(s.label.is_none());
+        assert!(s.params.is_empty());
     }
 }
 

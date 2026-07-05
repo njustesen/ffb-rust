@@ -66,7 +66,7 @@ impl StallingExtension {
     /// The injury machinery (UtilServerInjury, InjuryTypeThrowARockStalling,
     /// SteadyFootingContext, DropPlayerCommand, Animation) is not yet translated,
     /// so the rock-hit branch is a TODO stub that never executes (conservative).
-    pub fn handle_staller(&self, game: &mut Game, player_id: &str, turn_nr: i32, rng: &mut ffb_model::util::rng::GameRng) {
+    pub fn handle_staller(&self, game: &mut Game, player_id: &str, turn_nr: i32, rng: &mut ffb_model::util::rng::GameRng) -> ffb_model::events::GameEvent {
         let roll: i32;
         let successful: bool;
 
@@ -86,9 +86,12 @@ impl StallingExtension {
             game.game_result.away.stalled = true;
         }
 
-        // DEFERRED: emit ReportThrowAtStallingPlayer event (roll, successful).
         // DEFERRED: if successful { apply InjuryTypeThrowARockStalling injury and animation }
-        let _ = (roll, successful);
+        ffb_model::events::GameEvent::ThrowAtStallingPlayer {
+            player_id: player_id.to_string(),
+            roll,
+            success: successful,
+        }
     }
 }
 
@@ -118,6 +121,7 @@ mod tests {
             passing: 4, armour: 9, starting_skills: vec![], extra_skills: vec![],
             temporary_skills: vec![], used_skills: std::collections::HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         };
         if home { game.team_home.players.push(p); } else { game.team_away.players.push(p); }
         game.field_model.set_player_coordinate(id, coord);
@@ -151,7 +155,7 @@ mod tests {
         add_player(&mut game, true, "h1", FieldCoordinate::new(5, 5));
         let ext = StallingExtension::new();
         let mut rng = GameRng::new(42);
-        ext.handle_staller(&mut game, "h1", 3, &mut rng);
+        let _ = ext.handle_staller(&mut game, "h1", 3, &mut rng);
         assert!(game.game_result.home.stalled);
         assert!(!game.game_result.away.stalled);
     }
@@ -162,7 +166,7 @@ mod tests {
         add_player(&mut game, false, "a1", FieldCoordinate::new(5, 5));
         let ext = StallingExtension::new();
         let mut rng = GameRng::new(42);
-        ext.handle_staller(&mut game, "a1", 3, &mut rng);
+        let _ = ext.handle_staller(&mut game, "a1", 3, &mut rng);
         assert!(game.game_result.away.stalled);
         assert!(!game.game_result.home.stalled);
     }

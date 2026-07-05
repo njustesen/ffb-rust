@@ -23,3 +23,20 @@ impl Pushback {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn new_stores_player_id_and_coordinate() {
+        let p = Pushback::new("p1", FieldCoordinate::new(2, 4));
+        assert_eq!(p.get_player_id(), Some("p1"));
+        assert_eq!(p.get_coordinate(), Some(FieldCoordinate::new(2, 4)));
+    }
+    #[test]
+    fn transform_preserves_player_id() {
+        let p = Pushback::new("p2", FieldCoordinate::new(2, 4));
+        let t = p.transform();
+        assert_eq!(t.get_player_id(), Some("p2"));
+    }
+}

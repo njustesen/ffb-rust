@@ -81,4 +81,22 @@ mod tests {
         let bl = steps.iter().find(|s| s.step_id == StepId::BloodLust).unwrap();
         assert!(!bl.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(_))));
     }
+
+    #[test]
+    fn failure_label_passed_to_raiding_party_step() {
+        let params = RaidingPartyParams { failure_label: "fail_lbl".into(), success_label: "ok".into() };
+        let steps = RaidingParty::build_sequence(&params);
+        let rp = steps.iter().find(|s| s.step_id == StepId::RaidingParty).unwrap();
+        let has = rp.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "fail_lbl"));
+        assert!(has);
+    }
+
+    #[test]
+    fn success_label_passed_to_raiding_party_step() {
+        let params = RaidingPartyParams { failure_label: "fail".into(), success_label: "succ_lbl".into() };
+        let steps = RaidingParty::build_sequence(&params);
+        let rp = steps.iter().find(|s| s.step_id == StepId::RaidingParty).unwrap();
+        let has = rp.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnSuccess(l) if l == "succ_lbl"));
+        assert!(has);
+    }
 }

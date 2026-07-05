@@ -4,7 +4,7 @@ use ffb_model::enums::{ApothecaryMode, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
-use crate::injury::{InjuryContext, InjuryTypeServer, do_injury_roll};
+use crate::injury::{InjuryContext, InjuryTypeServer, do_injury_roll_for_player};
 
 pub struct InjuryTypeThrowARock { ctx: InjuryContext }
 impl InjuryTypeThrowARock { pub fn new() -> Self { Self { ctx: InjuryContext::new(ApothecaryMode::Defender) } } }
@@ -18,7 +18,7 @@ impl InjuryTypeServer for InjuryTypeThrowARock {
         self.ctx.defender_coordinate = Some(coord);
         self.ctx.apothecary_mode = apo_mode;
         self.ctx.armor_broken = true;
-        do_injury_roll(rng, &mut self.ctx);
+        do_injury_roll_for_player(rng, &mut self.ctx, _game, defender_id);
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }

@@ -6,12 +6,9 @@
 //
 // No methods skipped — the Java only touches FieldModel (no DB/WebSocket).
 //
-// NOTE: the property check (ttmScattersInSingleDirection) requires
-// `Player::has_skill_property` which is not yet in this version of ffb-model.
-// The check always returns false (no swoop squares are generated).
-// Correct once has_skill_property / NamedProperties are added.
 
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds, MoveSquare};
 
 pub struct UtilServerPlayerSwoop;
@@ -37,13 +34,9 @@ impl UtilServerPlayerSwoop {
             _ => return,
         };
 
-        // TODO: replace `false` with:
-        //   game.player(player_id)
-        //       .map(|p| p.has_skill_property(NamedProperties::TTM_SCATTERS_IN_SINGLE_DIRECTION))
-        //       .unwrap_or(false)
-        // once has_skill_property is available.
-        let has_property: bool = false;
-        let _ = player_coord; // used below once has_property becomes meaningful
+        let has_property = game.player(player_id)
+            .map(|p| p.has_skill_property(NamedProperties::TTM_SCATTERS_IN_SINGLE_DIRECTION))
+            .unwrap_or(false);
 
         if !has_property {
             return;
@@ -134,6 +127,7 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
+            ..Default::default()
         }
     }
 

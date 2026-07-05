@@ -102,4 +102,16 @@ mod tests {
         let bl = steps.iter().find(|s| s.step_id == StepId::BloodLust).unwrap();
         assert!(!bl.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(_))));
     }
+
+    #[test]
+    fn furious_outburst_starts_with_init_furious_outburst() {
+        let steps = FuriousOutburst::build_sequence();
+        assert_eq!(steps[0].step_id, StepId::InitFuriousOutburst);
+    }
+
+    #[test]
+    fn furious_outburst_has_second_move() {
+        let steps = FuriousOutburst::build_sequence();
+        assert!(steps.iter().any(|s| s.step_id == StepId::SecondMoveFuriousOutburst));
+    }
 }

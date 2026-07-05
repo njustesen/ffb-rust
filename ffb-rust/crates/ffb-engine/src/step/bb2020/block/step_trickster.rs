@@ -1,4 +1,4 @@
-use ffb_model::types::FieldCoordinate;
+use ffb_model::types::{FieldCoordinate, MoveSquare};
 use ffb_model::enums::TurnMode;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
@@ -161,15 +161,20 @@ impl StepTrickster {
                 game.turn_mode = TurnMode::Trickster;
                 // Java: game.setHomePlaying(!game.isHomePlaying()) — switch acting team
                 game.home_playing = !game.home_playing;
-                // DEFERRED: fieldModel.clearMoveSquares + add MoveSquares for eligibles
+                game.field_model.clear_move_squares();
+                for &coord in &self.eligible_squares {
+                    game.field_model.add_move_square(MoveSquare::new(coord, 0, 0));
+                }
                 return StepOutcome::cont();
             } else if self.action_status == TricksterPhase::WaitingForSkillUse {
                 // Java: move defender and update state — then push current step for pick-up
                 let def_id = defender_id.clone().unwrap_or_default();
                 let to = self.to_coordinate.unwrap();
 
-                // Update multi-block target coordinate if applicable
-                // DEFERRED: fieldModel.replaceMultiBlockTargetCoordinate
+                // Java: fieldModel.replaceMultiBlockTargetCoordinate(old, new)
+                if let Some(old_coord) = game.field_model.player_coordinate(&def_id) {
+                    game.field_model.replace_multi_block_target_coordinate(old_coord, to);
+                }
 
                 // Check if defender has ball
                 self.with_ball = game.field_model.ball_coordinate
@@ -204,9 +209,17 @@ impl StepTrickster {
                         self.attempt_pick_up = Some(false);
                     }
                     if let Some(true) = self.attempt_pick_up {
-                        // DEFERRED: publish AttemptPickUp + PlayerOnBallId + PickUpOptional
+                        // Java: publish AttemptPickUp=true, PlayerOnBallId=mover, PickUpOptional=false
+                        let mover = game.acting_player.player_id.clone().unwrap_or_default();
+                        outcome = outcome
+                            .publish(StepParameter::AttemptPickUp(true))
+                            .publish(StepParameter::PlayerOnBallId(mover))
+                            .publish(StepParameter::PickUpOptional(false));
                     } else {
-                        // DEFERRED: publish CatchScatterThrowInMode::ScatterBall
+                        // Java: publish CatchScatterThrowInMode::ScatterBall
+                        outcome = outcome.publish(StepParameter::CatchScatterThrowInMode(
+                            crate::step::framework::CatchScatterThrowInMode::ScatterBall,
+                        ));
                     }
                 }
 

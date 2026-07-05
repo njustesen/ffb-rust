@@ -5,29 +5,35 @@
 /// Mandatory init param: GOTO_LABEL_ON_FAILURE.
 /// Expected preceding param: CATCHER_ID.
 ///
-/// Logic:
+/// Logic (from AnimosityBehaviour.handleExecuteStepHook):
+/// - If isSufferingAnimosity() → already processed, NEXT_STEP
 /// - If bomb turn → NEXT_STEP (skip)
-/// - Check animosity_exists(thrower, catcher):
-///   - If false → NEXT_STEP
-///   - If true → roll d6; if ≥ 2 → NEXT_STEP; else → GOTO failure
-///
-/// Stub: animosity_exists currently always returns false (AnimosityValueEvaluator not yet translated).
-/// Stub: reroll dialog omitted (random agent always declines).
+/// - If HAND_OVER action → NEXT_STEP (no animosity on hand-offs in some editions, but handled here)
+/// - Check animosity_exists(thrower, catcher) — race-based comparison
+/// - If false → NEXT_STEP
+/// - If true: roll d6 vs minimumRollAnimosity (2); on success → NEXT_STEP
+/// - On failure: offer re-roll (Pass skill or TRR); on final failure → set sufferingAnimosity=true → GOTO failure
+use ffb_model::enums::{PlayerAction, ReRollSource};
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_mechanics::bb2025::skill_mechanic::SkillMechanic;
-use ffb_mechanics::mechanics::minimum_roll_animosity;
-use ffb_mechanics::mechanics::is_skill_roll_successful;
+use ffb_mechanics::mechanics::{is_skill_roll_successful, minimum_roll_animosity};
 use ffb_mechanics::skill_mechanic::SkillMechanic as SkillMechanicTrait;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
 pub struct StepAnimosity {
     /// Java: state.gotoLabelOnFailure — mandatory.
     pub goto_label_on_failure: String,
     /// Java: state.catcherId — set by preceding step parameter.
     pub catcher_id: Option<String>,
+    /// Java: AbstractStepWithReRoll.reRolledAction
+    pub re_rolled_action: Option<String>,
+    /// Java: AbstractStepWithReRoll.reRollSource
+    pub re_roll_source: Option<String>,
 }
 
 impl StepAnimosity {
@@ -35,6 +41,8 @@ impl StepAnimosity {
         Self {
             goto_label_on_failure: goto_label_on_failure.into(),
             catcher_id: None,
+            re_rolled_action: None,
+            re_roll_source: None,
         }
     }
 }
@@ -46,9 +54,10 @@ impl Step for StepAnimosity {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // AbstractStepWithReRoll.handleCommand processes reroll responses.
-        // Random agent always declines → re-execute directly.
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        if let Action::UseReRoll { use_reroll: false } = action {
+            self.re_roll_source = None;
+        }
         self.execute_step(game, rng)
     }
 
@@ -62,10 +71,38 @@ impl Step for StepAnimosity {
 }
 
 impl StepAnimosity {
-    fn execute_step(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: if (actingPlayer.isSufferingAnimosity()) → NEXT_STEP (already resolved)
+        if game.acting_player.suffering_animosity {
+            return StepOutcome::next();
+        }
+
         // Java: if (game.getTurnMode().isBombTurn()) → NEXT_STEP
         if game.turn_mode.is_bomb_turn() {
             return StepOutcome::next();
+        }
+
+        // Java: if (HAND_OVER action) → NEXT_STEP (Animosity only applies to Pass, not HandOver)
+        if game.acting_player.player_action == Some(PlayerAction::HandOver) {
+            return StepOutcome::next();
+        }
+
+        let re_rolled = self.re_rolled_action.as_deref() == Some("ANIMOSITY");
+
+        // Re-roll path: we already rolled and offered a re-roll; now handle response.
+        if re_rolled {
+            if let Some(ref source_str) = self.re_roll_source.clone() {
+                let source = ReRollSource::new(source_str.as_str());
+                let thrower_id = game.acting_player.player_id.clone().unwrap_or_default();
+                if use_reroll(game, &source, &thrower_id) {
+                    // Re-roll granted — fall through to the roll below
+                } else {
+                    return self.fail_animosity(game);
+                }
+            } else {
+                // re_roll_source cleared to None means player declined
+                return self.fail_animosity(game);
+            }
         }
 
         let thrower = game.thrower().map(|p| p.clone());
@@ -73,26 +110,45 @@ impl StepAnimosity {
             .and_then(|id| game.player(id).map(|p| p.clone()));
 
         let mechanic = SkillMechanic::new();
-
         let do_roll = match (&thrower, &catcher) {
             (Some(t), Some(c)) => mechanic.animosity_exists(t, c),
             _ => false,
         };
 
-        if do_roll {
-            let roll = rng.d6();
-            let min_roll = minimum_roll_animosity();
-            let successful = is_skill_roll_successful(roll, min_roll);
-            if successful {
-                return StepOutcome::next();
-            } else {
-                // Random agent: no reroll → sufferingAnimosity = true → GOTO failure
-                return StepOutcome::goto(&self.goto_label_on_failure);
+        if !do_roll {
+            return StepOutcome::next();
+        }
+
+        let roll = rng.d6();
+        let min_roll = minimum_roll_animosity();
+        let successful = is_skill_roll_successful(roll, min_roll);
+
+        let thrower_id = game.acting_player.player_id.clone().unwrap_or_default();
+        let event = GameEvent::AnimosityRoll {
+            player_id: thrower_id.clone(),
+            roll,
+            success: successful,
+        };
+
+        if successful {
+            return StepOutcome::next().with_event(event);
+        }
+
+        // Failed: offer re-roll (Pass skill → TRR)
+        if !re_rolled {
+            if let Some(prompt) = ask_for_reroll_if_available(game, "ANIMOSITY", min_roll, false) {
+                self.re_rolled_action = Some("ANIMOSITY".into());
+                self.re_roll_source = Some("TRR".into());
+                return StepOutcome::cont().with_event(event).with_prompt(prompt);
             }
         }
 
-        // Java: doRoll = false → NEXT_STEP
-        StepOutcome::next()
+        self.fail_animosity(game).with_event(event)
+    }
+
+    fn fail_animosity(&mut self, game: &mut Game) -> StepOutcome {
+        game.acting_player.suffering_animosity = true;
+        StepOutcome::goto(&self.goto_label_on_failure)
     }
 }
 
@@ -112,11 +168,26 @@ mod tests {
     }
 
     #[test]
+    fn already_suffering_animosity_returns_next() {
+        let mut game = make_game();
+        game.acting_player.suffering_animosity = true;
+        let out = StepAnimosity::new("fail").start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
     fn bomb_turn_skips_animosity_check() {
         let mut game = make_game();
         game.turn_mode = TurnMode::BombHome;
-        let mut step = StepAnimosity::new("fail");
-        let out = step.start(&mut game, &mut GameRng::new(0));
+        let out = StepAnimosity::new("fail").start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn hand_over_action_skips_animosity_check() {
+        let mut game = make_game();
+        game.acting_player.player_action = Some(PlayerAction::HandOver);
+        let out = StepAnimosity::new("fail").start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
     }
 
@@ -124,8 +195,7 @@ mod tests {
     fn no_animosity_skill_returns_next() {
         let mut game = make_game();
         // No thrower set, no catcher → animosity_exists = false
-        let mut step = StepAnimosity::new("fail");
-        let out = step.start(&mut game, &mut GameRng::new(0));
+        let out = StepAnimosity::new("fail").start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
     }
 
@@ -150,7 +220,23 @@ mod tests {
         let mut step = StepAnimosity::new("fail");
         step.catcher_id = Some("c2".into());
         let out = step.start(&mut game, &mut GameRng::new(0));
-        // animosity_exists stub returns false → always NEXT_STEP
+        // animosity_exists returns false without matching race → always NEXT_STEP
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn step_id_is_animosity() {
+        assert_eq!(StepAnimosity::new("fail").id(), StepId::Animosity);
+    }
+
+    #[test]
+    fn decline_reroll_sets_suffering_animosity() {
+        let mut step = StepAnimosity::new("fail");
+        step.re_rolled_action = Some("ANIMOSITY".into());
+        step.re_roll_source = None; // declined → source is None
+        let mut game = make_game();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(game.acting_player.suffering_animosity);
     }
 }

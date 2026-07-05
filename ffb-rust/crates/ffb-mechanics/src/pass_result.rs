@@ -20,3 +20,23 @@ impl PassResult {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accurate_name() {
+        assert_eq!(PassResult::ACCURATE.get_name(), "ACCURATE");
+    }
+
+    #[test]
+    fn fumble_name() {
+        assert_eq!(PassResult::FUMBLE.get_name(), "FUMBLE");
+    }
+
+    #[test]
+    fn variants_are_distinct() {
+        assert_ne!(PassResult::ACCURATE, PassResult::INACCURATE);
+    }
+}

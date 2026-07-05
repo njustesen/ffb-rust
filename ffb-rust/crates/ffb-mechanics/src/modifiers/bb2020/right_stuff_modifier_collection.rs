@@ -31,3 +31,28 @@ impl RightStuffModifierCollection {
 impl Default for RightStuffModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_eleven_modifiers() {
+        // 3 pass result (inaccurate/terrible/fumbled) + 8 tacklezone = 11
+        assert_eq!(RightStuffModifierCollection::new().get_modifiers().len(), 11);
+    }
+
+    #[test]
+    fn includes_successful_throw_modifier() {
+        let col = RightStuffModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Successful Throw"));
+    }
+
+    #[test]
+    fn tacklezone_count_is_eight() {
+        let col = RightStuffModifierCollection::new();
+        use crate::modifiers::modifier_type::ModifierType;
+        let tz_count = col.get_modifiers().iter().filter(|m| m.get_type() == ModifierType::TACKLEZONE).count();
+        assert_eq!(tz_count, 8);
+    }
+}

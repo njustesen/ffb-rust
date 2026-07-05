@@ -1,11 +1,15 @@
-use ffb_model::enums::{TurnMode, PS_RESERVE};
+use ffb_model::enums::{TurnMode, PS_PRONE, PS_RESERVE};
 use ffb_model::model::SpecialRule;
 use ffb_model::types::FieldCoordinateBounds;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
+use crate::mechanic::mixed::setup_mechanic::SetupMechanic;
+use crate::mechanic::setup_mechanic::SetupMechanic as SetupMechanicTrait;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::util::util_server_setup::UtilServerSetup;
 
 /// Handles the Swarming kickoff result: the Swarming team places extra lineman
 /// reserves onto the Line of Scrimmage.
@@ -71,8 +75,7 @@ impl Step for StepSwarming {
                 self.end_turn = true;
             }
             Action::PlacePlayer { player_id, coord } => {
-                // Java CLIENT_SETUP_PLAYER → UtilServerSetup.setupPlayer(...)
-                game.field_model.set_player_coordinate(player_id, *coord);
+                UtilServerSetup::setup_player(game, player_id, *coord);
                 return StepOutcome::cont();
             }
             _ => {}
@@ -115,18 +118,21 @@ impl StepSwarming {
                     return StepOutcome::cont();
                 }
 
-                // DEFERRED: SetupMechanic.checkSetup, then call leave().
-                // Stub: always proceed.
-                self.leave(game);
+                let setup_valid = SetupMechanic::new().check_setup(game, game.home_playing);
+                // DEFERRED(dialog): show setup error when !setup_valid
+                if setup_valid {
+                    self.leave(game, placed);
+                }
             }
             return StepOutcome::cont();
         }
 
         // First entry.
 
-        // Reset kicking-swarmers counter if we are handling the kicking team.
-        // (Java: if !handleReceivingTeam → gameState.setKickingSwarmers(0).)
-        // DEFERRED: kicking_swarmers field on GameState not yet ported.
+        // Java: if !handleReceivingTeam → gameState.setKickingSwarmers(0)
+        if !self.handle_receiving_team {
+            game.kicking_swarmers = 0;
+        }
 
         // Determine the swarming team.
         let team_id = self.swarming_team_id(game);
@@ -166,16 +172,29 @@ impl StepSwarming {
         StepOutcome::cont()
     }
 
-    fn leave(&mut self, game: &mut Game) {
-        // Java: restore PRONE → RESERVE, set TurnMode::Kickoff, refreshPlayersForTurnStart,
-        //       clearTrackNumbers, handle receiving-team flip / kicking-swarmers count.
-        // DEFERRED: restore player states (PRONE → RESERVE).
-        // DEFERRED: UtilPlayer.refreshPlayersForTurnStart, fieldModel.clearTrackNumbers.
+    fn leave(&mut self, game: &mut Game, placed_swarming_players: i32) {
+        // Java: restore PRONE → RESERVE for all swarming-team players, then kickoff housekeeping.
+        if let Some(ref team_id) = self.team_id.clone() {
+            let team = if game.team_home.id == *team_id { &game.team_home } else { &game.team_away };
+            let prone_ids: Vec<String> = team.players.iter()
+                .filter(|p| game.field_model.player_state(&p.id).map(|s| s.base() == PS_PRONE).unwrap_or(false))
+                .map(|p| p.id.clone())
+                .collect();
+            for pid in prone_ids {
+                if let Some(state) = game.field_model.player_state(&pid) {
+                    game.field_model.set_player_state(&pid, state.change_base(PS_RESERVE));
+                }
+            }
+        }
+        UtilPlayer::refresh_players_for_turn_start(game);
+        game.field_model.clear_track_numbers();
 
         if self.handle_receiving_team {
             game.home_playing = !game.home_playing;
+        } else {
+            // Java: gameState.setKickingSwarmers(placedSwarmingPlayers)
+            game.kicking_swarmers = placed_swarming_players;
         }
-        // DEFERRED: else gameState.setKickingSwarmers(placedSwarmingPlayers).
 
         game.turn_mode = TurnMode::Kickoff;
     }

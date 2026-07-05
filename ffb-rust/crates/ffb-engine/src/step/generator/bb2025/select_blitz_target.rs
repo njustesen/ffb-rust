@@ -55,4 +55,11 @@ mod tests {
         let s = steps.iter().find(|s| s.step_id == StepId::SelectBlitzTargetEnd).unwrap();
         assert_eq!(s.label.as_deref(), Some(labels::END_BLITZING));
     }
+
+    #[test]
+    fn select_blitz_target_has_jump_up_and_stand_up() {
+        let steps = SelectBlitzTarget::build_sequence();
+        assert!(steps.iter().any(|s| s.step_id == StepId::JumpUp));
+        assert!(steps.iter().any(|s| s.step_id == StepId::StandUp));
+    }
 }

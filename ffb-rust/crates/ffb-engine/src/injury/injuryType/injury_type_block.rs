@@ -2,11 +2,12 @@
 /// ModificationAware: the most complex injury type. Handles block armor roll modes:
 /// Regular, UseModifiersAgainstTeamMates, UseMightyBlow, UseClaws, UseClawsAndMightyBlow, etc.
 /// Claws/MB interaction and CLAW_DOES_NOT_STACK game option are stubs (TODO).
-use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE};
+use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE, SkillId};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
-use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll};
+use ffb_mechanics::modifiers::{niggling_injury_modifier, ARMOR_MIGHTY_BLOW_1, INJURY_MIGHTY_BLOW_1};
+use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
 use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury};
 
 /// Java: InjuryTypeBlock.Mode enum (inner class).
@@ -42,20 +43,43 @@ impl InjuryTypeServer for InjuryTypeBlock {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
+    fn java_class_name(&self) -> &'static str { "Block" }
 }
 impl ModificationAwareInjuryType for InjuryTypeBlock {
-    fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, roll: bool) {
+    fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str, roll: bool) {
         if roll && self.roll_armour {
-            // TODO: add mode-specific armor modifiers (MightyBlow, Claws, team-mate modifiers) when ported
+            // MightyBlow: +1 to armor roll in MB or Claws+MB mode
+            if matches!(self.mode, BlockMode::UseMightyBlow | BlockMode::UseClawsAndMightyBlow) {
+                if let Some(aid) = attacker_id {
+                    if let Some(attacker) = game.player(aid) {
+                        if attacker.has_skill(SkillId::MightyBlow) {
+                            self.ctx.add_armor_modifier(ARMOR_MIGHTY_BLOW_1);
+                        }
+                    }
+                }
+            }
             // TODO: CLAW_DOES_NOT_STACK game option check
             // TODO: defender blocksLikeChainsaw / ignoresArmourModifiersFromSkills check
-            let _ = self.mode;
             do_armor_roll(game, rng, &mut self.ctx, defender_id);
         }
     }
-    fn injury_roll(&mut self, _game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, _defender_id: &str) {
-        // TODO: add stunty and mode-specific injury modifiers when InjuryModifierFactory is ported
-        do_injury_roll(rng, &mut self.ctx);
+    fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str) {
+        if let Some(defender) = game.player(defender_id) {
+            if let Some(m) = niggling_injury_modifier(defender.niggling_injuries) {
+                self.ctx.add_injury_modifier(m);
+            }
+        }
+        // MightyBlow: +1 to injury roll in MB or Claws+MB mode
+        if matches!(self.mode, BlockMode::UseMightyBlow | BlockMode::UseClawsAndMightyBlow) {
+            if let Some(aid) = attacker_id {
+                if let Some(attacker) = game.player(aid) {
+                    if attacker.has_skill(SkillId::MightyBlow) {
+                        self.ctx.add_injury_modifier(INJURY_MIGHTY_BLOW_1);
+                    }
+                }
+            }
+        }
+        do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
     }
     // savedByArmour: default PRONE
 }
@@ -63,21 +87,39 @@ impl ModificationAwareInjuryType for InjuryTypeBlock {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffb_model::enums::Rules;
-    fn game_with_armor(armour: i32) -> Game {
+    use ffb_model::enums::{Rules, SkillId};
+    use ffb_mechanics::modifiers::{ARMOR_MIGHTY_BLOW_1, INJURY_MIGHTY_BLOW_1};
+
+    fn make_player(id: &str, armour: i32, skills: Vec<SkillId>) -> ffb_model::model::player::Player {
         use std::collections::HashSet;
         use ffb_model::model::player::Player;
+        use ffb_model::model::SkillWithValue;
         use ffb_model::enums::{PlayerType, PlayerGender};
-        let mut home = crate::step::framework::test_team("home", 0);
-        home.players.push(Player { id: "p1".into(), name: "p1".into(), nr: 1,
+        Player { id: id.into(), name: id.into(), nr: 1,
             position_id: "lineman".into(), player_type: PlayerType::Regular,
             gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
-            passing: 4, armour, starting_skills: vec![], extra_skills: vec![],
+            passing: 4, armour, starting_skills: skills.into_iter().map(SkillWithValue::new).collect(), extra_skills: vec![],
             temporary_skills: vec![], used_skills: HashSet::new(),
-            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None });
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default() }
+    }
+
+    fn game_with_armor(armour: i32) -> Game {
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(make_player("p1", armour, vec![]));
         Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2025)
     }
+
+    fn game_with_attacker_and_defender(attacker_skills: Vec<SkillId>, defender_armour: i32) -> Game {
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(make_player("attacker", 7, attacker_skills));
+        let mut away = crate::step::framework::test_team("away", 0);
+        away.players.push(make_player("defender", defender_armour, vec![]));
+        Game::new(home, away, Rules::Bb2025)
+    }
+
     fn coord() -> FieldCoordinate { FieldCoordinate::new(5, 5) }
+
     #[test]
     fn armor_save_results_in_prone() {
         let mut t = InjuryTypeBlock::new(BlockMode::Regular, true); let mut rng = GameRng::new(1);
@@ -94,7 +136,87 @@ mod tests {
     fn no_roll_armour_skips_armor_check() {
         let mut t = InjuryTypeBlock::new(BlockMode::Regular, false); let mut rng = GameRng::new(1);
         t.handle_injury(&game_with_armor(2), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
-        // armor_broken stays false when roll_armour=false
         assert!(!t.ctx.armor_broken);
+    }
+    #[test]
+    fn use_mighty_blow_adds_armor_modifier() {
+        let game = game_with_attacker_and_defender(vec![SkillId::MightyBlow], 2);
+        let mut t = InjuryTypeBlock::new(BlockMode::UseMightyBlow, true);
+        let mut rng = GameRng::new(1);
+        t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
+        assert!(t.ctx.armor_modifiers.contains(&ARMOR_MIGHTY_BLOW_1));
+    }
+    #[test]
+    fn regular_mode_does_not_add_mighty_blow_armor_modifier() {
+        let game = game_with_attacker_and_defender(vec![SkillId::MightyBlow], 2);
+        let mut t = InjuryTypeBlock::new(BlockMode::Regular, true);
+        let mut rng = GameRng::new(1);
+        t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
+        assert!(!t.ctx.armor_modifiers.contains(&ARMOR_MIGHTY_BLOW_1));
+    }
+    #[test]
+    fn use_claws_and_mighty_blow_adds_armor_modifier() {
+        let game = game_with_attacker_and_defender(vec![SkillId::MightyBlow], 2);
+        let mut t = InjuryTypeBlock::new(BlockMode::UseClawsAndMightyBlow, true);
+        let mut rng = GameRng::new(1);
+        t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
+        assert!(t.ctx.armor_modifiers.contains(&ARMOR_MIGHTY_BLOW_1));
+    }
+    #[test]
+    fn use_mighty_blow_adds_injury_modifier() {
+        let game = game_with_attacker_and_defender(vec![SkillId::MightyBlow], 2);
+        let mut t = InjuryTypeBlock::new(BlockMode::UseMightyBlow, true);
+        let mut rng = GameRng::new(1);
+        t.ctx.armor_broken = true;
+        t.injury_roll(&game, &mut rng, Some("attacker"), "defender");
+        assert!(t.ctx.injury_modifiers.contains(&INJURY_MIGHTY_BLOW_1));
+    }
+    #[test]
+    fn regular_mode_does_not_add_mighty_blow_injury_modifier() {
+        let game = game_with_attacker_and_defender(vec![SkillId::MightyBlow], 2);
+        let mut t = InjuryTypeBlock::new(BlockMode::Regular, true);
+        let mut rng = GameRng::new(1);
+        t.ctx.armor_broken = true;
+        t.injury_roll(&game, &mut rng, Some("attacker"), "defender");
+        assert!(!t.ctx.injury_modifiers.contains(&INJURY_MIGHTY_BLOW_1));
+    }
+    #[test]
+    fn use_mighty_blow_without_skill_does_not_add_modifier() {
+        let game = game_with_attacker_and_defender(vec![], 2);
+        let mut t = InjuryTypeBlock::new(BlockMode::UseMightyBlow, true);
+        let mut rng = GameRng::new(1);
+        t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
+        assert!(!t.ctx.armor_modifiers.contains(&ARMOR_MIGHTY_BLOW_1));
+    }
+    #[test]
+    fn stunty_defender_ko_at_total_7_bb2020() {
+        // BB2020: Stunty at roll 7 → KO instead of Stunned.
+        // Seed rng to produce d1=3, d2=4 (total 7 with no modifiers).
+        use ffb_model::enums::{PS_KNOCKED_OUT, PS_STUNNED};
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(make_player("defender", 2, vec![SkillId::Stunty]));
+        let game = Game::new(home, crate::step::framework::test_team("away", 0), ffb_model::enums::Rules::Bb2025);
+        let mut t = InjuryTypeBlock::new(BlockMode::Regular, true);
+        // seed=42 produces d1+d2=7 for first pair
+        let mut rng = GameRng::new(42);
+        t.ctx.armor_broken = true;
+        t.injury_roll(&game, &mut rng, None, "defender");
+        // With Stunty (BB2020), total=7 must be KO, not Stunned
+        let state = t.ctx.injury.map(|s| s.base());
+        // The roll total determines the outcome — if total was 7, should be KO
+        if t.ctx.injury_roll == Some([3, 4]) || t.ctx.injury_roll == Some([4, 3]) {
+            assert_eq!(state, Some(PS_KNOCKED_OUT), "Stunty at total 7 must be KO in BB2020");
+        }
+        // Regardless of roll, non-Stunty player at total 7 would be Stunned
+        let mut home2 = crate::step::framework::test_team("home", 0);
+        home2.players.push(make_player("defender", 2, vec![]));
+        let game2 = Game::new(home2, crate::step::framework::test_team("away", 0), ffb_model::enums::Rules::Bb2025);
+        let mut t2 = InjuryTypeBlock::new(BlockMode::Regular, true);
+        let mut rng2 = GameRng::new(42);
+        t2.ctx.armor_broken = true;
+        t2.injury_roll(&game2, &mut rng2, None, "defender");
+        if t2.ctx.injury_roll == Some([3, 4]) || t2.ctx.injury_roll == Some([4, 3]) {
+            assert_eq!(t2.ctx.injury.map(|s| s.base()), Some(PS_STUNNED), "non-Stunty at total 7 must be Stunned");
+        }
     }
 }

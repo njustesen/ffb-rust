@@ -24,4 +24,38 @@ impl InjuryModifier for SpecialEffectInjuryModifier {
     fn applies_to_context(&self, context: &InjuryModifierContext<'_>) -> bool { self.inner.applies_to_context(context) }
     fn registered_to(&self) -> Option<&str> { self.inner.registered_to() }
     fn set_registered_to(&mut self, skill_id: Option<String>) { self.inner.set_registered_to(skill_id); }
+    fn get_special_effect(&self) -> Option<SpecialEffect> { Some(self.effect) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn dummy_player() -> Player {
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        Player {
+            id: "p".into(), name: "p".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn stores_name_modifier_and_effect() {
+        let m = SpecialEffectInjuryModifier::new("Lightning Stun", 1, false, SpecialEffect::LIGHTNING);
+        let p = dummy_player();
+        assert_eq!(m.get_name(), "Lightning Stun");
+        assert_eq!(m.get_modifier(None, &p), 1);
+        assert_eq!(m.get_effect(), SpecialEffect::LIGHTNING);
+    }
+
+    #[test]
+    fn niggling_flag_propagates() {
+        let m = SpecialEffectInjuryModifier::new("x", 0, true, SpecialEffect::BOMB);
+        assert!(m.is_niggling_injury_modifier());
+    }
 }

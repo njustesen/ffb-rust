@@ -41,3 +41,41 @@ pub trait ThrowInMechanic: Mechanic {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::types::FieldCoordinate;
+    use crate::mechanic::{Mechanic, MechanicType};
+
+    struct TestThrowIn;
+    impl Mechanic for TestThrowIn {
+        fn get_type(&self) -> MechanicType { MechanicType::THROW_IN }
+    }
+    impl ThrowInMechanic for TestThrowIn {
+        fn distance(&self, _: &[i32]) -> i32 { 0 }
+        fn is_corner_throw_in(&self, _: FieldCoordinate) -> bool { false }
+        fn interpret_throw_in_direction_roll(&self, _: FieldCoordinate, _: i32) -> Direction { Direction::East }
+    }
+
+    #[test]
+    fn east_roll_1_2_is_northeast() {
+        let m = TestThrowIn;
+        assert_eq!(m.interpret_throw_in_direction_roll_with_template(Direction::East, 1), Direction::Northeast);
+        assert_eq!(m.interpret_throw_in_direction_roll_with_template(Direction::East, 2), Direction::Northeast);
+    }
+
+    #[test]
+    fn west_roll_3_4_is_west() {
+        let m = TestThrowIn;
+        assert_eq!(m.interpret_throw_in_direction_roll_with_template(Direction::West, 3), Direction::West);
+        assert_eq!(m.interpret_throw_in_direction_roll_with_template(Direction::West, 4), Direction::West);
+    }
+
+    #[test]
+    fn north_roll_5_6_is_northeast() {
+        let m = TestThrowIn;
+        assert_eq!(m.interpret_throw_in_direction_roll_with_template(Direction::North, 5), Direction::Northeast);
+        assert_eq!(m.interpret_throw_in_direction_roll_with_template(Direction::North, 6), Direction::Northeast);
+    }
+}

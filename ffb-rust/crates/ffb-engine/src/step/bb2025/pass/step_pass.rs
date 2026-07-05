@@ -3,6 +3,10 @@ use ffb_model::model::game::Game;
 use ffb_model::util::passing::passing_distance;
 use ffb_model::util::rng::GameRng;
 use ffb_mechanics::bb2025::pass_mechanic::PassMechanic as Bb2025PassMechanic;
+use ffb_mechanics::modifiers::modifier_type::ModifierType;
+use ffb_mechanics::modifiers::pass_context::PassContext;
+use ffb_mechanics::modifiers::pass_modifier::PassModifier;
+use ffb_mechanics::modifiers::pass_modifier_factory::PassModifierFactory;
 use ffb_mechanics::pass_mechanic::PassMechanic;
 use ffb_mechanics::pass_result::PassResult;
 use crate::action::Action;
@@ -164,9 +168,20 @@ impl StepPass {
         });
 
         // Java: PassModifierFactory.findModifiers(new PassContext(game, thrower, passingDistance, false))
-        // DEFERRED: actual modifier lookup — currently empty (no tacklezone/weather modifiers applied)
-        // This means the roll is pure PA-based without any context modifiers.
-        let pass_modifiers: Vec<ffb_mechanics::modifiers::PassModifier> = Vec::new();
+        let pass_modifier_total: i32 = {
+            if let (Some(thrower), Some(dist)) = (game.thrower(), passing_dist) {
+                let factory = PassModifierFactory::for_rules(game.rules);
+                let ctx = PassContext::new(game, thrower, dist, false);
+                factory.find_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum()
+            } else {
+                0
+            }
+        };
+        let pass_modifiers: Vec<PassModifier> = if pass_modifier_total != 0 {
+            vec![PassModifier::new("pass_mods", pass_modifier_total, ModifierType::REGULAR)]
+        } else {
+            vec![]
+        };
 
         // Roll if not yet rolled (roll=0 means fresh)
         if self.roll == 0 {

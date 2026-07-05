@@ -16,8 +16,7 @@ use crate::step::framework::{StepId, StepParameter};
 /// `ignore_acted_flag` is kept as a field for future use; the Java init param
 /// IGNORE_ACTED_FLAG is handled via set_parameter.
 ///
-/// Note: StepParameter::IgnoreActedFlag does not yet exist in the Rust framework.
-/// DEFERRED(stalling): wire IgnoreActedFlag once added to StepParameter enum.
+/// Note: `StepParameter::IgnoreActedFlag` is handled via `set_parameter`.
 pub struct StepCheckStalling {
     /// Java: fIgnoreActedFlag (default true in Java init)
     pub ignore_acted_flag: bool,
@@ -39,7 +38,7 @@ impl Step for StepCheckStalling {
     fn id(&self) -> StepId { StepId::CheckStalling }
 
     fn start(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // DEFERRED(stalling): full stalling check requires prayer state, pathfinding infrastructure
+        // DEFERRED(stalling): full stalling check requires pathfinding infrastructure (prayer state now available via game.prayer_state)
         StepOutcome::next()
     }
 
@@ -47,13 +46,11 @@ impl Step for StepCheckStalling {
         StepOutcome::next()
     }
 
-    fn set_parameter(&mut self, _param: &StepParameter) -> bool {
-        // DEFERRED(stalling): handle StepParameter::IgnoreActedFlag once added to the enum.
-        // match param {
-        //     StepParameter::IgnoreActedFlag(v) => { self.ignore_acted_flag = *v; true }
-        //     _ => false,
-        // }
-        false
+    fn set_parameter(&mut self, param: &StepParameter) -> bool {
+        match param {
+            StepParameter::IgnoreActedFlag(v) => { self.ignore_acted_flag = *v; true }
+            _ => false,
+        }
     }
 }
 
@@ -90,5 +87,21 @@ mod tests {
         let mut step = StepCheckStalling::new();
         let out = step.handle_command(&Action::Acknowledge, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn set_parameter_ignore_acted_flag_accepted() {
+        let mut step = StepCheckStalling::new();
+        assert!(step.ignore_acted_flag); // default = true
+        assert!(step.set_parameter(&StepParameter::IgnoreActedFlag(false)));
+        assert!(!step.ignore_acted_flag);
+        assert!(step.set_parameter(&StepParameter::IgnoreActedFlag(true)));
+        assert!(step.ignore_acted_flag);
+    }
+
+    #[test]
+    fn set_parameter_unknown_returns_false() {
+        let mut step = StepCheckStalling::new();
+        assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
     }
 }

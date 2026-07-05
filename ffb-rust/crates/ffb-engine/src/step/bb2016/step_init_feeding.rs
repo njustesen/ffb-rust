@@ -1,7 +1,9 @@
+use ffb_model::events::GameEvent;
 use ffb_model::enums::ApothecaryMode;
 use ffb_model::enums::{PlayerState, PS_KNOCKED_OUT, PS_RESERVE};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_box::UtilBox;
 use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::step::framework::{CatchScatterThrowInMode, Step, StepOutcome};
@@ -58,7 +60,8 @@ impl Step for StepInitFeeding {
         // Java: CLIENT_PLAYER_CHOICE (PlayerChoiceMode.FEED)
         //   fFeedOnPlayerChoice = StringTool.isProvided(playerId)
         //   game.setDefenderId(playerId)
-        if let Action::SelectPlayer { player_id } = action {
+        if let Action::SelectPlayer { player_id
+} = action {
             self.feed_on_player_choice = Some(!player_id.is_empty());
             game.defender_id = if player_id.is_empty() { None } else { Some(player_id.clone()) };
         }
@@ -119,9 +122,16 @@ impl StepInitFeeding {
         let has_tackle_zones = player_state.map(|s| s.has_tacklezones()).unwrap_or(false);
 
         if has_tackle_zones && self.feed_on_player_choice.is_none() {
-            // DEFERRED(findAdjacentPlayersToFeedOn): UtilPlayer.findAdjacentPlayersToFeedOn not yet ported
-            // Stub: return cont() to wait for CLIENT_PLAYER_CHOICE dialog response
-            return StepOutcome::cont();
+            let acting_coord = game.field_model.player_coordinate(&acting_id)
+                .unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
+            let acting_team = if game.home_playing { game.team_home.clone() } else { game.team_away.clone() };
+            let victims = UtilPlayer::find_adjacent_players_to_feed_on(game, &acting_team, acting_coord);
+            if victims.is_empty() {
+                self.feed_on_player_choice = Some(false);
+            } else {
+                // DEFERRED(dialog): UtilServerDialog.showDialog(VAMPIRE_FEEDING) — dialog infra not yet ported
+                return StepOutcome::cont();
+            }
         }
 
         let mut outcome = StepOutcome::next();
@@ -179,8 +189,8 @@ impl StepInitFeeding {
                 if let Some(s) = player_state {
                     game.field_model.set_player_state(&acting_id, s.change_base(PS_RESERVE));
                 }
-                // DEFERRED(UtilBox): UtilBox.putPlayerIntoBox not yet ported
-                // DEFERRED(reports): ReportBiteSpectator not yet ported
+                UtilBox::put_player_into_box(game, &acting_id);
+                outcome = outcome.with_event(GameEvent::BiteSpectator { player_id: acting_id.clone() });
             }
         }
 
@@ -218,7 +228,8 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+                    ..Default::default()
+});
         game.field_model.set_player_coordinate(id, coord);
         game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
     }

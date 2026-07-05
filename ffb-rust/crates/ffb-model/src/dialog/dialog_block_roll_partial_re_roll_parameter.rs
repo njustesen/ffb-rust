@@ -34,3 +34,41 @@ impl IDialogParameter for DialogBlockRollPartialReRollParameter {
     fn get_id(&self) -> DialogId { DialogId::BLOCK_ROLL_PARTIAL_RE_ROLL }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dialog_id_is_block_roll_partial_re_roll() {
+        assert_eq!(DialogBlockRollPartialReRollParameter::default().get_id(), DialogId::BLOCK_ROLL_PARTIAL_RE_ROLL);
+    }
+
+    #[test]
+    fn boolean_flags_propagate_correctly() {
+        let p = DialogBlockRollPartialReRollParameter {
+            team_re_roll_option: true,
+            pro_re_roll_option: false,
+            brawler_option: true,
+            consummate_option: false,
+            ..Default::default()
+        };
+        assert!(p.has_team_re_roll_option());
+        assert!(!p.has_pro_re_roll_option());
+        assert!(p.has_brawler_option());
+        assert!(!p.has_consummate_option());
+    }
+
+    #[test]
+    fn stores_dice_and_team_id() {
+        let p = DialogBlockRollPartialReRollParameter {
+            choosing_team_id: Some("team1".into()),
+            nr_of_dice: 2,
+            block_roll: vec![3, 5],
+            ..Default::default()
+        };
+        assert_eq!(p.get_choosing_team_id(), Some("team1"));
+        assert_eq!(p.get_nr_of_dice(), 2);
+        assert_eq!(p.get_block_roll(), &[3, 5]);
+    }
+}

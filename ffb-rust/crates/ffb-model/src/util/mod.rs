@@ -6,6 +6,7 @@ pub mod passing;
 pub mod state_hash;
 pub mod raise_type;
 pub mod util_cards;
+pub mod util_disturbing_presence;
 pub mod util_player;
 pub mod util_box;
 

@@ -110,8 +110,9 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         }
-    }
+}
 
     fn make_game_with_player(id: &str) -> Game {
         let mut home = test_team("home", 0);

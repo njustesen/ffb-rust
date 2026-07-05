@@ -99,3 +99,25 @@ fn path_finder_allow_pass_block_move_is_provided(
 ) -> bool {
     false
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::on_the_ball_mechanic::OnTheBallMechanic as OnTheBallTrait;
+
+    #[test]
+    fn display_string_pass_interference_is_pass_block() {
+        assert_eq!(OnTheBallMechanic.display_string_pass_interference(), "Pass Block");
+    }
+
+    #[test]
+    fn pass_interference_dialog_has_two_entries() {
+        let lines = OnTheBallMechanic.pass_interference_dialog_description();
+        assert_eq!(lines.len(), 2);
+    }
+
+    #[test]
+    fn display_string_kick_off_interference_is_kickoff_return() {
+        assert_eq!(OnTheBallMechanic.display_string_kick_off_interference(), "Kick-Off Return");
+    }
+}

@@ -1,6 +1,7 @@
-use ffb_model::enums::PassingDistance;
+use ffb_model::enums::{PassingDistance, TurnMode};
 use ffb_model::model::{Game, Player};
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::mechanic::{Mechanic, MechanicType};
 use crate::modifiers::{PassModifier, StatBasedRollModifier};
 use crate::pass_result::PassResult;
@@ -130,9 +131,18 @@ impl PassMechanicTrait for PassMechanic {
         re_rolled_action_name != "pass" && thrower.passing_with_modifiers() > 0
     }
 
-    fn pass_modifiers(&self, _game: &Game, _player: &Player) -> i32 {
-        // TODO: UtilPlayer::find_tacklezone_players + TurnMode::DumpOff check
-        0
+    fn pass_modifiers(&self, game: &Game, player: &Player) -> i32 {
+        let players = UtilPlayer::find_tacklezone_players(game, &player.id);
+        let mut zones = players.len() as i32;
+        let ap = &game.acting_player;
+        if game.turn_mode == TurnMode::DumpOff {
+            if let Some(ap_id) = ap.player_id.as_deref() {
+                if ap.standing_up && players.iter().any(|id| id.as_str() == ap_id) {
+                    zones -= 1;
+                }
+            }
+        }
+        zones
     }
 }
 
@@ -155,6 +165,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         }
     }
 

@@ -14,3 +14,19 @@ impl PlayerGenderFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_gender() {
+        assert!(PlayerGenderFactory::default().for_name("male").is_some());
+        assert!(PlayerGenderFactory::default().for_name("female").is_some());
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(PlayerGenderFactory::default().for_name("invalid"), None);
+    }
+}

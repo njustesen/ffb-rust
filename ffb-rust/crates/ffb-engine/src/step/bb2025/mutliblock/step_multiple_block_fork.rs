@@ -1,8 +1,24 @@
+use ffb_model::enums::{BlockResult, PlayerState};
 use ffb_model::model::game::Game;
+use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
-use crate::step::framework::{Step, StepOutcome};
+use crate::step::framework::{SequenceStep, Step, StepOutcome, StepParameter};
 use crate::step::framework::{StepAction, StepId};
+
+/// Java: parameterToConsume fixed set for bb2025 (no UsingStab — stab not in multiple block).
+fn params_to_consume() -> Vec<std::mem::Discriminant<StepParameter>> {
+    vec![
+        std::mem::discriminant(&StepParameter::BlockRoll(vec![])),
+        std::mem::discriminant(&StepParameter::BlockResult(BlockResult::Pushback)),
+        std::mem::discriminant(&StepParameter::DiceIndex(0)),
+        std::mem::discriminant(&StepParameter::NrOfDice(0)),
+        std::mem::discriminant(&StepParameter::StartingPushbackSquare(None)),
+        std::mem::discriminant(&StepParameter::DefenderPushed(false)),
+        std::mem::discriminant(&StepParameter::FollowupChoice(false)),
+        std::mem::discriminant(&StepParameter::OldDefenderState(PlayerState::new(0))),
+    ]
+}
 
 /// Initial fork step for multiple block setup.
 ///
@@ -28,10 +44,7 @@ use crate::step::framework::{StepAction, StepId};
 ///   BLOCK_ROLL, BLOCK_RESULT, DICE_INDEX, NR_OF_DICE, STARTING_PUSHBACK_SQUARE,
 ///   DEFENDER_PUSHED, FOLLOWUP_CHOICE, OLD_DEFENDER_STATE
 ///
-/// Unported utilities:
-///   TODO: Sequence builder (Sequence.add / gameState.stepStack.push)
-///   TODO: BlockTarget type (currently stored as plain String player IDs)
-///   TODO: IStepLabel.DROP_FALLING_PLAYERS constant
+/// parameterToConsume is wired: passed to BLOCK_ROLL_MULTIPLE step.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.mutliblock.StepMultipleBlockFork`.
 pub struct StepMultipleBlockFork {
@@ -63,17 +76,36 @@ impl Step for StepMultipleBlockFork {
 
 impl StepMultipleBlockFork {
     fn execute_step(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // DEFERRED: build and push per-target sequence:
-        //   sequence.add(DAUNTLESS_MULTIPLE, BLOCK_TARGETS=targets)
-        //   sequence.add(DOUBLE_STRENGTH)
-        //   for target in targets:
-        //     sequence.add(SET_DEFENDER, BLOCK_DEFENDER_ID=target)
-        //     sequence.add(TRICKSTER)
-        //     sequence.add(PICK_UP, GOTO_LABEL_ON_FAILURE=DROP_FALLING_PLAYERS)
-        //     sequence.add(CATCH_SCATTER_THROW_IN)
-        //   sequence.add(BLOCK_ROLL_MULTIPLE, BLOCK_TARGETS=targets, CONSUME_PARAMETER=...)
-        //   gameState.stepStack.push(sequence)
-        StepOutcome::next()
+        let mut seq: Vec<SequenceStep> = Vec::new();
+
+        seq.push(SequenceStep::with_params(
+            StepId::DauntlessMultiple,
+            vec![StepParameter::BlockTargets(self.targets.clone())],
+        ));
+        seq.push(SequenceStep::new(StepId::DoubleStrength));
+
+        for target in &self.targets {
+            seq.push(SequenceStep::with_params(
+                StepId::SetDefender,
+                vec![StepParameter::BlockDefenderId(target.clone())],
+            ));
+            seq.push(SequenceStep::new(StepId::Trickster));
+            seq.push(SequenceStep::with_params(
+                StepId::PickUp,
+                vec![StepParameter::GotoLabelOnFailure("DROP_FALLING_PLAYERS".into())],
+            ));
+            seq.push(SequenceStep::new(StepId::CatchScatterThrowIn));
+        }
+
+        seq.push(SequenceStep::with_params(
+            StepId::BlockRollMultiple,
+            vec![
+                StepParameter::BlockTargets(self.targets.clone()),
+                StepParameter::ParametersToConsume(params_to_consume()),
+            ],
+        ));
+
+        StepOutcome::next().push_seq(seq)
     }
 }
 
@@ -97,11 +129,15 @@ mod tests {
     }
 
     #[test]
-    fn start_with_targets_returns_next_step() {
+    fn start_with_targets_pushes_sequence() {
         let mut game = make_game();
         let mut step = StepMultipleBlockFork::new(vec!["p1".into(), "p2".into()]);
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(out.pushes.len(), 1, "should push one sequence");
+        // Sequence: DauntlessMultiple + DoubleStrength + 4 steps per target + BlockRollMultiple
+        // = 1 + 1 + 2*4 + 1 = 11 steps
+        assert_eq!(out.pushes[0].len(), 11);
     }
 
     #[test]

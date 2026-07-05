@@ -23,3 +23,17 @@ impl IDialogParameter for DialogUseApothecaryParameter {
     fn get_id(&self) -> DialogId { DialogId::USE_APOTHECARY }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_use_apothecary() {
+        assert_eq!(DialogUseApothecaryParameter::default().get_id(), DialogId::USE_APOTHECARY);
+    }
+    #[test]
+    fn stores_player_id() {
+        let p = DialogUseApothecaryParameter { player_id: Some("p42".into()), ..Default::default() };
+        assert_eq!(p.get_player_id(), Some("p42"));
+    }
+}

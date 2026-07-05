@@ -44,3 +44,25 @@ impl Default for GoForItModifier {
         GoForItModifier::new("", 0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_stores_name_and_modifier() {
+        let m = GoForItModifier::new("Blizzard", -1);
+        assert_eq!(m.get_name(), "Blizzard");
+        assert_eq!(m.get_modifier(), -1);
+    }
+
+    #[test]
+    fn type_is_always_regular() {
+        assert_eq!(GoForItModifier::new("x", 0).get_type(), ModifierType::REGULAR);
+    }
+
+    #[test]
+    fn is_modifier_included_always_false() {
+        assert!(!GoForItModifier::new("x", 0).is_modifier_included());
+    }
+}

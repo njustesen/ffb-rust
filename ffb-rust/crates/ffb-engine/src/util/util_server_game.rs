@@ -8,23 +8,25 @@
 //   prepare_for_setup(game)                            — two-team wrapper
 //   prepare_for_setup_team(game, team_id)              — per-team RESERVE/SETUP_PREVENTED logic
 //   update_single_use_rerolls(turn_data, team, fm)     — count single-use reroll providers
-//
-// Property-dependent filtering (canJoinTeamIfLessThanEleven,
-// grantsSingleUseTeamRerollWhenOnPitch) requires the NamedProperties
-// infrastructure that is not yet present in this version.  These are
-// implemented with a TODO stub that always returns false for the property
-// check, which is correct for teams without Chameleon Skinks / similar.
+//   update_player_state_dependent_properties(game)     — leader re-rolls + single-use re-rolls
+//                                                         (checkForMissingPartners DEFERRED)
+//   mark_played_and_secret_weapons(game)               — per-drive turns_played + has_used_secret_weapon
 //
 // Skipped (touch IStep / server / WebSocket):
 //   syncGameModel, changeActingPlayer, handleChefRolls, rollMasterChef,
-//   checkForWastedSkills, updatePlayerStateDependentProperties,
-//   checkForMissingPartners, addPartnerEnhancement, closeGame, handleInvalidTeam
+//   checkForWastedSkills, addPartnerEnhancement, closeGame, handleInvalidTeam
+//
+// Partially implemented (checkForMissingPartners is DEFERRED: needs addSkillEnhancements):
+//   updatePlayerStateDependentProperties, checkForMissingPartners
 
-use ffb_model::enums::{PlayerState, PS_BANNED, PS_RESERVE, PS_SETUP_PREVENTED};
+use ffb_model::enums::{PlayerState, PS_BANNED, PS_RESERVE, PS_SETUP_PREVENTED, TurnMode};
 use ffb_model::model::field_model::FieldModel;
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::team::Team;
 use ffb_model::model::turn_data::TurnData;
+use ffb_model::util::util_cards::UtilCards;
+use crate::mechanic::{state_mechanic_for, state_mechanic::StateMechanic as StateMechanicTrait};
 
 pub struct UtilServerGame;
 
@@ -64,10 +66,7 @@ impl UtilServerGame {
                         .unwrap_or(false)
                 })
                 .map(|p| {
-                    // TODO: replace `false` with
-                    //   p.has_skill_property(NamedProperties::CAN_JOIN_TEAM_IF_LESS_THAN_ELEVEN)
-                    //   once NamedProperties is available.
-                    let keen: bool = false;
+                    let keen = p.has_skill_property(NamedProperties::CAN_JOIN_TEAM_IF_LESS_THAN_ELEVEN);
                     (p.id.clone(), keen)
                 })
                 .collect()
@@ -92,6 +91,44 @@ impl UtilServerGame {
         }
     }
 
+    /// Java: `UtilServerGame.updatePlayerStateDependentProperties(IStep)`.
+    ///
+    /// Three sub-steps (in Java order):
+    ///   1. `mechanic.updateLeaderReRollsForTeam` — both teams
+    ///   2. `checkForMissingPartners` — both teams
+    ///      DEFERRED: requires `FieldModel.addSkillEnhancements` (TwoForOne skill pair)
+    ///   3. `updateSingleUseReRolls` — both teams
+    pub fn update_player_state_dependent_properties(game: &mut Game) {
+        let mechanic = state_mechanic_for(game.rules);
+        mechanic.update_leader_re_rolls_for_team(game, true);
+        mechanic.update_leader_re_rolls_for_team(game, false);
+        // DEFERRED: checkForMissingPartners — requires FieldModel.addSkillEnhancements (TwoForOne)
+        Self::update_single_use_rerolls_for_game(game, true);
+        Self::update_single_use_rerolls_for_game(game, false);
+    }
+
+    /// Helper: calls `update_single_use_rerolls` for home (true) or away (false) team.
+    fn update_single_use_rerolls_for_game(game: &mut Game, home: bool) {
+        // Collect player data before mutating turn_data to avoid borrow conflict.
+        let player_data: Vec<(String, bool)> = {
+            let team = if home { &game.team_home } else { &game.team_away };
+            team.players.iter()
+                .map(|p| (p.id.clone(), UtilCards::has_unused_skill_with_property(p, NamedProperties::GRANTS_SINGLE_USE_TEAM_REROLL_WHEN_ON_PITCH)))
+                .collect()
+        };
+        let count = player_data.iter()
+            .filter(|(_, has_prop)| *has_prop)
+            .filter(|(id, _)| game.field_model.player_state(id)
+                .map(|s| !s.is_casualty() && s.base() != PS_BANNED)
+                .unwrap_or(false))
+            .count() as i32;
+        if home {
+            game.turn_data_home.single_use_rerolls = count;
+        } else {
+            game.turn_data_away.single_use_rerolls = count;
+        }
+    }
+
     /// Java: UtilServerGame.updateSingleUseReRolls(TurnData, Team, FieldModel)
     ///
     /// Counts on-pitch, non-casualty, non-banned players with the
@@ -108,12 +145,7 @@ impl UtilServerGame {
         let count = team
             .players
             .iter()
-            .filter(|p| {
-                // TODO: replace with
-                //   p.has_skill_property(NamedProperties::GRANTS_SINGLE_USE_TEAM_REROLL_WHEN_ON_PITCH)
-                let _ = p; // suppress unused warning
-                false
-            })
+            .filter(|p| UtilCards::has_unused_skill_with_property(p, NamedProperties::GRANTS_SINGLE_USE_TEAM_REROLL_WHEN_ON_PITCH))
             .filter(|p| {
                 field_model
                     .player_state(&p.id)
@@ -123,6 +155,46 @@ impl UtilServerGame {
             .count() as i32;
 
         turn_data.single_use_rerolls = count;
+    }
+
+    /// Java: StepEndTurn.markPlayedAndSecretWeapons()
+    ///
+    /// For each player that `can_be_set_up_next_drive()` and whose base state is
+    /// not RESERVE (i.e. played this drive):
+    /// - If they have `getsSentOffAtEndOfDrive` → mark `has_used_secret_weapon = true`.
+    /// - In REGULAR turns only, increment `turns_played` for the active team's players.
+    ///
+    /// Only runs for `TurnMode::Regular` and `TurnMode::Kickoff`.
+    pub fn mark_played_and_secret_weapons(game: &mut Game) {
+        if game.turn_mode != TurnMode::Regular && game.turn_mode != TurnMode::Kickoff {
+            return;
+        }
+        let is_regular = game.turn_mode == TurnMode::Regular;
+        let home_playing = game.home_playing;
+        // Collect updates first to avoid simultaneous borrow of game fields.
+        // Collect (player_id, is_home, increment_turns, has_secret_weapon) to avoid borrow conflicts.
+        let mut updates: Vec<(String, bool, bool, bool)> = Vec::new();
+        for is_home in [true, false] {
+            let team = if is_home { &game.team_home } else { &game.team_away };
+            for player in &team.players {
+                let state = game.field_model.player_state(&player.id);
+                let Some(state) = state else { continue };
+                if state.can_be_set_up_next_drive() && state.base() != PS_RESERVE {
+                    let has_secret_weapon = player.has_skill_property(NamedProperties::GETS_SENT_OFF_AT_END_OF_DRIVE);
+                    let increment_turns = is_regular && (is_home == home_playing);
+                    updates.push((player.id.clone(), is_home, increment_turns, has_secret_weapon));
+                }
+            }
+        }
+        for (player_id, is_home, increment_turns, has_secret_weapon) in updates {
+            let pr = game.game_result.team_result_mut(is_home).player_result_mut(&player_id);
+            if has_secret_weapon {
+                pr.has_used_secret_weapon = true;
+            }
+            if increment_turns {
+                pr.turns_played += 1;
+            }
+        }
     }
 }
 
@@ -190,6 +262,7 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
+            ..Default::default()
         }
     }
 
@@ -303,5 +376,99 @@ mod tests {
         let count_first = td.single_use_rerolls;
         UtilServerGame::update_single_use_rerolls(&mut td, &team, &fm);
         assert_eq!(td.single_use_rerolls, count_first);
+    }
+
+    // ── mark_played_and_secret_weapons ─────────────────────────────────────
+
+    fn game_with_standing_player(id: &str, is_home: bool) -> Game {
+        use ffb_model::enums::PS_STANDING;
+        let p = make_player(id);
+        let (home_players, away_players) = if is_home {
+            (vec![p], vec![])
+        } else {
+            (vec![], vec![make_player(id)])
+        };
+        let mut game = Game::new(
+            make_team("home", home_players),
+            make_team("away", away_players),
+            Rules::Bb2025,
+        );
+        game.field_model.set_player_state(id, PlayerState(PS_STANDING));
+        game
+    }
+
+    #[test]
+    fn mark_played_noop_for_non_regular_kickoff_turnmode() {
+        let mut game = game_with_standing_player("p1", true);
+        game.turn_mode = TurnMode::Blitz;
+        game.home_playing = true;
+        UtilServerGame::mark_played_and_secret_weapons(&mut game);
+        assert_eq!(game.game_result.home.player_result("p1").map(|p| p.turns_played), None);
+    }
+
+    #[test]
+    fn mark_played_increments_turns_played_for_active_team_in_regular_mode() {
+        use ffb_model::enums::PS_STANDING;
+        let mut game = game_with_standing_player("p1", true);
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        UtilServerGame::mark_played_and_secret_weapons(&mut game);
+        assert_eq!(game.game_result.home.player_result("p1").unwrap().turns_played, 1);
+    }
+
+    #[test]
+    fn mark_played_does_not_increment_turns_played_for_inactive_team_in_regular_mode() {
+        use ffb_model::enums::PS_STANDING;
+        let mut game = game_with_standing_player("p1", false); // away player
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true; // home is active
+        UtilServerGame::mark_played_and_secret_weapons(&mut game);
+        assert_eq!(game.game_result.away.player_result("p1").map(|p| p.turns_played).unwrap_or(0), 0);
+    }
+
+    #[test]
+    fn mark_played_does_not_increment_turns_played_in_kickoff_mode() {
+        let mut game = game_with_standing_player("p1", true);
+        game.turn_mode = TurnMode::Kickoff;
+        game.home_playing = true;
+        UtilServerGame::mark_played_and_secret_weapons(&mut game);
+        assert_eq!(game.game_result.home.player_result("p1").map(|p| p.turns_played).unwrap_or(0), 0);
+    }
+
+    #[test]
+    fn mark_played_skips_reserve_player() {
+        let mut game = game_with_standing_player("p1", true);
+        // Override state to RESERVE
+        game.field_model.set_player_state("p1", PlayerState(PS_RESERVE));
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        UtilServerGame::mark_played_and_secret_weapons(&mut game);
+        assert_eq!(game.game_result.home.player_result("p1").map(|p| p.turns_played).unwrap_or(0), 0);
+    }
+
+    #[test]
+    fn mark_played_sets_has_used_secret_weapon_for_player_with_secret_weapon_skill() {
+        use ffb_model::model::SkillWithValue;
+        use ffb_model::enums::SkillId;
+        let mut p = make_player("sw");
+        p.starting_skills.push(SkillWithValue::new(SkillId::SecretWeapon));
+        let home = make_team("home", vec![p]);
+        let away = make_team("away", vec![]);
+        let mut game = Game::new(home, away, Rules::Bb2025);
+        use ffb_model::enums::PS_STANDING;
+        game.field_model.set_player_state("sw", PlayerState(PS_STANDING));
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        UtilServerGame::mark_played_and_secret_weapons(&mut game);
+        assert!(game.game_result.home.player_result("sw").unwrap().has_used_secret_weapon);
+    }
+
+    #[test]
+    fn mark_played_does_not_set_secret_weapon_for_regular_player() {
+        let mut game = game_with_standing_player("p1", true);
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        UtilServerGame::mark_played_and_secret_weapons(&mut game);
+        assert!(!game.game_result.home.player_result("p1").map(|p| p.has_used_secret_weapon).unwrap_or(false));
     }
 }

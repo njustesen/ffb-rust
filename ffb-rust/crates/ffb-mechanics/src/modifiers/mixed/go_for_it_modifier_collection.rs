@@ -33,3 +33,27 @@ impl GoForItModifierCollection {
 impl Default for GoForItModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_three_modifiers() {
+        // blizzard + moles_home + moles_away = 3
+        assert_eq!(GoForItModifierCollection::new().get_modifiers().len(), 3);
+    }
+
+    #[test]
+    fn includes_blizzard_modifier() {
+        let col = GoForItModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Blizzard"));
+    }
+
+    #[test]
+    fn has_moles_home_and_away() {
+        let col = GoForItModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Moles under the Pitch (Home)"));
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Moles under the Pitch (Away)"));
+    }
+}

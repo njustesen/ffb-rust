@@ -4,7 +4,8 @@ use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
-use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll};
+use ffb_mechanics::modifiers::{ARMOR_BOMB, INJURY_BOMB};
+use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
 
 pub struct InjuryTypeBombWithModifier { ctx: InjuryContext }
 impl InjuryTypeBombWithModifier { pub fn new() -> Self { Self { ctx: InjuryContext::new(ApothecaryMode::Defender) } } }
@@ -17,13 +18,11 @@ impl InjuryTypeServer for InjuryTypeBombWithModifier {
         self.ctx.attacker_id = attacker_id.map(str::to_owned);
         self.ctx.defender_coordinate = Some(coord);
         self.ctx.apothecary_mode = apo_mode;
+        self.ctx.add_armor_modifier(ARMOR_BOMB);
         do_armor_roll(game, rng, &mut self.ctx, defender_id);
-        if !self.ctx.armor_broken {
-            // TODO: add specialEffectArmourModifiers(SpecialEffect::BOMB) and recalc when factory is ported
-        }
         if self.ctx.armor_broken {
-            do_injury_roll(rng, &mut self.ctx);
-            // TODO: add specialEffectInjuryModifiers(SpecialEffect::BOMB) when InjuryModifierFactory is ported
+            self.ctx.add_injury_modifier(INJURY_BOMB);
+            do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
         } else {
             self.ctx.injury = Some(PlayerState::new(PS_PRONE));
         }
@@ -47,7 +46,8 @@ mod tests {
             gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
             passing: 4, armour, starting_skills: vec![], extra_skills: vec![],
             temporary_skills: vec![], used_skills: HashSet::new(),
-            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None });
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+    ..Default::default() });
         Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2025)
     }
     fn coord() -> FieldCoordinate { FieldCoordinate::new(5, 5) }

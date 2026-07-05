@@ -89,4 +89,21 @@ mod tests {
         let rfr = steps.iter().find(|s| s.step_id == StepId::ResetFumblerooskie).unwrap();
         assert_eq!(rfr.label.as_deref(), Some(labels::END_SELECTING));
     }
+
+    #[test]
+    fn update_persistence_param_passed_to_init_selecting() {
+        let params = SelectParams { update_persistence: true, ..Default::default() };
+        let steps = Select::build_sequence(&params);
+        let has = steps[0].params.iter().any(|p| matches!(p, StepParameter::UpdatePersistence(true)));
+        assert!(has);
+    }
+
+    #[test]
+    fn is_blitz_move_sets_reset_for_failed_block() {
+        let params = SelectParams { is_blitz_move: true, ..Default::default() };
+        let steps = Select::build_sequence(&params);
+        let rfr = steps.iter().find(|s| s.step_id == StepId::ResetFumblerooskie).unwrap();
+        let has = rfr.params.iter().any(|p| matches!(p, StepParameter::ResetForFailedBlock(true)));
+        assert!(has);
+    }
 }

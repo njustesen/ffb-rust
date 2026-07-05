@@ -7,6 +7,7 @@
 /// subclasses _may_ embed and delegate to.  The `HasIdForSingleUseReRoll` Java interface
 /// maps to the `id_for_single_use_re_roll()` method here.
 use ffb_model::model::game::Game;
+use ffb_model::model::property::NamedProperties;
 
 /// Java: `AbstractStepMultiple` — shared re-roll state for multi-target block steps.
 ///
@@ -45,28 +46,38 @@ impl SingleReRollUseState {
     }
 }
 
-/// Helper: returns `true` when the re-roll source can be resolved without showing a dialog
-/// (i.e. exactly zero or one Lord-of-Chaos player is on pitch).
+/// Java: `AbstractStepMultiple.reRollSourceSuccessfully(ReRollSource)`.
 ///
-/// Java: `AbstractStepMultiple.reRollSourceSuccessfully(ReRollSource)` (simplified).
 /// When `source` is "LORD_OF_CHAOS", searches the acting team for players with the
-/// `grantsSingleUseTeamRerollWhenOnPitch` property.  If > 1, shows a dialog (not yet
-/// ported → returns `false` stub).  If 1, sets the id.  Returns `true`.
+/// `grantsSingleUseTeamRerollWhenOnPitch` property (i.e. Lord of Chaos players with an
+/// unused skill).  If > 1, shows a player-choice dialog (not yet ported → returns `false`
+/// to signal waiting-for-command).  If exactly 1, sets the id automatically and returns
+/// `true`.  If 0, returns `true` (no dialog needed).
+/// For all other re-roll sources always returns `true`.
 pub fn re_roll_source_successfully(
     state: &mut SingleReRollUseState,
     source: &str,
-    acting_lords: &[String],
+    game: &Game,
 ) -> bool {
     if source == "LORD_OF_CHAOS" {
         state.set_re_roll_source(source);
-        match acting_lords.len() {
+        // Java: Arrays.stream(game.getActingTeam().getPlayers())
+        //         .filter(p -> UtilCards.hasUnusedSkillWithProperty(p, grantsSingleUseTeamRerollWhenOnPitch))
+        //         .map(Player::getId)
+        let lords: Vec<String> = game.active_team().players.iter()
+            .filter(|p| p.has_unused_skill_with_property(NamedProperties::GRANTS_SINGLE_USE_TEAM_REROLL_WHEN_ON_PITCH))
+            .map(|p| p.id.clone())
+            .collect();
+        match lords.len() {
             0 => true,
             1 => {
-                state.set_id(acting_lords[0].clone());
+                state.set_id(lords[0].clone());
                 true
             }
             _ => {
-                // DEFERRED(dialog port): showDialog(DialogPlayerChoiceParameter / LORD_OF_CHAOS)
+                // DEFERRED(dialog port): showDialog(DialogPlayerChoiceParameter / LORD_OF_CHAOS, lords)
+                // Java shows a PlayerChoiceMode::LordOfChaos dialog; CLIENT_PLAYER_CHOICE then
+                // calls apply_lord_of_chaos_command which sets state.id.
                 false
             }
         }
@@ -144,28 +155,58 @@ mod tests {
         assert!(b.id_for_single_use_re_roll().is_none());
     }
 
+    fn make_game_with_lords(count: usize) -> ffb_model::model::game::Game {
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::{SkillId, SkillWithValue};
+        let mut home = crate::step::framework::test_team("home", 0);
+        for i in 0..count {
+            let mut p = Player::default();
+            p.id = format!("lord{}", i);
+            p.starting_skills.push(SkillWithValue { skill_id: SkillId::LordOfChaos, value: None });
+            home.players.push(p);
+        }
+        ffb_model::model::game::Game::new(
+            home,
+            crate::step::framework::test_team("away", 0),
+            ffb_model::enums::Rules::Bb2025,
+        )
+    }
+
     #[test]
     fn re_roll_source_non_lord_always_succeeds() {
         let mut state = SingleReRollUseState::new();
-        let result = re_roll_source_successfully(&mut state, "PRO", &[]);
+        let game = ffb_model::model::game::Game::new(
+            crate::step::framework::test_team("home", 0),
+            crate::step::framework::test_team("away", 0),
+            ffb_model::enums::Rules::Bb2025,
+        );
+        let result = re_roll_source_successfully(&mut state, "PRO", &game);
         assert!(result);
         assert_eq!(state.re_roll_source.as_deref(), Some("PRO"));
     }
 
     #[test]
+    fn re_roll_source_lord_zero_returns_true() {
+        let mut state = SingleReRollUseState::new();
+        let game = make_game_with_lords(0);
+        let result = re_roll_source_successfully(&mut state, "LORD_OF_CHAOS", &game);
+        assert!(result);
+    }
+
+    #[test]
     fn re_roll_source_lord_single_sets_id() {
         let mut state = SingleReRollUseState::new();
-        let lords = vec!["lord1".into()];
-        let result = re_roll_source_successfully(&mut state, "LORD_OF_CHAOS", &lords);
+        let game = make_game_with_lords(1);
+        let result = re_roll_source_successfully(&mut state, "LORD_OF_CHAOS", &game);
         assert!(result);
-        assert_eq!(state.id.as_deref(), Some("lord1"));
+        assert_eq!(state.id.as_deref(), Some("lord0"));
     }
 
     #[test]
     fn re_roll_source_lord_multiple_returns_false() {
         let mut state = SingleReRollUseState::new();
-        let lords = vec!["l1".into(), "l2".into()];
-        let result = re_roll_source_successfully(&mut state, "LORD_OF_CHAOS", &lords);
+        let game = make_game_with_lords(2);
+        let result = re_roll_source_successfully(&mut state, "LORD_OF_CHAOS", &game);
         assert!(!result);
     }
 }

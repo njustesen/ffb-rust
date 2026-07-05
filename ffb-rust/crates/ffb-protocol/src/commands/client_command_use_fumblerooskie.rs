@@ -1,10 +1,24 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
+/// 1:1 translation of ClientCommandUseFumblerooskie (Java: no fields).
+#[derive(Debug, Clone, Default)]
 pub struct ClientCommandUseFumblerooskie;
 
 impl ClientCommandUseFumblerooskie {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
-impl Default for ClientCommandUseFumblerooskie {
-    fn default() -> Self { Self::new() }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn can_construct() {
+        let _cmd = ClientCommandUseFumblerooskie::new();
+    }
+
+    #[test]
+    fn default_works() {
+        let _cmd = ClientCommandUseFumblerooskie::default();
+    }
 }

@@ -2,6 +2,7 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::model::{ActingPlayer, Game, Player};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::util_cards::UtilCards;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::mechanic::{Mechanic, MechanicType};
 use crate::jump_mechanic::JumpMechanic as JumpMechanicTrait;
 
@@ -22,11 +23,7 @@ impl Mechanic for JumpMechanic {
 
 impl JumpMechanicTrait for JumpMechanic {
     fn is_available_as_next_move(&self, game: &Game, acting_player: &ActingPlayer, jumping: bool) -> bool {
-        self.can_still_jump(game, acting_player) && {
-            // TODO: UtilPlayer::is_next_move_possible(game, jumping)
-            let _ = (game, jumping);
-            false
-        }
+        self.can_still_jump(game, acting_player) && UtilPlayer::is_next_move_possible(game, jumping)
     }
 
     fn can_still_jump(&self, game: &Game, acting_player: &ActingPlayer) -> bool {
@@ -80,7 +77,8 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        };
+            ..Default::default()
+};
         game.team_home.players.push(p);
         game.acting_player.player_id = Some(id.into());
     }
@@ -103,7 +101,8 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+            ..Default::default()
+});
         game.acting_player.player_id = Some("p1".into());
         let ap = game.acting_player.clone();
         assert!(!JumpMechanic::new().can_still_jump(&game, &ap));

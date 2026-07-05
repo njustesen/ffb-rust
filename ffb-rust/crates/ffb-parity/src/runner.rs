@@ -350,6 +350,7 @@ fn make_lineman_team(side: &str, roster_id: &str) -> Team {
         current_spps: 0,
         career_spps: 0,
         race: None,
+        ..Default::default()
     }).collect();
 
     Team {
@@ -551,7 +552,7 @@ pub(crate) fn action_label(action: &ffb_engine::action::Action) -> String {
         Action::Move { path } => path.last().map(|c| format!("Move→({},{})", c.x, c.y)).unwrap_or("Move".into()),
         Action::Block { defender_id } => format!("Block→{defender_id}"),
         Action::Stab { defender_id } => format!("Stab→{defender_id}"),
-        Action::BlockChoice { die_index } => format!("BlockChoice({die_index})"),
+        Action::BlockChoice { die_index, .. } => format!("BlockChoice({die_index})"),
         Action::PushTo { coord } => format!("Push({},{})", coord.x, coord.y),
         Action::FollowUp { follow_up } => if *follow_up { "FollowUp".into() } else { "NoFollowUp".into() },
         Action::Pass { coord } => format!("Pass({},{})", coord.x, coord.y),

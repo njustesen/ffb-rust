@@ -135,7 +135,8 @@ mod tests {
             starting_skills: skills.iter().map(|&s| SkillWithValue { skill_id: s, value: None }).collect(),
             extra_skills: vec![], temporary_skills: vec![], used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+            ..Default::default()
+});
         game.field_model.set_player_coordinate(id, pos);
         game.field_model.set_player_state(id, PlayerState::new(state_bits));
     }

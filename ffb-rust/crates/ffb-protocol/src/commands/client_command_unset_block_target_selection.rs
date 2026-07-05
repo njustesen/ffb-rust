@@ -1,10 +1,36 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct ClientCommandUnsetBlockTargetSelection;
-
-impl ClientCommandUnsetBlockTargetSelection {
-    pub fn new() -> Self { Self }
+/// 1:1 translation of ClientCommandUnsetBlockTargetSelection (Java field: playerId).
+#[derive(Debug, Clone, Default)]
+pub struct ClientCommandUnsetBlockTargetSelection {
+    pub player_id: Option<String>,
 }
 
-impl Default for ClientCommandUnsetBlockTargetSelection {
-    fn default() -> Self { Self::new() }
+impl ClientCommandUnsetBlockTargetSelection {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_player_id(id: impl Into<String>) -> Self {
+        Self { player_id: Some(id.into()) }
+    }
+
+    pub fn get_player_id(&self) -> Option<&str> {
+        self.player_id.as_deref()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_has_no_player_id() {
+        let cmd = ClientCommandUnsetBlockTargetSelection::new();
+        assert!(cmd.get_player_id().is_none());
+    }
+
+    #[test]
+    fn with_player_id_stores_value() {
+        let cmd = ClientCommandUnsetBlockTargetSelection::with_player_id("p-99");
+        assert_eq!(cmd.get_player_id(), Some("p-99"));
+    }
 }

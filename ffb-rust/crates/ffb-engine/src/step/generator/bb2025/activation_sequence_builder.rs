@@ -135,3 +135,48 @@ impl ActivationSequenceBuilder {
 impl Default for ActivationSequenceBuilder {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn build_with_label(label: &str) -> Vec<crate::step::framework::SequenceStep> {
+        let mut seq = Sequence::new();
+        ActivationSequenceBuilder::new()
+            .with_failure_label(label)
+            .add_to(&mut seq);
+        seq.build()
+    }
+
+    #[test]
+    fn add_to_emits_thirteen_steps_without_defender() {
+        let steps = build_with_label("END");
+        assert_eq!(steps.len(), 13);
+    }
+
+    #[test]
+    fn first_step_is_init_activation() {
+        let steps = build_with_label("END");
+        assert_eq!(steps[0].step_id, StepId::InitActivation);
+    }
+
+    #[test]
+    fn bone_head_has_next_label_at_index_8() {
+        let steps = build_with_label("END");
+        // Without eventual_defender: GotoLabel at 7, BoneHead [NEXT] at 8
+        assert_eq!(steps[8].step_id, StepId::BoneHead);
+        assert_eq!(steps[8].label.as_deref(), Some(labels::NEXT));
+    }
+
+    #[test]
+    fn eventual_defender_adds_set_defender_and_emits_fourteen_steps() {
+        let mut seq = Sequence::new();
+        ActivationSequenceBuilder::new()
+            .with_failure_label("END")
+            .with_eventual_defender(Some("player1".into()))
+            .add_to(&mut seq);
+        let steps = seq.build();
+        assert_eq!(steps.len(), 14);
+        assert_eq!(steps[7].step_id, StepId::SetDefender);
+    }
+}

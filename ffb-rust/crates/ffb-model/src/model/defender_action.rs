@@ -28,3 +28,20 @@ impl DefenderAction {
         match id { 1 => Some(DefenderAction::DUMP_OFF), _ => None }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dump_off_get_id_is_1() {
+        assert_eq!(DefenderAction::DUMP_OFF.get_id(), 1);
+        assert_eq!(DefenderAction::DUMP_OFF.get_name(), "dumpOff");
+    }
+
+    #[test]
+    fn from_id_round_trips() {
+        assert_eq!(DefenderAction::from_id(1), Some(DefenderAction::DUMP_OFF));
+        assert_eq!(DefenderAction::from_id(0), None);
+    }
+}

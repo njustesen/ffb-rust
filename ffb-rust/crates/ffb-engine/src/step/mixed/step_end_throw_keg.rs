@@ -104,4 +104,10 @@ mod tests {
         let has_end_turn_true = out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true)));
         assert!(has_end_turn_true, "should publish EndTurn(true) after set_parameter");
     }
+
+    #[test]
+    fn set_parameter_rejects_unknown() {
+        let mut step = StepEndThrowKeg::new();
+        assert!(!step.set_parameter(&StepParameter::EndPlayerAction(true)));
+    }
 }

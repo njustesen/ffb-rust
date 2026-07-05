@@ -1,5 +1,7 @@
 use ffb_model::enums::KickoffResult;
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::option::game_option_id;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -21,8 +23,8 @@ use crate::step::framework::{StepId, StepParameter};
 ///  11 → Dodgy Snack
 ///  12 → Pitch Invasion
 ///
-/// Java also handles overtime options (GameOptionId::OVERTIME_KICK_OFF_RESULTS) and
-/// a client-commanded result choice dialog.  Those paths are TODO.
+/// Overtime options (GameOptionId::OVERTIME_KICK_OFF_RESULTS) implemented for all
+/// non-dialog paths. DEFERRED: `blitzOrSolidDefence` dialog path.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.kickoff.StepKickoffResultRoll`.
 pub struct StepKickoffResultRoll {
@@ -49,7 +51,7 @@ impl Step for StepKickoffResultRoll {
 
     fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java CLIENT_KICK_OFF_RESULT_CHOICE: set fKickoffResult from the command.
-        // DEFERRED: handle overtime kickoff choice dialog (GameOptionId::OVERTIME_KICK_OFF_RESULTS).
+        // DEFERRED(KickoffResultRoll-dialog): blitzOrSolidDefence dialog choice not yet ported.
         self.execute_step(game, rng)
     }
 
@@ -57,15 +59,31 @@ impl Step for StepKickoffResultRoll {
 }
 
 impl StepKickoffResultRoll {
-    fn execute_step(&mut self, _game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         if self.kickoff_result.is_none() {
-            // Java: rollKickoff() → two individual d6 summed; we use d6_two().
-            let roll = rng.d6_two();
-            self.kickoff_result = Some(kickoff_result_for_roll(roll));
+            let overtime_option = game.options.get(game_option_id::OVERTIME_KICK_OFF_RESULTS).unwrap_or("all");
+            if game.half < 3 || overtime_option == "all" {
+                let roll = rng.d6_two();
+                self.kickoff_result = Some(kickoff_result_for_roll(roll));
+            } else if overtime_option == "randomBlitzOrSolidDefence" {
+                let valid_rolls: [[i32; 2]; 6] = [[1, 3], [2, 2], [3, 1], [6, 4], [5, 5], [4, 6]];
+                let index = (rng.d6() - 1) as usize;
+                let pair = valid_rolls[index.min(5)];
+                self.kickoff_result = Some(kickoff_result_for_roll(pair[0] + pair[1]));
+            } else if overtime_option == "blitz" {
+                self.kickoff_result = Some(KickoffResult::Blitz);
+            } else if overtime_option == "solidDefence" {
+                self.kickoff_result = Some(KickoffResult::SolidDefence);
+            } else {
+                // DEFERRED(KickoffResultRoll-dialog): blitzOrSolidDefence requires CLIENT_KICK_OFF_RESULT_CHOICE dialog.
+                let roll = rng.d6_two();
+                self.kickoff_result = Some(kickoff_result_for_roll(roll));
+            }
         }
 
         let result = self.kickoff_result.unwrap();
         StepOutcome::next()
+            .with_event(GameEvent::KickoffResultEvent { result })
             .publish(StepParameter::KickoffResult(result))
     }
 }

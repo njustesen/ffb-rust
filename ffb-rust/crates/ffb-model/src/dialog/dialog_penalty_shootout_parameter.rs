@@ -52,3 +52,39 @@ impl IDialogParameter for DialogPenaltyShootoutParameter {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_shootout_appends_to_all_vecs() {
+        let mut p = DialogPenaltyShootoutParameter::default();
+        p.add_shootout(5, 3, true, "Round 1".into());
+        assert_eq!(p.get_home_rolls(), &[5]);
+        assert_eq!(p.get_away_rolls(), &[3]);
+        assert_eq!(p.get_home_won(), &[true]);
+        assert_eq!(p.get_descriptions(), &["Round 1"]);
+    }
+
+    #[test]
+    fn transform_preserves_dialog_id() {
+        let p = DialogPenaltyShootoutParameter { home_score: 2, away_score: 1, home_team_wins: true, ..Default::default() };
+        assert_eq!(p.transform().get_id(), DialogId::PENALTY_SHOOTOUT);
+    }
+
+    #[test]
+    fn add_shootout_multiple_rounds_accumulate() {
+        let mut p = DialogPenaltyShootoutParameter::default();
+        p.add_shootout(3, 5, false, "Round 1".into());
+        p.add_shootout(6, 2, true, "Round 2".into());
+        assert_eq!(p.get_home_rolls().len(), 2);
+        assert_eq!(p.get_away_rolls()[0], 5);
+        assert_eq!(p.get_home_won()[1], true);
+    }
+
+    #[test]
+    fn dialog_id_is_penalty_shootout() {
+        assert_eq!(DialogPenaltyShootoutParameter::default().get_id(), DialogId::PENALTY_SHOOTOUT);
+    }
+}

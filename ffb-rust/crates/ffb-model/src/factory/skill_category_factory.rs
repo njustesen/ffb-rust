@@ -14,3 +14,19 @@ impl SkillCategoryFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_category() {
+        assert_eq!(SkillCategoryFactory::default().for_name("General"), Some(SkillCategory::General));
+        assert_eq!(SkillCategoryFactory::default().for_name("Agility"), Some(SkillCategory::Agility));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(SkillCategoryFactory::default().for_name("invalid"), None);
+    }
+}

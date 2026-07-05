@@ -34,3 +34,26 @@ impl CatchModifierCollection {
 impl Default for CatchModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_twenty_three_modifiers() {
+        // base 8 tacklezone + 11 disturbing_presence + 1 pouring_rain + 3 inaccurate/deflected/blast_it = 23
+        assert_eq!(CatchModifierCollection::new().get_modifiers().len(), 23);
+    }
+
+    #[test]
+    fn includes_deflected_pass_modifier() {
+        let col = CatchModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Deflected Pass"));
+    }
+
+    #[test]
+    fn includes_blast_it_modifier() {
+        let col = CatchModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Blast It!"));
+    }
+}

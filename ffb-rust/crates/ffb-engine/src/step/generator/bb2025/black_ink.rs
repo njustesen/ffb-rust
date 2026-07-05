@@ -43,4 +43,28 @@ mod tests {
         assert_eq!(steps[0].step_id, StepId::BlackInk);
         assert_eq!(steps[0].label.as_deref(), Some(labels::END));
     }
+
+    #[test]
+    fn failure_label_in_params() {
+        let steps = BlackInk::build_sequence(&BlackInkParams {
+            failure_label: "theLabel".into(),
+            old_player_state: None,
+        });
+        let has = steps[0].params.iter().any(|p| {
+            matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "theLabel")
+        });
+        assert!(has);
+    }
+
+    #[test]
+    fn old_player_state_added_when_some() {
+        use ffb_model::enums::{PlayerState, PS_STANDING};
+        let state = PlayerState::new(PS_STANDING);
+        let steps = BlackInk::build_sequence(&BlackInkParams {
+            failure_label: "X".into(),
+            old_player_state: Some(state),
+        });
+        let has = steps[0].params.iter().any(|p| matches!(p, StepParameter::OldPlayerState(_)));
+        assert!(has);
+    }
 }

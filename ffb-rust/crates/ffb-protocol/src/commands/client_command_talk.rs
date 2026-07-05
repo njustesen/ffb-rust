@@ -1,10 +1,36 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct ClientCommandTalk;
-
-impl ClientCommandTalk {
-    pub fn new() -> Self { Self }
+/// 1:1 translation of ClientCommandTalk (Java field: fTalk).
+#[derive(Debug, Clone, Default)]
+pub struct ClientCommandTalk {
+    pub talk: Option<String>,
 }
 
-impl Default for ClientCommandTalk {
-    fn default() -> Self { Self::new() }
+impl ClientCommandTalk {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_talk(talk: impl Into<String>) -> Self {
+        Self { talk: Some(talk.into()) }
+    }
+
+    pub fn get_talk(&self) -> Option<&str> {
+        self.talk.as_deref()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_has_no_talk() {
+        let cmd = ClientCommandTalk::new();
+        assert!(cmd.get_talk().is_none());
+    }
+
+    #[test]
+    fn with_talk_stores_value() {
+        let cmd = ClientCommandTalk::with_talk("hello");
+        assert_eq!(cmd.get_talk(), Some("hello"));
+    }
 }

@@ -100,3 +100,47 @@ pub mod labels {
     pub const FUMBLE_TTM_PASS: &str = "FUMBLE_TTM_PASS";
     pub const SKIP_PILE_DRIVER: &str = "SKIP_PILE_DRIVER";
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_creates_unlabelled_step() {
+        let mut seq = Sequence::new();
+        seq.add(StepId::Apothecary, vec![]);
+        let steps = seq.build();
+        assert_eq!(steps.len(), 1);
+        assert_eq!(steps[0].step_id, StepId::Apothecary);
+        assert!(steps[0].label.is_none());
+        assert!(steps[0].params.is_empty());
+    }
+
+    #[test]
+    fn add_labelled_creates_step_with_label() {
+        let mut seq = Sequence::new();
+        seq.add_labelled(StepId::Apothecary, "MY_LABEL", vec![]);
+        let steps = seq.build();
+        assert_eq!(steps[0].label.as_deref(), Some("MY_LABEL"));
+    }
+
+    #[test]
+    fn jump_creates_goto_label_step() {
+        let mut seq = Sequence::new();
+        seq.jump("END");
+        let steps = seq.build();
+        assert_eq!(steps.len(), 1);
+        assert_eq!(steps[0].step_id, StepId::GotoLabel);
+        assert!(matches!(steps[0].params[0], StepParameter::GotoLabel(ref s) if s == "END"));
+    }
+
+    #[test]
+    fn build_returns_steps_in_authored_order() {
+        let mut seq = Sequence::new();
+        seq.add(StepId::Apothecary, vec![]);
+        seq.add(StepId::GotoLabel, vec![]);
+        let steps = seq.build();
+        assert_eq!(steps[0].step_id, StepId::Apothecary);
+        assert_eq!(steps[1].step_id, StepId::GotoLabel);
+    }
+}

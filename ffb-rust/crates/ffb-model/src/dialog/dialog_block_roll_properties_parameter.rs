@@ -26,3 +26,24 @@ impl IDialogParameter for DialogBlockRollPropertiesParameter {
     fn get_id(&self) -> DialogId { DialogId::BLOCK_ROLL_PROPERTIES }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dialog_id_is_block_roll_properties() {
+        assert_eq!(DialogBlockRollPropertiesParameter::default().get_id(), DialogId::BLOCK_ROLL_PROPERTIES);
+    }
+
+    #[test]
+    fn stores_nr_of_dice_and_roll() {
+        let p = DialogBlockRollPropertiesParameter {
+            nr_of_dice: 2,
+            block_roll: vec![3, 5],
+            ..Default::default()
+        };
+        assert_eq!(p.get_nr_of_dice(), 2);
+        assert_eq!(p.get_block_roll(), &[3, 5]);
+    }
+}

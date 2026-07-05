@@ -82,4 +82,18 @@ mod tests {
         let steps = SelectGazeTarget::build_sequence();
         assert!(steps.iter().any(|s| s.step_id == StepId::FoulAppearance));
     }
+
+    #[test]
+    fn select_gaze_target_blood_lust_has_failure_label() {
+        let steps = SelectGazeTarget::build_sequence();
+        let bl = steps.iter().find(|s| s.step_id == StepId::BloodLust).unwrap();
+        let has = bl.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(_)));
+        assert!(has);
+    }
+
+    #[test]
+    fn select_gaze_target_has_no_dump_off() {
+        let steps = SelectGazeTarget::build_sequence();
+        assert!(!steps.iter().any(|s| s.step_id == StepId::DumpOff));
+    }
 }

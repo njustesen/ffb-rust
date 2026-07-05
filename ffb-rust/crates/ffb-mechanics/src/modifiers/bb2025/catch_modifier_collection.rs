@@ -31,3 +31,26 @@ impl CatchModifierCollection {
 impl Default for CatchModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_twenty_two_modifiers() {
+        // base 8 tacklezone + 11 disturbing_presence + 1 pouring_rain + 2 (inaccurate/blast_it) = 22
+        assert_eq!(CatchModifierCollection::new().get_modifiers().len(), 22);
+    }
+
+    #[test]
+    fn includes_inaccurate_pass_or_scatter() {
+        let col = CatchModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Inaccurate Pass or Scatter"));
+    }
+
+    #[test]
+    fn includes_blast_it_modifier() {
+        let col = CatchModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Blast It!"));
+    }
+}

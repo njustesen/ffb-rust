@@ -5,6 +5,7 @@ use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepAction, StepId, StepParameter};
+use crate::util::util_server_player_swoop::UtilServerPlayerSwoop;
 
 /// Handles the Swoop skill: deflects a scattered TTM player toward a chosen target square.
 ///
@@ -22,19 +23,20 @@ use crate::step::framework::{StepAction, StepId, StepParameter};
 ///   passCoordinate = game.passCoordinate
 ///   if throwScatter:
 ///     game.fieldModel.setRangeRuler(null); clearMoveSquares
-///     render animation(thrownPlayerCoordinate -> passCoordinate)
-///     syncGameModel
+///     // DEFERRED: render animation(thrownPlayerCoordinate -> passCoordinate)
+///     // DEFERRED: syncGameModel
 ///     setPlayerCoordinate(thrownPlayer, passCoordinate)
-///     changeActingPlayer(thrownPlayerId, SWOOP)
-///     if blitzTurnState: blitzTurnState.changeActingPlayer()
+///     // DEFERRED: changeActingPlayer(thrownPlayerId, SWOOP)
+///     // DEFERRED: if blitzTurnState: blitzTurnState.changeActingPlayer()
 ///     if thrownPlayerHasBall: setBallCoordinate(passCoordinate)
 ///     setCurrentMove(thrownPlayer.movementWithModifiers - 3)
 ///     publish THROWN_PLAYER_ID, THROWN_PLAYER_STATE, THROWN_PLAYER_HAS_BALL
-///     syncGameModel
+///     // DEFERRED: syncGameModel
 ///
 ///   if coordinateTo==null:
 ///     UtilServerPlayerSwoop.updateSwoopSquares(thrownPlayer)
 ///     publish USING_SWOOP=true
+///     return (wait for CLIENT_SWOOP)
 ///   // else: coordinateTo was set by CLIENT_SWOOP -> executeSwoop hook runs
 ///
 /// handleCommand additionally handles:
@@ -47,11 +49,10 @@ use crate::step::framework::{StepAction, StepId, StepParameter};
 /// Unported utilities:
 ///   TODO: UtilServerDialog.showDialog (Swoop skill dialog)
 ///   TODO: UtilActingPlayer.changeActingPlayer(game, thrownPlayerId, SWOOP)
-///   TODO: UtilServerPlayerSwoop.updateSwoopSquares
-///   TODO: game.setPassCoordinate / getPassCoordinate
-///   TODO: fieldModel animation, clearMoveSquares
-///   TODO: executeStepHooks (Swoop scatter/deflection hook)
+///   TODO: fieldModel animation, syncGameModel
 ///   TODO: game.blitzTurnState.changeActingPlayer()
+///   TODO: executeStepHooks (Swoop scatter/deflection hook)
+///   TODO: coordinate transform for away-team CLIENT_SWOOP command
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.ttm.StepSwoop`.
 pub struct StepSwoop {
@@ -117,20 +118,23 @@ impl Step for StepSwoop {
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
             Action::UseSkill { use_skill, .. } => {
-                // CLIENT_USE_SKILL -> usingSwoop = isSkillUsed
+                // Java: CLIENT_USE_SKILL -> usingSwoop = isSkillUsed -> EXECUTE_STEP
                 self.using_swoop = Some(*use_skill);
             }
             Action::Pass { coord } => {
-                // CLIENT_SWOOP -> coordinateTo (Swoop target square selection)
-                // DEFERRED: transform coordinate for away team
+                // Java: CLIENT_SWOOP -> coordinateTo = swoopCommand.getTargetCoordinate()
+                // Java: if !checkCommandIsFromHomePlayer: coordinateTo = coordinateTo.transform()
+                // DEFERRED: away-team coordinate transform
                 self.coordinate_to = Some(*coord);
-                // DEFERRED: executeSwoop() (hooks)
+                // Java: executeSwoop() = executeStepHooks(this, state)
+                // DEFERRED: executeSwoop hook
                 return StepOutcome::next();
             }
-            Action::UseReRoll { use_reroll: _ } => {
-                // CLIENT_USE_RE_ROLL -> update reRollSource/reRolledAction -> executeSwoop
-                // DEFERRED: extract ReRollSource/ReRolledAction from command
-                // DEFERRED: executeSwoop() (hooks)
+            Action::UseReRoll { .. } => {
+                // Java: CLIENT_USE_RE_ROLL -> state.reRollSource = command.reRollSource
+                //                             state.reRolledAction = command.reRolledAction
+                //                             executeSwoop()
+                // DEFERRED: extract ReRollSource/ReRolledAction from command; executeSwoop
                 return StepOutcome::next();
             }
             _ => {}
@@ -148,31 +152,79 @@ impl Step for StepSwoop {
 }
 
 impl StepSwoop {
-    fn execute_step(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // Guard: thrown player and coordinate must be present.
-        if self.thrown_player_id.is_none() || self.thrown_player_coordinate.is_none() {
+    fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        // Java: thrownPlayer = game.getPlayerById(state.thrownPlayerId)
+        // Java: if (thrownPlayer == null || state.thrownPlayerCoordinate == null) -> NEXT_STEP
+        let player_id = match self.thrown_player_id.as_deref() {
+            Some(id) if game.player(id).is_some() => id.to_string(),
+            _ => return StepOutcome::next(),
+        };
+        if self.thrown_player_coordinate.is_none() {
             return StepOutcome::next();
         }
 
-        // DEFERRED: if using_swoop == None: show DialogSkillUseParameter -> wait (Continue)
+        // Java: if (state.usingSwoop == null):
+        //   UtilServerDialog.showDialog(gameState, DialogSkillUseParameter(...))
+        //   return  // wait for CLIENT_USE_SKILL
+        // DEFERRED: UtilServerDialog.showDialog — return Continue to wait
         if self.using_swoop.is_none() {
             return StepOutcome::cont();
         }
 
+        // Java: if (!state.usingSwoop):
+        //   publishParameter(USING_SWOOP, false); NEXT_STEP; return
         if !self.using_swoop.unwrap_or(false) {
-            // DEFERRED: publish USING_SWOOP=false
-            return StepOutcome::next();
+            return StepOutcome::next().publish(StepParameter::UsingSwoop(false));
         }
 
-        // usingSwoop==true
-        // DEFERRED: if throwScatter: animate + move player + update movement points
-        // DEFERRED: if coordinateTo==None: updateSwoopSquares + publish USING_SWOOP=true -> wait
+        // usingSwoop == true
+        // Java: if (state.throwScatter):
+        //   fieldModel.setRangeRuler(null); fieldModel.clearMoveSquares()
+        //   passCoordinate = game.getPassCoordinate()
+        //   [animation — DEFERRED]
+        //   [syncGameModel — DEFERRED]
+        //   fieldModel.setPlayerCoordinate(thrownPlayer, passCoordinate)
+        //   [UtilActingPlayer.changeActingPlayer — DEFERRED]
+        //   [blitzTurnState.changeActingPlayer — DEFERRED]
+        //   if thrownPlayerHasBall: setBallCoordinate(passCoordinate)
+        //   actingPlayer.setCurrentMove(thrownPlayer.movementWithModifiers - 3)
+        //   publish THROWN_PLAYER_ID, THROWN_PLAYER_STATE, THROWN_PLAYER_HAS_BALL
+        //   [syncGameModel — DEFERRED]
+        let mut outcome = StepOutcome::cont();
+        if self.throw_scatter {
+            game.field_model.range_ruler = None;
+            game.field_model.clear_move_squares();
+            if let Some(pass_coord) = game.pass_coordinate {
+                // Move player to the pass coordinate
+                game.field_model.set_player_coordinate(&player_id, pass_coord);
+                // DEFERRED: UtilActingPlayer.changeActingPlayer(game, thrownPlayerId, SWOOP, false)
+                // DEFERRED: blitzTurnState.changeActingPlayer()
+                if self.thrown_player_has_ball {
+                    game.field_model.ball_coordinate = Some(pass_coord);
+                }
+                // setCurrentMove(thrownPlayer.movementWithModifiers - 3)
+                let movement = game.player(&player_id)
+                    .map(|p| p.movement_with_modifiers())
+                    .unwrap_or(0);
+                game.acting_player.current_move = movement - 3;
+            }
+            // publish THROWN_PLAYER_ID, THROWN_PLAYER_STATE, THROWN_PLAYER_HAS_BALL
+            outcome = outcome
+                .publish(StepParameter::ThrownPlayerId(self.thrown_player_id.clone()))
+                .publish(StepParameter::ThrownPlayerState(self.thrown_player_state.unwrap_or_default()))
+                .publish(StepParameter::ThrownPlayerHasBall(self.thrown_player_has_ball));
+        }
+
+        // Java: if (state.coordinateTo == null):
+        //   UtilServerPlayerSwoop.updateSwoopSquares(gameState, thrownPlayer)
+        //   publishParameter(USING_SWOOP, true)
+        //   [implicit wait for CLIENT_SWOOP]
         if self.coordinate_to.is_none() {
-            // DEFERRED: UtilServerPlayerSwoop.updateSwoopSquares; publish USING_SWOOP=true
-            return StepOutcome::cont();
+            UtilServerPlayerSwoop::update_swoop_squares(game, &player_id);
+            return outcome.publish(StepParameter::UsingSwoop(true));
         }
 
-        // coordinateTo known -> executeSwoop hook handles the rest
+        // coordinateTo is known -> executeSwoop hook handles the rest
         // DEFERRED: executeStepHooks(this, state)
         StepOutcome::next()
     }
@@ -198,9 +250,26 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
     }
 
+    fn add_player(game: &mut Game, id: &str) {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use std::collections::HashSet;
+        game.team_home.players.push(Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate(id, FieldCoordinate { x: 3, y: 3 });
+    }
+
     #[test]
     fn start_with_player_but_no_swoop_decision_waits() {
         let mut game = make_game();
+        add_player(&mut game, "p1");
         let mut step = StepSwoop::new("fall".into());
         step.thrown_player_id = Some("p1".into());
         step.thrown_player_coordinate = Some(FieldCoordinate { x: 3, y: 3 });
@@ -212,12 +281,28 @@ mod tests {
     #[test]
     fn use_skill_false_stores_decision() {
         let mut game = make_game();
+        add_player(&mut game, "p1");
         let mut step = StepSwoop::new("fall".into());
         step.thrown_player_id = Some("p1".into());
         step.thrown_player_coordinate = Some(FieldCoordinate { x: 3, y: 3 });
         use ffb_mechanics::skills::SkillId;
         step.handle_command(&Action::UseSkill { skill_id: SkillId::Swoop, use_skill: false }, &mut game, &mut GameRng::new(0));
         assert_eq!(step.using_swoop, Some(false));
+    }
+
+    #[test]
+    fn use_skill_false_publishes_using_swoop_false() {
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        let mut step = StepSwoop::new("fall".into());
+        step.thrown_player_id = Some("p1".into());
+        step.thrown_player_coordinate = Some(FieldCoordinate { x: 3, y: 3 });
+        use ffb_mechanics::skills::SkillId;
+        let out = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Swoop, use_skill: false },
+            &mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::UsingSwoop(false))));
+        assert_eq!(out.action, StepAction::NextStep);
     }
 
     #[test]
@@ -234,5 +319,31 @@ mod tests {
         let c = FieldCoordinate { x: 3, y: 4 };
         assert!(step.set_parameter(&StepParameter::CoordinateTo(c)));
         assert_eq!(step.coordinate_to, Some(c));
+    }
+
+    #[test]
+    fn using_swoop_true_with_no_coord_to_publishes_using_swoop_true() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use std::collections::HashSet;
+        let mut game = make_game();
+        let p = Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        };
+        game.team_home.players.push(p);
+        game.field_model.set_player_coordinate("p1", FieldCoordinate { x: 5, y: 5 });
+        let mut step = StepSwoop::new("fall".into());
+        step.thrown_player_id = Some("p1".into());
+        step.thrown_player_coordinate = Some(FieldCoordinate { x: 5, y: 5 });
+        step.using_swoop = Some(true);
+        // coordinate_to is None -> should publish UsingSwoop(true) and wait
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::UsingSwoop(true))));
     }
 }

@@ -14,3 +14,19 @@ impl SoundIdFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_sound_id() {
+        let f = SoundIdFactory::default();
+        assert_eq!(f.for_name("block"), Some(SoundId::BLOCK));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(SoundIdFactory::default().for_name("invalid"), None);
+    }
+}

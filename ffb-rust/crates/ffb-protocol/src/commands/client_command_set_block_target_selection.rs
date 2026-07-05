@@ -1,10 +1,40 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct ClientCommandSetBlockTargetSelection;
+use ffb_model::model::BlockKind;
 
-impl ClientCommandSetBlockTargetSelection {
-    pub fn new() -> Self { Self }
+/// 1:1 translation of `com.fumbbl.ffb.net.commands.ClientCommandSetBlockTargetSelection`.
+#[derive(Debug, Clone, Default)]
+pub struct ClientCommandSetBlockTargetSelection {
+    /// Java: `playerId`
+    pub player_id: Option<String>,
+    /// Java: `kind`
+    pub kind: Option<BlockKind>,
 }
 
-impl Default for ClientCommandSetBlockTargetSelection {
-    fn default() -> Self { Self::new() }
+impl ClientCommandSetBlockTargetSelection {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn with_target(player_id: impl Into<String>, kind: BlockKind) -> Self {
+        Self { player_id: Some(player_id.into()), kind: Some(kind) }
+    }
+
+    pub fn get_player_id(&self) -> Option<&str> { self.player_id.as_deref() }
+    pub fn get_kind(&self) -> Option<BlockKind> { self.kind }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fields_stored() {
+        let cmd = ClientCommandSetBlockTargetSelection::with_target("p1", BlockKind::BLOCK);
+        assert_eq!(cmd.get_player_id(), Some("p1"));
+        assert_eq!(cmd.get_kind(), Some(BlockKind::BLOCK));
+    }
+
+    #[test]
+    fn default_is_empty() {
+        let cmd = ClientCommandSetBlockTargetSelection::new();
+        assert!(cmd.player_id.is_none());
+        assert!(cmd.kind.is_none());
+    }
 }

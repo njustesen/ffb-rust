@@ -453,7 +453,8 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+                    ..Default::default()
+});
         game.acting_player.player_id = Some("p1".into());
         game.acting_player.player_action = Some(PlayerAction::Move);
         game.acting_player.standing_up = true;
@@ -478,7 +479,8 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+                    ..Default::default()
+});
         game.acting_player.player_id = Some("p1".into());
         game.acting_player.player_action = Some(PlayerAction::Move);
         game.acting_player.standing_up = true;
@@ -503,7 +505,8 @@ mod tests {
 
     fn activate_player_action(game: &mut Game, step: &mut StepInitSelecting, pac: PlayerActionChoice) -> StepOutcome {
         let rng = &mut GameRng::new(0);
-        let action = Action::ActivatePlayer { player_id: "p1".into(), player_action: pac, block_defender_id: None };
+        let action = Action::ActivatePlayer { player_id: "p1".into(), player_action: pac, block_defender_id: None
+};
         step.handle_command(&action, game, rng)
     }
 

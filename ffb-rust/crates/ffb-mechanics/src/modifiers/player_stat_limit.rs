@@ -17,3 +17,22 @@ impl PlayerStatLimit {
 impl Default for PlayerStatLimit {
     fn default() -> Self { PlayerStatLimit { min: 0, max: 0 } }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_stores_min_max() {
+        let limit = PlayerStatLimit::new(1, 9);
+        assert_eq!(limit.get_min(), 1);
+        assert_eq!(limit.get_max(), 9);
+    }
+
+    #[test]
+    fn default_is_zero_zero() {
+        let limit = PlayerStatLimit::default();
+        assert_eq!(limit.min, 0);
+        assert_eq!(limit.max, 0);
+    }
+}

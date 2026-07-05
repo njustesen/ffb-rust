@@ -55,10 +55,77 @@ pub const INJURY_NIGGLING_1: Modifier =
     Modifier::new("1 Niggling Injury", 1, Rules::Bb2016);
 pub const INJURY_NIGGLING_2: Modifier =
     Modifier::new("2 Niggling Injuries", 2, Rules::Bb2016);
+pub const INJURY_NIGGLING_3: Modifier =
+    Modifier::new("3 Niggling Injuries", 3, Rules::Bb2016);
+pub const INJURY_NIGGLING_4: Modifier =
+    Modifier::new("4 Niggling Injuries", 4, Rules::Bb2016);
+pub const INJURY_NIGGLING_5: Modifier =
+    Modifier::new("5 Niggling Injuries", 5, Rules::Bb2016);
 pub const INJURY_FIREBALL: Modifier =
     Modifier::new("Fireball", 1, Rules::Common);
 pub const INJURY_LIGHTNING: Modifier =
     Modifier::new("Lightning", 1, Rules::Common);
+pub const INJURY_BOMB: Modifier =
+    Modifier::new("Bomb", 1, Rules::Bb2020);
+
+// ── Armor foul-assist modifiers ───────────────────────────────────────────────
+
+pub const ARMOR_FOUL_1_OFF: Modifier = Modifier::new("1 Offensive Assist", 1, Rules::Common);
+pub const ARMOR_FOUL_2_OFF: Modifier = Modifier::new("2 Offensive Assists", 2, Rules::Common);
+pub const ARMOR_FOUL_3_OFF: Modifier = Modifier::new("3 Offensive Assists", 3, Rules::Common);
+pub const ARMOR_FOUL_4_OFF: Modifier = Modifier::new("4 Offensive Assists", 4, Rules::Common);
+pub const ARMOR_FOUL_5_OFF: Modifier = Modifier::new("5 Offensive Assists", 5, Rules::Common);
+pub const ARMOR_FOUL_6_OFF: Modifier = Modifier::new("6 Offensive Assists", 6, Rules::Common);
+pub const ARMOR_FOUL_7_OFF: Modifier = Modifier::new("7 Offensive Assists", 7, Rules::Common);
+pub const ARMOR_FOUL_1_DEF: Modifier = Modifier::new("1 Defensive Assist", -1, Rules::Common);
+pub const ARMOR_FOUL_2_DEF: Modifier = Modifier::new("2 Defensive Assists", -2, Rules::Common);
+pub const ARMOR_FOUL_3_DEF: Modifier = Modifier::new("3 Defensive Assists", -3, Rules::Common);
+pub const ARMOR_FOUL_4_DEF: Modifier = Modifier::new("4 Defensive Assists", -4, Rules::Common);
+pub const ARMOR_FOUL_5_DEF: Modifier = Modifier::new("5 Defensive Assists", -5, Rules::Common);
+
+/// The "Foul" blatant-foul bonus (+1) when FOUL_BONUS option or FOUL_BONUS_OUTSIDE_TACKLEZONE applies.
+pub const ARMOR_FOUL: Modifier = Modifier::new("Foul", 1, Rules::Common);
+
+/// Chainsaw foul armor modifier (+3) — applied when attacker uses chainsaw for a Foul Action.
+pub const ARMOR_CHAINSAW_3: Modifier = Modifier::new("Chainsaw", 3, Rules::Common);
+
+/// Special-effect armor modifiers.
+pub const ARMOR_FIREBALL: Modifier = Modifier::new("Fireball", 1, Rules::Common);
+pub const ARMOR_LIGHTNING: Modifier = Modifier::new("Lightning", 1, Rules::Common);
+pub const ARMOR_BOMB: Modifier = Modifier::new("Bomb", 1, Rules::Bb2020);
+
+/// Returns the armor foul-assist modifier constant for a given net assist count.
+/// net_assists = offensive_assists - defensive_assists.
+/// Returns None if count is 0 or out of range (-5..=7 supported).
+pub fn foul_assist_armor_modifier(net_assists: i32) -> Option<Modifier> {
+    match net_assists {
+        1 => Some(ARMOR_FOUL_1_OFF),
+        2 => Some(ARMOR_FOUL_2_OFF),
+        3 => Some(ARMOR_FOUL_3_OFF),
+        4 => Some(ARMOR_FOUL_4_OFF),
+        5 => Some(ARMOR_FOUL_5_OFF),
+        6 => Some(ARMOR_FOUL_6_OFF),
+        7 => Some(ARMOR_FOUL_7_OFF),
+        -1 => Some(ARMOR_FOUL_1_DEF),
+        -2 => Some(ARMOR_FOUL_2_DEF),
+        -3 => Some(ARMOR_FOUL_3_DEF),
+        -4 => Some(ARMOR_FOUL_4_DEF),
+        -5 => Some(ARMOR_FOUL_5_DEF),
+        _ => None,
+    }
+}
+
+/// Returns the BB2016 niggling injury modifier for a given niggling count (1-5).
+pub fn niggling_injury_modifier(count: i32) -> Option<Modifier> {
+    match count {
+        1 => Some(INJURY_NIGGLING_1),
+        2 => Some(INJURY_NIGGLING_2),
+        3 => Some(INJURY_NIGGLING_3),
+        4 => Some(INJURY_NIGGLING_4),
+        5 => Some(INJURY_NIGGLING_5),
+        _ => None,
+    }
+}
 
 // ── Common dodge modifiers ────────────────────────────────────────────────────
 // Positive = harder for dodging player (penalty); negative = easier (benefit).

@@ -84,4 +84,18 @@ mod tests {
         let steps = SelectBlitzTarget::build_sequence();
         assert!(steps.iter().any(|s| s.step_id == StepId::DumpOff));
     }
+
+    #[test]
+    fn select_blitz_target_blood_lust_has_failure_label() {
+        let steps = SelectBlitzTarget::build_sequence();
+        let bl = steps.iter().find(|s| s.step_id == StepId::BloodLust).unwrap();
+        let has = bl.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(_)));
+        assert!(has);
+    }
+
+    #[test]
+    fn select_blitz_target_step_count() {
+        let steps = SelectBlitzTarget::build_sequence();
+        assert_eq!(steps.len(), 18);
+    }
 }

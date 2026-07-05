@@ -177,7 +177,8 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        };
+                    ..Default::default()
+};
         game.team_home.players.push(p);
         game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 5));
         game.field_model.set_player_state(id, ffb_model::enums::PlayerState::new(PS_STANDING));
@@ -214,5 +215,32 @@ mod tests {
     #[test]
     fn id_is_foul_chainsaw() {
         assert_eq!(StepFoulChainsaw::new().id(), StepId::FoulChainsaw);
+    }
+
+    #[test]
+    fn player_with_chainsaw_on_high_roll_publishes_using_chainsaw() {
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = make_game();
+        let mut p = Player {
+            id: "saw".into(), name: "saw".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Chainsaw, value: None }],
+            extra_skills: vec![], temporary_skills: vec![], used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+                    ..Default::default()
+};
+        game.team_home.players.push(p);
+        game.field_model.set_player_coordinate("saw", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("saw", ffb_model::enums::PlayerState::new(PS_STANDING));
+        game.acting_player.player_id = Some("saw".into());
+        let mut step = StepFoulChainsaw::new();
+        step.goto_label_on_failure = "fail".into();
+        // roll=6 → success → NextStep + USING_CHAINSAW(true)
+        step.roll = 6;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.action, StepAction::NextStep));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::UsingChainsaw(true))));
     }
 }

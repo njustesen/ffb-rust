@@ -109,4 +109,11 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(matches!(out.action, StepAction::NextStep));
     }
+
+    #[test]
+    fn set_parameter_end_player_action() {
+        let mut step = StepPassBlock::new();
+        assert!(step.set_parameter(&StepParameter::EndPlayerAction(true)));
+        assert!(step.end_player_action);
+    }
 }

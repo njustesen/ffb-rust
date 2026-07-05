@@ -1,10 +1,15 @@
 use ffb_model::enums::TurnMode;
+use ffb_model::events::GameEvent;
 use ffb_model::model::blitz_turn_state::BlitzTurnState;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
-use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
-use crate::step::generator::select::Select;
+use crate::mechanic::mixed::setup_mechanic::SetupMechanic;
+use crate::mechanic::setup_mechanic::SetupMechanic as SetupMechanicTrait;
+use crate::step::framework::{Step, StepOutcome, SequenceStep, StepId, StepParameter};
+use crate::util::util_server_game::UtilServerGame;
+use crate::step::generator::bb2020::Select;
+use crate::step::generator::bb2020::select::SelectParams;
 
 /// 1:1 translation of `com.fumbbl.ffb.server.step.bb2020.StepBlitzTurn` (BB2020).
 ///
@@ -53,15 +58,19 @@ impl StepBlitzTurn {
         } else {
             // Java: Team blitzingTeam = game.isHomePlaying() ? game.getTeamHome() : game.getTeamAway()
             // Java: SetupMechanic mechanic = ...; mechanic.pinPlayersInTacklezones(getGameState(), blitzingTeam, true)
-            // DEFERRED(blitz_turn): call SetupMechanic.pinPlayersInTacklezones when mechanics layer is available
+            let blitzing_team_id = if game.home_playing {
+                game.team_home.id.clone()
+            } else {
+                game.team_away.id.clone()
+            };
+            SetupMechanic::new().pin_players_in_tacklezones_chain(game, &blitzing_team_id, true);
 
             // Java: int availablePlayers = Arrays.stream(blitzingTeam.getPlayers())
             //   .filter(player -> game.getFieldModel().getPlayerState(player).isActive()).count()
             let available_players = Self::count_active_players(game);
 
             if available_players == 0 {
-                // Java: getResult().addReport(new ReportKickoffSequenceActivationsExhausted(false))
-                // DEFERRED(blitz_turn): emit ReportKickoffSequenceActivationsExhausted event
+                return StepOutcome::next().with_event(GameEvent::KickoffSequenceActivationsExhausted { limit_reached: false });
             } else {
                 // Java: int roll = getGameState().getDiceRoller().rollDice(3)
                 // Java: int limit = roll + 3
@@ -77,21 +86,21 @@ impl StepBlitzTurn {
                 // DEFERRED(blitz_turn): timer management when server timer infra is available
 
                 // Java: game.startTurn()
-                // DEFERRED(blitz_turn): call game.startTurn() when method is available
+                game.start_turn();
 
-                // Java: UtilServerGame.updatePlayerStateDependentProperties(this)
-                // DEFERRED(blitz_turn): updatePlayerStateDependentProperties when UtilServerGame is available
+                UtilServerGame::update_player_state_dependent_properties(game);
 
-                // Java: getGameState().pushCurrentStepOnStack()
-                // Java: ((Select) factory.forName(SequenceGenerator.Type.Select.name()))
-                //   .pushSequence(new Select.SequenceParams(getGameState(), true))
-                // In Rust: push the Select sequence via the generator stub
-                // DEFERRED(blitz_turn): Select.push_sequence needs full implementation
-                let _ = Select::new();
-
-                // Java: getResult().addReport(new ReportBlitzRoll(blitzingTeam.getId(), roll, limit))
-                // DEFERRED(blitz_turn): emit ReportBlitzRoll event
-                let _ = (roll, limit);
+                // Java: addReport(ReportBlitzRoll(blitzingTeam.getId(), roll, limit))
+                // Java: pushCurrentStepOnStack(); Select.pushSequence(gameState, true)
+                let self_seq = vec![SequenceStep::new(StepId::BlitzTurn)];
+                let select_seq = Select::build_sequence(&SelectParams {
+                    update_persistence: true,
+                    is_blitz_move: false,
+                    block_targets: vec![],
+                });
+                return StepOutcome::next()
+                    .with_event(GameEvent::BlitzRoll { team_id: blitzing_team_id, roll, limit })
+                    .push_seq(self_seq).push_seq(select_seq);
             }
         }
 
@@ -137,6 +146,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         }
     }
 
@@ -194,6 +204,8 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(game.turn_mode, TurnMode::Blitz);
         assert!(game.blitz_turn_state.is_some());
+        // Java: pushCurrentStepOnStack() + Select.pushSequence → two pushed sequences
+        assert_eq!(out.pushes.len(), 2, "must push self_seq + select_seq");
 
         // limit = d3 + 3, so must be in range [4..6]
         let bts = game.blitz_turn_state.as_ref().unwrap();

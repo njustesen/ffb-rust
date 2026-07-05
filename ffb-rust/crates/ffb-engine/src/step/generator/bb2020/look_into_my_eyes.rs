@@ -84,4 +84,22 @@ mod tests {
         let bl = steps.iter().find(|s| s.step_id == StepId::BloodLust).unwrap();
         assert!(!bl.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(_))));
     }
+
+    #[test]
+    fn push_select_param_passed_to_look_into_my_eyes_step() {
+        let params = LookIntoMyEyesParams { push_select: true, goto_on_end: "end".into() };
+        let steps = LookIntoMyEyes::build_sequence(&params);
+        let s = steps.iter().find(|s| s.step_id == StepId::LookIntoMyEyes).unwrap();
+        let has = s.params.iter().any(|p| matches!(p, StepParameter::PushSelect(true)));
+        assert!(has);
+    }
+
+    #[test]
+    fn goto_on_end_param_passed_to_look_into_my_eyes_step() {
+        let params = LookIntoMyEyesParams { push_select: false, goto_on_end: "myEnd".into() };
+        let steps = LookIntoMyEyes::build_sequence(&params);
+        let s = steps.iter().find(|s| s.step_id == StepId::LookIntoMyEyes).unwrap();
+        let has = s.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnEnd(l) if l == "myEnd"));
+        assert!(has);
+    }
 }

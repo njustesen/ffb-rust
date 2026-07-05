@@ -12,14 +12,17 @@
 /// PilingOn dialog involve NamedProperties.canPileOnOpponent which is not yet implemented.
 ///
 /// Expects OLD_DEFENDER_STATE parameter from a preceding step.
+use ffb_model::dialog::dialog_id::DialogId;
 use ffb_model::enums::{ApothecaryMode, PS_FALLING, PS_PRONE};
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_mechanics::mechanics::armor_broken;
 use crate::action::Action;
 use crate::injury::{InjuryContext, InjuryResult};
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::util::util_server_dialog::UtilServerDialog;
 
 pub struct StepDropFallingPlayers {
     /// Java: state.injuryResultDefender — populated after defender is dropped.
@@ -120,14 +123,21 @@ impl StepDropFallingPlayers {
             let ir = Box::new(InjuryResult { injury_context: ctx, knocked_out: false, rip: false });
             self.injury_result_defender = Some(ir.clone());
 
-            // Java: stub PilingOn dialog check → NamedProperties.canPileOnOpponent not implemented
-            // → treat as ineligible → doNextStep = true
-            let piling_on_eligible = false; // stub: NamedProperties not available
+            // Java: PilingOnBehaviour.handleExecuteStepHook — check if attacker has canPileOnOpponent.
+            let piling_on_eligible = game.acting_player.player_id.as_deref()
+                .and_then(|id| game.player(id))
+                .map(|p| p.has_skill_property(NamedProperties::CAN_PILE_ON_OPPONENT))
+                .unwrap_or(false);
 
-            if !piling_on_eligible {
-                outcome = outcome.publish(StepParameter::InjuryResult(ir));
+            if piling_on_eligible && self.using_piling_on.is_none() {
+                // Attacker has PilingOn and hasn't decided yet → show dialog.
+                // Java: UtilServerDialog.showDialog(gameState, new DialogPilingOnParameter(...), false)
+                UtilServerDialog::show_dialog(game, DialogId::PILING_ON, false);
+                // Continue waiting for Action::UseSkill { use_skill } response.
+                return StepOutcome::cont();
             }
-            // If piling_on_eligible were true, we'd show dialog here → CONTINUE.
+            // Not eligible or player already decided → publish result.
+            outcome = outcome.publish(StepParameter::InjuryResult(ir));
         }
 
         // Java: if (defenderFalling && defender is own team && !oldDefenderState.isProne) → END_TURN
@@ -199,6 +209,7 @@ mod tests {
             starting_skills: vec![],
             extra_skills: vec![], temporary_skills: vec![], used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         };
         home.players.push(make_player("att", 1));
         away.players.push(make_player("def", 2));
@@ -265,5 +276,65 @@ mod tests {
         assert!(step.set_parameter(&StepParameter::OldDefenderState(PlayerState::new(PS_STANDING))));
         assert!(step.old_defender_state.is_some());
         assert!(!step.set_parameter(&StepParameter::EndPlayerAction(true)));
+    }
+
+    fn add_piling_on_skill(game: &mut Game, player_id: &str) {
+        // Add PilingOn skill (canPileOnOpponent property) to the attacker.
+        if let Some(p) = game.team_home.player_mut(player_id) {
+            p.extra_skills.push(SkillWithValue::new(SkillId::PilingOn));
+        }
+    }
+
+    #[test]
+    fn defender_falling_piling_on_eligible_returns_continue() {
+        // When attacker has PilingOn and defender is falling, step returns Continue.
+        let mut game = make_game_with_falling(false, true);
+        add_piling_on_skill(&mut game, "att");
+        let mut step = StepDropFallingPlayers::new();
+        let outcome = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(outcome.action, StepAction::Continue);
+        // InjuryResult not yet published — waiting for dialog response.
+        assert!(!outcome.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))));
+    }
+
+    #[test]
+    fn piling_on_declined_publishes_injury_result() {
+        // When player declines PilingOn (UseSkill false), InjuryResult is published.
+        let mut game = make_game_with_falling(false, true);
+        add_piling_on_skill(&mut game, "att");
+        let mut step = StepDropFallingPlayers::new();
+        // First call: returns Continue (dialog shown).
+        step.start(&mut game, &mut GameRng::new(0));
+        // Player declines PilingOn.
+        let outcome = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::PilingOn, use_skill: false },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_eq!(outcome.action, StepAction::NextStep);
+        assert!(outcome.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))));
+    }
+
+    #[test]
+    fn piling_on_accepted_publishes_using_piling_on_true() {
+        // When player accepts PilingOn, UsingPilingOn(true) is published.
+        let mut game = make_game_with_falling(false, true);
+        add_piling_on_skill(&mut game, "att");
+        let mut step = StepDropFallingPlayers::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        let outcome = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::PilingOn, use_skill: true },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert!(outcome.published.iter().any(|p| matches!(p, StepParameter::UsingPilingOn(true))));
+    }
+
+    #[test]
+    fn no_piling_on_skill_publishes_injury_result_immediately() {
+        // Without PilingOn skill, no dialog — InjuryResult published on first call.
+        let mut game = make_game_with_falling(false, true);
+        // attacker has no PilingOn skill (default test_team players)
+        let outcome = StepDropFallingPlayers::new().start(&mut game, &mut GameRng::new(0));
+        assert_eq!(outcome.action, StepAction::NextStep);
+        assert!(outcome.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))));
     }
 }

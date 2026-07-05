@@ -28,3 +28,28 @@ impl IDialogParameter for DialogArgueTheCallParameter {
     fn get_id(&self) -> DialogId { DialogId::ARGUE_THE_CALL }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_player_id_appends_nonempty_strings() {
+        let mut p = DialogArgueTheCallParameter::default();
+        p.add_player_id("p1");
+        p.add_player_id("p2");
+        assert_eq!(p.get_player_ids(), &["p1", "p2"]);
+    }
+
+    #[test]
+    fn add_player_id_ignores_empty_string() {
+        let mut p = DialogArgueTheCallParameter::default();
+        p.add_player_id("");
+        assert!(p.get_player_ids().is_empty());
+    }
+
+    #[test]
+    fn dialog_id_is_argue_the_call() {
+        assert_eq!(DialogArgueTheCallParameter::default().get_id(), DialogId::ARGUE_THE_CALL);
+    }
+}

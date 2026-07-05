@@ -30,3 +30,20 @@ impl BlockTarget {
     pub fn get_kind(&self) -> Option<BlockKind> { self.kind }
     pub fn get_original_player_state(&self) -> Option<PlayerState> { self.original_player_state }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn default_has_no_fields() {
+        let t = BlockTarget::default();
+        assert!(t.player_id.is_none());
+        assert!(t.kind.is_none());
+    }
+    #[test]
+    fn new_stores_all_fields() {
+        let t = BlockTarget::new("p1", BlockKind::BLOCK, None);
+        assert_eq!(t.get_player_id().map(|s| s.as_str()), Some("p1"));
+        assert_eq!(t.get_kind(), Some(BlockKind::BLOCK));
+    }
+}

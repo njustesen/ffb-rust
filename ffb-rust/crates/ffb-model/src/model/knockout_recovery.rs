@@ -33,3 +33,26 @@ impl KnockoutRecovery {
     pub fn get_bloodweiser_babes(&self) -> i32 { self.bloodweiser_babes }
     pub fn get_re_roll_reason(&self) -> Option<&str> { self.re_roll_reason.as_deref() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_stores_all_fields() {
+        let k = KnockoutRecovery::new("p1", true, 4, 2, Some("loner".into()));
+        assert_eq!(k.get_player_id(), Some("p1"));
+        assert!(k.is_recovering());
+        assert_eq!(k.get_roll(), 4);
+        assert_eq!(k.get_bloodweiser_babes(), 2);
+        assert_eq!(k.get_re_roll_reason(), Some("loner"));
+    }
+
+    #[test]
+    fn default_has_no_player_id() {
+        let k = KnockoutRecovery::default();
+        assert_eq!(k.get_player_id(), None);
+        assert!(!k.is_recovering());
+        assert_eq!(k.get_roll(), 0);
+    }
+}

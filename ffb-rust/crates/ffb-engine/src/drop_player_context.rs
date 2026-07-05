@@ -1,7 +1,10 @@
 /// Port of `com.fumbbl.ffb.server.model.DropPlayerContext` and
 /// `com.fumbbl.ffb.server.model.SteadyFootingContext`.
+use std::sync::Arc;
 use ffb_model::enums::ApothecaryMode;
+use ffb_model::model::game::Game;
 use crate::injury::InjuryResult;
+use crate::step::framework::{DeferredCommand, StepParameter};
 
 // ── VictimStateKey ────────────────────────────────────────────────────────────
 
@@ -102,11 +105,23 @@ impl DropPlayerContext {
 /// On a Steady Footing failure the context is forwarded to the next step via
 /// `DROP_PLAYER_CONTEXT`, `INJURY_RESULT`, or `INJURY_TYPE` parameters respectively.
 /// On success the context is discarded (the fall is cancelled).
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SteadyFootingContext {
     /// The wrapped payload (one of three variants).
     pub inner: SteadyFootingInner,
-    // Java: List<DeferredCommand> deferredCommands — not yet ported; always empty.
+    /// Java: `List<DeferredCommand> deferredCommands` — commands executed when Steady Footing fails.
+    /// E.g. `HitPlayerTurnOverCommand`, `DropPlayerCommand`.
+    /// `Arc` is used (rather than `Box`) so that `SteadyFootingContext` can remain `Clone`.
+    pub deferred_commands: Vec<Arc<dyn DeferredCommand>>,
+}
+
+impl std::fmt::Debug for SteadyFootingContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SteadyFootingContext")
+            .field("inner", &self.inner)
+            .field("deferred_commands_count", &self.deferred_commands.len())
+            .finish()
+    }
 }
 
 /// Discriminated payload inside `SteadyFootingContext`.
@@ -120,15 +135,30 @@ pub enum SteadyFootingInner {
 
 impl SteadyFootingContext {
     pub fn from_drop_player(ctx: DropPlayerContext) -> Self {
-        Self { inner: SteadyFootingInner::DropPlayer(Box::new(ctx)) }
+        Self { inner: SteadyFootingInner::DropPlayer(Box::new(ctx)), deferred_commands: Vec::new() }
     }
 
     pub fn from_injury_result(result: InjuryResult) -> Self {
-        Self { inner: SteadyFootingInner::InjuryResult(Box::new(result)) }
+        Self { inner: SteadyFootingInner::InjuryResult(Box::new(result)), deferred_commands: Vec::new() }
+    }
+
+    /// Java: `new SteadyFootingContext(injuryResult, commands)` — injury result with deferred commands.
+    pub fn from_injury_result_with_commands(result: InjuryResult, commands: Vec<Arc<dyn DeferredCommand>>) -> Self {
+        Self { inner: SteadyFootingInner::InjuryResult(Box::new(result)), deferred_commands: commands }
     }
 
     pub fn from_injury_type_name(name: String) -> Self {
-        Self { inner: SteadyFootingInner::InjuryTypeName(name) }
+        Self { inner: SteadyFootingInner::InjuryTypeName(name), deferred_commands: Vec::new() }
+    }
+
+    /// Executes all deferred commands and returns the resulting parameters.
+    /// Java: `context.getDeferredCommands().forEach(cmd -> cmd.execute(step))`
+    pub fn execute_deferred_commands(&self, game: &mut Game) -> Vec<StepParameter> {
+        let mut params = Vec::new();
+        for cmd in &self.deferred_commands {
+            params.extend(cmd.execute(game));
+        }
+        params
     }
 
     /// Java: `getApothecaryMode()` — delegates to whichever inner holds the mode.
@@ -172,5 +202,44 @@ impl SteadyFootingContext {
             SteadyFootingInner::InjuryTypeName(n) => Some(n),
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn drop_player_context_defaults_all_false() {
+        let ctx = DropPlayerContext::new();
+        assert!(!ctx.end_turn);
+        assert!(!ctx.requires_armour_break);
+        assert!(!ctx.already_dropped);
+        assert!(ctx.player_id.is_none());
+    }
+
+    #[test]
+    fn drop_player_context_with_injury_sets_fields() {
+        let injury = InjuryResult::new(ApothecaryMode::Attacker);
+        let ctx = DropPlayerContext::with_injury(injury, "p1".into(), ApothecaryMode::Attacker, true);
+        assert_eq!(ctx.player_id.as_deref(), Some("p1"));
+        assert_eq!(ctx.apothecary_mode, Some(ApothecaryMode::Attacker));
+        assert!(ctx.eligible_for_safe_pair_of_hands);
+    }
+
+    #[test]
+    fn steady_footing_from_injury_type_name_round_trips() {
+        let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeCrowd".into());
+        assert_eq!(ctx.injury_type_name(), Some("InjuryTypeCrowd"));
+        assert!(ctx.drop_player_context().is_none());
+        assert!(ctx.injury_result().is_none());
+    }
+
+    #[test]
+    fn steady_footing_from_drop_player_returns_context() {
+        let dpc = DropPlayerContext { player_id: Some("p2".into()), ..Default::default() };
+        let ctx = SteadyFootingContext::from_drop_player(dpc);
+        assert_eq!(ctx.get_player_id(), Some("p2"));
+        assert!(ctx.drop_player_context().is_some());
     }
 }

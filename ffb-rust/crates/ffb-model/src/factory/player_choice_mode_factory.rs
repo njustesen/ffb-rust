@@ -14,3 +14,19 @@ impl PlayerChoiceModeFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_mode() {
+        let f = PlayerChoiceModeFactory::default();
+        assert_eq!(f.for_name("tentacles"), Some(PlayerChoiceMode::TENTACLES));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(PlayerChoiceModeFactory::default().for_name("invalid"), None);
+    }
+}

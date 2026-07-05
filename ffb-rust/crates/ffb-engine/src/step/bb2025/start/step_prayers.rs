@@ -12,6 +12,7 @@
 ///   TV-underdog team receives free prayers.
 ///
 /// Prayer roll table: rolls 1–16 (BB2025 has exactly 16 prayer entries).
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -67,6 +68,7 @@ impl StepPrayers {
         let available_prayer_rolls: Vec<i32> = ALL_PRAYER_ROLLS.to_vec();
 
         let mut additional_prayer_amount = additional_prayer_amount_raw;
+        let mut prayer_amount_event: Option<GameEvent> = None;
 
         if add_prayers_to_underdog && additional_prayer_amount > 0 {
             // Java: alreadyBoughtPrayers = (homeTeamAdditionalReceivesPrayers ? prayersBoughtHome : prayersBoughtAway)
@@ -80,7 +82,12 @@ impl StepPrayers {
                 .min((available_prayer_rolls.len() as i32) - already_bought_prayers);
 
             // Java: getResult().addReport(new ReportPrayerAmount(...))
-            // Report not yet wired into StepOutcome events — intentional stub.
+            prayer_amount_event = Some(GameEvent::PrayerAmount {
+                tv_home: self.tv_home,
+                tv_away: self.tv_away,
+                prayer_amount: additional_prayer_amount,
+                home_team_receives_prayers: home_team_additional_receives_prayers,
+            });
 
             if home_team_additional_receives_prayers {
                 prayers_total_home += additional_prayer_amount;
@@ -113,7 +120,12 @@ impl StepPrayers {
                 rng,
             );
 
-            return StepOutcome::next().push_seq(seq);
+            let out = StepOutcome::next().push_seq(seq);
+            return if let Some(ev) = prayer_amount_event { out.with_event(ev) } else { out };
+        }
+
+        if let Some(ev) = prayer_amount_event {
+            return StepOutcome::next().with_event(ev);
         }
 
         StepOutcome::next()

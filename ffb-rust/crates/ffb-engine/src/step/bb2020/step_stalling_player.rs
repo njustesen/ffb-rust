@@ -1,4 +1,5 @@
 use ffb_model::enums::ApothecaryMode;
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
@@ -78,14 +79,12 @@ impl StepStallingPlayer {
         let roll = rng.d6();
         let successful = roll >= 5;
 
-        // Java: getResult().addReport(new ReportThrowAtStallingPlayer(playerId, roll, successful))
-        // DEFERRED(stalling_player): emit ReportThrowAtStallingPlayer event
-        let _ = (roll, successful);
+        let stalling_event = GameEvent::ThrowAtStallingPlayer { player_id: player_id.clone(), roll, success: successful };
 
         if successful {
             let player = match game.player(&player_id) {
                 Some(_) => {},
-                None => return StepOutcome::next(),
+                None => return StepOutcome::next().with_event(stalling_event),
             };
             let _ = player;
 
@@ -105,16 +104,11 @@ impl StepStallingPlayer {
                 FieldCoordinate::new(x, 14)
             };
 
-            // Java: getResult().setAnimation(new Animation(AnimationType.THROW_A_ROCK, startCoordinate, playerCoordinate))
-            // DEFERRED(stalling_player): emit animation event
-
-            // Java: UtilServerGame.syncGameModel(this)
-            // DEFERRED(stalling_player): syncGameModel when infra is available
+            // Animation and syncGameModel are client-side only; no server state change.
 
             // Java: StepParameterSet pParameterSet = UtilServerInjury.dropPlayer(this, player, ApothecaryMode.HIT_PLAYER, true)
             // Java: pParameterSet.remove(StepParameterKey.END_TURN)
-            // Java: publishParameters(pParameterSet)
-            // DEFERRED(stalling_player): publish drop_player parameters when UtilServerInjury.dropPlayer is available for HIT_PLAYER mode
+            // Java: publishParameters(pParameterSet) — implemented below via DropPlayerContext.
 
             // Java: publishParameter(new StepParameter(StepParameterKey.INJURY_RESULT,
             //   UtilServerInjury.handleInjury(this, new InjuryTypeThrowARockStalling(),
@@ -141,11 +135,12 @@ impl StepStallingPlayer {
             };
             let ctx = SteadyFootingContext::from_drop_player(dpc);
             return StepOutcome::next()
+                .with_event(stalling_event)
                 .publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
         }
 
         // Java: getResult().setNextAction(StepAction.NEXT_STEP)
-        StepOutcome::next()
+        StepOutcome::next().with_event(stalling_event)
     }
 }
 
@@ -173,6 +168,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         }
     }
 
@@ -184,7 +180,7 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert!(out.published.is_empty());
-    }
+}
 
     /// set_parameter wires player_id correctly.
     #[test]

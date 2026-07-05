@@ -1,4 +1,4 @@
-use ffb_model::model::Player;
+use ffb_model::model::{Player, SpecialEffect};
 use crate::modifiers::injury_modifier_context::InjuryModifierContext;
 
 /// 1:1 translation of com.fumbbl.ffb.modifiers.InjuryModifier (Java interface → Rust trait).
@@ -10,4 +10,8 @@ pub trait InjuryModifier: Send + Sync {
 
     fn registered_to(&self) -> Option<&str> { None }
     fn set_registered_to(&mut self, _skill_id: Option<String>) {}
+
+    /// Returns the SpecialEffect this modifier is tied to, if any.
+    /// Overridden by SpecialEffectInjuryModifier; all others return None.
+    fn get_special_effect(&self) -> Option<SpecialEffect> { None }
 }

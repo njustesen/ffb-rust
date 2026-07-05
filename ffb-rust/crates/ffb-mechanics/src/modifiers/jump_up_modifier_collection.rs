@@ -36,3 +36,21 @@ impl JumpUpModifierCollection {
 impl Default for JumpUpModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn base_collection_is_empty() {
+        assert_eq!(JumpUpModifierCollection::new().get_modifiers().len(), 0);
+    }
+
+    #[test]
+    fn can_add_and_retrieve_modifier() {
+        let mut col = JumpUpModifierCollection::new();
+        col.add(JumpUpModifier::new("Jump Up", -2, ModifierType::REGULAR));
+        assert_eq!(col.get_modifiers().len(), 1);
+        assert_eq!(col.get_modifiers()[0].get_name(), "Jump Up");
+    }
+}

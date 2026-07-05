@@ -33,3 +33,21 @@ impl JumpModifierCollection {
 impl Default for JumpModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn base_collection_is_empty() {
+        assert_eq!(JumpModifierCollection::new().get_modifiers().len(), 0);
+    }
+
+    #[test]
+    fn can_add_and_retrieve_modifier() {
+        let mut col = JumpModifierCollection::new();
+        col.add(JumpModifier::new("1 Tacklezone", 1, ModifierType::TACKLEZONE));
+        assert_eq!(col.get_modifiers().len(), 1);
+        assert_eq!(col.get_modifiers()[0].get_name(), "1 Tacklezone");
+    }
+}

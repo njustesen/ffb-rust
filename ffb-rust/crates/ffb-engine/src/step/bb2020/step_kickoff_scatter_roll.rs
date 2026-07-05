@@ -1,4 +1,5 @@
 use ffb_model::enums::{Direction, SkillId};
+use ffb_model::events::GameEvent;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -32,6 +33,10 @@ pub struct StepKickoffScatterRoll {
     pub kickoff_bounds: Option<FieldCoordinateBounds>,
     /// Java: fTouchback
     pub touchback: bool,
+    /// Raw D8 roll for direction (for event reporting)
+    pub scatter_direction_roll: i32,
+    /// Kicking player id (stored from phase 1 for SkillUse event in phase 2)
+    pub kicking_player_id: Option<String>,
 }
 
 impl StepKickoffScatterRoll {
@@ -44,6 +49,8 @@ impl StepKickoffScatterRoll {
             kicking_player_coordinate: None,
             kickoff_bounds: None,
             touchback: false,
+            scatter_direction_roll: 0,
+            kicking_player_id: None,
         }
     }
 }
@@ -92,11 +99,11 @@ impl StepKickoffScatterRoll {
 
             self.scatter_direction = Some(direction);
             self.scatter_distance = distance;
-
-            // DEFERRED(kickoff): add ReportKickoffScatter event when reports are ported
+            self.scatter_direction_roll = dir_roll;
 
             // Find kicking player (prefers CENTER_FIELD, falls back to LOS)
             let kicking_player_id = Self::find_kicking_player_id(game);
+            self.kicking_player_id = kicking_player_id.clone();
 
             self.kicking_player_coordinate = match kicking_player_id.as_deref() {
                 Some(id) => game.field_model.player_coordinate(id),
@@ -167,22 +174,38 @@ impl StepKickoffScatterRoll {
             self.touchback = self.kickoff_bounds.is_none();
 
             if self.touchback {
-                // DEFERRED(kickoff): game.field_model.out_of_bounds = true (field not in worktree model yet)
+                game.field_model.out_of_bounds = true;
                 // DEFERRED(kickoff): add ReportEvent("TOUCHBACK") when reports are ported
             }
 
-            // DEFERRED(kickoff): report ReportSkillUse(kick, true, HALVE_KICKOFF_SCATTER) when use_kick
+            // Java: addReport(new ReportSkillUse(kick, true, SkillUse.HALVE_KICKOFF_SCATTER))
+            let kick_event = if use_kick {
+                self.kicking_player_id.as_ref().map(|pid| GameEvent::SkillUse {
+                    player_id: pid.clone(),
+                    skill_id: SkillId::Kick as u16,
+                    used: true,
+                })
+            } else { None };
 
             // DEFERRED(kickoff): handleChefRolls for first drive (turn 0/0)
 
             let kicking_coord = self.kicking_player_coordinate.unwrap();
             let touchback = self.touchback;
 
+            // Java: addReport(new ReportKickoffScatter(direction, distance))
             let mut outcome = StepOutcome::next()
+                .with_event(GameEvent::KickoffScatter {
+                    start: kicking_coord,
+                    direction: self.scatter_direction_roll,
+                    distance,
+                })
                 .publish(StepParameter::KickingPlayerCoordinate(kicking_coord))
                 .publish(StepParameter::Touchback(touchback));
             if let Some(b) = self.kickoff_bounds {
                 outcome = outcome.publish(StepParameter::KickoffBounds(b));
+            }
+            if let Some(ev) = kick_event {
+                outcome = outcome.with_event(ev);
             }
             return outcome;
         }

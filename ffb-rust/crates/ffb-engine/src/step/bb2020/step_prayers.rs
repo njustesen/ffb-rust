@@ -5,9 +5,9 @@
 ///
 /// DEFERRED items:
 ///  - PrayerFactory.availablePrayerRolls() not translated → uses fixed rolls 1..=16.
-///  - ReportPrayerAmount event not translated.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2020.StepPrayers`.
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -72,7 +72,12 @@ impl StepPrayers {
 
             prayer_amount = prayer_amount.min(available_rolls.len() as i32);
 
-            // DEFERRED(prayers): ReportPrayerAmount event not translated.
+            let prayer_amount_event = GameEvent::PrayerAmount {
+                tv_home: self.tv_home,
+                tv_away: self.tv_away,
+                prayer_amount,
+                home_team_receives_prayers: home_team_receives,
+            };
 
             let praying_team_id = if home_team_receives {
                 game.team_home.id.clone()
@@ -91,7 +96,7 @@ impl StepPrayers {
             }
             // Stack is LIFO: reverse so first prayer runs first.
             seq.reverse();
-            return StepOutcome::next().push_seq(seq);
+            return StepOutcome::next().with_event(prayer_amount_event).push_seq(seq);
         }
 
         StepOutcome::next()

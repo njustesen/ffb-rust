@@ -232,6 +232,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         };
         if team_home { game.team_home.players.push(player); }
         else { game.team_away.players.push(player); }

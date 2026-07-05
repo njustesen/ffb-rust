@@ -38,8 +38,8 @@ impl StepEndGame {
     /// Java: `executeStep()` — sets the game finished and transitions to FINISHED status.
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
         game.status = GameStatus::Finished;
-        // DEFERRED(dialog): show GameStatistics dialog (requires dialog infra)
-        // DEFERRED(replay): save replay file (requires file I/O infra)
+        // DEFERRED(dialog-client): show GameStatistics dialog (requires dialog infra)
+        // DEFERRED(replay-server): save replay file (requires file I/O infra)
         StepOutcome::next()
     }
 }

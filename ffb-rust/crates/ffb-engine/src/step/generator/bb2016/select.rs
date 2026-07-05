@@ -80,4 +80,18 @@ mod tests {
         assert!(steps.iter().any(|s| s.step_id == StepId::JumpUp));
         assert!(steps.iter().any(|s| s.step_id == StepId::StandUp));
     }
+
+    #[test]
+    fn update_persistence_param_passed_to_init_selecting() {
+        let params = SelectParams { update_persistence: true };
+        let steps = Select::build_sequence(&params);
+        let has = steps[0].params.iter().any(|p| matches!(p, StepParameter::UpdatePersistence(true)));
+        assert!(has);
+    }
+
+    #[test]
+    fn select_has_nine_steps() {
+        let steps = Select::build_sequence(&SelectParams::default());
+        assert_eq!(steps.len(), 9);
+    }
 }

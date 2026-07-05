@@ -46,4 +46,11 @@ mod tests {
         let params = cmd.execute(&mut game);
         assert!(params.is_empty());
     }
+
+    #[test]
+    fn id_is_drop_player() {
+        use crate::step::framework::DeferredCommandId;
+        let cmd = DropPlayerCommand::new("p1".into(), ApothecaryMode::Defender, false);
+        assert_eq!(cmd.id(), DeferredCommandId::DropPlayer);
+    }
 }

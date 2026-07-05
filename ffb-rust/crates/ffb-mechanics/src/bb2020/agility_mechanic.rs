@@ -142,3 +142,50 @@ impl AgilityMechanicTrait for AgilityMechanic {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+    use ffb_model::enums::{PlayerType, PlayerGender};
+    use crate::agility_mechanic::AgilityMechanic as Trait;
+
+    fn player_with_agility(ag: i32) -> Player {
+        Player {
+            id: "p".into(), name: "p".into(), nr: 1,
+            position_id: "pos".into(),
+            player_type: PlayerType::Regular,
+            gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: ag, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn minimum_roll_catch_ag3_no_modifiers() {
+        // (3 + 0).max(2) = 3
+        assert_eq!(AgilityMechanic.minimum_roll_catch(&player_with_agility(3), &HashSet::new()), 3);
+    }
+
+    #[test]
+    fn minimum_roll_catch_ag1_no_modifiers() {
+        // (1 + 0).max(2) = 2 (floored at 2)
+        assert_eq!(AgilityMechanic.minimum_roll_catch(&player_with_agility(1), &HashSet::new()), 2);
+    }
+
+    #[test]
+    fn minimum_roll_pickup_ag4_no_modifiers() {
+        assert_eq!(AgilityMechanic.minimum_roll_pickup(&player_with_agility(4), &HashSet::new()), 4);
+    }
+
+    #[test]
+    fn minimum_roll_hypnotic_gaze_fixed_at_3() {
+        // bb2020 gaze: (ag + 0).max(2) where ag=3 → 3; but with inflictsConfusion=0 variable → ag is used
+        let p = player_with_agility(3);
+        assert_eq!(AgilityMechanic.minimum_roll_hypnotic_gaze(&p, &HashSet::new()), 3);
+    }
+}

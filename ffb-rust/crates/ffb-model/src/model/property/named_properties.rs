@@ -27,6 +27,8 @@ impl NamedProperties {
     pub const CAN_ADD_STRENGTH_TO_DODGE: &'static str = "canAddStrengthToDodge";
     pub const CAN_ADD_STRENGTH_TO_PASS: &'static str = "canAddStrengthToPass";
     pub const CAN_ALWAYS_ASSIST_FOULS: &'static str = "canAlwaysAssistFouls";
+    /// Java: CancelSkillProperty(NamedProperties.canAlwaysAssistFouls) — BB2025 Defensive cancels SneakyGit/PutTheBootIn.
+    pub const CANCELS_CAN_ALWAYS_ASSIST_FOULS: &'static str = "cancelsCanAlwaysAssistFouls";
     pub const CAN_ATTACK_OPPONENT_FOR_BALL_AFTER_CATCH: &'static str = "canAttackOpponentForBallAfterCatch";
     pub const CAN_ATTEMPT_CATCH_IN_ADJACENT_SQUARES: &'static str = "canAttemptCatchInAdjacentSquares";
     pub const CAN_ATTEMPT_TO_TACKLE_DODGING_PLAYER: &'static str = "canAttemptToTackleDodgingPlayer";

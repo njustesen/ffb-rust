@@ -22,3 +22,19 @@ impl IDialogParameter for DialogSetupErrorParameter {
     fn get_id(&self) -> DialogId { DialogId::SETUP_ERROR }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_setup_error() {
+        assert_eq!(DialogSetupErrorParameter::default().get_id(), DialogId::SETUP_ERROR);
+    }
+    #[test]
+    fn add_setup_error_filters_empty() {
+        let mut p = DialogSetupErrorParameter::default();
+        p.add_setup_error("err1");
+        p.add_setup_error("");
+        assert_eq!(p.get_setup_errors().len(), 1);
+    }
+}

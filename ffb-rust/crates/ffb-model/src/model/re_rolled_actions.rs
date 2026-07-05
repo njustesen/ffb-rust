@@ -94,3 +94,23 @@ impl ReRolledActions {
 impl Default for ReRolledActions {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn for_name_case_insensitive() {
+        let r = ReRolledActions::new();
+        assert!(r.for_name("Go For It").is_some());
+        assert!(r.for_name("go for it").is_some());
+    }
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert!(ReRolledActions::new().for_name("NOT_AN_ACTION").is_none());
+    }
+    #[test]
+    fn values_contains_all_entries() {
+        let r = ReRolledActions::new();
+        assert!(!r.values().is_empty());
+    }
+}

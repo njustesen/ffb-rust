@@ -163,10 +163,20 @@ impl StepApothecary {
                     }
                 }
                 ApothecaryStatus::DoNotUseApothecary => {
-                    // DEFERRED(reports): ReportApothecaryRoll event not yet ported
+                    // Java: addReport(new ReportApothecaryRoll(defenderId, null, null, null, null, modifiers))
+                    if let Some(ref ir) = self.injury_result {
+                        if let Some(ref did) = ir.injury_context.defender_id {
+                            outcome = outcome.with_event(GameEvent::ApothecaryRoll {
+                                player_id: did.clone(),
+                                roll: None,
+                                new_state: None,
+                                new_serious_injury: None,
+                            });
+                        }
+                    }
                 }
                 ApothecaryStatus::NoApothecary => {
-                    // DEFERRED(reports): fInjuryResult.report() not yet ported
+                    // Java: if (fShowReport) fInjuryResult.report(this) — no explicit report added here
                 }
                 _ => {}
             }
@@ -217,8 +227,8 @@ impl StepApothecary {
             // Java: addReport(new ReportApothecaryRoll(defender, casualtyRoll, newState, newSI, origSI, mods))
             let apo_event = GameEvent::ApothecaryRoll {
                 player_id,
-                roll,
-                new_state: base as u16,
+                roll: Some(roll),
+                new_state: Some(base as u16),
                 new_serious_injury: None,
             };
             // DEFERRED(dialog): DialogApothecaryChoiceParameter not yet ported
@@ -238,7 +248,12 @@ impl StepApothecary {
                 ir.injury_context.injury = Some(cured);
                 ir.injury_context.serious_injury = None;
             }
-            (false, None)
+            // Java: addReport(new ReportApothecaryChoice(defenderId, playerState, null))
+            let choice_event = GameEvent::ApothecaryChoice {
+                player_id,
+                healed: true,
+            };
+            (false, Some(choice_event))
         }
     }
 

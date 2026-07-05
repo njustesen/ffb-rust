@@ -205,7 +205,8 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
-        });
+            ..Default::default()
+});
         let mut step = StepSwoop::new("fall".into());
         step.thrown_player_id = Some("away_p".into());
         step.thrown_player_coordinate = Some(FieldCoordinate { x: 5, y: 5 });
@@ -228,7 +229,8 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
-        });
+            ..Default::default()
+});
         let mut step = StepSwoop::new("fall".into());
         step.thrown_player_id = Some("home_p".into());
         step.thrown_player_coordinate = Some(FieldCoordinate { x: 5, y: 5 });

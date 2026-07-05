@@ -165,6 +165,10 @@ pub enum AgentPrompt {
     InformationOkay {
         message: String,
     },
+    /// Java: DialogBloodlustActionParameter — vampire failed blood lust; offer action change.
+    BloodlustAction {
+        player_id: PlayerId,
+    },
     SwarmingPlayers {
         team_id: String,
         eligible_players: Vec<PlayerId>,

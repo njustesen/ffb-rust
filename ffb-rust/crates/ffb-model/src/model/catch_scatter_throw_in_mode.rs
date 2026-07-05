@@ -86,3 +86,28 @@ impl CatchScatterThrowInMode {
         ]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn catch_accurate_bomb_is_bomb() {
+        assert!(CatchScatterThrowInMode::CatchAccurateBomb.is_bomb());
+    }
+
+    #[test]
+    fn catch_scatter_is_not_bomb() {
+        assert!(!CatchScatterThrowInMode::CatchScatter.is_bomb());
+    }
+
+    #[test]
+    fn for_name_round_trip() {
+        assert_eq!(CatchScatterThrowInMode::for_name("catchHandOff"), Some(CatchScatterThrowInMode::CatchHandOff));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(CatchScatterThrowInMode::for_name("unknown"), None);
+    }
+}

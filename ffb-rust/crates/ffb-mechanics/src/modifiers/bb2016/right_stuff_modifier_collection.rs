@@ -28,3 +28,27 @@ impl RightStuffModifierCollection {
 impl Default for RightStuffModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_ten_modifiers() {
+        // 2 kick range (medium + long) + 8 tacklezone = 10
+        assert_eq!(RightStuffModifierCollection::new().get_modifiers().len(), 10);
+    }
+
+    #[test]
+    fn includes_medium_kick_modifier() {
+        let col = RightStuffModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Medium Kick"));
+    }
+
+    #[test]
+    fn tacklezone_count_is_eight() {
+        let col = RightStuffModifierCollection::new();
+        let tz_count = col.get_modifiers().iter().filter(|m| m.get_type() == ModifierType::TACKLEZONE).count();
+        assert_eq!(tz_count, 8);
+    }
+}

@@ -31,3 +31,19 @@ impl KeywordChoiceMode {
         match name { "gettingEven" => Some(KeywordChoiceMode::GETTING_EVEN), _ => None }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn getting_even_get_name_is_camel_case() {
+        assert_eq!(KeywordChoiceMode::GETTING_EVEN.get_name(), "gettingEven");
+    }
+
+    #[test]
+    fn for_name_round_trips() {
+        assert_eq!(KeywordChoiceMode::for_name("gettingEven"), Some(KeywordChoiceMode::GETTING_EVEN));
+        assert_eq!(KeywordChoiceMode::for_name("invalid"), None);
+    }
+}

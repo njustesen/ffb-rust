@@ -165,6 +165,37 @@ impl DiceInterpreter {
     pub fn interpret_master_chef_roll(master_chef_roll: &[i32]) -> i32 {
         master_chef_roll.iter().filter(|&&r| r > 3).count() as i32
     }
+
+    /// 1:1 translation of DiceInterpreter.interpretPickMeUp(int).
+    pub fn interpret_pick_me_up(roll: i32) -> bool {
+        roll >= 5
+    }
+
+    /// 1:1 translation of DiceInterpreter.isBribesSuccessful(int).
+    pub fn is_bribes_successful(roll: i32) -> bool {
+        roll > 1
+    }
+
+    /// 1:1 translation of DiceInterpreter.isArgueTheCallSuccessful(int).
+    pub fn is_argue_the_call_successful(roll: i32) -> bool {
+        roll > 5
+    }
+
+    /// 1:1 translation of DiceInterpreter.isCoachBanned(int).
+    pub fn is_coach_banned(roll: i32) -> bool {
+        roll < 2
+    }
+
+    /// 1:1 translation of DiceInterpreter.interpretRiotRoll(int).
+    /// Returns +1 (turn advances) when roll < 4, -1 (turn retreats) otherwise.
+    pub fn interpret_riot_roll(riot_roll: i32) -> i32 {
+        if riot_roll < 4 { 1 } else { -1 }
+    }
+
+    /// 1:1 translation of DiceInterpreter.isDouble(int[]).
+    pub fn is_double(roll: &[i32]) -> bool {
+        roll.len() == 2 && roll[0] == roll[1]
+    }
 }
 
 impl Default for DiceInterpreter {
@@ -300,5 +331,47 @@ mod tests {
     fn interpret_master_chef_roll_counts_high_dice() {
         // rolls: 4, 2, 5 → 4 > 3 and 5 > 3 → 2 rerolls stolen
         assert_eq!(DiceInterpreter::interpret_master_chef_roll(&[4, 2, 5]), 2);
+    }
+
+    // ── Additional boolean checks ─────────────────────────────────────────────
+
+    #[test]
+    fn interpret_pick_me_up_five_and_six_succeed() {
+        assert!(DiceInterpreter::interpret_pick_me_up(5));
+        assert!(DiceInterpreter::interpret_pick_me_up(6));
+        assert!(!DiceInterpreter::interpret_pick_me_up(4));
+    }
+
+    #[test]
+    fn is_bribes_successful_roll_greater_than_one() {
+        assert!(DiceInterpreter::is_bribes_successful(2));
+        assert!(!DiceInterpreter::is_bribes_successful(1));
+    }
+
+    #[test]
+    fn is_argue_the_call_successful_six_only() {
+        assert!(DiceInterpreter::is_argue_the_call_successful(6));
+        assert!(!DiceInterpreter::is_argue_the_call_successful(5));
+    }
+
+    #[test]
+    fn is_coach_banned_only_on_one() {
+        assert!(DiceInterpreter::is_coach_banned(1));
+        assert!(!DiceInterpreter::is_coach_banned(2));
+    }
+
+    #[test]
+    fn interpret_riot_roll_low_advances_turn() {
+        assert_eq!(DiceInterpreter::interpret_riot_roll(1), 1);
+        assert_eq!(DiceInterpreter::interpret_riot_roll(3), 1);
+        assert_eq!(DiceInterpreter::interpret_riot_roll(4), -1);
+        assert_eq!(DiceInterpreter::interpret_riot_roll(6), -1);
+    }
+
+    #[test]
+    fn is_double_matches_equal_dice() {
+        assert!(DiceInterpreter::is_double(&[3, 3]));
+        assert!(!DiceInterpreter::is_double(&[2, 3]));
+        assert!(!DiceInterpreter::is_double(&[3]));
     }
 }

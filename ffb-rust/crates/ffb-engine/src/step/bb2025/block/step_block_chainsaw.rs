@@ -258,6 +258,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         };
         if let Some(s) = skill {
             p.starting_skills.push(SkillWithValue { skill_id: s, value: None });

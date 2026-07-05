@@ -43,3 +43,33 @@ impl ThrowInMechanicTrait for ThrowInMechanic {
 impl ThrowInMechanic {
     pub fn new() -> Self { ThrowInMechanic }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::throw_in_mechanic::ThrowInMechanic as ThrowInTrait;
+
+    #[test]
+    fn distance_sums_two_dice() {
+        assert_eq!(ThrowInMechanic.distance(&[3, 4]), 7);
+    }
+
+    #[test]
+    fn is_corner_throw_in_always_false() {
+        assert!(!ThrowInMechanic.is_corner_throw_in(FieldCoordinate::new(0, 0)));
+    }
+
+    #[test]
+    fn direction_from_west_edge_roll_3_is_east() {
+        // x < 1 → template East; roll 3 or 4 → East
+        let dir = ThrowInMechanic.interpret_throw_in_direction_roll(FieldCoordinate::new(0, 7), 3);
+        assert_eq!(dir, Direction::East);
+    }
+
+    #[test]
+    fn direction_from_east_edge_roll_1_is_southwest() {
+        // x > 24 → template West; roll 1 or 2 → Southwest
+        let dir = ThrowInMechanic.interpret_throw_in_direction_roll(FieldCoordinate::new(25, 7), 1);
+        assert_eq!(dir, Direction::Southwest);
+    }
+}

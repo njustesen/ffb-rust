@@ -429,6 +429,48 @@ impl SkillId {
         }
     }
 
+    /// Java: Skill.getSkillUsageType() — returns the usage tracking type for this skill.
+    pub fn usage_type(self) -> crate::enums::SkillUsageType {
+        use crate::enums::SkillUsageType::*;
+        match self {
+            // OncePerDrive (mixed): BeerBarrelBash, RaidingParty
+            SkillId::BeerBarrelBash | SkillId::RaidingParty => OncePerDrive,
+
+            // OncePerHalf (bb2020): GhostlyFlames, ThenIStartedBlastin
+            SkillId::GhostlyFlames | SkillId::ThenIStartedBlastin => OncePerHalf,
+            // OncePerHalf (bb2025): Leader, BlastinSolvesEverything, MesmerisingDance, SlashingNails
+            SkillId::Leader | SkillId::BlastinSolvesEverything | SkillId::MesmerisingDance | SkillId::SlashingNails => OncePerHalf,
+            // OncePerHalf (mixed): CatchOfTheDay, FuriousOutburst
+            SkillId::CatchOfTheDay | SkillId::FuriousOutburst => OncePerHalf,
+            // FrenziedRush/PutridRegurgitation: bb2020=OncePerGame, bb2025=OncePerHalf — use bb2025
+            SkillId::FrenziedRush | SkillId::PutridRegurgitation => OncePerHalf,
+
+            // OncePerTurn (bb2025): Dodge, Pro, LoneFouler, SureFeet
+            SkillId::Dodge | SkillId::Pro | SkillId::LoneFouler | SkillId::SureFeet => OncePerTurn,
+            // OncePerTurnByTeamMate: WisdomOfTheWhiteDwarf, Swoop
+            SkillId::WisdomOfTheWhiteDwarf | SkillId::Swoop => OncePerTurnByTeamMate,
+
+            // OncePerGame (bb2020)
+            SkillId::BlastIt | SkillId::BrutalBlock | SkillId::BurstOfSpeed |
+            SkillId::ConsummateProfessional | SkillId::DwarfenScourge |
+            SkillId::ExcuseMeAreYouAZoat | SkillId::Incorporeal | SkillId::LordOfChaos |
+            SkillId::MasterAssassin | SkillId::MesmerizingDance | SkillId::PumpUpTheCrowd |
+            SkillId::TheBallista => OncePerGame,
+            // OncePerGame (bb2025): DwarvenScourge, KrumpAndSmash + bb2025 versions of shared ones
+            SkillId::DwarvenScourge | SkillId::KrumpAndSmash => OncePerGame,
+            // OncePerGame (mixed)
+            SkillId::AllYouCanEat | SkillId::BalefulHex | SkillId::BlackInk |
+            SkillId::BoundingLeap | SkillId::CrushingBlow | SkillId::FuryOfTheBloodGod |
+            SkillId::GoredByTheBull | SkillId::HalflingLuck | SkillId::Indomitable |
+            SkillId::Kaboom | SkillId::KickEmWhileTheyReDown | SkillId::LookIntoMyEyes |
+            SkillId::MaximumCarnage | SkillId::OldPro | SkillId::PrimalSavagery |
+            SkillId::QuickBite => OncePerGame,
+
+            // All other skills are Regular
+            _ => Regular,
+        }
+    }
+
     /// Parse from a Java class name string OR a human-readable skill name.
     ///
     /// Normalizes the input by stripping all non-alphanumeric characters and
@@ -739,7 +781,7 @@ impl SkillId {
             // Java: BreatheFire.postConstruct registers canPerformArmourRollInsteadOfBlockThatMightFailWithTurnover
             SkillId::BreatheFire => &["canPerformArmourRollInsteadOfBlockThatMightFailWithTurnover"],
             SkillId::WildAnimal => &["needsToRollForAction"],
-            SkillId::Loner => &["needsToRollForTeamReroll"],
+            SkillId::Loner => &["hasToRollToUseTeamReroll"],
             SkillId::Decay => &["decaysAfterInjury"],
             SkillId::Regeneration => &["preventRaiseFromDead", "canRollToSaveFromInjury"],
             SkillId::GiveAndGo => &["canMoveAfterQuickPass", "canMoveAfterHandOff"],
@@ -770,6 +812,28 @@ impl SkillId {
             SkillId::MaximumCarnage => &["canPerformSecondChainsawAttack"],
             // Java: BeerBarrelBash.postConstruct registers canThrowKeg
             SkillId::BeerBarrelBash => &["canThrowKeg"],
+            // Java: PilingOnBehaviour registers canPileOnOpponent
+            SkillId::PilingOn => &["canPileOnOpponent"],
+            // Java: bb2025/PumpUpTheCrowd.postConstruct registers grantsTeamReRollWhenCausingBlockCas
+            // Java: bb2020/PumpUpTheCrowd.postConstruct registers grantsTeamReRollWhenCausingCas
+            SkillId::PumpUpTheCrowd => &["grantsTeamReRollWhenCausingBlockCas", "grantsTeamReRollWhenCausingCas"],
+            // Java: bb2016+bb2020/SneakyGit.postConstruct + bb2025/PutTheBootIn.postConstruct register canAlwaysAssistFouls
+            SkillId::SneakyGit | SkillId::PutTheBootIn => &["canAlwaysAssistFouls"],
+            // Java: bb2025/Defensive.postConstruct registers CancelSkillProperty(canAlwaysAssistFouls)
+            SkillId::Defensive => &["cancelsCanAlwaysAssistFouls"],
+            // Java: bb2020/PileDriver.postConstruct + bb2025/PileDriver.postConstruct register canFoulAfterBlock
+            SkillId::PileDriver => &["canFoulAfterBlock"],
+            // Java: mixed/SecretWeapon.postConstruct registers getsSentOffAtEndOfDrive
+            SkillId::SecretWeapon => &["getsSentOffAtEndOfDrive"],
+            // Java: mixed/IronHardSkin.postConstruct registers cancelsReducesArmourToFixedValue + ignores properties
+            SkillId::IronHardSkin => &[
+                "cancelsReducesArmourToFixedValue",
+                "ignoresArmourModifiersFromFouls",
+                "ignoresArmourModifiersFromSkills",
+                "ignoresArmourModifiersFromSpecialEffects",
+            ],
+            // Java: bb2020+bb2025/LordOfChaos.postConstruct registers grantsSingleUseTeamRerollWhenOnPitch
+            SkillId::LordOfChaos => &["grantsSingleUseTeamRerollWhenOnPitch"],
             _ => &[],
         }
     }

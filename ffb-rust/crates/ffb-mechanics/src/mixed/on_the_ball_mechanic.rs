@@ -56,3 +56,27 @@ impl OnTheBallMechanicTrait for OnTheBallMechanic {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::on_the_ball_mechanic::OnTheBallMechanic as OnTheBallTrait;
+
+    #[test]
+    fn display_string_is_on_the_ball() {
+        assert_eq!(OnTheBallMechanic.display_string_pass_interference(), "On The Ball");
+    }
+
+    #[test]
+    fn kick_off_interference_matches_pass_interference() {
+        assert_eq!(
+            OnTheBallMechanic.display_string_kick_off_interference(),
+            OnTheBallMechanic.display_string_pass_interference()
+        );
+    }
+
+    #[test]
+    fn dialog_description_has_one_entry() {
+        assert_eq!(OnTheBallMechanic.pass_interference_dialog_description().len(), 1);
+    }
+}

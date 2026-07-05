@@ -36,4 +36,11 @@ mod tests {
         assert!(params.iter().any(|p| matches!(p, StepParameter::UseAlternateLabel(true))));
         assert!(params.iter().any(|p| matches!(p, StepParameter::ThrownPlayerCoordinate(None))));
     }
+
+    #[test]
+    fn publishes_exactly_two_params() {
+        let mut game = make_game();
+        let params = AnimalSavageryControlCommand.execute(&mut game);
+        assert_eq!(params.len(), 2);
+    }
 }

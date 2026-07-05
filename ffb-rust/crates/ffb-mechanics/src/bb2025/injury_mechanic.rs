@@ -2,6 +2,7 @@ use ffb_model::enums::{PlayerState, PlayerType, SendToBoxReason};
 use ffb_model::model::{Game, Player, RosterPosition, SpecialRule, Team, TeamResult};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::raise_type::RaiseType;
+use ffb_model::util::util_cards::UtilCards;
 use crate::mechanic::{Mechanic, MechanicType};
 use crate::injury_mechanic::InjuryMechanic as InjuryMechanicTrait;
 
@@ -28,16 +29,20 @@ impl InjuryMechanicTrait for InjuryMechanic {
     fn can_raise_infected_players(
         &self,
         _team: &Team,
-        _team_result: &TeamResult,
+        team_result: &TeamResult,
         attacker: Option<&Player>,
         dead_player: &Player,
     ) -> bool {
-        // attacker.hasSkillProperty(allowsRaisingLineman) && !dead_player.hasSkillProperty(BIG_GUY keyword)
-        // && !UtilCards.hasSkillToCancelProperty(...)
-        // TODO: Keyword.BIG_GUY on RosterPosition not yet translated
-        attacker.is_some()
+        // Java: teamResult.getRaisedDead() == 0 && attacker.hasSkillProperty(allowsRaisingLineman)
+        //   && !dead_player.getPosition().getKeywords().contains(Keyword.BIG_GUY)  -- TODO: position keyword lookup
+        //   && !dead_player.hasSkillProperty(preventRaiseFromDead)
+        //   && !UtilCards.hasSkillToCancelProperty(dead_player, allowsRaisingLineman)
+        team_result.raised_dead == 0
+            && attacker.is_some()
             && attacker.unwrap().has_skill_property(NamedProperties::ALLOWS_RAISING_LINEMAN)
+            // TODO: !dead_player.position.keywords.contains("BIG_GUY") — needs position embedded in Player
             && !dead_player.has_skill_property(NamedProperties::PREVENT_RAISE_FROM_DEAD)
+            && !UtilCards::has_skill_to_cancel_property(dead_player, NamedProperties::ALLOWS_RAISING_LINEMAN)
     }
 
     fn infected_goes_to_reserves(&self) -> bool { true }
@@ -56,9 +61,11 @@ impl InjuryMechanicTrait for InjuryMechanic {
 
     fn raised_nurgle_type(&self) -> PlayerType { PlayerType::PlagueRidden }
 
-    fn can_use_apo(&self, _game: &Game, _defender: &Player, _player_state: PlayerState) -> bool {
-        // TODO: ApothecaryType.forPlayer(game, defender, playerState).isEmpty()
-        false
+    fn can_use_apo(&self, game: &Game, defender: &Player, player_state: PlayerState) -> bool {
+        use crate::apothecary_mechanic::ApothecaryMechanic as ApoTrait;
+        !super::apothecary_mechanic::ApothecaryMechanic::new()
+            .apothecary_types(game, defender, player_state)
+            .is_empty()
     }
 
     fn raise_positions(&self, _team: &Team) -> Vec<RosterPosition> {
@@ -77,4 +84,88 @@ impl InjuryMechanicTrait for InjuryMechanic {
 
 impl InjuryMechanic {
     pub fn new() -> Self { InjuryMechanic }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::injury_mechanic::InjuryMechanic as InjuryMechanicTrait;
+
+    fn empty_team(special_rules: Vec<String>) -> Team {
+        Team {
+            id: "t".into(), name: "T".into(), race: "human".into(),
+            roster_id: "human".into(), coach: "Coach".into(),
+            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+            prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+            cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
+            team_value: 0, treasury: 0, special_rules, players: vec![],
+        }
+    }
+
+    fn empty_team_result() -> TeamResult {
+        TeamResult::default()
+    }
+
+    fn bare_player() -> Player {
+        Player::default()
+    }
+
+    #[test]
+    fn can_raise_infected_blocked_if_raised_dead_nonzero() {
+        let m = InjuryMechanic::new();
+        let team = empty_team(vec![]);
+        let mut tr = empty_team_result();
+        tr.raised_dead = 1;
+        let dead = bare_player();
+        assert!(!m.can_raise_infected_players(&team, &tr, None, &dead));
+    }
+
+    #[test]
+    fn can_raise_infected_false_without_attacker() {
+        let m = InjuryMechanic::new();
+        let team = empty_team(vec![]);
+        let tr = empty_team_result();
+        let dead = bare_player();
+        assert!(!m.can_raise_infected_players(&team, &tr, None, &dead));
+    }
+
+    #[test]
+    fn infected_goes_to_reserves_true() {
+        assert!(InjuryMechanic::new().infected_goes_to_reserves());
+    }
+
+    #[test]
+    fn raise_type_zombie_for_masters_of_undeath() {
+        let m = InjuryMechanic::new();
+        let team = empty_team(vec![SpecialRule::MASTERS_OF_UNDEATH.get_rule_name().into()]);
+        assert_eq!(m.raise_type(&team), RaiseType::ZOMBIE);
+    }
+
+    #[test]
+    fn raise_type_rotter_without_special_rule() {
+        let m = InjuryMechanic::new();
+        let team = empty_team(vec![]);
+        assert_eq!(m.raise_type(&team), RaiseType::ROTTER);
+    }
+
+    #[test]
+    fn can_use_apo_false_when_no_apothecaries() {
+        use ffb_model::enums::{PS_SERIOUS_INJURY, Rules};
+        let mut home = empty_team(vec![]);
+        let p = bare_player();
+        home.players.push(p.clone());
+        let game = ffb_model::model::Game::new(home, empty_team(vec![]), Rules::Bb2025);
+        assert!(!InjuryMechanic::new().can_use_apo(&game, &p, PlayerState(PS_SERIOUS_INJURY)));
+    }
+
+    #[test]
+    fn can_use_apo_true_when_team_has_apo() {
+        use ffb_model::enums::{PS_SERIOUS_INJURY, Rules};
+        let mut home = empty_team(vec![]);
+        let p = bare_player();
+        home.players.push(p.clone());
+        let mut game = ffb_model::model::Game::new(home, empty_team(vec![]), Rules::Bb2025);
+        game.turn_data_home.apothecaries = 1;
+        assert!(InjuryMechanic::new().can_use_apo(&game, &p, PlayerState(PS_SERIOUS_INJURY)));
+    }
 }

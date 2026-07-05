@@ -12,6 +12,7 @@
 ///
 /// If all gates pass, logs the event and delegates to `StallingExtension.handle_staller()`.
 use ffb_model::enums::TurnMode;
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
@@ -80,10 +81,11 @@ impl StepForgoneStalling {
 
         if let Some(player_id) = stalling_player_id {
             if self.stalling_extension.is_considered_stalling(game, &player_id) {
-                // Java: getResult().addReport(new ReportPlayerEvent(player.getId(), "is stalling"));
-                // DEFERRED: emit ReportPlayerEvent("is stalling") game event
                 let turn_nr = game.turn_data().turn_nr;
-                self.stalling_extension.handle_staller(game, &player_id, turn_nr, rng);
+                let stalling_ev = self.stalling_extension.handle_staller(game, &player_id, turn_nr, rng);
+                return StepOutcome::next()
+                    .with_event(stalling_ev)
+                    .with_event(GameEvent::PlayerNote { player_id, note: "is stalling".into() });
             }
         }
 

@@ -1,10 +1,41 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct ClientCommandSynchronousMultiBlock;
+use ffb_model::model::BlockTarget;
 
-impl ClientCommandSynchronousMultiBlock {
-    pub fn new() -> Self { Self }
+/// 1:1 translation of `com.fumbbl.ffb.net.commands.ClientCommandSynchronousMultiBlock`.
+#[derive(Debug, Clone, Default)]
+pub struct ClientCommandSynchronousMultiBlock {
+    /// Java: `selectedBlockTargets`
+    pub selected_block_targets: Vec<BlockTarget>,
 }
 
-impl Default for ClientCommandSynchronousMultiBlock {
-    fn default() -> Self { Self::new() }
+impl ClientCommandSynchronousMultiBlock {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn with_targets(selected_block_targets: Vec<BlockTarget>) -> Self {
+        Self { selected_block_targets }
+    }
+
+    pub fn get_selected_block_targets(&self) -> &[BlockTarget] { &self.selected_block_targets }
+
+    pub fn add_target(&mut self, target: BlockTarget) {
+        self.selected_block_targets.push(target);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::model::BlockKind;
+
+    #[test]
+    fn targets_stored() {
+        let t = BlockTarget::new("p1", BlockKind::BLOCK, None);
+        let cmd = ClientCommandSynchronousMultiBlock::with_targets(vec![t]);
+        assert_eq!(cmd.get_selected_block_targets().len(), 1);
+    }
+
+    #[test]
+    fn default_is_empty() {
+        let cmd = ClientCommandSynchronousMultiBlock::new();
+        assert!(cmd.selected_block_targets.is_empty());
+    }
 }

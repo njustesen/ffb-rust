@@ -396,6 +396,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.acting_player.player_id = Some("att".into());
         // Pre-set result so we don't need a full roll

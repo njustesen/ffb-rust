@@ -14,3 +14,19 @@ impl DialogIdFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_id() {
+        assert_eq!(DialogIdFactory::default().for_name("reRoll"), Some(DialogId::RE_ROLL));
+        assert_eq!(DialogIdFactory::default().for_name("skillUse"), Some(DialogId::SKILL_USE));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(DialogIdFactory::default().for_name("invalid"), None);
+    }
+}

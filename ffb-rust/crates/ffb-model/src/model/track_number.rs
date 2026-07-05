@@ -22,3 +22,20 @@ impl Default for TrackNumber {
         TrackNumber { coordinate: None, number: 0 }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn new_stores_coordinate_and_number() {
+        let t = TrackNumber::new(FieldCoordinate::new(5, 3), 7);
+        assert_eq!(t.get_number(), 7);
+        assert_eq!(t.get_coordinate(), Some(&FieldCoordinate::new(5, 3)));
+    }
+    #[test]
+    fn default_is_zero_and_none() {
+        let t = TrackNumber::default();
+        assert_eq!(t.get_number(), 0);
+        assert!(t.get_coordinate().is_none());
+    }
+}

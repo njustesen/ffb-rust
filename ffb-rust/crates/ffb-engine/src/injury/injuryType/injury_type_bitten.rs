@@ -4,6 +4,7 @@ use ffb_model::enums::{ApothecaryMode, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
+use ffb_mechanics::modifiers::niggling_injury_modifier;
 use crate::injury::{InjuryContext, InjuryTypeServer, do_injury_roll};
 
 pub struct InjuryTypeBitten { ctx: InjuryContext }
@@ -11,14 +12,18 @@ impl InjuryTypeBitten { pub fn new() -> Self { Self { ctx: InjuryContext::new(Ap
 impl Default for InjuryTypeBitten { fn default() -> Self { Self::new() } }
 
 impl InjuryTypeServer for InjuryTypeBitten {
-    fn handle_injury(&mut self, _game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,
+    fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,
         coord: FieldCoordinate, _from_coord: Option<FieldCoordinate>, _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode) {
         self.ctx.defender_id = Some(defender_id.to_owned());
         self.ctx.attacker_id = attacker_id.map(str::to_owned);
         self.ctx.defender_coordinate = Some(coord);
         self.ctx.apothecary_mode = apo_mode;
         self.ctx.armor_broken = true;
-        // TODO: add getNigglingInjuryModifier when InjuryModifierFactory is ported
+        if let Some(defender) = game.player(defender_id) {
+            if let Some(m) = niggling_injury_modifier(defender.niggling_injuries) {
+                self.ctx.add_injury_modifier(m);
+            }
+        }
         do_injury_roll(rng, &mut self.ctx);
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }

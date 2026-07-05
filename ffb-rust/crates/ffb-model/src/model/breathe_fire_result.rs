@@ -20,3 +20,18 @@ impl BreatheFireResult {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn failure_get_message_is_non_empty() {
+        assert!(!BreatheFireResult::FAILURE.get_message().is_empty());
+    }
+
+    #[test]
+    fn knock_down_get_message_is_empty() {
+        assert!(BreatheFireResult::KNOCK_DOWN.get_message().is_empty());
+    }
+}

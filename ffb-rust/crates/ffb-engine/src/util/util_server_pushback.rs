@@ -109,6 +109,40 @@ impl UtilServerPushback {
             .collect()
     }
 
+    /// Java: `UtilServerPushback.findPushbackSquares(GRAB or SIDE_STEP mode)`.
+    ///
+    /// Returns all adjacent squares that are on the pitch, not occupied, and not
+    /// a multi-block target coordinate (isValidPushbackSquare). Used when the
+    /// attacker has `canPushBackToAnySquare` (Grab) or defender has SideStep.
+    pub fn find_pushback_squares_grab(
+        starting_square: PushbackSquare,
+        occupied: &dyn Fn(FieldCoordinate) -> bool,
+        is_valid: &dyn Fn(FieldCoordinate) -> bool,
+        home_choice: bool,
+    ) -> Vec<PushbackSquare> {
+        let coord = starting_square.coordinate;
+        let dirs = [
+            (Direction::Northwest, -1i32, -1i32),
+            (Direction::North,      0,   -1),
+            (Direction::Northeast,  1,   -1),
+            (Direction::East,       1,    0),
+            (Direction::Southeast,  1,    1),
+            (Direction::South,      0,    1),
+            (Direction::Southwest, -1,    1),
+            (Direction::West,      -1,    0),
+        ];
+        dirs.iter()
+            .filter_map(|(dir, dx, dy)| {
+                let c = FieldCoordinate::new(coord.x + dx, coord.y + dy);
+                if FieldCoordinateBounds::FIELD.is_in_bounds(c) && !occupied(c) && is_valid(c) {
+                    Some(PushbackSquare::new(c, *dir, home_choice))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     /// Returns all in-bounds candidate pushback squares without filtering by occupancy.
     ///
     /// Java: `UtilServerPushback.findPushbackSquares` returns all 3 candidates (including

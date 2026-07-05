@@ -19,3 +19,21 @@ impl ReRolledActionFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_action() {
+        let f = ReRolledActionFactory::default();
+        assert!(f.for_name("Dodge").is_some());
+        assert_eq!(f.for_name("dodge").unwrap().get_name(), "Dodge");
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        let f = ReRolledActionFactory::default();
+        assert!(f.for_name("NOT_AN_ACTION").is_none());
+    }
+}

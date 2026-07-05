@@ -15,3 +15,24 @@ impl PassModifierCollection {
 impl Default for PassModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_twenty_modifiers() {
+        // base 1 very_sunny + 8 tacklezone + 11 disturbing_presence = 20 (no extra in mixed)
+        assert_eq!(PassModifierCollection::new().get_modifiers().len(), 20);
+    }
+
+    #[test]
+    fn includes_very_sunny_modifier() {
+        assert!(PassModifierCollection::new().get_modifiers().iter().any(|m| m.get_name() == "Very Sunny"));
+    }
+
+    #[test]
+    fn includes_single_tacklezone_modifier() {
+        assert!(PassModifierCollection::new().get_modifiers().iter().any(|m| m.get_name() == "1 Tacklezone"));
+    }
+}

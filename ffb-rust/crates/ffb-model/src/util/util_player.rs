@@ -5,6 +5,7 @@ use crate::model::player::{Player, PlayerId};
 use crate::model::property::named_properties::NamedProperties;
 use crate::model::team::Team;
 use crate::types::FieldCoordinate;
+use crate::util::util_cards::UtilCards;
 
 /// 1:1 translation of com.fumbbl.ffb.util.UtilPlayer.
 pub struct UtilPlayer;
@@ -51,6 +52,28 @@ impl UtilPlayer {
             if let Some(id) = field_model.player_at(adj_coord) {
                 if team.has_player(id) {
                     result.push(id);
+                }
+            }
+        }
+        result
+    }
+
+    /// 1:1 translation of findAdjacentPlayersToFeedOn.
+    /// Returns team-owned thrall players adjacent to `coord`.
+    pub fn find_adjacent_players_to_feed_on<'a>(
+        game: &'a Game,
+        team: &'a Team,
+        coord: FieldCoordinate,
+    ) -> Vec<&'a PlayerId> {
+        let field_model = &game.field_model;
+        let mut result = Vec::new();
+        for adj_coord in field_model.adjacent_on_pitch(coord) {
+            if let Some(id) = field_model.player_at(adj_coord) {
+                if !team.has_player(id) { continue; }
+                if let Some(player) = game.player(id) {
+                    if player.is_thrall {
+                        result.push(id);
+                    }
                 }
             }
         }
@@ -134,6 +157,20 @@ impl UtilPlayer {
         Self::find_blockable_players(game, team, coord, 1)
     }
 
+    /// 1:1 translation of findBlockablePlayersTwoSquaresAway.
+    /// Returns players at Chebyshev distance 2 from coord that can be blocked,
+    /// excluding those adjacent (distance 1).
+    pub fn find_blockable_players_two_squares_away<'a>(
+        game: &'a Game,
+        team: &'a Team,
+        coord: FieldCoordinate,
+    ) -> Vec<&'a PlayerId> {
+        let at_two = Self::find_blockable_players(game, team, coord, 2);
+        let at_one: std::collections::HashSet<&PlayerId> =
+            Self::find_adjacent_blockable_players(game, team, coord).into_iter().collect();
+        at_two.into_iter().filter(|id| !at_one.contains(id)).collect()
+    }
+
     /// 1:1 translation of findPlayersOnPitchWithProperty.
     pub fn find_players_on_pitch_with_property<'a>(
         game: &'a Game,
@@ -194,6 +231,67 @@ impl UtilPlayer {
         assists
     }
 
+    /// 1:1 translation of findOffensiveFoulAssists(Game, Player, Player, SkillMechanic).
+    ///
+    /// Counts attacker-team players adjacent to the defender (with tacklezones, excluding attacker)
+    /// that are not marked by opposing players — or have canAlwaysAssistFouls (SneakyGit/PutTheBootIn)
+    /// and that property isn't cancelled by an adjacent opponent with cancelsCanAlwaysAssistFouls.
+    pub fn find_offensive_foul_assists(game: &Game, attacker_id: &str, defender_id: &str) -> i32 {
+        let attacker_team = if game.team_home.has_player(attacker_id) { &game.team_home } else { &game.team_away };
+        let defender_team = if game.team_home.has_player(defender_id) { &game.team_home } else { &game.team_away };
+        let def_coord = match game.field_model.player_coordinate(defender_id) {
+            Some(c) => c,
+            None => return 0,
+        };
+        let mut assists = 0i32;
+        for assist_id in Self::find_adjacent_players_with_tacklezones(game, attacker_team, def_coord, false) {
+            if assist_id == attacker_id {
+                continue;
+            }
+            if let Some(assist_coord) = game.field_model.player_coordinate(assist_id) {
+                let adjacent_defenders = Self::find_adjacent_players_with_tacklezones(game, defender_team, assist_coord, false);
+                let can_always_assist = game.player(assist_id)
+                    .map(|p| p.has_skill_property(NamedProperties::CAN_ALWAYS_ASSIST_FOULS))
+                    .unwrap_or(false);
+                let cancelled = adjacent_defenders.iter().any(|def_id| {
+                    game.player(def_id)
+                        .map(|p| p.has_skill_property(NamedProperties::CANCELS_CAN_ALWAYS_ASSIST_FOULS))
+                        .unwrap_or(false)
+                });
+                if adjacent_defenders.is_empty() || (can_always_assist && !cancelled) {
+                    assists += 1;
+                }
+            }
+        }
+        assists
+    }
+
+    /// 1:1 translation of findDefensiveFoulAssists(Game, Player, Player).
+    ///
+    /// Counts defender-team players adjacent to the attacker (with tacklezones, excluding defender)
+    /// where the attacker-side count of adjacent TZ players next to that assist player is < 2.
+    pub fn find_defensive_foul_assists(game: &Game, attacker_id: &str, defender_id: &str) -> i32 {
+        let attacker_team = if game.team_home.has_player(attacker_id) { &game.team_home } else { &game.team_away };
+        let defender_team = if game.team_home.has_player(defender_id) { &game.team_home } else { &game.team_away };
+        let att_coord = match game.field_model.player_coordinate(attacker_id) {
+            Some(c) => c,
+            None => return 0,
+        };
+        let mut assists = 0i32;
+        for assist_id in Self::find_adjacent_players_with_tacklezones(game, defender_team, att_coord, false) {
+            if assist_id == defender_id {
+                continue;
+            }
+            if let Some(assist_coord) = game.field_model.player_coordinate(assist_id) {
+                let adjacent_attackers = Self::find_adjacent_players_with_tacklezones(game, attacker_team, assist_coord, false);
+                if adjacent_attackers.len() < 2 {
+                    assists += 1;
+                }
+            }
+        }
+        assists
+    }
+
     /// 1:1 translation of findTacklezonePlayers.
     pub fn find_tacklezone_players<'a>(game: &'a Game, player_id: &str) -> Vec<&'a PlayerId> {
         let other_team = Self::find_other_team(game, player_id);
@@ -229,9 +327,8 @@ impl UtilPlayer {
         coord: FieldCoordinate,
         property: &str,
         check_able_to_move: bool,
-        _require_unused_skill: bool,
+        require_unused_skill: bool,
     ) -> Vec<&'a PlayerId> {
-        // TODO: requireUnusedSkill requires UtilCards.hasUnusedSkillWithProperty — not yet translated
         let other_team = Self::find_other_team(game, acting_player_id);
         let opponents =
             Self::find_adjacent_players_with_tacklezones(game, other_team, coord, false);
@@ -243,11 +340,14 @@ impl UtilPlayer {
                 let has_tz = state.map(|s| s.has_tacklezones()).unwrap_or(false);
                 let able = !check_able_to_move
                     || state.map(|s| s.is_able_to_move()).unwrap_or(false);
-                let skill_ok = game.team_home
-                    .player(id)
-                    .or_else(|| game.team_away.player(id))
-                    .map(|p| p.has_skill_property(property))
-                    .unwrap_or(false);
+                let player = game.team_home.player(id).or_else(|| game.team_away.player(id));
+                let skill_ok = player.map(|p| {
+                    if require_unused_skill {
+                        UtilCards::has_unused_skill_with_property(p, property)
+                    } else {
+                        p.has_skill_property(property)
+                    }
+                }).unwrap_or(false);
                 has_tz && skill_ok && able
             })
             .collect()
@@ -320,7 +420,9 @@ impl UtilPlayer {
                     if player.has_skill_property(NamedProperties::CAN_MAKE_AN_EXTRA_GFI) {
                         extra_move += 1;
                     }
-                    // TODO: canMakeAnExtraGfiOnce (SureFeet) requires UtilCards.hasUnusedSkillWithProperty
+                    if UtilCards::has_unused_skill_with_property(player, NamedProperties::CAN_MAKE_AN_EXTRA_GFI_ONCE) {
+                        extra_move += 1;
+                    }
                     if jumping {
                         extra_move -= 1;
                     }
@@ -443,6 +545,76 @@ impl UtilPlayer {
         !Self::find_adjacent_players_with_tacklezones(game, team, coord, false).is_empty()
     }
 
+    /// 1:1 translation of findStandingOrPronePlayers(Game, Team, FieldCoordinate, distance).
+    ///
+    /// Returns team players within `distance` Chebyshev squares of `coord` that are not stunned.
+    pub fn find_standing_or_prone_players<'a>(
+        game: &'a Game,
+        team: &'a Team,
+        coord: FieldCoordinate,
+        distance: i32,
+    ) -> Vec<&'a Player> {
+        let field_model = &game.field_model;
+        let mut result = Vec::new();
+        for adj in Self::find_adjacent_coordinates(field_model, coord, distance) {
+            if let Some(id) = field_model.player_at(adj) {
+                if team.has_player(id) {
+                    if let Some(state) = field_model.player_state(id) {
+                        if !state.is_stunned() {
+                            if let Some(player) = game.player(id) {
+                                result.push(player);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        result
+    }
+
+    /// Java: UtilPlayer.refreshPlayersForTurnStart(Game) — resets transient player states at the
+    /// start of each team's turn. Called after flipping `home_playing` to the new active team.
+    ///
+    /// Transitions (1:1 with Java switch):
+    ///   BLOCKED / MOVING / FALLING / HIT_ON_GROUND → STANDING + active
+    ///   PRONE / STANDING → setActive only
+    ///   STUNNED (new active team) → PRONE + active=false
+    ///
+    /// DEFERRED(enhancement-removal): FieldModel.removeSkillEnhancements + Player.resetUsedSkills
+    /// are not yet ported; enhancement removal at end-of-turn is skipped.
+    pub fn refresh_players_for_turn_start(game: &mut Game) {
+        use crate::enums::{PS_BLOCKED, PS_FALLING, PS_HIT_ON_GROUND, PS_MOVING, PS_PRONE, PS_STANDING, PS_STUNNED};
+        let home_ids: Vec<String> = game.team_home.players.iter().map(|p| p.id.clone()).collect();
+        let away_ids: Vec<String> = game.team_away.players.iter().map(|p| p.id.clone()).collect();
+        let home_playing = game.home_playing;
+        for (id, is_home) in home_ids.iter().map(|id| (id, true))
+            .chain(away_ids.iter().map(|id| (id, false)))
+        {
+            let Some(ps) = game.field_model.player_state(id) else { continue };
+            let base = ps.base();
+            // Java: setActive = playerOnTeamFromLastTurn || !player.hasSkillProperty(hasToMissTurn)
+            // Simplified: no hasToMissTurn check (DEFERRED(enhancement-removal))
+            let player_on_team_from_last_turn = is_home != home_playing;
+            let set_active = player_on_team_from_last_turn; // simplified; full check DEFERRED
+            let new_ps = if base == PS_BLOCKED || base == PS_MOVING || base == PS_FALLING || base == PS_HIT_ON_GROUND {
+                Some(ps.change_base(PS_STANDING).change_active(true))
+            } else if base == PS_STANDING || base == PS_PRONE {
+                if ps.is_active() != set_active || (!is_home == home_playing) {
+                    Some(ps.change_active(true))
+                } else {
+                    None
+                }
+            } else if base == PS_STUNNED && is_home == home_playing {
+                Some(ps.change_base(PS_PRONE).change_active(false))
+            } else {
+                None
+            };
+            if let Some(new_ps) = new_ps {
+                game.field_model.set_player_state(id, new_ps);
+            }
+        }
+    }
+
     /// Returns all coordinates within `distance` from `coord` that are on the pitch
     /// (Chebyshev distance — matches Java FieldModel.findAdjacentCoordinates).
     fn find_adjacent_coordinates(
@@ -526,6 +698,7 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
+            ..Default::default()
         }
     }
 
@@ -739,5 +912,143 @@ mod tests {
         add_player(&mut game, true, "h2", FieldCoordinate::new(6, 5), ACTIVE_STANDING);
         add_player(&mut game, true, "h3", FieldCoordinate::new(5, 6), ACTIVE_STANDING);
         assert_eq!(UtilPlayer::find_stand_up_assists(&game, "h1"), 2);
+    }
+
+    #[test]
+    fn find_standing_or_prone_players_returns_non_stunned_team_mates() {
+        use crate::enums::PS_STUNNED;
+        let mut game = minimal_game();
+        add_player(&mut game, true, "h1", FieldCoordinate::new(5, 5), ACTIVE_STANDING);
+        add_player(&mut game, true, "h2", FieldCoordinate::new(5, 6), ACTIVE_STANDING);
+        let stunned = PlayerState::new(PS_STUNNED);
+        add_player(&mut game, true, "h3", FieldCoordinate::new(5, 7), stunned);
+        let team = game.team_home.clone();
+        let result = UtilPlayer::find_standing_or_prone_players(
+            &game, &team, FieldCoordinate::new(5, 5), 1
+        );
+        // h2 is adjacent and not stunned; h3 is stunned (excluded); h1 is origin (excluded)
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "h2");
+    }
+
+    #[test]
+    fn find_standing_or_prone_players_distance_2_includes_two_squares_away() {
+        let mut game = minimal_game();
+        add_player(&mut game, true, "h1", FieldCoordinate::new(5, 5), ACTIVE_STANDING);
+        add_player(&mut game, true, "h2", FieldCoordinate::new(5, 7), ACTIVE_STANDING);
+        let team = game.team_home.clone();
+        let result = UtilPlayer::find_standing_or_prone_players(
+            &game, &team, FieldCoordinate::new(5, 5), 2
+        );
+        assert!(result.iter().any(|p| p.id == "h2"), "should find player 2 squares away");
+    }
+
+    #[test]
+    fn find_standing_or_prone_players_excludes_opposing_team() {
+        let mut game = minimal_game();
+        add_player(&mut game, false, "a1", FieldCoordinate::new(5, 6), ACTIVE_STANDING);
+        let team = game.team_home.clone();
+        let result = UtilPlayer::find_standing_or_prone_players(
+            &game, &team, FieldCoordinate::new(5, 5), 1
+        );
+        assert!(result.is_empty(), "should not include opposing team players");
+    }
+
+    // PS_STUNNED base = 0x4; PS_PRONE base = 0x3 (see enums/player.rs constants)
+    const STUNNED: PlayerState = PlayerState(crate::enums::PS_STUNNED);
+    const PRONE_INACTIVE: PlayerState = PlayerState(crate::enums::PS_PRONE);
+
+    #[test]
+    fn refresh_players_stunned_on_active_team_becomes_prone() {
+        let mut game = minimal_game();
+        game.home_playing = true;
+        // home player is STUNNED; home_playing=true so home team is the "new active team"
+        add_player(&mut game, true, "h1", FieldCoordinate::new(5, 5), STUNNED);
+        UtilPlayer::refresh_players_for_turn_start(&mut game);
+        let ps = game.field_model.player_state("h1").unwrap();
+        assert_eq!(ps.base(), crate::enums::PS_PRONE, "STUNNED on active team → PRONE");
+    }
+
+    #[test]
+    fn refresh_players_blocked_becomes_standing() {
+        use crate::enums::PS_BLOCKED;
+        let mut game = minimal_game();
+        game.home_playing = true;
+        let blocked = PlayerState(PS_BLOCKED);
+        add_player(&mut game, true, "h1", FieldCoordinate::new(5, 5), blocked);
+        UtilPlayer::refresh_players_for_turn_start(&mut game);
+        let ps = game.field_model.player_state("h1").unwrap();
+        assert_eq!(ps.base(), crate::enums::PS_STANDING, "BLOCKED → STANDING");
+    }
+
+    #[test]
+    fn refresh_players_stunned_on_opponent_team_unchanged() {
+        let mut game = minimal_game();
+        game.home_playing = true;
+        // away player is STUNNED; away team is NOT the active team → should not recover
+        add_player(&mut game, false, "a1", FieldCoordinate::new(5, 5), STUNNED);
+        UtilPlayer::refresh_players_for_turn_start(&mut game);
+        let ps = game.field_model.player_state("a1").unwrap();
+        assert_eq!(ps.base(), crate::enums::PS_STUNNED, "STUNNED on opponent stays STUNNED");
+    }
+
+    #[test]
+    fn field_model_clear_track_numbers_is_no_op() {
+        let mut fm = crate::model::field_model::FieldModel::new();
+        fm.clear_track_numbers(); // should not panic
+    }
+
+    // PS_PRONE(0x3) = prone, no tacklezones
+    const PRONE: PlayerState = PlayerState(0x3);
+
+    #[test]
+    fn find_offensive_foul_assists_no_assistants() {
+        let mut game = minimal_game();
+        add_player(&mut game, true, "att", FieldCoordinate::new(5, 5), ACTIVE_STANDING);
+        // def is prone (typical for foul victim) — no tacklezones
+        add_player(&mut game, false, "def", FieldCoordinate::new(5, 6), PRONE);
+        // No other attacker-team player adjacent to def
+        assert_eq!(UtilPlayer::find_offensive_foul_assists(&game, "att", "def"), 0);
+    }
+
+    #[test]
+    fn find_offensive_foul_assists_one_free_assistant() {
+        let mut game = minimal_game();
+        add_player(&mut game, true, "att", FieldCoordinate::new(5, 5), ACTIVE_STANDING);
+        // def is prone — no tacklezones (cannot mark assist1)
+        add_player(&mut game, false, "def", FieldCoordinate::new(7, 7), PRONE);
+        // assist1 adjacent to def, no standing defender adjacent to assist1
+        add_player(&mut game, true, "assist1", FieldCoordinate::new(7, 6), ACTIVE_STANDING);
+        assert_eq!(UtilPlayer::find_offensive_foul_assists(&game, "att", "def"), 1);
+    }
+
+    #[test]
+    fn find_offensive_foul_assists_assistant_marked_by_standing_defender() {
+        let mut game = minimal_game();
+        add_player(&mut game, true, "att", FieldCoordinate::new(5, 5), ACTIVE_STANDING);
+        add_player(&mut game, false, "def", FieldCoordinate::new(7, 7), PRONE);
+        add_player(&mut game, true, "assist1", FieldCoordinate::new(7, 6), ACTIVE_STANDING);
+        // A standing defender adjacent to assist1 marks it
+        add_player(&mut game, false, "def2", FieldCoordinate::new(7, 5), ACTIVE_STANDING);
+        assert_eq!(UtilPlayer::find_offensive_foul_assists(&game, "att", "def"), 0);
+    }
+
+    #[test]
+    fn find_defensive_foul_assists_no_assistants() {
+        let mut game = minimal_game();
+        add_player(&mut game, true, "att", FieldCoordinate::new(5, 5), ACTIVE_STANDING);
+        add_player(&mut game, false, "def", FieldCoordinate::new(5, 6), PRONE);
+        assert_eq!(UtilPlayer::find_defensive_foul_assists(&game, "att", "def"), 0);
+    }
+
+    #[test]
+    fn find_defensive_foul_assists_one_free_assistant() {
+        let mut game = minimal_game();
+        // att at (5,5); def2 (defender) at (5,6) adjacent to att; att is the only attacker adjacent
+        // to def2 (< 2), so def2 counts as a defensive assist
+        add_player(&mut game, true, "att", FieldCoordinate::new(5, 5), ACTIVE_STANDING);
+        add_player(&mut game, false, "def", FieldCoordinate::new(10, 10), PRONE);
+        add_player(&mut game, false, "def2", FieldCoordinate::new(5, 6), ACTIVE_STANDING);
+        assert_eq!(UtilPlayer::find_defensive_foul_assists(&game, "att", "def"), 1);
     }
 }

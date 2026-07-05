@@ -10,10 +10,11 @@
 ///
 /// extraMvp option → wired (+1 each per team). mvpNominations option → wired (get_int).
 /// DEFERRED(Mvp-dialog): DialogPlayerChoiceParameter not yet ported.
-/// DEFERRED(Mvp-findPlayers): recovering_injury and NurglesRot player result filtering not yet ported.
+use ffb_model::enums::SendToBoxReason;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
+use crate::mechanic::spp_calc::SppCalc;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
 /// Java: `StepMvp` (bb2016/end).
@@ -75,26 +76,45 @@ impl StepMvp {
         let _ = mvp_nominations; // DEFERRED(mvp-dialog): nominations dialog loop not yet ported.
         // Auto-roll: pick one random player per side using rng.
         // Java: DiceRoller.randomPlayerId(findPlayerIdsForMvp(team)) — filter killed players.
-        // DEFERRED(Mvp-findPlayers): recovering_injury and NurglesRot result filtering not yet ported.
         if self.nr_of_home_choices < self.nr_of_home_mvps {
             let players: Vec<String> = game.team_home.players.iter()
                 .filter(|p| !game.field_model.player_state(&p.id).map(|s| s.is_killed()).unwrap_or(false))
+                .filter(|p| p.recovering_injury.is_none())
+                .filter(|p| game.game_result.home.player_result(&p.id)
+                    .map(|pr| pr.send_to_box_reason != Some(SendToBoxReason::NurglesRot))
+                    .unwrap_or(true))
                 .map(|p| p.id.clone())
                 .collect();
             if !players.is_empty() {
                 let idx = rng.range(players.len());
-                self.home_players_mvp.push(players[idx].clone());
+                let mvp_id = players[idx].clone();
+                let mvp_spp = SppCalc::mvp_spp(game.rules);
+                let pr = game.game_result.home.player_results.entry(mvp_id.clone()).or_default();
+                pr.mvp = true;
+                pr.player_awards += 1;
+                pr.spp_gained += mvp_spp;
+                self.home_players_mvp.push(mvp_id);
             }
             self.nr_of_home_choices += 1;
         }
         if self.nr_of_away_choices < self.nr_of_away_mvps {
             let players: Vec<String> = game.team_away.players.iter()
                 .filter(|p| !game.field_model.player_state(&p.id).map(|s| s.is_killed()).unwrap_or(false))
+                .filter(|p| p.recovering_injury.is_none())
+                .filter(|p| game.game_result.away.player_result(&p.id)
+                    .map(|pr| pr.send_to_box_reason != Some(SendToBoxReason::NurglesRot))
+                    .unwrap_or(true))
                 .map(|p| p.id.clone())
                 .collect();
             if !players.is_empty() {
                 let idx = rng.range(players.len());
-                self.away_players_mvp.push(players[idx].clone());
+                let mvp_id = players[idx].clone();
+                let mvp_spp = SppCalc::mvp_spp(game.rules);
+                let pr = game.game_result.away.player_results.entry(mvp_id.clone()).or_default();
+                pr.mvp = true;
+                pr.player_awards += 1;
+                pr.spp_gained += mvp_spp;
+                self.away_players_mvp.push(mvp_id);
             }
             self.nr_of_away_choices += 1;
         }
@@ -187,6 +207,32 @@ mod tests {
     }
 
     #[test]
+    fn mvp_player_result_updated_with_spp_and_award() {
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+        use std::collections::HashSet;
+        let mut game = make_game();
+        // Add a player to the home team so there's someone to pick.
+        game.team_home.players.push(Player {
+            id: "p1".into(), name: "Player1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+                    ..Default::default()
+});
+        let mut step = StepMvp::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        // The home MVP should have spp_gained = 5 (BB2016 mvp_spp) and mvp = true.
+        let mvp_id = step.home_players_mvp.first().cloned().unwrap();
+        let pr = game.game_result.home.player_results.get(&mvp_id).unwrap();
+        assert!(pr.mvp);
+        assert_eq!(pr.player_awards, 1);
+        assert_eq!(pr.spp_gained, 5); // SppCalc::mvp_spp(Rules::Bb2016) = 5
+    }
+
+    #[test]
     fn killed_player_is_not_eligible_for_mvp() {
         use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_RIP};
         use ffb_model::model::player::Player;
@@ -200,7 +246,8 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+                    ..Default::default()
+});
         game.field_model.set_player_state("dead1", PlayerState::new(PS_RIP));
         let mut step = StepMvp::new();
         step.start(&mut game, &mut GameRng::new(0));

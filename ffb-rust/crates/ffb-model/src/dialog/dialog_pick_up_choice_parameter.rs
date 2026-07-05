@@ -10,3 +10,16 @@ impl IDialogParameter for DialogPickUpChoiceParameter {
     fn get_id(&self) -> DialogId { DialogId::PICK_UP_CHOICE }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_pick_up_choice() {
+        assert_eq!(DialogPickUpChoiceParameter.get_id(), DialogId::PICK_UP_CHOICE);
+    }
+    #[test]
+    fn transform_preserves_id() {
+        assert_eq!(DialogPickUpChoiceParameter.transform().get_id(), DialogId::PICK_UP_CHOICE);
+    }
+}

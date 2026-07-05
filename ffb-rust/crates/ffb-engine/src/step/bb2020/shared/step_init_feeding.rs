@@ -72,6 +72,11 @@ mod tests {
     }
 
     #[test]
+    fn id_is_init_feeding() {
+        assert_eq!(StepInitFeeding::new("x".into()).id(), StepId::InitFeeding);
+    }
+
+    #[test]
     fn start_returns_cont() {
         let mut game = make_game();
         let mut step = StepInitFeeding::new("end".into());
@@ -91,5 +96,12 @@ mod tests {
         let mut step = StepInitFeeding::new("end".into());
         assert!(step.set_parameter(&StepParameter::EndTurn(true)));
         assert!(step.end_turn);
+    }
+
+    #[test]
+    fn set_parameter_feed_on_player_choice_accepted() {
+        let mut step = StepInitFeeding::new("end".into());
+        assert!(step.set_parameter(&StepParameter::FeedOnPlayerChoice(true)));
+        assert_eq!(step.feed_on_player_choice, Some(true));
     }
 }

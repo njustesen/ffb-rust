@@ -21,3 +21,18 @@ impl IDialogParameter for DialogUseIgorsParameter {
     fn get_id(&self) -> DialogId { DialogId::USE_IGORS }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_use_igors() {
+        assert_eq!(DialogUseIgorsParameter::default().get_id(), DialogId::USE_IGORS);
+    }
+    #[test]
+    fn stores_team_id_and_max_igors() {
+        let p = DialogUseIgorsParameter { team_id: Some("home".into()), max_igors: 2, ..Default::default() };
+        assert_eq!(p.get_team_id(), Some("home"));
+        assert_eq!(p.get_max_igors(), 2);
+    }
+}

@@ -11,13 +11,14 @@
 /// Receives: FOULER_HAS_BALL, ARGUE_THE_CALL_SUCCESSFUL.
 /// Publishes: END_TURN, CATCH_SCATTER_THROW_IN_MODE.
 ///
-/// DEFERRED(EjectPlayer-box): UtilBox.putPlayerIntoBox / refreshBoxes not yet ported.
 /// DEFERRED(EjectPlayer-wastedSkills): UtilServerGame.checkForWastedSkills not yet ported.
 /// DEFERRED(EjectPlayer-hooks): executeStepHooks not yet ported.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_box::UtilBox;
 use crate::action::Action;
 use crate::step::framework::{CatchScatterThrowInMode, Step, StepOutcome, StepId, StepParameter};
+use crate::util::util_server_game::UtilServerGame;
 
 /// Java: `StepEjectPlayer` (bb2016/foul).
 pub struct StepEjectPlayer {
@@ -38,9 +39,13 @@ impl StepEjectPlayer {
         }
     }
 
-    fn execute_step(&self, _game: &mut Game) -> StepOutcome {
-        // DEFERRED(EjectPlayer-box): UtilBox.putPlayerIntoBox — player stays on field model.
-        // DEFERRED(EjectPlayer-wastedSkills): UtilServerGame.checkForWastedSkills not yet ported.
+    fn execute_step(&self, game: &mut Game) -> StepOutcome {
+        if let Some(player_id) = game.acting_player.player_id.clone() {
+            UtilBox::put_player_into_box(game, &player_id);
+        }
+        UtilBox::refresh_boxes(game);
+        // DEFERRED(EjectPlayer-wastedSkills): checkForWastedSkills requires report infrastructure.
+        UtilServerGame::update_player_state_dependent_properties(game);
         let has_ball = self.fouler_has_ball.unwrap_or(false);
         if has_ball {
             StepOutcome::next()

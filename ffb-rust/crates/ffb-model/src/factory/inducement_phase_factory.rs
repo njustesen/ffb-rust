@@ -14,3 +14,25 @@ impl InducementPhaseFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_phase() {
+        assert_eq!(
+            InducementPhaseFactory::default().for_name("endOfOpponentTurn"),
+            Some(InducementPhase::EndOfOpponentTurn)
+        );
+        assert_eq!(
+            InducementPhaseFactory::default().for_name("startOfOwnTurn"),
+            Some(InducementPhase::StartOfOwnTurn)
+        );
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(InducementPhaseFactory::default().for_name("invalid"), None);
+    }
+}

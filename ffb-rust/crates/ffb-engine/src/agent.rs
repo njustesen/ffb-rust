@@ -270,13 +270,13 @@ impl Agent for RandomAgent {
             // Synced with Java ParityRunner BLOCK_ROLL dialog case.
             Some(AgentPrompt::BlockChoice { dice, .. }) => {
                 let idx = self.pick(dice.len().max(1));
-                Action::BlockChoice { die_index: idx }
+                Action::BlockChoice { die_index: idx, target_id: None }
             }
             // Block choice with re-roll properties: consume 1 decision_rng call for consistency.
             // Synced with Java ParityRunner BLOCK_ROLL_PROPERTIES case.
             Some(AgentPrompt::BlockChoiceProperties { .. }) => {
                 let _ = self.pick_bool();
-                Action::BlockChoice { die_index: 0 }
+                Action::BlockChoice { die_index: 0, target_id: None }
             }
             // Re-roll offer: uniformly sample use/decline — 1 decision_rng call.
             // Synced with Java ParityRunner RE_ROLL dialog case.
@@ -396,16 +396,39 @@ impl Agent for RandomAgent {
 /// `PlayerActionChoice` (for `Action::ActivatePlayer`). Covers the lineman-reachable set.
 fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
     match pa {
-        PlayerAction::Move       => PlayerActionChoice::Move,
+        PlayerAction::Move | PlayerAction::BlitzMove | PlayerAction::PassMove
+        | PlayerAction::HandOverMove | PlayerAction::FoulMove | PlayerAction::GazeMove
+        | PlayerAction::BlitzSelect | PlayerAction::KickTeamMateMove
+        | PlayerAction::PuntMove => PlayerActionChoice::Move,
         PlayerAction::Block      => PlayerActionChoice::Block,
         PlayerAction::Blitz      => PlayerActionChoice::Blitz,
-        PlayerAction::StandUp    => PlayerActionChoice::StandUp,
+        PlayerAction::StandUp | PlayerAction::RemoveConfusion => PlayerActionChoice::StandUp,
         PlayerAction::StandUpBlitz => PlayerActionChoice::StandUpBlitz,
         PlayerAction::Foul       => PlayerActionChoice::Foul,
-        PlayerAction::Pass       => PlayerActionChoice::Pass,
+        PlayerAction::Pass | PlayerAction::HailMaryPass | PlayerAction::DumpOff => PlayerActionChoice::Pass,
         PlayerAction::HandOver      => PlayerActionChoice::HandOff,
         PlayerAction::SecureTheBall => PlayerActionChoice::SecureTheBall,
-        other => unimplemented!("player_action_to_pac: unhandled {other:?}"),
+        PlayerAction::ThrowTeamMate | PlayerAction::ThrowTeamMateMove => PlayerActionChoice::ThrowTeamMate,
+        PlayerAction::KickTeamMate => PlayerActionChoice::KickTeamMate,
+        PlayerAction::Gaze | PlayerAction::GazeSelect | PlayerAction::LookIntoMyEyes
+        | PlayerAction::AutoGazeZoat => PlayerActionChoice::HypnoticGaze,
+        PlayerAction::ThrowBomb | PlayerAction::HailMaryBomb => PlayerActionChoice::ThrowBomb,
+        PlayerAction::Swoop => PlayerActionChoice::Swoop,
+        PlayerAction::Punt => PlayerActionChoice::Punt,
+        PlayerAction::BreatheFire => PlayerActionChoice::BreatheFire,
+        PlayerAction::ProjectileVomit | PlayerAction::PutridRegurgitationMove
+        | PlayerAction::PutridRegurgitationBlitz | PlayerAction::PutridRegurgitationBlock => PlayerActionChoice::ProjectileVomit,
+        PlayerAction::Chainsaw | PlayerAction::Stab => PlayerActionChoice::Stab,
+        // Skills that modify existing actions — treat as the underlying action type
+        PlayerAction::MultipleBlock | PlayerAction::KickEmBlock => PlayerActionChoice::Block,
+        PlayerAction::KickEmBlitz => PlayerActionChoice::Blitz,
+        // Special actions with no direct PAC equivalent — default to Move
+        PlayerAction::Treacherous | PlayerAction::WisdomOfTheWhiteDwarf | PlayerAction::ThrowKeg
+        | PlayerAction::RaidingParty | PlayerAction::MaximumCarnage | PlayerAction::BalefulHex
+        | PlayerAction::AllYouCanEat | PlayerAction::BlackInk | PlayerAction::CatchOfTheDay
+        | PlayerAction::ThenIStartedBlastin | PlayerAction::TheFlashingBlade
+        | PlayerAction::ViciousVines | PlayerAction::FuriousOutburst | PlayerAction::Chomp
+        | PlayerAction::Incorporeal | PlayerAction::Forgo => PlayerActionChoice::Move,
     }
 }
 

@@ -31,3 +31,19 @@ impl IDialogParameter for DialogBuyCardsAndInducementsParameter {
     fn get_id(&self) -> DialogId { DialogId::BUY_CARDS_AND_INDUCEMENTS }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_buy_cards_and_inducements() {
+        assert_eq!(DialogBuyCardsAndInducementsParameter::default().get_id(), DialogId::BUY_CARDS_AND_INDUCEMENTS);
+    }
+    #[test]
+    fn stores_gold_and_card_fields() {
+        let p = DialogBuyCardsAndInducementsParameter { available_gold: 80_000, card_slots: 2, can_buy_cards: true, ..Default::default() };
+        assert_eq!(p.get_available_gold(), 80_000);
+        assert_eq!(p.get_card_slots(), 2);
+        assert!(p.can_buy_cards());
+    }
+}

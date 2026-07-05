@@ -33,3 +33,34 @@ impl Default for DiceDecoration {
         DiceDecoration { coordinate: None, nr_of_dice: 0, block_kind: None }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::FieldCoordinate;
+
+    #[test]
+    fn new_stores_all_fields() {
+        let coord = FieldCoordinate::new(5, 7);
+        let d = DiceDecoration::new(coord, 2, BlockKind::BLOCK);
+        assert_eq!(d.get_coordinate(), Some(&coord));
+        assert_eq!(d.get_nr_of_dice(), 2);
+        assert_eq!(d.get_block_kind(), Some(BlockKind::BLOCK));
+    }
+
+    #[test]
+    fn transform_preserves_dice_count_and_block_kind() {
+        let d = DiceDecoration::new(FieldCoordinate::new(5, 3), 3, BlockKind::STAB);
+        let t = d.transform();
+        assert_eq!(t.get_nr_of_dice(), 3);
+        assert_eq!(t.get_block_kind(), Some(BlockKind::STAB));
+    }
+
+    #[test]
+    fn default_has_no_coordinate_or_block_kind() {
+        let d = DiceDecoration::default();
+        assert_eq!(d.get_coordinate(), None);
+        assert_eq!(d.get_block_kind(), None);
+        assert_eq!(d.get_nr_of_dice(), 0);
+    }
+}

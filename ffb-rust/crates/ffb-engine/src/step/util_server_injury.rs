@@ -63,6 +63,12 @@ pub fn handle_injury(
         injury_type.injury_context_mut().modified_injury_context = Some(modified);
     }
 
+    // Store the injury type's simple class name for post-hoc checks (e.g. isBlock()).
+    let type_name = injury_type.java_class_name();
+    if !type_name.is_empty() {
+        injury_type.injury_context_mut().injury_type_name = Some(type_name.to_string());
+    }
+
     let knocked_out = injury_type.injury_context().is_knocked_out();
     let rip = injury_type.injury_context().injury
         .map(|s| s.base() == PS_RIP).unwrap_or(false);
@@ -106,6 +112,7 @@ fn evaluate_injury_context(
         if defender.map(|d| d.has_skill_property(NamedProperties::REQUIRES_SECOND_CASUALTY_ROLL)).unwrap_or(false) {
             ctx.serious_injury_decay = interpret_serious_injury_roll(ctx.casualty_roll);
         }
+        // NOTE: decay roll (casualty_roll_decay) not yet implemented; Decay skill path deferred
     }
 
     // Java lines 115–118: stun → KO conversion
@@ -163,8 +170,9 @@ fn evaluate_injury_context(
 
 /// Maps the stored casualty roll to a `SeriousInjuryKind` using the BB2025 table.
 /// Port of `RollMechanic.interpretSeriousInjuryRoll()` (simplified, no modifiers yet).
-fn interpret_serious_injury_roll(casualty_roll: Option<i32>) -> Option<SeriousInjuryKind> {
-    casualty_roll.and_then(ffb_mechanics::injury::serious_injury_kind_bb2025)
+fn interpret_serious_injury_roll(casualty_roll: Option<[i32; 2]>) -> Option<SeriousInjuryKind> {
+    // Uses d16 (index 0) for the BB2025 table lookup
+    casualty_roll.and_then(|r| ffb_mechanics::injury::serious_injury_kind_bb2025(r[0]))
 }
 
 /// Dispatch `InjuryMechanic.canUseApo()` to the appropriate edition mechanic.
@@ -307,6 +315,20 @@ pub fn drop_player_no_sph(game: &mut Game, player_id: &str) -> Vec<StepParameter
     drop_player(game, player_id, false)
 }
 
+// ── stun_player ───────────────────────────────────────────────────────────────
+
+/// Port of `UtilServerInjury.stunPlayer()`.
+///
+/// Directly sets a player to Stunned (no armor or injury roll), preserving any
+/// existing state bits (rooted, active) except the base state.
+/// Used by PitchInvasion and similar effects.
+pub fn stun_player(game: &mut Game, player_id: &str) {
+    if let Some(state) = game.field_model.player_state(player_id) {
+        let new_state = state.change_base(PS_STUNNED);
+        game.field_model.set_player_state(player_id, new_state);
+    }
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -339,7 +361,8 @@ mod tests {
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
-        });
+            ..Default::default()
+});
         game.field_model.set_player_coordinate(id, pos);
         game.field_model.set_player_state(id, PlayerState::new(state));
         pos
@@ -624,7 +647,8 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+            ..Default::default()
+});
         game.field_model.set_player_coordinate("p2", FieldCoordinate::new(26, 5));
         game.field_model.set_player_state("p2", PlayerState::new(PS_STANDING));
         let params = drop_player_no_sph(&mut game, "p2");
@@ -632,6 +656,22 @@ mod tests {
         // state unchanged
         let state = game.field_model.player_state("p2").unwrap();
         assert_eq!(state.base(), PS_STANDING);
+    }
+
+    #[test]
+    fn stun_player_sets_stunned_state() {
+        let mut game = make_game();
+        add_player(&mut game, "p1", PS_STANDING);
+        stun_player(&mut game, "p1");
+        let state = game.field_model.player_state("p1").unwrap();
+        assert_eq!(state.base(), PS_STUNNED);
+    }
+
+    #[test]
+    fn stun_player_noop_for_unknown_player() {
+        let mut game = make_game();
+        // No panic — just a no-op
+        stun_player(&mut game, "does_not_exist");
     }
 
     #[test]

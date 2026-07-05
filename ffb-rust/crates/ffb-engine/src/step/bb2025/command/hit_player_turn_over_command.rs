@@ -32,4 +32,11 @@ mod tests {
         let params = cmd.execute(&mut game);
         assert!(params.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
     }
+
+    #[test]
+    fn publishes_exactly_one_param() {
+        let mut game = make_game();
+        let params = HitPlayerTurnOverCommand.execute(&mut game);
+        assert_eq!(params.len(), 1);
+    }
 }

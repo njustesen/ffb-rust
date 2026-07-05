@@ -525,7 +525,7 @@ mod tests {
     #[test]
     fn bb2016_si_table_die5_stat_effects() {
         assert_eq!(serious_injury_bb2016(5, 1), Some(SeriousInjuryKind::SeriousInjuryNi)); // NI
-        assert_eq!(serious_injury_bb2016(5, 2), Some(SeriousInjuryKind::SmashedKneeB2016)); // -MA
+        assert_eq!(serious_injury_bb2016(5, 2), Some(SeriousInjuryKind::SmashedKneeB2016)); // NI (Smashed Knee BB2016)
         assert_eq!(serious_injury_bb2016(5, 5), Some(SeriousInjuryKind::HeadInjuryAv)); // -AV
         assert_eq!(serious_injury_bb2016(5, 7), Some(SeriousInjuryKind::NeckInjuryAg)); // -AG
         assert_eq!(serious_injury_bb2016(5, 8), Some(SeriousInjuryKind::BrokenCollarBone)); // -ST

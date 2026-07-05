@@ -32,3 +32,23 @@ impl SpecialEffect {
             .iter().copied().find(|v| v.get_name().eq_ignore_ascii_case(name))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lightning_is_wizard_spell() {
+        assert!(SpecialEffect::LIGHTNING.is_wizard_spell());
+    }
+
+    #[test]
+    fn bomb_is_not_wizard_spell() {
+        assert!(!SpecialEffect::BOMB.is_wizard_spell());
+    }
+
+    #[test]
+    fn for_name_round_trip() {
+        assert_eq!(SpecialEffect::for_name("lightning"), Some(SpecialEffect::LIGHTNING));
+    }
+}

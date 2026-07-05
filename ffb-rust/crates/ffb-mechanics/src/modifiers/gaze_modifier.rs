@@ -64,3 +64,26 @@ impl GazeModifier {
         self.applies_to_context.as_ref().map(|f| f(context)).unwrap_or(true)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_stores_fields() {
+        let m = GazeModifier::new("1 Tacklezone", 1, ModifierType::TACKLEZONE);
+        assert_eq!(m.get_name(), "1 Tacklezone");
+        assert_eq!(m.get_modifier(), 1);
+        assert_eq!(m.get_type(), ModifierType::TACKLEZONE);
+    }
+
+    #[test]
+    fn tacklezone_is_modifier_included() {
+        assert!(GazeModifier::new("tz", 1, ModifierType::TACKLEZONE).is_modifier_included());
+    }
+
+    #[test]
+    fn regular_is_not_modifier_included() {
+        assert!(!GazeModifier::new("x", 0, ModifierType::REGULAR).is_modifier_included());
+    }
+}

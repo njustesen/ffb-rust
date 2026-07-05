@@ -1,10 +1,42 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct SessionMode;
-
-impl SessionMode {
-    pub fn new() -> Self { Self }
+/// 1:1 translation of `com.fumbbl.ffb.server.SessionMode`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SessionMode {
+    Home,
+    Away,
+    Spec,
+    Admin,
+    Dev,
 }
 
-impl Default for SessionMode {
-    fn default() -> Self { Self::new() }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn all_variants_are_distinct() {
+        let variants = [
+            SessionMode::Home,
+            SessionMode::Away,
+            SessionMode::Spec,
+            SessionMode::Admin,
+            SessionMode::Dev,
+        ];
+        for i in 0..variants.len() {
+            for j in (i + 1)..variants.len() {
+                assert_ne!(variants[i], variants[j]);
+            }
+        }
+    }
+
+    #[test]
+    fn home_is_not_away() {
+        assert_ne!(SessionMode::Home, SessionMode::Away);
+    }
+
+    #[test]
+    fn copy_semantics() {
+        let a = SessionMode::Admin;
+        let b = a;
+        assert_eq!(a, b);
+    }
 }

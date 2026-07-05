@@ -25,3 +25,29 @@ impl InterceptionModifierCollection {
 impl Default for InterceptionModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_twenty_modifiers() {
+        // base 11 disturbing_presence + 1 pouring_rain + 8 tacklezone = 20
+        assert_eq!(InterceptionModifierCollection::new().get_modifiers().len(), 20);
+    }
+
+    #[test]
+    fn includes_tacklezone_modifiers() {
+        let col = InterceptionModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "1 Tacklezone"));
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "8 Tacklezones"));
+    }
+
+    #[test]
+    fn tacklezone_count_is_eight() {
+        let col = InterceptionModifierCollection::new();
+        use crate::modifiers::modifier_type::ModifierType;
+        let tz_count = col.get_modifiers().iter().filter(|m| m.get_type() == ModifierType::TACKLEZONE).count();
+        assert_eq!(tz_count, 8);
+    }
+}

@@ -4,7 +4,8 @@ use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
-use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll};
+use ffb_mechanics::modifiers::niggling_injury_modifier;
+use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
 use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury};
 
 pub struct InjuryTypeBlockProne { ctx: InjuryContext }
@@ -21,12 +22,15 @@ impl InjuryTypeServer for InjuryTypeBlockProne {
 }
 impl ModificationAwareInjuryType for InjuryTypeBlockProne {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
-        // TODO: add defender blocksLikeChainsaw / ignoresArmourModifiersFromSkills armor modifiers
         do_armor_roll(game, rng, &mut self.ctx, defender_id);
     }
-    fn injury_roll(&mut self, _game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, _defender_id: &str) {
-        // TODO: add stunty injury modifier when InjuryModifierFactory is ported
-        do_injury_roll(rng, &mut self.ctx);
+    fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str) {
+        if let Some(defender) = game.player(defender_id) {
+            if let Some(m) = niggling_injury_modifier(defender.niggling_injuries) {
+                self.ctx.add_injury_modifier(m);
+            }
+        }
+        do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
     }
     // savedByArmour: default PRONE
 }
@@ -45,7 +49,8 @@ mod tests {
             gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
             passing: 4, armour, starting_skills: vec![], extra_skills: vec![],
             temporary_skills: vec![], used_skills: HashSet::new(),
-            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None });
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default() });
         Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2025)
     }
     fn coord() -> FieldCoordinate { FieldCoordinate::new(5, 5) }

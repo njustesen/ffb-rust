@@ -24,3 +24,33 @@ impl TemporaryEnhancements {
 impl Default for TemporaryEnhancements {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_starts_empty() {
+        let e = TemporaryEnhancements::new();
+        assert!(e.get_modifiers().is_empty());
+        assert!(e.get_skills().is_empty());
+        assert!(e.get_properties().is_empty());
+        assert!(e.get_stat_modifiers().is_empty());
+    }
+
+    #[test]
+    fn can_add_modifier_string() {
+        let mut e = TemporaryEnhancements::new();
+        e.modifiers.insert("Block".into());
+        assert!(e.get_modifiers().contains("Block"));
+    }
+
+    #[test]
+    fn can_add_skill_and_property() {
+        let mut e = TemporaryEnhancements::new();
+        e.skills.insert("Dodge".into());
+        e.properties.insert("canUseOwnTackleZone".into());
+        assert!(e.get_skills().contains("Dodge"));
+        assert!(e.get_properties().contains("canUseOwnTackleZone"));
+    }
+}

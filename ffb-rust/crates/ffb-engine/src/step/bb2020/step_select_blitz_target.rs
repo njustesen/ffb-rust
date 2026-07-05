@@ -154,11 +154,16 @@ impl StepSelectBlitzTarget {
         if is_on_inactive_team {
             // Selected an opponent → valid blitz target
             game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
-            // DEFERRED(select_blitz_target): add SelectedBlitzTarget state bit not translated.
-            // Java: setTargetSelectionState(new TargetSelectionState(selectedPlayerId).select().commit())
+            // Java: getFieldModel().getPlayerState(targetPlayer).addSelectedBlitzTarget()
+            if let Some(state) = game.field_model.player_state(&selected_id) {
+                game.field_model.set_player_state(&selected_id, state.add_selected_blitz_target());
+            }
+            // Java: new TargetSelectionState(selectedPlayerId) → conditional commit → select()
             let mut ts = TargetSelectionState::new(selected_id.clone());
+            if game.acting_player.has_acted {
+                ts.commit();
+            }
             ts.select();
-            ts.commit();
             game.field_model.target_selection_state = Some(ts);
             // DEFERRED(select_blitz_target): usedSkill skill-enhancements not translated.
             let attacker_id = game.acting_player.player_id.clone().unwrap_or_default();
@@ -232,6 +237,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.field_model.set_player_coordinate(&pid, FieldCoordinate::new(10, 7));
         game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
@@ -349,6 +355,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.field_model.set_player_coordinate(&pid, FieldCoordinate::new(10, 7));
         // KO state cannot be blocked
@@ -373,10 +380,76 @@ mod tests {
     }
 
     #[test]
-    fn selecting_opponent_sets_target_selection_state_selected() {
+    fn selecting_opponent_with_acted_sets_target_selection_state_selected_and_committed() {
         use ffb_model::model::player::Player;
         use ffb_model::enums::{PlayerType, PlayerGender};
         use ffb_model::model::target_selection_state::TargetSelectionState;
+
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("home_p1".into());
+        game.acting_player.has_acted = true;
+
+        let pid = "away_p1".to_string();
+        game.team_away.players.push(Player {
+            id: pid.clone(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate(&pid, FieldCoordinate::new(10, 7));
+        game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
+
+        let mut step = StepSelectBlitzTarget::new();
+        step.selected_player_id = Some(pid.clone());
+        step.start(&mut game, &mut GameRng::new(0));
+
+        let ts = game.field_model.target_selection_state.as_ref().unwrap();
+        assert!(ts.is_selected());
+        assert!(ts.is_committed());
+        assert_eq!(ts.get_selected_player_id().map(|id| id.as_str()), Some(pid.as_str()));
+    }
+
+    #[test]
+    fn selecting_opponent_without_acted_does_not_commit_target_selection() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::model::target_selection_state::TargetSelectionState;
+
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("home_p1".into());
+        game.acting_player.has_acted = false;
+
+        let pid = "away_p1".to_string();
+        game.team_away.players.push(Player {
+            id: pid.clone(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate(&pid, FieldCoordinate::new(10, 7));
+        game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
+
+        let mut step = StepSelectBlitzTarget::new();
+        step.selected_player_id = Some(pid.clone());
+        step.start(&mut game, &mut GameRng::new(0));
+
+        let ts = game.field_model.target_selection_state.as_ref().unwrap();
+        assert!(ts.is_selected());
+        assert!(!ts.is_committed());
+    }
+
+    #[test]
+    fn selecting_opponent_adds_selected_blitz_target_bit() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
 
         let mut game = make_game();
         game.home_playing = true;
@@ -390,6 +463,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.field_model.set_player_coordinate(&pid, FieldCoordinate::new(10, 7));
         game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
@@ -398,10 +472,8 @@ mod tests {
         step.selected_player_id = Some(pid.clone());
         step.start(&mut game, &mut GameRng::new(0));
 
-        let ts = game.field_model.target_selection_state.as_ref().unwrap();
-        assert!(ts.is_selected());
-        assert!(ts.is_committed());
-        assert_eq!(ts.get_selected_player_id().map(|id| id.as_str()), Some(pid.as_str()));
+        let state = game.field_model.player_state(&pid).unwrap();
+        assert!(state.is_selected_blitz_target());
     }
 
     #[test]
@@ -434,6 +506,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.field_model.set_player_coordinate("defender", FieldCoordinate::new(5, 5));
         game.field_model.set_player_state("defender", PlayerState::new(PS_STANDING));

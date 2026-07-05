@@ -128,7 +128,8 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+            ..Default::default()
+});
         game.field_model.set_player_coordinate(id, pos);
         game.field_model.set_player_state(id, ffb_model::enums::PlayerState::new(PS_STANDING));
         game.acting_player.set_player(id.into(), PlayerAction::Foul);
@@ -164,7 +165,8 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+            ..Default::default()
+});
         game.acting_player.set_player("att".into(), PlayerAction::Foul);
         let mut rng = GameRng::new(0);
         let outcome = step.start(&mut game, &mut rng);

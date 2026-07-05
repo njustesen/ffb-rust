@@ -43,3 +43,27 @@ impl ThrowInMechanicTrait for ThrowInMechanic {
 impl ThrowInMechanic {
     pub fn new() -> Self { ThrowInMechanic }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::throw_in_mechanic::ThrowInMechanic as ThrowInTrait;
+
+    #[test]
+    fn distance_sums_two_dice_plus_one() {
+        // bb2020 adds 1 to the total
+        assert_eq!(ThrowInMechanic.distance(&[3, 4]), 8);
+    }
+
+    #[test]
+    fn direction_from_south_edge_roll_1_is_southeast() {
+        let dir = ThrowInMechanic.interpret_throw_in_direction_roll(FieldCoordinate::new(12, 0), 1);
+        assert_eq!(dir, Direction::Southeast);
+    }
+
+    #[test]
+    fn direction_from_north_edge_roll_4_is_north() {
+        let dir = ThrowInMechanic.interpret_throw_in_direction_roll(FieldCoordinate::new(12, 14), 4);
+        assert_eq!(dir, Direction::North);
+    }
+}

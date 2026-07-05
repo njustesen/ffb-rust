@@ -1,10 +1,56 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct SelectPlayerPrayerHandler;
+/// 1:1 translation of `com.fumbbl.ffb.server.inducements.mixed.prayers.SelectPlayerPrayerHandler`.
+/// Abstract handler that shows a dialog for the coach to pick a player.
+/// DEFERRED — dialog system not yet ported.
+use ffb_model::model::game::Game;
+use crate::prayer_state::PrayerState;
 
-impl SelectPlayerPrayerHandler {
-    pub fn new() -> Self { Self }
+/// Java: SelectPlayerPrayerHandler.initEffect — opens dialog, returns false (waiting).
+pub fn init_effect_select_player(
+    _prayer_state: &mut PrayerState,
+    _game: &Game,
+    _team_id: &str,
+    _prayer_name: &str,
+) -> bool {
+    // DEFERRED(prayer-dialog): needs UtilServerDialog.showDialog + player candidate list
+    false
 }
 
-impl Default for SelectPlayerPrayerHandler {
-    fn default() -> Self { Self::new() }
+/// Java: SelectPlayerPrayerHandler.applySelection — applies enhancement after dialog.
+pub fn apply_selection_select_player(
+    _game: &mut Game,
+    _player_id: &str,
+    _prayer_name: &str,
+) {
+    // DEFERRED(prayer-dialog): needs fieldModel.addPrayerEnhancements
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_game() -> Game {
+        use ffb_model::enums::Rules;
+        use crate::step::framework::test_team;
+        Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020)
+    }
+
+    #[test]
+    fn init_effect_returns_false_waiting_for_dialog() {
+        let mut state = PrayerState::new();
+        let game = make_game();
+        assert!(!init_effect_select_player(&mut state, &game, "team1", "KNUCKLE_DUSTERS"));
+    }
+
+    #[test]
+    fn apply_selection_is_callable() {
+        let mut game = make_game();
+        apply_selection_select_player(&mut game, "player1", "KNUCKLE_DUSTERS");
+    }
+
+    #[test]
+    fn init_effect_returns_false_for_iron_man() {
+        let mut state = PrayerState::new();
+        let game = make_game();
+        assert!(!init_effect_select_player(&mut state, &game, "team1", "IRON_MAN"));
+    }
 }

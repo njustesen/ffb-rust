@@ -1,5 +1,6 @@
 use ffb_model::enums::TurnMode;
 use ffb_model::events::GameEvent;
+use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
 use ffb_model::model::SpecialEffect;
 use ffb_model::types::FieldCoordinate;
@@ -7,6 +8,7 @@ use ffb_model::util::rng::GameRng;
 use crate::action::{Action, WizardSpellChoice};
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::generator::bb2016::special_effect::{SpecialEffect as SpecialEffectGenerator, SpecialEffectParams};
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2016.StepWizard.
 ///
@@ -118,25 +120,50 @@ impl StepWizard {
 
         if let (Some(spell), Some(coord)) = (self.wizard_spell, self.target_coordinate) {
             if game.turn_mode == TurnMode::Wizard {
-                // Java: use inducement, collect affected players, push SpecialEffect sequences
-                // Java: ZAP → 1 player at coord
-                // Java: LIGHTNING → 1 player at coord
-                // Java: FIREBALL → 1 + 8 adjacent players (3×3)
-                // DEFERRED(useInducement): UtilServerInducementUse.useInducement not yet ported.
-                // DEFERRED(generator): SequenceGeneratorFactory.SpecialEffect.pushSequence not yet ported.
                 // Restore old turn mode
                 if let Some(old_mode) = self.old_turn_mode {
                     game.turn_mode = old_mode;
                 }
-                // Java: getResult().addReport(new ReportWizardUse(gameState.getActingTeam().getId(), spell, coord))
+                // Java: UtilServerInducementUse.useInducement — mark wizard inducement as used
+                let inducement_id = if self.home_team {
+                    game.turn_data_home.inducement_set.for_usage(Usage::SPELL).map(|s| s.to_string())
+                } else {
+                    game.turn_data_away.inducement_set.for_usage(Usage::SPELL).map(|s| s.to_string())
+                };
+                if let Some(type_id) = inducement_id {
+                    if self.home_team {
+                        game.turn_data_home.inducement_set.use_one_of(&type_id);
+                    } else {
+                        game.turn_data_away.inducement_set.use_one_of(&type_id);
+                    }
+                }
                 let team_id = if self.home_team { game.team_home.id.clone() } else { game.team_away.id.clone() };
                 let wizard_event = GameEvent::WizardUse {
                     team_id,
                     spell: format!("{:?}", spell),
                     coord: Some(self.transform_coord(coord, game)),
                 };
-                // DEFERRED(generator): SpecialEffect sequences per player not yet ported.
-                return StepOutcome::next().with_event(wizard_event);
+                // Collect affected player IDs: ZAP/LIGHTNING → player at coord; FIREBALL → 3×3 area.
+                let spell_key = format!("{:?}", spell);
+                let affected: Vec<String> = if spell == SpecialEffect::FIREBALL {
+                    let mut coords = vec![coord];
+                    coords.extend(game.field_model.adjacent_on_pitch(coord));
+                    coords.iter()
+                        .filter_map(|c| game.field_model.player_at(*c).cloned())
+                        .collect()
+                } else {
+                    game.field_model.player_at(coord).cloned().into_iter().collect()
+                };
+                let mut out = StepOutcome::next().with_event(wizard_event);
+                for player_id in affected {
+                    let seq = SpecialEffectGenerator::build_sequence(&SpecialEffectParams {
+                        special_effect: Some(spell_key.clone()),
+                        player_id: Some(player_id),
+                        roll_for_effect: true,
+                    });
+                    out = out.push_seq(seq);
+                }
+                return out;
             }
         }
 

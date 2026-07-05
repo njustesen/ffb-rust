@@ -54,4 +54,22 @@ mod tests {
         assert_eq!(last.step_id, StepId::EndThenIStartedBlastin);
         assert_eq!(last.label.as_deref(), Some(labels::END));
     }
+
+    #[test]
+    fn first_step_is_then_i_started_blastin() {
+        let steps = ThenIStartedBlastin::build_sequence();
+        assert_eq!(steps[0].step_id, StepId::ThenIStartedBlastin);
+    }
+
+    #[test]
+    fn first_step_has_goto_label_on_end() {
+        let steps = ThenIStartedBlastin::build_sequence();
+        assert!(steps[0].params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnEnd(_))));
+    }
+
+    #[test]
+    fn contains_apothecary_step() {
+        let steps = ThenIStartedBlastin::build_sequence();
+        assert!(steps.iter().any(|s| s.step_id == StepId::Apothecary));
+    }
 }

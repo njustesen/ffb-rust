@@ -21,3 +21,25 @@ impl IDialogParameter for DialogInterceptionParameter {
     fn get_id(&self) -> DialogId { DialogId::INTERCEPTION }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dialog_id_is_interception() {
+        assert_eq!(DialogInterceptionParameter::default().get_id(), DialogId::INTERCEPTION);
+    }
+
+    #[test]
+    fn stores_thrower_id_and_skill() {
+        let p = DialogInterceptionParameter {
+            thrower_id: Some("t1".into()),
+            interception_skill: Some(SkillId::Catch),
+            skill_mnemonic: 42,
+        };
+        assert_eq!(p.get_thrower_id(), Some("t1"));
+        assert_eq!(p.get_interception_skill(), Some(SkillId::Catch));
+        assert_eq!(p.get_skill_mnemonic(), 42);
+    }
+}

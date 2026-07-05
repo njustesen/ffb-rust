@@ -65,3 +65,27 @@ impl JumpModifier {
         self.applies_to_context.as_ref().map(|f| f(context)).unwrap_or(true)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_stores_fields() {
+        let m = JumpModifier::new("1 Tacklezone", 1, ModifierType::TACKLEZONE);
+        assert_eq!(m.get_name(), "1 Tacklezone");
+        assert_eq!(m.get_modifier(), 1);
+        assert_eq!(m.get_type(), ModifierType::TACKLEZONE);
+        assert_eq!(m.get_multiplier(), 1);
+    }
+
+    #[test]
+    fn tacklezone_is_modifier_included() {
+        assert!(JumpModifier::new("tz", 1, ModifierType::TACKLEZONE).is_modifier_included());
+    }
+
+    #[test]
+    fn regular_is_not_modifier_included() {
+        assert!(!JumpModifier::new("x", 0, ModifierType::REGULAR).is_modifier_included());
+    }
+}

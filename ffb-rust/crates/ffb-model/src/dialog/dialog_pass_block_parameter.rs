@@ -10,3 +10,16 @@ impl IDialogParameter for DialogPassBlockParameter {
     fn get_id(&self) -> DialogId { DialogId::PASS_BLOCK }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_pass_block() {
+        assert_eq!(DialogPassBlockParameter.get_id(), DialogId::PASS_BLOCK);
+    }
+    #[test]
+    fn transform_preserves_id() {
+        assert_eq!(DialogPassBlockParameter.transform().get_id(), DialogId::PASS_BLOCK);
+    }
+}

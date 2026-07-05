@@ -24,3 +24,46 @@ impl StatBasedRollModifierFactory {
         StatBasedRollModifier::new(&self.name, value)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::enums::{PlayerType, PlayerGender};
+
+    fn player_with_stats(agility: i32, strength: i32, armour: i32) -> Player {
+        Player {
+            id: "p".into(), name: "p".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength, agility, passing: 4, armour,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn create_with_ag_reads_agility() {
+        let factory = StatBasedRollModifierFactory::new("Agility", PlayerStatKey::AG);
+        let p = player_with_stats(3, 4, 8);
+        let m = factory.create(&p);
+        assert_eq!(m.get_modifier(), 3);
+        assert_eq!(m.get_report_string(), "Agility");
+    }
+
+    #[test]
+    fn create_with_st_reads_strength() {
+        let factory = StatBasedRollModifierFactory::new("Strength", PlayerStatKey::ST);
+        let p = player_with_stats(3, 5, 8);
+        let m = factory.create(&p);
+        assert_eq!(m.get_modifier(), 5);
+    }
+
+    #[test]
+    fn create_with_av_reads_armour() {
+        let factory = StatBasedRollModifierFactory::new("Armour", PlayerStatKey::AV);
+        let p = player_with_stats(3, 4, 9);
+        let m = factory.create(&p);
+        assert_eq!(m.get_modifier(), 9);
+    }
+}

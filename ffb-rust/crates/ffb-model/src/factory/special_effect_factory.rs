@@ -14,3 +14,19 @@ impl SpecialEffectFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_effect() {
+        let f = SpecialEffectFactory::default();
+        assert!(f.for_name("LIGHTNING").is_some() || f.for_name("lightning").is_some() || f.for_name("Lightning").is_some());
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(SpecialEffectFactory::default().for_name("NOT_VALID"), None);
+    }
+}

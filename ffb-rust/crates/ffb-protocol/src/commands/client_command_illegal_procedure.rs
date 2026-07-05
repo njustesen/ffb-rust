@@ -1,10 +1,23 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
+/// 1:1 translation of `com.fumbbl.ffb.net.commands.ClientCommandIllegalProcedure`.
+/// Sent when a coach invokes the Illegal Procedure ruling (no payload).
+#[derive(Debug, Clone, Default)]
 pub struct ClientCommandIllegalProcedure;
 
 impl ClientCommandIllegalProcedure {
     pub fn new() -> Self { Self }
 }
 
-impl Default for ClientCommandIllegalProcedure {
-    fn default() -> Self { Self::new() }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn can_construct() {
+        let _ = ClientCommandIllegalProcedure::new();
+    }
+
+    #[test]
+    fn default_same_as_new() {
+        let _ = ClientCommandIllegalProcedure::default();
+    }
 }

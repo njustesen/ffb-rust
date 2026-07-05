@@ -141,3 +141,38 @@ impl ISeriousInjury for SeriousInjury {
         false
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dead_is_dead() {
+        assert!(SeriousInjury::DEAD.is_dead());
+    }
+
+    #[test]
+    fn broken_ribs_is_not_dead() {
+        assert!(!SeriousInjury::BROKEN_RIBS.is_dead());
+    }
+
+    #[test]
+    fn broken_neck_has_ag_attribute() {
+        assert_eq!(SeriousInjury::BROKEN_NECK.get_injury_attribute(), Some(InjuryAttribute::AG));
+    }
+
+    #[test]
+    fn broken_ribs_has_no_attribute() {
+        assert_eq!(SeriousInjury::BROKEN_RIBS.get_injury_attribute(), None);
+    }
+
+    #[test]
+    fn poisoned_is_poison() {
+        assert!(SeriousInjury::POISONED.is_poison());
+    }
+
+    #[test]
+    fn dead_name_contains_rip() {
+        assert!(SeriousInjury::DEAD.get_name().contains("RIP"));
+    }
+}

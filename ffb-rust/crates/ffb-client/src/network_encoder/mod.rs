@@ -52,7 +52,7 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
             Some(ClientCommand::ClientBlock(ClientBlock { defender_id }))
         }
 
-        Action::BlockChoice { die_index } => {
+        Action::BlockChoice { die_index, .. } => {
             Some(ClientCommand::ClientBlockChoice(ClientBlockChoice {
                 selected_die_index: die_index as i32,
             }))
@@ -174,6 +174,8 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
 
         Action::PlayCard { card_id: _, target_player_id: _ } => Some(ClientCommand::ClientConfirm(ClientConfirm)),
 
+        Action::UseInducement { inducement_type: _, card_id: _, player_ids: _ } => Some(ClientCommand::ClientConfirm(ClientConfirm)),
+
         Action::Acknowledge => None,
 
         Action::MultiBlock { defender1_id, defender2_id: _ } => {
@@ -217,7 +219,7 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
         // Block-specific re-roll actions: not yet encoded in the Java protocol.
         // Java uses dedicated command types (ClientCommandUseBrawler, etc.) but these
         // are not yet added to ffb-protocol. The engine handles these internally.
-        Action::UseBrawler => None,
+        Action::UseBrawler { .. } => None,
         Action::UseHatred => None,
         Action::UseProReRollForBlock { .. } => None,
         Action::UseConsummateReRollForBlock { .. } => None,
@@ -243,6 +245,23 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
         // Game lifecycle: CLIENT_START_GAME — not yet wired to a protocol command.
         // DEFERRED(protocol): add ClientCommandStartGame to ffb-protocol and map here.
         Action::StartGame { .. } => None,
+
+        // Java: ClientCommandBloodlustAction — maps to ClientConfirm as a fallback.
+        Action::BloodlustAction { .. } => Some(ClientCommand::ClientConfirm(ClientConfirm)),
+
+        // Java: ClientCommandPettyCash — team_id determined by home flag.
+        Action::PettyCash { home, amount } => {
+            let team_id = if active_player_id.is_some() {
+                // Use the active player id as a proxy; caller knows which team
+                active_player_id.unwrap_or("").to_string()
+            } else {
+                (if home { "home" } else { "away" }).to_string()
+            };
+            Some(ClientCommand::ClientPettyCash(ffb_protocol::client_commands::ClientPettyCash {
+                team_id,
+                amount,
+            }))
+        },
     }
 }
 
@@ -354,7 +373,7 @@ mod tests {
 
     #[test]
     fn encode_block_choice() {
-        if let ClientCommand::ClientBlockChoice(c) = enc(Action::BlockChoice { die_index: 2 }) {
+        if let ClientCommand::ClientBlockChoice(c) = enc(Action::BlockChoice { die_index: 2, target_id: None }) {
             assert_eq!(c.selected_die_index, 2);
         } else { panic!("expected ClientBlockChoice") }
     }

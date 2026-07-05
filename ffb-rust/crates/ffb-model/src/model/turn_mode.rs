@@ -97,3 +97,54 @@ impl TurnMode {
         ]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn regular_is_basic_mode() {
+        assert!(TurnMode::REGULAR.is_basic_mode());
+    }
+
+    #[test]
+    fn blitz_is_basic_mode() {
+        assert!(TurnMode::BLITZ.is_basic_mode());
+    }
+
+    #[test]
+    fn setup_is_not_basic_mode() {
+        assert!(!TurnMode::SETUP.is_basic_mode());
+    }
+
+    #[test]
+    fn bomb_home_is_bomb_turn() {
+        assert!(TurnMode::BOMB_HOME.is_bomb_turn());
+    }
+
+    #[test]
+    fn regular_is_not_bomb_turn() {
+        assert!(!TurnMode::REGULAR.is_bomb_turn());
+    }
+
+    #[test]
+    fn regular_checks_negatraits() {
+        assert!(TurnMode::REGULAR.check_negatraits());
+    }
+
+    #[test]
+    fn pass_block_does_not_check_negatraits() {
+        assert!(!TurnMode::PASS_BLOCK.check_negatraits());
+    }
+
+    #[test]
+    fn for_name_round_trip() {
+        assert_eq!(TurnMode::for_name("regular"), Some(TurnMode::REGULAR));
+        assert_eq!(TurnMode::for_name("blitz"), Some(TurnMode::BLITZ));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(TurnMode::for_name("notATurnMode"), None);
+    }
+}

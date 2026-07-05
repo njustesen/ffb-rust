@@ -18,3 +18,17 @@ impl IDialogParameter for DialogWinningsReRollParameter {
     fn get_id(&self) -> DialogId { DialogId::WINNINGS_RE_ROLL }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_winnings_re_roll() {
+        assert_eq!(DialogWinningsReRollParameter::default().get_id(), DialogId::WINNINGS_RE_ROLL);
+    }
+    #[test]
+    fn stores_old_roll() {
+        let p = DialogWinningsReRollParameter { old_roll: 3, ..Default::default() };
+        assert_eq!(p.get_old_roll(), 3);
+    }
+}

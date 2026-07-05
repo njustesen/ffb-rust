@@ -3,6 +3,10 @@ use ffb_model::model::game::Game;
 use ffb_model::util::passing::passing_distance;
 use ffb_model::util::rng::GameRng;
 use ffb_mechanics::bb2020::pass_mechanic::PassMechanic as Bb2020PassMechanic;
+use ffb_mechanics::modifiers::modifier_type::ModifierType;
+use ffb_mechanics::modifiers::pass_context::PassContext;
+use ffb_mechanics::modifiers::pass_modifier::PassModifier;
+use ffb_mechanics::modifiers::pass_modifier_factory::PassModifierFactory;
 use ffb_mechanics::pass_mechanic::PassMechanic;
 use ffb_mechanics::pass_result::PassResult;
 use crate::action::Action;
@@ -21,9 +25,8 @@ use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 /// Publishes: `PassingDistance`, `PassFumble`, `DontDropFumble`, `CatcherId`,
 ///            `CatchScatterThrowInMode`, `PassResultParam`.
 ///
-/// DEFERRED(pass-modifiers): PassModifierFactory.findModifiers(PassContext) — tacklezone and
-///   disturbing-presence modifier counting requires UtilServerGame.passModifiers() (counts adj.
-///   tacklezone squares from game.field_model) which is not yet translated.
+/// NOTE(pass-modifiers): PassModifierFactory now wired; tacklezone + disturbing-presence computed
+///   via UtilPlayer::find_tacklezone_players and UtilDisturbingPresence.
 /// DEFERRED(dialog): modifying-skill dialog (DialogSkillUseParameter for canAddStrengthToPass) and
 ///   pass-skill re-roll dialog — waiting for dialog infrastructure.
 pub struct StepPass {
@@ -162,10 +165,20 @@ impl StepPass {
         });
 
         // Java: PassModifierFactory.findModifiers(new PassContext(game, thrower, passingDistance, false))
-        // DEFERRED(pass-modifiers): PassContext tacklezone + disturbing-presence counting requires
-        //   UtilServerGame.passModifiers() (counts adj. tacklezone squares) — not yet translated.
-        //   BB2020 also has Very Sunny weather modifier and skill-based modifiers; currently empty.
-        let pass_modifiers: Vec<ffb_mechanics::modifiers::PassModifier> = Vec::new();
+        let pass_modifier_total: i32 = {
+            if let (Some(thrower), Some(dist)) = (game.thrower(), passing_dist) {
+                let factory = PassModifierFactory::for_rules(game.rules);
+                let ctx = PassContext::new(game, thrower, dist, false);
+                factory.find_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum()
+            } else {
+                0
+            }
+        };
+        let pass_modifiers: Vec<PassModifier> = if pass_modifier_total != 0 {
+            vec![PassModifier::new("pass_mods", pass_modifier_total, ModifierType::REGULAR)]
+        } else {
+            vec![]
+        };
 
         // Java: usingModifyingSkill != null && usingModifyingSkill → use stat-based modifier path
         // Java: else → standard roll path (state.setThrowerCoordinate, publishParameter PASSING_DISTANCE)

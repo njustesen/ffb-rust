@@ -66,4 +66,20 @@ mod tests {
         let steps = Bomb::build_sequence(&BombParams::default());
         assert_eq!(steps[0].step_id, StepId::InitBomb);
     }
+
+    #[test]
+    fn catcher_id_included_when_some() {
+        let params = BombParams { catcher_id: Some("catcher1".into()), ..Default::default() };
+        let steps = Bomb::build_sequence(&params);
+        let has = steps[0].params.iter().any(|p| matches!(p, StepParameter::CatcherId(Some(id)) if id == "catcher1"));
+        assert!(has);
+    }
+
+    #[test]
+    fn pass_fumble_param_passed() {
+        let params = BombParams { pass_fumble: true, ..Default::default() };
+        let steps = Bomb::build_sequence(&params);
+        let has = steps[0].params.iter().any(|p| matches!(p, StepParameter::PassFumble(true)));
+        assert!(has);
+    }
 }

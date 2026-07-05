@@ -35,3 +35,25 @@ impl ClientMode {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_player() {
+        assert_eq!(ClientMode::for_name("player"), Some(ClientMode::PLAYER));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(ClientMode::for_name("admin"), None);
+    }
+
+    #[test]
+    fn get_name_round_trip() {
+        for &mode in &[ClientMode::PLAYER, ClientMode::SPECTATOR, ClientMode::REPLAY] {
+            assert_eq!(ClientMode::for_name(mode.get_name()), Some(mode));
+        }
+    }
+}

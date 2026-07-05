@@ -4,6 +4,7 @@ use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::generator::common::wizard::Wizard;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2016.StepInitInducement.
 ///
@@ -73,8 +74,14 @@ impl Step for StepInitInducement {
                 self.end_inducement_phase = false;
             }
         }
-        // Java: CLIENT_USE_INDUCEMENT with spell type
-        // DEFERRED(action): dedicated Action::UseInducement variant not yet ported.
+        // Java: CLIENT_USE_INDUCEMENT
+        if let Action::UseInducement { inducement_type, card_id: _, player_ids: _ } = action {
+            if let Some(itype) = inducement_type {
+                self.inducement_type = Some(itype.clone());
+                self.end_inducement_phase = false;
+            }
+        }
+        // Java: CLIENT_USE_INDUCEMENT with spell type (wizard)
         if let Action::WizardSpell { spell: _, coord: _ } = action {
             // Treat as a spell-type inducement — push Wizard sequence
             self.inducement_type = Some("SPELL".to_string());
@@ -120,13 +127,13 @@ impl StepInitInducement {
 
         if self.inducement_type.as_deref() == Some("SPELL") {
             // Java: push Wizard sequence
-            // DEFERRED(generator): SequenceGeneratorFactory.Wizard.pushSequence not yet ported.
-            return self.leave_step(false);
+            let seq = Wizard::build_sequence();
+            return self.leave_step(false).push_seq(seq);
         }
 
         if self.card.is_some() {
             // Java: push Card sequence
-            // DEFERRED(generator): SequenceGeneratorFactory.Card.pushSequence not yet ported.
+            // DEFERRED(card-system): Card generator not yet ported.
             return self.leave_step(false);
         }
 

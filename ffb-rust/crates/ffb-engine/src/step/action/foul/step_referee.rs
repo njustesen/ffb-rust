@@ -200,7 +200,8 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
-        });
+                    ..Default::default()
+});
         let away = test_team("away", 0);
         let mut game = Game::new(home, away, Rules::Bb2025);
         game.turn_mode = TurnMode::Regular;

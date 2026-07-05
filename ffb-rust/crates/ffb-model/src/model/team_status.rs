@@ -38,3 +38,26 @@ impl TeamStatus {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn active_has_id_1() {
+        assert_eq!(TeamStatus::ACTIVE.get_id(), 1);
+    }
+    #[test]
+    fn active_name_is_active() {
+        assert_eq!(TeamStatus::ACTIVE.get_name(), "Active");
+    }
+    #[test]
+    fn all_ids_are_unique() {
+        let ids: Vec<i32> = [
+            TeamStatus::NEW, TeamStatus::ACTIVE, TeamStatus::PENDING_APPROVAL,
+            TeamStatus::BLOCKED, TeamStatus::RETIRED, TeamStatus::WAITING_FOR_OPPONENT,
+            TeamStatus::SKILL_ROLLS_PENDING,
+        ].iter().map(|s| s.get_id()).collect();
+        let unique: std::collections::HashSet<_> = ids.iter().collect();
+        assert_eq!(ids.len(), unique.len());
+    }
+}

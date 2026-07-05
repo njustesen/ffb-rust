@@ -33,3 +33,21 @@ impl GazeModifierCollection {
 impl Default for GazeModifierCollection {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn base_collection_is_empty() {
+        assert_eq!(GazeModifierCollection::new().get_modifiers().len(), 0);
+    }
+
+    #[test]
+    fn can_add_modifier_and_retrieve_it() {
+        let mut col = GazeModifierCollection::new();
+        col.add(GazeModifier::new("1 Tacklezone", 1, ModifierType::TACKLEZONE));
+        assert_eq!(col.get_modifiers().len(), 1);
+        assert_eq!(col.get_modifiers()[0].get_name(), "1 Tacklezone");
+    }
+}

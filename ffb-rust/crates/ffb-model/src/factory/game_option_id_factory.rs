@@ -14,3 +14,18 @@ impl GameOptionIdFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_non_empty_returns_some() {
+        assert!(GameOptionIdFactory::default().for_name("someOption").is_some());
+    }
+
+    #[test]
+    fn for_name_empty_returns_none() {
+        assert_eq!(GameOptionIdFactory::default().for_name(""), None);
+    }
+}

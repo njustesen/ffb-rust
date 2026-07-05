@@ -147,6 +147,14 @@ pub fn inducement_sequence(phase: InducementPhase, home_team: bool) -> Vec<Seque
     ]
 }
 
+/// Java: HitAndRun / ball-enters-square sequence — PickUp followed by CatchScatterThrowIn.
+pub fn pick_up_catch_scatter_sequence() -> Vec<SequenceStep> {
+    vec![
+        SequenceStep::new(StepId::PickUp),
+        SequenceStep::new(StepId::CatchScatterThrowIn),
+    ]
+}
+
 pub fn select_sequence() -> Vec<SequenceStep> {
     let mut seq = Vec::with_capacity(20);
     seq.push(SequenceStep::new(StepId::InitSelecting));
@@ -158,4 +166,41 @@ pub fn select_sequence() -> Vec<SequenceStep> {
     }
     seq.push(SequenceStep::labelled(StepId::EndSelecting, "END_SELECTING", vec![]));
     seq
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn start_game_sequence_starts_with_init_start_game() {
+        let seq = start_game_sequence();
+        assert_eq!(seq[0].step_id, StepId::InitStartGame);
+    }
+
+    #[test]
+    fn end_turn_sequence_ends_with_end_turn() {
+        let seq = end_turn_sequence(false);
+        assert_eq!(seq.last().unwrap().step_id, StepId::EndTurn);
+    }
+
+    #[test]
+    fn end_turn_sequence_check_forgo_param_propagates() {
+        let seq = end_turn_sequence(true);
+        assert!(matches!(seq[0].params[0], StepParameter::CheckForgo(true)));
+    }
+
+    #[test]
+    fn inducement_sequence_carries_phase_param() {
+        let seq = inducement_sequence(InducementPhase::AfterKickoffToOpponent, true);
+        assert!(matches!(seq[0].params[0], StepParameter::InducementPhase(InducementPhase::AfterKickoffToOpponent)));
+    }
+
+    #[test]
+    fn select_sequence_last_step_has_end_selecting_label() {
+        let seq = select_sequence();
+        let last = seq.last().unwrap();
+        assert_eq!(last.step_id, StepId::EndSelecting);
+        assert_eq!(last.label.as_deref(), Some("END_SELECTING"));
+    }
 }

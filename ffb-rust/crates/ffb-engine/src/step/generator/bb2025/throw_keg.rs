@@ -61,4 +61,29 @@ mod tests {
         assert_eq!(last.step_id, StepId::EndThrowKeg);
         assert_eq!(last.label.as_deref(), Some(labels::END));
     }
+
+    #[test]
+    fn first_step_is_throw_keg() {
+        let steps = ThrowKeg::build_sequence(&ThrowKegParams::default());
+        assert_eq!(steps[0].step_id, StepId::ThrowKeg);
+    }
+
+    #[test]
+    fn player_id_param_wired_when_provided() {
+        let steps = ThrowKeg::build_sequence(&ThrowKegParams { player_id: Some("p1".into()) });
+        let throw_keg_step = &steps[0];
+        assert!(throw_keg_step.params.iter().any(|p| matches!(p, StepParameter::TargetPlayerId(Some(id)) if id == "p1")));
+    }
+
+    #[test]
+    fn no_player_id_produces_empty_throw_keg_params() {
+        let steps = ThrowKeg::build_sequence(&ThrowKegParams::default());
+        assert!(steps[0].params.is_empty());
+    }
+
+    #[test]
+    fn contains_apothecary_step() {
+        let steps = ThrowKeg::build_sequence(&ThrowKegParams::default());
+        assert!(steps.iter().any(|s| s.step_id == StepId::Apothecary));
+    }
 }

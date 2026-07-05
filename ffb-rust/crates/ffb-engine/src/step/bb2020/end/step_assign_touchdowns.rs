@@ -14,10 +14,8 @@
 ///
 /// DEFERRED(assign-td-dialog): DialogPlayerChoiceParameter(ASSIGN_TOUCHDOWN) + UtilServerDialog.showDialog —
 ///   waiting for dialog infrastructure to be ported.
-/// isKilled() filter wired; recoveringInjury filter DEFERRED(assign-td-recover) — not yet ported.
-///   (Player.getRecoveringInjury() != null) players — PlayerResult/injury tracking not yet fully wired.
-/// DEFERRED(assign-td-report): ReportPlayerEvent("is awarded a touchdown") —
-///   report infrastructure not yet translated.
+/// PlayerNote("is awarded a touchdown") GameEvent wired.
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -43,6 +41,7 @@ impl StepAssignTouchdowns {
     }
 
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        let mut pending_events: Vec<GameEvent> = vec![];
         // Java: if (winningTeamId == null) { setNextAction(NEXT_STEP); return; }
         let winning_team_id = match self.winning_team_id.clone() {
             Some(id) => id,
@@ -51,19 +50,15 @@ impl StepAssignTouchdowns {
 
         // Java: List<Player> players = findPlayers(game, game.getTeamById(winningTeamId))
         // Filter: player.getRecoveringInjury() == null && !playerState.isKilled()
-        // DEFERRED(assign-td-recover): recoveringInjury tracking not yet ported — isKilled() check wired.
-        let all_player_ids: Vec<String> = if game.team_home.id == winning_team_id {
-            game.team_home.players.iter().map(|p| p.id.clone()).collect()
+        let players: Vec<String> = if game.team_home.id == winning_team_id {
+            game.team_home.players.iter()
         } else {
-            game.team_away.players.iter().map(|p| p.id.clone()).collect()
-        };
-        let players: Vec<String> = all_player_ids.into_iter()
-            .filter(|id| {
-                game.field_model.player_state(id)
-                    .map(|s| !s.is_killed())
-                    .unwrap_or(true)
-            })
-            .collect();
+            game.team_away.players.iter()
+        }
+        .filter(|p| p.recovering_injury.is_none())
+        .filter(|p| game.field_model.player_state(&p.id).map(|s| !s.is_killed()).unwrap_or(true))
+        .map(|p| p.id.clone())
+        .collect();
 
         // Java: if (players.isEmpty()) { touchdowns = 0; }
         if players.is_empty() {
@@ -84,7 +79,7 @@ impl StepAssignTouchdowns {
                 if !players.is_empty() {
                     let idx = rng.range(players.len());
                     let pid = players[idx].clone();
-                    // DEFERRED(assign-td-report): ReportPlayerEvent(pid, "is awarded a touchdown") — report infra not translated.
+                    pending_events.push(GameEvent::PlayerNote { player_id: pid.clone(), note: "is awarded a touchdown".into() });
                     let result = if game.team_home.id == winning_team_id {
                         game.game_result.home.player_results.entry(pid).or_default()
                     } else {
@@ -100,7 +95,7 @@ impl StepAssignTouchdowns {
         // }
         if let Some(pid) = self.player_id.take() {
             if !pid.is_empty() {
-                // DEFERRED(assign-td-report): ReportPlayerEvent(pid, "is awarded a touchdown") — report infra not translated.
+                pending_events.push(GameEvent::PlayerNote { player_id: pid.clone(), note: "is awarded a touchdown".into() });
                 let result = if game.team_home.id == winning_team_id {
                     game.game_result.home.player_results.entry(pid).or_default()
                 } else {
@@ -137,13 +132,17 @@ impl StepAssignTouchdowns {
                 };
                 result.touchdowns = 0;
             }
-            return StepOutcome::next();
+            let mut out = StepOutcome::next();
+            for ev in pending_events { out = out.with_event(ev); }
+            return out;
         }
 
         // Java: DialogPlayerChoiceParameter(winningTeamId, ASSIGN_TOUCHDOWN, playerIds, null, 1, 1)
         // UtilServerDialog.showDialog(getGameState(), dialogParameter, false) → wait for player choice.
         // DEFERRED(assign-td-dialog): show ASSIGN_TOUCHDOWN dialog — waiting for dialog infrastructure.
-        StepOutcome::cont()
+        let mut out = StepOutcome::cont();
+        for ev in pending_events { out = out.with_event(ev); }
+        out
     }
 }
 

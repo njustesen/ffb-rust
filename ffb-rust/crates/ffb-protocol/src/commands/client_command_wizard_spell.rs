@@ -1,10 +1,31 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct ClientCommandWizardSpell;
+use ffb_model::model::SpecialEffect;
+use ffb_model::types::FieldCoordinate;
 
-impl ClientCommandWizardSpell {
-    pub fn new() -> Self { Self }
+/// 1:1 translation of `com.fumbbl.ffb.net.commands.ClientCommandWizardSpell`.
+/// Sent when a wizard casts a spell at a target square.
+#[derive(Debug, Clone, Default)]
+pub struct ClientCommandWizardSpell {
+    /// Java: `fWizardSpell`
+    pub wizard_spell: Option<SpecialEffect>,
+    /// Java: `fTargetCoordinate`
+    pub target_coordinate: Option<FieldCoordinate>,
 }
 
-impl Default for ClientCommandWizardSpell {
-    fn default() -> Self { Self::new() }
+impl ClientCommandWizardSpell {
+    pub fn new() -> Self { Self::default() }
+    pub fn with_spell(spell: SpecialEffect, target: FieldCoordinate) -> Self {
+        Self { wizard_spell: Some(spell), target_coordinate: Some(target) }
+    }
+    pub fn get_wizard_spell(&self) -> Option<SpecialEffect> { self.wizard_spell }
+    pub fn get_target_coordinate(&self) -> Option<FieldCoordinate> { self.target_coordinate }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn default_none() {
+        let cmd = ClientCommandWizardSpell::new();
+        assert!(cmd.wizard_spell.is_none());
+    }
 }

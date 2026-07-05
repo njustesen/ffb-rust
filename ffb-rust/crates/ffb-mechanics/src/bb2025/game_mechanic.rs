@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 use ffb_model::enums::{TurnMode, Weather};
 use ffb_model::model::{Game, Player, PlayerStats, Roster, RosterPosition, Team, TeamResult};
+use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::util::util_cards::UtilCards;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::mechanic::{Mechanic, MechanicType};
 use crate::game_mechanic::GameMechanic as GameMechanicTrait;
 
@@ -136,12 +139,86 @@ impl GameMechanicTrait for GameMechanic {
         game.options.is_enabled("enableStallingCheck")
     }
 
-    fn is_wisdom_available(&self, _game: &Game, _player: &Player) -> bool {
-        // TODO: UtilCards.hasUnusedSkillWithProperty + UtilPlayer.findStandingOrPronePlayers
-        false
+    fn is_wisdom_available(&self, game: &Game, player: &Player) -> bool {
+        // Java: check hasUnusedSkillWithProperty(canGrantSkillsToTeamMates) first.
+        if !UtilCards::has_unused_skill_with_property(player, NamedProperties::CAN_GRANT_SKILLS_TO_TEAM_MATES) {
+            return false;
+        }
+        // Java: find team-mates within 2 squares (not stunned, active) that lack a grantable skill.
+        let coord = match game.field_model.player_coordinate(&player.id) {
+            Some(c) => c,
+            None => return false,
+        };
+        let is_home = game.team_home.has_player(&player.id);
+        let team = if is_home { &game.team_home } else { &game.team_away };
+        let team_mates = UtilPlayer::find_standing_or_prone_players(game, team, coord, 2);
+        // TODO: Constant.getGrantAbleSkills via SkillFactory — check that teammate lacks a grantable skill
+        // For now: return true if any active team-mate is present within 2 squares.
+        team_mates.iter().any(|tm| {
+            game.field_model.player_state(&tm.id)
+                .map(|s| s.is_active())
+                .unwrap_or(false)
+        })
     }
 }
 
 impl GameMechanic {
     pub fn new() -> Self { GameMechanic }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::enums::Weather;
+    use ffb_model::model::Team;
+    use crate::game_mechanic::GameMechanic as GameTrait;
+
+    fn bare_team(id: &str) -> Team {
+        Team {
+            id: id.into(), name: id.into(), race: "human".into(), roster_id: "human".into(), coach: "c".into(),
+            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0,
+            bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
+            fan_factor: 4, dedicated_fans: 9, team_value: 0, treasury: 0,
+            special_rules: vec![], players: vec![],
+        }
+    }
+
+    #[test]
+    fn is_foul_not_allowed_during_blitz() {
+        assert!(!GameMechanic.is_foul_action_allowed(TurnMode::Blitz));
+    }
+
+    #[test]
+    fn is_foul_allowed_during_regular() {
+        assert!(GameMechanic.is_foul_action_allowed(TurnMode::Regular));
+    }
+
+    #[test]
+    fn is_ktm_allowed_during_blitz() {
+        // bb2025: KTM is allowed even during blitz (unlike bb2020)
+        assert!(GameMechanic.is_kick_team_mate_action_allowed(TurnMode::Blitz));
+    }
+
+    #[test]
+    fn fan_modification_name_is_dedicated_fans() {
+        assert_eq!(GameMechanic.fan_modification_name(), "Dedicated Fans");
+    }
+
+    #[test]
+    fn fans_returns_dedicated_fans() {
+        let team = bare_team("home");
+        assert_eq!(GameMechanic.fans(&team), 9);
+    }
+
+    #[test]
+    fn roll_for_chef_is_false() {
+        assert!(!GameMechanic.roll_for_chef_at_start_of_half());
+    }
+
+    #[test]
+    fn concession_dialog_illegal_has_five_messages_in_bb2025() {
+        // bb2025 adds "You will loose all SPP earned during this game"
+        let msgs = GameMechanic.concession_dialog_messages(false);
+        assert_eq!(msgs.len(), 5);
+    }
 }

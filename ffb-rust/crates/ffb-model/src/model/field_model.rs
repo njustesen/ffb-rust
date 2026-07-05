@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
-use crate::enums::Weather;
+use crate::enums::{CardEffect, Weather};
 use crate::types::{FieldCoordinate, MoveSquare, PushbackSquare, RangeRuler};
 use crate::enums::PlayerState;
 use crate::model::player::PlayerId;
@@ -59,6 +59,14 @@ pub struct FieldModel {
     /// Java: FieldModel.fDiceDecorations — transient dice display decorations.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dice_decorations: Vec<DiceDecoration>,
+
+    /// Java: FieldModel.fCardEffectsByPlayerId — active card effects per player.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub card_effects: HashMap<PlayerId, HashSet<CardEffect>>,
+
+    /// Java: addPrayerEnhancements / removePrayerEnhancements — prayer name → player IDs with that prayer active.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub prayer_enhancements: HashMap<String, HashSet<PlayerId>>,
 }
 
 impl FieldModel {
@@ -83,12 +91,26 @@ impl FieldModel {
             multi_block_target_coordinates: HashSet::new(),
             blocked_for_trickster_coordinates: HashSet::new(),
             dice_decorations: Vec::new(),
+            card_effects: HashMap::new(),
+            prayer_enhancements: HashMap::new(),
         }
     }
 
     /// True if there is a trap door at the given coordinate.
     pub fn has_trap_door(&self, coord: FieldCoordinate) -> bool {
         self.trap_doors.contains(&coord)
+    }
+
+    /// Java: FieldModel.add(TrapDoor) — places a trapdoor at the given coordinate.
+    pub fn add_trap_door(&mut self, coord: FieldCoordinate) {
+        if !self.trap_doors.contains(&coord) {
+            self.trap_doors.push(coord);
+        }
+    }
+
+    /// Java: FieldModel.clearTrapdoors() — removes all trapdoors from the field.
+    pub fn clear_trap_doors(&mut self) {
+        self.trap_doors.clear();
     }
 
     pub fn player_coordinate(&self, id: &str) -> Option<FieldCoordinate> {
@@ -123,6 +145,73 @@ impl FieldModel {
                 self.player_states.insert(chompee_id.to_string(), st.change_chomped(true));
             }
         }
+    }
+
+    /// Java: FieldModel.removeChomps(Player chomper) — removes all chomps by chomper,
+    /// clears the chomped state bit on each chompee that is no longer chomped by anyone.
+    /// Returns map of chompeeId → true if chompee state was cleared, false if still chomped by another.
+    pub fn remove_chomps(&mut self, chomper_id: &str) -> Vec<(String, bool)> {
+        let chompees = match self.chomped.remove(chomper_id) {
+            Some(v) => v,
+            None => return vec![],
+        };
+        let mut result = Vec::new();
+        for chompee_id in chompees {
+            let still_chomped = self.chomped.values().any(|list| list.contains(&chompee_id));
+            if !still_chomped {
+                if let Some(st) = self.player_states.get(chompee_id.as_str()).copied() {
+                    self.player_states.insert(chompee_id.clone(), st.change_chomped(false));
+                }
+                result.push((chompee_id, true));
+            } else {
+                result.push((chompee_id, false));
+            }
+        }
+        result
+    }
+
+    /// Java: FieldModel.updateChomps(Player chomper) — removes any chomps where the chompee
+    /// is no longer adjacent to the chomper.
+    pub fn update_chomps(&mut self, chomper_id: &str) -> Vec<(String, bool)> {
+        let chomper_coord = match self.player_coordinates.get(chomper_id).copied() {
+            Some(c) => c,
+            None => return self.remove_chomps(chomper_id),
+        };
+        let to_remove: Vec<String> = match self.chomped.get(chomper_id) {
+            Some(chompees) => chompees.iter()
+                .filter(|chompee_id| {
+                    let adjacent = self.player_coordinates.get(chompee_id.as_str())
+                        .map_or(false, |c| chomper_coord.is_adjacent(*c));
+                    !adjacent
+                })
+                .cloned()
+                .collect(),
+            None => return vec![],
+        };
+        let mut result = Vec::new();
+        for chompee_id in to_remove {
+            let removed = self.remove_single_chomp(chomper_id, &chompee_id);
+            result.push((chompee_id, removed));
+        }
+        result
+    }
+
+    /// Java: FieldModel.removeChomp(Player chomper, Player chompee) — remove a single chomp entry.
+    /// Returns true if the chompee's state was cleared (no longer chomped by anyone).
+    pub fn remove_single_chomp(&mut self, chomper_id: &str, chompee_id: &str) -> bool {
+        if let Some(chompees) = self.chomped.get_mut(chomper_id) {
+            if let Some(pos) = chompees.iter().position(|id| id == chompee_id) {
+                chompees.remove(pos);
+                let still_chomped = self.chomped.values().any(|list| list.contains(&chompee_id.to_string()));
+                if !still_chomped {
+                    if let Some(st) = self.player_states.get(chompee_id).copied() {
+                        self.player_states.insert(chompee_id.to_string(), st.change_chomped(false));
+                    }
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     pub fn player_at(&self, coord: FieldCoordinate) -> Option<&PlayerId> {
@@ -232,6 +321,87 @@ impl FieldModel {
             .filter(|c| c.is_on_pitch())
             .collect()
     }
+
+    /// Java: FieldModel.addCardEffect — adds a card effect to a player.
+    pub fn add_card_effect(&mut self, player_id: &str, effect: CardEffect) {
+        self.card_effects
+            .entry(player_id.to_string())
+            .or_default()
+            .insert(effect);
+    }
+
+    /// Java: FieldModel.removeCardEffect — removes a card effect from a player. Returns true if removed.
+    pub fn remove_card_effect(&mut self, player_id: &str, effect: CardEffect) -> bool {
+        if let Some(effects) = self.card_effects.get_mut(player_id) {
+            let removed = effects.remove(&effect);
+            if effects.is_empty() {
+                self.card_effects.remove(player_id);
+            }
+            removed
+        } else {
+            false
+        }
+    }
+
+    /// Java: FieldModel.hasCardEffect — checks if a player has a specific card effect.
+    pub fn has_card_effect(&self, player_id: &str, effect: CardEffect) -> bool {
+        self.card_effects
+            .get(player_id)
+            .map_or(false, |set| set.contains(&effect))
+    }
+
+    /// Java: FieldModel.findPlayers(CardEffect) — returns all player ids with the given card effect.
+    pub fn find_players_with_card_effect(&self, effect: CardEffect) -> Vec<&str> {
+        self.card_effects
+            .iter()
+            .filter(|(_, effects)| effects.contains(&effect))
+            .map(|(id, _)| id.as_str())
+            .collect()
+    }
+
+    /// Java: FieldModel.addPrayerEnhancements(Player, Prayer) — marks the prayer as active on the player.
+    pub fn add_prayer_enhancement(&mut self, player_id: &str, prayer_name: &str) {
+        self.prayer_enhancements
+            .entry(prayer_name.to_string())
+            .or_default()
+            .insert(player_id.to_string());
+    }
+
+    /// Java: FieldModel.removePrayerEnhancements(Player, Prayer) — removes the prayer from the player.
+    pub fn remove_prayer_enhancement(&mut self, player_id: &str, prayer_name: &str) {
+        if let Some(players) = self.prayer_enhancements.get_mut(prayer_name) {
+            players.remove(player_id);
+            if players.is_empty() {
+                self.prayer_enhancements.remove(prayer_name);
+            }
+        }
+    }
+
+    /// Returns true if the given prayer is currently active on the given player.
+    pub fn has_prayer_enhancement(&self, player_id: &str, prayer_name: &str) -> bool {
+        self.prayer_enhancements
+            .get(prayer_name)
+            .map_or(false, |players| players.contains(player_id))
+    }
+
+    /// Returns all player IDs that currently have the given prayer active.
+    pub fn find_players_with_prayer_enhancement(&self, prayer_name: &str) -> Vec<&str> {
+        self.prayer_enhancements
+            .get(prayer_name)
+            .map(|ids| ids.iter().map(|s| s.as_str()).collect())
+            .unwrap_or_default()
+    }
+
+    /// Removes all prayer enhancements for the given prayer from all players.
+    pub fn clear_prayer_enhancement(&mut self, prayer_name: &str) {
+        self.prayer_enhancements.remove(prayer_name);
+    }
+
+    /// Java: FieldModel.clearTrackNumbers() — clears the client-side movement-track visualisation.
+    /// No game-state effect; track numbers are purely a UI concern.
+    pub fn clear_track_numbers(&mut self) {
+        // No-op: track numbers are client-side visualisation data not stored in the engine model.
+    }
 }
 
 impl Default for FieldModel {
@@ -322,6 +492,33 @@ mod tests {
     }
 
     #[test]
+    fn add_trap_door_stores_coordinate() {
+        let mut fm = FieldModel::new();
+        let coord = FieldCoordinate::new(6, 1);
+        fm.add_trap_door(coord);
+        assert!(fm.has_trap_door(coord));
+    }
+
+    #[test]
+    fn add_trap_door_no_duplicate() {
+        let mut fm = FieldModel::new();
+        let coord = FieldCoordinate::new(6, 1);
+        fm.add_trap_door(coord);
+        fm.add_trap_door(coord);
+        assert_eq!(fm.trap_doors.len(), 1);
+    }
+
+    #[test]
+    fn clear_trap_doors_empties_vec() {
+        let mut fm = FieldModel::new();
+        fm.add_trap_door(FieldCoordinate::new(6, 1));
+        fm.add_trap_door(FieldCoordinate::new(19, 13));
+        assert_eq!(fm.trap_doors.len(), 2);
+        fm.clear_trap_doors();
+        assert!(fm.trap_doors.is_empty());
+    }
+
+    #[test]
     fn remove_player_clears_position_and_state() {
         let mut fm = FieldModel::new();
         let coord = FieldCoordinate::new(5, 7);
@@ -399,5 +596,36 @@ mod tests {
         assert_eq!(found.unwrap().nr_of_dice, 2);
 
         assert!(fm.get_dice_decoration_at(FieldCoordinate::new(0, 0)).is_none());
+    }
+
+    #[test]
+    fn add_card_effect_stores_and_queries() {
+        let mut fm = FieldModel::new();
+        fm.add_card_effect("p1", CardEffect::Distracted);
+        assert!(fm.has_card_effect("p1", CardEffect::Distracted));
+        assert!(!fm.has_card_effect("p1", CardEffect::Sedative));
+        assert!(!fm.has_card_effect("p2", CardEffect::Distracted));
+    }
+
+    #[test]
+    fn remove_card_effect_clears_entry() {
+        let mut fm = FieldModel::new();
+        fm.add_card_effect("p1", CardEffect::Sedative);
+        assert!(fm.remove_card_effect("p1", CardEffect::Sedative));
+        assert!(!fm.has_card_effect("p1", CardEffect::Sedative));
+        assert!(!fm.remove_card_effect("p1", CardEffect::Sedative));
+    }
+
+    #[test]
+    fn find_players_with_card_effect_returns_affected() {
+        let mut fm = FieldModel::new();
+        fm.add_card_effect("p1", CardEffect::Distracted);
+        fm.add_card_effect("p2", CardEffect::Distracted);
+        fm.add_card_effect("p3", CardEffect::Sedative);
+        let mut distracted = fm.find_players_with_card_effect(CardEffect::Distracted);
+        distracted.sort();
+        assert_eq!(distracted, vec!["p1", "p2"]);
+        let sedated = fm.find_players_with_card_effect(CardEffect::Sedative);
+        assert_eq!(sedated, vec!["p3"]);
     }
 }

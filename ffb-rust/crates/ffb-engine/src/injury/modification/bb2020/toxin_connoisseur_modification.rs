@@ -1,10 +1,59 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct ToxinConnoisseurModification;
+/// Translation of com.fumbbl.ffb.server.injury.modification.bb2020.ToxinConnoisseurModification.
+///
+/// Valid for Stab only (BB2020). Gate: not a casualty. ADD_INJURY_MODIFIER.
+use ffb_model::model::game::Game;
+use ffb_model::model::SkillUse;
+use crate::injury::InjuryContext;
+use crate::injury::modification::InjuryContextModification;
+
+pub struct ToxinConnoisseurModification {
+    skill_id: Option<u16>,
+}
 
 impl ToxinConnoisseurModification {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self { Self { skill_id: None } }
 }
 
 impl Default for ToxinConnoisseurModification {
     fn default() -> Self { Self::new() }
+}
+
+impl InjuryContextModification for ToxinConnoisseurModification {
+    fn skill_use(&self) -> SkillUse { SkillUse::ADD_INJURY_MODIFIER }
+    fn valid_types(&self) -> &'static [&'static str] { &["Stab"] }
+    fn skill_id(&self) -> Option<u16> { self.skill_id }
+    fn set_skill_id(&mut self, id: u16) { self.skill_id = Some(id); }
+
+    fn try_injury_modification(&self, _game: &Game, ctx: &InjuryContext, _injury_type_name: &str) -> bool {
+        !ctx.is_casualty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::enums::{ApothecaryMode, Rules, PS_SERIOUS_INJURY, PlayerState};
+    use ffb_model::model::game::Game;
+    use crate::step::framework::test_team;
+
+    #[test]
+    fn valid_type_is_stab() {
+        assert!(ToxinConnoisseurModification::new().is_valid_type("Stab"));
+        assert!(!ToxinConnoisseurModification::new().is_valid_type("Block"));
+    }
+
+    #[test]
+    fn try_injury_false_when_casualty() {
+        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.injury = Some(PlayerState::new(PS_SERIOUS_INJURY));
+        assert!(!ToxinConnoisseurModification::new().try_injury_modification(&game, &ctx, "Stab"));
+    }
+
+    #[test]
+    fn try_injury_true_when_not_casualty() {
+        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        let ctx = InjuryContext::new(ApothecaryMode::Defender);
+        assert!(ToxinConnoisseurModification::new().try_injury_modification(&game, &ctx, "Stab"));
+    }
 }

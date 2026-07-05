@@ -2,11 +2,15 @@ use ffb_model::enums::InducementPhase;
 use ffb_model::model::game::Game;
 use ffb_model::prompts::AgentPrompt;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_box::UtilBox;
 use crate::action::Action;
+use crate::mechanic::mixed::setup_mechanic::SetupMechanic;
+use crate::mechanic::setup_mechanic::SetupMechanic as SetupMechanicTrait;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::common::Inducement;
 use crate::step::generator::common::inducement::InducementParams;
+use crate::util::util_server_setup::UtilServerSetup;
 
 /// Handles team setup (pre-kickoff player placement).
 ///
@@ -51,10 +55,7 @@ impl Step for StepSetup {
                 self.end_setup = true;
             }
             Action::PlacePlayer { player_id, coord } => {
-                // Java CLIENT_SETUP_PLAYER → UtilServerSetup.setupPlayer(...)
-                // Place or remove the player at the given coordinate.
-                game.field_model.set_player_coordinate(player_id, *coord);
-                // Placement commands are SKIP_STEP in Java (no execute_step call).
+                UtilServerSetup::setup_player(game, player_id, *coord);
                 return StepOutcome::cont();
             }
             _ => {}
@@ -84,9 +85,8 @@ impl StepSetup {
             return StepOutcome::cont().with_prompt(AgentPrompt::TeamSetup { team_id, players: player_ids });
         }
 
-        // Java: SetupMechanic.checkSetup — validate placement counts, LOS, etc.
-        // DEFERRED: port SetupMechanic.checkSetup.  For now always accept.
-        let setup_valid = true;
+        let setup_valid = SetupMechanic::new().check_setup(game, game.home_playing);
+        // DEFERRED(dialog): show setup error dialog when !setup_valid
 
         if setup_valid {
             // Java: flip home_playing so the other team sets up next.
@@ -96,8 +96,7 @@ impl StepSetup {
             game.turn_data_mut().turn_started = false;
             game.turn_data_mut().first_turn_after_kickoff = false;
 
-            // Java: UtilBox.refreshBoxes(game) — reconcile dugout box contents.
-            // DEFERRED: port refreshBoxes.
+            UtilBox::refresh_boxes(game);
 
             if !game.setup_offense {
                 // Java: push Inducement(BEFORE_SETUP, home_playing) + Inducement(BEFORE_SETUP, !home_playing)
@@ -169,7 +168,18 @@ mod tests {
 
     #[test]
     fn place_player_action_returns_cont_without_advancing() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
         let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
         let mut step = StepSetup::new();
         let coord = ffb_model::types::FieldCoordinate::new(5, 7);
         let out = step.handle_command(
@@ -177,7 +187,6 @@ mod tests {
             &mut game, &mut GameRng::new(0),
         );
         assert_eq!(out.action, StepAction::Continue);
-        // Player should be placed at the coordinate.
         assert_eq!(game.field_model.player_coordinate("p1"), Some(coord));
     }
 

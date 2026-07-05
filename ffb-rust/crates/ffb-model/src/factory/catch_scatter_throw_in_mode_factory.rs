@@ -14,3 +14,21 @@ impl CatchScatterThrowInModeFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_mode() {
+        assert_eq!(
+            CatchScatterThrowInModeFactory::default().for_name("catchHandOff"),
+            Some(CatchScatterThrowInMode::CatchHandOff)
+        );
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(CatchScatterThrowInModeFactory::default().for_name("invalid"), None);
+    }
+}

@@ -77,4 +77,21 @@ mod tests {
         let steps = Bomb::build_sequence(&BombParams::default());
         assert_eq!(steps.len(), 3);
     }
+
+    #[test]
+    fn catcher_id_included_when_some() {
+        let params = BombParams { catcher_id: Some("catcher1".into()), ..Default::default() };
+        let steps = Bomb::build_sequence(&params);
+        let has = steps[0].params.iter().any(|p| matches!(p, StepParameter::CatcherId(Some(id)) if id == "catcher1"));
+        assert!(has);
+    }
+
+    #[test]
+    fn allow_move_after_pass_passed_to_end_bomb() {
+        let params = BombParams { allow_move_after_pass: true, ..Default::default() };
+        let steps = Bomb::build_sequence(&params);
+        let end_bomb = steps.iter().find(|s| s.step_id == StepId::EndBomb).unwrap();
+        let has = end_bomb.params.iter().any(|p| matches!(p, StepParameter::AllowMoveAfterPass(true)));
+        assert!(has);
+    }
 }

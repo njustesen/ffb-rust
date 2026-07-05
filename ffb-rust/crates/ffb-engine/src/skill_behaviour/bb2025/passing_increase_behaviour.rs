@@ -1,7 +1,17 @@
 use crate::skill_behaviour::SkillBehaviour;
+use ffb_model::model::player::Player;
+use ffb_model::model::roster_position::RosterPosition;
 
-/// Passing Increase advancement: re-roll one passing stat increase per level-up.
-/// No StepModifier -- execute_step_hook is a no-op (returns the default false).
+/// 1:1 translation of `com.fumbbl.ffb.server.skillbehaviour.bb2025.PassingIncreaseBehaviour`.
+///
+/// Java:
+/// ```java
+/// registerModifier(player -> {
+///     if (player.getPassing() <= 0) { player.setPassing(6); }
+///     else { player.setPassing(max(max(1, pos.getPassing()-2), player.getPassing()-1)); }
+/// });
+/// ```
+/// BB2025: identical to BB2020; players with no passing skill start at 6+.
 pub struct PassingIncreaseBehaviour;
 
 impl PassingIncreaseBehaviour {
@@ -14,36 +24,58 @@ impl Default for PassingIncreaseBehaviour {
 
 impl SkillBehaviour for PassingIncreaseBehaviour {
     fn name(&self) -> &'static str { "PassingIncreaseBehaviour" }
+
+    fn apply_modifier(&self, player: &mut Player, position: &RosterPosition) {
+        if player.passing <= 0 {
+            player.passing = 6;
+        } else {
+            player.passing = (position.passing - 2).max(1).max(player.passing - 1);
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn test_game() -> ffb_model::model::game::Game {
-        let home = ffb_model::model::team::Team {
-            id: "home".into(), name: "Home".into(), race: "human".into(),
-            roster_id: "human".into(), coach: "Coach".into(),
-            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
-            prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
-            cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
-            team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
-        };
-        let away = home.clone();
-        ffb_model::model::game::Game::new(home, away, ffb_model::enums::Rules::Bb2025)
+    fn pos(passing: i32) -> RosterPosition {
+        RosterPosition { passing, ..Default::default() }
     }
 
     #[test]
-    fn hook_is_noop_returns_false() {
-        let behaviour = PassingIncreaseBehaviour::new();
-        let mut game = test_game();
-        assert!(!behaviour.execute_step_hook(&mut game));
+    fn apply_no_passing_gives_six() {
+        let b = PassingIncreaseBehaviour::new();
+        let mut player = Player { passing: 0, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(0));
+        assert_eq!(player.passing, 6);
     }
 
     #[test]
-    fn execute_step_hook_returns_bool() {
-        let behaviour = PassingIncreaseBehaviour::new();
-        let mut game = test_game();
-        let _result: bool = behaviour.execute_step_hook(&mut game);
+    fn apply_decreases_by_one() {
+        let b = PassingIncreaseBehaviour::new();
+        let mut player = Player { passing: 4, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(4));
+        assert_eq!(player.passing, 3);
+    }
+
+    #[test]
+    fn apply_capped_at_one() {
+        let b = PassingIncreaseBehaviour::new();
+        let mut player = Player { passing: 1, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(3));
+        assert_eq!(player.passing, 1);
+    }
+
+    #[test]
+    fn negative_passing_also_gives_six() {
+        let b = PassingIncreaseBehaviour::new();
+        let mut player = Player { passing: -1, ..Default::default() };
+        b.apply_modifier(&mut player, &pos(0));
+        assert_eq!(player.passing, 6);
+    }
+
+    #[test]
+    fn name_is_correct() {
+        assert_eq!(PassingIncreaseBehaviour::new().name(), "PassingIncreaseBehaviour");
     }
 }

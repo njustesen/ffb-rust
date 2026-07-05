@@ -63,4 +63,42 @@ mod tests {
         assert_eq!(last.step_id, StepId::NextStep);
         assert_eq!(last.label.as_deref(), Some(labels::END_SPECIAL_EFFECT));
     }
+
+    #[test]
+    fn special_effect_key_passed_to_first_step() {
+        let params = SpecialEffectParams {
+            special_effect_key: "LIGHTNING".into(),
+            player_id: "p1".into(),
+            roll_for_effect: true,
+        };
+        let steps = SpecialEffect::build_sequence(&params);
+        let has_key = steps[0].params.iter().any(|p| {
+            matches!(p, StepParameter::SpecialEffectKey(k) if k == "LIGHTNING")
+        });
+        assert!(has_key);
+    }
+
+    #[test]
+    fn player_id_passed_to_first_step() {
+        let params = SpecialEffectParams {
+            special_effect_key: "ZAP".into(),
+            player_id: "player42".into(),
+            roll_for_effect: false,
+        };
+        let steps = SpecialEffect::build_sequence(&params);
+        let has_pid = steps[0].params.iter().any(|p| {
+            matches!(p, StepParameter::PlayerId(id) if id == "player42")
+        });
+        assert!(has_pid);
+    }
+
+    #[test]
+    fn apothecary_step_uses_special_effect_mode() {
+        let steps = SpecialEffect::build_sequence(&SpecialEffectParams::default());
+        let apo = steps.iter().find(|s| s.step_id == StepId::Apothecary).unwrap();
+        let has_mode = apo.params.iter().any(|p| {
+            matches!(p, StepParameter::ApothecaryMode(ApothecaryMode::SpecialEffect))
+        });
+        assert!(has_mode);
+    }
 }

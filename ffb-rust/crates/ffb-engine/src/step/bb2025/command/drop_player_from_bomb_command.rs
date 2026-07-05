@@ -60,4 +60,12 @@ mod tests {
         let params = cmd.execute(&mut game);
         assert!(params.is_empty());
     }
+
+    #[test]
+    fn suppress_end_turn_removes_end_turn_param() {
+        let mut game = make_game();
+        let cmd = DropPlayerFromBombCommand::new("p1".into(), ApothecaryMode::Defender, true, false, true);
+        let params = cmd.execute(&mut game);
+        assert!(!params.iter().any(|p| matches!(p, StepParameter::EndTurn(_))));
+    }
 }

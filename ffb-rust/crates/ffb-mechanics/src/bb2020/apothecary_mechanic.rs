@@ -55,3 +55,62 @@ impl ApothecaryMechanicTrait for ApothecaryMechanic {
         valid_types
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::enums::{PS_SERIOUS_INJURY, PS_KNOCKED_OUT, PlayerGender, Rules};
+    use ffb_model::model::Team;
+    use crate::apothecary_mechanic::ApothecaryMechanic as ApoTrait;
+
+    fn bare_team(id: &str) -> Team {
+        Team {
+            id: id.into(), name: id.into(), race: "human".into(), roster_id: "human".into(), coach: "c".into(),
+            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0,
+            bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
+            fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0,
+            special_rules: vec![], players: vec![],
+        }
+    }
+
+    fn player(id: &str, player_type: PlayerType) -> Player {
+        Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "pos".into(),
+            player_type, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn star_player_returns_empty() {
+        let game = Game::new(bare_team("home"), bare_team("away"), Rules::Bb2020);
+        let p = player("p1", PlayerType::Star);
+        assert!(ApothecaryMechanic.apothecary_types(&game, &p, PlayerState(PS_SERIOUS_INJURY)).is_empty());
+    }
+
+    #[test]
+    fn regular_player_with_team_apo_returns_team_type() {
+        let mut home = bare_team("home");
+        let p = player("p1", PlayerType::Regular);
+        home.players.push(p.clone());
+        let mut game = Game::new(home, bare_team("away"), Rules::Bb2020);
+        game.turn_data_home.apothecaries = 1;
+        let result = ApothecaryMechanic.apothecary_types(&game, &p, PlayerState(PS_SERIOUS_INJURY));
+        assert_eq!(result, vec![ApothecaryType::Team]);
+    }
+
+    #[test]
+    fn regular_player_ko_with_plague_doctor_gets_plague_type() {
+        let mut home = bare_team("home");
+        let p = player("p1", PlayerType::Regular);
+        home.players.push(p.clone());
+        let mut game = Game::new(home, bare_team("away"), Rules::Bb2020);
+        game.turn_data_home.plague_doctors = 1;
+        let result = ApothecaryMechanic.apothecary_types(&game, &p, PlayerState(PS_KNOCKED_OUT));
+        assert!(result.contains(&ApothecaryType::Plague));
+    }
+}

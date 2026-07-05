@@ -148,6 +148,8 @@ mod tests {
         use ffb_model::enums::Direction;
         let mut game = make_game();
         game.field_model.pushback_squares.push(PushbackSquare::new(FieldCoordinate::new(1, 1), Direction::North, false));
+        game.acting_player.player_id = Some("att".into());
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(5, 4));
         game.defender_id = Some("def".into());
         game.field_model.set_player_coordinate("def", FieldCoordinate::new(5, 5));
         let params = init_pushback(&mut game);

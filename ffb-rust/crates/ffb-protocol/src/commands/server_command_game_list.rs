@@ -1,10 +1,30 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct ServerCommandGameList;
+use ffb_model::model::game_list::GameList;
 
-impl ServerCommandGameList {
-    pub fn new() -> Self { Self }
+/// 1:1 translation of `com.fumbbl.ffb.net.commands.ServerCommandGameList`.
+/// Sends the lobby game list to the client.
+#[derive(Debug, Clone, Default)]
+pub struct ServerCommandGameList {
+    /// Java: `fGameList` — the list of available games.
+    pub game_list: GameList,
 }
 
-impl Default for ServerCommandGameList {
-    fn default() -> Self { Self::new() }
+impl ServerCommandGameList {
+    pub fn new(game_list: GameList) -> Self { Self { game_list } }
+    pub fn get_game_list(&self) -> &GameList { &self.game_list }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fields_stored() {
+        let cmd = ServerCommandGameList::new(GameList::default());
+        let _ = cmd.get_game_list();
+    }
+
+    #[test]
+    fn default_works() {
+        let _ = ServerCommandGameList::default();
+    }
 }

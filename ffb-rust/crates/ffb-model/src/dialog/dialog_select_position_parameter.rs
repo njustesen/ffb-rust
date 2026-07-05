@@ -29,3 +29,19 @@ impl IDialogParameter for DialogSelectPositionParameter {
     fn get_id(&self) -> DialogId { DialogId::SELECT_POSITION }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_select_position() {
+        assert_eq!(DialogSelectPositionParameter::default().get_id(), DialogId::SELECT_POSITION);
+    }
+    #[test]
+    fn add_position_filters_empty_string() {
+        let mut p = DialogSelectPositionParameter::default();
+        p.add_position("pos1");
+        p.add_position("");
+        assert_eq!(p.get_positions().len(), 1);
+    }
+}

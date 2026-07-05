@@ -85,4 +85,20 @@ mod tests {
         let steps = ThrowKeg::build_sequence(&ThrowKegParams::default());
         assert!(!steps.iter().any(|s| s.step_id == StepId::SteadyFooting));
     }
+
+    #[test]
+    fn player_id_passed_when_some() {
+        let params = ThrowKegParams { player_id: Some("target_player".into()) };
+        let steps = ThrowKeg::build_sequence(&params);
+        let keg = steps.iter().find(|s| s.step_id == StepId::ThrowKeg).unwrap();
+        let has = keg.params.iter().any(|p| matches!(p, StepParameter::TargetPlayerId(Some(id)) if id == "target_player"));
+        assert!(has);
+    }
+
+    #[test]
+    fn player_id_absent_when_none() {
+        let steps = ThrowKeg::build_sequence(&ThrowKegParams::default());
+        let keg = steps.iter().find(|s| s.step_id == StepId::ThrowKeg).unwrap();
+        assert!(keg.params.is_empty());
+    }
 }

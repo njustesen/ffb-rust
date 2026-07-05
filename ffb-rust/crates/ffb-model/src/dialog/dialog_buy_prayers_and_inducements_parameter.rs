@@ -24,3 +24,18 @@ impl IDialogParameter for DialogBuyPrayersAndInducementsParameter {
     fn get_id(&self) -> DialogId { DialogId::BUY_PRAYERS_AND_INDUCEMENTS }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_buy_prayers_and_inducements() {
+        assert_eq!(DialogBuyPrayersAndInducementsParameter::default().get_id(), DialogId::BUY_PRAYERS_AND_INDUCEMENTS);
+    }
+    #[test]
+    fn stores_gold_and_treasury() {
+        let p = DialogBuyPrayersAndInducementsParameter { available_gold: 100_000, treasury: 50_000, ..Default::default() };
+        assert_eq!(p.get_available_gold(), 100_000);
+        assert_eq!(p.get_treasury(), 50_000);
+    }
+}

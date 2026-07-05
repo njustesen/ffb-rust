@@ -62,7 +62,8 @@ impl StepEndFeeding {
                 // Java: EndTurn.pushSequence(new EndTurn.SequenceParams(getGameState(), false))
                 return StepOutcome::next().push_seq(EndTurn::build_sequence());
             } else {
-                // Java: changePlayerAction(null, null, false) — no-op (null player)
+                // Java: changePlayerAction(null, null, false) → clear acting player
+                game.acting_player.player_id = None;
                 // Java: Inducement(END_OF_OWN_TURN, homePlaying)
                 let seq = Inducement::build_sequence(&InducementParams {
                     inducement_phase: InducementPhase::EndOfOwnTurn,
@@ -92,7 +93,8 @@ impl StepEndFeeding {
 
         // Java: game.setPassCoordinate(null)
         game.pass_coordinate = None;
-        // Java: changePlayerAction(null, null, false) — no-op (null player)
+        // Java: changePlayerAction(null, null, false) → clear acting player
+        game.acting_player.player_id = None;
         // Java: Select.pushSequence(false)
         let seq = Select::build_sequence(&SelectParams { update_persistence: false });
         StepOutcome::next().push_seq(seq)

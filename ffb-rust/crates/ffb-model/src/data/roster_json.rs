@@ -31,6 +31,10 @@ pub struct RosterJson {
     pub apothecary: bool,
     #[serde(default)]
     pub undead: bool,
+    #[serde(default)]
+    pub necromancer: bool,
+    #[serde(default)]
+    pub keywords: Vec<String>,
     pub positions: Vec<PositionJson>,
     #[serde(default)]
     pub special_rules: Vec<String>,

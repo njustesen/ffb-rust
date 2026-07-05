@@ -11,6 +11,10 @@ pub struct Roster {
     pub max_rerolls: i32,
     pub positions: Vec<RosterPosition>,
     pub special_rules: Vec<String>,
+    #[serde(default)]
+    pub necromancer: bool,
+    #[serde(default)]
+    pub keywords: Vec<String>,
 }
 
 impl Roster {
@@ -20,6 +24,16 @@ impl Roster {
 
     pub fn non_star_positions(&self) -> impl Iterator<Item = &RosterPosition> {
         self.positions.iter().filter(|p| !p.is_star_player())
+    }
+
+    /// 1:1 translation of hasNecromancer.
+    pub fn has_necromancer(&self) -> bool {
+        self.necromancer
+    }
+
+    /// 1:1 translation of hasVampireLord.
+    pub fn has_vampire_lord(&self) -> bool {
+        self.keywords.iter().any(|k| k.eq_ignore_ascii_case("vampire lord"))
     }
 }
 
@@ -36,6 +50,8 @@ mod tests {
             max_rerolls: 8,
             positions: vec![],
             special_rules: vec![],
+            necromancer: false,
+            keywords: vec![],
         }
     }
 
@@ -139,5 +155,31 @@ mod tests {
             race: None, replaces_position: None,
         });
         assert_eq!(r.positions.len(), 1);
+    }
+
+    #[test]
+    fn has_necromancer_false_by_default() {
+        let r = empty_roster();
+        assert!(!r.has_necromancer());
+    }
+
+    #[test]
+    fn has_necromancer_true_when_set() {
+        let mut r = empty_roster();
+        r.necromancer = true;
+        assert!(r.has_necromancer());
+    }
+
+    #[test]
+    fn has_vampire_lord_false_without_keyword() {
+        let r = empty_roster();
+        assert!(!r.has_vampire_lord());
+    }
+
+    #[test]
+    fn has_vampire_lord_true_with_keyword() {
+        let mut r = empty_roster();
+        r.keywords.push("vampire lord".into());
+        assert!(r.has_vampire_lord());
     }
 }

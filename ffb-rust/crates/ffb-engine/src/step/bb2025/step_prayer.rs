@@ -57,7 +57,7 @@ impl Step for StepPrayer {
         // Java: CLIENT_PLAYER_CHOICE → set playerId → EXECUTE_STEP
         // Java: CLIENT_PRAYER_SELECTION → set playerId + skill → EXECUTE_STEP
         match action {
-            Action::SelectPlayer { player_id } => {
+            Action::SelectPlayer {player_id } => {
                 self.player_id = Some(player_id.clone());
             }
             Action::SelectSkill { skill_id: _ } => {
@@ -130,7 +130,7 @@ mod tests {
     fn handle_command_select_player_stores_player_id() {
         let mut game = make_game();
         let mut step = StepPrayer::new(3, "home");
-        let action = Action::SelectPlayer { player_id: "p1".into() };
+        let action = Action::SelectPlayer {player_id: "p1".into() };
         step.handle_command(&action, &mut game, &mut GameRng::new(0));
         assert_eq!(step.player_id.as_deref(), Some("p1"));
     }
@@ -139,7 +139,7 @@ mod tests {
     fn handle_command_returns_next_step() {
         let mut game = make_game();
         let mut step = StepPrayer::new(3, "home");
-        let action = Action::SelectPlayer { player_id: "p1".into() };
+        let action = Action::SelectPlayer {player_id: "p1".into() };
         let out = step.handle_command(&action, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
     }

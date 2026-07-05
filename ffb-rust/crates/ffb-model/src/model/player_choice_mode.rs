@@ -229,3 +229,26 @@ impl PlayerChoiceMode {
         ]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tentacles_get_name_is_camel_case() {
+        assert_eq!(PlayerChoiceMode::TENTACLES.get_name(), "tentacles");
+        assert_eq!(PlayerChoiceMode::ANIMAL_SAVAGERY.get_name(), "animalSavagery");
+    }
+
+    #[test]
+    fn for_name_round_trips() {
+        assert_eq!(PlayerChoiceMode::for_name("tentacles"), Some(PlayerChoiceMode::TENTACLES));
+        assert_eq!(PlayerChoiceMode::for_name("invalid"), None);
+    }
+
+    #[test]
+    fn is_use_player_position_returns_bool() {
+        let _ = PlayerChoiceMode::TENTACLES.is_use_player_position();
+        let _ = PlayerChoiceMode::BLOCK.is_use_player_position();
+    }
+}

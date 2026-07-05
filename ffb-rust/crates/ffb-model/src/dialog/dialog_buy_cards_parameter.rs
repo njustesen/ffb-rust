@@ -24,3 +24,26 @@ impl IDialogParameter for DialogBuyCardsParameter {
     fn get_id(&self) -> DialogId { DialogId::BUY_CARDS }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dialog_id_is_buy_cards() {
+        assert_eq!(DialogBuyCardsParameter::default().get_id(), DialogId::BUY_CARDS);
+    }
+
+    #[test]
+    fn stores_gold_and_card_counts() {
+        let p = DialogBuyCardsParameter {
+            team_id: Some("t1".into()),
+            available_gold: 100_000,
+            available_cards: 3,
+            ..Default::default()
+        };
+        assert_eq!(p.get_available_gold(), 100_000);
+        assert_eq!(p.get_available_cards(), 3);
+        assert_eq!(p.get_team_id(), Some("t1"));
+    }
+}

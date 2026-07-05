@@ -5,14 +5,13 @@
 ///
 /// Consumes: THROWN_PLAYER_ID, THROWN_PLAYER_HAS_BALL, THROWN_PLAYER_STATE (all).
 /// Does NOT consume THROWN_PLAYER_COORDINATE (left for driver to propagate further).
-///
-/// DEFERRED(generator): ScatterPlayer SequenceGenerator not yet ported for BB2016.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::PlayerState;
 use ffb_model::types::FieldCoordinate;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::step::generator::bb2016::scatter_player::{ScatterPlayer, ScatterPlayerParams};
 
 /// Java: `StepEndScatterPlayer` (bb2016/ttm).
 pub struct StepEndScatterPlayer {
@@ -43,10 +42,18 @@ impl StepEndScatterPlayer {
         let all_present = self.thrown_player_id.is_some()
             && self.thrown_player_state.is_some()
             && self.thrown_player_coordinate.is_some();
-        if all_present {
-            // DEFERRED(generator): push ScatterPlayer sequence not yet ported.
-        }
         let mut out = StepOutcome::next();
+        if all_present {
+            let seq = ScatterPlayer::build_sequence(&ScatterPlayerParams {
+                thrown_player_id: self.thrown_player_id.clone(),
+                thrown_player_state: self.thrown_player_state,
+                thrown_player_has_ball: self.thrown_player_has_ball,
+                thrown_player_coordinate: self.thrown_player_coordinate,
+                throw_scatter: false,
+                has_swoop: false,
+            });
+            out = out.push_seq(seq);
+        }
         if self.is_kicked_player {
             out = out.publish(StepParameter::IsKickedPlayer(true));
         }

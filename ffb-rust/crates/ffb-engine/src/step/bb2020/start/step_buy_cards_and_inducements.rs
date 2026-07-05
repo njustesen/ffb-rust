@@ -14,12 +14,11 @@
 /// In "parallel" mode (equal-TV games with allowEvenCTV option set) both teams buy
 /// simultaneously: BuyInducements commands are buffered and applied in leaveStep().
 ///
-/// DEFERRED(BuyCardsAndInducements-options): GameOptionId checks (INDUCEMENTS, USE_PREDEFINED_INDUCEMENTS,
-///   FREE_INDUCEMENT_CASH, FREE_CARD_CASH, INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV,
-///   INDUCEMENTS_ALLOW_OVERDOG_SPENDING, INDUCEMENTS_ALWAYS_USE_TREASURY, CARDS_SPECIAL_PLAY_COST,
+/// DEFERRED(BuyCardsAndInducements-options): GameOptionId checks (USE_PREDEFINED_INDUCEMENTS,
+///   INDUCEMENTS_ALWAYS_USE_TREASURY, CARDS_SPECIAL_PLAY_COST,
 ///   MAX_NR_OF_CARDS, ALLOW_STAR_ON_BOTH_TEAMS, ALLOW_STAFF_ON_BOTH_TEAMS,
 ///   INDUCEMENT_MERCENARIES_EXTRA_COST, INDUCEMENT_MERCENARIES_SKILL_COST,
-///   INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG) all deferred.
+///   INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG) deferred.
 /// DEFERRED(BuyCardsAndInducements-decks): CardTypeFactory / CardDeck / card-choice randomisation deferred.
 /// DEFERRED(BuyCardsAndInducements-addStarPlayers): RosterPlayer creation + sendAddedPlayers deferred.
 /// DEFERRED(BuyCardsAndInducements-addMercenaries): RosterPlayer mercenary creation / Loner skill injection deferred.
@@ -33,12 +32,18 @@
 ///   / CLIENT_BUY_INDUCEMENTS dialog path deferred.
 use ffb_model::enums::InducementPhase;
 use ffb_model::model::game::Game;
+use ffb_model::option::game_option_id::{
+    INDUCEMENTS, FREE_INDUCEMENT_CASH, FREE_CARD_CASH,
+    INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV, INDUCEMENTS_ALLOW_OVERDOG_SPENDING,
+};
+use ffb_model::option::util_game_option::{is_option_enabled, get_int_option};
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::generator::common::inducement::InducementParams;
-use crate::step::generator::common::Inducement;
-use crate::step::generator::common::RiotousRookies;
+use crate::step::generator::common::{Inducement, RiotousRookies};
+use crate::step::generator::mixed::kickoff::{Kickoff, KickoffParams};
+use crate::step::game::start::util_inducement_sequence::UtilInducementSequence;
 
 /// Phase enum mirroring the private inner `Phase` in Java.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -131,28 +136,55 @@ impl StepBuyCardsAndInducements {
 
     /// Java: `init(Game game)` — determine who has petty cash and set initial phase.
     fn init(&mut self, game: &mut Game) {
-        // DEFERRED(BuyCardsAndInducements-options): check GameOptionId::INDUCEMENTS.
-        // DEFERRED(BuyCardsAndInducements-options): check USE_PREDEFINED_INDUCEMENTS.
+        // Java: if (!INDUCEMENTS) → phase = DONE
+        if !is_option_enabled(game, INDUCEMENTS) {
+            self.phase = Phase::Done;
+            self.available_inducement_gold_home = Some(0);
+            self.available_inducement_gold_away = Some(0);
+            return;
+        }
+
+        // DEFERRED(BuyCardsAndInducements-options): USE_PREDEFINED_INDUCEMENTS not yet ported.
         // DEFERRED(BuyCardsAndInducements-decks): buildDecks().
-        // DEFERRED(BuyCardsAndInducements-options): read FREE_INDUCEMENT_CASH + FREE_CARD_CASH.
+
+        let free_cash = get_int_option(game, FREE_INDUCEMENT_CASH) + get_int_option(game, FREE_CARD_CASH);
 
         let petty_home = game.game_result.home.petty_cash_from_tv_diff;
         let petty_away = game.game_result.away.petty_cash_from_tv_diff;
 
-        // DEFERRED(BuyCardsAndInducements-options): check INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV.
-        // DEFERRED(BuyCardsAndInducements-options): check INDUCEMENTS_ALLOW_OVERDOG_SPENDING.
-        // For now: use petty_cash_from_tv_diff to decide who is the underdog.
+        let allow_even_ctv = is_option_enabled(game, INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV)
+            || free_cash > 0;
+        let allow_overdog = is_option_enabled(game, INDUCEMENTS_ALLOW_OVERDOG_SPENDING);
+
         if petty_home > 0 {
             // Away is the overdog; home team (underdog) shops first.
             self.phase = Phase::Home;
-            self.available_inducement_gold_home = Some(petty_home);
+            let gold = if allow_overdog {
+                petty_home + game.team_home.treasury + free_cash
+            } else {
+                petty_home + free_cash
+            };
+            self.available_inducement_gold_home = Some(gold);
             // DEFERRED(BuyCardsAndInducements-dialog): showDialog for home.
-            // Fall through to swap_team / leave if no dialog triggered.
         } else if petty_away > 0 {
             // Home is the overdog; away team (underdog) shops first.
             self.phase = Phase::Away;
-            self.available_inducement_gold_away = Some(petty_away);
+            let gold = if allow_overdog {
+                petty_away + game.team_away.treasury + free_cash
+            } else {
+                petty_away + free_cash
+            };
+            self.available_inducement_gold_away = Some(gold);
             // DEFERRED(BuyCardsAndInducements-dialog): showDialog for away.
+        } else if allow_even_ctv {
+            // Equal TV but treasury/free-cash spending allowed: both teams shop in parallel.
+            self.phase = Phase::Home;
+            self.parallel = true;
+            let gold_home = game.team_home.treasury + free_cash;
+            let gold_away = game.team_away.treasury + free_cash;
+            self.available_inducement_gold_home = Some(gold_home);
+            self.available_inducement_gold_away = Some(gold_away);
+            // DEFERRED(BuyCardsAndInducements-dialog): showDialog for both (parallel).
         } else {
             // Equal TV and no treasury spending: skip.
             self.available_inducement_gold_home = Some(0);
@@ -204,9 +236,8 @@ impl StepBuyCardsAndInducements {
         // Java: if parallel → addReport for both teams now (serial: already reported per-command).
         // DEFERRED(BuyCardsAndInducements-report): ReportCardsAndInducementsBought deferred.
 
-        // Java: push Kickoff sequence (always first).
-        // DEFERRED(BuyCardsAndInducements-generators): push Kickoff.build_sequence() when implemented.
-        //   Kickoff::build_sequence(game.rules)
+        // Java: ((Kickoff) factory.forName(Kickoff)).pushSequence(new Kickoff.SequenceParams(gameState, true))
+        let seq_kickoff = Kickoff::build_sequence(&KickoffParams { with_coin_choice: true });
 
         // Java: push Inducement(AFTER_INDUCEMENTS_PURCHASED) × 2.
         // Order: if newTvHome > newTvAway → home first; else away first.
@@ -232,8 +263,9 @@ impl StepBuyCardsAndInducements {
         // Java: check INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG option → push PRAYERS step.
         // DEFERRED(BuyCardsAndInducements-prayers): prayers step push deferred.
 
-        // Java: record treasury_spent_on_inducements / petty_cash_used for both teams.
-        // DEFERRED(BuyCardsAndInducements-accounting): TeamResult treasury/petty-cash accounting deferred.
+        // Java: game.getTeamHome/Away().getTeamData().setPettyCashUsed(UtilInducementSequence.calculateInducementGold(...))
+        game.game_result.home.petty_cash_used = UtilInducementSequence::calculate_inducement_gold(Some(game), true);
+        game.game_result.away.petty_cash_used = UtilInducementSequence::calculate_inducement_gold(Some(game), false);
 
         // Java: BriberyAndCorruption special rule handling.
         // DEFERRED(BuyCardsAndInducements-briberyAndCorruption): deferred.
@@ -247,6 +279,7 @@ impl StepBuyCardsAndInducements {
         StepOutcome::next()
             .publish(StepParameter::InducementGoldHome(new_tv_home))
             .publish(StepParameter::InducementGoldAway(new_tv_away))
+            .push_seq(seq_kickoff)
             .push_seq(seq_first)
             .push_seq(seq_second)
             .push_seq(seq_riotous)
@@ -341,8 +374,8 @@ mod tests {
         let mut game = make_game();
         let mut step = StepBuyCardsAndInducements::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
-        // Expect: 2 × Inducement(AFTER_INDUCEMENTS_PURCHASED) + 1 × RiotousRookies = 3 sequences.
-        assert_eq!(out.pushes.len(), 3, "expected 2 Inducement + 1 RiotousRookies sequences");
+        // Expect: 1 × Kickoff + 2 × Inducement(AFTER_INDUCEMENTS_PURCHASED) + 1 × RiotousRookies = 4 sequences.
+        assert_eq!(out.pushes.len(), 4, "expected Kickoff + 2 Inducement + 1 RiotousRookies sequences");
     }
 
     #[test]
@@ -372,6 +405,57 @@ mod tests {
         let mut step = StepBuyCardsAndInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert!(step.available_inducement_gold_away.is_some());
+    }
+
+    #[test]
+    fn inducements_disabled_skips_to_done() {
+        let mut game = make_game_with_petty_cash(100_000, 0);
+        // INDUCEMENTS not set → disabled → skip immediately.
+        let mut step = StepBuyCardsAndInducements::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(step.phase, Phase::Done);
+        assert_eq!(step.available_inducement_gold_home, Some(0));
+        assert_eq!(step.available_inducement_gold_away, Some(0));
+    }
+
+    #[test]
+    fn inducements_enabled_home_underdog_sets_phase_and_gold() {
+        use ffb_model::option::game_option_id::INDUCEMENTS;
+        let mut game = make_game_with_petty_cash(100_000, 0);
+        game.options.set(INDUCEMENTS, "true");
+        let mut step = StepBuyCardsAndInducements::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        // available_inducement_gold_home = petty_home + free_cash(0)
+        assert_eq!(step.available_inducement_gold_home, Some(100_000));
+    }
+
+    #[test]
+    fn free_cash_added_to_underdog_gold() {
+        use ffb_model::option::game_option_id::{INDUCEMENTS, FREE_INDUCEMENT_CASH, FREE_CARD_CASH};
+        let mut game = make_game_with_petty_cash(100_000, 0);
+        game.options.set(INDUCEMENTS, "true");
+        game.options.set(FREE_INDUCEMENT_CASH, "20000");
+        game.options.set(FREE_CARD_CASH, "10000");
+        let mut step = StepBuyCardsAndInducements::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        // 100,000 petty + 20,000 + 10,000 free cash = 130,000
+        assert_eq!(step.available_inducement_gold_home, Some(130_000));
+    }
+
+    #[test]
+    fn allow_even_ctv_enables_parallel_mode() {
+        use ffb_model::option::game_option_id::{INDUCEMENTS, INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV};
+        let mut game = make_game();
+        game.options.set(INDUCEMENTS, "true");
+        game.options.set(INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV, "true");
+        game.team_home.treasury = 50_000;
+        game.team_away.treasury = 30_000;
+        let mut step = StepBuyCardsAndInducements::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(step.parallel);
+        assert_eq!(step.available_inducement_gold_home, Some(50_000));
+        assert_eq!(step.available_inducement_gold_away, Some(30_000));
     }
 
     #[test]

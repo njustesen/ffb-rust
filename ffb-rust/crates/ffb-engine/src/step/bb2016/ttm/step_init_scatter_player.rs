@@ -11,7 +11,7 @@
 ///
 /// DEFERRED(scatter): UtilThrowTeamMateSequence.scatterPlayer/kickPlayer not yet ported.
 /// DEFERRED(injury): UtilServerInjury.handleInjury for hit player not yet ported.
-/// DEFERRED(animation): Animation/syncGameModel not yet ported.
+/// Animation/syncGameModel are client-side only; no server state change.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::PlayerState;

@@ -69,3 +69,32 @@ impl SkillMechanicTrait for SkillMechanic {
         false
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::enums::{PlayerState, PS_STANDING, PS_PRONE, TurnMode};
+    use crate::skill_mechanic::SkillMechanic as SkillTrait;
+
+    #[test]
+    fn allows_cancelling_guard_false_on_blitz() {
+        assert!(!SkillMechanic.allows_cancelling_guard(TurnMode::Blitz));
+    }
+
+    #[test]
+    fn allows_cancelling_guard_true_on_regular() {
+        assert!(SkillMechanic.allows_cancelling_guard(TurnMode::Regular));
+    }
+
+    #[test]
+    fn can_prevent_strip_ball_true_when_standing() {
+        // PlayerState::Standing has tacklezones
+        assert!(SkillMechanic.can_prevent_strip_ball(PlayerState(PS_STANDING)));
+    }
+
+    #[test]
+    fn can_prevent_strip_ball_false_when_prone() {
+        // PlayerState::Prone has no tacklezones
+        assert!(!SkillMechanic.can_prevent_strip_ball(PlayerState(PS_PRONE)));
+    }
+}

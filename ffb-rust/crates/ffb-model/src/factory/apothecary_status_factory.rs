@@ -14,3 +14,16 @@ impl ApothecaryStatusFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn for_name_returns_variant() {
+        assert_eq!(ApothecaryStatusFactory.for_name("noApothecary"), Some(ApothecaryStatus::NoApothecary));
+    }
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert!(ApothecaryStatusFactory.for_name("UNKNOWN").is_none());
+    }
+}

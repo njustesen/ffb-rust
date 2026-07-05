@@ -12,6 +12,7 @@
 ///  5. Clear stalling flag (`resetStalling()`).
 ///  6. If `noStalling` OR player is prone/stunned → optionally log "did not stall" + return.
 ///  7. Otherwise → `StallingExtension.handleStaller(this, player)`.
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
@@ -83,16 +84,18 @@ impl StepStallingPlayer {
 
         if no_stalling || is_prone_or_stunned {
             // Java: if (gotRid || scored) { addReport(new ReportPlayerEvent(id, "did not stall after all")) }
-            // DEFERRED: emit ReportPlayerEvent("did not stall after all") game event
-            let _ = (got_rid, scored);
+            if got_rid || scored {
+                return StepOutcome::next()
+                    .with_event(GameEvent::PlayerNote { player_id: player_id.clone(), note: "did not stall after all".into() });
+            }
             return StepOutcome::next();
         }
 
         // Java: stallingExtension.handleStaller(this, player);
         let turn_nr = game.turn_data().turn_nr;
-        self.stalling_extension.handle_staller(game, &player_id, turn_nr, rng);
+        let stalling_ev = self.stalling_extension.handle_staller(game, &player_id, turn_nr, rng);
 
-        StepOutcome::next()
+        StepOutcome::next().with_event(stalling_ev)
     }
 }
 
@@ -119,6 +122,7 @@ mod tests {
             passing: 4, armour: 9, starting_skills: vec![], extra_skills: vec![],
             temporary_skills: vec![], used_skills: std::collections::HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.field_model.set_player_coordinate(id, pos);
         game.field_model.set_player_state(id, PlayerState::new(state));

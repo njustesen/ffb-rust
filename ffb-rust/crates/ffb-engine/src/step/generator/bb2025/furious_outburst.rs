@@ -87,4 +87,16 @@ mod tests {
         });
         assert!(pb.is_some());
     }
+
+    #[test]
+    fn furious_outburst_starts_with_init_furious_outburst() {
+        let steps = FuriousOutburst::build_sequence();
+        assert_eq!(steps[0].step_id, StepId::InitFuriousOutburst);
+    }
+
+    #[test]
+    fn furious_outburst_has_stab() {
+        let steps = FuriousOutburst::build_sequence();
+        assert!(steps.iter().any(|s| s.step_id == StepId::Stab));
+    }
 }

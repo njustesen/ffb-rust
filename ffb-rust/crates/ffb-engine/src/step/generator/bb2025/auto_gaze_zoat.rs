@@ -43,4 +43,38 @@ mod tests {
         assert_eq!(steps[0].step_id, StepId::AutoGazeZoat);
         assert_eq!(steps[0].label.as_deref(), Some(labels::END));
     }
+
+    #[test]
+    fn failure_label_passed_as_goto_label_on_failure() {
+        let steps = AutoGazeZoat::build_sequence(&AutoGazeZoatParams {
+            failure_label: "myLabel".into(),
+            old_player_state: None,
+        });
+        let has_label = steps[0].params.iter().any(|p| {
+            matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "myLabel")
+        });
+        assert!(has_label);
+    }
+
+    #[test]
+    fn old_player_state_added_when_some() {
+        use ffb_model::enums::{PlayerState, PS_STANDING};
+        let state = PlayerState::new(PS_STANDING);
+        let steps = AutoGazeZoat::build_sequence(&AutoGazeZoatParams {
+            failure_label: "X".into(),
+            old_player_state: Some(state),
+        });
+        let has_state = steps[0].params.iter().any(|p| matches!(p, StepParameter::OldPlayerState(_)));
+        assert!(has_state);
+    }
+
+    #[test]
+    fn old_player_state_absent_when_none() {
+        let steps = AutoGazeZoat::build_sequence(&AutoGazeZoatParams {
+            failure_label: "X".into(),
+            old_player_state: None,
+        });
+        let has_state = steps[0].params.iter().any(|p| matches!(p, StepParameter::OldPlayerState(_)));
+        assert!(!has_state);
+    }
 }

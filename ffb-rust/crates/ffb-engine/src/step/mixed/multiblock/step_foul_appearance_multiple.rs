@@ -77,11 +77,12 @@ impl Step for StepFoulAppearanceMultiple {
                 if re_rolled_action.as_deref() == Some("FOUL_APPEARANCE") =>
             {
                 self.re_roll_target = target_id.clone();
-                let lords: Vec<String> = vec![]; // DEFERRED: gather from game when property system is ported
+                // Java: AbstractStepMultiple.reRollSourceSuccessfully(command.getReRollSource())
+                // Gathers acting-team players with grantsSingleUseTeamRerollWhenOnPitch (LordOfChaos).
                 let proceed = crate::step::mixed::multiblock::abstract_step_multiple::re_roll_source_successfully(
                     &mut self.base.state,
                     re_roll_source.as_deref().unwrap_or(""),
-                    &lords,
+                    game,
                 );
                 if proceed {
                     return self.execute_step(game, rng);

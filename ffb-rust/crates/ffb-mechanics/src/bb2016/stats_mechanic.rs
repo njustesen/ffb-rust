@@ -60,3 +60,47 @@ impl StatsMechanicTrait for StatsMechanic {
 impl StatsMechanic {
     pub fn new() -> Self { StatsMechanic }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::enums::PlayerStatKey;
+    use crate::stats_mechanic::StatsMechanic as StatsTrait;
+
+    #[test]
+    fn draw_passing_is_false() {
+        assert!(!StatsMechanic.draw_passing());
+    }
+
+    #[test]
+    fn stat_suffix_is_empty() {
+        assert_eq!(StatsMechanic.stat_suffix(), "");
+    }
+
+    #[test]
+    fn improvement_increases_value_is_true() {
+        assert!(StatsMechanic.improvement_increases_value());
+    }
+
+    #[test]
+    fn apply_in_game_agility_injury_decrements() {
+        assert_eq!(StatsMechanic.apply_in_game_agility_injury(3, 1), 2);
+    }
+
+    #[test]
+    fn apply_lasting_injury_decrements_and_floors_at_one() {
+        // min is 1 for AG
+        assert_eq!(StatsMechanic.apply_lasting_injury(4, PlayerStatKey::Ag), 3);
+        assert_eq!(StatsMechanic.apply_lasting_injury(1, PlayerStatKey::Ag), 1);
+    }
+
+    #[test]
+    fn stat_can_be_reduced_by_injury_true_when_diff_less_than_2() {
+        assert!(StatsMechanic.stat_can_be_reduced_by_injury(3, 2));
+    }
+
+    #[test]
+    fn stat_can_be_reduced_by_injury_false_when_diff_equals_2() {
+        assert!(!StatsMechanic.stat_can_be_reduced_by_injury(3, 1));
+    }
+}

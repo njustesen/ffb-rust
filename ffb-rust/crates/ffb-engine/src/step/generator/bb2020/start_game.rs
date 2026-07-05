@@ -55,4 +55,17 @@ mod tests {
         let steps = StartGame::build_sequence();
         assert!(steps.iter().any(|s| s.step_id == StepId::PettyCash));
     }
+
+    #[test]
+    fn start_game_has_weather() {
+        let steps = StartGame::build_sequence();
+        assert!(steps.iter().any(|s| s.step_id == StepId::Weather));
+    }
+
+    #[test]
+    fn start_game_has_buy_cards_and_inducements_not_buy_inducements() {
+        let steps = StartGame::build_sequence();
+        assert!(steps.iter().any(|s| s.step_id == StepId::BuyCardsAndInducements));
+        assert!(!steps.iter().any(|s| s.step_id == StepId::BuyInducements));
+    }
 }

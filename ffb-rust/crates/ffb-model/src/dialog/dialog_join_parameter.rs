@@ -10,3 +10,16 @@ impl IDialogParameter for DialogJoinParameter {
     fn get_id(&self) -> DialogId { DialogId::JOIN }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_join() {
+        assert_eq!(DialogJoinParameter.get_id(), DialogId::JOIN);
+    }
+    #[test]
+    fn transform_preserves_id() {
+        assert_eq!(DialogJoinParameter.transform().get_id(), DialogId::JOIN);
+    }
+}

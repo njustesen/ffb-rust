@@ -31,3 +31,26 @@ impl LeaderState {
 impl Default for LeaderState {
     fn default() -> Self { LeaderState::NONE }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_correct_variant() {
+        assert_eq!(LeaderState::for_name("none"), Some(LeaderState::NONE));
+        assert_eq!(LeaderState::for_name("available"), Some(LeaderState::AVAILABLE));
+        assert_eq!(LeaderState::for_name("used"), Some(LeaderState::USED));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(LeaderState::for_name("AVAILABLE"), None);
+        assert_eq!(LeaderState::for_name("invalid"), None);
+    }
+
+    #[test]
+    fn default_is_none() {
+        assert_eq!(LeaderState::default(), LeaderState::NONE);
+    }
+}

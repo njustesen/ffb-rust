@@ -22,3 +22,24 @@ impl Wording {
     pub fn get_inflection(&self) -> &str { &self.inflection }
     pub fn get_player_characterization(&self) -> &str { &self.player_characterization }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn getters_return_constructed_values() {
+        let w = Wording::new("Pass", "passes", "es", "thrower");
+        assert_eq!(w.get_noun(), "Pass");
+        assert_eq!(w.get_verb(), "passes");
+        assert_eq!(w.get_inflection(), "es");
+        assert_eq!(w.get_player_characterization(), "thrower");
+    }
+
+    #[test]
+    fn equal_wordings_compare_equal() {
+        let a = Wording::new("Pass", "passes", "es", "thrower");
+        let b = Wording::new("Pass", "passes", "es", "thrower");
+        assert_eq!(a, b);
+    }
+}

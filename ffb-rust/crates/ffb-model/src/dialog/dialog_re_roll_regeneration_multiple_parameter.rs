@@ -20,3 +20,17 @@ impl IDialogParameter for DialogReRollRegenerationMultipleParameter {
     fn get_id(&self) -> DialogId { DialogId::RE_ROLL_REGENERATION_MULTIPLE }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_re_roll_regeneration_multiple() {
+        assert_eq!(DialogReRollRegenerationMultipleParameter::default().get_id(), DialogId::RE_ROLL_REGENERATION_MULTIPLE);
+    }
+    #[test]
+    fn stores_player_ids_vec() {
+        let p = DialogReRollRegenerationMultipleParameter { player_ids: vec!["p1".into(), "p2".into()], ..Default::default() };
+        assert_eq!(p.get_player_ids().len(), 2);
+    }
+}

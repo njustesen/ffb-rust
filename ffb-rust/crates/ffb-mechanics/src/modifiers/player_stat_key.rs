@@ -10,3 +10,21 @@ pub enum PlayerStatKey {
     PA,
     AV,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn variants_distinct() {
+        assert_ne!(PlayerStatKey::AG, PlayerStatKey::AV);
+        assert_ne!(PlayerStatKey::MA, PlayerStatKey::ST);
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let v = PlayerStatKey::AG;
+        let json = serde_json::to_string(&v).unwrap();
+        assert_eq!(serde_json::from_str::<PlayerStatKey>(&json).unwrap(), v);
+    }
+}

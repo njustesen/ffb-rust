@@ -229,7 +229,7 @@ impl StepFollowup {
                         game.field_model.set_player_coordinate(attacker_id, followup_coord);
                         // Java: UtilServerPlayerMove.updateMoveSquares(getGameState(), jumping)
                         UtilServerPlayerMove::update_move_squares(game, game.acting_player.jumping);
-                        // DEFERRED(trackNumber): TrackNumber animation not ported
+                        // DEFERRED(animation-client): TrackNumber animation not ported
                         outcome = outcome.publish(StepParameter::PlayerEnteringSquare(attacker_id.clone()));
                     }
                 }
@@ -356,6 +356,7 @@ mod tests {
             starting_skills: vec![SkillWithValue { skill_id: SkillId::Juggernaut, value: None }],
             extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         // Defender (away) has Fend, standing (has tacklezones).
         game.team_away.players.push(Player {
@@ -365,6 +366,7 @@ mod tests {
             starting_skills: vec![SkillWithValue { skill_id: SkillId::Fend, value: None }],
             extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         let standing = PlayerState::new(PS_STANDING);
         game.field_model.set_player_state("defender", standing);

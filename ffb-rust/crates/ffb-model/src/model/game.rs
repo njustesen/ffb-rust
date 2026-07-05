@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
+use crate::dialog::dialog_id::DialogId;
 use crate::enums::{GameStatus, TurnMode, PlayerAction, Rules, Weather};
+use crate::model::property::NamedProperties;
 use crate::types::FieldCoordinate;
 use crate::model::acting_player::ActingPlayer;
 use crate::model::blitz_turn_state::BlitzTurnState;
@@ -9,6 +11,7 @@ use crate::model::game_result::GameResult;
 use crate::model::player::PlayerId;
 use crate::model::team::Team;
 use crate::model::turn_data::TurnData;
+use crate::model::prayer_state::PrayerState;
 
 /// The complete game state — primary data structure for the headless engine.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,6 +64,17 @@ pub struct Game {
     pub last_defender_id: Option<PlayerId>,
     /// Java: GameState.getBlitzTurnState / setBlitzTurnState — tracks activations during the Blitz! kickoff result.
     pub blitz_turn_state: Option<BlitzTurnState>,
+    /// Java: GameState.getPrayerState() — prayer effects active this game.
+    pub prayer_state: PrayerState,
+    /// Java: GameState.getKickingSwarmers / setKickingSwarmers — tracks how many
+    /// kicking-team swarming players were placed during the Swarming kickoff result.
+    pub kicking_swarmers: i32,
+    /// Java: GameState.activeEffects.shadowers — list of player IDs that have shadowed
+    /// this move (may contain duplicates; count per ID = shadowingCount for that player).
+    pub active_shadowers: Vec<String>,
+    /// Java: GameState.getGame().getDialogParameter().getId() — which dialog is currently shown.
+    /// Set by UtilServerDialog.showDialog(), cleared by hideDialog().
+    pub dialog_id: Option<DialogId>,
 }
 
 impl Game {
@@ -102,6 +116,10 @@ impl Game {
             admin_mode: false,
             last_defender_id: None,
             blitz_turn_state: None,
+            prayer_state: PrayerState::new(),
+            kicking_swarmers: 0,
+            active_shadowers: Vec::new(),
+            dialog_id: None,
         }
     }
 
@@ -140,6 +158,16 @@ impl Game {
         } else {
             self.team_away.player_mut(id)
         }
+    }
+
+    /// Java: GameState.shadowingCount(playerId) — count of how many times a player has shadowed.
+    pub fn shadowing_count(&self, player_id: &str) -> usize {
+        self.active_shadowers.iter().filter(|id| id.as_str() == player_id).count()
+    }
+
+    /// Java: GameState.addShadower(playerId) — record that a player shadowed this move.
+    pub fn add_shadower(&mut self, player_id: &str) {
+        self.active_shadowers.push(player_id.to_owned());
     }
 
     /// Mark a skill as used for the given player (Java: actingPlayer.markSkillUsed / player.addUsedSkill).
@@ -190,10 +218,42 @@ impl Game {
         }
     }
 
-    /// Stub for Game.isActive(NamedProperties) — checks if any active player has the given skill property.
-    /// TODO: implement when NamedProperties lookup is translated.
-    pub fn is_active(&self, _named_property: &str) -> bool {
-        false
+    /// Java: `Game.isActive(ISkillProperty)` — true if any active card in either team's
+    /// InducementSet has the given named property in its globalProperties().
+    pub fn is_active(&self, named_property: &str) -> bool {
+        let home = self.turn_data_home.inducement_set.get_active_cards();
+        let away = self.turn_data_away.inducement_set.get_active_cards();
+        home.into_iter().chain(away)
+            .any(|card| Self::card_global_properties(card).contains(&named_property))
+    }
+
+    /// Static mapping of BB2016 card names → their globalProperties().
+    /// Java: anonymous Card subclasses override globalProperties() per card.
+    fn card_global_properties(card_name: &str) -> &'static [&'static str] {
+        match card_name {
+            "Blatant Foul" => &[NamedProperties::FOUL_BREAKS_ARMOUR_WITHOUT_ROLL],
+            "Greased Shoes" => &[NamedProperties::SET_GFI_ROLL_TO_FIVE],
+            "Spiked Ball" => &[NamedProperties::DROPPED_BALL_CAUSES_ARMOUR_ROLL],
+            _ => &[],
+        }
+    }
+
+    /// Java: `Game.startTurn()` — resets per-turn state on both teams' TurnData and clears acting player.
+    /// Called at the start of each team turn (end-turn, blitz turn, etc.).
+    pub fn start_turn(&mut self) {
+        self.pass_coordinate = None;
+        self.acting_player.clear();
+        self.turn_data_home.reset_for_turn();
+        self.turn_data_away.reset_for_turn();
+        self.thrower_id = None;
+        self.thrower_action = None;
+        self.defender_id = None;
+        self.defender_action = None;
+        self.waiting_for_opponent = false;
+        self.timeout_possible = false;
+        self.timeout_enforced = false;
+        self.concession_possible = true;
+        self.last_defender_id = None;
     }
 }
 
@@ -300,7 +360,8 @@ mod tests {
             temporary_skills: vec![], used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
             career_spps: 0, race: None,
-        });
+            ..Default::default()
+});
         let mut away = empty_team("away");
         away.players.push(Player {
             id: "a1".into(), name: "AwayPlayer".into(), nr: 1,
@@ -310,7 +371,8 @@ mod tests {
             temporary_skills: vec![], used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
             career_spps: 0, race: None,
-        });
+            ..Default::default()
+});
         let g = Game::new(home, away, Rules::Bb2020);
         assert_eq!(g.player("h1").map(|p| p.name.as_str()), Some("HomePlayer"));
         assert_eq!(g.player("a1").map(|p| p.name.as_str()), Some("AwayPlayer"));
@@ -330,7 +392,8 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
-        });
+            ..Default::default()
+});
         let mut g = Game::new(home, empty_team("away"), Rules::Bb2020);
         assert!(!g.player("p1").unwrap().used_skills.contains(&SkillId::BlastIt));
         g.mark_skill_used("p1", SkillId::BlastIt);
@@ -342,5 +405,79 @@ mod tests {
         let mut g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2020);
         // Should not panic
         g.mark_skill_used("nonexistent", crate::enums::SkillId::BlastIt);
+    }
+
+    #[test]
+    fn start_turn_clears_per_turn_state() {
+        let mut g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2020);
+        use crate::types::FieldCoordinate;
+        g.pass_coordinate = Some(FieldCoordinate::new(5, 7));
+        g.thrower_id = Some("p1".into());
+        g.thrower_action = Some(crate::enums::PlayerAction::Pass);
+        g.defender_id = Some("p2".into());
+        g.defender_action = Some(crate::enums::PlayerAction::Blitz);
+        g.waiting_for_opponent = true;
+        g.timeout_possible = true;
+        g.timeout_enforced = true;
+        g.concession_possible = false;
+        g.last_defender_id = Some("p3".into());
+        g.turn_data_home.blitz_used = true;
+        g.turn_data_away.foul_used = true;
+
+        g.start_turn();
+
+        assert!(g.pass_coordinate.is_none());
+        assert!(g.thrower_id.is_none());
+        assert!(g.thrower_action.is_none());
+        assert!(g.defender_id.is_none());
+        assert!(g.defender_action.is_none());
+        assert!(!g.waiting_for_opponent);
+        assert!(!g.timeout_possible);
+        assert!(!g.timeout_enforced);
+        assert!(g.concession_possible);
+        assert!(g.last_defender_id.is_none());
+        assert!(!g.turn_data_home.blitz_used);
+        assert!(!g.turn_data_away.foul_used);
+    }
+
+    #[test]
+    fn is_active_returns_false_with_no_active_cards() {
+        let g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2016);
+        assert!(!g.is_active(NamedProperties::FOUL_BREAKS_ARMOUR_WITHOUT_ROLL));
+    }
+
+    #[test]
+    fn is_active_returns_true_when_blatant_foul_active_on_home() {
+        let mut g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2016);
+        g.turn_data_home.inducement_set.add_available_card("Blatant Foul");
+        g.turn_data_home.inducement_set.activate_card("Blatant Foul");
+        assert!(g.is_active(NamedProperties::FOUL_BREAKS_ARMOUR_WITHOUT_ROLL));
+    }
+
+    #[test]
+    fn is_active_returns_true_when_blatant_foul_active_on_away() {
+        let mut g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2016);
+        g.turn_data_away.inducement_set.add_available_card("Blatant Foul");
+        g.turn_data_away.inducement_set.activate_card("Blatant Foul");
+        assert!(g.is_active(NamedProperties::FOUL_BREAKS_ARMOUR_WITHOUT_ROLL));
+    }
+
+    #[test]
+    fn is_active_greased_shoes_sets_gfi_property() {
+        let mut g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2016);
+        g.turn_data_home.inducement_set.add_available_card("Greased Shoes");
+        g.turn_data_home.inducement_set.activate_card("Greased Shoes");
+        assert!(g.is_active(NamedProperties::SET_GFI_ROLL_TO_FIVE));
+        assert!(!g.is_active(NamedProperties::FOUL_BREAKS_ARMOUR_WITHOUT_ROLL));
+    }
+
+    #[test]
+    fn card_deactivated_is_no_longer_active() {
+        let mut g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2016);
+        g.turn_data_home.inducement_set.add_available_card("Blatant Foul");
+        g.turn_data_home.inducement_set.activate_card("Blatant Foul");
+        assert!(g.is_active(NamedProperties::FOUL_BREAKS_ARMOUR_WITHOUT_ROLL));
+        g.turn_data_home.inducement_set.deactivate_card("Blatant Foul");
+        assert!(!g.is_active(NamedProperties::FOUL_BREAKS_ARMOUR_WITHOUT_ROLL));
     }
 }

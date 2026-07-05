@@ -27,3 +27,29 @@ impl ArmorModifier for VariableArmourModifier {
     fn registered_to(&self) -> Option<&str> { self.registered_to.as_deref() }
     fn set_registered_to(&mut self, skill_id: Option<String>) { self.registered_to = skill_id; }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_stores_name_and_foul_flag() {
+        let m = VariableArmourModifier::new("Mighty Blow", false);
+        assert_eq!(m.get_name(), "Mighty Blow");
+        assert!(!m.is_foul_assist_modifier());
+    }
+
+    #[test]
+    fn registered_to_defaults_none() {
+        let m = VariableArmourModifier::new("x", false);
+        assert!(m.registered_to().is_none());
+    }
+
+    #[test]
+    fn foul_assist_flag_propagates() {
+        let m_foul = VariableArmourModifier::new("Foul Assist", true);
+        assert!(m_foul.is_foul_assist_modifier());
+        let m_no_foul = VariableArmourModifier::new("x", false);
+        assert!(!m_no_foul.is_foul_assist_modifier());
+    }
+}

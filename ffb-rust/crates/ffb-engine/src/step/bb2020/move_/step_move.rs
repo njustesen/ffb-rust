@@ -13,7 +13,7 @@ use crate::step::framework::{StepId, StepParameter};
 /// increments currentMove (×2 for jumping), optionally moves the ball if carried,
 /// publishes PLAYER_ENTERING_SQUARE.
 ///
-/// DEFERRED(trackNumber): TrackNumber animation not ported — no Rust FieldModel.track_numbers field.
+/// DEFERRED(animation-client): TrackNumber animation not ported — no Rust FieldModel.track_numbers field.
 pub struct StepMove {
     /// Java: fCoordinateFrom
     pub coordinate_from: Option<FieldCoordinate>,
@@ -164,5 +164,100 @@ mod tests {
         step.coordinate_to = Some(FieldCoordinate::new(6, 5));
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.acting_player.current_move, 3);
+    }
+
+    #[test]
+    fn increments_current_move_by_two_for_jumping() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.current_move = 0;
+        game.acting_player.jumping = true;
+        game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 5));
+        let mut step = StepMove::new();
+        step.coordinate_to = Some(FieldCoordinate::new(7, 5));
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.acting_player.current_move, 2);
+    }
+
+    #[test]
+    fn rooted_player_returns_next_step_without_moving() {
+        use ffb_model::enums::{PlayerState, PS_STANDING};
+        let mut game = make_game();
+        let from = FieldCoordinate::new(5, 5);
+        let to = FieldCoordinate::new(6, 5);
+        game.acting_player.player_id = Some("p1".into());
+        game.field_model.set_player_coordinate("p1", from);
+        // Rooted state means is_pinned() = true.
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING).change_rooted(true));
+        let mut step = StepMove::new();
+        step.coordinate_to = Some(to);
+        step.start(&mut game, &mut GameRng::new(0));
+        // Pinned player should not have moved.
+        assert_eq!(game.field_model.player_coordinate("p1"), Some(from));
+    }
+
+    #[test]
+    fn ball_moves_with_carrier() {
+        let mut game = make_game();
+        let from = FieldCoordinate::new(5, 5);
+        let to = FieldCoordinate::new(6, 5);
+        game.acting_player.player_id = Some("p1".into());
+        game.home_playing = true;
+        game.field_model.set_player_coordinate("p1", from);
+        game.field_model.ball_coordinate = Some(from);
+        game.field_model.ball_moving = false;
+        let mut step = StepMove::new();
+        step.coordinate_from = Some(from);
+        step.coordinate_to = Some(to);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.field_model.ball_coordinate, Some(to));
+    }
+
+    #[test]
+    fn ball_does_not_move_when_ball_moving() {
+        let mut game = make_game();
+        let from = FieldCoordinate::new(5, 5);
+        let to = FieldCoordinate::new(6, 5);
+        let ball_pos = FieldCoordinate::new(10, 5);
+        game.acting_player.player_id = Some("p1".into());
+        game.field_model.set_player_coordinate("p1", from);
+        game.field_model.ball_coordinate = Some(ball_pos);
+        game.field_model.ball_moving = true; // ball is already in transit
+        let mut step = StepMove::new();
+        step.coordinate_to = Some(to);
+        step.start(&mut game, &mut GameRng::new(0));
+        // Ball position should not change.
+        assert_eq!(game.field_model.ball_coordinate, Some(ball_pos));
+    }
+
+    #[test]
+    fn rushing_yards_added_to_player_result_when_carrying_ball() {
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+        use std::collections::HashSet;
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "carrier".into(), name: "c".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        let from = FieldCoordinate::new(5, 7);
+        let to = FieldCoordinate::new(8, 7);
+        game.acting_player.player_id = Some("carrier".into());
+        game.home_playing = true;
+        game.field_model.set_player_coordinate("carrier", from);
+        game.field_model.ball_coordinate = Some(from);
+        game.field_model.ball_moving = false;
+        let mut step = StepMove::new();
+        step.coordinate_from = Some(from);
+        step.coordinate_to = Some(to);
+        step.start(&mut game, &mut GameRng::new(0));
+        // delta_x = to.x - from.x = 8 - 5 = 3 (home playing)
+        let pr = game.game_result.home.player_results.get("carrier").unwrap();
+        assert_eq!(pr.rushing, 3);
     }
 }

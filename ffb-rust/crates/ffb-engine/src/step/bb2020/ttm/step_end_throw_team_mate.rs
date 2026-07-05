@@ -13,15 +13,17 @@
 /// Consumes: END_TURN, END_PLAYER_ACTION, THROWN_PLAYER_COORDINATE, THROWN_PLAYER_HAS_BALL,
 ///           THROWN_PLAYER_ID, THROWN_PLAYER_STATE, OLD_DEFENDER_STATE, BLOOD_LUST_ACTION.
 ///
-/// DEFERRED(EndTTM-generator): EndPlayerAction / Move SequenceGenerator not yet ported for BB2020.
-/// DEFERRED(EndTTM-dialog): UtilServerDialog.hideDialog deferred.
-/// DEFERRED(EndTTM-bloodlust): UtilServerGame.syncGameModel / UtilServerSteps.changePlayerAction deferred.
+/// DEFERRED(EndTTM-dialog): UtilServerDialog.hideDialog deferred (dialog-client).
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::{PlayerState, PlayerAction};
 use ffb_model::types::FieldCoordinate;
 use crate::action::Action;
-use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::step::framework::{Step, StepOutcome, StepAction, StepId, StepParameter};
+use crate::step::generator::bb2020::end_player_action::{EndPlayerAction, EndPlayerActionParams};
+use crate::step::generator::bb2020::move_::{Move as MoveGenerator, MoveParams};
+use crate::step::generator::bb2020::Select;
+use crate::step::generator::bb2020::select::SelectParams;
 
 /// Java: `StepEndThrowTeamMate` (bb2020/ttm).
 pub struct StepEndThrowTeamMate {
@@ -64,8 +66,9 @@ impl StepEndThrowTeamMate {
         game.defender_id = None;
         game.thrower_id = None;
 
-        // DEFERRED(EndTTM-bloodlust): BB2020 bloodlust check: actingPlayer.isSufferingBloodLust() && bloodlustAction != null.
-        let move_due_to_bloodlust = false; // stub — bloodlust detection deferred
+        // Java: actingPlayer.isSufferingBloodLust() && bloodlustAction != null
+        let move_due_to_bloodlust = game.acting_player.suffering_blood_lust
+            && self.bloodlust_action.is_some();
 
         // Reset thrown player to pre-throw coordinate/state if all values present.
         if let (Some(id), Some(coord)) = (
@@ -93,11 +96,23 @@ impl StepEndThrowTeamMate {
         }
 
         if move_due_to_bloodlust {
-            // DEFERRED(EndTTM-bloodlust): syncGameModel; changePlayerAction; push Move sequence.
+            // Java: UtilServerGame.syncGameModel (clear acting player move data)
+            // Java: UtilServerSteps.changePlayerAction(actingPlayer, bloodlustAction)
+            game.acting_player.player_action = self.bloodlust_action;
+            let seq = MoveGenerator::build_sequence(&MoveParams {
+                bloodlust_action: self.bloodlust_action,
+                ..Default::default()
+            });
+            StepOutcome::next().push_seq(seq)
         } else {
-            // DEFERRED(EndTTM-generator): EndPlayerAction.pushSequence(true, true, end_turn).
+            // Java: EndPlayerAction.pushSequence(feedingAllowed=true, endPlayerAction=true, endTurn)
+            let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
+                feeding_allowed: true,
+                end_player_action: true,
+                end_turn: self.end_turn,
+            });
+            StepOutcome::next().push_seq(seq)
         }
-        StepOutcome::next()
     }
 }
 
@@ -112,8 +127,24 @@ impl Step for StepEndThrowTeamMate {
         self.execute_step(game)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // DEFERRED(EndTTM-selectGenerator): CLIENT_ACTING_PLAYER → push Select sequence + NEXT_STEP_AND_REPEAT.
+    fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        if let Action::ActivatePlayer { .. } = action {
+            // Java: CLIENT_ACTING_PLAYER → Select.pushSequence(false) + NEXT_STEP_AND_REPEAT.
+            let select_seq = Select::build_sequence(&SelectParams {
+                update_persistence: false,
+                is_blitz_move: false,
+                block_targets: vec![],
+            });
+            return StepOutcome {
+                action: StepAction::NextStepAndRepeat,
+                goto_label: None,
+                published: vec![],
+                pushes: vec![select_seq],
+                events: vec![],
+                prompt: None,
+                clear_stack: false,
+            };
+        }
         self.execute_step(game)
     }
 
@@ -126,6 +157,7 @@ impl Step for StepEndThrowTeamMate {
             StepParameter::ThrownPlayerId(v)          => { self.thrown_player_id = v.clone(); true }
             StepParameter::ThrownPlayerState(v)       => { self.thrown_player_state = Some(*v); true }
             StepParameter::OldDefenderState(v)        => { self.old_player_state = Some(*v); true }
+            StepParameter::BloodLustAction(v)         => { self.bloodlust_action = *v; true }
             _ => false,
         }
     }
@@ -194,5 +226,44 @@ mod tests {
         let state = PlayerState::new(PS_STANDING);
         assert!(step.set_parameter(&StepParameter::OldDefenderState(state)));
         assert_eq!(step.old_player_state, Some(state));
+    }
+
+    #[test]
+    fn start_pushes_end_player_action_sequence() {
+        let mut game = make_game();
+        let out = StepEndThrowTeamMate::new().start(&mut game, &mut GameRng::new(0));
+        assert!(!out.pushes.is_empty(), "should push EndPlayerAction sequence");
+    }
+
+    #[test]
+    fn bloodlust_active_pushes_move_sequence() {
+        let mut game = make_game();
+        game.acting_player.suffering_blood_lust = true;
+        let mut step = StepEndThrowTeamMate::new();
+        step.bloodlust_action = Some(PlayerAction::Move);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(!out.pushes.is_empty(), "should push Move sequence for bloodlust");
+    }
+
+    #[test]
+    fn set_parameter_blood_lust_action() {
+        let mut step = StepEndThrowTeamMate::new();
+        assert!(step.set_parameter(&StepParameter::BloodLustAction(Some(PlayerAction::Move))));
+        assert_eq!(step.bloodlust_action, Some(PlayerAction::Move));
+    }
+
+    #[test]
+    fn activate_player_pushes_select_and_next_step_and_repeat() {
+        use crate::action::PlayerActionChoice;
+        let mut game = make_game();
+        let mut step = StepEndThrowTeamMate::new();
+        let out = step.handle_command(
+            &Action::ActivatePlayer { player_id: "p1".into(), player_action: PlayerActionChoice::Move, block_defender_id: None },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        // Java: Select.pushSequence(false) + NEXT_STEP_AND_REPEAT
+        assert_eq!(out.action, StepAction::NextStepAndRepeat);
+        assert_eq!(out.pushes.len(), 1);
     }
 }

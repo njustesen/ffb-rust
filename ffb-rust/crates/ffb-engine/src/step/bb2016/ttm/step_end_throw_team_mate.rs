@@ -7,14 +7,16 @@
 /// Consumes: END_TURN, THROWN_PLAYER_COORDINATE, THROWN_PLAYER_HAS_BALL,
 ///           THROWN_PLAYER_ID, THROWN_PLAYER_STATE.
 ///
-/// DEFERRED(generator): EndPlayerAction SequenceGenerator not yet ported for BB2016.
-/// DEFERRED(dialog): UtilServerDialog.hideDialog not yet ported.
+/// DEFERRED(dialog-client): UtilServerDialog.hideDialog not yet ported.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::PlayerState;
 use ffb_model::types::FieldCoordinate;
 use crate::action::Action;
-use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::step::framework::{Step, StepOutcome, StepAction, StepId, StepParameter};
+use crate::step::generator::bb2016::end_player_action::{EndPlayerAction, EndPlayerActionParams};
+use crate::step::generator::bb2016::Select;
+use crate::step::generator::bb2016::select::SelectParams;
 
 /// Java: `StepEndThrowTeamMate` (bb2016/ttm).
 pub struct StepEndThrowTeamMate {
@@ -65,8 +67,12 @@ impl StepEndThrowTeamMate {
                 }
             }
         }
-        // DEFERRED(generator): EndPlayerAction.pushSequence not yet ported.
-        StepOutcome::next()
+        let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
+            feeding_allowed: true,
+            end_player_action: true,
+            end_turn: self.end_turn,
+        });
+        StepOutcome::next().push_seq(seq)
     }
 }
 
@@ -83,8 +89,19 @@ impl Step for StepEndThrowTeamMate {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         match action {
-            // Java: CLIENT_ACTING_PLAYER → push Select sequence + NEXT_STEP_AND_REPEAT.
-            // DEFERRED(selectGenerator): Select SequenceGenerator not yet ported.
+            // Java: CLIENT_ACTING_PLAYER → Select.pushSequence(false) + NEXT_STEP_AND_REPEAT.
+            Action::ActivatePlayer { .. } => {
+                let select_seq = Select::build_sequence(&SelectParams { update_persistence: false });
+                return StepOutcome {
+                    action: StepAction::NextStepAndRepeat,
+                    goto_label: None,
+                    published: vec![],
+                    pushes: vec![select_seq],
+                    events: vec![],
+                    prompt: None,
+                    clear_stack: false,
+                };
+            }
             _ => {}
         }
         self.execute_step(game)
@@ -148,5 +165,27 @@ mod tests {
         let mut step = StepEndThrowTeamMate::new();
         assert!(step.set_parameter(&StepParameter::EndTurn(true)));
         assert!(step.end_turn);
+    }
+
+    #[test]
+    fn start_pushes_end_player_action_sequence() {
+        let mut game = make_game();
+        let out = StepEndThrowTeamMate::new().start(&mut game, &mut GameRng::new(0));
+        assert!(!out.pushes.is_empty());
+    }
+
+    #[test]
+    fn activate_player_pushes_select_and_next_step_and_repeat() {
+        use crate::action::PlayerActionChoice;
+        let mut game = make_game();
+        let mut step = StepEndThrowTeamMate::new();
+        let out = step.handle_command(
+            &Action::ActivatePlayer { player_id: "p1".into(), player_action: PlayerActionChoice::Move, block_defender_id: None },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        // Java: Select.pushSequence(false) + NEXT_STEP_AND_REPEAT
+        assert_eq!(out.action, StepAction::NextStepAndRepeat);
+        assert_eq!(out.pushes.len(), 1);
     }
 }

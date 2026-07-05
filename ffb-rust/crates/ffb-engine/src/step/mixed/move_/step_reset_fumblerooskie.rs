@@ -6,6 +6,7 @@
 ///
 /// Init parameters (optional): RESET_FOR_FAILED_BLOCK, END_PLAYER_ACTION, IN_SELECT.
 /// Incoming parameters: END_PLAYER_ACTION, END_TURN.
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -71,17 +72,11 @@ impl StepResetFumblerooskie {
 
                 // Java: if (endPlayerAction || (ballCarrierStanding && !isNextMovePossible))
                 //           setSound(PICKUP) + addReport(new ReportFumblerooskie(playerId, false))
-                // NOTE: ReportFumblerooskie is not yet in GameEvent; emit SkillUse as proxy.
                 if self.end_player_action || (ball_carrier_standing && self.end_player_action) {
-                    // Java: getResult().addReport(new ReportFumblerooskie(actingPlayer.getPlayerId(), false))
-                    // Emit SkillUse with skill_id 0 as a placeholder (Fumblerooskie report not yet in GameEvent).
-                    outcome = outcome.with_event(
-                        ffb_model::events::GameEvent::SkillUse {
-                            player_id: player_id.clone(),
-                            skill_id: 0,
-                            used: false,
-                        }
-                    );
+                    outcome = outcome.with_event(GameEvent::Fumblerooskie {
+                        player_id: player_id.clone(),
+                        used: false,
+                    });
                 }
 
                 return outcome;

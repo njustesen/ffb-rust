@@ -16,3 +16,17 @@ impl IDialogParameter for DialogReceiveChoiceParameter {
     fn get_id(&self) -> DialogId { DialogId::RECEIVE_CHOICE }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_receive_choice() {
+        assert_eq!(DialogReceiveChoiceParameter::default().get_id(), DialogId::RECEIVE_CHOICE);
+    }
+    #[test]
+    fn stores_choosing_team_id() {
+        let p = DialogReceiveChoiceParameter { choosing_team_id: Some("home".into()) };
+        assert_eq!(p.get_choosing_team_id(), Some("home"));
+    }
+}

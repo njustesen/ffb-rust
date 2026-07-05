@@ -212,9 +212,17 @@ impl StepTrickster {
                         self.attempt_pick_up = Some(false);
                     }
                     if let Some(true) = self.attempt_pick_up {
-                        // DEFERRED: publish AttemptPickUp + PlayerOnBallId + PickUpOptional
+                        // Java: publish AttemptPickUp=true, PlayerOnBallId=mover, PickUpOptional=false
+                        let mover = game.acting_player.player_id.clone().unwrap_or_default();
+                        outcome = outcome
+                            .publish(StepParameter::AttemptPickUp(true))
+                            .publish(StepParameter::PlayerOnBallId(mover))
+                            .publish(StepParameter::PickUpOptional(false));
                     } else {
-                        // DEFERRED: publish CatchScatterThrowInMode::ScatterBall
+                        // Java: publish CatchScatterThrowInMode::ScatterBall
+                        outcome = outcome.publish(StepParameter::CatchScatterThrowInMode(
+                            crate::step::framework::CatchScatterThrowInMode::ScatterBall,
+                        ));
                     }
                 }
 
@@ -347,6 +355,7 @@ mod tests {
             movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         };
         let defender = Player {
             id: "def".into(), name: "d".into(), nr: 2, position_id: "p".into(),
@@ -356,6 +365,7 @@ mod tests {
             starting_skills: vec![ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::Trickster, value: None }],
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         };
         game.team_home.players.push(attacker);
         game.field_model.set_player_coordinate("att", FieldCoordinate::new(5, 5));

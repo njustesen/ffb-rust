@@ -5,7 +5,7 @@ use ffb_model::enums::{ApothecaryMode, PlayerState, PS_RESERVE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
-use crate::injury::{InjuryContext, do_injury_roll};
+use crate::injury::{InjuryContext, do_injury_roll_for_player};
 
 pub(crate) fn crowd_handle_injury(
     ctx: &mut InjuryContext, _game: &Game, rng: &mut GameRng,
@@ -17,8 +17,48 @@ pub(crate) fn crowd_handle_injury(
     ctx.defender_coordinate = Some(coord);
     ctx.apothecary_mode = apo_mode;
     ctx.armor_broken = true;
-    do_injury_roll(rng, ctx);
+    do_injury_roll_for_player(rng, ctx, _game, defender_id);
     if !ctx.is_casualty() && !ctx.is_knocked_out() {
         ctx.injury = Some(PlayerState::new(PS_RESERVE));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::enums::{ApothecaryMode, Rules};
+    use ffb_model::model::game::Game;
+    use crate::step::framework::test_team;
+    use ffb_model::types::FieldCoordinate;
+
+    #[test]
+    fn sets_defender_and_attacker_ids() {
+        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let mut rng = GameRng::new(1);
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        crowd_handle_injury(&mut ctx, &game, &mut rng, Some("atk1"), "def1",
+            FieldCoordinate::new(0, 0), ApothecaryMode::Defender);
+        assert_eq!(ctx.defender_id.as_deref(), Some("def1"));
+        assert_eq!(ctx.attacker_id.as_deref(), Some("atk1"));
+    }
+
+    #[test]
+    fn sets_armor_broken_true() {
+        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let mut rng = GameRng::new(1);
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        crowd_handle_injury(&mut ctx, &game, &mut rng, None, "def1",
+            FieldCoordinate::new(0, 0), ApothecaryMode::Defender);
+        assert!(ctx.armor_broken);
+    }
+
+    #[test]
+    fn injury_is_set_after_call() {
+        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let mut rng = GameRng::new(1);
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        crowd_handle_injury(&mut ctx, &game, &mut rng, None, "def1",
+            FieldCoordinate::new(0, 0), ApothecaryMode::Defender);
+        assert!(ctx.injury.is_some());
     }
 }

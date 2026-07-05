@@ -69,3 +69,46 @@ impl SkillMechanicTrait for SkillMechanic {
         false
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::enums::{PlayerState, PS_STANDING, PS_PRONE, PlayerType, PlayerGender, TurnMode};
+    use crate::skill_mechanic::SkillMechanic as SkillTrait;
+
+    fn bare_player(id: &str, career_spps: i32) -> Player {
+        Player {
+            id: id.into(), name: id.into(), nr: 1,
+            position_id: "pos".into(),
+            player_type: PlayerType::Regular,
+            gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: career_spps, career_spps,
+            race: None,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn allows_cancelling_guard_is_always_false() {
+        assert!(!SkillMechanic.allows_cancelling_guard(TurnMode::Regular));
+        assert!(!SkillMechanic.allows_cancelling_guard(TurnMode::Blitz));
+    }
+
+    #[test]
+    fn can_prevent_strip_ball_is_always_true() {
+        assert!(SkillMechanic.can_prevent_strip_ball(PlayerState(PS_STANDING)));
+        assert!(SkillMechanic.can_prevent_strip_ball(PlayerState(PS_PRONE)));
+    }
+
+    #[test]
+    fn animosity_exists_always_false() {
+        let p1 = bare_player("p1", 0);
+        let p2 = bare_player("p2", 0);
+        assert!(!SkillMechanic.animosity_exists(&p1, &p2));
+    }
+
+}

@@ -39,3 +39,41 @@ impl ArmorModifier for StaticArmourModifier {
     fn registered_to(&self) -> Option<&str> { self.registered_to.as_deref() }
     fn set_registered_to(&mut self, skill_id: Option<String>) { self.registered_to = skill_id; }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn dummy_player() -> Player {
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        Player {
+            id: "p".into(), name: "p".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn new_stores_name_modifier_and_foul_flag() {
+        let m = StaticArmourModifier::new("Mighty Blow", 1, false);
+        assert_eq!(m.get_name(), "Mighty Blow");
+        let p = dummy_player();
+        assert_eq!(m.get_modifier(None, &p), 1);
+        assert!(!m.is_foul_assist_modifier());
+    }
+
+    #[test]
+    fn chainsaw_flag_defaults_false() {
+        assert!(!StaticArmourModifier::new("x", 0, false).is_chainsaw());
+    }
+
+    #[test]
+    fn chainsaw_flag_can_be_set() {
+        let m = StaticArmourModifier::new_with_chainsaw("Chainsaw +3", 3, false, true);
+        assert!(m.is_chainsaw());
+    }
+}

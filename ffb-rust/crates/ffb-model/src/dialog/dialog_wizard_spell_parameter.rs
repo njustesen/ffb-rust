@@ -16,3 +16,17 @@ impl IDialogParameter for DialogWizardSpellParameter {
     fn get_id(&self) -> DialogId { DialogId::WIZARD_SPELL }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dialog_id_is_wizard_spell() {
+        assert_eq!(DialogWizardSpellParameter::default().get_id(), DialogId::WIZARD_SPELL);
+    }
+    #[test]
+    fn stores_team_id() {
+        let p = DialogWizardSpellParameter { team_id: Some("home".into()) };
+        assert_eq!(p.get_team_id(), Some("home"));
+    }
+}

@@ -24,10 +24,12 @@
 ///
 /// Sets stepParameter KICKOFF_RESULT for all steps on the stack.
 ///
-/// DEFERRED(KickoffResultRoll-overtime): GameOptionId::OVERTIME_KICK_OFF_RESULTS handling deferred.
-/// DEFERRED(KickoffResultRoll-dialog): CLIENT_KICK_OFF_RESULT_CHOICE dialog path deferred.
+/// Overtime option handling: all paths implemented except `blitzOrSolidDefence` (requires dialog).
+/// DEFERRED(KickoffResultRoll-dialog): CLIENT_KICK_OFF_RESULT_CHOICE dialog for blitzOrSolidDefence deferred.
 use ffb_model::enums::KickoffResult;
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::option::game_option_id;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -43,30 +45,39 @@ impl StepKickoffResultRoll {
         Self { kickoff_result: None }
     }
 
-    fn execute_step(&mut self, _game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: UtilServerDialog.hideDialog(getGameState())
 
         if self.kickoff_result.is_none() {
-            // DEFERRED(KickoffResultRoll-overtime): check game.half < 3 and
-            // GameOptionId::OVERTIME_KICK_OFF_RESULTS to select the overtime path:
-            //   - OVERTIME_KICK_OFF_RANDOM_BLITZ_OR_SOLID_DEFENCE: roll d6, use validRolls[index].
-            //   - OVERTIME_KICK_OFF_BLITZ: fKickoffResult = KickoffResult::BLITZ; goto NextStep.
-            //   - OVERTIME_KICK_OFF_SOLID_DEFENCE: fKickoffResult = KickoffResult::SOLID_DEFENCE; goto NextStep.
-            //   - Otherwise: showDialog + return Continue.
-            //
-            // For now: always roll normally (covers half < 3 and the default path).
-
-            // Java: rollKickoff = getGameState().getDiceRoller().rollKickoff() → two d6
-            // Java: fKickoffResult = DiceInterpreter.interpretRollKickoff(game, rollKickoff)
-            let roll = rng.d6_two();
-            self.kickoff_result = Some(kickoff_result_for_roll(roll));
+            // Java: check overtime option; half < 3 → always roll normally
+            let overtime_option = game.options.get(game_option_id::OVERTIME_KICK_OFF_RESULTS).unwrap_or("all");
+            if game.half < 3 || overtime_option == "all" {
+                let roll = rng.d6_two();
+                self.kickoff_result = Some(kickoff_result_for_roll(roll));
+            } else if overtime_option == "randomBlitzOrSolidDefence" {
+                // Java: int[][] validRolls = {{1,3},{2,2},{3,1},{6,4},{5,5},{4,6}}
+                let valid_rolls: [[i32; 2]; 6] = [[1, 3], [2, 2], [3, 1], [6, 4], [5, 5], [4, 6]];
+                let index = (rng.d6() - 1) as usize;
+                let pair = valid_rolls[index.min(5)];
+                self.kickoff_result = Some(kickoff_result_for_roll(pair[0] + pair[1]));
+            } else if overtime_option == "blitz" {
+                self.kickoff_result = Some(KickoffResult::Blitz);
+            } else if overtime_option == "solidDefence" {
+                self.kickoff_result = Some(KickoffResult::SolidDefence);
+            } else {
+                // DEFERRED(KickoffResultRoll-dialog): blitzOrSolidDefence requires CLIENT_KICK_OFF_RESULT_CHOICE dialog.
+                // Fall back to normal roll to avoid blocking.
+                let roll = rng.d6_two();
+                self.kickoff_result = Some(kickoff_result_for_roll(roll));
+            }
         }
 
         let result = self.kickoff_result.unwrap();
-        // Java: getResult().addReport(new ReportKickoffResult(fKickoffResult, rollKickoff))
         // Java: publishParameter(new StepParameter(StepParameterKey.KICKOFF_RESULT, fKickoffResult))
         // Java: getResult().setNextAction(StepAction.NEXT_STEP)
-        StepOutcome::next().publish(StepParameter::KickoffResult(result))
+        StepOutcome::next()
+            .with_event(GameEvent::KickoffResultEvent { result })
+            .publish(StepParameter::KickoffResult(result))
     }
 }
 
@@ -204,5 +215,49 @@ mod tests {
         let mut step = StepKickoffResultRoll::new();
         let out = step.handle_command(&Action::Acknowledge, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn overtime_blitz_option_forces_blitz() {
+        let mut game = make_game();
+        game.half = 3;
+        game.options.set("overtimeKickOffResults", "blitz");
+        let mut step = StepKickoffResultRoll::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(step.kickoff_result, Some(KickoffResult::Blitz));
+    }
+
+    #[test]
+    fn overtime_solid_defence_option_forces_solid_defence() {
+        let mut game = make_game();
+        game.half = 3;
+        game.options.set("overtimeKickOffResults", "solidDefence");
+        let mut step = StepKickoffResultRoll::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(step.kickoff_result, Some(KickoffResult::SolidDefence));
+    }
+
+    #[test]
+    fn half_less_than_3_always_rolls_normally_ignoring_overtime_option() {
+        let mut game = make_game();
+        game.half = 2;
+        game.options.set("overtimeKickOffResults", "blitz");
+        let mut step = StepKickoffResultRoll::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        // half < 3 → must roll normally; result must not be forced Blitz
+        // (with seed 0 the roll is not necessarily Blitz, so just check it's set)
+        assert!(step.kickoff_result.is_some());
+    }
+
+    #[test]
+    fn overtime_random_blitz_or_solid_defence_sets_valid_result() {
+        let mut game = make_game();
+        game.half = 3;
+        game.options.set("overtimeKickOffResults", "randomBlitzOrSolidDefence");
+        let mut step = StepKickoffResultRoll::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        // valid_rolls are all {1+3, 2+2, 3+1, 6+4, 5+5, 4+6} = {4, 4, 4, 10, 10, 10}
+        // → SolidDefence(4) or Blitz(10)
+        assert!(matches!(step.kickoff_result, Some(KickoffResult::SolidDefence) | Some(KickoffResult::Blitz)));
     }
 }

@@ -17,8 +17,7 @@ use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter};
 ///
 /// Publishes: `CatchScatterThrowInMode`, `PassAccurate`, `BombOutOfBounds`.
 ///
-/// DEFERRED(animation): Animation type + UtilServerGame.syncGameModel not yet translated —
-///   these send client-visible animation events; no game-state effect.
+/// Animation type + UtilServerGame.syncGameModel are client-side only; no server game-state effect.
 pub struct StepResolvePass {
     /// Consumed from PassAccurate parameter published by StepPass.
     pub pass_accurate: bool,
@@ -87,8 +86,7 @@ impl StepResolvePass {
         // Java: AnimationType animationType = getAnimationType(throwerAction)
         // Java: getResult().setAnimation(new Animation(animationType, throwerCoord, passCoord, interceptorCoord))
         // Java: UtilServerGame.syncGameModel(this)
-        // DEFERRED(animation): Animation + syncGameModel — client-side visual only; no game-state effect.
-        //   Waiting for StepResult.animation and UtilServerGame.sync_game_model() to be ported.
+        // Animation + syncGameModel: client-side visual only, no server state change.
 
         let is_bomb = matches!(
             game.thrower_action,

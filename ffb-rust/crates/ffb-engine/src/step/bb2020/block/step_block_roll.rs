@@ -66,7 +66,7 @@ impl Step for StepBlockRoll {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
-            Action::BlockChoice { die_index } => {
+            Action::BlockChoice { die_index, .. } => {
                 // Java: CLIENT_BLOCK_CHOICE — player selects which die result to apply.
                 self.dice_index = *die_index;
                 if let Some(&roll) = self.block_roll.get(*die_index) {
@@ -78,7 +78,7 @@ impl Step for StepBlockRoll {
                 self.re_roll_source = None;
             }
             // Java: CLIENT_USE_BRAWLER
-            Action::UseBrawler => {
+            Action::UseBrawler { .. } => {
                 self.re_roll_source = Some("Brawler".into());
                 self.re_rolled_action = Some("BLOCK".into());
             }
@@ -325,6 +325,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.field_model.set_player_coordinate(id, coord);
     }
@@ -436,7 +437,7 @@ mod tests {
         step.nr_of_dice = 3;
         let mut game = make_game();
         let out = step.handle_command(
-            &Action::BlockChoice { die_index: 1 },
+            &Action::BlockChoice { die_index: 1, target_id: None },
             &mut game,
             &mut GameRng::new(0),
         );
@@ -452,7 +453,7 @@ mod tests {
         step.nr_of_dice = 1;
         let mut game = make_game();
         step.handle_command(
-            &Action::BlockChoice { die_index: 0 },
+            &Action::BlockChoice { die_index: 0, target_id: None },
             &mut game,
             &mut GameRng::new(0),
         );
@@ -466,7 +467,7 @@ mod tests {
         step.nr_of_dice = 1;
         let mut game = make_game();
         step.handle_command(
-            &Action::BlockChoice { die_index: 0 },
+            &Action::BlockChoice { die_index: 0, target_id: None },
             &mut game,
             &mut GameRng::new(0),
         );
@@ -480,7 +481,7 @@ mod tests {
         step.nr_of_dice = 1;
         let mut game = make_game();
         step.handle_command(
-            &Action::BlockChoice { die_index: 0 },
+            &Action::BlockChoice { die_index: 0, target_id: None },
             &mut game,
             &mut GameRng::new(0),
         );
@@ -545,7 +546,7 @@ mod tests {
         add_player_with_skill(&mut game, "p1", SkillId::Brawler);
         game.acting_player.player_id = Some("p1".into());
         game.home_playing = true;
-        step.handle_command(&Action::UseBrawler, &mut game, &mut GameRng::new(1));
+        step.handle_command(&Action::UseBrawler { target_id: None }, &mut game, &mut GameRng::new(1));
         // die_index should be 1 (first BothDown at index 1)
         assert_eq!(step.die_index, 1);
         // block_roll[0] and [2] should be unchanged

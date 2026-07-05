@@ -14,3 +14,19 @@ impl TeamStatusFactory {
 
     pub fn initialize(&mut self) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn for_name_returns_known_status() {
+        assert_eq!(TeamStatusFactory::default().for_name("Active"), Some(TeamStatus::Active));
+        assert_eq!(TeamStatusFactory::default().for_name("New"), Some(TeamStatus::New));
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(TeamStatusFactory::default().for_name("invalid"), None);
+    }
+}

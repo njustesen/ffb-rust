@@ -43,9 +43,12 @@ mod tests {
 
     #[test]
     fn starting_pushback_square_parameter_accepted() {
+        use ffb_model::enums::Direction;
+        use ffb_model::types::PushbackSquare;
         let mut step = StepPushback::new();
         let coord = FieldCoordinate::new(7, 5);
-        let accepted = step.set_parameter(&StepParameter::StartingPushbackSquare(coord));
+        let sq = PushbackSquare::new(coord, Direction::North, true);
+        let accepted = step.set_parameter(&StepParameter::StartingPushbackSquare(Some(sq)));
         assert!(accepted);
         assert!(step.starting_pushback_square.is_some());
         assert_eq!(step.starting_pushback_square.unwrap().coordinate, coord);

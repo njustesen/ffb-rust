@@ -14,11 +14,16 @@
 /// DEFERRED(inducements): InducementTypeFactory, Inducement, InducementSet not yet ported.
 /// DEFERRED(addStarPlayers): RosterPlayer creation + DB update not yet ported.
 /// DEFERRED(addMercenaries): Loner skill injection not yet ported.
-/// DEFERRED(generators): Inducement / RiotousRookies generators not yet ported.
+use ffb_model::enums::InducementPhase;
 use ffb_model::model::game::Game;
+use ffb_model::option::game_option_id::INDUCEMENTS;
+use ffb_model::option::util_game_option::is_option_enabled;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::step::generator::common::inducement::{Inducement, InducementParams};
+use crate::step::generator::common::riotous_rookies::RiotousRookies;
+use crate::step::game::start::util_inducement_sequence::UtilInducementSequence;
 
 const MINIMUM_PETTY_CASH_FOR_INDUCEMENTS: i32 = 50_000;
 
@@ -56,8 +61,15 @@ impl StepBuyInducements {
         }
     }
 
-    fn execute_step(&mut self, _game: &mut Game) -> StepOutcome {
-        // DEFERRED(options): INDUCEMENTS GameOption check not yet ported.
+    fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
+        // Java: if (!INDUCEMENTS) → leaveStep (skip inducement buying entirely)
+        if !is_option_enabled(game, INDUCEMENTS) {
+            self.inducements_selected_home = true;
+            self.inducements_selected_away = true;
+            return self.leave_step(game);
+        }
+
+        // DEFERRED(options): USE_PREDEFINED_INDUCEMENTS not yet ported.
         // Auto-skip if under minimum.
         if self.inducement_gold_home < MINIMUM_PETTY_CASH_FOR_INDUCEMENTS {
             self.inducements_selected_home = true;
@@ -66,11 +78,31 @@ impl StepBuyInducements {
             self.inducements_selected_away = true;
         }
         // DEFERRED(dialog): show dialog for teams still buying — not yet ported.
-        // DEFERRED(generators): push Inducement + RiotousRookies sequences — not yet ported.
         if self.inducements_selected_home && self.inducements_selected_away {
-            return StepOutcome::next();
+            return self.leave_step(game);
         }
         StepOutcome::cont()
+    }
+
+    fn leave_step(&self, game: &mut Game) -> StepOutcome {
+        let home_tv = game.game_result.home.team_value;
+        let away_tv = game.game_result.away.team_value;
+        let (first_home, second_home) = if home_tv > away_tv { (true, false) } else { (false, true) };
+        let seq1 = Inducement::build_sequence(&InducementParams {
+            inducement_phase: InducementPhase::AfterInducementsPurchased,
+            home_team: first_home,
+            check_forgo: false,
+        });
+        let seq2 = Inducement::build_sequence(&InducementParams {
+            inducement_phase: InducementPhase::AfterInducementsPurchased,
+            home_team: second_home,
+            check_forgo: false,
+        });
+        let seq_rr = RiotousRookies::build_sequence();
+        // Java: game.getTeamHome/Away().getTeamData().setPettyCashUsed(UtilInducementSequence.calculateInducementGold(...))
+        game.game_result.home.petty_cash_used = UtilInducementSequence::calculate_inducement_gold(Some(game), true);
+        game.game_result.away.petty_cash_used = UtilInducementSequence::calculate_inducement_gold(Some(game), false);
+        StepOutcome::next().push_seq(seq1).push_seq(seq2).push_seq(seq_rr)
     }
 }
 
@@ -139,13 +171,49 @@ mod tests {
     }
 
     #[test]
-    fn both_rich_returns_continue() {
+    fn both_rich_returns_continue_when_inducements_enabled() {
+        use ffb_model::option::game_option_id::INDUCEMENTS;
         let mut game = make_game();
+        game.options.set(INDUCEMENTS, "true");
         let mut step = StepBuyInducements::new();
         step.inducement_gold_home = 150_000;
         step.inducement_gold_away = 150_000;
         let out = step.start(&mut game, &mut GameRng::new(0));
         // Dialog would be shown — until generator deferred, fall to Continue
         assert!(matches!(out.action, StepAction::Continue));
+    }
+
+    #[test]
+    fn both_under_minimum_pushes_three_sequences() {
+        let mut game = make_game();
+        let mut step = StepBuyInducements::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // Two Inducement sequences + one RiotousRookies
+        assert_eq!(out.pushes.len(), 3);
+    }
+
+    #[test]
+    fn leave_step_sets_petty_cash_used() {
+        let mut game = make_game();
+        // Set TV diff so home gets petty cash
+        game.game_result.home.team_value = 800_000;
+        game.game_result.away.team_value = 1_000_000;
+        game.game_result.away.petty_cash_transferred = 0;
+        let mut step = StepBuyInducements::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        // UtilInducementSequence: home gets 200k petty cash
+        assert_eq!(game.game_result.home.petty_cash_used, 200_000);
+        assert_eq!(game.game_result.away.petty_cash_used, 0);
+    }
+
+    #[test]
+    fn inducements_disabled_skips_to_next_step() {
+        let mut game = make_game();
+        // INDUCEMENTS not set → disabled → skip to leaveStep immediately
+        let mut step = StepBuyInducements::new();
+        step.inducement_gold_home = 150_000;
+        step.inducement_gold_away = 150_000;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.action, StepAction::NextStep));
     }
 }

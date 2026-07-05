@@ -71,4 +71,18 @@ mod tests {
         let steps = EndGame::build_sequence(&EndGameParams::default());
         assert!(steps.iter().any(|s| s.step_id == StepId::PenaltyShootout));
     }
+
+    #[test]
+    fn admin_mode_param_passed_to_init() {
+        let params = EndGameParams { admin_mode: true };
+        let steps = EndGame::build_sequence(&params);
+        let has = steps[0].params.iter().any(|p| matches!(p, StepParameter::AdminMode(true)));
+        assert!(has);
+    }
+
+    #[test]
+    fn end_game_starts_with_init_end_game() {
+        let steps = EndGame::build_sequence(&EndGameParams::default());
+        assert_eq!(steps[0].step_id, StepId::InitEndGame);
+    }
 }

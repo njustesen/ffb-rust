@@ -65,3 +65,27 @@ impl InterceptionModifier {
         self.applies_to_context.as_ref().map(|f| f(context)).unwrap_or(true)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_stores_fields() {
+        let m = InterceptionModifier::new("Accurate Pass", -2, ModifierType::REGULAR);
+        assert_eq!(m.get_name(), "Accurate Pass");
+        assert_eq!(m.get_modifier(), -2);
+        assert_eq!(m.get_type(), ModifierType::REGULAR);
+        assert_eq!(m.get_multiplier(), 1);
+    }
+
+    #[test]
+    fn tacklezone_is_modifier_included() {
+        assert!(InterceptionModifier::new("tz", 1, ModifierType::TACKLEZONE).is_modifier_included());
+    }
+
+    #[test]
+    fn regular_is_not_modifier_included() {
+        assert!(!InterceptionModifier::new("x", 1, ModifierType::REGULAR).is_modifier_included());
+    }
+}

@@ -1,8 +1,10 @@
 pub mod dialog;
+pub mod inducement;
 pub mod factory;
 pub mod enums;
 pub mod types;
 pub mod model;
+pub mod marking;
 pub mod bb2016;
 pub mod bb2020;
 pub mod bb2025;
@@ -11,3 +13,6 @@ pub mod events;
 pub mod prompts;
 pub mod kickoff;
 pub mod data;
+pub mod option;
+pub mod injury;
+pub mod report;

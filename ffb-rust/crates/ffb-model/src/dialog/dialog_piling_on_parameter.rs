@@ -20,3 +20,25 @@ impl IDialogParameter for DialogPilingOnParameter {
     fn get_id(&self) -> DialogId { DialogId::PILING_ON }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dialog_id_is_piling_on() {
+        assert_eq!(DialogPilingOnParameter::default().get_id(), DialogId::PILING_ON);
+    }
+
+    #[test]
+    fn stores_flags_and_player_id() {
+        let p = DialogPilingOnParameter {
+            player_id: Some("atk".into()),
+            re_roll_injury: true,
+            uses_a_team_reroll: false,
+        };
+        assert_eq!(p.get_player_id(), Some("atk"));
+        assert!(p.is_re_roll_injury());
+        assert!(!p.is_uses_a_team_reroll());
+    }
+}

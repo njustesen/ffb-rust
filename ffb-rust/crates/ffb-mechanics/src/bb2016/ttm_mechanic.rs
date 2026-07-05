@@ -3,6 +3,7 @@ use ffb_model::enums::PassingDistance;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::{Game, Player, TurnData};
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::mechanic::{Mechanic, MechanicType};
 use crate::modifiers::PassModifier;
 use crate::ttm_mechanic::TtmMechanic as TtmMechanicTrait;
@@ -24,15 +25,15 @@ impl Mechanic for TtmMechanic {
 
 impl TtmMechanicTrait for TtmMechanic {
     fn find_throwable_team_mates<'a>(&self, game: &'a Game, thrower: &Player) -> Vec<&'a Player> {
-        // TODO: UtilPlayer::find_adjacent_players_with_tacklezones(game, thrower.team, coord, false)
         let thrower_coord = match game.field_model.player_coordinate(&thrower.id) {
             Some(c) => c,
             None => return Vec::new(),
         };
-        thrower_coord.neighbours().iter()
-            .filter_map(|&adj| game.field_model.player_at(adj))
+        let team = game.active_team();
+        UtilPlayer::find_adjacent_players_with_tacklezones(game, team, thrower_coord, false)
+            .into_iter()
             .filter_map(|id| game.player(id))
-            .filter(|p| self.can_be_thrown(game, p))
+            .filter(|p| p.can_be_thrown())
             .collect()
     }
 
@@ -78,15 +79,65 @@ impl TtmMechanicTrait for TtmMechanic {
     }
 
     fn find_kickable_team_mates<'a>(&self, game: &'a Game, kicker: &Player) -> Vec<&'a Player> {
-        // TODO: UtilPlayer::find_adjacent_players_with_tacklezones(game, kicker.team, coord, false)
         let kicker_coord = match game.field_model.player_coordinate(&kicker.id) {
             Some(c) => c,
             None => return Vec::new(),
         };
-        kicker_coord.neighbours().iter()
-            .filter_map(|&adj| game.field_model.player_at(adj))
+        let team = game.active_team();
+        UtilPlayer::find_adjacent_players_with_tacklezones(game, team, kicker_coord, false)
+            .into_iter()
             .filter_map(|id| game.player(id))
             .filter(|p| self.can_be_kicked(game, p))
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+    use ffb_model::enums::PassingDistance;
+    use ffb_model::model::TurnData;
+    use crate::ttm_mechanic::TtmMechanic as TtmTrait;
+
+    #[test]
+    fn minimum_roll_quick_pass_no_modifiers() {
+        // QuickPass modifier_2016=1, modifier_sum=0-1=-1, max(2,2-1)=2
+        assert_eq!(TtmMechanic.minimum_roll(PassingDistance::QuickPass, &HashSet::new()), 2);
+    }
+
+    #[test]
+    fn minimum_roll_long_bomb_no_modifiers() {
+        // LongBomb modifier_2016=-2, modifier_sum=0-(-2)=2, max(2,4)=4
+        assert_eq!(TtmMechanic.minimum_roll(PassingDistance::LongBomb, &HashSet::new()), 4);
+    }
+
+    #[test]
+    fn handle_kick_like_throw_is_false() {
+        assert!(!TtmMechanic.handle_kick_like_throw());
+    }
+
+    #[test]
+    fn is_ttm_available_when_pass_not_used() {
+        assert!(TtmMechanic.is_ttm_available(&TurnData::new()));
+    }
+
+    #[test]
+    fn is_ttm_not_available_when_pass_used() {
+        let mut td = TurnData::new();
+        td.pass_used = true;
+        assert!(!TtmMechanic.is_ttm_available(&td));
+    }
+
+    #[test]
+    fn is_ktm_available_when_blitz_not_used() {
+        assert!(TtmMechanic.is_ktm_available(&TurnData::new()));
+    }
+
+    #[test]
+    fn is_ktm_not_available_when_blitz_used() {
+        let mut td = TurnData::new();
+        td.blitz_used = true;
+        assert!(!TtmMechanic.is_ktm_available(&td));
     }
 }

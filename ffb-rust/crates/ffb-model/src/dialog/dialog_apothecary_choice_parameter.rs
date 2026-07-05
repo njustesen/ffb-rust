@@ -44,3 +44,33 @@ impl IDialogParameter for DialogApothecaryChoiceParameter {
     fn get_id(&self) -> DialogId { DialogId::APOTHECARY_CHOICE }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::enums::{PS_BADLY_HURT, PS_SERIOUS_INJURY};
+
+    #[test]
+    fn new_with_stores_player_id_and_states() {
+        let p = DialogApothecaryChoiceParameter::new_with(
+            "player1",
+            Some(PlayerState::new(PS_BADLY_HURT)),
+            None,
+            Some(PlayerState::new(PS_SERIOUS_INJURY)),
+            None,
+        );
+        assert_eq!(p.get_player_id(), Some("player1"));
+        assert_eq!(p.get_player_state_old().map(|s| s.base()), Some(PS_BADLY_HURT));
+        assert_eq!(p.get_player_state_new().map(|s| s.base()), Some(PS_SERIOUS_INJURY));
+    }
+
+    #[test]
+    fn dialog_id_is_apothecary_choice() {
+        assert_eq!(DialogApothecaryChoiceParameter::new().get_id(), DialogId::APOTHECARY_CHOICE);
+    }
+
+    #[test]
+    fn default_has_no_player_id() {
+        assert!(DialogApothecaryChoiceParameter::new().get_player_id().is_none());
+    }
+}

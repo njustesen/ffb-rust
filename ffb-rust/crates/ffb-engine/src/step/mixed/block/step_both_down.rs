@@ -118,7 +118,8 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
-        };
+            ..Default::default()
+};
         game.team_home.players.push(p);
         game.field_model.set_player_coordinate(id, pos);
         game.field_model.set_player_state(id, PlayerState::new(state));

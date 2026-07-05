@@ -75,4 +75,22 @@ mod tests {
         let apo = steps.iter().find(|s| s.step_id == StepId::Apothecary).unwrap();
         assert!(apo.params.iter().any(|p| matches!(p, StepParameter::ApothecaryMode(ffb_model::enums::ApothecaryMode::Feeding))));
     }
+
+    #[test]
+    fn feeding_allowed_param_flows_to_init_feeding() {
+        let params = EndPlayerActionParams { feeding_allowed: true, ..Default::default() };
+        let steps = EndPlayerAction::build_sequence(&params);
+        let init = steps.iter().find(|s| s.step_id == StepId::InitFeeding).unwrap();
+        let has = init.params.iter().any(|p| matches!(p, StepParameter::FeedingAllowed(true)));
+        assert!(has);
+    }
+
+    #[test]
+    fn end_turn_param_flows_to_init_feeding() {
+        let params = EndPlayerActionParams { end_turn: true, ..Default::default() };
+        let steps = EndPlayerAction::build_sequence(&params);
+        let init = steps.iter().find(|s| s.step_id == StepId::InitFeeding).unwrap();
+        let has = init.params.iter().any(|p| matches!(p, StepParameter::EndTurn(true)));
+        assert!(has);
+    }
 }

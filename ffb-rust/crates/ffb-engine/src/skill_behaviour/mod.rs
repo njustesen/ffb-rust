@@ -15,8 +15,7 @@ pub mod step_hook;
 
 /// Marker trait — the Rust analogue of Java's `ISkillBehaviour`.
 /// `execute_step_hook` mirrors Java's `StepModifier.handleExecuteStepHook`.
-/// TODO: add `get_player_modifiers()` and `has_injury_modifier()` when
-///       `PlayerModifier` and `InjuryType` types are fully ported.
+/// `apply_modifier` mirrors Java's `registerModifier` lambda — called during level-up.
 pub trait SkillBehaviour: Send + Sync {
     fn name(&self) -> &'static str;
 
@@ -25,4 +24,13 @@ pub trait SkillBehaviour: Send + Sync {
     fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
         false
     }
+
+    /// Java: `registerModifier(player -> ...)` lambda — applies a stat mutation on level-up.
+    /// `position` provides the position's base stats used as the cap anchor.
+    /// Default no-op for behaviours that don't register a player modifier.
+    fn apply_modifier(
+        &self,
+        _player: &mut ffb_model::model::player::Player,
+        _position: &ffb_model::model::roster_position::RosterPosition,
+    ) {}
 }

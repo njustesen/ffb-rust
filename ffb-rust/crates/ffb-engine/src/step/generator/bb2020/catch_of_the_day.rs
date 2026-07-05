@@ -76,4 +76,18 @@ mod tests {
         let bl = steps.iter().find(|s| s.step_id == StepId::BloodLust).unwrap();
         assert!(!bl.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(_))));
     }
+
+    #[test]
+    fn failure_label_passed_to_catch_of_the_day_step() {
+        let steps = CatchOfTheDay::build_sequence(&CatchOfTheDayParams { failure_label: "myLabel".into() });
+        let cotd = steps.iter().find(|s| s.step_id == StepId::CatchOfTheDay).unwrap();
+        let has = cotd.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "myLabel"));
+        assert!(has);
+    }
+
+    #[test]
+    fn catch_of_the_day_step_count() {
+        let steps = CatchOfTheDay::build_sequence(&CatchOfTheDayParams::default());
+        assert_eq!(steps.len(), 12);
+    }
 }

@@ -68,3 +68,30 @@ impl MechanicType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mechanic_type_name_returns_uppercase() {
+        assert_eq!(MechanicType::AGILITY.name(), "AGILITY");
+        assert_eq!(MechanicType::THROW_IN.name(), "THROW_IN");
+    }
+
+    #[test]
+    fn for_name_round_trips() {
+        assert_eq!(MechanicType::for_name("PASS"), Some(MechanicType::PASS));
+        assert_eq!(MechanicType::for_name("invalid"), None);
+    }
+
+    #[test]
+    fn get_name_returns_type_name() {
+        struct TestMechanic;
+        impl Mechanic for TestMechanic {
+            fn get_type(&self) -> MechanicType { MechanicType::AGILITY }
+        }
+        let m = TestMechanic;
+        assert_eq!(m.get_name(), "AGILITY");
+    }
+}

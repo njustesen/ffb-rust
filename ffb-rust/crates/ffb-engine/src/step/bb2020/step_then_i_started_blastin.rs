@@ -1,4 +1,5 @@
 use ffb_model::enums::{ApothecaryMode, PlayerAction, SkillId, TurnMode};
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::re_rolled_action::ReRolledAction;
 use ffb_model::types::FieldCoordinate;
@@ -87,8 +88,14 @@ impl Step for StepThenIStartedBlastin {
                     game.home_playing = !game.home_playing;
                     let hit_id = player_id.clone();
                     let outcome = self.hit_player(game, rng, &hit_id);
-                    // DEFERRED(tisb): ReportThenIStartedBlastin(actingPlayerId, defenderId, 0, true, false)
-                    return outcome;
+                    let acting_id = game.acting_player.player_id.clone().unwrap_or_default();
+                    return outcome.with_event(GameEvent::ThenIStartedBlastin {
+                        attacker_id: acting_id,
+                        defender_id: Some(hit_id),
+                        roll: 0,
+                        success: true,
+                        fumble: false,
+                    });
                 }
             }
             // Java: CLIENT_END_TURN → restoreTurnModes; SKIP_STEP + NEXT_STEP
@@ -157,8 +164,13 @@ impl StepThenIStartedBlastin {
         if game.turn_mode != TurnMode::ThenIStartedBlastin {
             self.old_turn_mode = game.last_turn_mode;
             game.turn_mode = TurnMode::ThenIStartedBlastin;
-            // DEFERRED(tisb): ReportThenIStartedBlastin(actingPlayerId, null, 0, false, false)
-            return StepOutcome::cont();
+            return StepOutcome::cont().with_event(GameEvent::ThenIStartedBlastin {
+                attacker_id: acting_id.clone(),
+                defender_id: None,
+                roll: 0,
+                success: false,
+                fumble: false,
+            });
         }
 
         // Java: actingPlayer.markSkillUsed(skill)
@@ -176,23 +188,29 @@ impl StepThenIStartedBlastin {
         // Java: roll = rollSkill(); success = isSkillRollSuccessful(roll, 3) → roll >= 3
         self.roll = rng.d6();
         let success = self.roll >= 3;
-
-        // DEFERRED(tisb): ReportThenIStartedBlastin(actingId, defenderId, roll, success, roll==1)
+        let def_id = game.defender_id.clone();
+        let tisb_event = GameEvent::ThenIStartedBlastin {
+            attacker_id: acting_id.clone(),
+            defender_id: def_id.clone(),
+            roll: self.roll,
+            success,
+            fumble: self.roll == 1,
+        };
 
         if success {
-            if let Some(def_id) = game.defender_id.clone() {
-                return self.hit_player(game, rng, &def_id);
+            if let Some(did) = def_id {
+                return self.hit_player(game, rng, &did).with_event(tisb_event);
             }
-            return StepOutcome::next();
+            return StepOutcome::next().with_event(tisb_event);
         } else {
             // Failure: ask for re-roll or fail
             if !is_rerolling {
                 if let Some(prompt) = ask_for_reroll_if_available(game, RE_ROLLED_ACTION_NAME, 3, false) {
                     self.re_roll_state.re_rolled_action = Some(ReRolledAction::new(RE_ROLLED_ACTION_NAME));
-                    return StepOutcome::cont().with_prompt(prompt);
+                    return StepOutcome::cont().with_event(tisb_event).with_prompt(prompt);
                 }
             }
-            return self.fail(game, rng);
+            return self.fail(game, rng).with_event(tisb_event);
         }
     }
 
@@ -311,6 +329,7 @@ mod tests {
             starting_skills: vec![SkillWithValue { skill_id: skill, value: None }],
             extra_skills: vec![], temporary_skills: vec![], used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         }
     }
 
@@ -322,6 +341,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         }
     }
 

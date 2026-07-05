@@ -298,7 +298,7 @@ impl CoverageReport {
                 *self.kickoff_events.entry(result.name().to_string()).or_default() += 1;
             }
             GameEvent::KickoffPitchInvasion { .. } => { self.kickoff_pitch_invasions += 1; }
-            GameEvent::KickoffRiot => { self.kickoff_riots += 1; }
+            GameEvent::KickoffRiot { .. } => { self.kickoff_riots += 1; }
             GameEvent::KickoffThrowARock { .. } => { self.kickoff_rocks_thrown += 1; }
 
             GameEvent::SkillUse { skill_id, used, .. } => {
@@ -376,6 +376,32 @@ impl CoverageReport {
             | GameEvent::ApothecaryRoll { .. }
             | GameEvent::SelectBlitzTarget { .. }
             | GameEvent::SelectGazeTarget { .. }
+            | GameEvent::KegThrow { .. }
+            | GameEvent::BlitzRoll { .. }
+            | GameEvent::SpecialEffectRoll { .. }
+            | GameEvent::ThrowAtStallingPlayer { .. }
+            | GameEvent::NoPlayersToField { .. }
+            | GameEvent::PlayerNote { .. }
+            | GameEvent::HitAndRun { .. }
+            | GameEvent::KickTeamMateFumble
+            | GameEvent::PrayerAmount { .. }
+            | GameEvent::BiteSpectator { .. }
+            | GameEvent::CardsAndInducementsBought { .. }
+            | GameEvent::KickoffSequenceActivationsExhausted { .. }
+            | GameEvent::SolidDefenceRoll { .. }
+            | GameEvent::CheeringFans { .. }
+            | GameEvent::KickoffExtraReRoll { .. }
+            | GameEvent::QuickSnapRoll { .. }
+            | GameEvent::KickoffTimeout { .. }
+            | GameEvent::KickoffOfficiousRef { .. }
+            | GameEvent::KickoffDodgySnack { .. }
+            | GameEvent::DodgySnackRoll { .. }
+            | GameEvent::ThrowAtPlayer { .. }
+            | GameEvent::Fumblerooskie { .. }
+            | GameEvent::AllYouCanEatRoll { .. }
+            | GameEvent::KickoffExtraReRollBb2016 { .. }
+            | GameEvent::KickoffThrowARockBb2016 { .. }
+            | GameEvent::KickoffPitchInvasionBb2016 { .. }
             => {}
         }
     }

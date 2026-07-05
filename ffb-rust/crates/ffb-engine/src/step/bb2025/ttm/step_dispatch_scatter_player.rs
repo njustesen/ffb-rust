@@ -1,3 +1,4 @@
+use ffb_model::events::GameEvent;
 use ffb_model::enums::{PassResult, PlayerState};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
@@ -101,8 +102,7 @@ impl StepDispatchScatterPlayer {
     fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: if passResult==FUMBLE && isKickedPlayer: report KickTeamMateFumble; NEXT_STEP
         if self.pass_result == PassResult::Fumble && self.is_kicked_player {
-            // DEFERRED: addReport(ReportKickTeamMateFumble) when event system is ported
-            return StepOutcome::next();
+            return StepOutcome::next().with_event(GameEvent::KickTeamMateFumble);
         }
 
         // Java: thrower = game.actingPlayer.getPlayer()

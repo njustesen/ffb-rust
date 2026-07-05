@@ -72,3 +72,22 @@ impl ReRollSources {
 impl Default for ReRollSources {
     fn default() -> Self { Self::new() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn for_name_finds_known_source() {
+        let r = ReRollSources::new();
+        assert!(r.for_name("Pro").is_some());
+        assert_eq!(r.for_name("pro").unwrap().name, "Pro");
+    }
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert!(ReRollSources::new().for_name("NOT_VALID").is_none());
+    }
+    #[test]
+    fn values_is_non_empty() {
+        assert!(!ReRollSources::new().values().is_empty());
+    }
+}

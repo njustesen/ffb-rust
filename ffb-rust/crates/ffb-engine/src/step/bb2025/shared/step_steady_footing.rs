@@ -278,7 +278,7 @@ impl StepSteadyFooting {
     }
 
     /// Java: fail() — routes to failure label, republishes context-derived parameters.
-    fn fail(&self, _game: &mut Game) -> StepOutcome {
+    fn fail(&self, game: &mut Game) -> StepOutcome {
         let mut out = if !self.goto_label_on_failure.is_empty() {
             StepOutcome::goto(&self.goto_label_on_failure)
         } else {
@@ -286,7 +286,11 @@ impl StepSteadyFooting {
         };
 
         // Java: context.getDeferredCommands().forEach(cmd → cmd.execute(this))
-        // Deferred commands are not yet ported — always empty.
+        if let Some(ctx) = &self.context {
+            for param in ctx.execute_deferred_commands(game) {
+                out = out.publish(param);
+            }
+        }
 
         if let Some(ctx) = &self.context {
             // Java: if (context.getDropPlayerContext() != null) publishParameter(DROP_PLAYER_CONTEXT, ...)
@@ -338,6 +342,7 @@ mod tests {
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         }
     }
 

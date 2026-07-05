@@ -9,7 +9,7 @@
 ///      waiting for dialog infrastructure (UtilServerDialog.showDialog) to be ported.
 ///  - DEFERRED(clear-stack): stack clear before EndPlayerAction — the step has no stack reference;
 ///      waiting for driver-level stack-clear support.
-///  - DEFERRED(reportSkillUse): ReportSkillUse (GAIN_FRENZY_FOR_BLITZ) — skill-use tracking not yet ported.
+///  - SkillUse GameEvent wired for GAIN_FRENZY_FOR_BLITZ path.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2020.gaze.StepSelectGazeTarget`.
 use ffb_model::events::GameEvent;
@@ -71,7 +71,7 @@ impl Step for StepSelectGazeTarget {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
-            Action::SelectPlayer { player_id } => {
+            Action::SelectPlayer {player_id } => {
                 // Java CLIENT_TARGET_SELECTED: set selectedPlayerId, EXECUTE_STEP
                 self.selected_player_id = Some(player_id.clone());
             }
@@ -116,7 +116,8 @@ impl Step for StepSelectGazeTarget {
                     Some(BlackInk::build_sequence(&BlackInkParams {
                         failure_label: self.goto_label_on_end.clone(),
                         old_player_state: old_state,
-                    }))
+                        ..Default::default()
+}))
                 } else if props.contains(&NamedProperties::CAN_BLAST_REMOTE_PLAYER) {
                     // Java: ThenIStartedBlastin generator (no params)
                     Some(ThenIStartedBlastin::build_sequence())
@@ -131,14 +132,19 @@ impl Step for StepSelectGazeTarget {
                     None
                 };
 
+                let player_id = game.acting_player.player_id.clone().unwrap_or_default();
+                let skill_event = GameEvent::SkillUse { player_id, skill_id: *skill_id as u16, used: true };
                 if let Some(seq) = sub_seq {
                     // Push self-return first (goes below sub-sequence), then sub-sequence on top.
                     // This mirrors Java's pushCurrentStepOnStack() + pushSequence() + NEXT_STEP.
-                    let mut outcome = StepOutcome::next()
+                    return StepOutcome::next()
+                        .with_event(skill_event)
                         .push_seq(self_return_seq)
                         .push_seq(seq);
-                    return outcome;
                 }
+                // No sub-sequence (e.g. GAIN_FRENZY_FOR_BLITZ): skill used, proceed directly.
+                let out = self.execute_step(game, rng);
+                return out.with_event(skill_event);
             }
             Action::UseSkill { .. } => {
                 // use_skill = false: skill not used, just execute step
@@ -332,6 +338,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.field_model.set_player_coordinate(&pid, FieldCoordinate::new(10, 7));
         game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
@@ -363,6 +370,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
 
         let mut step = StepSelectGazeTarget::new();
@@ -399,7 +407,7 @@ mod tests {
         let mut step = StepSelectGazeTarget::new();
         // SelectPlayer with an away player id — no away player registered so falls to teammate path
         let out = step.handle_command(
-            &Action::SelectPlayer { player_id: "target_p".into() },
+            &Action::SelectPlayer {player_id: "target_p".into() },
             &mut game,
             &mut GameRng::new(0),
         );
@@ -456,6 +464,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
         });
         game.field_model.set_player_coordinate("target", FieldCoordinate::new(5, 5));
         game.field_model.set_player_state("target", PlayerState::new(PS_STANDING));
