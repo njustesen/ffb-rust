@@ -373,9 +373,25 @@ impl StepCatchScatterThrowIn {
             let catcher_at_ball = ball_coord
                 .and_then(|c| game.field_model.player_at(c))
                 .map(|id| id.clone());
-            catcher_id = catcher_at_ball;
             // Java: check QuickBite adjacents
-            // headless: QuickBite sequence — NamedProperties::CAN_ATTACK_OPPONENT_FOR_BALL_AFTER_CATCH not yet ported
+            if let (Some(ref catcher), Some(ball)) = (&catcher_at_ball, ball_coord) {
+                use ffb_model::util::util_player::UtilPlayer;
+                let qb_opponents = UtilPlayer::find_adjacent_opposing_players_with_property(
+                    game, catcher, ball,
+                    NamedProperties::CAN_ATTACK_OPPONENT_FOR_BALL_AFTER_CATCH,
+                    false,
+                );
+                if !qb_opponents.is_empty() {
+                    use crate::step::generator::mixed::quick_bite::QuickBite;
+                    let seq = QuickBite::build_sequence();
+                    let mut out2 = StepOutcome::next().with_events(events.clone());
+                    for p in published.clone() { out2 = out2.publish(p); }
+                    out2 = out2.publish(StepParameter::CatcherId(catcher_at_ball.clone()));
+                    self.deactivate_cards(game);
+                    return out2.push_seq(seq);
+                }
+            }
+            catcher_id = catcher_at_ball;
         }
 
         let mut out = StepOutcome::next().with_events(events);
