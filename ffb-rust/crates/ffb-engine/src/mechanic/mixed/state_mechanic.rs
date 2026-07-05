@@ -22,7 +22,7 @@ use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::turn_data::TurnData;
 use ffb_model::util::rng::GameRng;
 use crate::dice_interpreter::DiceInterpreter;
-use crate::injury_result::InjuryResult;
+use crate::injury::InjuryContext;
 use crate::mechanic::state_mechanic::StateMechanic as StateMechanicTrait;
 use crate::util::util_server_game::UtilServerGame;
 
@@ -80,7 +80,8 @@ impl StateMechanicTrait for StateMechanic {
     /// immediately after `start_half` when `half < 3` and `bb2016` ruleset is active
     /// (i.e. when `GameMechanic::rollForChefAtStartOfHalf()` would return true).
     /// BB2020/BB2025 return false for that method, so no chef rolls happen there.
-    fn start_half(&self, game: &mut Game, half: i32) {
+    fn start_half(&self, game: &mut Game, half: i32) -> Vec<GameEvent> {
+        let mut events: Vec<GameEvent> = Vec::new();
         game.half = half;
         game.turn_data_home.turn_nr = 0;
         game.turn_data_away.turn_nr = 0;
@@ -94,12 +95,12 @@ impl StateMechanicTrait for StateMechanic {
         // NOTE: ReportStartHalf emitted by the calling step (StepInitKickoff) after start_half returns.
 
         if half < 2 {
-            self.add_apothecaries(game, true);
-            self.add_apothecaries(game, false);
+            events.extend(self.add_apothecaries(game, true));
+            events.extend(self.add_apothecaries(game, false));
         }
         if half < 3 {
-            self.add_re_rolls(game, true);
-            self.add_re_rolls(game, false);
+            events.extend(self.add_re_rolls(game, true));
+            events.extend(self.add_re_rolls(game, false));
             // NOTE: chef rolls omitted here — caller does handle_chef_rolls(game, rng)
             // after start_half when the rules require it (BB2016 only).
         }
@@ -107,20 +108,20 @@ impl StateMechanicTrait for StateMechanic {
         self.reset_leader_state(game);
         UtilServerGame::update_player_state_dependent_properties(game);
         self.reset_special_skills_at_half_time(game);
+        events
     }
 
     /// Java: handlePumpUp(IStep, InjuryResult).
     /// Mixed: checks `grantsTeamReRollWhenCausingCas` (any casualty, not block-specific).
-    /// DEFERRED: report emission (ReportPumpUpTheCrowdReRoll, SoundId::PUMP_CROWD).
-    fn handle_pump_up(&self, game: &mut Game, injury_result: &InjuryResult) -> bool {
-        let attacker_id = injury_result.injury_context().attacker_id.clone();
+    fn handle_pump_up(&self, game: &mut Game, injury_context: &InjuryContext) -> bool {
+        let attacker_id = injury_context.attacker_id.clone();
         let attacker_id = match attacker_id.as_deref() {
             Some(id) => id.to_string(),
             None => return false,
         };
 
         let on_acting_team = game.is_active_team_player(&attacker_id);
-        let is_casualty = injury_result.injury_context().is_casualty();
+        let is_casualty = injury_context.is_casualty();
 
         if !on_acting_team || !is_casualty {
             return false;
@@ -155,8 +156,7 @@ impl StateMechanicTrait for StateMechanic {
         }
 
         game.mark_skill_used(&attacker_id, SkillId::PumpUpTheCrowd);
-        // NOTE: caller emits ReportPumpUpTheCrowdReRoll event when this returns true.
-        // No GameEvent::PumpUpTheCrowdReRoll variant exists yet; add to GameEvent enum when needed.
+        // NOTE: caller emits GameEvent::PumpUpTheCrowdReRoll { player_id: attacker_id } when this returns true.
         // SoundId::PUMP_CROWD is client-side only — not modelled in the engine event stream.
         true
     }
@@ -368,10 +368,11 @@ mod tests {
 
     #[test]
     fn handle_pump_up_no_attacker_returns_false() {
+        use ffb_model::enums::ApothecaryMode;
         let m = StateMechanic::new();
         let mut g = make_game();
-        let ir = InjuryResult::new();
-        assert!(!m.handle_pump_up(&mut g, &ir));
+        let ctx = InjuryContext::new(ApothecaryMode::Defender);
+        assert!(!m.handle_pump_up(&mut g, &ctx));
     }
 
     // ── chef roll tests ───────────────────────────────────────────────────────

@@ -10,12 +10,13 @@
 /// Report emission status:
 ///   - ReportStartHalf: wired in StepInitKickoff (emits GameEvent::StartHalf after start_half call)
 ///   - ReportLeader: caller responsibility — emitted when update_leader_re_rolls_for_team returns Some
-///   - ReportPumpUpTheCrowdReRoll: needs GameEvent::PumpUpTheCrowdReRoll variant (not yet added)
+///   - ReportPumpUpTheCrowdReRoll: GameEvent::PumpUpTheCrowdReRoll — caller emits when handle_pump_up returns true
 use ffb_model::enums::{LeaderState, SkillId};
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::turn_data::TurnData;
 use ffb_model::model::property::named_properties::NamedProperties;
-use crate::injury_result::InjuryResult;
+use crate::injury::InjuryContext;
 use crate::mechanic::state_mechanic::StateMechanic as StateMechanicTrait;
 
 pub struct StateMechanic;
@@ -65,7 +66,8 @@ impl StateMechanicTrait for StateMechanic {
     }
 
     /// Java: startHalf(IStep, int pHalf).
-    fn start_half(&self, game: &mut Game, half: i32) {
+    fn start_half(&self, game: &mut Game, half: i32) -> Vec<GameEvent> {
+        let mut events: Vec<GameEvent> = Vec::new();
         game.half = half;
         game.turn_data_home.turn_nr = 0;
         game.turn_data_away.turn_nr = 0;
@@ -79,32 +81,32 @@ impl StateMechanicTrait for StateMechanic {
         // NOTE: ReportStartHalf emitted by the calling step (StepInitKickoff) after start_half returns.
 
         if half <= 1 {
-            self.add_apothecaries(game, true);
-            self.add_apothecaries(game, false);
+            events.extend(self.add_apothecaries(game, true));
+            events.extend(self.add_apothecaries(game, false));
         }
         if half <= 2 {
-            self.add_re_rolls(game, true);
-            self.add_re_rolls(game, false);
+            events.extend(self.add_re_rolls(game, true));
+            events.extend(self.add_re_rolls(game, false));
         }
 
         self.reset_leader_state(game);
         self.reset_special_skills_at_half_time(game);
         self.reset_inducements(game);
+        events
     }
 
     /// Java: handlePumpUp(IStep, InjuryResult).
     /// BB2025: grants re-roll only for block-type casualties
     /// (NamedProperties.grantsTeamReRollWhenCausingBlockCas).
-    /// DEFERRED: report emission (ReportPumpUpTheCrowdReRoll, SoundId::PUMP_CROWD).
-    fn handle_pump_up(&self, game: &mut Game, injury_result: &InjuryResult) -> bool {
-        let attacker_id = injury_result.injury_context().attacker_id.clone();
+    fn handle_pump_up(&self, game: &mut Game, injury_context: &InjuryContext) -> bool {
+        let attacker_id = injury_context.attacker_id.clone();
         let attacker_id = match attacker_id.as_deref() {
             Some(id) => id.to_string(),
             None => return false,
         };
 
         let on_acting_team = game.is_active_team_player(&attacker_id);
-        let is_casualty = injury_result.injury_context().is_casualty();
+        let is_casualty = injury_context.is_casualty();
 
         if !on_acting_team || !is_casualty {
             return false;
@@ -129,7 +131,7 @@ impl StateMechanicTrait for StateMechanic {
             return false;
         }
 
-        let is_block_injury = injury_result.injury_context().injury_type_name.as_deref() == Some("Block");
+        let is_block_injury = injury_context.injury_type_name.as_deref() == Some("Block");
         if !is_block_injury {
             return false;
         }
@@ -143,8 +145,7 @@ impl StateMechanicTrait for StateMechanic {
         }
 
         game.mark_skill_used(&attacker_id, SkillId::PumpUpTheCrowd);
-        // NOTE: caller emits ReportPumpUpTheCrowdReRoll event when this returns true.
-        // No GameEvent::PumpUpTheCrowdReRoll variant exists yet; add to GameEvent enum when needed.
+        // NOTE: caller emits GameEvent::PumpUpTheCrowdReRoll { player_id: attacker_id } when this returns true.
         // SoundId::PUMP_CROWD is client-side only — not modelled in the engine event stream.
         true
     }
@@ -344,21 +345,22 @@ mod tests {
         game.field_model.set_player_state("att", state);
     }
 
-    fn make_block_injury_result(is_cas: bool, injury_type_name: Option<&str>) -> InjuryResult {
-        use ffb_model::enums::{PS_RIP, PS_STUNNED, PlayerState};
-        let mut ir = InjuryResult::new();
-        ir.injury_context_mut().attacker_id = Some("att".into());
-        ir.injury_context_mut().injury = Some(PlayerState::new(if is_cas { PS_RIP } else { PS_STUNNED }));
-        ir.injury_context_mut().injury_type_name = injury_type_name.map(|s| s.to_string());
-        ir
+    fn make_block_injury_context(is_cas: bool, injury_type_name: Option<&str>) -> InjuryContext {
+        use ffb_model::enums::{ApothecaryMode, PS_RIP, PS_STUNNED, PlayerState};
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.attacker_id = Some("att".into());
+        ctx.injury = Some(PlayerState::new(if is_cas { PS_RIP } else { PS_STUNNED }));
+        ctx.injury_type_name = injury_type_name.map(|s| s.to_string());
+        ctx
     }
 
     #[test]
     fn handle_pump_up_no_attacker_returns_false() {
+        use ffb_model::enums::ApothecaryMode;
         let m = StateMechanic::new();
         let mut g = make_game();
-        let ir = InjuryResult::new();
-        assert!(!m.handle_pump_up(&mut g, &ir));
+        let ctx = InjuryContext::new(ApothecaryMode::Defender);
+        assert!(!m.handle_pump_up(&mut g, &ctx));
     }
 
     #[test]
@@ -367,8 +369,8 @@ mod tests {
         let mut g = make_game();
         g.home_playing = true;
         make_pump_up_player(&mut g, true);
-        let ir = make_block_injury_result(true, Some("Foul"));
-        assert!(!m.handle_pump_up(&mut g, &ir));
+        let ctx = make_block_injury_context(true, Some("Foul"));
+        assert!(!m.handle_pump_up(&mut g, &ctx));
     }
 
     #[test]
@@ -377,8 +379,8 @@ mod tests {
         let mut g = make_game();
         g.home_playing = true;
         make_pump_up_player(&mut g, true);
-        let ir = make_block_injury_result(true, None);
-        assert!(!m.handle_pump_up(&mut g, &ir));
+        let ctx = make_block_injury_context(true, None);
+        assert!(!m.handle_pump_up(&mut g, &ctx));
     }
 
     #[test]
@@ -387,8 +389,8 @@ mod tests {
         let mut g = make_game();
         g.home_playing = true;
         make_pump_up_player(&mut g, true);
-        let ir = make_block_injury_result(true, Some("Block"));
-        let result = m.handle_pump_up(&mut g, &ir);
+        let ctx = make_block_injury_context(true, Some("Block"));
+        let result = m.handle_pump_up(&mut g, &ctx);
         assert!(result);
         assert_eq!(g.turn_data_home.rerolls, 1);
         assert_eq!(g.turn_data_home.rerolls_pump_up_the_crowd_one_drive, 1);
@@ -514,5 +516,46 @@ mod tests {
         m.reset_inducements(&mut g);
         let retrieved = g.turn_data_away.inducement_set.get("conditionalReroll").unwrap();
         assert_eq!(retrieved.get_uses(), 0);
+    }
+
+    #[test]
+    fn start_half_returns_inducement_events_for_wandering_apo_at_half_1() {
+        use ffb_model::inducement::inducement::Inducement;
+        use ffb_model::inducement::usage::Usage;
+        use ffb_model::events::GameEvent;
+        let m = StateMechanic::new();
+        let mut g = make_game();
+        g.turn_data_home.inducement_set.add_inducement(
+            Inducement::new("wanderingApothecary", 1, vec![Usage::APOTHECARY])
+        );
+        let events = m.start_half(&mut g, 1);
+        assert!(events.iter().any(|e| matches!(e,
+            GameEvent::Inducement { inducement_type, .. } if inducement_type == "wanderingApothecary"
+        )));
+    }
+
+    #[test]
+    fn start_half_no_inducements_returns_empty_events() {
+        use ffb_model::events::GameEvent;
+        let m = StateMechanic::new();
+        let mut g = make_game();
+        let events = m.start_half(&mut g, 1);
+        assert!(events.is_empty(), "no inducements → no events");
+    }
+
+    #[test]
+    fn start_half_half_2_skips_apothecary_events() {
+        use ffb_model::inducement::inducement::Inducement;
+        use ffb_model::inducement::usage::Usage;
+        use ffb_model::events::GameEvent;
+        let m = StateMechanic::new();
+        let mut g = make_game();
+        // Add wandering apo — should NOT be registered at half 2 (BB2025 condition: half <= 1)
+        g.turn_data_home.inducement_set.add_inducement(
+            Inducement::new("wanderingApothecary", 1, vec![Usage::APOTHECARY])
+        );
+        let events = m.start_half(&mut g, 2);
+        assert!(!events.iter().any(|e| matches!(e, GameEvent::Inducement { .. })),
+            "apothecaries not registered at half 2");
     }
 }

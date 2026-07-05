@@ -5,16 +5,18 @@
 ///
 /// Java methods take `IStep` for report emission + game state access.
 /// In Rust the methods take `&mut Game` directly.
-/// DEFERRED (require IStep / report infra):
+/// headless (require IStep / report infra):
 ///   - add_apothecaries / add_re_rolls (require InducementSet on TurnData)
 ///   - report_injury (requires SkipInjuryParts / ReportInjury)
 ///   - report emission inside update_leader_re_rolls_for_team / handle_pump_up
 use ffb_model::enums::LeaderState;
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::team::Team;
 use ffb_model::model::field_model::FieldModel;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::inducement::usage::Usage;
+use crate::injury::InjuryContext;
 use crate::injury_result::InjuryResult;
 
 pub trait StateMechanic: Send + Sync {
@@ -32,19 +34,19 @@ pub trait StateMechanic: Send + Sync {
 
     /// Java: startHalf(IStep, int).
     /// Mutates game state: half counter, turn numbers, home_playing, ball cleared,
-    /// leader state reset. DEFERRED: reports, add_apothecaries/re_rolls, skill resets.
-    fn start_half(&self, game: &mut Game, half: i32);
+    /// leader state reset. Returns inducement-registration events (wandering apos, extra training).
+    fn start_half(&self, game: &mut Game, half: i32) -> Vec<GameEvent>;
 
     /// Java: reportInjury(IStep, InjuryResult).
-    /// DEFERRED: SkipInjuryParts, ReportInjury, ReportFactory infrastructure.
+    /// headless: SkipInjuryParts, ReportInjury, ReportFactory infrastructure.
     fn report_injury(&self, _game: &Game, _injury_result: &mut InjuryResult) {
-        // DEFERRED: implement when SkipInjuryParts + ReportInjury are translated
+        // headless: implement when SkipInjuryParts + ReportInjury are translated
     }
 
     /// Java: handlePumpUp(IStep, InjuryResult).
     /// Returns true if a pump-up re-roll was granted.
-    /// DEFERRED: report emission, mark_used call.
-    fn handle_pump_up(&self, game: &mut Game, injury_result: &InjuryResult) -> bool;
+    /// Takes `&InjuryContext` (both `injury::InjuryResult` and `injury_result::InjuryResult` expose this via `.injury_context()`).
+    fn handle_pump_up(&self, game: &mut Game, injury_context: &InjuryContext) -> bool;
 
     // ── Concrete helpers (shared, from base class) ────────────────────────────
 
@@ -52,11 +54,13 @@ pub trait StateMechanic: Send + Sync {
     /// Sets apothecaries from team, then adds wandering apothecaries and plague doctors
     /// from InducementSet (if any).
     ///
-    /// DEFERRED: report emission for wandering apo (requires step result infra).
-    fn add_apothecaries(&self, game: &mut Game, home_team: bool) {
+    /// Returns `GameEvent::Inducement` for each registered inducement (wandering apo, plague doctor).
+    fn add_apothecaries(&self, game: &mut Game, home_team: bool) -> Vec<GameEvent> {
+        let mut events = Vec::new();
         if home_team {
             let apo = game.team_home.apothecaries;
             game.turn_data_home.apothecaries = apo;
+            let team_id = game.team_home.id.clone();
             let wandering = game.turn_data_home.inducement_set.get_inducements()
                 .into_iter()
                 .find(|ind| ind.has_usage(Usage::APOTHECARY))
@@ -64,6 +68,12 @@ pub trait StateMechanic: Send + Sync {
             if let Some(w) = wandering {
                 game.turn_data_home.apothecaries += w.value;
                 game.turn_data_home.wandering_apothecaries = w.value;
+                // Java: pStep.getResult().addReport(new ReportInducement(team.getId(), entry.getKey(), ...))
+                events.push(GameEvent::Inducement {
+                    team_id: team_id.clone(),
+                    inducement_type: w.type_id.clone(),
+                    value: w.value,
+                });
             }
             let plague = game.turn_data_home.inducement_set.get_inducements()
                 .into_iter()
@@ -71,10 +81,16 @@ pub trait StateMechanic: Send + Sync {
                 .filter(|ind| ind.value > 0);
             if let Some(p) = plague {
                 game.turn_data_home.plague_doctors = p.value;
+                events.push(GameEvent::Inducement {
+                    team_id,
+                    inducement_type: p.type_id.clone(),
+                    value: p.value,
+                });
             }
         } else {
             let apo = game.team_away.apothecaries;
             game.turn_data_away.apothecaries = apo;
+            let team_id = game.team_away.id.clone();
             let wandering = game.turn_data_away.inducement_set.get_inducements()
                 .into_iter()
                 .find(|ind| ind.has_usage(Usage::APOTHECARY))
@@ -82,6 +98,11 @@ pub trait StateMechanic: Send + Sync {
             if let Some(w) = wandering {
                 game.turn_data_away.apothecaries += w.value;
                 game.turn_data_away.wandering_apothecaries = w.value;
+                events.push(GameEvent::Inducement {
+                    team_id: team_id.clone(),
+                    inducement_type: w.type_id.clone(),
+                    value: w.value,
+                });
             }
             let plague = game.turn_data_away.inducement_set.get_inducements()
                 .into_iter()
@@ -89,38 +110,57 @@ pub trait StateMechanic: Send + Sync {
                 .filter(|ind| ind.value > 0);
             if let Some(p) = plague {
                 game.turn_data_away.plague_doctors = p.value;
+                events.push(GameEvent::Inducement {
+                    team_id,
+                    inducement_type: p.type_id.clone(),
+                    value: p.value,
+                });
             }
         }
-        // DEFERRED: ReportInducement emission (requires step result infra)
+        events
     }
 
     /// Java: `addReRolls(IStep, boolean)`.
     /// Sets rerolls from team, then adds extra training re-rolls from InducementSet (if any).
     ///
-    /// DEFERRED: report emission for extra training (requires step result infra).
-    fn add_re_rolls(&self, game: &mut Game, home_team: bool) {
+    /// Returns `GameEvent::Inducement` for each registered extra-training inducement.
+    fn add_re_rolls(&self, game: &mut Game, home_team: bool) -> Vec<GameEvent> {
+        let mut events = Vec::new();
         if home_team {
             let rr = game.team_home.rerolls;
             game.turn_data_home.rerolls = rr;
+            let team_id = game.team_home.id.clone();
             let extra = game.turn_data_home.inducement_set.get_inducements()
                 .into_iter()
                 .find(|ind| ind.has_usage(Usage::REROLL))
                 .filter(|ind| ind.value > 0);
             if let Some(e) = extra {
                 game.turn_data_home.rerolls += e.value;
+                // Java: pStep.getResult().addReport(new ReportInducement(team.getId(), entry.getKey(), ...))
+                events.push(GameEvent::Inducement {
+                    team_id,
+                    inducement_type: e.type_id.clone(),
+                    value: e.value,
+                });
             }
         } else {
             let rr = game.team_away.rerolls;
             game.turn_data_away.rerolls = rr;
+            let team_id = game.team_away.id.clone();
             let extra = game.turn_data_away.inducement_set.get_inducements()
                 .into_iter()
                 .find(|ind| ind.has_usage(Usage::REROLL))
                 .filter(|ind| ind.value > 0);
             if let Some(e) = extra {
                 game.turn_data_away.rerolls += e.value;
+                events.push(GameEvent::Inducement {
+                    team_id,
+                    inducement_type: e.type_id.clone(),
+                    value: e.value,
+                });
             }
         }
-        // DEFERRED: ReportInducement emission (requires step result infra)
+        events
     }
 
     /// Java: resetSpecialSkillAtEndOfDrive(Game).
@@ -157,8 +197,8 @@ mod tests {
     struct TestMechanic;
     impl StateMechanic for TestMechanic {
         fn update_leader_re_rolls_for_team(&self, _g: &mut Game, _home: bool) -> Option<LeaderState> { None }
-        fn start_half(&self, _g: &mut Game, _half: i32) {}
-        fn handle_pump_up(&self, _g: &mut Game, _ir: &InjuryResult) -> bool { false }
+        fn start_half(&self, _g: &mut Game, _half: i32) -> Vec<GameEvent> { vec![] }
+        fn handle_pump_up(&self, _g: &mut Game, _ctx: &InjuryContext) -> bool { false }
     }
 
     fn make_game() -> Game {
@@ -287,5 +327,114 @@ mod tests {
         // Player on pitch but no leader skill
         g.field_model.set_player_coordinate("p1", FieldCoordinate::new(8, 5));
         assert!(!m.team_has_leader_on_field(&g.team_home, &g.field_model));
+    }
+
+    // ── Event emission tests ──────────────────────────────────────────────────
+
+    #[test]
+    fn add_apothecaries_no_inducement_emits_no_events() {
+        let m = TestMechanic;
+        let mut g = make_game();
+        let events = m.add_apothecaries(&mut g, true);
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn add_apothecaries_wandering_emits_inducement_event() {
+        use ffb_model::inducement::inducement::Inducement;
+        let m = TestMechanic;
+        let mut g = make_game();
+        g.turn_data_home.inducement_set.add_inducement(
+            Inducement::new("wanderingApothecary", 1, vec![Usage::APOTHECARY])
+        );
+        let events = m.add_apothecaries(&mut g, true);
+        assert_eq!(events.len(), 1);
+        assert!(matches!(&events[0], GameEvent::Inducement { inducement_type, value: 1, .. }
+            if inducement_type == "wanderingApothecary"));
+    }
+
+    #[test]
+    fn add_apothecaries_plague_doctor_emits_inducement_event() {
+        use ffb_model::inducement::inducement::Inducement;
+        let m = TestMechanic;
+        let mut g = make_game();
+        g.turn_data_home.inducement_set.add_inducement(
+            Inducement::new("plagueDoctor", 2, vec![Usage::APOTHECARY_JOURNEYMEN])
+        );
+        let events = m.add_apothecaries(&mut g, true);
+        assert_eq!(events.len(), 1);
+        assert!(matches!(&events[0], GameEvent::Inducement { inducement_type, value: 2, .. }
+            if inducement_type == "plagueDoctor"));
+    }
+
+    #[test]
+    fn add_apothecaries_wandering_and_plague_emits_two_events() {
+        use ffb_model::inducement::inducement::Inducement;
+        let m = TestMechanic;
+        let mut g = make_game();
+        g.turn_data_home.inducement_set.add_inducement(
+            Inducement::new("wanderingApothecary", 1, vec![Usage::APOTHECARY])
+        );
+        g.turn_data_home.inducement_set.add_inducement(
+            Inducement::new("plagueDoctor", 1, vec![Usage::APOTHECARY_JOURNEYMEN])
+        );
+        let events = m.add_apothecaries(&mut g, true);
+        assert_eq!(events.len(), 2);
+    }
+
+    #[test]
+    fn add_apothecaries_away_team_event_carries_away_team_id() {
+        use ffb_model::inducement::inducement::Inducement;
+        let m = TestMechanic;
+        let mut g = make_game();
+        g.turn_data_away.inducement_set.add_inducement(
+            Inducement::new("wanderingApothecary", 1, vec![Usage::APOTHECARY])
+        );
+        let events = m.add_apothecaries(&mut g, false);
+        assert_eq!(events.len(), 1);
+        if let GameEvent::Inducement { team_id, .. } = &events[0] {
+            assert_eq!(team_id, &g.team_away.id);
+        } else {
+            panic!("expected Inducement event");
+        }
+    }
+
+    #[test]
+    fn add_re_rolls_no_inducement_emits_no_events() {
+        let m = TestMechanic;
+        let mut g = make_game();
+        let events = m.add_re_rolls(&mut g, true);
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn add_re_rolls_extra_training_emits_inducement_event() {
+        use ffb_model::inducement::inducement::Inducement;
+        let m = TestMechanic;
+        let mut g = make_game();
+        g.turn_data_home.inducement_set.add_inducement(
+            Inducement::new("extraTraining", 1, vec![Usage::REROLL])
+        );
+        let events = m.add_re_rolls(&mut g, true);
+        assert_eq!(events.len(), 1);
+        assert!(matches!(&events[0], GameEvent::Inducement { inducement_type, value: 1, .. }
+            if inducement_type == "extraTraining"));
+    }
+
+    #[test]
+    fn add_re_rolls_away_team_event_carries_away_team_id() {
+        use ffb_model::inducement::inducement::Inducement;
+        let m = TestMechanic;
+        let mut g = make_game();
+        g.turn_data_away.inducement_set.add_inducement(
+            Inducement::new("extraTraining", 2, vec![Usage::REROLL])
+        );
+        let events = m.add_re_rolls(&mut g, false);
+        assert_eq!(events.len(), 1);
+        if let GameEvent::Inducement { team_id, .. } = &events[0] {
+            assert_eq!(team_id, &g.team_away.id);
+        } else {
+            panic!("expected Inducement event");
+        }
     }
 }

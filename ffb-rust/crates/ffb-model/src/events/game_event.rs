@@ -177,6 +177,10 @@ pub enum GameEvent {
     BombOutOfBounds { coord: FieldCoordinate },
     /// Java: ReportThrownKeg — BeerBarrelBash keg throw result.
     KegThrow { thrower_id: PlayerId, target_id: Option<PlayerId>, roll: i32, success: bool, fumble: bool },
+    /// Java: ReportInducement — inducement registered at start of half (wandering apo, extra training, etc.).
+    Inducement { team_id: String, inducement_type: String, value: i32 },
+    /// Java: ReportPumpUpTheCrowdReRoll — attacker's PumpUpTheCrowd skill granted a re-roll.
+    PumpUpTheCrowdReRoll { player_id: PlayerId },
 
     // ── Weather effects ────────────────────────────────────────────────────────
     HeatExhaustion { player_id: PlayerId },

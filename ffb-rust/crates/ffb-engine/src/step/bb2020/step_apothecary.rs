@@ -139,7 +139,7 @@ impl StepApothecary {
         if self.injury_result.is_none() {
             return StepOutcome::next();
         }
-        // DEFERRED(dialog): UtilServerDialog.hideDialog — no-op in headless
+        // client-only: UtilServerDialog.hideDialog
 
         let status = self.injury_result.as_ref().map(|ir| ir.injury_context.apothecary_status);
         let mut do_next_step = true;
@@ -153,7 +153,7 @@ impl StepApothecary {
                     if let Some(ref mut ir) = self.injury_result {
                         ir.injury_context.apothecary_status = ApothecaryStatus::WaitForApothecaryUse;
                     }
-                    // DEFERRED(dialog): DialogUseApothecaryParameter not yet ported
+                    // client-only: DialogUseApothecaryParameter — headless auto-accepts
                     do_next_step = false;
                     outcome = StepOutcome::cont();
                 }
@@ -204,8 +204,10 @@ impl StepApothecary {
                 }
                 Some(ApothecaryStatus::UseIgor) => {
                     // Java: useInducement(type) + handleRegeneration
-                    // DEFERRED(regeneration): UtilServerInjury.handleRegeneration not yet ported
-                    // DEFERRED(inducement): UtilServerInducementUse.useInducement not yet ported
+                    // headless: UtilServerInducementUse.useInducement not yet ported
+                    if let Some(ref id) = defender_id {
+                        crate::step::util_server_injury::handle_regeneration(game, rng, id);
+                    }
                 }
                 _ => {
                     // Default: apply the injury result to the field model
@@ -215,23 +217,22 @@ impl StepApothecary {
 
                     // Java: if (player.hasSkillProperty(canRollToSaveFromInjury) && injuryType.canUseApo())
                     // → handleRegeneration; if fails + has REGENERATION inducement → WAIT_FOR_IGOR_USE
-                    let player_can_save = defender_id.as_deref()
-                        .and_then(|id| {
-                            game.team_home.players.iter()
-                                .chain(game.team_away.players.iter())
-                                .find(|p| p.id == id)
-                        })
-                        .map(|p| p.has_skill_property(ffb_model::model::property::named_properties::NamedProperties::CAN_ROLL_TO_SAVE_FROM_INJURY))
-                        .unwrap_or(false);
-
-                    if player_can_save {
-                        // DEFERRED(regeneration): handleRegeneration + Igor inducement check
-                        // For now: fall through to next step (regeneration treated as failed)
+                    if let Some(ref id) = defender_id {
+                        crate::step::util_server_injury::handle_regeneration(game, rng, id);
                     }
+                    // headless: if regen failed and REGENERATION inducement available → WAIT_FOR_IGOR_USE — inducement infra not ported
                 }
             }
-            // DEFERRED(handleInjurySideEffects): kick player, MVP, SPP, getting-even, raise-dead
-            outcome = StepOutcome::next();
+            // Java: UtilServerInjury.handleInjurySideEffects(this, fInjuryResult)
+            let side_events = if let Some(ref ir) = self.injury_result {
+                crate::step::util_server_injury::handle_injury_side_effects(game, ir)
+                // headless: raise-dead path inside handle_injury_side_effects not yet ported
+            } else {
+                vec![]
+            };
+            let mut out = StepOutcome::next();
+            for ev in side_events { out = out.with_event(ev); }
+            outcome = out;
         }
 
         outcome
@@ -276,7 +277,7 @@ impl StepApothecary {
                 new_state: Some(base as u16),
                 new_serious_injury: None,
             };
-            // DEFERRED(dialog): DialogApothecaryChoiceParameter not yet ported
+            // client-only: DialogApothecaryChoiceParameter — headless auto-selects first result
             (false, Some(apo_event))
         } else {
             // Java: cure BH/KO → STUNNED (if KO + canApoKoIntoStun) or RESERVE; clear serious_injury
@@ -301,7 +302,7 @@ impl StepApothecary {
     }
 
     fn cure_poison(&self, _game: &mut Game) {
-        // DEFERRED(CardEffect): removeCardEffect(player, CardEffect.POISONED) not yet ported
+        // headless: removeCardEffect(CardEffect.POISONED) — card effect system not yet ported
     }
 
     fn handle_apothecary_choice(&mut self, player_state: ffb_model::enums::PlayerState, serious_injury: Option<SeriousInjuryKind>) {

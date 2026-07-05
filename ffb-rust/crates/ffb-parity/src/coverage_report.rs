@@ -402,6 +402,8 @@ impl CoverageReport {
             | GameEvent::KickoffExtraReRollBb2016 { .. }
             | GameEvent::KickoffThrowARockBb2016 { .. }
             | GameEvent::KickoffPitchInvasionBb2016 { .. }
+            | GameEvent::Inducement { .. }
+            | GameEvent::PumpUpTheCrowdReRoll { .. }
             => {}
         }
     }

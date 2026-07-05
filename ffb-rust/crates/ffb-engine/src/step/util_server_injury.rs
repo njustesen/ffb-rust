@@ -329,6 +329,46 @@ pub fn stun_player(game: &mut Game, player_id: &str) {
     }
 }
 
+/// Port of `UtilServerInjury.handleInjurySideEffects(IStep, InjuryResult)`.
+///
+/// Called after injury resolution is finalised (apothecary done or declined).
+/// 1. `handleRaiseDead` — headless: InjuryMechanic.canRaiseDead + player creation not ported; no-op.
+/// 2. `mechanic.handlePumpUp` — grant extra re-roll if attacker has PumpUpTheCrowd skill.
+///    Emits `GameEvent::PumpUpTheCrowdReRoll` when a re-roll is granted.
+///
+/// Returns the events to be included in the step's `StepOutcome`.
+pub fn handle_injury_side_effects(
+    game: &mut Game,
+    injury_result: &InjuryResult,
+) -> Vec<ffb_model::events::GameEvent> {
+    use ffb_model::enums::Rules;
+    use ffb_model::events::GameEvent;
+    use crate::mechanic::state_mechanic::StateMechanic as StateMechanicTrait;
+
+    // headless: handleRaiseDead — requires InjuryMechanic.canRaiseDead + player creation not ported
+
+    // Java: mechanic.handlePumpUp(pStep, pInjuryResult) — dispatch on edition
+    let injury_context = injury_result.injury_context();
+    let pump_up_granted = match game.rules {
+        Rules::Bb2025 => {
+            use crate::mechanic::bb2025::state_mechanic::StateMechanic;
+            StateMechanic::new().handle_pump_up(game, injury_context)
+        }
+        _ => {
+            use crate::mechanic::mixed::state_mechanic::StateMechanic;
+            StateMechanic::new().handle_pump_up(game, injury_context)
+        }
+    };
+
+    if pump_up_granted {
+        let attacker_id = injury_result.injury_context().attacker_id.clone()
+            .unwrap_or_default();
+        vec![GameEvent::PumpUpTheCrowdReRoll { player_id: attacker_id }]
+    } else {
+        vec![]
+    }
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -683,5 +723,108 @@ mod tests {
         let params = drop_player(&mut game, "p1", true);
         assert!(params.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall))));
         assert!(game.field_model.ball_moving);
+    }
+
+    // ── handle_injury_side_effects tests ─────────────────────────────────────
+
+    fn make_pump_up_ir(game: &mut Game, home: bool, attacker_state: u32, injury_type: Option<&str>) -> InjuryResult {
+        use ffb_model::enums::{ApothecaryMode, PS_RIP, PlayerState};
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::model::player::Player;
+        use std::collections::HashSet;
+        // Create attacker with PumpUpTheCrowd skill
+        let mut attacker = Player {
+            id: "att".into(), name: "att".into(), nr: 99,
+            position_id: "pos".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 8, starting_skills: vec![], extra_skills: vec![],
+            temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        };
+        attacker.extra_skills.push(SkillWithValue { skill_id: SkillId::PumpUpTheCrowd, value: None });
+        let coord = FieldCoordinate::new(5, 5);
+        if home {
+            game.team_home.players.push(attacker);
+        } else {
+            game.team_away.players.push(attacker);
+        }
+        game.field_model.set_player_coordinate("att", coord);
+        game.field_model.set_player_state("att", PlayerState::new(attacker_state));
+
+        let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+        ir.injury_context_mut().attacker_id = Some("att".into());
+        ir.injury_context_mut().injury = Some(PlayerState::new(PS_RIP));
+        ir.injury_context_mut().injury_type_name = injury_type.map(|s| s.to_string());
+        ir
+    }
+
+    #[test]
+    fn handle_injury_side_effects_no_attacker_no_events() {
+        use ffb_model::enums::ApothecaryMode;
+        let mut game = make_game();
+        let ir = InjuryResult::new(ApothecaryMode::Defender);
+        let events = handle_injury_side_effects(&mut game, &ir);
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn handle_injury_side_effects_block_casualty_emits_pump_up_event() {
+        use ffb_model::enums::PS_STANDING;
+        use ffb_model::events::GameEvent;
+        let mut game = make_game();
+        game.home_playing = true;
+        let ir = make_pump_up_ir(&mut game, true, PS_STANDING, Some("Block"));
+        let events = handle_injury_side_effects(&mut game, &ir);
+        assert_eq!(events.len(), 1);
+        assert!(matches!(&events[0], GameEvent::PumpUpTheCrowdReRoll { player_id }
+            if player_id == "att"));
+        assert_eq!(game.turn_data_home.rerolls, 1);
+    }
+
+    #[test]
+    fn handle_injury_side_effects_non_block_no_event() {
+        use ffb_model::enums::PS_STANDING;
+        let mut game = make_game();
+        game.home_playing = true;
+        let ir = make_pump_up_ir(&mut game, true, PS_STANDING, Some("Foul"));
+        let events = handle_injury_side_effects(&mut game, &ir);
+        // BB2025 rules: only Block casualties grant pump-up
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn handle_injury_side_effects_mixed_rules_any_casualty() {
+        use ffb_model::enums::{ApothecaryMode, PS_STANDING, PS_RIP, PlayerState};
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::model::player::Player;
+        use std::collections::HashSet;
+        use ffb_model::events::GameEvent;
+        let mut game = Game::new(
+            test_team("home", 0), test_team("away", 0), Rules::Bb2016
+        );
+        game.home_playing = true;
+        // Create attacker with PumpUpTheCrowd on BB2016
+        let mut attacker = Player {
+            id: "att".into(), name: "att".into(), nr: 99,
+            position_id: "pos".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 8, starting_skills: vec![], extra_skills: vec![],
+            temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        };
+        attacker.extra_skills.push(SkillWithValue { skill_id: SkillId::PumpUpTheCrowd, value: None });
+        let coord = FieldCoordinate::new(5, 5);
+        game.team_home.players.push(attacker);
+        game.field_model.set_player_coordinate("att", coord);
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+        ir.injury_context_mut().attacker_id = Some("att".into());
+        ir.injury_context_mut().injury = Some(PlayerState::new(PS_RIP));
+        ir.injury_context_mut().injury_type_name = Some("Foul".into()); // Not Block — but mixed accepts any cas
+        let events = handle_injury_side_effects(&mut game, &ir);
+        assert_eq!(events.len(), 1);
+        assert!(matches!(&events[0], GameEvent::PumpUpTheCrowdReRoll { .. }));
     }
 }

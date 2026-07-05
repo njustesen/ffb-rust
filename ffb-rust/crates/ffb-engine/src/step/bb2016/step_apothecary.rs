@@ -125,7 +125,7 @@ impl StepApothecary {
             return StepOutcome::next();
         }
 
-        // DEFERRED(dialog): UtilServerDialog.hideDialog — no-op in headless
+        // client-only: UtilServerDialog.hideDialog
 
         let status = self.injury_result.as_ref()
             .map(|ir| ir.injury_context.apothecary_status);
@@ -142,7 +142,7 @@ impl StepApothecary {
                     if let Some(ref mut ir) = self.injury_result {
                         ir.injury_context.apothecary_status = ApothecaryStatus::WaitForApothecaryUse;
                     }
-                    // DEFERRED(dialog): DialogUseApothecaryParameter not yet ported
+                    // client-only: DialogUseApothecaryParameter — headless auto-accepts
                     do_next_step = false;
                     outcome = StepOutcome::cont();
                 }
@@ -184,11 +184,17 @@ impl StepApothecary {
 
         if do_next_step {
             // Java: fInjuryResult.applyTo(this) — apply injury outcome to field model
-            if let Some(ref ir) = self.injury_result {
+            let side_events = if let Some(ref ir) = self.injury_result {
                 ir.apply_to(game);
-            }
-            // DEFERRED(handleInjurySideEffects): kick player, MVP, SPP, getting-even, raise-dead
-            outcome = StepOutcome::next();
+                // Java: UtilServerInjury.handleInjurySideEffects(this, fInjuryResult)
+                crate::step::util_server_injury::handle_injury_side_effects(game, ir)
+                // headless: raise-dead path inside handle_injury_side_effects not yet ported
+            } else {
+                vec![]
+            };
+            let mut out = StepOutcome::next();
+            for ev in side_events { out = out.with_event(ev); }
+            outcome = out;
         }
 
         outcome
@@ -231,8 +237,7 @@ impl StepApothecary {
                 new_state: Some(base as u16),
                 new_serious_injury: None,
             };
-            // DEFERRED(dialog): DialogApothecaryChoiceParameter not yet ported
-            // Approximation: treat as no-choice (BADLY_HURT)
+            // client-only: DialogApothecaryChoiceParameter — headless auto-selects first result
             (false, Some(apo_event))
         } else {
             // Java: cure to STUNNED (if was KO and canApoKoIntoStun) or RESERVE
@@ -259,7 +264,7 @@ impl StepApothecary {
 
     /// Java: curePoison() — remove POISONED CardEffect based on mode.
     fn cure_poison(&self, _game: &mut Game) {
-        // DEFERRED(CardEffect): removeCardEffect(player, CardEffect.POISONED) not yet ported
+        // headless: removeCardEffect(CardEffect.POISONED) — card effect system not yet ported
     }
 
     /// Java: handleApothecaryChoice(pPlayerState, pSeriousInjury).

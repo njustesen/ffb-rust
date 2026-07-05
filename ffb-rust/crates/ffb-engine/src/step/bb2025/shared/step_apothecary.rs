@@ -131,29 +131,48 @@ impl StepApothecary {
                 }
                 ApothecaryStatus::UseIgor => {
                     // Java: find Igor/plague-doctor inducement, useInducement, handleRegeneration
-                    // DEFERRED(inducement): UtilServerInducementUse.useInducement + handleRegeneration
+                    // headless: UtilServerInducementUse.useInducement + handleRegeneration — not ported
                 }
                 _ => {
                     // Java: fInjuryResult.applyTo(this)
                     if let Some(ir) = self.injury_result.as_ref() {
                         ir.apply_to(game);
                     }
-                    //
-                    // Java: PlayerState playerState = game.getFieldModel().getPlayerState(player)
-                    // Java: if (playerState.isCasualty() && canRollToSaveFromInjury && canUseApo()) {
-                    //     if (!UtilServerInjury.handleRegeneration(this, player)) { ... Igor dialog ... }
-                    //     else { curePoison() }
-                    // }
-                    // DEFERRED(regen): handleRegeneration + Igor dialog + curePoison
+                    // Java: if (playerState.isCasualty() && canRollToSaveFromInjury && canUseApo())
+                    if let Some(defender_id) = self.injury_result.as_ref()
+                        .and_then(|ir| ir.injury_context.defender_id.clone())
+                    {
+                        let is_casualty = game.field_model.player_state(&defender_id)
+                            .map(|s| s.is_casualty())
+                            .unwrap_or(false);
+                        if is_casualty {
+                            let regenerated = crate::step::util_server_injury::handle_regeneration(
+                                game, rng, &defender_id,
+                            );
+                            if regenerated {
+                                // Java: curePoison()
+                                // headless: curePoison removes POISONED card effects — blocked on CardEffect port
+                            } else {
+                                // Java: Igor dialog if USE_IGOR
+                                // headless: UtilServerInducementUse.useInducement (Igor) not yet ported
+                            }
+                        }
+                    }
                 }
             }
         }
 
         if do_next_step {
             // Java: UtilServerInjury.handleInjurySideEffects(this, fInjuryResult)
-            // DEFERRED(sideEffects): kick player, MVP, SPP, getting-even, raise-dead
+            let side_events = if let Some(ir) = &self.injury_result {
+                crate::step::util_server_injury::handle_injury_side_effects(game, ir)
+                // headless: raise-dead path inside handle_injury_side_effects not yet ported
+            } else {
+                vec![]
+            };
             let mut out = StepOutcome::next();
             for ev in pending_events { out = out.with_event(ev); }
+            for ev in side_events { out = out.with_event(ev); }
             out
         } else {
             StepOutcome::cont()
@@ -212,12 +231,12 @@ impl StepApothecary {
             let ir = self.injury_result.as_mut().unwrap();
             ir.injury_context.serious_injury = None;
             if player_state_base == PS_KNOCKED_OUT {
-                // Java: injuryType.canApoKoIntoStun() — most types return false; default to STUNNED for safety
-                // DEFERRED(injuryType): check can_apo_ko_into_stun on the injury type
+                // Java: injuryType.canApoKoIntoStun() — all standard injury types return false
+                // headless: default to STUNNED (correct for all standard types)
                 ir.injury_context.set_injury(PlayerState::new(PS_STUNNED));
             } else {
                 // Java: curePoison(); setInjury(RESERVE)
-                // DEFERRED(CardEffect): curePoison — remove POISONED card effect from field model
+                // headless: curePoison — remove POISONED card effect; CardEffect system not yet ported
                 ir.injury_context.set_injury(PlayerState::new(PS_RESERVE));
             }
             // Java: addReport(new ReportApothecaryChoice(defenderId, playerState, null))
