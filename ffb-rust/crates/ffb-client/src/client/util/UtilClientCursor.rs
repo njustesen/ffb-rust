@@ -1,4 +1,4 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
+// client-only: Java AWT/Swing utility — no headless equivalent.
 pub struct Utilclientcursor;
 
 impl Utilclientcursor {

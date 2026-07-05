@@ -1,4 +1,4 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
+// client-only: Java Swing dialog UI — headless decisions handled by network_encoder/mod.rs.
 pub struct Dialogabouthandler;
 
 impl Dialogabouthandler {

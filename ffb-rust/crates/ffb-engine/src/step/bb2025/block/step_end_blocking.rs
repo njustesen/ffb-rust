@@ -1006,6 +1006,7 @@ mod tests {
     fn pile_driver_true_pushes_pile_driver_sequence_and_returns_early() {
         use ffb_model::model::skill_def::{SkillId, SkillWithValue};
         use ffb_model::model::player::Player;
+        use ffb_model::model::player_status::PlayerStatus;
         use ffb_model::enums::{PlayerType, PlayerGender, PS_PRONE};
         use ffb_model::types::FieldCoordinate;
         use std::collections::HashSet;
@@ -1024,7 +1025,7 @@ mod tests {
             used_skills: HashSet::new(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, is_thrall: false, race: None,
             temporary_stat_mods: vec![], temporary_skill_sources: vec![],
-            recovering_injury: None,
+            recovering_injury: None, player_status: PlayerStatus::ACTIVE,
         };
         atk.starting_skills.push(SkillWithValue { skill_id: SkillId::PileDriver, value: None });
         game.team_home.players.push(atk);
@@ -1043,7 +1044,7 @@ mod tests {
             used_skills: HashSet::new(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, is_thrall: false, race: None,
             temporary_stat_mods: vec![], temporary_skill_sources: vec![],
-            recovering_injury: None,
+            recovering_injury: None, player_status: PlayerStatus::ACTIVE,
         };
         game.team_away.players.push(def);
         game.field_model.set_player_state(&def_id, PlayerState::new(PS_PRONE));

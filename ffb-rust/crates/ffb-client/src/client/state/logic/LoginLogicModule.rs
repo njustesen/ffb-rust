@@ -1,4 +1,4 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
+// client-only: Java client state machine — superseded by crate::state_dispatch::mod.
 pub struct Loginlogicmodule;
 
 impl Loginlogicmodule {

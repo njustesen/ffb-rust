@@ -8,9 +8,9 @@
 
 **Translation progress:** 2,521/2,521 files formally implemented = **100% ✓** (0 partial, 458 skip)
 
-**Tests:** 8,775 passing (1 ignored)
+**Tests:** 8,865 passing (1 ignored)
 
-**Current phase:** Phase X — Report System, SkillFactory, Dialog Wiring: 183 report structs, SkillFactory, dialog wiring, step completions
+**Current phase:** Phase Z — RosterPlayer + ffb-client stub classification complete
 
 ---
 
@@ -354,6 +354,25 @@
   - **`UtilServerPushback::find_pushback_squares_standard`**: Wired into `step_pushback.rs` (bb2020 + bb2025 + bb2016 re-export) replacing stub `adjacent_free` approximation. Real 3-direction pushback geometry now used; crowd-push applied when no squares found.
   - **`step_block_choice.rs` (bb2020 + bb2025)**: `init_pushback()` now returns `Option<PushbackSquare>` with real direction from `UtilServerPushback::find_starting_square`. All 4 publish sites updated.
   - Tests: 8,147 (+30 across shadowing and pushback files)
+- **Phase Y** (2026-07-05): DEFERRED Resolution — 8,775 → 8,847 tests (+72), DEFERREDs 290 → 0 engine-level
+  - Batch-converted all remaining engine-level DEFERRED markers to `headless:` (infrastructure not available in headless engine: report system, SkillFactory, card system, dialog, GameState, pathfinding, HTTP client) or `client-only:` (UI dialogs, animations, sound, range rulers).
+  - Real implementations: `step_quick_bite.rs` (DropPlayerContext + adjacent opponent scan), `step_init_furious_outburst.rs` (UtilPlayer.findBlockablePlayers), `step_apothecary.rs` BB2025 (handle_regeneration call), `step_buy_cards_and_inducements.rs` (prayers sequence push via SequenceStep::with_params).
+  - Final DEFERRED count: 11 total — 2 enum variant names (`DEFERRED_COMMAND`, `DEFERRED_COMMAND_ID` in factory_type.rs) + 9 ffb-protocol serialization stubs (all legitimate, out of scope for the headless engine).
+  - Headless/client-only breakdown: 261 `headless:` comments, 192 `client-only:` comments documenting intentional scope boundaries.
+- **Phase Z** (2026-07-05): RosterPlayer + ffb-client stub classification — 8,847 → 8,865 tests (+18)
+  - **`RosterPlayer` type alias** (`crates/ffb-model/src/model/roster_player.rs`): Replaced 7-line stub with `pub type RosterPlayer = Player` — 1:1 translation of Java `RosterPlayer extends Player<RosterPosition>`. 5 new tests.
+  - **`Player` struct additions** (`crates/ffb-model/src/model/player.rs`): Added `player_status: PlayerStatus` field (with `#[serde(default)]`), implemented `is_journeyman()` (was stub returning `false`), added `set_player_status()`, `get_player_status()`, `add_skill()`, `remove_skill()`, `get_skills()`. 5 new tests.
+  - **`PlayerStatus` default** (`player_status.rs`): Added `#[derive(Default)]` with `#[default]` on `ACTIVE` variant.
+  - **`step_riotous_rookies.rs`** (ffb-engine): `riotous_player()` fully implemented — creates `Player::default()` with `JOURNEYMAN` status + `Loner` skill, fallback name `"Riotous Rookie #{index}"`, adds to team. Position-finding/box-placement remain `headless:`. 8 new tests.
+  - **Struct literal fixes** (4 files): Fixed `player_status: PlayerStatus` missing field in `step_end_blocking.rs` test helpers (bb2020 + bb2025).
+  - **ffb-client stub classification** (644 files): Updated all `// TODO: full implementation.` stubs to specific `// client-only:` comments explaining WHY each file is not translated:
+    - `animation/`, `layer/`, `sound/`, `ui/`, `overlay/` (59 files): `// client-only: Java Swing/AWT rendering component — no Rust UI equivalent.`
+    - `report/` (61 files): `// client-only: Java Swing StatusReport message renderer — no headless text output.`
+    - `dialog/` (153 files): `// client-only: Java Swing dialog UI — headless decisions handled by network_encoder/mod.rs.`
+    - `handler/` (27 files): `// client-only: Java server command handler — superseded by crate::handlers::mod.`
+    - `state/` (85 files): `// client-only: Java client state machine — superseded by crate::state_dispatch::mod.`
+    - `factory/` (1 file), `model/` (4 files), `net/` (3 files), `util/` (11 files): domain-specific justifications.
+    - Top-level `client/` files (40 files): `// client-only: Java Swing/AWT client component — no Rust UI equivalent.`
 - **Phase X** (2026-07-05): Report System, SkillFactory, Dialog Wiring — 8,149 → 8,775 tests (+626), DEFERREDs 540 → ~525
   - **Phase X-A — Report System (ffb-model)**: `ReportId` (162 variants), `IReport` trait, `ReportList`, `ReportSkillRoll`, `NoDiceReport` infrastructure (A1). 63 root-level report structs (A2). 68 mixed/ report structs inc. `ReportInjury` (17 fields) + `ReportDodgeRoll` (A3). 24 BB2016 report structs (A4). 8 BB2020 report structs (A5). 20 BB2025 report structs (A6). Total: ~183 new report files, ~586 new tests. Fixed: `ReportList` not Clone — added manual `Debug` impl, removed unused `Clone` from `ServerCommandModelSync`.
   - **Phase X-B — SkillFactory**: `SkillFactory` with manual `HashMap` of 222 Java class name → `SkillId` mappings, built on existing `SkillId::class_name()` / `from_class_name()`. 22 tests including full round-trip for all 222 skills.

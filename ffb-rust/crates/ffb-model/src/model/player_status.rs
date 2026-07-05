@@ -2,8 +2,9 @@ use serde::{Deserialize, Serialize};
 
 /// 1:1 translation of com.fumbbl.ffb.model.PlayerStatus.
 #[allow(non_camel_case_types)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum PlayerStatus {
+    #[default]
     ACTIVE,
     JOURNEYMAN,
 }

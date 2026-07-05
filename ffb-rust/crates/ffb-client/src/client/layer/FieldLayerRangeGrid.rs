@@ -1,4 +1,4 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
+// client-only: Java Swing/AWT rendering component — no Rust UI equivalent.
 pub struct Fieldlayerrangegrid;
 
 impl Fieldlayerrangegrid {

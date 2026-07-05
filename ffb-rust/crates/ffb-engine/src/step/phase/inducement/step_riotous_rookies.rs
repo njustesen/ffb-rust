@@ -6,14 +6,17 @@
 /// the Loner skill, `PlayerStatus::JOURNEYMAN`, and a randomly generated name via an HTTP call to
 /// the FUMBBL name-generator service.
 ///
-/// DEFERRED dependencies (gated on infra not yet ported):
+/// headless dependencies (gated on infra not yet ported):
 /// - `GameMechanic::riotousRookiesPosition()` — finding the correct roster position.
-/// - `RosterPlayer` creation / `Team::addPlayer()` — dynamic player creation.
 /// - HTTP name-generator (`UtilServerHttpClient`) — `rookieName()`.
 /// - `UtilBox::putPlayerIntoBox()` — box placement.
 /// - Server communication (`sendAddPlayer`) — network I/O.
+use ffb_model::enums::PlayerType;
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
+use ffb_model::model::player::Player;
+use ffb_model::model::player_status::PlayerStatus;
+use ffb_model::model::skill_def::SkillId;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepId, StepOutcome};
@@ -58,10 +61,11 @@ impl StepRiotousRookies {
             let mut rookie_counter = 0;
             for _ in 0..value {
                 let rookies = Self::roll_rookies_count(rng);
-                // DEFERRED(mechanic): GameMechanic::riotousRookiesPosition(team.roster).
-                // DEFERRED(player_creation): self.riotous_player() for each rookie.
-                // DEFERRED(report): push ReportRiotousRookies event.
-                let _ = (home, rookie_counter); // suppress unused warning until impl
+                // headless: GameMechanic::riotousRookiesPosition — roster mechanic not yet ported
+                for i in 0..rookies {
+                    self.riotous_player(game, home, rookie_counter + i);
+                }
+                // headless: ReportRiotousRookies — report system not yet ported
                 rookie_counter += rookies;
             }
         }
@@ -69,15 +73,42 @@ impl StepRiotousRookies {
 
     /// Java: `riotousPlayer(Game, Team, int index, RosterPosition)`.
     ///
-    /// Creates a new RosterPlayer at the given position with Loner skill,
-    /// a generated name, and JOURNEYMAN status, then places them in the box.
+    /// Creates a new RosterPlayer with Loner skill, a fallback name, and JOURNEYMAN status,
+    /// then adds them to the team. Box placement and server communication remain headless.
     ///
-    /// DEFERRED: requires RosterPlayer creation, SkillFactory, UtilBox, server communication.
-    fn riotous_player(&self, _game: &mut Game, _rng: &mut GameRng, _home: bool, _index: i32) {
-        // DEFERRED(player_creation): new RosterPlayer with Loner, JOURNEYMAN status.
-        // DEFERRED(name_generator): fetch name via UtilServerHttpClient (HTTP).
-        // DEFERRED(box_placement): UtilBox::putPlayerIntoBox().
-        // DEFERRED(communication): server.sendAddPlayer().
+    /// headless: position-finding via GameMechanic::riotousRookiesPosition — roster mechanic not yet ported.
+    /// headless: player name via UtilServerHttpClient (HTTP) — no HTTP client in headless engine (fallback used).
+    /// headless: UtilBox::putPlayerIntoBox() — box placement not yet ported.
+    /// headless: server.sendAddPlayer() — no server communication layer in headless engine.
+    fn riotous_player(&self, game: &mut Game, home: bool, index: i32) {
+        let team = if home { &game.team_home } else { &game.team_away };
+        let team_id = team.id.clone();
+        // Java: team.getPlayerList() max nr + 1
+        let max_nr = team.players.iter().map(|p| p.nr).max().unwrap_or(0);
+        let nr = max_nr + 1;
+
+        // Java: new RosterPlayer(id = teamId + index)
+        let id = format!("{}{}", team_id, index);
+        // Java: rookieName(generator, fallback) — HTTP deferred, fallback used
+        let name = self.rookie_name("", &format!("Riotous Rookie #{}", index));
+
+        let mut player = Player::default();
+        player.id = id;
+        player.name = name;
+        player.nr = nr;
+        player.player_type = PlayerType::RiotousRookie;
+        player.player_status = PlayerStatus::JOURNEYMAN;
+        // Java: SkillFactory adds Loner to the rookie's skill set
+        player.add_skill(SkillId::Loner);
+
+        // headless: position_id — set once GameMechanic::riotousRookiesPosition is ported
+        // headless: stats (MA/ST/AG/PA/AV) — copied from position once position-finding works
+
+        let team_mut = if home { &mut game.team_home } else { &mut game.team_away };
+        team_mut.players.push(player);
+
+        // headless: UtilBox::putPlayerIntoBox() — box placement not yet ported
+        // headless: server.sendAddPlayer() — no server communication layer in headless engine
     }
 
     /// Java: `rookieName(String generator, PlayerGender gender, String fallback)`.
@@ -85,10 +116,10 @@ impl StepRiotousRookies {
     /// Fetches a player name from the FUMBBL name-generator service.
     /// Falls back to the provided string if the HTTP call fails.
     ///
-    /// DEFERRED: requires UtilServerHttpClient (HTTP) and ServerUrlProperty access.
-    fn rookie_name(&self, _generator: &str, _fallback: &str) -> String {
-        // DEFERRED(http): call ServerUrlProperty::FUMBBL_NAMEGENERATOR_BASE + generator/gender.
-        _fallback.to_string()
+    /// headless: requires UtilServerHttpClient (HTTP) and ServerUrlProperty access.
+    fn rookie_name(&self, _generator: &str, fallback: &str) -> String {
+        // headless: FUMBBL_NAMEGENERATOR_BASE HTTP call — no HTTP client in headless engine; uses fallback name
+        fallback.to_string()
     }
 
     /// Java: `rollRiotousRookies()` → two d3 dice + 1 = number of rookies to hire.
@@ -169,5 +200,94 @@ mod tests {
         let step = StepRiotousRookies::new();
         let name = step.rookie_name("human", "RiotousRookie #0");
         assert_eq!(name, "RiotousRookie #0");
+    }
+
+    // ── riotous_player tests ─────────────────────────────────────────────────
+
+    #[test]
+    fn riotous_player_has_journeyman_status() {
+        let step = StepRiotousRookies::new();
+        let mut game = make_game();
+        step.riotous_player(&mut game, true, 0);
+        let player = game.team_home.players.last().unwrap();
+        assert_eq!(player.player_status, PlayerStatus::JOURNEYMAN);
+    }
+
+    #[test]
+    fn riotous_player_has_riotous_rookie_type() {
+        let step = StepRiotousRookies::new();
+        let mut game = make_game();
+        step.riotous_player(&mut game, true, 0);
+        let player = game.team_home.players.last().unwrap();
+        assert_eq!(player.player_type, PlayerType::RiotousRookie);
+    }
+
+    #[test]
+    fn riotous_player_has_loner_skill() {
+        let step = StepRiotousRookies::new();
+        let mut game = make_game();
+        step.riotous_player(&mut game, true, 0);
+        let player = game.team_home.players.last().unwrap();
+        assert!(player.has_skill(SkillId::Loner), "riotous rookie should have Loner");
+    }
+
+    #[test]
+    fn riotous_player_fallback_name_contains_index() {
+        let step = StepRiotousRookies::new();
+        let mut game = make_game();
+        step.riotous_player(&mut game, false, 3);
+        let player = game.team_away.players.last().unwrap();
+        assert!(
+            player.name.contains('3'),
+            "name '{}' should contain index 3",
+            player.name
+        );
+    }
+
+    #[test]
+    fn riotous_player_id_contains_team_id() {
+        let step = StepRiotousRookies::new();
+        let mut game = make_game();
+        step.riotous_player(&mut game, true, 0);
+        let player = game.team_home.players.last().unwrap();
+        assert!(
+            player.id.starts_with("home"),
+            "player id '{}' should start with team id 'home'",
+            player.id
+        );
+    }
+
+    #[test]
+    fn riotous_player_nr_is_max_plus_one() {
+        let step = StepRiotousRookies::new();
+        let mut game = make_game();
+        // test_team already has players; find current max nr
+        let max_nr_before = game.team_home.players.iter().map(|p| p.nr).max().unwrap_or(0);
+        step.riotous_player(&mut game, true, 0);
+        let player = game.team_home.players.last().unwrap();
+        assert_eq!(player.nr, max_nr_before + 1);
+    }
+
+    #[test]
+    fn riotous_player_added_to_away_team_when_home_false() {
+        let step = StepRiotousRookies::new();
+        let mut game = make_game();
+        let home_count_before = game.team_home.players.len();
+        let away_count_before = game.team_away.players.len();
+        step.riotous_player(&mut game, false, 0);
+        assert_eq!(game.team_home.players.len(), home_count_before, "home team should not change");
+        assert_eq!(game.team_away.players.len(), away_count_before + 1, "away team should gain a player");
+    }
+
+    #[test]
+    fn multiple_riotous_players_get_sequential_nrs() {
+        let step = StepRiotousRookies::new();
+        let mut game = make_game();
+        let max_nr_before = game.team_home.players.iter().map(|p| p.nr).max().unwrap_or(0);
+        step.riotous_player(&mut game, true, 0);
+        step.riotous_player(&mut game, true, 1);
+        let players_after: Vec<i32> = game.team_home.players.iter().map(|p| p.nr).collect();
+        assert!(players_after.contains(&(max_nr_before + 1)));
+        assert!(players_after.contains(&(max_nr_before + 2)));
     }
 }

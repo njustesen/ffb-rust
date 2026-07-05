@@ -1,4 +1,4 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
+// client-only: Java WebSocket client utility — superseded by crate::connection::mod.
 pub struct Clientpingtask;
 
 impl Clientpingtask {

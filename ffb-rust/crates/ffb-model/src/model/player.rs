@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use crate::enums::{PlayerType, PlayerGender, SeriousInjuryKind};
+use crate::model::player_status::PlayerStatus;
 use crate::model::property::named_properties::NamedProperties;
 use crate::model::skill_def::{SkillId, SkillWithValue};
 use crate::model::roster_position::RosterPosition;
@@ -85,6 +86,10 @@ pub struct Player {
     /// None means the player has no current MNG injury.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recovering_injury: Option<SeriousInjuryKind>,
+
+    /// Java: RosterPlayer.playerStatus — ACTIVE for registered players, JOURNEYMAN for hired-for-game players.
+    #[serde(default)]
+    pub player_status: PlayerStatus,
 }
 
 impl Player {
@@ -203,8 +208,7 @@ impl Player {
     }
 
     /// 1:1 translation of isJourneyman — true if the player has journeyman status (borrowed for the drive).
-    /// TODO: requires PlayerStatus field to be translated.
-    pub fn is_journeyman(&self) -> bool { false }
+    pub fn is_journeyman(&self) -> bool { self.player_status == PlayerStatus::JOURNEYMAN }
 
     /// 1:1 translation of ZappedPlayer check — true if this player was "zapped" by an opponent card.
     /// TODO: requires ZappedPlayer subclass equivalent (player_status or separate enum).
@@ -213,6 +217,31 @@ impl Player {
     /// Java: RosterPlayer.resetUsedSkills — removes from used_skills all entries with the given usage type.
     pub fn reset_used_skills(&mut self, usage_type: crate::enums::SkillUsageType) {
         self.used_skills.retain(|id| id.usage_type() != usage_type);
+    }
+
+    /// Java: RosterPlayer.setPlayerStatus
+    pub fn set_player_status(&mut self, status: PlayerStatus) { self.player_status = status; }
+
+    /// Java: RosterPlayer.getPlayerStatus
+    pub fn get_player_status(&self) -> PlayerStatus { self.player_status }
+
+    /// Java: RosterPlayer.addSkill — adds to extra_skills if not already present.
+    pub fn add_skill(&mut self, skill_id: SkillId) {
+        if !self.has_skill(skill_id) {
+            self.extra_skills.push(SkillWithValue { skill_id, value: None });
+        }
+    }
+
+    /// Java: RosterPlayer.removeSkill — removes from extra_skills.
+    pub fn remove_skill(&mut self, skill_id: SkillId) {
+        if let Some(pos) = self.extra_skills.iter().position(|sw| sw.skill_id == skill_id) {
+            self.extra_skills.remove(pos);
+        }
+    }
+
+    /// Java: RosterPlayer.getSkills — all skills (starting + extra).
+    pub fn get_skills(&self) -> Vec<SkillId> {
+        self.starting_skills.iter().chain(self.extra_skills.iter()).map(|sw| sw.skill_id).collect()
     }
 
     /// Construct a new player instance from a roster position template.
@@ -247,6 +276,7 @@ impl Player {
             temporary_stat_mods: vec![],
             temporary_skill_sources: vec![],
             recovering_injury: None,
+            player_status: PlayerStatus::ACTIVE,
         }
     }
 }
@@ -255,6 +285,7 @@ impl Player {
 mod tests {
     use super::*;
     use crate::enums::{PlayerType, PlayerGender};
+    use crate::model::player_status::PlayerStatus;
 
     fn test_player() -> Player {
         Player {
@@ -287,6 +318,7 @@ mod tests {
             temporary_stat_mods: vec![],
             temporary_skill_sources: vec![],
             recovering_injury: None,
+            player_status: PlayerStatus::ACTIVE,
         }
     }
 
@@ -559,5 +591,39 @@ mod tests {
         p.remove_enhancements("GREASY_CLEATS");
         assert_eq!(p.movement_with_modifiers(), 6);
         assert!(!p.has_skill(SkillId::Stab));
+    }
+
+    #[test]
+    fn player_status_defaults_to_active() {
+        let p = Player::default();
+        assert_eq!(p.player_status, PlayerStatus::ACTIVE);
+    }
+
+    #[test]
+    fn is_journeyman_false_for_active() {
+        let p = test_player();
+        assert!(!p.is_journeyman());
+    }
+
+    #[test]
+    fn is_journeyman_true_for_journeyman_status() {
+        let mut p = test_player();
+        p.set_player_status(PlayerStatus::JOURNEYMAN);
+        assert!(p.is_journeyman());
+    }
+
+    #[test]
+    fn add_skill_and_get_skills() {
+        let mut p = test_player();
+        p.add_skill(SkillId::Dodge);
+        assert!(p.get_skills().contains(&SkillId::Dodge));
+    }
+
+    #[test]
+    fn remove_skill_removes_from_extra() {
+        let mut p = test_player();
+        p.add_skill(SkillId::Dodge);
+        p.remove_skill(SkillId::Dodge);
+        assert!(!p.get_skills().contains(&SkillId::Dodge));
     }
 }

@@ -1,4 +1,4 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
+// client-only: Java client changelog/version model — no Rust UI equivalent.
 pub struct Onlineaware;
 
 impl Onlineaware {

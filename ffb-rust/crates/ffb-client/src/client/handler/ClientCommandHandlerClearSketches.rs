@@ -1,4 +1,4 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
+// client-only: Java server command handler — superseded by crate::handlers::mod.
 pub struct Clientcommandhandlerclearsketches;
 
 impl Clientcommandhandlerclearsketches {

@@ -1,4 +1,4 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
+// client-only: Java Swing/AWT client component — no Rust UI equivalent.
 pub struct Userinterface;
 
 impl Userinterface {

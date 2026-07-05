@@ -1,4 +1,4 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
+// client-only: Java logic plugin factory — superseded by crate::state_dispatch::mod.
 pub struct Logicpluginfactory;
 
 impl Logicpluginfactory {

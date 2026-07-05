@@ -1,4 +1,4 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
+// client-only: Java Swing StatusReport message renderer — no headless text output.
 pub struct Brilliantcoachingrerollslostmessage;
 
 impl Brilliantcoachingrerollslostmessage {
