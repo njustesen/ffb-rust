@@ -2,6 +2,8 @@
 use ffb_model::enums::CardEffect;
 use ffb_model::model::game::Game;
 use ffb_model::inducement::card::Card;
+use ffb_model::util::rng::GameRng;
+use crate::dice_interpreter::DiceInterpreter;
 use crate::inducements::card_handler::CardHandler;
 
 pub struct WitchBrewHandler;
@@ -19,11 +21,18 @@ impl CardHandler for WitchBrewHandler {
 
     fn get_name(&self) -> &'static str { "WitchBrewHandler" }
 
-    /// Java: rollCardEffect() → interpretWitchBrewRoll(roll) → addCardEffect(player, effect).
-    /// headless: WitchBrew dice roll requires RNG not in CardHandler trait;
-    /// dice rolling (DiceRoller.rollCardEffect + DiceInterpreter.interpretWitchBrewRoll) requires
-    /// IStep context. This activation path must be handled by StepPlayCard when wiring card effects.
-    fn activate_on_game(&self, _game: &mut Game, _card: &Card, _player_id: &str) -> bool {
+    /// Java: rollCardEffect() → interpretWitchBrewRoll(roll) → addCardEffect(player, effect) → report.
+    fn activate_on_game(&self, game: &mut Game, card: &Card, player_id: &str, rng: &mut GameRng) -> bool {
+        let roll = rng.d6();
+        let effect = DiceInterpreter::interpret_witch_brew_roll(roll);
+        if let Some(e) = effect {
+            game.field_model.add_card_effect(player_id, e);
+        }
+        let mut report = ffb_model::report::report_card_effect_roll::ReportCardEffectRoll::new(
+            card.name.clone(), roll,
+        );
+        report.set_card_effect(effect.map(|e| format!("{:?}", e)));
+        game.report_list.add(report);
         true
     }
 
@@ -44,6 +53,16 @@ mod tests {
     use crate::step::framework::test_team;
     use ffb_model::enums::Rules;
     use ffb_model::types::FieldCoordinate;
+    use ffb_model::util::rng::GameRng;
+
+    fn seed_for_d6(target: i32) -> u64 {
+        for s in 0u64..10_000 {
+            if GameRng::new(s).d6() == target {
+                return s;
+            }
+        }
+        panic!("no seed for d6={}", target);
+    }
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2016)
@@ -71,7 +90,39 @@ mod tests {
         let mut game = make_game();
         let h = WitchBrewHandler;
         let card = Card::new("Witch Brew", Some("WITCH_BREW"));
-        assert!(h.activate_on_game(&mut game, &card, "player1"));
+        let mut rng = GameRng::new(0);
+        assert!(h.activate_on_game(&mut game, &card, "player1", &mut rng));
+    }
+
+    #[test]
+    fn activate_roll_1_gives_mad_cap_mushroom_potion() {
+        let mut game = make_game();
+        let h = WitchBrewHandler;
+        let card = Card::new("Witch Brew", Some("WITCH_BREW"));
+        let mut rng = GameRng::new(seed_for_d6(1));
+        h.activate_on_game(&mut game, &card, "p1", &mut rng);
+        assert!(game.field_model.has_card_effect("p1", CardEffect::MadCapMushroomPotion));
+    }
+
+    #[test]
+    fn activate_roll_3_gives_sedative() {
+        let mut game = make_game();
+        let h = WitchBrewHandler;
+        let card = Card::new("Witch Brew", Some("WITCH_BREW"));
+        let mut rng = GameRng::new(seed_for_d6(3));
+        h.activate_on_game(&mut game, &card, "p1", &mut rng);
+        assert!(game.field_model.has_card_effect("p1", CardEffect::Sedative));
+    }
+
+    #[test]
+    fn activate_roll_2_gives_no_effect() {
+        let mut game = make_game();
+        let h = WitchBrewHandler;
+        let card = Card::new("Witch Brew", Some("WITCH_BREW"));
+        let mut rng = GameRng::new(seed_for_d6(2));
+        h.activate_on_game(&mut game, &card, "p1", &mut rng);
+        assert!(!game.field_model.has_card_effect("p1", CardEffect::MadCapMushroomPotion));
+        assert!(!game.field_model.has_card_effect("p1", CardEffect::Sedative));
     }
 
     #[test]

@@ -8,9 +8,7 @@
 ///   - BOMB: complex suppressEndTurn logic + SteadyFootingContext; SPP tracking via
 ///     InjuryTypeBombWithModifierForSpp when bombardier != player's team and has ViolentInnovator.
 ///   - END_TURN guard: only published if `isStanding` (not prone/stunned).
-///   - ZAP: ZappedPlayer substitution still headless (ZappedPlayer not yet ported).
-///
-/// headless(ZAP): ZappedPlayer substitution not yet ported.
+///   - ZAP: creates ZappedPlayer with BB2020 stats (MA=5, ST=1, AG=2, PA=0, AV=5).
 use ffb_model::enums::{ApothecaryMode, TurnMode};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
@@ -138,8 +136,14 @@ impl StepSpecialEffect {
                 for p in drop_player(game, &player_id, true) { outcome = outcome.publish(p); }
             }
             SpecialEffect::ZAP => {
-                // headless: ZappedPlayer substitution not yet ported
-                // Java: create ZappedPlayer, add to team, sendZapPlayer, scatter ball if on ball.
+                // Java: ZappedPlayer.init(rosterPlayer, game) + team.addPlayer(zappedPlayer)
+                // BB2025 zap stats same as BB2020: MA=5, ST=1, AG=2, PA=0, AV=5
+                if let Some(player) = game.player(&player_id).cloned() {
+                    let position = ffb_model::model::zapped_position::ZappedPosition::new_bb2020(
+                        player.position_id.clone(), player.name.clone(),
+                    );
+                    game.add_zapped_player(ffb_model::model::zapped_player::ZappedPlayer::new(player, position));
+                }
                 let ball_coord = game.field_model.ball_coordinate;
                 let on_ball = ball_coord.map(|b| b == coord).unwrap_or(false);
                 if on_ball {

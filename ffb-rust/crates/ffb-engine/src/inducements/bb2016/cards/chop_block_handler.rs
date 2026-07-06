@@ -79,6 +79,6 @@ mod tests {
         let mut game = make_game();
         let h = ChopBlockHandler;
         let card = Card::new("Chop Block", Some("CHOP_BLOCK"));
-        assert!(h.activate_on_game(&mut game, &card, "player1"));
+        assert!(h.activate_on_game(&mut game, &card, "player1", &mut ffb_model::util::rng::GameRng::new(0)));
     }
 }

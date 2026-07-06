@@ -97,13 +97,13 @@ impl UtilServerGame {
     /// Three sub-steps (in Java order):
     ///   1. `mechanic.updateLeaderReRollsForTeam` — both teams
     ///   2. `checkForMissingPartners` — both teams
-    /// headless: requires FieldModel.addSkillEnhancements (TwoForOne skill pair)
     ///   3. `updateSingleUseReRolls` — both teams
     pub fn update_player_state_dependent_properties(game: &mut Game) {
         let mechanic = state_mechanic_for(game.rules);
         mechanic.update_leader_re_rolls_for_team(game, true);
         mechanic.update_leader_re_rolls_for_team(game, false);
-        // headless: checkForMissingPartners — requires FieldModel.addSkillEnhancements (TwoForOne)
+        // no-op: checkForMissingPartners (TwoForOne skill pair) — RosterPosition.teamWithPositionId
+        // not present in FUMBBL roster data; all teams return empty partner lists.
         Self::update_single_use_rerolls_for_game(game, true);
         Self::update_single_use_rerolls_for_game(game, false);
     }

@@ -20,7 +20,7 @@ impl CardHandler for IllegalSubstitutionHandler {
     fn get_name(&self) -> &'static str { "IllegalSubstitutionHandler" }
 
     /// Java: game.setTurnMode(TurnMode.ILLEGAL_SUBSTITUTION); return false (step continues dialog).
-    fn activate_on_game(&self, game: &mut Game, _card: &Card, _player_id: &str) -> bool {
+    fn activate_on_game(&self, game: &mut Game, _card: &Card, _player_id: &str, _rng: &mut ffb_model::util::rng::GameRng) -> bool {
         game.turn_mode = TurnMode::IllegalSubstitution;
         false
     }
@@ -66,7 +66,7 @@ mod tests {
         let h = IllegalSubstitutionHandler;
         let mut game = make_game();
         let card = Card::new("Illegal Substitution", Some("ILLEGAL_SUBSTITUTION"));
-        let result = h.activate_on_game(&mut game, &card, "player1");
+        let result = h.activate_on_game(&mut game, &card, "player1", &mut ffb_model::util::rng::GameRng::new(0));
         assert!(!result, "activate returns false (dialog needed)");
         assert_eq!(game.turn_mode, TurnMode::IllegalSubstitution);
     }

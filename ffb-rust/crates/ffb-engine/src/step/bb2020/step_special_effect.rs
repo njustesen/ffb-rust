@@ -130,14 +130,18 @@ impl StepSpecialEffect {
 
         match special_effect {
             Some(SpecialEffect::ZAP) => {
-                // Java: ZappedPlayer creation + team replacement (TODO)
-                // headless: ZappedPlayer substitution not yet ported
-                // If ball is on this player's square → scatter ball
+                // Java: ZappedPlayer.init(rosterPlayer, game) + team.addPlayer(zappedPlayer)
+                // BB2020 zap stats: MA=5, ST=1, AG=2, PA=0, AV=5
+                if let Some(player) = game.player(&player_id).cloned() {
+                    let position = ffb_model::model::zapped_position::ZappedPosition::new_bb2020(
+                        player.position_id.clone(), player.name.clone(),
+                    );
+                    game.add_zapped_player(ffb_model::model::zapped_player::ZappedPlayer::new(player, position));
+                }
                 if game.field_model.ball_coordinate == Some(player_coord) {
                     outcome = outcome.publish(StepParameter::CatchScatterThrowInMode(
                         CatchScatterThrowInMode::ScatterBall,
                     ));
-                    // CatchScatterThrowInMode published above; generator sequence handles the scatter step
                 }
             }
             Some(SpecialEffect::FIREBALL) => {

@@ -12,6 +12,8 @@ use crate::model::player::PlayerId;
 use crate::model::team::Team;
 use crate::model::turn_data::TurnData;
 use crate::model::prayer_state::PrayerState;
+use crate::model::zapped_player::ZappedPlayer;
+use crate::model::zapped_position::ZappedPosition;
 use crate::report::report_list::ReportList;
 
 /// The complete game state — primary data structure for the headless engine.
@@ -83,6 +85,12 @@ pub struct Game {
     /// Populated by step methods via report structs in ffb-model/src/report/.
     #[serde(skip)]
     pub report_list: ReportList,
+
+    /// Java: GameState.zappedPlayerIds + team.addPlayer(zappedPlayer) —
+    /// stores the original player snapshot before ZAP stats were applied.
+    /// Players are restored (unzapped) at end of drive/half.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub zapped_players: Vec<ZappedPlayer>,
 }
 
 impl Game {
@@ -130,6 +138,7 @@ impl Game {
             active_shadowers: Vec::new(),
             dialog_id: None,
             report_list: ReportList::new(),
+            zapped_players: Vec::new(),
         }
     }
 
@@ -246,6 +255,50 @@ impl Game {
             "Spiked Ball" => &[NamedProperties::DROPPED_BALL_CAUSES_ARMOUR_ROLL],
             _ => &[],
         }
+    }
+
+    /// Java: GameState.addZappedPlayer(player) + team.addPlayer(zappedPlayer) —
+    /// saves the original player, then overwrites the in-team player with ZAP stats and skills.
+    pub fn add_zapped_player(&mut self, zapped: ZappedPlayer) {
+        let id = zapped.original_player.id.clone();
+        // Apply zap stats to the live player in the team.
+        if let Some(p) = self.player_mut(&id) {
+            p.movement = zapped.position.movement;
+            p.strength = zapped.position.strength;
+            p.agility = zapped.position.agility;
+            p.passing = zapped.position.passing;
+            p.armour = zapped.position.armour;
+            p.starting_skills = ZappedPosition::get_skills();
+            p.extra_skills.clear();
+            p.temporary_skills.clear();
+            p.zapped = true;
+        }
+        self.zapped_players.push(zapped);
+    }
+
+    /// Java: GameState.removeZappedPlayer(player) — called after unzapping restores the original.
+    pub fn remove_zapped_player(&mut self, player_id: &str) {
+        self.zapped_players.retain(|z| z.original_player.id != player_id);
+    }
+
+    /// Java: GameState.isZapped(player).
+    pub fn is_zapped_player(&self, player_id: &str) -> bool {
+        self.zapped_players.iter().any(|z| z.original_player.id == player_id)
+    }
+
+    /// Java: end-of-drive unzap loop in StepEndTurn — restores all zapped players to their original stats.
+    /// Returns the IDs of all players that were unzapped.
+    pub fn unzap_all_players(&mut self) -> Vec<String> {
+        let zapped = std::mem::take(&mut self.zapped_players);
+        let mut ids = Vec::with_capacity(zapped.len());
+        for z in zapped {
+            let id = z.original_player.id.clone();
+            if let Some(p) = self.player_mut(&id) {
+                *p = z.original_player;
+            }
+            ids.push(id);
+        }
+        ids
     }
 
     /// Java: `Game.startTurn()` — resets per-turn state on both teams' TurnData and clears acting player.

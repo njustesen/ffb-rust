@@ -21,7 +21,7 @@ impl CardHandler for DistractHandler {
     fn get_name(&self) -> &'static str { "DistractHandler" }
 
     /// Java: add DISTRACTED to opponent players adjacent to the card user.
-    fn activate_on_game(&self, game: &mut Game, _card: &Card, player_id: &str) -> bool {
+    fn activate_on_game(&self, game: &mut Game, _card: &Card, player_id: &str, _rng: &mut ffb_model::util::rng::GameRng) -> bool {
         let coord = match game.field_model.player_coordinate(player_id) {
             Some(c) => c,
             None => return true,
@@ -92,7 +92,7 @@ mod tests {
         let mut game = make_game();
         let h = DistractHandler;
         let card = Card::new("Distract", Some("DISTRACT"));
-        assert!(h.activate_on_game(&mut game, &card, "nonexistent"));
+        assert!(h.activate_on_game(&mut game, &card, "nonexistent", &mut ffb_model::util::rng::GameRng::new(0)));
     }
 
     #[test]

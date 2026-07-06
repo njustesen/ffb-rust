@@ -9,6 +9,7 @@
 /// Expects: `INJURY_RESULT`, `USING_PILING_ON` (DEFENDER mode), `DEFENDER_POISONED`, `ATTACKER_POISONED`.
 use ffb_model::enums::{ApothecaryMode, ApothecaryStatus, ApothecaryType, SeriousInjuryKind};
 use ffb_model::events::GameEvent;
+use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -211,9 +212,14 @@ impl StepApothecary {
                     // Java: break — fall through to applyTo
                 }
                 Some(ApothecaryStatus::UseIgor) => {
-                    // Java: useInducement(type) + handleRegeneration
-                    // headless: UtilServerInducementUse.useInducement not yet ported
+                    // Java: find REGENERATION inducement with uses left, useInducement, handleRegeneration
                     if let Some(ref id) = defender_id {
+                        let is_home = game.team_home.has_player(id);
+                        if is_home {
+                            game.turn_data_home.inducement_set.use_one_for_usage(Usage::REGENERATION);
+                        } else {
+                            game.turn_data_away.inducement_set.use_one_for_usage(Usage::REGENERATION);
+                        }
                         crate::step::util_server_injury::handle_regeneration(game, rng, id);
                     }
                 }
@@ -228,13 +234,14 @@ impl StepApothecary {
                     if let Some(ref id) = defender_id {
                         crate::step::util_server_injury::handle_regeneration(game, rng, id);
                     }
-                    // headless: if regen failed and REGENERATION inducement available → WAIT_FOR_IGOR_USE — inducement infra not ported
+                    // client-only: if regen failed and REGENERATION inducement available → WAIT_FOR_IGOR_USE dialog
+                    // Headless auto-declines Igor dialog; game continues with the injury.
                 }
             }
             // Java: UtilServerInjury.handleInjurySideEffects(this, fInjuryResult)
             let side_events = if let Some(ref ir) = self.injury_result {
                 crate::step::util_server_injury::handle_injury_side_effects(game, ir)
-                // headless: raise-dead path inside handle_injury_side_effects not yet ported
+                // no-op: handleRaiseDead — InjuryMechanic.canRaiseDead + player creation not ported
             } else {
                 vec![]
             };

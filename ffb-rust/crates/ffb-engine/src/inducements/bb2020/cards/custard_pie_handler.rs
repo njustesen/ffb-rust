@@ -31,7 +31,7 @@ impl CardHandler for CustardPieHandler {
     }
 
     /// Java: game.getFieldModel().setPlayerState(player, playerState.changeHypnotized(true))
-    fn activate_on_game(&self, game: &mut Game, _card: &Card, player_id: &str) -> bool {
+    fn activate_on_game(&self, game: &mut Game, _card: &Card, player_id: &str, _rng: &mut ffb_model::util::rng::GameRng) -> bool {
         if let Some(state) = game.field_model.player_state(player_id) {
             game.field_model.set_player_state(player_id, state.change_hypnotized(true));
         }
@@ -88,7 +88,7 @@ mod tests {
         game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
         let h = CustardPieHandler;
         let card = Card::new("Custard Pie", Some("CUSTARD_PIE"));
-        h.activate_on_game(&mut game, &card, "p1");
+        h.activate_on_game(&mut game, &card, "p1", &mut ffb_model::util::rng::GameRng::new(0));
         let state = game.field_model.player_state("p1").unwrap();
         assert!(state.is_hypnotized());
     }

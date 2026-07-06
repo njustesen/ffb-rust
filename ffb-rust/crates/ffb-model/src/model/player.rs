@@ -90,6 +90,11 @@ pub struct Player {
     /// Java: RosterPlayer.playerStatus — ACTIVE for registered players, JOURNEYMAN for hired-for-game players.
     #[serde(default)]
     pub player_status: PlayerStatus,
+
+    /// True when this player has been ZAP-ped by a card; stats replaced by ZappedPosition values.
+    /// Java: player instanceof ZappedPlayer check — tracked via GameState.isZapped().
+    #[serde(default)]
+    pub zapped: bool,
 }
 
 impl Player {
@@ -210,9 +215,8 @@ impl Player {
     /// 1:1 translation of isJourneyman — true if the player has journeyman status (borrowed for the drive).
     pub fn is_journeyman(&self) -> bool { self.player_status == PlayerStatus::JOURNEYMAN }
 
-    /// 1:1 translation of ZappedPlayer check — true if this player was "zapped" by an opponent card.
-    /// TODO: requires ZappedPlayer subclass equivalent (player_status or separate enum).
-    pub fn is_zapped(&self) -> bool { false }
+    /// Java: player instanceof ZappedPlayer — true when this player was ZAP-ped this drive.
+    pub fn is_zapped(&self) -> bool { self.zapped }
 
     /// Java: RosterPlayer.resetUsedSkills — removes from used_skills all entries with the given usage type.
     pub fn reset_used_skills(&mut self, usage_type: crate::enums::SkillUsageType) {
@@ -277,6 +281,7 @@ impl Player {
             temporary_skill_sources: vec![],
             recovering_injury: None,
             player_status: PlayerStatus::ACTIVE,
+            zapped: false,
         }
     }
 }
@@ -319,6 +324,7 @@ mod tests {
             temporary_skill_sources: vec![],
             recovering_injury: None,
             player_status: PlayerStatus::ACTIVE,
+            zapped: false,
         }
     }
 

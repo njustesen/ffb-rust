@@ -303,11 +303,12 @@ impl StepEndTurn {
                     }
                 }
                 let td_player_id = if touchdown { game.acting_player.player_id.clone() } else { None };
+                let unzapped = game.unzap_all_players(); // Java: end-of-drive loop restoring ZappedPlayer → originalPlayer
                 game.report_list.add(ReportTurnEnd::new(
                     td_player_id,
                     ko_recoveries,
                     heat_exhaustions,
-                    vec![], // no-op: unzapped_players — ZappedPlayer tracking not ported in headless
+                    unzapped,
                     0,      // heat_roll: field-level roll; individual player rolls captured in heat_exhaustions
                 ));
                 UtilBox::put_all_players_into_box(game);

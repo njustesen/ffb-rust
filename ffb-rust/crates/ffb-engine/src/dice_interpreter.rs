@@ -196,6 +196,17 @@ impl DiceInterpreter {
     pub fn is_double(roll: &[i32]) -> bool {
         roll.len() == 2 && roll[0] == roll[1]
     }
+
+    /// Java: DiceInterpreter.interpretWitchBrewRoll(int roll).
+    /// 1 → MadCapMushroomPotion, 3–6 → Sedative, 2 → None (no effect).
+    pub fn interpret_witch_brew_roll(roll: i32) -> Option<ffb_model::enums::CardEffect> {
+        use ffb_model::enums::CardEffect;
+        match roll {
+            1 => Some(CardEffect::MadCapMushroomPotion),
+            3 | 4 | 5 | 6 => Some(CardEffect::Sedative),
+            _ => None,
+        }
+    }
 }
 
 impl Default for DiceInterpreter {
@@ -373,5 +384,24 @@ mod tests {
         assert!(DiceInterpreter::is_double(&[3, 3]));
         assert!(!DiceInterpreter::is_double(&[2, 3]));
         assert!(!DiceInterpreter::is_double(&[3]));
+    }
+
+    #[test]
+    fn witch_brew_roll_1_gives_mad_cap_mushroom_potion() {
+        use ffb_model::enums::CardEffect;
+        assert_eq!(DiceInterpreter::interpret_witch_brew_roll(1), Some(CardEffect::MadCapMushroomPotion));
+    }
+
+    #[test]
+    fn witch_brew_roll_3_to_6_gives_sedative() {
+        use ffb_model::enums::CardEffect;
+        for roll in 3..=6 {
+            assert_eq!(DiceInterpreter::interpret_witch_brew_roll(roll), Some(CardEffect::Sedative), "roll={}", roll);
+        }
+    }
+
+    #[test]
+    fn witch_brew_roll_2_gives_none() {
+        assert_eq!(DiceInterpreter::interpret_witch_brew_roll(2), None);
     }
 }

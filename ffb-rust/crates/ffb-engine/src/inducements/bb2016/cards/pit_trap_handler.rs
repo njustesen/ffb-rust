@@ -19,8 +19,10 @@ impl CardHandler for PitTrapHandler {
     fn get_name(&self) -> &'static str { "PitTrapHandler" }
 
     /// Java: step.publishParameters(UtilServerInjury.dropPlayer(step, player, ApothecaryMode.DEFENDER))
-    /// headless: PitTrap injury pipeline requires RNG not in CardHandler trait — StepPlayCard must wire this when available
-    fn activate_on_game(&self, _game: &mut Game, _card: &Card, _player_id: &str) -> bool {
+    /// headless: PitTrap injury pipeline must be triggered by StepPlayCard (needs StepParameter publishing);
+    /// activate_on_game alone cannot push injury sequences — StepPlayCard.play_card_on_player() must call
+    /// drop_player() after calling this handler when the card is a PIT_TRAP.
+    fn activate_on_game(&self, _game: &mut Game, _card: &Card, _player_id: &str, _rng: &mut ffb_model::util::rng::GameRng) -> bool {
         true
     }
 }

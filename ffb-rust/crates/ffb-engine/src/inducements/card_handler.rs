@@ -2,6 +2,7 @@
 /// Abstract base for all card handlers — each concrete handler is responsible for one card type.
 use ffb_model::inducement::card::Card;
 use ffb_model::model::game::Game;
+use ffb_model::util::rng::GameRng;
 
 pub trait CardHandler: Send + Sync {
     /// Java: handlerKey() — the name of the CardHandlerKey variant this handler is responsible for.
@@ -24,10 +25,7 @@ pub trait CardHandler: Send + Sync {
     /// Java: activate(Card, IStep, Player) — apply the card effect. Returns true if activation
     /// completed synchronously (no dialog needed).
     /// Default: true (no effect; override in concrete handlers).
-    /// NOTE: `activate` / `deactivate` take mutable game state via a separate call path
-    /// because the full IStep interface is not yet ported. Handlers with activate/deactivate
-    /// logic wire directly into the step that uses them.
-    fn activate_on_game(&self, _game: &mut Game, _card: &Card, _player_id: &str) -> bool {
+    fn activate_on_game(&self, _game: &mut Game, _card: &Card, _player_id: &str, _rng: &mut GameRng) -> bool {
         true
     }
 
@@ -49,6 +47,7 @@ mod tests {
     impl CardHandler for TestHandler {
         fn handler_key_name(&self) -> &'static str { "TEST_KEY" }
         fn get_name(&self) -> &'static str { "TestHandler" }
+        fn activate_on_game(&self, _game: &mut Game, _card: &Card, _player_id: &str, _rng: &mut GameRng) -> bool { true }
     }
 
     #[test]

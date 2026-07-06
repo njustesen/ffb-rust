@@ -87,7 +87,7 @@ mod tests {
         let mut game = make_game();
         let h = RabbitsFootHandler;
         let card = Card::new("Rabbit's Foot", Some("RABBITS_FOOT"));
-        assert!(h.activate_on_game(&mut game, &card, "player1"));
+        assert!(h.activate_on_game(&mut game, &card, "player1", &mut ffb_model::util::rng::GameRng::new(0)));
     }
 
     #[test]

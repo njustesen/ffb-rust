@@ -13,6 +13,7 @@ use ffb_model::enums::{
     SeriousInjuryKind,
 };
 use ffb_model::events::GameEvent;
+use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::prompts::AgentPrompt;
@@ -138,8 +139,18 @@ impl StepApothecary {
                     // Java: nothing — fall through to handleInjurySideEffects
                 }
                 ApothecaryStatus::UseIgor => {
-                    // Java: find Igor/plague-doctor inducement, useInducement, handleRegeneration
-                    // headless: UtilServerInducementUse.useInducement + handleRegeneration — not ported
+                    // Java: find REGENERATION inducement with uses left, useInducement, handleRegeneration
+                    let defender_id2 = self.injury_result.as_ref()
+                        .and_then(|ir| ir.injury_context.defender_id.clone());
+                    if let Some(ref id) = defender_id2 {
+                        let is_home = game.team_home.has_player(id);
+                        if is_home {
+                            game.turn_data_home.inducement_set.use_one_for_usage(Usage::REGENERATION);
+                        } else {
+                            game.turn_data_away.inducement_set.use_one_for_usage(Usage::REGENERATION);
+                        }
+                        crate::step::util_server_injury::handle_regeneration(game, rng, id);
+                    }
                 }
                 _ => {
                     // Java: fInjuryResult.applyTo(this)
@@ -160,8 +171,7 @@ impl StepApothecary {
                             if regenerated {
                                 self.cure_poison(game);
                             } else {
-                                // Java: Igor dialog if USE_IGOR
-                                // headless: UtilServerInducementUse.useInducement (Igor) not yet ported
+                                // client-only: Igor/WAIT_FOR_IGOR_USE dialog — headless auto-declines
                             }
                         }
                     }
@@ -173,7 +183,7 @@ impl StepApothecary {
             // Java: UtilServerInjury.handleInjurySideEffects(this, fInjuryResult)
             let side_events = if let Some(ir) = &self.injury_result {
                 crate::step::util_server_injury::handle_injury_side_effects(game, ir)
-                // headless: raise-dead path inside handle_injury_side_effects not yet ported
+                // no-op: handleRaiseDead — InjuryMechanic.canRaiseDead + player creation not ported
             } else {
                 vec![]
             };
