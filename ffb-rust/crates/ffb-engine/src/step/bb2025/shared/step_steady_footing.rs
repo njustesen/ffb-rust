@@ -194,7 +194,16 @@ impl StepSteadyFooting {
         let re_rolled = self.re_rolled_action.as_deref() == Some("STEADY_FOOTING")
             && self.re_roll_source.is_some();
 
-        // Java: if (!reRolled) addReport(ReportSkillUse) — reports deferred
+        // Java: if (!reRolled) addReport(ReportSkillUse(playerId, SteadyFooting, useSkill, AVOID_FALLING))
+        if !re_rolled {
+            use ffb_model::enums::SkillId;
+            use ffb_model::model::skill_use::SkillUse;
+            use ffb_model::report::report_skill_use::ReportSkillUse;
+            game.report_list.add(ReportSkillUse::new(
+                Some(player_id.clone()), SkillId::SteadyFooting,
+                self.use_skill.unwrap_or(false), SkillUse::AVOID_FALLING,
+            ));
+        }
 
         // Java: if (!useSkill) → fail()
         if !self.use_skill.unwrap_or(false) {

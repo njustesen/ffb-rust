@@ -135,8 +135,15 @@ impl StepBlockDodge {
             !self.ask_for_skill.unwrap_or(false)
         });
 
-        // Java: addReport(ReportSkillUse(defenderId, skill, usingDodge, AVOID_FALLING))
-        // Report emission deferred — emit report infrastructure not yet wired here.
+        // Java: addReport(ReportSkillUse(defenderId, Dodge, usingDodge, AVOID_FALLING))
+        if let Some(ref defender_id) = game.defender_id {
+            use ffb_model::enums::SkillId;
+            use ffb_model::model::skill_use::SkillUse;
+            use ffb_model::report::report_skill_use::ReportSkillUse;
+            game.report_list.add(ReportSkillUse::new(
+                Some(defender_id.clone()), SkillId::Dodge, using_dodge, SkillUse::AVOID_FALLING,
+            ));
+        }
 
         if let Some(defender_id) = game.defender_id.clone() {
             if using_dodge {
