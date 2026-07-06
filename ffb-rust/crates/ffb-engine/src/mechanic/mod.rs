@@ -17,6 +17,7 @@ use ffb_model::enums::Rules;
 use crate::mechanic::roll_mechanic::RollMechanic as RollMechanicTrait;
 use crate::mechanic::setup_mechanic::SetupMechanic as SetupMechanicTrait;
 use crate::mechanic::state_mechanic::StateMechanic as StateMechanicTrait;
+use ffb_mechanics::game_mechanic::GameMechanic as GameMechanicTrait;
 
 /// Returns the edition-appropriate `RollMechanic` for the given rules.
 /// Mirrors Java's `game.getFactory(MECHANIC).forName(Mechanic.Type.ROLL.name())`.
@@ -43,6 +44,16 @@ pub fn setup_mechanic_for(rules: Rules) -> Box<dyn SetupMechanicTrait> {
     match rules {
         Rules::Bb2025 | Rules::Common => Box::new(bb2025::setup_mechanic::SetupMechanic::new()),
         Rules::Bb2016 | Rules::Bb2020 => Box::new(mixed::setup_mechanic::SetupMechanic::new()),
+    }
+}
+
+/// Returns the edition-appropriate `GameMechanic` for the given rules.
+/// Mirrors Java's `game.getFactory(MECHANIC).forName(Mechanic.Type.GAME.name())`.
+pub fn game_mechanic_for(rules: Rules) -> Box<dyn GameMechanicTrait> {
+    match rules {
+        Rules::Bb2025 | Rules::Common => Box::new(ffb_mechanics::bb2025::game_mechanic::GameMechanic::new()),
+        Rules::Bb2020 => Box::new(ffb_mechanics::bb2020::game_mechanic::GameMechanic::new()),
+        Rules::Bb2016 => Box::new(ffb_mechanics::bb2016::game_mechanic::GameMechanic::new()),
     }
 }
 

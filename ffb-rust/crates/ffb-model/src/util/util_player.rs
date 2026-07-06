@@ -580,9 +580,15 @@ impl UtilPlayer {
     ///   PRONE / STANDING → setActive only
     ///   STUNNED (new active team) → PRONE + active=false
     ///
-    /// headless: FieldModel.removeSkillEnhancements not yet ported;
-    /// skill stat bonuses from WisdomOfTheWhiteDwarf etc. are not removed at end-of-turn.
-    pub fn refresh_players_for_turn_start(game: &mut Game) {
+    /// `enhancements_to_remove`: skill-source names removed from every player at end-of-turn
+    ///   (e.g. "Wisdom of the White Dwarf"). Pass an empty set when the mechanic is unavailable.
+    /// `enhancements_to_remove_when_not_active`: same, but only for players that are NOT being
+    ///   set active this turn (e.g. extra skills granted only while active).
+    pub fn refresh_players_for_turn_start(
+        game: &mut Game,
+        enhancements_to_remove: &std::collections::HashSet<String>,
+        enhancements_to_remove_when_not_active: &std::collections::HashSet<String>,
+    ) {
         use crate::enums::{PS_BLOCKED, PS_FALLING, PS_HIT_ON_GROUND, PS_MOVING, PS_PRONE, PS_STANDING, PS_STUNNED};
         use crate::enums::SkillUsageType;
         use crate::model::property::NamedProperties;
@@ -603,10 +609,13 @@ impl UtilPlayer {
             }))
             .collect();
 
-        // Reset once-per-turn skill usage for all players.
+        // Remove per-turn enhancements from all players.
         for p in game.team_home.players.iter_mut().chain(game.team_away.players.iter_mut()) {
             p.reset_used_skills(SkillUsageType::OncePerTurn);
             p.reset_used_skills(SkillUsageType::OncePerTurnByTeamMate);
+            for name in enhancements_to_remove.iter() {
+                p.remove_enhancements(name);
+            }
         }
 
         // Second pass: update player states.
@@ -626,6 +635,16 @@ impl UtilPlayer {
             };
             if let Some(new_ps) = new_ps {
                 game.field_model.set_player_state(&entry.id, new_ps);
+            }
+            // Java: enhancementsToRemoveWhenNotSettingActive — only strip when not becoming active.
+            if !set_active {
+                if let Some(p) = game.team_home.players.iter_mut().chain(game.team_away.players.iter_mut())
+                    .find(|p| p.id == entry.id)
+                {
+                    for name in enhancements_to_remove_when_not_active.iter() {
+                        p.remove_enhancements(name);
+                    }
+                }
             }
         }
     }
@@ -979,7 +998,7 @@ mod tests {
         game.home_playing = true;
         // home player is STUNNED; home_playing=true so home team is the "new active team"
         add_player(&mut game, true, "h1", FieldCoordinate::new(5, 5), STUNNED);
-        UtilPlayer::refresh_players_for_turn_start(&mut game);
+        UtilPlayer::refresh_players_for_turn_start(&mut game, &Default::default(), &Default::default());
         let ps = game.field_model.player_state("h1").unwrap();
         assert_eq!(ps.base(), crate::enums::PS_PRONE, "STUNNED on active team → PRONE");
     }
@@ -991,7 +1010,7 @@ mod tests {
         game.home_playing = true;
         let blocked = PlayerState(PS_BLOCKED);
         add_player(&mut game, true, "h1", FieldCoordinate::new(5, 5), blocked);
-        UtilPlayer::refresh_players_for_turn_start(&mut game);
+        UtilPlayer::refresh_players_for_turn_start(&mut game, &Default::default(), &Default::default());
         let ps = game.field_model.player_state("h1").unwrap();
         assert_eq!(ps.base(), crate::enums::PS_STANDING, "BLOCKED → STANDING");
     }
@@ -1002,7 +1021,7 @@ mod tests {
         game.home_playing = true;
         // away player is STUNNED; away team is NOT the active team → should not recover
         add_player(&mut game, false, "a1", FieldCoordinate::new(5, 5), STUNNED);
-        UtilPlayer::refresh_players_for_turn_start(&mut game);
+        UtilPlayer::refresh_players_for_turn_start(&mut game, &Default::default(), &Default::default());
         let ps = game.field_model.player_state("a1").unwrap();
         assert_eq!(ps.base(), crate::enums::PS_STUNNED, "STUNNED on opponent stays STUNNED");
     }
@@ -1065,5 +1084,54 @@ mod tests {
         add_player(&mut game, false, "def", FieldCoordinate::new(10, 10), PRONE);
         add_player(&mut game, false, "def2", FieldCoordinate::new(5, 6), ACTIVE_STANDING);
         assert_eq!(UtilPlayer::find_defensive_foul_assists(&game, "att", "def"), 1);
+    }
+
+    #[test]
+    fn refresh_removes_enhancements_for_all_players() {
+        use std::collections::HashSet;
+        use crate::enums::{SkillId, PS_STANDING};
+        let mut game = minimal_game();
+        let ps = PlayerState(PS_STANDING);
+        add_player(&mut game, true, "h1", FieldCoordinate::new(5, 5), ps);
+        add_player(&mut game, false, "a1", FieldCoordinate::new(10, 5), ps);
+        // Give each player a "Wisdom of the White Dwarf" enhancement
+        game.team_home.players.iter_mut().find(|p| p.id == "h1").unwrap()
+            .add_prayer_skill("Wisdom of the White Dwarf", SkillId::Dodge, None);
+        game.team_away.players.iter_mut().find(|p| p.id == "a1").unwrap()
+            .add_prayer_skill("Wisdom of the White Dwarf", SkillId::Sprint, None);
+        let mut to_remove = HashSet::new();
+        to_remove.insert("Wisdom of the White Dwarf".to_string());
+        UtilPlayer::refresh_players_for_turn_start(&mut game, &to_remove, &Default::default());
+        let h1 = game.team_home.players.iter().find(|p| p.id == "h1").unwrap();
+        let a1 = game.team_away.players.iter().find(|p| p.id == "a1").unwrap();
+        assert!(h1.temporary_skills.is_empty(), "wisdom enhancement removed from home");
+        assert!(a1.temporary_skills.is_empty(), "wisdom enhancement removed from away");
+    }
+
+    #[test]
+    fn refresh_removes_conditional_enhancements_only_when_not_setting_active() {
+        use std::collections::HashSet;
+        use crate::enums::{SkillId, PS_STANDING};
+        let mut game = minimal_game();
+        let ps = PlayerState(PS_STANDING);
+        game.home_playing = true;
+        // h1 (home) sets active=false if has_to_miss_turn; use a player without that skill
+        add_player(&mut game, true, "h1", FieldCoordinate::new(5, 5), ps);
+        add_player(&mut game, false, "a1", FieldCoordinate::new(10, 5), ps);
+        game.team_home.players.iter_mut().find(|p| p.id == "h1").unwrap()
+            .add_prayer_skill("ConditionalSkill", SkillId::Dodge, None);
+        game.team_away.players.iter_mut().find(|p| p.id == "a1").unwrap()
+            .add_prayer_skill("ConditionalSkill", SkillId::Sprint, None);
+        // conditional set for "ConditionalSkill" — only removes when NOT setting active
+        let mut cond_remove = HashSet::new();
+        cond_remove.insert("ConditionalSkill".to_string());
+        UtilPlayer::refresh_players_for_turn_start(&mut game, &Default::default(), &cond_remove);
+        // h1 is home, home_playing=true → player_on_team_from_last_turn=false → set_active = !has_to_miss_turn
+        // a1 is away, home_playing=true → player_on_team_from_last_turn=true → set_active=true
+        // Both h1 and a1 should keep the skill (both set active)
+        let h1 = game.team_home.players.iter().find(|p| p.id == "h1").unwrap();
+        let a1 = game.team_away.players.iter().find(|p| p.id == "a1").unwrap();
+        assert!(!h1.temporary_skills.is_empty(), "active player keeps conditional skill");
+        assert!(!a1.temporary_skills.is_empty(), "active player keeps conditional skill");
     }
 }

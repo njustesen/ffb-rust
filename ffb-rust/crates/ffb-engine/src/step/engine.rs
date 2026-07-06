@@ -936,7 +936,10 @@ impl Step {
                     }
                     // Java UtilPlayer.refreshPlayersForTurnStart: flips transient states and
                     // recovers STUNNED players on the newly-active team to PRONE.
-                    refresh_players_for_turn_start(game);
+                    let gm = crate::mechanic::game_mechanic_for(game.rules);
+                    let etr = gm.enhancements_to_remove_at_end_of_turn();
+                    let etr_wna = gm.enhancements_to_remove_at_end_of_turn_when_not_setting_active();
+                    ffb_model::util::util_player::UtilPlayer::refresh_players_for_turn_start(game, &etr, &etr_wna);
                     if std::env::var_os("FFB_TRACE").is_some() {
                         let ss = ffb_model::util::state_hash::state_string(game);
                         eprintln!("RUST_ENDTURN_STATE home_turn={} away_turn={} home_playing={}: {}", game.turn_data_home.turn_nr, game.turn_data_away.turn_nr, game.home_playing, ss);

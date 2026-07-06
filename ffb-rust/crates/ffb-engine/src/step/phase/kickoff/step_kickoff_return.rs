@@ -83,7 +83,8 @@ impl StepKickoffReturn {
                 // Java: game.setTurnMode(TurnMode.KICKOFF)
                 game.turn_mode = TurnMode::Kickoff;
                 // Java: UtilPlayer.refreshPlayersForTurnStart(game)
-                UtilPlayer::refresh_players_for_turn_start(game);
+                let mechanic = crate::mechanic::game_mechanic_for(game.rules);
+                UtilPlayer::refresh_players_for_turn_start(game, &mechanic.enhancements_to_remove_at_end_of_turn(), &mechanic.enhancements_to_remove_at_end_of_turn_when_not_setting_active());
                 // Java: game.getFieldModel().clearTrackNumbers()
                 game.field_model.clear_track_numbers();
             }
