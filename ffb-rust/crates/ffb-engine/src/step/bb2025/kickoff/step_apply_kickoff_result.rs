@@ -3,6 +3,11 @@ use ffb_model::events::GameEvent;
 use ffb_model::enums::{KickoffResult, TurnMode, Weather, PS_EXHAUSTED, PS_RESERVE, PS_STANDING};
 use ffb_model::inducement::inducement::Inducement;
 use ffb_model::inducement::usage::Usage;
+use ffb_model::report::mixed::report_kickoff_sequence_activations_count::ReportKickoffSequenceActivationsCount;
+use ffb_model::report::mixed::report_kickoff_extra_re_roll::ReportKickoffExtraReRoll;
+use ffb_model::report::mixed::report_solid_defence_roll::ReportSolidDefenceRoll;
+use ffb_model::report::bb2025::report_cheering_fans::ReportCheeringFans as ReportCheeringFansBb2025;
+use ffb_model::report::report_scatter_ball::ReportScatterBall;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::util::util_player::UtilPlayer;
 use ffb_model::util::util_box::UtilBox;
@@ -115,7 +120,7 @@ impl Step for StepApplyKickoffResult {
                     game.home_playing = !game.home_playing;
                     game.turn_mode = TurnMode::Kickoff;
                 } else if game.turn_mode == TurnMode::SolidDefence {
-                    // headless: no-op — SolidDefence positions are tracked directly in field_model
+                    // client-only: no-op — SolidDefence playerCoordinate updates are sent only by clients
                 }
             }
             Action::ConfirmSetup => {
@@ -216,12 +221,16 @@ impl StepApplyKickoffResult {
             + game.turn_data_away.inducement_set.value(Usage::ADD_CHEERLEADER);
 
         // Java: winning team (or both on tie) gains 1 extra offensive block assist.
+        let mut winner_ids: Vec<String> = Vec::new();
         if total_home >= total_away {
             game.home_additional_assists += 1;
+            winner_ids.push(game.team_home.id.clone());
         }
         if total_away >= total_home {
             game.away_additional_assists += 1;
+            winner_ids.push(game.team_away.id.clone());
         }
+        game.report_list.add(ReportCheeringFansBb2025::new(winner_ids, roll_home, roll_away, vec![]));
 
         StepOutcome::next().with_event(GameEvent::CheeringFans { home_roll: roll_home, away_roll: roll_away })
     }
@@ -238,6 +247,7 @@ impl StepApplyKickoffResult {
             + game.turn_data_away.inducement_set.value(Usage::ADD_COACH);
 
         let mut outcome = StepOutcome::next();
+        let tie = total_home == total_away;
         // Java: winning team (or both on tie) gains +1 re-roll for the drive.
         if total_home >= total_away {
             game.turn_data_home.rerolls += 1;
@@ -249,6 +259,12 @@ impl StepApplyKickoffResult {
             let team_id = game.team_away.id.clone();
             outcome = outcome.with_event(GameEvent::KickoffExtraReRoll { team_id });
         }
+        let report_team = if tie { None } else if total_home > total_away {
+            Some(game.team_home.id.clone())
+        } else {
+            Some(game.team_away.id.clone())
+        };
+        game.report_list.add(ReportKickoffExtraReRoll::new(roll_home, roll_away, report_team));
         outcome
     }
 
@@ -361,6 +377,11 @@ impl StepApplyKickoffResult {
                 }
             }
             game.turn_mode = TurnMode::SolidDefence;
+            game.report_list.add(ReportSolidDefenceRoll::new(
+                Some(acting_team_id.clone()),
+                roll,
+                self.nr_of_players_allowed,
+            ));
             // client-only: setAnimation(KICKOFF_SOLID_DEFENSE)
             StepOutcome::cont().with_event(GameEvent::SolidDefenceRoll {
                 team_id: acting_team_id,
@@ -427,6 +448,8 @@ impl StepApplyKickoffResult {
         if !self.touchback && weather == Weather::Nice {
             if let Some(ball_coord) = game.field_model.ball_coordinate {
                 let mut last_valid = ball_coord;
+                let mut scatter_dirs = Vec::new();
+                let mut scatter_rolls = Vec::new();
                 for _ in 0..3 {
                     let dir_roll = rng.d8();
                     let direction = Direction::for_roll(dir_roll).unwrap_or(Direction::North);
@@ -435,6 +458,8 @@ impl StepApplyKickoffResult {
                         .map(|b| b.is_in_bounds(candidate))
                         .unwrap_or_else(|| FieldCoordinateBounds::FIELD.is_in_bounds(candidate));
                     self.touchback = !in_bounds;
+                    scatter_dirs.push(direction);
+                    scatter_rolls.push(dir_roll);
                     if !self.touchback {
                         game.field_model.ball_coordinate = Some(candidate);
                         last_valid = candidate;
@@ -443,8 +468,8 @@ impl StepApplyKickoffResult {
                         break;
                     }
                 }
+                game.report_list.add(ReportScatterBall::new(scatter_dirs, scatter_rolls, true));
             }
-            // headless: ReportScatterBall
         }
 
         StepOutcome::next()
@@ -463,9 +488,13 @@ impl StepApplyKickoffResult {
             if let (Some(ref player_id), Some(coord)) = (self.moved_player.clone(), self.to_coordinate) {
                 if self.nr_of_moved_players < self.nr_of_players_allowed {
                     self.nr_of_moved_players += 1;
-                    // headless: ReportKickoffSequenceActivationsCount
                     UtilServerSetup::setup_player(game, player_id, coord);
-
+                    let active_on_field = count_active_players_on_field(game);
+                    game.report_list.add(ReportKickoffSequenceActivationsCount::new(
+                        active_on_field,
+                        self.nr_of_moved_players,
+                        self.nr_of_players_allowed,
+                    ));
                     if self.nr_of_moved_players == self.nr_of_players_allowed {
                         self.end_kickoff = true;
                     }
@@ -647,6 +676,22 @@ impl StepApplyKickoffResult {
         let idx = rng.range(on_field.len());
         Some(on_field[idx].to_owned())
     }
+}
+
+/// Java: StepApplyKickoffResult — active players on field for acting team.
+fn count_active_players_on_field(game: &Game) -> i32 {
+    let acting_team = game.active_team();
+    let ids: Vec<String> = acting_team.players.iter().map(|p| p.id.clone()).collect();
+    ids.iter()
+        .filter(|pid| {
+            game.field_model.player_coordinate(pid)
+                .map(|c| FieldCoordinateBounds::FIELD.is_in_bounds(c))
+                .unwrap_or(false)
+                && game.field_model.player_state(pid)
+                    .map(|s| s.is_active())
+                    .unwrap_or(false)
+        })
+        .count() as i32
 }
 
 #[cfg(test)]

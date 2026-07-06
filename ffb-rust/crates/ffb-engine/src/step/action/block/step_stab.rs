@@ -103,7 +103,7 @@ impl StepStab {
             ctx.injury_roll = Some([i1, i2]);
         }
 
-        let injury_result = InjuryResult { injury_context: ctx, knocked_out: false, rip: false };
+        let injury_result = InjuryResult { injury_context: ctx, knocked_out: false, rip: false, already_reported: false, pre_regeneration: true };
 
         StepOutcome::goto(&self.goto_label_on_success)
             .publish(StepParameter::InjuryResult(Box::new(injury_result)))

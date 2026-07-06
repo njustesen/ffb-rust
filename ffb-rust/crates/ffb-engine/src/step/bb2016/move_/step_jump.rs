@@ -32,7 +32,7 @@ use ffb_mechanics::mechanics::minimum_roll_jump;
 ///
 /// BB2016 JumpModifierCollection is empty (confirmed Java source) → &[] is correct.
 /// BB2016 agility_with_modifiers() == agility (no stat-injury pipeline yet).
-/// headless: executeStepHooks infrastructure not yet ported — DivingTackle hook skipped.
+/// no-op: DivingTackle executeStepHooks skipped in headless (SkillBehaviour registry not ported).
 /// canStillJump: wired via BB2016 JumpMechanic.
 /// client-only: checkDivingTackle dialog — headless auto-skips diving tackle activation.
 pub struct StepJump {

@@ -3,8 +3,8 @@
 /// Static utility methods for injury handling: evaluating injury contexts, regeneration,
 /// injury side-effects (raise dead, pump-up), and dropping players.
 ///
-/// headless: all methods require GameState and IStep which are not yet fully ported.
-/// Method signatures are declared so callers can compile; bodies are no-ops or headless stubs.
+/// Stub — full method bodies are in `crate::step::util_server_injury` (step-layer utility module).
+/// This outer module exists to satisfy import paths; all real logic lives in the step module.
 pub struct UtilServerInjury;
 
 impl UtilServerInjury {

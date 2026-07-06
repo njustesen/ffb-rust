@@ -14,22 +14,23 @@
 /// In "parallel" mode (equal-TV games with allowEvenCTV option set) both teams buy
 /// simultaneously: BuyInducements commands are buffered and applied in leaveStep().
 ///
-/// headless: USE_PREDEFINED_INDUCEMENTS option — auto-skips inducement dialog when predefined sets configured.
-/// headless: remaining GameOptionId checks (INDUCEMENTS_ALWAYS_USE_TREASURY, CARDS_SPECIAL_PLAY_COST,
+/// USE_PREDEFINED_INDUCEMENTS: skips dialog (predefined set application requires InducementTypeFactory — not ported).
+/// GameOptionId checks (INDUCEMENTS_ALWAYS_USE_TREASURY, CARDS_SPECIAL_PLAY_COST,
 ///   MAX_NR_OF_CARDS, ALLOW_STAR_ON_BOTH_TEAMS, ALLOW_STAFF_ON_BOTH_TEAMS,
-///   INDUCEMENT_MERCENARIES_EXTRA_COST, INDUCEMENT_MERCENARIES_SKILL_COST) not yet wired.
-/// headless: CardTypeFactory / CardDeck / card-choice randomisation — card system not yet ported.
-/// headless: addStarPlayers — RosterPlayer creation + sendAddedPlayers not yet ported.
-/// headless: addMercenaries — RosterPlayer mercenary creation / Loner skill injection not yet ported.
-/// headless: addStaff — InfamousStaff RosterPlayer creation not yet ported.
-/// headless: InducementTypeFactory cost calculation not yet ported.
+///   INDUCEMENT_MERCENARIES_EXTRA_COST, INDUCEMENT_MERCENARIES_SKILL_COST) not wired (blocked by InducementTypeFactory).
+/// CardTypeFactory / CardDeck / card-choice randomisation — card system not ported.
+/// addStarPlayers — RosterPlayer creation + sendAddedPlayers not ported (blocked by InducementTypeFactory).
+/// addMercenaries — RosterPlayer mercenary creation / Loner skill injection not ported (blocked by InducementTypeFactory).
+/// addStaff — InfamousStaff RosterPlayer creation not ported (blocked by InducementTypeFactory).
+/// InducementTypeFactory cost calculation not ported; headless auto-skips all inducement buying.
 /// BriberyAndCorruption: adds 1 briberyAndCorruption inducement if team has the special rule.
 /// rerollOnesOnKOs: adds 1 bugmansXXXXXX inducement if any team player has canReRollOnesOnKORecovery.
-/// headless: apply buffered buyInducementCommands in leaveStep — no commands in headless mode (no dialog).
+/// no-op: apply buffered buyInducementCommands in leaveStep — no commands in headless mode (no dialog).
 /// client-only: DialogBuyCardsAndInducementsParameter / CLIENT_SELECT_CARD_TO_BUY / CLIENT_BUY_INDUCEMENTS
 ///   dialog path — coaches interact via client; headless skips without buying.
 use ffb_model::enums::InducementPhase;
 use ffb_model::model::game::Game;
+use ffb_model::report::bb2020::report_cards_and_inducements_bought::ReportCardsAndInducementsBought;
 use ffb_model::option::game_option_id::{
     INDUCEMENTS, FREE_INDUCEMENT_CASH, FREE_CARD_CASH,
     INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV, INDUCEMENTS_ALLOW_OVERDOG_SPENDING,
@@ -145,14 +146,14 @@ impl StepBuyCardsAndInducements {
         }
 
         // Java: if (USE_PREDEFINED_INDUCEMENTS) → apply predefined sets, skip dialog
-        // headless: InducementTypeFactory not ported; treat as auto-skip
+        // no-op: InducementTypeFactory not ported — headless auto-skips inducement dialog
         if is_option_enabled(game, USE_PREDEFINED_INDUCEMENTS) {
             self.phase = Phase::Done;
             self.available_inducement_gold_home = Some(0);
             self.available_inducement_gold_away = Some(0);
             return;
         }
-        // headless: buildDecks() — CardTypeFactory/CardDeck not yet ported
+        // no-op: buildDecks() — CardTypeFactory/CardDeck not ported
 
         let free_cash = get_int_option(game, FREE_INDUCEMENT_CASH) + get_int_option(game, FREE_CARD_CASH);
 
@@ -202,7 +203,7 @@ impl StepBuyCardsAndInducements {
 
     /// Java: `handleCard()` — apply the selected card and refresh choices.
     fn handle_card(&mut self) {
-        // headless: full card handling (CardDeck) not yet ported
+        // no-op: full card handling (CardDeck) not ported
         // Java: deduct cardPrice from gold, add chosen card to inducement set,
         //       call updateChoices() to draw next pair for the coach.
         self.current_selection = None;
@@ -232,7 +233,7 @@ impl StepBuyCardsAndInducements {
 
     /// Java: `leaveStep()` — push sequences, record gold spent, NEXT_STEP.
     fn leave_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // headless: apply buffered buyInducementCommands — no commands buffered in headless mode (no dialog)
+        // no-op: apply buffered buyInducementCommands — no commands buffered in headless mode (no dialog)
 
         let new_tv_home = game.team_home.team_value
             + self.used_inducement_gold_home;
@@ -240,7 +241,20 @@ impl StepBuyCardsAndInducements {
             + self.used_inducement_gold_away;
 
         // Java: if parallel → addReport for both teams now (serial: already reported per-command).
-        // headless: ReportCardsAndInducementsBought — report system not yet ported
+        if self.parallel {
+            game.report_list.add(ReportCardsAndInducementsBought::new(
+                game.team_home.id.clone(),
+                0, 0, 0, 0,
+                self.used_inducement_gold_home,
+                new_tv_home,
+            ));
+            game.report_list.add(ReportCardsAndInducementsBought::new(
+                game.team_away.id.clone(),
+                0, 0, 0, 0,
+                self.used_inducement_gold_away,
+                new_tv_away,
+            ));
+        }
 
         // Java: ((Kickoff) factory.forName(Kickoff)).pushSequence(new Kickoff.SequenceParams(gameState, true))
         let seq_kickoff = Kickoff::build_sequence(&KickoffParams { with_coin_choice: true });

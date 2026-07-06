@@ -12,7 +12,8 @@ use crate::step::abstract_step_with_re_roll::find_skill_reroll_source;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 use ffb_mechanics::bb2025::jump_mechanic::JumpMechanic;
 use ffb_mechanics::jump_mechanic::JumpMechanic as JumpMechanicTrait;
-use ffb_mechanics::mechanics::minimum_roll_jump;
+use ffb_mechanics::modifiers::jump_modifier_factory::JumpModifierFactory;
+use ffb_mechanics::modifiers::jump_context::JumpContext;
 use crate::util::util_server_player_move::UtilServerPlayerMove;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.move.StepJump.
@@ -33,13 +34,13 @@ use crate::util::util_server_player_move::UtilServerPlayerMove;
 /// DiceInterpreter.is_skill_roll_successful used for success check.
 ///
 /// Skill re-roll for JUMP (Leap canRerollJump source) → wired via find_skill_reroll_source.
-/// headless: JumpModifierFactory / modifier collection for minimumRollJump not yet ported.
+/// JumpModifierFactory wired: TACKLEZONE (max of from/to zones) and PREHENSILE_TAIL modifiers applied.
 /// client-only: DivingTackle dialog (checkDivingTackle, usingDivingTackle) — client-side.
 /// client-only: canChooseToIgnoreJumpModifierAfterRoll skill dialog — client-side.
-/// headless: canIgnoreJumpModifiers (useIgnoreModifierSkill) — skill property not ported.
+/// client-only: canIgnoreJumpModifiers dialog (useIgnoreModifierSkill) — headless always applies modifiers.
 /// handleFailure: COORDINATE_FROM(null if roll==1), updatePlayerAndBallPosition, updateMoveSquares — all implemented.
 /// client-only: checkDivingTackle/usingDivingTackle dialog — headless auto-skips diving tackle activation.
-/// headless: fSecondGoForIt (succeedGfi push for jumping players) not yet ported.
+/// fSecondGoForIt: handled in StepGoForIt (second_go_for_it field there triggers repeat for jumping players).
 pub struct StepJump {
     /// Java: goToLabelOnFailure
     pub goto_label_on_failure: String,
@@ -88,8 +89,8 @@ impl Step for StepJump {
         if let Action::UseReRoll { use_reroll: false } = action {
             self.re_roll_state.re_roll_source = None;
         }
-        // headless: CLIENT_PLAYER_CHOICE → DIVING_TACKLE mode → usingDivingTackle / setDefenderId
-        // headless: CLIENT_USE_SKILL → canChooseToIgnoreJumpModifierAfterRoll → useIgnoreModifierAfterRollSkill
+        // client-only: CLIENT_PLAYER_CHOICE → DIVING_TACKLE mode → usingDivingTackle / setDefenderId
+        // client-only: CLIENT_USE_SKILL → canChooseToIgnoreJumpModifierAfterRoll → useIgnoreModifierAfterRollSkill
         self.execute_step(game, rng)
     }
 
@@ -142,8 +143,34 @@ impl StepJump {
             .map(|p| p.agility_with_modifiers())
             .unwrap_or(3);
 
-        let minimum_roll = minimum_roll_jump(agility, &[]);
+        // Java: JumpModifierFactory.findModifiers(JumpContext(game, player, moveStart, to)).
+        // from = move_start (origin of leap); to = current player coordinate.
+        let (modifier_total, modifier_names) = if let (Some(pid), Some(from)) = (player_id.as_deref(), self.move_start) {
+            if let Some(player) = game.player(pid) {
+                let to = game.field_model.player_coordinate(pid).unwrap_or(from);
+                let ctx = JumpContext::new(game, player, from, to);
+                let factory = JumpModifierFactory::for_rules(game.rules);
+                let mods = factory.find_applicable(&ctx);
+                let total: i32 = mods.iter().map(|m| m.get_modifier()).sum();
+                let names: Vec<String> = mods.iter().map(|m| m.get_report_string().to_owned()).collect();
+                (total, names)
+            } else { (0, vec![]) }
+        } else { (0, vec![]) };
+        let minimum_roll = (agility + modifier_total).max(2);
         let successful = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
+
+        // Java: getResult().addReport(new ReportJumpRoll(playerId, successful, roll, minRoll, reRolled, modifiers))
+        {
+            use ffb_model::report::report_jump_roll::ReportJumpRoll;
+            game.report_list.add(ReportJumpRoll::new(
+                player_id.clone(),
+                successful,
+                self.roll,
+                minimum_roll,
+                already_rerolled,
+                modifier_names,
+            ));
+        }
 
         if successful {
             game.acting_player.jumping = false;
@@ -413,5 +440,62 @@ mod tests {
         step.roll = 2;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep, "AG2 player should succeed on roll 2");
+    }
+
+    #[test]
+    fn tackle_zone_at_destination_increases_minimum_roll() {
+        // AG3 player jumping TO a square adjacent to an opponent with TZ.
+        // Without TZ: min_roll = 3. With 1 TZ: min_roll = 4.
+        // Roll of 3 should fail when there's a TZ opponent at the landing square.
+        use ffb_model::enums::PS_STANDING;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+
+        let mut leaper = Player::default();
+        leaper.id = "leaper".into();
+        leaper.agility = 3;
+        leaper.starting_skills.push(SkillWithValue::new(SkillId::Leap));
+        game.team_home.players.push(leaper);
+
+        // Place leaper at (5,5) — this is the "to" (current) coordinate.
+        game.field_model.set_player_coordinate("leaper", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("leaper", ffb_model::enums::PlayerState::new(PS_STANDING));
+        game.acting_player.player_id = Some("leaper".into());
+        game.acting_player.jumping = true;
+
+        // Opponent adjacent to (5,5) at (5,6) — creates a tackle zone at the "to" square.
+        let mut opp = Player::default();
+        opp.id = "opp".into();
+        opp.agility = 3;
+        game.team_away.players.push(opp);
+        game.field_model.set_player_coordinate("opp", FieldCoordinate::new(5, 6));
+        game.field_model.set_player_state("opp", ffb_model::enums::PlayerState::new(PS_STANDING));
+
+        // move_start = (3,3) — the "from" coordinate (no adjacent opponents there).
+        let mut step = StepJump::new("fail".into());
+        step.move_start = Some(FieldCoordinate::new(3, 3));
+        step.roll = 3; // Exactly meets ag=3 if no modifiers; fails with +1 from 1 TZ.
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // With 1 tackle zone at "to": min_roll = 3 + 1 = 4, so roll 3 fails.
+        assert_eq!(out.action, StepAction::GotoLabel,
+            "roll=3 should fail when 1 TZ at landing square (min_roll=4)");
+    }
+
+    #[test]
+    fn no_tackle_zones_roll_equals_agility_succeeds() {
+        // AG3 player with no adjacent opponents: min_roll = 3, roll=3 → success.
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game_with_leaper(); // p1 at (5,5), ag=3, no opponents
+
+        let mut step = StepJump::new("fail".into());
+        step.move_start = Some(FieldCoordinate::new(3, 3));
+        step.roll = 3;
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep,
+            "roll=3 should succeed when no TZ (min_roll=3)");
     }
 }

@@ -121,7 +121,7 @@ impl StepTreacherous {
                     ctx.injury_roll = Some([i1, i2]);
                 }
 
-                let ir = Box::new(InjuryResult { injury_context: ctx, knocked_out: false, rip: false });
+                let ir = Box::new(InjuryResult { injury_context: ctx, knocked_out: false, rip: false, already_reported: false, pre_regeneration: true });
                 StepOutcome::next().publish(StepParameter::InjuryResult(ir))
             } else {
                 StepOutcome::next()

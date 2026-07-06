@@ -377,6 +377,8 @@ pub enum StepParameter {
     KtmModifier(ffb_model::model::kick_team_mate_range::KickTeamMateRange),
     BallKnockedLoose(bool),
     IgnoreActedFlag(bool),
+    /// Java: ORIGINAL_BOMBARDIER — PassState.originalBombardier (player ID of the bomb thrower).
+    OriginalBombardier(Option<String>),
     // … grow per 20_steps entries as steps are ported.
 }
 

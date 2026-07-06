@@ -14,8 +14,7 @@
 ///
 /// This step does not handle any commands — it runs once on start().
 ///
-/// headless: InjuryResult.report() — blocked on report system infrastructure.
-/// headless: StepException when PLAYER_ID not provided — blocked on report system infrastructure.
+/// StepException when PLAYER_ID not provided: not ported — headless engine trusts callers set this.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -46,13 +45,10 @@ impl Default for StepReportStabInjury {
 impl Step for StepReportStabInjury {
     fn id(&self) -> StepId { StepId::ReportStabInjury }
 
-    fn start(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // Java: if (injuryResult != null) { injuryResult.report(this); }
-        // headless: call injuryResult.report() when report system is ported.
-        if self.injury_result.is_some() {
-            // report deferred
+    fn start(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        if let Some(ref mut ir) = self.injury_result {
+            ir.report(game);
         }
-        // Java: getResult().setNextAction(StepAction.NEXT_STEP)
         StepOutcome::next()
     }
 

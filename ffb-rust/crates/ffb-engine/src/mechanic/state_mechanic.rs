@@ -5,10 +5,10 @@
 ///
 /// Java methods take `IStep` for report emission + game state access.
 /// In Rust the methods take `&mut Game` directly.
-/// headless (require IStep / report infra):
-///   - add_apothecaries / add_re_rolls (require InducementSet on TurnData)
-///   - report_injury (requires SkipInjuryParts / ReportInjury)
-///   - report emission inside update_leader_re_rolls_for_team / handle_pump_up
+/// Notes:
+///   - add_apothecaries / add_re_rolls: wired via TurnData.inducement_set
+///   - ReportLeader: caller responsibility — emitted when update_leader_re_rolls_for_team returns Some
+///   - ReportPumpUpTheCrowdReRoll: wired via GameEvent::PumpUpTheCrowdReRoll in handle_injury_side_effects
 use ffb_model::enums::LeaderState;
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
@@ -16,8 +16,11 @@ use ffb_model::model::team::Team;
 use ffb_model::model::field_model::FieldModel;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::inducement::usage::Usage;
+use ffb_model::injury::context::InjuryModification;
+use ffb_model::report::SkipInjuryParts;
+use ffb_model::report::mixed::report_injury::ReportInjury;
 use crate::injury::InjuryContext;
-use crate::injury_result::InjuryResult;
+use crate::injury::InjuryResult;
 
 pub trait StateMechanic: Send + Sync {
     // ── Abstract (edition-specific) ───────────────────────────────────────────
@@ -38,9 +41,47 @@ pub trait StateMechanic: Send + Sync {
     fn start_half(&self, game: &mut Game, half: i32) -> Vec<GameEvent>;
 
     /// Java: reportInjury(IStep, InjuryResult).
-    /// headless: SkipInjuryParts, ReportInjury, ReportFactory infrastructure.
-    fn report_injury(&self, _game: &Game, _injury_result: &mut InjuryResult) {
-        // headless: implement when SkipInjuryParts + ReportInjury are translated
+    /// 1:1 translation of bb2025/StateMechanic.reportInjury().
+    fn report_injury(&self, game: &mut Game, injury_result: &mut InjuryResult) {
+        let ctx = injury_result.injury_context();
+        let pre_regen = injury_result.is_pre_regeneration();
+
+        // Determine which parts of the injury to skip in the report.
+        let mut skip = if pre_regen { SkipInjuryParts::Cas } else { SkipInjuryParts::EverythingButCas };
+
+        if ctx.modification != InjuryModification::NONE {
+            // injuryContext IS a ModifiedInjuryContext
+            if ctx.modification == InjuryModification::INJURY {
+                skip = if pre_regen { SkipInjuryParts::ArmourAndCas } else { SkipInjuryParts::EverythingButCas };
+            }
+        } else if injury_result.injury_context().modified_injury_context.is_some() {
+            let mod_ctx_modification = injury_result.injury_context()
+                .modified_injury_context.as_ref().unwrap().modification;
+            if injury_result.is_already_reported() {
+                skip = match mod_ctx_modification {
+                    InjuryModification::ARMOUR => if pre_regen { SkipInjuryParts::ArmourAndCas } else { SkipInjuryParts::Armour },
+                    InjuryModification::INJURY => SkipInjuryParts::ArmourAndInjury,
+                    InjuryModification::NONE => skip,
+                };
+                injury_result.set_already_reported(false);
+            } else {
+                // playSound = false (client-only: no-op in headless)
+                skip = match mod_ctx_modification {
+                    InjuryModification::ARMOUR => SkipInjuryParts::Injury,
+                    InjuryModification::INJURY => SkipInjuryParts::Cas,
+                    InjuryModification::NONE => skip,
+                };
+            }
+        }
+
+        if injury_result.is_already_reported() {
+            return;
+        }
+
+        let report = build_report_injury(injury_result.injury_context(), skip);
+        game.report_list.add(report);
+        // Java: step.getResult().setSound() — client-only, no-op in headless
+        injury_result.set_already_reported(true);
     }
 
     /// Java: handlePumpUp(IStep, InjuryResult).
@@ -186,10 +227,34 @@ pub trait StateMechanic: Send + Sync {
     }
 }
 
+/// Java: ReportInjury.init(InjuryContext, SkipInjuryParts) — builds a ReportInjury from context.
+fn build_report_injury(ctx: &InjuryContext, skip: SkipInjuryParts) -> ReportInjury {
+    ReportInjury::new(
+        ctx.attacker_id.clone(),
+        ctx.defender_id.clone(),
+        ctx.injury_type_name.clone().unwrap_or_default(),
+        ctx.armor_broken,
+        ctx.armor_modifiers.iter().map(|m| format!("{m:?}")).collect(),
+        ctx.armor_roll.map(|r| r.to_vec()).unwrap_or_default(),
+        ctx.injury_modifiers.iter().map(|m| format!("{m:?}")).collect(),
+        ctx.injury_roll.map(|r| r.to_vec()).unwrap_or_default(),
+        ctx.casualty_roll.map(|r| r.to_vec()).unwrap_or_default(),
+        ctx.serious_injury.map(|s| format!("{s:?}")),
+        ctx.casualty_roll_decay.map(|r| r.to_vec()).unwrap_or_default(),
+        ctx.serious_injury_decay.map(|s| format!("{s:?}")),
+        ctx.original_serious_injury.map(|s| format!("{s:?}")),
+        ctx.injury,
+        ctx.injury_decay,
+        ctx.casualty_modifiers.iter().map(|m| format!("{m:?}")).collect(),
+        skip.to_string(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffb_model::enums::{LeaderState, Rules};
+    use ffb_model::enums::{LeaderState, Rules, ApothecaryMode};
+    use ffb_model::report::ReportId;
     use ffb_model::model::game::Game;
     use ffb_model::types::FieldCoordinate;
     use ffb_model::types::RSV_HOME_X;
@@ -210,11 +275,27 @@ mod tests {
     }
 
     #[test]
-    fn report_injury_default_does_not_panic() {
+    fn report_injury_emits_to_report_list() {
         let m = TestMechanic;
-        let g = make_game();
-        let mut ir = InjuryResult::new();
-        m.report_injury(&g, &mut ir);
+        let mut g = make_game();
+        let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+        ir.injury_context.defender_id = Some("p1".into());
+        ir.injury_context.injury_type_name = Some("REGULAR".into());
+        m.report_injury(&mut g, &mut ir);
+        assert!(ir.is_already_reported());
+        assert!(g.report_list.has_report(ReportId::INJURY));
+    }
+
+    #[test]
+    fn report_injury_skips_second_call_when_already_reported() {
+        let m = TestMechanic;
+        let mut g = make_game();
+        let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+        m.report_injury(&mut g, &mut ir);
+        assert_eq!(g.report_list.size(), 1);
+        // second call must be a no-op
+        m.report_injury(&mut g, &mut ir);
+        assert_eq!(g.report_list.size(), 1);
     }
 
     #[test]

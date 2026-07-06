@@ -6,15 +6,15 @@
 /// BB2025 differences vs BB2016:
 ///   - FIREBALL: publishes SteadyFootingContext(InjuryResult) instead of InjuryResult directly.
 ///   - BOMB: complex suppressEndTurn logic + SteadyFootingContext; SPP tracking via
-///     InjuryTypeBombWithModifierForSpp when bombardier gets SPPs (headless: PassState.originalBombardier not ported).
+///     InjuryTypeBombWithModifierForSpp when bombardier != player's team and has ViolentInnovator.
 ///   - END_TURN guard: only published if `isStanding` (not prone/stunned).
 ///   - ZAP: ZappedPlayer substitution still headless (ZappedPlayer not yet ported).
 ///
 /// headless(ZAP): ZappedPlayer substitution not yet ported.
-/// headless(bombardier-spp): InjuryTypeBombWithModifierForSpp needs original_bombardier wired as init param.
 use ffb_model::enums::{ApothecaryMode, TurnMode};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::special_effect::SpecialEffect;
 use ffb_model::option::game_option_id::{BOMB_TEAM_MATE_KNOCK_DOWN_CAUSES_TURNOVER, BOMBER_PLACED_PRONE_IGNORES_TURNOVER};
 use ffb_model::option::util_game_option::is_option_enabled;
@@ -35,6 +35,8 @@ pub struct StepSpecialEffect {
     pub roll_for_effect: bool,
     /// Java: fSpecialEffect (mandatory init param)
     pub special_effect: Option<SpecialEffect>,
+    /// Java: passState.getOriginalBombardier() — set when bomb sequence wires up the bombardier.
+    pub original_bombardier: Option<String>,
 }
 
 impl StepSpecialEffect {
@@ -44,6 +46,7 @@ impl StepSpecialEffect {
             player_id: None,
             roll_for_effect: false,
             special_effect: None,
+            original_bombardier: None,
         }
     }
 }
@@ -73,6 +76,7 @@ impl Step for StepSpecialEffect {
                 self.special_effect = SpecialEffect::for_name(&v.to_lowercase());
                 true
             }
+            StepParameter::OriginalBombardier(v) => { self.original_bombardier = v.clone(); true }
             _ => false,
         }
     }
@@ -153,6 +157,9 @@ impl StepSpecialEffect {
                 outcome = outcome.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
             }
             SpecialEffect::BOMB => {
+                // Sync original_bombardier to game state for apply_to() downstream.
+                game.original_bombardier = self.original_bombardier.clone();
+
                 let bomb_from_home = matches!(game.turn_mode, TurnMode::BombHome | TurnMode::BombHomeBlitz);
                 let bomb_from_away = matches!(game.turn_mode, TurnMode::BombAway | TurnMode::BombAwayBlitz);
 
@@ -168,13 +175,28 @@ impl StepSpecialEffect {
                     suppress_end_turn = !(player_hit_from_bomb_team && has_ball);
                 }
                 // Java: if player == originalBombardier && !bomberTurnoverIgnored → suppressEndTurn=false
-                // headless: original_bombardier not wired as init param — PassState not ported
-                let _ = is_option_enabled(game, BOMBER_PLACED_PRONE_IGNORES_TURNOVER);
+                if let Some(ref orig_id) = self.original_bombardier {
+                    if &player_id == orig_id && !is_option_enabled(game, BOMBER_PLACED_PRONE_IGNORES_TURNOVER) {
+                        suppress_end_turn = false;
+                    }
+                }
 
-                // headless: use InjuryTypeBombWithModifierForSpp when bombardier != player's team — PassState not ported
+                // Java: bombardierGetsSpp = bombardier team != player team && bombardier has grantsSppFromSpecialActionsCas
+                let bombardier_id = self.original_bombardier.as_deref();
+                let bombardier_gets_spp = bombardier_id.map(|b_id| {
+                    game.player(b_id).map(|bombardier| {
+                        let bombardier_is_home = game.team_home.has_player(b_id);
+                        let player_is_home = game.team_home.has_player(&player_id);
+                        let different_teams = bombardier_is_home != player_is_home;
+                        different_teams && bombardier.has_skill_property(NamedProperties::GRANTS_SPP_FROM_SPECIAL_ACTIONS_CAS)
+                    }).unwrap_or(false)
+                }).unwrap_or(false);
+
+                let injury_type_name = if bombardier_gets_spp { "InjuryTypeBombWithModifierForSpp" } else { "InjuryTypeBombWithModifier" };
+                let attacker_id = if bombardier_gets_spp { bombardier_id } else { None };
                 let ir = handle_injury_by_name(
-                    game, rng, "InjuryTypeBombWithModifier",
-                    None, &player_id, coord, None, None, ApothecaryMode::SpecialEffect,
+                    game, rng, injury_type_name,
+                    attacker_id, &player_id, coord, None, None, ApothecaryMode::SpecialEffect,
                 );
                 let ctx = SteadyFootingContext::from_injury_result(ir);
                 outcome = outcome.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
@@ -356,5 +378,54 @@ mod tests {
         step.roll_for_effect = false;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
+    }
+
+    #[test]
+    fn set_parameter_original_bombardier_accepted() {
+        let mut step = StepSpecialEffect::default();
+        assert!(step.set_parameter(&StepParameter::OriginalBombardier(Some("bomb1".into()))));
+        assert_eq!(step.original_bombardier.as_deref(), Some("bomb1"));
+    }
+
+    #[test]
+    fn set_parameter_original_bombardier_none_accepted() {
+        let mut step = StepSpecialEffect::default();
+        assert!(step.set_parameter(&StepParameter::OriginalBombardier(None)));
+        assert!(step.original_bombardier.is_none());
+    }
+
+    #[test]
+    fn bomb_uses_bomb_with_modifier_injury_type() {
+        // Bomb with no originalBombardier → uses InjuryTypeBombWithModifier → publishes SteadyFootingContext
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_mode = TurnMode::BombHome;
+        add_home_player(&mut game, "p1");
+        let mut step = StepSpecialEffect::new("fail".into());
+        step.player_id = Some("p1".into());
+        step.special_effect = Some(SpecialEffect::BOMB);
+        step.roll_for_effect = false;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))));
+    }
+
+    #[test]
+    fn bomb_original_bombardier_is_same_as_player_and_option_disabled_suppresses_end_turn() {
+        // When originalBombardier == player and BOMBER_PLACED_PRONE_IGNORES_TURNOVER is disabled,
+        // suppressEndTurn should become false → EndTurn should be published for a standing acting-team player
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_mode = TurnMode::BombHome;
+        add_home_player(&mut game, "bomb1");
+        let mut step = StepSpecialEffect::new("fail".into());
+        step.player_id = Some("bomb1".into());
+        step.special_effect = Some(SpecialEffect::BOMB);
+        step.roll_for_effect = false;
+        step.original_bombardier = Some("bomb1".into());
+        // BOMBER_PLACED_PRONE_IGNORES_TURNOVER defaults to false → !false = true → suppressEndTurn=false
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // suppressEndTurn=false AND player is standing AND acting team has player → should publish EndTurn
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "when original bombardier is hit and option disabled, EndTurn should be published");
     }
 }

@@ -3,8 +3,7 @@ use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::passing::can_intercept;
 use ffb_model::util::rng::GameRng;
-use ffb_mechanics::modifiers::bb2025::interception_modifier_collection::InterceptionModifierCollection;
-use ffb_mechanics::modifiers::interception_context::InterceptionContext;
+use ffb_mechanics::modifiers::interception_modifier_factory::InterceptionModifierFactory;
 use ffb_mechanics::pass_result::PassResult;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -25,8 +24,8 @@ use crate::step::framework::{StepId, StepParameter};
 /// Needs init param: `GotoLabelOnFailure`.
 /// Publishes: `InterceptorId` on success.
 ///
-/// headless: re-roll dialog handling (AbstractStepWithReRoll path), TurnMode=INTERCEPTION dialog,
-///       UtilCards.getRerollSource — those require dialog/reroll infrastructure not yet ported.
+/// client-only: TurnMode=INTERCEPTION is a UI signal; headless waits via cont() for SelectPlayer.
+/// client-only: re-roll dialog (AbstractStepWithReRoll path) — re-rolls are offered via UtilCards.getRerollSource.
 pub struct StepIntercept {
     /// Java: fGotoLabelOnFailure (init param, mandatory)
     pub goto_label_on_failure: String,
@@ -135,26 +134,13 @@ impl StepIntercept {
         }
 
         // Java: modifierFactory.findModifiers(new InterceptionContext(game, pInterceptor, state.getResult(), isOriginalBombardier))
-        // Java factory: only one DISTURBING_PRESENCE modifier (matching count) and one TACKLEZONE modifier
-        // are included, not all 11. Since we lack the full factory (UtilDisturbingPresence / UtilPlayer.findTacklezones),
-        // we collect only REGULAR modifiers (which have proper predicates like pass result and weather).
-        // DISTURBING_PRESENCE and TACKLEZONE modifiers are stubbed as 0 (no adjacent DP/TZ players assumed).
-        let collection = InterceptionModifierCollection::new();
+        let factory = InterceptionModifierFactory::for_rules(game.rules);
         let is_bomb = self.original_bombardier.is_some();
-        let ctx = InterceptionContext::new(game, interceptor, self.pass_result, is_bomb);
-
-        // Only apply REGULAR modifiers (have predicates); skip DISTURBING_PRESENCE and TACKLEZONE
-        // (those require UtilDisturbingPresence.findOpposingDisturbingPresences / UtilPlayer.findTacklezones)
-        use ffb_mechanics::modifiers::modifier_type::ModifierType;
-        let applicable = collection.find_applicable(&ctx);
-        let modifier_total: i32 = applicable.iter()
-            .filter(|m| m.get_type() == ModifierType::REGULAR)
-            .map(|m| m.get_modifier())
-            .sum();
+        let mods = factory.find_applicable(game, interceptor, self.pass_result, is_bomb);
 
         // Java: AgilityMechanic.minimumRollInterception(pInterceptor, interceptionModifiers)
         // BB2025: minimum = max(2, agility + sum_of_modifiers)
-        let minimum_roll = (interceptor.agility_with_modifiers() + modifier_total).max(2);
+        let minimum_roll = InterceptionModifierFactory::minimum_roll_bb2020(interceptor, &mods);
 
         roll >= minimum_roll
     }
@@ -228,9 +214,8 @@ impl StepIntercept {
 
         // Java: if (!state.isInterceptorChosen()) → showDialog, TurnMode=INTERCEPTION, doNextStep=false
         if !self.interceptor_chosen {
-            // Java: UtilServerDialog.showDialog → CLIENT_INTERCEPTOR_CHOICE
-            // headless: emit a prompt / set TurnMode=INTERCEPTION — dialog infra not ported
-            // For now: wait for the intercept choice command (CONTINUE)
+            // Java: UtilServerDialog.showDialog → CLIENT_INTERCEPTOR_CHOICE; setTurnMode(INTERCEPTION)
+            // client-only: TurnMode=INTERCEPTION is a UI signal to show the dialog; game logic waits for SelectPlayer.
             return StepOutcome::cont();
         }
 

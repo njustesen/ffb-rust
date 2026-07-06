@@ -1,6 +1,13 @@
 use std::collections::HashMap;
 use ffb_model::events::GameEvent;
 use ffb_model::enums::{KickoffResult, TurnMode, Weather, PS_EXHAUSTED, PS_RESERVE, PS_STANDING};
+use ffb_model::report::report_scatter_ball::ReportScatterBall;
+use ffb_model::report::mixed::report_kickoff_sequence_activations_count::ReportKickoffSequenceActivationsCount;
+use ffb_model::report::mixed::report_kickoff_timeout::ReportKickoffTimeout;
+use ffb_model::report::mixed::report_kickoff_extra_re_roll::ReportKickoffExtraReRoll;
+use ffb_model::report::mixed::report_solid_defence_roll::ReportSolidDefenceRoll;
+use ffb_model::report::bb2020::report_cheering_fans::ReportCheeringFans;
+use ffb_model::report::report_weather::ReportWeather;
 use ffb_model::inducement::inducement::Inducement;
 use ffb_model::inducement::usage::Usage;
 use ffb_model::option::game_option_id;
@@ -109,7 +116,7 @@ impl Step for StepApplyKickoffResult {
                     game.turn_mode = TurnMode::Kickoff;
                 } else if game.turn_mode == TurnMode::SolidDefence {
                     // Java: setPlayerCoordinates from command
-                    // headless: no-op — playerCoordinates from ClientCommandEndTurn not applicable
+                    // client-only: no-op — playerCoordinates from ClientCommandEndTurn sent only by clients
                 }
             }
             Action::ConfirmSetup => {
@@ -189,6 +196,7 @@ impl StepApplyKickoffResult {
         game.turn_data_away.turn_nr += turn_modifier;
 
         // client-only: setAnimation(KICKOFF_TIMEOUT)
+        game.report_list.add(ReportKickoffTimeout::new(turn_modifier, kicking_turn));
         StepOutcome::next().with_event(GameEvent::KickoffTimeout { turn_number: kicking_turn, turn_modifier })
     }
 
@@ -279,6 +287,11 @@ impl StepApplyKickoffResult {
             }
 
             game.turn_mode = TurnMode::SolidDefence;
+            game.report_list.add(ReportSolidDefenceRoll::new(
+                Some(acting_team_id.clone()),
+                roll,
+                self.nr_of_players_allowed,
+            ));
             // client-only: setAnimation(KICKOFF_SOLID_DEFENSE)
             StepOutcome::cont().with_event(GameEvent::SolidDefenceRoll {
                 team_id: acting_team_id,
@@ -337,25 +350,35 @@ impl StepApplyKickoffResult {
         let use_league = game.options.is_enabled(game_option_id::INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE);
         let max_prayer_roll = if use_league { 16 } else { 8 };
         let mut outcome = StepOutcome::next();
-        if total_home > total_away {
+        let (winner_team_id, prayer_available) = if total_home > total_away {
             let prayer_roll = rng.range(max_prayer_roll) as i32 + 1;
             let team_id = game.team_home.id.clone();
             outcome = outcome.push_seq(vec![
                 SequenceStep::with_params(StepId::Prayer, vec![
                     StepParameter::PrayerRoll(prayer_roll),
-                    StepParameter::TeamId(team_id),
+                    StepParameter::TeamId(team_id.clone()),
                 ])
             ]);
+            (Some(team_id), true)
         } else if total_away > total_home {
             let prayer_roll = rng.range(max_prayer_roll) as i32 + 1;
             let team_id = game.team_away.id.clone();
             outcome = outcome.push_seq(vec![
                 SequenceStep::with_params(StepId::Prayer, vec![
                     StepParameter::PrayerRoll(prayer_roll),
-                    StepParameter::TeamId(team_id),
+                    StepParameter::TeamId(team_id.clone()),
                 ])
             ]);
-        }
+            (Some(team_id), true)
+        } else {
+            (None, false)
+        };
+        game.report_list.add(ReportCheeringFans::new(
+            winner_team_id.unwrap_or_default(),
+            prayer_available,
+            roll_home,
+            roll_away,
+        ));
         // client-only: setAnimation(KICKOFF_CHEERING_FANS)
         outcome.with_event(GameEvent::CheeringFans { home_roll: roll_home, away_roll: roll_away })
     }
@@ -384,6 +407,8 @@ impl StepApplyKickoffResult {
         if !self.touchback && weather == Weather::Nice {
             if let Some(ball_coord) = game.field_model.ball_coordinate {
                 let mut last_valid = ball_coord;
+                let mut scatter_dirs = Vec::new();
+                let mut scatter_rolls = Vec::new();
                 for _ in 0..3 {
                     let dir_roll = rng.d8();
                     let direction = Direction::for_roll(dir_roll).unwrap_or(Direction::North);
@@ -392,6 +417,8 @@ impl StepApplyKickoffResult {
                         .map(|b| b.is_in_bounds(candidate))
                         .unwrap_or_else(|| FieldCoordinateBounds::FIELD.is_in_bounds(candidate));
                     self.touchback = !in_bounds;
+                    scatter_dirs.push(direction);
+                    scatter_rolls.push(dir_roll);
                     if !self.touchback {
                         game.field_model.ball_coordinate = Some(candidate);
                         last_valid = candidate;
@@ -400,8 +427,8 @@ impl StepApplyKickoffResult {
                         break;
                     }
                 }
+                game.report_list.add(ReportScatterBall::new(scatter_dirs, scatter_rolls, true));
             }
-            // headless: ReportScatterBall — report system not yet ported
         }
 
         StepOutcome::next()
@@ -427,17 +454,23 @@ impl StepApplyKickoffResult {
 
         let mut outcome = StepOutcome::next();
         // client-only: setAnimation(KICKOFF_BRILLIANT_COACHING)
+        let winner_team_id: Option<String>;
         if total_home > total_away {
             game.turn_data_home.rerolls += 1;
             game.turn_data_home.rerolls_brilliant_coaching_one_drive += 1;
             let team_id = game.team_home.id.clone();
+            winner_team_id = Some(team_id.clone());
             outcome = outcome.with_event(GameEvent::KickoffExtraReRoll { team_id });
         } else if total_away > total_home {
             game.turn_data_away.rerolls += 1;
             game.turn_data_away.rerolls_brilliant_coaching_one_drive += 1;
             let team_id = game.team_away.id.clone();
+            winner_team_id = Some(team_id.clone());
             outcome = outcome.with_event(GameEvent::KickoffExtraReRoll { team_id });
+        } else {
+            winner_team_id = None;
         }
+        game.report_list.add(ReportKickoffExtraReRoll::new(roll_home, roll_away, winner_team_id));
         outcome
     }
 
@@ -452,9 +485,13 @@ impl StepApplyKickoffResult {
             if let (Some(ref player_id), Some(coord)) = (self.moved_player.clone(), self.to_coordinate) {
                 if self.nr_of_moved_players < self.nr_of_players_allowed {
                     self.nr_of_moved_players += 1;
-                    // headless: ReportKickoffSequenceActivationsCount — report system not yet ported
                     UtilServerSetup::setup_player(game, player_id, coord);
-
+                    let active_on_field = count_active_players_on_field(game);
+                    game.report_list.add(ReportKickoffSequenceActivationsCount::new(
+                        active_on_field,
+                        self.nr_of_moved_players,
+                        self.nr_of_players_allowed,
+                    ));
                     if self.nr_of_moved_players == self.nr_of_players_allowed {
                         self.end_kickoff = true;
                     }
@@ -525,7 +562,7 @@ impl StepApplyKickoffResult {
 
     fn handle_officious_ref(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: roll throwARock (D6) per team; lower fan-factor total → player targeted.
-        // Per targeted player: roll D6; 1 → eject (headless: eject not yet ported), else → stun immediately.
+        // Per targeted player: roll D6; 1 → push EjectPlayer sequence, else → stun immediately.
         let roll_home = rng.d6();
         let roll_away = rng.d6();
 
@@ -677,6 +714,22 @@ impl StepApplyKickoffResult {
             util_server_injury::stun_player(game, &id);
         }
     }
+}
+
+/// Java: StepApplyKickoffResult — active players on field for acting team.
+fn count_active_players_on_field(game: &Game) -> i32 {
+    let acting_team = game.active_team();
+    let ids: Vec<String> = acting_team.players.iter().map(|p| p.id.clone()).collect();
+    ids.iter()
+        .filter(|pid| {
+            game.field_model.player_coordinate(pid)
+                .map(|c| FieldCoordinateBounds::FIELD.is_in_bounds(c))
+                .unwrap_or(false)
+                && game.field_model.player_state(pid)
+                    .map(|s| s.is_active())
+                    .unwrap_or(false)
+        })
+        .count() as i32
 }
 
 #[cfg(test)]

@@ -3,16 +3,18 @@
 /// Scatters the thrown/kicked player to their landing square (BB2025).
 ///
 /// BB2025 differences vs BB2020:
-///  - Extends AbstractStepWithReRoll — supports Swoop distance re-rolls (headless: not ported).
+///  - Extends AbstractStepWithReRoll — Swoop re-roll dialog is client-only (headless executes immediately).
 ///  - `usingBullseye` flag: when set, land at `game.passCoordinate` directly (no scatter roll).
-///  - usingSwoop flag: Swoop movement with optional re-roll (headless: not ported).
-///  - SteadyFootingContext — published for hit-player scenarios (headless: not ported).
-///  - SppMechanic — grants SPP on TTM hit for skilled players (headless: not ported).
+///  - usingSwoop flag: implemented — controls Swoop movement path.
+///  - SteadyFootingContext — published for hit-player scenarios (implemented).
+///  - SppMechanic — grants SPP on TTM hit for skilled players (wired: addCasualty for lethalSpp+violentSpp).
 ///  - Always uses `InjuryTypeCrowdPush` (no InjuryTypeKTMCrowd) for OOB.
 ///  - No `deviate` / `crashLanding` flags (BB2020-only).
 ///  - Publishes `USING_SWOOP` and `OLD_DEFENDER_STATE` from `handleLanding`.
 use std::sync::Arc;
+use ffb_mechanics::bb2025::spp_mechanic::SppMechanic as SppMechanic2025;
 use ffb_mechanics::mechanics::scatter_coordinate;
+use ffb_mechanics::spp_mechanic::SppMechanic as SppMechanicTrait;
 use ffb_model::enums::{ApothecaryMode, Direction, PS_IN_THE_AIR, PS_PICKED_UP, PlayerState};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
@@ -207,6 +209,7 @@ impl StepInitScatterPlayer {
                     .map(|p| p.has_skill_property(NamedProperties::GRANTS_SPP_FROM_SPECIAL_ACTIONS_CAS))
                     .unwrap_or(false);
 
+            let thrower_id_clone = game.acting_player.player_id.clone();
             let injury_result = if vs_opponent && (lethal_spp || violent_spp) {
                 // Java: attacker = lethalSpp ? thrownPlayer : thrower
                 let attacker_id: Option<String> = if lethal_spp {
@@ -220,9 +223,21 @@ impl StepInitScatterPlayer {
                     attacker_id.as_deref(), &hit_player_id, end_coord, None, None,
                     ApothecaryMode::HitPlayer,
                 );
-                // Java: if (lethalSpp && violentSpp && injuryResultHitPlayer.injuryContext().isCasualty())
-                //         spp.addCasualty(...) — headless: SppMechanic.addCasualty not ported
                 result.apply_to(game);
+                // Java: if (lethalSpp && violentSpp && injuryResultHitPlayer.injuryContext().isCasualty())
+                //         spp.addCasualty(prayerState.additionalCasSppTeams, playerResult(thrower))
+                if lethal_spp && violent_spp && result.injury_context().is_casualty() {
+                    if let Some(ref tid) = thrower_id_clone {
+                        let thrower_team_id = if game.home_playing {
+                            game.team_home.id.clone()
+                        } else {
+                            game.team_away.id.clone()
+                        };
+                        let additional_teams = game.prayer_state.get_additional_cas_spp_teams().clone();
+                        let pr = game.game_result.team_result_mut(game.home_playing).player_result_mut(tid);
+                        SppMechanic2025::new().add_casualty(&additional_teams, pr, &thrower_team_id);
+                    }
+                }
                 result
             } else {
                 let mut hit_injury = InjuryTypeTTMHitPlayer::new();
@@ -704,5 +719,71 @@ mod tests {
         // Opponent hit without always-turn-over → 1 command: DropPlayer only
         assert_eq!(sfc_param.unwrap().deferred_commands.len(), 1,
             "expected only DropPlayerCommand (1 total) for opponent hit");
+    }
+
+    /// When lethal_spp + violent_spp conditions are met, the step runs without panic
+    /// and uses InjuryTypeTTMHitPlayerForSpp (DropThrownPlayer published).
+    #[test]
+    fn lethal_spp_and_violent_spp_conditions_run_without_panic() {
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = make_game();
+        game.home_playing = true;
+        // Thrown player (on home team) with LethalFlight — grants SPP when hitting on TTM
+        let land = FieldCoordinate::new(10, 7);
+        game.team_home.players.push(Player {
+            id: "thrown".into(), name: "thrown".into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::LethalFlight, value: None }],
+            extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
+            career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("thrown", FieldCoordinate::new(8, 7));
+        game.field_model.set_player_state("thrown", PlayerState::new(PS_STANDING));
+
+        // Thrower (actingPlayer) on home team with ViolentInnovator
+        game.team_home.players.push(Player {
+            id: "thrower".into(), name: "thrower".into(), nr: 2,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::ViolentInnovator, value: None }],
+            extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
+            career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.acting_player.player_id = Some("thrower".into());
+
+        // Hit player on away team (opponent) with AV=2 to maximize armor-break chance
+        game.team_away.players.push(Player {
+            id: "opponent".into(), name: "opponent".into(), nr: 3,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 2,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("opponent", land);
+        game.field_model.set_player_state("opponent", PlayerState::new(PS_STANDING));
+
+        game.pass_coordinate = Some(land);
+
+        let mut step = StepInitScatterPlayer::new();
+        step.thrown_player_id = Some("thrown".into());
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        step.thrown_player_coordinate = Some(FieldCoordinate::new(8, 7));
+        step.using_bullseye = true;
+        step.is_kicked_player = true;
+
+        // Must not panic; DropThrownPlayer(true) should be published
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DropThrownPlayer(true))));
     }
 }

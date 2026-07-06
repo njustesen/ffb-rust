@@ -106,6 +106,34 @@ impl UtilServerCards {
         events
     }
 
+    /// Java: UtilServerCards.deactivateCard(GameState, Player) — deactivate the card for a player.
+    /// Finds the first active card (home or away) whose handler's allows_player returns true for player_id.
+    pub fn deactivate_card_for_player(game: &mut Game, player_id: &str) -> Option<GameEvent> {
+        use crate::factory::card_handler_factory::CardHandlerFactory;
+
+        let home_names: Vec<String> = game.turn_data_home.inducement_set.get_active_cards()
+            .iter().map(|s| s.to_string()).collect();
+        let away_names: Vec<String> = game.turn_data_away.inducement_set.get_active_cards()
+            .iter().map(|s| s.to_string()).collect();
+
+        let mut factory = CardHandlerFactory::new();
+        factory.initialize(game.rules);
+
+        for card_name in home_names.iter().chain(away_names.iter()) {
+            let card = game.turn_data_home.inducement_set.get_active_card(card_name)
+                .or_else(|| game.turn_data_away.inducement_set.get_active_card(card_name))
+                .cloned();
+            if let Some(card) = card {
+                if let Some(handler) = factory.for_card(&card) {
+                    if handler.allows_player(game, &card, player_id) {
+                        return Self::deactivate_card(game, card_name);
+                    }
+                }
+            }
+        }
+        None
+    }
+
     /// Java: StepCatchScatterThrowIn.deactivateCards() — deactivate WHILE_HOLDING_THE_BALL
     /// cards from players who no longer hold the ball.
     pub fn deactivate_while_holding_ball(game: &mut Game) -> Vec<GameEvent> {

@@ -5,7 +5,8 @@
 ///
 /// Rust: each generator is a standalone module with different parameter types, so they cannot
 /// share a single trait easily. This factory validates known generator names per edition.
-/// headless: full generator dispatch via enum-based dispatcher not yet implemented — name validation only.
+/// no-op: full generator dispatch not ported — Rust generators have incompatible parameter types
+/// (no common trait); name validation via HashSet is the correct Rust design for this factory.
 use std::collections::HashSet;
 use ffb_model::enums::Rules;
 

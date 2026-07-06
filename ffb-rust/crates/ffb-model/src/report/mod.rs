@@ -3,6 +3,7 @@ pub mod i_report;
 pub mod no_dice_report;
 pub mod report_list;
 pub mod report_skill_roll;
+pub mod skip_injury_parts;
 
 // Root-level report structs (ffb-common/src/main/java/com/fumbbl/ffb/report/Report*.java)
 pub mod report_always_hungry_roll;
@@ -80,3 +81,4 @@ pub use report_id::ReportId;
 pub use i_report::IReport;
 pub use report_list::ReportList;
 pub use report_skill_roll::ReportSkillRoll;
+pub use skip_injury_parts::SkipInjuryParts;

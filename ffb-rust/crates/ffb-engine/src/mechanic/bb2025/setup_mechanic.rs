@@ -59,7 +59,7 @@ impl SetupMechanicTrait for SetupMechanic {
 
         // Collect player data without borrowing game mutably mid-loop.
         // Java: `player.getPosition().getKeywords().contains(Keyword.LINEMAN)` for swarmer check.
-        // headless: Swarming position keyword lookup requires roster access not yet ported
+        // no-op: Swarming position keyword lookup requires roster access not ported — headless treats all players as non-swarmers
         // Currently treats all on-field players as regular (no swarmer separation).
         let player_data: Vec<(String, bool, bool)> = {
             let team = if home_team { &game.team_home } else { &game.team_away };
@@ -85,7 +85,7 @@ impl SetupMechanicTrait for SetupMechanic {
             let in_away_half = FieldCoordinateBounds::HALF_AWAY.is_in_bounds(coord);
 
             if (home_team && in_home_half) || (!home_team && in_away_half) {
-                // headless: Keyword.LINEMAN check for swarmer count — roster keyword access not yet ported
+                // no-op: Keyword.LINEMAN check — roster keyword access not ported; all on-field players counted as regular
                 players_on_field += 1;
                 let _ = swarmers_on_field;
             }

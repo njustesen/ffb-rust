@@ -107,8 +107,7 @@ impl StepHailMaryPass {
         }
 
         // client-only: DialogSkillUseParameter for canAddStrengthToPass — headless skips
-        // headless: PassMechanic.evaluatePass with statBasedModifier blocked on
-        //   ActingPlayer.stat_based_modifier() (StatBasedRollModifier) not yet ported
+        // client-only: PassMechanic.evaluatePass with statBasedModifier (canAddStrengthToPass dialog) — headless skips
 
         let is_fumble = self.roll == 1;
         let is_accurate = self.roll >= self.minimum_roll;

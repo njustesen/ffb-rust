@@ -812,6 +812,8 @@ impl SkillId {
                 "providesBlockAlternative",
                 "canPerformArmourRollInsteadOfBlockThatMightFail",
             ],
+            // Java: LethalFlight.postConstruct registers affectsEitherArmourOrInjuryOnTtm + grantsSppWhenHittingOpponentOnTtm
+            SkillId::LethalFlight => &["affectsEitherArmourOrInjuryOnTtm", "grantsSppWhenHittingOpponentOnTtm"],
             // Java: ViolentInnovator.postConstruct registers grantsSppFromSpecialActionsCas
             SkillId::ViolentInnovator => &["grantsSppFromSpecialActionsCas"],
             // Java: MaximumCarnage.postConstruct registers canPerformSecondChainsawAttack
@@ -953,6 +955,13 @@ mod tests {
         assert!(props.contains(&"canUseVomitAfterBlock"));
         assert!(props.contains(&"providesBlockAlternative"));
         assert!(props.contains(&"canPerformArmourRollInsteadOfBlockThatMightFail"));
+    }
+
+    #[test]
+    fn properties_lethal_flight_ttm_spp() {
+        let props = SkillId::LethalFlight.properties();
+        assert!(props.contains(&"affectsEitherArmourOrInjuryOnTtm"));
+        assert!(props.contains(&"grantsSppWhenHittingOpponentOnTtm"));
     }
 
     #[test]

@@ -29,6 +29,7 @@ use crate::injury::injuryType::injury_type_ktm_crowd::InjuryTypeKTMCrowd;
 use crate::injury::injuryType::injury_type_ttm_hit_player::InjuryTypeTTMHitPlayer;
 use crate::step::action::ttm::util_throw_team_mate_sequence::{scatter_player, kick_player, ScatterResult};
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use ffb_model::report::report_pass_deviate::ReportPassDeviate;
 use crate::step::mixed::ttm::ttm_to_crowd_handler::TtmToCrowdHandler;
 use crate::step::util_server_injury;
 
@@ -117,7 +118,7 @@ impl StepInitScatterPlayer {
             // Java: UtilThrowTeamMateSequence.kickPlayer(this, thrownPlayerCoordinate, startCoordinate)
             scatter_result = kick_player(game, rng, thrown_player_coord, start_coord);
         } else if self.deviate {
-            scatter_result = self.deviate_scatter(rng, thrown_player_coord);
+            scatter_result = self.deviate_scatter(game, rng, thrown_player_coord);
         } else if self.swoop_direction.is_some() {
             scatter_result = self.swoop_scatter(game, rng, start_coord);
             if let Some(coord) = self.thrown_player_coordinate {
@@ -238,7 +239,7 @@ impl StepInitScatterPlayer {
 
     /// Java: deviate(Game game, FieldCoordinate throwerCoordinate)
     /// Rolls D8 direction + D6 distance from the thrower coordinate.
-    fn deviate_scatter(&mut self, rng: &mut GameRng, thrower_coord: FieldCoordinate) -> ScatterResult {
+    fn deviate_scatter(&mut self, game: &mut Game, rng: &mut GameRng, thrower_coord: FieldCoordinate) -> ScatterResult {
         let direction_roll = rng.d8();
         let distance_roll = rng.d6();
         let direction = Direction::for_roll(direction_roll).expect("d8 is 1..=8");
@@ -258,7 +259,7 @@ impl StepInitScatterPlayer {
         // Java: publishParameter(THROWN_PLAYER_COORDINATE, lastValidCoordinate)
         self.thrown_player_coordinate = Some(last_valid);
         // Java: addReport(new ReportPassDeviate(coordinateEnd, direction, directionRoll, distanceRoll, true))
-        // headless: ReportPassDeviate — blocked on report system infrastructure
+        game.report_list.add(ReportPassDeviate::new(coord_end, direction, direction_roll, distance_roll, true));
 
         ScatterResult::new(last_valid, coord_end.is_on_pitch())
     }

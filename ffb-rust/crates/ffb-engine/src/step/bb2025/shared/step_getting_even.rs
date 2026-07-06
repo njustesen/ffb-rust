@@ -6,7 +6,7 @@ use crate::step::framework::{StepId, StepParameter};
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.shared.StepGettingEven.
 /// Opposing team may use their apothecary after a casualty (Getting Even apothecary rule).
-/// headless: opposing apo dialog — client-only.
+/// client-only: opposing apo dialog (DialogUseApothecaryParameter for opposing team) — headless auto-skips.
 pub struct StepGettingEven {
     /// Java: playerId
     pub player_id: Option<String>,

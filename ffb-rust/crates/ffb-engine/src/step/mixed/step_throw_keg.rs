@@ -8,7 +8,7 @@
 ///      a. On re-roll: consume re-roll source; if unavailable → fail().
 ///      b. Otherwise: markSkillUsed(skill).
 ///      c. Roll D6; success = roll >= 3.
-///      d. Report ReportThrownKeg (headless: report framework not yet ported).
+///      d. Report ReportThrownKeg to game.report_list.
 ///      e. On success: animate + hitPlayer(target, false).
 ///      f. On failure (not re-rolling): ask for re-roll; if available → CONTINUE.
 ///         Otherwise → fail().
@@ -24,6 +24,7 @@ use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_cards::UtilCards;
+use ffb_model::report::mixed::report_thrown_keg::ReportThrownKeg;
 use crate::action::Action;
 use crate::drop_player_context::DropPlayerContext;
 use crate::injury::injuryType::injury_type_keg_hit::InjuryTypeKegHit;
@@ -96,6 +97,13 @@ impl StepThrowKeg {
         let success = self.roll >= MINIMUM_THROW_KEG_ROLL;
 
         // Java: getResult().addReport(new ReportThrownKeg(actingPlayer.getPlayerId(), playerId, roll, success, roll == 1))
+        game.report_list.add(ReportThrownKeg::new(
+            Some(acting_player_id.clone()),
+            self.player_id.clone(),
+            self.roll,
+            success,
+            self.roll == 1,
+        ));
         let keg_event = GameEvent::KegThrow {
             thrower_id: acting_player_id.clone(),
             target_id: self.player_id.clone(),

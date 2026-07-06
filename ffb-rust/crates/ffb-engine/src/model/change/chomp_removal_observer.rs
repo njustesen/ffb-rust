@@ -4,10 +4,9 @@
 /// Handles FIELD_MODEL_SET_PLAYER_COORDINATE and FIELD_MODEL_SET_PLAYER_STATE model changes
 /// to remove or update Chomp markers on the field model.
 ///
-/// headless: ReportChompRemoved not yet ported — chomp removal updates field state
-/// but does not emit reports until the report system is in place.
 use ffb_model::enums::ModelChangeId;
 use ffb_model::model::game::Game;
+use ffb_model::report::bb2025::report_chomp_removed::ReportChompRemoved;
 use crate::model::change::conditional_model_change_observer::ConditionalModelChangeObserver;
 
 pub struct ChompRemovalObserver;
@@ -31,7 +30,7 @@ impl ConditionalModelChangeObserver for ChompRemovalObserver {
     /// FIELD_MODEL_SET_PLAYER_STATE: if player no longer has tackle zones → removeChomps
     /// (prone/stunned/KO players can't maintain a chomp).
     ///
-    /// Reports ReportChompRemoved for each evicted chompee — headless: report system not yet ported.
+    /// Reports ReportChompRemoved for each evicted chompee.
     fn next(&self, key: Option<&str>, change_id: ModelChangeId, game: &mut Game) {
         let player_id = match key {
             Some(id) => id,
@@ -64,8 +63,9 @@ impl ConditionalModelChangeObserver for ChompRemovalObserver {
             _ => return,
         };
 
-        // headless: emit ReportChompRemoved for each chompee_id in removed — report system not yet ported
-        let _ = removed;
+        for (chompee_id, successful) in removed {
+            game.report_list.add(ReportChompRemoved::new(chompee_id, successful));
+        }
     }
 }
 
@@ -176,5 +176,19 @@ mod tests {
     #[test]
     fn default_creates_instance() {
         let _obs = ChompRemovalObserver::default();
+    }
+
+    #[test]
+    fn coordinate_change_to_box_emits_chomp_removed_report() {
+        use ffb_model::report::bb2025::report_chomp_removed::ReportChompRemoved;
+        let obs = ChompRemovalObserver::new();
+        let mut game = make_game();
+        game.field_model.set_player_state("p2", PlayerState::new(PS_STANDING));
+        game.field_model.add_chomp("p1", "p2");
+        game.field_model.set_player_coordinate("p1", FieldCoordinate::new(-1, 3));
+
+        obs.next(Some("p1"), ModelChangeId::FieldModelSetPlayerCoordinate, &mut game);
+
+        assert!(!game.report_list.is_empty(), "should emit ReportChompRemoved");
     }
 }

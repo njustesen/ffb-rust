@@ -97,9 +97,9 @@ impl Step for StepMoveDodge {
                 self.re_roll_state.re_roll_source = None;
                 self.execute_step(game, rng)
             }
-            // headless: CLIENT_USE_SKILL → canAddStrengthToDodge / canChooseToIgnoreDodgeModifierAfterRoll /
-            //       canRerollDodge handling.
-            // headless: CLIENT_PLAYER_CHOICE → ARM_BAR mode
+            // client-only: CLIENT_USE_SKILL → canAddStrengthToDodge / canChooseToIgnoreDodgeModifierAfterRoll /
+            //       canRerollDodge — headless auto-declines skill dialogs.
+            // client-only: CLIENT_PLAYER_CHOICE → ARM_BAR mode — dialog not shown in headless.
             _ => self.execute_step(game, rng),
         }
     }

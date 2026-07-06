@@ -5,7 +5,7 @@ use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 
 /// Handles pre-game inducement purchase dialogs for both coaches.
-/// headless: full inducement buying logic not yet ported.
+/// InducementTypeFactory not ported; headless auto-skips all inducement buying.
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.start.StepBuyInducements`.
 pub struct StepBuyInducements {
     /// Java: availableInducementGoldHome (Integer nullable)
@@ -64,7 +64,7 @@ impl Step for StepBuyInducements {
 
 impl StepBuyInducements {
     fn execute_step(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // headless: calculate underdog gold, show dialog per team, process commands, buy prayers — infra not ported
+        // no-op: InducementTypeFactory not ported — headless auto-skips inducement buying (no dialog, no predefined inducements)
         StepOutcome::next()
     }
 }

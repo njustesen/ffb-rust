@@ -68,11 +68,7 @@ impl Step for StepTrickster {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         if self.action_status == TricksterPhase::SkillChoiceYes {
-            // Waiting for pick-up choice (ball on destination square)
-            if let Action::Acknowledge = action {
-                // Java: CLIENT_PICK_UP_CHOICE → attemptPickUp
-                self.attempt_pick_up = Some(true); // headless: decode from action — command parsing not yet ported
-            }
+            // Java: any command in SKILL_CHOICE_YES → EXECUTE_STEP (no pick-up dialog in this step)
         } else {
             match action {
                 Action::UseSkill { skill_id: _, use_skill } => {

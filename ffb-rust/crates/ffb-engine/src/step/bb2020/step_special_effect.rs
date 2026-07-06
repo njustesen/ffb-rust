@@ -2,6 +2,8 @@ use ffb_model::enums::{ApothecaryMode, TurnMode};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::special_effect::SpecialEffect;
+use ffb_model::option::game_option_id::BOMBER_PLACED_PRONE_IGNORES_TURNOVER;
+use ffb_model::option::util_game_option::is_option_enabled;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{CatchScatterThrowInMode, Step, StepOutcome};
@@ -38,6 +40,8 @@ pub struct StepSpecialEffect {
     pub roll_for_effect: bool,
     /// Java: fSpecialEffect (mandatory init param — stored as string key)
     pub special_effect_key: Option<String>,
+    /// Java: passState.getOriginalBombardier() — wired when bomb sequence initializes this step.
+    pub original_bombardier: Option<String>,
 }
 
 impl StepSpecialEffect {
@@ -47,6 +51,7 @@ impl StepSpecialEffect {
             player_id: None,
             roll_for_effect: false,
             special_effect_key: None,
+            original_bombardier: None,
         }
     }
 }
@@ -72,6 +77,7 @@ impl Step for StepSpecialEffect {
             StepParameter::PlayerId(v)           => { self.player_id = Some(v.clone()); true }
             StepParameter::RollForEffect(v)      => { self.roll_for_effect = *v; true }
             StepParameter::SpecialEffectKey(v)   => { self.special_effect_key = Some(v.clone()); true }
+            StepParameter::OriginalBombardier(v) => { self.original_bombardier = v.clone(); true }
             _ => false,
         }
     }
@@ -144,6 +150,9 @@ impl StepSpecialEffect {
                 let _ = is_active;
             }
             Some(SpecialEffect::BOMB) => {
+                // Sync original_bombardier to game state for apply_to() downstream.
+                game.original_bombardier = self.original_bombardier.clone();
+
                 let bomb_from_home = matches!(game.turn_mode, TurnMode::BombHome | TurnMode::BombHomeBlitz);
                 let bomb_from_away = matches!(game.turn_mode, TurnMode::BombAway | TurnMode::BombAwayBlitz);
 
@@ -151,10 +160,14 @@ impl StepSpecialEffect {
                 let player_hit_is_from_bomb_team =
                     (bomb_from_home && player_is_home) || (bomb_from_away && !player_is_home);
 
-                // headless: passState.getOriginalBombardier not wired as init param
-                // headless: BOMBER_PLACED_PRONE_IGNORES_TURNOVER option check — PassState not ported
-                let suppress_end_turn = !(player_hit_is_from_bomb_team
+                let mut suppress_end_turn = !(player_hit_is_from_bomb_team
                     && game.field_model.ball_coordinate == Some(player_coord));
+                // Java: if player == originalBombardier && !bomberTurnoverIgnored → suppressEndTurn=false
+                if let Some(ref orig_id) = self.original_bombardier {
+                    if &player_id == orig_id && !is_option_enabled(game, BOMBER_PLACED_PRONE_IGNORES_TURNOVER) {
+                        suppress_end_turn = false;
+                    }
+                }
 
                 let injury_result = handle_injury_by_name(
                     game, rng, "InjuryTypeBombWithModifier",
@@ -391,5 +404,31 @@ mod tests {
         assert!(!is_special_effect_successful(Some(SpecialEffect::ZAP), &game, "p1", 2));
         // roll==1 always fails (roll > 1 guard)
         assert!(!is_special_effect_successful(Some(SpecialEffect::ZAP), &game, "p1", 1));
+    }
+
+    #[test]
+    fn set_parameter_original_bombardier_accepted() {
+        let mut step = StepSpecialEffect::default();
+        assert!(step.set_parameter(&StepParameter::OriginalBombardier(Some("bomb1".into()))));
+        assert_eq!(step.original_bombardier.as_deref(), Some("bomb1"));
+    }
+
+    #[test]
+    fn bomb_original_bombardier_same_as_player_suppresses_end_turn_false() {
+        // When player is their own bomb (originalBombardier == player) and the option is disabled,
+        // suppressEndTurn becomes false → EndTurn published for standing acting-team player
+        let pid = "bomb1";
+        let mut step = StepSpecialEffect::new("FAIL".into());
+        step.player_id = Some(pid.into());
+        step.roll_for_effect = false;
+        step.special_effect_key = Some("bomb".into());
+        step.original_bombardier = Some(pid.into());
+
+        let mut game = make_game_with_player(pid, true); // home player, home playing
+        game.turn_mode = TurnMode::BombHome;
+        // BOMBER_PLACED_PRONE_IGNORES_TURNOVER defaults to false → !false = true → suppressEndTurn=false
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "original bombardier hits themselves → suppressEndTurn=false → EndTurn published");
     }
 }

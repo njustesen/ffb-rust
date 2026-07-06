@@ -91,7 +91,7 @@ impl StepPushback {
         }
 
         if !self.standing_firm.contains_key(defender_id) {
-            // Dialog would be shown here; headless: auto-decide = false
+            // client-only: Standing Firm skill-use dialog — headless auto-declines (false = do not use)
             self.standing_firm.insert(defender_id.to_owned(), false);
             return false;
         }

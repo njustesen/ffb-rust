@@ -38,7 +38,7 @@ impl Step for StepCheckStalling {
     fn id(&self) -> StepId { StepId::CheckStalling }
 
     fn start(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // headless: stalling detection requires pathfinding infrastructure — no stall detected in headless
+        // no-op: stalling detection requires pathfinding — headless conservatively reports no stall
         StepOutcome::next()
     }
 

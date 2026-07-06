@@ -98,7 +98,7 @@ impl StepPassBlock {
                 }
             } else if self.end_player_action {
                 // Player finished — switch to next pass blocker or end
-                // headless: sequence generator integration — PassBlock move/select sequences not ported
+                // no-op: PassBlock move/select sequences not ported — headless skips PassBlock sequence dispatch
                 self.end_player_action = false;
             }
 

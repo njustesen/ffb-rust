@@ -19,7 +19,7 @@ use ffb_mechanics::modifiers::pickup_context::PickupContext;
 /// Init params: GOTO_LABEL_ON_FAILURE (mandatory), THROWN_PLAYER_ID (optional).
 /// Sets: CATCH_SCATTER_THROW_IN_MODE, FEEDING_ALLOWED, END_TURN, END_PLAYER_ACTION.
 ///
-/// headless: CLIENT_PICK_UP_CHOICE (Trickster optional path) — client-only dialog
+/// client-only: CLIENT_PICK_UP_CHOICE (Trickster optional path) — dialog is client-side; headless skips.
 pub struct StepPickUp {
     /// Java: fGotoLabelOnFailure
     pub goto_label_on_failure: String,

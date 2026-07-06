@@ -53,7 +53,7 @@ impl StallingExtension {
             return false;
         }
         // Guard 4: open path to end-zone.
-        // headless: PathFinderWithPassBlockSupport not yet translated; conservatively returns false
+        // no-op: PathFinderWithPassBlockSupport not ported; headless conservatively returns false (no open path detected)
         false
     }
 
@@ -86,7 +86,7 @@ impl StallingExtension {
             game.game_result.away.stalled = true;
         }
 
-        // headless: apply InjuryTypeThrowARockStalling injury — client-only: animation
+        // no-op: InjuryTypeThrowARockStalling injury — unreachable in headless (stalling detection disabled; Guard 4 requires pathfinder not ported)
         ffb_model::events::GameEvent::ThrowAtStallingPlayer {
             player_id: player_id.to_string(),
             roll,

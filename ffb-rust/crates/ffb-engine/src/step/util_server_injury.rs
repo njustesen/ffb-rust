@@ -77,6 +77,8 @@ pub fn handle_injury(
         injury_context: injury_type.injury_context().clone(),
         knocked_out,
         rip,
+        already_reported: false,
+        pre_regeneration: true,
     }
 }
 
@@ -332,7 +334,7 @@ pub fn stun_player(game: &mut Game, player_id: &str) {
 /// Port of `UtilServerInjury.handleInjurySideEffects(IStep, InjuryResult)`.
 ///
 /// Called after injury resolution is finalised (apothecary done or declined).
-/// 1. `handleRaiseDead` — headless: InjuryMechanic.canRaiseDead + player creation not ported; no-op.
+/// 1. `handleRaiseDead` — no-op: InjuryMechanic.canRaiseDead + player creation not ported.
 /// 2. `mechanic.handlePumpUp` — grant extra re-roll if attacker has PumpUpTheCrowd skill.
 ///    Emits `GameEvent::PumpUpTheCrowdReRoll` when a re-roll is granted.
 ///
@@ -345,7 +347,7 @@ pub fn handle_injury_side_effects(
     use ffb_model::events::GameEvent;
     use crate::mechanic::state_mechanic::StateMechanic as StateMechanicTrait;
 
-    // headless: handleRaiseDead — requires InjuryMechanic.canRaiseDead + player creation not ported
+    // no-op: handleRaiseDead — InjuryMechanic.canRaiseDead + player creation not ported
 
     // Java: mechanic.handlePumpUp(pStep, pInjuryResult) — dispatch on edition
     let injury_context = injury_result.injury_context();

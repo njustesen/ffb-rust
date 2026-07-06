@@ -88,8 +88,7 @@ impl InjuryResult {
     /// Also updates PlayerResult (secret weapon flag, serious injury, send-to-box) and
     /// TeamResult injury counters, and awards the attacker a casualty SPP count.
     ///
-    /// headless: BloodSpot (client-only visual), UtilServerGame.checkForWastedSkills (report system),
-    ///   PassState.originalBombardier bomb team check.
+    /// client-only: BloodSpot — visual effect, not ported.
     pub fn apply_to(&self, game: &mut Game) {
         let ctx = &self.injury_context;
         let defender_id = match ctx.defender_id.as_deref() {
@@ -132,10 +131,23 @@ impl InjuryResult {
             game.field_model.set_player_state(&defender_id, existing.change_base(new_state.base()));
         }
 
-        // STUNNED on the acting team → deactivate.
-        if new_state.base() == PS_STUNNED && game.is_active_team_player(&defender_id) {
-            let state = game.field_model.player_state(&defender_id).unwrap_or(new_state);
-            game.field_model.set_player_state(&defender_id, state.change_active(false));
+        // Java: STUNNED → deactivate if on acting team OR on the bombardier's team (bomb hits friendlies).
+        if new_state.base() == PS_STUNNED {
+            let (home_bomb, away_bomb) = if let Some(ref orig_id) = game.original_bombardier.clone() {
+                let bombardier_is_home = game.team_home.player(orig_id).is_some();
+                (bombardier_is_home, !bombardier_is_home)
+            } else {
+                (false, false)
+            };
+            let should_deactivate = if defender_is_home {
+                game.home_playing || home_bomb
+            } else {
+                !game.home_playing || away_bomb
+            };
+            if should_deactivate {
+                let state = game.field_model.player_state(&defender_id).unwrap_or(new_state);
+                game.field_model.set_player_state(&defender_id, state.change_active(false));
+            }
         }
 
         // KO / casualty / reserve → put into dugout box.
@@ -144,7 +156,7 @@ impl InjuryResult {
         if base == PS_KNOCKED_OUT || final_state.is_casualty() || base == PS_RESERVE {
             UtilBox::put_player_into_box(game, &defender_id);
             UtilServerGame::update_player_state_dependent_properties(game);
-            // headless: UtilServerGame.checkForWastedSkills — report system not yet ported
+            UtilServerGame::check_for_wasted_skills(game, &defender_id);
         }
 
         // Java: death is also a serious injury — update PlayerResult serious injury.
@@ -217,10 +229,17 @@ impl InjuryResult {
     }
 
     /// Java: `InjuryResult.report(IStep)` — delegates to `StateMechanic.reportInjury`.
-    ///
-    /// headless: reportInjury requires SkipInjuryParts + ReportInjury infrastructure.
-    pub fn report(&self, _game: &mut Game) {
-        // headless: implement when StateMechanic.report_injury is un-deferred
+    /// Note: step code uses `crate::injury::InjuryResult.report()` directly; this
+    /// variant is kept for tests and legacy callers.
+    pub fn report(&mut self, game: &mut Game) {
+        // Translate to the canonical InjuryResult used by the trait, emit, then sync back.
+        let mut canonical = crate::injury::InjuryResult::new(self.injury_context.apothecary_mode);
+        canonical.injury_context = self.injury_context.clone();
+        canonical.already_reported = self.already_reported;
+        canonical.pre_regeneration = self.pre_regeneration;
+        let mechanic = crate::mechanic::state_mechanic_for(game.rules);
+        mechanic.report_injury(game, &mut canonical);
+        self.already_reported = canonical.already_reported;
     }
 
     /// Java: `InjuryResult.handleIgnoringArmourBreaks(IStep, Player, Game)`.
@@ -228,8 +247,8 @@ impl InjuryResult {
     /// If armour was broken AND the defender has `ignoreFirstArmourBreak`:
     /// resets `armor_broken`, sets injury to PRONE, and returns `true`.
     ///
-    /// headless: card deactivation (UtilServerCards.deactivateCard) — card infra not ported.
-    pub fn handle_ignoring_armour_breaks(&mut self, game: &Game) -> bool {
+    /// Deactivates the Force Shield (or equivalent) card via UtilServerCards::deactivate_card_for_player.
+    pub fn handle_ignoring_armour_breaks(&mut self, game: &mut Game) -> bool {
         if !self.injury_context.armor_broken {
             return false;
         }
@@ -244,7 +263,11 @@ impl InjuryResult {
         if has_property {
             self.injury_context.armor_broken = false;
             self.injury_context.injury = Some(PlayerState::new(PS_PRONE));
-            // headless: UtilServerCards.deactivateCard — requires card infra
+            // Java: UtilServerCards.deactivateCard(gameState, player) — deactivate Force Shield
+            if let Some(defender_id) = self.injury_context.defender_id.clone() {
+                use crate::util::util_server_cards::UtilServerCards;
+                UtilServerCards::deactivate_card_for_player(game, &defender_id);
+            }
             return true;
         }
         false
@@ -254,7 +277,7 @@ impl InjuryResult {
     ///
     /// If a modified injury context exists (set by apothecary), replaces the current
     /// context with it, clears `already_reported`, and handles `ignoreFirstArmourBreak`.
-    pub fn swap_to_alternate_context(&mut self, game: &Game) {
+    pub fn swap_to_alternate_context(&mut self, game: &mut Game) {
         if self.injury_context.modified_injury_context.is_none() {
             return;
         }
@@ -415,49 +438,49 @@ mod tests {
 
     #[test]
     fn handle_ignoring_armour_breaks_returns_false_when_not_broken() {
-        let game = make_game();
+        let mut game = make_game();
         let mut ir = InjuryResult::new();
         ir.injury_context.armor_broken = false;
         ir.injury_context.armor_roll = Some([3, 4]);
-        assert!(!ir.handle_ignoring_armour_breaks(&game));
+        assert!(!ir.handle_ignoring_armour_breaks(&mut game));
     }
 
     #[test]
     fn handle_ignoring_armour_breaks_returns_false_when_no_armor_roll() {
-        let game = make_game();
+        let mut game = make_game();
         let mut ir = InjuryResult::new();
         ir.injury_context.armor_broken = true;
         ir.injury_context.armor_roll = None;
-        assert!(!ir.handle_ignoring_armour_breaks(&game));
+        assert!(!ir.handle_ignoring_armour_breaks(&mut game));
     }
 
     #[test]
     fn handle_ignoring_armour_breaks_returns_false_when_no_property() {
-        let game = make_game();
+        let mut game = make_game();
         let mut ir = InjuryResult::new();
         ir.injury_context.armor_broken = true;
         ir.injury_context.armor_roll = Some([3, 4]);
         ir.injury_context.defender_id = Some("p1".into());
         // p1 not in game / no skill → returns false
-        assert!(!ir.handle_ignoring_armour_breaks(&game));
+        assert!(!ir.handle_ignoring_armour_breaks(&mut game));
     }
 
     // ── swap_to_alternate_context tests ──────────────────────────────────────
 
     #[test]
     fn swap_to_alternate_context_no_modified_is_noop() {
-        let game = make_game();
+        let mut game = make_game();
         let mut ir = InjuryResult::new();
         ir.injury_context.defender_id = Some("p1".into());
         ir.already_reported = true;
-        ir.swap_to_alternate_context(&game);
+        ir.swap_to_alternate_context(&mut game);
         // nothing changed
         assert!(ir.already_reported);
     }
 
     #[test]
     fn swap_to_alternate_context_swaps_and_resets_reported() {
-        let game = make_game();
+        let mut game = make_game();
         let mut ir = InjuryResult::new();
         ir.already_reported = true;
 
@@ -466,7 +489,7 @@ mod tests {
         modified.injury = Some(PlayerState::new(PS_BADLY_HURT));
         ir.injury_context.modified_injury_context = Some(Box::new(modified));
 
-        ir.swap_to_alternate_context(&game);
+        ir.swap_to_alternate_context(&mut game);
 
         assert!(!ir.already_reported);
         assert_eq!(ir.injury_context.injury.unwrap().base(), PS_BADLY_HURT);
@@ -474,10 +497,12 @@ mod tests {
     }
 
     #[test]
-    fn report_does_not_panic() {
+    fn report_emits_injury_report() {
         let mut game = make_game();
-        let ir = InjuryResult::new();
+        let mut ir = InjuryResult::new();
         ir.report(&mut game);
+        assert!(ir.is_already_reported());
+        assert!(game.report_list.has_report(ffb_model::report::ReportId::INJURY));
     }
 
     // ── PlayerResult / TeamResult wiring tests ───────────────────────────────
@@ -598,5 +623,160 @@ mod tests {
         // No casualties on attacker
         assert!(game.game_result.home.player_results.get("h1").is_none()
             || game.game_result.home.player_results["h1"].casualties == 0);
+    }
+
+    // ── bomb team deactivation tests ─────────────────────────────────────────
+
+    fn active_standing() -> PlayerState {
+        PlayerState::new(PS_STANDING).change_active(true)
+    }
+
+    // Normal (non-bomb) STUNNED: active team player → deactivated.
+    #[test]
+    fn stunned_active_team_player_deactivated_no_bomb() {
+        let mut game = make_game();
+        game.home_playing = true;
+        add_player_to_game(&mut game, "home", "h1");
+        game.field_model.set_player_coordinate("h1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("h1", active_standing());
+
+        let mut ir = InjuryResult::new();
+        ir.injury_context.defender_id = Some("h1".into());
+        ir.injury_context.injury = Some(PlayerState::new(PS_STUNNED));
+        ir.apply_to(&mut game);
+
+        // h1 is on home team, home is playing → deactivated
+        let state = game.field_model.player_state("h1").unwrap();
+        assert_eq!(state.base(), PS_STUNNED);
+        assert!(!state.is_active());
+    }
+
+    // Normal (non-bomb) STUNNED: inactive team player → NOT deactivated.
+    #[test]
+    fn stunned_inactive_team_player_not_deactivated_no_bomb() {
+        let mut game = make_game();
+        game.home_playing = true;
+        add_player_to_game(&mut game, "away", "a1");
+        game.field_model.set_player_coordinate("a1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("a1", active_standing());
+
+        let mut ir = InjuryResult::new();
+        ir.injury_context.defender_id = Some("a1".into());
+        ir.injury_context.injury = Some(PlayerState::new(PS_STUNNED));
+        ir.apply_to(&mut game);
+
+        // a1 is on away team, home is playing → a1 is inactive team → active bit preserved
+        let state = game.field_model.player_state("a1").unwrap();
+        assert_eq!(state.base(), PS_STUNNED);
+        assert!(state.is_active());
+    }
+
+    // Bomb: home bombardier stuns home player during away turn → deactivated (homeBomb).
+    #[test]
+    fn bomb_stuns_friendly_player_deactivated_when_bombardier_same_team() {
+        let mut game = make_game();
+        game.home_playing = false; // away's turn
+        add_player_to_game(&mut game, "home", "bombardier");
+        add_player_to_game(&mut game, "home", "friendly");
+        game.field_model.set_player_coordinate("friendly", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("friendly", active_standing());
+        game.original_bombardier = Some("bombardier".into()); // home bombardier
+
+        let mut ir = InjuryResult::new();
+        ir.injury_context.defender_id = Some("friendly".into());
+        ir.injury_context.injury = Some(PlayerState::new(PS_STUNNED));
+        ir.apply_to(&mut game);
+
+        // friendly is home team, bombardier is home → homeBomb=true → deactivated even on away turn
+        let state = game.field_model.player_state("friendly").unwrap();
+        assert_eq!(state.base(), PS_STUNNED);
+        assert!(!state.is_active());
+    }
+
+    // Bomb: home bombardier stuns away player during away turn → deactivated by active-team rule.
+    #[test]
+    fn bomb_stuns_enemy_player_deactivated_by_active_team_rule() {
+        let mut game = make_game();
+        game.home_playing = false; // away's turn — away is active
+        add_player_to_game(&mut game, "home", "bombardier");
+        add_player_to_game(&mut game, "away", "enemy");
+        game.field_model.set_player_coordinate("enemy", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("enemy", active_standing());
+        game.original_bombardier = Some("bombardier".into()); // home bombardier
+
+        let mut ir = InjuryResult::new();
+        ir.injury_context.defender_id = Some("enemy".into());
+        ir.injury_context.injury = Some(PlayerState::new(PS_STUNNED));
+        ir.apply_to(&mut game);
+
+        // enemy is away team (active on away's turn) → normal deactivation applies
+        let state = game.field_model.player_state("enemy").unwrap();
+        assert_eq!(state.base(), PS_STUNNED);
+        assert!(!state.is_active());
+    }
+
+    // Bomb: away bombardier stuns away player during home turn → deactivated (awayBomb).
+    #[test]
+    fn bomb_stuns_away_friendly_during_home_turn_deactivated() {
+        let mut game = make_game();
+        game.home_playing = true; // home's turn
+        add_player_to_game(&mut game, "away", "bombardier");
+        add_player_to_game(&mut game, "away", "friendly");
+        game.field_model.set_player_coordinate("friendly", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("friendly", active_standing());
+        game.original_bombardier = Some("bombardier".into()); // away bombardier
+
+        let mut ir = InjuryResult::new();
+        ir.injury_context.defender_id = Some("friendly".into());
+        ir.injury_context.injury = Some(PlayerState::new(PS_STUNNED));
+        ir.apply_to(&mut game);
+
+        // friendly is away, bombardier is away → awayBomb=true → deactivated even on home's turn
+        let state = game.field_model.player_state("friendly").unwrap();
+        assert_eq!(state.base(), PS_STUNNED);
+        assert!(!state.is_active());
+    }
+
+    // Bomb: away bombardier stuns home player during home turn → deactivated by active-team rule.
+    #[test]
+    fn bomb_stuns_home_player_during_home_turn_deactivated_by_active_rule() {
+        let mut game = make_game();
+        game.home_playing = true; // home's turn
+        add_player_to_game(&mut game, "away", "bombardier");
+        add_player_to_game(&mut game, "home", "target");
+        game.field_model.set_player_coordinate("target", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("target", active_standing());
+        game.original_bombardier = Some("bombardier".into()); // away bombardier
+
+        let mut ir = InjuryResult::new();
+        ir.injury_context.defender_id = Some("target".into());
+        ir.injury_context.injury = Some(PlayerState::new(PS_STUNNED));
+        ir.apply_to(&mut game);
+
+        // target is home (active on home's turn) → deactivated by active-team rule
+        let state = game.field_model.player_state("target").unwrap();
+        assert_eq!(state.base(), PS_STUNNED);
+        assert!(!state.is_active());
+    }
+
+    // No bomb: away player stunned while away is inactive → active bit preserved.
+    #[test]
+    fn no_bomb_away_player_stunned_inactive_turn_stays_active() {
+        let mut game = make_game();
+        game.home_playing = false; // away's turn — away is ACTIVE
+        // Test: home player on away's turn → home is inactive → stays active
+        add_player_to_game(&mut game, "home", "h1");
+        game.field_model.set_player_coordinate("h1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("h1", active_standing());
+
+        let mut ir = InjuryResult::new();
+        ir.injury_context.defender_id = Some("h1".into());
+        ir.injury_context.injury = Some(PlayerState::new(PS_STUNNED));
+        ir.apply_to(&mut game);
+
+        // h1 is home, away is playing → h1 is inactive team → active bit preserved
+        let state = game.field_model.player_state("h1").unwrap();
+        assert_eq!(state.base(), PS_STUNNED);
+        assert!(state.is_active());
     }
 }

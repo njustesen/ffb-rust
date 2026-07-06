@@ -175,7 +175,7 @@ mod tests {
         ctx.armor_roll = armor_roll;
         ctx.armor_broken = armor_broken;
         ctx.injury_roll = injury_roll;
-        Box::new(InjuryResult { injury_context: ctx, knocked_out: false, rip: false })
+        Box::new(InjuryResult { injury_context: ctx, knocked_out: false, rip: false, already_reported: false, pre_regeneration: true })
     }
 
     fn make_game_with_player(skills: Vec<SkillId>) -> (Game, String) {

@@ -113,6 +113,31 @@ impl PrayerHandlerFactory {
 
     pub fn len(&self) -> usize { self.handlers.len() }
     pub fn is_empty(&self) -> bool { self.handlers.is_empty() }
+
+    /// Java: PrayerHandlerFactory.deactivatePrayers(GameState, isHomeTurnEnding).
+    /// Calls remove_effect() on each active prayer for the given team.
+    pub fn deactivate_prayers(game: &mut ffb_model::model::game::Game, is_home: bool) {
+        let team_id = if is_home {
+            game.team_home.id.clone()
+        } else {
+            game.team_away.id.clone()
+        };
+        let prayer_names: Vec<String> = if is_home {
+            game.turn_data_home.inducement_set.get_prayers().iter().map(|s| s.to_string()).collect()
+        } else {
+            game.turn_data_away.inducement_set.get_prayers().iter().map(|s| s.to_string()).collect()
+        };
+        let mut factory = PrayerHandlerFactory::new();
+        factory.initialize(game.rules);
+        for prayer_name in prayer_names {
+            // std::mem::take extracts prayer_state to avoid double-borrow of game
+            let mut prayer_state = std::mem::take(&mut game.prayer_state);
+            if let Some(handler) = factory.for_prayer(&prayer_name) {
+                handler.remove_effect(&mut prayer_state, game, &team_id);
+            }
+            game.prayer_state = prayer_state;
+        }
+    }
 }
 
 impl Default for PrayerHandlerFactory {
@@ -192,5 +217,33 @@ mod tests {
         let mut f = PrayerHandlerFactory::new();
         f.initialize(Rules::Bb2025);
         f.initialize(Rules::Bb2020);
+    }
+
+    #[test]
+    fn deactivate_prayers_removes_fan_interaction_effect() {
+        use crate::step::framework::test_team;
+        use ffb_model::model::game::Game;
+        let home = test_team("home", 0);
+        let away = test_team("away", 0);
+        let mut game = Game::new(home, away, Rules::Bb2020);
+        // Add FAN_INTERACTION prayer to home team inducement set
+        game.turn_data_home.inducement_set.add_prayer("FAN_INTERACTION");
+        // Set the prayer effect in prayer_state
+        game.prayer_state.add_fan_interaction("home");
+        assert!(game.prayer_state.has_fan_interaction("home"));
+        // Deactivate prayers for home team
+        PrayerHandlerFactory::deactivate_prayers(&mut game, true);
+        assert!(!game.prayer_state.has_fan_interaction("home"));
+    }
+
+    #[test]
+    fn deactivate_prayers_no_op_if_no_prayers() {
+        use crate::step::framework::test_team;
+        use ffb_model::model::game::Game;
+        let home = test_team("home", 0);
+        let away = test_team("away", 0);
+        let mut game = Game::new(home, away, Rules::Bb2020);
+        // No prayers registered; must not panic
+        PrayerHandlerFactory::deactivate_prayers(&mut game, true);
     }
 }

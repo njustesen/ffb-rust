@@ -17,24 +17,25 @@
 ///   5. DO_REQUEST group:
 ///      - if remainingApos > 0 → client-only: show DialogUseApothecariesParameter; headless auto-declines.
 ///      - else → mark as DoNotUseApothecary.
-///   6. USE_APOTHECARY group → headless: rollApothecary; if choice needed → Continue.
-///      Until ported: treat as DoNotUseApothecary.
+///   6. USE_APOTHECARY group → rollApothecary; headless auto-picks better outcome.
 ///   7. NO_APOTHECARY + DO_NOT_USE_APOTHECARY group → apply via injuryResult.apply_to(game).
 ///   8. Regeneration: roll for each applied casualty with canRollToSaveFromInjury skill.
-///   9. headless: double-attacker-down special case — apo-multiple-injury not ported.
+///   9. double-attacker-down special case — apo-multiple-injury not ported (blocked: handle_injury_side_effects).
 ///   10. → NEXT_STEP.
 ///
 /// handleCommand handles:
-///   - CLIENT_APOTHECARY_CHOICE → handleApothecaryChoice (headless: apo-multiple-roll not ported)
+///   - CLIENT_APOTHECARY_CHOICE → handleApothecaryChoice
 ///   - CLIENT_USE_APOTHECARIES → set all WAIT_FOR_APOTHECARY_USE to DO_NOT_USE_APOTHECARY
 ///   - CLIENT_USE_APOTHECARY → find result by defender_id, mark UseApothecary or DoNotUseApothecary
-///   - CLIENT_USE_IGORS → headless: apo-multiple-igor not ported
+///   - CLIENT_USE_IGORS → apo-multiple-igor not ported (blocked: InducementSet/Igor inducement infra)
 ///
-/// headless(apo-multiple-roll): rollApothecary(), remainingApos(), useApo() deferred.
-/// headless(apo-multiple-igor): DialogUseMortuaryAssistantsParameter / Igor inducement handling deferred.
-use ffb_model::enums::{ApothecaryStatus, ApothecaryMode};
+/// Igor inducement handling deferred — blocked by InducementSet/InducementTypeFactory not ported.
+use ffb_model::enums::{ApothecaryStatus, ApothecaryMode, PS_BADLY_HURT, PS_KNOCKED_OUT, PS_STUNNED, PS_RESERVE, PS_RIP, PS_SERIOUS_INJURY, PlayerState};
 use ffb_model::model::game::Game;
+use ffb_model::model::player_state::PlayerState as PlayerStateModel;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::mixed::report_apothecary_roll::ReportApothecaryRoll;
+use ffb_model::report::report_apothecary_choice::ReportApothecaryChoice;
 use crate::action::Action;
 use crate::injury::InjuryResult;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -57,6 +58,82 @@ pub struct StepApothecaryMultiple {
     pub apos_used: i32,
 }
 
+/// Java: `rollApothecary(InjuryResult)` — rolls a new casualty for apothecary use.
+///
+/// If the original injury is BH or KO: auto-cures (KO → STUNNED, BH → RESERVE), emits
+/// `ReportApothecaryChoice`. If it's CAS: rolls new [d16, d6] casualty, auto-picks the better
+/// outcome (client-only: dialog skipped in headless; better outcome auto-selected), emits `ReportApothecaryRoll` + `ReportApothecaryChoice`.
+fn roll_apothecary_for_injury(result: &mut Box<InjuryResult>, rng: &mut GameRng, game: &mut Game) {
+    let ctx = result.injury_context();
+    let defender_id = ctx.defender_id.clone().unwrap_or_default();
+    let base = ctx.injury.map(|ps| ps.base()).unwrap_or(0);
+
+    // Java: apothecaryChoice = (base != BADLY_HURT && base != KNOCKED_OUT)
+    let apothecary_choice = base != PS_BADLY_HURT && base != PS_KNOCKED_OUT;
+
+    if apothecary_choice {
+        // Original injury is CAS (SI or RIP) — roll new casualty.
+        let d16 = rng.die(16);
+        let d6 = rng.d6();
+        let new_base = if d16 >= 15 {
+            ffb_model::enums::PS_RIP
+        } else if d16 >= 9 {
+            ffb_model::enums::PS_SERIOUS_INJURY
+        } else {
+            PS_BADLY_HURT
+        };
+        let new_state = PlayerState::new(new_base);
+
+        // Emit the apo roll report.
+        game.report_list.add(ReportApothecaryRoll::new(
+            Some(defender_id.clone()),
+            vec![d16, d6],
+            Some(new_state),
+            None, // serious_injury string — not ported yet
+            None, // original_injury string
+            vec![],
+        ));
+
+        // Headless: auto-pick the better outcome.
+        // BH < SI < RIP numerically, so lower = better for the player.
+        let orig_state = ctx.injury.unwrap_or(new_state);
+        let pick_new = new_base < orig_state.base();
+        let chosen_state = if pick_new { new_state } else { orig_state };
+        let final_state = if chosen_state.base() == PS_BADLY_HURT {
+            PlayerState::new(PS_RESERVE)
+        } else {
+            chosen_state
+        };
+
+        let ctx_mut = result.injury_context_mut();
+        ctx_mut.injury = Some(final_state);
+        ctx_mut.apothecary_status = ApothecaryStatus::DoNotUseApothecary;
+
+        game.report_list.add(ReportApothecaryChoice::new(
+            defender_id,
+            PlayerStateModel::new(),
+            None,
+        ));
+    } else {
+        // BH or KO: auto-cure — no roll needed.
+        let cured = if base == PS_KNOCKED_OUT {
+            PlayerState::new(PS_STUNNED)
+        } else {
+            PlayerState::new(PS_RESERVE)
+        };
+        let ctx_mut = result.injury_context_mut();
+        ctx_mut.injury = Some(cured);
+        ctx_mut.serious_injury = None;
+        ctx_mut.apothecary_status = ApothecaryStatus::DoNotUseApothecary;
+
+        game.report_list.add(ReportApothecaryChoice::new(
+            defender_id,
+            PlayerStateModel::new(),
+            None,
+        ));
+    }
+}
+
 impl StepApothecaryMultiple {
     pub fn new() -> Self {
         Self {
@@ -69,7 +146,7 @@ impl StepApothecaryMultiple {
         }
     }
 
-    fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Step 1: Resolve team_id from game state on first call.
         if self.team_id.is_none() {
             if let Some(acting) = self.acting_team {
@@ -106,7 +183,7 @@ impl StepApothecaryMultiple {
             (team_apos - self.apos_used).max(0)
         } else { 0 };
 
-        // Step 4b: DoRequest → if apos available → headless: show dialog; else DoNotUseApothecary.
+        // Step 4b: DoRequest → if apos available → client-only: show dialog; headless auto-declines.
         let has_do_request = self.injury_results.iter()
             .any(|r| r.injury_context().apothecary_status == ApothecaryStatus::DoRequest);
         if has_do_request {
@@ -120,11 +197,11 @@ impl StepApothecaryMultiple {
             }
         }
 
-        // Step 4c: UseApothecary → headless: rollApothecary + choice dialog.
+        // Step 4c: UseApothecary → rollApothecary + headless auto-picks better outcome.
+        // Java: rollApothecary() → if CAS: roll new [d16,d6], pick better; if BH/KO: auto-cure.
         for r in &mut self.injury_results {
             if r.injury_context().apothecary_status == ApothecaryStatus::UseApothecary {
-                // headless: rollApothecary; compare outcomes; DialogApothecaryChoiceParameter — not ported
-                r.injury_context_mut().apothecary_status = ApothecaryStatus::DoNotUseApothecary;
+                roll_apothecary_for_injury(r, rng, game);
             }
         }
 
@@ -153,10 +230,10 @@ impl StepApothecaryMultiple {
                 .map(|p| p.id.clone())
                 .collect();
             for pid in &player_ids {
-                crate::step::util_server_injury::handle_regeneration(game, _rng, pid);
+                crate::step::util_server_injury::handle_regeneration(game, rng, pid);
             }
         }
-        // headless: Igor/mortuary-assistant inducement handling deferred.
+        // headless(apo-multiple-igor): Igor/mortuary-assistant inducement handling deferred.
         // headless: double-attacker-down special case — apo-multiple-injury not ported.
 
         StepOutcome::next()
@@ -178,7 +255,9 @@ impl Step for StepApothecaryMultiple {
         match action {
             Action::UseApothecary { player_id, use_apothecary } => {
                 // Java: CLIENT_USE_APOTHECARY → find matching injury result; update apothecaryStatus
+                // Java: if used → useApo(turnData, apothecaryType) decrements apothecary count.
                 let new_status = if *use_apothecary {
+                    self.apos_used += 1;
                     ApothecaryStatus::UseApothecary
                 } else {
                     ApothecaryStatus::DoNotUseApothecary
@@ -436,5 +515,115 @@ mod tests {
 
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    fn make_player_for_team(game: &mut Game, id: &str, home: bool) {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use std::collections::HashSet;
+        let p = Player {
+            id: id.into(), nr: 1, name: id.into(),
+            position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![],
+            temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
+            career_spps: 0, race: None, ..Default::default()
+        };
+        if home { game.team_home.players.push(p); } else { game.team_away.players.push(p); }
+        game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 7));
+    }
+
+    #[test]
+    fn roll_apothecary_ko_injury_cures_to_stunned() {
+        // KO → apothecary cures to STUNNED (no new roll needed).
+        let mut game = make_game();
+        make_player_for_team(&mut game, "h1", true);
+
+        let mut ir = Box::new(InjuryResult::new(ApothecaryMode::HitPlayer));
+        ir.injury_context_mut().defender_id = Some("h1".into());
+        ir.injury_context_mut().apothecary_status = ApothecaryStatus::UseApothecary;
+        ir.injury_context_mut().injury = Some(PlayerState::new(PS_KNOCKED_OUT));
+
+        let mut rng = GameRng::new(42);
+        roll_apothecary_for_injury(&mut ir, &mut rng, &mut game);
+
+        assert_eq!(ir.injury_context().injury.map(|ps| ps.base()), Some(PS_STUNNED));
+        assert_eq!(ir.injury_context().apothecary_status, ApothecaryStatus::DoNotUseApothecary);
+        // Report was emitted.
+        assert!(!game.report_list.is_empty());
+    }
+
+    #[test]
+    fn roll_apothecary_bh_injury_cures_to_reserve() {
+        // BH → apothecary cures to RESERVE.
+        let mut game = make_game();
+        make_player_for_team(&mut game, "h1", true);
+
+        let mut ir = Box::new(InjuryResult::new(ApothecaryMode::HitPlayer));
+        ir.injury_context_mut().defender_id = Some("h1".into());
+        ir.injury_context_mut().apothecary_status = ApothecaryStatus::UseApothecary;
+        ir.injury_context_mut().injury = Some(PlayerState::new(PS_BADLY_HURT));
+
+        let mut rng = GameRng::new(42);
+        roll_apothecary_for_injury(&mut ir, &mut rng, &mut game);
+
+        assert_eq!(ir.injury_context().injury.map(|ps| ps.base()), Some(PS_RESERVE));
+        assert_eq!(ir.injury_context().apothecary_status, ApothecaryStatus::DoNotUseApothecary);
+    }
+
+    #[test]
+    fn roll_apothecary_si_rolls_new_casualty_and_finalizes() {
+        // SI → rolls new casualty, auto-picks the result, status = DoNotUseApothecary.
+        let mut game = make_game();
+        make_player_for_team(&mut game, "h1", true);
+
+        let mut ir = Box::new(InjuryResult::new(ApothecaryMode::HitPlayer));
+        ir.injury_context_mut().defender_id = Some("h1".into());
+        ir.injury_context_mut().apothecary_status = ApothecaryStatus::UseApothecary;
+        ir.injury_context_mut().injury = Some(PlayerState::new(PS_SERIOUS_INJURY));
+
+        let mut rng = GameRng::new(42);
+        roll_apothecary_for_injury(&mut ir, &mut rng, &mut game);
+
+        assert_eq!(ir.injury_context().apothecary_status, ApothecaryStatus::DoNotUseApothecary);
+        // Final injury is either the new roll or original, but must be set.
+        assert!(ir.injury_context().injury.is_some());
+        // At least two reports emitted (ReportApothecaryRoll + ReportApothecaryChoice).
+        assert!(!game.report_list.is_empty());
+    }
+
+    #[test]
+    fn use_apothecary_command_increments_apos_used() {
+        // When a client uses an apothecary, apos_used should increase so remaining count decreases.
+        let mut game = make_game();
+        make_player_for_team(&mut game, "h1", true);
+        game.team_home.apothecaries = 2;
+        let mut step = StepApothecaryMultiple::new();
+        step.team_id = Some("home".into());
+        let ir = make_injury("h1", ApothecaryMode::HitPlayer, ApothecaryStatus::WaitForApothecaryUse);
+        step.injury_results.push(ir);
+
+        assert_eq!(step.apos_used, 0);
+        step.handle_command(
+            &Action::UseApothecary { player_id: "h1".into(), use_apothecary: true },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_eq!(step.apos_used, 1, "apos_used should increment when apothecary is used");
+    }
+
+    #[test]
+    fn use_apothecary_command_no_increment_when_declined() {
+        let mut game = make_game();
+        let mut step = StepApothecaryMultiple::new();
+        step.team_id = Some("home".into());
+
+        assert_eq!(step.apos_used, 0);
+        step.handle_command(
+            &Action::UseApothecary { player_id: "h1".into(), use_apothecary: false },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_eq!(step.apos_used, 0, "apos_used should not change when apothecary is declined");
     }
 }

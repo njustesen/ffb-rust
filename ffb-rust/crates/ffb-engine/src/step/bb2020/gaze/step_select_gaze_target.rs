@@ -6,7 +6,7 @@
 ///
 /// headless items:
 ///  - client-only: DialogSelectGazeTargetParameter / DialogConfirmEndActionParameter
-///  - headless: stack clear before EndPlayerAction — driver handles stack management at sequence boundary.
+///  - no-op: stack clear before EndPlayerAction — driver handles stack management at sequence boundary.
 ///  - SkillUse GameEvent wired for GAIN_FRENZY_FOR_BLITZ path.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2020.gaze.StepSelectGazeTarget`.
@@ -171,11 +171,11 @@ impl StepSelectGazeTarget {
         // Java: result.setNextAction(StepAction.CONTINUE)  (default)
 
         // Case 1: end player action or end turn triggered
-        // Java: game.setTurnMode(game.getLastTurnMode()); clear stack; push EndPlayerAction; NEXT_STEP
+        // Java: game.setTurnMode(game.getLastTurnMode()); clearStepStack(); push EndPlayerAction; NEXT_STEP
+        // Headless: clearStepStack() is skipped — the EndPlayerAction sequence is pushed on top and
+        // runs first (LIFO), then the driver continues from whatever remains on the stack.
         if self.end_player_action || self.end_turn {
             game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
-            // headless: Java clears the step stack before pushing EndPlayerAction —
-            //   driver handles stack management at sequence boundary
             let params = EndPlayerActionParams {
                 feeding_allowed: false,
                 end_player_action: true,
@@ -472,5 +472,27 @@ mod tests {
         assert!(out.events.iter().any(|e| matches!(e, GameEvent::SelectGazeTarget {
             defender_id, ..
         } if defender_id == "target")));
+    }
+
+    #[test]
+    fn end_player_action_also_pushes_sequence() {
+        let mut game = make_game();
+        let mut step = StepSelectGazeTarget::new();
+        step.end_player_action = true;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "EndPlayerAction sequence must be pushed");
+    }
+
+    #[test]
+    fn end_player_action_restores_last_turn_mode() {
+        use ffb_model::enums::TurnMode;
+        let mut game = make_game();
+        game.turn_mode = TurnMode::SelectGazeTarget;
+        game.last_turn_mode = Some(TurnMode::Regular);
+        let mut step = StepSelectGazeTarget::new();
+        step.end_turn = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.turn_mode, TurnMode::Regular);
     }
 }

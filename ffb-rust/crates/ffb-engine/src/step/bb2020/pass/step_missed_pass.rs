@@ -3,6 +3,7 @@ use ffb_model::events::GameEvent;
 use ffb_model::types::{FieldCoordinate, MoveSquare};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_scatter_ball::ReportScatterBall;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter};
@@ -224,10 +225,15 @@ impl StepMissedPass {
                 // if (HAIL_MARY_PASS && ((hasUnusedBlastIt && usingBlastIt==null) || (hasBlastIt && usingBlastIt)) && !reRolling)
                 //     → reportDirectionRoll(); showDialog; reRolling=true; fieldModel.add(MoveSquare); return
                 // client-only: Blast-It scatter re-roll dialog (DialogSkillUseParameter) — headless always falls through
-                // headless: using_blast_it stays None; ActingPlayer.used_skills wiring deferred
 
-                // Java: if (reRolling && doRoll) reportDirectionRoll()
-                // headless: ReportScatterBall (partial direction roll) — report infrastructure not translated.
+                // Java: if (reRolling && doRoll) reportDirectionRoll() — partial scatter during re-roll
+                if self.re_rolling && self.do_roll {
+                    game.report_list.add(ReportScatterBall::new(
+                        self.direction_list.clone(),
+                        self.roll_list.clone(),
+                        false,
+                    ));
+                }
 
                 // Java: rollList.add(roll); directionList.add(direction);
                 self.roll_list.push(self.roll);
@@ -242,6 +248,11 @@ impl StepMissedPass {
             }
 
             // Java: getResult().addReport(new ReportScatterBall(directions, rolls, false))
+            game.report_list.add(ReportScatterBall::new(
+                self.direction_list.clone(),
+                self.roll_list.clone(),
+                false,
+            ));
             if let Some(start) = self.coordinate_start {
                 events.push(GameEvent::ScatterBall { from: start, directions: self.roll_list.clone() });
             }

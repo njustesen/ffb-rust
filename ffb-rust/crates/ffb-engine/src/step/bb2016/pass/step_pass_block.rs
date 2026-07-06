@@ -41,7 +41,7 @@ impl StepPassBlock {
     }
 
     fn execute_step(&self, _game: &mut Game) -> StepOutcome {
-        // headless: find pass-blockers, set TurnMode.PASS_BLOCK — OnTheBallMechanic not ported
+        // no-op: OnTheBallMechanic not ported — pass-blocker detection skipped; headless conservatively skips PASS_BLOCK mode
         StepOutcome::next()
     }
 }

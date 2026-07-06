@@ -17,7 +17,7 @@ use crate::step::framework::{StepAction, StepId, StepParameter};
 ///
 /// Command dispatch (Move/Block/Foul/Pass/HandOff/ThrowTeamMate/KickTeamMate/Gaze/EndTurn) ported.
 /// CLIENT_USE_FUMBLEROOSKIE / CLIENT_USE_SKILL (canAddBlockDie) not yet ported.
-/// headless: UtilServerPlayerMove.isValidMove path validation not yet ported (agent paths trusted).
+/// no-op: UtilServerPlayerMove.isValidMove path validation not ported; agent-submitted paths are trusted.
 /// setDodging/setGoingForIt, setTurnStarted, concessionPossible, per-action TurnData flags are wired.
 pub struct StepInitMoving {
     /// Java: fGotoLabelOnEnd

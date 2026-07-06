@@ -121,7 +121,7 @@ impl StepInitInducement {
             // Java: fTouchdownOrEndOfHalf = UtilServerSteps.checkTouchdown(getGameState())
             // Java: find playable cards + useable inducements
             // Java: if any → show dialog; else → leaveStep(true)
-            // headless: UtilServerSteps.checkTouchdown + card/inducement lookup not yet ported — always leaves step
+            // client-only: checkTouchdown + card/inducement dialog lookup — headless always leaves (no inducements triggered without dialog)
             return self.leave_step(true);
         }
 
@@ -133,7 +133,7 @@ impl StepInitInducement {
 
         if self.card.is_some() {
             // Java: push Card sequence
-            // headless: Card sequence generator not yet ported — falls through to leave_step
+            // no-op: Card sequence generator (PlayCard) not ported — headless skips card play
             return self.leave_step(false);
         }
 

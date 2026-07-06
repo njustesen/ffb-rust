@@ -12,6 +12,7 @@ use crate::model::player::PlayerId;
 use crate::model::team::Team;
 use crate::model::turn_data::TurnData;
 use crate::model::prayer_state::PrayerState;
+use crate::report::report_list::ReportList;
 
 /// The complete game state — primary data structure for the headless engine.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,6 +43,9 @@ pub struct Game {
     pub thrower_id: Option<PlayerId>,
     pub thrower_action: Option<PlayerAction>,
     pub pass_coordinate: Option<FieldCoordinate>,
+    /// Java: GameState.getPassState().getOriginalBombardier() — player ID of the bombardier
+    /// who fired a bomb this turn; set by bomb-pass steps, cleared at start_turn().
+    pub original_bombardier: Option<PlayerId>,
     pub waiting_for_opponent: bool,
     pub timeout_possible: bool,
     pub timeout_enforced: bool,
@@ -75,6 +79,10 @@ pub struct Game {
     /// Java: GameState.getGame().getDialogParameter().getId() — which dialog is currently shown.
     /// Set by UtilServerDialog.showDialog(), cleared by hideDialog().
     pub dialog_id: Option<DialogId>,
+    /// Java: GameState.getReportList() — all reports emitted this turn/game.
+    /// Populated by step methods via report structs in ffb-model/src/report/.
+    #[serde(skip)]
+    pub report_list: ReportList,
 }
 
 impl Game {
@@ -103,6 +111,7 @@ impl Game {
             thrower_id: None,
             thrower_action: None,
             pass_coordinate: None,
+            original_bombardier: None,
             waiting_for_opponent: false,
             timeout_possible: false,
             timeout_enforced: false,
@@ -120,6 +129,7 @@ impl Game {
             kicking_swarmers: 0,
             active_shadowers: Vec::new(),
             dialog_id: None,
+            report_list: ReportList::new(),
         }
     }
 
@@ -242,6 +252,7 @@ impl Game {
     /// Called at the start of each team turn (end-turn, blitz turn, etc.).
     pub fn start_turn(&mut self) {
         self.pass_coordinate = None;
+        self.original_bombardier = None;
         self.acting_player.clear();
         self.turn_data_home.reset_for_turn();
         self.turn_data_away.reset_for_turn();

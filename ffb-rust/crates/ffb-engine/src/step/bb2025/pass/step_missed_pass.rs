@@ -2,6 +2,7 @@ use ffb_model::enums::{Direction, PlayerAction};
 use ffb_model::types::{FieldCoordinate, MoveSquare};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_scatter_ball::ReportScatterBall;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter};
@@ -87,7 +88,7 @@ impl Step for StepMissedPass {
         //   report ReportSkillUse(playerId, skill, doRoll, SkillUse.RE_ROLL_DIRECTION)
         //   if used → getGameState().getPassState().setUsingBlastIt(true)
         //   if neverUse → getGameState().getPassState().setUsingBlastIt(false)
-        // headless: PassState.set_using_blast_it — PassState not yet in Game struct
+        // local tracking via self.do_roll/self.re_rolling — Java PassState not needed here
         match action {
             Action::UseSkill { skill_id, use_skill } => {
                 // Blast-It answer: if used → re-roll the direction; else keep current
@@ -160,13 +161,17 @@ impl StepMissedPass {
             // if (HAIL_MARY_PASS && ((hasUnusedBlastIt && usingBlastIt==null) || (hasBlastIt && usingBlastIt)) && !reRolling)
             //     → reportDirectionRoll(); showDialog(DialogSkillUseParameter(...)); reRolling=true;
             //       fieldModel.add(MoveSquare(coordinateEnd, 0, 0)); return StepAction.CONTINUE
-            // headless: UtilCards.hasUnusedSkillWithProperty, PassState.getUsingBlastIt — not yet translated
-            // The Blast-It dialog path is reached when handle_command delivers USE_SKILL with re_rolling=false.
-            // With no skill registry, we conservatively skip the dialog (safe for non-Goblin rosters).
+            // client-only: Blast-It! dialog (UtilCards.hasUnusedSkillWithProperty, PassState.getUsingBlastIt)
+            // Headless skips the dialog; Blast-It! reroll never triggered (safe for non-Goblin rosters).
 
-            // Java: if (reRolling && doRoll) reportDirectionRoll()
-            // Java: getResult().addReport(new ReportScatterBall(new Direction[]{direction}, new int[]{roll}, false))
-            // headless: emit partial scatter report — report infrastructure not yet translated
+            // Java: if (reRolling && doRoll) reportDirectionRoll() — partial scatter during re-roll
+            if self.re_rolling && self.do_roll {
+                game.report_list.add(ReportScatterBall::new(
+                    self.direction_list.clone(),
+                    self.roll_list.clone(),
+                    false,
+                ));
+            }
 
             // Java: rollList.add(roll); directionList.add(direction);
             self.roll_list.push(self.roll);
@@ -180,7 +185,11 @@ impl StepMissedPass {
         }
 
         // Java: getResult().addReport(new ReportScatterBall(directions, rolls, false))
-        // headless: emit full scatter report — report infrastructure not yet translated
+        game.report_list.add(ReportScatterBall::new(
+            self.direction_list.clone(),
+            self.roll_list.clone(),
+            false,
+        ));
 
         // Java: game.setPassCoordinate(lastValidCoordinate)
         game.pass_coordinate = self.last_valid_coordinate;

@@ -63,7 +63,11 @@ impl StepApothecary {
         // Java: if (fInjuryResult.injuryContext().getApothecaryStatus() != null) { switch ... }
         match apo_status {
             ApothecaryStatus::DoRequest => {
-                // Java: if (fShowReport) fInjuryResult.report(this)
+                if self.show_report {
+                    if let Some(ref mut ir) = self.injury_result {
+                        ir.report(game);
+                    }
+                }
                 // Java: apothecaryTypes = ApothecaryType.forPlayer(game, defender, playerState)
                 // Java: showDialog(new DialogUseApothecaryParameter(defenderId, playerState, seriousInjury, apothecaryTypes))
                 // Java: setApothecaryStatus(WAIT_FOR_APOTHECARY_USE)
@@ -116,7 +120,11 @@ impl StepApothecary {
                 });
             }
             ApothecaryStatus::NoApothecary => {
-                // Java: if (fShowReport) fInjuryResult.report(this)
+                if self.show_report {
+                    if let Some(ref mut ir) = self.injury_result {
+                        ir.report(game);
+                    }
+                }
             }
             // WAIT_FOR_APOTHECARY_USE, WAIT_FOR_APOTHECARY_CHOICE, RESULT_CHOICE, etc. — fall through
             _ => {}
@@ -234,9 +242,12 @@ impl StepApothecary {
             let ir = self.injury_result.as_mut().unwrap();
             ir.injury_context.serious_injury = None;
             if player_state_base == PS_KNOCKED_OUT {
-                // Java: injuryType.canApoKoIntoStun() — all standard injury types return false
-                // headless: default to STUNNED (correct for all standard types)
-                ir.injury_context.set_injury(PlayerState::new(PS_STUNNED));
+                // Java: injuryType.canApoKoIntoStun() — true for most types, false for CrowdPush/TrapDoor
+                if crate::injury::can_apo_ko_into_stun(ir.injury_context.injury_type_name.as_deref()) {
+                    ir.injury_context.set_injury(PlayerState::new(PS_STUNNED));
+                } else {
+                    ir.injury_context.set_injury(PlayerState::new(PS_RESERVE));
+                }
             } else {
                 ir.injury_context.set_injury(PlayerState::new(PS_RESERVE));
             }

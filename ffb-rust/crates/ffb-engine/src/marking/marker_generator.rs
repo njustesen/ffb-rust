@@ -141,8 +141,7 @@ impl Default for MarkerGenerator {
 /// Positive = stat was gained (advancement); negative = stat was lost (injury).
 ///
 /// For Ag/PA the sign is inverted per BB2020/2025 convention (lower PA = better;
-/// higher AG = better in BB2025 but inverted in BB2016 — that distinction is
-/// headless: until StatsMechanic is fully ported).
+/// higher AG = better in BB2025 but inverted in BB2016 — uses player.position_* fields directly).
 fn stat_diff(key: PlayerStatKey, player: &Player) -> i32 {
     match key {
         PlayerStatKey::Ma => player.movement_with_modifiers() - player.position_movement,

@@ -118,14 +118,14 @@ impl StepHailMaryPass {
             self.roll = rng.d6();
         }
 
-        // headless: if usingModifyingSkill == null && modifyingSkill exists → showDialog
-        // headless: PassMechanic.evaluatePass with statBasedModifier — SkillProperty not ported
+        // client-only: if usingModifyingSkill == null && modifyingSkill exists → showDialog
+        // client-only: PassMechanic.evaluatePass with statBasedModifier (canAddStrengthToPass dialog) — headless skips
 
         let is_fumble = self.roll == 1;
         let is_accurate = self.roll >= self.minimum_roll;
 
         // client-only: Safe Pass dialog — client-side
-        // headless: if !usingSafePass → result = FUMBLE — PassState not ported
+        // client-only: Safe Pass dialog sets using_safe_pass; headless leaves it None → fumbles resolve as FUMBLE
 
         // Java: publishParameter(PASS_FUMBLE, PassResult.FUMBLE == state.result)
         // Java: if ACCURATE/SAVED_FUMBLE → NEXT_STEP

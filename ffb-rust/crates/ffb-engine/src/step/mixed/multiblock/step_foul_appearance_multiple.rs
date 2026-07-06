@@ -123,7 +123,7 @@ impl StepFoulAppearanceMultiple {
                     // Java: state.blockTargets.remove(currentTargetId); successFulRollCallback (no-op for FA)
                     self.block_targets.retain(|t| t != &target_id);
                 }
-                // Java: failedRollEffect → SoundId.EW (headless: no-op)
+                // client-only: SoundId.EW sound effect — no audio in headless engine
             }
 
             // Java: state.reRollAvailableAgainst.addAll(state.blockTargets)

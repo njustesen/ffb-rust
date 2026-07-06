@@ -3,8 +3,7 @@ use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::passing::can_intercept;
 use ffb_model::util::rng::GameRng;
-use ffb_mechanics::modifiers::bb2020::interception_modifier_collection::InterceptionModifierCollection;
-use ffb_mechanics::modifiers::interception_context::InterceptionContext;
+use ffb_mechanics::modifiers::interception_modifier_factory::InterceptionModifierFactory;
 use ffb_mechanics::pass_result::PassResult;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -113,19 +112,12 @@ impl StepIntercept {
         }
 
         // Java: BB2020 InterceptionModifierFactory.findModifiers(new InterceptionContext(...))
-        let collection = InterceptionModifierCollection::new();
+        let factory = InterceptionModifierFactory::for_rules(game.rules);
         let is_bomb = self.original_bombardier.is_some();
-        let ctx = InterceptionContext::new(game, interceptor, self.pass_result, is_bomb);
-
-        use ffb_mechanics::modifiers::modifier_type::ModifierType;
-        let applicable = collection.find_applicable(&ctx);
-        let modifier_total: i32 = applicable.iter()
-            .filter(|m| m.get_type() == ModifierType::REGULAR)
-            .map(|m| m.get_modifier())
-            .sum();
+        let mods = factory.find_applicable(game, interceptor, self.pass_result, is_bomb);
 
         // Java: AgilityMechanic.minimumRollInterception(pInterceptor, interceptionModifiers)
-        let minimum_roll = (interceptor.agility_with_modifiers() + modifier_total).max(2);
+        let minimum_roll = InterceptionModifierFactory::minimum_roll_bb2020(interceptor, &mods);
 
         roll >= minimum_roll
     }

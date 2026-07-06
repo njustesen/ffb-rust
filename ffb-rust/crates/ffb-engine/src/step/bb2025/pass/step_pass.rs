@@ -24,10 +24,9 @@ use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 /// Publishes: `PassingDistance`, `PassFumble`, `DontDropFumble`, `CatcherId`,
 ///            `CatchScatterThrowInMode`, `PassResultParam`.
 ///
-/// headless: PassModifierFactory (findModifiers) — tacklezone/disturbing-presence modifiers
-///       on the pass roll. Not yet translated; uses empty modifier list.
-/// headless: re-roll dialog, Safe Pass (dontDropFumbles) dialog — dialog infra not ported.
-/// headless: usingModifyingSkill path (canAddStrengthToPass) — SkillProperty not ported.
+/// client-only: re-roll dialog — headless uses auto-reroll via AbstractStepWithReRoll.
+/// client-only: Safe Pass (dontDropFumbles) dialog — headless auto-skips.
+/// client-only: usingModifyingSkill dialog (canAddStrengthToPass) — headless auto-declines skill use.
 pub struct StepPass {
     /// Java: goToLabelOnEnd (init param, mandatory)
     pub goto_label_on_end: String,
@@ -153,7 +152,9 @@ impl StepPass {
         // Java: set ball/bomb moving flag
         if is_bomb {
             game.field_model.bomb_moving = true;
-            // Java: if originalBombardier is not set → setOriginalBombardier(throwerId)
+            if game.original_bombardier.is_none() {
+                game.original_bombardier = game.thrower_id.clone();
+            }
         } else {
             game.field_model.ball_moving = true;
         }
@@ -245,7 +246,7 @@ impl StepPass {
             }
             PassResult::SAVED_FUMBLE => {
                 // Java: handleSafePass → usingSafePass dialog / goto goToLabelOnSavedFumble
-                // headless: Safe Pass dialog (dontDropFumbles) — client-only
+                // client-only: Safe Pass (dontDropFumbles) dialog — headless auto-skips, ball stays with thrower
                 if is_bomb {
                     game.field_model.bomb_coordinate = None;
                     game.field_model.bomb_moving = false;

@@ -447,9 +447,11 @@ impl StepCatchScatterThrowIn {
             if game.field_model.ball_in_play && game.field_model.ball_moving {
                 if has_tz {
                     let new_mode = self.catch_ball(game, rng);
-                    // Java: if result==null && deflectedPass && passState.isDeflectionSuccessful():
-                    //          passState.setInterceptionSuccessful(true)
-                    // headless: passState integration — PassState not yet in model
+                    // Java has two branches:
+                    //   1. result==null && deflectedPass && passState.isDeflectionSuccessful() → setInterceptionSuccessful(true)
+                    //      In bb2025, StepIntercept uses setInterceptionSuccessful() directly; setDeflectionSuccessful() is
+                    //      never called, so isDeflectionSuccessful() always returns false — this branch is dead code.
+                    //   2. result==FAILED_CATCH && deflectedPass → FAILED_DEFLECTION_CONVERSION  [implemented below]
                     if new_mode == Some(CatchScatterThrowInMode::FailedCatch) && deflected_pass {
                         self.catch_scatter_throw_in_mode = Some(CatchScatterThrowInMode::FailedDeflectionConversion);
                     } else {
@@ -858,7 +860,7 @@ impl StepCatchScatterThrowIn {
 
             // Failure path
             if !already_rerolled {
-                // headless: state.rerollCatch (from executeStepHooks) — SkillBehaviour registry not ported
+                // no-op: state.rerollCatch from Catch skill SkillBehaviour hook — registry not ported; auto-declines
                 // client-only: blast-it dialog (grantsCatchBonusToReceiver + Hail Mary pass) — client-side
 
                 if let Some(prompt) = ask_for_reroll_if_available(game, "CATCH", min_roll, false) {

@@ -11,9 +11,9 @@
 ///
 /// Receives: INDUCEMENT_GOLD_HOME, INDUCEMENT_GOLD_AWAY.
 ///
-/// headless: InducementTypeFactory, Inducement, InducementSet not yet ported.
-/// headless: addStarPlayers — RosterPlayer creation + DB update not yet ported.
-/// headless: addMercenaries — Loner skill injection not yet ported.
+/// InducementTypeFactory not ported; headless auto-skips inducement buying (no dialog, no predefined inducements).
+/// addStarPlayers — RosterPlayer creation + DB update not yet ported (blocked by InducementTypeFactory).
+/// addMercenaries — Loner skill injection not yet ported (blocked by InducementTypeFactory).
 use ffb_model::enums::InducementPhase;
 use ffb_model::model::game::Game;
 use ffb_model::option::game_option_id::{INDUCEMENTS, USE_PREDEFINED_INDUCEMENTS};
@@ -70,7 +70,7 @@ impl StepBuyInducements {
         }
 
         // Java: if (USE_PREDEFINED_INDUCEMENTS) → apply predefined sets, skip dialog
-        // headless: InducementTypeFactory not ported; treat as auto-skip
+        // no-op: InducementTypeFactory not ported — headless auto-skips inducement dialog
         if is_option_enabled(game, USE_PREDEFINED_INDUCEMENTS) {
             self.inducements_selected_home = true;
             self.inducements_selected_away = true;

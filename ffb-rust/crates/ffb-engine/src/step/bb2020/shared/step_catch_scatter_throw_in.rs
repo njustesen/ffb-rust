@@ -879,7 +879,7 @@ impl StepCatchScatterThrowIn {
             // Java BB2020: no Blast-it (grantsCatchBonusToReceiver) check here
             // Java BB2020: state.rerollCatch check via executeStepHooks (if not already rerolled)
             if !already_rerolled {
-                // headless: state.rerollCatch (from executeStepHooks) — SkillBehaviour registry not ported
+                // no-op: state.rerollCatch from Catch skill SkillBehaviour hook — registry not ported; auto-declines
                 if let Some(prompt) = ask_for_reroll_if_available(game, "CATCH", min_roll, false) {
                     self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("CATCH"));
                     self.re_roll_state.re_roll_source = Some(ffb_model::enums::ReRollSource::new("TRR"));

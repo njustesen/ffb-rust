@@ -74,6 +74,9 @@ impl StepPass {
         let is_bomb = thrower_action == PlayerAction::ThrowBomb;
         if is_bomb {
             game.field_model.bomb_moving = true;
+            if game.original_bombardier.is_none() {
+                game.original_bombardier = game.thrower_id.clone();
+            }
         } else {
             game.field_model.ball_moving = true;
         }

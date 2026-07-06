@@ -16,7 +16,7 @@
 //   syncGameModel, changeActingPlayer, handleChefRolls, rollMasterChef,
 //   checkForWastedSkills, addPartnerEnhancement, closeGame, handleInvalidTeam
 //
-// Partially implemented (checkForMissingPartners is headless: needs addSkillEnhancements):
+// Partially implemented (checkForMissingPartners skipped — needs addSkillEnhancements):
 //   updatePlayerStateDependentProperties, checkForMissingPartners
 
 use ffb_model::enums::{PlayerState, PS_BANNED, PS_RESERVE, PS_SETUP_PREVENTED, TurnMode};
@@ -26,6 +26,7 @@ use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::team::Team;
 use ffb_model::model::turn_data::TurnData;
 use ffb_model::util::util_cards::UtilCards;
+use ffb_model::report::mixed::report_skill_wasted::ReportSkillWasted;
 use crate::mechanic::{state_mechanic_for, state_mechanic::StateMechanic as StateMechanicTrait};
 
 pub struct UtilServerGame;
@@ -194,6 +195,32 @@ impl UtilServerGame {
             if increment_turns {
                 pr.turns_played += 1;
             }
+        }
+    }
+
+    /// Java: UtilServerGame.checkForWastedSkills(Player, IStep, FieldModel).
+    ///
+    /// If the player's state is casualty or BANNED, check for any
+    /// `grantsSingleUseTeamRerollWhenOnPitch` skills that were never used,
+    /// and emit a `ReportSkillWasted` for each.
+    pub fn check_for_wasted_skills(game: &mut Game, player_id: &str) {
+        let state = game.field_model.player_state(player_id);
+        let Some(ps) = state else { return };
+        if !ps.is_casualty() && ps.base() != PS_BANNED { return; }
+
+        // Java: Constant.CHECK_AFTER_PLAYER_REMOVAL = {grantsSingleUseTeamRerollWhenOnPitch}
+        let wasted: Vec<_> = game.player(player_id)
+            .map(|p| {
+                p.all_skill_ids()
+                    .filter(|id| id.properties().contains(&NamedProperties::GRANTS_SINGLE_USE_TEAM_REROLL_WHEN_ON_PITCH))
+                    .filter(|id| !p.used_skills.contains(id))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let pid = player_id.to_owned();
+        for skill_id in wasted {
+            game.report_list.add(ReportSkillWasted::new(Some(pid.clone()), Some(skill_id)));
         }
     }
 }
@@ -470,5 +497,23 @@ mod tests {
         game.home_playing = true;
         UtilServerGame::mark_played_and_secret_weapons(&mut game);
         assert!(!game.game_result.home.player_result("p1").map(|p| p.has_used_secret_weapon).unwrap_or(false));
+    }
+
+    #[test]
+    fn check_for_wasted_skills_no_report_when_not_casualty() {
+        let game = &mut game_with_standing_player("p1", true);
+        use ffb_model::enums::PS_STANDING;
+        game.field_model.set_player_state("p1", PlayerState(PS_STANDING));
+        UtilServerGame::check_for_wasted_skills(game, "p1");
+        assert!(game.report_list.is_empty());
+    }
+
+    #[test]
+    fn check_for_wasted_skills_no_report_when_no_single_use_skill() {
+        let game = &mut game_with_standing_player("p1", true);
+        use ffb_model::enums::PS_BADLY_HURT;
+        game.field_model.set_player_state("p1", PlayerState(PS_BADLY_HURT));
+        UtilServerGame::check_for_wasted_skills(game, "p1");
+        assert!(game.report_list.is_empty());
     }
 }

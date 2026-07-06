@@ -10,7 +10,7 @@
 ///
 /// Publishes: INDUCEMENT_GOLD_HOME, INDUCEMENT_GOLD_AWAY.
 ///
-/// headless: CardDeck / CardTypeFactory not yet ported.
+/// CardDeck / CardTypeFactory not ported; headless always skips card purchasing.
 /// client-only: DialogBuyCardsParameter — headless skips card purchasing dialog
 use ffb_model::model::game::Game;
 use ffb_model::option::game_option_id::{MAX_NR_OF_CARDS, USE_PREDEFINED_INDUCEMENTS};
@@ -54,7 +54,7 @@ impl StepBuyCards {
                 .publish(StepParameter::InducementGoldHome(self.inducement_gold_home))
                 .publish(StepParameter::InducementGoldAway(self.inducement_gold_away));
         }
-        // headless: CardDeck / CardTypeFactory not yet ported — both teams treated as done
+        // no-op: CardDeck / CardTypeFactory not ported — headless treats both teams as done (no cards bought)
         self.cards_selected_home = true;
         self.cards_selected_away = true;
         StepOutcome::next()

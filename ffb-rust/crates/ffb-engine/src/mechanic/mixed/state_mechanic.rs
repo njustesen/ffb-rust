@@ -11,7 +11,7 @@
 /// Report emission status:
 ///   - ReportStartHalf: wired in StepInitKickoff (emits GameEvent::StartHalf after start_half call)
 ///   - ReportLeader: caller responsibility — emitted when update_leader_re_rolls_for_team returns Some
-///   - ReportPumpUpTheCrowdReRoll: needs GameEvent::PumpUpTheCrowdReRoll variant (not yet added)
+///   - ReportPumpUpTheCrowdReRoll: wired via GameEvent::PumpUpTheCrowdReRoll in handle_injury_side_effects
 ///   - ReportMasterChefRoll: returned from handle_chef_rolls as GameEvent::MasterChefRoll
 ///     (caller in StepInitKickoff must emit these events)
 use ffb_model::enums::{LeaderState, SkillId};

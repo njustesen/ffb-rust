@@ -69,7 +69,7 @@ impl Step for StepSwarming {
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
             Action::EndTurn => {
-                // headless: no-op — player positions tracked directly in field_model
+                // no-op: player positions tracked directly in field_model
                 self.end_turn = true;
             }
             Action::PlacePlayer { player_id, coord } => {

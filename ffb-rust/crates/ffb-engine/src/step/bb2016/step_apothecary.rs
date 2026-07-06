@@ -136,7 +136,11 @@ impl StepApothecary {
         if let Some(status) = status {
             match status {
                 ApothecaryStatus::DoRequest => {
-                    // Java: if (fShowReport) fInjuryResult.report(this)
+                    if self.show_report {
+                        if let Some(ref mut ir) = self.injury_result {
+                            ir.report(game);
+                        }
+                    }
                     // Java: showDialog(DialogUseApothecaryParameter)
                     // Java: setApothecaryStatus(WAIT_FOR_APOTHECARY_USE)
                     if let Some(ref mut ir) = self.injury_result {
@@ -176,7 +180,11 @@ impl StepApothecary {
                     }
                 }
                 ApothecaryStatus::NoApothecary => {
-                    // Java: if (fShowReport) fInjuryResult.report(this) — no explicit report added here
+                    if self.show_report {
+                        if let Some(ref mut ir) = self.injury_result {
+                            ir.report(game);
+                        }
+                    }
                 }
                 _ => {}
             }
@@ -245,7 +253,9 @@ impl StepApothecary {
             // Java: setPlayerState(defender, STUNNED or RESERVE) — apply cured state
             if let Some(ref mut ir) = self.injury_result {
                 use ffb_model::enums::{PS_KNOCKED_OUT, PS_RESERVE, PS_STUNNED, PlayerState};
-                let cured = if base == PS_KNOCKED_OUT {
+                let cured = if base == PS_KNOCKED_OUT
+                    && crate::injury::can_apo_ko_into_stun(ir.injury_context.injury_type_name.as_deref())
+                {
                     PlayerState::new(PS_STUNNED)
                 } else {
                     PlayerState::new(PS_RESERVE)

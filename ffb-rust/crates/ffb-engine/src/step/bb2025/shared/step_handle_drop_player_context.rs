@@ -191,6 +191,8 @@ mod tests {
                 injury_context: ctx,
                 knocked_out: false,
                 rip: false,
+                already_reported: false,
+                pre_regeneration: true,
             })),
             player_id: Some(player_id.to_owned()),
             apothecary_mode: Some(ApothecaryMode::Defender),

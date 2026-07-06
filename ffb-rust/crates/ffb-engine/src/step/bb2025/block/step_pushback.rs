@@ -98,7 +98,7 @@ impl StepPushback {
         }
 
         if !self.standing_firm.contains_key(defender_id) {
-            // Dialog would be shown here; headless: auto-decide = false (don't use)
+            // client-only: Standing Firm skill-use dialog — headless auto-declines (false = do not use)
             self.standing_firm.insert(defender_id.to_owned(), false);
             return false;
         }
@@ -153,7 +153,7 @@ impl StepPushback {
         }
 
         if !self.side_stepping.contains_key(defender_id) {
-            // Dialog would be shown; headless: auto-decide = false (don't use)
+            // client-only: Side Step skill-use dialog — headless auto-declines (false = do not use)
             self.side_stepping.insert(defender_id.to_owned(), false);
             return None;
         }

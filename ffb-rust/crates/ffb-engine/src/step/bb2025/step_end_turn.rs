@@ -21,6 +21,7 @@ use std::collections::HashSet;
 use ffb_model::enums::{TurnMode, Weather, PS_KNOCKED_OUT, PS_EXHAUSTED, PS_RESERVE};
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
+use ffb_model::report::mixed::report_turn_end::{ReportTurnEnd, KnockoutRecovery, HeatExhaustion};
 use ffb_model::types::FIELD_WIDTH;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_box::UtilBox;
@@ -260,17 +261,14 @@ impl StepEndTurn {
                     UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfHalf, is_home);
                 }
             }
-            // Java: ReportTurnEnd → stub
-            // Java: removeReRollsLastingForDrive → stub
-            // Java: prepareForSetup, updatePlayerStateDependentProperties → stub
-            // Java: startHalf → stub
-
             // Java: getFaintingCount / heatExhaustions / KO recovery — only on new half or touchdown
             if self.new_half || touchdown {
                 let all_player_ids: Vec<String> = game.team_home.players.iter()
                     .chain(game.team_away.players.iter())
                     .map(|p| p.id.clone())
                     .collect();
+                let mut ko_recoveries: Vec<KnockoutRecovery> = Vec::new();
+                let mut heat_exhaustions: Vec<HeatExhaustion> = Vec::new();
                 for player_id in &all_player_ids {
                     let player_state = match game.field_model.player_state(player_id) {
                         Some(s) => s,
@@ -285,9 +283,11 @@ impl StepEndTurn {
                             game.turn_data_away.inducement_set.value(Usage::KNOCKOUT_RECOVERY)
                         };
                         let roll = rng.d6();
-                        if DiceInterpreter::is_recovering_from_knockout(roll, bloodweiser_keg) {
+                        let recovered = DiceInterpreter::is_recovering_from_knockout(roll, bloodweiser_keg);
+                        if recovered {
                             game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
                         }
+                        ko_recoveries.push(KnockoutRecovery::new(player_id.clone(), recovered));
                     }
                     if base == PS_EXHAUSTED {
                         game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
@@ -298,10 +298,19 @@ impl StepEndTurn {
                             if DiceInterpreter::is_exhausted(roll) {
                                 let cur = game.field_model.player_state(player_id).unwrap_or_default();
                                 game.field_model.set_player_state(player_id, cur.change_base(PS_EXHAUSTED));
+                                heat_exhaustions.push(HeatExhaustion::new(player_id.clone(), roll));
                             }
                         }
                     }
                 }
+                let td_player_id = if touchdown { game.acting_player.player_id.clone() } else { None };
+                game.report_list.add(ReportTurnEnd::new(
+                    td_player_id,
+                    ko_recoveries,
+                    heat_exhaustions,
+                    vec![],
+                    0,
+                ));
                 UtilBox::put_all_players_into_box(game);
             }
 

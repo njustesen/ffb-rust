@@ -11,14 +11,15 @@ use crate::step::abstract_step_with_re_roll::ReRollState;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 use ffb_mechanics::bb2020::jump_mechanic::JumpMechanic;
 use ffb_mechanics::jump_mechanic::JumpMechanic as JumpMechanicTrait;
-use ffb_mechanics::mechanics::minimum_roll_jump;
+use ffb_mechanics::modifiers::jump_modifier_factory::JumpModifierFactory;
+use ffb_mechanics::modifiers::jump_context::JumpContext;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2020.move.StepJump.
 ///
 /// BB2020 uses the BB2020 JumpMechanic for canStillJump checks.
 /// Otherwise logic is identical to BB2025.
 ///
-/// headless: DivingTackle dialog — client-only; headless auto-skips.
+/// JumpModifierFactory wired: TACKLEZONE and PREHENSILE_TAIL modifiers applied.
 /// client-only: checkDivingTackle/usingDivingTackle dialog — headless auto-skips diving tackle activation.
 pub struct StepJump {
     /// Java: goToLabelOnFailure
@@ -116,8 +117,31 @@ impl StepJump {
             .map(|p| p.agility_with_modifiers())
             .unwrap_or(3);
 
-        let minimum_roll = minimum_roll_jump(agility, &[]);
+        let (modifier_total, modifier_names) = if let (Some(pid), Some(from)) = (player_id.as_deref(), self.move_start) {
+            if let Some(player) = game.player(pid) {
+                let to = game.field_model.player_coordinate(pid).unwrap_or(from);
+                let ctx = JumpContext::new(game, player, from, to);
+                let factory = JumpModifierFactory::for_rules(game.rules);
+                let mods = factory.find_applicable(&ctx);
+                let total: i32 = mods.iter().map(|m| m.get_modifier()).sum();
+                let names: Vec<String> = mods.iter().map(|m| m.get_report_string().to_owned()).collect();
+                (total, names)
+            } else { (0, vec![]) }
+        } else { (0, vec![]) };
+        let minimum_roll = (agility + modifier_total).max(2);
         let successful = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
+
+        {
+            use ffb_model::report::report_jump_roll::ReportJumpRoll;
+            game.report_list.add(ReportJumpRoll::new(
+                player_id.clone(),
+                successful,
+                self.roll,
+                minimum_roll,
+                already_rerolled,
+                modifier_names,
+            ));
+        }
 
         if successful {
             game.acting_player.jumping = false;

@@ -17,9 +17,8 @@ use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter};
 /// Rust step-rewrite they are expected to arrive via published StepParameters
 /// (`PassAccurate`, `InterceptorId`, `CatcherId`).
 ///
-/// headless: Animation / syncGameModel infrastructure not yet translated.
-///       PassState.isInterceptionSuccessful / getResult() not yet wired — interceptor
-///       path and full accurate routing require PassState translation.
+/// client-only: Animation / syncGameModel infrastructure — client-side rendering only.
+/// Interception and accurate-pass routing are wired via StepParameter::InterceptorId and PassAccurate.
 pub struct StepResolvePass {
     /// Consumed from PassAccurate parameter published by StepPass.
     pub pass_accurate: bool,

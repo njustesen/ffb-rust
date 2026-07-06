@@ -64,7 +64,7 @@ impl StepAnimalSavagery {
 
     fn execute_step(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: getGameState().executeStepHooks(this, state) — entire logic is in step hooks
-        // headless: executeStepHooks infrastructure not yet ported — Animal Savagery no-ops
+        // no-op: Animal Savagery step hooks (SkillBehaviour registry not ported) — auto-proceeds
         StepOutcome::next()
     }
 }

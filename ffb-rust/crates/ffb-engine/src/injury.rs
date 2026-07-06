@@ -65,6 +65,10 @@ pub struct InjuryContext {
     pub serious_injury: Option<SeriousInjuryKind>,
     /// Java: fSeriousInjuryDecay — decay SI kind for players with requiresSecondCasualtyRoll.
     pub serious_injury_decay: Option<SeriousInjuryKind>,
+    /// Java: fInjuryDecay — decay player state for players with Decay skill (second casualty roll outcome).
+    pub injury_decay: Option<PlayerState>,
+    /// Java: originalSeriousInjury — SI before apothecary modification.
+    pub original_serious_injury: Option<SeriousInjuryKind>,
     /// Java: fSendToBoxReason — why the player was removed from the field.
     pub send_to_box_reason: Option<SendToBoxReason>,
     /// Java: fSound — sound effect associated with this injury.
@@ -108,6 +112,8 @@ impl InjuryContext {
             casualty_modifiers: Vec::new(),
             serious_injury: None,
             serious_injury_decay: None,
+            injury_decay: None,
+            original_serious_injury: None,
             send_to_box_reason: None,
             sound: None,
             modified_injury_context: None,
@@ -199,6 +205,10 @@ pub struct InjuryResult {
     pub knocked_out: bool,
     /// Java: injury outcome is RIP / dead (convenience flag, derived from context).
     pub rip: bool,
+    /// Java: fAlreadyReported — true after report() has been called once.
+    pub already_reported: bool,
+    /// Java: fPreRegeneration — true until passed_regeneration() is called.
+    pub pre_regeneration: bool,
 }
 
 impl InjuryResult {
@@ -207,11 +217,24 @@ impl InjuryResult {
             injury_context: InjuryContext::new(apothecary_mode),
             knocked_out: false,
             rip: false,
+            already_reported: false,
+            pre_regeneration: true,
         }
     }
 
     pub fn injury_context(&self) -> &InjuryContext { &self.injury_context }
     pub fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.injury_context }
+
+    pub fn is_already_reported(&self) -> bool { self.already_reported }
+    pub fn set_already_reported(&mut self, v: bool) { self.already_reported = v; }
+    pub fn is_pre_regeneration(&self) -> bool { self.pre_regeneration }
+    pub fn passed_regeneration(&mut self) { self.pre_regeneration = false; }
+
+    /// Java: `InjuryResult.report(IStep)` — delegates to `StateMechanic.reportInjury`.
+    pub fn report(&mut self, game: &mut ffb_model::model::game::Game) {
+        let mechanic = crate::mechanic::state_mechanic_for(game.rules);
+        mechanic.report_injury(game, self);
+    }
 
     /// Java: InjuryResult.applyTo(IStep) — applies injury outcome to game state.
     ///
@@ -269,10 +292,24 @@ impl InjuryResult {
             game.field_model.set_player_state(defender_id, existing.change_base(new_state.base()));
         }
 
-        // 2. If STUNNED and player belongs to the acting team → set inactive.
-        if new_state.base() == PS_STUNNED && game.is_active_team_player(defender_id) {
-            let state = game.field_model.player_state(defender_id).unwrap_or(new_state);
-            game.field_model.set_player_state(defender_id, state.change_active(false));
+        // 2. If STUNNED → deactivate if on acting team OR on the bombardier's team (bomb hits friendlies).
+        if new_state.base() == PS_STUNNED {
+            let (home_bomb, away_bomb) = if let Some(ref orig_id) = game.original_bombardier.clone() {
+                let bombardier_is_home = game.team_home.player(orig_id).is_some();
+                (bombardier_is_home, !bombardier_is_home)
+            } else {
+                (false, false)
+            };
+            let defender_is_home = game.team_home.player(defender_id).is_some();
+            let should_deactivate = if defender_is_home {
+                game.home_playing || home_bomb
+            } else {
+                !game.home_playing || away_bomb
+            };
+            if should_deactivate {
+                let state = game.field_model.player_state(defender_id).unwrap_or(new_state);
+                game.field_model.set_player_state(defender_id, state.change_active(false));
+            }
         }
 
         // 3. If KO, casualty, or reserve → put player into box.
@@ -330,6 +367,18 @@ pub trait InjuryTypeServer {
     fn is_caused_by_opponent(&self) -> bool { false }
     /// Java: InjuryType.isWorthSpps() — whether the attacker earns a casualty SPP.
     fn is_worth_spps(&self) -> bool { false }
+}
+
+/// Java: `InjuryType.canApoKoIntoStun()` — whether an apothecary can revive a KO'd player as STUNNED.
+///
+/// Default: `true` (most injury types). Returns `false` for crowd-push and trap-door injuries
+/// (Java: `CrowdPush`, `CrowdPushForSpp`, `TrapDoorFall`, `TrapDoorFallForSpp`).
+pub fn can_apo_ko_into_stun(injury_type_name: Option<&str>) -> bool {
+    match injury_type_name {
+        Some("InjuryTypeCrowdPush") | Some("InjuryTypeCrowdPushForSpp")
+        | Some("InjuryTypeTrapDoorFall") | Some("InjuryTypeTrapDoorFallForSpp") => false,
+        _ => true,
+    }
 }
 
 // ── Shared dice helpers ───────────────────────────────────────────────────────
@@ -740,6 +789,14 @@ pub fn make_injury_type(name: &str) -> Box<dyn InjuryTypeServer> {
             Box::new(InjuryTypeBlockImpl::new(true)),
         "InjuryTypeBlockStunnedForSpp" =>
             Box::new(InjuryTypeBlockImpl::new(true).with_spps()),
+        "InjuryTypeBombWithModifier" | "bombWithModifier" =>
+            Box::new(injuryType::injury_type_bomb_with_modifier::InjuryTypeBombWithModifier::new()),
+        "InjuryTypeBombWithModifierForSpp" | "bombForSpp" =>
+            Box::new(injuryType::injury_type_bomb_with_modifier_for_spp::InjuryTypeBombWithModifierForSpp::new()),
+        "InjuryTypeLightning" =>
+            Box::new(injuryType::injury_type_lightning::InjuryTypeLightning::new()),
+        "InjuryTypeFireball" =>
+            Box::new(injuryType::injury_type_fireball::InjuryTypeFireball::new()),
         _ => {
             // Unknown type: fall through with generic drop behavior (causes turnover)
             Box::new(InjuryTypeDropFall::new(true))
@@ -918,5 +975,21 @@ mod tests {
         // Should produce some injury result
         assert!(ctx.injury.is_some());
         assert!(ctx.injury_roll.is_some());
+    }
+
+    #[test]
+    fn can_apo_ko_into_stun_defaults_true() {
+        assert!(can_apo_ko_into_stun(None));
+        assert!(can_apo_ko_into_stun(Some("InjuryTypeBlock")));
+        assert!(can_apo_ko_into_stun(Some("InjuryTypeFoul")));
+        assert!(can_apo_ko_into_stun(Some("InjuryTypeFumbledKtmApoKo")));
+    }
+
+    #[test]
+    fn can_apo_ko_into_stun_false_for_crowd_and_trapdoor() {
+        assert!(!can_apo_ko_into_stun(Some("InjuryTypeCrowdPush")));
+        assert!(!can_apo_ko_into_stun(Some("InjuryTypeCrowdPushForSpp")));
+        assert!(!can_apo_ko_into_stun(Some("InjuryTypeTrapDoorFall")));
+        assert!(!can_apo_ko_into_stun(Some("InjuryTypeTrapDoorFallForSpp")));
     }
 }

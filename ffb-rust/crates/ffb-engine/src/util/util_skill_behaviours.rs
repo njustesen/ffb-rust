@@ -6,7 +6,7 @@
 ///
 /// Rust: reflection not available; explicit registration replaces the Scanner.
 /// The function returns the list of concrete behaviours for the given rules edition.
-/// headless: setSkill wiring requires SkillFactory.for_class() — not yet ported.
+/// setSkill wiring: no-op in Rust — each SkillBehaviour already encodes its skill name via name().
 use ffb_model::enums::Rules;
 use crate::skill_behaviour::SkillBehaviour;
 
@@ -17,7 +17,7 @@ impl UtilSkillBehaviours {
 
     /// Java: registerBehaviours(Game, DebugLog).
     /// Returns all concrete SkillBehaviour instances for the given rules edition.
-    /// Caller is responsible for calling setSkill (headless: SkillFactory.for_class not ported).
+    /// setSkill: no-op in Rust — each behaviour encodes its skill name via name().
     pub fn register_behaviours(rules: Rules) -> Vec<Box<dyn SkillBehaviour>> {
         use crate::skill_behaviour::{bb2016, bb2020, bb2025, common, mixed};
         let mut behaviours: Vec<Box<dyn SkillBehaviour>> = Vec::new();

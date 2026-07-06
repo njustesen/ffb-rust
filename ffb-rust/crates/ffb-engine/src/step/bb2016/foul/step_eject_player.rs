@@ -14,7 +14,7 @@
 /// Receives: FOULER_HAS_BALL, ARGUE_THE_CALL_SUCCESSFUL.
 /// Publishes: END_TURN, CATCH_SCATTER_THROW_IN_MODE.
 ///
-/// headless: UtilServerGame.checkForWastedSkills — requires report infrastructure.
+/// Publishes ReportSkillWasted for any unused single-use-reroll skills on the ejected player.
 use ffb_model::enums::{PS_RESERVE, PS_BANNED, PS_KNOCKED_OUT, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -67,7 +67,9 @@ impl StepEjectPlayer {
             UtilBox::put_player_into_box(game, &player_id);
         }
         UtilBox::refresh_boxes(game);
-        // headless: checkForWastedSkills — requires report infrastructure
+        if let Some(ref pid) = game.acting_player.player_id.clone() {
+            UtilServerGame::check_for_wasted_skills(game, pid);
+        }
         UtilServerGame::update_player_state_dependent_properties(game);
         let has_ball = self.fouler_has_ball.unwrap_or(false);
         if has_ball {

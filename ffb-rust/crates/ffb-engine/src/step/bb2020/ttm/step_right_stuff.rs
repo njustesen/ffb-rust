@@ -21,7 +21,7 @@
 ///
 /// RightStuffModifierFactory + AgilityMechanic.minimumRollRightStuff → wired.
 /// UtilServerInjury.handleInjury wired for both TTMLanding and FumbledKtm paths.
-/// headless: SppMechanic.addCompletion for accurate TTM pass — SPP tracking not yet ported.
+/// SppMechanic.addCompletion wired for accurate TTM pass (non-kicked player).
 /// `isBoxCoordinate()` guard wired — skips landing roll when player is in the dugout.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -146,6 +146,19 @@ impl StepRightStuff {
             }
             let successful = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
             if successful {
+                // Java: if (passResult == ACCURATE && !kickedPlayer && thrower != null)
+                //   spp.addCompletion(additionalCompletionSppTeams, playerResult(thrower))
+                if self.pass_result == Some(ModelPassResult::Complete) && !self.kicked_player {
+                    if let Some(ref thrower_id) = game.thrower_id.clone() {
+                        let is_home = game.team_home.has_player(thrower_id);
+                        let team_result = if is_home {
+                            &mut game.game_result.home
+                        } else {
+                            &mut game.game_result.away
+                        };
+                        team_result.player_result_mut(thrower_id).completions += 1;
+                    }
+                }
                 let success_label = self.goto_on_success.as_deref().unwrap_or("");
                 let mut out = StepOutcome::goto(success_label)
                     .publish(StepParameter::ThrownPlayerState(out_state))

@@ -46,7 +46,7 @@ use crate::step::framework::{StepAction, StepId, StepParameter};
 ///   TODO: game.setPassCoordinate / game.setDefenderId / game.getDefender
 ///   TODO: game.fieldModel.setPlayerState / getPlayerState / getPlayerCoordinate
 ///   TODO: UtilServerSteps.changePlayerAction
-///   TODO: coordinate.transform() (away-side coordinate mirror)
+///   ✓ coordinate.transform() applied for away-team client commands
 ///   TODO: PICKED_UP base state
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.ttm.StepInitThrowTeamMate`.
@@ -99,15 +99,22 @@ impl Step for StepInitThrowTeamMate {
             }
             Action::ThrowTeamMate { player_id, coord } => {
                 if self.thrown_player_id.is_some() {
-                    // target chosen after player
-                    self.target_coordinate = Some(*coord);
+                    // target chosen after player; transform if from away-team client
+                    let is_home = game.acting_player.player_id.as_deref()
+                        .map(|id| game.team_home.player(id).is_some())
+                        .unwrap_or(game.home_playing);
+                    self.target_coordinate = Some(if is_home { *coord } else { coord.transform() });
                 } else {
                     self.thrown_player_id = Some(player_id.clone());
                 }
             }
             Action::KickTeamMate { player_id, coord } => {
                 if self.thrown_player_id.is_some() {
-                    self.target_coordinate = Some(*coord);
+                    // target chosen after player; transform if from away-team client
+                    let is_home = game.acting_player.player_id.as_deref()
+                        .map(|id| game.team_home.player(id).is_some())
+                        .unwrap_or(game.home_playing);
+                    self.target_coordinate = Some(if is_home { *coord } else { coord.transform() });
                 } else {
                     self.thrown_player_id = Some(player_id.clone());
                 }

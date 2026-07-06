@@ -3,6 +3,7 @@ use ffb_model::events::GameEvent;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::mixed::report_event::ReportEvent;
 use crate::action::Action;
 use crate::mechanic::mixed::state_mechanic::StateMechanic;
 use crate::step::framework::{Step, StepOutcome};
@@ -175,7 +176,7 @@ impl StepKickoffScatterRoll {
 
             if self.touchback {
                 game.field_model.out_of_bounds = true;
-                // headless: ReportTouchback — report system not yet ported
+                game.report_list.add(ReportEvent::new(Some("The ball lands out of bounds -> TOUCHBACK!!".into())));
             }
 
             // Java: addReport(new ReportSkillUse(kick, true, SkillUse.HALVE_KICKOFF_SCATTER))
@@ -192,7 +193,7 @@ impl StepKickoffScatterRoll {
                 || game.turn_data_away.first_turn_after_kickoff;
             if game.half < 3 && first_turn {
                 let _chef_events = StateMechanic::new().handle_chef_rolls(game, rng);
-                // headless: emit MasterChefRoll events when report system is ported
+                // Chef GameEvents are handled downstream; no report needed here.
             }
 
             let kicking_coord = self.kicking_player_coordinate.unwrap();

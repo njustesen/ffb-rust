@@ -120,7 +120,7 @@ impl StepDropFallingPlayers {
                 ctx.injury_roll = Some([i1, i2]);
             }
 
-            let ir = Box::new(InjuryResult { injury_context: ctx, knocked_out: false, rip: false });
+            let ir = Box::new(InjuryResult { injury_context: ctx, knocked_out: false, rip: false, already_reported: false, pre_regeneration: true });
             self.injury_result_defender = Some(ir.clone());
 
             // Java: PilingOnBehaviour.handleExecuteStepHook — check if attacker has canPileOnOpponent.
@@ -178,7 +178,7 @@ impl StepDropFallingPlayers {
                 let i2 = rng.d6();
                 ctx.injury_roll = Some([i1, i2]);
             }
-            let ir = Box::new(InjuryResult { injury_context: ctx, knocked_out: false, rip: false });
+            let ir = Box::new(InjuryResult { injury_context: ctx, knocked_out: false, rip: false, already_reported: false, pre_regeneration: true });
             outcome = outcome
                 .publish(StepParameter::EndTurn(true))
                 .publish(StepParameter::InjuryResult(ir));

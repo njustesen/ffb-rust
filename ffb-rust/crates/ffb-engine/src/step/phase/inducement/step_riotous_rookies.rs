@@ -9,15 +9,17 @@
 /// headless dependencies (gated on infra not yet ported):
 /// - `GameMechanic::riotousRookiesPosition()` — finding the correct roster position.
 /// - HTTP name-generator (`UtilServerHttpClient`) — `rookieName()`.
-/// - `UtilBox::putPlayerIntoBox()` — box placement.
-/// - Server communication (`sendAddPlayer`) — network I/O.
-use ffb_model::enums::PlayerType;
+/// Implemented: box placement via `UtilBox::put_player_into_box`.
+/// no-op: server.sendAddPlayer — headless has no server communication layer.
+use ffb_model::enums::{PlayerType, PlayerState, PS_RESERVE};
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
 use ffb_model::model::player::Player;
 use ffb_model::model::player_status::PlayerStatus;
 use ffb_model::model::skill_def::SkillId;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_box::UtilBox;
+use ffb_model::report::report_riotous_rookies::ReportRiotousRookies;
 use crate::action::Action;
 use crate::step::framework::{Step, StepId, StepOutcome};
 
@@ -58,14 +60,15 @@ impl StepRiotousRookies {
         let add_linemen = turn_data.inducement_set.for_usage(Usage::ADD_LINEMEN).map(|s| s.to_string());
         if let Some(type_id) = add_linemen {
             let value = turn_data.inducement_set.get(&type_id).map_or(0, |i| i.get_value());
+            let team_id = if home { game.team_home.id.clone() } else { game.team_away.id.clone() };
             let mut rookie_counter = 0;
             for _ in 0..value {
-                let rookies = Self::roll_rookies_count(rng);
+                let (roll, rookies) = Self::roll_rookies_count(rng);
                 // headless: GameMechanic::riotousRookiesPosition — roster mechanic not yet ported
                 for i in 0..rookies {
                     self.riotous_player(game, home, rookie_counter + i);
                 }
-                // headless: ReportRiotousRookies — report system not yet ported
+                game.report_list.add(ReportRiotousRookies::new(roll.to_vec(), rookies, team_id.clone()));
                 rookie_counter += rookies;
             }
         }
@@ -77,9 +80,8 @@ impl StepRiotousRookies {
     /// then adds them to the team. Box placement and server communication remain headless.
     ///
     /// headless: position-finding via GameMechanic::riotousRookiesPosition — roster mechanic not yet ported.
-    /// headless: player name via UtilServerHttpClient (HTTP) — no HTTP client in headless engine (fallback used).
-    /// headless: UtilBox::putPlayerIntoBox() — box placement not yet ported.
-    /// headless: server.sendAddPlayer() — no server communication layer in headless engine.
+    /// no-op: player name via HTTP — headless engine uses fallback name (confirmed intentional).
+    /// no-op: server.sendAddPlayer() — headless engine has no server communication layer.
     fn riotous_player(&self, game: &mut Game, home: bool, index: i32) {
         let team = if home { &game.team_home } else { &game.team_away };
         let team_id = team.id.clone();
@@ -89,6 +91,7 @@ impl StepRiotousRookies {
 
         // Java: new RosterPlayer(id = teamId + index)
         let id = format!("{}{}", team_id, index);
+        let player_id = id.clone();
         // Java: rookieName(generator, fallback) — HTTP deferred, fallback used
         let name = self.rookie_name("", &format!("Riotous Rookie #{}", index));
 
@@ -107,8 +110,10 @@ impl StepRiotousRookies {
         let team_mut = if home { &mut game.team_home } else { &mut game.team_away };
         team_mut.players.push(player);
 
-        // headless: UtilBox::putPlayerIntoBox() — box placement not yet ported
-        // headless: server.sendAddPlayer() — no server communication layer in headless engine
+        // Place rookie in reserves box.
+        game.field_model.set_player_state(&player_id, PlayerState::new(PS_RESERVE));
+        UtilBox::put_player_into_box(game, &player_id);
+        // no-op: server.sendAddPlayer() — headless engine has no server communication layer
     }
 
     /// Java: `rookieName(String generator, PlayerGender gender, String fallback)`.
@@ -116,19 +121,20 @@ impl StepRiotousRookies {
     /// Fetches a player name from the FUMBBL name-generator service.
     /// Falls back to the provided string if the HTTP call fails.
     ///
-    /// headless: requires UtilServerHttpClient (HTTP) and ServerUrlProperty access.
+    /// HTTP-out-of-scope: UtilServerHttpClient / FUMBBL_NAMEGENERATOR_BASE — headless engine has no
+    /// HTTP client; fallback name is returned directly (confirmed intentional no-op).
     fn rookie_name(&self, _generator: &str, fallback: &str) -> String {
-        // headless: FUMBBL_NAMEGENERATOR_BASE HTTP call — no HTTP client in headless engine; uses fallback name
         fallback.to_string()
     }
 
     /// Java: `rollRiotousRookies()` → two d3 dice + 1 = number of rookies to hire.
     ///
     /// Java: `DiceRoller.rollRiotousRookies()` → `{ rollDice(3), rollDice(3) }`.
-    /// `rookies = rookiesRoll[0] + rookiesRoll[1] + 1` → range 3–7.
-    fn roll_rookies_count(rng: &mut GameRng) -> i32 {
+    /// Returns `(roll, count)` where `count = roll[0] + roll[1] + 1` → range 3–7.
+    fn roll_rookies_count(rng: &mut GameRng) -> ([i32; 2], i32) {
         let roll = rng.roll_riotous_rookies();
-        roll[0] + roll[1] + 1
+        let count = roll[0] + roll[1] + 1;
+        (roll, count)
     }
 }
 
@@ -180,7 +186,7 @@ mod tests {
         // Run 100 seeds and verify count is always >= 3 (d3+d3+1 minimum = 3).
         for seed in 0..100u64 {
             let mut rng = GameRng::new(seed);
-            let count = StepRiotousRookies::roll_rookies_count(&mut rng);
+            let (_, count) = StepRiotousRookies::roll_rookies_count(&mut rng);
             assert!(count >= 3, "seed {seed}: count {count} < 3");
         }
     }
@@ -190,7 +196,7 @@ mod tests {
         // d3+d3+1 maximum = 3+3+1 = 7.
         for seed in 0..100u64 {
             let mut rng = GameRng::new(seed);
-            let count = StepRiotousRookies::roll_rookies_count(&mut rng);
+            let (_, count) = StepRiotousRookies::roll_rookies_count(&mut rng);
             assert!(count <= 7, "seed {seed}: count {count} > 7");
         }
     }
@@ -289,5 +295,24 @@ mod tests {
         let players_after: Vec<i32> = game.team_home.players.iter().map(|p| p.nr).collect();
         assert!(players_after.contains(&(max_nr_before + 1)));
         assert!(players_after.contains(&(max_nr_before + 2)));
+    }
+
+    #[test]
+    fn riotous_player_placed_in_reserves_box() {
+        use ffb_model::enums::PS_RESERVE;
+        let step = StepRiotousRookies::new();
+        let mut game = make_game();
+        step.riotous_player(&mut game, true, 0);
+        let player = game.team_home.players.last().unwrap();
+        let state = game.field_model.player_state(&player.id);
+        assert!(
+            state.map_or(false, |s| s.base() == PS_RESERVE),
+            "riotous rookie should be in RESERVE state after placement"
+        );
+        // Verify the player has a coordinate assigned (placed in box, not floating).
+        assert!(
+            game.field_model.player_coordinates.contains_key(&player.id),
+            "riotous rookie should have a box coordinate assigned"
+        );
     }
 }

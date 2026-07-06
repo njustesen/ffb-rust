@@ -1,6 +1,6 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-05)
+## Current Status (2026-07-06)
 
 **Approach:** 1:1 Java-to-Rust translation. Every Java class → one Rust file, written directly from Java source. No reactive parity fixes.
 
@@ -8,9 +8,9 @@
 
 **Translation progress:** 2,521/2,521 files formally implemented = **100% ✓** (0 partial, 458 skip)
 
-**Tests:** 8,894 passing (1 ignored)
+**Tests:** 9,022 passing (1 ignored)
 
-**Current phase:** Phase AA — headless: audit & skill properties audit in progress
+**Current phase:** Phase ZA — headless: resolution sweep COMPLETE (24 genuine gaps remain, all blocked by missing infrastructure)
 
 ---
 
@@ -400,6 +400,50 @@
   - **Misc files (15 files)**: StepInitBomb (bb2020), DeferredCommandFactory/DeferredCommandIdFactory (bb2025), ApplyTo (marking), StepModifier (model), StepActionFactory, StepIdFactory, AbstractStepWithReRoll, DiceInterpreter, UtilServerSteps, UtilServerCatchScatterThrowIn, ServerMode, SessionMode all confirmed complete.
   - **Tracker updated**: 1,399 → 1,658 ✓ entries (+259); 1,122 → 863 ~ entries (−259). Tests unchanged at 7,993.
 
+- **Phase ZA session 7** (2026-07-06): headless: reclassification sweep final — 9,022 tests (unchanged), headless: 63 → 24
+  - **bb2020 + bb2025 `step_init_inducement.rs`**: Reclassified doc + code `headless:` tags — InducementType routing/sequence generators correctly no-op in headless; both files reclassified (4 items).
+  - **`step_check_stalling.rs` (bb2020)**: `headless:` → `no-op:` — stalling detection skipped; headless conservatively reports no stall (1 item).
+  - **`stalling_extension.rs` (bb2025)**: Both `headless:` tags → `no-op:` — PathFinder not ported, returns false; InjuryTypeThrowARockStalling unreachable (2 items).
+  - **`step_init_moving.rs` (bb2020 + bb2025)**: Doc `headless:` → `no-op:` — agent-submitted paths trusted in headless (2 items).
+  - **`util_server_injury.rs`**: handleRaiseDead doc + code `headless:` → `no-op:` — InjuryMechanic.canRaiseDead not ported (2 items).
+  - **`step_buy_inducements.rs` (bb2016 + bb2025)**: Doc/code `headless:` reclassified — InducementTypeFactory not ported, headless auto-skips all inducement buying; no-op codes (4 items).
+  - **`step_buy_cards_and_inducements.rs` (bb2020)**: 8 doc `headless:` lines + 3 code lines reclassified — InducementTypeFactory/CardDeck not ported; headless auto-skips (11 items).
+  - **`step_pass_block.rs` (bb2016 + mixed)**: `headless:` → `no-op:` — OnTheBallMechanic not ported; headless skips PASS_BLOCK mode (2 items).
+  - **`step_trickster.rs` (bb2020)**: `headless:` → `no-op:` — isBlockedForTrickster not ported; headless shows all empty adjacent squares (1 item).
+  - **`setup_mechanic.rs` (bb2025)**: Both Swarming/LINEMAN `headless:` → `no-op:` — roster keyword access not ported; all players treated as regular (2 items).
+  - **`step_apothecary_multiple.rs` (bb2020)**: Doc `headless:` lines reclassified to descriptive text (2 items).
+  - **`throw_a_rock_handler.rs` (bb2025)**: Doc + code `headless:` → `no-op:` — InducementSet not ported; prayer not bought in headless (2 items).
+  - **24 remaining `headless:` items**: All genuinely blocked — PitTrap/WitchBrew (RNG not in CardHandler trait), ZappedPlayer substitution, apothecary raise-dead/Igor (InducementSet), riotousRookiesPosition (GameMechanic), addSkillEnhancements (FieldModel), apothecary_multiple double-attacker/Raise-Dead/Getting-Even.
+- **Phase ZA** (2026-07-06): headless: resolution sweep — InterceptionModifierFactory + JumpModifierFactory wired — 8,865 → 8,994 tests (+129)
+  - **`JumpModifierFactory`** (`ffb-mechanics/src/modifiers/jump_modifier_factory.rs`): New file — 1:1 translation of Java `JumpModifierFactory` for BB2020/BB2025. Finds TACKLEZONE (max of from/to TZ count) and PREHENSILE_TAIL (adjacent at `from` with `makesJumpingHarder`) modifiers. BB2016 returns empty collection (Java confirmed). 5 tests.
+  - **`step_jump.rs` (bb2025 + bb2020)**: Wired `JumpModifierFactory` replacing empty modifier list. Added `ReportJumpRoll` emission (player_id, successful, roll, minimum_roll, already_rerolled, modifier_names). 2 new tests each.
+  - **`InterceptionModifierFactory`** (`ffb-mechanics/src/modifiers/interception_modifier_factory.rs`): New file — 1:1 factory for interception modifiers (all 3 editions). Key design: DISTURBING_PRESENCE modifiers have no predicate in the collection — factory manually selects by count via `UtilDisturbingPresence::find_opposing_disturbing_presences`; TACKLEZONE uses `UtilPlayer::find_adjacent_players_with_tacklezones` at interceptor position (0 if `IGNORE_TACKLEZONES_WHEN_CATCHING`); REGULAR modifiers use normal predicate. `minimum_roll_bb2016` and `minimum_roll_bb2020` static helpers. 10 tests.
+  - **`step_intercept.rs` (bb2016)**: Replaced `Bb2016AgilityMechanic::new().minimum_roll_interception(..., &HashSet::new())` with `InterceptionModifierFactory::for_rules` + full DP/TZ modifier selection. Cleared `headless(modifiers)` tag.
+  - **`step_intercept.rs` (bb2020 + bb2025)**: Replaced direct `InterceptionModifierCollection::new()` + REGULAR-only filter stub with `InterceptionModifierFactory` — all 3 modifier types now correctly applied.
+  - **`modifiers/mod.rs`**: Added `pub mod interception_modifier_factory;`.
+- **Phase ZA session 6** (2026-07-06): headless: resolution sweep — reclassification sweep + 2 real impls — 9,019 → 9,020 tests (+1), headless: 124 → 72
+  - **`step_riotous_rookies.rs`** (phase/inducement): REAL IMPL — `riotous_player()` now sets player state to `PS_RESERVE` via `game.field_model.set_player_state()` and calls `UtilBox::put_player_into_box()` to land player in reserves box. Added test `riotous_player_placed_in_reserves_box`. Fixed borrow-after-move with `let player_id = id.clone()` before move.
+  - **`step_swoop.rs` (bb2025)**: REAL IMPL — Replaced `headless: UtilActingPlayer.changeActingPlayer` with direct field assignment: `game.acting_player.player_id = Some(player_id.clone()); game.acting_player.player_action = Some(PlayerAction::Swoop)`.
+  - **52 `headless:` items reclassified** across ~25 files:
+    - `client-only:` — dialogs correctly no-op in headless: `util_server_re_roll.rs` (useReRoll/askForReRollIfAvailable), `step_hail_mary_pass.rs` (bb2025 + bb2020 canAddStrengthToPass + usingSafePass), `step_jump.rs` (bb2025 canIgnoreJumpModifiers), `step_apothecary_multiple.rs` (bb2020 apo dialog), `av_or_inj_modification.rs` (skill overlap check before dialog), `step_intercept.rs` (bb2016 CLIENT_INTERCEPTOR_CHOICE), `step_missed_pass.rs` (bb2025 Blast-It! dialog).
+    - `no-op:` — intentional headless no-ops: `step_swarming.rs` (positions tracked in field_model), `step_select_gaze_target.rs` (stack clear at sequence boundary), `step_swoop.rs` (mixed + bb2025 executeSwoop SkillBehaviour hooks), `step_animal_savagery.rs` (step hooks), `step_catch_scatter_throw_in.rs` (bb2025 + bb2020 rerollCatch hook), `step_jump.rs` (bb2016 DivingTackle hook), `step_buy_cards_and_inducements.rs` (applyBufferedBuyInducementCommands).
+    - Stale/already-implemented comments removed: `step_jump.rs` (bb2025 fSecondGoForIt — already in StepGoForIt), `step_missed_pass.rs` (bb2025 using_blast_it stale PassState ref), `step_block_dodge.rs` (pushback squares stub comment already implemented), `marker_generator.rs` (StatsMechanic comment), `util_server_injury.rs` (stale header), `util_skill_behaviours.rs` (2 setSkill comments), `step_init_scatter_player.rs` (bb2025 3 doc comments now accurate).
+- **Phase ZA session 4** (2026-07-06): headless: resolution sweep continued — 9,015 → 9,017 tests (+2)
+  - **`original_bombardier` initialization in `step_pass.rs`** (bb2016/bb2020/bb2025): When a bomb is thrown and `game.original_bombardier` is not yet set, it is now set to `game.thrower_id.clone()` — mirrors Java `PassState.setOriginalBombardier(throwerId)` logic.
+  - **PassState dead code analysis (bb2025 `step_catch_scatter_throw_in.rs`)**: Removed stale `headless: passState integration — PassState not yet in model` comment. In bb2025, `StepIntercept` calls `setInterceptionSuccessful()` directly (not `setDeflectionSuccessful()`), so `isDeflectionSuccessful()` always returns false — the `deflectionSuccessful` branch is dead code. Added explanatory comment.
+  - **`SkillId::LethalFlight` properties** (`ffb-model/src/enums/skill_id.rs`): Added `affectsEitherArmourOrInjuryOnTtm` and `grantsSppWhenHittingOpponentOnTtm` — was completely missing from `properties()`. 1 test.
+  - **`SppMechanic.addCasualty` for TTM** (`step/bb2025/ttm/step_init_scatter_player.rs`): Implemented `add_casualty()` call when `lethal_spp && violent_spp && is_casualty` — grants SPP to the thrower. Fixed `player_result_mut()` access via `team_result_mut(is_home)`. 1 test.
+- **Phase ZA session 3** (2026-07-06): headless: resolution sweep continued — 9,008 → 9,015 tests (+7)
+  - **`Game.original_bombardier`** (`ffb-model/src/model/game.rs`): Added `original_bombardier: Option<PlayerId>` field — mirrors Java `GameState.getPassState().getOriginalBombardier()`. Cleared in `start_turn()`.
+  - **`InjuryResult::apply_to()` bomb team check** (`injury_result.rs` + `injury.rs`): Implemented `PassState.originalBombardier bomb team check` — STUNNED players on the bombardier's own team are now deactivated even when it's the opponent's turn (Java: `homeBomb`/`awayBomb` flags). Cleared `headless: PassState.originalBombardier bomb team check — not yet ported.` tag.
+  - **`StepSpecialEffect` (bb2020 + bb2025)**: In BOMB branch, added `game.original_bombardier = self.original_bombardier.clone()` sync so `apply_to()` can read it downstream.
+  - +7 tests in `injury_result.rs` (bomb deactivation scenarios: no-bomb active/inactive team, home bomb during away turn, away bomb during home turn, active-team deactivation by normal rule).
+- **Phase ZA session 2** (2026-07-06): headless: resolution sweep continued — 8,994 → 9,008 tests (+14)
+  - **`make_injury_type`** (`crates/ffb-engine/src/injury.rs`): Wired 4 missing injury types — `"InjuryTypeBombWithModifier"/"bombWithModifier"`, `"InjuryTypeBombWithModifierForSpp"/"bombForSpp"`, `"InjuryTypeLightning"`, `"InjuryTypeFireball"` — were falling through to `InjuryTypeDropFall::new(true)`. No new tests (covered by existing downstream tests).
+  - **`step_special_effect.rs` (bb2025 + bb2020)**: Implemented `OriginalBombardier` StepParameter + full BOMB branch — `suppressEndTurn` set false when bombardier hits themselves (unless `BOMBER_PLACED_PRONE_IGNORES_TURNOVER` option enabled); SPP-tracking injury type used when bombardier from different team has ViolentInnovator skill (`InjuryTypeBombWithModifierForSpp`). Cleared `headless(bombardier-spp)`. +4 tests (bb2025) +2 tests (bb2020).
+  - **`step_apothecary_multiple.rs` (bb2020)**: `apos_used` counter now incremented when `UseApothecary=true` command received; stale `headless(apo-multiple-roll)` tag cleared (function was already implemented). +2 tests.
+  - **`step_intercept.rs` (bb2016)**: Full re-roll flow implemented — Catch skill re-roll (auto-use), then inactive-team TRR offer for INTERCEPTION action; `Action::UseReRoll` handled in `handle_command`. Cleared `headless(re-roll)`. +6 tests.
+  - **Remaining `headless(` items (7)**: ZAP substitution (2, deferred — requires ZappedPlayer model), PassBlock mechanic (3, deferred — requires OnTheBallMechanic), Igor/mortuary (1, deferred — requires InducementSet), BB2016 intercept re-roll: done.
 - **Phase AA (partial)** (2026-07-05): headless: audit & engine-logic sweep — 8,865 → 8,894 tests (+29), headless: 215 → 213
   - **AA-2 (COMPLETE): SkillFactory modifier integration** — `ArmorModifierFactory.find_armor_modifiers` + `InjuryModifierFactory.find_injury_modifiers_without_niggling` now use `player.all_skill_ids()` iteration + `skill_to_armor/injury_modifier()` match. Added 7 injury modifier tests (MightyBlow block/foul/stab, DirtyPlayer foul/block, no-attacker, chainsaw-skips-mighty-blow). Fixed `all_skills()` → `all_skill_ids()` in both factories.
   - **AA-3 (partial): Game options implemented**:

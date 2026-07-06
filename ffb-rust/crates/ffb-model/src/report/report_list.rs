@@ -6,6 +6,11 @@ pub struct ReportList {
     reports: Vec<Box<dyn IReport>>,
 }
 
+/// Clone creates a fresh empty list — reports are ephemeral per-step state and not cloned.
+impl Clone for ReportList {
+    fn clone(&self) -> Self { Self::new() }
+}
+
 impl std::fmt::Debug for ReportList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "ReportList({})", self.reports.len())

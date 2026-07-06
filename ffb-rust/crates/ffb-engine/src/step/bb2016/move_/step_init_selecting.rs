@@ -29,9 +29,9 @@ const MINIMUM_MOVE_TO_STAND_UP: i32 = 3;
 ///   (unless standingUp → NEXT_STEP)
 /// - else → prepareStandingUp, then NEXT_STEP if REMOVE_CONFUSION/STAND_UP/STAND_UP_BLITZ
 ///
-/// headless: gameCache.queueDbUpdate — no database layer in headless engine.
+/// no-op: gameCache.queueDbUpdate — headless engine has no DB layer (confirmed intentional).
 /// REMOVE_CONFUSION / STAND_UP / STAND_UP_BLITZ → NEXT_STEP path implemented.
-/// headless: game.isTimeoutEnforced() — no turn timer in headless engine; timeout enforcement skipped.
+/// no-op: game.isTimeoutEnforced() — headless engine has no turn timer; always treated as false.
 pub struct StepInitSelecting {
     /// Java: fGotoLabelOnEnd (init param)
     pub goto_label_on_end: String,
@@ -66,7 +66,7 @@ impl Step for StepInitSelecting {
 
     fn start(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: if (fUpdatePersistence) { fUpdatePersistence=false; gameCache.queueDbUpdate(...); }
-        // headless: persistence (gameCache.queueDbUpdate) not implemented — headless has no DB
+        // no-op: headless engine has no DB layer; gameCache.queueDbUpdate is skipped
         self.update_persistence = false;
         // start() does NOT call executeStep — waits for a client command
         StepOutcome::cont()
@@ -190,7 +190,7 @@ impl StepInitSelecting {
     pub fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         let label = self.goto_label_on_end.clone();
 
-        // headless: game.isTimeoutEnforced() — no turn timer in headless engine; timeout enforcement skipped
+        // no-op: headless engine has no turn timer; game.isTimeoutEnforced() always treated as false
         if self.end_turn {
             return StepOutcome::goto(&label)
                 .publish(StepParameter::EndTurn(true));

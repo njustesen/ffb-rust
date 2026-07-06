@@ -33,7 +33,7 @@ use crate::step::util_server_steps::change_player_action;
 ///
 /// isSufferingBloodLust, REMOVE_CONFUSION (with setHasMoved), STAND_UP / STAND_UP_BLITZ are all wired.
 /// client-only: UtilServerDialog.hideDialog
-/// headless: gameCache.queueDbUpdate — no database layer in headless engine.
+/// no-op: gameCache.queueDbUpdate — headless engine has no DB layer (confirmed intentional).
 pub struct StepEndSelecting {
     /// Java: fEndTurn
     pub end_turn: bool,

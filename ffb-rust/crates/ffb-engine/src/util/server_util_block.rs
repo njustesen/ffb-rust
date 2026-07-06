@@ -24,8 +24,8 @@ impl ServerUtilBlock {
     /// per-target assist counting (Guard skill not yet handled — assistsBlocksInTacklezones
     /// branch headless).
     ///
-    /// headless: TurnMode::force_dice_decoration_update not ported — dice decorations are
-    /// client-only display; headless always uses the conservative path (decorations not rebuilt).
+    /// client-only: TurnMode::force_dice_decoration_update — dice decorations are client-side display only;
+    /// headless always uses the conservative path (decorations not rebuilt).
     pub fn update_dice_decorations_with_frenzy(game: &mut Game, decorate_for_frenzy_blitz: bool) {
         let player_action = game.acting_player.player_action;
 

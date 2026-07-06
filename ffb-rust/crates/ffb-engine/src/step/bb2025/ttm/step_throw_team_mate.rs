@@ -6,7 +6,7 @@
 /// BB2025 differences vs BB2020:
 ///  - Uses `ttm_used` instead of `pass_used` for non-kicked throws.
 ///  - `evaluatePass`: resultAfterModifiers <= 1 → FUMBLE (not WILDLY_INACCURATE).
-///  - Adds Bullseye (canSkipTtmScatterOnSuperbThrow) — headless: auto-decide = false.
+///  - Adds Bullseye (canSkipTtmScatterOnSuperbThrow) — client-only: dialog auto-skipped in headless (default = no skip).
 ///
 /// Init param: IS_KICKED_PLAYER (optional).
 /// Consumed params: THROWN_PLAYER_ID, THROWN_PLAYER_STATE, THROWN_PLAYER_HAS_BALL.

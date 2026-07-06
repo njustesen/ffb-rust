@@ -166,7 +166,8 @@ impl StepSwarming {
 
         game.turn_mode = TurnMode::Swarming;
 
-        // headless: push self back onto stack (StepStack not ported)
+        // Java: pushes self back onto stack to re-enter when setup is submitted.
+        // StepOutcome::cont() keeps this step active — equivalent behavior; no stack push needed.
         // client-only: show DialogSwarmingPlayersParameter — dialog is client-side
 
         StepOutcome::cont()

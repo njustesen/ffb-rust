@@ -64,7 +64,7 @@ impl StepBlitzTurn {
                 game.team_away.id.clone()
             };
             SetupMechanic::new().pin_players_in_tacklezones_chain(game, &blitzing_team_id, true);
-            // headless: UtilServerTimer.stopTurnTimer / startTurnTimer — no timer in headless engine
+            // no-op: headless engine has no turn timer; stopTurnTimer/startTurnTimer are server-only
             game.start_turn();
             game.turn_mode = TurnMode::Blitz;
             // Java: pushCurrentStepOnStack(); Select.pushSequence(gameState, true)

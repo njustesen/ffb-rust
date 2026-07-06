@@ -24,7 +24,7 @@ use crate::step::framework::{StepId, StepParameter};
 ///  12 → Pitch Invasion
 ///
 /// Overtime options (GameOptionId::OVERTIME_KICK_OFF_RESULTS) implemented for all
-/// non-dialog paths. headless: blitzOrSolidDefence dialog path — client-only.
+/// non-dialog paths. client-only: blitzOrSolidDefence dialog path (Blitz/SolidDefence result) — dialog is client-side.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.kickoff.StepKickoffResultRoll`.
 pub struct StepKickoffResultRoll {

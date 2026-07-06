@@ -85,7 +85,7 @@ impl Step for StepSwoop {
                     .map(|id| game.team_home.player(id).is_some())
                     .unwrap_or(game.home_playing);
                 self.coordinate_to = Some(if is_home_player { *coord } else { coord.transform() });
-                // headless: executeSwoop() hooks — SkillBehaviour registry not ported
+                // no-op: executeSwoop() SkillBehaviour hooks skipped in headless (registry not ported)
                 return StepOutcome::next();
             }
             _ => {}
@@ -103,16 +103,18 @@ impl Step for StepSwoop {
 }
 
 impl StepSwoop {
-    fn execute_step(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Guard: both player and coordinate must be set
         if self.thrown_player_id.is_none() || self.thrown_player_coordinate.is_none() {
             return StepOutcome::next();
         }
 
-        // Java: if throwScatter → animate + move player (TODO: field model + animation)
-        // Java: if coordinateTo == null → updateSwoopSquares (TODO) → wait
+        // Java: if coordinateTo == null → updateSwoopSquares → wait for CLIENT_SWOOP
         if self.coordinate_to.is_none() {
-            // headless: UtilServerPlayerSwoop.updateSwoopSquares — TTM swoop coordinate calc not ported
+            if let Some(player_id) = &self.thrown_player_id {
+                use crate::util::util_server_player_swoop::UtilServerPlayerSwoop;
+                UtilServerPlayerSwoop::update_swoop_squares(game, &player_id.clone());
+            }
             return StepOutcome::cont();
         }
 

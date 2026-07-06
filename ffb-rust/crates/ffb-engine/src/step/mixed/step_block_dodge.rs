@@ -16,8 +16,8 @@
 ///   5. Publish pushback-init parameters and advance to next step.
 ///
 /// Note: `findDodgeChoice` and `UtilServerPushback` are not yet fully ported.
-/// The step stores the fields faithfully; the complex pushback-square scan is stubbed
-/// (`// headless: pushback squares`) while the set_parameter and structural logic are correct.
+/// The step stores the fields faithfully; the pushback-square scan is stubbed (no-op)
+/// while the set_parameter and structural logic are correct.
 use ffb_model::enums::{PlayerState, PS_FALLING};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;

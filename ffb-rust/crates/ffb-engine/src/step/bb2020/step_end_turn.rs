@@ -10,8 +10,8 @@
 /// BB2020 differs from BB2016:
 /// - Adds Swarming to the TurnMode skip guard
 /// - Adds useStarOfTheShow (detection wired; dialog not translated)
-/// - Adds getFaintingCount / deactivateCardsAndPrayers (headless: not yet ported)
-/// - Adds PrayerHandlerFactory handling (headless: not yet ported)
+/// - Card deactivation (UntilEndOfTurn, UntilEndOfOpponentsTurn, UntilEndOfDrive, UntilEndOfHalf) wired.
+/// - Prayer deactivation wired: PrayerHandlerFactory::deactivate_prayers called; getFaintingCount is no-op (returns 0).
 ///
 /// Stubs (untranslated server-side systems):
 /// - ArgueTheCall, Bribes, StarOfTheShow dialogs → skip (choices set to Some(false) immediately)
@@ -26,6 +26,7 @@ use std::collections::HashSet;
 use ffb_model::enums::{SkillId, TurnMode, Weather, PS_KNOCKED_OUT, PS_EXHAUSTED, PS_RESERVE};
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
+use ffb_model::report::mixed::report_turn_end::{ReportTurnEnd, KnockoutRecovery, HeatExhaustion};
 use ffb_model::types::FIELD_WIDTH;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_box::UtilBox;
@@ -241,13 +242,16 @@ impl StepEndTurn {
             && self.bribes_choice_away.is_some();
 
         if self.end_game || all_choices_done {
-            // headless: deactivateCardsAndPrayers / getFaintingCount — prayer state not yet ported
+            let is_home = self.is_home_turn_ending.unwrap_or(game.home_playing);
+            // Java: getPrayerHandlerFactory().deactivatePrayers(gameState, isHomeTurnEnding)
+            use crate::factory::mixed::prayer_handler_factory::PrayerHandlerFactory;
+            PrayerHandlerFactory::deactivate_prayers(game, is_home);
+            // no-op: getFaintingCount — MolesUnderThePitch fainting not tracked in headless; heat rolls still run
             // Java: deactivateCards(UNTIL_END_OF_TURN, isHomeTurnEnding)
             // Java: deactivateCards(UNTIL_END_OF_OPPONENTS_TURN, isHomeTurnEnding)
             {
                 use crate::util::util_server_cards::UtilServerCards;
                 use ffb_model::enums::InducementDuration;
-                let is_home = self.is_home_turn_ending.unwrap_or(game.home_playing);
                 UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfTurn, is_home);
                 UtilServerCards::deactivate_cards(game, InducementDuration::UntilEndOfOpponentsTurn, is_home);
                 if self.new_half || touchdown {
@@ -262,6 +266,8 @@ impl StepEndTurn {
                     .chain(game.team_away.players.iter())
                     .map(|p| p.id.clone())
                     .collect();
+                let mut ko_recoveries: Vec<KnockoutRecovery> = Vec::new();
+                let mut heat_exhaustions: Vec<HeatExhaustion> = Vec::new();
                 for player_id in &all_player_ids {
                     let player_state = match game.field_model.player_state(player_id) {
                         Some(s) => s,
@@ -276,9 +282,11 @@ impl StepEndTurn {
                             game.turn_data_away.inducement_set.value(Usage::KNOCKOUT_RECOVERY)
                         };
                         let roll = rng.d6();
-                        if DiceInterpreter::is_recovering_from_knockout(roll, bloodweiser_keg) {
+                        let recovered = DiceInterpreter::is_recovering_from_knockout(roll, bloodweiser_keg);
+                        if recovered {
                             game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
                         }
+                        ko_recoveries.push(KnockoutRecovery::new(player_id.clone(), recovered));
                     }
                     if base == PS_EXHAUSTED {
                         game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
@@ -289,10 +297,19 @@ impl StepEndTurn {
                             if DiceInterpreter::is_exhausted(roll) {
                                 let cur = game.field_model.player_state(player_id).unwrap_or_default();
                                 game.field_model.set_player_state(player_id, cur.change_base(PS_EXHAUSTED));
+                                heat_exhaustions.push(HeatExhaustion::new(player_id.clone(), roll));
                             }
                         }
                     }
                 }
+                let td_player_id = if touchdown { game.acting_player.player_id.clone() } else { None };
+                game.report_list.add(ReportTurnEnd::new(
+                    td_player_id,
+                    ko_recoveries,
+                    heat_exhaustions,
+                    vec![], // no-op: unzapped_players — ZappedPlayer tracking not ported in headless
+                    0,      // heat_roll: field-level roll; individual player rolls captured in heat_exhaustions
+                ));
                 UtilBox::put_all_players_into_box(game);
             }
 

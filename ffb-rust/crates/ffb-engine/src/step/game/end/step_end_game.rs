@@ -39,7 +39,7 @@ impl StepEndGame {
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
         game.status = GameStatus::Finished;
         // client-only: show GameStatistics dialog
-        // headless: replay file save (requires file I/O) — headless engine has no file system access
+        // no-op: replay file save requires file I/O — headless engine has no file system access
         StepOutcome::next()
     }
 }

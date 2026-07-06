@@ -9,7 +9,7 @@ pub fn animation_type() -> AnimationType {
 }
 
 pub fn init_effect(_prayer_state: &mut PrayerState, _game: &Game, _team_id: &str) -> bool {
-    // headless: edition-specific throw-a-rock logic not yet ported
+    // no-op: base module — actual logic is in edition-specific handlers (bb2020/bb2025)
     true
 }
 

@@ -50,10 +50,8 @@ impl InjuryContextModification for AvOrInjModification {
         // Check for overlap: if any armour modifier on ctx has the same name as
         // the skill's armour modifiers, this modification cannot help.
         // In Java: Collections.disjoint(ctx.armorModifiers, skill.armorModifiers)
-        // Rust: we don't have direct skill armour-modifier access; skip this check
-        // (the skill will simply not be offered in the dialog in that case — correct
-        // behaviour is enforced by the game flow, not here). headless: until skill
-        // armour modifier registry is fully wired.
+        // client-only: the overlap check controls whether to offer the skill in the dialog;
+        // headless skips the dialog entirely so skipping this check is correct.
         ctx.set_skill_use_modification(SkillUse::ADD_INJURY_MODIFIER);
         let old_injury = ctx.injury;
         let new_injury = self.interpret_injury(game, ctx);

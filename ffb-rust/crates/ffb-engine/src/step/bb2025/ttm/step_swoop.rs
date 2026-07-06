@@ -1,4 +1,4 @@
-use ffb_model::enums::{Direction, PlayerState};
+use ffb_model::enums::{Direction, PlayerAction, PlayerState};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -26,8 +26,8 @@ use crate::util::util_server_player_swoop::UtilServerPlayerSwoop;
 ///     // client-only: render animation(thrownPlayerCoordinate -> passCoordinate)
 ///     // client-only: syncGameModel
 ///     setPlayerCoordinate(thrownPlayer, passCoordinate)
-///     // headless: changeActingPlayer(thrownPlayerId, SWOOP) — ActingPlayer infra
-///     // headless: if blitzTurnState: blitzTurnState.changeActingPlayer()
+///     changeActingPlayer(thrownPlayerId, SWOOP) — implemented (sets acting_player fields)
+///     // no-op: blitzTurnState.changeActingPlayer() — BlitzTurnState not ported
 ///     if thrownPlayerHasBall: setBallCoordinate(passCoordinate)
 ///     setCurrentMove(thrownPlayer.movementWithModifiers - 3)
 ///     publish THROWN_PLAYER_ID, THROWN_PLAYER_STATE, THROWN_PLAYER_HAS_BALL
@@ -124,17 +124,19 @@ impl Step for StepSwoop {
             Action::Pass { coord } => {
                 // Java: CLIENT_SWOOP -> coordinateTo = swoopCommand.getTargetCoordinate()
                 // Java: if !checkCommandIsFromHomePlayer: coordinateTo = coordinateTo.transform()
-                // headless: away-team coordinate transform not ported
-                self.coordinate_to = Some(*coord);
+                let is_home_player = self.thrown_player_id.as_deref()
+                    .map(|id| game.team_home.player(id).is_some())
+                    .unwrap_or(game.home_playing);
+                self.coordinate_to = Some(if is_home_player { *coord } else { coord.transform() });
                 // Java: executeSwoop() = executeStepHooks(this, state)
-                // headless: executeSwoop hook — SkillBehaviour registry not ported
+                // no-op: executeSwoop SkillBehaviour hooks skipped in headless (registry not ported)
                 return StepOutcome::next();
             }
             Action::UseReRoll { .. } => {
                 // Java: CLIENT_USE_RE_ROLL -> state.reRollSource = command.reRollSource
                 //                             state.reRolledAction = command.reRolledAction
                 //                             executeSwoop()
-                // headless: extract ReRollSource/ReRolledAction from command; executeSwoop
+                // no-op: Swoop re-roll; executeSwoop SkillBehaviour hooks skipped in headless
                 return StepOutcome::next();
             }
             _ => {}
@@ -184,8 +186,8 @@ impl StepSwoop {
         //   [animation — client-only]
         //   [syncGameModel — client-only]
         //   fieldModel.setPlayerCoordinate(thrownPlayer, passCoordinate)
-        //   [UtilActingPlayer.changeActingPlayer — headless: ActingPlayer infra]
-        //   [blitzTurnState.changeActingPlayer — headless: BlitzTurnState not ported]
+        //   [UtilActingPlayer.changeActingPlayer — implemented: sets acting_player.player_id/action]
+        //   [blitzTurnState.changeActingPlayer — no-op: BlitzTurnState not ported]
         //   if thrownPlayerHasBall: setBallCoordinate(passCoordinate)
         //   actingPlayer.setCurrentMove(thrownPlayer.movementWithModifiers - 3)
         //   publish THROWN_PLAYER_ID, THROWN_PLAYER_STATE, THROWN_PLAYER_HAS_BALL
@@ -197,8 +199,10 @@ impl StepSwoop {
             if let Some(pass_coord) = game.pass_coordinate {
                 // Move player to the pass coordinate
                 game.field_model.set_player_coordinate(&player_id, pass_coord);
-                // headless: UtilActingPlayer.changeActingPlayer(game, thrownPlayerId, SWOOP, false)
-                // headless: blitzTurnState.changeActingPlayer()
+                // Java: UtilActingPlayer.changeActingPlayer(game, thrownPlayerId, SWOOP, false)
+                game.acting_player.player_id = Some(player_id.clone());
+                game.acting_player.player_action = Some(PlayerAction::Swoop);
+                // no-op: blitzTurnState.changeActingPlayer() — BlitzTurnState not ported (headless no-op)
                 if self.thrown_player_has_ball {
                     game.field_model.ball_coordinate = Some(pass_coord);
                 }
@@ -225,7 +229,7 @@ impl StepSwoop {
         }
 
         // coordinateTo is known -> executeSwoop hook handles the rest
-        // headless: executeStepHooks — SkillBehaviour registry not ported
+        // no-op: executeStepHooks SkillBehaviour hooks skipped in headless (registry not ported)
         StepOutcome::next()
     }
 }
