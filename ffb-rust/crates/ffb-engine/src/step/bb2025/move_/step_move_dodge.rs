@@ -156,21 +156,38 @@ impl StepMoveDodge {
             self.dodge_roll = rng.d6();
         }
 
-        let minimum_roll = {
-            let factory = DodgeModifierFactory::for_rules(game.rules);
-            if let Some(pid) = player_id.as_deref() {
-                let acting = game.acting_player.clone();
-                let src = self.coordinate_from.unwrap_or(FieldCoordinate::new(0, 0));
-                let tgt = self.coordinate_to.unwrap_or(FieldCoordinate::new(0, 0));
-                let ctx = DodgeContext::new(game, &acting, src, tgt);
-                let mods = factory.find_applicable(&ctx);
-                let agility = game.player(pid).map(|p| p.agility as i32).unwrap_or(3);
-                DodgeModifierFactory::minimum_roll(agility, &mods)
-            } else {
-                2
-            }
+        let factory = DodgeModifierFactory::for_rules(game.rules);
+        let (minimum_roll, mod_names): (i32, Vec<String>) = if let Some(pid) = player_id.as_deref() {
+            let acting = game.acting_player.clone();
+            let src = self.coordinate_from.unwrap_or(FieldCoordinate::new(0, 0));
+            let tgt = self.coordinate_to.unwrap_or(FieldCoordinate::new(0, 0));
+            let ctx = DodgeContext::new(game, &acting, src, tgt);
+            let mods = factory.find_applicable(&ctx);
+            let agility = game.player(pid).map(|p| p.agility as i32).unwrap_or(3);
+            let min = DodgeModifierFactory::minimum_roll(agility, &mods);
+            let names: Vec<String> = mods.iter().map(|m| m.get_report_string().to_string()).collect();
+            (min, names)
+        } else {
+            (2, vec![])
         };
         let successful = DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll);
+
+        // Java line 333-335: addReport(new ReportDodgeRoll(...))
+        {
+            use ffb_model::report::mixed::report_dodge_roll::ReportDodgeRoll;
+            let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
+                .map(|a| a.name == "DODGE").unwrap_or(false)
+                && self.re_roll_state.re_roll_source.is_some();
+            game.report_list.add(ReportDodgeRoll::new(
+                player_id.clone(),
+                successful,
+                self.dodge_roll,
+                minimum_roll,
+                re_rolled,
+                mod_names,
+                None, // stat_based_roll_modifier: headless never applies modifier-ignoring skill
+            ));
+        }
 
         if successful {
             let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
@@ -384,5 +401,29 @@ mod tests {
         step.dodge_roll = 1;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
+    }
+
+    #[test]
+    fn success_emits_dodge_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        game.acting_player.dodging = true;
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 6;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::DODGE_ROLL));
+    }
+
+    #[test]
+    fn failure_emits_dodge_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        game.acting_player.dodging = true;
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::DODGE_ROLL));
     }
 }

@@ -30,6 +30,12 @@ use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::bb2016::report_kickoff_riot::ReportKickoffRiot;
+use ffb_model::report::bb2016::report_kickoff_extra_re_roll::ReportKickoffExtraReRoll;
+use ffb_model::report::bb2016::report_kickoff_throw_a_rock::ReportKickoffThrowARock;
+use ffb_model::report::bb2016::report_kickoff_pitch_invasion::ReportKickoffPitchInvasion;
+use ffb_model::report::report_weather::ReportWeather;
+use ffb_model::report::report_scatter_ball::ReportScatterBall;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
 use crate::mechanic::mixed::setup_mechanic::SetupMechanic;
@@ -162,6 +168,7 @@ impl StepApplyKickoffResult {
         game.turn_data_away.turn_nr = (game.turn_data_away.turn_nr + turn_modifier).max(0);
 
         // Java: getResult().addReport(new ReportKickoffRiot(turnModifier, riotRoll))
+        game.report_list.add(ReportKickoffRiot::new(riot_roll, turn_modifier));
         let riot_event = GameEvent::KickoffRiot { turn_modifier, roll: riot_roll };
 
         if game.turn_data_home.turn_nr > 8 || game.turn_data_away.turn_nr > 8 {
@@ -253,6 +260,14 @@ impl StepApplyKickoffResult {
         }
 
         let kickoff_result = self.kickoff_result.unwrap_or(KickoffResult::BrilliantCoaching);
+        // Java: getResult().addReport(new ReportKickoffExtraReRoll(kickoffResult, rollHome, homeGainsReRoll, rollAway, awayGainsReRoll))
+        game.report_list.add(ReportKickoffExtraReRoll::new(
+            kickoff_result,
+            roll_home,
+            home_gains,
+            roll_away,
+            away_gains,
+        ));
         StepOutcome::next().with_event(GameEvent::KickoffExtraReRollBb2016 {
             kickoff_result,
             roll_home,
@@ -267,6 +282,8 @@ impl StepApplyKickoffResult {
         let weather_roll = rng.roll_weather();
         let weather = DiceInterpreter::interpret_roll_weather(&weather_roll);
         game.field_model.weather = weather;
+        // Java: getResult().addReport(new ReportWeather(weather, weatherRoll))
+        game.report_list.add(ReportWeather::new(weather, weather_roll.to_vec()));
 
         // Java: SWELTERING_HEAT → EXHAUSTED players move to RESERVE
         if weather == Weather::SwelteringHeat {
@@ -293,6 +310,8 @@ impl StepApplyKickoffResult {
                 let in_bounds = self.kickoff_bounds
                     .map(|b| b.is_in_bounds(new_coord))
                     .unwrap_or_else(|| FieldCoordinateBounds::FIELD.is_in_bounds(new_coord));
+                // Java: getResult().addReport(new ReportScatterBall(new Direction[] { direction }, new int[] { roll }, true))
+                game.report_list.add(ReportScatterBall::new(vec![direction], vec![roll], true));
                 if in_bounds {
                     game.field_model.ball_coordinate = Some(new_coord);
                 } else {
@@ -339,41 +358,51 @@ impl StepApplyKickoffResult {
         let total_home = roll_home + game.game_result.home.fame + fan_favs_home;
         let total_away = roll_away + game.game_result.away.fame + fan_favs_away;
 
+        // Collect hit player IDs first (before injury processing, matching Java order)
+        let hit_home: Option<String> = if total_away >= total_home {
+            let candidates: Vec<String> = on_field_player_ids(game, true);
+            rng.choose(&candidates).cloned()
+        } else {
+            None
+        };
+        let hit_away: Option<String> = if total_home >= total_away {
+            let candidates: Vec<String> = on_field_player_ids(game, false);
+            rng.choose(&candidates).cloned()
+        } else {
+            None
+        };
+
         let mut hit_player_ids: Vec<String> = Vec::new();
+        if let Some(ref id) = hit_home { hit_player_ids.push(id.clone()); }
+        if let Some(ref id) = hit_away { hit_player_ids.push(id.clone()); }
+
+        // Java: getResult().addReport(new ReportKickoffThrowARock(rollHome, rollAway, hitPlayerIds))
+        game.report_list.add(ReportKickoffThrowARock::new(roll_home, roll_away, hit_player_ids.clone()));
+
         let mut outcome = StepOutcome::next();
 
-        // Away wins (or ties) → a home player gets hit
-        if total_away >= total_home {
-            let candidates: Vec<String> = on_field_player_ids(game, true);
-            if let Some(hit_id) = rng.choose(&candidates).cloned() {
-                hit_player_ids.push(hit_id.clone());
-                let coord = game.field_model.player_coordinate(&hit_id)
-                    .unwrap_or(FieldCoordinate::new(0, 0));
-                let drop_params = util_server_injury::drop_player(game, &hit_id, false);
-                for p in drop_params { outcome = outcome.publish(p); }
-                let result = util_server_injury::handle_injury_by_name(
-                    game, rng, "InjuryTypeThrowARock", None, &hit_id,
-                    coord, None, None, ApothecaryMode::Home,
-                );
-                outcome = outcome.publish(StepParameter::InjuryResult(Box::new(result)));
-            }
+        if let Some(ref hit_id) = hit_home {
+            let coord = game.field_model.player_coordinate(hit_id)
+                .unwrap_or(FieldCoordinate::new(0, 0));
+            let drop_params = util_server_injury::drop_player(game, hit_id, false);
+            for p in drop_params { outcome = outcome.publish(p); }
+            let result = util_server_injury::handle_injury_by_name(
+                game, rng, "InjuryTypeThrowARock", None, hit_id,
+                coord, None, None, ApothecaryMode::Home,
+            );
+            outcome = outcome.publish(StepParameter::InjuryResult(Box::new(result)));
         }
 
-        // Home wins (or ties) → an away player gets hit
-        if total_home >= total_away {
-            let candidates: Vec<String> = on_field_player_ids(game, false);
-            if let Some(hit_id) = rng.choose(&candidates).cloned() {
-                hit_player_ids.push(hit_id.clone());
-                let coord = game.field_model.player_coordinate(&hit_id)
-                    .unwrap_or(FieldCoordinate::new(0, 0));
-                let drop_params = util_server_injury::drop_player(game, &hit_id, false);
-                for p in drop_params { outcome = outcome.publish(p); }
-                let result = util_server_injury::handle_injury_by_name(
-                    game, rng, "InjuryTypeThrowARock", None, &hit_id,
-                    coord, None, None, ApothecaryMode::Away,
-                );
-                outcome = outcome.publish(StepParameter::InjuryResult(Box::new(result)));
-            }
+        if let Some(ref hit_id) = hit_away {
+            let coord = game.field_model.player_coordinate(hit_id)
+                .unwrap_or(FieldCoordinate::new(0, 0));
+            let drop_params = util_server_injury::drop_player(game, hit_id, false);
+            for p in drop_params { outcome = outcome.publish(p); }
+            let result = util_server_injury::handle_injury_by_name(
+                game, rng, "InjuryTypeThrowARock", None, hit_id,
+                coord, None, None, ApothecaryMode::Away,
+            );
+            outcome = outcome.publish(StepParameter::InjuryResult(Box::new(result)));
         }
 
         outcome.with_event(GameEvent::KickoffThrowARockBb2016 {
@@ -419,6 +448,13 @@ impl StepApplyKickoffResult {
             }
         }
 
+        // Java: getResult().addReport(new ReportKickoffPitchInvasion(rollsHome, playerAffectedHome, rollsAway, playerAffectedAway))
+        game.report_list.add(ReportKickoffPitchInvasion::new(
+            rolls_home.clone(),
+            affected_home.clone(),
+            rolls_away.clone(),
+            affected_away.clone(),
+        ));
         StepOutcome::next().with_event(GameEvent::KickoffPitchInvasionBb2016 {
             rolls_home,
             affected_home,
@@ -677,5 +713,34 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(99)); // high rolls for home
         // Home should get at least a reroll attempt (actual result depends on seed)
         let _ = game.turn_data_home.rerolls >= before_home;
+    }
+
+    #[test]
+    fn riot_adds_kickoff_riot_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.turn_data_home.turn_nr = 3;
+        game.turn_data_away.turn_nr = 3;
+        game.home_playing = true;
+        let mut step = StepApplyKickoffResult::new("end".into(), "blitz".into());
+        step.kickoff_result = Some(KickoffResult::Riot);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::KICKOFF_RIOT),
+            "Riot should add ReportKickoffRiot"
+        );
+    }
+
+    #[test]
+    fn pitch_invasion_adds_kickoff_pitch_invasion_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepApplyKickoffResult::new("end".into(), "blitz".into());
+        step.kickoff_result = Some(KickoffResult::PitchInvasion);
+        step.start(&mut game, &mut GameRng::new(1));
+        assert!(
+            game.report_list.has_report(ReportId::KICKOFF_PITCH_INVASION),
+            "PitchInvasion should add ReportKickoffPitchInvasion"
+        );
     }
 }

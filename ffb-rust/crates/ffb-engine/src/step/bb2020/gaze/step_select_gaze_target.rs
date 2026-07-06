@@ -17,6 +17,7 @@ use ffb_model::enums::TurnMode;
 use ffb_model::enums::PlayerState;
 use ffb_model::model::property::NamedProperties;
 use ffb_model::model::target_selection_state::TargetSelectionState;
+use ffb_model::report::mixed::report_select_gaze_target::ReportSelectGazeTarget;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -237,6 +238,10 @@ impl StepSelectGazeTarget {
 
             // Java: getResult().addReport(new ReportSelectGazeTarget(actingPlayer.getId(), selectedId))
             let attacker_id = game.acting_player.player_id.clone().unwrap_or_default();
+            game.report_list.add(ReportSelectGazeTarget::new(
+                Some(attacker_id.clone()),
+                Some(selected_id.clone()),
+            ));
             return StepOutcome::next().with_event(GameEvent::SelectGazeTarget {
                 attacker_id,
                 defender_id: selected_id,
@@ -494,5 +499,56 @@ mod tests {
         step.end_turn = true;
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::Regular);
+    }
+
+    #[test]
+    fn selecting_opponent_adds_select_gaze_target_report() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerState};
+        use ffb_model::report::report_id::ReportId;
+        use std::collections::HashSet;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("gazer".into());
+        game.team_away.players.push(Player {
+            id: "target2".into(), name: "Target2".into(), nr: 2, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("target2", FieldCoordinate::new(6, 6));
+        game.field_model.set_player_state("target2", PlayerState::new(PS_STANDING));
+        let mut step = StepSelectGazeTarget::new();
+        step.selected_player_id = Some("target2".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SELECT_GAZE_TARGET),
+            "selecting opponent must add SELECT_GAZE_TARGET report");
+    }
+
+    #[test]
+    fn selecting_own_team_does_not_add_select_gaze_target_report() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("home_a".into());
+        game.team_home.players.push(Player {
+            id: "home_b".into(), name: "B".into(), nr: 3, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        let mut step = StepSelectGazeTarget::new();
+        step.selected_player_id = Some("home_b".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::SELECT_GAZE_TARGET),
+            "selecting own team-mate must NOT add SELECT_GAZE_TARGET report");
     }
 }

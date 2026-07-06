@@ -79,7 +79,7 @@ impl StepBlockChoice {
         let juggernaut_label = self.goto_label_on_juggernaut.clone();
         let pushback_label = self.goto_label_on_pushback.clone();
 
-        match block_result {
+        let outcome = match block_result {
             BlockResult::Skull => {
                 // Restore defender to old state first; set attacker to FALLING
                 if let Some(defender_id) = game.defender_id.clone() {
@@ -106,7 +106,7 @@ impl StepBlockChoice {
                 if defender_has_dodge {
                     let attacker_has_tackle = acting_player_id.as_deref()
                         .and_then(|id| game.player(id))
-                        .map(|p| p.has_skill_property("cancelsDodge"))
+                        .map(|p| p.has_skill_property(NamedProperties::CANCELS_IGNORE_DEFENDER_STUMBLES_RESULT))
                         .unwrap_or(false);
                     let attacker_can_block_same_team = acting_player_id.as_deref()
                         .and_then(|id| game.player(id))
@@ -123,47 +123,66 @@ impl StepBlockChoice {
                             .map(|p| p.has_skill_property(NamedProperties::IGNORE_TACKLE_WHEN_BLOCKED))
                             .unwrap_or(false);
                         if right_stuff_cancels_tackle && defender_has_right_stuff {
-                            // Java: ReportSkillUse(defender, Dodge, true)
-                            let out = StepOutcome::goto(&dodge_label);
-                            let out = if let Some(ref did) = defender_id {
-                                out.with_event(GameEvent::SkillUse { player_id: did.clone(), skill_id: SkillId::Dodge as u16, used: true })
-                            } else { out };
-                            return out;
+                            // Java: getResult().addReport(new ReportSkillUse(game.getDefenderId(), ignoreTackleSkill, true, SkillUse.CANCEL_TACKLE))
+                            if let Some(ref did) = defender_id {
+                                use ffb_model::model::skill_use::SkillUse;
+                                use ffb_model::report::report_skill_use::ReportSkillUse;
+                                game.report_list.add(ReportSkillUse::new(
+                                    Some(did.clone()), SkillId::RightStuff, true, SkillUse::CANCEL_TACKLE,
+                                ));
+                                game.report_list.add(ReportSkillUse::new(
+                                    Some(did.clone()), SkillId::Dodge, true, SkillUse::AVOID_FALLING,
+                                ));
+                            }
+                            let mut out = StepOutcome::goto(&dodge_label);
+                            if let Some(ref did) = defender_id {
+                                out = out.with_event(GameEvent::SkillUse { player_id: did.clone(), skill_id: SkillId::Dodge as u16, used: true });
+                            }
+                            out
+                        } else {
+                            // Tackle cancels Dodge → defender falls + pushback
+                            // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), attackerCanCancelDodgeSkill, true, SkillUse.CANCEL_DODGE))
+                            if let Some(ref aid) = acting_player_id {
+                                use ffb_model::model::skill_use::SkillUse;
+                                use ffb_model::report::report_skill_use::ReportSkillUse;
+                                game.report_list.add(ReportSkillUse::new(
+                                    Some(aid.clone()), SkillId::Tackle, true, SkillUse::CANCEL_DODGE,
+                                ));
+                            }
+                            if let Some(ref did) = defender_id {
+                                let defender_state = game.field_model.player_state(did).unwrap_or_default();
+                                game.field_model.set_player_state(did, defender_state.change_base(PS_FALLING));
+                            }
+                            let (sq, _) = self.init_pushback(game);
+                            let mut out = StepOutcome::goto(&pushback_label);
+                            if let Some(ref aid) = acting_player_id {
+                                out = out.with_event(GameEvent::SkillUse { player_id: aid.clone(), skill_id: SkillId::Tackle as u16, used: true });
+                            }
+                            if let Some(ref did) = defender_id {
+                                out = out.with_event(GameEvent::SkillUse { player_id: did.clone(), skill_id: SkillId::Dodge as u16, used: false });
+                            }
+                            out = out.publish(StepParameter::StartingPushbackSquare(sq));
+                            out
                         }
-                        // Tackle cancels Dodge → defender falls + pushback
-                        // Java: ReportSkillUse(attacker, Tackle, true); ReportSkillUse(defender, Dodge, false)
+                    } else {
+                        // No Tackle → Dodge works
+                        let mut out = StepOutcome::goto(&dodge_label);
                         if let Some(ref did) = defender_id {
-                            let defender_state = game.field_model.player_state(did).unwrap_or_default();
-                            game.field_model.set_player_state(did, defender_state.change_base(PS_FALLING));
+                            out = out.with_event(GameEvent::SkillUse { player_id: did.clone(), skill_id: SkillId::Dodge as u16, used: true });
                         }
-                        let (sq, _) = self.init_pushback(game);
-                        let mut out = StepOutcome::goto(&pushback_label);
-                        if let Some(ref aid) = acting_player_id {
-                            out = out.with_event(GameEvent::SkillUse { player_id: aid.clone(), skill_id: SkillId::Tackle as u16, used: true });
-                        }
-                        if let Some(ref did) = defender_id {
-                            out = out.with_event(GameEvent::SkillUse { player_id: did.clone(), skill_id: SkillId::Dodge as u16, used: false });
-                        }
-                        out = out.publish(StepParameter::StartingPushbackSquare(sq));
-                        return out;
+                        out
                     }
-                    // No Tackle → Dodge works
-                    // Java: ReportSkillUse(defender, Dodge, true)
-                    let mut out = StepOutcome::goto(&dodge_label);
+                } else {
+                    // No Dodge → defender falls + pushback
                     if let Some(ref did) = defender_id {
-                        out = out.with_event(GameEvent::SkillUse { player_id: did.clone(), skill_id: SkillId::Dodge as u16, used: true });
+                        let defender_state = game.field_model.player_state(did).unwrap_or_default();
+                        game.field_model.set_player_state(did, defender_state.change_base(PS_FALLING));
                     }
-                    return out;
+                    let (sq, _) = self.init_pushback(game);
+                    let mut out = StepOutcome::goto(&pushback_label);
+                    out = out.publish(StepParameter::StartingPushbackSquare(sq));
+                    out
                 }
-                // No Dodge → defender falls + pushback
-                if let Some(ref did) = defender_id {
-                    let defender_state = game.field_model.player_state(did).unwrap_or_default();
-                    game.field_model.set_player_state(did, defender_state.change_base(PS_FALLING));
-                }
-                let (sq, _) = self.init_pushback(game);
-                let mut out = StepOutcome::goto(&pushback_label);
-                out = out.publish(StepParameter::StartingPushbackSquare(sq));
-                out
             }
             BlockResult::Pow => {
                 if let Some(defender_id) = game.defender_id.clone() {
@@ -186,7 +205,25 @@ impl StepBlockChoice {
                 out
             }
             _ => StepOutcome::next(),
+        };
+
+        // Java: getResult().addReport(new ReportBlockChoice(fNrOfDice, fBlockRoll, fDiceIndex,
+        //         fBlockResult, game.getDefenderId(), suppressExtraEffectHandling, showNameInReport, blockRollId))
+        {
+            use ffb_model::report::report_block_choice::ReportBlockChoice;
+            game.report_list.add(ReportBlockChoice::new(
+                self.nr_of_dice,
+                self.block_roll.clone(),
+                self.dice_index as i32,
+                block_result.name().to_string(),
+                game.defender_id.clone().unwrap_or_default(),
+                self.suppress_extra_effect_handling,
+                self.show_name_in_report,
+                self.block_roll_id,
+            ));
         }
+
+        outcome
     }
 
     /// Returns (starting_pushback_square, scatter_ball).
@@ -214,7 +251,8 @@ mod tests {
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::StepAction;
-    use ffb_model::enums::{Rules, BlockResult, PS_STANDING, PS_FALLING};
+    use ffb_model::enums::{Rules, BlockResult, PS_STANDING, PS_FALLING, PlayerGender, PlayerType, SkillId};
+    use ffb_model::model::player::Player;
 
     fn make_game() -> Game {
         let home = test_team("home", 0);
@@ -282,5 +320,86 @@ mod tests {
         let state = PlayerState::new(PS_STANDING);
         step.set_parameter(&StepParameter::OldDefenderState(state));
         assert!(step.old_defender_state.is_some());
+    }
+
+    #[test]
+    fn pow_result_emits_report_block_choice() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepBlockChoice::new("dodge".into(), "jugger".into(), "push".into());
+        step.block_result = Some(BlockResult::Pow);
+        step.block_roll = vec![4];
+        let mut game = make_game();
+        // add a defender so field_model doesn't crash on pushback
+        game.team_away.players.push(make_bare_player("def", 2_i32));
+        game.field_model.set_player_coordinate("def", ffb_model::types::FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.defender_id = Some("def".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::BLOCK_CHOICE));
+    }
+
+    #[test]
+    fn skull_result_emits_report_block_choice() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepBlockChoice::new("dodge".into(), "jugger".into(), "push".into());
+        step.block_result = Some(BlockResult::Skull);
+        step.block_roll = vec![1];
+        let mut game = make_game();
+        game.team_home.players.push(make_bare_player("att", 1_i32));
+        game.field_model.set_player_coordinate("att", ffb_model::types::FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        game.acting_player.player_id = Some("att".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::BLOCK_CHOICE));
+    }
+
+    #[test]
+    fn tackle_cancels_dodge_emits_cancel_dodge_skill_use() {
+        use ffb_model::report::report_id::ReportId;
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut step = StepBlockChoice::new("dodge".into(), "jugger".into(), "push".into());
+        step.block_result = Some(BlockResult::PowPushback);
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "att".into(), name: "att".into(), nr: 1, position_id: "l".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue::new(SkillId::Tackle)],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("att", ffb_model::types::FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        game.team_away.players.push(Player {
+            id: "def".into(), name: "def".into(), nr: 2, position_id: "l".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 4, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue::new(SkillId::Dodge)],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("def", ffb_model::types::FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_USE), "Tackle cancel dodge must emit ReportSkillUse");
+        assert!(game.report_list.has_report(ReportId::BLOCK_CHOICE));
+    }
+
+    fn make_bare_player(id: &str, nr: i32) -> Player {
+        Player {
+            id: id.into(), name: id.into(), nr, position_id: "l".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        }
     }
 }

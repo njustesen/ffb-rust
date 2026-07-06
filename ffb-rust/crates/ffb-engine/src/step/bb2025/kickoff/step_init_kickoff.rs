@@ -1,6 +1,7 @@
 use ffb_model::enums::{InducementPhase, TurnMode};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::report::report_start_half::ReportStartHalf;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::mechanic::bb2025::state_mechanic::StateMechanic;
@@ -55,6 +56,7 @@ impl StepInitKickoff {
             let half_events = StateMechanic::new().start_half(game, 1);
             events.extend(half_events);
             // Java: getResult().addReport(new ReportStartHalf(game.getHalf()))
+            game.report_list.add(ReportStartHalf::new(game.half));
             events.push(GameEvent::StartHalf { half: game.half });
             game.turn_mode = TurnMode::Setup;
             game.start_turn();
@@ -135,5 +137,29 @@ mod tests {
     fn set_parameter_returns_false() {
         let mut step = StepInitKickoff::new();
         assert!(!step.set_parameter(&StepParameter::EndTurn(false)));
+    }
+
+    #[test]
+    fn start_game_mode_adds_start_half_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.team_home.rerolls = 1;
+        game.team_away.rerolls = 1;
+        game.turn_mode = TurnMode::StartGame;
+        let mut step = StepInitKickoff::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::START_HALF),
+            "START_HALF report must be added when StartGame mode");
+    }
+
+    #[test]
+    fn non_start_game_mode_does_not_add_start_half_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Kickoff;
+        let mut step = StepInitKickoff::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::START_HALF),
+            "START_HALF report must NOT be added when not StartGame mode");
     }
 }

@@ -87,6 +87,18 @@ impl StepBlockChainsaw {
             let successful = roll >= minimum_roll;
 
             // Java: getResult().addReport(new ReportChainsawRoll(actingPlayer.getPlayerId(), successful, roll, minimumRoll, reRolled, null))
+            {
+                use ffb_model::report::report_chainsaw_roll::ReportChainsawRoll;
+                game.report_list.add(ReportChainsawRoll::new(
+                    Some(acting_id.clone()),
+                    successful,
+                    roll,
+                    minimum_roll,
+                    re_rolled,
+                    vec![],
+                    game.defender_id.clone(),
+                ));
+            }
             let chainsaw_event = GameEvent::ChainsawRoll {
                 player_id: acting_id.clone(),
                 roll,
@@ -299,6 +311,21 @@ mod tests {
             out.action == StepAction::GotoLabel || out.action == StepAction::Continue,
             "unexpected action: {:?}", out.action
         );
+    }
+
+    #[test]
+    fn chainsaw_emits_report_chainsaw_roll() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepBlockChainsaw::new();
+        step.set_parameter(&StepParameter::GotoLabelOnSuccess("ok".into()));
+        step.set_parameter(&StepParameter::GotoLabelOnFailure("fail".into()));
+        let mut game = make_game();
+        add_player_with_skill(&mut game, "saw", SkillId::Chainsaw);
+        add_player(&mut game, "def");
+        game.acting_player.player_id = Some("saw".into());
+        game.defender_id = Some("def".into());
+        step.start(&mut game, &mut GameRng::new(42));
+        assert!(game.report_list.has_report(ReportId::CHAINSAW_ROLL), "ReportChainsawRoll must be emitted");
     }
 
     #[test]

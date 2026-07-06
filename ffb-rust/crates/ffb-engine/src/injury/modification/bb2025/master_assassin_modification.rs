@@ -35,6 +35,16 @@ impl InjuryContextModification for MasterAssassinModification {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ffb_model::enums::{ApothecaryMode, Rules};
+    use ffb_model::model::game::Game;
+    use ffb_model::util::rng::GameRng;
+    use crate::injury::InjuryContext;
+    use crate::injury::modification::ModificationParams;
+    use crate::step::framework::test_team;
+
+    fn make_game() -> Game {
+        Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+    }
 
     #[test]
     fn valid_type_is_stab() {
@@ -55,5 +65,29 @@ mod tests {
         let m = MasterAssassinModification::new();
         assert!(!m.is_valid_type("Chainsaw"));
         assert!(!m.is_valid_type("ProjectileVomit"));
+    }
+
+    #[test]
+    fn skill_use_is_reroll_armour() {
+        assert_eq!(MasterAssassinModification::new().skill_use(), SkillUse::RE_ROLL_ARMOUR);
+    }
+
+    #[test]
+    fn try_armour_false_when_broken() {
+        let game = make_game();
+        let mut rng = GameRng::new(1);
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.armor_broken = true;
+        let params = ModificationParams::new(&game, &mut rng, ctx, "Stab");
+        assert!(!MasterAssassinModification::new().try_armour_roll_modification(&params));
+    }
+
+    #[test]
+    fn try_armour_true_when_not_broken() {
+        let game = make_game();
+        let mut rng = GameRng::new(1);
+        let ctx = InjuryContext::new(ApothecaryMode::Defender);
+        let params = ModificationParams::new(&game, &mut rng, ctx, "Stab");
+        assert!(MasterAssassinModification::new().try_armour_roll_modification(&params));
     }
 }

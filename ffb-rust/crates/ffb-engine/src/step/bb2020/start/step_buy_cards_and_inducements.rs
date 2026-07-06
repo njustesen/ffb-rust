@@ -31,6 +31,7 @@
 use ffb_model::enums::InducementPhase;
 use ffb_model::model::game::Game;
 use ffb_model::report::bb2020::report_cards_and_inducements_bought::ReportCardsAndInducementsBought;
+use ffb_model::report::mixed::report_bribery_and_corruption_re_roll::ReportBriberyAndCorruptionReRoll;
 use ffb_model::option::game_option_id::{
     INDUCEMENTS, FREE_INDUCEMENT_CASH, FREE_CARD_CASH,
     INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV, INDUCEMENTS_ALLOW_OVERDOG_SPENDING,
@@ -305,10 +306,20 @@ impl StepBuyCardsAndInducements {
             if game.team_home.special_rules.iter().any(|r| r == bnc_name) {
                 game.turn_data_home.inducement_set.add_inducement(
                     InducementModel::new("briberyAndCorruption", 1, vec![Usage::REROLL_ARGUE]));
+                // Java: getResult().addReport(new ReportBriberyAndCorruptionReRoll(teamHome.getId(), BriberyAndCorruptionAction.ADDED))
+                game.report_list.add(ReportBriberyAndCorruptionReRoll::new(
+                    Some(game.team_home.id.clone()),
+                    "ADDED".into(),
+                ));
             }
             if game.team_away.special_rules.iter().any(|r| r == bnc_name) {
                 game.turn_data_away.inducement_set.add_inducement(
                     InducementModel::new("briberyAndCorruption", 1, vec![Usage::REROLL_ARGUE]));
+                // Java: getResult().addReport(new ReportBriberyAndCorruptionReRoll(teamAway.getId(), BriberyAndCorruptionAction.ADDED))
+                game.report_list.add(ReportBriberyAndCorruptionReRoll::new(
+                    Some(game.team_away.id.clone()),
+                    "ADDED".into(),
+                ));
             }
         }
 
@@ -528,5 +539,28 @@ mod tests {
             assert_eq!(phase.as_name(), name);
             assert_eq!(Phase::from_name(name), phase);
         }
+    }
+
+    #[test]
+    fn bribery_and_corruption_adds_report_for_home_team() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        // Give home team the Bribery and Corruption special rule.
+        game.team_home.special_rules.push("Bribery and Corruption".into());
+        let mut step = StepBuyCardsAndInducements::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::BRIBERY_AND_CORRUPTION_RE_ROLL),
+            "team with BriberyAndCorruption must add BRIBERY_AND_CORRUPTION_RE_ROLL report");
+    }
+
+    #[test]
+    fn no_bribery_rule_does_not_add_bnc_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        // No special rules on either team.
+        let mut step = StepBuyCardsAndInducements::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::BRIBERY_AND_CORRUPTION_RE_ROLL),
+            "team without BriberyAndCorruption must NOT add BRIBERY_AND_CORRUPTION_RE_ROLL report");
     }
 }

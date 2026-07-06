@@ -64,4 +64,12 @@ mod tests {
         t.handle_injury(&game_with_armor(2), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert!(t.ctx.armor_broken); assert!(t.ctx.injury.is_some());
     }
+    #[test]
+    fn does_not_cause_turnover() { assert!(!InjuryTypeThenIStartedBlastin::new().falling_down_causes_turnover()); }
+    #[test]
+    fn context_stores_defender_id() {
+        let mut t = InjuryTypeThenIStartedBlastin::new(); let mut rng = GameRng::new(1);
+        t.handle_injury(&game_with_armor(13), &mut rng, None, "blastin_target", coord(), None, None, ApothecaryMode::Defender);
+        assert_eq!(t.ctx.defender_id.as_deref(), Some("blastin_target"));
+    }
 }

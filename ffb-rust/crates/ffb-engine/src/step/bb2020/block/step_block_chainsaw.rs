@@ -121,6 +121,12 @@ impl StepBlockChainsaw {
                 let is_home = game.team_home.player(&attacker_id).is_some();
                 if is_home { game.team_home.player_mut(&attacker_id).map(|p| p.used_skills.insert(sid)); }
                 else { game.team_away.player_mut(&attacker_id).map(|p| p.used_skills.insert(sid)); }
+                // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skillWithProperty.get(), true, SkillUse.PERFORM_SECOND_CHAINSAW_ATTACK))
+                use ffb_model::model::skill_use::SkillUse;
+                use ffb_model::report::report_skill_use::ReportSkillUse;
+                game.report_list.add(ReportSkillUse::new(
+                    Some(attacker_id.clone()), sid, true, SkillUse::PERFORM_SECOND_CHAINSAW_ATTACK,
+                ));
             }
         }
 
@@ -142,9 +148,24 @@ impl StepBlockChainsaw {
         }
 
         // Java: int roll = rollChainsaw(); int minimumRoll = minimumRollChainsaw() (= 2, only 1 fails)
+        let re_rolled = self.re_rolled_action.as_deref() == Some("CHAINSAW") && self.re_roll_source.is_some();
         let roll = rng.d6();
         let minimum_roll = ffb_mechanics::mechanics::minimum_roll_chainsaw();
         let successful = roll >= minimum_roll;
+
+        // Java: getResult().addReport(new ReportChainsawRoll(actingPlayer.getPlayerId(), successful, roll, minimumRoll, reRolled, null))
+        {
+            use ffb_model::report::report_chainsaw_roll::ReportChainsawRoll;
+            game.report_list.add(ReportChainsawRoll::new(
+                Some(attacker_id.clone()),
+                successful,
+                roll,
+                minimum_roll,
+                re_rolled,
+                vec![],
+                game.defender_id.clone(),
+            ));
+        }
 
         if successful {
             let defender_id = match game.defender_id.clone() {
@@ -184,8 +205,6 @@ impl StepBlockChainsaw {
             StepOutcome::next().publish(StepParameter::DropPlayerContext(Box::new(dpc)))
         } else {
             // Failed roll — Java: if (reRolled || !askForReRollIfAvailable(...)) → drop
-            let re_rolled = self.re_rolled_action.as_deref() == Some("CHAINSAW")
-                && self.re_roll_source.is_some();
             if !re_rolled {
                 if let Some(prompt) = ask_for_reroll_if_available(game, "CHAINSAW", minimum_roll, false) {
                     self.re_rolled_action = Some("CHAINSAW".into());

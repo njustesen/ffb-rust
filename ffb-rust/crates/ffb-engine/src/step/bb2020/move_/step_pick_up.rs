@@ -172,23 +172,39 @@ impl StepPickUp {
             self.roll = rng.d6();
         }
 
-        let minimum_roll = {
-            let factory = PickupModifierFactory::for_rules(game.rules);
-            if let Some(pid) = player_id.as_deref() {
-                if let Some(player) = game.player(pid) {
-                    let ctx = PickupContext::new(game, player);
-                    let mods = factory.find_applicable(&ctx);
-                    let effective_agility = if self.secure_the_ball { 2 } else { player.agility as i32 };
-                    PickupModifierFactory::minimum_roll(effective_agility, &mods)
-                } else {
-                    2
-                }
+        let factory = PickupModifierFactory::for_rules(game.rules);
+        let (minimum_roll, mod_names): (i32, Vec<String>) = if let Some(pid) = player_id.as_deref() {
+            if let Some(player) = game.player(pid) {
+                let ctx = PickupContext::new(game, player);
+                let mods = factory.find_applicable(&ctx);
+                let effective_agility = if self.secure_the_ball { 2 } else { player.agility as i32 };
+                let min = PickupModifierFactory::minimum_roll(effective_agility, &mods);
+                let names: Vec<String> = mods.iter().map(|m| m.get_report_string().to_string()).collect();
+                (min, names)
             } else {
-                2
+                (2, vec![])
             }
+        } else {
+            (2, vec![])
         };
 
         let successful = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
+
+        // Java line 191: addReport(new ReportPickupRoll(...))
+        {
+            use ffb_model::report::mixed::report_pickup_roll::ReportPickupRoll;
+            let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
+                .map(|a| a.name == "PICKUP").unwrap_or(false)
+                && self.re_roll_state.re_roll_source.is_some();
+            game.report_list.add(ReportPickupRoll::new(
+                player_id.clone(),
+                successful,
+                self.roll,
+                minimum_roll,
+                re_rolled,
+                mod_names,
+            ));
+        }
 
         if successful {
             game.field_model.ball_moving = false;
@@ -369,5 +385,27 @@ mod tests {
         let _offer = step.start(&mut game, &mut GameRng::new(0));
         let out = step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
+    }
+
+    #[test]
+    fn success_emits_pickup_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        add_player_at_ball(&mut game, "p1");
+        let mut step = StepPickUp::new("fail".into());
+        step.roll = 6;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PICK_UP_ROLL));
+    }
+
+    #[test]
+    fn failure_emits_pickup_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        add_player_at_ball(&mut game, "p1");
+        let mut step = StepPickUp::new("fail".into());
+        step.roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PICK_UP_ROLL));
     }
 }

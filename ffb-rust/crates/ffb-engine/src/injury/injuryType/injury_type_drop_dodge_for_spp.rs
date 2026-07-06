@@ -83,4 +83,26 @@ mod tests {
         t.handle_injury(&game_with_armor(2), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert!(t.ctx.armor_broken); assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
+
+    #[test]
+    fn falling_down_causes_turnover() {
+        assert!(InjuryTypeDropDodgeForSpp::new().falling_down_causes_turnover());
+    }
+
+    #[test]
+    fn new_with_arm_bar_stores_player_id() {
+        let t = InjuryTypeDropDodgeForSpp::new_with_arm_bar(Some("arm_bar_player".into()));
+        assert_eq!(t.arm_bar_player_id.as_deref(), Some("arm_bar_player"));
+    }
+
+    #[test]
+    fn pre_broken_armor_skips_armor_roll_goes_to_injury() {
+        // If ctx.armor_broken is already set, the armor roll phase is skipped and injury roll runs
+        let mut t = InjuryTypeDropDodgeForSpp::new();
+        t.ctx.armor_broken = true; // pre-set broken
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game_with_armor(7), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert!(t.ctx.armor_broken);
+        assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
+    }
 }

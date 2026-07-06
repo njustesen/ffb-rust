@@ -90,4 +90,21 @@ mod tests {
     }
     #[test]
     fn causes_turnover() { assert!(InjuryTypeDropDodge::new().falling_down_causes_turnover()); }
+
+    #[test]
+    fn new_with_arm_bar_stores_arm_bar_player() {
+        let t = InjuryTypeDropDodge::new_with_arm_bar(Some("arm_bar".into()), true);
+        assert_eq!(t.arm_bar_player_id.as_deref(), Some("arm_bar"));
+        assert!(t.use_arm_bar_modifiers);
+    }
+
+    #[test]
+    fn pre_broken_armor_skips_armor_roll() {
+        let mut t = InjuryTypeDropDodge::new();
+        t.ctx.armor_broken = true;
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game_with_armor(7), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert!(t.ctx.armor_broken);
+        assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
+    }
 }

@@ -16,6 +16,7 @@ use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::re_rolled_action::ReRolledAction;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_chainsaw_roll::ReportChainsawRoll;
 use crate::action::Action;
 use crate::injury::InjuryTypeChainsawImpl;
 use crate::step::abstract_step_with_re_roll::ReRollState;
@@ -80,6 +81,15 @@ impl StepFoulChainsaw {
             let rerolled = already_rerolled && self.re_roll_state.re_roll_source.is_some();
 
             // Java: getResult().addReport(new ReportChainsawRoll(actingPlayer.getPlayerId(), successful, roll, minimumRoll, reRolled, null))
+            game.report_list.add(ReportChainsawRoll::new(
+                Some(acting_id.clone()),
+                successful,
+                self.roll,
+                minimum_roll,
+                rerolled,
+                vec![],
+                None,
+            ));
             let chainsaw_event = GameEvent::ChainsawRoll {
                 player_id: acting_id.clone(),
                 roll: self.roll,
@@ -215,6 +225,54 @@ mod tests {
     #[test]
     fn id_is_foul_chainsaw() {
         assert_eq!(StepFoulChainsaw::new().id(), StepId::FoulChainsaw);
+    }
+
+    fn make_chainsaw_player(game: &mut Game, id: &str) {
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::skill_def::SkillWithValue;
+        game.team_home.players.push(Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Chainsaw, value: None }],
+            extra_skills: vec![], temporary_skills: vec![], used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state(id, ffb_model::enums::PlayerState::new(PS_STANDING));
+        game.acting_player.player_id = Some(id.into());
+    }
+
+    #[test]
+    fn chainsaw_success_adds_chainsaw_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        make_chainsaw_player(&mut game, "saw1");
+        let mut step = StepFoulChainsaw::new();
+        step.goto_label_on_failure = "fail".into();
+        step.roll = 6; // success
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::CHAINSAW_ROLL),
+            "successful chainsaw roll should add ReportChainsawRoll"
+        );
+    }
+
+    #[test]
+    fn chainsaw_failure_adds_chainsaw_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        make_chainsaw_player(&mut game, "saw2");
+        let mut step = StepFoulChainsaw::new();
+        step.goto_label_on_failure = "fail".into();
+        step.roll = 1; // failure (< minimum 2)
+        // seed 0 gives no re-roll available → immediately drops the player
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::CHAINSAW_ROLL),
+            "failed chainsaw roll should add ReportChainsawRoll"
+        );
     }
 
     #[test]

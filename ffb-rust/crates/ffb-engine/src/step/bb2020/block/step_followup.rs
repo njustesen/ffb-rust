@@ -3,6 +3,7 @@ use ffb_model::enums::{PlayerAction, PlayerState};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_cards::UtilCards;
 use ffb_mechanics::skills::SkillId;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -86,6 +87,15 @@ impl StepFollowup {
         let attacker_state = acting_player_id.as_deref()
             .and_then(|id| game.field_model.player_state(id))
             .unwrap_or_default();
+        // Java local var: SkillId skillPreventingFollowUp = UtilCards.getSkillWithProperty(pGame.getDefender(), preventOpponentFollowingUp)
+        let fend_skill_id = game.defender_id.as_deref()
+            .and_then(|id| game.player(id))
+            .and_then(|p| p.all_skill_ids().find(|id| id.properties().contains(&NamedProperties::PREVENT_OPPONENT_FOLLOWING_UP)));
+        // Java local var: SkillId skillCancelsSkillPreventingFollow = UtilCards.getSkillCancelling(attacker, skillPreventingFollowUp)
+        let cancel_skill_id = acting_player_id.as_deref()
+            .and_then(|id| game.player(id))
+            .and_then(|p| UtilCards::get_skill_cancelling_property(p, NamedProperties::PREVENT_OPPONENT_FOLLOWING_UP));
+        let mut cancel_skill_used = false;
 
         // Local effective choice — mirrors Java's `publishParameter(FollowupChoice, ...)` which
         // immediately updates `followupChoice` on the current step via the stack walk.
@@ -138,10 +148,23 @@ impl StepFollowup {
                 if attacker_cancels_fend && action_allows_cancel {
                     // Juggernaut auto-cancels Fend — no dialog needed.
                     self.using_skill_preventing_follow_up = Some(false);
+                    cancel_skill_used = true;
+                    // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skillCancelsSkillPreventingFollow, true, SkillUse.CANCEL_FEND))
+                    if let (Some(ref aid), Some(csid)) = (&acting_player_id, cancel_skill_id) {
+                        use ffb_model::model::skill_use::SkillUse;
+                        use ffb_model::report::report_skill_use::ReportSkillUse;
+                        game.report_list.add(ReportSkillUse::new(Some(aid.clone()), csid, true, SkillUse::CANCEL_FEND));
+                    }
                 } else if self.using_skill_preventing_follow_up.is_none() {
                     if !old_defender_state.has_tacklezones() {
                         // Defender has no tacklezones — Fend fails automatically
                         self.using_skill_preventing_follow_up = Some(false);
+                        // Java: getResult().addReport(new ReportSkillUse(game.getDefenderId(), skillPreventingFollowUp, false, SkillUse.NO_TACKLEZONE))
+                        if let (Some(ref did), Some(fsid)) = (&game.defender_id.clone(), fend_skill_id) {
+                            use ffb_model::model::skill_use::SkillUse;
+                            use ffb_model::report::report_skill_use::ReportSkillUse;
+                            game.report_list.add(ReportSkillUse::new(Some(did.clone()), fsid, false, SkillUse::NO_TACKLEZONE));
+                        }
                     } else {
                         // Would show DialogSkillUse for Fend — stub: wait for response
                         return build_outcome(out_params, StepOutcome::cont());
@@ -151,7 +174,18 @@ impl StepFollowup {
                     effective_choice = Some(false);
                     out_params.push(StepParameter::FollowupChoice(false));
                 }
-                // Report skill use (TODO: add ReportSkillUse event)
+                // Java: if (!cancelSkillUsed) getResult().addReport(new ReportSkillUse(defenderId, skillPreventingFollowUp, usingSkillPreventingFollowUp, SkillUse.STAY_AWAY_FROM_OPPONENT))
+                if !cancel_skill_used {
+                    if let (Some(ref did), Some(fsid)) = (&game.defender_id.clone(), fend_skill_id) {
+                        use ffb_model::model::skill_use::SkillUse;
+                        use ffb_model::report::report_skill_use::ReportSkillUse;
+                        game.report_list.add(ReportSkillUse::new(
+                            Some(did.clone()), fsid,
+                            self.using_skill_preventing_follow_up.unwrap_or(false),
+                            SkillUse::STAY_AWAY_FROM_OPPONENT,
+                        ));
+                    }
+                }
             } else {
                 self.using_skill_preventing_follow_up = Some(false);
             }
@@ -339,6 +373,44 @@ mod tests {
         let coord = FieldCoordinate::new(3, 7);
         step.set_parameter(&StepParameter::DefenderPosition(coord));
         assert_eq!(step.defender_position, Some(coord));
+    }
+
+    #[test]
+    fn fend_no_tacklezone_emits_no_tacklezone_report() {
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerGender, PlayerType, SkillId, PS_FALLING};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "attacker".into(), name: "attacker".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 4, strength: 4, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.team_away.players.push(Player {
+            id: "defender".into(), name: "defender".into(), nr: 2, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 4, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Fend, value: None }],
+            extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        let falling_state = PlayerState::new(PS_FALLING);
+        game.field_model.set_player_state("defender", falling_state);
+        game.acting_player.player_id = Some("attacker".into());
+        game.defender_id = Some("defender".into());
+        let mut step = StepFollowup::new();
+        // FALLING state → no tacklezones but not prone/stunned → triggers NO_TACKLEZONE path
+        step.old_defender_state = Some(PlayerState::new(PS_FALLING));
+        step.using_skill_forcing_follow_up = Some(false);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_USE), "Fend no-tacklezone path must emit ReportSkillUse");
     }
 
     #[test]

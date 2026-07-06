@@ -1,6 +1,9 @@
 use ffb_model::enums::PlayerAction;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::report_interception_roll::ReportInterceptionRoll;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::passing::can_intercept;
 use ffb_model::util::rng::GameRng;
 use ffb_mechanics::modifiers::interception_modifier_factory::InterceptionModifierFactory;
@@ -92,34 +95,70 @@ impl StepIntercept {
     }
 
     /// Java: intercept(pInterceptor, passState) — rolls agility, checks modifiers.
-    fn intercept(&self, interceptor_id: &str, game: &Game, rng: &mut GameRng) -> bool {
-        let interceptor = match game.player(interceptor_id) {
-            Some(p) => p,
-            None => return false,
+    fn intercept(&self, interceptor_id: &str, game: &mut Game, rng: &mut GameRng) -> bool {
+        let (easy_intercept, minimum_roll, roll) = {
+            let interceptor = match game.player(interceptor_id) {
+                Some(p) => p,
+                None => return false,
+            };
+
+            // Java: easyIntercept = interceptionSkill != null && pInterceptor.hasUnused(interceptionSkill)
+            let easy_intercept = self.interception_skill_name
+                .as_deref()
+                .map(|_| interceptor.has_skill_property(NamedProperties::CAN_INTERCEPT_EASILY))
+                .unwrap_or(false);
+
+            let roll = rng.d6();
+
+            let minimum_roll = if easy_intercept {
+                // Java: minimumRoll = 2, no modifiers applied
+                2
+            } else {
+                // Java: BB2020 InterceptionModifierFactory.findModifiers(new InterceptionContext(...))
+                let factory = InterceptionModifierFactory::for_rules(game.rules);
+                let is_bomb = self.original_bombardier.is_some();
+                let mods = factory.find_applicable(game, interceptor, self.pass_result, is_bomb);
+                // Java: AgilityMechanic.minimumRollInterception(pInterceptor, interceptionModifiers)
+                InterceptionModifierFactory::minimum_roll_bb2020(interceptor, &mods)
+            };
+            (easy_intercept, minimum_roll, roll)
         };
 
-        // Java: easyIntercept = interceptionSkill != null && pInterceptor.hasUnused(interceptionSkill)
-        let easy_intercept = self.interception_skill_name
-            .as_deref()
-            .map(|_| interceptor.has_skill_property(NamedProperties::CAN_INTERCEPT_EASILY))
-            .unwrap_or(false);
+        let successful = roll >= minimum_roll;
+        let re_rolled = self.re_rolled_action.is_some() && self.re_roll_source.is_some();
+        let is_bomb = matches!(
+            game.thrower_action,
+            Some(PlayerAction::ThrowBomb) | Some(PlayerAction::HailMaryBomb)
+        );
 
-        let roll = rng.d6();
-
-        if easy_intercept {
-            // Java: minimumRoll = 2, no modifiers applied
-            return roll >= 2;
+        // Java: if (easyIntercept && !reRolled) addReport(new ReportSkillUse(..., SkillUse.EASY_INTERCEPT))
+        if easy_intercept && !re_rolled {
+            let skill_id = game.player(interceptor_id)
+                .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_INTERCEPT_EASILY));
+            if let Some(sid) = skill_id {
+                game.report_list.add(ReportSkillUse::new(
+                    Some(interceptor_id.to_string()),
+                    sid,
+                    true,
+                    SkillUse::EASY_INTERCEPT,
+                ));
+            }
         }
 
-        // Java: BB2020 InterceptionModifierFactory.findModifiers(new InterceptionContext(...))
-        let factory = InterceptionModifierFactory::for_rules(game.rules);
-        let is_bomb = self.original_bombardier.is_some();
-        let mods = factory.find_applicable(game, interceptor, self.pass_result, is_bomb);
+        // Java: getResult().addReport(new ReportInterceptionRoll(interceptor_id, successful, roll, minimumRoll,
+        //   reRolled, modifiers, isBomb, easyIntercept))
+        game.report_list.add(ReportInterceptionRoll::new(
+            Some(interceptor_id.to_string()),
+            successful,
+            roll,
+            minimum_roll,
+            re_rolled,
+            vec![],
+            is_bomb,
+            easy_intercept,
+        ));
 
-        // Java: AgilityMechanic.minimumRollInterception(pInterceptor, interceptionModifiers)
-        let minimum_roll = InterceptionModifierFactory::minimum_roll_bb2020(interceptor, &mods);
-
-        roll >= minimum_roll
+        successful
     }
 }
 
@@ -345,5 +384,76 @@ mod tests {
         let interceptors = StepIntercept::find_interceptors(&game);
         assert_eq!(interceptors.len(), 1);
         assert_eq!(interceptors[0], "opp1");
+    }
+
+    #[test]
+    fn interception_roll_report_added_when_interceptor_chosen() {
+        use ffb_model::enums::{PlayerState as PS, PS_STANDING};
+        use ffb_model::report::report_id::ReportId;
+        let mut home = test_team("home", 0);
+        let mut away = test_team("away", 0);
+
+        let mut thrower = ffb_model::model::player::Player::default();
+        thrower.id = "t1".into();
+        home.players.push(thrower);
+
+        let mut interceptor = ffb_model::model::player::Player::default();
+        interceptor.id = "opp1".into();
+        interceptor.agility = 4;
+        away.players.push(interceptor);
+
+        let mut game = Game::new(home, away, Rules::Bb2020);
+        game.thrower_id = Some("t1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.pass_coordinate = Some(FieldCoordinate::new(14, 7));
+        game.field_model.set_player_coordinate("t1", FieldCoordinate::new(1, 7));
+        game.field_model.set_player_coordinate("opp1", FieldCoordinate::new(7, 7));
+        game.field_model.set_player_state("opp1", PS::new(PS_STANDING));
+
+        let mut step = StepIntercept::new("fail".into());
+        step.interceptor_chosen = true;
+        step.interceptor_id = Some("opp1".into());
+        step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(
+            game.report_list.has_report(ReportId::INTERCEPTION_ROLL),
+            "expected ReportInterceptionRoll in report_list after intercept attempt"
+        );
+    }
+
+    #[test]
+    fn interception_failure_adds_report_to_report_list() {
+        use ffb_model::enums::{PlayerState as PS, PS_STANDING};
+        use ffb_model::report::report_id::ReportId;
+        let mut home = test_team("home", 0);
+        let mut away = test_team("away", 0);
+
+        let mut thrower = ffb_model::model::player::Player::default();
+        thrower.id = "t1".into();
+        home.players.push(thrower);
+
+        // interceptor with low agility (likely to fail)
+        let mut interceptor = ffb_model::model::player::Player::default();
+        interceptor.id = "opp1".into();
+        interceptor.agility = 1;
+        away.players.push(interceptor);
+
+        let mut game = Game::new(home, away, Rules::Bb2020);
+        game.thrower_id = Some("t1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.pass_coordinate = Some(FieldCoordinate::new(14, 7));
+        game.field_model.set_player_coordinate("t1", FieldCoordinate::new(1, 7));
+        game.field_model.set_player_coordinate("opp1", FieldCoordinate::new(7, 7));
+        game.field_model.set_player_state("opp1", PS::new(PS_STANDING));
+
+        let mut step = StepIntercept::new("fail".into());
+        step.interceptor_chosen = true;
+        step.interceptor_id = Some("opp1".into());
+        step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(
+            game.report_list.has_report(ReportId::INTERCEPTION_ROLL),
+            "expected ReportInterceptionRoll even on failed intercept"
+        );
     }
 }

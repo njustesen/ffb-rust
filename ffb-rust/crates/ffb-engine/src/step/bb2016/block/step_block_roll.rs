@@ -97,6 +97,10 @@ impl StepBlockRoll {
 
                 // Java: getResult().addReport(new ReportBlock(game.getDefenderId()))
                 // Java: getResult().setSound(SoundId.BLOCK)
+                if let Some(ref did) = game.defender_id {
+                    use ffb_model::report::report_block::ReportBlock;
+                    game.report_list.add(ReportBlock::new(did.clone()));
+                }
                 let block_event = game.defender_id.as_ref().map(|did| {
                     GameEvent::Block { defender_id: did.clone() }
                 });
@@ -130,11 +134,23 @@ impl StepBlockRoll {
     /// Java: showBlockRollDialog(boolean pDoRoll)
     /// Determines which team gets the re-roll option and shows the dialog.
     fn show_block_roll_dialog(&self, game: &mut Game) {
-        let _team_id = if game.home_playing {
+        let team_id = if game.home_playing {
             game.team_home.id.clone()
         } else {
             game.team_away.id.clone()
         };
+
+        // Java: getResult().addReport(new ReportBlockRoll(teamId, fBlockRoll))
+        {
+            use ffb_model::report::report_block_roll::ReportBlockRoll;
+            game.report_list.add(ReportBlockRoll::new(
+                team_id.clone(),
+                self.block_roll.clone(),
+                game.defender_id.clone(),
+            ));
+        }
+
+        let _team_id = team_id;
         let acting_id = game.acting_player.player_id.as_deref().unwrap_or("");
 
         // Java: boolean teamReRollOption = (getReRollSource() == null) && !reRollUsed && (reRolls > 0)
@@ -283,5 +299,25 @@ mod tests {
         for &v in &step.block_roll {
             assert!((1..=6).contains(&v), "die value out of range: {v}");
         }
+    }
+
+    #[test]
+    fn roll_emits_report_block() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepBlockRoll::new();
+        let mut game = make_game();
+        game.defender_id = Some("def".into());
+        step.start(&mut game, &mut GameRng::new(1));
+        assert!(game.report_list.has_report(ReportId::BLOCK), "ReportBlock must be emitted on roll");
+    }
+
+    #[test]
+    fn roll_emits_report_block_roll() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepBlockRoll::new();
+        let mut game = make_game();
+        game.defender_id = Some("def".into());
+        step.start(&mut game, &mut GameRng::new(1));
+        assert!(game.report_list.has_report(ReportId::BLOCK_ROLL), "ReportBlockRoll must be emitted via showBlockRollDialog");
     }
 }

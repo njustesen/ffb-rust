@@ -79,4 +79,33 @@ mod tests {
         let h = TestPrayerHandler;
         assert_eq!(h.get_name(), "TestPrayerHandler");
     }
+
+    #[test]
+    fn handled_prayer_name_returned() {
+        assert_eq!(TestPrayerHandler.handled_prayer_name(), "FOULING_FRENZY");
+    }
+
+    #[test]
+    fn animation_type_returned() {
+        assert_eq!(TestPrayerHandler.animation_type(), AnimationType::PRAYER_FOULING_FRENZY);
+    }
+
+    #[test]
+    fn remove_effect_delegates_to_internal() {
+        // Create a handler whose remove_effect_internal records a call via PrayerState mutation
+        struct TrackingHandler;
+        impl PrayerHandler for TrackingHandler {
+            fn handled_prayer_name(&self) -> &'static str { "TRACKING" }
+            fn animation_type(&self) -> AnimationType { AnimationType::PRAYER_FOULING_FRENZY }
+            fn get_name(&self) -> &'static str { "Tracking" }
+            fn init_effect(&self, _: &mut PrayerState, _: &mut Game, _: &mut GameRng, _: &str) -> bool { false }
+            fn remove_effect_internal(&self, state: &mut PrayerState, _: &mut Game, team_id: &str) {
+                state.add_fouling_frenzy(team_id); // use as side-effect marker
+            }
+        }
+        let mut state = PrayerState::new();
+        let mut game = make_game();
+        TrackingHandler.remove_effect(&mut state, &mut game, "home");
+        assert!(state.has_fouling_frenzy("home"));
+    }
 }

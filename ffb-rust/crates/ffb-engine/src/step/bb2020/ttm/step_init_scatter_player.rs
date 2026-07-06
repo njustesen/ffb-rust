@@ -30,6 +30,7 @@ use crate::injury::injuryType::injury_type_ttm_hit_player::InjuryTypeTTMHitPlaye
 use crate::step::action::ttm::util_throw_team_mate_sequence::{scatter_player, kick_player, ScatterResult};
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use ffb_model::report::report_pass_deviate::ReportPassDeviate;
+use ffb_model::report::bb2020::report_swoop_player::ReportSwoopPlayer;
 use crate::step::mixed::ttm::ttm_to_crowd_handler::TtmToCrowdHandler;
 use crate::step::util_server_injury;
 
@@ -266,7 +267,7 @@ impl StepInitScatterPlayer {
 
     /// Java: swoop(FieldCoordinate throwerCoordinate, Direction direction)
     /// Rolls D3 distance (or uses SWOOP_DISTANCE option) in the given direction.
-    fn swoop_scatter(&mut self, game: &Game, rng: &mut GameRng, start_coord: FieldCoordinate) -> ScatterResult {
+    fn swoop_scatter(&mut self, game: &mut Game, rng: &mut GameRng, start_coord: FieldCoordinate) -> ScatterResult {
         let direction = self.swoop_direction.expect("swoop_direction is set when this is called");
 
         // Java: getOptionWithDefault(SWOOP_DISTANCE).getValue() — 0 means roll D3.
@@ -286,7 +287,13 @@ impl StepInitScatterPlayer {
 
         // Java: publishParameter(THROWN_PLAYER_COORDINATE, lastValidCoordinate)
         self.thrown_player_coordinate = Some(last_valid);
-        // SwoopPlayer GameEvent emitted in execute_step after swoop_scatter returns.
+        // Java: addReport(new ReportSwoopPlayer(throwerCoordinate, coordinateEnd, direction, distanceRoll))
+        game.report_list.add(ReportSwoopPlayer::new(
+            start_coord,
+            coord_end,
+            direction,
+            distance_roll,
+        ));
 
         ScatterResult::new(last_valid, coord_end.is_on_pitch())
     }
@@ -519,5 +526,37 @@ mod tests {
         step.deviate = true;
         let out = step.start(&mut game, &mut GameRng::new(3));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn swoop_adds_swoop_player_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        add_player(&mut game, "p1", FieldCoordinate::new(13, 7));
+
+        let mut step = StepInitScatterPlayer::new();
+        step.thrown_player_id = Some("p1".into());
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        step.thrown_player_coordinate = Some(FieldCoordinate::new(13, 7));
+        step.swoop_direction = Some(Direction::North);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SWOOP_PLAYER),
+            "swoop path must add SWOOP_PLAYER report");
+    }
+
+    #[test]
+    fn deviate_adds_pass_deviate_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        add_player(&mut game, "p1", FieldCoordinate::new(13, 7));
+
+        let mut step = StepInitScatterPlayer::new();
+        step.thrown_player_id = Some("p1".into());
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        step.thrown_player_coordinate = Some(FieldCoordinate::new(13, 7));
+        step.deviate = true;
+        step.start(&mut game, &mut GameRng::new(5));
+        assert!(game.report_list.has_report(ReportId::PASS_DEVIATE),
+            "deviate path must add PASS_DEVIATE report");
     }
 }

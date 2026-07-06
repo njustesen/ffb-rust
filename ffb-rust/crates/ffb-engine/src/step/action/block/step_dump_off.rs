@@ -8,8 +8,11 @@
 use ffb_model::enums::{PlayerAction, SkillId, TurnMode};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::model::skill_use::SkillUse;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_skill_use::ReportSkillUse;
+use ffb_model::report::report_id::ReportId;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -109,6 +112,13 @@ impl StepDumpOff {
                 .map(|p| p.has_skill(SkillId::DumpOff))
                 .unwrap_or(false);
             if defender_has {
+                // Java: addReport(new ReportSkillUse(defenderId, skill, false, null))
+                game.report_list.add(ReportSkillUse::new(
+                    defender_id.clone(),
+                    SkillId::DumpOff,
+                    false,
+                    SkillUse::WOULD_NOT_HELP,
+                ));
                 let event = GameEvent::SkillUse {
                     player_id: defender_id.unwrap_or_default(),
                     skill_id: skill_num,
@@ -274,5 +284,30 @@ mod tests {
         assert!(step.set_parameter(&StepParameter::DefenderPosition(pos)));
         assert_eq!(step.defender_position, Some(pos));
         assert!(!step.set_parameter(&StepParameter::EndPlayerAction(true)));
+    }
+
+    #[test]
+    fn defender_has_skill_but_declines_adds_skill_use_report() {
+        let mut game = make_game(vec![SkillId::DumpOff]);
+        // Ball not at defender → conditions not met → using_dump_off = false
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(3, 3));
+        let mut step = StepDumpOff::new();
+        step.defender_position = Some(FieldCoordinate::new(6, 5));
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::SKILL_USE),
+            "SKILL_USE report must be added when defender has DumpOff but does not use it"
+        );
+    }
+
+    #[test]
+    fn defender_without_skill_does_not_add_skill_use_report() {
+        let mut game = make_game(vec![]);
+        let outcome = StepDumpOff::new().start(&mut game, &mut GameRng::new(0));
+        assert_eq!(outcome.action, crate::step::framework::StepAction::NextStep);
+        assert!(
+            !game.report_list.has_report(ReportId::SKILL_USE),
+            "SKILL_USE report must NOT be added when defender has no DumpOff skill"
+        );
     }
 }

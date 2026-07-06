@@ -21,6 +21,7 @@ use ffb_model::events::GameEvent;
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
 use ffb_model::model::special_effect::SpecialEffect;
+use ffb_model::report::report_wizard_use::ReportWizardUse;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use crate::action::{Action, WizardSpellChoice};
@@ -80,6 +81,7 @@ impl StepWizard {
                 } else {
                     game.team_away.id.clone()
                 };
+                game.report_list.add(ReportWizardUse::new(team_id.clone(), spell));
                 let wizard_event = GameEvent::WizardUse {
                     team_id,
                     spell: spell_name.clone(),
@@ -365,5 +367,38 @@ mod tests {
 
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.pushes.is_empty(), "stunned player should not be affected");
+    }
+
+    #[test]
+    fn wizard_use_in_wizard_mode_adds_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepWizard::new();
+        step.home_team = true;
+        step.old_turn_mode = Some(TurnMode::Regular);
+        step.wizard_spell = Some(SpecialEffect::LIGHTNING);
+        let coord = FieldCoordinate::new(5, 5);
+        step.target_coordinate = Some(coord);
+
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Wizard;
+
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::WIZARD_USE),
+            "should add a WIZARD_USE report when spell is cast");
+    }
+
+    #[test]
+    fn end_inducement_does_not_add_wizard_use_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepWizard::new();
+        step.old_turn_mode = Some(TurnMode::Regular);
+        step.end_inducement = true;
+
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Wizard;
+
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::WIZARD_USE),
+            "cancelling the spell should not add a WIZARD_USE report");
     }
 }

@@ -4,6 +4,8 @@ use ffb_model::enums::BlockResult;
 use ffb_model::enums::ReRollSource;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::report::report_block::ReportBlock;
+use ffb_model::report::report_block_roll::ReportBlockRoll;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -183,6 +185,10 @@ impl StepBlockRoll {
 
         if do_roll {
             // Java: clearDiceDecorations(), addReport(ReportBlock), setSound(BLOCK)
+            // Java: getResult().addReport(new ReportBlock(game.getDefenderId()))
+            if let Some(ref did) = game.defender_id.clone() {
+                game.report_list.add(ReportBlock::new(did.clone()));
+            }
             let source = self.re_roll_source.clone();
             match source.as_deref() {
                 Some("Brawler") => {
@@ -198,6 +204,19 @@ impl StepBlockRoll {
                 }
             }
             // Java: showBlockRollDialog(false)
+            // Java: getResult().addReport(new ReportBlockRoll(teamId, fBlockRoll))
+            {
+                let team_id = if game.home_playing {
+                    game.team_home.id.clone()
+                } else {
+                    game.team_away.id.clone()
+                };
+                game.report_list.add(ReportBlockRoll::new(
+                    team_id,
+                    self.block_roll.clone(),
+                    game.defender_id.clone(),
+                ));
+            }
             return StepOutcome::cont();
         }
 
@@ -306,6 +325,7 @@ mod tests {
     use ffb_model::model::player::Player;
     use ffb_model::model::skill_def::SkillWithValue;
     use ffb_model::enums::{PlayerType, PlayerGender, SkillId};
+    use ffb_model::report::report_id::ReportId;
     use ffb_model::types::FieldCoordinate;
     use std::collections::HashSet;
 
@@ -687,5 +707,25 @@ mod tests {
         // TRR consumed → fresh dice rolled → still cont (awaiting BlockChoice)
         assert_eq!(out.action, StepAction::Continue);
         assert_eq!(game.turn_data().rerolls, 0);
+    }
+
+    // ── report wiring ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn initial_roll_adds_report_block() {
+        let mut step = StepBlockRoll::new();
+        let mut game = make_game();
+        game.defender_id = Some("def1".into());
+        step.start(&mut game, &mut GameRng::new(1));
+        assert!(game.report_list.has_report(ReportId::BLOCK), "ReportBlock should appear after initial roll");
+    }
+
+    #[test]
+    fn initial_roll_adds_report_block_roll() {
+        let mut step = StepBlockRoll::new();
+        let mut game = make_game();
+        game.defender_id = Some("def1".into());
+        step.start(&mut game, &mut GameRng::new(2));
+        assert!(game.report_list.has_report(ReportId::BLOCK_ROLL), "ReportBlockRoll should appear after initial roll");
     }
 }

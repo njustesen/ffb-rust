@@ -66,10 +66,32 @@ impl InjuryContextModification for AvOrInjModification {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffb_model::enums::{ApothecaryMode, Rules};
+    use ffb_model::enums::{ApothecaryMode, Rules, PS_BADLY_HURT, PS_STUNNED, PS_STANDING, PlayerState};
+    use ffb_model::model::player::Player;
+    use ffb_model::enums::{PlayerType, PlayerGender};
+    use ffb_model::types::FieldCoordinate;
+    use ffb_model::util::rng::GameRng;
     use crate::step::framework::test_team;
 
     fn make() -> AvOrInjModification { AvOrInjModification::new() }
+
+    fn make_game_with_acting_player() -> Game {
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let p = Player {
+            id: "act".into(), name: "act".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 7,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
+            race: None, ..Default::default()
+        };
+        game.team_home.players.push(p);
+        game.field_model.set_player_coordinate("act", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("act", PlayerState::new(PS_STANDING));
+        game.acting_player.player_id = Some("act".into());
+        game
+    }
 
     #[test]
     fn valid_type_is_block() {
@@ -84,11 +106,47 @@ mod tests {
 
     #[test]
     fn try_armour_false_when_armor_broken() {
-        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
-        let mut rng = ffb_model::util::rng::GameRng::new(1);
+        let game = make_game_with_acting_player();
+        let mut rng = GameRng::new(1);
         let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
         ctx.armor_broken = true;
         let params = ModificationParams::new(&game, &mut rng, ctx, "Block");
         assert!(!make().try_armour_roll_modification(&params));
+    }
+
+    #[test]
+    fn try_armour_true_when_not_broken() {
+        let game = make_game_with_acting_player();
+        let mut rng = GameRng::new(1);
+        let ctx = InjuryContext::new(ApothecaryMode::Defender);
+        let params = ModificationParams::new(&game, &mut rng, ctx, "Block");
+        assert!(make().try_armour_roll_modification(&params));
+    }
+
+    #[test]
+    fn try_injury_false_when_casualty() {
+        let game = make_game_with_acting_player();
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.injury = Some(PlayerState::new(PS_BADLY_HURT));
+        assert!(!make().try_injury_modification(&game, &ctx, "Block"));
+    }
+
+    #[test]
+    fn try_injury_true_when_not_casualty() {
+        let game = make_game_with_acting_player();
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.injury = Some(PlayerState::new(PS_STUNNED));
+        assert!(make().try_injury_modification(&game, &ctx, "Block"));
+    }
+
+    #[test]
+    fn modify_injury_sets_add_injury_modifier_skill_use() {
+        let game = make_game_with_acting_player();
+        let mut rng = GameRng::new(1);
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.injury_roll = Some([2, 2]); // sum=4 → stunned in standard injury table
+        ctx.injury = Some(PlayerState::new(PS_STUNNED));
+        let _ = make().modify_injury_internal(&game, &mut rng, &mut ctx);
+        assert_eq!(ctx.skill_use_modification, Some(SkillUse::ADD_INJURY_MODIFIER));
     }
 }

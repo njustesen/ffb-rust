@@ -74,4 +74,33 @@ mod tests {
         let h = TestHandler;
         assert_eq!(h.get_name(), "TestHandler");
     }
+
+    #[test]
+    fn activate_on_game_default_returns_true() {
+        struct DefaultHandler;
+        impl CardHandler for DefaultHandler {
+            fn handler_key_name(&self) -> &'static str { "DH" }
+            fn get_name(&self) -> &'static str { "DefaultHandler" }
+        }
+        let h = DefaultHandler;
+        let mut game = make_game();
+        let card = Card::new("X", Some("DH"));
+        let mut rng = GameRng::new(1);
+        assert!(h.activate_on_game(&mut game, &card, "p1", &mut rng));
+    }
+
+    #[test]
+    fn deactivate_on_game_default_is_noop() {
+        let h = TestHandler;
+        let mut game = make_game();
+        let card = Card::new("Test", Some("TEST_KEY"));
+        // Should not panic
+        h.deactivate_on_game(&mut game, &card, "player1");
+    }
+
+    #[test]
+    fn handler_key_name_returned_correctly() {
+        let h = TestHandler;
+        assert_eq!(h.handler_key_name(), "TEST_KEY");
+    }
 }

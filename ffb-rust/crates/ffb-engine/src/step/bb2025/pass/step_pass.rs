@@ -2,6 +2,7 @@ use ffb_model::enums::{PassingDistance, PlayerAction, ReRollSource};
 use ffb_model::model::game::Game;
 use ffb_model::util::passing::passing_distance;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::mixed::report_pass_roll::ReportPassRoll;
 use ffb_mechanics::bb2025::pass_mechanic::PassMechanic as Bb2025PassMechanic;
 use ffb_mechanics::modifiers::modifier_type::ModifierType;
 use ffb_mechanics::modifiers::pass_context::PassContext;
@@ -227,7 +228,27 @@ impl StepPass {
         let result = self.pass_result.unwrap();
         let already_rerolled = self.re_rolled_action.is_some();
 
-        // Java: ReportPassRoll added here (not translated — report infra pending)
+        // Java: getResult().addReport(new ReportPassRoll(game.getThrowerId(), roll, minimumRoll, reRolled,
+        //   passModifiers, passingDistance, isBomb, state.getResult(), false, statBasedRollModifier))
+        {
+            let re_rolled = self.re_rolled_action.is_some() && self.re_roll_source.is_some();
+            let pass_result_name = self.pass_result.map(|r| r.get_name().to_string());
+            let successful = self.pass_result == Some(PassResult::ACCURATE);
+            let dist_name = passing_dist.map(|d| format!("{:?}", d));
+            game.report_list.add(ReportPassRoll::new(
+                game.thrower_id.clone(),
+                successful,
+                self.roll,
+                self.minimum_roll,
+                re_rolled,
+                vec![],
+                dist_name,
+                is_bomb,
+                pass_result_name,
+                false,
+                None,
+            ));
+        }
 
         // Java result routing:
         match result {
@@ -551,6 +572,32 @@ mod tests {
         assert_eq!(out.action, StepAction::Continue, "TRR available → offer re-roll");
         assert!(out.prompt.is_some());
         assert_eq!(step.re_rolled_action.as_deref(), Some("PASS"));
+    }
+
+    #[test]
+    fn accurate_pass_emits_report_pass_roll() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game_with_thrower(3);
+        let mut step = make_step();
+        step.roll = 6; // accurate
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::PASS_ROLL),
+            "expected ReportPassRoll in report_list after an accurate pass"
+        );
+    }
+
+    #[test]
+    fn fumble_emits_report_pass_roll() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game_with_thrower(3);
+        let mut step = make_step();
+        step.roll = 1; // natural 1 → fumble
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::PASS_ROLL),
+            "expected ReportPassRoll in report_list after a fumble"
+        );
     }
 
     #[test]

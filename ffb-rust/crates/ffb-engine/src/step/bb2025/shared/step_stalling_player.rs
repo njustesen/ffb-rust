@@ -14,6 +14,7 @@
 ///  7. Otherwise → `StallingExtension.handleStaller(this, player)`.
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::report::mixed::report_player_event::ReportPlayerEvent;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
@@ -85,6 +86,10 @@ impl StepStallingPlayer {
         if no_stalling || is_prone_or_stunned {
             // Java: if (gotRid || scored) { addReport(new ReportPlayerEvent(id, "did not stall after all")) }
             if got_rid || scored {
+                game.report_list.add(ReportPlayerEvent::new(
+                    Some(player_id.clone()),
+                    Some("did not stall after all".into()),
+                ));
                 return StepOutcome::next()
                     .with_event(GameEvent::PlayerNote { player_id: player_id.clone(), note: "did not stall after all".into() });
             }
@@ -235,5 +240,39 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         // prone → no penalty
         assert!(!game.game_result.home.stalled);
+    }
+
+    #[test]
+    fn got_rid_adds_player_event_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.options.set("enableStallingCheck", "true");
+        let pos = FieldCoordinate::new(5, 5);
+        add_player_to_home(&mut game, "h1", pos, PS_STANDING);
+        game.acting_player.set_player("h1".into(), PlayerAction::Move);
+        game.stalling = true;
+        // ball not at player → gotRid = true
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(10, 10));
+        let mut step = StepStallingPlayer::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PLAYER_EVENT),
+            "PLAYER_EVENT report expected when got_rid=true");
+    }
+
+    #[test]
+    fn no_stalling_no_got_rid_does_not_add_player_event_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.options.set("enableStallingCheck", "true");
+        let pos = FieldCoordinate::new(5, 5);
+        add_player_to_home(&mut game, "h1", pos, PS_STANDING);
+        game.acting_player.set_player("h1".into(), PlayerAction::Move);
+        // stalling = false, ball elsewhere → noStalling=true but gotRid=false
+        game.stalling = false;
+        let mut step = StepStallingPlayer::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::PLAYER_EVENT),
+            "PLAYER_EVENT must NOT be added when no stalling and no got_rid");
     }
 }

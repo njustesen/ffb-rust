@@ -2,6 +2,8 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::enums::ReRollSource;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::bb2016::report_dodge_roll::ReportDodgeRoll;
+use ffb_model::report::report_id::ReportId;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
 use crate::drop_player_context::SteadyFootingContext;
@@ -147,6 +149,20 @@ impl StepMoveDodge {
             }
         };
         let successful = DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll);
+
+        // Java: getResult().addReport(new ReportDodgeRoll(actingPlayer.getPlayerId(), successful,
+        //         (pDoRoll ? fDodgeRoll : 0), minimumRoll, reRolled, dodgeModifiers.toArray(...)))
+        let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
+            .map(|a| a.name == "DODGE").unwrap_or(false)
+            && self.re_roll_state.re_roll_source.is_some();
+        game.report_list.add(ReportDodgeRoll::new(
+            player_id.clone(),
+            successful,
+            self.dodge_roll,
+            minimum_roll,
+            re_rolled,
+            vec![],
+        ));
 
         if successful {
             let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
@@ -385,5 +401,35 @@ mod tests {
         step.dodge_roll = 1;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
+    }
+
+    #[test]
+    fn success_adds_dodge_roll_report() {
+        // Java: getResult().addReport(new ReportDodgeRoll(...)) on success
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 5; // high roll → success
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::DODGE_ROLL),
+            "DODGE_ROLL report should be added on a successful dodge"
+        );
+    }
+
+    #[test]
+    fn failure_adds_dodge_roll_report() {
+        // Java: addReport is always called in the dodge() method
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        add_player(&mut game, "p1");
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 1; // failure
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::DODGE_ROLL),
+            "DODGE_ROLL report should be added on a failed dodge"
+        );
     }
 }

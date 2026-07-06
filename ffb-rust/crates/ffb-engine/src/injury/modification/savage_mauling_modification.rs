@@ -70,10 +70,30 @@ impl InjuryContextModification for SavageMaulingModification {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffb_model::enums::{Rules, PS_STUNNED, PlayerState};
+    use ffb_model::enums::{Rules, PS_STUNNED, PS_BADLY_HURT, PS_SERIOUS_INJURY, PlayerState};
+    use ffb_model::model::player::Player;
+    use ffb_model::enums::{PlayerType, PlayerGender};
     use crate::step::framework::test_team;
 
     fn make() -> SavageMaulingModification { SavageMaulingModification::new() }
+
+    fn make_game() -> Game {
+        Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+    }
+
+    fn add_player(game: &mut Game, home: bool, id: &str) {
+        let p = Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 7,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
+            race: None, ..Default::default()
+        };
+        if home { game.team_home.players.push(p); }
+        else { game.team_away.players.push(p); }
+    }
 
     #[test]
     fn valid_types() {
@@ -86,16 +106,76 @@ mod tests {
 
     #[test]
     fn allows_same_team() {
-        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let game = make_game();
         let ctx = InjuryContext::new(ApothecaryMode::Defender);
         assert!(make().allowed_for_attacker_and_defender_teams(&game, &ctx));
     }
 
     #[test]
     fn try_injury_true_when_not_casualty() {
-        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let game = make_game();
         let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
         ctx.injury = Some(PlayerState::new(PS_STUNNED));
         assert!(make().try_injury_modification(&game, &ctx, "Block"));
+    }
+
+    #[test]
+    fn try_injury_true_for_casualty_with_spotted_foul() {
+        let game = make_game();
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.injury = Some(PlayerState::new(PS_BADLY_HURT));
+        ctx.injury_roll = Some([3, 3]); // doubles
+        assert!(make().try_injury_modification(&game, &ctx, "Foul"));
+    }
+
+    #[test]
+    fn try_injury_false_for_casualty_different_teams_no_spotted_foul() {
+        let mut game = make_game();
+        add_player(&mut game, true, "att");
+        add_player(&mut game, false, "def");
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.injury = Some(PlayerState::new(PS_SERIOUS_INJURY));
+        ctx.injury_roll = Some([3, 4]);
+        ctx.attacker_id = Some("att".into());
+        ctx.defender_id = Some("def".into());
+        assert!(!make().try_injury_modification(&game, &ctx, "Block"));
+    }
+
+    #[test]
+    fn try_injury_false_for_casualty_animal_savagery() {
+        let mut game = make_game();
+        add_player(&mut game, true, "att");
+        add_player(&mut game, true, "def"); // same team
+        let mut ctx = InjuryContext::new(ApothecaryMode::AnimalSavagery);
+        ctx.injury = Some(PlayerState::new(PS_BADLY_HURT));
+        ctx.attacker_id = Some("att".into());
+        ctx.defender_id = Some("def".into());
+        assert!(!make().try_injury_modification(&game, &ctx, "Block"));
+    }
+
+    #[test]
+    fn modify_injury_internal_sets_injury_roll_and_injury() {
+        let game = make_game();
+        let mut rng = GameRng::new(1);
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        let result = make().modify_injury_internal(&game, &mut rng, &mut ctx);
+        assert!(result);
+        assert!(ctx.injury_roll.is_some());
+        let [d1, d2] = ctx.injury_roll.unwrap();
+        assert!((1..=6).contains(&d1));
+        assert!((1..=6).contains(&d2));
+    }
+
+    #[test]
+    fn is_spotted_foul_false_for_non_foul_type() {
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.injury_roll = Some([4, 4]);
+        assert!(!SavageMaulingModification::is_spotted_foul(&ctx, "Block"));
+    }
+
+    #[test]
+    fn is_spotted_foul_false_when_no_injury_roll() {
+        let ctx = InjuryContext::new(ApothecaryMode::Defender);
+        assert!(!SavageMaulingModification::is_spotted_foul(&ctx, "Foul"));
     }
 }

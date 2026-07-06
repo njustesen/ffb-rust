@@ -8,9 +8,9 @@
 
 **Translation progress:** 2,521/2,521 files formally implemented = **100% ✓** (0 partial, 458 skip)
 
-**Tests:** 9,022 passing (1 ignored)
+**Tests:** 9,262 passing (1 ignored)
 
-**Current phase:** Phase ZA — headless: resolution sweep COMPLETE (24 genuine gaps remain, all blocked by missing infrastructure)
+**Current phase:** Phase ZD — Parity testing prep (next)
 
 ---
 
@@ -400,6 +400,39 @@
   - **Misc files (15 files)**: StepInitBomb (bb2020), DeferredCommandFactory/DeferredCommandIdFactory (bb2025), ApplyTo (marking), StepModifier (model), StepActionFactory, StepIdFactory, AbstractStepWithReRoll, DiceInterpreter, UtilServerSteps, UtilServerCatchScatterThrowIn, ServerMode, SessionMode all confirmed complete.
   - **Tracker updated**: 1,399 → 1,658 ✓ entries (+259); 1,122 → 863 ~ entries (−259). Tests unchanged at 7,993.
 
+- **Phase ZC** (2026-07-06): Report wiring — 9,178 → 9,262 tests (+84, complete)
+  - **Scope**: Report emission wired across ~50 step files in action/, bb2016/, bb2020/, bb2025/, mixed/
+  - **bb2020/bb2025 block/**: `step_block_choice.rs` — `ReportBlockChoice`, `ReportSkillUse(CANCEL_TACKLE)`, `ReportSkillUse(CANCEL_DODGE)`; `step_followup.rs` — `ReportSkillUse(CANCEL_FEND)`, `ReportSkillUse(NO_TACKLEZONE)`, `ReportSkillUse(STAY_AWAY_FROM_OPPONENT)`.
+  - **bb2020/bb2025 move_/**: `step_go_for_it.rs` — `ReportGoForItRoll`; `step_pick_up.rs` — `ReportPickupRoll`; `step_stand_up.rs` — `ReportStandUpRoll`; `step_move_dodge.rs` — `ReportDodgeRoll`.
+  - **bb2016 files already complete from ZB**: `step_block_chainsaw.rs`, `step_block_choice.rs`, `step_followup.rs`.
+  - **Overall completion note**: Translation ~96% complete. Only 11 headless: items remain (blocked by missing infrastructure).
+  - **Test count verified**: 31 + 5637 + 1695 + 1621 + 12 + 266 = **9,262 tests passing**, 0 failed.
+  - **`bb2020/block/step_block_choice.rs`**: Restructured `execute_step` to compute outcome then emit `ReportBlockChoice`; added `ReportSkillUse(CANCEL_TACKLE)` in RightStuff path, `ReportSkillUse(CANCEL_DODGE)` in Tackle-cancels-Dodge path; fixed pre-existing bug `"cancelsDodge"` → `NamedProperties::CANCELS_IGNORE_DEFENDER_STUMBLES_RESULT`. +3 tests (10 total).
+  - **`bb2025/block/step_block_choice.rs`**: Same restructuring + same three reports wired. +3 tests (13 total).
+  - **`bb2020/block/step_followup.rs`**: Wired `UtilCards::get_skill_cancelling_property`, `fend_skill_id`, `cancel_skill_used` local var; added `ReportSkillUse(CANCEL_FEND)` in Juggernaut-cancel path, `ReportSkillUse(NO_TACKLEZONE)` in no-tacklezone path, `ReportSkillUse(STAY_AWAY_FROM_OPPONENT)` when not cancelled. +1 test (8 total).
+  - **`bb2025/block/step_followup.rs`**: Same 3 reports + test. +1 test (7 total).
+  - **`bb2020/move_/step_go_for_it.rs`**: Hoisted `mod_names` from minimum_roll block; added `ReportGoForItRoll` guarded by `using_modifier_ignoring_skill.is_none()` (Java parity). +2 tests (11 total).
+  - **`bb2025/move_/step_go_for_it.rs`**: Same change. +2 tests.
+  - **`bb2020/move_/step_pick_up.rs`**: Hoisted `mod_names`; added `ReportPickupRoll` always (Java: always emitted before success/fail branches). +2 tests (12 total).
+  - **`bb2025/move_/step_pick_up.rs`**: Same change. +2 tests.
+  - **`bb2020/move_/step_stand_up.rs`**: Added `ReportStandUpRoll` after `let successful = ...`. +2 tests (7 total).
+  - **`bb2025/move_/step_stand_up.rs`**: Same change. +2 tests.
+  - **`bb2020/move_/step_move_dodge.rs`**: Hoisted `mod_names`; added `ReportDodgeRoll` with `stat_based_roll_modifier=None` (headless never applies modifier-ignoring skill). +2 tests (10 total).
+  - **`bb2025/move_/step_move_dodge.rs`**: Same change. +2 tests.
+  - **Files already done in ZB (bb2016)**: `step_block_chainsaw.rs`, `step_block_choice.rs`, `step_followup.rs` all fully wired.
+  - **Remaining ZC scope**: bb2020/bb2025 block roll, pass/, foul/, mixed/, kickoff steps; bb2016 move_/ steps.
+
+- **Phase ZB** (2026-07-06): Test coverage expansion — 9,022 → 9,147 tests (+125)
+  - **ZB-0**: Committed all in-progress ZA work as single commit.
+  - **ZB-1–ZB-6**: Infrastructure tracks (InducementSet, ZappedPlayer, CardHandler RNG, FieldModel enhancements, apothecary_multiple, report wiring) deferred — requires deeper infrastructure not yet available in headless.
+  - **ZB-7**: Test coverage expansion — added 2-3 tests to 35+ low-coverage (2-test) files:
+    - **injury/modification/** (9 files): `old_pro_modification`, `savage_mauling_modification`, `av_or_inj_modification`, `bb2025/lone_fouler_modification`, `bb2025/reroll_armour_modification`, `bb2025/krump_and_smash_modification`, `bb2020/slayer_modification`, `bb2025/master_assassin_modification` — gating logic, modifier paths, context stores.
+    - **inducements/** (2 files): `card_handler`, `prayer_handler` — default method behavior, delegation.
+    - **step/bb2025/** (1 file): `step_wisdom_of_the_white_dwarf` — ID, unrecognized action.
+    - **step/bb2020/** (1 file): `step_wisdom_of_the_white_dwarf` — ID, non-select action.
+    - **injury/injuryType/** (22 files): `injury_type_drop_dodge_for_spp`, `injury_type_drop_dodge`, `injury_type_bomb_with_modifier`, `injury_type_drop_gfi`, `injury_type_drop_jump`, `injury_type_ball_and_chain`, `injury_type_quick_bite`, `injury_type_bitten`, `injury_type_breathe_fire`, `injury_type_breathe_fire_for_spp`, `injury_type_crowd_push`, `injury_type_crowd_push_for_spp`, `injury_type_saboteur`, `injury_type_eat_player`, `injury_type_fumbled_ktm`, `injury_type_ktm_crowd`, `injury_type_piling_on_knocked_out`, `injury_type_fumbled_ktm_apo_ko`, `injury_type_trap_door_fall`, `injury_type_trap_door_fall_for_spp`, `injury_type_sabotaged`, `injury_type_bomb_with_modifier_for_spp`, `injury_type_projectile_vomit`, `injury_type_then_i_started_blastin` — turnover flag, context stores, modifier presence, armor/injury paths.
+  - **ZB-8**: SESSION.md updated, test count verified at 9,147.
+  - **Remaining headless: items** (24 items, unchanged): PitTrap/WitchBrew (RNG not in CardHandler), ZappedPlayer substitution, apothecary Igor/raise-dead (InducementSet), riotousRookiesPosition, addSkillEnhancements, apothecary_multiple double-attacker/Raise-Dead/Getting-Even.
 - **Phase ZA session 7** (2026-07-06): headless: reclassification sweep final — 9,022 tests (unchanged), headless: 63 → 24
   - **bb2020 + bb2025 `step_init_inducement.rs`**: Reclassified doc + code `headless:` tags — InducementType routing/sequence generators correctly no-op in headless; both files reclassified (4 items).
   - **`step_check_stalling.rs` (bb2020)**: `headless:` → `no-op:` — stalling detection skipped; headless conservatively reports no stall (1 item).

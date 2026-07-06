@@ -3,6 +3,8 @@ use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::enums::PlayerAction;
 use ffb_model::enums::ReRollSource;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_go_for_it_roll::ReportGoForItRoll;
+use ffb_model::report::report_id::ReportId;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -161,6 +163,19 @@ impl StepGoForIt {
         };
 
         let successful = self.roll >= minimum_roll;
+
+        // Java: getResult().addReport(new ReportGoForItRoll(actingPlayer.getPlayerId(), successful, roll,
+        //         minimumRoll, reRolled, goForItModifiers.toArray(...)))
+        let re_rolled = self.re_roll_state.re_rolled_action.as_ref().map(|a| a.name == "GFI").unwrap_or(false)
+            && self.re_roll_state.re_roll_source.is_some();
+        game.report_list.add(ReportGoForItRoll::new(
+            player_id.clone(),
+            successful,
+            self.roll,
+            minimum_roll,
+            re_rolled,
+            vec![],
+        ));
 
         if successful {
             // Java: if (actingPlayer.isJumping() && currentMove > MA+1 && !fSecondGoForIt)
@@ -453,5 +468,31 @@ mod tests {
         step.second_go_for_it = true; // already done first repeat
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn success_adds_go_for_it_roll_report() {
+        // Java: getResult().addReport(new ReportGoForItRoll(...)) on success
+        let mut game = make_gfi_game();
+        let mut step = StepGoForIt::new("fail".into());
+        step.roll = 4; // success
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::GO_FOR_IT_ROLL),
+            "GO_FOR_IT_ROLL report should be added on a successful roll"
+        );
+    }
+
+    #[test]
+    fn failure_adds_go_for_it_roll_report() {
+        // Java: addReport is added regardless of success/failure before the reroll branch
+        let mut game = make_gfi_game();
+        let mut step = StepGoForIt::new("fail".into());
+        step.roll = 1; // failure, no rerolls → goes directly to fail_gfi
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::GO_FOR_IT_ROLL),
+            "GO_FOR_IT_ROLL report should be added on a failed roll"
+        );
     }
 }

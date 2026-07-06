@@ -1,5 +1,9 @@
 use ffb_model::enums::{PassingDistance, PlayerAction, ReRollSource};
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::mixed::report_pass_roll::ReportPassRoll;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::passing::passing_distance;
 use ffb_model::util::rng::GameRng;
 use ffb_mechanics::bb2020::pass_mechanic::PassMechanic as Bb2020PassMechanic;
@@ -213,6 +217,19 @@ impl StepPass {
                 };
                 self.pass_result = Some(result);
             }
+            // Java: getResult().addReport(new ReportSkillUse(game.getThrowerId(), modifyingSkill, true, SkillUse.ADD_STRENGTH_TO_ROLL))
+            {
+                let skill_id = game.thrower()
+                    .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_ADD_STRENGTH_TO_PASS));
+                if let Some(sid) = skill_id {
+                    game.report_list.add(ReportSkillUse::new(
+                        game.thrower_id.clone(),
+                        sid,
+                        true,
+                        SkillUse::ADD_STRENGTH_TO_ROLL,
+                    ));
+                }
+            }
         } else {
             // Standard path
             // Java: state.setThrowerCoordinate(throwerCoordinate)
@@ -243,6 +260,28 @@ impl StepPass {
                 };
                 self.pass_result = Some(result);
             }
+        }
+
+        // Java: getResult().addReport(new ReportPassRoll(game.getThrowerId(), roll, minimumRoll, reRolled,
+        //   passModifiers, passingDistance, isBomb, state.getResult(), false, statBasedRollModifier))
+        {
+            let re_rolled = self.re_rolled_action.is_some() && self.re_roll_source.is_some();
+            let pass_result_name = self.pass_result.map(|r| r.get_name().to_string());
+            let successful = self.pass_result == Some(PassResult::ACCURATE);
+            let dist_name = passing_dist.map(|d| format!("{:?}", d));
+            game.report_list.add(ReportPassRoll::new(
+                game.thrower_id.clone(),
+                successful,
+                self.roll,
+                self.minimum_roll,
+                re_rolled,
+                vec![],
+                dist_name,
+                is_bomb,
+                pass_result_name,
+                false,
+                None,
+            ));
         }
 
         let result = self.pass_result.unwrap();
@@ -518,5 +557,32 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("missed"));
+    }
+
+    #[test]
+    fn pass_roll_report_added_on_accurate_pass() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game_with_thrower(3);
+        let mut step = make_step();
+        step.pass_result = Some(PassResult::ACCURATE);
+        step.minimum_roll = 3;
+        step.roll = 5;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::PASS_ROLL),
+            "expected ReportPassRoll in report_list after an accurate pass"
+        );
+    }
+
+    #[test]
+    fn pass_roll_report_added_on_fumble() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game_with_thrower(0);
+        let mut step = make_step();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::PASS_ROLL),
+            "expected ReportPassRoll in report_list after a fumble"
+        );
     }
 }

@@ -3,6 +3,8 @@ use ffb_model::events::GameEvent;
 use ffb_model::model::blitz_turn_state::BlitzTurnState;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::mixed::report_kickoff_sequence_activations_exhausted::ReportKickoffSequenceActivationsExhausted;
+use ffb_model::report::mixed::report_blitz_roll::ReportBlitzRoll;
 use crate::action::Action;
 use crate::mechanic::mixed::setup_mechanic::SetupMechanic;
 use crate::mechanic::setup_mechanic::SetupMechanic as SetupMechanicTrait;
@@ -70,6 +72,8 @@ impl StepBlitzTurn {
             let available_players = Self::count_active_players(game);
 
             if available_players == 0 {
+                // Java: getResult().addReport(new ReportKickoffSequenceActivationsExhausted(false))
+                game.report_list.add(ReportKickoffSequenceActivationsExhausted::new(false));
                 return StepOutcome::next().with_event(GameEvent::KickoffSequenceActivationsExhausted { limit_reached: false });
             } else {
                 // Java: int roll = getGameState().getDiceRoller().rollDice(3)
@@ -91,6 +95,8 @@ impl StepBlitzTurn {
                 UtilServerGame::update_player_state_dependent_properties(game);
 
                 // Java: addReport(ReportBlitzRoll(blitzingTeam.getId(), roll, limit))
+                // Java params: teamId, amount (=d3 roll), roll (=limit)
+                game.report_list.add(ReportBlitzRoll::new(Some(blitzing_team_id.clone()), roll, limit));
                 // Java: pushCurrentStepOnStack(); Select.pushSequence(gameState, true)
                 let self_seq = vec![SequenceStep::new(StepId::BlitzTurn)];
                 let select_seq = Select::build_sequence(&SelectParams {
@@ -280,5 +286,34 @@ mod tests {
         game.field_model.set_player_state("h3", PlayerState::new(PS_STANDING).change_active(true));
 
         assert_eq!(StepBlitzTurn::count_active_players(&game), 2);
+    }
+
+    #[test]
+    fn no_active_players_adds_activations_exhausted_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Kickoff;
+        game.home_playing = true;
+        let mut step = StepBlitzTurn::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::KICKOFF_SEQUENCE_ACTIVATIONS_EXHAUSTED),
+            "zero active players must add KICKOFF_SEQUENCE_ACTIVATIONS_EXHAUSTED report");
+    }
+
+    #[test]
+    fn active_players_adds_blitz_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Kickoff;
+        game.home_playing = true;
+        let player = make_player("home1");
+        game.team_home.players.push(player);
+        game.field_model.set_player_coordinate("home1", FieldCoordinate::new(5, 7));
+        use ffb_model::enums::PlayerState;
+        game.field_model.set_player_state("home1", PlayerState::new(PS_STANDING).change_active(true));
+        let mut step = StepBlitzTurn::new();
+        step.start(&mut game, &mut GameRng::new(42));
+        assert!(game.report_list.has_report(ReportId::BLITZ_ROLL),
+            "active players setup must add BLITZ_ROLL report");
     }
 }

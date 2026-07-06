@@ -56,4 +56,13 @@ mod tests {
         t.handle_injury(&game_with_armor(2), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert!(t.ctx.armor_broken); assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
+    #[test]
+    fn causes_turnover_by_default() { assert!(InjuryTypeSabotaged::new().falling_down_causes_turnover()); }
+    #[test]
+    fn context_stores_attacker_and_defender() {
+        let mut t = InjuryTypeSabotaged::new(); let mut rng = GameRng::new(1);
+        t.handle_injury(&game_with_armor(13), &mut rng, Some("saboteur"), "target", coord(), None, None, ApothecaryMode::Defender);
+        assert_eq!(t.ctx.attacker_id.as_deref(), Some("saboteur"));
+        assert_eq!(t.ctx.defender_id.as_deref(), Some("target"));
+    }
 }

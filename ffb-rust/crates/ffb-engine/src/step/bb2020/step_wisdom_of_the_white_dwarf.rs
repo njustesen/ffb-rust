@@ -79,4 +79,17 @@ mod tests {
         let mut step = StepWisdomOfTheWhiteDwarf::new();
         assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
     }
+
+    #[test]
+    fn id_is_wisdom_of_the_white_dwarf() {
+        assert_eq!(StepWisdomOfTheWhiteDwarf::new().id(), StepId::WisdomOfTheWhiteDwarf);
+    }
+
+    #[test]
+    fn non_select_player_action_does_not_store_id() {
+        let mut game = make_game();
+        let mut step = StepWisdomOfTheWhiteDwarf::new();
+        step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
+        assert!(step.player_id.is_none());
+    }
 }

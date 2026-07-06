@@ -1,4 +1,6 @@
 use ffb_model::model::game::Game;
+use ffb_model::report::mixed::report_argue_the_call_roll::ReportArgueTheCallRoll;
+use ffb_model::report::report_id::ReportId;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -85,6 +87,16 @@ impl StepBribes {
                 if coach_banned_by_argue {
                     game.turn_data_mut().coach_banned = true;
                 }
+                // Java: getResult().addReport(new ReportArgueTheCallRoll(actingPlayer.getPlayerId(), fArgueTheCallSuccessful, coachBanned, roll, true, friendsWithTheRef, biasedRefBonus))
+                game.report_list.add(ReportArgueTheCallRoll::new(
+                    game.acting_player.player_id.clone(),
+                    successful,
+                    coach_banned_by_argue,
+                    roll,
+                    true,
+                    false,
+                    0,
+                ));
                 if successful {
                     self.bribes_choice = Some(false);
                     let label = self.goto_label_on_end.clone();
@@ -173,6 +185,36 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
+    }
+
+    // 6. Argue roll emits ReportArgueTheCallRoll when coach is not banned
+    #[test]
+    fn argue_roll_emits_argue_the_call_report() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(5, 5));
+        // coach NOT banned → argue roll fires
+        let mut step = StepBribes::new("end".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::ARGUE_THE_CALL),
+            "ReportArgueTheCallRoll should be emitted when argue roll is made"
+        );
+    }
+
+    // 7. No argue roll when coach is banned → no ARGUE_THE_CALL report
+    #[test]
+    fn no_argue_report_when_coach_banned() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(5, 5));
+        game.turn_data_mut().coach_banned = true;
+        let mut step = StepBribes::new("end".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            !game.report_list.has_report(ReportId::ARGUE_THE_CALL),
+            "No ReportArgueTheCallRoll should be emitted when coach is already banned"
+        );
     }
 
     // 5. UseBribe action sets bribes_choice flag

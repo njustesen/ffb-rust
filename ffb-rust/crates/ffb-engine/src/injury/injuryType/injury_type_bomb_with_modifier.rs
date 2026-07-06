@@ -63,4 +63,12 @@ mod tests {
         t.handle_injury(&game_with_armor(2), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert!(t.ctx.armor_broken); assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
+    #[test]
+    fn does_not_cause_turnover() { assert!(!InjuryTypeBombWithModifier::new().falling_down_causes_turnover()); }
+    #[test]
+    fn bomb_armor_modifier_is_added() {
+        let mut t = InjuryTypeBombWithModifier::new(); let mut rng = GameRng::new(1);
+        t.handle_injury(&game_with_armor(13), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert!(!t.ctx.armor_modifiers.is_empty());
+    }
 }

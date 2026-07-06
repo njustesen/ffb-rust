@@ -21,6 +21,7 @@ use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::{PS_STANDING, PS_PRONE};
+use ffb_model::report::mixed::report_pick_me_up::ReportPickMeUp;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -103,7 +104,8 @@ impl StepPickMeUp {
                         );
                     }
                 }
-                // Java: addReport(ReportPickMeUp(id, roll, success))
+                // Java: addReport(new ReportPickMeUp(player.getId(), roll, success))
+                game.report_list.add(ReportPickMeUp::new(Some(id.clone()), roll, success));
                 events.push(GameEvent::PickMeUpRoll { player_id: id, roll, success });
             }
 
@@ -250,5 +252,49 @@ mod tests {
         );
         // p1 was selected and processed; p2 remains
         assert!(!step.player_ids.contains(&"p1".to_string()));
+    }
+
+    #[test]
+    fn pick_me_up_roll_adds_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepPickMeUp::new();
+        step.player_ids = vec!["p2".into()];
+        step.first_run = false;
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        // Select p2 for processing
+        step.handle_command(
+            &Action::PlayerChoice {
+                player_id: None,
+                player_ids: vec!["p2".into()],
+                mode: "PICK_ME_UP".into(),
+            },
+            &mut game,
+            &mut rng,
+        );
+        assert!(game.report_list.has_report(ReportId::PICK_ME_UP),
+            "should add a PICK_ME_UP report for each roll");
+    }
+
+    #[test]
+    fn pick_me_up_no_selection_no_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepPickMeUp::new();
+        step.player_ids = vec!["p3".into()];
+        step.first_run = false;
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        // Empty selection — clears list, no rolls
+        step.handle_command(
+            &Action::PlayerChoice {
+                player_id: None,
+                player_ids: vec![],
+                mode: "PICK_ME_UP".into(),
+            },
+            &mut game,
+            &mut rng,
+        );
+        assert!(!game.report_list.has_report(ReportId::PICK_ME_UP),
+            "empty selection should not add any PICK_ME_UP report");
     }
 }

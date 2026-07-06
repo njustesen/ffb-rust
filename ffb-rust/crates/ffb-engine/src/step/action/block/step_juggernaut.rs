@@ -16,7 +16,10 @@ use ffb_model::enums::{PlayerAction, SkillId};
 use ffb_model::enums::BlockResult;
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::model::skill_use::SkillUse;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_skill_use::ReportSkillUse;
+use ffb_model::report::report_id::ReportId;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -94,6 +97,13 @@ impl StepJuggernaut {
 
         if using {
             // Java: publish BLOCK_RESULT(Pushback), restore defender, initPushback, goto label.
+            // Java: addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, SkillUse.PUSH_BACK_OPPONENT))
+            game.report_list.add(ReportSkillUse::new(
+                Some(player_id.clone()),
+                SkillId::Juggernaut,
+                true,
+                SkillUse::PUSH_BACK_OPPONENT,
+            ));
             let old_state = self.old_defender_state.unwrap_or_default();
             if let Some(defender_id) = game.defender_id.clone() {
                 game.field_model.set_player_state(&defender_id, old_state);
@@ -114,7 +124,13 @@ impl StepJuggernaut {
             outcome = outcome.publish(StepParameter::StartingPushbackSquare(starting_sq));
             outcome
         } else {
-            // Java: addReport(SkillUse false); NEXT_STEP
+            // Java: addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, false, null))
+            game.report_list.add(ReportSkillUse::new(
+                Some(player_id.clone()),
+                SkillId::Juggernaut,
+                false,
+                SkillUse::WOULD_NOT_HELP,
+            ));
             StepOutcome::next()
                 .with_event(GameEvent::SkillUse { player_id, skill_id: skill_num, used: false })
         }
@@ -283,5 +299,32 @@ mod tests {
         assert_eq!(step.goto_label_on_success, "X");
         assert!(step.old_defender_state.is_some());
         assert!(!step.set_parameter(&StepParameter::EndPlayerAction(true)));
+    }
+
+    #[test]
+    fn using_juggernaut_adds_skill_use_report() {
+        let mut game = make_blitz_game(vec![SkillId::Juggernaut]);
+        let mut step = StepJuggernaut::new();
+        step.goto_label_on_success = "JUG".into();
+        step.using_juggernaut = Some(true);
+        step.old_defender_state = Some(PlayerState::new(PS_STANDING));
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::SKILL_USE),
+            "SKILL_USE report must be added when Juggernaut is used"
+        );
+    }
+
+    #[test]
+    fn declining_juggernaut_adds_skill_use_report() {
+        let mut game = make_blitz_game(vec![SkillId::Juggernaut]);
+        let mut step = StepJuggernaut::new();
+        step.goto_label_on_success = "JUG".into();
+        step.using_juggernaut = Some(false);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::SKILL_USE),
+            "SKILL_USE report must be added when Juggernaut is declined"
+        );
     }
 }

@@ -20,7 +20,9 @@
 use ffb_model::enums::{ApothecaryMode, TurnMode};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::model::special_effect::SpecialEffect as ModelSpecialEffect;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_special_effect_roll::ReportSpecialEffectRoll;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -98,13 +100,22 @@ impl StepSpecialEffect {
 
         // Java: if (fRollForEffect) { roll; check success } else { successful = true }
         let mut spell_roll_event: Option<GameEvent> = None;
+        let model_effect = special_effect_to_model(self.special_effect);
         let successful = if self.roll_for_effect {
             let roll = rng.d6();
-            // Java: getResult().addReport(new ReportSpecialEffectRoll(effect, roll, success))
+            let success = is_special_effect_successful(self.special_effect, game, &self.player_id, roll);
+            // Java: getResult().addReport(new ReportSpecialEffectRoll(effect, player.getId(), roll, successful))
+            if let Some(me) = model_effect {
+                game.report_list.add(ReportSpecialEffectRoll::new(me, Some(self.player_id.clone()), roll, success));
+            }
             spell_roll_event = Some(GameEvent::SpellEffectRoll { roll });
             // Java: DiceInterpreter.isSpecialEffectSuccesful(effect, targetPlayer, roll)
-            is_special_effect_successful(self.special_effect, game, &self.player_id, roll)
+            success
         } else {
+            // Java: getResult().addReport(new ReportSpecialEffectRoll(effect, player.getId(), 0, true))
+            if let Some(me) = model_effect {
+                game.report_list.add(ReportSpecialEffectRoll::new(me, Some(self.player_id.clone()), 0, true));
+            }
             true
         };
 
@@ -175,6 +186,17 @@ impl StepSpecialEffect {
         }
 
         outcome
+    }
+}
+
+/// Map engine-local SpecialEffect to model SpecialEffect for reporting.
+fn special_effect_to_model(effect: Option<SpecialEffect>) -> Option<ModelSpecialEffect> {
+    match effect {
+        Some(SpecialEffect::Lightning) => Some(ModelSpecialEffect::LIGHTNING),
+        Some(SpecialEffect::Zap) => Some(ModelSpecialEffect::ZAP),
+        Some(SpecialEffect::Fireball) => Some(ModelSpecialEffect::FIREBALL),
+        Some(SpecialEffect::Bomb) => Some(ModelSpecialEffect::BOMB),
+        None => None,
     }
 }
 
@@ -383,5 +405,36 @@ mod tests {
     fn none_effect_always_fails() {
         let game = make_game();
         assert!(!is_special_effect_successful(None, &game, "x", 6));
+    }
+
+    #[test]
+    fn no_roll_required_adds_special_effect_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        add_away_player(&mut game, "p1");
+        game.home_playing = true;
+        let mut step = StepSpecialEffect::new("fail".into(), "p1".into(), Some(SpecialEffect::Lightning));
+        step.roll_for_effect = false;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::SPELL_EFFECT_ROLL),
+            "no-roll path should add ReportSpecialEffectRoll"
+        );
+    }
+
+    #[test]
+    fn roll_required_adds_special_effect_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        add_away_player(&mut game, "p1");
+        game.home_playing = true;
+        let mut step = StepSpecialEffect::new("fail".into(), "p1".into(), Some(SpecialEffect::Fireball));
+        step.roll_for_effect = true;
+        // Seed 5 gives d6>=4 → fireball succeeds
+        step.start(&mut game, &mut GameRng::new(5));
+        assert!(
+            game.report_list.has_report(ReportId::SPELL_EFFECT_ROLL),
+            "roll path should add ReportSpecialEffectRoll"
+        );
     }
 }

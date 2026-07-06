@@ -12,9 +12,11 @@
 ///        extends `AbstractStepWithReRoll`.
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::model::skill_use::SkillUse;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::SkillId;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -101,10 +103,17 @@ impl Step for StepAnimalSavagery {
                         if is_home { game.team_home.player_mut(pid).map(|p| p.used_skills.insert(SkillId::PrimalSavagery)); }
                         else { game.team_away.player_mut(pid).map(|p| p.used_skills.insert(SkillId::PrimalSavagery)); }
                     }
-                    // Java: addReport(new ReportSkillUse(ANIMAL_SAVAGERY/PrimalSavagery, true))
-                    let skill_event = self.state.player_id.as_ref().map(|pid| {
+                    // Java: addReport(new ReportSkillUse(playerId, skill, skillUsed, SkillUse.LASH_OUT_AGAINST_OPPONENT))
+                    let player_id_opt = self.state.player_id.clone();
+                    game.report_list.add(ReportSkillUse::new(
+                        player_id_opt.clone(),
+                        SkillId::PrimalSavagery,
+                        true,
+                        SkillUse::LASH_OUT_AGAINST_OPPONENT,
+                    ));
+                    let skill_event = player_id_opt.map(|pid| {
                         GameEvent::SkillUse {
-                            player_id: pid.clone(),
+                            player_id: pid,
                             skill_id: SkillId::PrimalSavagery as u16,
                             used: true,
                         }
@@ -254,5 +263,37 @@ mod tests {
             &mut rng,
         );
         assert_eq!(step.state.attack_opponent, Some(true));
+    }
+
+    #[test]
+    fn use_skill_lash_out_adds_skill_use_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepAnimalSavagery::new("fail");
+        step.state.player_id = Some("p1".into());
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::PrimalSavagery, use_skill: true },
+            &mut game,
+            &mut rng,
+        );
+        assert!(game.report_list.has_report(ReportId::SKILL_USE),
+            "should add a SKILL_USE report when lashing out");
+    }
+
+    #[test]
+    fn use_skill_not_used_does_not_add_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepAnimalSavagery::new("fail");
+        step.state.player_id = Some("p1".into());
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::PrimalSavagery, use_skill: false },
+            &mut game,
+            &mut rng,
+        );
+        assert!(!game.report_list.has_report(ReportId::SKILL_USE),
+            "should not add a report when skill is not used");
     }
 }

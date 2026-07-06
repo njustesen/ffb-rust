@@ -14,6 +14,7 @@
 /// Prayer roll table: rolls 1–16 (BB2025 has exactly 16 prayer entries).
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::report::mixed::report_prayer_amount::ReportPrayerAmount;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepId, StepOutcome, StepParameter, SequenceStep};
@@ -82,6 +83,12 @@ impl StepPrayers {
                 .min((available_prayer_rolls.len() as i32) - already_bought_prayers);
 
             // Java: getResult().addReport(new ReportPrayerAmount(...))
+            game.report_list.add(ReportPrayerAmount::new(
+                self.tv_home,
+                self.tv_away,
+                additional_prayer_amount,
+                home_team_additional_receives_prayers,
+            ));
             prayer_amount_event = Some(GameEvent::PrayerAmount {
                 tv_home: self.tv_home,
                 tv_away: self.tv_away,
@@ -303,5 +310,35 @@ mod tests {
         let rolls: Vec<i32> = out.pushes[0].iter().map(prayer_roll_from_entry).collect();
         let unique: std::collections::HashSet<i32> = rolls.iter().cloned().collect();
         assert_eq!(rolls.len(), unique.len(), "prayer rolls must be distinct");
+    }
+
+    #[test]
+    fn tv_gap_adds_prayer_amount_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepPrayers {
+            tv_home: 800_000,
+            tv_away: 1_000_000,
+            prayers_bought_home: 0,
+            prayers_bought_away: 0,
+        };
+        step.start(&mut game, &mut GameRng::new(1));
+        assert!(game.report_list.has_report(ReportId::PRAYER_AMOUNT),
+            "PRAYER_AMOUNT report must be added when TV gap exists");
+    }
+
+    #[test]
+    fn equal_tv_no_prayer_amount_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepPrayers {
+            tv_home: 1_000_000,
+            tv_away: 1_000_000,
+            prayers_bought_home: 0,
+            prayers_bought_away: 0,
+        };
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::PRAYER_AMOUNT),
+            "PRAYER_AMOUNT must NOT be added when TV is equal");
     }
 }

@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use ffb_model::enums::{ApothecaryMode, PlayerState, SkillId};
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::model::pushback_mode::PushbackMode;
+use ffb_model::report::report_pushback::ReportPushback;
 use ffb_model::types::{FieldCoordinate, PushbackSquare};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -312,7 +314,13 @@ impl StepPushback {
                 }
 
                 // Java: if (state.startingPushbackSquare == null) addReport(ReportPushback(...))
-                // (startingPushbackSquare is still set here — this branch is for when it was just cleared above)
+                // SideStep hook may have cleared starting_pushback_square → add report now.
+                if self.starting_pushback_square.is_none() {
+                    game.report_list.add(ReportPushback::new(
+                        defender_id.clone(),
+                        PushbackMode::REGULAR,
+                    ));
+                }
 
                 // Java: fieldModel.add(state.pushbackSquares)
                 game.field_model.pushback_squares.clear();
@@ -378,8 +386,12 @@ mod tests {
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::StepAction;
-    use ffb_model::enums::{Rules, PS_STANDING, Direction};
+    use ffb_model::enums::{Rules, PS_STANDING, Direction, PlayerType, PlayerGender};
+    use ffb_model::model::player::Player;
+    use ffb_model::model::skill_def::SkillWithValue;
+    use ffb_model::report::report_id::ReportId;
     use ffb_model::types::PushbackSquare;
+    use std::collections::HashSet;
 
     fn make_game() -> Game {
         let home = test_team("home", 0);
@@ -574,5 +586,53 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::Continue);
         assert_eq!(game.field_model.pushback_squares.len(), 3);
+    }
+
+    // ── report wiring ────────────────────────────────────────────────────────
+
+    /// SideStep player who accepts the side-step triggers the addReport(ReportPushback) path.
+    #[test]
+    fn side_step_clears_starting_square_and_adds_pushback_report() {
+        let mut step = StepPushback::new();
+        let coord = FieldCoordinate::new(10, 7);
+        step.starting_pushback_square = Some(PushbackSquare::new(coord, Direction::North, true));
+
+        let mut game = make_game();
+        // Add a defender with SideStep
+        game.team_away.players.push(Player {
+            id: "def1".into(), name: "def1".into(), nr: 2, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::SideStep, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("def1", coord);
+        game.defender_id = Some("def1".into());
+        game.home_playing = true;
+
+        // Pre-populate side_stepping = true so headless path uses side-step
+        step.side_stepping.insert("def1".to_owned(), true);
+        // Also need to set old_defender_state to has_tacklezones
+        use ffb_model::enums::PS_STANDING;
+        step.old_defender_state = Some(PlayerState::new(PS_STANDING));
+
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PUSHBACK), "ReportPushback should appear when SideStep clears starting square");
+    }
+
+    /// Without SideStep the starting_pushback_square stays set, so no pushback report is added.
+    #[test]
+    fn without_side_step_no_pushback_report_added() {
+        let mut step = StepPushback::new();
+        let coord = FieldCoordinate::new(10, 7);
+        step.starting_pushback_square = Some(PushbackSquare::new(coord, Direction::North, true));
+        let mut game = make_game();
+        game.defender_id = Some("p1".into());
+        game.field_model.set_player_coordinate("p1", coord);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::PUSHBACK), "ReportPushback should NOT appear when starting square is not cleared");
     }
 }

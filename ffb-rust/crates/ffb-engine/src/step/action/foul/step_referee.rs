@@ -12,6 +12,8 @@ use ffb_model::enums::SkillId;
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::mixed::report_referee::ReportReferee;
+use ffb_model::report::report_id::ReportId;
 use crate::action::Action;
 use crate::injury::InjuryResult;
 use crate::step::framework::{Step, StepOutcome};
@@ -123,6 +125,7 @@ impl StepReferee {
         referee_spots_foul |= under_scrutiny && ctx.is_armor_broken();
 
         // Java: addReport(new ReportReferee(refereeSpotsFoul, underScrutiny))
+        game.report_list.add(ReportReferee::new(referee_spots_foul, under_scrutiny));
         let referee_event = GameEvent::RefereeSpotsFoul { referee_spots_foul, under_scrutiny };
 
         // Java: if (!refereeSpotsFoul) { loop over opponentInducementSet.value(Usage.SPOT_FOUL) }
@@ -344,6 +347,34 @@ mod tests {
         assert!(
             outcome.events.iter().any(|e| matches!(e, GameEvent::RefereeSpotsFoul { .. })),
             "RefereeSpotsFoul event must always be emitted when injury result is set"
+        );
+    }
+
+    #[test]
+    fn referee_spots_foul_adds_referee_report() {
+        let (mut game, _) = make_game_with_player(vec![]);
+        let mut step = StepReferee::new();
+        step.goto_label_on_end = "NO_FOUL".into();
+        // Armor doubles → referee spots foul
+        step.injury_result_defender = Some(make_injury_result(Some([3, 3]), false, None));
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::REFEREE),
+            "REFEREE report must be added when referee spots the foul"
+        );
+    }
+
+    #[test]
+    fn referee_misses_foul_also_adds_referee_report() {
+        let (mut game, _) = make_game_with_player(vec![]);
+        let mut step = StepReferee::new();
+        step.goto_label_on_end = "NO_FOUL".into();
+        // No doubles → referee misses
+        step.injury_result_defender = Some(make_injury_result(Some([2, 5]), false, None));
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::REFEREE),
+            "REFEREE report must be added even when referee misses the foul"
         );
     }
 }

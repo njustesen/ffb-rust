@@ -498,4 +498,28 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep,
             "roll=3 should succeed when no TZ (min_roll=3)");
     }
+
+    #[test]
+    fn success_adds_jump_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game_with_leaper();
+        let mut step = StepJump::new("fail".into());
+        step.roll = 4; // ag=3, min_roll=3, success
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::JUMP_ROLL),
+            "JUMP_ROLL report must be added on success");
+    }
+
+    #[test]
+    fn failure_adds_jump_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game_with_leaper();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        let mut step = StepJump::new("fail".into());
+        step.roll = 1; // failure
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::JUMP_ROLL),
+            "JUMP_ROLL report must be added on failure");
+    }
 }

@@ -19,6 +19,7 @@
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_bomb_out_of_bounds::ReportBombOutOfBounds;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::generator::bb2016::special_effect::{SpecialEffect as SpecialEffectGenerator, SpecialEffectParams};
@@ -60,6 +61,7 @@ impl StepInitBomb {
             let out = if self.bomb_coordinate.is_none() {
                 // Bomb went out of bounds with no landing square.
                 // Java: getResult().addReport(new ReportBombOutOfBounds())
+                game.report_list.add(ReportBombOutOfBounds::new());
                 StepOutcome::next()
                     .with_event(GameEvent::BombOutOfBounds { coord: ffb_model::types::FieldCoordinate::new(0, 0) })
                     .publish(StepParameter::CatcherId(None))
@@ -190,6 +192,34 @@ mod tests {
         let mut step = StepInitBomb::new();
         assert!(step.set_parameter(&StepParameter::GotoLabelOnEnd("x".into())));
         assert_eq!(step.goto_label_on_end, "x");
+    }
+
+    #[test]
+    fn no_bomb_coord_adds_bomb_out_of_bounds_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        // bomb_coordinate is None → OOB path
+        let mut step = StepInitBomb::new();
+        step.goto_label_on_end = "catch".into();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::BOMB_OUT_OF_BOUNDS),
+            "bomb OOB with no coordinate should add ReportBombOutOfBounds"
+        );
+    }
+
+    #[test]
+    fn bomb_coordinate_present_does_not_add_bomb_out_of_bounds_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.field_model.bomb_coordinate = Some(FieldCoordinate { x: 10, y: 7 });
+        let mut step = StepInitBomb::new();
+        step.goto_label_on_end = "catch".into();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            !game.report_list.has_report(ReportId::BOMB_OUT_OF_BOUNDS),
+            "bomb explosion with coordinate should NOT add ReportBombOutOfBounds"
+        );
     }
 
     #[test]

@@ -50,10 +50,33 @@ impl InjuryContextModification for SlayerModification {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffb_model::enums::{ApothecaryMode, Rules};
+    use ffb_model::enums::{ApothecaryMode, Rules, PS_STANDING, PlayerState};
+    use ffb_model::model::player::Player;
+    use ffb_model::enums::{PlayerType, PlayerGender};
+    use ffb_model::types::FieldCoordinate;
     use ffb_model::util::rng::GameRng;
     use ffb_model::model::game::Game;
     use crate::step::framework::test_team;
+
+    fn make_game() -> Game {
+        Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020)
+    }
+
+    fn add_player(game: &mut Game, home: bool, id: &str, strength: i32) {
+        let p = Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength, agility: 3, passing: 4, armour: 7,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
+            race: None, ..Default::default()
+        };
+        if home { game.team_home.players.push(p); }
+        else { game.team_away.players.push(p); }
+        game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+    }
 
     #[test]
     fn valid_type_is_block() {
@@ -63,7 +86,7 @@ mod tests {
 
     #[test]
     fn try_armour_false_when_no_defender() {
-        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        let game = make_game();
         let mut rng = GameRng::new(1);
         let ctx = InjuryContext::new(ApothecaryMode::Defender);
         let params = ModificationParams::new(&game, &mut rng, ctx, "Block");
@@ -72,7 +95,46 @@ mod tests {
 
     #[test]
     fn skill_use_is_add_armour_modifier() {
-        use ffb_model::model::SkillUse;
         assert_eq!(SlayerModification::new().skill_use(), SkillUse::ADD_ARMOUR_MODIFIER);
+    }
+
+    #[test]
+    fn try_armour_false_when_defender_st4() {
+        let mut game = make_game();
+        add_player(&mut game, true, "act", 4);
+        add_player(&mut game, false, "def", 4); // ST4 — below threshold
+        game.acting_player.player_id = Some("act".into());
+
+        let mut rng = GameRng::new(1);
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.defender_id = Some("def".into());
+        let params = ModificationParams::new(&game, &mut rng, ctx, "Block");
+        assert!(!SlayerModification::new().try_armour_roll_modification(&params));
+    }
+
+    #[test]
+    fn try_armour_true_when_defender_st5_and_acting_player_standing() {
+        let mut game = make_game();
+        add_player(&mut game, true, "act", 3);
+        add_player(&mut game, false, "def", 5); // ST5 ✓
+        game.acting_player.player_id = Some("act".into());
+
+        let mut rng = GameRng::new(1);
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.defender_id = Some("def".into());
+        let params = ModificationParams::new(&game, &mut rng, ctx, "Block");
+        assert!(SlayerModification::new().try_armour_roll_modification(&params));
+    }
+
+    #[test]
+    fn try_injury_false_when_defender_st4() {
+        let mut game = make_game();
+        add_player(&mut game, true, "act", 3);
+        add_player(&mut game, false, "def", 4);
+        game.acting_player.player_id = Some("act".into());
+
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.defender_id = Some("def".into());
+        assert!(!SlayerModification::new().try_injury_modification(&game, &ctx, "Block"));
     }
 }

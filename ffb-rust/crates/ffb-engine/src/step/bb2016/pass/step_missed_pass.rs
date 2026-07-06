@@ -2,6 +2,8 @@ use ffb_model::enums::{Direction, PlayerAction};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_pass_deviate::ReportPassDeviate;
+use ffb_model::report::report_scatter_ball::ReportScatterBall;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter};
@@ -86,18 +88,23 @@ impl StepMissedPass {
                 lvc = start.step(direction, valid_distance);
             }
             last_valid_coordinate = lvc;
-            // Java: getResult().addReport(new ReportPassDeviate(...)) — skip (reports not translated)
+            // Java: getResult().addReport(new ReportPassDeviate(coordinateEnd, direction, directionRoll, distanceRoll, false))
+            game.report_list.add(ReportPassDeviate::new(coordinate_end, direction, dir_roll, dist_roll, false));
         } else {
             // Java: coordinateStart = game.getPassCoordinate()
             let mut coord_start = game.pass_coordinate.unwrap_or(FieldCoordinate::new(0, 0));
             let mut coord_end = coord_start;
             let mut lvc = coord_start;
+            let mut roll_list: Vec<i32> = Vec::new();
+            let mut direction_list: Vec<Direction> = Vec::new();
 
             // Java: while (FIELD.isInBounds(coordinateStart) && rollList.size() < 3)
             let mut count = 0;
             while coord_start.is_on_pitch() && count < 3 {
                 let roll = rng.d8();
                 let direction = Self::direction_for_roll(roll);
+                roll_list.push(roll);
+                direction_list.push(direction);
                 coord_end = coord_start.step(direction, 1);
                 lvc = if coord_end.is_on_pitch() { coord_end } else { coord_start };
                 coord_start = coord_end;
@@ -105,7 +112,8 @@ impl StepMissedPass {
             }
             coordinate_end = coord_end;
             last_valid_coordinate = lvc;
-            // Java: getResult().addReport(new ReportScatterBall(...)) — skip (reports not translated)
+            // Java: getResult().addReport(new ReportScatterBall(directions, rolls, false))
+            game.report_list.add(ReportScatterBall::new(direction_list, roll_list, false));
         }
 
         // Java: game.getFieldModel().setRangeRuler(null)
@@ -281,6 +289,36 @@ mod tests {
             }));
             assert!(game.field_model.bomb_moving);
         }
+    }
+
+    #[test]
+    fn scatter_adds_scatter_ball_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+        let mut step = StepMissedPass::new();
+        // pass_deviates = false → scatter path
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, crate::step::framework::StepAction::NextStep);
+        assert!(
+            game.report_list.has_report(ReportId::SCATTER_BALL),
+            "scatter path should add ReportScatterBall"
+        );
+    }
+
+    #[test]
+    fn deviate_adds_pass_deviate_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.thrower_id = Some("t1".into());
+        game.field_model.set_player_coordinate("t1", FieldCoordinate::new(10, 5));
+        let mut step = StepMissedPass::new();
+        step.pass_deviates = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::PASS_DEVIATE),
+            "deviate path should add ReportPassDeviate"
+        );
     }
 
     #[test]

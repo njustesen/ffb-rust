@@ -12,6 +12,8 @@ use ffb_model::events::GameEvent;
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::mixed::report_apothecary_roll::ReportApothecaryRoll;
+use ffb_model::report::report_apothecary_choice::ReportApothecaryChoice;
 use crate::action::Action;
 use crate::injury::InjuryResult;
 use crate::step::framework::{Step, StepOutcome};
@@ -181,6 +183,14 @@ impl StepApothecary {
                     // Java: addReport(new ReportApothecaryRoll(defenderId, null, null, null, null, modifiers))
                     if let Some(ref ir) = self.injury_result {
                         if let Some(ref did) = ir.injury_context.defender_id {
+                            game.report_list.add(ReportApothecaryRoll::new(
+                                Some(did.clone()),
+                                vec![],
+                                None,
+                                None,
+                                None,
+                                vec![],
+                            ));
                             outcome = outcome.with_event(GameEvent::ApothecaryRoll {
                                 player_id: did.clone(),
                                 roll: None,
@@ -286,6 +296,15 @@ impl StepApothecary {
         if apothecary_choice {
             // Java: rollCasualty() + DialogApothecaryChoiceParameter
             let roll = rng.d6() + rng.d6();
+            // Java: addReport(new ReportApothecaryRoll(defender.getId(), casualtyRoll, playerState, seriousInjury, originalSeriousInjury, modifiers))
+            game.report_list.add(ReportApothecaryRoll::new(
+                Some(player_id.clone()),
+                vec![roll],
+                None,
+                None,
+                None,
+                vec![],
+            ));
             let apo_event = GameEvent::ApothecaryRoll {
                 player_id,
                 roll: Some(roll),
@@ -310,6 +329,11 @@ impl StepApothecary {
                 ir.injury_context.serious_injury = None;
             }
             // Java: addReport(new ReportApothecaryChoice(defenderId, playerState, null))
+            game.report_list.add(ReportApothecaryChoice::new(
+                player_id.clone(),
+                ffb_model::model::player_state::PlayerState::new(),
+                None,
+            ));
             let choice_event = GameEvent::ApothecaryChoice {
                 player_id,
                 healed: true,
@@ -490,5 +514,39 @@ mod tests {
             step.injury_result.as_ref().unwrap().injury_context.apothecary_status,
             ApothecaryStatus::DoNotUseIgor,
         );
+    }
+
+    #[test]
+    fn do_not_use_apothecary_adds_apothecary_roll_report() {
+        use ffb_model::enums::PlayerState;
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepApothecary::new();
+        step.apothecary_mode = Some(ApothecaryMode::Defender);
+        let mut ir = make_ir(ApothecaryMode::Defender, ApothecaryStatus::DoNotUseApothecary);
+        ir.injury_context.defender_id = Some("p1".into());
+        ir.injury_context.injury = Some(PlayerState::new(PS_BADLY_HURT));
+        step.injury_result = Some(ir);
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(game.report_list.has_report(ReportId::APOTHECARY_ROLL),
+            "DoNotUseApothecary must add APOTHECARY_ROLL report");
+    }
+
+    #[test]
+    fn use_apothecary_on_bh_adds_apothecary_choice_report() {
+        use ffb_model::enums::PlayerState;
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepApothecary::new();
+        step.apothecary_mode = Some(ApothecaryMode::Defender);
+        let mut ir = make_ir(ApothecaryMode::Defender, ApothecaryStatus::UseApothecary);
+        ir.injury_context.defender_id = Some("p2".into());
+        ir.injury_context.injury = Some(PlayerState::new(PS_BADLY_HURT));
+        step.injury_result = Some(ir);
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(game.report_list.has_report(ReportId::APOTHECARY_CHOICE),
+            "UseApothecary on BH must add APOTHECARY_CHOICE report");
     }
 }

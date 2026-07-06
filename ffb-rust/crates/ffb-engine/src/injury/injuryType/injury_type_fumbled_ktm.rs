@@ -41,4 +41,13 @@ mod tests {
         assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
     #[test] fn stun_is_ko() { assert!(InjuryTypeFumbledKtm::new().stun_is_treated_as_ko()); }
+    #[test]
+    fn causes_turnover_by_default() { assert!(InjuryTypeFumbledKtm::new().falling_down_causes_turnover()); }
+    #[test]
+    fn context_stores_attacker_and_defender() {
+        let mut t = InjuryTypeFumbledKtm::new(); let mut rng = GameRng::new(1);
+        t.handle_injury(&make_game(), &mut rng, Some("att"), "def", coord(), None, None, ApothecaryMode::Defender);
+        assert_eq!(t.ctx.attacker_id.as_deref(), Some("att"));
+        assert_eq!(t.ctx.defender_id.as_deref(), Some("def"));
+    }
 }

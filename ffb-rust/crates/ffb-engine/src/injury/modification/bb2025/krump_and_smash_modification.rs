@@ -35,6 +35,16 @@ impl InjuryContextModification for KrumpAndSmashModification {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ffb_model::enums::{ApothecaryMode, Rules};
+    use ffb_model::model::game::Game;
+    use ffb_model::util::rng::GameRng;
+    use crate::injury::InjuryContext;
+    use crate::injury::modification::ModificationParams;
+    use crate::step::framework::test_team;
+
+    fn make_game() -> Game {
+        Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+    }
 
     #[test]
     fn valid_type_is_block() {
@@ -46,5 +56,36 @@ mod tests {
     #[test]
     fn skill_use_is_reroll_armour() {
         assert_eq!(KrumpAndSmashModification::new().skill_use(), SkillUse::RE_ROLL_ARMOUR);
+    }
+
+    #[test]
+    fn try_armour_false_when_broken() {
+        let game = make_game();
+        let mut rng = GameRng::new(1);
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        ctx.armor_broken = true;
+        let params = ModificationParams::new(&game, &mut rng, ctx, "Block");
+        assert!(!KrumpAndSmashModification::new().try_armour_roll_modification(&params));
+    }
+
+    #[test]
+    fn try_armour_true_when_not_broken() {
+        let game = make_game();
+        let mut rng = GameRng::new(1);
+        let ctx = InjuryContext::new(ApothecaryMode::Defender);
+        let params = ModificationParams::new(&game, &mut rng, ctx, "Block");
+        assert!(KrumpAndSmashModification::new().try_armour_roll_modification(&params));
+    }
+
+    #[test]
+    fn modify_armour_internal_returns_true() {
+        let game = make_game();
+        let mut rng = GameRng::new(1);
+        let ctx = InjuryContext::new(ApothecaryMode::Defender);
+        let mut params = ModificationParams::new(&game, &mut rng, ctx, "Block");
+        assert!(KrumpAndSmashModification::new().modify_armour_internal(&mut params));
+        let [d1, d2] = params.new_context.armor_roll.unwrap();
+        assert!((1..=6).contains(&d1));
+        assert!((1..=6).contains(&d2));
     }
 }

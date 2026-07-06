@@ -201,6 +201,26 @@ mod tests {
         assert_eq!(fouls, 1);
     }
 
+    // No Java addReport calls in StepInitFouling — verify the step produces no spurious reports.
+    #[test]
+    fn no_reports_emitted_on_valid_foul() {
+        let mut game = make_game();
+        game.team_home.players.push(bare_player("f1"));
+        game.team_away.players.push(bare_player("d1"));
+        game.acting_player.player_id = Some("f1".into());
+        let mut step = StepInitFouling::new("end".into()).with_defender("d1".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.report_list.size(), 0, "StepInitFouling must not emit any reports");
+    }
+
+    #[test]
+    fn no_reports_emitted_on_end_turn() {
+        let mut game = make_game();
+        let mut step = StepInitFouling::new("end".into());
+        step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
+        assert_eq!(game.report_list.size(), 0, "StepInitFouling end_turn path must not emit any reports");
+    }
+
     // 5. Foul command sets defender then resolves
     #[test]
     fn foul_command_sets_defender_and_resolves() {

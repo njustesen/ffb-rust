@@ -48,6 +48,21 @@ impl UtilCards {
         };
         player.has_skill_property(&cancel_prop)
     }
+
+    /// Java: `getSkillCancelling(Player<?> player, Skill skill)` (by property).
+    ///
+    /// Returns the first SkillId that has a CancelSkillProperty for the given named property,
+    /// matching `hasSkillToCancelProperty` but returning the ID for use in reports.
+    pub fn get_skill_cancelling_property(player: &Player, property: &str) -> Option<SkillId> {
+        let cancel_prop = if property.is_empty() {
+            "cancels".to_string()
+        } else {
+            let mut chars = property.chars();
+            let first = chars.next().unwrap().to_uppercase().to_string();
+            format!("cancels{}{}", first, chars.as_str())
+        };
+        player.all_skill_ids().find(|id| id.properties().contains(&cancel_prop.as_str()))
+    }
 }
 
 impl Default for UtilCards {

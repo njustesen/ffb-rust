@@ -2,6 +2,8 @@ use ffb_model::events::GameEvent;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::report::report_bomb_out_of_bounds::ReportBombOutOfBounds;
+use ffb_model::report::report_scatter_ball::ReportScatterBall;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_cards::UtilCards;
 use ffb_model::enums::Direction;
@@ -186,6 +188,8 @@ impl StepInitBomb {
                     let scatter_roll = rng.d8();
                     let direction = Direction::for_roll(scatter_roll).unwrap_or(Direction::North);
                     let bounce_to = UtilServerCatchScatterThrowIn::find_scatter_coordinate(bomb_coord, direction, 1);
+                    // Java: getResult().addReport(new ReportScatterBall(new Direction[]{direction}, new int[]{scatterRoll}, false))
+                    game.report_list.add(ReportScatterBall::new(vec![direction], vec![scatter_roll], false));
                     if !FieldCoordinateBounds::FIELD.is_in_bounds(bounce_to) {
                         bomb_out = true;
                     } else if game.field_model.player_at(bounce_to).is_some() {
@@ -203,6 +207,8 @@ impl StepInitBomb {
             if bomb_out {
                 game.field_model.bomb_coordinate = None;
                 game.field_model.bomb_moving = false;
+                // Java: getResult().addReport(new ReportBombOutOfBounds())
+                game.report_list.add(ReportBombOutOfBounds::new());
                 out_event = Some(GameEvent::BombOutOfBounds {
                     coord: self.bomb_coordinate.unwrap_or(FieldCoordinate::new(0, 0)),
                 });
@@ -340,5 +346,30 @@ mod tests {
         // bomb_moving should NOT have been set to false by bomb_out path
         // (bomb_out skipped due to dont_drop_fumble)
         assert!(!game.field_model.bomb_moving); // stays false (default)
+    }
+
+    #[test]
+    fn null_bomb_coordinate_adds_bomb_out_of_bounds_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.field_model.bomb_coordinate = None;
+        let mut step = StepInitBomb::new("end".into());
+        step.dont_drop_fumble = false;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::BOMB_OUT_OF_BOUNDS),
+            "BOMB_OUT_OF_BOUNDS report must be added when bomb is out of bounds");
+    }
+
+    #[test]
+    fn catcher_set_no_bomb_out_does_not_add_bomb_out_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        // catcher_id set, explode_skill_used=false → goes to gotoLabel path (no bomb_out)
+        let mut step = StepInitBomb::new("end".into());
+        step.catcher_id = Some("p1".into());
+        step.explode_skill_used = Some(false);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::BOMB_OUT_OF_BOUNDS),
+            "BOMB_OUT_OF_BOUNDS must NOT be added when catcher is present");
     }
 }

@@ -156,22 +156,38 @@ impl StepGoForIt {
         }
 
         let player_id = game.acting_player.player_id.clone();
-        let minimum_roll = {
-            let factory = GoForItModifierFactory::for_rules(game.rules);
-            if let Some(pid) = player_id.as_deref() {
-                if let Some(player) = game.player(pid) {
-                    let ctx = GoForItContext::new(game, player);
-                    let mods = factory.find_applicable(&ctx);
-                    GoForItModifierFactory::minimum_roll_going_for_it(&mods)
-                } else {
-                    2
-                }
+        let factory = GoForItModifierFactory::for_rules(game.rules);
+        let (minimum_roll, mod_names): (i32, Vec<String>) = if let Some(pid) = player_id.as_deref() {
+            if let Some(player) = game.player(pid) {
+                let ctx = GoForItContext::new(game, player);
+                let mods = factory.find_applicable(&ctx);
+                let min = GoForItModifierFactory::minimum_roll_going_for_it(&mods);
+                let names: Vec<String> = mods.iter().map(|m| m.get_report_string().to_string()).collect();
+                (min, names)
             } else {
-                2
+                (2, vec![])
             }
+        } else {
+            (2, vec![])
         };
 
         let successful = self.roll >= minimum_roll;
+
+        // Java line 234-238: if (usingModifierIgnoringSkill == null) addReport(new ReportGoForItRoll(...))
+        if self.using_modifier_ignoring_skill.is_none() {
+            use ffb_model::report::report_go_for_it_roll::ReportGoForItRoll;
+            let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
+                .map(|a| a.name == "GFI").unwrap_or(false)
+                && self.re_roll_state.re_roll_source.is_some();
+            game.report_list.add(ReportGoForItRoll::new(
+                player_id.clone(),
+                successful,
+                self.roll,
+                minimum_roll,
+                re_rolled,
+                mod_names,
+            ));
+        }
 
         if successful {
             // Java: succeedGfi — if jumping and !secondGfi and currentMove > ma+1 → repeat
@@ -541,5 +557,25 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.field_model.player_coordinate("p1"), Some(start),
             "without always_lands skill, player should be moved back to move_start");
+    }
+
+    #[test]
+    fn success_emits_go_for_it_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_gfi_game();
+        let mut step = StepGoForIt::new("fail".into());
+        step.roll = 4;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::GO_FOR_IT_ROLL));
+    }
+
+    #[test]
+    fn failure_emits_go_for_it_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_gfi_game();
+        let mut step = StepGoForIt::new("fail".into());
+        step.roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::GO_FOR_IT_ROLL));
     }
 }

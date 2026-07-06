@@ -42,4 +42,13 @@ mod tests {
         t.handle_injury(&make_game(), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert_eq!(t.ctx.injury.map(|s| s.base()), Some(PS_KNOCKED_OUT));
     }
+    #[test]
+    fn does_not_cause_turnover() { assert!(!InjuryTypeKTMCrowd::new().falling_down_causes_turnover()); }
+    #[test]
+    fn context_stores_attacker_and_defender() {
+        let mut t = InjuryTypeKTMCrowd::new(); let mut rng = GameRng::new(1);
+        t.handle_injury(&make_game(), &mut rng, Some("ktm_att"), "ktm_def", coord(), None, None, ApothecaryMode::Defender);
+        assert_eq!(t.ctx.attacker_id.as_deref(), Some("ktm_att"));
+        assert_eq!(t.ctx.defender_id.as_deref(), Some("ktm_def"));
+    }
 }

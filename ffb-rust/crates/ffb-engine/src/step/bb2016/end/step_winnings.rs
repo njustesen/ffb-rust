@@ -12,6 +12,7 @@
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::bb2016::report_winnings_roll::ReportWinningsRoll;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -56,9 +57,16 @@ impl StepWinnings {
         let winnings_away_initial = game.game_result.away.winnings;
         let fame_home = game.game_result.home.fame;
         let fame_away = game.game_result.away.fame;
+        // Java: getResult().addReport(reportWinnings) — initial roll report
+        game.report_list.add(ReportWinningsRoll::new(roll_home, winnings_home_initial, roll_away, winnings_away_initial));
         // client-only: DialogWinningsReRollParameter shown to winning coach — headless skips re-roll
         Self::concede_winnings(game);
-        // Java: addReport(new ReportWinningsRoll(home.id, fame, roll, total)) x2 (initial + concede)
+        // Java: getResult().addReport(concedeWinnings()) — concede transfer report (if any)
+        let concede_home = game.game_result.home.winnings;
+        let concede_away = game.game_result.away.winnings;
+        if concede_home != winnings_home_initial || concede_away != winnings_away_initial {
+            game.report_list.add(ReportWinningsRoll::new(0, concede_home, 0, concede_away));
+        }
         StepOutcome::next()
             .with_event(GameEvent::WinningsRoll {
                 team_id: home_id.clone(),
@@ -157,5 +165,30 @@ mod tests {
         StepWinnings::new().start(&mut game, &mut GameRng::new(1));
         // Minimum roll on D6 = 1; home gets 1+1 = 20000 minimum.
         assert!(game.game_result.home.winnings >= 20_000);
+    }
+
+    #[test]
+    fn start_adds_winnings_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game(0, 0);
+        StepWinnings::new().start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::WINNINGS_ROLL),
+            "StepWinnings should add ReportWinningsRoll"
+        );
+    }
+
+    #[test]
+    fn illegal_concede_adds_second_winnings_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game(3, 1);
+        game.game_result.home.conceded = true;
+        game.conceded_legally = false;
+        StepWinnings::new().start(&mut game, &mut GameRng::new(42));
+        // Should have at least 2 WINNINGS_ROLL reports (initial + concede transfer)
+        let count = game.report_list.get_reports().iter()
+            .filter(|r| r.get_id() == ReportId::WINNINGS_ROLL)
+            .count();
+        assert!(count >= 2, "illegal concede should add a second ReportWinningsRoll, got {}", count);
     }
 }

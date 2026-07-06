@@ -49,4 +49,19 @@ mod tests {
         assert!(t.ctx.injury.is_some());
         assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
+    #[test]
+    fn failed_armour_does_not_place_prone() {
+        assert!(!InjuryTypeBallAndChain::new().failed_armour_places_prone());
+    }
+    #[test]
+    fn send_to_box_reason_is_ball_and_chain() {
+        use ffb_model::enums::SendToBoxReason;
+        assert_eq!(InjuryTypeBallAndChain::new().send_to_box_reason(), Some(SendToBoxReason::BallAndChain));
+    }
+    #[test]
+    fn attacker_id_stored_in_context() {
+        let mut t = InjuryTypeBallAndChain::new(); let mut rng = GameRng::new(1);
+        t.handle_injury(&make_game(), &mut rng, Some("attacker"), "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert_eq!(t.ctx.attacker_id.as_deref(), Some("attacker"));
+    }
 }

@@ -1,6 +1,8 @@
 use ffb_model::model::game::Game;
 use ffb_model::enums::ReRollSource;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_jump_roll::ReportJumpRoll;
+use ffb_model::report::report_id::ReportId;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
 use crate::drop_player_context::SteadyFootingContext;
@@ -120,6 +122,19 @@ impl StepJump {
             .unwrap_or(3);
         let minimum_roll = minimum_roll_jump(agility, &[]);
         let successful = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
+
+        // Java (LeapBehaviour): step.getResult().addReport(new ReportJumpRoll(actingPlayer.getPlayerId(),
+        //         successful, roll, minimumRoll, reRolled, jumpModifiers.toArray(...)))
+        let re_rolled = self.re_roll_state.re_rolled_action.as_ref().map(|a| a.name == "JUMP").unwrap_or(false)
+            && self.re_roll_state.re_roll_source.is_some();
+        game.report_list.add(ReportJumpRoll::new(
+            game.acting_player.player_id.clone(),
+            successful,
+            self.roll,
+            minimum_roll,
+            re_rolled,
+            vec![],
+        ));
 
         if successful {
             game.acting_player.jumping = false;
@@ -327,5 +342,37 @@ mod tests {
         step.roll = 1;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))));
+    }
+
+    #[test]
+    fn success_adds_jump_roll_report() {
+        // Java (LeapBehaviour): addReport(new ReportJumpRoll(...)) on success
+        let mut game = make_game();
+        add_player_ag3(&mut game, "p1");
+        game.acting_player.jumping = true;
+        let mut step = StepJump::new("fail".into());
+        step.roll = 4; // ag=3, min=3, success
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::JUMP_ROLL),
+            "JUMP_ROLL report should be added on a successful jump"
+        );
+    }
+
+    #[test]
+    fn failure_adds_jump_roll_report() {
+        // Java (LeapBehaviour): addReport is called regardless of success/failure
+        let mut game = make_game();
+        add_player_ag3(&mut game, "p1");
+        game.acting_player.jumping = true;
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        let mut step = StepJump::new("fail".into());
+        step.roll = 1; // failure
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::JUMP_ROLL),
+            "JUMP_ROLL report should be added on a failed jump"
+        );
     }
 }

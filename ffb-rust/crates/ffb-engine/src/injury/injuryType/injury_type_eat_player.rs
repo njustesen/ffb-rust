@@ -42,4 +42,13 @@ mod tests {
         t.handle_injury(&make_game(), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert_eq!(t.ctx.injury.map(|s| s.base()), Some(PS_RIP));
     }
+    #[test]
+    fn does_not_cause_turnover() { assert!(!InjuryTypeEatPlayer::new().falling_down_causes_turnover()); }
+    #[test]
+    fn context_stores_attacker_and_defender() {
+        let mut t = InjuryTypeEatPlayer::new(); let mut rng = GameRng::new(1);
+        t.handle_injury(&make_game(), &mut rng, Some("eater"), "eaten", coord(), None, None, ApothecaryMode::Defender);
+        assert_eq!(t.ctx.attacker_id.as_deref(), Some("eater"));
+        assert_eq!(t.ctx.defender_id.as_deref(), Some("eaten"));
+    }
 }

@@ -192,6 +192,11 @@ impl Player {
         self.all_skill_ids().any(|id| id.properties().contains(&property))
     }
 
+    /// Java: getSkillWithProperty — returns the first SkillId that has the given property.
+    pub fn skill_id_with_property(&self, property: &str) -> Option<SkillId> {
+        self.all_skill_ids().find(|id| id.properties().contains(&property))
+    }
+
     /// Java: UtilCards.hasUnusedSkillWithProperty — true if player has a skill with the given property
     /// AND that skill has not been used this drive (not in used_skills).
     pub fn has_unused_skill_with_property(&self, property: &str) -> bool {

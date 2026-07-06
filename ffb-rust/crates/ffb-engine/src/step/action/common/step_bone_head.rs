@@ -9,6 +9,8 @@ use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_mechanics::mechanics::minimum_roll_confusion;
+use ffb_model::report::report_confusion_roll::ReportConfusionRoll;
+use ffb_model::report::report_id::ReportId;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -123,6 +125,16 @@ impl StepBoneHead {
         }
 
         // Java: addReport(new ReportConfusionRoll(...))
+        let re_rolled = self.re_rolled_action.as_deref() == Some("BONE_HEAD")
+            && self.re_roll_source.is_some();
+        game.report_list.add(ReportConfusionRoll::new(
+            Some(player_id.clone()),
+            successful,
+            roll,
+            min_roll,
+            re_rolled,
+            Some(SkillId::BoneHead.class_name().to_string()),
+        ));
         let confusion_event = GameEvent::ConfusionRoll {
             player_id: player_id.clone(),
             roll,
@@ -367,5 +379,33 @@ mod tests {
         );
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("FAIL"));
+    }
+
+    #[test]
+    fn successful_roll_adds_confusion_roll_report() {
+        let seed = seed_for_d6(4);
+        let (mut game, _) = make_game_with_bone_head_player();
+        let mut step = StepBoneHead::new();
+        step.goto_label_on_failure = "FAIL".into();
+        let mut rng = GameRng::new(seed);
+        step.start(&mut game, &mut rng);
+        assert!(
+            game.report_list.has_report(ReportId::CONFUSION_ROLL),
+            "CONFUSION_ROLL report must be added after a successful roll"
+        );
+    }
+
+    #[test]
+    fn failed_roll_adds_confusion_roll_report() {
+        let seed = seed_for_d6(1);
+        let (mut game, _) = make_game_with_bone_head_player();
+        let mut step = StepBoneHead::new();
+        step.goto_label_on_failure = "FAIL".into();
+        let mut rng = GameRng::new(seed);
+        step.start(&mut game, &mut rng);
+        assert!(
+            game.report_list.has_report(ReportId::CONFUSION_ROLL),
+            "CONFUSION_ROLL report must be added after a failed roll"
+        );
     }
 }

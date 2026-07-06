@@ -122,6 +122,21 @@ impl StepStandUp {
             .unwrap_or(0);
         let successful = DiceInterpreter::is_stand_up_successful(self.roll, modifier);
 
+        // Java line 110-112: boolean reRolled = ...; addReport(new ReportStandUpRoll(...))
+        {
+            use ffb_model::report::report_stand_up_roll::ReportStandUpRoll;
+            let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
+                .map(|a| a.name == "STAND_UP").unwrap_or(false)
+                && self.re_roll_state.re_roll_source.is_some();
+            game.report_list.add(ReportStandUpRoll::new(
+                game.acting_player.player_id.clone(),
+                successful,
+                self.roll,
+                modifier,
+                re_rolled,
+            ));
+        }
+
         let is_pinned = game.acting_player.player_id.as_deref()
             .and_then(|id| game.field_model.player_state(id))
             .map(|s| s.is_pinned())
@@ -290,5 +305,27 @@ mod tests {
         let mut step = StepStandUp::new("old".into());
         assert!(step.set_parameter(&StepParameter::GotoLabelOnFailure("new".into())));
         assert_eq!(step.goto_label_on_failure, "new");
+    }
+
+    #[test]
+    fn roll_emits_stand_up_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.acting_player.standing_up = true;
+        let mut step = StepStandUp::new("fail".into());
+        step.roll = 4;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::STAND_UP_ROLL));
+    }
+
+    #[test]
+    fn failed_roll_still_emits_stand_up_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.acting_player.standing_up = true;
+        let mut step = StepStandUp::new("fail".into());
+        step.roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::STAND_UP_ROLL));
     }
 }

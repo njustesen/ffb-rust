@@ -41,4 +41,12 @@ mod tests {
             assert!(b == PS_RESERVE || t.ctx.is_knocked_out() || t.ctx.is_casualty(), "seed={seed}");
         }
     }
+    #[test]
+    fn does_not_cause_turnover() { assert!(!InjuryTypeTrapDoorFall::new().falling_down_causes_turnover()); }
+    #[test]
+    fn context_stores_defender_id() {
+        let mut t = InjuryTypeTrapDoorFall::new(); let mut rng = GameRng::new(1);
+        t.handle_injury(&make_game(), &mut rng, None, "trap_victim", coord(), None, None, ApothecaryMode::Defender);
+        assert_eq!(t.ctx.defender_id.as_deref(), Some("trap_victim"));
+    }
 }

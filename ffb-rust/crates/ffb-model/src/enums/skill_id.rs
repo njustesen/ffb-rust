@@ -854,6 +854,10 @@ impl SkillId {
                 "isHurtMoreEasily",
                 "passesAreInterceptedEasier",
             ],
+            // Java: StrongPassingGame.postConstruct registers canAddStrengthToPass
+            SkillId::StrongPassingGame => &["canAddStrengthToPass"],
+            // Java: Yoink.postConstruct registers canInterceptEasily
+            SkillId::Yoink => &["canInterceptEasily"],
             // Java: PassBlock.postConstruct registers canMoveWhenOpponentPasses
             SkillId::PassBlock => &["canMoveWhenOpponentPasses"],
             // Java: mixed/OnTheBall.postConstruct registers canMoveDuringKickOffScatter + canMoveWhenOpponentPasses

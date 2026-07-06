@@ -1,5 +1,8 @@
 use ffb_model::events::GameEvent;
 use ffb_model::enums::{Direction, TurnMode};
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::mixed::report_hit_and_run::ReportHitAndRun;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds, MoveSquare};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
@@ -81,6 +84,20 @@ impl StepHitAndRun {
             }
 
             if self.coordinate.is_none() {
+                // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, SkillUse.MOVE_SQUARE))
+                {
+                    let skill_id = acting_player_id.as_deref()
+                        .and_then(|id| game.player(id))
+                        .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_MOVE_AFTER_BLOCK));
+                    if let Some(sid) = skill_id {
+                        game.report_list.add(ReportSkillUse::new(
+                            acting_player_id.clone(),
+                            sid,
+                            true,
+                            SkillUse::MOVE_SQUARE,
+                        ));
+                    }
+                }
                 // Show eligible squares to agent; set HIT_AND_RUN turn mode
                 if game.turn_mode != TurnMode::HitAndRun {
                     self.saved_turn_mode = game.last_turn_mode;
@@ -108,6 +125,11 @@ impl StepHitAndRun {
                     let direction = old_pos
                         .and_then(|o| Direction::from_coords(o.x, o.y, dest.x, dest.y))
                         .unwrap_or(Direction::North);
+                    // Java: getResult().addReport(new ReportHitAndRun(actingPlayer.getPlayerId(), direction))
+                    game.report_list.add(ReportHitAndRun::new(
+                        Some(attacker_id.clone()),
+                        Some(direction),
+                    ));
                     game.field_model.set_player_coordinate(attacker_id, dest);
                     hit_and_run_event = Some(GameEvent::HitAndRun { player_id: attacker_id.clone(), direction });
                     // Java: actingPlayer.markSkillUsed(canMoveAfterBlock)
@@ -171,8 +193,12 @@ mod tests {
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::StepAction;
-    use ffb_model::enums::Rules;
+    use ffb_model::enums::{Rules, PlayerType, PlayerGender, SkillId};
+    use ffb_model::model::player::Player;
+    use ffb_model::model::skill_def::SkillWithValue;
+    use ffb_model::report::report_id::ReportId;
     use ffb_model::types::FieldCoordinate;
+    use std::collections::HashSet;
 
     fn make_game() -> Game {
         let home = test_team("home", 0);
@@ -224,5 +250,48 @@ mod tests {
             &mut GameRng::new(0),
         );
         assert_eq!(step.coordinate, Some(coord));
+    }
+
+    // ── report wiring ─────────────────────────────────────────────────────────
+
+    fn add_hit_and_run_player(game: &mut Game, id: &str, coord: FieldCoordinate) {
+        game.team_home.players.push(Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::HitAndRun, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate(id, coord);
+    }
+
+    /// When coordinate is None, the step shows the dialog and adds ReportSkillUse (MOVE_SQUARE).
+    #[test]
+    fn no_coordinate_adds_skill_use_report() {
+        let mut step = StepHitAndRun::new();
+        let coord = FieldCoordinate::new(10, 7);
+        let mut game = make_game();
+        add_hit_and_run_player(&mut game, "p1", coord);
+        game.acting_player.player_id = Some("p1".into());
+        // coordinate is None — step shows dialog
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_USE), "ReportSkillUse should appear when showing hit-and-run dialog");
+    }
+
+    /// When coordinate is set, the step moves the player and adds ReportHitAndRun.
+    #[test]
+    fn with_coordinate_adds_hit_and_run_report() {
+        let mut step = StepHitAndRun::new();
+        let from = FieldCoordinate::new(10, 7);
+        let dest = FieldCoordinate::new(11, 7);
+        let mut game = make_game();
+        add_hit_and_run_player(&mut game, "p1", from);
+        game.acting_player.player_id = Some("p1".into());
+        step.coordinate = Some(dest);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::HIT_AND_RUN), "ReportHitAndRun should appear after player moves");
     }
 }

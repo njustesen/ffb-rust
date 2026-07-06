@@ -174,6 +174,24 @@ mod tests {
         assert!(!step.set_parameter(&StepParameter::CheckForgo(true)));
     }
 
+    // No Java addReport calls in StepEndFouling — verify the step produces no spurious reports.
+    #[test]
+    fn no_reports_emitted_on_default_path() {
+        let mut game = make_game();
+        let mut step = StepEndFouling::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.report_list.size(), 0, "StepEndFouling must not emit any reports on the default path");
+    }
+
+    #[test]
+    fn no_reports_emitted_on_end_turn_path() {
+        let mut game = make_game();
+        let mut step = StepEndFouling::new();
+        step.end_turn = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.report_list.size(), 0, "StepEndFouling must not emit any reports when end_turn=true");
+    }
+
     #[test]
     fn can_move_after_foul_with_sneaky_git_pushes_select() {
         use ffb_model::enums::PlayerState;

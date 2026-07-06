@@ -50,4 +50,13 @@ mod tests {
         assert!(t.ctx.injury.is_some());
         assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
+    #[test]
+    fn does_not_cause_turnover() { assert!(!InjuryTypeBitten::new().falling_down_causes_turnover()); }
+    #[test]
+    fn defender_id_stored_in_context() {
+        let mut t = InjuryTypeBitten::new(); let mut rng = GameRng::new(1);
+        t.handle_injury(&make_game(), &mut rng, Some("att"), "def", coord(), None, None, ApothecaryMode::Attacker);
+        assert_eq!(t.ctx.defender_id.as_deref(), Some("def"));
+        assert_eq!(t.ctx.attacker_id.as_deref(), Some("att"));
+    }
 }
