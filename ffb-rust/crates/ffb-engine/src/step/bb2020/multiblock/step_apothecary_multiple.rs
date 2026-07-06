@@ -234,7 +234,47 @@ impl StepApothecaryMultiple {
             }
         }
         // headless(apo-multiple-igor): Igor/mortuary-assistant inducement handling deferred.
-        // headless: double-attacker-down special case — apo-multiple-injury not ported.
+
+        // Java: double-attacker-down: two injury results for the same player + regeneration failed.
+        // When a player is injured twice (e.g. multi-block double-down), reset to RESERVE and
+        // re-apply only the regeneration-failed injuries in the original order.
+        {
+            let double_attacker = self.injury_results.len() == 2
+                && {
+                    let id0 = self.injury_results[0].injury_context().defender_id.clone();
+                    let id1 = self.injury_results[1].injury_context().defender_id.clone();
+                    id0.is_some() && id0 == id1
+                }
+                && !self.regeneration_failed_results.is_empty();
+
+            if double_attacker {
+                let player_id = self.injury_results[0].injury_context().defender_id.clone().unwrap_or_default();
+                if let Some(ps) = game.field_model.player_state(&player_id) {
+                    game.field_model.set_player_state(&player_id, ps.change_base(PS_RESERVE));
+                }
+                // Clear serious injury from GameResult.
+                {
+                    let is_home = game.team_home.players.iter().any(|p| p.id == player_id);
+                    let tr = game.game_result.team_result_mut(is_home);
+                    let pr = tr.player_result_mut(&player_id);
+                    pr.serious_injury = None;
+                    pr.serious_injury_decay = None;
+                }
+                // Re-apply only the regeneration-failed injury results.
+                let regen_failed_ids: std::collections::HashSet<*const InjuryResult> =
+                    self.regeneration_failed_results.iter().map(|r| r.as_ref() as *const InjuryResult).collect();
+                for r in &self.injury_results {
+                    let ptr = r.as_ref() as *const InjuryResult;
+                    let is_regen_failed = self.regeneration_failed_results.iter()
+                        .any(|rf| rf.injury_context().defender_id == r.injury_context().defender_id
+                            && rf.injury_context().injury == r.injury_context().injury);
+                    let _ = regen_failed_ids; // suppress unused warning
+                    if is_regen_failed {
+                        r.apply_to(game);
+                    }
+                }
+            }
+        }
 
         StepOutcome::next()
     }

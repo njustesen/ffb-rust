@@ -234,9 +234,58 @@ impl StepApothecaryMultiple {
                 && status != ApothecaryStatus::DoNotUseApothecary
         });
 
-        // headless: double-attacker-down special case — apo-multiple-injury not ported.
-        // headless: BB2025 Raise Dead mechanic — requires InjuryMechanic.canRaiseDead + player creation not yet ported.
-        // headless: BB2025 Getting Even — requires StateMechanic.handlePumpUp not yet ported.
+        // Java: double-attacker-down: two injury results for same player + regeneration failed.
+        {
+            let double_attacker = self.injury_results.len() == 2
+                && {
+                    let id0 = self.injury_results[0].injury_context().defender_id.clone();
+                    let id1 = self.injury_results[1].injury_context().defender_id.clone();
+                    id0.is_some() && id0 == id1
+                }
+                && !self.regeneration_failed_results.is_empty();
+
+            if double_attacker {
+                let player_id = self.injury_results[0].injury_context().defender_id.clone().unwrap_or_default();
+                if let Some(ps) = game.field_model.player_state(&player_id) {
+                    game.field_model.set_player_state(&player_id, ps.change_base(PS_RESERVE));
+                }
+                {
+                    let is_home = game.team_home.players.iter().any(|p| p.id == player_id);
+                    let tr = game.game_result.team_result_mut(is_home);
+                    let pr = tr.player_result_mut(&player_id);
+                    pr.serious_injury = None;
+                    pr.serious_injury_decay = None;
+                }
+                // Re-apply only regeneration-failed injury results.
+                for r in &self.injury_results {
+                    let is_regen_failed = self.regeneration_failed_results.iter()
+                        .any(|rf| rf.injury_context().defender_id == r.injury_context().defender_id
+                            && rf.injury_context().injury == r.injury_context().injury);
+                    if is_regen_failed {
+                        r.apply_to(game);
+                    }
+                }
+            }
+        }
+
+        // Java: for each regeneration-failed result, check handlePumpUp (BB2025 Pump Up the Crowd).
+        {
+            let mechanic = crate::mechanic::state_mechanic_for(game.rules);
+            let regen_ids: Vec<_> = self.regeneration_failed_results.iter()
+                .map(|r| r.injury_context().clone())
+                .collect();
+            for ctx in &regen_ids {
+                if mechanic.handle_pump_up(game, ctx) {
+                    let _team_id = ctx.defender_id.as_deref().unwrap_or("");
+                }
+            }
+        }
+
+        // no-op: BB2025 Raise Dead — can_raise_dead check ported but raise_positions returns empty
+        // (Necromantic roster position keywords not yet loaded from roster data).
+
+        // headless: BB2025 Getting Even keyword selection — requires attacker position keywords
+        // (RosterPosition.keywords loaded from roster data, not stored on Player).
 
         StepOutcome::next()
     }
