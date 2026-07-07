@@ -50,4 +50,8 @@ mod tests {
         let col = JumpModifierCollection::new();
         assert!(col.get_modifiers().iter().any(|m| m.get_name() == "1 Tacklezone"));
     }
+    #[test]
+    fn default_has_same_count_as_new() {
+        assert_eq!(JumpModifierCollection::default().get_modifiers().len(), JumpModifierCollection::new().get_modifiers().len());
+    }
 }

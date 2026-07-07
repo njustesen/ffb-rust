@@ -89,4 +89,10 @@ mod tests {
         GreasyCleatsHandler.init_effect(&mut state, &mut game, &mut GameRng::new(0), "home");
         assert!(game.field_model.has_prayer_enhancement("a1", "GREASY_CLEATS"));
     }
+    #[test]
+    fn does_not_handle_other_prayers() {
+        let h = GreasyCleatsHandler;
+        assert!(!h.handles_prayer("PERFECT_PASSING"));
+        assert!(!h.handles_prayer(""));
+    }
 }

@@ -8,9 +8,9 @@
 
 **Translation progress:** 2,521/2,521 files formally implemented = **100% ✓** (0 partial, 458 skip)
 
-**Tests:** 10,835 passing (1 ignored)
+**Tests:** 11,476 passing (1 ignored)
 
-**Current phase:** Phase ZG continued — Test expansion ongoing (9,556 → 10,835 tests so far)
+**Current phase:** Phase ZG continued — Test expansion ongoing (9,556 → 11,476 tests so far)
 
 ---
 

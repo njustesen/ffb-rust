@@ -73,4 +73,11 @@ mod tests {
         t.handle_injury(&game_with_armor(2), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert!(t.ctx.armor_broken); assert!(t.ctx.injury.is_some());
     }
+
+    #[test]
+    fn initial_context_has_no_injury() {
+        let t = InjuryTypeStab::new();
+        assert!(!t.ctx.armor_broken);
+        assert!(t.ctx.injury.is_none());
+    }
 }

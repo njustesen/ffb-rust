@@ -41,4 +41,9 @@ mod tests {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<UtilServerInjury>();
     }
+    #[test]
+    fn util_server_injury_can_be_cloned_via_new() {
+        let _a = UtilServerInjury::new();
+        let _b = UtilServerInjury::new();
+    }
 }

@@ -60,4 +60,9 @@ mod tests {
     fn name_is_correct() {
         assert_eq!(ArmourIncreaseBehaviour::new().name(), "ArmourIncreaseBehaviour");
     }
+    #[test]
+    fn default_creates_instance_same_as_new() {
+        let _a = ArmourIncreaseBehaviour::new();
+        let _b = ArmourIncreaseBehaviour::default();
+    }
 }

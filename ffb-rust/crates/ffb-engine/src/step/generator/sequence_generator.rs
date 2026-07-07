@@ -38,4 +38,8 @@ mod tests {
         let via_default = SequenceGenerator::default();
         let _ = (via_new, via_default);
     }
+    #[test]
+    fn is_zero_sized_struct() {
+        assert_eq!(std::mem::size_of::<SequenceGenerator>(), 0);
+    }
 }

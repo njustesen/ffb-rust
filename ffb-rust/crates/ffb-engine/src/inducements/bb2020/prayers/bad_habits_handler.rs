@@ -70,4 +70,10 @@ mod tests {
         let h = BadHabitsHandler;
         assert_eq!(h.animation_type(), AnimationType::PRAYER_BAD_HABITS);
     }
+    #[test]
+    fn does_not_handle_other_prayers() {
+        let h = BadHabitsHandler;
+        assert!(!h.handles_prayer("PERFECT_PASSING"));
+        assert!(!h.handles_prayer(""));
+    }
 }

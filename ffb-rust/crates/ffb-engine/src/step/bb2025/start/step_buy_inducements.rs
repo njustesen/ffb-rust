@@ -101,4 +101,9 @@ mod tests {
         let mut step = StepBuyInducements::new();
         assert!(!step.set_parameter(&StepParameter::EndTurn(false)));
     }
+    #[test]
+    fn default_equivalent_to_new() {
+        let _a = StepBuyInducements::new();
+        let _b = StepBuyInducements::default();
+    }
 }

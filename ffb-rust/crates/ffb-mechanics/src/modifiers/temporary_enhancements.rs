@@ -53,4 +53,10 @@ mod tests {
         assert!(e.get_skills().contains("Dodge"));
         assert!(e.get_properties().contains("canUseOwnTackleZone"));
     }
+    #[test]
+    fn default_is_same_as_new() {
+        let e = TemporaryEnhancements::default();
+        assert!(e.get_modifiers().is_empty());
+        assert!(e.get_stat_modifiers().is_empty());
+    }
 }

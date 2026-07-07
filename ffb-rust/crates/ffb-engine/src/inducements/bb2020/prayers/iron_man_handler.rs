@@ -89,4 +89,10 @@ mod tests {
         let h = IronManHandler;
         assert_eq!(h.animation_type(), AnimationType::PRAYER_IRON_MAN);
     }
+    #[test]
+    fn does_not_handle_other_prayers() {
+        let h = IronManHandler;
+        assert!(!h.handles_prayer("PERFECT_PASSING"));
+        assert!(!h.handles_prayer(""));
+    }
 }

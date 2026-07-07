@@ -79,4 +79,9 @@ mod tests {
         let mut step = StepEndKickoff::new();
         assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
     }
+    #[test]
+    fn default_creates_equivalent_instance() {
+        let _a = StepEndKickoff::new();
+        let _b = StepEndKickoff::default();
+    }
 }

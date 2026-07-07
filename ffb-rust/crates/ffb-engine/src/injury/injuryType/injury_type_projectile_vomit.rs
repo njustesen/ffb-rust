@@ -73,4 +73,11 @@ mod tests {
         t.handle_injury(&game_with_armor(13), &mut rng, None, "vomit_target", coord(), None, None, ApothecaryMode::Defender);
         assert_eq!(t.ctx.defender_id.as_deref(), Some("vomit_target"));
     }
+    #[test]
+    fn default_equivalent_to_new() {
+        let t1 = InjuryTypeProjectileVomit::new();
+        let t2 = InjuryTypeProjectileVomit::default();
+        assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
+        assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
+    }
 }

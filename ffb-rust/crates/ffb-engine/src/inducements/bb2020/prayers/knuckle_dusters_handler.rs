@@ -89,4 +89,10 @@ mod tests {
         h.init_effect(&mut state, &mut game, &mut GameRng::new(0), "home");
         assert!(game.player("h1").unwrap().has_skill(SkillId::MightyBlow));
     }
+    #[test]
+    fn does_not_handle_other_prayers() {
+        let h = KnuckleDustersHandler;
+        assert!(!h.handles_prayer("PERFECT_PASSING"));
+        assert!(!h.handles_prayer(""));
+    }
 }

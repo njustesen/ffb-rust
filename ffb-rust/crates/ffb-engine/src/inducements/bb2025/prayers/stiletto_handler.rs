@@ -88,4 +88,10 @@ mod tests {
         StilettoHandler.init_effect(&mut state, &mut game, &mut GameRng::new(0), "home");
         assert!(game.field_model.has_prayer_enhancement("h1", "STILETTO"));
     }
+    #[test]
+    fn does_not_handle_other_prayers() {
+        let h = StilettoHandler;
+        assert!(!h.handles_prayer("PERFECT_PASSING"));
+        assert!(!h.handles_prayer(""));
+    }
 }

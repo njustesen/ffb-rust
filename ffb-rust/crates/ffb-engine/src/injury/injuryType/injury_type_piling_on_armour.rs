@@ -75,4 +75,11 @@ mod tests {
         assert!(t.ctx.armor_modifiers.contains(&ARMOR_PILING_ON),
             "ARMOR_PILING_ON (+2) must be in armor_modifiers");
     }
+    #[test]
+    fn default_equivalent_to_new() {
+        let t1 = InjuryTypePilingOnArmour::new();
+        let t2 = InjuryTypePilingOnArmour::default();
+        assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
+        assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
+    }
 }

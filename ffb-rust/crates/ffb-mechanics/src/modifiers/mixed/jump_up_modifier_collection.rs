@@ -44,4 +44,10 @@ mod tests {
         let ju = col.get_modifiers().iter().find(|m| m.get_name() == "Jump Up").unwrap();
         assert_eq!(ju.get_type(), ModifierType::REGULAR);
     }
+    #[test]
+    fn jump_up_has_negative_one_modifier_value() {
+        let col = JumpUpModifierCollection::new();
+        let ju = col.get_modifiers().iter().find(|m| m.get_name() == "Jump Up").unwrap();
+        assert_eq!(ju.get_modifier(), -1);
+    }
 }

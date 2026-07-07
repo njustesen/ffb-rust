@@ -81,4 +81,10 @@ mod tests {
         let card = Card::new("Chop Block", Some("CHOP_BLOCK"));
         assert!(h.activate_on_game(&mut game, &card, "player1", &mut ffb_model::util::rng::GameRng::new(0)));
     }
+    #[test]
+    fn is_not_responsible_for_nil_key() {
+        let h = ChopBlockHandler;
+        let card = Card::new("Other", None::<&str>);
+        assert!(!h.is_responsible(&card));
+    }
 }

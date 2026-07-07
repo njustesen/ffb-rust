@@ -35,4 +35,9 @@ mod tests {
     fn includes_single_tacklezone_modifier() {
         assert!(PassModifierCollection::new().get_modifiers().iter().any(|m| m.get_name() == "1 Tacklezone"));
     }
+    #[test]
+    fn includes_disturbing_presence_modifier() {
+        let col = PassModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name().contains("Disturbing")));
+    }
 }

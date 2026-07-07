@@ -51,4 +51,11 @@ mod tests {
         assert_eq!(t.ctx.attacker_id.as_deref(), Some("saboteur"));
         assert_eq!(t.ctx.defender_id.as_deref(), Some("victim"));
     }
+    #[test]
+    fn default_equivalent_to_new() {
+        let t1 = InjuryTypeSaboteur::new();
+        let t2 = InjuryTypeSaboteur::default();
+        assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
+        assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
+    }
 }

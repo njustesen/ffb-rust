@@ -87,4 +87,26 @@ mod tests {
     fn regular_is_not_modifier_included() {
         assert!(!PassModifier::new("x", 0, ModifierType::REGULAR).is_modifier_included());
     }
+    #[test]
+    fn applies_to_context_returns_true_without_predicate() {
+        use ffb_model::enums::{Rules, PassingDistance};
+        use ffb_model::model::{Game, Team, Player};
+        let m = PassModifier::new("x", 1, ModifierType::REGULAR);
+        let game = Game::new(
+            Team { id: "h".into(), name: "H".into(), race: "x".into(), roster_id: "x".into(), coach: "c".into(),
+                rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0,
+                bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
+                fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0,
+                special_rules: vec![], players: vec![], vampire_lord: false, necromancer: false },
+            Team { id: "a".into(), name: "A".into(), race: "x".into(), roster_id: "x".into(), coach: "c".into(),
+                rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0,
+                bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
+                fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0,
+                special_rules: vec![], players: vec![], vampire_lord: false, necromancer: false },
+            Rules::Bb2025,
+        );
+        let player = Player::default();
+        let ctx = crate::modifiers::pass_context::PassContext::new(&game, &player, PassingDistance::ShortPass, false);
+        assert!(m.applies_to_context(&ctx));
+    }
 }

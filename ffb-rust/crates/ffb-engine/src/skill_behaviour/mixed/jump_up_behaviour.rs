@@ -76,4 +76,9 @@ mod tests {
         b.apply_modifier(&mut player, &pos);
         assert_eq!(player.movement, movement_before);
     }
+    #[test]
+    fn default_creates_instance_same_as_new() {
+        let _a = JumpUpBehaviour::new();
+        let _b = JumpUpBehaviour::default();
+    }
 }

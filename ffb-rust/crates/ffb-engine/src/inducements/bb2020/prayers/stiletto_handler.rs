@@ -68,4 +68,10 @@ mod tests {
         let mut game = make_game();
         h.remove_effect_internal(&mut state, &mut game, "home");
     }
+    #[test]
+    fn does_not_handle_other_prayers() {
+        let h = StilettoHandler;
+        assert!(!h.handles_prayer("PERFECT_PASSING"));
+        assert!(!h.handles_prayer(""));
+    }
 }

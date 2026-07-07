@@ -70,4 +70,10 @@ mod tests {
         let h = ForceShieldHandler;
         assert_eq!(h.get_name(), "ForceShieldHandler");
     }
+    #[test]
+    fn is_not_responsible_for_nil_key() {
+        let h = ForceShieldHandler;
+        let card = Card::new("Other", None::<&str>);
+        assert!(!h.is_responsible(&card));
+    }
 }

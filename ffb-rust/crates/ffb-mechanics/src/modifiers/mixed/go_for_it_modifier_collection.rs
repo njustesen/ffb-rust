@@ -56,4 +56,8 @@ mod tests {
         assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Moles under the Pitch (Home)"));
         assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Moles under the Pitch (Away)"));
     }
+    #[test]
+    fn default_has_same_count_as_new() {
+        assert_eq!(GoForItModifierCollection::default().get_modifiers().len(), GoForItModifierCollection::new().get_modifiers().len());
+    }
 }

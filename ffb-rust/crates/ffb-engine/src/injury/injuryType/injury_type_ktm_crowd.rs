@@ -51,4 +51,11 @@ mod tests {
         assert_eq!(t.ctx.attacker_id.as_deref(), Some("ktm_att"));
         assert_eq!(t.ctx.defender_id.as_deref(), Some("ktm_def"));
     }
+    #[test]
+    fn default_equivalent_to_new() {
+        let t1 = InjuryTypeKTMCrowd::new();
+        let t2 = InjuryTypeKTMCrowd::default();
+        assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
+        assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
+    }
 }

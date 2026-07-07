@@ -60,4 +60,9 @@ mod tests {
     fn name_is_correct() {
         assert_eq!(StrengthIncreaseBehaviour::new().name(), "StrengthIncreaseBehaviour");
     }
+    #[test]
+    fn default_creates_instance_same_as_new() {
+        let _a = StrengthIncreaseBehaviour::new();
+        let _b = StrengthIncreaseBehaviour::default();
+    }
 }

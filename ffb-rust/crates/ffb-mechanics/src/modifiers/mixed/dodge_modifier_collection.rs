@@ -46,4 +46,8 @@ mod tests {
         let col = DodgeModifierCollection::new();
         assert!(col.get_modifiers().iter().any(|m| m.get_name() == "3 Prehensile Tails"));
     }
+    #[test]
+    fn default_has_same_count_as_new() {
+        assert_eq!(DodgeModifierCollection::default().get_modifiers().len(), DodgeModifierCollection::new().get_modifiers().len());
+    }
 }

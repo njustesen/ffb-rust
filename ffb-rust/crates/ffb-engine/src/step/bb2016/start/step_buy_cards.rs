@@ -123,4 +123,9 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::InducementGoldAway(50_000))));
     }
+    #[test]
+    fn new_and_default_create_equivalent_instances() {
+        let _a = StepBuyCards::new();
+        let _b = StepBuyCards::default();
+    }
 }

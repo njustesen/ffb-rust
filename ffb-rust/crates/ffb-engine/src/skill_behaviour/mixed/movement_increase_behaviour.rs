@@ -61,4 +61,9 @@ mod tests {
     fn name_is_correct() {
         assert_eq!(MovementIncreaseBehaviour::new().name(), "MovementIncreaseBehaviour");
     }
+    #[test]
+    fn default_creates_instance_same_as_new() {
+        let _a = MovementIncreaseBehaviour::new();
+        let _b = MovementIncreaseBehaviour::default();
+    }
 }

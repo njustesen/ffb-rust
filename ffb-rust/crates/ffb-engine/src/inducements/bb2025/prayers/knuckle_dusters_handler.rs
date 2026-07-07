@@ -93,4 +93,10 @@ mod tests {
         let h = KnuckleDustersHandler;
         assert_eq!(h.animation_type(), AnimationType::PRAYER_KNUCKLE_DUSTERS);
     }
+    #[test]
+    fn does_not_handle_other_prayers() {
+        let h = KnuckleDustersHandler;
+        assert!(!h.handles_prayer("PERFECT_PASSING"));
+        assert!(!h.handles_prayer(""));
+    }
 }

@@ -89,4 +89,10 @@ mod tests {
         let h = BlessedStatueOfNuffleHandler;
         assert_eq!(h.animation_type(), AnimationType::PRAYER_BLESSED_STATUE_OF_NUFFLE);
     }
+    #[test]
+    fn does_not_handle_other_prayers() {
+        let h = BlessedStatueOfNuffleHandler;
+        assert!(!h.handles_prayer("PERFECT_PASSING"));
+        assert!(!h.handles_prayer(""));
+    }
 }

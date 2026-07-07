@@ -82,4 +82,12 @@ mod tests {
         assert!(!ctx_no_ttm.is_ttm());
         assert!(ctx_ttm.is_ttm());
     }
+    #[test]
+    fn player_stored_is_same_as_input() {
+        let game = make_game();
+        let mut player = Player::default();
+        player.id = "thrower".into();
+        let ctx = PassContext::new(&game, &player, PassingDistance::QuickPass, false);
+        assert_eq!(ctx.get_player().id, "thrower");
+    }
 }

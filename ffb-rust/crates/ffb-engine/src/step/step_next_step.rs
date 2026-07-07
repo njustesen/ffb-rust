@@ -60,4 +60,9 @@ mod tests {
         let outcome = step.handle_command(&Action::Acknowledge, &mut game, &mut rng);
         assert_eq!(outcome.action, StepAction::NextStep);
     }
+    #[test]
+    fn new_and_default_both_create_instance() {
+        let _a = StepNextStep::new();
+        let _b = StepNextStep::default();
+    }
 }

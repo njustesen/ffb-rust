@@ -64,4 +64,11 @@ mod tests {
         col.add(RightStuffModifier::new("reg", 1, ModifierType::REGULAR));
         assert_eq!(col.get_modifiers_by_type(ModifierType::TACKLEZONE).len(), 1);
     }
+    #[test]
+    fn get_modifiers_by_type_excludes_non_matching() {
+        let mut col = RightStuffModifierCollection::new();
+        col.add(RightStuffModifier::new("tz", 1, ModifierType::TACKLEZONE));
+        col.add(RightStuffModifier::new("reg", 1, ModifierType::REGULAR));
+        assert_eq!(col.get_modifiers_by_type(ModifierType::REGULAR).len(), 1);
+    }
 }

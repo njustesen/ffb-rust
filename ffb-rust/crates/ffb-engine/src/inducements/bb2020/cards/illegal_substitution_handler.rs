@@ -76,4 +76,10 @@ mod tests {
         let h = IllegalSubstitutionHandler;
         assert_eq!(h.get_name(), "IllegalSubstitutionHandler");
     }
+    #[test]
+    fn is_not_responsible_for_nil_key() {
+        let h = IllegalSubstitutionHandler;
+        let card = Card::new("Other", None::<&str>);
+        assert!(!h.is_responsible(&card));
+    }
 }

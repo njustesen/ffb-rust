@@ -143,4 +143,14 @@ mod tests {
         assert_eq!(steps[0].step_id, StepId::Apothecary);
         assert_eq!(steps[1].step_id, StepId::GotoLabel);
     }
+    #[test]
+    fn build_returns_multiple_steps_in_order() {
+        let mut seq = Sequence::new();
+        seq.add(StepId::Apothecary, vec![]);
+        seq.add(StepId::GotoLabel, vec![]);
+        let steps = seq.build();
+        assert_eq!(steps.len(), 2);
+        assert_eq!(steps[0].step_id, StepId::Apothecary);
+        assert_eq!(steps[1].step_id, StepId::GotoLabel);
+    }
 }

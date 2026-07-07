@@ -46,4 +46,9 @@ mod tests {
         let col = DodgeModifierCollection::new();
         assert!(col.get_modifiers().iter().any(|m| m.get_name() == "2 Prehensile Tails"));
     }
+    #[test]
+    fn includes_eight_tacklezone_modifier() {
+        let col = DodgeModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "8 Tacklezones"));
+    }
 }

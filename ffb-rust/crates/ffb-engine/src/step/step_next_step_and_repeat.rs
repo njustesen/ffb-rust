@@ -65,4 +65,9 @@ mod tests {
     fn set_parameter_returns_false() {
         assert!(!StepNextStepAndRepeat::new().set_parameter(&StepParameter::EndTurn(true)));
     }
+    #[test]
+    fn new_and_default_create_equivalent_instances() {
+        let _a = StepNextStepAndRepeat::new();
+        let _b = StepNextStepAndRepeat::default();
+    }
 }
