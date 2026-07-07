@@ -71,4 +71,19 @@ mod tests {
         assert_eq!(p.get_nr_of_dice(), 2);
         assert_eq!(p.get_block_roll(), &[3, 5]);
     }
+
+    #[test]
+    fn transform_preserves_id() {
+        let t = DialogBlockRollPartialReRollParameter::default().transform();
+        assert_eq!(t.get_id(), DialogId::BLOCK_ROLL_PARTIAL_RE_ROLL);
+    }
+
+    #[test]
+    fn re_rolled_dice_indexes_stored() {
+        let p = DialogBlockRollPartialReRollParameter {
+            re_rolled_dice_indexes: vec![0, 2],
+            ..Default::default()
+        };
+        assert_eq!(p.get_re_rolled_dice_indexes(), &[0, 2]);
+    }
 }

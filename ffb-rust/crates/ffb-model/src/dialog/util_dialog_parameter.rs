@@ -34,4 +34,17 @@ mod tests {
         let param = DialogBlockRollParameter { choosing_team_id: Some("t1".into()), nr_of_dice: 2, ..Default::default() };
         UtilDialogParameter::validate_dialog_id(&param, DialogId::RE_ROLL);
     }
+
+    #[test]
+    fn validate_block_roll_with_block_roll_id_passes() {
+        let param = DialogBlockRollParameter { choosing_team_id: Some("t2".into()), nr_of_dice: 3, ..Default::default() };
+        UtilDialogParameter::validate_dialog_id(&param, DialogId::BLOCK_ROLL);
+    }
+
+    #[test]
+    #[should_panic(expected = "Wrong dialog id")]
+    fn validate_re_roll_with_block_roll_id_panics() {
+        let param = DialogReRollParameter { player_id: Some("p2".into()), minimum_roll: 4, ..Default::default() };
+        UtilDialogParameter::validate_dialog_id(&param, DialogId::BLOCK_ROLL);
+    }
 }

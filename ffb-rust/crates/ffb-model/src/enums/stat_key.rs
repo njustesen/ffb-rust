@@ -79,4 +79,17 @@ mod tests {
     fn pa_skill_id_for_increase_is_passing_increase() {
         assert_eq!(PlayerStatKey::Pa.skill_id_for_increase(), SkillId::PassingIncrease);
     }
+
+    #[test]
+    fn ma_skill_id_for_increase_is_movement_increase() {
+        assert_eq!(PlayerStatKey::Ma.skill_id_for_increase(), SkillId::MovementIncrease);
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let k = PlayerStatKey::St;
+        let json = serde_json::to_string(&k).unwrap();
+        let back: PlayerStatKey = serde_json::from_str(&json).unwrap();
+        assert_eq!(k, back);
+    }
 }

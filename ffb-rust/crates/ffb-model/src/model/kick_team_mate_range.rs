@@ -45,4 +45,16 @@ mod tests {
             assert_eq!(v, back);
         }
     }
+
+    #[test]
+    fn copy_semantics() {
+        let a = KickTeamMateRange::LONG;
+        let b = a;
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn debug_contains_variant_name() {
+        assert!(format!("{:?}", KickTeamMateRange::MEDIUM).contains("MEDIUM"));
+    }
 }

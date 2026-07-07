@@ -56,4 +56,14 @@ mod tests {
     fn fixed_armour_cap_bb2020_is_8() {
         assert_eq!(ArmorModifierValues::FIXED_ARMOUR_CAP_BB2020, 8);
     }
+
+    #[test]
+    fn dirty_player_default_is_1() {
+        assert_eq!(ArmorModifierValues::DIRTY_PLAYER_DEFAULT, 1);
+    }
+
+    #[test]
+    fn bb2016_cap_less_than_bb2020_cap() {
+        assert!(ArmorModifierValues::FIXED_ARMOUR_CAP_BB2016 < ArmorModifierValues::FIXED_ARMOUR_CAP_BB2020);
+    }
 }

@@ -402,4 +402,23 @@ mod tests {
         assert_eq!(ModelChangeDataType::Integer.name(), "integer");
         assert_eq!(ModelChangeDataType::Boolean.name(), "boolean");
     }
+
+    #[test]
+    fn model_change_data_type_for_name_round_trip() {
+        let dt = ModelChangeDataType::TurnMode;
+        assert_eq!(ModelChangeDataType::for_name("turnMode"), Some(dt));
+    }
+
+    #[test]
+    fn model_change_id_for_name_unknown_returns_none() {
+        assert_eq!(ModelChangeId::for_name("notAField"), None);
+    }
+
+    #[test]
+    fn model_change_data_type_serde_null() {
+        let dt = ModelChangeDataType::Null;
+        let json = serde_json::to_string(&dt).unwrap();
+        let back: ModelChangeDataType = serde_json::from_str(&json).unwrap();
+        assert_eq!(dt, back);
+    }
 }

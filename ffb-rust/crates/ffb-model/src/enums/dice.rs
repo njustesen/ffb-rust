@@ -97,4 +97,18 @@ mod tests {
         assert_eq!(d.nr_of_dice, 2);
         assert_eq!(d.block_kind, BlockKind::Normal);
     }
+
+    #[test]
+    fn block_kind_distinct_variants() {
+        assert_ne!(BlockKind::Normal, BlockKind::Blitz);
+        assert_ne!(BlockKind::Foul, BlockKind::Normal);
+    }
+
+    #[test]
+    fn dice_category_kind_serde_round_trip() {
+        let k = DiceCategoryKind::D6;
+        let json = serde_json::to_string(&k).unwrap();
+        let back: DiceCategoryKind = serde_json::from_str(&json).unwrap();
+        assert_eq!(k, back);
+    }
 }

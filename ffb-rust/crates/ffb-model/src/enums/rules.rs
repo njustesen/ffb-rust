@@ -81,4 +81,17 @@ mod tests {
         let back: Rules = serde_json::from_str(&json).unwrap();
         assert_eq!(r, back);
     }
+
+    #[test]
+    fn bb2025_extends_common() {
+        assert!(Rules::Bb2025.is_or_extends(Rules::Common));
+        assert!(!Rules::Bb2025.is_or_extends(Rules::Bb2016));
+    }
+
+    #[test]
+    fn name_values() {
+        assert_eq!(Rules::Bb2016.name(), "BB2016");
+        assert_eq!(Rules::Bb2025.name(), "BB2025");
+        assert_eq!(Rules::Common.name(), "COMMON");
+    }
 }

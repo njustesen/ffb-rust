@@ -43,4 +43,27 @@ mod tests {
         let h = MockHandler;
         assert_eq!(h.hook_points(), &[HookPoint::PassIntercept]);
     }
+
+    #[test]
+    fn hook_point_debug_contains_name() {
+        assert!(format!("{:?}", HookPoint::PassIntercept).contains("PassIntercept"));
+    }
+
+    #[test]
+    fn hook_point_is_hashable() {
+        use std::collections::HashSet;
+        let mut set = HashSet::new();
+        set.insert(HookPoint::PassIntercept);
+        assert!(set.contains(&HookPoint::PassIntercept));
+    }
+
+    #[test]
+    fn empty_hook_points_handler() {
+        struct EmptyHandler;
+        impl StepHookHandler for EmptyHandler {
+            fn hook_points(&self) -> &[HookPoint] { &[] }
+        }
+        let h = EmptyHandler;
+        assert!(h.hook_points().is_empty());
+    }
 }

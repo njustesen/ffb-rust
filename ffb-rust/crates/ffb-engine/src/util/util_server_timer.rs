@@ -63,4 +63,19 @@ mod tests {
     fn sync_time_does_not_panic() {
         UtilServerTimer::sync_time(1_000_000);
     }
+
+    #[test]
+    fn default_same_as_new() {
+        let _ = UtilServerTimer::default();
+    }
+
+    #[test]
+    fn start_turn_timer_zero_does_not_panic() {
+        UtilServerTimer::start_turn_timer(0);
+    }
+
+    #[test]
+    fn stop_turn_timer_zero_does_not_panic() {
+        UtilServerTimer::stop_turn_timer(0);
+    }
 }

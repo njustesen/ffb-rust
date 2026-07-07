@@ -110,4 +110,19 @@ mod tests {
     fn for_name_unknown_returns_none() {
         assert_eq!(CatchScatterThrowInMode::for_name("unknown"), None);
     }
+
+    #[test]
+    fn deflected_bomb_is_bomb() {
+        assert!(CatchScatterThrowInMode::DeflectedBomb.is_bomb());
+    }
+
+    #[test]
+    fn throw_in_is_not_bomb() {
+        assert!(!CatchScatterThrowInMode::ThrowIn.is_bomb());
+    }
+
+    #[test]
+    fn all_has_19_variants() {
+        assert_eq!(CatchScatterThrowInMode::all().len(), 19);
+    }
 }

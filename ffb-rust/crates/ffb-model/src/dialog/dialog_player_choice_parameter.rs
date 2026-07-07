@@ -63,4 +63,15 @@ mod tests {
         assert_eq!(p.get_min_selects(), 1);
         assert_eq!(p.get_max_selects(), 3);
     }
+
+    #[test]
+    fn dialog_id_is_player_choice() {
+        assert_eq!(DialogPlayerChoiceParameter::default().get_id(), DialogId::PLAYER_CHOICE);
+    }
+
+    #[test]
+    fn team_id_stored() {
+        let p = DialogPlayerChoiceParameter { team_id: Some("home".into()), ..Default::default() };
+        assert_eq!(p.get_team_id(), Some("home"));
+    }
 }

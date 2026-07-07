@@ -52,4 +52,19 @@ mod tests {
     fn niggling_injury_per_stack_is_1() {
         assert_eq!(InjuryModifierValues::NIGGLING_INJURY_PER_STACK, 1);
     }
+
+    #[test]
+    fn dirty_player_default_is_1() {
+        assert_eq!(InjuryModifierValues::DIRTY_PLAYER_DEFAULT, 1);
+    }
+
+    #[test]
+    fn dirty_player_foul_only() {
+        assert!(InjuryModifierValues::DIRTY_PLAYER_FOUL_ONLY);
+    }
+
+    #[test]
+    fn lightning_modifier_is_1() {
+        assert_eq!(InjuryModifierValues::LIGHTNING_MODIFIER, 1);
+    }
 }

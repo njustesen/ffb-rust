@@ -47,4 +47,16 @@ mod tests {
         let p = DialogJourneymenParameter { nr_of_slots: 3, ..Default::default() };
         assert_eq!(p.get_nr_of_slots(), 3);
     }
+
+    #[test]
+    fn team_id_stored() {
+        let p = DialogJourneymenParameter { team_id: Some("home".into()), ..Default::default() };
+        assert_eq!(p.get_team_id(), Some("home"));
+    }
+
+    #[test]
+    fn transform_preserves_id() {
+        let t = DialogJourneymenParameter::default().transform();
+        assert_eq!(t.get_id(), DialogId::JOURNEYMEN);
+    }
 }

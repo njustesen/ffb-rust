@@ -88,4 +88,19 @@ mod tests {
         let ag_id = InjuryAttribute::AG.get_id();
         assert_ne!(ma_id, ag_id);
     }
+
+    #[test]
+    fn for_stat_key_ma_returns_ma() {
+        assert_eq!(InjuryAttribute::for_stat_key(PlayerStatKey::Ma), Some(InjuryAttribute::MA));
+    }
+
+    #[test]
+    fn get_name_av_is_av() {
+        assert_eq!(InjuryAttribute::AV.get_name(), "AV");
+    }
+
+    #[test]
+    fn for_name_case_insensitive() {
+        assert_eq!(InjuryAttribute::for_name("ma"), Some(InjuryAttribute::MA));
+    }
 }

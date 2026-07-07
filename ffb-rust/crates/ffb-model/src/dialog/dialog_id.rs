@@ -302,4 +302,20 @@ mod tests {
         let back: DialogId = serde_json::from_str(&json).unwrap();
         assert_eq!(id, back);
     }
+
+    #[test]
+    fn get_name_re_roll_is_camel_case() {
+        assert_eq!(DialogId::RE_ROLL.get_name(), "reRoll");
+    }
+
+    #[test]
+    fn for_name_block_roll_round_trips() {
+        assert_eq!(DialogId::for_name("blockRoll"), Some(DialogId::BLOCK_ROLL));
+    }
+
+    #[test]
+    fn variants_are_eq() {
+        assert_eq!(DialogId::TOUCHBACK, DialogId::TOUCHBACK);
+        assert_ne!(DialogId::TOUCHBACK, DialogId::INTERCEPTION);
+    }
 }

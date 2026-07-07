@@ -61,4 +61,5 @@ mod tests {
     fn name_is_correct() {
         assert_eq!(StrengthIncreaseBehaviour::new().name(), "StrengthIncreaseBehaviour");
     }
+#[test]    fn name_is_not_empty() {        assert!(!StrengthIncreaseBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2020() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = StrengthIncreaseBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2020,        );        assert!(!b.execute_step_hook(&mut game));    }
 }

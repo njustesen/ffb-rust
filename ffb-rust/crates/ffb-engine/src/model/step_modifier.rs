@@ -80,4 +80,26 @@ mod tests {
         let priorities: Vec<i32> = mods.iter().map(|m| m.priority()).collect();
         assert_eq!(priorities, vec![1, 3, 5]);
     }
+
+    #[test]
+    fn sort_by_priority_empty_vec_does_not_panic() {
+        let mut mods: Vec<Box<dyn StepModifierTrait>> = vec![];
+        sort_by_priority(&mut mods);
+        assert!(mods.is_empty());
+    }
+
+    #[test]
+    fn sort_by_priority_single_item_unchanged() {
+        let mut mods: Vec<Box<dyn StepModifierTrait>> = vec![
+            Box::new(TestModifier { target: StepId::BlockRoll, priority: 7 }),
+        ];
+        sort_by_priority(&mut mods);
+        assert_eq!(mods[0].priority(), 7);
+    }
+
+    #[test]
+    fn step_command_status_eq() {
+        assert_eq!(StepCommandStatus::Handled, StepCommandStatus::Handled);
+        assert_ne!(StepCommandStatus::Handled, StepCommandStatus::NotHandled);
+    }
 }

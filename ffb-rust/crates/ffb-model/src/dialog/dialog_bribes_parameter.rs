@@ -55,4 +55,20 @@ mod tests {
     fn dialog_id_is_bribes() {
         assert_eq!(DialogBribesParameter::default().get_id(), DialogId::BRIBES);
     }
+
+    #[test]
+    fn transform_preserves_id() {
+        let p = DialogBribesParameter::default();
+        let t = p.transform();
+        assert_eq!(t.get_id(), DialogId::BRIBES);
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let p = DialogBribesParameter::new_with("team2", 5);
+        let json = serde_json::to_string(&p).unwrap();
+        let back: DialogBribesParameter = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.get_max_nr_of_bribes(), 5);
+        assert_eq!(back.get_team_id(), Some("team2"));
+    }
 }

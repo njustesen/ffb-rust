@@ -73,4 +73,19 @@ mod tests {
     fn default_has_no_player_id() {
         assert!(DialogApothecaryChoiceParameter::new().get_player_id().is_none());
     }
+
+    #[test]
+    fn transform_preserves_id() {
+        let p = DialogApothecaryChoiceParameter::new();
+        let t = p.transform();
+        assert_eq!(t.get_id(), DialogId::APOTHECARY_CHOICE);
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let p = DialogApothecaryChoiceParameter::new_with("p42", None, None, None, None);
+        let json = serde_json::to_string(&p).unwrap();
+        let back: DialogApothecaryChoiceParameter = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.get_player_id(), Some("p42"));
+    }
 }

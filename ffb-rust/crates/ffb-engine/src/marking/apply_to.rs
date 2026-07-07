@@ -64,4 +64,16 @@ mod tests {
         assert!(format!("{:?}", ApplyTo::Opponent).contains("Opponent"));
         assert!(format!("{:?}", ApplyTo::Both).contains("Both"));
     }
+
+    #[test]
+    fn own_eq_self() {
+        assert_eq!(ApplyTo::Own, ApplyTo::Own);
+    }
+
+    #[test]
+    fn both_is_copy() {
+        let a = ApplyTo::Both;
+        let _b = a;
+        let _c = a; // copy semantics: can use after "move"
+    }
 }

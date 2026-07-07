@@ -47,4 +47,24 @@ mod tests {
         let sfc = SteadyFootingContext::from_injury_type_name("SomeType".to_string());
         assert_eq!(sfc.get_apothecary_mode(), ApothecaryMode::Attacker);
     }
+
+    #[test]
+    fn get_apothecary_mode_from_injury_result() {
+        let ir = InjuryResult::new(ApothecaryMode::Attacker);
+        let sfc = SteadyFootingContext::from_injury_result(ir);
+        assert_eq!(sfc.get_apothecary_mode(), ApothecaryMode::Attacker);
+    }
+
+    #[test]
+    fn from_injury_type_name_injury_result_is_none() {
+        let sfc = SteadyFootingContext::from_injury_type_name("Block".to_string());
+        assert!(sfc.injury_result().is_none());
+    }
+
+    #[test]
+    fn from_drop_player_injury_type_name_is_none() {
+        let ctx = DropPlayerContext::new();
+        let sfc = SteadyFootingContext::from_drop_player(ctx);
+        assert!(sfc.injury_type_name().is_none());
+    }
 }

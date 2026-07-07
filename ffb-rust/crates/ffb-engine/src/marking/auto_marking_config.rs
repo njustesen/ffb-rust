@@ -113,4 +113,19 @@ mod tests {
             .build());
         assert_eq!(c.get_markings().len(), 1);
     }
+
+    #[test]
+    fn default_same_as_new() {
+        let c = AutoMarkingConfig::default();
+        assert!(c.get_markings().is_empty());
+    }
+
+    #[test]
+    fn defaults_tackle_marking_is_t() {
+        let defaults = AutoMarkingConfig::defaults();
+        let tackle = defaults.iter()
+            .find(|r| r.skills().contains(&ffb_model::model::skill_def::SkillId::Tackle));
+        assert!(tackle.is_some());
+        assert_eq!(tackle.unwrap().marking(), "T");
+    }
 }
