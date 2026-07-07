@@ -43,4 +43,22 @@ mod tests {
         let steps = SpikedBallApo::build_sequence();
         assert!(steps[0].label.is_none());
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        // SpikedBallApo has no Params struct; verify apothecary mode is CATCHER
+        let steps = SpikedBallApo::build_sequence();
+        let has_catcher = steps[0].params.iter().any(|p| {
+            matches!(p, StepParameter::ApothecaryMode(ApothecaryMode::Catcher))
+        });
+        assert!(has_catcher);
+    }
+
+    #[test]
+    fn params_clone() {
+        // No Params struct; verify the struct itself can be created via Default
+        let _s = SpikedBallApo::default();
+        let steps = SpikedBallApo::build_sequence();
+        assert_eq!(steps.len(), 1);
+    }
 }

@@ -52,4 +52,17 @@ mod tests {
         let steps = BalefulHex::build_sequence(&BalefulHexParams::default());
         assert_eq!(steps.len(), 1);
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = BalefulHexParams { failure_label: "myLabel".into() };
+        assert_eq!(p.failure_label, "myLabel");
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = BalefulHexParams { failure_label: "lbl".into() };
+        let q = p.clone();
+        assert_eq!(q.failure_label, "lbl");
+    }
 }

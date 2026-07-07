@@ -42,4 +42,21 @@ mod tests {
     fn rading_party_struct_is_default() {
         let _ = RadingParty::default();
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = RadingPartyParams {
+            failure_label: Some("fail".into()),
+            success_label: Some("ok".into()),
+        };
+        assert_eq!(p.failure_label.as_deref(), Some("fail"));
+        assert_eq!(p.success_label.as_deref(), Some("ok"));
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = RadingPartyParams { failure_label: Some("x".into()), success_label: None };
+        let q = p.clone();
+        assert_eq!(q.failure_label.as_deref(), Some("x"));
+    }
 }

@@ -36,4 +36,17 @@ mod tests {
     fn kickoff_struct_is_default() {
         let _ = Kickoff::default();
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = KickoffParams { with_coin_choice: true };
+        assert!(p.with_coin_choice);
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = KickoffParams { with_coin_choice: true };
+        let q = p.clone();
+        assert!(q.with_coin_choice);
+    }
 }

@@ -36,4 +36,17 @@ mod tests {
     fn throw_keg_struct_is_default() {
         let _ = ThrowKeg::default();
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = ThrowKegParams { player_id: Some("p1".into()) };
+        assert_eq!(p.player_id.as_deref(), Some("p1"));
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = ThrowKegParams { player_id: Some("x".into()) };
+        let q = p.clone();
+        assert_eq!(q.player_id.as_deref(), Some("x"));
+    }
 }

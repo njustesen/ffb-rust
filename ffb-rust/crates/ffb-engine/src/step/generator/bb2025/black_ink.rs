@@ -67,4 +67,21 @@ mod tests {
         let has = steps[0].params.iter().any(|p| matches!(p, StepParameter::OldPlayerState(_)));
         assert!(has);
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = BlackInkParams {
+            failure_label: "myLabel".into(),
+            old_player_state: None,
+        };
+        assert_eq!(p.failure_label, "myLabel");
+        assert!(p.old_player_state.is_none());
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = BlackInkParams { failure_label: "lbl".into(), old_player_state: None };
+        let q = p.clone();
+        assert_eq!(q.failure_label, "lbl");
+    }
 }

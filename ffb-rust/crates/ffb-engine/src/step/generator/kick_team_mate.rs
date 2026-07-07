@@ -37,4 +37,21 @@ mod tests {
     fn kick_team_mate_struct_is_default() {
         let _ = KickTeamMate::default();
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = KickTeamMateParams {
+            num_dice: 2,
+            kicked_player_id: Some("p1".into()),
+        };
+        assert_eq!(p.num_dice, 2);
+        assert_eq!(p.kicked_player_id.as_deref(), Some("p1"));
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = KickTeamMateParams { kicked_player_id: Some("x".into()), ..Default::default() };
+        let q = p.clone();
+        assert_eq!(q.kicked_player_id.as_deref(), Some("x"));
+    }
 }

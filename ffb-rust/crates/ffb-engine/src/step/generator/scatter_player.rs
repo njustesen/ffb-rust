@@ -64,4 +64,23 @@ mod tests {
     fn scatter_player_struct_is_default() {
         let _ = ScatterPlayer::default();
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = ScatterPlayerParams {
+            thrown_player_id: Some("p1".into()),
+            has_swoop: true,
+            ..Default::default()
+        };
+        assert_eq!(p.thrown_player_id.as_deref(), Some("p1"));
+        assert!(p.has_swoop);
+        assert!(!p.thrown_player_has_ball);
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = ScatterPlayerParams { thrown_player_id: Some("x".into()), ..Default::default() };
+        let q = p.clone();
+        assert_eq!(q.thrown_player_id.as_deref(), Some("x"));
+    }
 }

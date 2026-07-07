@@ -36,4 +36,17 @@ mod tests {
     fn pile_driver_struct_is_default() {
         let _ = PileDriver::default();
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = PileDriverParams { target_player_id: Some("p2".into()) };
+        assert_eq!(p.target_player_id.as_deref(), Some("p2"));
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = PileDriverParams { target_player_id: Some("x".into()) };
+        let q = p.clone();
+        assert_eq!(q.target_player_id.as_deref(), Some("x"));
+    }
 }

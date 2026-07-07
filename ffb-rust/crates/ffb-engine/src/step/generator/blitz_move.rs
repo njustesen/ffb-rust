@@ -40,4 +40,21 @@ mod tests {
         let p = BlitzMoveParams::default();
         assert!(p.move_start.is_none());
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = BlitzMoveParams {
+            gaze_victim_id: Some("victim".into()),
+            ..Default::default()
+        };
+        assert_eq!(p.gaze_victim_id.as_deref(), Some("victim"));
+        assert!(p.move_stack.is_empty());
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = BlitzMoveParams { gaze_victim_id: Some("x".into()), ..Default::default() };
+        let q = p.clone();
+        assert_eq!(q.gaze_victim_id.as_deref(), Some("x"));
+    }
 }

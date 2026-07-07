@@ -37,4 +37,21 @@ mod tests {
     fn foul_struct_is_default() {
         let _ = Foul::default();
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = FoulParams {
+            fouled_defender_id: Some("p1".into()),
+            using_chainsaw: true,
+        };
+        assert_eq!(p.fouled_defender_id.as_deref(), Some("p1"));
+        assert!(p.using_chainsaw);
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = FoulParams { fouled_defender_id: Some("x".into()), using_chainsaw: false };
+        let q = p.clone();
+        assert_eq!(q.fouled_defender_id.as_deref(), Some("x"));
+    }
 }

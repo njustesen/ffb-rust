@@ -52,4 +52,17 @@ mod tests {
         let steps = CatchOfTheDay::build_sequence(&CatchOfTheDayParams::default());
         assert_eq!(steps[0].step_id, StepId::CatchOfTheDay);
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = CatchOfTheDayParams { failure_label: "myLabel".into() };
+        assert_eq!(p.failure_label, "myLabel");
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = CatchOfTheDayParams { failure_label: "lbl".into() };
+        let q = p.clone();
+        assert_eq!(q.failure_label, "lbl");
+    }
 }

@@ -36,4 +36,17 @@ mod tests {
     fn end_game_struct_is_default() {
         let _ = EndGame::default();
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = EndGameParams { admin_mode: true };
+        assert!(p.admin_mode);
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = EndGameParams { admin_mode: true };
+        let q = p.clone();
+        assert!(q.admin_mode);
+    }
 }

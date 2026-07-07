@@ -38,4 +38,19 @@ mod tests {
     fn pass_struct_is_default() {
         let _ = Pass::default();
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let coord = FieldCoordinate::new(3, 5);
+        let p = PassParams { target_coordinate: Some(coord) };
+        assert!(p.target_coordinate.is_some());
+    }
+
+    #[test]
+    fn params_clone() {
+        let coord = FieldCoordinate::new(2, 4);
+        let p = PassParams { target_coordinate: Some(coord) };
+        let q = p.clone();
+        assert!(q.target_coordinate.is_some());
+    }
 }

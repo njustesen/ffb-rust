@@ -51,4 +51,23 @@ mod tests {
         let p = BlockParams::default();
         assert!(p.multi_block_defender_id.is_none());
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = BlockParams {
+            block_defender_id: Some("p1".into()),
+            using_stab: true,
+            ..Default::default()
+        };
+        assert_eq!(p.block_defender_id.as_deref(), Some("p1"));
+        assert!(p.using_stab);
+        assert!(!p.using_chainsaw);
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = BlockParams { frenzy_block: true, ..Default::default() };
+        let q = p.clone();
+        assert!(q.frenzy_block);
+    }
 }

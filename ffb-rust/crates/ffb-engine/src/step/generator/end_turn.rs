@@ -36,4 +36,17 @@ mod tests {
     fn end_turn_struct_is_default() {
         let _ = EndTurn::default();
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = EndTurnParams { check_forgo: true };
+        assert!(p.check_forgo);
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = EndTurnParams { check_forgo: true };
+        let q = p.clone();
+        assert!(q.check_forgo);
+    }
 }

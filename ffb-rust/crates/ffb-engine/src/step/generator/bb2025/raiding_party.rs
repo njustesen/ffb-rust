@@ -58,4 +58,19 @@ mod tests {
         });
         assert!(steps[0].params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnSuccess(l) if l == "SUCCESS_LABEL")));
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = RaidingPartyParams { failure_label: "fail".into(), success_label: "ok".into() };
+        assert_eq!(p.failure_label, "fail");
+        assert_eq!(p.success_label, "ok");
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = RaidingPartyParams { failure_label: "f".into(), success_label: "s".into() };
+        let q = p.clone();
+        assert_eq!(q.failure_label, "f");
+        assert_eq!(q.success_label, "s");
+    }
 }

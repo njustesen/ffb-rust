@@ -54,4 +54,22 @@ mod tests {
         let steps = Card::build_sequence(&CardParams::default());
         assert!(steps[0].label.is_none());
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = CardParams {
+            card_id: Some("card-1".into()),
+            home_team: true,
+        };
+        assert_eq!(p.card_id.as_deref(), Some("card-1"));
+        assert!(p.home_team);
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = CardParams { card_id: Some("x".into()), home_team: true };
+        let q = p.clone();
+        assert_eq!(q.card_id.as_deref(), Some("x"));
+        assert!(q.home_team);
+    }
 }

@@ -47,4 +47,19 @@ mod tests {
         let steps = QuickBite::build_sequence();
         assert_eq!(steps.last().unwrap().step_id, StepId::Apothecary);
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        // QuickBite has no Params struct; verify the middle step is HandleDropPlayerContext
+        let steps = QuickBite::build_sequence();
+        assert_eq!(steps[1].step_id, StepId::HandleDropPlayerContext);
+    }
+
+    #[test]
+    fn params_clone() {
+        // No Params struct; verify the struct itself can be created via Default
+        let _q = QuickBite::default();
+        let steps = QuickBite::build_sequence();
+        assert_eq!(steps.len(), 3);
+    }
 }

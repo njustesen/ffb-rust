@@ -36,4 +36,17 @@ mod tests {
     fn baleful_hex_struct_is_default() {
         let _ = BalefulHex::default();
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = BalefulHexParams { failure_label: Some("lbl".into()) };
+        assert_eq!(p.failure_label.as_deref(), Some("lbl"));
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = BalefulHexParams { failure_label: Some("x".into()) };
+        let q = p.clone();
+        assert_eq!(q.failure_label.as_deref(), Some("x"));
+    }
 }

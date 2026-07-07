@@ -42,4 +42,24 @@ mod tests {
     fn end_player_action_struct_is_default() {
         let _ = EndPlayerAction::default();
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = EndPlayerActionParams {
+            feeding_allowed: true,
+            end_turn: true,
+            ..Default::default()
+        };
+        assert!(p.feeding_allowed);
+        assert!(p.end_turn);
+        assert!(!p.end_player_action);
+        assert!(!p.check_forgo);
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = EndPlayerActionParams { check_forgo: true, ..Default::default() };
+        let q = p.clone();
+        assert!(q.check_forgo);
+    }
 }

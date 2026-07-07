@@ -40,4 +40,22 @@ mod tests {
         let p = ThrowTeamMateParams::default();
         assert!(p.target_coordinate.is_none());
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = ThrowTeamMateParams {
+            thrown_player_id: Some("p1".into()),
+            kicked: true,
+            ..Default::default()
+        };
+        assert_eq!(p.thrown_player_id.as_deref(), Some("p1"));
+        assert!(p.kicked);
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = ThrowTeamMateParams { thrown_player_id: Some("x".into()), ..Default::default() };
+        let q = p.clone();
+        assert_eq!(q.thrown_player_id.as_deref(), Some("x"));
+    }
 }

@@ -85,4 +85,26 @@ mod tests {
         let steps = Inducement::build_sequence(&params);
         assert_eq!(steps[4].step_id, StepId::EndInducement);
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = InducementParams {
+            inducement_phase: InducementPhase::BeforeSetup,
+            home_team: true,
+            check_forgo: true,
+        };
+        assert!(p.home_team);
+        assert!(p.check_forgo);
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = InducementParams {
+            inducement_phase: InducementPhase::BeforeSetup,
+            home_team: true,
+            check_forgo: false,
+        };
+        let q = p.clone();
+        assert!(q.home_team);
+    }
 }

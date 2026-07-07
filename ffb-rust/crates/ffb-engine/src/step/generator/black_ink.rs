@@ -47,4 +47,21 @@ mod tests {
     fn black_ink_struct_is_default() {
         let _ = BlackInk::default();
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = BlackInkParams {
+            go_to_label_failure: Some("fail".into()),
+            ..Default::default()
+        };
+        assert_eq!(p.go_to_label_failure.as_deref(), Some("fail"));
+        assert!(p.old_player_state.is_none());
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = BlackInkParams { go_to_label_failure: Some("x".into()), ..Default::default() };
+        let q = p.clone();
+        assert_eq!(q.go_to_label_failure.as_deref(), Some("x"));
+    }
 }

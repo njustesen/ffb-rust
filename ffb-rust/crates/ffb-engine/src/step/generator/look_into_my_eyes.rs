@@ -37,4 +37,22 @@ mod tests {
     fn look_into_my_eyes_struct_is_default() {
         let _ = LookIntoMyEyes::default();
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = LookIntoMyEyesParams {
+            push_select: true,
+            goto_on_end: Some("end".into()),
+        };
+        assert!(p.push_select);
+        assert_eq!(p.goto_on_end.as_deref(), Some("end"));
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = LookIntoMyEyesParams { push_select: true, goto_on_end: Some("x".into()) };
+        let q = p.clone();
+        assert!(q.push_select);
+        assert_eq!(q.goto_on_end.as_deref(), Some("x"));
+    }
 }

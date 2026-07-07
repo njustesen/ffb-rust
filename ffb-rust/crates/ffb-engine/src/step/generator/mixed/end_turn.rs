@@ -42,4 +42,19 @@ mod tests {
         let steps = EndTurn::build_sequence();
         assert!(steps[0].label.is_none());
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        // EndTurn has no Params struct; verify the step has no params
+        let steps = EndTurn::build_sequence();
+        assert!(steps[0].params.is_empty());
+    }
+
+    #[test]
+    fn params_clone() {
+        // No Params struct; verify the struct itself can be created via Default
+        let _e = EndTurn::default();
+        let steps = EndTurn::build_sequence();
+        assert_eq!(steps.len(), 1);
+    }
 }

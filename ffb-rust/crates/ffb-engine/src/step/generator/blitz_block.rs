@@ -53,4 +53,23 @@ mod tests {
     fn blitz_block_struct_is_default() {
         let _ = BlitzBlock::default();
     }
+
+    #[test]
+    fn params_with_fields_set() {
+        let p = BlitzBlockParams {
+            block_defender_id: Some("p1".into()),
+            using_stab: true,
+            ..Default::default()
+        };
+        assert_eq!(p.block_defender_id.as_deref(), Some("p1"));
+        assert!(p.using_stab);
+        assert!(!p.using_chainsaw);
+    }
+
+    #[test]
+    fn params_clone() {
+        let p = BlitzBlockParams { frenzy_block: true, ..Default::default() };
+        let q = p.clone();
+        assert!(q.frenzy_block);
+    }
 }
