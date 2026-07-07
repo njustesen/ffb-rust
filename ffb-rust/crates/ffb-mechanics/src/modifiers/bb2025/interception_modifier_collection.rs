@@ -59,4 +59,16 @@ mod tests {
         let tz_count = col.get_modifiers().iter().filter(|m| m.get_type() == ModifierType::TACKLEZONE).count();
         assert_eq!(tz_count, 8);
     }
+
+    #[test]
+    fn includes_inaccurate_pass_modifier() {
+        let col = InterceptionModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Inaccurate Pass"));
+    }
+
+    #[test]
+    fn includes_stunty_modifier() {
+        let col = InterceptionModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Thrower has Stunty"));
+    }
 }

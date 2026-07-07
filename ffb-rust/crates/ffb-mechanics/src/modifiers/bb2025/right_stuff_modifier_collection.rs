@@ -51,4 +51,19 @@ mod tests {
         let col = RightStuffModifierCollection::new();
         assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Fumbled Throw"));
     }
+
+    #[test]
+    fn tacklezone_count_is_eight() {
+        let col = RightStuffModifierCollection::new();
+        let tz_count = col.get_modifiers().iter().filter(|m| m.get_type() == ModifierType::TACKLEZONE).count();
+        assert_eq!(tz_count, 8);
+    }
+
+    #[test]
+    fn regular_type_count_is_two() {
+        let col = RightStuffModifierCollection::new();
+        let regular_count = col.get_modifiers().iter().filter(|m| m.get_type() == ModifierType::REGULAR).count();
+        // subpar_throw(1) + fumbled_throw(1) = 2
+        assert_eq!(regular_count, 2);
+    }
 }

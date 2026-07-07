@@ -60,4 +60,17 @@ mod tests {
         let col = InterceptionModifierCollection::new();
         assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Thrower has Stunty"));
     }
+
+    #[test]
+    fn includes_wildly_inaccurate_pass_modifier() {
+        let col = InterceptionModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Wildly Inaccurate Pass"));
+    }
+
+    #[test]
+    fn tacklezone_count_is_eight() {
+        let col = InterceptionModifierCollection::new();
+        let tz_count = col.get_modifiers().iter().filter(|m| m.get_type() == ModifierType::TACKLEZONE).count();
+        assert_eq!(tz_count, 8);
+    }
 }

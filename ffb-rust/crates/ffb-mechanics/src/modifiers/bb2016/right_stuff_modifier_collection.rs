@@ -51,4 +51,17 @@ mod tests {
         let tz_count = col.get_modifiers().iter().filter(|m| m.get_type() == ModifierType::TACKLEZONE).count();
         assert_eq!(tz_count, 8);
     }
+
+    #[test]
+    fn includes_long_kick_modifier() {
+        let col = RightStuffModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Long Kick"));
+    }
+
+    #[test]
+    fn long_kick_is_regular_type() {
+        let col = RightStuffModifierCollection::new();
+        let lk = col.get_modifiers().iter().find(|m| m.get_name() == "Long Kick").unwrap();
+        assert_eq!(lk.get_type(), ModifierType::REGULAR);
+    }
 }

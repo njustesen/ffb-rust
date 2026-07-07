@@ -48,4 +48,18 @@ mod tests {
         use crate::modifiers::modifier_type::ModifierType;
         assert!(col.get_modifiers().iter().all(|m| m.get_type() == ModifierType::TACKLEZONE));
     }
+
+    #[test]
+    fn includes_eight_tacklezones_modifier() {
+        let col = GazeModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "8 Tacklezones"));
+    }
+
+    #[test]
+    fn tacklezone_count_is_eight() {
+        let col = GazeModifierCollection::new();
+        use crate::modifiers::modifier_type::ModifierType;
+        let tz_count = col.get_modifiers().iter().filter(|m| m.get_type() == ModifierType::TACKLEZONE).count();
+        assert_eq!(tz_count, 8);
+    }
 }

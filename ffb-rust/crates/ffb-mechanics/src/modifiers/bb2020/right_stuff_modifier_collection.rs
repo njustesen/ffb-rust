@@ -55,4 +55,16 @@ mod tests {
         let tz_count = col.get_modifiers().iter().filter(|m| m.get_type() == ModifierType::TACKLEZONE).count();
         assert_eq!(tz_count, 8);
     }
+
+    #[test]
+    fn includes_terrible_throw_modifier() {
+        let col = RightStuffModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Terrible Throw"));
+    }
+
+    #[test]
+    fn includes_fumbled_throw_modifier() {
+        let col = RightStuffModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Fumbled Throw"));
+    }
 }

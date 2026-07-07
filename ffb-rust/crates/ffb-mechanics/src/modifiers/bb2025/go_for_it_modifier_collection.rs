@@ -53,4 +53,18 @@ mod tests {
         let col = GoForItModifierCollection::new();
         assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Moles under the Pitch"));
     }
+
+    #[test]
+    fn blizzard_modifier_value_is_one() {
+        let col = GoForItModifierCollection::new();
+        let blizzard = col.get_modifiers().iter().find(|m| m.get_name() == "Blizzard").unwrap();
+        assert_eq!(blizzard.get_modifier(), 1);
+    }
+
+    #[test]
+    fn moles_modifier_value_is_one() {
+        let col = GoForItModifierCollection::new();
+        let moles = col.get_modifiers().iter().find(|m| m.get_name() == "Moles under the Pitch").unwrap();
+        assert_eq!(moles.get_modifier(), 1);
+    }
 }

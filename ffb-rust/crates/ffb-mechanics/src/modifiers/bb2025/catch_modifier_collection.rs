@@ -53,4 +53,18 @@ mod tests {
         let col = CatchModifierCollection::new();
         assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Blast It!"));
     }
+
+    #[test]
+    fn disturbing_presence_count_is_eleven() {
+        let col = CatchModifierCollection::new();
+        let dp_count = col.get_modifiers().iter().filter(|m| m.get_type() == ModifierType::DISTURBING_PRESENCE).count();
+        assert_eq!(dp_count, 11);
+    }
+
+    #[test]
+    fn tacklezone_count_is_eight() {
+        let col = CatchModifierCollection::new();
+        let tz_count = col.get_modifiers().iter().filter(|m| m.get_type() == ModifierType::TACKLEZONE).count();
+        assert_eq!(tz_count, 8);
+    }
 }

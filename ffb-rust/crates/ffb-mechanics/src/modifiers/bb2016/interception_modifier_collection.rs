@@ -50,4 +50,18 @@ mod tests {
         let tz_count = col.get_modifiers().iter().filter(|m| m.get_type() == ModifierType::TACKLEZONE).count();
         assert_eq!(tz_count, 8);
     }
+
+    #[test]
+    fn includes_eight_tacklezones_modifier() {
+        let col = InterceptionModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "8 Tacklezones"));
+    }
+
+    #[test]
+    fn disturbing_presence_count_is_eleven() {
+        let col = InterceptionModifierCollection::new();
+        use crate::modifiers::modifier_type::ModifierType;
+        let dp_count = col.get_modifiers().iter().filter(|m| m.get_type() == ModifierType::DISTURBING_PRESENCE).count();
+        assert_eq!(dp_count, 11);
+    }
 }

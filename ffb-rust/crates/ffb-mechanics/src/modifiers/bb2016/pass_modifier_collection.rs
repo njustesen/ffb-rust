@@ -47,4 +47,18 @@ mod tests {
         let blizzard = col.get_modifiers().iter().find(|m| m.get_name() == "Blizzard").unwrap();
         assert_eq!(blizzard.get_type(), ModifierType::REGULAR);
     }
+
+    #[test]
+    fn includes_very_sunny_modifier() {
+        let col = PassModifierCollection::new();
+        assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Very Sunny"));
+    }
+
+    #[test]
+    fn very_sunny_is_regular_type() {
+        use crate::modifiers::modifier_type::ModifierType;
+        let col = PassModifierCollection::new();
+        let vs = col.get_modifiers().iter().find(|m| m.get_name() == "Very Sunny").unwrap();
+        assert_eq!(vs.get_type(), ModifierType::REGULAR);
+    }
 }

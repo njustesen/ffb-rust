@@ -45,4 +45,19 @@ mod tests {
         let ju = col.get_modifiers().iter().find(|m| m.get_name() == "Jump Up").unwrap();
         assert_eq!(ju.get_type(), ModifierType::REGULAR);
     }
+
+    #[test]
+    fn jump_up_modifier_value_is_minus_two() {
+        let col = JumpUpModifierCollection::new();
+        let ju = col.get_modifiers().iter().find(|m| m.get_name() == "Jump Up").unwrap();
+        assert_eq!(ju.get_modifier(), -2);
+    }
+
+    #[test]
+    fn regular_type_count_is_one() {
+        use crate::modifiers::modifier_type::ModifierType;
+        let col = JumpUpModifierCollection::new();
+        let regular_count = col.get_modifiers().iter().filter(|m| m.get_type() == ModifierType::REGULAR).count();
+        assert_eq!(regular_count, 1);
+    }
 }

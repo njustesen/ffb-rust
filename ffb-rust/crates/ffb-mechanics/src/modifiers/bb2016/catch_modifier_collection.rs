@@ -54,4 +54,19 @@ mod tests {
         let col = CatchModifierCollection::new();
         assert!(col.get_modifiers().iter().any(|m| m.get_name() == "Hand Off"));
     }
+
+    #[test]
+    fn disturbing_presence_count_is_eleven() {
+        let col = CatchModifierCollection::new();
+        let dp_count = col.get_modifiers().iter().filter(|m| m.get_type() == ModifierType::DISTURBING_PRESENCE).count();
+        assert_eq!(dp_count, 11);
+    }
+
+    #[test]
+    fn regular_type_count_includes_accurate_pass_and_hand_off() {
+        let col = CatchModifierCollection::new();
+        let regular_count = col.get_modifiers().iter().filter(|m| m.get_type() == ModifierType::REGULAR).count();
+        // pouring_rain(1) + accurate_pass(1) + hand_off(1) = 3
+        assert_eq!(regular_count, 3);
+    }
 }
