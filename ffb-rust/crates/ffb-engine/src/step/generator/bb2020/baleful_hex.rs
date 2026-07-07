@@ -77,4 +77,9 @@ mod tests {
         let bl = steps.iter().find(|s| s.step_id == StepId::BloodLust).unwrap();
         assert!(!bl.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(_))));
     }
+    #[test]
+    fn build_sequence_is_nonempty() {
+        assert!(!BalefulHex::build_sequence(&Default::default()).is_empty());
+    }
+
 }

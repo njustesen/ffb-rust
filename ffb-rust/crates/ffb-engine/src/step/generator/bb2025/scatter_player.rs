@@ -118,4 +118,10 @@ mod tests {
         let apo = steps.iter().find(|s| s.label.as_deref() == Some(labels::APOTHECARY_HIT_PLAYER)).unwrap();
         assert_eq!(apo.step_id, StepId::Apothecary);
     }
+    #[test]
+    fn build_sequence_returns_vec() {
+        let seq = ScatterPlayer::build_sequence(&Default::default());
+        assert!(!seq.is_empty(), "sequence should not be empty");
+    }
+
 }

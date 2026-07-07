@@ -47,4 +47,9 @@ mod tests {
         let p = SpecialEffectParams { special_effect: Some(SpecialEffectKind::LIGHTNING), ..Default::default() };
         assert_eq!(p.special_effect, Some(SpecialEffectKind::LIGHTNING));
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", SpecialEffectParams::default()).is_empty());
+    }
+
 }

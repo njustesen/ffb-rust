@@ -46,4 +46,9 @@ mod tests {
         let p = SelectParams { block_targets: vec![bt], ..Default::default() };
         assert_eq!(p.block_targets.len(), 1);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", SelectParams::default()).is_empty());
+    }
+
 }

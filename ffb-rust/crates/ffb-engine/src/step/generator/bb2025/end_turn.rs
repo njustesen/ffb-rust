@@ -74,4 +74,10 @@ mod tests {
         let forgone = &steps[0];
         assert!(forgone.params.iter().any(|p| matches!(p, StepParameter::CheckForgo(true))));
     }
+    #[test]
+    fn build_sequence_returns_vec() {
+        let seq = EndTurn::build_sequence(&Default::default());
+        assert!(!seq.is_empty(), "sequence should not be empty");
+    }
+
 }

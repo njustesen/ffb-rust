@@ -68,4 +68,10 @@ mod tests {
         assert!(steps.iter().any(|s| s.step_id == StepId::BuyCards));
         assert!(steps.iter().any(|s| s.step_id == StepId::BuyInducements));
     }
+    #[test]
+    fn build_sequence_returns_vec() {
+        let seq = StartGame::build_sequence();
+        assert!(!seq.is_empty(), "sequence should not be empty");
+    }
+
 }

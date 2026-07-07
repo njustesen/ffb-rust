@@ -77,4 +77,9 @@ mod tests {
         let has_state = steps[0].params.iter().any(|p| matches!(p, StepParameter::OldPlayerState(_)));
         assert!(!has_state);
     }
+    #[test]
+    fn build_sequence_is_nonempty() {
+        assert!(!AutoGazeZoat::build_sequence(&Default::default()).is_empty());
+    }
+
 }

@@ -62,4 +62,10 @@ mod tests {
         assert!(steps.iter().any(|s| s.step_id == StepId::JumpUp));
         assert!(steps.iter().any(|s| s.step_id == StepId::StandUp));
     }
+    #[test]
+    fn build_sequence_returns_vec() {
+        let seq = SelectBlitzTarget::build_sequence();
+        assert!(!seq.is_empty(), "sequence should not be empty");
+    }
+
 }

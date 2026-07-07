@@ -116,4 +116,9 @@ mod tests {
         let apo = steps.iter().find(|s| s.label.as_deref() == Some(labels::APOTHECARY_ATTACKER)).unwrap();
         assert_eq!(apo.step_id, StepId::Apothecary);
     }
+    #[test]
+    fn build_sequence_is_nonempty() {
+        assert!(!Foul::build_sequence(&Default::default()).is_empty());
+    }
+
 }
