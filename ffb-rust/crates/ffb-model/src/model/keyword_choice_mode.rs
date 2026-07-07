@@ -46,4 +46,23 @@ mod tests {
         assert_eq!(KeywordChoiceMode::for_name("gettingEven"), Some(KeywordChoiceMode::GETTING_EVEN));
         assert_eq!(KeywordChoiceMode::for_name("invalid"), None);
     }
+
+    #[test]
+    fn get_dialog_header_contains_player_name() {
+        let header = KeywordChoiceMode::GETTING_EVEN.get_dialog_header("Griff");
+        assert!(header.contains("Griff"));
+    }
+
+    #[test]
+    fn get_status_title_non_empty() {
+        assert!(!KeywordChoiceMode::GETTING_EVEN.get_status_title().is_empty());
+        assert!(!KeywordChoiceMode::GETTING_EVEN.get_status_message().is_empty());
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let s = serde_json::to_string(&KeywordChoiceMode::GETTING_EVEN).unwrap();
+        let back: KeywordChoiceMode = serde_json::from_str(&s).unwrap();
+        assert_eq!(back, KeywordChoiceMode::GETTING_EVEN);
+    }
 }

@@ -51,4 +51,26 @@ mod tests {
         let back: PushbackSquare = serde_json::from_str(&json).unwrap();
         assert_eq!(sq, back);
     }
+
+    #[test]
+    fn new_starts_unselected_and_unlocked() {
+        let sq = PushbackSquare::new(FieldCoordinate::new(3, 3), Direction::South, true);
+        assert!(!sq.selected);
+        assert!(!sq.locked);
+        assert!(sq.home_choice);
+    }
+
+    #[test]
+    fn transform_double_inverts_home_choice() {
+        let sq = PushbackSquare::new(FieldCoordinate::new(10, 7), Direction::East, true);
+        let t = sq.transform().transform();
+        assert_eq!(t.home_choice, sq.home_choice);
+    }
+
+    #[test]
+    fn copy_semantics() {
+        let sq = PushbackSquare::new(FieldCoordinate::new(1, 1), Direction::North, false);
+        let sq2 = sq;
+        assert_eq!(sq, sq2);
+    }
 }

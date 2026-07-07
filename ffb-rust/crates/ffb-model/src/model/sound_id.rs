@@ -111,4 +111,27 @@ mod tests {
         assert_eq!(SoundId::for_name("BLOCK"), Some(SoundId::BLOCK));
         assert_eq!(SoundId::for_name("invalid"), None);
     }
+
+    #[test]
+    fn spectator_sounds_are_flagged() {
+        assert!(SoundId::SPEC_AAH.is_spectator_sound());
+        assert!(SoundId::SPEC_STOMP.is_spectator_sound());
+        assert!(!SoundId::BLOCK.is_spectator_sound());
+        assert!(!SoundId::TOUCHDOWN.is_spectator_sound());
+    }
+
+    #[test]
+    fn for_name_round_trips_all_variants() {
+        for v in SoundId::all() {
+            let name = v.get_name();
+            assert_eq!(SoundId::for_name(name), Some(*v), "round trip failed for {:?}", v);
+        }
+    }
+
+    #[test]
+    fn all_variants_have_non_empty_names() {
+        for v in SoundId::all() {
+            assert!(!v.get_name().is_empty(), "{:?} has empty name", v);
+        }
+    }
 }

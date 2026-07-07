@@ -67,4 +67,27 @@ mod tests {
         assert!(r.is_re_rolled());
         assert!(!r.is_successful());
     }
+
+    #[test]
+    fn default_has_no_player_id() {
+        let r = ReportSkillRoll::default();
+        assert!(r.get_player_id().is_none());
+        assert!(!r.is_successful());
+        assert_eq!(r.get_roll(), 0);
+        assert_eq!(r.get_minimum_roll(), 0);
+    }
+
+    #[test]
+    fn get_player_id_and_roll_accessors() {
+        let r = ReportSkillRoll::new(Some("p2".into()), true, 5, 3, false, vec![]);
+        assert_eq!(r.get_player_id(), Some("p2"));
+        assert_eq!(r.get_roll(), 5);
+        assert_eq!(r.get_minimum_roll(), 3);
+    }
+
+    #[test]
+    fn modifiers_empty_when_none_provided() {
+        let r = ReportSkillRoll::new(None, true, 4, 2, false, vec![]);
+        assert!(r.get_roll_modifiers().is_empty());
+    }
 }

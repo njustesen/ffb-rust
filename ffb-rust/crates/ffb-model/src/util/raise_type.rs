@@ -22,4 +22,25 @@ mod tests {
         let all = [RaiseType::ZOMBIE, RaiseType::ROTTER, RaiseType::THRALL];
         assert_eq!(all.len(), 3);
     }
+
+    #[test]
+    fn copy_semantics() {
+        let a = RaiseType::ZOMBIE;
+        let b = a;
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn all_variants_are_distinct_from_each_other() {
+        assert_ne!(RaiseType::ZOMBIE, RaiseType::THRALL);
+        assert_ne!(RaiseType::ROTTER, RaiseType::ZOMBIE);
+        assert_ne!(RaiseType::ROTTER, RaiseType::THRALL);
+    }
+
+    #[test]
+    fn equality_is_reflexive() {
+        assert_eq!(RaiseType::ZOMBIE, RaiseType::ZOMBIE);
+        assert_eq!(RaiseType::ROTTER, RaiseType::ROTTER);
+        assert_eq!(RaiseType::THRALL, RaiseType::THRALL);
+    }
 }

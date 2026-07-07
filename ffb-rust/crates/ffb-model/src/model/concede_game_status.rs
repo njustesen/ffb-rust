@@ -44,4 +44,24 @@ mod tests {
         assert_eq!(ConcedeGameStatus::from_name("requested"), Some(ConcedeGameStatus::REQUESTED));
         assert_eq!(ConcedeGameStatus::from_name("invalid"), None);
     }
+
+    #[test]
+    fn all_names_round_trip() {
+        for v in [ConcedeGameStatus::REQUESTED, ConcedeGameStatus::CONFIRMED, ConcedeGameStatus::DENIED] {
+            assert_eq!(ConcedeGameStatus::from_name(v.get_name()), Some(v));
+        }
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let s = serde_json::to_string(&ConcedeGameStatus::CONFIRMED).unwrap();
+        let back: ConcedeGameStatus = serde_json::from_str(&s).unwrap();
+        assert_eq!(back, ConcedeGameStatus::CONFIRMED);
+    }
+
+    #[test]
+    fn variants_are_distinct() {
+        assert_ne!(ConcedeGameStatus::REQUESTED, ConcedeGameStatus::CONFIRMED);
+        assert_ne!(ConcedeGameStatus::CONFIRMED, ConcedeGameStatus::DENIED);
+    }
 }

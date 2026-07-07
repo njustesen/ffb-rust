@@ -23,4 +23,23 @@ mod tests {
         let p = NamedProperty::new("canAvoidFallingDown");
         assert!(!p.name().is_empty());
     }
+
+    #[test]
+    fn name_matches_input() {
+        let p = NamedProperty::new("canBlock");
+        assert_eq!(p.name(), "canBlock");
+    }
+
+    #[test]
+    fn different_names_are_unequal() {
+        let p1 = NamedProperty::new("canLeap");
+        let p2 = NamedProperty::new("canBlock");
+        assert_ne!(p1.name(), p2.name());
+    }
+
+    #[test]
+    fn empty_string_name_is_accepted() {
+        let p = NamedProperty::new("");
+        assert_eq!(p.name(), "");
+    }
 }

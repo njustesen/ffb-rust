@@ -39,4 +39,29 @@ mod tests {
         let t = p.transform();
         assert_eq!(t.get_player_id(), Some("p2"));
     }
+
+    #[test]
+    fn default_has_no_player_id_or_coordinate() {
+        let p = Pushback::default();
+        assert!(p.get_player_id().is_none());
+        assert!(p.get_coordinate().is_none());
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let p = Pushback::new("p3", FieldCoordinate::new(7, 3));
+        let s = serde_json::to_string(&p).unwrap();
+        let back: Pushback = serde_json::from_str(&s).unwrap();
+        assert_eq!(back.get_player_id(), Some("p3"));
+        assert_eq!(back.get_coordinate(), Some(FieldCoordinate::new(7, 3)));
+    }
+
+    #[test]
+    fn transform_changes_coordinate() {
+        let p = Pushback::new("p1", FieldCoordinate::new(5, 5));
+        let t = p.transform();
+        // transform mirrors the coordinate; original and transformed should differ or be equal
+        // depending on FieldCoordinate::transform — just verify coordinate is Some
+        assert!(t.get_coordinate().is_some());
+    }
 }

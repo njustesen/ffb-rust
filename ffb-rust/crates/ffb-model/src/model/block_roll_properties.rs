@@ -29,4 +29,27 @@ mod tests {
         p.add_re_roll_source(source);
         assert_eq!(p.re_roll_sources.len(), 1);
     }
+
+    #[test]
+    fn add_multiple_re_roll_sources() {
+        let mut p = BlockRollProperties::new();
+        p.add_re_roll_source(ReRollSource::new("teamReRoll"));
+        p.add_re_roll_source(ReRollSource::new("proReRoll"));
+        assert_eq!(p.re_roll_sources.len(), 2);
+    }
+
+    #[test]
+    fn default_equals_new() {
+        let a = BlockRollProperties::default();
+        let b = BlockRollProperties::new();
+        assert_eq!(a.re_roll_sources.len(), b.re_roll_sources.len());
+    }
+
+    #[test]
+    fn serde_round_trip_empty() {
+        let p = BlockRollProperties::new();
+        let s = serde_json::to_string(&p).unwrap();
+        let back: BlockRollProperties = serde_json::from_str(&s).unwrap();
+        assert!(back.re_roll_sources.is_empty());
+    }
 }

@@ -23,4 +23,24 @@ mod tests {
         let d: StatusType = serde_json::from_str(&s).unwrap();
         assert_eq!(d, StatusType::WAITING);
     }
+
+    #[test]
+    fn serde_round_trip_ref() {
+        let s = serde_json::to_string(&StatusType::REF).unwrap();
+        let d: StatusType = serde_json::from_str(&s).unwrap();
+        assert_eq!(d, StatusType::REF);
+    }
+
+    #[test]
+    fn copy_semantics() {
+        let a = StatusType::WAITING;
+        let b = a;
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn equality_is_reflexive() {
+        assert_eq!(StatusType::WAITING, StatusType::WAITING);
+        assert_eq!(StatusType::REF, StatusType::REF);
+    }
 }

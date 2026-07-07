@@ -37,4 +37,29 @@ mod tests {
         assert!(!h.is_exhausted());
         assert_eq!(h.get_roll(), 0);
     }
+
+    #[test]
+    fn not_exhausted_stores_correctly() {
+        let h = HeatExhaustion::new("p2", false, 6);
+        assert!(!h.is_exhausted());
+        assert_eq!(h.get_roll(), 6);
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let h = HeatExhaustion::new("p1", true, 3);
+        let s = serde_json::to_string(&h).unwrap();
+        let back: HeatExhaustion = serde_json::from_str(&s).unwrap();
+        assert_eq!(back.get_player_id(), Some("p1"));
+        assert!(back.is_exhausted());
+        assert_eq!(back.get_roll(), 3);
+    }
+
+    #[test]
+    fn roll_boundary_values() {
+        let h_min = HeatExhaustion::new("p", false, 1);
+        let h_max = HeatExhaustion::new("p", false, 6);
+        assert_eq!(h_min.get_roll(), 1);
+        assert_eq!(h_max.get_roll(), 6);
+    }
 }

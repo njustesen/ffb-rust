@@ -114,4 +114,23 @@ mod tests {
         assert_eq!(Factory::SKILL.get_context(), FactoryContext::GAME);
         assert_eq!(Factory::ANIMATION_TYPE.get_context(), FactoryContext::GAME);
     }
+
+    #[test]
+    fn all_five_application_factories_are_application_context() {
+        for f in [Factory::NET_COMMAND_ID, Factory::CLIENT_MODE, Factory::GAME_OPTION_ID, Factory::SERVER_STATUS, Factory::GAME_STATUS] {
+            assert_eq!(f.get_context(), FactoryContext::APPLICATION, "{:?} should be APPLICATION", f);
+        }
+    }
+
+    #[test]
+    fn contexts_are_distinct() {
+        assert_ne!(FactoryContext::APPLICATION, FactoryContext::GAME);
+    }
+
+    #[test]
+    fn copy_semantics_for_factory() {
+        let a = Factory::SKILL;
+        let b = a;
+        assert_eq!(a, b);
+    }
 }

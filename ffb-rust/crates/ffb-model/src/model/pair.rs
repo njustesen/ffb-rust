@@ -28,4 +28,25 @@ mod tests {
         assert_eq!(Pair::new(1, 2), Pair::new(1, 2));
         assert_ne!(Pair::new(1, 2), Pair::new(1, 3));
     }
+
+    #[test]
+    fn left_and_right_different_types() {
+        let p = Pair::new(true, 42u32);
+        assert_eq!(p.get_left(), &true);
+        assert_eq!(p.get_right(), &42u32);
+    }
+
+    #[test]
+    fn field_access_matches_getters() {
+        let p = Pair::new("a", "b");
+        assert_eq!(p.left, *p.get_left());
+        assert_eq!(p.right, *p.get_right());
+    }
+
+    #[test]
+    fn clone_produces_equal_pair() {
+        let p = Pair::new(10, 20);
+        let c = p.clone();
+        assert_eq!(p, c);
+    }
 }

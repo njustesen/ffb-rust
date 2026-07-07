@@ -137,4 +137,26 @@ mod tests {
         assert_eq!(AnimationType::for_name("PASS"), Some(AnimationType::PASS));
         assert_eq!(AnimationType::for_name("invalid"), None);
     }
+
+    #[test]
+    fn all_variants_have_non_empty_names() {
+        for v in AnimationType::all() {
+            assert!(!v.get_name().is_empty(), "{:?} has empty name", v);
+        }
+    }
+
+    #[test]
+    fn for_name_round_trips_all_variants() {
+        for v in AnimationType::all() {
+            let name = v.get_name();
+            assert_eq!(AnimationType::for_name(name), Some(*v), "round trip failed for {:?}", v);
+        }
+    }
+
+    #[test]
+    fn copy_semantics() {
+        let a = AnimationType::CARD;
+        let b = a;
+        assert_eq!(a, b);
+    }
 }

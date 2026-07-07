@@ -43,4 +43,22 @@ mod tests {
         assert_eq!(PositionChoiceMode::for_name("raiseDead"), Some(PositionChoiceMode::RAISE_DEAD));
         assert_eq!(PositionChoiceMode::for_name("invalid"), None);
     }
+
+    #[test]
+    fn get_dialog_header_non_empty() {
+        assert!(!PositionChoiceMode::RAISE_DEAD.get_dialog_header().is_empty());
+    }
+
+    #[test]
+    fn get_status_title_and_message_non_empty() {
+        assert!(!PositionChoiceMode::RAISE_DEAD.get_status_title().is_empty());
+        assert!(!PositionChoiceMode::RAISE_DEAD.get_status_message().is_empty());
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let s = serde_json::to_string(&PositionChoiceMode::RAISE_DEAD).unwrap();
+        let back: PositionChoiceMode = serde_json::from_str(&s).unwrap();
+        assert_eq!(back, PositionChoiceMode::RAISE_DEAD);
+    }
 }

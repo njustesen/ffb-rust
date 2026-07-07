@@ -46,4 +46,25 @@ mod tests {
         assert_eq!(t.get_player_id().map(|s| s.as_str()), Some("p1"));
         assert_eq!(t.get_kind(), Some(BlockKind::BLOCK));
     }
+
+    #[test]
+    fn default_original_player_state_is_none() {
+        let t = BlockTarget::default();
+        assert!(t.get_original_player_state().is_none());
+    }
+
+    #[test]
+    fn new_with_stab_kind() {
+        let t = BlockTarget::new("p2", BlockKind::STAB, None);
+        assert_eq!(t.get_kind(), Some(BlockKind::STAB));
+    }
+
+    #[test]
+    fn serde_round_trip_default() {
+        let t = BlockTarget::default();
+        let s = serde_json::to_string(&t).unwrap();
+        let back: BlockTarget = serde_json::from_str(&s).unwrap();
+        assert!(back.player_id.is_none());
+        assert!(back.kind.is_none());
+    }
 }

@@ -44,4 +44,23 @@ mod tests {
         assert_eq!(DefenderAction::from_id(1), Some(DefenderAction::DUMP_OFF));
         assert_eq!(DefenderAction::from_id(0), None);
     }
+
+    #[test]
+    fn get_title_and_description() {
+        assert_eq!(DefenderAction::DUMP_OFF.get_title(), "Dump Off");
+        assert!(!DefenderAction::DUMP_OFF.get_description().is_empty());
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let s = serde_json::to_string(&DefenderAction::DUMP_OFF).unwrap();
+        let back: DefenderAction = serde_json::from_str(&s).unwrap();
+        assert_eq!(back, DefenderAction::DUMP_OFF);
+    }
+
+    #[test]
+    fn from_id_negative_returns_none() {
+        assert_eq!(DefenderAction::from_id(-1), None);
+        assert_eq!(DefenderAction::from_id(99), None);
+    }
 }
