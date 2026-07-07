@@ -483,6 +483,55 @@ mod tests {
         let act = a.action_rng.next_u64();
         assert_ne!(d, act);
     }
+
+    #[test]
+    fn new_parity_and_new_produce_different_decision_streams() {
+        // new_parity applies XOR 0xDEAD_BEEF_CAFE_0001 to seed; new() uses seed directly.
+        let seed = 42u64;
+        let mut parity = RandomAgent::new_parity(seed);
+        let mut plain = RandomAgent::new(seed);
+        // The decision_rng streams must differ because the seeds differ.
+        let parity_draw = parity.decision_rng.next_u64();
+        let plain_draw = plain.decision_rng.next_u64();
+        assert_ne!(parity_draw, plain_draw, "parity XOR makes decision RNG distinct from plain");
+    }
+
+    #[test]
+    fn new_same_seed_produces_same_sequence() {
+        let mut a1 = RandomAgent::new(99);
+        let mut a2 = RandomAgent::new(99);
+        for _ in 0..5 {
+            assert_eq!(a1.decision_rng.next_u64(), a2.decision_rng.next_u64());
+        }
+    }
+
+    #[test]
+    fn pick_t2_activation_advances_decision_rng() {
+        let mut a1 = RandomAgent::new(1);
+        let mut a2 = RandomAgent::new(1);
+        // Consume one draw on a1 via pick_t2_activation; a2 stays at its initial position.
+        a1.pick_t2_activation(5);
+        // Now their next draws should differ.
+        assert_ne!(a1.decision_rng.next_u64(), a2.decision_rng.next_u64());
+    }
+
+    #[test]
+    fn action_rng_count_increments_with_pick_action() {
+        let mut a = RandomAgent::new(1);
+        assert_eq!(a.action_rng_count, 0);
+        // Directly invoke pick_action to confirm counter increments.
+        let _ = a.pick_action(4);
+        assert_eq!(a.action_rng_count, 1);
+        let _ = a.pick_action(4);
+        assert_eq!(a.action_rng_count, 2);
+    }
+
+    #[test]
+    fn skipped_this_turn_starts_empty() {
+        let a = RandomAgent::new(1);
+        assert!(a.skipped_this_turn.is_empty());
+        assert!(a.last_turn_key.is_none());
+    }
 }
 
 #[cfg(test)]

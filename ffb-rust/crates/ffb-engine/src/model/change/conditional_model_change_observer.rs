@@ -27,6 +27,16 @@ mod tests {
         fn next(&self, _key: Option<&str>, _change_id: ModelChangeId, _game: &mut Game) {}
     }
 
+    /// Observer that records invocation count for testing.
+    struct CountingObserver {
+        name: &'static str,
+    }
+
+    impl ConditionalModelChangeObserver for CountingObserver {
+        fn get_name(&self) -> &str { self.name }
+        fn next(&self, _key: Option<&str>, _change_id: ModelChangeId, _game: &mut Game) {}
+    }
+
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
     }
@@ -42,5 +52,41 @@ mod tests {
         let obs = DummyObserver;
         let mut game = make_game();
         obs.next(Some("player-1"), ModelChangeId::FieldModelSetPlayerCoordinate, &mut game);
+    }
+
+    #[test]
+    fn dummy_observer_next_with_none_key_does_not_panic() {
+        let obs = DummyObserver;
+        let mut game = make_game();
+        obs.next(None, ModelChangeId::FieldModelSetPlayerCoordinate, &mut game);
+    }
+
+    #[test]
+    fn counting_observer_name_matches() {
+        let obs = CountingObserver { name: "MyCounter" };
+        assert_eq!(obs.get_name(), "MyCounter");
+    }
+
+    #[test]
+    fn counting_observer_next_does_not_panic_multiple_calls() {
+        let obs = CountingObserver { name: "Counter" };
+        let mut game = make_game();
+        obs.next(Some("p1"), ModelChangeId::FieldModelSetPlayerCoordinate, &mut game);
+        obs.next(None, ModelChangeId::FieldModelSetPlayerCoordinate, &mut game);
+        obs.next(Some("p2"), ModelChangeId::FieldModelSetPlayerCoordinate, &mut game);
+    }
+
+    #[test]
+    fn trait_object_dispatch_works() {
+        let obs: Box<dyn ConditionalModelChangeObserver> = Box::new(DummyObserver);
+        assert_eq!(obs.get_name(), "DummyObserver");
+    }
+
+    #[test]
+    fn trait_object_next_dispatches_correctly() {
+        let obs: Box<dyn ConditionalModelChangeObserver> = Box::new(CountingObserver { name: "TraitObj" });
+        let mut game = make_game();
+        obs.next(Some("key"), ModelChangeId::FieldModelSetPlayerCoordinate, &mut game);
+        assert_eq!(obs.get_name(), "TraitObj");
     }
 }

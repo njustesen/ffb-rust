@@ -47,4 +47,59 @@ mod tests {
         let _ = VictimStateKey::ThrownPlayerState;
         let _ = VictimStateKey::KickedPlayerState;
     }
+
+    #[test]
+    fn with_injury_not_eligible_for_safe_pair_of_hands() {
+        let injury_result = InjuryResult::new(ApothecaryMode::Attacker);
+        let ctx = DropPlayerContext::with_injury(
+            injury_result,
+            "p2".to_string(),
+            ApothecaryMode::Defender,
+            false,
+        );
+        assert!(!ctx.eligible_for_safe_pair_of_hands);
+        assert_eq!(ctx.apothecary_mode, Some(ApothecaryMode::Defender));
+    }
+
+    #[test]
+    fn default_same_as_new() {
+        let a = DropPlayerContext::new();
+        let b = DropPlayerContext::default();
+        assert_eq!(a.end_turn, b.end_turn);
+        assert_eq!(a.player_id, b.player_id);
+        assert_eq!(a.additional_victim_state_keys.len(), b.additional_victim_state_keys.len());
+    }
+
+    #[test]
+    fn victim_state_key_variants_are_distinct() {
+        assert_ne!(VictimStateKey::OldDefenderState, VictimStateKey::OldPlayerState);
+        assert_ne!(VictimStateKey::ThrownPlayerState, VictimStateKey::KickedPlayerState);
+        assert_ne!(VictimStateKey::OldDefenderState, VictimStateKey::ThrownPlayerState);
+    }
+
+    #[test]
+    fn victim_state_key_copy_semantics() {
+        let a = VictimStateKey::ThrownPlayerState;
+        let b = a;
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn with_injury_leaves_other_booleans_false() {
+        let injury_result = InjuryResult::new(ApothecaryMode::Attacker);
+        let ctx = DropPlayerContext::with_injury(
+            injury_result,
+            "p3".to_string(),
+            ApothecaryMode::Attacker,
+            true,
+        );
+        assert!(!ctx.end_turn);
+        assert!(!ctx.requires_armour_break);
+        assert!(!ctx.already_dropped);
+        assert!(!ctx.modified_injury_ends_turn);
+        assert!(!ctx.end_turn_without_knockdown);
+        assert!(ctx.label.is_none());
+        assert!(ctx.victim_state_key.is_none());
+        assert!(ctx.additional_victim_state_keys.is_empty());
+    }
 }

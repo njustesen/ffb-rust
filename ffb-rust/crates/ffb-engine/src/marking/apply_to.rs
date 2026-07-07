@@ -37,4 +37,31 @@ mod tests {
         assert!(ApplyTo::Both.applies_to_own());
         assert!(ApplyTo::Both.applies_to_opponent());
     }
+
+    #[test]
+    fn all_variants_are_distinct() {
+        assert_ne!(ApplyTo::Own, ApplyTo::Opponent);
+        assert_ne!(ApplyTo::Own, ApplyTo::Both);
+        assert_ne!(ApplyTo::Opponent, ApplyTo::Both);
+    }
+
+    #[test]
+    fn copy_semantics_preserved() {
+        let a = ApplyTo::Both;
+        let b = a;
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn clone_equals_original() {
+        let a = ApplyTo::Opponent;
+        assert_eq!(a.clone(), a);
+    }
+
+    #[test]
+    fn debug_format_contains_variant_name() {
+        assert!(format!("{:?}", ApplyTo::Own).contains("Own"));
+        assert!(format!("{:?}", ApplyTo::Opponent).contains("Opponent"));
+        assert!(format!("{:?}", ApplyTo::Both).contains("Both"));
+    }
 }

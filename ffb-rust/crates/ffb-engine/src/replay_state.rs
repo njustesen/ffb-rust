@@ -88,4 +88,36 @@ mod tests {
         assert!(!rs.is_coach_prevented_from_sketching("c1"));
         assert!(rs.is_coach_prevented_from_sketching("c2"));
     }
+
+    #[test]
+    fn allow_not_prevented_coach_is_noop() {
+        let mut rs = ReplayState::new("r");
+        // Allowing a coach that was never prevented should not panic.
+        rs.allow_coach_to_sketch("ghost");
+        assert!(!rs.is_coach_prevented_from_sketching("ghost"));
+    }
+
+    #[test]
+    fn prevent_same_coach_twice_is_idempotent() {
+        let mut rs = ReplayState::new("r");
+        rs.prevent_coach_from_sketching("dup");
+        rs.prevent_coach_from_sketching("dup");
+        assert!(rs.is_coach_prevented_from_sketching("dup"));
+        // Allow once should remove.
+        rs.allow_coach_to_sketch("dup");
+        assert!(!rs.is_coach_prevented_from_sketching("dup"));
+    }
+
+    #[test]
+    fn unknown_coach_is_not_prevented() {
+        let rs = ReplayState::new("r");
+        assert!(!rs.is_coach_prevented_from_sketching("nobody"));
+    }
+
+    #[test]
+    fn name_preserved_exactly() {
+        let name = "test-replay-2025";
+        let rs = ReplayState::new(name);
+        assert_eq!(rs.get_name(), name);
+    }
 }

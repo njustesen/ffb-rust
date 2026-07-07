@@ -50,4 +50,37 @@ mod tests {
         let mut gen = IdGenerator::new(100);
         assert_eq!(gen.generate_id(), 101);
     }
+
+    #[test]
+    fn default_starts_at_zero() {
+        let mut gen = IdGenerator::default();
+        assert_eq!(gen.last_id(), 0);
+        assert_eq!(gen.generate_id(), 1);
+    }
+
+    #[test]
+    fn negative_start_increments_correctly() {
+        let mut gen = IdGenerator::new(-3);
+        assert_eq!(gen.generate_id(), -2);
+        assert_eq!(gen.generate_id(), -1);
+        assert_eq!(gen.generate_id(), 0);
+    }
+
+    #[test]
+    fn many_sequential_ids_are_strictly_increasing() {
+        let mut gen = IdGenerator::new(0);
+        let ids: Vec<i64> = (0..10).map(|_| gen.generate_id()).collect();
+        for w in ids.windows(2) {
+            assert_eq!(w[1], w[0] + 1);
+        }
+    }
+
+    #[test]
+    fn last_id_tracks_generate_id() {
+        let mut gen = IdGenerator::new(0);
+        for expected in 1..=5i64 {
+            gen.generate_id();
+            assert_eq!(gen.last_id(), expected);
+        }
+    }
 }
