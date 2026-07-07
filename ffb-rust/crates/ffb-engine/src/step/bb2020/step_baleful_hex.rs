@@ -1,6 +1,10 @@
 use ffb_model::enums::{PlayerAction, SkillId};
-use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::mixed::report_baleful_hex_roll::ReportBalefulHexRoll;
+use ffb_model::report::mixed::report_skill_wasted::ReportSkillWasted;
+use ffb_model::report::report_skill_use::ReportSkillUse;
+use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -52,6 +56,17 @@ impl Step for StepBalefulHex {
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
             Action::SelectPlayer { player_id } => {
+                if player_id.is_empty() {
+                    // Java: empty playerId → skill not used, ReportSkillUse(false, MAKE_OPPONENT_MISS_TURN)
+                    let acting_id = game.acting_player.player_id.clone();
+                    game.report_list.add(ReportSkillUse::new(
+                        acting_id,
+                        SkillId::BalefulHex,
+                        false,
+                        SkillUse::MAKE_OPPONENT_MISS_TURN,
+                    ));
+                    return StepOutcome::next();
+                }
                 self.player_id = Some(player_id.clone());
             }
             _ => {}
@@ -90,6 +105,11 @@ impl StepBalefulHex {
 
         // Java: if (endTurn || endPlayerAction) → ReportSkillWasted + GOTO_LABEL + markSkillUsed
         if self.end_turn || self.end_player_action {
+            // Java: getResult().addReport(new ReportSkillWasted(actingPlayer.getPlayerId(), skill))
+            game.report_list.add(ReportSkillWasted::new(
+                Some(player_id.clone()),
+                Some(SkillId::BalefulHex),
+            ));
             Self::mark_skill_used(game, &player_id);
             return StepOutcome::goto(&self.goto_label_on_failure);
         }
@@ -100,6 +120,13 @@ impl StepBalefulHex {
             if eligibles.is_empty() {
                 return StepOutcome::next();
             }
+            // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, MAKE_OPPONENT_MISS_TURN))
+            game.report_list.add(ReportSkillUse::new(
+                Some(player_id.clone()),
+                SkillId::BalefulHex,
+                true,
+                SkillUse::MAKE_OPPONENT_MISS_TURN,
+            ));
             if eligibles.len() == 1 {
                 self.player_id = Some(eligibles[0].clone());
             } else {
@@ -112,6 +139,16 @@ impl StepBalefulHex {
         if self.player_id.is_some() {
             self.roll = rng.d6();
             let successful = self.roll > 1;
+
+            // Java: getResult().addReport(new ReportBalefulHexRoll(actingPlayer.getPlayerId(), playerId, successful, roll, reRolled))
+            game.report_list.add(ReportBalefulHexRoll::new(
+                Some(player_id.clone()),
+                successful,
+                self.roll,
+                2, // minimum roll: roll > 1 means 2+
+                false, // re_rolled: simplified — re-roll handling deferred
+                self.player_id.clone(),
+            ));
 
             if successful {
                 if let Some(ref target_id) = self.player_id.clone() {
@@ -295,6 +332,35 @@ mod tests {
         StepBalefulHex::mark_action_used(&mut game, "actor");
         assert!(game.turn_data_mut().pass_used);
         assert!(!game.turn_data_mut().ttm_used);
+    }
+
+    #[test]
+    fn skill_wasted_report_on_end_turn() {
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, _) = make_game_bh();
+        let mut step = StepBalefulHex::new();
+        step.goto_label_on_failure = "FAIL".into();
+        step.end_turn = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_WASTED),
+            "expected SKILL_WASTED report when end_turn is set");
+    }
+
+    #[test]
+    fn baleful_hex_roll_report_added_on_success() {
+        use ffb_model::report::report_id::ReportId;
+        let seed = seed_for_d6(4); // > 1 → success
+        let (mut game, _) = make_game_bh();
+        let target_id = "opp1".to_string();
+        game.team_away.players.push(make_player(&target_id, None));
+        game.field_model.set_player_coordinate(&target_id, FieldCoordinate::new(12, 7));
+        game.field_model.set_player_state(&target_id, PlayerState::new(PS_STANDING).change_active(true));
+        let mut step = StepBalefulHex::new();
+        step.start(&mut game, &mut GameRng::new(seed));
+        assert!(game.report_list.has_report(ReportId::BALEFUL_HEX),
+            "expected BALEFUL_HEX roll report on successful roll");
+        assert!(game.report_list.has_report(ReportId::SKILL_USE),
+            "expected SKILL_USE report when eligible target found");
     }
 
     #[test]

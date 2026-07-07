@@ -9,9 +9,11 @@
 /// Expects stepParameter USING_STAB to be set by a preceding step.
 ///
 /// May push a new sequence on the stack.
-use ffb_model::enums::{PlayerAction, PlayerState};
+use ffb_model::enums::{PlayerAction, PlayerState, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_cards::UtilCards;
 use ffb_model::util::util_player::UtilPlayer;
@@ -282,7 +284,15 @@ impl Step for StepEndBlocking {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: CLIENT_USE_SKILL → canAddBlockDie →
+        //   getResult().addReport(new ReportSkillUse(commandUseSkill.getSkill(), true, SkillUse.ADD_BLOCK_DIE))
+        if let Action::UseSkill { skill_id, use_skill: true } = action {
+            game.report_list.add(ReportSkillUse::new(
+                None, *skill_id, true, SkillUse::ADD_BLOCK_DIE,
+            ));
+            ServerUtilBlock::update_dice_decorations_with_frenzy(game, true);
+        }
         self.execute_step(game, rng)
     }
 
@@ -381,5 +391,35 @@ mod tests {
     fn unrecognised_parameter_returns_false() {
         let mut step = StepEndBlocking::new();
         assert!(!step.set_parameter(&StepParameter::GotoLabel("x".into())));
+    }
+
+    // ── report_list: ADD_BLOCK_DIE skill use ─────────────────────────────────
+
+    #[test]
+    fn use_skill_adds_report_skill_use_add_block_die() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepEndBlocking::new();
+        let mut game = make_game();
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Block, use_skill: true },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(game.report_list.has_report(ReportId::SKILL_USE),
+            "expected SKILL_USE report for ADD_BLOCK_DIE");
+    }
+
+    #[test]
+    fn use_skill_false_does_not_add_report_skill_use() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepEndBlocking::new();
+        let mut game = make_game();
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Block, use_skill: false },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(!game.report_list.has_report(ReportId::SKILL_USE),
+            "no SKILL_USE report should be added when use_skill=false");
     }
 }

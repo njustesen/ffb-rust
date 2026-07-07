@@ -2,6 +2,7 @@ use ffb_model::enums::ApothecaryMode;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_foul::ReportFoul;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -48,6 +49,7 @@ impl StepFoul {
             Some(id) => id,
             None => return StepOutcome::next(),
         };
+        game.report_list.add(ReportFoul::new(defender_id.clone()));
         let attacker_id = game.acting_player.player_id.clone();
         let defender_coord = game.field_model.player_coordinate(&defender_id)
             .unwrap_or(FieldCoordinate::new(0, 0));
@@ -83,6 +85,7 @@ mod tests {
     use ffb_model::model::player::Player;
     use ffb_model::enums::{PlayerType, PlayerGender};
     use ffb_model::types::FieldCoordinate;
+    use ffb_model::report::report_id::ReportId;
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2016)
@@ -151,5 +154,25 @@ mod tests {
         let mut step = StepFoul::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn foul_adds_report_foul() {
+        let mut game = make_game();
+        add_player(&mut game, "home", "att");
+        add_player(&mut game, "away", "def");
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+        let mut step = StepFoul::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::FOUL), "foul should add ReportFoul");
+    }
+
+    #[test]
+    fn no_defender_does_not_add_foul_report() {
+        let mut game = make_game();
+        let mut step = StepFoul::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::FOUL), "no defender means no ReportFoul");
     }
 }

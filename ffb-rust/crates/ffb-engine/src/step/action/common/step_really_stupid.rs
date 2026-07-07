@@ -11,6 +11,7 @@ use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::types::FieldCoordinate;
+use ffb_model::report::report_confusion_roll::ReportConfusionRoll;
 use ffb_mechanics::mechanics::minimum_roll_confusion;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -106,6 +107,15 @@ impl StepReallyStupid {
 
         if skip_roll {
             let confusion_event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll: 1, confused: true };
+            // Java: addReport(new ReportConfusionRoll(...))
+            game.report_list.add(ReportConfusionRoll::new(
+                Some(player_id.clone()),
+                false,
+                1,
+                min_roll,
+                true,
+                Some(SkillId::ReallyStupid.class_name().to_string()),
+            ));
             cancel_negatrait_player_action(game, &player_id);
             return StepOutcome::goto(&self.goto_label_on_failure)
                 .with_event(confusion_event)
@@ -124,6 +134,18 @@ impl StepReallyStupid {
         } else if let Some(p) = game.team_away.player_mut(&player_id) {
             p.used_skills.insert(SkillId::ReallyStupid);
         }
+
+        // Java: addReport(new ReportConfusionRoll(...))
+        let re_rolled_flag = self.re_rolled_action.as_deref() == Some("REALLY_STUPID")
+            && self.re_roll_source.is_some();
+        game.report_list.add(ReportConfusionRoll::new(
+            Some(player_id.clone()),
+            successful,
+            roll,
+            min_roll,
+            re_rolled_flag,
+            Some(SkillId::ReallyStupid.class_name().to_string()),
+        ));
 
         let confusion_event = GameEvent::ConfusionRoll {
             player_id: player_id.clone(),
@@ -338,6 +360,36 @@ mod tests {
         assert_eq!(out.action, StepAction::Continue, "TRR available → should offer re-roll");
         assert!(out.prompt.is_some());
         assert_eq!(step.re_rolled_action.as_deref(), Some("REALLY_STUPID"));
+    }
+
+    #[test]
+    fn successful_roll_adds_confusion_roll_report() {
+        let seed = seed_for_d6(2);
+        let (mut game, _) = make_game_with_really_stupid();
+        // Adjacent non-RS teammate → good conditions (min_roll=2)
+        add_player(&mut game.team_home, "p2", 2, vec![]);
+        game.field_model.set_player_state("p2", PlayerState::new(PS_STANDING));
+        game.field_model.set_player_coordinate("p2", FieldCoordinate::new(6, 7));
+        let mut step = StepReallyStupid::new();
+        step.goto_label_on_failure = "FAIL".into();
+        step.start(&mut game, &mut GameRng::new(seed));
+        assert!(
+            game.report_list.has_report(ffb_model::report::report_id::ReportId::CONFUSION_ROLL),
+            "successful roll should add ReportConfusionRoll"
+        );
+    }
+
+    #[test]
+    fn failed_roll_adds_confusion_roll_report() {
+        let seed = seed_for_d6(1);
+        let (mut game, _) = make_game_with_really_stupid();
+        let mut step = StepReallyStupid::new();
+        step.goto_label_on_failure = "FAIL".into();
+        step.start(&mut game, &mut GameRng::new(seed));
+        assert!(
+            game.report_list.has_report(ffb_model::report::report_id::ReportId::CONFUSION_ROLL),
+            "failed roll should add ReportConfusionRoll"
+        );
     }
 
     #[test]

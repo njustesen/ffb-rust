@@ -13,6 +13,7 @@ use ffb_model::enums::PlayerState;
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_jump_up_roll::ReportJumpUpRoll;
 use ffb_mechanics::mechanics::minimum_roll_jump_up;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -134,6 +135,16 @@ impl StepJumpUp {
             roll,
             success: successful,
         };
+
+        // Java: step.getResult().addReport(new ReportJumpUpRoll(...))
+        game.report_list.add(ReportJumpUpRoll::new(
+            Some(player_id.clone()),
+            successful,
+            roll,
+            min_roll,
+            re_rolled,
+            vec![],
+        ));
 
         mark_used(game, &player_id);
 
@@ -367,6 +378,32 @@ mod tests {
         assert_eq!(out.action, StepAction::Continue, "TRR available → should offer re-roll");
         assert!(out.prompt.is_some());
         assert_eq!(step.re_rolled_action.as_deref(), Some("JUMP_UP"));
+    }
+
+    #[test]
+    fn successful_roll_adds_jump_up_roll_report() {
+        let seed = seed_for_d6(4);
+        let (mut game, _) = make_game_block_standing_up(vec![SkillId::JumpUp], 3);
+        let mut step = StepJumpUp::new();
+        step.goto_label_on_failure = "FAIL".into();
+        step.start(&mut game, &mut GameRng::new(seed));
+        assert!(
+            game.report_list.has_report(ffb_model::report::report_id::ReportId::JUMP_UP_ROLL),
+            "successful roll should add ReportJumpUpRoll"
+        );
+    }
+
+    #[test]
+    fn failed_roll_adds_jump_up_roll_report() {
+        let seed = seed_for_d6(1);
+        let (mut game, _) = make_game_block_standing_up(vec![SkillId::JumpUp], 3);
+        let mut step = StepJumpUp::new();
+        step.goto_label_on_failure = "FAIL".into();
+        step.start(&mut game, &mut GameRng::new(seed));
+        assert!(
+            game.report_list.has_report(ffb_model::report::report_id::ReportId::JUMP_UP_ROLL),
+            "failed roll should add ReportJumpUpRoll"
+        );
     }
 
     #[test]

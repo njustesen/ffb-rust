@@ -1,9 +1,9 @@
 use ffb_model::enums::{ApothecaryMode, TurnMode};
-use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::special_effect::SpecialEffect;
 use ffb_model::option::game_option_id::BOMBER_PLACED_PRONE_IGNORES_TURNOVER;
 use ffb_model::option::util_game_option::is_option_enabled;
+use ffb_model::report::report_special_effect_roll::ReportSpecialEffectRoll;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{CatchScatterThrowInMode, Step, StepOutcome};
@@ -107,7 +107,6 @@ impl StepSpecialEffect {
             .and_then(SpecialEffect::for_name);
 
         // Java: if fRollForEffect → roll and check success; else always successful
-        let effect_name = self.special_effect_key.clone().unwrap_or_default();
         let (successful, effect_roll, effect_success) = if self.roll_for_effect {
             let roll = rng.d6();
             let success = is_special_effect_successful(special_effect, game, &player_id, roll);
@@ -115,15 +114,18 @@ impl StepSpecialEffect {
         } else {
             (true, 0, true)
         };
-        let special_effect_event = GameEvent::SpecialEffectRoll {
-            effect: effect_name,
-            player_id: player_id.clone(),
-            roll: effect_roll,
-            success: effect_success,
-        };
+        // Java: getResult().addReport(new ReportSpecialEffectRoll(fSpecialEffect, player.getId(), roll, successful))
+        if let Some(effect) = special_effect {
+            game.report_list.add(ReportSpecialEffectRoll::new(
+                effect,
+                Some(player_id.clone()),
+                effect_roll,
+                effect_success,
+            ));
+        }
 
         if !successful {
-            return StepOutcome::goto(&self.goto_label_on_failure).with_event(special_effect_event);
+            return StepOutcome::goto(&self.goto_label_on_failure);
         }
 
         let mut outcome = StepOutcome::next();
@@ -207,7 +209,7 @@ impl StepSpecialEffect {
             }
         }
 
-        outcome.with_event(special_effect_event)
+        outcome
     }
 }
 
@@ -232,6 +234,7 @@ mod tests {
     use crate::step::framework::{StepAction, test_team};
     use ffb_model::enums::{Rules, PlayerState, PS_STANDING, PlayerType, PlayerGender};
     use ffb_model::model::player::Player;
+    use ffb_model::report::report_id::ReportId;
     use ffb_model::types::FieldCoordinate;
     use ffb_model::util::rng::GameRng;
 
@@ -434,5 +437,41 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
             "original bombardier hits themselves → suppressEndTurn=false → EndTurn published");
+    }
+
+    #[test]
+    fn no_roll_for_effect_adds_report_with_roll_zero_and_successful_true() {
+        // Java: else { getResult().addReport(new ReportSpecialEffectRoll(fSpecialEffect, player.getId(), 0, true)) }
+        let pid = "p1";
+        let mut step = StepSpecialEffect::new("FAIL".into());
+        step.player_id = Some(pid.into());
+        step.roll_for_effect = false;
+        step.special_effect_key = Some("lightning".into());
+
+        let mut game = make_game_with_player(pid, false);
+        step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(
+            game.report_list.has_report(ReportId::SPELL_EFFECT_ROLL),
+            "report_list should contain a ReportSpecialEffectRoll when roll_for_effect=false"
+        );
+    }
+
+    #[test]
+    fn roll_for_effect_adds_report_with_actual_roll() {
+        // Java: getResult().addReport(new ReportSpecialEffectRoll(fSpecialEffect, player.getId(), roll, successful))
+        let pid = "p1";
+        let mut step = StepSpecialEffect::new("FAIL".into());
+        step.player_id = Some(pid.into());
+        step.roll_for_effect = true;
+        step.special_effect_key = Some("fireball".into()); // always-success threshold=4; seed chosen to pass
+
+        let mut game = make_game_with_player(pid, false);
+        step.start(&mut game, &mut GameRng::new(42));
+
+        assert!(
+            game.report_list.has_report(ReportId::SPELL_EFFECT_ROLL),
+            "report_list should contain a ReportSpecialEffectRoll when roll_for_effect=true"
+        );
     }
 }

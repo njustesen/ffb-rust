@@ -34,6 +34,9 @@ use ffb_model::enums::{BlockResult, ReRollSource};
 use ffb_model::model::block_roll::BlockRoll;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::report::mixed::report_block_re_roll::ReportBlockReRoll;
+use ffb_model::report::report_block::ReportBlock;
+use ffb_model::report::report_block_roll::ReportBlockRoll;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepId, StepOutcome, StepParameter};
@@ -141,14 +144,23 @@ impl StepBlockRollMultiple {
                     if let Some(roll) = self.block_rolls.iter_mut().find(|r| r.target_id.as_deref() == Some(target.as_str())) {
                         if let Some(ref source_name) = self.re_roll_source.clone() {
                             let source = ReRollSource::new(source_name.as_str());
+                            // Java: getResult().addReport(new ReportBlock(defender.getId()))
+                            if let Some(tid) = roll.target_id.clone() {
+                                game.report_list.add(ReportBlock::new(tid));
+                            }
                             let implicit_result = match source_name.as_str() {
                                 "Brawler" => Some(BlockResult::BothDown),
                                 "Hatred" => Some(BlockResult::Skull),
                                 _ => None,
                             };
                             if let Some(result_to_replace) = implicit_result {
-                                // Roll 1 die, replace matching result
+                                // Java: handleImplicitReRollIndex → addReport(new ReportBlockReRoll([reRolledDie], player.getId(), source))
                                 let new_die = rng.d6();
+                                game.report_list.add(ReportBlockReRoll::new(
+                                    vec![new_die],
+                                    Some(acting_player_id.clone()),
+                                    Some(source.clone()),
+                                ));
                                 let nr = roll.get_nr_of_dice() as usize;
                                 for i in 0..nr {
                                     let val = roll.get_block_roll().get(i).copied().unwrap_or(0);
@@ -164,7 +176,18 @@ impl StepBlockRollMultiple {
                                 }
                                 roll.clear_re_roll_sources();
                             } else if source_name == "Pro" {
+                                // Java: adjustRollForIndexedReRoll → addReport(new ReportBlockReRoll([reRolledDie], playerId, source))
+                                let new_die = rng.d6();
+                                game.report_list.add(ReportBlockReRoll::new(
+                                    vec![new_die],
+                                    Some(acting_player_id.clone()),
+                                    Some(source.clone()),
+                                ));
                                 let pro_idx = roll.get_pro_index();
+                                let old_roll = roll.get_block_roll().to_vec();
+                                let mut updated = old_roll;
+                                if (pro_idx as usize) < updated.len() { updated[pro_idx as usize] = new_die; }
+                                roll.set_block_roll(updated);
                                 let mut idxs = roll.get_re_roll_dice_indexes().to_vec();
                                 idxs.push(pro_idx);
                                 roll.set_re_roll_dice_indexes(idxs);
@@ -189,6 +212,16 @@ impl StepBlockRollMultiple {
                             } else {
                                 roll.clear_re_roll_sources();
                             }
+                            // Java: getResult().addReport(new ReportBlockRoll(defender.getTeam().getId(), roll.getBlockRoll(), roll.getTargetId()))
+                            let team_id = roll.target_id.as_deref()
+                                .and_then(|tid| game.player_team_id(tid))
+                                .unwrap_or("")
+                                .to_string();
+                            game.report_list.add(ReportBlockRoll::new(
+                                team_id,
+                                roll.get_block_roll().to_vec(),
+                                roll.target_id.clone(),
+                            ));
                         } else {
                             roll.clear_re_roll_sources();
                         }
@@ -460,5 +493,44 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         let out = step.handle_command(&Action::Acknowledge, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn brawler_reroll_adds_block_and_block_re_roll_reports() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepBlockRollMultiple::new();
+        step.set_parameter(&StepParameter::BlockTargets(vec!["p1".into()]));
+        step.start(&mut game, &mut GameRng::new(0));
+        step.first_run = false;
+        step.selected_target = Some("p1".into());
+        step.re_roll_source = Some("Brawler".into());
+        if let Some(roll) = step.block_rolls.iter_mut().find(|r| r.target_id.as_deref() == Some("p1")) {
+            roll.set_block_roll(vec![2]); // BothDown
+            roll.set_nr_of_dice(1);
+        }
+        step.handle_command(&Action::Acknowledge, &mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::BLOCK));
+        assert!(game.report_list.has_report(ReportId::BLOCK_RE_ROLL));
+    }
+
+    #[test]
+    fn hatred_reroll_adds_block_and_block_roll_reports() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepBlockRollMultiple::new();
+        step.set_parameter(&StepParameter::BlockTargets(vec!["p1".into()]));
+        step.start(&mut game, &mut GameRng::new(0));
+        step.first_run = false;
+        step.selected_target = Some("p1".into());
+        step.re_roll_source = Some("Hatred".into());
+        if let Some(roll) = step.block_rolls.iter_mut().find(|r| r.target_id.as_deref() == Some("p1")) {
+            roll.set_block_roll(vec![1]); // Skull
+            roll.set_nr_of_dice(1);
+        }
+        step.handle_command(&Action::Acknowledge, &mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::BLOCK));
+        assert!(game.report_list.has_report(ReportId::BLOCK_RE_ROLL));
+        assert!(game.report_list.has_report(ReportId::BLOCK_ROLL));
     }
 }

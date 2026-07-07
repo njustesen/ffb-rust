@@ -21,6 +21,9 @@ use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use super::stalling_extension::StallingExtension;
 
+use ffb_model::report::mixed::report_player_event::ReportPlayerEvent;
+use ffb_model::report::report_id::ReportId;
+
 pub struct StepForgoneStalling {
     /// Java: checkForgo
     pub check_forgo: bool,
@@ -83,6 +86,8 @@ impl StepForgoneStalling {
             if self.stalling_extension.is_considered_stalling(game, &player_id) {
                 let turn_nr = game.turn_data().turn_nr;
                 let stalling_ev = self.stalling_extension.handle_staller(game, &player_id, turn_nr, rng);
+                // Java: getResult().addReport(new ReportPlayerEvent(player.getId(), "is stalling"))
+                game.report_list.add(ReportPlayerEvent::new(Some(player_id.clone()), Some("is stalling".into())));
                 return StepOutcome::next()
                     .with_event(stalling_ev)
                     .with_event(GameEvent::PlayerNote { player_id, note: "is stalling".into() });
@@ -171,5 +176,24 @@ mod tests {
         step.check_forgo = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn no_player_event_report_when_skipped() {
+        let mut game = make_game();
+        let mut step = StepForgoneStalling::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::PLAYER_EVENT));
+    }
+
+    #[test]
+    fn no_player_event_report_when_option_disabled() {
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        let mut step = StepForgoneStalling::new();
+        step.check_forgo = true;
+        // enableStallingCheck not set -> skips without report
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::PLAYER_EVENT));
     }
 }

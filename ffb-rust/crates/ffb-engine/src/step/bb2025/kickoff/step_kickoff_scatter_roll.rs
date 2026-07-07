@@ -3,7 +3,11 @@ use ffb_model::events::GameEvent;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::model::skill_use::SkillUse;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_kickoff_scatter::ReportKickoffScatter;
+use ffb_model::report::report_skill_use::ReportSkillUse;
+use ffb_model::report::mixed::report_event::ReportEvent;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -72,6 +76,15 @@ impl Step for StepKickoffScatterRoll {
         if let Action::UseSkill { use_skill, .. } = action {
             if self.use_kick_choice.is_none() {
                 self.use_kick_choice = Some(*use_skill);
+                if *use_skill {
+                    let pid = self.kicking_player_id.clone();
+                    game.report_list.add(ReportSkillUse::new(
+                        pid,
+                        SkillId::Kick,
+                        true,
+                        SkillUse::HALVE_KICKOFF_SCATTER,
+                    ));
+                }
             }
         }
         self.execute_step(game, rng)
@@ -167,6 +180,13 @@ impl StepKickoffScatterRoll {
         game.field_model.ball_coordinate = Some(last_valid);
         game.field_model.ball_moving = true;
 
+        game.report_list.add(ReportKickoffScatter::new(
+            ball_end,
+            direction,
+            dir_roll,
+            raw_distance,
+        ));
+
         // ── Determine kickoff bounds and touchback ────────────────────────────
         // Java: if home is kicking the ball must land in HALF_AWAY; if away is kicking → HALF_HOME.
         let receiving_half = if game.home_playing {
@@ -182,6 +202,10 @@ impl StepKickoffScatterRoll {
         }
         self.touchback = self.kickoff_bounds.is_none();
         game.field_model.out_of_bounds = self.touchback;
+
+        if self.touchback {
+            game.report_list.add(ReportEvent::new(Some("The ball lands out of bounds -> TOUCHBACK!!".to_string())));
+        }
 
         // ── Publish parameters and events ────────────────────────────────────
         let kicking_coord = self.kicking_player_coordinate.unwrap();
@@ -286,6 +310,29 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         // Regardless of outcome, touchback state must match bounds.
         assert_eq!(step.touchback, step.kickoff_bounds.is_none());
+    }
+
+    #[test]
+    fn adds_kickoff_scatter_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepKickoffScatterRoll::new();
+        step.kickoff_start_coordinate = Some(FieldCoordinate::new(13, 7));
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::KICKOFF_SCATTER));
+    }
+
+    #[test]
+    fn adds_event_report_on_touchback() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.home_playing = true;
+        let mut step = StepKickoffScatterRoll::new();
+        step.kickoff_start_coordinate = Some(FieldCoordinate::new(13, 7));
+        step.start(&mut game, &mut GameRng::new(0));
+        if step.touchback {
+            assert!(game.report_list.has_report(ReportId::EVENT));
+        }
     }
 
     #[test]

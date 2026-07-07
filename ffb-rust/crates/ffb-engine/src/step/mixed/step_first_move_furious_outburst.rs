@@ -23,6 +23,9 @@
 use std::collections::HashSet;
 use ffb_model::types::{FieldCoordinate, MoveSquare};
 use ffb_model::model::game::Game;
+use ffb_model::model::property::NamedProperties;
+use ffb_model::report::mixed::report_skill_wasted::ReportSkillWasted;
+use ffb_model::util::util_cards::UtilCards;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter, CatchScatterThrowInMode};
@@ -63,7 +66,14 @@ impl StepFirstMoveFuriousOutburst {
 
     fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
         if self.end_player_action {
-            // Java: if (actingPlayer.hasActed()) report SkillWasted (report infra blocked)
+            // Java: if (actingPlayer.hasActed()) getResult().addReport(new ReportSkillWasted(actingPlayer.getPlayerId(), skill))
+            if game.acting_player.has_acted {
+                let player_id = game.acting_player.player_id.clone();
+                let skill = player_id.as_deref()
+                    .and_then(|pid| game.player(pid))
+                    .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_TELEPORT_BEFORE_AND_AFTER_AV_ROLL_ATTACK));
+                game.report_list.add(ReportSkillWasted::new(player_id, skill));
+            }
             // Java: fieldModel.getTargetSelectionState().cancel()
             if let Some(ref mut ts) = game.field_model.target_selection_state {
                 ts.cancel();
@@ -253,6 +263,30 @@ mod tests {
         step.start(&mut game, &mut rng);
         let pos = game.field_model.player_coordinate("att");
         assert_eq!(pos, Some(FieldCoordinate::new(7, 7)));
+    }
+
+    #[test]
+    fn skill_wasted_report_added_when_has_acted() {
+        let mut step = StepFirstMoveFuriousOutburst::new("end");
+        step.end_player_action = true;
+        let mut game = make_game();
+        add_player(&mut game, "att", PS_STANDING);
+        game.acting_player.has_acted = true;
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_WASTED));
+    }
+
+    #[test]
+    fn no_skill_wasted_report_when_not_acted() {
+        let mut step = StepFirstMoveFuriousOutburst::new("end");
+        step.end_player_action = true;
+        let mut game = make_game();
+        add_player(&mut game, "att", PS_STANDING);
+        game.acting_player.has_acted = false;
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_WASTED));
     }
 
     #[test]

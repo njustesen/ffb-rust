@@ -8,6 +8,8 @@
 /// Stub: Sequence generation (PICK_UP + CATCH_SCATTER_THROW_IN) not translated → NEXT_STEP.
 use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -48,6 +50,9 @@ impl Step for StepRaidingParty {
         match action {
             Action::SelectPlayer { player_id } => {
                 if player_id.is_empty() {
+                    // Java: CLIENT_PLAYER_CHOICE with empty id → ReportSkillUse(false, MOVE_OPEN_TEAM_MATE) + resetState + NEXT_STEP
+                    let acting_player_id = game.acting_player.player_id.clone();
+                    game.report_list.add(ReportSkillUse::new(acting_player_id, SkillId::RaidingParty, false, SkillUse::MOVE_OPEN_TEAM_MATE));
                     return StepOutcome::next();
                 }
                 self.player_id = Some(player_id.clone());
@@ -88,8 +93,10 @@ impl StepRaidingParty {
             return StepOutcome::goto(&self.goto_label_on_failure);
         }
 
+        // Java: if eligible players found → addReport(new ReportSkillUse(..., skill, true, MOVE_OPEN_TEAM_MATE))
         // Stub: full sequence generation (PICK_UP + CATCH_SCATTER_THROW_IN) not translated.
         // BB2020 eligible player filter includes !playerState.isRooted() (not yet applied).
+        game.report_list.add(ReportSkillUse::new(Some(player_id.clone()), SkillId::RaidingParty, true, SkillUse::MOVE_OPEN_TEAM_MATE));
         StepOutcome::next()
     }
 }
@@ -167,5 +174,24 @@ mod tests {
         assert_eq!(step.goto_label_on_success, "S");
         assert!(step.set_parameter(&StepParameter::EndTurn(true)));
         assert!(step.set_parameter(&StepParameter::EndPlayerAction(true)));
+    }
+
+    #[test]
+    fn cancel_player_choice_adds_skill_use_false_report() {
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, _) = make_game_rp();
+        let mut step = StepRaidingParty::new();
+        // Empty player_id = cancel → ReportSkillUse(false, MOVE_OPEN_TEAM_MATE)
+        step.handle_command(&Action::SelectPlayer { player_id: String::new() }, &mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_USE));
+    }
+
+    #[test]
+    fn with_skill_active_adds_skill_use_true_report() {
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, _) = make_game_rp();
+        let mut step = StepRaidingParty::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_USE));
     }
 }

@@ -27,6 +27,7 @@
 use ffb_model::enums::{PlayerType, PS_RIP, PS_MISSING};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::report::report_most_valuable_players::ReportMostValuablePlayers;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -200,6 +201,10 @@ impl StepMvp {
                     });
                 }
             }
+            // Java: getResult().addReport(mvpReport) — mvpReport contains home+away MVP IDs
+            let home_ids: Vec<String> = self.home_players_mvp.iter().filter(|id| !id.is_empty()).cloned().collect();
+            let away_ids: Vec<String> = self.away_players_mvp.iter().filter(|id| !id.is_empty()).cloned().collect();
+            game.report_list.add(ReportMostValuablePlayers::new(home_ids, away_ids));
             return out;
         }
 
@@ -362,5 +367,35 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         // Star player should not be selected as MVP.
         assert!(!step.home_players_mvp.contains(&"star1".to_string()));
+    }
+
+    #[test]
+    fn mvp_report_added_when_eligible_players_exist() {
+        use ffb_model::report::report_id::ReportId;
+        use ffb_model::enums::{PlayerGender, PlayerType};
+        use ffb_model::model::player::Player;
+        use std::collections::HashSet;
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        game.team_home.players.push(Player {
+            id: "h1".into(), name: "h1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.team_away.players.push(Player {
+            id: "a1".into(), name: "a1".into(), nr: 2, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        let mut step = StepMvp::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::MOST_VALUABLE_PLAYERS), "should add ReportMostValuablePlayers");
     }
 }

@@ -1,4 +1,5 @@
 use ffb_model::model::game::Game;
+use ffb_model::report::mixed::report_winnings::ReportWinnings;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -46,6 +47,12 @@ impl StepWinnings {
 
         game.game_result.home.winnings = (home_winnings * 10_000.0) as i32;
         game.game_result.away.winnings = (away_winnings * 10_000.0) as i32;
+
+        // Java: getResult().addReport(new ReportWinnings((int) homeWinnings, (int) awayWinnings))
+        game.report_list.add(ReportWinnings::new(
+            game.game_result.home.winnings,
+            game.game_result.away.winnings,
+        ));
 
         StepOutcome::next()
     }
@@ -166,5 +173,41 @@ mod tests {
         // 0+1+2.5 = 3.5, cast to i32 = 3 → 35_000
         assert_eq!(game.game_result.home.winnings, 35_000);
         assert_eq!(game.game_result.away.winnings, 35_000);
+    }
+
+    /// ReportWinnings is added to report_list with correct values.
+    #[test]
+    fn report_winnings_added_with_correct_values() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepWinnings;
+        game.game_result.home.score = 2;
+        game.game_result.away.score = 1;
+        game.game_result.home.fan_factor = 5;
+        game.game_result.away.fan_factor = 5;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::WINNINGS),
+            "expected WINNINGS report in report_list"
+        );
+    }
+
+    /// ReportWinnings values match the computed winnings stored in game_result.
+    #[test]
+    fn report_winnings_values_match_game_result() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepWinnings;
+        game.game_result.home.score = 2;
+        game.game_result.away.score = 1;
+        game.game_result.home.fan_factor = 4;
+        game.game_result.away.fan_factor = 4;
+        step.start(&mut game, &mut GameRng::new(0));
+        // Report should reflect values written to game_result.
+        let home_w = game.game_result.home.winnings;
+        let away_w = game.game_result.away.winnings;
+        assert!(home_w > 0);
+        assert!(away_w > 0);
+        assert!(game.report_list.has_report(ReportId::WINNINGS));
     }
 }

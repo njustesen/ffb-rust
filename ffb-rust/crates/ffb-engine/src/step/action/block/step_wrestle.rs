@@ -12,7 +12,9 @@ use ffb_model::enums::{PlayerAction, SkillId, PS_PRONE};
 use ffb_model::enums::PlayerState;
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::model::skill_use::SkillUse;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -121,9 +123,23 @@ impl StepWrestle {
         let skill_num = SkillId::Wrestle as u16;
 
         if using_attacker {
+            // Java: addReport(new ReportSkillUse(actingPlayerId, skill, true, BRING_DOWN_OPPONENT))
+            game.report_list.add(ReportSkillUse::new(
+                Some(player_id.to_string()),
+                SkillId::Wrestle,
+                true,
+                SkillUse::BRING_DOWN_OPPONENT,
+            ));
             events.push(GameEvent::SkillUse { player_id: player_id.to_string(), skill_id: skill_num, used: true });
         } else if using_defender {
             if let Some(did) = &defender_id {
+                // Java: addReport(new ReportSkillUse(defenderId, skill, true, BRING_DOWN_OPPONENT))
+                game.report_list.add(ReportSkillUse::new(
+                    Some(did.clone()),
+                    SkillId::Wrestle,
+                    true,
+                    SkillUse::BRING_DOWN_OPPONENT,
+                ));
                 events.push(GameEvent::SkillUse { player_id: did.clone(), skill_id: skill_num, used: true });
             }
         } else {
@@ -277,6 +293,32 @@ mod tests {
         step.using_wrestle_defender = Some(false);
         let outcome = step.start(&mut game, &mut GameRng::new(0));
         assert!(outcome.events.iter().any(|e| matches!(e, GameEvent::SkillUse { used: true, .. })));
+    }
+
+    #[test]
+    fn attacker_uses_wrestle_adds_skill_use_report() {
+        let mut game = make_game(vec![SkillId::Wrestle], vec![]);
+        let mut step = StepWrestle::new();
+        step.using_wrestle_attacker = Some(true);
+        step.using_wrestle_defender = Some(false);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE),
+            "attacker using Wrestle should add ReportSkillUse"
+        );
+    }
+
+    #[test]
+    fn defender_uses_wrestle_adds_skill_use_report() {
+        let mut game = make_game(vec![], vec![SkillId::Wrestle]);
+        let mut step = StepWrestle::new();
+        step.using_wrestle_attacker = Some(false);
+        step.using_wrestle_defender = Some(true);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE),
+            "defender using Wrestle should add ReportSkillUse"
+        );
     }
 
     #[test]

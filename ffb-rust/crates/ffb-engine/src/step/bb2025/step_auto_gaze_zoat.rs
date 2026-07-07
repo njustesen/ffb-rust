@@ -140,4 +140,23 @@ mod tests {
         assert!(step.set_parameter(&StepParameter::EndPlayerAction(true)));
         assert!(step.end_player_action);
     }
+
+    #[test]
+    fn report_skill_use_not_added_by_stub() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepAutoGazeZoat::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::SKILL_USE));
+    }
+
+    #[test]
+    fn report_skill_use_not_added_on_select_player() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepAutoGazeZoat::new();
+        let action = Action::SelectPlayer { player_id: "p1".into() };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::SKILL_USE));
+    }
 }

@@ -1,6 +1,7 @@
-use ffb_model::enums::{PlayerAction, ReRollSource};
+use ffb_model::enums::{PlayerAction, ReRollSource, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::report::mixed::report_hypnotic_gaze_roll::ReportHypnoticGazeRoll;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -98,10 +99,26 @@ impl StepHypnoticGaze {
         let mut goto_end_label = true;
 
         if do_gaze {
-            // Java: actingPlayer.markSkillUsed(gazeSkill) — deferred
+            // Java: actingPlayer.markSkillUsed(gazeSkill.get())
+            if let Some(pid) = acting_player_id.as_deref() {
+                if let Some(p) = game.team_home.player_mut(pid).or_else(|| game.team_away.player_mut(pid)) {
+                    p.used_skills.insert(SkillId::HypnoticGaze);
+                }
+            }
 
             let roll = rng.d6();
             let successful = is_skill_roll_successful(roll, MINIMUM_ROLL_HYPNOTIC_GAZE);
+
+            let re_rolled = self.re_rolled_action.as_deref() == Some("HYPNOTIC_GAZE")
+                && self.re_roll_source.is_some();
+            game.report_list.add(ReportHypnoticGazeRoll::new(
+                acting_player_id.clone(),
+                successful,
+                roll,
+                MINIMUM_ROLL_HYPNOTIC_GAZE,
+                re_rolled,
+                defender_id.clone(),
+            ));
 
             if successful {
                 // Java: if !confused && !hypnotized → changeHypnotized(true)
@@ -265,5 +282,51 @@ mod tests {
         let mut step = StepHypnoticGaze::new("old".into());
         assert!(step.set_parameter(&StepParameter::GotoLabelOnEnd("new".into())));
         assert_eq!(step.goto_label_on_end, "new");
+    }
+
+    #[test]
+    fn gaze_adds_hypnotic_gaze_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut attacker = Player::default();
+        attacker.id = "a1".into();
+        attacker.starting_skills.push(SkillWithValue::new(SkillId::HypnoticGaze));
+        game.team_home.players.push(attacker);
+        game.field_model.set_player_coordinate("a1", FieldCoordinate::new(5, 5));
+        let mut defender = Player::default();
+        defender.id = "d1".into();
+        game.team_away.players.push(defender);
+        game.field_model.set_player_coordinate("d1", FieldCoordinate::new(6, 5));
+        game.home_playing = true;
+        game.acting_player.player_id = Some("a1".into());
+        game.acting_player.player_action = Some(PlayerAction::Gaze);
+        game.defender_id = Some("d1".into());
+        game.turn_data_home.rerolls = 0;
+        let mut step = StepHypnoticGaze::new("end".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::HYPNOTIC_GAZE_ROLL), "ReportHypnoticGazeRoll must be added");
+    }
+
+    #[test]
+    fn gaze_marks_hypnotic_gaze_skill_used() {
+        let mut game = make_game();
+        let mut attacker = Player::default();
+        attacker.id = "a1".into();
+        attacker.starting_skills.push(SkillWithValue::new(SkillId::HypnoticGaze));
+        game.team_home.players.push(attacker);
+        game.field_model.set_player_coordinate("a1", FieldCoordinate::new(5, 5));
+        let mut defender = Player::default();
+        defender.id = "d1".into();
+        game.team_away.players.push(defender);
+        game.field_model.set_player_coordinate("d1", FieldCoordinate::new(6, 5));
+        game.home_playing = true;
+        game.acting_player.player_id = Some("a1".into());
+        game.acting_player.player_action = Some(PlayerAction::Gaze);
+        game.defender_id = Some("d1".into());
+        game.turn_data_home.rerolls = 0;
+        let mut step = StepHypnoticGaze::new("end".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        let used = game.team_home.player("a1").map(|p| p.used_skills.contains(&SkillId::HypnoticGaze)).unwrap_or(false);
+        assert!(used, "HypnoticGaze skill must be marked as used");
     }
 }

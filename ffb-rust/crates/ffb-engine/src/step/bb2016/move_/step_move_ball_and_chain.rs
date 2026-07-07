@@ -1,5 +1,7 @@
 use ffb_model::enums::Direction;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::report::report_id::ReportId;
+use ffb_model::report::report_scatter_player::ReportScatterPlayer;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -98,13 +100,26 @@ impl StepMoveBallAndChain {
 
         // Java: ThrowInMechanic.scatter(coordinateFrom, directionRoll) → coordinateTo
         // Roll D8, map to scatter direction, step one square.
-        let coordinate_to = if let Some(pre_set) = self.coordinate_to {
-            pre_set
+        let (coordinate_to, scatter_direction, scatter_roll) = if let Some(pre_set) = self.coordinate_to {
+            (pre_set, None, None)
         } else {
             let roll = rng.d8();
             let direction = Direction::for_roll(roll).unwrap_or(Direction::North);
-            coordinate_from.step(direction, 1)
+            (coordinate_from.step(direction, 1), Some(direction), Some(roll))
         };
+
+        // Java: getResult().addReport(new ReportScatterPlayer(coordinateFrom, coordinateTo, directions, false))
+        {
+            let dirs = scatter_direction.map(|d| vec![d]).unwrap_or_default();
+            let rolls = scatter_roll.map(|r| vec![r]).unwrap_or_default();
+            game.report_list.add(ReportScatterPlayer::new(
+                coordinate_from,
+                coordinate_to,
+                dirs,
+                rolls,
+                Some(false),
+            ));
+        }
 
         // Check if out of bounds
         if !FieldCoordinateBounds::FIELD.is_in_bounds(coordinate_to) {
@@ -138,6 +153,7 @@ mod tests {
     use ffb_model::enums::Rules;
     use ffb_model::model::player::Player;
     use ffb_model::enums::{PlayerType, PlayerGender};
+    use ffb_model::report::report_id::ReportId;
     use ffb_model::types::FieldCoordinate;
     use ffb_model::util::rng::GameRng;
     use std::collections::HashSet;
@@ -277,6 +293,33 @@ mod tests {
         step.coordinate_from = None;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn scatter_player_report_added_with_preset_coordinate() {
+        let mut game = make_game();
+        let from = FieldCoordinate::new(5, 5);
+        let to = FieldCoordinate::new(6, 5);
+        add_ball_and_chain_player(&mut game, "carrier", from);
+        let mut step = StepMoveBallAndChain::new("end".into(), "fall".into());
+        step.coordinate_from = Some(from);
+        step.coordinate_to = Some(to);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SCATTER_PLAYER),
+            "should have SCATTER_PLAYER report when ball-and-chain player moves");
+    }
+
+    #[test]
+    fn scatter_player_report_added_without_preset_coordinate() {
+        let mut game = make_game();
+        let from = FieldCoordinate::new(12, 6);
+        add_ball_and_chain_player(&mut game, "carrier", from);
+        let mut step = StepMoveBallAndChain::new("end".into(), "fall".into());
+        step.coordinate_from = Some(from);
+        step.coordinate_to = None;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SCATTER_PLAYER),
+            "SCATTER_PLAYER report should be added when D8 scatter is rolled");
     }
 
     #[test]

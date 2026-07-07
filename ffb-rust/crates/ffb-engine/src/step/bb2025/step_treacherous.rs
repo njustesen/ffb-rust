@@ -9,6 +9,10 @@
 /// Full InjuryTypeStab mechanics not yet translated.
 use ffb_model::enums::{ApothecaryMode, SkillId, PlayerAction, PS_PRONE};
 use ffb_model::model::game::Game;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::mixed::report_skill_wasted::ReportSkillWasted;
+use ffb_model::report::report_id::ReportId;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
 use ffb_mechanics::mechanics::armor_broken;
 use crate::action::Action;
@@ -81,6 +85,8 @@ impl StepTreacherous {
 
         // Java: if (endTurn || endPlayerAction) → ReportSkillWasted + GOTO_LABEL + markSkillUsed
         if self.end_turn || self.end_player_action {
+            // Java: getResult().addReport(new ReportSkillWasted(actingPlayer.getPlayerId(), skill))
+            game.report_list.add(ReportSkillWasted::new(Some(player_id.clone()), Some(SkillId::Treacherous)));
             Self::mark_skill_used(game, &player_id);
             return StepOutcome::goto(&self.goto_label_on_failure);
         }
@@ -101,6 +107,8 @@ impl StepTreacherous {
                 if let Some(ac) = actor_coord {
                     game.field_model.ball_coordinate = Some(ac);
                 }
+                // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, SkillUse.TREACHEROUS))
+                game.report_list.add(ReportSkillUse::new(Some(player_id.clone()), SkillId::Treacherous, true, SkillUse::TREACHEROUS));
 
                 // Java: UtilServerInjury.handleInjury — InjuryTypeStab bypasses armor, rolls injury
                 // Simplified: create InjuryResult with armor broken and injury dice rolled
@@ -296,5 +304,31 @@ mod tests {
         assert!(step.set_parameter(&StepParameter::EndTurn(true)));
         assert!(step.set_parameter(&StepParameter::EndPlayerAction(true)));
         assert!(!step.set_parameter(&StepParameter::NrOfDice(2)));
+    }
+
+    #[test]
+    fn end_turn_adds_skill_wasted_report() {
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, _) = make_game_with_treacherous();
+        let mut step = StepTreacherous::new();
+        step.goto_label_on_failure = "FAIL".into();
+        step.end_turn = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_WASTED));
+    }
+
+    #[test]
+    fn target_with_ball_adds_skill_use_treacherous_report() {
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, _) = make_game_with_treacherous();
+        let mate_id = "mate".to_string();
+        game.team_home.players.push(make_player(&mate_id, None));
+        let adj = FieldCoordinate::new(11, 7);
+        game.field_model.set_player_coordinate(&mate_id, adj);
+        game.field_model.set_player_state(&mate_id, PlayerState::new(PS_STANDING).change_active(true));
+        game.field_model.ball_coordinate = Some(adj);
+        let mut step = StepTreacherous::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_USE));
     }
 }

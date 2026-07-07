@@ -15,6 +15,7 @@ use ffb_model::model::kick_team_mate_range::KickTeamMateRange;
 use ffb_model::enums::PlayerState;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::bb2016::report_kick_team_mate_roll::ReportKickTeamMateRoll;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -119,6 +120,17 @@ impl StepKickTeamMate {
             game.pass_coordinate = Some(target);
         }
 
+        // Java: getResult().addReport(new ReportKickTeamMateRoll(kicker.getId(), kickedPlayer.getId(), successful, fRolls, reRolled, fDistance))
+        // reRolled is always false here (reroll stub not yet ported).
+        game.report_list.add(ReportKickTeamMateRoll::new(
+            kicker_id.clone(),
+            kicked_id.clone(),
+            successful,
+            self.rolls.clone(),
+            false,
+            self.distance,
+        ));
+
         self.execute_kick(game, kicked_coord, kicker_coord, successful)
     }
 
@@ -158,6 +170,7 @@ mod tests {
     use crate::step::framework::test_team;
     use crate::step::framework::{StepAction, StepParameter};
     use ffb_model::enums::{PlayerState, Rules, PS_STANDING};
+    use ffb_model::report::report_id::ReportId;
     use ffb_model::types::FieldCoordinate;
 
     fn make_game_with_players() -> (Game, String, String) {
@@ -262,5 +275,31 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("fail"));
+    }
+
+    #[test]
+    fn successful_kick_adds_kick_team_mate_roll_report() {
+        let (mut game, _, kicked_id) = make_game_with_players();
+        let mut step = make_step(&kicked_id);
+        step.num_dice = 1;
+        step.start(&mut game, &mut GameRng::new(42));
+        assert!(game.report_list.has_report(ReportId::KICK_TEAM_MATE_ROLL));
+    }
+
+    #[test]
+    fn failed_kick_still_adds_kick_team_mate_roll_report() {
+        let (mut game, _, kicked_id) = make_game_with_players();
+        let mut step = make_step(&kicked_id);
+        // Force failure via execute_step with pre-seeded rolls that produce a double.
+        // We set num_dice=2 and call start; regardless of success/failure the report
+        // is always emitted (Java line 167 fires before the reroll/act branch).
+        // execute_kick with successful=false is called after addReport, so we test
+        // start() with num_dice=2 — report must be present even on goto outcome.
+        step.num_dice = 2;
+        step.rolls = vec![3, 3]; // pre-loaded to guarantee a double on the logic path
+        // Call execute_step path via start; rolls will be overwritten by RNG, but
+        // the report is always added before execute_kick. Verify presence regardless.
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::KICK_TEAM_MATE_ROLL));
     }
 }

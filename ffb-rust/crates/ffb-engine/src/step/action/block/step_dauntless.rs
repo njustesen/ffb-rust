@@ -9,6 +9,7 @@ use ffb_model::enums::{ReRollSource, SkillId};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_dauntless_roll::ReportDauntlessRoll;
 use ffb_mechanics::mechanics::minimum_roll_dauntless;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -144,6 +145,17 @@ impl StepDauntless {
             roll,
             success,
         };
+
+        // Java: step.getResult().addReport(new ReportDauntlessRoll(...))
+        game.report_list.add(ReportDauntlessRoll::new(
+            Some(player_id.clone()),
+            success,
+            roll,
+            min_roll,
+            re_rolled,
+            defender_st,
+            game.defender_id.clone(),
+        ));
 
         if success {
             StepOutcome::next()
@@ -355,6 +367,28 @@ mod tests {
         assert_eq!(out.action, StepAction::Continue, "TRR available → offer re-roll");
         assert!(out.prompt.is_some());
         assert_eq!(step.re_rolled_action.as_deref(), Some("DAUNTLESS"));
+    }
+
+    #[test]
+    fn successful_roll_adds_dauntless_roll_report() {
+        let seed = seed_for_d6(5);
+        let mut game = make_game(2, vec![SkillId::Dauntless], 4);
+        StepDauntless::new().start(&mut game, &mut GameRng::new(seed));
+        assert!(
+            game.report_list.has_report(ffb_model::report::report_id::ReportId::DAUNTLESS_ROLL),
+            "successful roll should add ReportDauntlessRoll"
+        );
+    }
+
+    #[test]
+    fn failed_roll_adds_dauntless_roll_report() {
+        let seed = seed_for_d6(1);
+        let mut game = make_game(2, vec![SkillId::Dauntless], 4);
+        StepDauntless::new().start(&mut game, &mut GameRng::new(seed));
+        assert!(
+            game.report_list.has_report(ffb_model::report::report_id::ReportId::DAUNTLESS_ROLL),
+            "failed roll should add ReportDauntlessRoll"
+        );
     }
 
     #[test]

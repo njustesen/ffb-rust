@@ -19,6 +19,11 @@ use crate::step::generator::common::SpikedBallApo;
 use ffb_model::option::game_option_id;
 use crate::step::util_server_catch_scatter_throw_in::UtilServerCatchScatterThrowIn;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use ffb_model::report::report_catch_roll::ReportCatchRoll;
+use ffb_model::report::report_scatter_ball::ReportScatterBall;
+use ffb_model::report::report_throw_in::ReportThrowIn;
+use ffb_model::report::report_skill_use::ReportSkillUse;
+use ffb_model::model::skill_use::SkillUse;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2020.shared.StepCatchScatterThrowIn.
 ///
@@ -532,6 +537,7 @@ impl StepCatchScatterThrowIn {
             from: ball_coord_start,
             directions: vec![roll],
         });
+        game.report_list.add(ReportScatterBall::new(vec![direction], vec![roll], false));
 
         game.field_model.ball_coordinate = Some(ball_coord_end);
         game.field_model.ball_moving = true;
@@ -569,6 +575,7 @@ impl StepCatchScatterThrowIn {
 
         let mut last_valid = game.field_model.ball_coordinate.unwrap_or(FieldCoordinate::new(0, 0));
         let mut rolls = Vec::new();
+        let mut directions: Vec<Direction> = Vec::new();
         let mut in_bounds = true;
 
         while in_bounds && rolls.len() < 3 {
@@ -578,6 +585,7 @@ impl StepCatchScatterThrowIn {
             if self.scatter_bounds.is_in_bounds(next) {
                 last_valid = next;
                 rolls.push(roll);
+                directions.push(direction);
             } else {
                 in_bounds = false;
             }
@@ -587,6 +595,7 @@ impl StepCatchScatterThrowIn {
             from: game.field_model.ball_coordinate.unwrap_or(FieldCoordinate::new(0, 0)),
             directions: rolls.clone(),
         });
+        game.report_list.add(ReportScatterBall::new(directions, rolls.clone(), false));
 
         game.field_model.ball_coordinate = Some(last_valid);
         game.field_model.ball_moving = true;
@@ -616,6 +625,7 @@ impl StepCatchScatterThrowIn {
 
         let mut last_valid = game.field_model.bomb_coordinate.unwrap_or(FieldCoordinate::new(0, 0));
         let mut rolls = Vec::new();
+        let mut directions: Vec<Direction> = Vec::new();
         let mut in_bounds = true;
 
         while in_bounds && rolls.len() < 3 {
@@ -625,6 +635,7 @@ impl StepCatchScatterThrowIn {
             if self.scatter_bounds.is_in_bounds(next) {
                 last_valid = next;
                 rolls.push(roll);
+                directions.push(direction);
             } else {
                 in_bounds = false;
             }
@@ -634,6 +645,7 @@ impl StepCatchScatterThrowIn {
             from: game.field_model.bomb_coordinate.unwrap_or(FieldCoordinate::new(0, 0)),
             directions: rolls.clone(),
         });
+        game.report_list.add(ReportScatterBall::new(directions, rolls.clone(), false));
 
         game.field_model.bomb_coordinate = Some(last_valid);
         game.field_model.bomb_moving = true;
@@ -684,6 +696,7 @@ impl StepCatchScatterThrowIn {
             direction: direction_roll,
             distance,
         });
+        game.report_list.add(ReportThrowIn::new(direction, direction_roll, vec![d1, d2]));
 
         game.field_model.ball_moving = true;
 
@@ -753,6 +766,12 @@ impl StepCatchScatterThrowIn {
                         skill_id: SkillId::DivingCatch as u16,
                         used: true,
                     });
+                    game.report_list.add(ReportSkillUse::new(
+                        Some(cid.clone()),
+                        SkillId::DivingCatch,
+                        true,
+                        ffb_model::model::skill_use::SkillUse::CATCH_BALL,
+                    ));
                 }
                 let mode = self.catch_ball(game, rng);
                 let current_mode = self.catch_scatter_throw_in_mode;
@@ -845,6 +864,15 @@ impl StepCatchScatterThrowIn {
                 success: successful,
                 rerolled: rerolled || self.evaluate,
             });
+            game.report_list.add(ReportCatchRoll::new(
+                Some(cid.clone()),
+                successful,
+                self.roll,
+                min_roll,
+                rerolled || self.evaluate,
+                vec![],
+                mode.is_bomb(),
+            ));
             self.evaluate = false;
 
             if successful {
@@ -1082,6 +1110,36 @@ mod tests {
         let _out = step.start(&mut game, &mut GameRng::new(0));
         assert_ne!(step.catch_scatter_throw_in_mode,
             Some(CatchScatterThrowInMode::FailedDeflectionConversion));
+    }
+
+    #[test]
+    fn catch_ball_adds_catch_roll_report() {
+        let mut game = make_game();
+        let coord = FieldCoordinate::new(12, 7);
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = true;
+        let player = make_player("h1", 4);
+        game.team_home.players.push(player);
+        game.field_model.set_player_coordinate("h1", coord);
+        game.field_model.set_player_state("h1", PlayerState::new(PS_STANDING));
+        let mut step = StepCatchScatterThrowIn::new();
+        step.catch_scatter_throw_in_mode = Some(CatchScatterThrowInMode::CatchScatter);
+        step.catcher_id = Some("h1".into());
+        step.start(&mut game, &mut GameRng::new(99));
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::CATCH_ROLL));
+    }
+
+    #[test]
+    fn bounce_ball_adds_scatter_ball_report() {
+        let mut game = make_game();
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(12, 7));
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = true;
+        let mut step = StepCatchScatterThrowIn::new();
+        step.catch_scatter_throw_in_mode = Some(CatchScatterThrowInMode::ScatterBall);
+        step.start(&mut game, &mut GameRng::new(1));
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SCATTER_BALL));
     }
 
     // ── terminal path ────────────────────────────────────────────────────────────

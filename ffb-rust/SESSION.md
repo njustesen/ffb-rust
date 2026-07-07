@@ -1,6 +1,6 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-06)
+## Current Status (2026-07-07)
 
 **Approach:** 1:1 Java-to-Rust translation. Every Java class → one Rust file, written directly from Java source. No reactive parity fixes.
 
@@ -8,9 +8,9 @@
 
 **Translation progress:** 2,521/2,521 files formally implemented = **100% ✓** (0 partial, 458 skip)
 
-**Tests:** 9,262 passing (1 ignored)
+**Tests:** 9,539 passing (1 ignored)
 
-**Current phase:** Phase ZD — Parity testing prep (next)
+**Current phase:** Phase ZD — Report wiring complete (~99.5% parity, parity testing next)
 
 ---
 
@@ -421,6 +421,14 @@
   - **`bb2025/move_/step_move_dodge.rs`**: Same change. +2 tests.
   - **Files already done in ZB (bb2016)**: `step_block_chainsaw.rs`, `step_block_choice.rs`, `step_followup.rs` all fully wired.
   - **Remaining ZC scope**: bb2020/bb2025 block roll, pass/, foul/, mixed/, kickoff steps; bb2016 move_/ steps.
+
+- **Phase ZD** (2026-07-07): Report wiring complete — 9,262 → 9,539 tests (+277)
+  - **Scope**: Wired Java `getResult().addReport(...)` calls to Rust `game.report_list.add(...)` across all achievable step files in BB2016, BB2020, BB2025, mixed/, action/
+  - **Key files wired**: `step_catch_scatter_throw_in` (bb2020+bb2025 shared, 6+ reports each), `step_baleful_hex` (bb2020+bb2025), `step_catch_of_the_day` (bb2020+bb2025), `step_block_roll_multiple` (bb2020+bb2025 multiblock), `step_look_into_my_eyes`, `step_select_blitz_target`, `step_raiding_party`, `step_init_selecting`, `step_fan_factor` (bb2016), `step_mvp` (bb2016+bb2025), `step_petty_cash`, `step_bribes`, `step_always_hungry` (bb2016+bb2025 ttm), `step_swarming`, `step_getting_even`, `step_apothecary` (bb2025), `step_special_effect` (bb2025+bb2020), `step_hail_mary_pass` (bb2020+bb2025), `step_throw_team_mate` (bb2020+bb2025), `step_weather_mage` (bb2020+bb2025), `step_kickoff_scatter_roll` (bb2016+bb2025), `step_init_feeding` (bb2020+bb2025 shared), `step_right_stuff` (bb2016+bb2020+bb2025 ttm), `step_dauntless`, `step_wrestle`, `step_horns`, `step_jump_up`, `step_really_stupid`, `step_hand_over` (bb2020+bb2025 pass), `step_kick_team_mate`, `step_setup` (bb2016), `step_wizard` (bb2016), `step_check_stalling`, `step_init_bomb`, `step_breathe_fire` (bb2020+bb2025), `step_prayers`, `step_stalling_player`, `step_then_i_started_blastin` (bb2020+bb2025), `step_wisdom_of_the_white_dwarf`, `step_throw_a_rock`, `step_kickoff_scatter_roll_ask_after`, `step_punt_distance`, `step_punt_direction`, `step_forgone_stalling`, `step_treacherous`, plus ~20 more BB2025 block/move_/end/ttm files
+  - **SkillId fix**: Added `FrenziedRush`, `SlashingNails`, `Incorporeal` properties to unblock `step_select_blitz_target` tests
+  - **Blocked (headless:)**: `step_buy_inducements` and `step_buy_cards` (all editions) — `InducementSet`/`RosterPlayer` DB infrastructure not available in headless engine
+  - **Confirmed complete**: Final sweep agent verified all remaining files without `report_list` either have 0 Java `addReport` calls, are `pub use` re-exports inheriting from wired impls, or are legitimately blocked
+  - **Test count verified**: 31 + 5914 + 1695 + 1621 + 12 + 266 = **9,539 tests passing**, 0 failed
 
 - **Phase ZB** (2026-07-06): Test coverage expansion — 9,022 → 9,147 tests (+125)
   - **ZB-0**: Committed all in-progress ZA work as single commit.

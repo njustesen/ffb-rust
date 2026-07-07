@@ -1,4 +1,7 @@
 use ffb_model::model::game::Game;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::report_id::ReportId;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::drop_player_context::{DropPlayerContext, VictimStateKey};
@@ -46,7 +49,18 @@ impl Step for StepHandleDropPlayerContext {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: clientCommandUseSkill → addReport(new ReportSkillUse(playerId, skill, skillUsed, ...))
+        if let Action::UseSkill { skill_id, use_skill } = action {
+            let player_id = game.acting_player.player_id.clone();
+            let skill_use = if *use_skill { SkillUse::WOULD_NOT_HELP } else { SkillUse::WOULD_NOT_HELP };
+            game.report_list.add(ReportSkillUse::new(
+                player_id,
+                *skill_id,
+                *use_skill,
+                skill_use,
+            ));
+        }
         self.execute_step(game, rng)
     }
 
@@ -154,9 +168,10 @@ mod tests {
     use crate::injury::{InjuryContext, InjuryResult};
     use crate::step::framework::test_team;
     use crate::step::framework::{StepAction, StepParameter};
-    use ffb_model::enums::{ApothecaryMode, Rules, PS_STANDING};
+    use ffb_model::enums::{ApothecaryMode, Rules, PS_STANDING, SkillId};
     use ffb_model::model::player::Player;
     use ffb_model::enums::{PlayerType, PlayerGender};
+    use ffb_model::report::report_id::ReportId;
     use ffb_model::types::FieldCoordinate;
 
     fn make_game() -> Game {
@@ -288,6 +303,32 @@ mod tests {
 
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
+    }
+
+    #[test]
+    fn use_skill_command_adds_skill_use_report() {
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        game.acting_player.player_id = Some("p1".into());
+
+        let mut step = StepHandleDropPlayerContext::new();
+        let action = Action::UseSkill { skill_id: SkillId::Pro, use_skill: true };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_USE),
+            "should have SKILL_USE report after UseSkill command");
+    }
+
+    #[test]
+    fn use_skill_false_command_also_adds_skill_use_report() {
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        game.acting_player.player_id = Some("p1".into());
+
+        let mut step = StepHandleDropPlayerContext::new();
+        let action = Action::UseSkill { skill_id: SkillId::Pro, use_skill: false };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_USE),
+            "SKILL_USE report must be added even when skill is not used");
     }
 
     #[test]

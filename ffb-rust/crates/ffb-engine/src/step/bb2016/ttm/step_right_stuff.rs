@@ -16,6 +16,7 @@
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::{PS_FALLING, ApothecaryMode, ReRollSource};
+use ffb_model::report::report_right_stuff_roll::ReportRightStuffRoll;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::CatchScatterThrowInMode;
@@ -139,6 +140,17 @@ impl StepRightStuff {
             self.roll = rng.d6();
         }
         let successful = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
+
+        // Java: getResult().addReport(new ReportRightStuffRoll(fThrownPlayerId, successful, roll, minimumRoll, reRolled, rightStuffModifiers.toArray(...)))
+        let re_rolled = already_rerolled && self.re_roll_state.re_roll_source.is_some();
+        game.report_list.add(ReportRightStuffRoll::new(
+            Some(player_id.clone()),
+            successful,
+            self.roll,
+            minimum_roll,
+            re_rolled,
+            vec![],
+        ));
 
         if successful {
             let mut out = StepOutcome::next()
@@ -332,5 +344,56 @@ mod tests {
         step.ktm_range = Some(KickTeamMateRange::LONG);
         let out = step.start(&mut game, &mut GameRng::new(42));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::ThrownPlayerCoordinate(None))));
+    }
+
+    #[test]
+    fn report_right_stuff_roll_added_on_roll() {
+        // Java: StepRightStuff adds ReportRightStuffRoll after rolling.
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerGender, PlayerType, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let p = Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 6, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        };
+        game.team_home.players.push(p);
+        let mut step = StepRightStuff::new();
+        step.thrown_player_id = Some("p1".into());
+        let _out = step.start(&mut game, &mut GameRng::new(5)); // roll=6 → success for agility 6
+        assert!(game.report_list.has_report(ReportId::RIGHT_STUFF_ROLL),
+            "RIGHT_STUFF_ROLL report should be added when rolling");
+    }
+
+    #[test]
+    fn report_right_stuff_roll_added_on_failure() {
+        // Java: ReportRightStuffRoll is also added on failure rolls.
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerGender, PlayerType, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let p = Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 1, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        };
+        game.team_home.players.push(p);
+        let mut step = StepRightStuff::new();
+        step.thrown_player_id = Some("p1".into());
+        step.roll = 1; // Force failure: agility 1 needs 6+, roll 1 fails
+        let _out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::RIGHT_STUFF_ROLL),
+            "RIGHT_STUFF_ROLL report should be added even on failure");
     }
 }

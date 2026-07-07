@@ -1,5 +1,7 @@
 use ffb_model::enums::{PlayerAction, PlayerState, PS_BLOCKED, PS_MOVING, PS_STANDING, TurnMode};
 use ffb_model::model::game::Game;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::prompts::AgentPrompt;
 use ffb_model::util::rng::GameRng;
@@ -113,6 +115,8 @@ impl Step for StepEndBlocking {
                     }
                     _ => {
                         // Java: canAddBlockDie — update dice decorations
+                        // Java: getResult().addReport(new ReportSkillUse(commandUseSkill.getSkill(), true, SkillUse.ADD_BLOCK_DIE))
+                        game.report_list.add(ReportSkillUse::new(None, *skill_id, true, SkillUse::ADD_BLOCK_DIE));
                         ServerUtilBlock::update_dice_decorations_with_frenzy(game, true);
                     }
                 }
@@ -1042,5 +1046,36 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!out.pushes.is_empty(), "expected PileDriver sequence to be pushed");
         assert_eq!(out.pushes[0][0].step_id, StepId::PileDriver);
+    }
+
+    #[test]
+    fn use_skill_for_add_block_die_adds_skill_use_report() {
+        use ffb_model::report::report_id::ReportId;
+        use crate::action::Action;
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        let mut step = StepEndBlocking::new();
+        step.end_player_action = true;
+        let out = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Frenzy, use_skill: true },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert!(game.report_list.has_report(ReportId::SKILL_USE), "add block die UseSkill should add ReportSkillUse");
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn use_skill_for_hit_and_run_does_not_add_block_die_report() {
+        use ffb_model::report::report_id::ReportId;
+        use crate::action::Action;
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        let mut step = StepEndBlocking::new();
+        step.end_player_action = true;
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::HitAndRun, use_skill: true },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert!(!game.report_list.has_report(ReportId::SKILL_USE), "HitAndRun UseSkill should NOT add ADD_BLOCK_DIE report");
     }
 }

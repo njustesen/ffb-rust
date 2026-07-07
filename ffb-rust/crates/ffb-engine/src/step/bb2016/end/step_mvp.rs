@@ -12,6 +12,7 @@
 /// client-only: MVP dialog (DialogPlayerChoiceParameter) — headless auto-selects MVP without dialog.
 use ffb_model::enums::SendToBoxReason;
 use ffb_model::model::game::Game;
+use ffb_model::report::report_most_valuable_players::ReportMostValuablePlayers;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::mechanic::spp_calc::SppCalc;
@@ -117,6 +118,20 @@ impl StepMvp {
                 self.away_players_mvp.push(mvp_id);
             }
             self.nr_of_away_choices += 1;
+        }
+        // Java: if (fHomePlayersMvp.size() >= fNrOfHomeMvps || fAwayPlayersMvp.size() >= fNrOfAwayMvps)
+        //         addReport(new ReportMostValuablePlayers(...))
+        // Note: when no eligible players exist, fNrOfHomeMvps/Away is set to 0 by Java; treat
+        // nr_of_choices >= nr_of_mvps (including 0-mvp case) as "done".
+        let home_done = self.nr_of_home_choices >= self.nr_of_home_mvps
+            || self.home_players_mvp.len() >= self.nr_of_home_mvps as usize;
+        let away_done = self.nr_of_away_choices >= self.nr_of_away_mvps
+            || self.away_players_mvp.len() >= self.nr_of_away_mvps as usize;
+        if home_done || away_done {
+            game.report_list.add(ReportMostValuablePlayers::new(
+                self.home_players_mvp.clone(),
+                self.away_players_mvp.clone(),
+            ));
         }
         StepOutcome::next()
     }
@@ -230,6 +245,49 @@ mod tests {
         assert!(pr.mvp);
         assert_eq!(pr.player_awards, 1);
         assert_eq!(pr.spp_gained, 5); // SppCalc::mvp_spp(Rules::Bb2016) = 5
+    }
+
+    #[test]
+    fn report_most_valuable_players_added_to_report_list() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepMvp::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::MOST_VALUABLE_PLAYERS),
+            "expected MOST_VALUABLE_PLAYERS in report list");
+    }
+
+    #[test]
+    fn report_contains_home_and_away_mvp_ids() {
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+        use std::collections::HashSet;
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "h1".into(), name: "Home1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.team_away.players.push(Player {
+            id: "a1".into(), name: "Away1".into(), nr: 2, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        let mut step = StepMvp::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        // The report list should have exactly one report.
+        assert_eq!(game.report_list.size(), 1);
+        // The step should have picked one home MVP and one away MVP.
+        assert_eq!(step.home_players_mvp.len(), 1);
+        assert_eq!(step.away_players_mvp.len(), 1);
     }
 
     #[test]

@@ -4,6 +4,7 @@
 /// Java: `rollFanFactor()` → `DiceRoller.rollFanFactor()` → 2D6.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::mixed::report_fan_factor::ReportFanFactor;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -19,6 +20,18 @@ impl StepSpectators {
 
         let fan_roll_away = rng.d6_two();
         game.game_result.away.fan_factor = game.team_away.dedicated_fans + fan_roll_away;
+
+        // Java: getResult().addReport(new ReportFanFactor(teamId, fanRoll, dedicatedFans)) — once per team
+        game.report_list.add(ReportFanFactor::new(
+            fan_roll_home,
+            game.team_home.dedicated_fans,
+            Some(game.team_home.id.clone()),
+        ));
+        game.report_list.add(ReportFanFactor::new(
+            fan_roll_away,
+            game.team_away.dedicated_fans,
+            Some(game.team_away.id.clone()),
+        ));
     }
 }
 
@@ -49,6 +62,7 @@ mod tests {
     use super::*;
     use crate::step::framework::test_team;
     use ffb_model::enums::Rules;
+    use ffb_model::report::report_id::ReportId;
 
     fn make_game(home_fans: i32, away_fans: i32) -> Game {
         let mut home = test_team("home", 0);
@@ -56,6 +70,30 @@ mod tests {
         home.dedicated_fans = home_fans;
         away.dedicated_fans = away_fans;
         Game::new(home, away, Rules::Bb2025)
+    }
+
+    #[test]
+    fn fan_factor_reports_added_for_both_teams() {
+        let mut step = StepSpectators::new();
+        let mut game = make_game(5, 4);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(
+            game.report_list.has_report(ReportId::FAN_FACTOR),
+            "should add at least one ReportFanFactor"
+        );
+    }
+
+    #[test]
+    fn fan_factor_report_count_is_two() {
+        let mut step = StepSpectators::new();
+        let mut game = make_game(3, 2);
+        let mut rng = GameRng::new(42);
+        step.start(&mut game, &mut rng);
+        let count = game.report_list.get_reports().iter()
+            .filter(|r| r.get_id() == ReportId::FAN_FACTOR)
+            .count();
+        assert_eq!(count, 2, "should add exactly two ReportFanFactor (one per team)");
     }
 
     #[test]

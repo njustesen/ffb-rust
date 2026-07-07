@@ -9,7 +9,11 @@
 /// declines re-rolls so the failure path collapses to NEXT_STEP.
 use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
+use ffb_model::model::skill_use::SkillUse;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_skill_use::ReportSkillUse;
+use ffb_model::report::mixed::report_look_into_my_eyes_roll::ReportLookIntoMyEyesRoll;
+use ffb_model::report::mixed::report_skill_wasted::ReportSkillWasted;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -83,6 +87,11 @@ impl StepLookIntoMyEyes {
 
         // Java: if (endTurn || endPlayerAction) → ReportSkillWasted + leave(endPlayerAction, endTurn)
         if self.end_turn || self.end_player_action {
+            // Java: getResult().addReport(new ReportSkillWasted(actingPlayer.getPlayerId(), skill))
+            game.report_list.add(ReportSkillWasted::new(
+                Some(player_id.clone()),
+                Some(SkillId::LookIntoMyEyes),
+            ));
             Self::mark_skill_used(game, &player_id);
             // Stub: cancelPlayerAction + EndPlayerAction sequence not translated → NEXT_STEP
             return StepOutcome::next();
@@ -93,11 +102,26 @@ impl StepLookIntoMyEyes {
             let roll = rng.d6();
             let successful = roll > 1;
 
+            // Java: getResult().addReport(new ReportLookIntoMyEyesRoll(playerId, successful, roll, reRolled))
+            game.report_list.add(ReportLookIntoMyEyesRoll::new(
+                Some(player_id.clone()),
+                successful,
+                roll,
+                2,
+                false, // headless: re-roll never taken
+            ));
+
             if successful {
                 if let Some(player_coord) = game.field_model.player_coordinate(&player_id) {
                     game.field_model.ball_coordinate = Some(player_coord);
                 }
-                // Java: leave(actingPlayer, skill, true, false) — endPlayerAction path
+                // Java: leave(actingPlayer, skill, true, false) — getResult().addReport(new ReportSkillUse(..., true, LOOK_INTO_MY_EYES))
+                game.report_list.add(ReportSkillUse::new(
+                    Some(player_id.clone()),
+                    SkillId::LookIntoMyEyes,
+                    true,
+                    SkillUse::LOOK_INTO_MY_EYES,
+                ));
                 Self::mark_skill_used(game, &player_id);
             } else {
                 // Java: random agent declines re-roll → leave(false, false)
@@ -225,5 +249,30 @@ mod tests {
         assert_eq!(step.goto_on_end, "END");
         assert!(step.set_parameter(&StepParameter::EndTurn(true)));
         assert!(step.set_parameter(&StepParameter::EndPlayerAction(true)));
+    }
+
+    #[test]
+    fn end_turn_adds_skill_wasted_report() {
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, _) = make_game_lime();
+        let mut step = StepLookIntoMyEyes::new();
+        step.end_turn = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_WASTED),
+            "end_turn should add ReportSkillWasted");
+    }
+
+    #[test]
+    fn successful_roll_adds_look_into_my_eyes_roll_report_and_skill_use_report() {
+        use ffb_model::report::report_id::ReportId;
+        let seed = seed_for_d6(4); // > 1 → success
+        let (mut game, _) = make_game_lime();
+        game.defender_id = Some("def".into());
+        let mut step = StepLookIntoMyEyes::new();
+        step.start(&mut game, &mut GameRng::new(seed));
+        assert!(game.report_list.has_report(ReportId::LOOK_INTO_MY_EYES_ROLL),
+            "successful roll should add ReportLookIntoMyEyesRoll");
+        assert!(game.report_list.has_report(ReportId::SKILL_USE),
+            "successful roll should add ReportSkillUse(true, LOOK_INTO_MY_EYES)");
     }
 }

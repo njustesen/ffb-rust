@@ -3,6 +3,9 @@ use ffb_model::enums::{PlayerState, PS_KNOCKED_OUT, PS_RESERVE};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::report::mixed::report_kickoff_sequence_activations_count::ReportKickoffSequenceActivationsCount;
+use ffb_model::report::mixed::report_kickoff_sequence_activations_exhausted::ReportKickoffSequenceActivationsExhausted;
+use ffb_model::report::mixed::report_player_event::ReportPlayerEvent;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_cards::UtilCards;
@@ -105,14 +108,28 @@ impl StepInitFeeding {
             && game.turn_mode == TurnMode::Blitz
             && self.feed_on_player_choice.is_none()
         {
-            if let Some(ref mut bts) = game.blitz_turn_state {
-                if game.acting_player.has_acted || bts.acting_player_was_changed() {
-                    bts.add_activation();
-                    let limit_reached = bts.limit_reached();
-                    let no_players_left = !bts.available_players_left();
-                    if limit_reached || no_players_left {
-                        self.end_turn = true;
+            let activation_report: Option<(i32, i32, i32, bool, bool)> =
+                if let Some(ref mut bts) = game.blitz_turn_state {
+                    if game.acting_player.has_acted || bts.acting_player_was_changed() {
+                        bts.add_activation();
+                        let lr = bts.limit_reached();
+                        let npl = !bts.available_players_left();
+                        if lr || npl {
+                            self.end_turn = true;
+                        }
+                        Some((bts.get_amount(), bts.get_available(), bts.get_limit(), lr, npl))
+                    } else {
+                        None
                     }
+                } else {
+                    None
+                };
+            if let Some((amount, available, limit, lr, npl)) = activation_report {
+                game.report_list.add(ReportKickoffSequenceActivationsCount::new(amount, available, limit));
+                if lr {
+                    game.report_list.add(ReportKickoffSequenceActivationsExhausted::new(true));
+                } else if npl {
+                    game.report_list.add(ReportKickoffSequenceActivationsExhausted::new(false));
                 }
             }
         }
@@ -215,6 +232,10 @@ impl StepInitFeeding {
                 if let Some(s) = player_state {
                     game.field_model.set_player_state(&acting_id, s.change_confused(true));
                 }
+                game.report_list.add(ReportPlayerEvent::new(
+                    Some(acting_id.clone()),
+                    Some("failed to bite anyone causing a turnover".to_string()),
+                ));
                 // client-only: SoundId.ROAR
                 outcome = outcome.with_event(GameEvent::BiteSpectator { player_id: acting_id.clone() });
             }
@@ -433,5 +454,38 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
+    }
+
+    #[test]
+    fn bite_spectator_adds_player_event_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepInitFeeding::new();
+        step.goto_label_on_end = Some("lbl".into());
+        step.feeding_allowed = Some(false);
+        let mut game = make_game();
+        let coord = FieldCoordinate::new(5, 5);
+        add_player(&mut game, "vamp", coord, true);
+        game.acting_player.player_id = Some("vamp".into());
+        game.acting_player.suffering_blood_lust = true;
+        let _ = step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PLAYER_EVENT));
+    }
+
+    #[test]
+    fn blitz_turn_activation_adds_activations_count_report() {
+        use ffb_model::model::blitz_turn_state::BlitzTurnState;
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepInitFeeding::new();
+        step.goto_label_on_end = Some("lbl".into());
+        step.feeding_allowed = Some(true);
+        step.end_player_action = true;
+        let mut game = make_game();
+        game.blitz_turn_state = Some(BlitzTurnState::new(2, 2));
+        game.turn_mode = TurnMode::Blitz;
+        game.acting_player.player_id = Some("vamp".into());
+        game.acting_player.suffering_blood_lust = true;
+        game.acting_player.has_acted = true;
+        let _ = step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::KICKOFF_SEQUENCE_ACTIVATIONS_COUNT));
     }
 }

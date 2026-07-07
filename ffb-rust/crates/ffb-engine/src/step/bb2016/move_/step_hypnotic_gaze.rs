@@ -1,6 +1,7 @@
 use ffb_model::enums::{PlayerAction, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::report::bb2016::report_hypnotic_gaze_roll::ReportHypnoticGazeRoll;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_cards::UtilCards;
 use crate::action::Action;
@@ -143,6 +144,16 @@ impl StepHypnoticGaze {
             };
             let minimum_roll = minimum_roll_base_bb2016(agility, modifier_total);
             let successful = DiceInterpreter::is_skill_roll_successful(roll, minimum_roll);
+
+            // Java: getResult().addReport(new ReportHypnoticGazeRoll(actingPlayer.getPlayerId(), successful, roll, minimumRoll, reRolled))
+            game.report_list.add(ReportHypnoticGazeRoll::new(
+                player_id.clone(),
+                successful,
+                roll,
+                minimum_roll,
+                already_rerolled,
+                vec![],
+            ));
 
             if successful {
                 // Java: if (!oldVictimState.isConfused() && !oldVictimState.isHypnotized())
@@ -322,6 +333,29 @@ mod tests {
         game.turn_data_home.rerolls = 0;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.goto_label.as_deref(), Some("end"));
+    }
+
+    // ── report_list: HYPNOTIC_GAZE_ROLL ──────────────────────────────────────
+
+    #[test]
+    fn gaze_roll_adds_hypnotic_gaze_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, mut step) = setup_gaze_game();
+        game.turn_data_home.rerolls = 0;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::HYPNOTIC_GAZE_ROLL),
+            "expected HYPNOTIC_GAZE_ROLL report after gaze roll");
+    }
+
+    #[test]
+    fn gaze_roll_report_not_added_when_no_gaze_skill() {
+        use ffb_model::report::report_id::ReportId;
+        // No gaze skill on player: do_gaze = false, no roll occurs, no report
+        let (mut game, mut step) = setup_gaze_game();
+        game.team_home.player_mut("a1").unwrap().starting_skills.clear();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::HYPNOTIC_GAZE_ROLL),
+            "no HYPNOTIC_GAZE_ROLL report when gaze skill is absent");
     }
 
     #[test]

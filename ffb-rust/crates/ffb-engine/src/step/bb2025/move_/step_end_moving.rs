@@ -2,6 +2,7 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::enums::PlayerAction;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::report::mixed::report_player_event::ReportPlayerEvent;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
 use ffb_mechanics::bb2025::ttm_mechanic::TtmMechanic as Bb2025TtmMechanic;
@@ -165,6 +166,14 @@ impl StepEndMoving {
             .map(|id| UtilPlayer::has_ball(game, id))
             .unwrap_or(false);
         let secure_the_ball_failed = self.end_player_action && tries_to_secure_ball && !has_ball;
+
+        // Java: if (secureTheBallFailed) getResult().addReport(new ReportPlayerEvent(...))
+        if secure_the_ball_failed {
+            game.report_list.add(ReportPlayerEvent::new(
+                game.acting_player.player_id.clone(),
+                Some("could not secure the ball, causing a turnover".into()),
+            ));
+        }
 
         // Java: fEndTurn |= checkTouchdown(gameState) || secureTheBallFailed
         self.end_turn |= check_touchdown(game) || secure_the_ball_failed;
@@ -799,5 +808,34 @@ mod tests {
         step.block_defender_id = Some("def1".into());
         let _out = step.start(&mut game, &mut GameRng::new(0));
         assert!(game.defender_id.is_none(), "defender_id must not be set when player lacks providesBlockAlternative");
+    }
+
+    #[test]
+    fn secure_the_ball_failed_adds_player_event_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        add_player_at(&mut game, true, "p1", FieldCoordinate::new(5, 5));
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::SecureTheBall);
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(10, 5));
+        let mut step = StepEndMoving::new();
+        step.end_player_action = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PLAYER_EVENT), "ReportPlayerEvent must be added when secure_the_ball_failed");
+    }
+
+    #[test]
+    fn no_player_event_report_when_secure_the_ball_succeeds() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        add_player_at(&mut game, true, "p1", FieldCoordinate::new(5, 5));
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::SecureTheBall);
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(5, 5));
+        game.field_model.ball_in_play = true;
+        let mut step = StepEndMoving::new();
+        step.end_player_action = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::PLAYER_EVENT), "no ReportPlayerEvent when player has the ball");
     }
 }

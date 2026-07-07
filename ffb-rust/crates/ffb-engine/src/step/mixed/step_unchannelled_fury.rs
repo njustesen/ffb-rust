@@ -10,6 +10,8 @@
 use ffb_model::enums::{PlayerAction, PS_PRONE, PS_STANDING, ReRollSource, SkillId};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
 use ffb_mechanics::mechanics::minimum_roll_confusion;
 use crate::action::Action;
@@ -62,6 +64,10 @@ impl Step for StepUnchannelledFury {
         match action {
             // Java: CLIENT_USE_SKILL for FuryOfTheBloodGod (skill with canPerformTwoBlocksAfterFailedFury)
             Action::UseSkill { skill_id, use_skill } if *skill_id == SkillId::FuryOfTheBloodGod => {
+                // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(),
+                //         useSkillCommand.getSkill(), useSkillCommand.isSkillUsed(), SkillUse.PERFORM_SECOND_TWO_BLOCKS))
+                let actor_id = game.acting_player.player_id.clone();
+                game.report_list.add(ReportSkillUse::new(actor_id, *skill_id, *use_skill, SkillUse::PERFORM_SECOND_TWO_BLOCKS));
                 self.status = Some(if *use_skill { SkillChoiceStatus::Yes } else { SkillChoiceStatus::No });
             }
             // Java: CLIENT_USE_SKILL for re-roll decline
@@ -443,6 +449,26 @@ mod tests {
         let mut rng = GameRng::new(0);
         step.handle_command(&Action::UseSkill { skill_id: SkillId::FuryOfTheBloodGod, use_skill: true }, &mut game, &mut rng);
         assert_eq!(step.status, Some(SkillChoiceStatus::Yes));
+    }
+
+    #[test]
+    fn skill_use_report_added_when_fury_of_blood_god_used() {
+        let mut game = make_game();
+        let mut step = StepUnchannelledFury::new("fail");
+        let mut rng = GameRng::new(0);
+        game.acting_player.player_id = Some("p1".into());
+        step.handle_command(&Action::UseSkill { skill_id: SkillId::FuryOfTheBloodGod, use_skill: true }, &mut game, &mut rng);
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
+    }
+
+    #[test]
+    fn skill_use_report_added_when_fury_of_blood_god_declined() {
+        let mut game = make_game();
+        let mut step = StepUnchannelledFury::new("fail");
+        let mut rng = GameRng::new(0);
+        game.acting_player.player_id = Some("p1".into());
+        step.handle_command(&Action::UseSkill { skill_id: SkillId::FuryOfTheBloodGod, use_skill: false }, &mut game, &mut rng);
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
     }
 
     #[test]

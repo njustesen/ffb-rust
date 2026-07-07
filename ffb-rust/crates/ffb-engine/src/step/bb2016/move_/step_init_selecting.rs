@@ -558,4 +558,25 @@ mod tests {
         // MOVE via ActivatePlayer → executeStep with no dispatch → cont (waits for CLIENT_MOVE)
         assert_eq!(out.action, StepAction::Continue);
     }
+
+    #[test]
+    fn report_list_empty_after_end_turn() {
+        // Java bb2016 StepInitSelecting has no addReport calls — verify report_list stays empty.
+        let mut game = make_game();
+        let mut step = StepInitSelecting::new("end".into());
+        step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
+        assert!(game.report_list.is_empty(),
+            "bb2016 StepInitSelecting has no addReport calls — report_list should remain empty");
+    }
+
+    #[test]
+    fn end_player_action_param_then_end_turn_publishes_end_turn() {
+        let mut game = make_game();
+        let mut step = StepInitSelecting::new("end".into());
+        step.set_parameter(&StepParameter::EndPlayerAction(true));
+        // EndTurn overrides end_player_action because it's checked first
+        let out = step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
+    }
 }

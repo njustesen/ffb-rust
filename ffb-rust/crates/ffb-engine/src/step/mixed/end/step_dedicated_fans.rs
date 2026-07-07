@@ -4,6 +4,7 @@
 /// Java: uses `score + penaltyScore` for tie-breaking; `penaltyScore` is now in `TeamResult`.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::mixed::report_dedicated_fans::ReportDedicatedFans;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -78,8 +79,20 @@ impl StepDedicatedFans {
 
             game.game_result.home.dedicated_fans_modifier = modifier_home;
             game.game_result.away.dedicated_fans_modifier = modifier_away;
+
+            // Java: getResult().addReport(new ReportDedicatedFans(rollHome, modifierHome, rollAway, modifierAway, concededTeam, concededTeam != null))
+            game.report_list.add(ReportDedicatedFans::new(
+                roll_home,
+                modifier_home,
+                roll_away,
+                modifier_away,
+                conceded_id.clone(),
+                conceded_id.is_some(),
+            ));
+        } else {
+            // If draw (winningTeam == null): Java adds empty ReportDedicatedFans, no modifiers set
+            game.report_list.add(ReportDedicatedFans::new(0, 0, 0, 0, None, false));
         }
-        // If draw (winningTeam == null): Java adds empty ReportDedicatedFans, no modifiers set
 
         StepOutcome::next()
     }
@@ -110,9 +123,39 @@ mod tests {
     use super::*;
     use crate::step::framework::test_team;
     use ffb_model::enums::Rules;
+    use ffb_model::report::report_id::ReportId;
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+    }
+
+    #[test]
+    fn dedicated_fans_report_added_when_winner() {
+        let mut step = StepDedicatedFans::new();
+        let mut game = make_game();
+        game.game_result.home.score = 2;
+        game.game_result.away.score = 0;
+        game.team_home.dedicated_fans = 3;
+        game.team_away.dedicated_fans = 3;
+        let mut rng = GameRng::new(42);
+        step.start(&mut game, &mut rng);
+        assert!(
+            game.report_list.has_report(ReportId::DEDICATED_FANS),
+            "should add ReportDedicatedFans when there is a winner"
+        );
+    }
+
+    #[test]
+    fn dedicated_fans_report_added_on_draw() {
+        let mut step = StepDedicatedFans::new();
+        let mut game = make_game();
+        // Both teams 0-0 → draw
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(
+            game.report_list.has_report(ReportId::DEDICATED_FANS),
+            "should add empty ReportDedicatedFans on draw"
+        );
     }
 
     #[test]

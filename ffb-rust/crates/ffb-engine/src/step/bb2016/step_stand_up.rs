@@ -24,6 +24,7 @@
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2016.StepStandUp`.
 use ffb_model::enums::{PS_PRONE, PlayerAction, PlayerState, ReRollSource};
 use ffb_model::model::game::Game;
+use ffb_model::report::report_stand_up_roll::ReportStandUpRoll;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
@@ -140,6 +141,15 @@ impl StepStandUp {
             .unwrap_or(0);
         let successful = DiceInterpreter::is_stand_up_successful(self.roll, modifier);
 
+        let re_rolled = already_rerolled;
+        game.report_list.add(ReportStandUpRoll::new(
+            game.acting_player.player_id.clone(),
+            successful,
+            self.roll,
+            modifier,
+            re_rolled,
+        ));
+
         // Java BB2016: if (successful) { actingPlayer.setStandingUp(false); if rooted → GOTO failure; else NEXT_STEP }
         if successful {
             game.acting_player.standing_up = false;
@@ -218,6 +228,7 @@ mod tests {
     use crate::step::framework::{StepAction, StepParameter};
     use ffb_model::enums::Rules;
     use ffb_model::util::rng::GameRng;
+    use ffb_model::report::report_id::ReportId;
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2016)
@@ -364,5 +375,27 @@ mod tests {
         step.roll = 1;
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.turn_data_home.foul_used);
+    }
+
+    #[test]
+    fn successful_roll_adds_stand_up_report() {
+        let mut game = make_game();
+        game.acting_player.standing_up = true;
+        let mut step = StepStandUp::new("fail".into());
+        step.roll = 6;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::STAND_UP_ROLL), "success should add ReportStandUpRoll");
+    }
+
+    #[test]
+    fn failed_roll_also_adds_stand_up_report() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        game.acting_player.standing_up = true;
+        let mut step = StepStandUp::new("fail".into());
+        step.roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::STAND_UP_ROLL), "failure should also add ReportStandUpRoll");
     }
 }

@@ -10,7 +10,9 @@
 use ffb_model::enums::{PlayerAction, SkillId};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::model::skill_use::SkillUse;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -68,6 +70,14 @@ impl StepHorns {
             } else if let Some(p) = game.team_away.player_mut(&player_id) {
                 p.used_skills.insert(SkillId::Horns);
             }
+
+            // Java: addReport(new ReportSkillUse(actingPlayerId, skill, true, INCREASE_STRENGTH_BY_1))
+            game.report_list.add(ReportSkillUse::new(
+                Some(player_id.clone()),
+                SkillId::Horns,
+                true,
+                SkillUse::INCREASE_STRENGTH_BY_1,
+            ));
 
             let event = GameEvent::SkillUse {
                 player_id: player_id.clone(),
@@ -176,6 +186,26 @@ mod tests {
         let (mut game, pid) = make_game(vec![SkillId::Horns], PlayerAction::Blitz);
         StepHorns::new().start(&mut game, &mut GameRng::new(0));
         assert!(game.team_home.player(&pid).unwrap().used_skills.contains(&SkillId::Horns));
+    }
+
+    #[test]
+    fn horns_with_blitz_adds_skill_use_report() {
+        let (mut game, _) = make_game(vec![SkillId::Horns], PlayerAction::Blitz);
+        StepHorns::new().start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE),
+            "Horns during Blitz should add ReportSkillUse"
+        );
+    }
+
+    #[test]
+    fn horns_without_blitz_no_report_added() {
+        let (mut game, _) = make_game(vec![SkillId::Horns], PlayerAction::Block);
+        StepHorns::new().start(&mut game, &mut GameRng::new(0));
+        assert!(
+            !game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE),
+            "Horns without Blitz should not add any report"
+        );
     }
 
     #[test]

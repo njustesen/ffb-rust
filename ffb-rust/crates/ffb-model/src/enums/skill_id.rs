@@ -873,6 +873,16 @@ impl SkillId {
                 "preventStuntyDodgeModifier",
                 "cancelsIgnoreTacklezonesWhenDodging",
             ],
+            // Java: FrenziedRush.postConstruct registers canGainFrenzyForBlitz
+            SkillId::FrenziedRush => &["canGainFrenzyForBlitz"],
+            // Java: SlashingNails.postConstruct registers canGainClawsForBlitz
+            SkillId::SlashingNails => &["canGainClawsForBlitz"],
+            // Java: Incorporeal.postConstruct registers canAvoidDodging
+            SkillId::Incorporeal => &["canAvoidDodging"],
+            // Java: HailMaryPass.postConstruct registers canGainHailMary
+            SkillId::HailMaryPass => &["canGainHailMary"],
+            // Java: SafePairOfHands.postConstruct registers canPlaceBallWhenKnockedDownOrPlacedProne
+            SkillId::SafePairOfHands => &["canPlaceBallWhenKnockedDownOrPlacedProne"],
             _ => &[],
         }
     }

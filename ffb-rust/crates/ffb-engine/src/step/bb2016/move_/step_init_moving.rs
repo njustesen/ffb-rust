@@ -1,6 +1,10 @@
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
-use ffb_model::enums::PlayerAction;
+use ffb_model::enums::{PlayerAction, SkillId};
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::mixed::report_fumblerooskie::ReportFumblerooskie;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepAction};
@@ -127,6 +131,23 @@ impl Step for StepInitMoving {
                 // Java: CLIENT_GAZE → fGazeVictimId = victimId, EXECUTE_STEP
                 self.gaze_victim_id = Some(target_id.clone());
                 return self.execute_step(game, rng);
+            }
+            // Java: CLIENT_USE_FUMBLEROOSKIE → ReportFumblerooskie(player.getId(), true)
+            Action::UseSkill { skill_id: SkillId::Fumblerooskie, use_skill: true } => {
+                let player_id = game.acting_player.player_id.clone();
+                game.report_list.add(ReportFumblerooskie::new(player_id, true));
+            }
+            // Java: CLIENT_USE_SKILL → canAddBlockDie → ReportSkillUse(skill, true, ADD_BLOCK_DIE)
+            Action::UseSkill { skill_id, use_skill: true } => {
+                if skill_id.properties().contains(&NamedProperties::CAN_ADD_BLOCK_DIE) {
+                    let player_id = game.acting_player.player_id.clone();
+                    game.report_list.add(ReportSkillUse::new(
+                        player_id,
+                        *skill_id,
+                        true,
+                        SkillUse::ADD_BLOCK_DIE,
+                    ));
+                }
             }
             Action::EndTurn => {
                 self.end_turn = true;
@@ -472,6 +493,41 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.acting_player.dodging);
         assert!(game.acting_player.goes_for_it, "setGoingForIt should be true for GFI square");
+    }
+
+    // ── report_list: Fumblerooskie and ADD_BLOCK_DIE ─────────────────────────
+
+    #[test]
+    fn use_fumblerooskie_skill_adds_fumblerooskie_report() {
+        use ffb_model::report::report_id::ReportId;
+        use ffb_model::enums::SkillId;
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        let mut step = StepInitMoving::new("end".into());
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Fumblerooskie, use_skill: true },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(game.report_list.has_report(ReportId::FUMBLEROOSKIE),
+            "expected FUMBLEROOSKIE report when Fumblerooskie skill is used");
+    }
+
+    #[test]
+    fn use_skill_without_can_add_block_die_does_not_add_skill_use_report() {
+        use ffb_model::report::report_id::ReportId;
+        use ffb_model::enums::SkillId;
+        // Dodge does NOT have CAN_ADD_BLOCK_DIE — no SKILL_USE report should be added
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        let mut step = StepInitMoving::new("end".into());
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Dodge, use_skill: true },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(!game.report_list.has_report(ReportId::SKILL_USE),
+            "Dodge does not have CAN_ADD_BLOCK_DIE — no SKILL_USE report should be added");
     }
 
     #[test]

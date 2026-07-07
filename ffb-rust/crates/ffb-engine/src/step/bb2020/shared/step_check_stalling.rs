@@ -1,4 +1,5 @@
 use ffb_model::model::game::Game;
+use ffb_model::report::mixed::report_staller_detected::ReportStallerDetected;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -28,6 +29,13 @@ impl StepCheckStalling {
             ignore_acted_flag: true,
         }
     }
+
+    /// Java: getResult().addReport(new ReportStallerDetected(stallingPlayer.getId()))
+    /// Called when a stalling player is found. Wired here for structural completeness;
+    /// the caller (start) currently skips detection because pathfinding is not yet ported.
+    pub fn report_staller_detected(game: &mut Game, player_id: Option<String>) {
+        game.report_list.add(ReportStallerDetected::new(player_id));
+    }
 }
 
 impl Default for StepCheckStalling {
@@ -38,7 +46,10 @@ impl Step for StepCheckStalling {
     fn id(&self) -> StepId { StepId::CheckStalling }
 
     fn start(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // no-op: stalling detection requires pathfinding — headless conservatively reports no stall
+        // no-op: stalling detection requires pathfinding — headless conservatively reports no stall.
+        // Java: if (performCheck()) { stallingPlayer = findStallingPlayer(); if (stallingPlayer != null) {
+        //           addReport(new ReportStallerDetected(stallingPlayer.getId()));
+        //           prayerState.addStaller(stallingPlayer); } }
         StepOutcome::next()
     }
 
@@ -60,6 +71,7 @@ mod tests {
     use crate::step::framework::test_team;
     use crate::step::framework::StepAction;
     use ffb_model::enums::Rules;
+    use ffb_model::report::report_id::ReportId;
 
     fn make_game() -> Game {
         let home = test_team("home", 0);
@@ -103,5 +115,19 @@ mod tests {
     fn set_parameter_unknown_returns_false() {
         let mut step = StepCheckStalling::new();
         assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
+    }
+
+    #[test]
+    fn report_staller_detected_with_player_id_emits_report() {
+        let mut game = make_game();
+        StepCheckStalling::report_staller_detected(&mut game, Some("home_01".into()));
+        assert!(game.report_list.has_report(ReportId::STALLER_DETECTED));
+    }
+
+    #[test]
+    fn report_staller_detected_without_player_id_emits_report() {
+        let mut game = make_game();
+        StepCheckStalling::report_staller_detected(&mut game, None);
+        assert!(game.report_list.has_report(ReportId::STALLER_DETECTED));
     }
 }

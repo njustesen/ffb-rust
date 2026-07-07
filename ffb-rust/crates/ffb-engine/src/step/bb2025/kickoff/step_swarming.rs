@@ -1,5 +1,7 @@
 use ffb_model::enums::{TurnMode, PS_PRONE, PS_RESERVE};
 use ffb_model::model::SpecialRule;
+use ffb_model::report::bb2025::report_swarming_roll::ReportSwarmingRoll;
+use ffb_model::report::report_id::ReportId;
 use ffb_model::types::FieldCoordinateBounds;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -159,6 +161,9 @@ impl StepSwarming {
         // Roll for the number of swarming players (Java: DiceRoller.rollSwarmingPlayers() = d6).
         self.rolled_amount = rng.d6();
 
+        // Java: addReport(new ReportSwarmingRoll(state.teamId, state.rolledAmount))
+        game.report_list.add(ReportSwarmingRoll::new(team_id.clone(), self.rolled_amount));
+
         // Flip home_playing if we are handling the receiving team.
         if self.handle_receiving_team {
             game.home_playing = !game.home_playing;
@@ -224,13 +229,31 @@ mod tests {
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::{StepAction, StepParameter};
-    use ffb_model::enums::Rules;
+    use ffb_model::enums::{Rules, PlayerType, PlayerGender, PlayerState, PS_RESERVE};
+    use ffb_model::model::player::Player;
     use ffb_model::util::rng::GameRng;
 
     fn make_game() -> Game {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2025)
+    }
+
+    fn make_swarming_game() -> Game {
+        let mut home = test_team("home", 0);
+        home.special_rules = vec!["Swarming".to_string()];
+        let p = Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            ..Default::default()
+        };
+        home.players.push(p);
+        let away = test_team("away", 0);
+        let mut game = Game::new(home, away, Rules::Bb2025);
+        game.home_playing = true;
+        game.field_model.set_player_state("p1", PlayerState::new(PS_RESERVE));
+        game
     }
 
     #[test]
@@ -277,5 +300,25 @@ mod tests {
     fn unknown_parameter_returns_false() {
         let mut step = StepSwarming::new();
         assert!(!step.set_parameter(&StepParameter::EndTurn(false)));
+    }
+
+    #[test]
+    fn swarming_roll_adds_report() {
+        let mut game = make_swarming_game();
+        let mut step = StepSwarming::new();
+        step.handle_receiving_team = false;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SWARMING_PLAYERS_ROLL));
+    }
+
+    #[test]
+    fn swarming_roll_sets_rolled_amount() {
+        let mut game = make_swarming_game();
+        let mut step = StepSwarming::new();
+        step.handle_receiving_team = false;
+        step.start(&mut game, &mut GameRng::new(0));
+        // rolled_amount should have been set to a valid d6 result (1..=6)
+        assert!(step.rolled_amount >= 1 && step.rolled_amount <= 6);
+        assert!(game.report_list.has_report(ReportId::SWARMING_PLAYERS_ROLL));
     }
 }

@@ -17,6 +17,8 @@
 use ffb_model::enums::{PlayerAction, ReRollSource};
 use ffb_model::model::game::Game;
 use ffb_model::prompts::AgentPrompt;
+use ffb_model::report::report_id::ReportId;
+use ffb_model::report::report_interception_roll::ReportInterceptionRoll;
 use ffb_model::util::passing::can_intercept;
 use ffb_model::util::rng::GameRng;
 use ffb_mechanics::modifiers::interception_modifier_factory::InterceptionModifierFactory;
@@ -90,16 +92,17 @@ impl StepIntercept {
 
     /// Java: `intercept(pInterceptor)` — rolls D6 agility check (pure roll, no re-roll logic).
     /// BB2016: minimum_roll = max(2, 7 - min(ag, 6) + 2 + modifier_total).
-    fn intercept(&self, interceptor_id: &str, game: &Game, rng: &mut GameRng) -> bool {
+    /// Returns (successful, roll, minimum_roll).
+    fn intercept(&self, interceptor_id: &str, game: &Game, rng: &mut GameRng) -> (bool, i32, i32) {
         let interceptor = match game.player(interceptor_id) {
             Some(p) => p,
-            None => return false,
+            None => return (false, 0, 0),
         };
         let roll = rng.d6();
         let factory = InterceptionModifierFactory::for_rules(game.rules);
         let mods = factory.find_applicable(game, interceptor, PassResult::ACCURATE, false);
         let minimum_roll = InterceptionModifierFactory::minimum_roll_bb2016(interceptor, &mods);
-        roll >= minimum_roll
+        (roll >= minimum_roll, roll, minimum_roll)
     }
 
     /// Java: intercept() with re-roll logic from AbstractStepWithReRoll.
@@ -111,7 +114,20 @@ impl StepIntercept {
     ///
     /// Side-effects: updates `re_rolled_action`, auto-uses Catch skill re-roll if available.
     fn roll_intercept(&mut self, interceptor_id: &str, game: &mut Game, rng: &mut GameRng) -> (bool, bool) {
-        let successful = self.intercept(interceptor_id, game, rng);
+        let (successful, roll, minimum_roll) = self.intercept(interceptor_id, game, rng);
+        let re_rolled = self.re_rolled_action.is_some();
+
+        // Java: getResult().addReport(new ReportInterceptionRoll(...))
+        game.report_list.add(ReportInterceptionRoll::new(
+            Some(interceptor_id.to_owned()),
+            successful,
+            roll,
+            minimum_roll,
+            re_rolled,
+            vec![],
+            false,
+            false,
+        ));
 
         if successful {
             game.field_model.out_of_bounds = false;
@@ -302,6 +318,7 @@ mod tests {
     use ffb_model::enums::{PlayerGender, PlayerType, PlayerState, PS_STANDING, Rules};
     use ffb_model::model::player::Player;
     use ffb_model::model::skill_def::SkillWithValue;
+    use ffb_model::report::report_id::ReportId;
     use ffb_model::types::FieldCoordinate;
     use std::collections::HashSet;
 
@@ -555,6 +572,37 @@ mod tests {
         // The important thing is it doesn't wait (no cont with re-roll prompt when no TRR)
         let is_waiting_with_prompt = out.action == StepAction::Continue && out.prompt.is_some();
         assert!(!is_waiting_with_prompt, "should not offer re-roll when no inactive TRR");
+    }
+
+    #[test]
+    fn interception_roll_report_added_when_interceptor_rolls() {
+        let (mut game, _) = make_game_with_interceptor();
+        game.turn_data_away.rerolls = 0; // no TRR so step goes to failure immediately after roll
+
+        let mut step = StepIntercept::new();
+        step.goto_label_on_failure = "fail".into();
+        step.interceptor_chosen = true;
+        step.interceptor_id = Some("interceptor".into());
+
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::INTERCEPTION_ROLL),
+            "should have INTERCEPTION_ROLL report after rolling");
+    }
+
+    #[test]
+    fn interception_roll_report_added_on_success() {
+        // Use seed that gives a roll of 6 (success for AG=3 needing 6+)
+        // We test many seeds until we find one where intercept succeeds
+        let (mut game, _) = make_game_with_interceptor();
+        game.turn_data_away.rerolls = 0;
+        let mut step = StepIntercept::new();
+        step.goto_label_on_failure = "fail".into();
+        step.interceptor_chosen = true;
+        step.interceptor_id = Some("interceptor".into());
+        // For seed 5, let the step roll; regardless of success/failure the report must exist
+        step.start(&mut game, &mut GameRng::new(5));
+        assert!(game.report_list.has_report(ReportId::INTERCEPTION_ROLL),
+            "INTERCEPTION_ROLL report must be added regardless of outcome");
     }
 
     #[test]

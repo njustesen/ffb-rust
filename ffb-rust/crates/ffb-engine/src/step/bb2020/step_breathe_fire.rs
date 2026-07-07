@@ -2,6 +2,8 @@ use ffb_model::enums::ApothecaryMode;
 use ffb_model::model::BreatheFireResult;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::report::mixed::report_breathe_fire::ReportBreatheFire;
+use ffb_model::report::report_id::ReportId;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_cards::UtilCards;
@@ -159,6 +161,21 @@ impl StepBreatheFire {
 
             let result = Self::evaluate(roll, effective_roll);
             self.result = Some(result);
+
+            // Java: getResult().addReport(new ReportBreatheFire(actingPlayer.getPlayerId(), successful, roll,
+            //   minimumRoll, reRolled, game.getDefenderId(), result, strongOpponent))
+            let minimum_roll = if strong_opponent { 3 } else { 2 };
+            let re_rolled = self.re_rolled_action.as_deref() == Some("BREATHE_FIRE") && self.re_roll_source.is_some();
+            game.report_list.add(ReportBreatheFire::new(
+                Some(attacker_id.clone()),
+                result == BreatheFireResult::KNOCK_DOWN,
+                roll,
+                minimum_roll,
+                re_rolled,
+                game.defender_id.clone(),
+                strong_opponent,
+                format!("{:?}", result),
+            ));
 
             // Java: boolean successful = result == BreatheFireResult.KNOCK_DOWN
             if result == BreatheFireResult::KNOCK_DOWN {
@@ -409,5 +426,43 @@ mod tests {
             .map(|p| p.used_skills.contains(&breathe_fire_skill))
             .unwrap_or(false);
         assert!(used, "BreatheFireSkill should be in used_skills after executing");
+    }
+
+    #[test]
+    fn with_breathe_fire_skill_emits_report_breathe_fire() {
+        use ffb_model::enums::{PlayerType, PlayerGender, SkillId, PS_STANDING, PlayerAction};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+
+        let mut game = make_game();
+        let att = Player {
+            id: "att".into(), name: "att".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 5, strength: 4, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::BreatheFire, value: None }],
+            extra_skills: vec![], temporary_skills: vec![], used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        };
+        game.team_home.players.push(att);
+        game.home_playing = true;
+        game.acting_player.set_player("att".into(), PlayerAction::Block);
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("att", ffb_model::enums::PlayerState::new(PS_STANDING));
+
+        let mut step = StepBreatheFire::new();
+        step.using_breathe_fire = true;
+        step.start(&mut game, &mut GameRng::new(4)); // roll=4 → PRONE result
+        assert!(game.report_list.has_report(ReportId::BREATHE_FIRE));
+    }
+
+    #[test]
+    fn not_using_breathe_fire_does_not_emit_report() {
+        let mut game = make_game();
+        let mut step = StepBreatheFire::new();
+        step.using_breathe_fire = false;
+        step.start(&mut game, &mut GameRng::new(4));
+        assert!(!game.report_list.has_report(ReportId::BREATHE_FIRE));
     }
 }

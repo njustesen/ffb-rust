@@ -1,6 +1,7 @@
 use ffb_model::enums::{PS_PRONE, PS_RESERVE, SkillId, TurnMode};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::report::bb2025::report_swarming_roll::ReportSwarmingRoll;
 use ffb_model::types::FieldCoordinateBounds;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
@@ -187,6 +188,9 @@ impl StepSwarming {
         // Roll how many swarmers may be placed: d3 (Java: DiceRoller.rollSwarmingPlayers() = d3).
         self.rolled_amount = rng.d3();
         self.allowed_amount = self.limiting_amount.min(self.rolled_amount);
+
+        // Java: getResult().addReport(new ReportSwarmingRoll(state.teamId, state.rolledAmount))
+        game.report_list.add(ReportSwarmingRoll::new(team_id.clone(), self.rolled_amount));
 
         let event = GameEvent::SwarmingPlayersRoll {
             team_id: team_id.clone(),
@@ -507,5 +511,38 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(1));
         let has_event = out.events.iter().any(|e| matches!(e, GameEvent::SwarmingPlayersRoll { .. }));
         assert!(has_event, "SwarmingPlayersRoll event should be emitted");
+    }
+
+    #[test]
+    fn swarming_report_added_when_reserves_exist() {
+        let mut game = make_game();
+        game.home_playing = true;
+        let sw = make_swarmer("h_s", 1);
+        game.team_home.players.push(sw);
+        game.field_model.set_player_coordinate("h_s", FieldCoordinate::new(10, 7));
+        game.field_model.set_player_state("h_s", PlayerState::new(PS_STANDING));
+        let sw2 = make_swarmer("h_s2", 2);
+        game.team_home.players.push(sw2);
+        game.field_model.set_player_state("h_s2", PlayerState::new(PS_RESERVE));
+
+        let mut step = StepSwarming::new();
+        step.start(&mut game, &mut GameRng::new(1));
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SWARMING_PLAYERS_ROLL));
+    }
+
+    #[test]
+    fn no_swarming_report_when_no_reserves() {
+        // No swarming reserves → step returns immediately without report
+        let mut game = make_game();
+        game.home_playing = true;
+        let sw = make_swarmer("h_s", 1);
+        game.team_home.players.push(sw);
+        game.field_model.set_player_coordinate("h_s", FieldCoordinate::new(10, 7));
+        game.field_model.set_player_state("h_s", PlayerState::new(PS_STANDING));
+        // No reserve swarmer — only on-pitch swarmer
+
+        let mut step = StepSwarming::new();
+        step.start(&mut game, &mut GameRng::new(1));
+        assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::SWARMING_PLAYERS_ROLL));
     }
 }

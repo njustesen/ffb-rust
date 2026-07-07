@@ -1,6 +1,7 @@
 use ffb_model::enums::{PlayerAction, ReRollSource};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::report::mixed::report_hypnotic_gaze_roll::ReportHypnoticGazeRoll;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -97,6 +98,18 @@ impl StepHypnoticGaze {
         if do_gaze {
             let roll = rng.d6();
             let successful = is_skill_roll_successful(roll, MINIMUM_ROLL_HYPNOTIC_GAZE);
+            let re_rolled = self.re_rolled_action.as_deref() == Some("HYPNOTIC_GAZE")
+                && self.re_roll_source.is_some();
+
+            // Java: getResult().addReport(new ReportHypnoticGazeRoll(...))
+            game.report_list.add(ReportHypnoticGazeRoll::new(
+                acting_player_id.clone(),
+                successful,
+                roll,
+                MINIMUM_ROLL_HYPNOTIC_GAZE,
+                re_rolled,
+                defender_id.clone(),
+            ));
 
             if successful {
                 if let Some(ref did) = defender_id {
@@ -207,5 +220,45 @@ mod tests {
         let mut step = StepHypnoticGaze::new("old".into());
         assert!(step.set_parameter(&StepParameter::GotoLabelOnEnd("new".into())));
         assert_eq!(step.goto_label_on_end, "new");
+    }
+
+    #[test]
+    fn gaze_roll_adds_hypnotic_gaze_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut attacker = ffb_model::model::player::Player::default();
+        attacker.id = "a1".into();
+        attacker.starting_skills.push(ffb_model::model::skill_def::SkillWithValue::new(ffb_model::enums::SkillId::HypnoticGaze));
+        game.team_home.players.push(attacker);
+        game.field_model.set_player_coordinate("a1", ffb_model::types::FieldCoordinate::new(5, 5));
+        let mut defender = ffb_model::model::player::Player::default();
+        defender.id = "d1".into();
+        game.team_away.players.push(defender);
+        game.field_model.set_player_coordinate("d1", ffb_model::types::FieldCoordinate::new(6, 5));
+        game.home_playing = true;
+        game.acting_player.player_id = Some("a1".into());
+        game.acting_player.player_action = Some(PlayerAction::Gaze);
+        game.defender_id = Some("d1".into());
+        let mut step = StepHypnoticGaze::new("end".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::HYPNOTIC_GAZE_ROLL),
+            "expected HYPNOTIC_GAZE_ROLL report after gaze roll"
+        );
+    }
+
+    #[test]
+    fn no_gaze_roll_report_when_gaze_skill_absent() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        // Player with no gaze skill: do_gaze becomes false, no roll occurs
+        game.acting_player.player_action = Some(PlayerAction::Gaze);
+        game.defender_id = Some("d1".into());
+        let mut step = StepHypnoticGaze::new("end".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            !game.report_list.has_report(ReportId::HYPNOTIC_GAZE_ROLL),
+            "no HYPNOTIC_GAZE_ROLL when gaze skill is absent"
+        );
     }
 }

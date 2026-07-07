@@ -10,6 +10,7 @@
 /// headless Rust (no client dialogs), kept as struct fields for completeness.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::mixed::report_penalty_shootout::ReportPenaltyShootout;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -26,6 +27,16 @@ impl StepPenaltyShootout {
         Self { home_confirmed: false, away_confirmed: false }
     }
 
+    /// Java: `toOrdinal(int number)`
+    fn to_ordinal(n: i32) -> String {
+        match n {
+            1 => "1st".into(),
+            2 => "2nd".into(),
+            3 => "3rd".into(),
+            _ => format!("{}th", n),
+        }
+    }
+
     fn execute_step(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let home_score = game.game_result.home.score;
         let away_score = game.game_result.away.score;
@@ -36,20 +47,50 @@ impl StepPenaltyShootout {
             let mut penalty_score_away = 0i32;
 
             while penalty_score_home + penalty_score_away < SHOOTOUT_LIMIT {
+                // Java: int currentPenalty = penaltyScoreAway + penaltyScoreHome + 1 (1-indexed round)
+                let current_penalty = penalty_score_home + penalty_score_away + 1;
+
                 // Java: DiceRoller.rollPenaltyShootout() = rollDice(6) = D6
                 let roll_home = rng.d6();
                 let roll_away = rng.d6();
 
+                let home_team_won_penalty: Option<bool>;
                 if roll_away > roll_home {
+                    home_team_won_penalty = Some(false);
                     penalty_score_away += 1;
                 } else if roll_away < roll_home {
+                    home_team_won_penalty = Some(true);
                     penalty_score_home += 1;
+                } else {
+                    home_team_won_penalty = None; // tied roll → nobody scores this round
                 }
-                // tied roll → nobody scores this round (loop continues)
-            }
 
-            game.game_result.home.penalty_score = penalty_score_home;
-            game.game_result.away.penalty_score = penalty_score_away;
+                // Java: if (penaltyScoreHome + penaltyScoreAway == SHOOTOUT_LIMIT) { set penalty scores + teamId }
+                let winning_team = if penalty_score_home + penalty_score_away == SHOOTOUT_LIMIT {
+                    game.game_result.home.penalty_score = penalty_score_home;
+                    game.game_result.away.penalty_score = penalty_score_away;
+                    if penalty_score_home > penalty_score_away {
+                        Some(game.team_home.id.clone())
+                    } else {
+                        Some(game.team_away.id.clone())
+                    }
+                } else {
+                    None
+                };
+
+                let round_str = Self::to_ordinal(current_penalty);
+
+                // Java: getResult().addReport(new ReportPenaltyShootout(rollHome, penaltyScoreHome, rollAway, penaltyScoreAway, homeTeamWonPenalty, round, teamId))
+                game.report_list.add(ReportPenaltyShootout::new(
+                    roll_home,
+                    penalty_score_home,
+                    roll_away,
+                    penalty_score_away,
+                    home_team_won_penalty,
+                    Some(round_str),
+                    winning_team,
+                ));
+            }
 
             // Java: after the loop sets CONTINUE (dialog); we skip the dialog
             // and fall through to NEXT_STEP since Rust has no client confirmation.
@@ -86,9 +127,38 @@ mod tests {
     use super::*;
     use crate::step::framework::{StepAction, test_team};
     use ffb_model::enums::Rules;
+    use ffb_model::report::report_id::ReportId;
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+    }
+
+    #[test]
+    fn penalty_shootout_reports_added() {
+        let mut step = StepPenaltyShootout::new();
+        let mut game = make_game();
+        game.half = 3;
+        game.game_result.home.score = 1;
+        game.game_result.away.score = 1;
+        step.start(&mut game, &mut GameRng::new(42));
+        assert!(
+            game.report_list.has_report(ReportId::PENALTY_SHOOTOUT),
+            "should add at least one ReportPenaltyShootout during shootout"
+        );
+    }
+
+    #[test]
+    fn no_penalty_shootout_reports_when_no_overtime() {
+        let mut step = StepPenaltyShootout::new();
+        let mut game = make_game();
+        game.half = 2; // not past half 2
+        game.game_result.home.score = 1;
+        game.game_result.away.score = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            !game.report_list.has_report(ReportId::PENALTY_SHOOTOUT),
+            "should not add ReportPenaltyShootout when not in overtime"
+        );
     }
 
     #[test]

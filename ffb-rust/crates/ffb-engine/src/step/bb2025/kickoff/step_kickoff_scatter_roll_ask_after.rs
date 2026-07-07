@@ -1,4 +1,10 @@
 use ffb_model::enums::Direction;
+use ffb_model::enums::SkillId;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::mixed::report_event::ReportEvent;
+use ffb_model::report::report_id::ReportId;
+use ffb_model::report::report_kickoff_scatter::ReportKickoffScatter;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -117,6 +123,14 @@ impl StepKickoffScatterRollAskAfter {
             // (with the two possible landing squares) and return Continue.
             // For the random-agent path there is no Kick player, so fall through.
             self.use_kick_choice = Some(false);
+            // Java: getResult().addReport(new ReportKickoffScatter(ballCoordinateEnd, fScatterDirection, rollScatterDirection, fScatterDistance))
+            let ball_end_report = start.step(self.scatter_direction.unwrap_or(Direction::North), self.scatter_distance);
+            game.report_list.add(ReportKickoffScatter::new(
+                ball_end_report,
+                self.scatter_direction.unwrap_or(Direction::North),
+                dir_roll,
+                self.scatter_distance,
+            ));
         }
 
         // ── Phase 2: resolve final distance and place ball ───────────────────
@@ -163,6 +177,10 @@ impl StepKickoffScatterRollAskAfter {
             self.kickoff_bounds = None;
         }
         self.touchback = self.kickoff_bounds.is_none();
+        // Java: if (fTouchback) getResult().addReport(new ReportEvent("The ball lands out of bounds -> TOUCHBACK!!"))
+        if self.touchback {
+            game.report_list.add(ReportEvent::new(Some("The ball lands out of bounds -> TOUCHBACK!!".into())));
+        }
 
         // ── Publish ────────────────────────────────────────────────────────────
         let kicking_coord = self.kicking_player_coordinate.unwrap();
@@ -247,5 +265,22 @@ mod tests {
         // Verify the step finished (returns NextStep).
         let out = step.handle_command(&action, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn report_kickoff_scatter_added_on_start() {
+        let mut game = make_game();
+        let mut step = StepKickoffScatterRollAskAfter::new();
+        step.kickoff_start_coordinate = Some(FieldCoordinate::new(13, 7));
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::KICKOFF_SCATTER));
+    }
+
+    #[test]
+    fn no_kickoff_scatter_report_without_start_coordinate() {
+        let mut game = make_game();
+        let mut step = StepKickoffScatterRollAskAfter::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::KICKOFF_SCATTER));
     }
 }

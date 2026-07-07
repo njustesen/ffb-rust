@@ -9,6 +9,7 @@
 use ffb_model::enums::KickoffResult;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_kickoff_result::ReportKickoffResult;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -38,10 +39,11 @@ impl StepKickoffResultRoll {
         }
     }
 
-    fn execute_step(&mut self, _game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let roll = rng.d6_two();
         let result = Self::interpret_roll(roll);
         self.kickoff_result = Some(result);
+        game.report_list.add(ReportKickoffResult::new(result, vec![roll]));
         StepOutcome::next()
             .publish(StepParameter::KickoffResult(result))
     }
@@ -72,6 +74,7 @@ mod tests {
     use super::*;
     use crate::step::framework::{StepAction, test_team};
     use ffb_model::enums::Rules;
+    use ffb_model::report::report_id::ReportId;
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2016)
@@ -123,5 +126,23 @@ mod tests {
         let mut rng = GameRng::new(0);
         step.start(&mut game, &mut rng);
         assert!(step.kickoff_result.is_some());
+    }
+
+    #[test]
+    fn adds_kickoff_result_report() {
+        let mut step = StepKickoffResultRoll::new();
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(game.report_list.has_report(ReportId::KICKOFF_RESULT), "should add ReportKickoffResult");
+    }
+
+    #[test]
+    fn report_added_on_handle_command() {
+        let mut step = StepKickoffResultRoll::new();
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        step.handle_command(&Action::EndTurn, &mut game, &mut rng);
+        assert!(game.report_list.has_report(ReportId::KICKOFF_RESULT), "handle_command should also add ReportKickoffResult");
     }
 }

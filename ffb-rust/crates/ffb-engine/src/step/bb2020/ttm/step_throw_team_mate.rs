@@ -15,6 +15,7 @@ use ffb_model::enums::{PassingDistance, PassResult, PlayerState, ReRollSource};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::mixed::report_throw_team_mate_roll::ReportThrowTeamMateRoll;
 use ffb_mechanics::bb2020::pass_mechanic::PassMechanic as Bb2020PassMechanic;
 use ffb_mechanics::bb2020::ttm_mechanic::TtmMechanic as Bb2020TtmMechanic;
 use ffb_mechanics::modifiers::pass_modifier::PassModifier;
@@ -130,6 +131,22 @@ impl StepThrowTeamMate {
 
             // Java: successful = passResult == ACCURATE || passResult == INACCURATE
             let successful = pass_result == PassResult::Complete || pass_result == PassResult::Inaccurate;
+
+            // Java: ThrowTeamMateBehaviour.handleExecuteStepHook → addReport(new ReportThrowTeamMateRoll(...))
+            let re_rolled = self.re_rolled_action.is_some() && self.re_roll_source.is_some();
+            let pass_result_name = Some(format!("{:?}", pass_result));
+            game.report_list.add(ReportThrowTeamMateRoll::new(
+                game.thrower_id.clone(),
+                successful,
+                roll,
+                self.minimum_roll,
+                re_rolled,
+                vec![],
+                Some(format!("{:?}", passing_distance)),
+                self.thrown_player_id.clone(),
+                pass_result_name,
+                self.kicked,
+            ));
 
             if successful {
                 // Push ScatterPlayer sequence
@@ -388,5 +405,37 @@ mod tests {
     fn evaluate_ttm_pass_inaccurate() {
         // passing=4, roll=3, modifier_sum=0 → 3 < 4, > 1 → INACCURATE
         assert_eq!(evaluate_ttm_pass(true, 4, 3, 0), PassResult::Inaccurate);
+    }
+
+    #[test]
+    fn successful_throw_emits_throw_team_mate_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.home_playing = true;
+        add_player(&mut game, true, "thrower", FieldCoordinate::new(10, 7), 4);
+        game.acting_player.player_id = Some("thrower".into());
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+
+        let mut step = StepThrowTeamMate::new();
+        step.thrown_player_id = Some("tp1".into());
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        step.start(&mut game, &mut GameRng::new(42));
+        assert!(game.report_list.has_report(ReportId::THROW_TEAM_MATE_ROLL));
+    }
+
+    #[test]
+    fn failed_throw_emits_throw_team_mate_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.home_playing = true;
+        // passing=0 → evaluate_ttm_pass returns Fumble (player_can_pass=false)
+        add_player(&mut game, true, "thrower", FieldCoordinate::new(10, 7), 0);
+        game.acting_player.player_id = Some("thrower".into());
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+
+        let mut step = StepThrowTeamMate::new();
+        step.thrown_player_id = Some("tp1".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::THROW_TEAM_MATE_ROLL));
     }
 }

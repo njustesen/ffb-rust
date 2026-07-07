@@ -16,6 +16,8 @@ use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::special_effect::SpecialEffect;
 use ffb_model::option::game_option_id::{BOMB_TEAM_MATE_KNOCK_DOWN_CAUSES_TURNOVER, BOMBER_PLACED_PRONE_IGNORES_TURNOVER};
 use ffb_model::option::util_game_option::is_option_enabled;
+use ffb_model::report::report_special_effect_roll::ReportSpecialEffectRoll;
+use ffb_model::report::report_id::ReportId;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::drop_player_context::SteadyFootingContext;
@@ -98,8 +100,10 @@ impl StepSpecialEffect {
 
         // Java: if fRollForEffect → roll; DiceInterpreter.isSpecialEffectSuccessful
         let mut spell_roll_event: Option<GameEvent> = None;
+        let mut last_roll: i32 = 0;
         let successful = if self.roll_for_effect {
             let roll = rng.d6();
+            last_roll = roll;
             spell_roll_event = Some(GameEvent::SpellEffectRoll { roll });
             is_special_effect_successful(self.special_effect, game, &player_id, roll)
         } else {
@@ -110,6 +114,10 @@ impl StepSpecialEffect {
             let label = self.goto_label_on_failure.clone();
             let mut out = StepOutcome::goto(&label);
             if let Some(ev) = spell_roll_event { out = out.with_event(ev); }
+            // Java: addReport(new ReportSpecialEffectRoll(effect, playerId, roll, false))
+            if let Some(effect) = self.special_effect {
+                game.report_list.add(ReportSpecialEffectRoll::new(effect, Some(player_id.clone()), last_roll, false));
+            }
             return out;
         }
 
@@ -120,6 +128,10 @@ impl StepSpecialEffect {
             Some(e) => e,
             None => return outcome,
         };
+
+        // Java: addReport(new ReportSpecialEffectRoll(effect, playerId, roll, true))
+        // roll=0 for the no-roll path (always-succeed effects); last_roll for the roll path.
+        game.report_list.add(ReportSpecialEffectRoll::new(effect, Some(player_id.clone()), last_roll, true));
 
         let coord = game.field_model.player_coordinate(&player_id)
             .unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
@@ -396,6 +408,35 @@ mod tests {
         let mut step = StepSpecialEffect::default();
         assert!(step.set_parameter(&StepParameter::OriginalBombardier(None)));
         assert!(step.original_bombardier.is_none());
+    }
+
+    #[test]
+    fn no_roll_lightning_emits_spell_effect_roll_report() {
+        let mut game = make_game();
+        game.home_playing = true;
+        add_home_player(&mut game, "p1");
+        let mut step = StepSpecialEffect::new("fail".into());
+        step.player_id = Some("p1".into());
+        step.special_effect = Some(SpecialEffect::LIGHTNING);
+        step.roll_for_effect = false;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SPELL_EFFECT_ROLL));
+    }
+
+    #[test]
+    fn roll_failure_still_emits_spell_effect_roll_report() {
+        // Seed 0 produces roll=1 for lightning (threshold>=2) → failure → goto label
+        // but report should still be added.
+        let mut game = make_game();
+        game.home_playing = true;
+        add_home_player(&mut game, "p1");
+        let mut step = StepSpecialEffect::new("fail_label".into());
+        step.player_id = Some("p1".into());
+        step.special_effect = Some(SpecialEffect::LIGHTNING);
+        step.roll_for_effect = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        // Whether roll succeeded or failed, the report is always emitted.
+        assert!(game.report_list.has_report(ReportId::SPELL_EFFECT_ROLL));
     }
 
     #[test]

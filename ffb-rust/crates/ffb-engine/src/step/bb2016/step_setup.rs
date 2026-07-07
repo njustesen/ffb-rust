@@ -1,6 +1,8 @@
 use ffb_model::enums::{TurnMode, InducementPhase};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::report::bb2016::report_no_players_to_field::ReportNoPlayersToField;
+use ffb_model::report::report_id::ReportId;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_box::UtilBox;
 use ffb_model::util::util_player::UtilPlayer;
@@ -147,14 +149,22 @@ impl StepSetup {
                 // Away has no players — home scores
                 game.home_playing = true;
                 game.game_result.home.score += 1;
-                Some(game.team_away.id.clone())
+                let id = game.team_away.id.clone();
+                // Java: getResult().addReport(new ReportNoPlayersToField(game.getTeamAway().getId()))
+                game.report_list.add(ReportNoPlayersToField::new(id.clone()));
+                Some(id)
             } else if home_empty && !away_empty {
                 // Home has no players — away scores
                 game.home_playing = false;
                 game.game_result.away.score += 1;
-                Some(game.team_home.id.clone())
+                let id = game.team_home.id.clone();
+                // Java: getResult().addReport(new ReportNoPlayersToField(game.getTeamHome().getId()))
+                game.report_list.add(ReportNoPlayersToField::new(id.clone()));
+                Some(id)
             } else {
                 // Both empty — no team id
+                // Java: getResult().addReport(new ReportNoPlayersToField(null))
+                game.report_list.add(ReportNoPlayersToField::new(String::new()));
                 None
             };
             let events = vec![GameEvent::NoPlayersToField { team_id: event_team_id }];
@@ -280,5 +290,39 @@ mod tests {
         let mut step = StepSetup::new();
         let accepted = step.set_parameter(&StepParameter::EndTurn(true));
         assert!(!accepted);
+    }
+
+    #[test]
+    fn no_away_players_emits_no_players_to_field_report() {
+        // Java: addReport(new ReportNoPlayersToField(game.getTeamAway().getId()))
+        // when away has no reserve/field players and home does.
+        let mut step = StepSetup::new();
+        step.goto_label_on_end = Some("end".to_string());
+        let mut game = make_game(); // both rosters empty — but we add only home player
+        let p_home = Player {
+            id: "h1".into(), name: "h1".into(), nr: 1,
+            position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 3, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        };
+        game.team_home.players.push(p_home);
+        game.field_model.set_player_state("h1", PlayerState::new(PS_RESERVE));
+        // Away roster empty → home scores, away team ID is reported
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::NO_PLAYERS_TO_FIELD));
+    }
+
+    #[test]
+    fn both_teams_empty_emits_no_players_to_field_report() {
+        // Java: addReport(new ReportNoPlayersToField(null)) when both teams have no players.
+        let mut step = StepSetup::new();
+        step.goto_label_on_end = Some("end".to_string());
+        let mut game = make_game(); // both rosters empty
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::NO_PLAYERS_TO_FIELD));
     }
 }

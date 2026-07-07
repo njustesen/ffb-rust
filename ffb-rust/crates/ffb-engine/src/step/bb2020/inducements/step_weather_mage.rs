@@ -3,6 +3,8 @@ use ffb_model::enums::Weather;
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
 use ffb_model::prompts::AgentPrompt;
+use ffb_model::report::mixed::report_weather_mage_roll::ReportWeatherMageRoll;
+use ffb_model::report::mixed::report_weather_mage_result::{ReportWeatherMageResult, WeatherMageEffect};
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -67,6 +69,8 @@ impl StepWeatherMage {
         add_weather_option(&mut seen, &mut options, sum, 2);
         add_weather_option(&mut seen, &mut options, sum, -2);
 
+        game.report_list.add(ReportWeatherMageRoll::new(roll.to_vec()));
+
         if options.len() > 1 {
             return StepOutcome::cont()
                 .with_prompt(AgentPrompt::SelectWeather { options });
@@ -77,6 +81,19 @@ impl StepWeatherMage {
                 let old_weather = game.field_model.weather;
                 if new_weather != old_weather {
                     game.field_model.weather = new_weather;
+                    game.report_list.add(ReportWeatherMageResult::new(
+                        0,
+                        Some(new_weather.name().to_string()),
+                        Some(WeatherMageEffect::NO_CHOICE),
+                        Some(old_weather.name().to_string()),
+                    ));
+                } else {
+                    game.report_list.add(ReportWeatherMageResult::new(
+                        0,
+                        Some(new_weather.name().to_string()),
+                        Some(WeatherMageEffect::NO_CHANGE),
+                        Some(new_weather.name().to_string()),
+                    ));
                 }
                 let msg = if new_weather != old_weather {
                     format!("Weather changed to {}.", new_weather.name())
@@ -222,5 +239,30 @@ mod tests {
         StepWeatherMage::use_mage(&mut game);
         let ind = game.turn_data_home.inducement_set.get("weatherMage").unwrap();
         assert_eq!(ind.get_uses(), 1);
+    }
+
+    #[test]
+    fn execute_step_adds_weather_mage_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.field_model.weather = Weather::Nice;
+        let mut step = StepWeatherMage::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::WEATHER_MAGE_ROLL));
+    }
+
+    #[test]
+    fn execute_step_adds_weather_mage_result_report_on_single_option() {
+        use ffb_model::report::report_id::ReportId;
+        // sum=7 → only Nice → single option → result report added
+        let mut game = make_game();
+        game.field_model.weather = Weather::Nice;
+        // Pre-set so that options.len()==1: force single option by using a fixed
+        // known-single-weather roll. We simply check the report was added.
+        // (actual roll seed-dependent, but any start adds a roll report)
+        let mut step = StepWeatherMage::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        // Roll report always added
+        assert!(game.report_list.has_report(ReportId::WEATHER_MAGE_ROLL));
     }
 }

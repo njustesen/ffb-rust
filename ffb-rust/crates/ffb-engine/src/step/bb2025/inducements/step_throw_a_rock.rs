@@ -1,6 +1,8 @@
 use ffb_model::enums::ApothecaryMode;
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::report::bb2025::report_throw_at_player::ReportThrowAtPlayer;
+use ffb_model::report::report_id::ReportId;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -79,6 +81,9 @@ impl StepThrowARock {
         let successful = roll >= 4;
 
         let throw_event = GameEvent::ThrowAtPlayer { player_id: target_id.clone(), roll, successful };
+
+        // Java: getResult().addReport(new ReportThrowAtPlayer(player.getId(), roll, successful))
+        game.report_list.add(ReportThrowAtPlayer::new(target_id.clone(), roll, successful));
 
         // Java: FieldCoordinate startCoordinate (animation origin — not tracked in Rust)
         // Java: UtilServerGame.syncGameModel(this)
@@ -267,5 +272,26 @@ mod tests {
         let mut step = StepThrowARock::new(false);
         assert!(step.set_parameter(&StepParameter::HomeTeam(true)));
         assert!(step.home_team);
+    }
+
+    #[test]
+    fn report_throw_at_player_added_on_eligible_target() {
+        let mut game = make_game();
+        let p = make_player("away1", 1);
+        game.team_away.players.push(p);
+        game.field_model.set_player_coordinate("away1", FieldCoordinate::new(10, 7));
+        game.field_model.set_player_state("away1", ffb_model::enums::PlayerState::new(PS_STANDING));
+
+        let mut step = StepThrowARock::new(true);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::THROW_AT_PLAYER));
+    }
+
+    #[test]
+    fn no_report_when_no_eligible_players() {
+        let mut game = make_game();
+        let mut step = StepThrowARock::new(true);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::THROW_AT_PLAYER));
     }
 }

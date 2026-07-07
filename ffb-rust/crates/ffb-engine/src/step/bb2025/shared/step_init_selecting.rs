@@ -1,6 +1,10 @@
 use ffb_model::enums::PlayerAction;
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::model::skill_use::SkillUse;
 use ffb_model::prompts::AgentPrompt;
+use ffb_model::report::mixed::report_staller_detected::ReportStallerDetected;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
 use crate::action::{Action, PlayerActionChoice};
 use crate::step::framework::{Step, StepOutcome};
@@ -77,6 +81,47 @@ impl Step for StepInitSelecting {
                     PlayerActionChoice::Block | PlayerActionChoice::Blitz
                 );
                 self.dispatch_player_action = Some(pa);
+                // Java: checkForStaller() called after CLIENT_ACTIVATE_PLAYER
+                Self::check_for_staller(game);
+            }
+            // Java: CLIENT_USE_SKILL — selected skills that are resolved immediately (SKIP_STEP).
+            Action::UseSkill { skill_id, use_skill: true } => {
+                let acting_player_id = game.acting_player.player_id.clone();
+                // Collect skill property booleans before any mutable borrow of game.
+                let (gain_hail_mary, avoid_dodging, add_block_die) = {
+                    let p = acting_player_id.as_deref().and_then(|id| game.player(id));
+                    p.map(|player| (
+                        player.has_skill_property(NamedProperties::CAN_GAIN_HAIL_MARY) && player.has_skill(*skill_id),
+                        player.has_skill_property(NamedProperties::CAN_AVOID_DODGING) && player.has_skill(*skill_id),
+                        player.has_skill_property(NamedProperties::CAN_ADD_BLOCK_DIE) && player.has_skill(*skill_id),
+                    )).unwrap_or((false, false, false))
+                };
+                if gain_hail_mary {
+                    // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, GAIN_HAIL_MARY))
+                    game.report_list.add(ReportSkillUse::new(
+                        acting_player_id.clone(),
+                        *skill_id,
+                        true,
+                        SkillUse::GAIN_HAIL_MARY,
+                    ));
+                } else if avoid_dodging {
+                    // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, AVOID_DODGING))
+                    game.report_list.add(ReportSkillUse::new(
+                        acting_player_id.clone(),
+                        *skill_id,
+                        true,
+                        SkillUse::AVOID_DODGING,
+                    ));
+                } else if add_block_die {
+                    // Java: getResult().addReport(new ReportSkillUse(skill, true, ADD_BLOCK_DIE)) — no player_id
+                    game.report_list.add(ReportSkillUse::new(
+                        None,
+                        *skill_id,
+                        true,
+                        SkillUse::ADD_BLOCK_DIE,
+                    ));
+                }
+                return self.execute_step(game, rng);
             }
             _ => {}
         }
@@ -94,6 +139,21 @@ impl Step for StepInitSelecting {
 }
 
 impl StepInitSelecting {
+    /// Java: `checkForStaller()` — if game is already marked stalling (game.stalling==true),
+    /// emit `ReportStallerDetected` for the acting player (unless they are forgone).
+    fn check_for_staller(game: &mut Game) {
+        if game.stalling {
+            let player_id = game.acting_player.player_id.clone();
+            if let Some(pid) = player_id {
+                let forgo = game.acting_player.forgone;
+                if !forgo {
+                    // Java: if (actingPlayer.getPlayerAction() != PlayerAction.FORGO)
+                    game.report_list.add(ReportStallerDetected::new(Some(pid)));
+                }
+            }
+        }
+    }
+
     fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         let label = &self.goto_label_on_end;
 
@@ -249,6 +309,66 @@ mod tests {
         let out = step.handle_command(&action, &mut game, &mut GameRng::new(0));
         assert!(step.force_goto_on_dispatch);
         assert_eq!(out.action, StepAction::GotoLabel);
+    }
+
+    #[test]
+    fn use_skill_hail_mary_adds_report() {
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::report::report_id::ReportId;
+        use std::collections::HashSet;
+        let mut game = make_game();
+        // Add a player with HailMaryPass (canGainHailMary property).
+        game.team_home.players.push(Player {
+            id: "hm1".into(), name: "HM".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: ffb_model::enums::SkillId::HailMaryPass, value: None }],
+            extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.home_playing = true;
+        game.acting_player.player_id = Some("hm1".into());
+        let mut step = StepInitSelecting::new("end".into());
+        step.handle_command(
+            &Action::UseSkill { skill_id: ffb_model::enums::SkillId::HailMaryPass, use_skill: true },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(game.report_list.has_report(ReportId::SKILL_USE),
+            "expected SKILL_USE report for HailMaryPass");
+    }
+
+    #[test]
+    fn staller_detected_report_added_when_stalling() {
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+        use ffb_model::report::report_id::ReportId;
+        use std::collections::HashSet;
+        let mut game = make_game();
+        game.stalling = true;
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.forgone = false;
+        game.team_home.players.push(Player {
+            id: "p1".into(), name: "P1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("p1", ffb_model::types::FieldCoordinate::new(5, 5));
+        let mut step = StepInitSelecting::new("end".into());
+        let action = Action::ActivatePlayer {
+            player_id: "p1".into(),
+            player_action: PlayerActionChoice::Move,
+            block_defender_id: None,
+        };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::STALLER_DETECTED),
+            "expected STALLER_DETECTED report when game.stalling is true");
     }
 
     #[test]

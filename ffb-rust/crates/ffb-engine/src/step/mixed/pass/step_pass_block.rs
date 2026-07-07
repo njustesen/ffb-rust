@@ -15,6 +15,7 @@
 /// Java: `@RulesCollection(BB2020, BB2025)`, extends `AbstractStep`.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_pass_block::ReportPassBlock;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -107,6 +108,12 @@ impl StepPassBlock {
             // Simplified: emit PassBlockEligible event and emit PassBlock(false) if none,
             // then advance.  Full mechanic lookup deferred.
             // Java: if (availablePassBlockers.size() == 0) { report PassBlock(false); }
+            let opposing_team_id = if game.home_playing {
+                game.team_away.id.clone()
+            } else {
+                game.team_home.id.clone()
+            };
+            game.report_list.add(ReportPassBlock::new(opposing_team_id, false));
             let outcome = StepOutcome::next()
                 .with_event(ffb_model::events::GameEvent::PassBlock {
                     player_id: None,
@@ -157,8 +164,36 @@ mod tests {
     use ffb_model::model::game::Game;
     use ffb_model::util::rng::GameRng;
 
+    use ffb_model::report::report_id::ReportId;
+
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+    }
+
+    #[test]
+    fn pass_block_report_added_when_no_pass_blockers() {
+        let mut step = StepPassBlock::new();
+        let mut game = make_game();
+        game.thrower_id = Some("p1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(
+            game.report_list.has_report(ReportId::PASS_BLOCK),
+            "should add ReportPassBlock(available=false) when no eligible pass blockers"
+        );
+    }
+
+    #[test]
+    fn no_pass_block_report_when_no_thrower() {
+        let mut step = StepPassBlock::new();
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(
+            !game.report_list.has_report(ReportId::PASS_BLOCK),
+            "should not add ReportPassBlock when there is no thrower"
+        );
     }
 
     #[test]

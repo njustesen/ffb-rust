@@ -1,5 +1,8 @@
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
@@ -84,6 +87,35 @@ impl StepMove {
         // Java: actingPlayer.getCurrentMove() + (jumping ? 2 : 1)
         let move_increment = if jumping { 2 } else { 1 };
         game.acting_player.current_move += move_increment;
+
+        // Java: if currentMove > movementWithModifiers + possibleFreeRushes && extraGfiOnceSkill.isPresent()
+        //   actingPlayer.markSkillUsed(extraGfiOnceSkill); addReport(ReportSkillUse(actingPlayer.getPlayerId(), skill, true, RUSH_ADDITIONALLY))
+        let extra_gfi_once_skill = game.acting_player.player_id.as_deref()
+            .and_then(|id| game.player(id))
+            .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_MAKE_AN_EXTRA_GFI_ONCE));
+        if let Some(skill_id) = extra_gfi_once_skill {
+            let possible_free_rushes = 2 + if game.acting_player.player_id.as_deref()
+                .and_then(|id| game.player(id))
+                .map(|p| p.has_skill_property(NamedProperties::CAN_MAKE_AN_EXTRA_GFI))
+                .unwrap_or(false) { 1 } else { 0 };
+            let movement = game.acting_player.player_id.as_deref()
+                .and_then(|id| game.player(id))
+                .map(|p| p.movement_with_modifiers())
+                .unwrap_or(0);
+            if game.acting_player.current_move > movement + possible_free_rushes {
+                if let Some(pid) = game.acting_player.player_id.clone() {
+                    if let Some(p) = game.team_home.player_mut(&pid).or_else(|| game.team_away.player_mut(&pid)) {
+                        p.used_skills.insert(skill_id);
+                    }
+                }
+                game.report_list.add(ReportSkillUse::new(
+                    game.acting_player.player_id.clone(),
+                    skill_id,
+                    true,
+                    SkillUse::RUSH_ADDITIONAL_SQUARE_ONCE,
+                ));
+            }
+        }
 
         // Java: game.getFieldModel().add(trackNumber)
         // client-only: TrackNumber animation — field_model.track_numbers is client-side display only
@@ -375,5 +407,53 @@ mod tests {
         step.coordinate_to = Some(to);
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.acting_player.goes_for_it);
+    }
+
+    // ── report_list: extra GFI once skill (RUSH_ADDITIONAL_SQUARE_ONCE) ──────
+
+    #[test]
+    fn extra_gfi_once_skill_adds_skill_use_report() {
+        use ffb_model::report::report_id::ReportId;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::SkillId;
+        // Player with SureFeet (CAN_MAKE_AN_EXTRA_GFI_ONCE), MA=4
+        // current_move starts at 5 (will become 6 after +1), > MA(4) + possibleFreeRushes(2) = 6 → exact threshold met
+        let mut game = make_game();
+        let from = FieldCoordinate::new(5, 5);
+        let to = FieldCoordinate::new(6, 5);
+        add_player(&mut game, "p1", from);
+        game.team_home.player_mut("p1").unwrap()
+            .starting_skills.push(SkillWithValue::new(SkillId::SureFeet));
+        // Set current_move so that after increment (current_move=6) > MA(4)+2=6 → false
+        // Need current_move after increment > MA + 2, so start at 6 (becomes 7)
+        game.acting_player.current_move = 6;
+        let mut step = StepMove::new();
+        step.coordinate_from = Some(from);
+        step.coordinate_to = Some(to);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_USE),
+            "expected SKILL_USE report for RUSH_ADDITIONAL_SQUARE_ONCE");
+    }
+
+    #[test]
+    fn extra_gfi_once_not_triggered_within_free_rushes() {
+        use ffb_model::report::report_id::ReportId;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::SkillId;
+        // Player with SureFeet (CAN_MAKE_AN_EXTRA_GFI_ONCE), MA=4
+        // current_move starts at 0 (becomes 1 after increment), < MA(4)+2=6 → no extra GFI once
+        let mut game = make_game();
+        let from = FieldCoordinate::new(5, 5);
+        let to = FieldCoordinate::new(6, 5);
+        add_player(&mut game, "p1", from);
+        game.team_home.player_mut("p1").unwrap()
+            .starting_skills.push(SkillWithValue::new(SkillId::SureFeet));
+        game.acting_player.current_move = 0;
+        let mut step = StepMove::new();
+        step.coordinate_from = Some(from);
+        step.coordinate_to = Some(to);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::SKILL_USE),
+            "no SKILL_USE report when current_move within free rushes");
     }
 }

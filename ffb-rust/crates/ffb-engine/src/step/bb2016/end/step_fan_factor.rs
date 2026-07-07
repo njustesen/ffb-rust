@@ -4,6 +4,7 @@
 /// Java: `DiceRoller.rollFanFactorPostMatch(winner)` = 3D6 if winning, 2D6 otherwise.
 /// Java: `DiceInterpreter.interpretFanFactorRoll(rolls, fan_factor, score_diff)`.
 use ffb_model::model::game::Game;
+use ffb_model::report::bb2016::report_fan_factor_roll_post_match::ReportFanFactorRollPostMatch;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -48,24 +49,44 @@ impl StepFanFactor {
         let away_fan_factor = game.team_away.fan_factor;
 
         // Home
-        let home_modifier = if !game.game_result.home.conceded {
-            let rolls = Self::roll_fan_factor_post_match(rng, score_diff_home > 0);
-            let total = Self::sum(rolls, score_diff_home > 0);
-            Self::interpret_fan_factor_roll(total, home_fan_factor, score_diff_home)
+        let home_winning = score_diff_home > 0;
+        let (home_modifier, home_roll_vec) = if !game.game_result.home.conceded {
+            let rolls = Self::roll_fan_factor_post_match(rng, home_winning);
+            let total = Self::sum(rolls, home_winning);
+            let roll_vec = if home_winning {
+                vec![rolls.0, rolls.1, rolls.2]
+            } else {
+                vec![rolls.0, rolls.1]
+            };
+            (Self::interpret_fan_factor_roll(total, home_fan_factor, score_diff_home), roll_vec)
         } else {
-            -1
+            (-1, vec![])
         };
         game.game_result.home.fan_factor_modifier = home_modifier;
 
         // Away (score_diff for away = -score_diff_home)
-        let away_modifier = if !game.game_result.away.conceded {
-            let rolls = Self::roll_fan_factor_post_match(rng, score_diff_home < 0);
-            let total = Self::sum(rolls, score_diff_home < 0);
-            Self::interpret_fan_factor_roll(total, away_fan_factor, -score_diff_home)
+        let away_winning = score_diff_home < 0;
+        let (away_modifier, away_roll_vec) = if !game.game_result.away.conceded {
+            let rolls = Self::roll_fan_factor_post_match(rng, away_winning);
+            let total = Self::sum(rolls, away_winning);
+            let roll_vec = if away_winning {
+                vec![rolls.0, rolls.1, rolls.2]
+            } else {
+                vec![rolls.0, rolls.1]
+            };
+            (Self::interpret_fan_factor_roll(total, away_fan_factor, -score_diff_home), roll_vec)
         } else {
-            -1
+            (-1, vec![])
         };
         game.game_result.away.fan_factor_modifier = away_modifier;
+
+        // Java: getResult().addReport(new ReportFanFactorRollPostMatch(...))
+        game.report_list.add(ReportFanFactorRollPostMatch::new(
+            home_roll_vec,
+            home_modifier,
+            away_roll_vec,
+            away_modifier,
+        ));
 
         StepOutcome::next()
     }
@@ -150,5 +171,27 @@ mod tests {
         // Both should be set to -1, 0, or 1 — not the default uninitialised value
         assert!(game.game_result.home.fan_factor_modifier >= -1 && game.game_result.home.fan_factor_modifier <= 1);
         assert!(game.game_result.away.fan_factor_modifier >= -1 && game.game_result.away.fan_factor_modifier <= 1);
+    }
+
+    #[test]
+    fn report_fan_factor_roll_post_match_added_to_report_list() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepFanFactor::new();
+        let mut game = make_game(2, 0, 5, 5);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(game.report_list.has_report(ReportId::FAN_FACTOR_ROLL_POST_MATCH),
+            "expected FAN_FACTOR_ROLL_POST_MATCH in report list");
+    }
+
+    #[test]
+    fn report_added_exactly_once() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepFanFactor::new();
+        let mut game = make_game(1, 0, 5, 5);
+        let mut rng = GameRng::new(42);
+        step.start(&mut game, &mut rng);
+        assert_eq!(game.report_list.size(), 1, "exactly one report should be added");
+        assert!(game.report_list.has_report(ReportId::FAN_FACTOR_ROLL_POST_MATCH));
     }
 }

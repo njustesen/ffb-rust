@@ -7,6 +7,7 @@
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::option::game_option_id;
+use ffb_model::report::mixed::report_prayer_amount::ReportPrayerAmount;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, SequenceStep};
@@ -95,6 +96,8 @@ impl StepPrayers {
             }
             // Stack is LIFO: reverse so first prayer runs first.
             seq.reverse();
+            // Java: getResult().addReport(new ReportPrayerAmount(tvHome, tvAway, prayerAmount, homeTeamReceivesPrayers))
+            game.report_list.add(ReportPrayerAmount::new(self.tv_home, self.tv_away, prayer_amount, home_team_receives));
             return StepOutcome::next().with_event(prayer_amount_event).push_seq(seq);
         }
 
@@ -258,5 +261,27 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(7));
         let seq = &out.pushes[0];
         assert_eq!(seq.len(), 16, "league mode should allow up to 16 unique prayers");
+    }
+
+    #[test]
+    fn tv_difference_emits_prayer_amount_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.options.set("inducementPrayersCost", "50000");
+        let mut step = StepPrayers::new();
+        step.tv_home = 1_000_000;
+        step.tv_away = 1_050_000; // 1 prayer
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PRAYER_AMOUNT));
+    }
+
+    #[test]
+    fn no_tv_difference_does_not_emit_prayer_amount_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepPrayers::new();
+        // tv_home == tv_away -> 0 prayers -> no report
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::PRAYER_AMOUNT));
     }
 }

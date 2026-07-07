@@ -9,6 +9,7 @@
 /// Behavior without handler: NEXT_STEP immediately (matches Java "no handler found" path).
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::bb2025::report_prayer_roll::ReportPrayerRoll;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -80,7 +81,7 @@ impl Step for StepPrayer {
 }
 
 impl StepPrayer {
-    fn execute_step(&mut self, _game: &mut Game) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
         // Java: UtilServerDialog.hideDialog(gameState)
         // Java: lookup PrayerHandler from factories (not yet translated)
         //
@@ -90,7 +91,18 @@ impl StepPrayer {
         // Java firstRun path when handler present: handler.initEffect() → may CONT for dialog.
         // Java secondRun path: handler.applySelection() → NEXT_STEP.
         // Both paths collapse to NEXT_STEP when the handler infrastructure is absent.
-        self.first_run = false;
+        if self.first_run {
+            self.first_run = false;
+            // Java: getResult().addReport(new ReportPrayerRoll(teamName, roll, isHomeTeam))
+            let team_id = self.team_id.clone().unwrap_or_default();
+            let team_name = game.team_by_id(&team_id)
+                .map(|t| t.name.clone())
+                .unwrap_or_default();
+            let home_team = game.team_home.id == team_id;
+            game.report_list.add(ReportPrayerRoll::new(team_name, self.roll, home_team));
+        } else {
+            self.first_run = false;
+        }
         StepOutcome::next()
     }
 }
@@ -156,5 +168,28 @@ mod tests {
         let mut step = StepPrayer::default();
         step.set_parameter(&StepParameter::TeamId("away".into()));
         assert_eq!(step.team_id.as_deref(), Some("away"));
+    }
+
+    #[test]
+    fn start_adds_prayer_roll_report_on_first_run() {
+        let mut game = make_game();
+        let mut step = StepPrayer::new(3, "home");
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ffb_model::report::report_id::ReportId::PRAYER_ROLL),
+            "ReportPrayerRoll must be added on first run"
+        );
+    }
+
+    #[test]
+    fn start_does_not_add_prayer_roll_report_on_second_run() {
+        let mut game = make_game();
+        let mut step = StepPrayer::new(3, "home");
+        step.first_run = false; // simulate second run
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            !game.report_list.has_report(ffb_model::report::report_id::ReportId::PRAYER_ROLL),
+            "ReportPrayerRoll must NOT be added on subsequent runs"
+        );
     }
 }

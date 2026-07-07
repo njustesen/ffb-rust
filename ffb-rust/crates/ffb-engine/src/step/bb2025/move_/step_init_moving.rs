@@ -1,6 +1,9 @@
 use ffb_model::enums::PlayerAction;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -144,6 +147,20 @@ impl Step for StepInitMoving {
             Action::EndTurn => {
                 self.end_turn = true;
                 return self.execute_step(game, rng);
+            }
+
+            // Java: CLIENT_USE_SKILL → canAddBlockDie → ReportSkillUse(skill, true, ADD_BLOCK_DIE)
+            Action::UseSkill { skill_id, use_skill: true } => {
+                if skill_id.properties().contains(&NamedProperties::CAN_ADD_BLOCK_DIE) {
+                    let player_id = game.acting_player.player_id.clone();
+                    game.report_list.add(ReportSkillUse::new(
+                        player_id,
+                        *skill_id,
+                        true,
+                        SkillUse::ADD_BLOCK_DIE,
+                    ));
+                    // Java: also dispatches to blitz if BlitzMove && !hasBlocked — deferred
+                }
             }
 
             // Java: CLIENT_ACTING_PLAYER with no player_id → fEndPlayerAction = true, EXECUTE_STEP
@@ -500,5 +517,31 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         // Java: setDodging(moveSquare.isDodging() && !actingPlayer.isJumping()) → false when jumping
         assert!(!game.acting_player.dodging, "dodging suppressed while jumping");
+    }
+
+    #[test]
+    fn use_skill_non_block_die_does_not_add_report() {
+        // Dodge does NOT have CAN_ADD_BLOCK_DIE -- no report should be added
+        use ffb_model::enums::SkillId;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        let mut step = StepInitMoving::new("end".into());
+        let action = crate::action::Action::UseSkill { skill_id: SkillId::Dodge, use_skill: true };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::SKILL_USE), "non-block-die UseSkill should not add report");
+    }
+
+    #[test]
+    fn use_skill_false_does_not_add_report() {
+        // use_skill: false -- no report should be added regardless of skill
+        use ffb_model::enums::SkillId;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        let mut step = StepInitMoving::new("end".into());
+        let action = crate::action::Action::UseSkill { skill_id: SkillId::Block, use_skill: false };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::SKILL_USE), "use_skill: false should not add report");
     }
 }

@@ -89,6 +89,16 @@ impl Step for StepThenIStartedBlastin {
                     let hit_id = player_id.clone();
                     let outcome = self.hit_player(game, rng, &hit_id);
                     let acting_id = game.acting_player.player_id.clone().unwrap_or_default();
+                    {
+                        use ffb_model::report::mixed::report_then_i_started_blastin::ReportThenIStartedBlastin;
+                        game.report_list.add(ReportThenIStartedBlastin::new(
+                            Some(acting_id.clone()),
+                            Some(hit_id.clone()),
+                            0,
+                            true,
+                            false,
+                        ));
+                    }
                     return outcome.with_event(GameEvent::ThenIStartedBlastin {
                         attacker_id: acting_id,
                         defender_id: Some(hit_id),
@@ -164,6 +174,16 @@ impl StepThenIStartedBlastin {
         if game.turn_mode != TurnMode::ThenIStartedBlastin {
             self.old_turn_mode = game.last_turn_mode;
             game.turn_mode = TurnMode::ThenIStartedBlastin;
+            {
+                use ffb_model::report::mixed::report_then_i_started_blastin::ReportThenIStartedBlastin;
+                game.report_list.add(ReportThenIStartedBlastin::new(
+                    Some(acting_id.clone()),
+                    None,
+                    0,
+                    false,
+                    false,
+                ));
+            }
             return StepOutcome::cont().with_event(GameEvent::ThenIStartedBlastin {
                 attacker_id: acting_id.clone(),
                 defender_id: None,
@@ -189,6 +209,16 @@ impl StepThenIStartedBlastin {
         self.roll = rng.d6();
         let success = self.roll >= 3;
         let def_id = game.defender_id.clone();
+        {
+            use ffb_model::report::mixed::report_then_i_started_blastin::ReportThenIStartedBlastin;
+            game.report_list.add(ReportThenIStartedBlastin::new(
+                Some(acting_id.clone()),
+                def_id.clone(),
+                self.roll,
+                success,
+                self.roll == 1,
+            ));
+        }
         let tisb_event = GameEvent::ThenIStartedBlastin {
             attacker_id: acting_id.clone(),
             defender_id: def_id.clone(),
@@ -432,5 +462,44 @@ mod tests {
         game.acting_player.player_action = Some(PlayerAction::BlitzMove);
         StepThenIStartedBlastin::mark_action_used(&mut game);
         assert!(game.turn_data_mut().blitz_used);
+    }
+
+    #[test]
+    fn enter_mode_adds_report() {
+        // Java: executeStep() when not yet in TISB mode → addReport(ReportThenIStartedBlastin(actorId, null, 0, false, false))
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, _) = make_game();
+        let mut step = StepThenIStartedBlastin::new();
+        // First call: not yet in THEN_I_STARTED_BLASTIN mode → should enter mode and add report
+        let _out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.turn_mode, TurnMode::ThenIStartedBlastin,
+            "turn mode should switch to ThenIStartedBlastin");
+        assert!(game.report_list.has_report(ReportId::THEN_I_STARTED_BLASTIN),
+            "entering TISB mode should add a ReportThenIStartedBlastin");
+    }
+
+    #[test]
+    fn roll_adds_report_with_correct_fields() {
+        // Java: executeStep() when already in TISB mode → addReport(ReportThenIStartedBlastin(actorId, defenderId, roll, success, fumble))
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, _actor_id) = make_game();
+        // Put a defender on the away team so the roll path can complete
+        let def_id = "defender2".to_string();
+        game.team_away.players.push(make_plain_player(&def_id));
+        game.field_model.set_player_state(&def_id, PlayerState::new(PS_STANDING).change_active(true));
+        game.field_model.set_player_coordinate(&def_id, FieldCoordinate::new(12, 7));
+        game.defender_id = Some(def_id.clone());
+        // Pre-position into TISB mode (skip the enter-mode branch)
+        game.turn_mode = TurnMode::ThenIStartedBlastin;
+        game.last_turn_mode = Some(TurnMode::Regular);
+        let mut step = StepThenIStartedBlastin::new();
+        step.old_turn_mode = Some(TurnMode::Regular);
+        let _out = step.execute_step(&mut game, &mut GameRng::new(42));
+        assert!(game.report_list.has_report(ReportId::THEN_I_STARTED_BLASTIN),
+            "rolling in TISB mode should add a ReportThenIStartedBlastin with roll/success fields");
+        // Verify player_id is set correctly in the report
+        let reports = game.report_list.get_reports();
+        let tisb_report = reports.iter().find(|r| r.get_id() == ReportId::THEN_I_STARTED_BLASTIN);
+        assert!(tisb_report.is_some(), "expected exactly one TISB report");
     }
 }

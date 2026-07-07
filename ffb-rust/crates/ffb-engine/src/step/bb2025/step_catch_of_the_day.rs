@@ -6,6 +6,10 @@
 /// Runtime params: END_TURN, END_PLAYER_ACTION.
 use ffb_model::enums::{SkillId, PlayerAction};
 use ffb_model::model::game::Game;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::mixed::report_catch_of_the_day_roll::ReportCatchOfTheDayRoll;
+use ffb_model::report::mixed::report_skill_wasted::ReportSkillWasted;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -79,6 +83,7 @@ impl StepCatchOfTheDay {
 
         // Java: if (endTurn || endPlayerAction) → ReportSkillWasted + GOTO_LABEL
         if self.end_turn || self.end_player_action {
+            game.report_list.add(ReportSkillWasted::new(Some(player_id.clone()), Some(SkillId::CatchOfTheDay)));
             return StepOutcome::goto(&self.goto_label_on_failure);
         }
 
@@ -96,6 +101,9 @@ impl StepCatchOfTheDay {
         let in_range = player_coord.distance_in_steps(ball_coord) <= 3;
 
         if ball_moving && in_range {
+            // Java: addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, GET_BALL_ON_GROUND))
+            game.report_list.add(ReportSkillUse::new(Some(player_id.clone()), SkillId::CatchOfTheDay, true, SkillUse::GET_BALL_ON_GROUND));
+
             // Java: roll = getDiceRoller().rollDice(6); success = roll >= 3
             let roll = rng.d6();
             let success = roll >= 3;
@@ -105,8 +113,13 @@ impl StepCatchOfTheDay {
                 game.field_model.ball_moving = false;
             }
             // On failure with random agent: no re-roll → NEXT_STEP
+
+            // Java: addReport(new ReportCatchOfTheDayRoll(actingPlayer.getPlayerId(), success, roll, 3, reRolled))
+            game.report_list.add(ReportCatchOfTheDayRoll::new(Some(player_id.clone()), success, roll, 3, false));
+        } else {
+            // Java: not in range → addReport(new ReportSkillWasted(actingPlayer.getPlayerId(), skill))
+            game.report_list.add(ReportSkillWasted::new(Some(player_id.clone()), Some(SkillId::CatchOfTheDay)));
         }
-        // Not in range → ReportSkillWasted (not translated), NEXT_STEP
 
         StepOutcome::next()
     }
@@ -261,5 +274,28 @@ mod tests {
         let mut step = StepCatchOfTheDay::new();
         let _ = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.field_model.ball_coordinate, Some(ball_coord));
+    }
+
+    #[test]
+    fn end_turn_adds_skill_wasted_report() {
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, _) = make_game_cotd();
+        let mut step = StepCatchOfTheDay::new();
+        step.goto_label_on_failure = "FAIL".into();
+        step.end_turn = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_WASTED));
+    }
+
+    #[test]
+    fn out_of_range_adds_skill_wasted_report() {
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, _) = make_game_cotd();
+        let ball_coord = FieldCoordinate::new(15, 7); // 5 steps away — out of range
+        game.field_model.ball_coordinate = Some(ball_coord);
+        game.field_model.ball_moving = true;
+        let mut step = StepCatchOfTheDay::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_WASTED));
     }
 }

@@ -117,6 +117,14 @@ impl Step for StepEndBlocking {
                     }
                     _ => {
                         // Java: canAddBlockDie — update dice decorations
+                        // Java: getResult().addReport(new ReportSkillUse(commandUseSkill.getSkill(), true, SkillUse.ADD_BLOCK_DIE))
+                        {
+                            use ffb_model::model::skill_use::SkillUse;
+                            use ffb_model::report::report_skill_use::ReportSkillUse;
+                            game.report_list.add(ReportSkillUse::new(
+                                None, *skill_id, true, SkillUse::ADD_BLOCK_DIE,
+                            ));
+                        }
                         ServerUtilBlock::update_dice_decorations_with_frenzy(game, true);
                     }
                 }
@@ -970,6 +978,38 @@ mod tests {
         remove_player_block_states(&mut game, None);
         let new_state = game.field_model.player_state("p_standing").unwrap();
         assert_eq!(new_state.base(), PS_STANDING);
+    }
+
+    // ── report_list: ADD_BLOCK_DIE skill use ─────────────────────────────────
+
+    #[test]
+    fn use_skill_block_adds_report_skill_use_add_block_die() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepEndBlocking::new();
+        let mut game = make_game();
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Block, use_skill: true },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(game.report_list.has_report(ReportId::SKILL_USE),
+            "expected SKILL_USE report for ADD_BLOCK_DIE");
+    }
+
+    #[test]
+    fn use_skill_add_block_die_report_count_is_one() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepEndBlocking::new();
+        let mut game = make_game();
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Block, use_skill: true },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        let count = game.report_list.get_reports().iter()
+            .filter(|r| r.get_id() == ReportId::SKILL_USE)
+            .count();
+        assert_eq!(count, 1, "exactly one SKILL_USE report should be added");
     }
 
     // ── auto-decline for skills not present on player ─────────────────────────

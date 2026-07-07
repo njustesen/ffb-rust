@@ -4,6 +4,7 @@
 /// Java: the `INDUCEMENTS_ALWAYS_USE_TREASURY` option check is omitted (not in Rust model).
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::mixed::report_free_petty_cash::ReportFreePettyCash;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -25,9 +26,19 @@ impl StepPettyCash {
         if available_petty_cash != 0 {
             // Negative means home is underdog; positive means away is underdog
             if available_petty_cash < 0 {
-                game.game_result.home.petty_cash_from_tv_diff = available_petty_cash.unsigned_abs() as i32;
+                let amount = available_petty_cash.unsigned_abs() as i32;
+                game.game_result.home.petty_cash_from_tv_diff = amount;
+                // Java: getResult().addReport(new ReportFreePettyCash(underdogResult.getTeam().getId(), underdogResult.getPettyCashFromTvDiff()))
+                game.report_list.add(ReportFreePettyCash::new(
+                    Some(game.team_home.id.clone()),
+                    amount,
+                ));
             } else {
                 game.game_result.away.petty_cash_from_tv_diff = available_petty_cash;
+                game.report_list.add(ReportFreePettyCash::new(
+                    Some(game.team_away.id.clone()),
+                    available_petty_cash,
+                ));
             }
         }
 
@@ -61,12 +72,38 @@ mod tests {
     use crate::step::framework::test_team;
     use ffb_model::enums::Rules;
 
+    use ffb_model::report::report_id::ReportId;
+
     fn make_game(home_tv: i32, away_tv: i32) -> Game {
         let mut home = test_team("home", 0);
         let mut away = test_team("away", 0);
         home.team_value = home_tv;
         away.team_value = away_tv;
         Game::new(home, away, Rules::Bb2025)
+    }
+
+    #[test]
+    fn petty_cash_report_when_tv_differs() {
+        let mut step = StepPettyCash::new();
+        let mut game = make_game(1_200_000, 1_000_000);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(
+            game.report_list.has_report(ReportId::FREE_PETTY_CASH),
+            "should add ReportFreePettyCash when TV differs"
+        );
+    }
+
+    #[test]
+    fn no_petty_cash_report_when_equal_tv() {
+        let mut step = StepPettyCash::new();
+        let mut game = make_game(1_000_000, 1_000_000);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(
+            !game.report_list.has_report(ReportId::FREE_PETTY_CASH),
+            "should not add ReportFreePettyCash when TV is equal"
+        );
     }
 
     #[test]

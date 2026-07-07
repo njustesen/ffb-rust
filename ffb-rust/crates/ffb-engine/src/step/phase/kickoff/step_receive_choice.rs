@@ -5,6 +5,8 @@
 /// game.home_first_offense and game.setup_offense.
 use ffb_model::model::game::Game;
 use ffb_model::prompts::AgentPrompt;
+use ffb_model::report::report_id::ReportId;
+use ffb_model::report::report_receive_choice::ReportReceiveChoice;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepId, StepOutcome, StepParameter};
@@ -61,8 +63,12 @@ impl StepReceiveChoice {
         //       else { game.setHomePlaying(fReceiveChoice); }
         if self.choosing_team_id.as_deref() == Some(game.team_home.id.as_str()) {
             game.home_playing = !receive_choice;
+            // Java: getResult().addReport(new ReportReceiveChoice(game.getTeamHome().getId(), fReceiveChoice))
+            game.report_list.add(ReportReceiveChoice::new(game.team_home.id.clone(), receive_choice));
         } else {
             game.home_playing = receive_choice;
+            // Java: getResult().addReport(new ReportReceiveChoice(game.getTeamAway().getId(), fReceiveChoice))
+            game.report_list.add(ReportReceiveChoice::new(game.team_away.id.clone(), receive_choice));
         }
         game.home_first_offense = !game.home_playing;
         game.setup_offense = false;
@@ -127,5 +133,25 @@ mod tests {
         let mut step = StepReceiveChoice::new();
         assert!(step.set_parameter(&StepParameter::ChoosingTeamId(Some("home".to_string()))));
         assert!(!step.set_parameter(&StepParameter::EndTurn(false)));
+    }
+
+    #[test]
+    fn home_choosing_adds_receive_choice_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepReceiveChoice::new();
+        step.set_parameter(&StepParameter::ChoosingTeamId(Some("home".to_string())));
+        step.handle_command(&Action::ReceiveChoice { receive: true }, &mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::RECEIVE_CHOICE));
+    }
+
+    #[test]
+    fn away_choosing_adds_receive_choice_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepReceiveChoice::new();
+        step.set_parameter(&StepParameter::ChoosingTeamId(Some("away".to_string())));
+        step.handle_command(&Action::ReceiveChoice { receive: false }, &mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::RECEIVE_CHOICE));
     }
 }

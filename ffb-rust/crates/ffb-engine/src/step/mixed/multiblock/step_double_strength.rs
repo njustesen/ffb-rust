@@ -5,6 +5,7 @@
 /// `DoubleTargetStrengthForPlayer` for the chosen target.
 use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
+use ffb_model::report::mixed::report_indomitable::ReportIndomitable;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -59,14 +60,20 @@ impl Step for StepDoubleStrength {
             _ => None,
         };
         if let Some(target_id) = chosen {
+            let actor_id = game.acting_player.player_id.clone();
             // Mark skill used
-            if let Some(actor_id) = game.acting_player.player_id.clone() {
-                if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == actor_id)
-                    .or_else(|| game.team_away.players.iter_mut().find(|p| p.id == actor_id))
+            if let Some(ref aid) = actor_id {
+                if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == *aid)
+                    .or_else(|| game.team_away.players.iter_mut().find(|p| p.id == *aid))
                 {
                     p.used_skills.insert(SkillId::Indomitable);
                 }
             }
+            // Java: getResult().addReport(new ReportIndomitable(actingPlayer.getPlayerId(), playerIds.get(0)))
+            game.report_list.add(ReportIndomitable::new(
+                actor_id,
+                Some(target_id.clone()),
+            ));
             self.player_ids.clear();
             return StepOutcome::next()
                 .publish(StepParameter::DoubleTargetStrengthForPlayer(target_id));
@@ -172,5 +179,35 @@ mod tests {
             matches!(p, StepParameter::DoubleTargetStrengthForPlayer(id) if id == "tgt")
         });
         assert!(has_double);
+    }
+
+    #[test]
+    fn indomitable_report_added_when_skill_used() {
+        let mut step = StepDoubleStrength::new();
+        step.set_parameter(&StepParameter::PlayerIdDauntlessSuccess("tgt".into()));
+        let mut game = make_game();
+        add_player_with_skill(&mut game, "att", SkillId::Indomitable);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Indomitable, use_skill: true },
+            &mut game, &mut rng,
+        );
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::INDOMITABLE));
+    }
+
+    #[test]
+    fn no_indomitable_report_when_skill_declined() {
+        let mut step = StepDoubleStrength::new();
+        step.set_parameter(&StepParameter::PlayerIdDauntlessSuccess("tgt".into()));
+        let mut game = make_game();
+        add_player_with_skill(&mut game, "att", SkillId::Indomitable);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Indomitable, use_skill: false },
+            &mut game, &mut rng,
+        );
+        assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::INDOMITABLE));
     }
 }

@@ -11,6 +11,8 @@
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::enums::{SkillId, PassResult, ReRollSource};
+use ffb_model::report::report_always_hungry_roll::ReportAlwaysHungryRoll;
+use ffb_model::report::report_escape_roll::ReportEscapeRoll;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
@@ -94,6 +96,18 @@ impl StepAlwaysHungry {
             }
             let successful = DiceInterpreter::is_always_hungry_successful(self.roll_ah);
 
+            let re_rolled = self.re_roll_state.re_rolled_action
+                .as_ref().map(|a| a.name == "ALWAYS_HUNGRY").unwrap_or(false)
+                && self.re_roll_state.re_roll_source.is_some();
+            game.report_list.add(ReportAlwaysHungryRoll::new(
+                Some(acting_id.clone()),
+                successful,
+                self.roll_ah,
+                2,
+                re_rolled,
+                vec![],
+            ));
+
             if successful {
                 return StepOutcome::next();
             }
@@ -146,6 +160,15 @@ impl StepAlwaysHungry {
                     self.roll_escape = rng.d6();
                 }
                 let successful = DiceInterpreter::is_escape_from_always_hungry_successful(self.roll_escape);
+
+                game.report_list.add(ReportEscapeRoll::new(
+                    self.thrown_player_id.clone(),
+                    successful,
+                    self.roll_escape,
+                    2,
+                    false,
+                    vec![],
+                ));
 
                 if successful {
                     let label = self.goto_label_on_success.clone();
@@ -389,5 +412,34 @@ mod tests {
     fn set_parameter_unknown_returns_false() {
         let mut step = StepAlwaysHungry::new();
         assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
+    }
+
+    #[test]
+    fn always_hungry_roll_adds_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        add_always_hungry_player(&mut game, "ogre");
+        add_thrown_player(&mut game, "gob");
+        let mut step = StepAlwaysHungry::new();
+        step.goto_label_on_failure = "fail".into();
+        step.goto_label_on_success = "success".into();
+        step.thrown_player_id = Some("gob".into());
+        step.start(&mut game, &mut GameRng::new(5));
+        assert!(game.report_list.has_report(ReportId::ALWAYS_HUNGRY_ROLL));
+    }
+
+    #[test]
+    fn escape_roll_adds_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        add_always_hungry_player(&mut game, "ogre");
+        game.team_home.player_mut("ogre").unwrap().used_skills.insert(SkillId::AlwaysHungry);
+        add_thrown_player(&mut game, "gob");
+        let mut step = StepAlwaysHungry::new();
+        step.goto_label_on_failure = "fail".into();
+        step.goto_label_on_success = "success".into();
+        step.thrown_player_id = Some("gob".into());
+        step.start(&mut game, &mut GameRng::new(5));
+        assert!(game.report_list.has_report(ReportId::ESCAPE_ROLL));
     }
 }

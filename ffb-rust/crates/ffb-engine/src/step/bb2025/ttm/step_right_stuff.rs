@@ -1,9 +1,12 @@
-use ffb_model::enums::{ApothecaryMode, PlayerState, PS_FALLING};
+use ffb_model::enums::{ApothecaryMode, PlayerState, PS_FALLING, SkillId};
 use ffb_model::enums::PassResult as ModelPassResult;
 use ffb_model::enums::ReRollSource;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::re_rolled_action::ReRolledAction;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::report_right_stuff_roll::ReportRightStuffRoll;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
@@ -230,14 +233,34 @@ impl StepRightStuff {
             let mut successful = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
 
             // Java: if passResult==FUMBLE && thrower.hasSkillProperty(fumbledPlayerLandsSafely): successful=true
-            if self.pass_result == Some(ModelPassResult::Fumble) {
-                let thrower_lands_safely = game.thrower_id.as_deref()
+            let thrower_lands_safely = if self.pass_result == Some(ModelPassResult::Fumble) {
+                game.thrower_id.as_deref()
                     .and_then(|id| game.player(id))
                     .map(|p| p.has_skill_property(NamedProperties::FUMBLED_PLAYER_LANDS_SAFELY))
-                    .unwrap_or(false);
-                if thrower_lands_safely {
-                    successful = true;
-                }
+                    .unwrap_or(false)
+            } else {
+                false
+            };
+            if thrower_lands_safely {
+                // Java: addReport(new ReportSkillUse(game.getThrowerId(), thrower.getSkillWithProperty(fumbledPlayerLandsSafely), true, FUMBLED_PLAYER_LANDS_SAFELY));
+                game.report_list.add(ReportSkillUse::new(
+                    game.thrower_id.clone(),
+                    SkillId::Reliable,
+                    true,
+                    SkillUse::FUMBLED_PLAYER_LANDS_SAFELY,
+                ));
+                successful = true;
+            } else {
+                // Java: getResult().addReport(new ReportRightStuffRoll(fThrownPlayerId, successful, roll, minimumRoll, reRolled, modifiers));
+                let re_rolled = already_rerolled && self.re_roll_state.re_roll_source.is_some();
+                game.report_list.add(ReportRightStuffRoll::new(
+                    self.thrown_player_id.clone(),
+                    successful,
+                    self.roll,
+                    minimum_roll,
+                    re_rolled,
+                    vec![],
+                ));
             }
 
             if successful {
@@ -439,5 +462,64 @@ mod tests {
         step.re_roll_state.set_re_roll_source(ReRollSource::new("TRR"));
         step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut GameRng::new(0));
         assert!(step.re_roll_state.re_roll_source.is_none());
+    }
+
+    // ── report wiring ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn right_stuff_roll_report_added_on_normal_roll() {
+        use ffb_model::report::report_id::ReportId;
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PS_STANDING, PlayerState};
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        let mut p = Player::default();
+        p.id = "p1".into();
+        p.agility = 3;
+        game.team_home.players.push(p);
+        let coord = FieldCoordinate::new(5, 5);
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+        game.home_playing = true;
+
+        let mut step = StepRightStuff::new("success".into());
+        step.thrown_player_id = Some("p1".into());
+        step.thrown_player_has_ball = Some(false);
+        step.old_player_state = Some(PlayerState::new(PS_STANDING));
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::RIGHT_STUFF_ROLL)
+            || game.report_list.has_report(ReportId::SKILL_USE),
+            "either RIGHT_STUFF_ROLL or SKILL_USE report must be added");
+    }
+
+    #[test]
+    fn right_stuff_roll_report_present_when_roll_happens() {
+        use ffb_model::report::report_id::ReportId;
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PS_STANDING, PlayerState};
+        use ffb_model::types::FieldCoordinate;
+        // Seed that produces roll=6 (success)
+        let mut seed = 0u64;
+        loop {
+            if GameRng::new(seed).d6() == 6 { break; }
+            seed += 1;
+        }
+        let mut game = make_game();
+        game.home_playing = true;
+        let mut p = Player::default();
+        p.id = "p1".into();
+        p.agility = 3;
+        game.team_home.players.push(p);
+        let coord = FieldCoordinate::new(10, 7);
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+
+        let mut step = StepRightStuff::new("success".into());
+        step.thrown_player_id = Some("p1".into());
+        step.thrown_player_has_ball = Some(false);
+        step.old_player_state = Some(PlayerState::new(PS_STANDING));
+        step.start(&mut game, &mut GameRng::new(seed));
+        assert!(game.report_list.has_report(ReportId::RIGHT_STUFF_ROLL),
+            "RIGHT_STUFF_ROLL report must be added on a normal d6 roll (no FumbledPlayerLandsSafely)");
     }
 }

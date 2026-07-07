@@ -1,5 +1,6 @@
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::mixed::report_defecting_players::ReportDefectingPlayers;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::StepId;
@@ -40,9 +41,13 @@ impl StepPlayerLoss {
                 .collect()
         };
 
+        let mut rolls: Vec<i32> = Vec::new();
+        let mut defectings: Vec<bool> = Vec::new();
         for pid in &player_ids {
             let roll = rng.d6();
             let defecting = roll <= 2;
+            rolls.push(roll);
+            defectings.push(defecting);
             let results = if conceding_home {
                 &mut game.game_result.home.player_results
             } else {
@@ -53,6 +58,11 @@ impl StepPlayerLoss {
             }
         }
 
+        // Java: .addReport(new ReportDefectingPlayers(defectingPlayerIds.toArray(new String[0]), rolls, defectings))
+        if !player_ids.is_empty() {
+            game.report_list.add(ReportDefectingPlayers::new(player_ids, rolls, defectings));
+        }
+
         StepOutcome::next()
     }
 }
@@ -61,6 +71,7 @@ impl StepPlayerLoss {
 mod tests {
     use super::*;
     use std::collections::HashSet;
+    use ffb_model::report::report_id::ReportId;
     use crate::step::framework::test_team;
     use crate::step::framework::StepAction;
     use ffb_model::enums::{PlayerType, PlayerGender, Rules, SkillId};
@@ -149,5 +160,30 @@ mod tests {
         let mut step = StepPlayerLoss;
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.game_result.home.player_results["h1"].defecting);
+    }
+
+    #[test]
+    fn defecting_players_report_added_when_player_has_enough_extra_skills() {
+        let mut game = make_game();
+        game.game_result.home.conceded = true;
+        game.conceded_legally = false;
+        game.team_home.players.push(make_player_with_extra_skills("h1", 3));
+        game.game_result.home.player_results.insert("h1".into(), PlayerResult::default());
+        let mut step = StepPlayerLoss;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::DEFECTING_PLAYERS), "should add ReportDefectingPlayers");
+    }
+
+    #[test]
+    fn no_defecting_report_when_no_eligible_players() {
+        let mut game = make_game();
+        game.game_result.home.conceded = true;
+        game.conceded_legally = false;
+        // player with only 2 extra skills — below threshold
+        game.team_home.players.push(make_player_with_extra_skills("h1", 2));
+        game.game_result.home.player_results.insert("h1".into(), PlayerResult::default());
+        let mut step = StepPlayerLoss;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::DEFECTING_PLAYERS), "should NOT add report when no eligible players");
     }
 }

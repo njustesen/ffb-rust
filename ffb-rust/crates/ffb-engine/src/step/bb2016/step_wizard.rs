@@ -138,6 +138,11 @@ impl StepWizard {
                     }
                 }
                 let team_id = if self.home_team { game.team_home.id.clone() } else { game.team_away.id.clone() };
+                // Java: getResult().addReport(new ReportWizardUse(team.getId(), fWizardSpell))
+                {
+                    use ffb_model::report::report_wizard_use::ReportWizardUse;
+                    game.report_list.add(ReportWizardUse::new(team_id.clone(), spell));
+                }
                 let wizard_event = GameEvent::WizardUse {
                     team_id,
                     spell: format!("{:?}", spell),
@@ -183,6 +188,7 @@ mod tests {
     use crate::step::framework::test_team;
     use crate::step::framework::StepAction;
     use ffb_model::enums::Rules;
+    use ffb_model::report::report_id::ReportId;
 
     fn make_game() -> Game {
         let home = test_team("home", 0);
@@ -273,5 +279,39 @@ mod tests {
             &mut GameRng::new(0),
         );
         assert_eq!(step.wizard_spell, Some(SpecialEffect::FIREBALL));
+    }
+
+    #[test]
+    fn lightning_spell_emits_wizard_use_report() {
+        // Java: getResult().addReport(new ReportWizardUse(team.getId(), fWizardSpell))
+        // Verify ReportWizardUse is added when a spell is cast in WIZARD turn mode.
+        let mut step = StepWizard::new();
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Wizard;
+        game.home_playing = true;
+        let coord = FieldCoordinate::new(8, 4);
+        step.handle_command(
+            &Action::WizardSpell { spell: WizardSpellChoice::Lightning, coord },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(game.report_list.has_report(ReportId::WIZARD_USE), "ReportWizardUse must be emitted on spell cast");
+    }
+
+    #[test]
+    fn fireball_spell_emits_wizard_use_report() {
+        // Java: getResult().addReport(new ReportWizardUse(team.getId(), fWizardSpell))
+        // Verify ReportWizardUse is added for fireball spells as well.
+        let mut step = StepWizard::new();
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Wizard;
+        game.home_playing = true;
+        let coord = FieldCoordinate::new(3, 6);
+        step.handle_command(
+            &Action::WizardSpell { spell: WizardSpellChoice::Fireball, coord },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(game.report_list.has_report(ReportId::WIZARD_USE), "ReportWizardUse must be emitted on fireball cast");
     }
 }

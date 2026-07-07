@@ -1,5 +1,6 @@
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::mixed::report_winnings::ReportWinnings;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::StepId;
@@ -41,6 +42,12 @@ impl StepWinnings {
         game.game_result.home.winnings = (home_winnings * 10_000.0) as i32;
         game.game_result.away.winnings = (away_winnings * 10_000.0) as i32;
 
+        // Java: getResult().addReport(new ReportWinnings((int) homeWinnings, (int) awayWinnings))
+        game.report_list.add(ReportWinnings::new(
+            game.game_result.home.winnings,
+            game.game_result.away.winnings,
+        ));
+
         StepOutcome::next()
     }
 }
@@ -51,6 +58,7 @@ mod tests {
     use crate::step::framework::test_team;
     use crate::step::framework::StepAction;
     use ffb_model::enums::Rules;
+    use ffb_model::report::report_id::ReportId;
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020)
@@ -153,5 +161,31 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.game_result.home.winnings, 0);
         assert_eq!(game.game_result.away.winnings, 0);
+    }
+
+    #[test]
+    fn adds_winnings_report() {
+        let mut game = make_game();
+        game.game_result.home.score = 1;
+        game.game_result.away.score = 0;
+        game.game_result.home.fan_factor = 2;
+        game.game_result.away.fan_factor = 2;
+        let mut step = StepWinnings;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::WINNINGS), "should add ReportWinnings");
+    }
+
+    #[test]
+    fn winnings_report_added_for_both_teams() {
+        let mut game = make_game();
+        game.game_result.home.score = 2;
+        game.game_result.away.score = 1;
+        game.game_result.home.fan_factor = 4;
+        game.game_result.away.fan_factor = 4;
+        let mut step = StepWinnings;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::WINNINGS));
+        assert_eq!(game.game_result.home.winnings, 60_000);
+        assert_eq!(game.game_result.away.winnings, 50_000);
     }
 }

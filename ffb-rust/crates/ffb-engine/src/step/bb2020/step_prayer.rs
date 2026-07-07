@@ -8,6 +8,7 @@
 /// Stub: PrayerHandlerFactory not translated → NEXT_STEP immediately.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::bb2020::report_prayer_roll::ReportPrayerRoll;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -59,8 +60,12 @@ impl Step for StepPrayer {
 }
 
 impl StepPrayer {
-    fn execute_step(&mut self, _game: &mut Game) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
         // Stub: PrayerHandlerFactory not translated → treat as "no handler found" path.
+        if self.first_run {
+            // Java: getResult().addReport(new ReportPrayerRoll(roll))
+            game.report_list.add(ReportPrayerRoll::new(self.roll));
+        }
         self.first_run = false;
         StepOutcome::next()
     }

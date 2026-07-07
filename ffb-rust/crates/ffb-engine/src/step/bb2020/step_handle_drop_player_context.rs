@@ -1,4 +1,6 @@
 use ffb_model::model::game::Game;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::drop_player_context::{DropPlayerContext, VictimStateKey};
@@ -31,7 +33,20 @@ impl Step for StepHandleDropPlayerContext {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: CLIENT_USE_SKILL → addReport(new ReportSkillUse(playerId, skill, isSkillUsed, skillUse))
+        if let Action::UseSkill { skill_id, use_skill } = action {
+            if let Some(ctx) = &self.drop_player_context {
+                if let Some(ir) = &ctx.injury_result {
+                    let skill_use = ir.injury_context()
+                        .modified_injury_context.as_deref()
+                        .and_then(|mic| mic.skill_use_modification)
+                        .unwrap_or(SkillUse::WOULD_NOT_HELP);
+                    let player_id = game.acting_player.player_id.clone();
+                    game.report_list.add(ReportSkillUse::new(player_id, *skill_id, *use_skill, skill_use));
+                }
+            }
+        }
         self.execute_step(game, rng)
     }
 
@@ -211,5 +226,35 @@ mod tests {
         let dpc = DropPlayerContext { injury_result: Some(Box::new(InjuryResult::new(ApothecaryMode::Defender))), ..DropPlayerContext::new() };
         assert!(step.set_parameter(&StepParameter::DropPlayerContext(Box::new(dpc))));
         assert!(step.drop_player_context.is_some());
+    }
+
+    #[test]
+    fn handle_command_use_skill_emits_report_skill_use() {
+        // Java: CLIENT_USE_SKILL → addReport(new ReportSkillUse(...))
+        use ffb_model::enums::SkillId;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        game.acting_player.player_id = Some("p1".to_owned());
+        let mut step = StepHandleDropPlayerContext::new();
+        step.drop_player_context = Some(make_dpc("p1"));
+        let action = crate::action::Action::UseSkill { skill_id: SkillId::Pro, use_skill: true };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_USE));
+    }
+
+    #[test]
+    fn handle_command_use_skill_not_used_also_emits_report_skill_use() {
+        // Java: even when isSkillUsed == false, addReport is still called
+        use ffb_model::enums::SkillId;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        game.acting_player.player_id = Some("p1".to_owned());
+        let mut step = StepHandleDropPlayerContext::new();
+        step.drop_player_context = Some(make_dpc("p1"));
+        let action = crate::action::Action::UseSkill { skill_id: SkillId::Pro, use_skill: false };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_USE));
     }
 }

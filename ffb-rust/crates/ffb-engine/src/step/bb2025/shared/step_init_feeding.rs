@@ -3,6 +3,8 @@ use ffb_model::enums::{PlayerState, PS_KNOCKED_OUT, PS_RESERVE};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::report::mixed::report_player_event::ReportPlayerEvent;
+use ffb_model::report::report_id::ReportId;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_cards::UtilCards;
@@ -161,6 +163,12 @@ impl StepInitFeeding {
         } else {
             self.end_turn = true;
 
+            // Java: getResult().addReport(new ReportPlayerEvent(actingPlayer.getPlayerId(), "failed to bite anyone causing a turnover"))
+            game.report_list.add(ReportPlayerEvent::new(
+                game.acting_player.player_id.clone(),
+                Some("failed to bite anyone causing a turnover".into()),
+            ));
+
             let is_eligible = player_state.map(|s| {
                 !s.is_casualty() && s.base() != PS_KNOCKED_OUT && s.base() != PS_RESERVE
             }).unwrap_or(false);
@@ -228,6 +236,7 @@ mod tests {
     use crate::step::framework::{StepAction, test_team};
     use ffb_model::enums::{PlayerGender, PS_STANDING, Rules};
     use ffb_model::model::player::Player;
+    use ffb_model::report::report_id::ReportId;
     use ffb_model::types::FieldCoordinate;
 
     fn make_game() -> Game {
@@ -335,6 +344,40 @@ mod tests {
         let state = game.field_model.player_state("vamp");
         assert!(state.map(|s| !s.has_tacklezones()).unwrap_or(false));
         assert_ne!(state.map(|s| s.base()), Some(PS_RESERVE));
+    }
+
+    #[test]
+    fn failed_to_bite_adds_player_event_report() {
+        // Vampire is blood_lusting but feed_on_player_choice is false → turnover path
+        let mut step = StepInitFeeding::new();
+        step.goto_label_on_end = Some("lbl".into());
+        step.feeding_allowed = Some(false); // forces feed_on_player_choice = false
+        let mut game = make_game();
+        game.acting_player.player_id = Some("vamp".into());
+        game.acting_player.suffering_blood_lust = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PLAYER_EVENT),
+            "should have PLAYER_EVENT report when vampire fails to bite");
+    }
+
+    #[test]
+    fn player_event_not_added_when_feeding_succeeds() {
+        // Vampire successfully feeds → no turnover player event
+        let mut step = StepInitFeeding::new();
+        step.goto_label_on_end = Some("lbl".into());
+        step.feeding_allowed = Some(true);
+        step.feed_on_player_choice = Some(true);
+        let mut game = make_game();
+        let coord = FieldCoordinate::new(5, 5);
+        let vcoord = FieldCoordinate::new(6, 5);
+        add_player(&mut game, "vamp", coord, true);
+        add_player(&mut game, "thrall", vcoord, true);
+        game.acting_player.player_id = Some("vamp".into());
+        game.acting_player.suffering_blood_lust = true;
+        game.defender_id = Some("thrall".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::PLAYER_EVENT),
+            "no PLAYER_EVENT when vampire successfully feeds");
     }
 
     #[test]

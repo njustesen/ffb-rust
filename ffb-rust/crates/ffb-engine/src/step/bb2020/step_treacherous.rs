@@ -1,4 +1,7 @@
 use ffb_model::enums::{ApothecaryMode, PlayerAction, SkillId};
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::report_skill_use::ReportSkillUse;
+use ffb_model::report::mixed::report_skill_wasted::ReportSkillWasted;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -80,6 +83,7 @@ impl StepTreacherous {
 
         // Java: if (endTurn || endPlayerAction) → ReportSkillWasted + GOTO_LABEL + markSkillUsed
         if self.end_turn || self.end_player_action {
+            game.report_list.add(ReportSkillWasted::new(Some(player_id.clone()), Some(SkillId::Treacherous)));
             Self::mark_skill_used(game, &player_id);
             return StepOutcome::goto(&self.goto_label_on_failure);
         }
@@ -120,6 +124,8 @@ impl StepTreacherous {
             StepOutcome::next()
         };
 
+        // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, SkillUse.TREACHEROUS))
+        game.report_list.add(ReportSkillUse::new(Some(player_id.clone()), SkillId::Treacherous, true, SkillUse::TREACHEROUS));
         // Java: actingPlayer.markSkillUsed(skill)
         Self::mark_skill_used(game, &player_id);
 
@@ -281,5 +287,35 @@ mod tests {
         assert!(step.set_parameter(&StepParameter::EndTurn(true)));
         assert!(step.set_parameter(&StepParameter::EndPlayerAction(true)));
         assert!(!step.set_parameter(&StepParameter::NrOfDice(2)));
+    }
+
+    #[test]
+    fn wasted_opportunity_adds_skill_wasted_report() {
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, _) = make_game_with_treacherous();
+        let mut step = StepTreacherous::new();
+        step.end_turn = true; // opportunity is wasted
+        step.goto_label_on_failure = "fail".into();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_WASTED), "wasted opportunity should add ReportSkillWasted");
+    }
+
+    #[test]
+    fn successful_stab_adds_skill_use_report() {
+        use ffb_model::report::report_id::ReportId;
+        use ffb_model::types::FieldCoordinate;
+        let (mut game, actor_id) = make_game_with_treacherous();
+        // Actor already placed at (10,7). Place a teammate with ball adjacent at (11,7).
+        let target_coord = FieldCoordinate::new(11, 7);
+        game.team_home.players.push(make_player("teammate", None));
+        game.field_model.set_player_coordinate("teammate", target_coord);
+        game.field_model.set_player_state("teammate", PlayerState::new(PS_STANDING).change_active(true));
+        game.field_model.ball_coordinate = Some(target_coord);
+        game.home_playing = true;
+        game.acting_player.player_id = Some(actor_id);
+        let mut step = StepTreacherous::new();
+        step.goto_label_on_failure = "fail".into();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_USE), "stab should add ReportSkillUse");
     }
 }

@@ -3,6 +3,7 @@ use ffb_model::enums::{PassResult, PlayerState};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::mixed::report_kick_team_mate_fumble::ReportKickTeamMateFumble;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepAction, StepId, StepParameter};
@@ -102,6 +103,8 @@ impl StepDispatchScatterPlayer {
     fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: if passResult==FUMBLE && isKickedPlayer: report KickTeamMateFumble; NEXT_STEP
         if self.pass_result == PassResult::Fumble && self.is_kicked_player {
+            // Java: getResult().addReport(new ReportKickTeamMateFumble());
+            game.report_list.add(ReportKickTeamMateFumble::new());
             return StepOutcome::next().with_event(GameEvent::KickTeamMateFumble);
         }
 
@@ -224,5 +227,31 @@ mod tests {
     fn default_pass_result_is_fumble() {
         let step = StepDispatchScatterPlayer::default();
         assert_eq!(step.pass_result, PassResult::Fumble);
+    }
+
+    // ── report wiring ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn fumble_kicked_player_adds_kick_team_mate_fumble_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepDispatchScatterPlayer::new();
+        step.pass_result = PassResult::Fumble;
+        step.is_kicked_player = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::KICK_TEAM_MATE_FUMBLE),
+            "KICK_TEAM_MATE_FUMBLE report must be added when kicked player fumbles");
+    }
+
+    #[test]
+    fn non_kicked_fumble_does_not_add_kick_team_mate_fumble_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepDispatchScatterPlayer::new();
+        step.pass_result = PassResult::Fumble;
+        step.is_kicked_player = false;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::KICK_TEAM_MATE_FUMBLE),
+            "KICK_TEAM_MATE_FUMBLE report must NOT be added for non-kicked fumble");
     }
 }

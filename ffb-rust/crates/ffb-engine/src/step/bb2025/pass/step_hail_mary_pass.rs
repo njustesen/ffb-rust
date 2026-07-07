@@ -2,6 +2,7 @@ use ffb_model::enums::PassResult;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::mixed::report_pass_roll::ReportPassRoll;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -100,7 +101,7 @@ impl Step for StepHailMaryPass {
 }
 
 impl StepHailMaryPass {
-    fn execute_step(&mut self, _game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: getGameState().executeStepHooks(this, state)
         //   → HailMaryPassHandler (not yet translated)
         //
@@ -133,6 +134,22 @@ impl StepHailMaryPass {
 
         let pass_fumble = is_fumble && self.using_safe_pass != Some(true);
         let label = self.goto_label_on_failure.clone();
+
+        // Java: PassBehaviour.handleExecuteStepHook → addReport(new ReportPassRoll(..., true/*hailMary*/))
+        let re_rolled = self.re_rolled_action.is_some() && self.re_roll_source.is_some();
+        game.report_list.add(ReportPassRoll::new(
+            game.thrower_id.clone(),
+            is_accurate,
+            self.roll,
+            self.minimum_roll,
+            re_rolled,
+            vec![],
+            None,  // passing_distance: N/A for hail mary
+            false, // bomb
+            None,  // result name: not yet determined at this point
+            true,  // hail_mary_pass
+            None,  // stat_based_roll_modifier
+        ));
 
         if is_accurate {
             // ACCURATE
@@ -210,5 +227,25 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(step.roll, 6); // unchanged
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn accurate_roll_emits_pass_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.roll = 5;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PASS_ROLL));
+    }
+
+    #[test]
+    fn fumble_roll_emits_pass_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PASS_ROLL));
     }
 }

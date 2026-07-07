@@ -7,6 +7,7 @@
 /// Java: `@RulesCollection(BB2020, BB2025)`, extends `AbstractStepWithReRoll`.
 use ffb_model::model::game::Game;
 use ffb_model::model::re_rolled_action::ReRolledAction;
+use ffb_model::report::mixed::report_all_you_can_eat_roll::ReportAllYouCanEatRoll;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter, SequenceStep};
@@ -69,6 +70,15 @@ impl StepAllYouCanEat {
             // Java: int roll = getDiceRoller().rollSkill()
             let roll = rng.d6();
             success = roll >= MINIMUM_ROLL;
+
+            // Java: getResult().addReport(new ReportAllYouCanEatRoll(player.getId(), success, roll, minimumRoll, reRolled))
+            game.report_list.add(ReportAllYouCanEatRoll::new(
+                Some(player_id.clone()),
+                success,
+                roll,
+                MINIMUM_ROLL,
+                rerolled,
+            ));
 
             let outcome_base = StepOutcome::next()
                 .with_event(ffb_model::events::GameEvent::AllYouCanEatRoll {
@@ -216,5 +226,23 @@ mod tests {
         assert_eq!(seq.len(), 2);
         assert_eq!(seq[0].step_id, StepId::EjectPlayer);
         assert_eq!(seq[1].step_id, StepId::Bribes);
+    }
+
+    #[test]
+    fn all_you_can_eat_report_added_on_roll() {
+        let mut game = make_game();
+        game.thrower_id = Some("bard".into());
+        let mut step = StepAllYouCanEat::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::ALL_YOU_CAN_EAT));
+    }
+
+    #[test]
+    fn no_all_you_can_eat_report_when_no_thrower() {
+        let mut game = make_game();
+        // No thrower set
+        let mut step = StepAllYouCanEat::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::ALL_YOU_CAN_EAT));
     }
 }

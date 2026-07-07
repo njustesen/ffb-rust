@@ -1,4 +1,6 @@
 use ffb_model::enums::Direction;
+use ffb_model::report::bb2025::report_punt_distance::ReportPuntDistance;
+use ffb_model::report::report_id::ReportId;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -64,6 +66,10 @@ impl StepPuntDistance {
 
         self.distance = rng.d6() as i32;
         let landing = coord_from.step(direction, self.distance);
+
+        let out_of_bounds = !landing.is_on_pitch();
+        // Java: getResult().addReport(new ReportPuntDistance(distance, fieldModel.isOutOfBounds()))
+        game.report_list.add(ReportPuntDistance::new(self.distance, out_of_bounds));
 
         if landing.is_on_pitch() {
             game.field_model.ball_coordinate = Some(landing);
@@ -156,5 +162,25 @@ mod tests {
         assert!(result.is_some());
         let c = result.unwrap();
         assert!(c.is_on_pitch());
+    }
+
+    #[test]
+    fn report_punt_distance_added_on_valid_step() {
+        let mut game = make_game();
+        let from = FieldCoordinate::new(5, 7);
+        let mut step = StepPuntDistance::new();
+        step.direction = Some(Direction::East);
+        step.coordinate_from = Some(from);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PUNT_DISTANCE_ROLL));
+    }
+
+    #[test]
+    fn no_punt_distance_report_without_direction() {
+        let mut game = make_game();
+        let mut step = StepPuntDistance::new();
+        step.coordinate_from = Some(FieldCoordinate::new(5, 7));
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::PUNT_DISTANCE_ROLL));
     }
 }

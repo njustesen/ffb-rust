@@ -22,6 +22,7 @@
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::enums::ReRollSource;
+use ffb_model::report::report_pickup_roll::ReportPickupRoll;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
@@ -144,6 +145,17 @@ impl StepPickUp {
 
         let successful = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
 
+        let already_rerolled_for_report = self.re_roll_state.re_rolled_action
+            .as_ref().map(|a| a.name == "PICKUP").unwrap_or(false);
+        game.report_list.add(ReportPickupRoll::new(
+            Some(player_id.to_owned()),
+            successful,
+            self.roll,
+            minimum_roll,
+            already_rerolled_for_report,
+            vec![],
+        ));
+
         if successful {
             game.field_model.ball_moving = false;
             return StepOutcome::next();
@@ -197,6 +209,7 @@ mod tests {
     use ffb_model::enums::{PlayerType, PlayerGender};
     use ffb_model::types::FieldCoordinate;
     use ffb_model::util::rng::GameRng;
+    use ffb_model::report::report_id::ReportId;
     use std::collections::HashSet;
 
     fn make_game() -> Game {
@@ -317,5 +330,27 @@ mod tests {
         let mut step = StepPickUp::new("old".into());
         assert!(step.set_parameter(&StepParameter::GotoLabelOnFailure("new".into())));
         assert_eq!(step.goto_label_on_failure, "new");
+    }
+
+    #[test]
+    fn success_adds_pick_up_roll_report() {
+        let mut game = make_game();
+        add_player_at_ball(&mut game, "p1");
+        let mut step = StepPickUp::new("fail".into());
+        step.roll = 6;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PICK_UP_ROLL), "success should add ReportPickupRoll");
+    }
+
+    #[test]
+    fn failure_adds_pick_up_roll_report() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        add_player_at_ball(&mut game, "p1");
+        let mut step = StepPickUp::new("fail".into());
+        step.roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PICK_UP_ROLL), "failure should also add ReportPickupRoll");
     }
 }

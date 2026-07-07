@@ -17,6 +17,8 @@
 /// PlayerNote("is awarded a touchdown") GameEvent wired.
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::report::mixed::report_player_event::ReportPlayerEvent;
+use ffb_model::report::report_id::ReportId;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -80,6 +82,8 @@ impl StepAssignTouchdowns {
                     let idx = rng.range(players.len());
                     let pid = players[idx].clone();
                     pending_events.push(GameEvent::PlayerNote { player_id: pid.clone(), note: "is awarded a touchdown".into() });
+                    // Java: getResult().addReport(new ReportPlayerEvent(player.getId(), "is awarded a touchdown"))
+                    game.report_list.add(ReportPlayerEvent::new(Some(pid.clone()), Some("is awarded a touchdown".into())));
                     let result = if game.team_home.id == winning_team_id {
                         game.game_result.home.player_results.entry(pid).or_default()
                     } else {
@@ -96,6 +100,8 @@ impl StepAssignTouchdowns {
         if let Some(pid) = self.player_id.take() {
             if !pid.is_empty() {
                 pending_events.push(GameEvent::PlayerNote { player_id: pid.clone(), note: "is awarded a touchdown".into() });
+                // Java: getResult().addReport(new ReportPlayerEvent(playerId, "is awarded a touchdown"))
+                game.report_list.add(ReportPlayerEvent::new(Some(pid.clone()), Some("is awarded a touchdown".into())));
                 let result = if game.team_home.id == winning_team_id {
                     game.game_result.home.player_results.entry(pid).or_default()
                 } else {
@@ -183,7 +189,8 @@ impl Step for StepAssignTouchdowns {
 mod tests {
     use super::*;
     use crate::step::framework::{StepAction, test_team};
-    use ffb_model::enums::Rules;
+    use ffb_model::enums::{Rules, PlayerGender, PlayerType};
+    use ffb_model::model::player::Player;
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020)
@@ -273,5 +280,46 @@ mod tests {
         let td = game.game_result.home.player_results
             .get("p_winner").map(|r| r.touchdowns).unwrap_or(0);
         assert_eq!(td, 1);
+    }
+
+    fn make_bare_player(id: &str) -> Player {
+        Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "l".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn select_player_adds_player_event_report() {
+        // Java: getResult().addReport(new ReportPlayerEvent(playerId, "is awarded a touchdown"))
+        // Verify report_list gets a PLAYER_EVENT report when a player_id is provided via SelectPlayer.
+        let mut game = make_game();
+        let team_id = game.team_home.id.clone();
+        let mut step = StepAssignTouchdowns::new();
+        step.winning_team_id = Some(team_id);
+        step.touchdowns = 1;
+        step.player_id = Some("p1".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PLAYER_EVENT));
+    }
+
+    #[test]
+    fn admin_mode_adds_player_event_report() {
+        // Java: getResult().addReport(new ReportPlayerEvent(player.getId(), "is awarded a touchdown"))
+        // Verify report_list gets a PLAYER_EVENT report when admin_mode assigns a touchdown.
+        let mut game = make_game();
+        game.admin_mode = true;
+        let team_id = game.team_home.id.clone();
+        game.team_home.players.push(make_bare_player("p_admin"));
+        let mut step = StepAssignTouchdowns::new();
+        step.winning_team_id = Some(team_id);
+        step.touchdowns = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PLAYER_EVENT));
     }
 }

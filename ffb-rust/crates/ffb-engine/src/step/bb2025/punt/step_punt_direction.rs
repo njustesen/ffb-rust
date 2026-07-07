@@ -1,6 +1,7 @@
 use ffb_mechanics::bb2025::throw_in_mechanic::ThrowInMechanic;
 use ffb_mechanics::throw_in_mechanic::ThrowInMechanic as ThrowInMechanicTrait;
 use ffb_model::enums::Direction;
+use ffb_model::report::bb2025::report_punt_direction::ReportPuntDirection;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -64,6 +65,8 @@ impl StepPuntDirection {
 
         if self.out_of_bounds {
             let ball_coord = game.field_model.ball_coordinate;
+            let player_id = game.acting_player.player_id.clone().unwrap_or_default();
+            game.report_list.add(ReportPuntDirection::new(None, 0, player_id, true));
             return StepOutcome::goto(&label)
                 .publish(StepParameter::EndTurn(true))
                 .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ThrowIn))
@@ -91,11 +94,15 @@ impl StepPuntDirection {
         let indicator = coord_from.step(direction, 1);
         if indicator.is_on_pitch() {
             game.field_model.ball_coordinate = Some(indicator);
+            let player_id = game.acting_player.player_id.clone().unwrap_or_default();
+            game.report_list.add(ReportPuntDirection::new(Some(direction), roll, player_id, false));
             StepOutcome::next()
                 .publish(StepParameter::Direction(direction))
         } else {
             // Out of bounds — throw in.
             let ball_coord = game.field_model.ball_coordinate;
+            let player_id = game.acting_player.player_id.clone().unwrap_or_default();
+            game.report_list.add(ReportPuntDirection::new(Some(direction), roll, player_id, true));
             StepOutcome::goto(&label)
                 .publish(StepParameter::EndTurn(true))
                 .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ThrowIn))
@@ -178,5 +185,30 @@ mod tests {
         // Either stays on pitch (Direction published) or goes out of bounds (GotoLabel)
         // — either is correct; ensure no panic and step terminates
         assert!(out.action == StepAction::NextStep || out.action == StepAction::GotoLabel);
+    }
+
+    #[test]
+    fn out_of_bounds_flag_adds_punt_direction_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(0, 7));
+        let mut step = StepPuntDirection::new("end".into());
+        step.out_of_bounds = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PUNT_DIRECTION_ROLL), "expected PUNT_DIRECTION_ROLL report");
+    }
+
+    #[test]
+    fn on_pitch_roll_adds_punt_direction_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let from = FieldCoordinate::new(12, 7);
+        let to = FieldCoordinate::new(13, 7);
+        game.field_model.ball_coordinate = Some(from);
+        let mut step = StepPuntDirection::new("end".into());
+        step.coordinate_from = Some(from);
+        step.coordinate_to = Some(to);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PUNT_DIRECTION_ROLL), "expected PUNT_DIRECTION_ROLL report after rolling direction");
     }
 }

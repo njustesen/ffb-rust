@@ -1,6 +1,7 @@
 use ffb_model::enums::PlayerType;
 use ffb_model::enums::{PS_RIP, PS_MISSING};
 use ffb_model::model::game::Game;
+use ffb_model::report::report_most_valuable_players::ReportMostValuablePlayers;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -110,6 +111,12 @@ impl StepMvp {
             pr.player_awards += 1;
             pr.spp_gained += mvp_spp;
         }
+
+        // Java: getResult().addReport(mvpReport) — emits ReportMostValuablePlayers
+        game.report_list.add(ReportMostValuablePlayers::new(
+            self.home_players_mvp.clone(),
+            self.away_players_mvp.clone(),
+        ));
 
         StepOutcome::next()
     }
@@ -246,5 +253,31 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(step.nr_of_home_mvps, 1);
         assert_eq!(step.nr_of_away_mvps, 1);
+    }
+
+    /// Report MOST_VALUABLE_PLAYERS is added to report_list after normal game.
+    #[test]
+    fn report_most_valuable_players_added_to_report_list() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game_with_players();
+        let mut step = StepMvp::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::MOST_VALUABLE_PLAYERS),
+            "expected MOST_VALUABLE_PLAYERS in report_list"
+        );
+    }
+
+    /// Report contains the selected home and away MVP player IDs.
+    #[test]
+    fn report_contains_home_and_away_mvp_ids() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game_with_players();
+        let mut step = StepMvp::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::MOST_VALUABLE_PLAYERS));
+        // One MVP selected per side.
+        assert_eq!(step.home_players_mvp.len(), 1);
+        assert_eq!(step.away_players_mvp.len(), 1);
     }
 }

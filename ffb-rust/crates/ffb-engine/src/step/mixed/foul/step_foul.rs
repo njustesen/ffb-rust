@@ -1,6 +1,7 @@
 use ffb_model::enums::ApothecaryMode;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_foul::ReportFoul;
 use crate::action::Action;
 use crate::drop_player_context::DropPlayerContext;
 use crate::step::framework::{Step, StepOutcome};
@@ -54,6 +55,8 @@ impl StepFoul {
             Some(id) => id,
             None => return StepOutcome::next(),
         };
+        // Java: getResult().addReport(new ReportFoul(game.getDefenderId()))
+        game.report_list.add(ReportFoul::new(defender_id.clone()));
         let attacker_id = game.acting_player.player_id.clone();
 
         let defender_coord = game.field_model.player_coordinate(&defender_id)
@@ -106,6 +109,7 @@ mod tests {
     use ffb_model::model::player::Player;
     use ffb_model::enums::{PlayerType, PlayerGender};
     use ffb_model::types::FieldCoordinate;
+    use ffb_model::report::report_id::ReportId;
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
@@ -128,6 +132,32 @@ mod tests {
         }
         game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 5));
         game.field_model.set_player_state(id, ffb_model::enums::PlayerState::new(PS_STANDING));
+    }
+
+    #[test]
+    fn foul_report_added_when_defender_present() {
+        let mut game = make_game();
+        add_player(&mut game, "home", "attacker");
+        add_player(&mut game, "away", "defender");
+        game.acting_player.player_id = Some("attacker".into());
+        game.defender_id = Some("defender".into());
+        let mut step = StepFoul::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::FOUL),
+            "should add ReportFoul when defender is present"
+        );
+    }
+
+    #[test]
+    fn no_foul_report_when_no_defender() {
+        let mut game = make_game();
+        let mut step = StepFoul::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            !game.report_list.has_report(ReportId::FOUL),
+            "should not add ReportFoul when no defender"
+        );
     }
 
     #[test]

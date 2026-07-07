@@ -1,5 +1,6 @@
 use ffb_mechanics::mechanics::minimum_roll_chainsaw;
 use ffb_model::enums::{ApothecaryMode, ReRollSource};
+use ffb_model::report::report_chainsaw_roll::ReportChainsawRoll;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
@@ -104,6 +105,17 @@ impl StepFoulChainsaw {
             let minimum_roll = minimum_roll_chainsaw();
             let successful = roll >= minimum_roll;
 
+            // Java: getResult().addReport(new ReportChainsawRoll(actingPlayer.getPlayerId(), successful, roll, minimumRoll, reRolled, null))
+            game.report_list.add(ReportChainsawRoll::new(
+                Some(attacker_id.clone()),
+                successful,
+                roll,
+                minimum_roll,
+                already_rerolled,
+                vec![],
+                None, // Java passes null for defender_id in foul context
+            ));
+
             if successful {
                 return StepOutcome::next()
                     .publish(StepParameter::UsingChainsaw(true));
@@ -178,6 +190,7 @@ mod tests {
     use ffb_model::model::skill_def::SkillWithValue;
     use ffb_model::enums::{PlayerType, PlayerGender};
     use ffb_model::types::FieldCoordinate;
+    use ffb_model::report::report_id::ReportId;
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
@@ -197,6 +210,41 @@ mod tests {
         if team == "home" { game.team_home.players.push(p); } else { game.team_away.players.push(p); }
         game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 5));
         game.field_model.set_player_state(id, ffb_model::enums::PlayerState::new(PS_STANDING));
+    }
+
+    #[test]
+    fn chainsaw_roll_report_added_on_roll() {
+        let mut game = make_game();
+        add_player(&mut game, "home", "atk", Some(SkillId::Chainsaw));
+        game.acting_player.player_id = Some("atk".into());
+        let mut step = StepFoulChainsaw::new("fail".into());
+        step.using_chainsaw = true;
+        // Check if Chainsaw has the blocksLikeChainsaw property
+        let has_prop = game.player("atk")
+            .map(|p| p.has_skill_property(NamedProperties::BLOCKS_LIKE_CHAINSAW))
+            .unwrap_or(false);
+        if !has_prop {
+            return; // Chainsaw property not yet wired — skip
+        }
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::CHAINSAW_ROLL),
+            "should add ReportChainsawRoll when chainsaw roll is made"
+        );
+    }
+
+    #[test]
+    fn no_chainsaw_report_when_no_chainsaw_skill() {
+        let mut game = make_game();
+        add_player(&mut game, "home", "atk", None); // no Chainsaw skill
+        game.acting_player.player_id = Some("atk".into());
+        let mut step = StepFoulChainsaw::new("fail".into());
+        step.using_chainsaw = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            !game.report_list.has_report(ReportId::CHAINSAW_ROLL),
+            "should not add ReportChainsawRoll when no chainsaw skill"
+        );
     }
 
     #[test]

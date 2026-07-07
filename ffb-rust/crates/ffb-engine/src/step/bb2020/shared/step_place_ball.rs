@@ -1,4 +1,6 @@
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -48,7 +50,23 @@ impl Step for StepPlaceBall {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        match action {
+            Action::UseSkill { skill_id, use_skill } => {
+                let has_prop = skill_id.properties().contains(&NamedProperties::CAN_PLACE_BALL_WHEN_KNOCKED_DOWN_OR_PLACED_PRONE);
+                if has_prop {
+                    if let Some(pid) = self.player_id.clone() {
+                        game.report_list.add(ReportSkillUse::new(
+                            Some(pid),
+                            *skill_id,
+                            *use_skill,
+                            SkillUse::PLACE_BALL,
+                        ));
+                    }
+                }
+            }
+            _ => {}
+        }
         self.execute_step(game, rng)
     }
 
@@ -135,5 +153,30 @@ mod tests {
         let mut step = StepPlaceBall::new();
         assert!(step.set_parameter(&StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall)));
         assert_eq!(step.catch_scatter_throw_in_mode, Some(CatchScatterThrowInMode::ScatterBall));
+    }
+
+    #[test]
+    fn handle_command_use_skill_adds_skill_use_report() {
+        use ffb_model::enums::SkillId;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepPlaceBall::new();
+        step.player_id = Some("p1".into());
+        // SafePairOfHands has CAN_PLACE_BALL_WHEN_KNOCKED_DOWN_OR_PLACED_PRONE
+        let action = crate::action::Action::UseSkill { skill_id: SkillId::SafePairOfHands, use_skill: true };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_USE), "expected SKILL_USE report on use-skill command");
+    }
+
+    #[test]
+    fn handle_command_no_skill_no_report() {
+        use ffb_model::enums::SkillId;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepPlaceBall::new();
+        step.player_id = Some("p1".into());
+        let action = crate::action::Action::UseSkill { skill_id: SkillId::Block, use_skill: true };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::SKILL_USE), "no SKILL_USE report for irrelevant skill");
     }
 }

@@ -8,6 +8,7 @@
 /// Always returns NEXT_STEP.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_hand_over::ReportHandOver;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter};
@@ -70,6 +71,10 @@ impl StepHandOver {
             if tc.is_adjacent(cc) {
                 // Java: game.getFieldModel().setBallCoordinate(catcherCoordinate)
                 game.field_model.ball_coordinate = Some(cc);
+                // Java: getResult().addReport(new ReportHandOver(fCatcherId))
+                if let Some(ref cid) = self.catcher_id {
+                    game.report_list.add(ReportHandOver::new(cid.clone()));
+                }
                 // Java: publishParameter(CATCH_SCATTER_THROW_IN_MODE, CATCH_HAND_OFF)
                 out = out.publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::CatchHandOff));
             }
@@ -184,6 +189,36 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.field_model.ball_moving);
         assert!(game.pass_coordinate.is_none());
+    }
+
+    #[test]
+    fn adjacent_catcher_adds_hand_over_report() {
+        let mut game = make_game();
+        game.field_model.set_player_coordinate("thrower", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_coordinate("catcher", FieldCoordinate::new(6, 5));
+        game.acting_player.player_id = Some("thrower".into());
+        let mut step = StepHandOver::new();
+        step.catcher_id = Some("catcher".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ffb_model::report::report_id::ReportId::HAND_OVER),
+            "adjacent catcher should add ReportHandOver"
+        );
+    }
+
+    #[test]
+    fn non_adjacent_catcher_no_hand_over_report() {
+        let mut game = make_game();
+        game.field_model.set_player_coordinate("thrower", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_coordinate("catcher", FieldCoordinate::new(8, 5));
+        game.acting_player.player_id = Some("thrower".into());
+        let mut step = StepHandOver::new();
+        step.catcher_id = Some("catcher".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            !game.report_list.has_report(ffb_model::report::report_id::ReportId::HAND_OVER),
+            "non-adjacent catcher should not add ReportHandOver"
+        );
     }
 
     #[test]

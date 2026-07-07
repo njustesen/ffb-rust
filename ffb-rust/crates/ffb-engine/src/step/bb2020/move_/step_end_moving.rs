@@ -1,6 +1,7 @@
 use ffb_model::types::FieldCoordinate;
 use ffb_model::enums::PlayerAction;
 use ffb_model::model::game::Game;
+use ffb_model::report::mixed::report_player_event::ReportPlayerEvent;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
@@ -140,6 +141,24 @@ impl StepEndMoving {
         self.end_turn |= check_touchdown(game);
 
         let feeding_allowed = self.feeding_allowed.unwrap_or(true);
+
+        // Java: triesToSecureBall = playerAction == SECURE_THE_BALL
+        // Java: secureTheBallFailed = endPlayerAction && triesToSecureBall && !UtilPlayer.hasBall(...)
+        let player_action = game.acting_player.player_action;
+        let player_id_for_secure = game.acting_player.player_id.clone();
+        let tries_to_secure_ball = player_action == Some(PlayerAction::SecureTheBall);
+        let has_ball_secure = player_id_for_secure.as_deref()
+            .map(|id| UtilPlayer::has_ball(game, id))
+            .unwrap_or(false);
+        let secure_the_ball_failed = self.end_player_action && tries_to_secure_ball && !has_ball_secure;
+        // Java: if (secureTheBallFailed) getResult().addReport(new ReportPlayerEvent(...))
+        if secure_the_ball_failed {
+            game.report_list.add(ReportPlayerEvent::new(
+                player_id_for_secure,
+                Some("could not secure the ball, causing a turnover".into()),
+            ));
+        }
+        self.end_turn |= secure_the_ball_failed;
 
         // ── Branch 1: end turn or end player action ─────────────────────────────
         if self.end_turn || self.end_player_action {
@@ -485,5 +504,29 @@ mod tests {
         // Falls through to EndPlayerAction — still NextStep, but pushes EndPlayerAction
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!out.pushes.is_empty(), "should push EndPlayerAction sequence as fallback");
+    }
+
+    #[test]
+    fn secure_the_ball_failed_adds_player_event_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.acting_player.player_action = Some(PlayerAction::SecureTheBall);
+        game.acting_player.player_id = None; // no ball
+        let mut step = StepEndMoving::new();
+        step.end_player_action = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PLAYER_EVENT), "should add ReportPlayerEvent when secure the ball fails");
+    }
+
+    #[test]
+    fn no_player_event_when_not_secure_the_ball_action() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        game.acting_player.player_id = None;
+        let mut step = StepEndMoving::new();
+        step.end_player_action = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::PLAYER_EVENT), "should NOT add ReportPlayerEvent for non-SecureTheBall actions");
     }
 }

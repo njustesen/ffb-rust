@@ -15,6 +15,7 @@ use ffb_model::model::game::Game;
 use ffb_model::model::target_selection_state::TargetSelectionState;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::TurnMode;
+use ffb_model::report::mixed::report_select_blitz_target::ReportSelectBlitzTarget;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -170,6 +171,11 @@ impl StepSelectBlitzTarget {
             game.field_model.target_selection_state = Some(ts);
             // client-only: used-skill enhancement sequences triggered from dialog; headless skips
             let attacker_id = game.acting_player.player_id.clone().unwrap_or_default();
+            // Java: getResult().addReport(new ReportSelectBlitzTarget(actingPlayer, selectedPlayerId))
+            game.report_list.add(ReportSelectBlitzTarget::new(
+                Some(attacker_id.clone()),
+                Some(selected_id.clone()),
+            ));
             StepOutcome::next().with_event(GameEvent::SelectBlitzTarget {
                 attacker_id,
                 defender_id: selected_id,
@@ -521,5 +527,43 @@ mod tests {
         assert!(out.events.iter().any(|e| matches!(e, GameEvent::SelectBlitzTarget {
             defender_id, ..
         } if defender_id == "defender")));
+    }
+
+    #[test]
+    fn selecting_opponent_adds_report_select_blitz_target() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::report::report_id::ReportId;
+        use std::collections::HashSet;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("attacker".into());
+        game.team_away.players.push(Player {
+            id: "defender".into(), name: "Defender".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("defender", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("defender", PlayerState::new(PS_STANDING));
+        let mut step = StepSelectBlitzTarget::new();
+        step.selected_player_id = Some("defender".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SELECT_BLITZ_TARGET),
+            "should add ReportSelectBlitzTarget to report_list");
+    }
+
+    #[test]
+    fn no_opponent_selected_does_not_add_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.home_playing = true;
+        let mut step = StepSelectBlitzTarget::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::SELECT_BLITZ_TARGET),
+            "no opponent selected should not add SelectBlitzTarget report");
     }
 }

@@ -18,6 +18,8 @@
 use ffb_model::enums::{PassResult as ModelPassResult, PlayerAction, ReRollSource};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::mixed::report_pass_roll::ReportPassRoll;
+use ffb_model::report::report_id::ReportId;
 use ffb_mechanics::bb2016::pass_mechanic::PassMechanic;
 use ffb_mechanics::modifiers::modifier_type::ModifierType;
 use ffb_mechanics::modifiers::pass_context::PassContext;
@@ -124,6 +126,24 @@ impl StepPass {
         let roll = rng.d6();
         let result = mechanic.evaluate_pass_simple(&thrower, roll, passing_distance, &modifiers_vec, is_bomb);
         self.mech_result = Some(result);
+
+        // Java: getResult().addReport(new ReportPassRoll(...))
+        let successful = result == PassResult::ACCURATE || result == PassResult::SAVED_FUMBLE;
+        let re_rolled = self.re_rolled_action.is_some();
+        let modifier_names: Vec<String> = modifiers_vec.iter().map(|m| m.get_name().to_string()).collect();
+        game.report_list.add(ReportPassRoll::new(
+            Some(thrower_id.clone()),
+            successful,
+            roll,
+            self.minimum_roll,
+            re_rolled,
+            modifier_names,
+            None,
+            is_bomb,
+            Some(format!("{:?}", result)),
+            false,
+            None,
+        ));
 
         if result == PassResult::ACCURATE {
             game.field_model.range_ruler = None;
@@ -368,6 +388,45 @@ mod tests {
         step.goto_label_on_missed_pass = "miss".into();
         step.start(&mut game, &mut GameRng::new(0));
         assert!(step.mech_result.is_some());
+    }
+
+    #[test]
+    fn pass_roll_report_added_after_roll() {
+        let (mut game, _) = make_thrower_game();
+        let mut step = StepPass::new();
+        step.goto_label_on_end = "end".into();
+        step.goto_label_on_missed_pass = "miss".into();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PASS_ROLL),
+            "should have PASS_ROLL report after rolling");
+    }
+
+    #[test]
+    fn pass_roll_report_present_for_bomb_throw() {
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerAction, Rules};
+        use ffb_model::model::player::Player;
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(Player {
+            id: "b2".into(), name: "B".into(), nr: 3, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+                    ..Default::default()
+        });
+        let mut game = Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2016);
+        game.thrower_id = Some("b2".into());
+        game.thrower_action = Some(PlayerAction::ThrowBomb);
+        game.field_model.set_player_coordinate("b2", ffb_model::types::FieldCoordinate::new(13, 7));
+        game.pass_coordinate = Some(ffb_model::types::FieldCoordinate::new(14, 7));
+        let mut step = StepPass::new();
+        step.goto_label_on_end = "end".into();
+        step.goto_label_on_missed_pass = "miss".into();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PASS_ROLL),
+            "should have PASS_ROLL report for bomb throw");
     }
 
     #[test]

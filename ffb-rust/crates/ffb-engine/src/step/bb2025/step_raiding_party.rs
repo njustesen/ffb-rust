@@ -10,7 +10,9 @@
 /// Behavior: NEXT_STEP immediately when no eligible players are found.
 use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
+use ffb_model::model::skill_use::SkillUse;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -55,6 +57,14 @@ impl Step for StepRaidingParty {
         match action {
             Action::SelectPlayer { player_id } => {
                 if player_id.is_empty() {
+                    // Java: empty playerId → CLIENT_PLAYER_CHOICE cancel → addReport(ReportSkillUse(false, MOVE_OPEN_TEAM_MATE))
+                    let actor_id = game.acting_player.player_id.clone();
+                    game.report_list.add(ReportSkillUse::new(
+                        actor_id,
+                        SkillId::RaidingParty,
+                        false,
+                        SkillUse::MOVE_OPEN_TEAM_MATE,
+                    ));
                     return StepOutcome::next();
                 }
                 self.player_id = Some(player_id.clone());
@@ -175,5 +185,34 @@ mod tests {
         assert_eq!(step.goto_label_on_success, "S");
         assert!(step.set_parameter(&StepParameter::EndTurn(true)));
         assert!(step.set_parameter(&StepParameter::EndPlayerAction(true)));
+    }
+
+    #[test]
+    fn cancel_selection_adds_skill_use_false_report() {
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, _) = make_game_rp();
+        let mut step = StepRaidingParty::new();
+        // Empty player_id = cancel
+        let out = step.handle_command(
+            &Action::SelectPlayer { player_id: String::new() },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.report_list.has_report(ReportId::SKILL_USE),
+            "cancel selection should add ReportSkillUse(false, MOVE_OPEN_TEAM_MATE)");
+    }
+
+    #[test]
+    fn cancel_selection_skill_use_is_false() {
+        use ffb_model::report::report_id::ReportId;
+        use ffb_model::model::skill_use::SkillUse;
+        let (mut game, _) = make_game_rp();
+        let mut step = StepRaidingParty::new();
+        step.handle_command(
+            &Action::SelectPlayer { player_id: String::new() },
+            &mut game, &mut GameRng::new(0),
+        );
+        // Verify the report is SKILL_USE (used=false path)
+        assert!(game.report_list.has_report(ReportId::SKILL_USE));
     }
 }

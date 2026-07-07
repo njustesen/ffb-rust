@@ -258,4 +258,27 @@ mod tests {
         assert_eq!(pac_to_player_action(PlayerActionChoice::Foul), PlayerAction::Foul);
         assert_eq!(pac_to_player_action(PlayerActionChoice::HandOff), PlayerAction::HandOver);
     }
+
+    #[test]
+    fn end_turn_command_publishes_end_turn_and_check_forgo() {
+        let mut game = make_game();
+        let mut step = StepInitSelecting::new("lbl".into());
+        let out = step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.goto_label.as_deref(), Some("lbl"));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::CheckForgo(true))));
+    }
+
+    #[test]
+    fn report_list_empty_after_headless_start() {
+        // Java's addReport calls (ReportFumblerooskie, ReportSkillUse for GAIN_HAIL_MARY,
+        // ADD_BLOCK_DIE) are all in client-dialog paths that headless does not exercise.
+        // Verify no spurious reports are emitted on plain start().
+        let mut game = make_game();
+        let mut step = StepInitSelecting::new("lbl".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.is_empty(),
+            "headless start() should emit no reports");
+    }
 }

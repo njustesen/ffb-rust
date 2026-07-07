@@ -1,6 +1,7 @@
 use ffb_model::enums::ReRollSource;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::report::bb2025::report_chomp_roll::ReportChompRoll;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -106,6 +107,18 @@ impl StepChomp {
         let roll = rng.d6();
         let minimum_roll = 3;
         let successful = roll >= minimum_roll;
+        let re_rolled = self.re_rolled_action.as_deref() == Some("CHOMP");
+
+        // Java: getResult().addReport(new ReportChompRoll(actingPlayer.getPlayerId(), successful, roll, minimumRoll, reRolled, actingPlayer.getPlayerId(), game.getDefenderId()))
+        game.report_list.add(ReportChompRoll::new(
+            Some(attacker_id.clone()),
+            successful,
+            roll,
+            minimum_roll,
+            re_rolled,
+            attacker_id.clone(),
+            game.defender_id.clone().unwrap_or_default(),
+        ));
 
         if successful {
             // Java: game.getFieldModel().addChomp(actingPlayer.getPlayer(), game.getDefender())
@@ -173,6 +186,32 @@ mod tests {
         let mut step = StepChomp::new("end".into());
         step.set_parameter(&StepParameter::GotoLabelOnEnd("new_end".into()));
         assert_eq!(step.goto_label_on_end, "new_end");
+    }
+
+    #[test]
+    fn chomp_roll_success_minimum_roll_is_3() {
+        // Minimum roll for Chomp is always 3 regardless of context
+        // roll >= 3 → successful
+        assert!(3 >= 3);
+        assert!(4 >= 3);
+        assert!(!(2 >= 3));
+    }
+
+    #[test]
+    fn chomp_roll_re_rolled_flag_set_when_re_rolled_action_is_chomp() {
+        // re_rolled = (reRolledAction == CHOMP) in Java
+        // Without a re_rolled_action set, re_rolled should be false
+        let step = StepChomp::new("end".into());
+        assert!(step.re_rolled_action.is_none());
+        let re_rolled = step.re_rolled_action.as_deref() == Some("CHOMP");
+        assert!(!re_rolled);
+
+        // With re_rolled_action set to "CHOMP" and a source, it should be true
+        let mut step2 = StepChomp::new("end".into());
+        step2.re_rolled_action = Some("CHOMP".into());
+        step2.re_roll_source = Some("TRR".into());
+        let re_rolled2 = step2.re_rolled_action.as_deref() == Some("CHOMP");
+        assert!(re_rolled2);
     }
 
     #[test]

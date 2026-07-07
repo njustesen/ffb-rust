@@ -14,6 +14,8 @@ use ffb_model::events::GameEvent;
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_bribes_roll::ReportBribesRoll;
+use ffb_model::report::bb2016::report_argue_the_call_roll::ReportArgueTheCallRoll;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -75,6 +77,12 @@ impl StepBribes {
             let roll = rng.d6();
             let player_id = game.acting_player.player_id.clone().unwrap_or_default();
             self.bribe_successful = Some(DiceInterpreter::is_bribes_successful(roll));
+            // Java: getResult().addReport(new ReportBribesRoll(actingPlayer.getPlayerId(), fBribeSuccessful, roll))
+            game.report_list.add(ReportBribesRoll::new(
+                player_id.clone(),
+                self.bribe_successful.unwrap_or(false),
+                roll,
+            ));
             pending_events.push(GameEvent::BribesRoll { player_id, roll, success: self.bribe_successful.unwrap_or(false) });
             if !self.bribe_successful.unwrap_or(false) {
                 // client-only: dialog would ask to retry if more bribes remain; headless treats failure as ejection
@@ -101,8 +109,16 @@ impl StepBribes {
             let roll = rng.d6();
             let player_id = game.acting_player.player_id.clone().unwrap_or_default();
             self.argue_the_call_successful = Some(DiceInterpreter::is_argue_the_call_successful(roll));
+            let coach_banned = DiceInterpreter::is_coach_banned(roll);
+            // Java: getResult().addReport(new ReportArgueTheCallRoll(actingPlayer.getPlayerId(), fArgueTheCallSuccessful, coachBanned, roll))
+            game.report_list.add(ReportArgueTheCallRoll::new(
+                player_id.clone(),
+                self.argue_the_call_successful.unwrap_or(false),
+                coach_banned,
+                roll,
+            ));
             pending_events.push(GameEvent::ArgueTheCall { player_id, roll, success: self.argue_the_call_successful.unwrap_or(false) });
-            if DiceInterpreter::is_coach_banned(roll) {
+            if coach_banned {
                 if game.home_playing {
                     game.turn_data_home.coach_banned = true;
                 } else {
@@ -254,5 +270,38 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(game.turn_data_home.coach_banned);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::ArgueTheCallSuccessful(false))));
+    }
+
+    #[test]
+    fn bribe_roll_adds_report_bribes_roll() {
+        use ffb_model::report::report_id::ReportId;
+        use ffb_model::inducement::inducement::Inducement;
+        use ffb_model::inducement::usage::Usage;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("fouler".into());
+        // Give the home team a bribe (AVOID_BAN inducement with 1 use)
+        game.turn_data_home.inducement_set.add_inducement(Inducement::new("BRIBE", 1, vec![Usage::AVOID_BAN]));
+        let mut step = StepBribes::new();
+        step.goto_label_on_end = "end".into();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::BRIBES_ROLL),
+            "bribe roll should add ReportBribesRoll to report_list");
+    }
+
+    #[test]
+    fn argue_the_call_roll_adds_report_argue_the_call() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("fouler".into());
+        let mut step = StepBribes::new();
+        step.goto_label_on_end = "end".into();
+        // Skip bribes, trigger argue-the-call
+        step.bribes_choice = Some(false);
+        step.argue_the_call_choice = Some(true);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::ARGUE_THE_CALL),
+            "argue-the-call roll should add ReportArgueTheCallRoll to report_list");
     }
 }

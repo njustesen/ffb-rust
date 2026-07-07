@@ -15,6 +15,8 @@ use ffb_model::enums::{
 use ffb_model::events::GameEvent;
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
+use ffb_model::report::mixed::report_apothecary_roll::ReportApothecaryRoll;
+use ffb_model::report::report_id::ReportId;
 use ffb_model::util::rng::GameRng;
 use ffb_model::prompts::AgentPrompt;
 use crate::action::Action;
@@ -113,6 +115,9 @@ impl StepApothecary {
                 let defender_id = self.injury_result.as_ref()
                     .and_then(|ir| ir.injury_context.defender_id.clone())
                     .unwrap_or_default();
+                game.report_list.add(ReportApothecaryRoll::new(
+                    Some(defender_id.clone()), vec![], None, None, None, vec![],
+                ));
                 pending_events.push(GameEvent::ApothecaryRoll {
                     player_id: defender_id,
                     roll: None,
@@ -234,6 +239,9 @@ impl StepApothecary {
                 else { PS_BADLY_HURT };
             apothecary_choice = new_state_base != PS_BADLY_HURT;
             // Java: addReport(new ReportApothecaryRoll(defender, casualtyRoll, newState, newSI, origSI, mods))
+            game.report_list.add(ReportApothecaryRoll::new(
+                Some(player_id.clone()), vec![roll], None, None, None, vec![],
+            ));
             events.push(GameEvent::ApothecaryRoll {
                 player_id: player_id.clone(),
                 roll: Some(roll),
@@ -700,5 +708,29 @@ mod tests {
         step.injury_result = Some(ir);
         step.roll_apothecary(&mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_data_away.apothecaries, 1);
+    }
+
+    #[test]
+    fn do_not_use_apothecary_adds_apothecary_roll_report() {
+        let mut game = make_game();
+        let mut step = StepApothecary::default();
+        step.apothecary_mode = Some(ApothecaryMode::Defender);
+        let ir = make_ir(ApothecaryMode::Defender, ApothecaryStatus::DoNotUseApothecary);
+        step.injury_result = Some(ir);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::APOTHECARY_ROLL));
+    }
+
+    #[test]
+    fn roll_apothecary_serious_injury_adds_apothecary_roll_report() {
+        let mut game = make_game();
+        let mut step = StepApothecary::default();
+        step.apothecary_mode = Some(ApothecaryMode::Defender);
+        let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+        ir.injury_context.defender_id = Some("d1".to_string());
+        ir.injury_context.set_injury(PlayerState::new(PS_SERIOUS_INJURY));
+        step.injury_result = Some(ir);
+        step.roll_apothecary(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::APOTHECARY_ROLL));
     }
 }

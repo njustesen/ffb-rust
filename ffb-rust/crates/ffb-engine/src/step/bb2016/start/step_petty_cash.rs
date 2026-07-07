@@ -15,6 +15,7 @@ use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::option::game_option_id::{PETTY_CASH, FORCE_TREASURY_TO_PETTY_CASH, PETTY_CASH_AFFECTS_TV};
 use ffb_model::option::util_game_option::is_option_enabled;
+use ffb_model::report::report_petty_cash::ReportPettyCash;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -95,6 +96,11 @@ impl StepPettyCash {
                 let transfer = game.game_result.home.petty_cash_transferred;
                 game.game_result.home.team_value += transfer;
             }
+            // Java: getResult().addReport(new ReportPettyCash(game.getTeamHome().getId(), ...))
+            game.report_list.add(ReportPettyCash::new(
+                game.team_home.id.clone(),
+                game.game_result.home.petty_cash_transferred,
+            ));
             pending_events.push(GameEvent::PettyCash {
                 team_id: game.team_home.id.clone(),
                 amount: game.game_result.home.petty_cash_transferred,
@@ -106,6 +112,11 @@ impl StepPettyCash {
                 let transfer = game.game_result.away.petty_cash_transferred;
                 game.game_result.away.team_value += transfer;
             }
+            // Java: getResult().addReport(new ReportPettyCash(game.getTeamAway().getId(), ...))
+            game.report_list.add(ReportPettyCash::new(
+                game.team_away.id.clone(),
+                game.game_result.away.petty_cash_transferred,
+            ));
             pending_events.push(GameEvent::PettyCash {
                 team_id: game.team_away.id.clone(),
                 amount: game.game_result.away.petty_cash_transferred,
@@ -282,6 +293,28 @@ mod tests {
             &mut GameRng::new(0),
         );
         assert_eq!(game.game_result.away.petty_cash_transferred, 60_000);
+    }
+
+    #[test]
+    fn report_petty_cash_added_for_both_teams_when_auto_selected() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.options.set(PETTY_CASH, "true");
+        // Both teams have 0 treasury → both auto-selected
+        let mut step = StepPettyCash::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.report_list.size(), 2, "expect one report per team");
+        assert!(game.report_list.has_report(ReportId::PETTY_CASH));
+    }
+
+    #[test]
+    fn report_petty_cash_not_added_when_option_disabled() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        // PETTY_CASH option disabled → NEXT_STEP immediately, no report
+        let mut step = StepPettyCash::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.report_list.has_report(ReportId::PETTY_CASH));
     }
 
     #[test]

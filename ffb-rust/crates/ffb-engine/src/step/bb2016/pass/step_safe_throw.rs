@@ -21,6 +21,8 @@ use ffb_model::enums::ReRollSource;
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::report::report_id::ReportId;
+use ffb_model::report::report_safe_throw_roll::ReportSafeThrowRoll;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
@@ -101,7 +103,18 @@ impl StepSafeThrow {
             .unwrap_or(2);
         let successful = DiceInterpreter::is_skill_roll_successful(roll, minimum_roll);
         let player_id = game.acting_player.player_id.clone().unwrap_or_default();
-        let safe_throw_event = GameEvent::SafeThrowRoll { player_id, roll, success: successful };
+        let safe_throw_event = GameEvent::SafeThrowRoll { player_id: player_id.clone(), roll, success: successful };
+
+        // Java: getResult().addReport(new ReportSafeThrowRoll(game.getThrowerId(), successful, roll, minimumRoll, reRolled))
+        let re_rolled = already_rerolled;
+        game.report_list.add(ReportSafeThrowRoll::new(
+            game.thrower_id.clone(),
+            successful,
+            roll,
+            minimum_roll,
+            re_rolled,
+            vec![],
+        ));
 
         // Java: if (!safeThrowSuccessful && getReRolledAction() != SAFE_THROW
         //         && askForReRollIfAvailable(...)) doNextStep = false
@@ -169,6 +182,7 @@ mod tests {
     use ffb_model::enums::{PlayerGender, PlayerType, Rules, SkillId};
     use ffb_model::model::player::Player;
     use ffb_model::model::skill_def::SkillWithValue;
+    use ffb_model::report::report_id::ReportId;
     use ffb_model::types::FieldCoordinate;
 
     fn make_game() -> Game {
@@ -271,6 +285,38 @@ mod tests {
         // No reroll source → do_safe_throw=false → fail path → ball moved to interceptor
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(game.field_model.ball_coordinate, Some(interceptor_coord));
+    }
+
+    #[test]
+    fn safe_throw_roll_report_added_on_roll() {
+        let mut game = make_game();
+        game.thrower_id = Some("thrower".into());
+        add_player_with_skill(&mut game, true, "thrower", SkillId::SafeThrow);
+        add_player_with_skill(&mut game, false, "interceptor", SkillId::Block);
+        game.field_model.set_player_coordinate("interceptor", FieldCoordinate::new(5, 5));
+        let mut step = StepSafeThrow::new();
+        step.goto_label_on_failure = "fail".into();
+        step.interceptor_id = Some("interceptor".into());
+        // Let step execute normally (no pre-set reroll state)
+        step.start(&mut game, &mut GameRng::new(3));
+        assert!(game.report_list.has_report(ReportId::SAFE_THROW_ROLL),
+            "should have SAFE_THROW_ROLL report after rolling");
+    }
+
+    #[test]
+    fn safe_throw_roll_report_added_on_forced_fail_path() {
+        let mut game = make_game();
+        game.thrower_id = Some("thrower".into());
+        add_player_with_skill(&mut game, true, "thrower", SkillId::SafeThrow);
+        add_player_with_skill(&mut game, false, "interceptor", SkillId::Block);
+        game.field_model.set_player_coordinate("interceptor", FieldCoordinate::new(5, 5));
+        let mut step = StepSafeThrow::new();
+        step.goto_label_on_failure = "fail".into();
+        step.interceptor_id = Some("interceptor".into());
+        // already_rerolled = false → rolls, report should be added before re-roll prompt or fail
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SAFE_THROW_ROLL),
+            "SAFE_THROW_ROLL must be added after rolling");
     }
 
     /// Declining a reroll clears the reroll source so the next execute goes to fail path.

@@ -1,6 +1,7 @@
 use ffb_model::enums::ApothecaryMode;
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::report::mixed::report_throw_at_stalling_player::ReportThrowAtStallingPlayer;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -78,6 +79,9 @@ impl StepStallingPlayer {
         // Java: boolean successful = roll >= 5
         let roll = rng.d6();
         let successful = roll >= 5;
+
+        // Java: getResult().addReport(new ReportThrowAtStallingPlayer(playerId, roll, successful))
+        game.report_list.add(ReportThrowAtStallingPlayer::new(Some(player_id.clone()), roll, successful));
 
         let stalling_event = GameEvent::ThrowAtStallingPlayer { player_id: player_id.clone(), roll, success: successful };
 
@@ -315,5 +319,63 @@ mod tests {
         let mut step = StepStallingPlayer::new();
         let out = step.handle_command(&Action::Acknowledge, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    /// A report is added to game.report_list on a failed roll (< 5).
+    #[test]
+    fn failed_roll_adds_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let player = make_player("staller");
+        game.team_home.players.push(player);
+        game.field_model.set_player_coordinate("staller", FieldCoordinate::new(10, 5));
+        use ffb_model::enums::PlayerState;
+        game.field_model.set_player_state("staller", PlayerState::new(PS_STANDING));
+
+        // Find a seed where d6 < 5 (roll is not successful)
+        for seed in 0u64..1000 {
+            let mut rng = GameRng::new(seed);
+            let roll = rng.d6();
+            if roll < 5 {
+                let mut step = StepStallingPlayer::new();
+                step.player_id = Some("staller".into());
+                let _out = step.start(&mut game, &mut GameRng::new(seed));
+                assert!(
+                    game.report_list.has_report(ReportId::THROW_AT_STALLING_PLAYER),
+                    "seed={seed} roll={roll}: report_list should contain ReportThrowAtStallingPlayer on miss"
+                );
+                return;
+            }
+        }
+        panic!("no seed found with d6 < 5");
+    }
+
+    /// A report is added to game.report_list on a successful roll (>= 5).
+    #[test]
+    fn successful_roll_adds_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let player = make_player("staller");
+        game.team_home.players.push(player);
+        game.field_model.set_player_coordinate("staller", FieldCoordinate::new(10, 5));
+        use ffb_model::enums::PlayerState;
+        game.field_model.set_player_state("staller", PlayerState::new(PS_STANDING));
+
+        // Find a seed where d6 >= 5 (roll is successful)
+        for seed in 0u64..1000 {
+            let mut rng = GameRng::new(seed);
+            let roll = rng.d6();
+            if roll >= 5 {
+                let mut step = StepStallingPlayer::new();
+                step.player_id = Some("staller".into());
+                let _out = step.start(&mut game, &mut GameRng::new(seed));
+                assert!(
+                    game.report_list.has_report(ReportId::THROW_AT_STALLING_PLAYER),
+                    "seed={seed} roll={roll}: report_list should contain ReportThrowAtStallingPlayer on hit"
+                );
+                return;
+            }
+        }
+        panic!("no seed found with d6 >= 5");
     }
 }

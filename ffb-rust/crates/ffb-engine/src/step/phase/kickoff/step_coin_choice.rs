@@ -4,6 +4,8 @@
 /// Publishes StepParameter::ChoosingTeamId for all subsequent steps on the stack.
 use ffb_model::model::game::Game;
 use ffb_model::prompts::AgentPrompt;
+use ffb_model::report::report_coin_throw::ReportCoinThrow;
+use ffb_model::report::report_id::ReportId;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepId, StepOutcome, StepParameter};
@@ -49,6 +51,14 @@ impl StepCoinChoice {
         let coin_choice_heads = self.coin_choice_heads.unwrap();
         // Java: getGameState().getDiceRoller().throwCoin() → rollDice(2) == 1 → rng.bool()
         let coin_throw_heads = rng.bool();
+        // Java: Team choosingTeam = game.isHomePlaying() ? teamHome : teamAway
+        let choosing_coach = if game.home_playing {
+            game.team_home.coach.clone()
+        } else {
+            game.team_away.coach.clone()
+        };
+        // Java: getResult().addReport(new ReportCoinThrow(coinThrowHeads, choosingTeam.getCoach(), fCoinChoiceHeads))
+        game.report_list.add(ReportCoinThrow::new(coin_throw_heads, choosing_coach, coin_choice_heads));
         // Java: the coach who is "home playing" makes the call
         // home wins the toss iff their guess matched the coin (when home is playing),
         // or their guess did NOT match the coin (when away is playing).
@@ -111,5 +121,23 @@ mod tests {
         let mut step = StepCoinChoice::new();
         let out = step.handle_command(&Action::Acknowledge, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::Continue);
+    }
+
+    #[test]
+    fn coin_choice_adds_coin_throw_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepCoinChoice::new();
+        step.handle_command(&Action::CoinChoice { heads: true }, &mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::COIN_THROW));
+    }
+
+    #[test]
+    fn coin_choice_report_present_regardless_of_guess() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepCoinChoice::new();
+        step.handle_command(&Action::CoinChoice { heads: false }, &mut game, &mut GameRng::new(42));
+        assert!(game.report_list.has_report(ReportId::COIN_THROW));
     }
 }

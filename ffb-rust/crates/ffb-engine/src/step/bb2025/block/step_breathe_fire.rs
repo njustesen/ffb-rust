@@ -2,6 +2,7 @@ use ffb_model::enums::{ApothecaryMode, ReRollSource};
 use ffb_model::model::game::Game;
 use ffb_model::model::BreatheFireResult;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::report::mixed::report_breathe_fire::ReportBreatheFire;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_cards::UtilCards;
@@ -141,9 +142,26 @@ impl StepBreatheFire {
                 .and_then(|id| game.player(id))
                 .map(|p| p.strength_with_modifiers() > 4)
                 .unwrap_or(false);
+            let minimum_roll = if strong_opponent { 3 } else { 2 };
             let effective_roll = if strong_opponent { roll - 1 } else { roll };
             let result = Self::evaluate(roll, effective_roll);
             self.result = Some(result);
+
+            // Java: getResult().addReport(new ReportBreatheFire(actingPlayer.getPlayerId(), successful, roll, minimumRoll, reRolled, game.getDefenderId(), result, strongOpponent))
+            {
+                let successful = result == BreatheFireResult::KNOCK_DOWN;
+                let re_rolled = self.re_rolled_action.as_deref() == Some("BREATHE_FIRE");
+                game.report_list.add(ReportBreatheFire::new(
+                    Some(attacker_id.clone()),
+                    successful,
+                    roll,
+                    minimum_roll,
+                    re_rolled,
+                    game.defender_id.clone(),
+                    strong_opponent,
+                    format!("{:?}", result),
+                ));
+            }
 
             if result == BreatheFireResult::KNOCK_DOWN {
                 let defender_id = match game.defender_id.clone() {
@@ -294,6 +312,28 @@ mod tests {
         let mut step = StepBreatheFire::new("s".into(), "f".into());
         step.set_parameter(&StepParameter::GotoLabelOnEnd("end_label".into()));
         assert_eq!(step.goto_on_end, "end_label");
+    }
+
+    #[test]
+    fn report_breathe_fire_successful_is_only_knock_down() {
+        // successful = (result == KNOCK_DOWN) in Java — verify evaluate alignment
+        assert!(StepBreatheFire::evaluate(6, 6) == BreatheFireResult::KNOCK_DOWN);
+        assert!(StepBreatheFire::evaluate(5, 5) != BreatheFireResult::KNOCK_DOWN);
+        assert!(StepBreatheFire::evaluate(1, 1) != BreatheFireResult::KNOCK_DOWN);
+    }
+
+    #[test]
+    fn report_breathe_fire_minimum_roll_strong_vs_normal() {
+        // minimum_roll = 3 for strong opponent, 2 otherwise — verified via the report wiring
+        // (Strong opponent means defender Strength > 4)
+        // We can confirm the evaluate logic: effective_roll = roll - 1 for strong opponent
+        // effective_roll < 4 → NO_EFFECT; effective_roll >= 4 → PRONE
+        // For strong, roll=4 → effective=3 → NO_EFFECT; roll=5 → effective=4 → PRONE
+        assert_eq!(StepBreatheFire::evaluate(4, 3), BreatheFireResult::NO_EFFECT);
+        assert_eq!(StepBreatheFire::evaluate(5, 4), BreatheFireResult::PRONE);
+        // For normal, minimum_roll = 2: roll=2 → effective=2 → NO_EFFECT (< 4); roll=4 → effective=4 → PRONE
+        assert_eq!(StepBreatheFire::evaluate(2, 2), BreatheFireResult::NO_EFFECT);
+        assert_eq!(StepBreatheFire::evaluate(4, 4), BreatheFireResult::PRONE);
     }
 
     /// has_skill_with_property correctly identifies grants_spp property (unit check, no full rollout).

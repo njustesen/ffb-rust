@@ -16,7 +16,10 @@
 /// Java: `StepQuickBite extends AbstractStep` (mixed, BB2020 + BB2025).
 use ffb_model::model::game::Game;
 use ffb_model::model::property::NamedProperties;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_cards::UtilCards;
 use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -76,8 +79,13 @@ impl StepQuickBite {
             //   headless falls through without dialog interaction
             return StepOutcome::next();
         } else if self.use_skill == Some(true) {
-            // Java: player.markUsed(skill, game)
+            // Java: Skill skill = player.getSkillWithProperty(NamedProperties.canAttackOpponentForBallAfterCatch)
+            //       getResult().addReport(new ReportSkillUse(playerId, skill, true, SkillUse.QUICK_BITE))
+            //       player.markUsed(skill, game)
             if let Some(pid) = &self.player_id {
+                let skill = game.player(pid)
+                    .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_ATTACK_OPPONENT_FOR_BALL_AFTER_CATCH));
+                game.report_list.add(ReportSkillUse::new(Some(pid.clone()), skill.unwrap_or(ffb_model::enums::SkillId::QuickBite), true, SkillUse::QUICK_BITE));
                 game.mark_skill_used(pid, ffb_model::enums::SkillId::QuickBite);
             }
 
@@ -222,5 +230,27 @@ mod tests {
         let action = Action::UseSkill { skill_id: SkillId::Block, use_skill: false };
         step.handle_command(&action, &mut game, &mut rng);
         assert_eq!(step.use_skill, Some(false));
+    }
+
+    #[test]
+    fn quick_bite_report_added_when_use_skill_true() {
+        let mut step = StepQuickBite::new();
+        step.catcher_id = Some("catcher".into());
+        step.player_id = Some("qb_player".into());
+        step.use_skill = Some(true);
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
+    }
+
+    #[test]
+    fn no_quick_bite_report_when_use_skill_none() {
+        let mut step = StepQuickBite::new();
+        // use_skill stays None → opponent-search path → no report
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
     }
 }

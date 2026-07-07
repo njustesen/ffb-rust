@@ -26,6 +26,11 @@
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::{PlayerState, PassResult as ModelPassResult, PS_FALLING, ApothecaryMode, ReRollSource};
+use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::report_right_stuff_roll::ReportRightStuffRoll;
+use ffb_model::report::report_skill_use::ReportSkillUse;
+use ffb_model::util::util_cards::UtilCards;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter, CatchScatterThrowInMode};
 use ffb_mechanics::modifiers::right_stuff_modifier_factory::RightStuffModifierFactory;
@@ -144,7 +149,39 @@ impl StepRightStuff {
             if self.roll == 0 {
                 self.roll = rng.d6();
             }
-            let successful = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
+            let mut successful = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
+            let re_rolled = already_rerolled && self.re_roll_state.re_roll_source.is_some();
+
+            // Java: if (PassResult.FUMBLE == passResult && thrower.hasSkillProperty(fumbledPlayerLandsSafely))
+            //         { successful = true; addReport(ReportSkillUse(..., FUMBLED_PLAYER_LANDS_SAFELY)); }
+            //       else { addReport(new ReportRightStuffRoll(...)); }
+            let fumble_lands_safely_skill = if self.pass_result == Some(ModelPassResult::Fumble) {
+                game.thrower_id.as_deref()
+                    .and_then(|id| game.player(id))
+                    .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::FUMBLED_PLAYER_LANDS_SAFELY))
+            } else {
+                None
+            };
+            if let Some(skill_id) = fumble_lands_safely_skill {
+                successful = true;
+                let thrower_id = game.thrower_id.clone();
+                game.report_list.add(ReportSkillUse::new(
+                    thrower_id,
+                    skill_id,
+                    true,
+                    SkillUse::FUMBLED_PLAYER_LANDS_SAFELY,
+                ));
+            } else {
+                game.report_list.add(ReportRightStuffRoll::new(
+                    Some(player_id.clone()),
+                    successful,
+                    self.roll,
+                    minimum_roll,
+                    re_rolled,
+                    vec![],
+                ));
+            }
+
             if successful {
                 // Java: if (passResult == ACCURATE && !kickedPlayer && thrower != null)
                 //   spp.addCompletion(additionalCompletionSppTeams, playerResult(thrower))
@@ -338,5 +375,57 @@ mod tests {
         // Fumbled KTM → no landing roll → drop path → NEXT_STEP.
         assert!(matches!(out.action, StepAction::NextStep));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::ThrownPlayerCoordinate(None))));
+    }
+
+    #[test]
+    fn report_right_stuff_roll_added_on_normal_roll() {
+        // Java: StepRightStuff (BB2020) adds ReportRightStuffRoll in the normal (non-fumble) path.
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerGender, PlayerType, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let p = Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 6, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        };
+        game.team_home.players.push(p);
+        let mut step = StepRightStuff::new();
+        step.thrown_player_id = Some("p1".into());
+        // Not a fumble, so normal roll path → ReportRightStuffRoll
+        let _out = step.start(&mut game, &mut GameRng::new(5));
+        assert!(game.report_list.has_report(ReportId::RIGHT_STUFF_ROLL),
+            "BB2020 normal roll path must add ReportRightStuffRoll");
+    }
+
+    #[test]
+    fn report_right_stuff_roll_added_on_failure_roll() {
+        // Java: ReportRightStuffRoll is also added on failure rolls (else branch).
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerGender, PlayerType, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let p = Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 1, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        };
+        game.team_home.players.push(p);
+        let mut step = StepRightStuff::new();
+        step.thrown_player_id = Some("p1".into());
+        step.roll = 1; // Force failure: agility 1 needs 6+, roll 1 fails
+        let _out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::RIGHT_STUFF_ROLL),
+            "BB2020 failure roll path must also add ReportRightStuffRoll");
     }
 }

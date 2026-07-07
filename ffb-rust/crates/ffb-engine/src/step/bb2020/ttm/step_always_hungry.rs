@@ -15,6 +15,8 @@ use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_cards::UtilCards;
+use ffb_model::report::report_always_hungry_roll::ReportAlwaysHungryRoll;
+use ffb_model::report::report_escape_roll::ReportEscapeRoll;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -135,6 +137,15 @@ impl StepAlwaysHungry {
                     roll,
                     success: successful,
                 };
+                // Java: getResult().addReport(new ReportAlwaysHungryRoll(actingPlayer.getPlayerId(), successful, roll, 2, reRolled, null));
+                game.report_list.add(ReportAlwaysHungryRoll::new(
+                    Some(acting_player_id.clone()),
+                    successful,
+                    roll,
+                    2,
+                    re_rolled,
+                    vec![],
+                ));
 
                 if successful {
                     return StepOutcome::next().with_event(event);
@@ -188,6 +199,15 @@ impl StepAlwaysHungry {
                 roll,
                 success: successful,
             };
+            // Java: getResult().addReport(new ReportEscapeRoll(fThrownPlayerId, successful, roll, 2, false, null));
+            game.report_list.add(ReportEscapeRoll::new(
+                Some(thrown_player_id.clone()),
+                successful,
+                roll,
+                2,
+                false,
+                vec![],
+            ));
 
             if successful {
                 return StepOutcome::goto(&self.goto_label_on_success)
@@ -474,5 +494,32 @@ mod tests {
         let s = StepAlwaysHungry::new("fail".into(), "ok".into());
         assert_eq!(s.goto_label_on_failure, "fail");
         assert_eq!(s.goto_label_on_success, "ok");
+    }
+
+    // ── report wiring ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn always_hungry_roll_report_added_on_success() {
+        use ffb_model::report::report_id::ReportId;
+        let seed = seed_for_d6(6); // success
+        let mut game = make_game_with_always_hungry();
+        let mut step = StepAlwaysHungry::new("fail".into(), "ok".into());
+        step.thrown_player_id = Some("thrown".into());
+        step.start(&mut game, &mut GameRng::new(seed));
+        assert!(game.report_list.has_report(ReportId::ALWAYS_HUNGRY_ROLL),
+            "ALWAYS_HUNGRY_ROLL report must be added on successful roll");
+    }
+
+    #[test]
+    fn escape_roll_report_added_when_escape_happens() {
+        use ffb_model::report::report_id::ReportId;
+        let seed = seed_for_d6(1); // always hungry fails → escape
+        let mut game = make_game_with_always_hungry();
+        // no TRR so escape fires immediately
+        let mut step = StepAlwaysHungry::new("fail".into(), "ok".into());
+        step.thrown_player_id = Some("thrown".into());
+        step.start(&mut game, &mut GameRng::new(seed));
+        assert!(game.report_list.has_report(ReportId::ESCAPE_ROLL),
+            "ESCAPE_ROLL report must be added when escape is attempted");
     }
 }

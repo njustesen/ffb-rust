@@ -2,6 +2,8 @@
 ///
 /// Rolls 2d6, maps to a Weather value, sets it on the field model, then advances.
 use ffb_model::model::game::Game;
+use ffb_model::report::report_id::ReportId;
+use ffb_model::report::report_weather::ReportWeather;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
@@ -24,6 +26,8 @@ impl Step for StepWeather {
         let roll = rng.roll_weather();
         let weather = DiceInterpreter::interpret_roll_weather(&roll);
         game.field_model.weather = weather;
+        // Java: getResult().addReport(rollWeather()) → new ReportWeather(weather, roll)
+        game.report_list.add(ReportWeather::new(weather, roll.to_vec()));
         StepOutcome::next()
     }
 
@@ -95,5 +99,27 @@ mod tests {
             }
         }
         assert!(changed, "Expected at least one seed to produce non-Nice weather");
+    }
+
+    #[test]
+    fn start_adds_weather_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepWeather::new();
+        let mut game = new_game();
+        let mut rng = GameRng::new(1);
+        step.start(&mut game, &mut rng);
+        assert!(game.report_list.has_report(ReportId::WEATHER));
+    }
+
+    #[test]
+    fn weather_report_added_for_multiple_seeds() {
+        use ffb_model::report::report_id::ReportId;
+        for seed in 0..5u64 {
+            let mut step = StepWeather::new();
+            let mut game = new_game();
+            let mut rng = GameRng::new(seed);
+            step.start(&mut game, &mut rng);
+            assert!(game.report_list.has_report(ReportId::WEATHER), "seed={seed} should add weather report");
+        }
     }
 }

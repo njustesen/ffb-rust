@@ -1,5 +1,9 @@
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_bomb_explodes_after_catch::ReportBombExplodesAfterCatch;
+use ffb_model::report::report_bomb_out_of_bounds::ReportBombOutOfBounds;
+use ffb_model::report::report_skill_use::ReportSkillUse;
+use ffb_model::model::skill_use::SkillUse;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -12,6 +16,8 @@ pub struct StepInitBomb {
     pass_fumble: bool,
     bomb_out_of_bounds: bool,
     dont_drop_fumble: bool,
+    /// Java: explodeSkillUsed — None = not yet decided, Some(true/false) = skill used/declined.
+    explode_skill_used: Option<bool>,
 }
 
 impl StepInitBomb {
@@ -22,10 +28,11 @@ impl StepInitBomb {
             pass_fumble: false,
             bomb_out_of_bounds: false,
             dont_drop_fumble: false,
+            explode_skill_used: None,
         }
     }
 
-    fn execute_step(&mut self) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: if fPassFumble → fCatcherId = null
         if self.pass_fumble {
             self.catcher_id = None;
@@ -35,18 +42,46 @@ impl StepInitBomb {
             self.catcher_id = None;
         }
 
-        // Java leaveStep: publish CatcherId always
         if self.catcher_id.is_some() {
-            if let Some(ref label) = self.goto_label_on_end.clone() {
-                // Java: leaveStep(fGotoLabelOnEnd) → GOTO_LABEL
-                return StepOutcome::goto(label)
-                    .publish(StepParameter::CatcherId(self.catcher_id.clone()));
+            // Java: if explodeSkillUsed == null → default false (no dialog in headless path)
+            let explode_skill_used = self.explode_skill_used.unwrap_or(false);
+            let explodes = if explode_skill_used {
+                true
+            } else {
+                // Java: int roll = getDiceRoller().rollDice(6); explodes = roll >= 4
+                let roll = rng.d6();
+                let explodes = roll >= 4;
+                // Java: addReport(new ReportBombExplodesAfterCatch(fCatcherId, explodes, roll))
+                let catcher_id = self.catcher_id.clone().unwrap_or_default();
+                game.report_list.add(ReportBombExplodesAfterCatch::new(catcher_id, explodes, roll));
+                explodes
+            };
+            if explodes {
+                self.catcher_id = None;
             }
         }
 
-        // Java: leaveStep(null) → NEXT_STEP (no catcher or no goto label)
-        StepOutcome::next()
-            .publish(StepParameter::CatcherId(self.catcher_id.clone()))
+        if self.catcher_id.is_none() {
+            let bomb_coordinate = game.field_model.bomb_coordinate;
+            if bomb_coordinate.is_none() {
+                // Java: if (!dontDropFumble) addReport(new ReportBombOutOfBounds())
+                if !self.dont_drop_fumble {
+                    game.report_list.add(ReportBombOutOfBounds::new());
+                }
+            }
+            // Java: leaveStep(null) → NEXT_STEP
+            StepOutcome::next()
+                .publish(StepParameter::CatcherId(self.catcher_id.clone()))
+        } else {
+            // Java: leaveStep(fGotoLabelOnEnd) → GOTO_LABEL
+            if let Some(ref label) = self.goto_label_on_end.clone() {
+                StepOutcome::goto(label)
+                    .publish(StepParameter::CatcherId(self.catcher_id.clone()))
+            } else {
+                StepOutcome::next()
+                    .publish(StepParameter::CatcherId(self.catcher_id.clone()))
+            }
+        }
     }
 }
 
@@ -57,12 +92,23 @@ impl Default for StepInitBomb {
 impl Step for StepInitBomb {
     fn id(&self) -> StepId { StepId::InitBomb }
 
-    fn start(&mut self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        self.execute_step()
+    fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        StepOutcome::next()
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: CLIENT_USE_SKILL with canForceBombExplosion skill
+        // → addReport(new ReportSkillUse(..., SkillUse.FORCE_BOMB_EXPLOSION))
+        if let Action::UseSkill { skill_id, use_skill } = action {
+            self.explode_skill_used = Some(*use_skill);
+            game.report_list.add(ReportSkillUse::new(
+                None,
+                *skill_id,
+                *use_skill,
+                SkillUse::FORCE_BOMB_EXPLOSION,
+            ));
+        }
+        self.execute_step(game, rng)
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
@@ -100,6 +146,7 @@ mod tests {
     use ffb_model::enums::Rules;
     use ffb_model::model::game::Game;
     use ffb_model::util::rng::GameRng;
+    use ffb_model::report::report_id::ReportId;
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020)
@@ -158,6 +205,9 @@ mod tests {
         let mut step = StepInitBomb::new();
         assert!(step.set_parameter(&StepParameter::CatcherId(Some("player-3".to_string()))));
         assert!(step.set_parameter(&StepParameter::GotoLabelOnEnd("label_catch".to_string())));
+        // Java: explodeSkillUsed = false → bomb does NOT explode (skill declined) → catcher retained
+        // Bypass dice roll by pre-setting explode_skill_used to Some(false)
+        step.explode_skill_used = Some(false);
 
         let mut game = make_game();
         let mut rng = GameRng::new(0);
@@ -166,6 +216,62 @@ mod tests {
         assert_eq!(outcome.action, StepAction::GotoLabel);
         assert_eq!(outcome.goto_label.as_deref(), Some("label_catch"));
         assert!(outcome.published.iter().any(|p| matches!(p, StepParameter::CatcherId(Some(_)))));
+    }
+
+    #[test]
+    fn bomb_explodes_after_catch_report_added_on_dice_roll() {
+        let mut step = StepInitBomb::new();
+        assert!(step.set_parameter(&StepParameter::CatcherId(Some("player-4".to_string()))));
+        // explode_skill_used = None → will roll dice → adds ReportBombExplodesAfterCatch
+
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+
+        // Java: addReport(new ReportBombExplodesAfterCatch(...)) when dice are rolled
+        assert!(game.report_list.has_report(ReportId::BOMB_EXPLODES_AFTER_CATCH));
+    }
+
+    #[test]
+    fn bomb_out_of_bounds_report_added_when_no_bomb_coordinate() {
+        let mut step = StepInitBomb::new();
+        // No catcher → goes to bomb_coordinate check; game.field_model.bomb_coordinate = None
+
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        let outcome = step.start(&mut game, &mut rng);
+
+        assert_eq!(outcome.action, StepAction::NextStep);
+        // Java: addReport(new ReportBombOutOfBounds()) when bomb_coordinate is None and !dontDropFumble
+        assert!(game.report_list.has_report(ReportId::BOMB_OUT_OF_BOUNDS));
+    }
+
+    #[test]
+    fn bomb_out_of_bounds_report_suppressed_by_dont_drop_fumble() {
+        let mut step = StepInitBomb::new();
+        assert!(step.set_parameter(&StepParameter::DontDropFumble(true)));
+
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+
+        // Java: if (!dontDropFumble) → no report when dontDropFumble is true
+        assert!(!game.report_list.has_report(ReportId::BOMB_OUT_OF_BOUNDS));
+    }
+
+    #[test]
+    fn skill_use_report_added_by_handle_command() {
+        use ffb_mechanics::skills::SkillId;
+        let mut step = StepInitBomb::new();
+        assert!(step.set_parameter(&StepParameter::CatcherId(Some("player-5".to_string()))));
+
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        let action = Action::UseSkill { skill_id: SkillId::Bombardier, use_skill: true };
+        step.handle_command(&action, &mut game, &mut rng);
+
+        // Java: addReport(new ReportSkillUse(..., SkillUse.FORCE_BOMB_EXPLOSION))
+        assert!(game.report_list.has_report(ReportId::SKILL_USE));
     }
 
     #[test]

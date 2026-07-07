@@ -8,6 +8,7 @@
 /// Incoming parameters: END_PLAYER_ACTION, END_TURN.
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::report::mixed::report_fumblerooskie::ReportFumblerooskie;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -73,6 +74,8 @@ impl StepResetFumblerooskie {
                 // Java: if (endPlayerAction || (ballCarrierStanding && !isNextMovePossible))
                 //           setSound(PICKUP) + addReport(new ReportFumblerooskie(playerId, false))
                 if self.end_player_action || (ball_carrier_standing && self.end_player_action) {
+                    // Java: getResult().addReport(new ReportFumblerooskie(actingPlayer.getPlayerId(), false))
+                    game.report_list.add(ReportFumblerooskie::new(Some(player_id.clone()), false));
                     outcome = outcome.with_event(GameEvent::Fumblerooskie {
                         player_id: player_id.clone(),
                         used: false,
@@ -163,5 +166,32 @@ mod tests {
         let mut step = StepResetFumblerooskie::new();
         step.set_parameter(&StepParameter::EndTurn(true));
         assert!(step.end_player_action);
+    }
+
+    #[test]
+    fn fumblerooskie_report_added_when_end_player_action_and_ball_on_player() {
+        let mut step = StepResetFumblerooskie::new();
+        step.end_player_action = true;
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.has_moved = true;
+        let coord = ffb_model::types::FieldCoordinate::new(5, 5);
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_moving = true;
+        // Set player state to standing (can_be_blocked = true)
+        game.field_model.set_player_state("p1", ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING));
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::FUMBLEROOSKIE));
+    }
+
+    #[test]
+    fn no_fumblerooskie_report_when_no_acting_player() {
+        let mut step = StepResetFumblerooskie::new();
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::FUMBLEROOSKIE));
     }
 }

@@ -9,7 +9,13 @@
 ///
 /// Stub: all generator dispatches (BlackInk, BalefulHex, CatchOfTheDay, LookIntoMyEyes,
 /// Treacherous, ThenIStartedBlastin, RaidingParty) not translated → NEXT_STEP immediately.
+use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
+use ffb_model::model::property::NamedProperties;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::mixed::report_select_blitz_target::ReportSelectBlitzTarget;
+use ffb_model::report::report_id::ReportId;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -30,6 +36,8 @@ pub struct StepSelectBlitzTarget {
     pub end_turn: bool,
     /// Java: checkForgo — set by CHECK_FORGO parameter.
     pub check_forgo: bool,
+    /// Java: usedSkill — set when CLIENT_USE_SKILL received.
+    pub used_skill: Option<SkillId>,
 }
 
 impl StepSelectBlitzTarget {
@@ -41,6 +49,7 @@ impl StepSelectBlitzTarget {
             end_player_action: false,
             end_turn: false,
             check_forgo: false,
+            used_skill: None,
         }
     }
 }
@@ -56,14 +65,56 @@ impl Step for StepSelectBlitzTarget {
         self.execute_step()
     }
 
-    fn handle_command(&mut self, action: &Action, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         match action {
             Action::SelectPlayer { player_id } => {
                 self.selected_player_id = Some(player_id.clone());
+                // Java: addReport(new ReportSelectBlitzTarget(actingPlayer.getPlayerId(), selectedPlayerId))
+                // when the selected player is not on the acting team.
+                let is_opponent = game.inactive_team().player(player_id).is_some();
+                if is_opponent {
+                    let acting_id = game.acting_player.player_id.clone();
+                    let attacker_id = acting_id.clone().unwrap_or_default();
+                    game.report_list.add(ReportSelectBlitzTarget::new(
+                        acting_id,
+                        Some(player_id.clone()),
+                    ));
+                    // Java: if usedSkill has canGainFrenzyForBlitz → ReportSkillUse(GAIN_FRENZY_FOR_BLITZ)
+                    //        else if canGainClawsForBlitz → ReportSkillUse(GAIN_CLAWS_FOR_BLITZ)
+                    //        else if canAvoidDodging → ReportSkillUse(AVOID_DODGING)
+                    if let Some(skill) = self.used_skill {
+                        if skill.properties().contains(&NamedProperties::CAN_GAIN_FRENZY_FOR_BLITZ) {
+                            game.report_list.add(ReportSkillUse::new(
+                                Some(attacker_id),
+                                skill,
+                                true,
+                                SkillUse::GAIN_FRENZY_FOR_BLITZ,
+                            ));
+                        } else if skill.properties().contains(&NamedProperties::CAN_GAIN_CLAWS_FOR_BLITZ) {
+                            game.report_list.add(ReportSkillUse::new(
+                                Some(attacker_id),
+                                skill,
+                                true,
+                                SkillUse::GAIN_CLAWS_FOR_BLITZ,
+                            ));
+                        } else if skill.properties().contains(&NamedProperties::CAN_AVOID_DODGING) {
+                            game.report_list.add(ReportSkillUse::new(
+                                Some(attacker_id),
+                                skill,
+                                true,
+                                SkillUse::AVOID_DODGING,
+                            ));
+                        }
+                    }
+                }
             }
             Action::EndTurn => {
                 self.end_turn = true;
                 self.check_forgo = true;
+            }
+            // Java: CLIENT_USE_SKILL → store usedSkill for ReportSkillUse emission
+            Action::UseSkill { skill_id, use_skill: true } => {
+                self.used_skill = Some(*skill_id);
             }
             _ => {}
         }
@@ -165,5 +216,37 @@ mod tests {
         assert!(step.set_parameter(&StepParameter::EndPlayerAction(true)));
         assert!(step.set_parameter(&StepParameter::CheckForgo(true)));
         assert!(step.check_forgo);
+    }
+
+    #[test]
+    fn select_opponent_adds_select_blitz_target_report() {
+        use ffb_model::model::player::Player;
+        use ffb_model::report::report_id::ReportId;
+        let home = test_team("home", 0);
+        let mut away = test_team("away", 0);
+        away.players.push(Player { id: "away_p1".into(), name: "A".into(), ..Default::default() });
+        let mut game = Game::new(home, away, Rules::Bb2025);
+        game.home_playing = true;
+        let mut step = StepSelectBlitzTarget::new();
+        let action = Action::SelectPlayer { player_id: "away_p1".into() };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SELECT_BLITZ_TARGET));
+    }
+
+    #[test]
+    fn select_opponent_with_frenzied_rush_adds_skill_use_report() {
+        use ffb_model::model::player::Player;
+        use ffb_model::report::report_id::ReportId;
+        let home = test_team("home", 0);
+        let mut away = test_team("away", 0);
+        away.players.push(Player { id: "away_p1".into(), name: "A".into(), ..Default::default() });
+        let mut game = Game::new(home, away, Rules::Bb2025);
+        game.home_playing = true;
+        let mut step = StepSelectBlitzTarget::new();
+        step.used_skill = Some(SkillId::FrenziedRush);
+        let action = Action::SelectPlayer { player_id: "away_p1".into() };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SELECT_BLITZ_TARGET));
+        assert!(game.report_list.has_report(ReportId::SKILL_USE));
     }
 }

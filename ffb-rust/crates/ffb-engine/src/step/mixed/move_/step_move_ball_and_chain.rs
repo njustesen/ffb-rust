@@ -9,6 +9,9 @@
 use ffb_model::enums::Direction;
 use ffb_model::model::game::Game;
 use ffb_model::model::re_rolled_action::ReRolledAction;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::report_scatter_player::ReportScatterPlayer;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -85,6 +88,9 @@ impl StepMoveBallAndChain {
             let new_coord = scatter_one_square(coord_from, scatter_dir);
             self.coordinate_to = Some(new_coord);
 
+            // Java: getResult().addReport(new ReportScatterPlayer(fCoordinateFrom, fCoordinateTo, new Direction[]{playerScatter}, new int[]{scatterRoll}))
+            game.report_list.add(ReportScatterPlayer::new(coord_from, new_coord, vec![scatter_dir], vec![scatter_roll], None));
+
             // Emit scatter report
             let pid = game.acting_player.player_id.clone().unwrap_or_default();
             let mut outcome = StepOutcome::next()
@@ -159,7 +165,18 @@ impl Step for StepMoveBallAndChain {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: CLIENT_USE_SKILL for re-roll direction skill
+        // getResult().addReport(new ReportSkillUse(playerId, skill, skillUsed, SkillUse.RE_ROLL_DIRECTION))
+        if let Action::UseSkill { skill_id, use_skill } = action {
+            if self.re_roll_state.re_rolled_action.as_ref().map(|a| a.get_name() == RE_ROLLED_ACTION).unwrap_or(true) {
+                let actor_id = game.acting_player.player_id.clone();
+                game.report_list.add(ReportSkillUse::new(actor_id, *skill_id, *use_skill, SkillUse::RE_ROLL_DIRECTION));
+                if !use_skill {
+                    self.re_roll_state.re_roll_source = None;
+                }
+            }
+        }
         self.execute_step(game, rng)
     }
 
@@ -345,6 +362,29 @@ mod tests {
         assert_eq!(scatter_one_square(origin, Direction::North),     FieldCoordinate::new(5, 4));
         assert_eq!(scatter_one_square(origin, Direction::East),      FieldCoordinate::new(6, 5));
         assert_eq!(scatter_one_square(origin, Direction::Southwest), FieldCoordinate::new(4, 6));
+    }
+
+    #[test]
+    fn scatter_player_report_added_on_roll() {
+        let mut step = StepMoveBallAndChain::new();
+        step.coordinate_from = Some(FieldCoordinate::new(10, 8));
+        step.coordinate_to = Some(FieldCoordinate::new(11, 8));
+        step.original_coordinate_to = Some(FieldCoordinate::new(11, 8));
+        step.goto_label_on_end = "end".into();
+        step.goto_label_on_fall_down = "fall".into();
+        let mut game = make_game();
+        let mut rng = GameRng::new(2);
+        step.start(&mut game, &mut rng);
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SCATTER_PLAYER));
+    }
+
+    #[test]
+    fn no_scatter_player_report_when_no_coords() {
+        let mut step = StepMoveBallAndChain::new();
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::SCATTER_PLAYER));
     }
 
     #[test]

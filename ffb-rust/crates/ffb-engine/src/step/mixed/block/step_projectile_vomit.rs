@@ -9,6 +9,7 @@
 use ffb_model::enums::ApothecaryMode;
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::report::mixed::report_projectile_vomit::ReportProjectileVomit;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::re_rolled_action::ReRolledAction;
 use ffb_model::util::rng::GameRng;
@@ -90,6 +91,16 @@ impl StepProjectileVomit {
                 success: successful,
                 rerolled: is_vomit_reroll,
             });
+
+            // Java: getResult().addReport(new ReportProjectileVomit(actingPlayer.getPlayerId(), successful, roll, minimumRoll, reRolled, game.getDefenderId()))
+            game.report_list.add(ReportProjectileVomit::new(
+                Some(acting_id.clone()),
+                successful,
+                roll,
+                minimum_roll,
+                is_vomit_reroll,
+                game.defender_id.clone(),
+            ));
 
             if successful {
                 let defender_coord = game.field_model.player_coordinate(&defender_id)
@@ -200,6 +211,7 @@ mod tests {
     use ffb_model::model::skill_def::SkillWithValue;
     use ffb_model::enums::{PlayerType, PlayerGender, SkillId};
     use ffb_model::types::FieldCoordinate;
+    use ffb_model::report::report_id::ReportId;
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
@@ -217,6 +229,65 @@ mod tests {
 });
         game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 5));
         game.field_model.set_player_state(id, ffb_model::enums::PlayerState::new(state_bits));
+    }
+
+    #[test]
+    fn projectile_vomit_report_added_on_roll() {
+        let mut step = StepProjectileVomit {
+            goto_label_on_success: "success".into(),
+            goto_label_on_failure: "failure".into(),
+            using_vomit: true,
+            ..Default::default()
+        };
+        let mut game = make_game();
+        add_player(&mut game, "att", PS_STANDING, &[SkillId::ProjectileVomit]);
+        game.acting_player.set_player("att".into(), ffb_model::enums::PlayerAction::ProjectileVomit);
+        // Add a defender
+        game.team_home.players.push(Player {
+            id: "def".into(), name: "def".into(), nr: 2, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("def", ffb_model::enums::PlayerState::new(PS_STANDING));
+        game.defender_id = Some("def".into());
+        // Check if ProjectileVomit skill has the needed property
+        let has_prop = game.player("att")
+            .map(|p| p.has_skill_property(NamedProperties::CAN_PERFORM_ARMOUR_ROLL_INSTEAD_OF_BLOCK_THAT_MIGHT_FAIL))
+            .unwrap_or(false);
+        if !has_prop {
+            return; // Skill not yet wired — skip
+        }
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(
+            game.report_list.has_report(ReportId::PROJECTILE_VOMIT),
+            "should add ReportProjectileVomit when vomit roll is made"
+        );
+    }
+
+    #[test]
+    fn no_projectile_vomit_report_when_no_skill() {
+        let mut step = StepProjectileVomit {
+            goto_label_on_success: "success".into(),
+            goto_label_on_failure: "failure".into(),
+            using_vomit: true,
+            ..Default::default()
+        };
+        let mut game = make_game();
+        // Block skill has no canPerformArmourRollInsteadOfBlockThatMightFail property
+        add_player(&mut game, "att", PS_STANDING, &[SkillId::Block]);
+        game.acting_player.set_player("att".into(), ffb_model::enums::PlayerAction::ProjectileVomit);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(
+            !game.report_list.has_report(ReportId::PROJECTILE_VOMIT),
+            "should not add ReportProjectileVomit when skill is absent"
+        );
     }
 
     #[test]

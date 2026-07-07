@@ -30,6 +30,7 @@ use ffb_model::enums::KickoffResult;
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::option::game_option_id;
+use ffb_model::report::report_kickoff_result::ReportKickoffResult;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -38,11 +39,13 @@ use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 pub struct StepKickoffResultRoll {
     /// Java: `fKickoffResult` — None means "not yet rolled/chosen".
     pub kickoff_result: Option<KickoffResult>,
+    /// Java: `rollKickoff` (int[]) — individual dice for ReportKickoffResult.
+    pub kickoff_roll: Vec<i32>,
 }
 
 impl StepKickoffResultRoll {
     pub fn new() -> Self {
-        Self { kickoff_result: None }
+        Self { kickoff_result: None, kickoff_roll: Vec::new() }
     }
 
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
@@ -52,13 +55,16 @@ impl StepKickoffResultRoll {
             // Java: check overtime option; half < 3 → always roll normally
             let overtime_option = game.options.get(game_option_id::OVERTIME_KICK_OFF_RESULTS).unwrap_or("all");
             if game.half < 3 || overtime_option == "all" {
-                let roll = rng.d6_two();
-                self.kickoff_result = Some(kickoff_result_for_roll(roll));
+                let d1 = rng.d6();
+                let d2 = rng.d6();
+                self.kickoff_roll = vec![d1, d2];
+                self.kickoff_result = Some(kickoff_result_for_roll(d1 + d2));
             } else if overtime_option == "randomBlitzOrSolidDefence" {
                 // Java: int[][] validRolls = {{1,3},{2,2},{3,1},{6,4},{5,5},{4,6}}
                 let valid_rolls: [[i32; 2]; 6] = [[1, 3], [2, 2], [3, 1], [6, 4], [5, 5], [4, 6]];
                 let index = (rng.d6() - 1) as usize;
                 let pair = valid_rolls[index.min(5)];
+                self.kickoff_roll = vec![pair[0], pair[1]];
                 self.kickoff_result = Some(kickoff_result_for_roll(pair[0] + pair[1]));
             } else if overtime_option == "blitz" {
                 self.kickoff_result = Some(KickoffResult::Blitz);
@@ -66,12 +72,16 @@ impl StepKickoffResultRoll {
                 self.kickoff_result = Some(KickoffResult::SolidDefence);
             } else {
                 // client-only: DialogKickOffResultChoice for blitzOrSolidDefence — headless auto-rolls
-                let roll = rng.d6_two();
-                self.kickoff_result = Some(kickoff_result_for_roll(roll));
+                let d1 = rng.d6();
+                let d2 = rng.d6();
+                self.kickoff_roll = vec![d1, d2];
+                self.kickoff_result = Some(kickoff_result_for_roll(d1 + d2));
             }
         }
 
         let result = self.kickoff_result.unwrap();
+        // Java: getResult().addReport(new ReportKickoffResult(fKickoffResult, rollKickoff))
+        game.report_list.add(ReportKickoffResult::new(result, self.kickoff_roll.clone()));
         // Java: publishParameter(new StepParameter(StepParameterKey.KICKOFF_RESULT, fKickoffResult))
         // Java: getResult().setNextAction(StepAction.NEXT_STEP)
         StepOutcome::next()
@@ -257,5 +267,30 @@ mod tests {
         // valid_rolls are all {1+3, 2+2, 3+1, 6+4, 5+5, 4+6} = {4, 4, 4, 10, 10, 10}
         // → SolidDefence(4) or Blitz(10)
         assert!(matches!(step.kickoff_result, Some(KickoffResult::SolidDefence) | Some(KickoffResult::Blitz)));
+    }
+
+    #[test]
+    fn report_kickoff_result_added_to_report_list() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepKickoffResultRoll::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::KICKOFF_RESULT),
+            "expected KICKOFF_RESULT in report_list after roll"
+        );
+    }
+
+    #[test]
+    fn report_kickoff_result_added_when_result_pre_set() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepKickoffResultRoll::new();
+        step.kickoff_result = Some(KickoffResult::Blitz);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.report_list.has_report(ReportId::KICKOFF_RESULT),
+            "expected KICKOFF_RESULT in report_list even when result was pre-set"
+        );
     }
 }

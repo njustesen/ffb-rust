@@ -319,4 +319,27 @@ mod tests {
         // (if stayed in-bounds, still has ThrownPlayerId)
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::ThrownPlayerId(_))));
     }
+
+    // ── report wiring (bb2016 has no addReport calls in Java) ─────────────────
+
+    #[test]
+    fn no_player_does_not_add_any_reports() {
+        // Java bb2016 StepInitScatterPlayer has no addReport calls.
+        // Verify the step runs cleanly with no player set.
+        let mut game = make_game();
+        let out = StepInitScatterPlayer::new().start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.action, StepAction::NextStep));
+    }
+
+    #[test]
+    fn always_publishes_thrown_player_id_on_early_exit() {
+        let mut game = make_game();
+        let mut step = StepInitScatterPlayer::new();
+        // No player in game → early exit path
+        step.thrown_player_id = Some("nobody".into());
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::ThrownPlayerId(_))),
+            "early exit must publish ThrownPlayerId");
+    }
 }

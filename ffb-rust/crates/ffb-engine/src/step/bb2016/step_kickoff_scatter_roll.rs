@@ -15,14 +15,16 @@
 ///
 /// headless items:
 ///  - findKickingPlayer: full center-field / frontmost-player logic.
-///  - ReportKickoffScatter, ReportSkillUse.
 ///  - UtilServerDialog.showDialog for Kick choice.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2016.StepKickoffScatterRoll`.
-use ffb_model::enums::Direction;
+use ffb_model::enums::{Direction, SkillId};
+use ffb_model::model::skill_use::SkillUse;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_kickoff_scatter::ReportKickoffScatter;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -36,6 +38,8 @@ pub struct StepKickoffScatterRoll {
     pub scatter_direction: Option<Direction>,
     /// Java: fScatterDistance
     pub scatter_distance: i32,
+    /// Raw d8 roll for scatter direction (stored in Phase 1 for use in Phase 2 report).
+    pub scatter_direction_roll: i32,
     /// Java: fKickingPlayerCoordinate
     pub kicking_player_coordinate: Option<FieldCoordinate>,
     /// Java: fKickoffBounds
@@ -51,6 +55,7 @@ impl StepKickoffScatterRoll {
             use_kick_choice: None,
             scatter_direction: None,
             scatter_distance: 0,
+            scatter_direction_roll: 0,
             kicking_player_coordinate: None,
             kickoff_bounds: None,
             touchback: false,
@@ -74,6 +79,15 @@ impl Step for StepKickoffScatterRoll {
         if let Action::UseSkill { use_skill, .. } = action {
             if self.use_kick_choice.is_none() {
                 self.use_kick_choice = Some(*use_skill);
+                if *use_skill {
+                    let pid = game.acting_player.player_id.clone();
+                    game.report_list.add(ReportSkillUse::new(
+                        pid,
+                        SkillId::Kick,
+                        true,
+                        SkillUse::HALVE_KICKOFF_SCATTER,
+                    ));
+                }
             }
         }
         self.execute_step(game, rng)
@@ -102,6 +116,7 @@ impl StepKickoffScatterRoll {
 
             self.scatter_direction = Some(direction);
             self.scatter_distance = distance;
+            self.scatter_direction_roll = dir_roll;
 
             // Java: find kicking player coordinate; fall back to center stub if not on field
             let default_kicker = if game.home_playing {
@@ -125,6 +140,13 @@ impl StepKickoffScatterRoll {
             let distance = if use_kick { self.scatter_distance / 2 } else { self.scatter_distance };
 
             let ball_end = start.step(direction, distance);
+
+            game.report_list.add(ReportKickoffScatter::new(
+                ball_end,
+                direction,
+                self.scatter_direction_roll,
+                self.scatter_distance, // raw distance before halving
+            ));
 
             // Java: walk back along scatter path until on field
             let mut d = distance;
@@ -260,5 +282,26 @@ mod tests {
     fn set_parameter_unknown_returns_false() {
         let mut step = StepKickoffScatterRoll::new();
         assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
+    }
+
+    #[test]
+    fn adds_kickoff_scatter_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.home_playing = true;
+        let mut step = StepKickoffScatterRoll::new();
+        step.kickoff_start_coordinate = Some(FieldCoordinate::new(13, 7));
+        let _ = step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::KICKOFF_SCATTER));
+    }
+
+    #[test]
+    fn scatter_direction_roll_stored_in_phase1() {
+        let mut game = make_game();
+        game.home_playing = true;
+        let mut step = StepKickoffScatterRoll::new();
+        step.kickoff_start_coordinate = Some(FieldCoordinate::new(13, 7));
+        step.start(&mut game, &mut GameRng::new(42));
+        assert!(step.scatter_direction_roll > 0, "scatter_direction_roll should be non-zero after phase 1");
     }
 }

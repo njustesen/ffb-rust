@@ -1,4 +1,6 @@
 use ffb_model::model::game::Game;
+use ffb_model::report::bb2025::report_getting_even_roll::ReportGettingEvenRoll;
+use ffb_model::report::report_id::ReportId;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -46,8 +48,19 @@ impl Step for StepGettingEven {
     }
 }
 
+/// Java: MINIMUM_ROLL = 4
+const MINIMUM_ROLL: i32 = 4;
+
 impl StepGettingEven {
-    fn execute_step(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: roll = DiceRoller.rollD6(); successful = roll >= MINIMUM_ROLL
+        // Java: addReport(new ReportGettingEvenRoll(playerId, successful, roll, MINIMUM_ROLL, reRolled, keyword))
+        let roll = rng.d6();
+        let successful = roll >= MINIMUM_ROLL;
+        let keyword = self.keyword_name.clone().unwrap_or_default();
+        game.report_list.add(ReportGettingEvenRoll::new(
+            self.player_id.clone(), successful, roll, MINIMUM_ROLL, false, keyword,
+        ));
         // client-only: offer opposing apothecary dialog — client-side
         StepOutcome::next()
     }
@@ -87,5 +100,24 @@ mod tests {
         let mut step = StepGettingEven::new();
         let out = step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn start_adds_getting_even_roll_report() {
+        let mut game = make_game();
+        let mut step = StepGettingEven::new();
+        step.player_id = Some("p1".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::GETTING_EVEN_ROLL));
+    }
+
+    #[test]
+    fn keyword_is_included_in_report() {
+        let mut game = make_game();
+        let mut step = StepGettingEven::new();
+        step.player_id = Some("p1".into());
+        step.keyword_name = Some("Agility".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::GETTING_EVEN_ROLL));
     }
 }

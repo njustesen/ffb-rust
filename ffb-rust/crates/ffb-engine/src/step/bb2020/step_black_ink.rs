@@ -6,7 +6,9 @@
 /// (BB2020 uses SkillUse REMOVE_TACKLEZONE which targets any adjacent standing/prone opponent).
 use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
+use ffb_model::model::skill_use::SkillUse;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -44,6 +46,15 @@ impl Step for StepBlackInk {
         match action {
             Action::SelectPlayer { player_id } => {
                 if player_id.is_empty() {
+                    // Java: addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, false, SkillUse.REMOVE_TACKLEZONE));
+                    if let Some(ref pid) = game.acting_player.player_id.clone() {
+                        game.report_list.add(ReportSkillUse::new(
+                            Some(pid.clone()),
+                            SkillId::BlackInk,
+                            false,
+                            SkillUse::REMOVE_TACKLEZONE,
+                        ));
+                    }
                     return StepOutcome::next();
                 }
                 self.player_id = Some(player_id.clone());
@@ -88,6 +99,13 @@ impl StepBlackInk {
             if eligibles.is_empty() {
                 return StepOutcome::next();
             }
+            // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, SkillUse.REMOVE_TACKLEZONE));
+            game.report_list.add(ReportSkillUse::new(
+                Some(player_id.clone()),
+                SkillId::BlackInk,
+                true,
+                SkillUse::REMOVE_TACKLEZONE,
+            ));
             if eligibles.len() == 1 {
                 self.player_id = Some(eligibles[0].clone());
             } else {
@@ -241,5 +259,37 @@ mod tests {
         assert!(step.set_parameter(&StepParameter::EndTurn(true)));
         assert!(step.set_parameter(&StepParameter::EndPlayerAction(true)));
         assert!(!step.set_parameter(&StepParameter::NrOfDice(2)));
+    }
+
+    // ── report wiring ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn skill_use_report_added_when_eligible_target_found() {
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, _actor_id) = make_game_bi();
+        let target_id = "opp1".to_string();
+        game.team_away.players.push(make_player(&target_id, None));
+        let adj = FieldCoordinate::new(11, 7);
+        game.field_model.set_player_coordinate(&target_id, adj);
+        game.field_model.set_player_state(&target_id, PlayerState::new(PS_STANDING).change_active(true));
+
+        let mut step = StepBlackInk::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::SKILL_USE),
+            "SKILL_USE(REMOVE_TACKLEZONE) report must be added when eligible target found");
+    }
+
+    #[test]
+    fn skill_use_report_not_used_when_player_declines() {
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, _) = make_game_bi();
+        let mut step = StepBlackInk::new();
+        step.handle_command(
+            &Action::SelectPlayer { player_id: "".to_string() },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(game.report_list.has_report(ReportId::SKILL_USE),
+            "SKILL_USE(used=false) report must be added when player declines");
     }
 }

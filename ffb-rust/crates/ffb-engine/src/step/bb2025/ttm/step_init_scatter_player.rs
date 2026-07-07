@@ -23,6 +23,8 @@ use ffb_model::option::game_option_id::{END_TURN_WHEN_HITTING_ANY_PLAYER_WITH_TT
 use ffb_model::option::util_game_option::{get_int_option, is_option_enabled};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::bb2025::report_swoop_player::ReportSwoopPlayer;
+use ffb_model::report::mixed::report_player_event::ReportPlayerEvent;
 use crate::action::Action;
 use crate::drop_player_context::SteadyFootingContext;
 use crate::injury::injuryType::injury_type_crowd_push::InjuryTypeCrowdPush;
@@ -271,6 +273,11 @@ impl StepInitScatterPlayer {
                 true,
             )));
 
+            // Java: getResult().addReport(new ReportPlayerEvent(playerLandedUpon.getId(), "was hit"));
+            game.report_list.add(ReportPlayerEvent::new(
+                Some(hit_player_id.clone()),
+                Some("was hit".to_string()),
+            ));
             // Java: publishParameter(STEADY_FOOTING_CONTEXT, new SteadyFootingContext(injuryResult, commands))
             let sfc = SteadyFootingContext::from_injury_result_with_commands(injury_result, commands);
             outcome = outcome.publish(StepParameter::SteadyFootingContext(Box::new(sfc)));
@@ -314,7 +321,7 @@ impl StepInitScatterPlayer {
     /// Java: swoop(FieldCoordinate throwerCoordinate, Direction direction, int distanceOption)
     ///
     /// distanceOption == 0 → roll D6; else use distanceOption directly.
-    fn swoop_scatter(&mut self, game: &Game, rng: &mut GameRng, start_coord: FieldCoordinate) -> ScatterResult {
+    fn swoop_scatter(&mut self, game: &mut Game, rng: &mut GameRng, start_coord: FieldCoordinate) -> ScatterResult {
         let direction = self.swoop_direction.expect("swoop_direction is set");
 
         // Java: getOptionWithDefault(SWOOP_DISTANCE).getValue() — 0 means roll D6.
@@ -332,11 +339,21 @@ impl StepInitScatterPlayer {
             last_valid = FieldCoordinate::new(vx, vy);
         }
 
+        let in_bounds = coord_end.is_on_pitch();
+
         // Java: publishParameter(THROWN_PLAYER_COORDINATE, lastValidCoordinate)
         self.thrown_player_coordinate = Some(last_valid);
+        // Java: getResult().addReport(new ReportSwoopPlayer(throwerCoordinate, coordinateEnd, direction, distanceRoll, !inBounds));
+        game.report_list.add(ReportSwoopPlayer::new(
+            start_coord,
+            coord_end,
+            direction,
+            distance_roll,
+            !in_bounds,
+        ));
         // SwoopPlayer GameEvent emitted in execute_step after swoop_scatter returns.
 
-        ScatterResult::new(last_valid, coord_end.is_on_pitch())
+        ScatterResult::new(last_valid, in_bounds)
     }
 }
 
@@ -558,9 +575,9 @@ mod tests {
         let mut step = StepInitScatterPlayer::new();
         step.swoop_direction = Some(Direction::North);
         let mut rng = GameRng::new(42);
-        let game = make_game();
+        let mut game = make_game();
         let start = FieldCoordinate::new(13, 7);
-        let result = step.swoop_scatter(&game, &mut rng, start);
+        let result = step.swoop_scatter(&mut game, &mut rng, start);
         // Should update thrown_player_coordinate to last valid coord
         assert!(step.thrown_player_coordinate.is_some());
         let _ = result;
@@ -575,7 +592,7 @@ mod tests {
         let mut game = make_game();
         game.options.set(SWOOP_DISTANCE, "3");
         let start = FieldCoordinate::new(13, 8);
-        let _result = step.swoop_scatter(&game, &mut rng, start);
+        let _result = step.swoop_scatter(&mut game, &mut rng, start);
         assert!(step.thrown_player_coordinate.is_some());
     }
 
@@ -785,5 +802,52 @@ mod tests {
         // Must not panic; DropThrownPlayer(true) should be published
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::DropThrownPlayer(true))));
+    }
+
+    // ── report wiring ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn player_event_report_added_when_landing_on_another_player() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.home_playing = true;
+        // Thrown player and target both on pitch; use bullseye so target is hit
+        add_player(&mut game, "thrower", FieldCoordinate::new(8, 7));
+        let land = FieldCoordinate::new(10, 7);
+        // Target on away team (so InjuryTypeTTMHitPlayer path)
+        game.team_away.players.push(Player {
+            id: "target".into(), name: "target".into(), nr: 2,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 8, starting_skills: vec![], extra_skills: vec![],
+            temporary_skills: vec![], used_skills: std::collections::HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
+            career_spps: 0, race: None, ..Default::default()
+        });
+        game.field_model.set_player_coordinate("target", land);
+        game.field_model.set_player_state("target", PlayerState::new(PS_STANDING));
+        game.pass_coordinate = Some(land);
+
+        let mut step = StepInitScatterPlayer::new();
+        step.thrown_player_id = Some("thrower".into());
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        step.thrown_player_coordinate = Some(FieldCoordinate::new(8, 7));
+        step.using_bullseye = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PLAYER_EVENT),
+            "PLAYER_EVENT report must be added when thrown player lands on another player");
+    }
+
+    #[test]
+    fn swoop_scatter_adds_swoop_player_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepInitScatterPlayer::new();
+        step.swoop_direction = Some(Direction::East);
+        let mut rng = GameRng::new(42);
+        let mut game = make_game();
+        let start = FieldCoordinate::new(13, 7);
+        step.swoop_scatter(&mut game, &mut rng, start);
+        assert!(game.report_list.has_report(ReportId::SWOOP_PLAYER),
+            "SWOOP_PLAYER report must be added by swoop_scatter");
     }
 }

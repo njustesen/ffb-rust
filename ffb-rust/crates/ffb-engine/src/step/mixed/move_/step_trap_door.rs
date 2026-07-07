@@ -10,6 +10,7 @@
 ///                       PLAYER_WAS_PUSHED (consumed).
 use ffb_model::model::game::Game;
 use ffb_model::model::re_rolled_action::ReRolledAction;
+use ffb_model::report::mixed::report_trap_door::ReportTrapDoor;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::enums::ApothecaryMode;
@@ -73,6 +74,9 @@ impl StepTrapDoor {
         // Java: int roll = getDiceRoller().rollDice(6)
         let roll = rng.d6();
         let escaped = roll != 1;
+
+        // Java: getResult().addReport(new ReportTrapDoor(playerId, roll, escaped))
+        game.report_list.add(ReportTrapDoor::new(Some(player_id.clone()), roll, escaped));
 
         // Emit TrapDoor event (ReportTrapDoor)
         let outcome_base = StepOutcome::next()
@@ -275,6 +279,32 @@ mod tests {
         let out = step.start(&mut game, &mut rng);
         let has_trap_door_event = out.events.iter().any(|e| matches!(e, ffb_model::events::GameEvent::TrapDoor { .. }));
         assert!(has_trap_door_event);
+    }
+
+    #[test]
+    fn trap_door_report_added_on_roll() {
+        let mut step = StepTrapDoor::new();
+        step.player_id = Some("p1".into());
+        let coord = FieldCoordinate::new(5, 5);
+        let mut game = make_game();
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.trap_doors.push(coord);
+        let mut rng = GameRng::new(5);
+        step.start(&mut game, &mut rng);
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::TRAP_DOOR));
+    }
+
+    #[test]
+    fn no_trap_door_report_when_not_on_trap_door() {
+        let mut step = StepTrapDoor::new();
+        step.player_id = Some("p1".into());
+        let coord = FieldCoordinate::new(5, 5);
+        let mut game = make_game();
+        // Place player but no trap door registered
+        game.field_model.set_player_coordinate("p1", coord);
+        let mut rng = GameRng::new(5);
+        step.start(&mut game, &mut rng);
+        assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::TRAP_DOOR));
     }
 
     #[test]
