@@ -26,8 +26,38 @@ impl Step for StepNextStep {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::step::framework::{StepAction, test_team};
+    use ffb_model::enums::Rules;
+    use ffb_model::util::rng::GameRng;
+    use crate::action::Action;
+
+    fn make_game() -> Game {
+        let home = test_team("home", 0);
+        let away = test_team("away", 0);
+        Game::new(home, away, Rules::Bb2025)
+    }
+
     #[test]
     fn id_is_next_step() { assert_eq!(StepNextStep::new().id(), StepId::NextStep); }
+
     #[test]
     fn set_parameter_returns_false() { assert!(!StepNextStep::new().set_parameter(&StepParameter::EndTurn(true))); }
+
+    #[test]
+    fn start_returns_next_step_action() {
+        let mut step = StepNextStep::new();
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        let outcome = step.start(&mut game, &mut rng);
+        assert_eq!(outcome.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn handle_command_returns_next_step_action() {
+        let mut step = StepNextStep::new();
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        let outcome = step.handle_command(&Action::Acknowledge, &mut game, &mut rng);
+        assert_eq!(outcome.action, StepAction::NextStep);
+    }
 }

@@ -39,4 +39,17 @@ mod tests {
         let params = HitPlayerTurnOverCommand.execute(&mut game);
         assert_eq!(params.len(), 1);
     }
+
+    #[test]
+    fn id_returns_hit_player_variant() {
+        assert_eq!(HitPlayerTurnOverCommand.id(), DeferredCommandId::HitPlayer);
+    }
+
+    #[test]
+    fn end_turn_value_is_true() {
+        let mut game = make_game();
+        let params = HitPlayerTurnOverCommand.execute(&mut game);
+        let end_turn = params.iter().find(|p| matches!(p, StepParameter::EndTurn(_)));
+        assert!(matches!(end_turn, Some(StepParameter::EndTurn(true))));
+    }
 }

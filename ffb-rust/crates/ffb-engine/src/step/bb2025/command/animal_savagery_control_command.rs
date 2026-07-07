@@ -43,4 +43,17 @@ mod tests {
         let params = AnimalSavageryControlCommand.execute(&mut game);
         assert_eq!(params.len(), 2);
     }
+
+    #[test]
+    fn id_returns_correct_variant() {
+        assert_eq!(AnimalSavageryControlCommand.id(), DeferredCommandId::AnimalSavageryControl);
+    }
+
+    #[test]
+    fn thrown_player_coordinate_is_none() {
+        let mut game = make_game();
+        let params = AnimalSavageryControlCommand.execute(&mut game);
+        let coord = params.iter().find(|p| matches!(p, StepParameter::ThrownPlayerCoordinate(_)));
+        assert!(matches!(coord, Some(StepParameter::ThrownPlayerCoordinate(None))));
+    }
 }

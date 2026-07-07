@@ -53,4 +53,20 @@ mod tests {
         let cmd = DropPlayerCommand::new("p1".into(), ApothecaryMode::Defender, false);
         assert_eq!(cmd.id(), DeferredCommandId::DropPlayer);
     }
+
+    #[test]
+    fn stores_player_id_and_apothecary_mode() {
+        let cmd = DropPlayerCommand::new("player42".into(), ApothecaryMode::Attacker, true);
+        assert_eq!(cmd.player_id, "player42");
+        assert_eq!(cmd.apothecary_mode, ApothecaryMode::Attacker);
+        assert!(cmd.eligible_for_safe_pair_of_hands);
+    }
+
+    #[test]
+    fn execute_with_sph_false_still_returns_empty_stub() {
+        let mut game = make_game();
+        let cmd = DropPlayerCommand::new("p2".into(), ApothecaryMode::Attacker, false);
+        let params = cmd.execute(&mut game);
+        assert!(params.is_empty());
+    }
 }

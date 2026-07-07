@@ -8,9 +8,9 @@
 
 **Translation progress:** 2,521/2,521 files formally implemented = **100% ✓** (0 partial, 458 skip)
 
-**Tests:** 10,249 passing (1 ignored)
+**Tests:** 10,835 passing (1 ignored)
 
-**Current phase:** Phase ZG complete — Comprehensive test expansion done (9,556 → 10,249 tests)
+**Current phase:** Phase ZG continued — Test expansion ongoing (9,556 → 10,835 tests so far)
 
 ---
 
@@ -422,7 +422,7 @@
   - **Files already done in ZB (bb2016)**: `step_block_chainsaw.rs`, `step_block_choice.rs`, `step_followup.rs` all fully wired.
   - **Remaining ZC scope**: bb2020/bb2025 block roll, pass/, foul/, mixed/, kickoff steps; bb2016 move_/ steps.
 
-- **Phase ZG** (2026-07-07): Comprehensive test expansion — 9,556 → 10,249 tests (+693)
+- **Phase ZG** (2026-07-07): Comprehensive test expansion — 9,556 → 10,835 tests (+1,279)
   - **Skill behaviour files**: Added `execute_step_hook_returns_false` + `apply_modifier_is_noop` to all 116 skill behaviour files in bb2016, bb2020, bb2025, mixed, common that had only 2 tests. ~232 new tests.
   - **ffb-mechanics modifier/mechanic files**: Expanded 26 files (gaze/go_for_it/jump/jump_up modifier collections, modifier_type, player_stat_key, player_stat_limit, special_effect modifiers, stat incrementer/decrementer, contexts, pass_mechanic, stats_mechanic, wording, agility_mechanic, apothecary_mechanic ×3, skill_mechanic, mechanic, throw_in_mechanic, on_the_ball_mechanic, jump_modifier_collection, injury_modifiers). ~99 new tests.
   - **Prayer handler files**: Added `get_name` + `handles_prayer_false` to 25 bb2020/bb2025/mixed prayer handler files. +52 tests.
@@ -430,6 +430,10 @@
   - **Dialog parameter files**: Added 3 tests each (default, accessor, edge case) to 58 dialog parameter files in ffb-model. +174 tests.
   - **Factory files**: Added 3 tests each (initialize_does_not_panic, second variant, empty string) to 28 factory files in ffb-model. +84 tests.
   - **Enum files**: Added 3 tests each to model_change.rs and stat_key.rs. +6 tests.
+  - **Report files** (163 files): Added `minimum_roll_and_rerolled` + `unsuccessful_with_modifiers` to all ReportSkillRoll wrapper files across bb2016/ (24), bb2020/ (8), bb2025/ (20), mixed/ (47), root (64). +326 tests.
+  - **ffb-model remaining files** (52 files): injury/context, enums/report, events/game_event, inducement files, model/*.rs, types/*.rs, util/*.rs — added 3 tests each. +156 tests.
+  - **Generator files** (41 files): 8 unit struct generators (clone/default tests) + 33 params struct generators (field-setting + clone tests). +82 tests.
+  - **BB2025 command files** (6 files) + `step_next_step.rs`: Added `id_returns_correct_variant`, content verification, and handle_command tests. Also fixed `step_next_step` not declared in `step/mod.rs`. +32 tests.
 
 - **Phase ZE** (2026-07-07): Infrastructure expansion — 9,539 → 9,556 tests (+17)
   - **`Team.vampire_lord: bool`** + **`Team.necromancer: bool`** fields: Added both with `#[serde(default)]`. Propagated to all ~350 struct literal initializers across ffb-model, ffb-mechanics, ffb-engine, ffb-client, ffb-parity. `necromancer` populated from `roster.has_necromancer()` in parity runner.

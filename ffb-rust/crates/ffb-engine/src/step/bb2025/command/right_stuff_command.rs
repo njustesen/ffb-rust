@@ -61,4 +61,24 @@ mod tests {
         assert!(!params.iter().any(|p| matches!(p, StepParameter::EndTurn(_))));
         assert!(params.iter().any(|p| matches!(p, StepParameter::ThrownPlayerCoordinate(None))));
     }
+
+    #[test]
+    fn id_returns_right_stuff_variant() {
+        let cmd = RightStuffCommand::new("p1".into(), false);
+        assert_eq!(cmd.id(), DeferredCommandId::RightStuff);
+    }
+
+    #[test]
+    fn always_clears_thrown_player_coordinate() {
+        let mut game = make_game();
+        // Test both has_ball=true and has_ball=false always clear coordinate
+        for has_ball in [true, false] {
+            let cmd = RightStuffCommand::new("p1".into(), has_ball);
+            let params = cmd.execute(&mut game);
+            assert!(
+                params.iter().any(|p| matches!(p, StepParameter::ThrownPlayerCoordinate(None))),
+                "ThrownPlayerCoordinate(None) missing when has_ball={has_ball}"
+            );
+        }
+    }
 }

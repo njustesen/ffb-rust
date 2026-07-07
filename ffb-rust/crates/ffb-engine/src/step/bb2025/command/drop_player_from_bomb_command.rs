@@ -68,4 +68,20 @@ mod tests {
         let params = cmd.execute(&mut game);
         assert!(!params.iter().any(|p| matches!(p, StepParameter::EndTurn(_))));
     }
+
+    #[test]
+    fn id_is_drop_player_from_bomb() {
+        let cmd = DropPlayerFromBombCommand::new("p1".into(), ApothecaryMode::Defender, false, false, false);
+        assert_eq!(cmd.id(), DeferredCommandId::DropPlayerFromBomb);
+    }
+
+    #[test]
+    fn stores_all_fields() {
+        let cmd = DropPlayerFromBombCommand::new("bomb_victim".into(), ApothecaryMode::Attacker, true, true, true);
+        assert_eq!(cmd.player_id, "bomb_victim");
+        assert_eq!(cmd.apothecary_mode, ApothecaryMode::Attacker);
+        assert!(cmd.eligible_for_safe_pair_of_hands);
+        assert!(cmd.was_active);
+        assert!(cmd.suppress_end_turn);
+    }
 }

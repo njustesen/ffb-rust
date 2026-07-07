@@ -43,4 +43,17 @@ mod tests {
         StandingUpCommand.execute(&mut game);
         assert!(!game.acting_player.standing_up);
     }
+
+    #[test]
+    fn id_returns_stand_up_variant() {
+        assert_eq!(StandingUpCommand.id(), DeferredCommandId::StandUp);
+    }
+
+    #[test]
+    fn execute_returns_empty_params() {
+        let mut game = make_game();
+        game.acting_player.standing_up = true;
+        let params = StandingUpCommand.execute(&mut game);
+        assert!(params.is_empty());
+    }
 }
