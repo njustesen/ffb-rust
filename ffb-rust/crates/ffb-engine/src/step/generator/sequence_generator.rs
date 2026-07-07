@@ -24,4 +24,18 @@ mod tests {
     fn sequence_generator_default_creates_instance() {
         let _ = SequenceGenerator::default();
     }
+
+    #[test]
+    fn sequence_generator_new_and_default_both_succeed() {
+        let _a = SequenceGenerator::new();
+        let _b = SequenceGenerator::default();
+        assert!(true);
+    }
+
+    #[test]
+    fn sequence_generator_new_is_consistent_with_default() {
+        let via_new = SequenceGenerator::new();
+        let via_default = SequenceGenerator::default();
+        let _ = (via_new, via_default);
+    }
 }

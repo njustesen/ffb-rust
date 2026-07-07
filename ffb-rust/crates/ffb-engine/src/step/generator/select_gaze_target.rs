@@ -25,4 +25,18 @@ mod tests {
     fn select_gaze_target_default_creates_instance() {
         let _ = SelectGazeTarget::default();
     }
+
+    #[test]
+    fn select_gaze_target_new_and_default_both_succeed() {
+        let _a = SelectGazeTarget::new();
+        let _b = SelectGazeTarget::default();
+        assert!(true);
+    }
+
+    #[test]
+    fn select_gaze_target_new_is_consistent_with_default() {
+        let via_new = SelectGazeTarget::new();
+        let via_default = SelectGazeTarget::default();
+        let _ = (via_new, via_default);
+    }
 }

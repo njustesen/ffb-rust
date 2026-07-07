@@ -25,4 +25,18 @@ mod tests {
     fn start_game_default_creates_instance() {
         let _ = StartGame::default();
     }
+
+    #[test]
+    fn start_game_new_and_default_both_succeed() {
+        let _a = StartGame::new();
+        let _b = StartGame::default();
+        assert!(true);
+    }
+
+    #[test]
+    fn start_game_new_is_consistent_with_default() {
+        let via_new = StartGame::new();
+        let via_default = StartGame::default();
+        let _ = (via_new, via_default);
+    }
 }

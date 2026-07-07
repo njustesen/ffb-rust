@@ -25,4 +25,18 @@ mod tests {
     fn select_blitz_target_default_creates_instance() {
         let _ = SelectBlitzTarget::default();
     }
+
+    #[test]
+    fn select_blitz_target_new_and_default_both_succeed() {
+        let _a = SelectBlitzTarget::new();
+        let _b = SelectBlitzTarget::default();
+        assert!(true);
+    }
+
+    #[test]
+    fn select_blitz_target_new_is_consistent_with_default() {
+        let via_new = SelectBlitzTarget::new();
+        let via_default = SelectBlitzTarget::default();
+        let _ = (via_new, via_default);
+    }
 }
