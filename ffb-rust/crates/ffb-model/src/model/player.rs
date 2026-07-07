@@ -66,6 +66,11 @@ pub struct Player {
     #[serde(default)]
     pub is_thrall: bool,
 
+    /// Whether this player's position has the BIG_GUY keyword (Java: position.getKeywords().contains(BIG_GUY)).
+    /// Stored here to avoid roster lookup at mechanic time.
+    #[serde(default)]
+    pub is_big_guy: bool,
+
     /// Race identifier for Animosity checks (e.g. "Hobgoblin", "Bull Centaur").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub race: Option<String>,
@@ -281,6 +286,7 @@ impl Player {
             current_spps: 0,
             career_spps: 0,
             is_thrall: pos.is_thrall,
+            is_big_guy: pos.is_big_guy,
             race: pos.race.clone(),
             temporary_stat_mods: vec![],
             temporary_skill_sources: vec![],
@@ -324,6 +330,7 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             is_thrall: false,
+            is_big_guy: false,
             race: None,
             temporary_stat_mods: vec![],
             temporary_skill_sources: vec![],

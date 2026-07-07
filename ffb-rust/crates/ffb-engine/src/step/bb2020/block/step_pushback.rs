@@ -607,6 +607,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
         });
         game.field_model.set_player_coordinate("def1", coord);

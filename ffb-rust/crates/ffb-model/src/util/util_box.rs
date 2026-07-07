@@ -136,6 +136,7 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
+            is_big_guy: false,
             ..Default::default()
         }
     }
@@ -162,6 +163,7 @@ mod tests {
             treasury: 0,
             special_rules: vec![],
             players: player_ids.iter().map(|id| make_player(id)).collect(),
+            vampire_lord: false,
         }
     }
 

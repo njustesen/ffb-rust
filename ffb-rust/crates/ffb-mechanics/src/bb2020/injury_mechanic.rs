@@ -51,10 +51,9 @@ impl InjuryMechanicTrait for InjuryMechanic {
     ) -> bool {
         // (MASTERS_OF_UNDEATH || roster.hasVampireLord()) && raisedDead == 0
         // && strength <= 4 && !preventRaiseFromDead
-        // TODO: Roster.has_vampire_lord() not yet translated
         let masters_of_undeath = team.special_rules.iter()
             .any(|r| r == SpecialRule::MASTERS_OF_UNDEATH.get_rule_name());
-        masters_of_undeath
+        (masters_of_undeath || team.vampire_lord)
             && team_result.raised_dead == 0
             && dead_player.strength_with_modifiers() <= 4
             && !dead_player.has_skill_property(NamedProperties::PREVENT_RAISE_FROM_DEAD)
@@ -75,7 +74,10 @@ impl InjuryMechanicTrait for InjuryMechanic {
         if team.special_rules.iter().any(|r| r == SpecialRule::MASTERS_OF_UNDEATH.get_rule_name()) {
             return RaiseType::ZOMBIE;
         }
-        // TODO: team.roster.has_vampire_lord() → RaiseType::THRALL
+        // Java: team.getRoster().hasVampireLord() → THRALL; stored on Team.vampire_lord
+        if team.vampire_lord {
+            return RaiseType::THRALL;
+        }
         RaiseType::ROTTER
     }
 }
@@ -97,6 +99,7 @@ mod tests {
             prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
             cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
             team_value: 0, treasury: 0, special_rules, players: vec![],
+            vampire_lord: false,
         }
     }
 

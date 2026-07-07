@@ -78,6 +78,7 @@ mod tests {
             used_skills: std::collections::HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
             race: None,
+            is_big_guy: false,
             player_status: ffb_model::model::player_status::PlayerStatus::ACTIVE,
             ..Default::default()
 };
@@ -101,6 +102,7 @@ mod tests {
             used_skills: std::collections::HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
             race: None,
+            is_big_guy: false,
             player_status: ffb_model::model::player_status::PlayerStatus::ACTIVE,
             ..Default::default()
 };

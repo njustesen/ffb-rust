@@ -40,6 +40,13 @@ pub struct RosterJson {
     pub special_rules: Vec<String>,
 }
 
+impl RosterJson {
+    /// Java: Roster.hasVampireLord() — checks roster-level keywords for "Vampire Lord".
+    pub fn has_vampire_lord(&self) -> bool {
+        self.keywords.iter().any(|k| k.eq_ignore_ascii_case("vampire lord"))
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct PositionJson {
     pub id: String,

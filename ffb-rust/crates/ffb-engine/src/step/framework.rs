@@ -483,6 +483,7 @@ pub fn test_team(side: &str, dedicated_fans: i32) -> ffb_model::model::team::Tea
         treasury: 0,
         special_rules: Vec::new(),
         players: Vec::new(),
+        vampire_lord: false,
     }
 }
 

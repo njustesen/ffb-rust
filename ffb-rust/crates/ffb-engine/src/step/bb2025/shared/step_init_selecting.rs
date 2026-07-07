@@ -327,6 +327,7 @@ mod tests {
             starting_skills: vec![SkillWithValue { skill_id: ffb_model::enums::SkillId::HailMaryPass, value: None }],
             extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
         });
         game.home_playing = true;
@@ -357,6 +358,7 @@ mod tests {
             movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
         });
         game.field_model.set_player_coordinate("p1", ffb_model::types::FieldCoordinate::new(5, 5));

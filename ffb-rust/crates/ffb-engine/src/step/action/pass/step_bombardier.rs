@@ -89,6 +89,7 @@ mod tests {
             starting_skills: vec![SkillWithValue { skill_id: SkillId::Bombardier, value: None }],
             extra_skills: vec![], temporary_skills: vec![], used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
                     ..Default::default()
 });
         let away = test_team("away", 0);
@@ -144,6 +145,7 @@ mod tests {
             starting_skills: vec![],
             extra_skills: vec![], temporary_skills: vec![], used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
                     ..Default::default()
 });
         let mut game = Game::new(home, away, Rules::Bb2025);

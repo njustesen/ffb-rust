@@ -30,6 +30,11 @@ pub struct Team {
 
     pub special_rules: Vec<String>,
     pub players: Vec<Player>,
+
+    /// True when this team's roster has the VAMPIRE_LORD keyword (e.g. Blood Bowl vampire teams).
+    /// Java: team.getRoster().hasVampireLord() — stored here to avoid roster lookup at mechanic time.
+    #[serde(default)]
+    pub vampire_lord: bool,
 }
 
 impl Team {
@@ -77,6 +82,7 @@ mod tests {
             treasury: 0,
             special_rules: vec![],
             players: vec![],
+            vampire_lord: false,
         }
     }
 
@@ -113,6 +119,7 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
+            is_big_guy: false,
             ..Default::default()
 });
         assert!(t.player("p1").is_some());
@@ -144,6 +151,7 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
+            is_big_guy: false,
             ..Default::default()
 });
         assert_eq!(t.player_by_nr(5).map(|p| p.id.as_str()), Some("p1"));
@@ -161,6 +169,7 @@ mod tests {
             temporary_skills: vec![], used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
             career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
 });
         t.player_mut("p1").unwrap().current_spps = 10;
@@ -194,6 +203,7 @@ mod tests {
                 temporary_skills: vec![], used_skills: HashSet::new(),
                 niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
                 career_spps: 0, race: None,
+                is_big_guy: false,
                 ..Default::default()
 });
         }
@@ -227,6 +237,7 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
+            is_big_guy: false,
             ..Default::default()
 });
         assert_eq!(t.players.len(), 1);

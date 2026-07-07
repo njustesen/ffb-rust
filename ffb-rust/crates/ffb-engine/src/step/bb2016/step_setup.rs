@@ -200,6 +200,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
                     ..Default::default()
 };
         let p_away = Player { id: "a1".into(), name: "a1".into(), ..p_home.clone()
@@ -307,6 +308,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
         };
         game.team_home.players.push(p_home);

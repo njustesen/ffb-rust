@@ -153,6 +153,7 @@ mod tests {
             cheerleaders: 0, assistant_coaches: 0, fan_factor: 0,
             dedicated_fans: 0, team_value: 0, treasury: 0,
             special_rules: vec![], players: vec![],
+            vampire_lord: false,
         }
     }
 
@@ -173,6 +174,7 @@ mod tests {
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
         }
     }

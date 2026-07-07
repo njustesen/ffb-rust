@@ -707,6 +707,7 @@ mod tests {
             dedicated_fans: 0, team_value: 0, treasury: 0,
             special_rules: vec![],
             players: vec![],
+            vampire_lord: false,
         }
     }
 
@@ -732,6 +733,7 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
+            is_big_guy: false,
             ..Default::default()
         }
     }

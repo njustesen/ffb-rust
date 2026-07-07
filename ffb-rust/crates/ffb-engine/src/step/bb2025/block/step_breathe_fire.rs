@@ -350,6 +350,7 @@ mod tests {
             movement: 6, strength: 4, agility: 3, passing: 4, armour: 9,
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
         };
         // Without the skill, grants_spp should be false

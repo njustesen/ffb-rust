@@ -942,6 +942,7 @@ mod tests {
             temporary_skills: vec![], used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
             career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
         });
     }
@@ -1064,6 +1065,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, is_thrall: false, race: None,
+            is_big_guy: false,
             temporary_stat_mods: vec![], temporary_skill_sources: vec![],
             recovering_injury: None, player_status: PlayerStatus::ACTIVE,
             zapped: false,
@@ -1084,6 +1086,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, is_thrall: false, race: None,
+            is_big_guy: false,
             temporary_stat_mods: vec![], temporary_skill_sources: vec![],
             recovering_injury: None, player_status: PlayerStatus::ACTIVE,
             zapped: false,

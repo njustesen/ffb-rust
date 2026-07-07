@@ -155,6 +155,7 @@ mod tests {
             bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
             fan_factor: 3, dedicated_fans: 7, team_value: 0, treasury: 0,
             special_rules: vec![], players: vec![],
+            vampire_lord: false,
         }
     }
 

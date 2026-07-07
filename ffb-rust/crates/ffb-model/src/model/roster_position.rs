@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::enums::{PlayerType, PlayerGender, SkillCategory};
+use crate::enums::{Keyword, PlayerType, PlayerGender, SkillCategory};
 use crate::model::skill_def::SkillWithValue;
 
 /// A position template within a team roster.
@@ -41,6 +41,13 @@ pub struct RosterPosition {
 impl RosterPosition {
     pub fn is_star_player(&self) -> bool {
         self.player_type == PlayerType::Star
+    }
+
+    /// Java: position.getKeywords().contains(keyword) — case-insensitive check.
+    /// Keywords are stored as strings in JSON (e.g. "Lineman", "Big Guy").
+    pub fn has_keyword(&self, kw: Keyword) -> bool {
+        let target = kw.get_name().to_lowercase();
+        self.keywords.iter().any(|k| k.to_lowercase() == target)
     }
 }
 

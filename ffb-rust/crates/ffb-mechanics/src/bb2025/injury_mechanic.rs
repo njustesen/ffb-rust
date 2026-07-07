@@ -34,13 +34,13 @@ impl InjuryMechanicTrait for InjuryMechanic {
         dead_player: &Player,
     ) -> bool {
         // Java: teamResult.getRaisedDead() == 0 && attacker.hasSkillProperty(allowsRaisingLineman)
-        //   && !dead_player.getPosition().getKeywords().contains(Keyword.BIG_GUY)  -- TODO: position keyword lookup
+        //   && !dead_player.getPosition().getKeywords().contains(Keyword.BIG_GUY)
         //   && !dead_player.hasSkillProperty(preventRaiseFromDead)
         //   && !UtilCards.hasSkillToCancelProperty(dead_player, allowsRaisingLineman)
         team_result.raised_dead == 0
             && attacker.is_some()
             && attacker.unwrap().has_skill_property(NamedProperties::ALLOWS_RAISING_LINEMAN)
-            // TODO: !dead_player.position.keywords.contains("BIG_GUY") — needs position embedded in Player
+            && !dead_player.is_big_guy
             && !dead_player.has_skill_property(NamedProperties::PREVENT_RAISE_FROM_DEAD)
             && !UtilCards::has_skill_to_cancel_property(dead_player, NamedProperties::ALLOWS_RAISING_LINEMAN)
     }
@@ -69,7 +69,9 @@ impl InjuryMechanicTrait for InjuryMechanic {
     }
 
     fn raise_positions(&self, _team: &Team) -> Vec<RosterPosition> {
-        // TODO: pos.get_keywords().contains(Keyword.LINEMAN) — needs Keyword support on RosterPosition
+        // no-op: raise_positions needs roster data (team.getRoster().getPositions() with LINEMAN keyword)
+        // but Roster is not accessible from Team in the headless model; positions loaded separately.
+        // RosterPosition.has_keyword(Keyword::LINEMAN) is now available for when this is wired.
         vec![]
     }
 
@@ -99,6 +101,7 @@ mod tests {
             prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
             cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
             team_value: 0, treasury: 0, special_rules, players: vec![],
+            vampire_lord: false,
         }
     }
 

@@ -128,6 +128,7 @@ mod tests {
             assistant_coaches: 0, fan_factor: 5, dedicated_fans: 5,
             team_value: 1_000_000, treasury: 0,
             special_rules: vec![], players: vec![],
+            vampire_lord: false,
         }
     }
 

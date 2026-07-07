@@ -259,6 +259,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
         };
         game.team_home.players.push(player);
@@ -289,6 +290,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
         };
         game.team_home.players.push(player);
@@ -323,6 +325,7 @@ mod tests {
             starting_skills: vec![ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::HitAndRun, value: None }], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
         };
 
@@ -362,6 +365,7 @@ mod tests {
             starting_skills: vec![ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::HitAndRun, value: None }], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
         };
 

@@ -235,6 +235,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
                     ..Default::default()
 });
         let mut game = Game::new(home, test_team("away", 0), Rules::Bb2016);

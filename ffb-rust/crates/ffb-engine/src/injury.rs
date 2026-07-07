@@ -838,6 +838,7 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
+            is_big_guy: false,
             ..Default::default()
         }
     }
@@ -855,6 +856,7 @@ mod tests {
                 cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
                 team_value: 0, treasury: 0, special_rules: vec![],
                 players: player_ids.iter().map(|pid| make_player(pid)).collect(),
+                vampire_lord: false,
             }
         };
         let home = make_team("home", home_ids);
@@ -923,6 +925,7 @@ mod tests {
             starting_skills: skills.into_iter().map(SkillWithValue::new).collect(),
             extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
         }
     }

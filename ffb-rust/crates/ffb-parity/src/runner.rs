@@ -372,6 +372,7 @@ fn make_lineman_team(side: &str, roster_id: &str) -> Team {
         treasury: 0,
         special_rules: vec![],
         players,
+        vampire_lord: false,
     }
 }
 
@@ -460,6 +461,7 @@ pub fn make_team_from_roster(roster_name: &str, side: &str, edition: &str) -> Re
         treasury: 0,
         special_rules: roster_json.special_rules.clone(),
         players,
+        vampire_lord: roster_json.has_vampire_lord(),
     })
 }
 

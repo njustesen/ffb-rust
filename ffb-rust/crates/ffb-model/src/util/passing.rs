@@ -221,6 +221,7 @@ mod tests {
             riotous_rookies: 0,
             special_rules: vec![],
             players: vec![],
+            vampire_lord: false,
         }
     }
 

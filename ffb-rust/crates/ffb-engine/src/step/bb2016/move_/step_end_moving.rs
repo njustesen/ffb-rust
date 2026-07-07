@@ -406,6 +406,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
                     ..Default::default()
 };
         if team_is_home { game.team_home.players.push(p) } else { game.team_away.players.push(p) }
@@ -453,6 +454,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
                     ..Default::default()
 });
         game.field_model.set_player_coordinate("gazer", FieldCoordinate::new(5, 5));
@@ -477,6 +479,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
                     ..Default::default()
 };
         if home { game.team_home.players.push(p) } else { game.team_away.players.push(p) }

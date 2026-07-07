@@ -173,6 +173,7 @@ mod tests {
             current_spps: 0,
             career_spps: 0,
             race: None,
+            is_big_guy: false,
             ..Default::default()
         });
     }

@@ -403,6 +403,7 @@ mod tests {
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
 });
         game.field_model.set_player_coordinate(id, pos);
@@ -689,6 +690,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
 });
         game.field_model.set_player_coordinate("p2", FieldCoordinate::new(26, 5));
@@ -742,6 +744,7 @@ mod tests {
             passing: 4, armour: 8, starting_skills: vec![], extra_skills: vec![],
             temporary_skills: vec![], used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
         };
         attacker.extra_skills.push(SkillWithValue { skill_id: SkillId::PumpUpTheCrowd, value: None });
@@ -814,6 +817,7 @@ mod tests {
             passing: 4, armour: 8, starting_skills: vec![], extra_skills: vec![],
             temporary_skills: vec![], used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
         };
         attacker.extra_skills.push(SkillWithValue { skill_id: SkillId::PumpUpTheCrowd, value: None });

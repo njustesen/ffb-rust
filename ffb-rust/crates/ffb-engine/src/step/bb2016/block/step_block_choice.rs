@@ -279,6 +279,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
                     ..Default::default()
 });
         game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 5));
@@ -419,6 +420,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
         });
         game.field_model.set_player_coordinate("att", FieldCoordinate::new(5, 5));
@@ -432,6 +434,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
         });
         game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
@@ -451,6 +454,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
                     ..Default::default()
 });
         game.field_model.set_player_coordinate(id, FieldCoordinate::new(6, 5));
@@ -494,6 +498,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
                     ..Default::default()
 });
         game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
@@ -524,6 +529,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
                     ..Default::default()
 });
         game.field_model.set_player_coordinate("att", FieldCoordinate::new(5, 5));
@@ -537,6 +543,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
                     ..Default::default()
 });
         game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));

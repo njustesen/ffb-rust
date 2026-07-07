@@ -88,6 +88,7 @@ mod tests {
             niggling_injuries: 0, stat_injuries: vec![],
             current_spps: career_spps, career_spps,
             race: None,
+            is_big_guy: false,
             ..Default::default()
         }
     }

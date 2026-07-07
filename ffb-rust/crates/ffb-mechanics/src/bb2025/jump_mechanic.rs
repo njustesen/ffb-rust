@@ -85,6 +85,7 @@ mod tests {
             bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
             fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0,
             special_rules: vec![], players: vec![],
+            vampire_lord: false,
         }
     }
 
@@ -99,6 +100,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
 };
         game.team_home.players.push(p);
@@ -129,6 +131,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
 };
         let c = FieldCoordinate::new(5, 5);
@@ -146,6 +149,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
 };
         assert!(!JumpMechanic.is_valid_jump(&game, &p, FieldCoordinate::new(5, 5), FieldCoordinate::new(5, 8)));
@@ -162,6 +166,7 @@ mod tests {
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
 };
         assert!(JumpMechanic.is_valid_jump(&game, &p, FieldCoordinate::new(5, 5), FieldCoordinate::new(7, 5)));

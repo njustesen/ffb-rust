@@ -101,6 +101,7 @@ mod tests {
             treasury: 0,
             special_rules: vec![],
             players: vec![],
+            vampire_lord: false,
         }
     }
 

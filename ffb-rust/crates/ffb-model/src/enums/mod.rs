@@ -3,6 +3,7 @@
 
 mod apothecary;
 mod block;
+mod keyword;
 mod card;
 mod client;
 mod direction;
@@ -26,6 +27,7 @@ mod weather;
 
 pub use apothecary::*;
 pub use block::*;
+pub use keyword::Keyword;
 pub use card::*;
 pub use client::*;
 pub use direction::*;

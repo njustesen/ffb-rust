@@ -251,6 +251,7 @@ mod tests {
             prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
             cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
             team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
+            vampire_lord: false,
         };
         let away = Team { id: "away".into(), ..home.clone() };
         Game::new(home, away, Rules::Bb2016)
@@ -267,6 +268,7 @@ mod tests {
             used_skills: std::collections::HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
             race: None,
+            is_big_guy: false,
             ..Default::default()
         };
         if team == "home" {
@@ -290,6 +292,7 @@ mod tests {
             used_skills: std::collections::HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0,
             race: None,
+            is_big_guy: false,
             ..Default::default()
         };
         if team == "home" {

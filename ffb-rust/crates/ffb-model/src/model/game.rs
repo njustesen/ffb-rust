@@ -346,6 +346,7 @@ mod tests {
             treasury: 0,
             special_rules: vec![],
             players: vec![],
+            vampire_lord: false,
         }
     }
 
@@ -424,6 +425,7 @@ mod tests {
             temporary_skills: vec![], used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
             career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
 });
         let mut away = empty_team("away");
@@ -435,6 +437,7 @@ mod tests {
             temporary_skills: vec![], used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0,
             career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
 });
         let g = Game::new(home, away, Rules::Bb2020);
@@ -456,6 +459,7 @@ mod tests {
             starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
             ..Default::default()
 });
         let mut g = Game::new(home, empty_team("away"), Rules::Bb2020);
