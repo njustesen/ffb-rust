@@ -106,4 +106,8 @@ mod tests {
         let _a = StepBuyInducements::new();
         let _b = StepBuyInducements::default();
     }
+    #[test]
+    fn has_positive_size() {
+        assert!(std::mem::size_of::<StepBuyInducements>() > 0);
+    }
 }
