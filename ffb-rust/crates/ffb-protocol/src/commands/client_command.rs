@@ -23,4 +23,10 @@ mod tests {
         let cmd = ClientCommand { entropy: Some(42) };
         assert_eq!(cmd.get_entropy(), Some(42));
     }
+
+    #[test]
+    fn max_entropy_stored() {
+        let cmd = ClientCommand { entropy: Some(255) };
+        assert_eq!(cmd.get_entropy(), Some(255));
+    }
 }

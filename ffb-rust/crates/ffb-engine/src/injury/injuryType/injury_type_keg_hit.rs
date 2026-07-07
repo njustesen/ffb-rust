@@ -71,4 +71,36 @@ mod tests {
         t.handle_injury(&game_with_armor(2), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert!(t.ctx.armor_broken); assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
+
+    #[test]
+    fn stores_defender_id() {
+        let mut t = InjuryTypeKegHit::new();
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game_with_armor(13), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert_eq!(t.injury_context().defender_id.as_deref(), Some("p1"));
+    }
+
+    #[test]
+    fn stores_attacker_id() {
+        let mut t = InjuryTypeKegHit::new();
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game_with_armor(13), &mut rng, Some("atk"), "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert_eq!(t.injury_context().attacker_id.as_deref(), Some("atk"));
+    }
+
+    #[test]
+    fn stores_coordinate() {
+        let mut t = InjuryTypeKegHit::new();
+        let mut rng = GameRng::new(1);
+        let c = FieldCoordinate::new(3, 7);
+        t.handle_injury(&game_with_armor(13), &mut rng, None, "p1", c, None, None, ApothecaryMode::Defender);
+        assert_eq!(t.injury_context().defender_coordinate, Some(c));
+    }
+
+    #[test]
+    fn injury_context_mut_allows_modification() {
+        let mut t = InjuryTypeKegHit::new();
+        t.injury_context_mut().armor_broken = true;
+        assert!(t.injury_context().armor_broken);
+    }
 }

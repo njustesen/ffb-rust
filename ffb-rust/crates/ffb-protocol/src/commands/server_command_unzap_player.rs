@@ -26,4 +26,15 @@ mod tests {
         assert_eq!(cmd.get_team_id(), "team1");
         assert_eq!(cmd.get_player_id(), "p1");
     }
+
+    #[test]
+    fn default_same_as_new() {
+        let _ = ServerCommandUnzapPlayer::default();
+    }
+
+    #[test]
+    fn debug_format_works() {
+        let v = ServerCommandUnzapPlayer::new("t", "p");
+        assert!(!format!("{:?}", v).is_empty());
+    }
 }

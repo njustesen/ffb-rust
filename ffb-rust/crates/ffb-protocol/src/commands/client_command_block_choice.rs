@@ -30,4 +30,10 @@ mod tests {
         let cmd = ClientCommandBlockChoice::default();
         assert_eq!(cmd.dice_index, 0);
     }
+
+    #[test]
+    fn negative_index_stored() {
+        let cmd = ClientCommandBlockChoice::new(-1);
+        assert_eq!(cmd.get_dice_index(), -1);
+    }
 }

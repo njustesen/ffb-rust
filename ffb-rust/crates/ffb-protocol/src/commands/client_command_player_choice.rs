@@ -43,4 +43,12 @@ mod tests {
         assert!(cmd.player_choice_mode.is_none());
         assert!(cmd.player_ids.is_empty());
     }
+
+    #[test]
+    fn add_single_id_len_is_one() {
+        let mut cmd = ClientCommandPlayerChoice::new();
+        cmd.add_player_id("p99");
+        assert_eq!(cmd.get_player_ids().len(), 1);
+    }
+
 }

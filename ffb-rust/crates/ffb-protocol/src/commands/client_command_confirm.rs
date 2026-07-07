@@ -20,4 +20,10 @@ mod tests {
     fn default_same_as_new() {
         let _ = ClientCommandConfirm::default();
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandConfirm::new()).is_empty());
+    }
+
 }

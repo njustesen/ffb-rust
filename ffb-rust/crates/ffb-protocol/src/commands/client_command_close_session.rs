@@ -12,4 +12,6 @@ mod tests {
     use super::*;
     #[test]
     fn can_construct() { let _ = ClientCommandCloseSession::new(); }
+
+#[test]    fn default_same_as_new() {        let _ = ClientCommandCloseSession::default();    }
 }

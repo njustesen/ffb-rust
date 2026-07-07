@@ -24,4 +24,11 @@ mod tests {
         let cmd = ClientCommandPuntToCrowd::default();
         assert!(!cmd.punt_to_crowd);
     }
+
+    #[test]
+    fn false_stored() {
+        let cmd = ClientCommandPuntToCrowd::new(false);
+        assert!(!cmd.is_punt_to_crowd());
+    }
+
 }

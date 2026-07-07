@@ -16,4 +16,6 @@ mod tests {
     fn can_be_created() {
         let _ = ServerCommandClearSketches::new();
     }
+
+#[test]    fn default_same_as_new() {        let _ = ServerCommandClearSketches::default();    }
 }

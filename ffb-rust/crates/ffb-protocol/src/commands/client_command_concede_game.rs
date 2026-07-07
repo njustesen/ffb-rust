@@ -21,4 +21,6 @@ mod tests {
         let cmd = ClientCommandConcedeGame::new();
         assert!(cmd.concede_game_status.is_none());
     }
+
+#[test]    fn default_same_as_new() {        let _ = ClientCommandConcedeGame::default();    }
 }

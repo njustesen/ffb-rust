@@ -99,4 +99,14 @@ mod tests {
         crowd_handle_injury(&mut ctx, &game, &mut rng, None, "def1", coord, ApothecaryMode::Defender);
         assert_eq!(ctx.defender_coordinate, Some(coord));
     }
+
+    #[test]
+    fn injury_is_some_after_call() {
+        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2016);
+        let mut rng = GameRng::new(3);
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        crowd_handle_injury(&mut ctx, &game, &mut rng, None, "def1",
+            FieldCoordinate::new(1, 2), ApothecaryMode::Defender);
+        assert!(ctx.injury.is_some());
+    }
 }

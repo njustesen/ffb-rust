@@ -35,4 +35,9 @@ mod tests {
         };
         assert_eq!(cmd.get_client_state_id(), Some(ClientStateId::Login));
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandDebugClientState::new()).is_empty());
+    }
 }

@@ -40,4 +40,11 @@ mod tests {
         assert!(cmd.acting_player_id.is_none());
         assert!(cmd.target_coordinate.is_none());
     }
+
+    #[test]
+    fn new_with_coord() {
+        let coord = FieldCoordinate::new(0, 0);
+        let cmd = ClientCommandPass::new("p1", coord);
+        assert!(cmd.get_acting_player_id().is_some());
+    }
 }

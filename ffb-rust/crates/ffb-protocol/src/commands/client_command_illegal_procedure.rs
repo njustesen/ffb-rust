@@ -20,4 +20,10 @@ mod tests {
     fn default_same_as_new() {
         let _ = ClientCommandIllegalProcedure::default();
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandIllegalProcedure::new()).is_empty());
+    }
+
 }

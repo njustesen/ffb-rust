@@ -53,4 +53,12 @@ mod tests {
         assert!(cmd.coordinate_from.is_none());
         assert!(cmd.coordinates_to.is_empty());
     }
+
+    #[test]
+    fn coordinates_to_slice_matches_input() {
+        let from = FieldCoordinate::new(0, 0);
+        let to = vec![FieldCoordinate::new(1, 0)];
+        let cmd = ClientCommandBlitzMove::with_move("p2", from, to.clone());
+        assert_eq!(cmd.get_coordinates_to(), to.as_slice());
+    }
 }

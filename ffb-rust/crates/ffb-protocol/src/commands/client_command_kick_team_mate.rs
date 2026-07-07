@@ -52,4 +52,12 @@ mod tests {
         assert_eq!(cmd.get_acting_player_id(), Some("acting_1"));
         assert_eq!(cmd.get_num_dice(), 2);
     }
+
+    #[test]
+    fn default_ids_are_none() {
+        let cmd = ClientCommandKickTeamMate::default();
+        assert!(cmd.get_kicked_player_id().is_none());
+        assert!(cmd.get_acting_player_id().is_none());
+    }
+
 }

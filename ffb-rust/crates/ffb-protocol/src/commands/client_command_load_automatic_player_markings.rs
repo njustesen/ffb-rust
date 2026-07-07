@@ -47,4 +47,10 @@ mod tests {
         assert_eq!(cmd.get_index(), 3);
         assert_eq!(cmd.get_coach(), Some("CoachB"));
     }
+
+    #[test]
+    fn coach_none_by_default() {
+        let cmd = ClientCommandLoadAutomaticPlayerMarkings::default();
+        assert!(cmd.get_coach().is_none());
+    }
 }

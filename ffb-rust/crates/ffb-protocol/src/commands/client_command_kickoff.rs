@@ -35,4 +35,10 @@ mod tests {
         let cmd = ClientCommandKickoff::default();
         assert!(cmd.ball_coordinate.is_none());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandKickoff::default()).is_empty());
+    }
+
 }

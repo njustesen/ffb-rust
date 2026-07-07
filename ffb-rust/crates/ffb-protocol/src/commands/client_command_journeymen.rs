@@ -54,4 +54,13 @@ mod tests {
         assert!(cmd.get_slots().is_empty());
         assert!(cmd.get_position_ids().is_empty());
     }
+
+    #[test]
+    fn slots_can_hold_multiple() {
+        let mut cmd = ClientCommandJourneymen::new();
+        cmd.add_slot(5);
+        cmd.add_slot(6);
+        assert_eq!(cmd.get_slots().len(), 2);
+    }
+
 }

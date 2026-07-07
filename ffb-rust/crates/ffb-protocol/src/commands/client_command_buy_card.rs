@@ -37,4 +37,10 @@ mod tests {
         };
         assert_eq!(cmd.get_card_type_name(), Some("BRIBE"));
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandBuyCard::new()).is_empty());
+    }
+
 }

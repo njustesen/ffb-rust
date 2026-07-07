@@ -33,4 +33,10 @@ mod tests {
         let cmd = ClientCommandPasswordChallenge::with_coach("coach-xyz");
         assert_eq!(cmd.get_coach(), Some("coach-xyz"));
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandPasswordChallenge::new()).is_empty());
+    }
+
 }

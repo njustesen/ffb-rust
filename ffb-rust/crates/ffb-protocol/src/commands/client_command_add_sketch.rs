@@ -32,4 +32,10 @@ mod tests {
         let cmd = ClientCommandAddSketch::new();
         assert!(cmd.sketch_id.is_none());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandAddSketch::new()).is_empty());
+    }
+
 }

@@ -34,4 +34,20 @@ mod tests {
         assert_eq!(c.re_roll_source, s.re_roll_source);
         assert!(c.re_roll_target.is_none());
     }
+
+    #[test]
+    fn re_roll_target_can_be_set() {
+        let mut s = SingleReRollUseState::new();
+        s.re_roll_target = Some("TEAM_REROLL".to_string());
+        assert_eq!(s.re_roll_target.as_deref(), Some("TEAM_REROLL"));
+    }
+
+    #[test]
+    fn id_can_be_mutated() {
+        let mut s = SingleReRollUseState::new();
+        s.id = Some("p-42".to_string());
+        assert_eq!(s.id.as_deref(), Some("p-42"));
+        s.id = None;
+        assert!(s.id.is_none());
+    }
 }

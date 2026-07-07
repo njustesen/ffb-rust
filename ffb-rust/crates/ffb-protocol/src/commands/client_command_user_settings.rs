@@ -26,4 +26,11 @@ mod tests {
     fn default_empty() {
         assert!(ClientCommandUserSettings::new().settings.is_empty());
     }
+
+    #[test]
+    fn set_and_get_value() {
+        let mut cmd = ClientCommandUserSettings::new();
+        cmd.set(CommonProperty::SETTING_SOUND_VOLUME, "80");
+        assert_eq!(cmd.get(CommonProperty::SETTING_SOUND_VOLUME), Some("80"));
+    }
 }

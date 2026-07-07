@@ -80,4 +80,14 @@ mod tests {
         assert_eq!(cmd.get_coach(), Some("TestCoach"));
         assert_eq!(cmd.get_game_id(), 42);
     }
+
+    #[test]
+    fn team_id_stored() {
+        let cmd = ClientCommandJoin {
+            team_id: Some("team-abc".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(cmd.get_team_id(), Some("team-abc"));
+    }
+
 }

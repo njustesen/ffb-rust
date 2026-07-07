@@ -51,4 +51,10 @@ mod tests {
         assert_eq!(cmd.get_player_id(), Some("player_1"));
         assert_eq!(cmd.get_keywords().len(), 1);
     }
+
+    #[test]
+    fn keywords_empty_by_default() {
+        let cmd = ClientCommandKeywordSelection::default();
+        assert!(cmd.get_keywords().is_empty());
+    }
 }

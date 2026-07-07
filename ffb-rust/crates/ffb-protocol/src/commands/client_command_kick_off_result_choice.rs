@@ -35,4 +35,12 @@ mod tests {
         };
         assert_eq!(cmd.get_kickoff_result(), Some(KickoffResult::QuickSnap));
     }
+
+    #[test]
+    fn blitz_variant_stored() {
+        let cmd = ClientCommandKickOffResultChoice {
+            kickoff_result: Some(KickoffResult::Blitz),
+        };
+        assert_eq!(cmd.get_kickoff_result(), Some(KickoffResult::Blitz));
+    }
 }

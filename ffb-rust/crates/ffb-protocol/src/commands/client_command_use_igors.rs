@@ -19,4 +19,11 @@ mod tests {
     fn default_empty() {
         assert!(ClientCommandUseIgors::new().injury_description_json.is_empty());
     }
+
+    #[test]
+    fn getter_returns_slice() {
+        let mut cmd = ClientCommandUseIgors::new();
+        cmd.injury_description_json.push("{}".into());
+        assert_eq!(cmd.get_injury_descriptions().len(), 1);
+    }
 }

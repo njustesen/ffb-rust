@@ -38,4 +38,12 @@ mod tests {
         assert!(cmd.team_id.is_none());
         assert!(cmd.position.is_empty());
     }
+
+    #[test]
+    fn position_slice_matches_input() {
+        let positions = vec!["Lineman".to_string()];
+        let cmd = ClientCommandPositionSelection::with_team("t1", positions.clone());
+        assert_eq!(cmd.get_position(), positions.as_slice());
+    }
+
 }

@@ -28,4 +28,12 @@ mod tests {
         let cmd = ClientCommandWizardSpell::new();
         assert!(cmd.wizard_spell.is_none());
     }
+
+    #[test]
+    fn with_spell_stores_values() {
+        use ffb_model::types::FieldCoordinate;
+        let cmd = ClientCommandWizardSpell::with_spell(SpecialEffect::FIREBALL, FieldCoordinate::new(3, 5));
+        assert!(cmd.get_wizard_spell().is_some());
+        assert_eq!(cmd.get_target_coordinate(), Some(FieldCoordinate::new(3, 5)));
+    }
 }

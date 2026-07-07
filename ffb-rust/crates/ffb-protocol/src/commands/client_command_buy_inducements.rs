@@ -79,4 +79,14 @@ mod tests {
         assert_eq!(cmd.get_team_id(), Some("team_home"));
         assert_eq!(cmd.get_available_gold(), 150000);
     }
+
+    #[test]
+    fn star_player_ids_stored() {
+        let cmd = ClientCommandBuyInducements {
+            star_player_position_ids: vec!["pos1".to_string()],
+            ..Default::default()
+        };
+        assert_eq!(cmd.get_star_player_position_ids().len(), 1);
+    }
+
 }

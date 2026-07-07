@@ -41,4 +41,5 @@ mod tests {
         let cmd = ClientCommandInterceptorChoice::new();
         assert!(cmd.interceptor_id.is_none());
     }
+#[test]    fn debug_format_nonempty() {        let v = ClientCommandInterceptorChoice::default();        assert!(!format!("{:?}", v).is_empty());    }
 }

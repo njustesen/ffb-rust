@@ -42,4 +42,5 @@ mod tests {
         assert!(cmd.acting_player_id.is_none());
         assert!(cmd.catcher_id.is_none());
     }
+#[test]    fn new_constructor_creates_default() {        let cmd = ClientCommandHandOver::new();        let _ = cmd;    }
 }

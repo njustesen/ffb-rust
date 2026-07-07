@@ -24,4 +24,5 @@ mod tests {
         let cmd = ClientCommandPing::default();
         assert_eq!(cmd.timestamp, 0);
     }
+#[test]    fn debug_format_nonempty() {        let v = ClientCommandPing::default();        assert!(!format!("{:?}", v).is_empty());    }
 }

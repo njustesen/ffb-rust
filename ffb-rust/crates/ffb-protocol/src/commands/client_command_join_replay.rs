@@ -52,4 +52,10 @@ mod tests {
         assert_eq!(cmd.get_coach(), Some("CoachA"));
         assert_eq!(cmd.get_game_id(), 99);
     }
+
+    #[test]
+    fn replay_name_none_by_default() {
+        let cmd = ClientCommandJoinReplay::default();
+        assert!(cmd.get_replay_name().is_none());
+    }
 }

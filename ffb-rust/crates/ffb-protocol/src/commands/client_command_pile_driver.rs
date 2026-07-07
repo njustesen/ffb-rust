@@ -33,4 +33,10 @@ mod tests {
         let cmd = ClientCommandPileDriver::with_player_id("p-7");
         assert_eq!(cmd.get_player_id(), Some("p-7"));
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandPileDriver::new()).is_empty());
+    }
+
 }

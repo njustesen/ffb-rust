@@ -29,4 +29,11 @@ mod tests {
         let cmd = ClientCommandPettyCash::default();
         assert_eq!(cmd.get_petty_cash(), 0);
     }
+
+    #[test]
+    fn negative_value_stored() {
+        let cmd = ClientCommandPettyCash::new(-1000);
+        assert_eq!(cmd.get_petty_cash(), -1000);
+    }
+
 }

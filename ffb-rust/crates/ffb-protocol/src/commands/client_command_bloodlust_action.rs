@@ -26,4 +26,10 @@ mod tests {
         let cmd = ClientCommandBloodlustAction::default();
         assert!(!cmd.change);
     }
+
+    #[test]
+    fn change_false_stored() {
+        let cmd = ClientCommandBloodlustAction::new(false);
+        assert!(!cmd.is_change());
+    }
 }

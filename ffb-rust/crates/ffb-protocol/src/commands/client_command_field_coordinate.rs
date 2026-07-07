@@ -37,4 +37,10 @@ mod tests {
         let cmd = ClientCommandFieldCoordinate::with_coordinate(coord);
         assert_eq!(cmd.get_field_coordinate(), Some(FieldCoordinate::new(3, 5)));
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandFieldCoordinate::new()).is_empty());
+    }
+
 }
