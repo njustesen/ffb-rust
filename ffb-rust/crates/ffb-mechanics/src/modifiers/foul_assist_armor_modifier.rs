@@ -108,4 +108,10 @@ mod tests {
         let m = FoulAssistArmorModifier::new("test", 3, false);
         assert_eq!(m.get_modifier(None, &p), 3);
     }
+
+    #[test]
+    fn is_foul_assist_modifier_reflects_constructor_arg() {
+        assert!(FoulAssistArmorModifier::new("x", 1, true).is_foul_assist_modifier());
+        assert!(!FoulAssistArmorModifier::new("x", 1, false).is_foul_assist_modifier());
+    }
 }

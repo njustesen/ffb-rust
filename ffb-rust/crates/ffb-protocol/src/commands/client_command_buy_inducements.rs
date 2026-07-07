@@ -95,4 +95,9 @@ mod tests {
         let cmd = ClientCommandBuyInducements::default();
         assert!(!format!("{cmd:?}").is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandBuyInducements::default().clone();
+    }
 }

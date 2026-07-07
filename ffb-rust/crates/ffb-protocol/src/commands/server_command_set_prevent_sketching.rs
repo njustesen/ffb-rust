@@ -31,4 +31,15 @@ mod tests {
         assert!(!format!("{:?}", ServerCommandSetPreventSketching::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandSetPreventSketching::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ServerCommandSetPreventSketching::default());
+        assert!(s.contains("ServerCommandSetPreventSketching"));
+    }
 }

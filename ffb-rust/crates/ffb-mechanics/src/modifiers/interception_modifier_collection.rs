@@ -83,4 +83,10 @@ mod tests {
     fn default_has_same_count_as_new() {
         assert_eq!(InterceptionModifierCollection::default().get_modifiers().len(), InterceptionModifierCollection::new().get_modifiers().len());
     }
+
+    #[test]
+    fn all_modifiers_have_nonempty_names() {
+        let col = InterceptionModifierCollection::new();
+        assert!(col.get_modifiers().iter().all(|m| !m.get_name().is_empty()));
+    }
 }

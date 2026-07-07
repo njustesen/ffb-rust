@@ -78,4 +78,10 @@ mod tests {
     fn get_name_is_nonempty() {
         assert!(!Bb2020InjuryModifiers::new().get_name().is_empty());
     }
+
+    #[test]
+    fn values_count_does_not_exceed_all_values_count() {
+        let m = Bb2020InjuryModifiers::new();
+        assert!(m.values().len() <= m.all_values().len());
+    }
 }

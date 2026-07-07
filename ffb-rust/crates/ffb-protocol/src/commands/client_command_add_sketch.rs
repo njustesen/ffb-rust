@@ -38,4 +38,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandAddSketch::new()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandAddSketch::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandAddSketch::default());
+        assert!(s.contains("ClientCommandAddSketch"));
+    }
 }

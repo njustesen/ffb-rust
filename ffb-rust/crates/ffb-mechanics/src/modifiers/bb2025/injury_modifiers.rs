@@ -55,4 +55,9 @@ mod tests {
     fn get_name_is_nonempty() {
         assert!(!Bb2025InjuryModifiers.get_name().is_empty());
     }
+
+    #[test]
+    fn values_and_all_values_return_same_count() {
+        assert_eq!(Bb2025InjuryModifiers.values().len(), Bb2025InjuryModifiers.all_values().len());
+    }
 }

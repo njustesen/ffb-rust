@@ -108,4 +108,11 @@ mod tests {
         let ctx = crate::modifiers::right_stuff_context::RightStuffContext::new(&game, &player);
         assert!(m.applies_to_context(&ctx));
     }
+
+    #[test]
+    fn new_full_uses_separate_reporting_string() {
+        let m = RightStuffModifier::new_full("Right Stuff", "Right Stuff Attempt", -1, ModifierType::REGULAR);
+        assert_eq!(m.get_name(), "Right Stuff");
+        assert_eq!(m.get_report_string(), "Right Stuff Attempt");
+    }
 }

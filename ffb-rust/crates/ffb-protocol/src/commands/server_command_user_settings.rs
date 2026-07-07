@@ -43,4 +43,15 @@ mod tests {
         assert!(!format!("{:?}", ServerCommandUserSettings::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandUserSettings::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ServerCommandUserSettings::default());
+        assert!(s.contains("ServerCommandUserSettings"));
+    }
 }

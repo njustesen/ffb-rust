@@ -38,4 +38,15 @@ mod tests {
         assert!(!format!("{:?}", ServerCommandGameTime::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandGameTime::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ServerCommandGameTime::default());
+        assert!(s.contains("ServerCommandGameTime"));
+    }
 }

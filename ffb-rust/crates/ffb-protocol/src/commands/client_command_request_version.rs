@@ -26,4 +26,15 @@ mod tests {
     fn debug_format_nonempty() {
         assert!(!format!("{:?}", ClientCommandRequestVersion::new()).is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandRequestVersion::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandRequestVersion::default());
+        assert!(s.contains("ClientCommandRequestVersion"));
+    }
 }

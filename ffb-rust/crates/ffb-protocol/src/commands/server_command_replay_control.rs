@@ -31,4 +31,15 @@ mod tests {
         assert!(!format!("{:?}", ServerCommandReplayControl::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandReplayControl::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ServerCommandReplayControl::default());
+        assert!(s.contains("ServerCommandReplayControl"));
+    }
 }

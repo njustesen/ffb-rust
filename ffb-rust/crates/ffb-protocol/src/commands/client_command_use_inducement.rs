@@ -39,4 +39,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandUseInducement::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandUseInducement::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandUseInducement::default());
+        assert!(s.contains("ClientCommandUseInducement"));
+    }
 }

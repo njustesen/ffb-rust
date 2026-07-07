@@ -38,4 +38,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandTransferReplayControl::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandTransferReplayControl::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandTransferReplayControl::default());
+        assert!(s.contains("ClientCommandTransferReplayControl"));
+    }
 }

@@ -56,4 +56,9 @@ mod tests {
         let cmd = ClientCommandReplay::default();
         assert!(!format!("{cmd:?}").is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandReplay::default().clone();
+    }
 }

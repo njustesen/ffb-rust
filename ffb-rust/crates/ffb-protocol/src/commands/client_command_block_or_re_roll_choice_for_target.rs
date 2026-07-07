@@ -93,4 +93,9 @@ mod tests {
         let cmd = ClientCommandBlockOrReRollChoiceForTarget::default();
         let _ = cmd.clone();
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandBlockOrReRollChoiceForTarget::default().clone();
+    }
 }

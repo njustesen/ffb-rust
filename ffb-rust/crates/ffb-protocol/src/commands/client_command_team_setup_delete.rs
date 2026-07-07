@@ -38,4 +38,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandTeamSetupDelete::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandTeamSetupDelete::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandTeamSetupDelete::default());
+        assert!(s.contains("ClientCommandTeamSetupDelete"));
+    }
 }

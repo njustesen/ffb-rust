@@ -32,4 +32,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandUseSingleBlockDieReRoll::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandUseSingleBlockDieReRoll::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandUseSingleBlockDieReRoll::default());
+        assert!(s.contains("ClientCommandUseSingleBlockDieReRoll"));
+    }
 }

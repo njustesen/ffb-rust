@@ -94,4 +94,12 @@ mod tests {
     fn can_prevent_strip_ball_false_when_prone() {
         assert!(!SkillMechanic.can_prevent_strip_ball(PlayerState(PS_PRONE)));
     }
+
+    #[test]
+    fn animosity_exists_returns_false_stub() {
+        use ffb_model::model::Player;
+        let p1 = Player::default();
+        let p2 = Player::default();
+        assert!(!SkillMechanic.animosity_exists(&p1, &p2));
+    }
 }

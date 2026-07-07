@@ -60,4 +60,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandThrowTeamMate::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandThrowTeamMate::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandThrowTeamMate::default());
+        assert!(s.contains("ClientCommandThrowTeamMate"));
+    }
 }

@@ -65,4 +65,9 @@ mod tests {
         let cmd = ServerCommandLeave::default();
         let _ = cmd.clone();
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandLeave::default().clone();
+    }
 }

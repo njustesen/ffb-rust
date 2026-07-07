@@ -49,4 +49,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandSwoop::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandSwoop::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandSwoop::default());
+        assert!(s.contains("ClientCommandSwoop"));
+    }
 }

@@ -32,4 +32,15 @@ mod tests {
         assert!(!format!("{:?}", ServerCommandTeamList::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandTeamList::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ServerCommandTeamList::default());
+        assert!(s.contains("ServerCommandTeamList"));
+    }
 }

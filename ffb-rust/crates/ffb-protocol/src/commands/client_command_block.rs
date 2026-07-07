@@ -83,4 +83,9 @@ mod tests {
         let cmd = ClientCommandBlock::default();
         assert!(!format!("{cmd:?}").is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandBlock::default().clone();
+    }
 }

@@ -86,4 +86,10 @@ mod tests {
     fn default_has_same_count_as_new() {
         assert_eq!(PickupModifierCollection::default().get_modifiers().len(), PickupModifierCollection::new().get_modifiers().len());
     }
+
+    #[test]
+    fn all_modifiers_have_nonempty_names() {
+        let col = PickupModifierCollection::new();
+        assert!(col.get_modifiers().iter().all(|m| !m.get_name().is_empty()));
+    }
 }

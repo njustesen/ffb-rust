@@ -47,4 +47,9 @@ mod tests {
         let cmd = ClientCommandPushback::default();
         assert!(!format!("{cmd:?}").is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandPushback::default().clone();
+    }
 }

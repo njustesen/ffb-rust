@@ -151,4 +151,15 @@ mod tests {
         let min = CatchModifierFactory::minimum_roll_catch(&player, &[&modifier]);
         assert_eq!(min, 2);
     }
+
+    #[test]
+    fn minimum_roll_catch_with_positive_modifier_raises_minimum() {
+        let player = minimal_player(3);
+        let modifier = crate::modifiers::catch_modifier::CatchModifier::new(
+            "Gloves", 1,
+            crate::modifiers::modifier_type::ModifierType::REGULAR,
+        );
+        let min = CatchModifierFactory::minimum_roll_catch(&player, &[&modifier]);
+        assert_eq!(min, 4); // 3 + 1 = 4
+    }
 }

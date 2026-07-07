@@ -78,4 +78,10 @@ mod tests {
         assert!(names.iter().any(|n| n.as_str() == "Fireball"));
         assert!(names.iter().any(|n| n.as_str() == "Lightning"));
     }
+
+    #[test]
+    fn get_name_is_nonempty() {
+        let m = Bb2025ArmorModifiers;
+        assert!(!m.get_name().is_empty());
+    }
 }

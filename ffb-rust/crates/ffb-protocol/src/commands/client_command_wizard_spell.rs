@@ -41,4 +41,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandWizardSpell::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandWizardSpell::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandWizardSpell::default());
+        assert!(s.contains("ClientCommandWizardSpell"));
+    }
 }

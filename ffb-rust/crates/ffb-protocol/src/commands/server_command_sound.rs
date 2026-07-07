@@ -37,4 +37,15 @@ mod tests {
         let cmd = ServerCommandSound::default();
         let _ = cmd.clone();
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandSound::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ServerCommandSound::default());
+        assert!(s.contains("ServerCommandSound"));
+    }
 }

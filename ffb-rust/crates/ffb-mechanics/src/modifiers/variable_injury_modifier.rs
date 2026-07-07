@@ -67,4 +67,12 @@ mod tests {
         m.set_registered_to(Some("DODGE".to_string()));
         assert_eq!(m.registered_to(), Some("DODGE"));
     }
+
+    #[test]
+    fn set_registered_to_then_clear_to_none() {
+        let mut m = VariableInjuryModifier::new_attacker("x", false);
+        m.set_registered_to(Some("DODGE".to_string()));
+        m.set_registered_to(None);
+        assert!(m.registered_to().is_none());
+    }
 }

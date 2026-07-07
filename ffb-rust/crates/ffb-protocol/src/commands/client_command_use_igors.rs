@@ -31,4 +31,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandUseIgors::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandUseIgors::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandUseIgors::default());
+        assert!(s.contains("ClientCommandUseIgors"));
+    }
 }

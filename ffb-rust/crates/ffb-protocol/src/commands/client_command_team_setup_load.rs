@@ -38,4 +38,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandTeamSetupLoad::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandTeamSetupLoad::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandTeamSetupLoad::default());
+        assert!(s.contains("ClientCommandTeamSetupLoad"));
+    }
 }

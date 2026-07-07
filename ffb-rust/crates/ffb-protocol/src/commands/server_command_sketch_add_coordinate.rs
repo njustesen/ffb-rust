@@ -57,4 +57,15 @@ mod tests {
         let cmd = ServerCommandSketchAddCoordinate::default();
         let _ = cmd.clone();
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandSketchAddCoordinate::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ServerCommandSketchAddCoordinate::default());
+        assert!(s.contains("ServerCommandSketchAddCoordinate"));
+    }
 }

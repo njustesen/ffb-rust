@@ -42,4 +42,9 @@ mod tests {
         let cmd = ClientCommandReceiveChoice::default();
         assert!(!format!("{cmd:?}").is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandReceiveChoice::default().clone();
+    }
 }

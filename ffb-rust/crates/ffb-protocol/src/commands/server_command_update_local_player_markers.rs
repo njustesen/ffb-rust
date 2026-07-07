@@ -33,4 +33,15 @@ mod tests {
         assert!(!format!("{:?}", ServerCommandUpdateLocalPlayerMarkers::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandUpdateLocalPlayerMarkers::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ServerCommandUpdateLocalPlayerMarkers::default());
+        assert!(s.contains("ServerCommandUpdateLocalPlayerMarkers"));
+    }
 }

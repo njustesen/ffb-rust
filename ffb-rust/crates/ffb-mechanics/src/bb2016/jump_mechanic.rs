@@ -127,4 +127,12 @@ mod tests {
         let ap = game.acting_player.clone();
         assert!(!JumpMechanic::new().can_still_jump(&game, &ap));
     }
+
+    #[test]
+    fn is_valid_jump_same_square_is_false() {
+        let game = make_game();
+        let player = Player::default();
+        let coord = FieldCoordinate::new(5, 5);
+        assert!(!JumpMechanic::new().is_valid_jump(&game, &player, coord, coord));
+    }
 }

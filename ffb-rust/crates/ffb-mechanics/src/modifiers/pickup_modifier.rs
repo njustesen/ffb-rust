@@ -108,4 +108,11 @@ mod tests {
         let ctx = crate::modifiers::pickup_context::PickupContext::new(&game, &player);
         assert!(m.applies_to_context(&ctx));
     }
+
+    #[test]
+    fn new_full_uses_separate_reporting_string() {
+        let m = PickupModifier::new_full("Pick Up", "Picking Up", 1, ModifierType::REGULAR);
+        assert_eq!(m.get_name(), "Pick Up");
+        assert_eq!(m.get_report_string(), "Picking Up");
+    }
 }

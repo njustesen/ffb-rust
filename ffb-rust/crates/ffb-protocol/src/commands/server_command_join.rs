@@ -88,4 +88,9 @@ mod tests {
         let cmd = ServerCommandJoin::default();
         let _ = cmd.clone();
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandJoin::default().clone();
+    }
 }

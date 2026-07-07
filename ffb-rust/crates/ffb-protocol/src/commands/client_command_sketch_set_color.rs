@@ -44,4 +44,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandSketchSetColor::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandSketchSetColor::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandSketchSetColor::default());
+        assert!(s.contains("ClientCommandSketchSetColor"));
+    }
 }

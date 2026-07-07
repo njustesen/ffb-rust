@@ -40,4 +40,9 @@ mod tests {
     fn for_name_empty_string_returns_none() {
         assert_eq!(TeamStatusFactory::default().for_name(""), None);
     }
+
+    #[test]
+    fn for_name_retired_returns_retired() {
+        assert_eq!(TeamStatusFactory::default().for_name("Retired"), Some(TeamStatus::Retired));
+    }
 }

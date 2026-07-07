@@ -84,4 +84,11 @@ mod tests {
         let m = TestThrowIn;
         assert_eq!(m.interpret_throw_in_direction_roll_with_template(Direction::South, 1), Direction::Southeast);
     }
+
+    #[test]
+    fn south_roll_5_6_is_southwest() {
+        let m = TestThrowIn;
+        assert_eq!(m.interpret_throw_in_direction_roll_with_template(Direction::South, 5), Direction::Southwest);
+        assert_eq!(m.interpret_throw_in_direction_roll_with_template(Direction::South, 6), Direction::Southwest);
+    }
 }

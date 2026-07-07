@@ -49,4 +49,9 @@ mod tests {
         let cmd = ClientCommandGaze::with_players("g", "v");
         assert_eq!(cmd.get_victim_id(), Some("v"));
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandGaze::default()).is_empty());
+    }
 }

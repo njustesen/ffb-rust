@@ -32,4 +32,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandUseReRollForTarget::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandUseReRollForTarget::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandUseReRollForTarget::default());
+        assert!(s.contains("ClientCommandUseReRollForTarget"));
+    }
 }

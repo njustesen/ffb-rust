@@ -38,4 +38,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandUseBrawler::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandUseBrawler::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandUseBrawler::default());
+        assert!(s.contains("ClientCommandUseBrawler"));
+    }
 }

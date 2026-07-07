@@ -206,4 +206,13 @@ mod tests {
         let result = m.evaluate_pass(&thrower, 3, PassingDistance::ShortPass, &[], false, None);
         assert_eq!(result, PassResult::FUMBLE);
     }
+
+    #[test]
+    fn accurate_roll_above_pa_is_accurate() {
+        let m = PassMechanic::new();
+        let thrower = make_thrower(); // passing=4
+        // roll=5 >= pa=4 → ACCURATE
+        let result = m.evaluate_pass(&thrower, 5, PassingDistance::ShortPass, &[], false, None);
+        assert_eq!(result, PassResult::ACCURATE);
+    }
 }

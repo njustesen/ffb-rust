@@ -40,4 +40,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandTouchback::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandTouchback::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandTouchback::default());
+        assert!(s.contains("ClientCommandTouchback"));
+    }
 }

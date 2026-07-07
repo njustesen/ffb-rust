@@ -39,4 +39,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandPileDriver::new()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandPileDriver::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandPileDriver::default());
+        assert!(s.contains("ClientCommandPileDriver"));
+    }
 }

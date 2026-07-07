@@ -191,4 +191,12 @@ mod tests {
         let result = m.evaluate_pass(&thrower, 2, PassingDistance::LongPass, &[], true, None);
         assert_eq!(result, PassResult::FUMBLE);
     }
+
+    #[test]
+    fn high_roll_is_accurate() {
+        let m = PassMechanic::new();
+        let thrower = make_thrower();
+        let result = m.evaluate_pass(&thrower, 6, PassingDistance::ShortPass, &[], false, None);
+        assert_eq!(result, PassResult::ACCURATE);
+    }
 }

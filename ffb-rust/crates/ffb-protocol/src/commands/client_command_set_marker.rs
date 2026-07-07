@@ -56,4 +56,15 @@ mod tests {
     fn debug_format_nonempty() {
         assert!(!format!("{:?}", ClientCommandSetMarker::new()).is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandSetMarker::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandSetMarker::default());
+        assert!(s.contains("ClientCommandSetMarker"));
+    }
 }

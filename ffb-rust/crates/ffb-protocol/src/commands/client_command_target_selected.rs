@@ -38,4 +38,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandTargetSelected::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandTargetSelected::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandTargetSelected::default());
+        assert!(s.contains("ClientCommandTargetSelected"));
+    }
 }

@@ -85,4 +85,9 @@ mod tests {
         SppMechanic.add_casualty(&Default::default(), &mut pr, "t");
         assert_eq!(pr.casualties, 1);
     }
+
+    #[test]
+    fn deflection_spp_is_1() {
+        assert_eq!(SppMechanic.deflection_spp(), 1);
+    }
 }

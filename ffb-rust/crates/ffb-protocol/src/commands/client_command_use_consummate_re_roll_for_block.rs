@@ -34,4 +34,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandUseConsummateReRollForBlock::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandUseConsummateReRollForBlock::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandUseConsummateReRollForBlock::default());
+        assert!(s.contains("ClientCommandUseConsummateReRollForBlock"));
+    }
 }

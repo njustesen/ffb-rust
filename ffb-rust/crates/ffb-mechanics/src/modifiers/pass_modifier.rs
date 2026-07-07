@@ -109,4 +109,11 @@ mod tests {
         let ctx = crate::modifiers::pass_context::PassContext::new(&game, &player, PassingDistance::ShortPass, false);
         assert!(m.applies_to_context(&ctx));
     }
+
+    #[test]
+    fn with_report_stores_different_reporting_string() {
+        let m = PassModifier::with_report("Short Pass", "Short Pass Attempt", 0, ModifierType::REGULAR);
+        assert_eq!(m.get_name(), "Short Pass");
+        assert_eq!(m.get_report_string(), "Short Pass Attempt");
+    }
 }

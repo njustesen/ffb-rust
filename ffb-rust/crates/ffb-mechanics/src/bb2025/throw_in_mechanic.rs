@@ -120,4 +120,10 @@ mod tests {
         let dir = ThrowInMechanic.interpret_throw_in_direction_roll(FieldCoordinate::new(12, 0), 3);
         assert_eq!(dir, Direction::South);
     }
+
+    #[test]
+    fn is_corner_throw_in_for_remaining_two_corners() {
+        assert!(ThrowInMechanic.is_corner_throw_in(FieldCoordinate::new(25, 0)));
+        assert!(ThrowInMechanic.is_corner_throw_in(FieldCoordinate::new(0, 14)));
+    }
 }

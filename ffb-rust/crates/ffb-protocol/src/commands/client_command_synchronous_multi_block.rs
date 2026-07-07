@@ -43,4 +43,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandSynchronousMultiBlock::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandSynchronousMultiBlock::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandSynchronousMultiBlock::default());
+        assert!(s.contains("ClientCommandSynchronousMultiBlock"));
+    }
 }

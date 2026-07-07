@@ -38,4 +38,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandUserSettings::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandUserSettings::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandUserSettings::default());
+        assert!(s.contains("ClientCommandUserSettings"));
+    }
 }

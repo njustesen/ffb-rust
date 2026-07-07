@@ -38,4 +38,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandUnsetBlockTargetSelection::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandUnsetBlockTargetSelection::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandUnsetBlockTargetSelection::default());
+        assert!(s.contains("ClientCommandUnsetBlockTargetSelection"));
+    }
 }

@@ -48,4 +48,11 @@ mod tests {
         assert!(!format!("{:?}", StatBasedRollModifier::default()).is_empty());
     }
 
+
+    #[test]
+    fn two_modifiers_with_same_fields_are_equal() {
+        let m1 = StatBasedRollModifier::new("Str", 3);
+        let m2 = StatBasedRollModifier::new("Str", 3);
+        assert_eq!(m1, m2);
+    }
 }

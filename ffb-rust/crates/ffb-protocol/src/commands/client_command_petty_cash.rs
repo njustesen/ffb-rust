@@ -42,4 +42,9 @@ mod tests {
         let cmd = ClientCommandPettyCash::default();
         assert!(!format!("{cmd:?}").is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandPettyCash::default().clone();
+    }
 }

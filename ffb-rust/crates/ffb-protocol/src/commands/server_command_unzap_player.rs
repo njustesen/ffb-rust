@@ -43,4 +43,9 @@ mod tests {
         let cmd = ServerCommandUnzapPlayer::default();
         assert!(!format!("{cmd:?}").is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandUnzapPlayer::default().clone();
+    }
 }

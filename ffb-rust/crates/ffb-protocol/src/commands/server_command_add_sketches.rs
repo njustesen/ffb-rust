@@ -40,4 +40,15 @@ mod tests {
         assert!(!format!("{:?}", ServerCommandAddSketches::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandAddSketches::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ServerCommandAddSketches::default());
+        assert!(s.contains("ServerCommandAddSketches"));
+    }
 }

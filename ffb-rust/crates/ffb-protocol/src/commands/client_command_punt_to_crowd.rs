@@ -37,4 +37,9 @@ mod tests {
         let cmd = ClientCommandPuntToCrowd::default();
         assert!(!format!("{cmd:?}").is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandPuntToCrowd::default().clone();
+    }
 }

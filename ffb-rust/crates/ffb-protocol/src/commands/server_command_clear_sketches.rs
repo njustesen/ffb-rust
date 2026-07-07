@@ -24,4 +24,15 @@ mod tests {
     fn debug_format_nonempty() {
         assert!(!format!("{:?}", ServerCommandClearSketches::new()).is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandClearSketches::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ServerCommandClearSketches::default());
+        assert!(s.contains("ServerCommandClearSketches"));
+    }
 }

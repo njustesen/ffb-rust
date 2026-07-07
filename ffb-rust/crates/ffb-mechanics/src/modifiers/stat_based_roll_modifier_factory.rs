@@ -74,4 +74,12 @@ mod tests {
         let m = factory.create(&p);
         assert_eq!(m.get_modifier(), 6); // movement defaults to 6 in helper
     }
+
+    #[test]
+    fn create_with_pa_reads_passing() {
+        let factory = StatBasedRollModifierFactory::new("Passing", PlayerStatKey::PA);
+        let p = player_with_stats(3, 4, 8);
+        let m = factory.create(&p);
+        assert_eq!(m.get_modifier(), 4); // passing defaults to 4 in helper
+    }
 }

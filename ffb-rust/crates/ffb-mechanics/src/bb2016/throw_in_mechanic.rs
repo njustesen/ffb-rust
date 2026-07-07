@@ -72,4 +72,11 @@ mod tests {
         let dir = ThrowInMechanic.interpret_throw_in_direction_roll(FieldCoordinate::new(25, 7), 1);
         assert_eq!(dir, Direction::Southwest);
     }
+
+    #[test]
+    fn direction_from_north_edge_roll_1_is_northwest() {
+        // y > 13 → template North; roll 1 or 2 → Northwest
+        let dir = ThrowInMechanic.interpret_throw_in_direction_roll(FieldCoordinate::new(12, 14), 1);
+        assert_eq!(dir, Direction::Northwest);
+    }
 }

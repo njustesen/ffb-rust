@@ -60,4 +60,10 @@ mod tests {
     fn default_has_same_count_as_new() {
         assert_eq!(GoForItModifierCollection::default().get_modifiers().len(), GoForItModifierCollection::new().get_modifiers().len());
     }
+
+    #[test]
+    fn all_modifiers_have_nonempty_names() {
+        let col = GoForItModifierCollection::new();
+        assert!(col.get_modifiers().iter().all(|m| !m.get_name().is_empty()));
+    }
 }

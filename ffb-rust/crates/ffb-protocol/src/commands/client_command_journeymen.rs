@@ -69,4 +69,9 @@ mod tests {
         let cmd = ClientCommandJourneymen::default();
         assert!(!format!("{cmd:?}").is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandJourneymen::default().clone();
+    }
 }

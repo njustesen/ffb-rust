@@ -43,4 +43,15 @@ mod tests {
     fn debug_format_nonempty() {
         assert!(!format!("{:?}", ClientCommandSketchAddCoordinate::new()).is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandSketchAddCoordinate::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandSketchAddCoordinate::default());
+        assert!(s.contains("ClientCommandSketchAddCoordinate"));
+    }
 }

@@ -40,4 +40,10 @@ mod tests {
         let col = PassModifierCollection::new();
         assert!(col.get_modifiers().iter().any(|m| m.get_name().contains("Disturbing")));
     }
+
+    #[test]
+    fn all_modifiers_have_nonempty_names() {
+        let col = PassModifierCollection::new();
+        assert!(col.get_modifiers().iter().all(|m| !m.get_name().is_empty()));
+    }
 }

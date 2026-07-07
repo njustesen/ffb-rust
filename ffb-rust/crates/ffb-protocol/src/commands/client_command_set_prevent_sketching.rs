@@ -55,4 +55,9 @@ mod tests {
         let cmd = ClientCommandSetPreventSketching::default();
         assert!(!format!("{cmd:?}").is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandSetPreventSketching::default().clone();
+    }
 }

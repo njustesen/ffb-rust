@@ -88,4 +88,9 @@ mod tests {
         assert_eq!(pr.casualties, 1);
         assert_eq!(pr.casualties_with_additional_spp, 1);
     }
+
+    #[test]
+    fn deflection_spp_is_1() {
+        assert_eq!(SppMechanic.deflection_spp(), 1);
+    }
 }

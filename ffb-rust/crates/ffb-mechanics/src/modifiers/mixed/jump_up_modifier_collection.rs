@@ -50,4 +50,10 @@ mod tests {
         let ju = col.get_modifiers().iter().find(|m| m.get_name() == "Jump Up").unwrap();
         assert_eq!(ju.get_modifier(), -1);
     }
+
+    #[test]
+    fn all_modifiers_have_nonempty_names() {
+        let col = JumpUpModifierCollection::new();
+        assert!(col.get_modifiers().iter().all(|m| !m.get_name().is_empty()));
+    }
 }

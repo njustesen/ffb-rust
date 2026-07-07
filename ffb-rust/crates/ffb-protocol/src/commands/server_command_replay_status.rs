@@ -50,4 +50,15 @@ mod tests {
         assert!(!format!("{:?}", ServerCommandReplayStatus::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandReplayStatus::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ServerCommandReplayStatus::default());
+        assert!(s.contains("ServerCommandReplayStatus"));
+    }
 }

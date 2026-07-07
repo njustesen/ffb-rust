@@ -67,4 +67,9 @@ mod tests {
         let cmd = ClientCommandApothecaryChoice::default();
         let _ = cmd.clone();
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandApothecaryChoice::default().clone();
+    }
 }

@@ -66,4 +66,10 @@ mod tests {
         let mods = col.get_modifiers();
         assert!(mods.is_empty());
     }
+
+    #[test]
+    fn all_modifiers_have_nonempty_names() {
+        let col = JumpModifierCollection::new();
+        assert!(col.get_modifiers().iter().all(|m| !m.get_name().is_empty()));
+    }
 }

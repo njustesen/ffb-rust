@@ -189,4 +189,10 @@ mod tests {
         let p = player_with_agility(3);
         assert_eq!(AgilityMechanic.minimum_roll_hypnotic_gaze(&p, &HashSet::new()), 3);
     }
+
+    #[test]
+    fn minimum_roll_jump_ag3_no_modifiers() {
+        let p = player_with_agility(3);
+        assert_eq!(AgilityMechanic.minimum_roll_jump(&p, &HashSet::new()), 3);
+    }
 }

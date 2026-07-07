@@ -44,4 +44,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandUseApothecaries::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandUseApothecaries::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandUseApothecaries::default());
+        assert!(s.contains("ClientCommandUseApothecaries"));
+    }
 }

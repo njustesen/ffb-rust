@@ -38,4 +38,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandTalk::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandTalk::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandTalk::default());
+        assert!(s.contains("ClientCommandTalk"));
+    }
 }

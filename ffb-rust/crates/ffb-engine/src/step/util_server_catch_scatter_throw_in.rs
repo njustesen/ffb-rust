@@ -115,4 +115,11 @@ mod tests {
         assert_eq!(catchers.len(), 1);
         assert_eq!(catchers[0].id, "h1");
     }
+
+    #[test]
+    fn find_scatter_coordinate_west() {
+        let start = FieldCoordinate::new(5, 5);
+        let end = UtilServerCatchScatterThrowIn::find_scatter_coordinate(start, Direction::West, 1);
+        assert_eq!(end, FieldCoordinate::new(4, 5));
+    }
 }

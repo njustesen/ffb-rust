@@ -179,4 +179,9 @@ mod tests {
         ];
         assert_eq!(GameLog::final_hash(&lines), Some("aabb"));
     }
+
+    #[test]
+    fn final_hash_returns_none_for_empty_lines() {
+        assert_eq!(GameLog::final_hash(&[]), None);
+    }
 }

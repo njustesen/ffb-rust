@@ -56,4 +56,9 @@ mod tests {
         let cmd = ClientCommandSelectWeather::default();
         assert!(!format!("{cmd:?}").is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandSelectWeather::default().clone();
+    }
 }

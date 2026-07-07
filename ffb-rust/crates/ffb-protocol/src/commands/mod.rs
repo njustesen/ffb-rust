@@ -183,4 +183,10 @@ mod tests {
         assert!(json.contains("clientBlock"), "must contain command tag");
         assert!(json.contains("p7"), "must contain defender_id");
     }
+
+    #[test]
+    fn parse_server_command_returns_error_on_unknown_type() {
+        let result = parse_server_command(r#"{"netCommandId":"unknownXyz"}"#);
+        assert!(result.is_err(), "unknown command type must return Err");
+    }
 }

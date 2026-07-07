@@ -26,4 +26,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandStartGame::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandStartGame::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandStartGame::default());
+        assert!(s.contains("ClientCommandStartGame"));
+    }
 }

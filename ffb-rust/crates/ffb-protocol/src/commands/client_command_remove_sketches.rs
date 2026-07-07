@@ -50,4 +50,9 @@ mod tests {
         let cmd = ClientCommandRemoveSketches::default();
         assert!(!format!("{cmd:?}").is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandRemoveSketches::default().clone();
+    }
 }

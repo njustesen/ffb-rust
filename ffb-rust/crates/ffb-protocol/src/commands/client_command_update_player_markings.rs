@@ -33,4 +33,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandUpdatePlayerMarkings::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandUpdatePlayerMarkings::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandUpdatePlayerMarkings::default());
+        assert!(s.contains("ClientCommandUpdatePlayerMarkings"));
+    }
 }

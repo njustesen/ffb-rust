@@ -123,4 +123,22 @@ mod tests {
     fn pass_interference_status_description_is_nonempty() {
         assert!(!OnTheBallMechanic.pass_interference_status_description().is_empty());
     }
+
+    #[test]
+    fn find_pass_blockers_with_no_players_returns_empty() {
+        use ffb_model::enums::Rules;
+        let empty_team = Team {
+            id: "h".into(), name: "h".into(), race: "h".into(),
+            roster_id: "h".into(), coach: "c".into(),
+            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+            prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+            cheerleaders: 0, assistant_coaches: 0, fan_factor: 0,
+            dedicated_fans: 0, team_value: 0, treasury: 0,
+            special_rules: vec![], players: vec![],
+            vampire_lord: false, necromancer: false,
+        };
+        let game = Game::new(empty_team.clone(), empty_team, Rules::Bb2025);
+        let result = OnTheBallMechanic::new().find_pass_blockers(&game, &game.team_home, false);
+        assert!(result.is_empty());
+    }
 }

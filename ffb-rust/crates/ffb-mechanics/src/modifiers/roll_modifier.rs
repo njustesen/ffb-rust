@@ -70,4 +70,11 @@ mod tests {
         assert!(!format!("{:?}", RollModifier::default()).is_empty());
     }
 
+
+    #[test]
+    fn default_has_empty_name_and_zero_modifier() {
+        let m = RollModifier::default();
+        assert_eq!(m.name, "");
+        assert_eq!(m.get_modifier(), 0);
+    }
 }

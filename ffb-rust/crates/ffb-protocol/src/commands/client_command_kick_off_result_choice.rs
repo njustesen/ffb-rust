@@ -49,4 +49,9 @@ mod tests {
         let cmd = ClientCommandKickOffResultChoice::default();
         assert!(!format!("{cmd:?}").is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandKickOffResultChoice::default().clone();
+    }
 }

@@ -33,4 +33,15 @@ mod tests {
         assert!(!format!("{:?}", ServerCommandRemovePlayer::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandRemovePlayer::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ServerCommandRemovePlayer::default());
+        assert!(s.contains("ServerCommandRemovePlayer"));
+    }
 }

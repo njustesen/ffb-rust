@@ -102,4 +102,10 @@ mod tests {
     fn base_count_is_fifteen() {
         assert_eq!(Bb2020ArmorModifiers::new().values().len(), 15);
     }
+
+    #[test]
+    fn get_name_is_nonempty() {
+        let m = Bb2020ArmorModifiers::new();
+        assert!(!m.get_name().is_empty());
+    }
 }

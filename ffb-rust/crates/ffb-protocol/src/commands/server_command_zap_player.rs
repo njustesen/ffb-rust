@@ -37,4 +37,15 @@ mod tests {
         assert!(!format!("{:?}", ServerCommandZapPlayer::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandZapPlayer::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ServerCommandZapPlayer::default());
+        assert!(s.contains("ServerCommandZapPlayer"));
+    }
 }

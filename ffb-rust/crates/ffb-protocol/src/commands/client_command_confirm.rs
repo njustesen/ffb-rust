@@ -26,4 +26,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandConfirm::new()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandConfirm::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandConfirm::default());
+        assert!(s.contains("ClientCommandConfirm"));
+    }
 }

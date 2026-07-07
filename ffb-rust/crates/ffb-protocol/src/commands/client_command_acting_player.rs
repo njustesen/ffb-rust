@@ -57,4 +57,9 @@ mod tests {
         let cmd = ClientCommandActingPlayer::default();
         assert!(!format!("{cmd:?}").is_empty());
     }
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandActingPlayer::default().clone();
+    }
 }

@@ -1,6 +1,6 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-07)
+## Current Status (2026-07-08)
 
 **Approach:** 1:1 Java-to-Rust translation. Every Java class → one Rust file, written directly from Java source. No reactive parity fixes.
 
@@ -8,9 +8,9 @@
 
 **Translation progress:** 2,521/2,521 files formally implemented = **100% ✓** (0 partial, 458 skip)
 
-**Tests:** 11,476 passing (1 ignored)
+**Tests:** 11,934 passing (1 ignored)
 
-**Current phase:** Phase ZG continued — Test expansion ongoing (9,556 → 11,476 tests so far)
+**Current phase:** Phase ZG complete — All thin files (≥1 test) now have ≥5 tests (11,717 → 11,934)
 
 ---
 

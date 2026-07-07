@@ -19,4 +19,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandUseTeamMatesWisdom::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandUseTeamMatesWisdom::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandUseTeamMatesWisdom::default());
+        assert!(s.contains("ClientCommandUseTeamMatesWisdom"));
+    }
 }

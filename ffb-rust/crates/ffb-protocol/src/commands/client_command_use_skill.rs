@@ -44,4 +44,15 @@ mod tests {
         assert!(!format!("{:?}", ClientCommandUseSkill::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ClientCommandUseSkill::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ClientCommandUseSkill::default());
+        assert!(s.contains("ClientCommandUseSkill"));
+    }
 }

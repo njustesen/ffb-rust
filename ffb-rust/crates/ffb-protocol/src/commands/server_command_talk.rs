@@ -42,4 +42,15 @@ mod tests {
         assert!(!format!("{:?}", ServerCommandTalk::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandTalk::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ServerCommandTalk::default());
+        assert!(s.contains("ServerCommandTalk"));
+    }
 }

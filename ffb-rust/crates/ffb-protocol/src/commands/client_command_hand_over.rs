@@ -49,4 +49,9 @@ mod tests {
         let cmd = ClientCommandHandOver::with_players("thrower", "catcher2");
         assert_eq!(cmd.get_catcher_id(), Some("catcher2"));
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandHandOver::default()).is_empty());
+    }
 }

@@ -31,4 +31,15 @@ mod tests {
         assert!(!format!("{:?}", ServerCommandPong::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_does_not_panic() {
+        let _ = ServerCommandPong::default().clone();
+    }
+
+    #[test]
+    fn debug_format_contains_struct_name() {
+        let s = format!("{:?}", ServerCommandPong::default());
+        assert!(s.contains("ServerCommandPong"));
+    }
 }
