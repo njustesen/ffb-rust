@@ -64,4 +64,17 @@ mod tests {
         h.remove_effect(&mut state, &mut game, "team1");
         assert!(!state.is_friends_with_ref("team1"));
     }
+
+    #[test]
+    fn get_name_returns_handler_name() {
+        let h = FriendsWithTheRefHandler;
+        assert_eq!(h.get_name(), "FriendsWithTheRefHandler");
+    }
+
+    #[test]
+    fn handles_prayer_is_case_sensitive() {
+        let h = FriendsWithTheRefHandler;
+        let prayer = h.handled_prayer_name();
+        assert!(!h.handles_prayer(&prayer.to_lowercase()));
+    }
 }

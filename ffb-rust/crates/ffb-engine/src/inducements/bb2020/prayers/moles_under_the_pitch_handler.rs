@@ -62,4 +62,17 @@ mod tests {
         h.remove_effect_internal(&mut state, &mut game, "teamA");
         assert!(!state.get_moles_under_the_pitch().contains("teamA"));
     }
+
+    #[test]
+    fn get_name_returns_handler_name() {
+        let h = MolesUnderThePitchHandler;
+        assert_eq!(h.get_name(), "MolesUnderThePitchHandler");
+    }
+
+    #[test]
+    fn handles_prayer_is_case_sensitive() {
+        let h = MolesUnderThePitchHandler;
+        let prayer = h.handled_prayer_name();
+        assert!(!h.handles_prayer(&prayer.to_lowercase()));
+    }
 }

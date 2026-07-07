@@ -65,4 +65,17 @@ mod tests {
         h.remove_effect_internal(&mut state, &mut game, "team1");
         assert!(!state.get_additional_cas_spp_teams().contains("team1"));
     }
+
+    #[test]
+    fn get_name_returns_handler_name() {
+        let h = NecessaryViolenceHandler;
+        assert_eq!(h.get_name(), "NecessaryViolenceHandler");
+    }
+
+    #[test]
+    fn handles_prayer_is_case_sensitive() {
+        let h = NecessaryViolenceHandler;
+        let prayer = h.handled_prayer_name();
+        assert!(!h.handles_prayer(&prayer.to_lowercase()));
+    }
 }

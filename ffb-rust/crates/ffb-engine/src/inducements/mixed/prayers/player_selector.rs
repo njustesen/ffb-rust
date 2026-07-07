@@ -46,4 +46,22 @@ mod tests {
     fn stub_is_default_constructible() {
         let _ = StubPlayerSelector::default();
     }
+
+    #[test]
+    fn stub_selector_returns_empty_for_multiple_requested() {
+        use ffb_model::util::rng::GameRng;
+        let selector = StubPlayerSelector;
+        let game = Game::new(crate::step::framework::test_team("home", 0), crate::step::framework::test_team("away", 0), Rules::Bb2020);
+        assert!(selector.select_players(&game, "team1", 3, &mut GameRng::new(42), &[]).is_empty());
+    }
+
+    #[test]
+    fn stub_selector_returns_empty_with_skills() {
+        use ffb_model::util::rng::GameRng;
+        use ffb_model::enums::SkillId;
+        let selector = StubPlayerSelector;
+        let game = Game::new(crate::step::framework::test_team("home", 0), crate::step::framework::test_team("away", 0), Rules::Bb2020);
+        let skills = [SkillId::Block, SkillId::Dodge];
+        assert!(selector.select_players(&game, "team1", 1, &mut GameRng::new(0), &skills).is_empty());
+    }
 }

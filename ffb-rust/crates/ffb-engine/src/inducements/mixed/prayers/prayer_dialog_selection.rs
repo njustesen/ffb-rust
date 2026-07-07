@@ -53,4 +53,19 @@ mod tests {
         assert_eq!(sel.get_player_id(), Some("p1"));
         assert_eq!(sel.get_team_id(), Some("t1"));
     }
+
+    #[test]
+    fn with_player_leaves_team_id_none() {
+        let sel = PrayerDialogSelection::with_player("player99");
+        assert_eq!(sel.get_player_id(), Some("player99"));
+        assert!(sel.get_team_id().is_none());
+    }
+
+    #[test]
+    fn clone_produces_equal_values() {
+        let sel = PrayerDialogSelection::with_player_and_team("p2", "t2");
+        let cloned = sel.clone();
+        assert_eq!(cloned.get_player_id(), sel.get_player_id());
+        assert_eq!(cloned.get_team_id(), sel.get_team_id());
+    }
 }

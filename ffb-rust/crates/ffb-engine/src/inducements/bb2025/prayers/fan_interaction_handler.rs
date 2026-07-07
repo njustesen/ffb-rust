@@ -64,4 +64,17 @@ mod tests {
         h.remove_effect(&mut state, &mut game, "team1");
         assert!(!state.has_fan_interaction("team1"));
     }
+
+    #[test]
+    fn get_name_returns_handler_name() {
+        let h = FanInteractionHandler;
+        assert_eq!(h.get_name(), "FanInteractionHandler");
+    }
+
+    #[test]
+    fn handles_prayer_is_case_sensitive() {
+        let h = FanInteractionHandler;
+        let prayer = h.handled_prayer_name();
+        assert!(!h.handles_prayer(&prayer.to_lowercase()));
+    }
 }

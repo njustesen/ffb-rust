@@ -64,4 +64,17 @@ mod tests {
         h.remove_effect(&mut state, &mut game, "team1");
         assert!(!state.has_fouling_frenzy("team1"));
     }
+
+    #[test]
+    fn get_name_returns_handler_name() {
+        let h = FoulingFrenzyHandler;
+        assert_eq!(h.get_name(), "FoulingFrenzyHandler");
+    }
+
+    #[test]
+    fn handles_prayer_is_case_sensitive() {
+        let h = FoulingFrenzyHandler;
+        let prayer = h.handled_prayer_name();
+        assert!(!h.handles_prayer(&prayer.to_lowercase()));
+    }
 }

@@ -45,4 +45,18 @@ mod tests {
         let game = make_game();
         remove_effect_internal(&mut state, &game, "team1");
     }
+
+    #[test]
+    fn init_effect_returns_true_for_any_team() {
+        let mut state = PrayerState::new();
+        let game = make_game();
+        assert!(init_effect(&mut state, &game, "away"));
+    }
+
+    #[test]
+    fn remove_effect_on_missing_team_is_safe() {
+        let mut state = PrayerState::new();
+        let game = make_game();
+        remove_effect_internal(&mut state, &game, "team_not_present");
+    }
 }

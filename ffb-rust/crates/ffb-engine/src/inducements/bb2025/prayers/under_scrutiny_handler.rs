@@ -66,4 +66,17 @@ mod tests {
         h.remove_effect(&mut state, &mut game, "home");
         assert!(!state.is_under_scrutiny("away"));
     }
+
+    #[test]
+    fn get_name_returns_handler_name() {
+        let h = UnderScrutinyHandler;
+        assert_eq!(h.get_name(), "UnderScrutinyHandler");
+    }
+
+    #[test]
+    fn handles_prayer_is_case_sensitive() {
+        let h = UnderScrutinyHandler;
+        let prayer = h.handled_prayer_name();
+        assert!(!h.handles_prayer(&prayer.to_lowercase()));
+    }
 }

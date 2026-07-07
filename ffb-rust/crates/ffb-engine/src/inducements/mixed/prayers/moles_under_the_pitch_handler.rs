@@ -38,4 +38,18 @@ mod tests {
     fn animation_type_is_correct() {
         assert_eq!(animation_type(), AnimationType::PRAYER_MOLES_UNDER_THE_PITCH);
     }
+
+    #[test]
+    fn init_effect_does_not_affect_other_team() {
+        let mut state = PrayerState::new();
+        init_effect(&mut state, "teamA");
+        assert!(!state.get_moles_under_the_pitch().contains("teamB"));
+    }
+
+    #[test]
+    fn remove_effect_on_missing_team_is_safe() {
+        let mut state = PrayerState::new();
+        remove_effect_internal(&mut state, "team_not_present");
+        assert!(!state.get_moles_under_the_pitch().contains("team_not_present"));
+    }
 }

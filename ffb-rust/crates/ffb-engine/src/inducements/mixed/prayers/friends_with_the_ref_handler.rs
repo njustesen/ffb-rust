@@ -38,4 +38,18 @@ mod tests {
     fn animation_type_is_correct() {
         assert_eq!(animation_type(), AnimationType::PRAYER_FRIENDS_WITH_THE_REF);
     }
+
+    #[test]
+    fn init_effect_does_not_affect_other_team() {
+        let mut state = PrayerState::new();
+        init_effect(&mut state, "team1");
+        assert!(!state.is_friends_with_ref("team2"));
+    }
+
+    #[test]
+    fn remove_effect_on_missing_team_is_safe() {
+        let mut state = PrayerState::new();
+        remove_effect_internal(&mut state, "team_not_present");
+        assert!(!state.is_friends_with_ref("team_not_present"));
+    }
 }

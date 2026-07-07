@@ -62,4 +62,17 @@ mod tests {
         let h = ThrowARockHandler;
         assert_eq!(h.animation_type(), AnimationType::PRAYER_THROW_A_ROCK);
     }
+
+    #[test]
+    fn get_name_returns_handler_name() {
+        let h = ThrowARockHandler;
+        assert_eq!(h.get_name(), "ThrowARockHandler");
+    }
+
+    #[test]
+    fn handles_prayer_is_case_sensitive() {
+        let h = ThrowARockHandler;
+        let prayer = h.handled_prayer_name();
+        assert!(!h.handles_prayer(&prayer.to_lowercase()));
+    }
 }

@@ -93,4 +93,21 @@ mod tests {
         let result = OpponentPlayerSelector::new().select_players(&game, "home", 1, &mut GameRng::new(0), &[]);
         assert!(result.is_empty());
     }
+
+    #[test]
+    fn selects_opponent_when_away_prays() {
+        let mut game = make_game();
+        add_player(&mut game, "home", "h1");
+        // no home players beyond h1; away is the praying team → opponent is home
+        let result = OpponentPlayerSelector::new().select_players(&game, "away", 1, &mut GameRng::new(0), &[]);
+        assert_eq!(result, vec!["h1".to_string()]);
+    }
+
+    #[test]
+    fn instance_const_is_usable() {
+        let game = make_game();
+        // INSTANCE const exists and can be used directly
+        let result = OpponentPlayerSelector::INSTANCE.select_players(&game, "home", 0, &mut GameRng::new(0), &[]);
+        assert!(result.is_empty());
+    }
 }

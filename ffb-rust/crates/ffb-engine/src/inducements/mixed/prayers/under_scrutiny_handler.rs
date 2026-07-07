@@ -55,4 +55,20 @@ mod tests {
     fn animation_type_is_correct() {
         assert_eq!(animation_type(), AnimationType::PRAYER_UNDER_SCRUTINY);
     }
+
+    #[test]
+    fn init_effect_does_not_add_scrutiny_to_praying_team() {
+        let mut state = PrayerState::new();
+        let game = make_game();
+        init_effect(&mut state, &game, "home");
+        assert!(!state.is_under_scrutiny("home"));
+    }
+
+    #[test]
+    fn remove_effect_on_missing_team_is_safe() {
+        let mut state = PrayerState::new();
+        let game = make_game();
+        remove_effect_internal(&mut state, &game, "home");
+        assert!(!state.is_under_scrutiny("away"));
+    }
 }

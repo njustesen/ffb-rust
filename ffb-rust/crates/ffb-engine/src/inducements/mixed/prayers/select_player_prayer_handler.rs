@@ -53,4 +53,18 @@ mod tests {
         let game = make_game();
         assert!(!init_effect_select_player(&mut state, &game, "team1", "IRON_MAN"));
     }
+
+    #[test]
+    fn apply_selection_with_empty_strings_is_safe() {
+        let mut game = make_game();
+        apply_selection_select_player(&mut game, "", "");
+    }
+
+    #[test]
+    fn init_effect_does_not_mutate_state() {
+        let mut state = PrayerState::new();
+        let game = make_game();
+        init_effect_select_player(&mut state, &game, "team1", "GREASY_CLEATS");
+        assert!(state.get_additional_completion_spp_teams().is_empty());
+    }
 }

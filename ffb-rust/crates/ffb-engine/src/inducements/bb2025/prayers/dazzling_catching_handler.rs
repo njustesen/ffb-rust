@@ -67,4 +67,17 @@ mod tests {
         // removeEffectInternal is empty in Java — entry must still be present.
         assert!(state.get_additional_catches_spp_teams().contains("team1"));
     }
+
+    #[test]
+    fn get_name_returns_handler_name() {
+        let h = DazzlingCatchingHandler;
+        assert_eq!(h.get_name(), "DazzlingCatchingHandler");
+    }
+
+    #[test]
+    fn handles_prayer_is_case_sensitive() {
+        let h = DazzlingCatchingHandler;
+        let prayer = h.handled_prayer_name();
+        assert!(!h.handles_prayer(&prayer.to_lowercase()));
+    }
 }
