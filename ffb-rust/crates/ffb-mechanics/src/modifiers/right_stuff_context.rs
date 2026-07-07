@@ -87,4 +87,13 @@ mod tests {
         assert!(ctx.get_pass_result().is_none());
         assert!(ctx.get_ktm_range().is_none());
     }
+
+    #[test]
+    fn player_stored_is_same_as_input() {
+        let game = make_game();
+        let player = Player::default();
+        let ctx = RightStuffContext::new(&game, &player);
+        assert_eq!(ctx.get_player().id, player.id);
+    }
+
 }

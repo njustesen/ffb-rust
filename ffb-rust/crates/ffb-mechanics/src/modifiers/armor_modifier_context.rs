@@ -93,4 +93,12 @@ mod tests {
         assert!(ctx.is_ttm());
         assert_eq!(ctx.get_foul_assists(), 2);
     }
+
+    #[test]
+    fn attacker_none_when_not_provided() {
+        let game = make_game();
+        let defender = Player::default();
+        let ctx = ArmorModifierContext::new(&game, None, &defender, false, false);
+        assert!(ctx.get_attacker().is_none());
+    }
 }

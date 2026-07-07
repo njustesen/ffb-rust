@@ -113,4 +113,16 @@ mod tests {
         assert_eq!(ctx.get_accumulated_modifiers(), -2);
         assert_eq!(ctx.get_modifier_count(), 1);
     }
+
+    #[test]
+    fn player_stored_is_same_as_input() {
+        let game = make_game();
+        let mut player = Player::default();
+        player.id = "jumper".into();
+        let from = FieldCoordinate { x: 0, y: 0 };
+        let to = FieldCoordinate { x: 1, y: 1 };
+        let ctx = JumpContext::new(&game, &player, from, to);
+        assert_eq!(ctx.get_player().id, "jumper");
+    }
+
 }

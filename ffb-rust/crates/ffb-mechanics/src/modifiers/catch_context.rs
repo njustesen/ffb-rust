@@ -81,4 +81,13 @@ mod tests {
         assert!(!ctx_default.get_using_blast_it());
         assert!(ctx_explicit.get_using_blast_it());
     }
+
+    #[test]
+    fn player_none_when_not_provided() {
+        use ffb_model::model::CatchScatterThrowInMode;
+        let game = make_game();
+        let ctx = CatchContext::new(&game, None, CatchScatterThrowInMode::CatchHandOff, None);
+        assert!(ctx.get_player().is_none());
+    }
+
 }

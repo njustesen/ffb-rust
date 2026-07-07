@@ -84,4 +84,13 @@ mod tests {
         assert_eq!(ctx.get_nr_of_tacklezones(), 3);
         assert_eq!(ctx.get_pass_result(), PassResult::FUMBLE);
     }
+
+    #[test]
+    fn accurate_pass_result_stored() {
+        let game = make_game();
+        let player = Player::default();
+        let ctx = InterceptionContext::new(&game, &player, PassResult::ACCURATE, false);
+        assert_eq!(ctx.get_pass_result(), PassResult::ACCURATE);
+    }
+
 }

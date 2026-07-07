@@ -120,4 +120,16 @@ mod tests {
         let ctx = DodgeContext::new_with_break_tackle(&game, &acting_player, src, tgt, true);
         assert!(ctx.is_use_break_tackle());
     }
+
+    #[test]
+    fn break_tackle_false_by_default() {
+        let game = make_game();
+        let acting_player = ActingPlayer::default();
+        use ffb_model::types::FieldCoordinate;
+        let src = FieldCoordinate { x: 0, y: 0 };
+        let tgt = FieldCoordinate { x: 1, y: 1 };
+        let ctx = DodgeContext::new(&game, &acting_player, src, tgt);
+        assert!(!ctx.is_use_break_tackle());
+    }
+
 }

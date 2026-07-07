@@ -99,4 +99,13 @@ mod tests {
         assert!(ctx.is_attacker_mode());
         assert!(!ctx.is_defender_mode());
     }
+
+    #[test]
+    fn attacker_none_when_not_provided() {
+        let game = make_game();
+        let defender = Player::default();
+        let ctx = InjuryModifierContext::new(&game, None, &defender, false, false, false, false);
+        assert!(ctx.get_attacker().is_none());
+    }
+
 }

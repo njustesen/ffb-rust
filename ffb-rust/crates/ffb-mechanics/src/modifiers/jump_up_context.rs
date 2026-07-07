@@ -77,4 +77,13 @@ mod tests {
         let ctx = JumpUpContext::new(&game, &acting_player);
         assert!(ctx.get_player(&game).is_none());
     }
+
+    #[test]
+    fn acting_player_id_none_by_default() {
+        let game = make_game();
+        let acting_player = ActingPlayer::default();
+        let ctx = JumpUpContext::new(&game, &acting_player);
+        assert!(ctx.get_acting_player().player_id.is_none());
+    }
+
 }

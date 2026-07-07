@@ -89,4 +89,13 @@ mod tests {
         assert!(ctx.get_teams_with_moles_under_pitch().contains("home"));
         assert_eq!(ctx.get_teams_with_moles_under_pitch().len(), 1);
     }
+
+    #[test]
+    fn teams_with_moles_empty_by_default() {
+        let game = make_game();
+        let player = Player::default();
+        let ctx = GoForItContext::new(&game, &player);
+        assert!(ctx.get_teams_with_moles_under_pitch().is_empty());
+    }
+
 }

@@ -43,4 +43,9 @@ mod tests {
         assert_eq!(m.get_modifier(), 0);
         assert!(m.name.is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", StatBasedRollModifier::default()).is_empty());
+    }
+
 }
