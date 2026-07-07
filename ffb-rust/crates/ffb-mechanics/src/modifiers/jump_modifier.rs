@@ -88,4 +88,50 @@ mod tests {
     fn regular_is_not_modifier_included() {
         assert!(!JumpModifier::new("x", 0, ModifierType::REGULAR).is_modifier_included());
     }
+
+    #[test]
+    fn new_full_sets_multiplier_and_reporting_string() {
+        let m = JumpModifier::new_full("Jump", "jump report", 1, 2, ModifierType::TACKLEZONE);
+        assert_eq!(m.get_name(), "Jump");
+        assert_eq!(m.get_report_string(), "jump report");
+        assert_eq!(m.get_multiplier(), 2);
+        assert_eq!(m.get_modifier(), 1);
+    }
+
+    #[test]
+    fn applies_to_context_without_predicate_returns_true() {
+        use ffb_model::types::FieldCoordinate;
+        let game = {
+            use ffb_model::enums::Rules;
+            ffb_model::model::Game::new(
+                ffb_model::model::Team {
+                    id: "home".into(), name: "H".into(), race: "human".into(),
+                    roster_id: "human".into(), coach: "c".into(),
+                    rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+                    prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+                    cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
+                    team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
+                    vampire_lord: false, necromancer: false,
+                },
+                ffb_model::model::Team {
+                    id: "away".into(), name: "A".into(), race: "human".into(),
+                    roster_id: "human".into(), coach: "c".into(),
+                    rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+                    prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+                    cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
+                    team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
+                    vampire_lord: false, necromancer: false,
+                },
+                Rules::Bb2025,
+            )
+        };
+        let player = ffb_model::model::Player::default();
+        let m = JumpModifier::new("x", 0, ModifierType::REGULAR);
+        let ctx = crate::modifiers::jump_context::JumpContext::new(
+            &game, &player,
+            FieldCoordinate { x: 0, y: 0 },
+            FieldCoordinate { x: 1, y: 1 },
+        );
+        assert!(m.applies_to_context(&ctx));
+    }
 }

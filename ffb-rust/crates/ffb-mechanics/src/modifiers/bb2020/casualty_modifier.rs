@@ -56,4 +56,31 @@ mod tests {
         assert!(s.contains("Mighty Blow"));
         assert!(s.contains('1'));
     }
+
+    #[test]
+    fn get_name_returns_stored_name() {
+        let m = CasualtyModifier::new("Claws", 1);
+        assert_eq!(m.get_name(), "Claws");
+    }
+
+    #[test]
+    fn predicate_can_reject_player() {
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        // modifier that only applies to big guys
+        let m = CasualtyModifier::new("BigGuyOnly", 1)
+            .with_predicate(|p: &ffb_model::model::Player| p.is_big_guy);
+        let mut p = ffb_model::model::Player {
+            id: "p".into(), name: "p".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        assert!(!m.applies_to_context(&p));
+        p.is_big_guy = true;
+        assert!(m.applies_to_context(&p));
+    }
 }

@@ -39,4 +39,20 @@ mod tests {
     fn variants_are_distinct() {
         assert_ne!(PassResult::ACCURATE, PassResult::INACCURATE);
     }
+
+    #[test]
+    fn all_variants_have_names() {
+        assert_eq!(PassResult::SAVED_FUMBLE.get_name(), "SAVED_FUMBLE");
+        assert_eq!(PassResult::WILDLY_INACCURATE.get_name(), "WILDLY_INACCURATE");
+        assert_eq!(PassResult::INACCURATE.get_name(), "INACCURATE");
+    }
+
+    #[test]
+    fn clone_and_copy_preserve_equality() {
+        let r = PassResult::ACCURATE;
+        let c = r;           // copy
+        let cl = r.clone();  // clone
+        assert_eq!(r, c);
+        assert_eq!(r, cl);
+    }
 }

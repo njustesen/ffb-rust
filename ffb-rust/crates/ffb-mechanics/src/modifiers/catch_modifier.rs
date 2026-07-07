@@ -79,4 +79,46 @@ mod tests {
         let m = CatchModifier::new("Rain", -1, ModifierType::REGULAR);
         assert!(!m.is_modifier_included());
     }
+
+    #[test]
+    fn new_with_reporting_uses_separate_names() {
+        let m = CatchModifier::new_with_reporting("internal", "display", 2, ModifierType::REGULAR);
+        assert_eq!(m.get_name(), "internal");
+        assert_eq!(m.get_report_string(), "display");
+        assert_eq!(m.get_modifier(), 2);
+    }
+
+    #[test]
+    fn applies_to_context_without_predicate_returns_true() {
+        use ffb_model::model::CatchScatterThrowInMode;
+        let game = {
+            use ffb_model::enums::Rules;
+            ffb_model::model::Game::new(
+                ffb_model::model::Team {
+                    id: "home".into(), name: "H".into(), race: "human".into(),
+                    roster_id: "human".into(), coach: "c".into(),
+                    rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+                    prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+                    cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
+                    team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
+                    vampire_lord: false, necromancer: false,
+                },
+                ffb_model::model::Team {
+                    id: "away".into(), name: "A".into(), race: "human".into(),
+                    roster_id: "human".into(), coach: "c".into(),
+                    rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+                    prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+                    cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
+                    team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
+                    vampire_lord: false, necromancer: false,
+                },
+                Rules::Bb2025,
+            )
+        };
+        let m = CatchModifier::new("Rain", -1, ModifierType::REGULAR);
+        let ctx = crate::modifiers::catch_context::CatchContext::new(
+            &game, None, CatchScatterThrowInMode::CatchAccuratePass, None,
+        );
+        assert!(m.applies_to_context(&ctx));
+    }
 }

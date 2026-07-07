@@ -170,3 +170,65 @@ pub struct PrayersJson {
     pub edition: String,
     pub prayers: Vec<PrayerJson>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_roster(keywords: Vec<String>, necromancer: bool) -> RosterJson {
+        RosterJson {
+            id: "test".into(),
+            name: "Test".into(),
+            reroll_cost: 50000,
+            max_rerolls: 8,
+            apothecary: false,
+            undead: false,
+            necromancer,
+            keywords,
+            positions: vec![],
+            special_rules: vec![],
+        }
+    }
+
+    #[test]
+    fn has_vampire_lord_true_for_keyword() {
+        let r = make_roster(vec!["Vampire Lord".into()], false);
+        assert!(r.has_vampire_lord());
+    }
+
+    #[test]
+    fn has_vampire_lord_case_insensitive() {
+        let r = make_roster(vec!["vampire lord".into()], false);
+        assert!(r.has_vampire_lord());
+    }
+
+    #[test]
+    fn has_vampire_lord_false_without_keyword() {
+        let r = make_roster(vec!["Undead".into()], false);
+        assert!(!r.has_vampire_lord());
+    }
+
+    #[test]
+    fn has_necromancer_true_when_set() {
+        let r = make_roster(vec![], true);
+        assert!(r.has_necromancer());
+    }
+
+    #[test]
+    fn has_necromancer_false_when_unset() {
+        let r = make_roster(vec![], false);
+        assert!(!r.has_necromancer());
+    }
+
+    #[test]
+    fn skill_entry_name_simple() {
+        let e = SkillEntry::Simple("Dodge".into());
+        assert_eq!(e.name(), "Dodge");
+    }
+
+    #[test]
+    fn skill_entry_name_with_value() {
+        let e = SkillEntry::WithValue { name: "Loner".into(), value: serde_json::Value::String("4+".into()) };
+        assert_eq!(e.name(), "Loner");
+    }
+}

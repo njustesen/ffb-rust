@@ -51,4 +51,21 @@ mod tests {
         assert_eq!(m.get_limit().get_min(), 2);
         assert_eq!(m.get_limit().get_max(), 13);
     }
+
+    #[test]
+    fn apply_fn_can_clamp_to_limit() {
+        let limit = PlayerStatLimit::new(1, 6);
+        let m = TemporaryStatModifier::new(PlayerStatKey::MA, limit, |v| v.max(1).min(6));
+        assert_eq!(m.apply(0), 1);
+        assert_eq!(m.apply(10), 6);
+        assert_eq!(m.apply(3), 3);
+    }
+
+    #[test]
+    fn applies_to_returns_false_for_other_stat() {
+        let m = TemporaryStatModifier::new(PlayerStatKey::AG, PlayerStatLimit::new(1, 6), |v| v + 1);
+        assert!(m.applies_to(PlayerStatKey::AG));
+        assert!(!m.applies_to(PlayerStatKey::PA));
+        assert!(!m.applies_to(PlayerStatKey::AV));
+    }
 }
