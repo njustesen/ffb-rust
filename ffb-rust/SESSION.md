@@ -8,9 +8,9 @@
 
 **Translation progress:** 2,521/2,521 files formally implemented = **100% ✓** (0 partial, 458 skip)
 
-**Tests:** 9,887 passing (1 ignored)
+**Tests:** 10,249 passing (1 ignored)
 
-**Current phase:** Phase ZG — Comprehensive test expansion (skill_behaviour files + modifier collections expanded)
+**Current phase:** Phase ZG complete — Comprehensive test expansion done (9,556 → 10,249 tests)
 
 ---
 
@@ -422,9 +422,14 @@
   - **Files already done in ZB (bb2016)**: `step_block_chainsaw.rs`, `step_block_choice.rs`, `step_followup.rs` all fully wired.
   - **Remaining ZC scope**: bb2020/bb2025 block roll, pass/, foul/, mixed/, kickoff steps; bb2016 move_/ steps.
 
-- **Phase ZG** (2026-07-07): Comprehensive test expansion — 9,556 → 9,887 tests (+331)
+- **Phase ZG** (2026-07-07): Comprehensive test expansion — 9,556 → 10,249 tests (+693)
   - **Skill behaviour files**: Added `execute_step_hook_returns_false` + `apply_modifier_is_noop` to all 116 skill behaviour files in bb2016, bb2020, bb2025, mixed, common that had only 2 tests. ~232 new tests.
   - **ffb-mechanics modifier/mechanic files**: Expanded 26 files (gaze/go_for_it/jump/jump_up modifier collections, modifier_type, player_stat_key, player_stat_limit, special_effect modifiers, stat incrementer/decrementer, contexts, pass_mechanic, stats_mechanic, wording, agility_mechanic, apothecary_mechanic ×3, skill_mechanic, mechanic, throw_in_mechanic, on_the_ball_mechanic, jump_modifier_collection, injury_modifiers). ~99 new tests.
+  - **Prayer handler files**: Added `get_name` + `handles_prayer_false` to 25 bb2020/bb2025/mixed prayer handler files. +52 tests.
+  - **Engine utility files**: Expanded 10 small utility files (action_status, agent, game_start_mode, id_generator, marking, drop_player_context, replay_state, session_mode, talk, conditional_model_change_observer). +46 tests.
+  - **Dialog parameter files**: Added 3 tests each (default, accessor, edge case) to 58 dialog parameter files in ffb-model. +174 tests.
+  - **Factory files**: Added 3 tests each (initialize_does_not_panic, second variant, empty string) to 28 factory files in ffb-model. +84 tests.
+  - **Enum files**: Added 3 tests each to model_change.rs and stat_key.rs. +6 tests.
 
 - **Phase ZE** (2026-07-07): Infrastructure expansion — 9,539 → 9,556 tests (+17)
   - **`Team.vampire_lord: bool`** + **`Team.necromancer: bool`** fields: Added both with `#[serde(default)]`. Propagated to all ~350 struct literal initializers across ffb-model, ffb-mechanics, ffb-engine, ffb-client, ffb-parity. `necromancer` populated from `roster.has_necromancer()` in parity runner.
