@@ -151,4 +151,9 @@ mod tests {
         assert!(Prayer::TREACHEROUS_TRAPDOOR.affects_both_teams());
         assert!(!Prayer::FAN_INTERACTION.affects_both_teams());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", Prayer::TREACHEROUS_TRAPDOOR).is_empty());
+    }
+
 }

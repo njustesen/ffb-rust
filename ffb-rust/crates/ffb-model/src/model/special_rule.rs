@@ -115,4 +115,9 @@ mod tests {
         let unique: std::collections::HashSet<_> = names.iter().collect();
         assert_eq!(names.len(), unique.len());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", SpecialRule::BADLANDS_BRAWL).is_empty());
+    }
+
 }

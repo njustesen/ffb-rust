@@ -60,4 +60,9 @@ mod tests {
             assert_eq!(v, back);
         }
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", PlayerStatus::default()).is_empty());
+    }
+
 }

@@ -64,4 +64,9 @@ mod tests {
         // depending on FieldCoordinate::transform — just verify coordinate is Some
         assert!(t.get_coordinate().is_some());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", Pushback::default()).is_empty());
+    }
+
 }

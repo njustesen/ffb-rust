@@ -65,4 +65,9 @@ mod tests {
         let back: KeywordChoiceMode = serde_json::from_str(&s).unwrap();
         assert_eq!(back, KeywordChoiceMode::GETTING_EVEN);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", KeywordChoiceMode::GETTING_EVEN).is_empty());
+    }
+
 }

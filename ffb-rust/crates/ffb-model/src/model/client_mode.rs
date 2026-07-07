@@ -69,4 +69,9 @@ mod tests {
         assert_eq!(ClientMode::for_name("spectator"), Some(ClientMode::SPECTATOR));
         assert_eq!(ClientMode::for_name("replay"), Some(ClientMode::REPLAY));
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientMode::PLAYER).is_empty());
+    }
+
 }

@@ -52,4 +52,9 @@ mod tests {
         let back: BlockRollProperties = serde_json::from_str(&s).unwrap();
         assert!(back.re_roll_sources.is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", BlockRollProperties::default()).is_empty());
+    }
+
 }

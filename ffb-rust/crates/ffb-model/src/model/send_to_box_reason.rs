@@ -144,4 +144,9 @@ mod tests {
         assert!(!SendToBoxReason::MNG.get_reason().is_empty());
         assert!(!SendToBoxReason::FOULED.get_reason().is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", SendToBoxReason::MNG).is_empty());
+    }
+
 }

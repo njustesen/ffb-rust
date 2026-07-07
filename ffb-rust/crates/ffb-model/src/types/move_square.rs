@@ -102,4 +102,9 @@ mod tests {
         // y coordinate is untouched by transform
         assert_eq!(t.coordinate.y, 3);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", MoveSquareKind::Move).is_empty());
+    }
+
 }

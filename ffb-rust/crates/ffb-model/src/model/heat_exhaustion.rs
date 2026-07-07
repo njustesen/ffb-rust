@@ -62,4 +62,9 @@ mod tests {
         assert_eq!(h_min.get_roll(), 1);
         assert_eq!(h_max.get_roll(), 6);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", HeatExhaustion::default()).is_empty());
+    }
+
 }

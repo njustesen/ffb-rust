@@ -48,4 +48,9 @@ mod tests {
         assert_eq!(BlockKind::STAB, BlockKind::STAB);
         assert_eq!(BlockKind::VOMIT, BlockKind::VOMIT);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", BlockKind::BLOCK).is_empty());
+    }
+
 }

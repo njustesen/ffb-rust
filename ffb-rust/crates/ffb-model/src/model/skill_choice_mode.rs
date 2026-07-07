@@ -90,4 +90,9 @@ mod tests {
             SkillChoiceMode::WISDOM_OF_THE_WHITE_DWARF.get_status_message(),
         );
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", SkillChoiceMode::INTENSIVE_TRAINING).is_empty());
+    }
+
 }

@@ -164,4 +164,9 @@ mod tests {
         assert_eq!(Prayer::IRON_MAN.name(), "IRON_MAN");
         assert_eq!(Prayer::THROW_A_ROCK.name(), "THROW_A_ROCK");
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", Prayer::TREACHEROUS_TRAPDOOR).is_empty());
+    }
+
 }

@@ -61,4 +61,9 @@ mod tests {
         let back: PositionChoiceMode = serde_json::from_str(&s).unwrap();
         assert_eq!(back, PositionChoiceMode::RAISE_DEAD);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", PositionChoiceMode::RAISE_DEAD).is_empty());
+    }
+
 }

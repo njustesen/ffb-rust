@@ -93,4 +93,9 @@ mod tests {
         .collect();
         assert_eq!(set.len(), 8);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", CardHandlerKey::CHOP_BLOCK).is_empty());
+    }
+
 }

@@ -281,4 +281,10 @@ mod tests {
         let back: GameEvent = serde_json::from_str(&json).unwrap();
         assert_eq!(ev, back);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        let ev = GameEvent::AlwaysHungry { player_id: "p1".to_string(), roll: 1, success: false };
+        assert!(!format!("{:?}", ev).is_empty());
+    }
+
 }

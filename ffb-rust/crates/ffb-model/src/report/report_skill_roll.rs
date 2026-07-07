@@ -90,4 +90,9 @@ mod tests {
         let r = ReportSkillRoll::new(None, true, 4, 2, false, vec![]);
         assert!(r.get_roll_modifiers().is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ReportSkillRoll::default()).is_empty());
+    }
+
 }

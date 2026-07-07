@@ -61,4 +61,9 @@ mod tests {
         let b = BloodSpot::new(FieldCoordinate::new(1, 1), state);
         assert!(b.get_injury().is_some());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", BloodSpot::default()).is_empty());
+    }
+
 }

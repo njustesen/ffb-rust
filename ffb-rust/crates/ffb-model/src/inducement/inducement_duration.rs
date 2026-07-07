@@ -101,4 +101,9 @@ mod tests {
         assert_eq!(InducementDuration::UNTIL_END_OF_OPPONENTS_TURN.get_description(), "For opponent's turn");
         assert_eq!(InducementDuration::UNTIL_END_OF_HALF.get_description(), "For this half");
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", InducementDuration::UNTIL_END_OF_GAME).is_empty());
+    }
+
 }

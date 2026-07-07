@@ -43,4 +43,9 @@ mod tests {
         assert_eq!(RaiseType::ROTTER, RaiseType::ROTTER);
         assert_eq!(RaiseType::THRALL, RaiseType::THRALL);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", RaiseType::ZOMBIE).is_empty());
+    }
+
 }

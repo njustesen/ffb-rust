@@ -43,4 +43,9 @@ mod tests {
         assert_eq!(StatusType::WAITING, StatusType::WAITING);
         assert_eq!(StatusType::REF, StatusType::REF);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", StatusType::WAITING).is_empty());
+    }
+
 }

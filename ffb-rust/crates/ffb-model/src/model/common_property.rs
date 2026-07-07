@@ -478,4 +478,9 @@ mod tests {
         assert_eq!(CommonProperty::SETTING_SOUND_MODE.get_value(), Some("Sound"));
         assert_eq!(CommonProperty::SETTING_AUTOCOMPLETE.get_value(), Some("Autocomplete"));
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", CommonProperty::CLIENT_COMMAND_COMPRESSION).is_empty());
+    }
+
 }

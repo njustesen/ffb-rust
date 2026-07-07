@@ -77,4 +77,9 @@ mod tests {
         let k = KnockoutRecovery::default();
         assert_eq!(k.get_bloodweiser_babes(), 0);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", KnockoutRecovery::default()).is_empty());
+    }
+
 }

@@ -110,4 +110,9 @@ mod tests {
         assert_eq!(back.get_nr_of_dice(), 2);
         assert_eq!(back.get_block_roll(), &[3, 5]);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", BlockRoll::default()).is_empty());
+    }
+
 }
