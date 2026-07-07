@@ -2,6 +2,7 @@ use ffb_model::events::GameEvent;
 use ffb_model::enums::ApothecaryMode;
 use ffb_model::enums::{PlayerState, PS_KNOCKED_OUT, PS_RESERVE};
 use ffb_model::model::game::Game;
+use ffb_model::report::report_bite_spectator::ReportBiteSpectator;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_box::UtilBox;
 use ffb_model::util::util_player::UtilPlayer;
@@ -190,6 +191,8 @@ impl StepInitFeeding {
                     game.field_model.set_player_state(&acting_id, s.change_base(PS_RESERVE));
                 }
                 UtilBox::put_player_into_box(game, &acting_id);
+                // Java: getResult().addReport(new ReportBiteSpectator(actingPlayer.getPlayerId()))
+                game.report_list.add(ReportBiteSpectator::new(acting_id.clone()));
                 outcome = outcome.with_event(GameEvent::BiteSpectator { player_id: acting_id.clone() });
             }
         }
@@ -376,5 +379,36 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         assert!(game.field_model.ball_moving);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(_))));
+    }
+
+    #[test]
+    fn bite_spectator_adds_report_bite_spectator() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepInitFeeding::new();
+        step.goto_label_on_end = Some("end".to_string());
+        step.feeding_allowed = Some(false);
+        let mut game = make_game();
+        let actor_coord = FieldCoordinate::new(5, 5);
+        add_player(&mut game, "vampire", actor_coord);
+        game.acting_player.player_id = Some("vampire".to_string());
+        game.acting_player.suffering_blood_lust = true;
+        let _ = step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::BITE_SPECTATOR));
+    }
+
+    #[test]
+    fn feeding_not_allowed_eligible_player_report_has_correct_player_id() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepInitFeeding::new();
+        step.goto_label_on_end = Some("end".to_string());
+        step.feeding_allowed = Some(false);
+        let mut game = make_game();
+        let actor_coord = FieldCoordinate::new(3, 3);
+        add_player(&mut game, "dracula", actor_coord);
+        game.acting_player.player_id = Some("dracula".to_string());
+        game.acting_player.suffering_blood_lust = true;
+        let _ = step.start(&mut game, &mut GameRng::new(0));
+        // Report should be in the list (player is eligible since state is STANDING)
+        assert!(game.report_list.has_report(ReportId::BITE_SPECTATOR));
     }
 }

@@ -3,6 +3,7 @@
 /// For illegal concession: any player with ≥51 current SPPs risks defecting.
 /// Java: `DiceInterpreter.isPlayerDefecting(roll)` = roll > 0 && roll < 4 (i.e., 1–3 on D6).
 use ffb_model::model::game::Game;
+use ffb_model::report::report_defecting_players::ReportDefectingPlayers;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -45,9 +46,15 @@ impl StepPlayerLoss {
                 .collect()
         };
 
+        // Java: collect defectingPlayerIds, defectingRolls, defectingFlags in parallel
+        let mut defecting_rolls: Vec<i32> = Vec::new();
+        let mut defecting_flags: Vec<bool> = Vec::new();
+
         for pid in &player_ids {
             let roll = rng.d6();
             let defecting = Self::is_player_defecting(roll);
+            defecting_rolls.push(roll);
+            defecting_flags.push(defecting);
             let results = if conceding_home {
                 &mut game.game_result.home.player_results
             } else {
@@ -56,6 +63,11 @@ impl StepPlayerLoss {
             if let Some(pr) = results.get_mut(pid) {
                 pr.defecting = defecting;
             }
+        }
+
+        // Java: if (defectingPlayerIds.size() > 0) { getResult().addReport(new ReportDefectingPlayers(...)) }
+        if !player_ids.is_empty() {
+            game.report_list.add(ReportDefectingPlayers::new(player_ids, defecting_rolls, defecting_flags));
         }
 
         StepOutcome::next()
@@ -175,5 +187,38 @@ mod tests {
         assert!(matches!(outcome.action, crate::step::framework::StepAction::NextStep));
         // defecting flag was accessed, verifying no panic
         let _ = game.game_result.away.player_results["a1"].defecting;
+    }
+
+    #[test]
+    fn defecting_players_report_emitted_when_eligible_player_exists() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepPlayerLoss::new();
+        let mut game = make_game();
+        game.game_result.home.conceded = true;
+        game.conceded_legally = false;
+        game.team_home.players.push(make_player("p1"));
+        let mut pr = PlayerResult::default();
+        pr.spp_gained = 55; // above threshold
+        game.game_result.home.player_results.insert("p1".into(), pr);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(game.report_list.has_report(ReportId::DEFECTING_PLAYERS));
+    }
+
+    #[test]
+    fn no_report_when_no_eligible_players() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepPlayerLoss::new();
+        let mut game = make_game();
+        game.game_result.home.conceded = true;
+        game.conceded_legally = false;
+        // Player below threshold — no defection roll, no report
+        game.team_home.players.push(make_player("p1"));
+        let mut pr = PlayerResult::default();
+        pr.spp_gained = 40;
+        game.game_result.home.player_results.insert("p1".into(), pr);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(!game.report_list.has_report(ReportId::DEFECTING_PLAYERS));
     }
 }

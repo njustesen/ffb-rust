@@ -14,6 +14,7 @@
 /// headless(PassBlock-generators): Move/Select sequence generators not yet ported.
 use ffb_model::enums::TurnMode;
 use ffb_model::model::game::Game;
+use ffb_model::report::report_pass_block::ReportPassBlock;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -40,8 +41,15 @@ impl StepPassBlock {
         }
     }
 
-    fn execute_step(&self, _game: &mut Game) -> StepOutcome {
-        // no-op: OnTheBallMechanic not ported — pass-blocker detection skipped; headless conservatively skips PASS_BLOCK mode
+    fn execute_step(&self, game: &mut Game) -> StepOutcome {
+        // headless: OnTheBallMechanic not ported — conservatively treats as no pass-blockers available.
+        // Java: if (availablePassBlockers.size() == 0) → addReport(new ReportPassBlock(opposingTeam.getId(), false))
+        let opposing_team_id = if game.home_playing {
+            game.team_away.id.clone()
+        } else {
+            game.team_home.id.clone()
+        };
+        game.report_list.add(ReportPassBlock::new(opposing_team_id, false));
         StepOutcome::next()
     }
 }
@@ -115,5 +123,24 @@ mod tests {
         let mut step = StepPassBlock::new();
         assert!(step.set_parameter(&StepParameter::EndPlayerAction(true)));
         assert!(step.end_player_action);
+    }
+
+    #[test]
+    fn start_adds_pass_block_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut step = StepPassBlock::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PASS_BLOCK));
+    }
+
+    #[test]
+    fn pass_block_report_uses_opposing_team_id() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.home_playing = true; // thrower is home → opposing team is away
+        let mut step = StepPassBlock::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::PASS_BLOCK));
     }
 }

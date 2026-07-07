@@ -6,6 +6,7 @@
 /// Fame rules: 2× or more → fame 2; more → fame 1; else → fame 0.
 /// Note: pushes Kickoff sequence in Java — deferred (SequenceGeneratorFactory not yet ported).
 use ffb_model::model::game::Game;
+use ffb_model::report::bb2016::report_spectators::ReportSpectators;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -16,16 +17,20 @@ pub struct StepSpectators;
 impl StepSpectators {
     pub fn new() -> Self { Self }
 
-    fn roll_spectators(game: &mut Game, rng: &mut GameRng) {
-        let roll_home = rng.d6_two();
-        let spectators_home = (roll_home + game.team_home.fan_factor) * 1000;
+    /// Java: `rollSpectators()` — rolls 2D6 per team, computes spectators and fame,
+    /// sets game result fields, then returns a `ReportSpectators`.
+    fn roll_spectators(game: &mut Game, rng: &mut GameRng) -> ReportSpectators {
+        // Java: int[] fanRollHome = getDiceRoller().rollSpectators() → [d6, d6]
+        let fan_roll_home = [rng.d6(), rng.d6()];
+        let spectators_home = (fan_roll_home[0] + fan_roll_home[1] + game.team_home.fan_factor) * 1000;
 
-        let roll_away = rng.d6_two();
-        let spectators_away = (roll_away + game.team_away.fan_factor) * 1000;
+        // Java: int[] fanRollAway = getDiceRoller().rollSpectators() → [d6, d6]
+        let fan_roll_away = [rng.d6(), rng.d6()];
+        let spectators_away = (fan_roll_away[0] + fan_roll_away[1] + game.team_away.fan_factor) * 1000;
 
         // fan_factor in TeamResult = dedicated_fans + 2D6 (same convention as mixed version).
-        game.game_result.home.fan_factor = roll_home + game.team_home.fan_factor;
-        game.game_result.away.fan_factor = roll_away + game.team_away.fan_factor;
+        game.game_result.home.fan_factor = fan_roll_home[0] + fan_roll_home[1] + game.team_home.fan_factor;
+        game.game_result.away.fan_factor = fan_roll_away[0] + fan_roll_away[1] + game.team_away.fan_factor;
 
         // Fame: ≥ 2× opponent → 2; more → 1; else 0
         game.game_result.home.fame = if spectators_home >= 2 * spectators_away {
@@ -42,6 +47,17 @@ impl StepSpectators {
         } else {
             0
         };
+
+        // Java: return new ReportSpectators(fanRollHome, teamResultHome.getSpectators(), teamResultHome.getFame(),
+        //                                   fanRollAway, teamResultAway.getSpectators(), teamResultAway.getFame())
+        ReportSpectators::new(
+            fan_roll_home.to_vec(),
+            spectators_home,
+            game.game_result.home.fame,
+            fan_roll_away.to_vec(),
+            spectators_away,
+            game.game_result.away.fame,
+        )
     }
 }
 
@@ -53,12 +69,15 @@ impl Step for StepSpectators {
     fn id(&self) -> StepId { StepId::Spectators }
 
     fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        Self::roll_spectators(game, rng);
+        // Java: getResult().addReport(rollSpectators())
+        let report = Self::roll_spectators(game, rng);
+        game.report_list.add(report);
         StepOutcome::next()
     }
 
     fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        Self::roll_spectators(game, rng);
+        let report = Self::roll_spectators(game, rng);
+        game.report_list.add(report);
         StepOutcome::next()
     }
 
@@ -92,8 +111,32 @@ mod tests {
         let mut game = make_game(5, 4);
         let mut rng = GameRng::new(0);
         step.start(&mut game, &mut rng);
+        // fan_factor in TeamResult = 2D6 + base fan_factor; minimum 2D6 = 2
         assert!(game.game_result.home.fan_factor >= 5 + 2);
         assert!(game.game_result.away.fan_factor >= 4 + 2);
+    }
+
+    #[test]
+    fn report_spectators_added_to_report_list() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepSpectators::new();
+        let mut game = make_game(5, 5);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(game.report_list.has_report(ReportId::SPECTATORS));
+    }
+
+    #[test]
+    fn report_spectators_contains_correct_fame() {
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepSpectators::new();
+        // home fan_factor 20 vs away 1 → home always has 2× spectators
+        let mut game = make_game(20, 1);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(game.report_list.has_report(ReportId::SPECTATORS));
+        assert_eq!(game.game_result.home.fame, 2);
+        assert_eq!(game.game_result.away.fame, 0);
     }
 
     #[test]
