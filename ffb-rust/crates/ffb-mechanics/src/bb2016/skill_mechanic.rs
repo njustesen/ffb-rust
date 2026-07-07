@@ -112,4 +112,42 @@ mod tests {
         assert!(!SkillMechanic.animosity_exists(&p1, &p2));
     }
 
+    fn bare_team(id: &str) -> ffb_model::model::Team {
+        ffb_model::model::Team {
+            id: id.into(), name: id.into(), race: "human".into(), roster_id: "human".into(), coach: "c".into(),
+            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0,
+            bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
+            fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0,
+            special_rules: vec![], players: vec![],
+            vampire_lord: false, necromancer: false,
+        }
+    }
+
+    fn bare_game() -> Game {
+        Game::new(bare_team("home"), bare_team("away"), ffb_model::enums::Rules::Bb2016)
+    }
+
+    #[test]
+    fn calculate_player_level_rookie() {
+        let p = bare_player("p1", 0);
+        assert_eq!(SkillMechanic.calculate_player_level(&bare_game(), &p), "Rookie");
+    }
+
+    #[test]
+    fn calculate_player_level_legend() {
+        let p = bare_player("legend", 176);
+        assert_eq!(SkillMechanic.calculate_player_level(&bare_game(), &p), "Legend");
+    }
+
+    #[test]
+    fn calculate_player_level_boundaries() {
+        // Thresholds: >5=Experienced, >15=Veteran, >30=Emerging, >50=Star, >75=SuperStar, >175=Legend
+        let g = bare_game();
+        assert_eq!(SkillMechanic.calculate_player_level(&g, &bare_player("x", 6)), "Experienced");
+        assert_eq!(SkillMechanic.calculate_player_level(&g, &bare_player("x", 16)), "Veteran");
+        assert_eq!(SkillMechanic.calculate_player_level(&g, &bare_player("x", 31)), "Emerging");
+        assert_eq!(SkillMechanic.calculate_player_level(&g, &bare_player("x", 51)), "Star");
+        assert_eq!(SkillMechanic.calculate_player_level(&g, &bare_player("x", 76)), "Super Star");
+    }
+
 }

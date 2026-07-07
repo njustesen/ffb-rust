@@ -116,4 +116,36 @@ mod tests {
         let result = ApothecaryMechanic.apothecary_types(&game, &p, PlayerState(PS_KNOCKED_OUT));
         assert!(result.contains(&ApothecaryType::Plague));
     }
+
+    #[test]
+    fn no_apo_returns_empty() {
+        let mut home = bare_team("home");
+        let p = player("p1", PlayerType::Regular);
+        home.players.push(p.clone());
+        let game = Game::new(home, bare_team("away"), Rules::Bb2020);
+        assert!(ApothecaryMechanic.apothecary_types(&game, &p, PlayerState(PS_SERIOUS_INJURY)).is_empty());
+    }
+
+    #[test]
+    fn mercenary_player_with_wandering_apo_returns_wandering() {
+        let mut home = bare_team("home");
+        let p = player("p1", PlayerType::Mercenary);
+        home.players.push(p.clone());
+        let mut game = Game::new(home, bare_team("away"), Rules::Bb2020);
+        game.turn_data_home.wandering_apothecaries = 1;
+        let result = ApothecaryMechanic.apothecary_types(&game, &p, PlayerState(PS_SERIOUS_INJURY));
+        assert!(result.contains(&ApothecaryType::Wandering));
+    }
+
+    #[test]
+    fn plague_doctor_not_applied_to_serious_injury_for_regular() {
+        // Plague doctor only activates on KO (is_ko check)
+        let mut home = bare_team("home");
+        let p = player("p1", PlayerType::Regular);
+        home.players.push(p.clone());
+        let mut game = Game::new(home, bare_team("away"), Rules::Bb2020);
+        game.turn_data_home.plague_doctors = 1;
+        let result = ApothecaryMechanic.apothecary_types(&game, &p, PlayerState(PS_SERIOUS_INJURY));
+        assert!(!result.contains(&ApothecaryType::Plague));
+    }
 }

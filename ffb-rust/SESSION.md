@@ -8,9 +8,9 @@
 
 **Translation progress:** 2,521/2,521 files formally implemented = **100% ✓** (0 partial, 458 skip)
 
-**Tests:** 9,539 passing (1 ignored)
+**Tests:** 9,887 passing (1 ignored)
 
-**Current phase:** Phase ZD — Report wiring complete (~99.5% parity, parity testing next)
+**Current phase:** Phase ZG — Comprehensive test expansion (skill_behaviour files + modifier collections expanded)
 
 ---
 
@@ -421,6 +421,19 @@
   - **`bb2025/move_/step_move_dodge.rs`**: Same change. +2 tests.
   - **Files already done in ZB (bb2016)**: `step_block_chainsaw.rs`, `step_block_choice.rs`, `step_followup.rs` all fully wired.
   - **Remaining ZC scope**: bb2020/bb2025 block roll, pass/, foul/, mixed/, kickoff steps; bb2016 move_/ steps.
+
+- **Phase ZG** (2026-07-07): Comprehensive test expansion — 9,556 → 9,887 tests (+331)
+  - **Skill behaviour files**: Added `execute_step_hook_returns_false` + `apply_modifier_is_noop` to all 116 skill behaviour files in bb2016, bb2020, bb2025, mixed, common that had only 2 tests. ~232 new tests.
+  - **ffb-mechanics modifier/mechanic files**: Expanded 26 files (gaze/go_for_it/jump/jump_up modifier collections, modifier_type, player_stat_key, player_stat_limit, special_effect modifiers, stat incrementer/decrementer, contexts, pass_mechanic, stats_mechanic, wording, agility_mechanic, apothecary_mechanic ×3, skill_mechanic, mechanic, throw_in_mechanic, on_the_ball_mechanic, jump_modifier_collection, injury_modifiers). ~99 new tests.
+
+- **Phase ZE** (2026-07-07): Infrastructure expansion — 9,539 → 9,556 tests (+17)
+  - **`Team.vampire_lord: bool`** + **`Team.necromancer: bool`** fields: Added both with `#[serde(default)]`. Propagated to all ~350 struct literal initializers across ffb-model, ffb-mechanics, ffb-engine, ffb-client, ffb-parity. `necromancer` populated from `roster.has_necromancer()` in parity runner.
+  - **`Player.is_big_guy: bool`** field: Added with `#[serde(default)]`. Propagated to ~100 Player struct literals.
+  - **BB2016 `InjuryMechanic.can_raise_dead`**: Now correctly guards on `team.necromancer || team.vampire_lord` — non-undead teams can no longer raise dead players (bug fix).
+  - **BB2016 `InjuryMechanic.raise_type`**: Cleared `TODO` — `necromancer → ZOMBIE`, `vampire_lord → THRALL`, else `ROTTER` (was always returning ROTTER).
+  - **BB2025 `InjuryMechanic.raise_type`**: Added missing `vampire_lord → THRALL` path.
+  - **`RosterJson.has_necromancer()`**: New method delegating to `self.necromancer` field (parity with `has_vampire_lord()`).
+  - +17 new tests covering necromancer/vampire_lord raise logic in BB2016 and BB2025.
 
 - **Phase ZD** (2026-07-07): Report wiring complete — 9,262 → 9,539 tests (+277)
   - **Scope**: Wired Java `getResult().addReport(...)` calls to Rust `game.report_list.add(...)` across all achievable step files in BB2016, BB2020, BB2025, mixed/, action/

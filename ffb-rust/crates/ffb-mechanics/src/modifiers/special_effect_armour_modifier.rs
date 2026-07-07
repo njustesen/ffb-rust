@@ -59,4 +59,31 @@ mod tests {
         let m = SpecialEffectArmourModifier::new("Fireball", 0, false, SpecialEffect::FIREBALL);
         assert_eq!(m.get_effect(), SpecialEffect::FIREBALL);
     }
+
+    #[test]
+    fn foul_assist_flag_propagates() {
+        let m_no_foul = SpecialEffectArmourModifier::new("X", 0, false, SpecialEffect::LIGHTNING);
+        assert!(!m_no_foul.is_foul_assist_modifier());
+        let m_foul = SpecialEffectArmourModifier::new("X", 0, true, SpecialEffect::LIGHTNING);
+        assert!(m_foul.is_foul_assist_modifier());
+    }
+
+    #[test]
+    fn get_special_effect_returns_some() {
+        let m = SpecialEffectArmourModifier::new("Bomb +2", 2, false, SpecialEffect::BOMB);
+        assert_eq!(m.get_special_effect(), Some(SpecialEffect::BOMB));
+    }
+
+    #[test]
+    fn negative_modifier_stored_correctly() {
+        let p = dummy_player();
+        let m = SpecialEffectArmourModifier::new("Reduce", -2, false, SpecialEffect::FIREBALL);
+        assert_eq!(m.get_modifier(None, &p), -2);
+    }
+
+    #[test]
+    fn registered_to_default_is_none() {
+        let m = SpecialEffectArmourModifier::new("X", 0, false, SpecialEffect::LIGHTNING);
+        assert!(m.registered_to().is_none());
+    }
 }

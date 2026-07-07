@@ -25,4 +25,27 @@ mod tests {
         assert!(inc.applies_to(PlayerStatKey::AV));
         assert!(!inc.applies_to(PlayerStatKey::ST));
     }
+
+    #[test]
+    fn incrementer_does_not_apply_to_other_stats() {
+        let inc = new_incrementer(PlayerStatKey::MA, PlayerStatLimit::new(1, 9));
+        assert!(!inc.applies_to(PlayerStatKey::ST));
+        assert!(!inc.applies_to(PlayerStatKey::AG));
+        assert!(!inc.applies_to(PlayerStatKey::PA));
+        assert!(!inc.applies_to(PlayerStatKey::AV));
+    }
+
+    #[test]
+    fn incrementer_limit_matches() {
+        let inc = new_incrementer(PlayerStatKey::PA, PlayerStatLimit::new(2, 6));
+        assert_eq!(inc.get_limit().get_min(), 2);
+        assert_eq!(inc.get_limit().get_max(), 6);
+    }
+
+    #[test]
+    fn incrementer_apply_from_max_still_adds_one() {
+        // The incrementer applies unconditionally; clamping is caller's responsibility
+        let inc = new_incrementer(PlayerStatKey::ST, PlayerStatLimit::new(1, 9));
+        assert_eq!(inc.apply(9), 10);
+    }
 }

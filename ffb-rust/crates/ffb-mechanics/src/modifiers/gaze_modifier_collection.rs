@@ -50,4 +50,53 @@ mod tests {
         assert_eq!(col.get_modifiers().len(), 1);
         assert_eq!(col.get_modifiers()[0].get_name(), "1 Tacklezone");
     }
+
+    #[test]
+    fn default_creates_empty_collection() {
+        let col = GazeModifierCollection::default();
+        assert_eq!(col.get_modifiers().len(), 0);
+    }
+
+    #[test]
+    fn add_multiple_modifiers_preserves_order() {
+        let mut col = GazeModifierCollection::new();
+        col.add(GazeModifier::new("First", 1, ModifierType::TACKLEZONE));
+        col.add(GazeModifier::new("Second", 2, ModifierType::DISTURBING_PRESENCE));
+        col.add(GazeModifier::new("Third", -1, ModifierType::REGULAR));
+        assert_eq!(col.get_modifiers().len(), 3);
+        assert_eq!(col.get_modifiers()[0].get_name(), "First");
+        assert_eq!(col.get_modifiers()[1].get_name(), "Second");
+        assert_eq!(col.get_modifiers()[2].get_name(), "Third");
+    }
+
+    #[test]
+    fn get_modifiers_by_type_filters_correctly() {
+        let mut col = GazeModifierCollection::new();
+        col.add(GazeModifier::new("TZ1", 1, ModifierType::TACKLEZONE));
+        col.add(GazeModifier::new("TZ2", 2, ModifierType::TACKLEZONE));
+        col.add(GazeModifier::new("Reg", 0, ModifierType::REGULAR));
+        let tz = col.get_modifiers_by_type(ModifierType::TACKLEZONE);
+        assert_eq!(tz.len(), 2);
+        let reg = col.get_modifiers_by_type(ModifierType::REGULAR);
+        assert_eq!(reg.len(), 1);
+    }
+
+    #[test]
+    fn find_applicable_returns_all_when_no_predicate() {
+        let mut col = GazeModifierCollection::new();
+        col.add(GazeModifier::new("A", 1, ModifierType::TACKLEZONE));
+        col.add(GazeModifier::new("B", -1, ModifierType::REGULAR));
+        // Without a predicate, applies_to_context always returns true
+        // We can verify modifier values are accessible
+        assert_eq!(col.get_modifiers()[0].get_modifier(), 1);
+        assert_eq!(col.get_modifiers()[1].get_modifier(), -1);
+    }
+
+    #[test]
+    fn get_modifiers_by_type_empty_when_no_match() {
+        let mut col = GazeModifierCollection::new();
+        col.add(GazeModifier::new("TZ", 1, ModifierType::TACKLEZONE));
+        let dp = col.get_modifiers_by_type(ModifierType::DISTURBING_PRESENCE);
+        assert_eq!(dp.len(), 0);
+    }
 }

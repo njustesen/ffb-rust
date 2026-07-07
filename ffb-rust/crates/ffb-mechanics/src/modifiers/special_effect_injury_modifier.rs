@@ -59,4 +59,29 @@ mod tests {
         let m = SpecialEffectInjuryModifier::new("x", 0, true, SpecialEffect::BOMB);
         assert!(m.is_niggling_injury_modifier());
     }
+
+    #[test]
+    fn non_niggling_flag_is_false() {
+        let m = SpecialEffectInjuryModifier::new("Fireball", 1, false, SpecialEffect::FIREBALL);
+        assert!(!m.is_niggling_injury_modifier());
+    }
+
+    #[test]
+    fn get_special_effect_returns_some() {
+        let m = SpecialEffectInjuryModifier::new("Bomb", 2, false, SpecialEffect::BOMB);
+        assert_eq!(m.get_special_effect(), Some(SpecialEffect::BOMB));
+    }
+
+    #[test]
+    fn negative_modifier_stored_correctly() {
+        let p = dummy_player();
+        let m = SpecialEffectInjuryModifier::new("Heal", -1, false, SpecialEffect::LIGHTNING);
+        assert_eq!(m.get_modifier(None, &p), -1);
+    }
+
+    #[test]
+    fn registered_to_default_is_none() {
+        let m = SpecialEffectInjuryModifier::new("X", 0, false, SpecialEffect::LIGHTNING);
+        assert!(m.registered_to().is_none());
+    }
 }

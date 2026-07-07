@@ -94,4 +94,38 @@ mod tests {
         let m = TestMechanic;
         assert_eq!(m.get_name(), "AGILITY");
     }
+
+    #[test]
+    fn all_mechanic_type_names_round_trip_for_name() {
+        let variants = [
+            MechanicType::AGILITY, MechanicType::GAME, MechanicType::INJURY,
+            MechanicType::JUMP, MechanicType::ON_THE_BALL, MechanicType::PASS,
+            MechanicType::SKILL, MechanicType::STAT, MechanicType::TTM,
+            MechanicType::SPP, MechanicType::APOTHECARY, MechanicType::THROW_IN,
+            MechanicType::ROLL, MechanicType::SETUP, MechanicType::STATE,
+        ];
+        for v in variants {
+            let name = v.name();
+            assert_eq!(MechanicType::for_name(name), Some(v), "round trip failed for {:?}", v);
+        }
+    }
+
+    #[test]
+    fn for_name_unknown_returns_none() {
+        assert_eq!(MechanicType::for_name(""), None);
+        assert_eq!(MechanicType::for_name("agility"), None); // case-sensitive
+    }
+
+    #[test]
+    fn mechanic_type_equality() {
+        assert_eq!(MechanicType::PASS, MechanicType::PASS);
+        assert_ne!(MechanicType::PASS, MechanicType::SKILL);
+    }
+
+    #[test]
+    fn mechanic_type_is_copyable() {
+        let a = MechanicType::INJURY;
+        let b = a;
+        assert_eq!(a, b);
+    }
 }

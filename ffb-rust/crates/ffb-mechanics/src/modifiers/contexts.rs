@@ -163,4 +163,49 @@ mod tests {
         ctx.set_defender_mode();
         assert!(!ctx.attacker_mode);
     }
+
+    #[test]
+    fn armor_context_foul_sets_foul_fields() {
+        let ctx = ArmorContext::foul("defender".into(), "attacker".into(), 3);
+        assert!(ctx.is_foul);
+        assert_eq!(ctx.foul_assists, 3);
+        assert!(!ctx.is_stab);
+        assert!(!ctx.is_ttm);
+    }
+
+    #[test]
+    fn armor_context_block_has_attacker_id() {
+        let ctx = ArmorContext::block("d1".into(), "a1".into());
+        assert_eq!(ctx.attacker_id, Some("a1".into()));
+        assert_eq!(ctx.defender_id, "d1".to_string());
+    }
+
+    #[test]
+    fn injury_context_block_starts_in_attacker_mode() {
+        let ctx = InjuryContext::block("d1".into(), "a1".into());
+        assert!(ctx.attacker_mode);
+        assert!(!ctx.is_foul);
+        assert!(!ctx.is_stab);
+        assert!(!ctx.is_chainsaw);
+    }
+
+    #[test]
+    fn pass_context_fields() {
+        let ctx = PassContext { thrower_id: "t1".into(), distance: PassingDistance::ShortPass, is_ttm: false };
+        assert_eq!(ctx.thrower_id, "t1".to_string());
+        assert!(!ctx.is_ttm);
+    }
+
+    #[test]
+    fn gaze_context_stores_both_ids() {
+        let ctx = GazeContext { player_id: "g1".into(), target_id: "t1".into() };
+        assert_eq!(ctx.player_id, "g1".to_string());
+        assert_eq!(ctx.target_id, "t1".to_string());
+    }
+
+    #[test]
+    fn jump_up_context_stores_player_id() {
+        let ctx = JumpUpContext { player_id: "p1".into() };
+        assert_eq!(ctx.player_id, "p1".to_string());
+    }
 }

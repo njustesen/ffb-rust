@@ -50,4 +50,45 @@ mod tests {
         assert_eq!(col.get_modifiers().len(), 1);
         assert_eq!(col.get_modifiers()[0].get_name(), "1 Tacklezone");
     }
+
+    #[test]
+    fn default_creates_empty_collection() {
+        let col = JumpModifierCollection::default();
+        assert_eq!(col.get_modifiers().len(), 0);
+    }
+
+    #[test]
+    fn add_multiple_modifiers_preserves_all() {
+        let mut col = JumpModifierCollection::new();
+        col.add(JumpModifier::new("TZ1", 1, ModifierType::TACKLEZONE));
+        col.add(JumpModifier::new("Tail", 1, ModifierType::PREHENSILE_TAIL));
+        col.add(JumpModifier::new("Reg", -1, ModifierType::REGULAR));
+        assert_eq!(col.get_modifiers().len(), 3);
+    }
+
+    #[test]
+    fn get_modifiers_by_type_filters_correctly() {
+        let mut col = JumpModifierCollection::new();
+        col.add(JumpModifier::new("TZ1", 1, ModifierType::TACKLEZONE));
+        col.add(JumpModifier::new("TZ2", 2, ModifierType::TACKLEZONE));
+        col.add(JumpModifier::new("Tail", 1, ModifierType::PREHENSILE_TAIL));
+        let tz = col.get_modifiers_by_type(ModifierType::TACKLEZONE);
+        assert_eq!(tz.len(), 2);
+        let tail = col.get_modifiers_by_type(ModifierType::PREHENSILE_TAIL);
+        assert_eq!(tail.len(), 1);
+    }
+
+    #[test]
+    fn get_modifiers_by_type_empty_when_no_match() {
+        let mut col = JumpModifierCollection::new();
+        col.add(JumpModifier::new("TZ", 1, ModifierType::TACKLEZONE));
+        assert_eq!(col.get_modifiers_by_type(ModifierType::REGULAR).len(), 0);
+    }
+
+    #[test]
+    fn modifier_value_accessible() {
+        let mut col = JumpModifierCollection::new();
+        col.add(JumpModifier::new("TZ", -1, ModifierType::TACKLEZONE));
+        assert_eq!(col.get_modifiers()[0].get_modifier(), -1);
+    }
 }

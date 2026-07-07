@@ -116,4 +116,27 @@ mod tests {
         let result = m.format_roll_modifiers(&[rm]);
         assert!(result.contains(" + "));
     }
+
+    #[test]
+    fn format_roll_modifiers_includes_report_string() {
+        let m = MinimalAgility;
+        let rm = RollModifier::new("Diving Tackle", -2);
+        let result = m.format_roll_modifiers(&[rm]);
+        assert!(result.contains("Diving Tackle"));
+    }
+
+    #[test]
+    fn format_roll_modifiers_multiple_modifiers_all_present() {
+        let m = MinimalAgility;
+        let rm1 = RollModifier::new("TZ1", 1);
+        let rm2 = RollModifier::new("Sure Feet", -1);
+        let result = m.format_roll_modifiers(&[rm1, rm2]);
+        assert!(result.contains("TZ1"));
+        assert!(result.contains("Sure Feet"));
+    }
+
+    #[test]
+    fn mechanic_type_is_agility() {
+        assert_eq!(crate::mechanic::Mechanic::get_type(&MinimalAgility), MechanicType::AGILITY);
+    }
 }

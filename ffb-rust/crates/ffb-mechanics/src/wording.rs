@@ -42,4 +42,34 @@ mod tests {
         let b = Wording::new("Pass", "passes", "es", "thrower");
         assert_eq!(a, b);
     }
+
+    #[test]
+    fn different_noun_is_not_equal() {
+        let a = Wording::new("Pass", "passes", "es", "thrower");
+        let b = Wording::new("Kick", "passes", "es", "thrower");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn different_verb_is_not_equal() {
+        let a = Wording::new("Pass", "passes", "es", "thrower");
+        let b = Wording::new("Pass", "kicks", "es", "thrower");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn clone_produces_equal_wording() {
+        let a = Wording::new("Catch", "catches", "es", "receiver");
+        let b = a.clone();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn empty_strings_accepted() {
+        let w = Wording::new("", "", "", "");
+        assert_eq!(w.get_noun(), "");
+        assert_eq!(w.get_verb(), "");
+        assert_eq!(w.get_inflection(), "");
+        assert_eq!(w.get_player_characterization(), "");
+    }
 }

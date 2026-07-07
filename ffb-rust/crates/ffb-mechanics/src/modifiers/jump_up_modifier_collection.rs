@@ -53,4 +53,35 @@ mod tests {
         assert_eq!(col.get_modifiers().len(), 1);
         assert_eq!(col.get_modifiers()[0].get_name(), "Jump Up");
     }
+
+    #[test]
+    fn default_creates_empty_collection() {
+        let col = JumpUpModifierCollection::default();
+        assert_eq!(col.get_modifiers().len(), 0);
+    }
+
+    #[test]
+    fn add_multiple_modifiers_all_accessible() {
+        let mut col = JumpUpModifierCollection::new();
+        col.add(JumpUpModifier::new("Jump Up", -2, ModifierType::REGULAR));
+        col.add(JumpUpModifier::new("TZ Penalty", 1, ModifierType::TACKLEZONE));
+        assert_eq!(col.get_modifiers().len(), 2);
+    }
+
+    #[test]
+    fn get_modifiers_by_type_filters_correctly() {
+        let mut col = JumpUpModifierCollection::new();
+        col.add(JumpUpModifier::new("Jump Up", -2, ModifierType::REGULAR));
+        col.add(JumpUpModifier::new("TZ1", 1, ModifierType::TACKLEZONE));
+        col.add(JumpUpModifier::new("TZ2", 2, ModifierType::TACKLEZONE));
+        assert_eq!(col.get_modifiers_by_type(ModifierType::TACKLEZONE).len(), 2);
+        assert_eq!(col.get_modifiers_by_type(ModifierType::REGULAR).len(), 1);
+    }
+
+    #[test]
+    fn modifier_value_accessible() {
+        let mut col = JumpUpModifierCollection::new();
+        col.add(JumpUpModifier::new("Jump Up", -2, ModifierType::REGULAR));
+        assert_eq!(col.get_modifiers()[0].get_modifier(), -2);
+    }
 }

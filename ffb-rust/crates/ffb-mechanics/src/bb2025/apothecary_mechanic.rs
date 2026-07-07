@@ -105,4 +105,35 @@ mod tests {
         let result = ApothecaryMechanic.apothecary_types(&game, &p, PlayerState(PS_SERIOUS_INJURY));
         assert!(result.contains(&ApothecaryType::Plague));
     }
+
+    #[test]
+    fn wandering_apo_when_no_team_apo() {
+        let mut home = bare_team("home");
+        let p = regular_player("p1");
+        home.players.push(p.clone());
+        let mut game = Game::new(home, bare_team("away"), Rules::Bb2025);
+        game.turn_data_home.wandering_apothecaries = 1;
+        // wandering_apothecaries == apothecaries (both 1), so wandering branch applies
+        game.turn_data_home.apothecaries = 1;
+        let result = ApothecaryMechanic.apothecary_types(&game, &p, PlayerState(PS_SERIOUS_INJURY));
+        assert!(result.contains(&ApothecaryType::Wandering));
+    }
+
+    #[test]
+    fn both_team_apo_and_plague_doctor() {
+        let mut home = bare_team("home");
+        let p = regular_player("p1");
+        home.players.push(p.clone());
+        let mut game = Game::new(home, bare_team("away"), Rules::Bb2025);
+        game.turn_data_home.apothecaries = 1;
+        game.turn_data_home.plague_doctors = 1;
+        let result = ApothecaryMechanic.apothecary_types(&game, &p, PlayerState(PS_SERIOUS_INJURY));
+        assert!(result.contains(&ApothecaryType::Team));
+        assert!(result.contains(&ApothecaryType::Plague));
+    }
+
+    #[test]
+    fn mechanic_type_is_apothecary() {
+        assert_eq!(crate::mechanic::Mechanic::get_type(&ApothecaryMechanic), MechanicType::APOTHECARY);
+    }
 }

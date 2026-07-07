@@ -57,4 +57,33 @@ mod tests {
         m.set_use_all(true);
         assert_eq!(m.values().len(), before);
     }
+
+    #[test]
+    fn all_values_same_as_values() {
+        assert_eq!(Bb2016InjuryModifiers.all_values().len(), Bb2016InjuryModifiers.values().len());
+    }
+
+    #[test]
+    fn two_non_niggling_modifiers_fireball_and_lightning() {
+        let count = Bb2016InjuryModifiers.values().iter()
+            .filter(|m| !m.is_niggling_injury_modifier()).count();
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn get_name_returns_expected_string() {
+        assert_eq!(Bb2016InjuryModifiers.get_name(), "Bb2016InjuryModifiers");
+    }
+
+    #[test]
+    fn niggling_modifier_names_include_injuries() {
+        let nigglings: Vec<_> = Bb2016InjuryModifiers.values()
+            .into_iter()
+            .filter(|m| m.is_niggling_injury_modifier())
+            .collect();
+        // All niggling names should contain "Niggling"
+        for n in &nigglings {
+            assert!(n.get_name().contains("Niggling"), "Expected Niggling in: {}", n.get_name());
+        }
+    }
 }

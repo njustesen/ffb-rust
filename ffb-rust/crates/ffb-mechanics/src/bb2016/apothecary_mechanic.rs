@@ -76,4 +76,26 @@ mod tests {
         let p = bare_player("p1");
         assert!(ApothecaryMechanic.apothecary_types(&game, &p, PlayerState(PS_KNOCKED_OUT)).is_empty());
     }
+
+    #[test]
+    fn default_creates_instance() {
+        let m = ApothecaryMechanic::default();
+        assert_eq!(Mechanic::get_type(&m), MechanicType::APOTHECARY);
+    }
+
+    #[test]
+    fn apothecary_types_empty_for_star_player_too() {
+        use ffb_model::enums::PlayerType;
+        let game = Game::new(bare_team("home"), bare_team("away"), Rules::Bb2016);
+        let mut p = bare_player("p1");
+        p.player_type = PlayerType::Star;
+        // BB2016 always returns empty regardless of player type
+        assert!(ApothecaryMechanic.apothecary_types(&game, &p, PlayerState(PS_SERIOUS_INJURY)).is_empty());
+    }
+
+    #[test]
+    fn get_name_returns_apothecary_string() {
+        use crate::mechanic::Mechanic;
+        assert_eq!(Mechanic::get_name(&ApothecaryMechanic), "APOTHECARY");
+    }
 }

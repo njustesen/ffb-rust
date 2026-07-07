@@ -49,4 +49,26 @@ mod tests {
         let b = DivingTackleBehaviour::default();
         assert_eq!(b.name(), "DivingTackleBehaviour");
     }
+
+    #[test]
+    fn execute_step_hook_returns_false() {
+        use ffb_model::enums::Rules;
+        use crate::step::framework::test_team;
+        let b = DivingTackleBehaviour::new();
+        let mut game = ffb_model::model::game::Game::new(
+            test_team("home", 0), test_team("away", 0), Rules::Bb2020,
+        );
+        assert!(!b.execute_step_hook(&mut game));
+    }
+
+    #[test]
+    fn apply_modifier_is_noop() {
+        use ffb_model::model::{Player, roster_position::RosterPosition};
+        let b = DivingTackleBehaviour::new();
+        let mut player = Player::default();
+        let pos = RosterPosition::default();
+        let movement_before = player.movement;
+        b.apply_modifier(&mut player, &pos);
+        assert_eq!(player.movement, movement_before);
+    }
 }

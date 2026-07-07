@@ -66,4 +66,29 @@ mod tests {
         assert_eq!(MinimalStats.reduce_armour(&ctx, 4, 8), 4);
         assert_eq!(MinimalStats.reduce_armour(&ctx, 5, 5), 5);
     }
+
+    #[test]
+    fn reduce_armour_returns_reduction_when_armour_is_much_higher() {
+        let ctx = InjuryContext::block("d1".into(), "a1".into());
+        assert_eq!(MinimalStats.reduce_armour(&ctx, 11, 1), 1);
+    }
+
+    #[test]
+    fn mechanic_type_is_stat() {
+        use crate::stats_mechanic::Mechanic;
+        assert_eq!(Mechanic::get_type(&MinimalStats), MechanicType::STAT);
+    }
+
+    #[test]
+    fn agility_modifier_returns_stat_based_roll_modifier() {
+        let sbr = MinimalStats.agility_modifier(2);
+        assert_eq!(sbr.get_modifier(), 2);
+    }
+
+    #[test]
+    fn limit_returns_one_to_ten() {
+        let lim = MinimalStats.limit(PlayerStatKey::Ma);
+        assert_eq!(lim.get_min(), 1);
+        assert_eq!(lim.get_max(), 10);
+    }
 }

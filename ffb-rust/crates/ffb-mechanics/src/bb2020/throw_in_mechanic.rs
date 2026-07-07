@@ -66,4 +66,33 @@ mod tests {
         let dir = ThrowInMechanic.interpret_throw_in_direction_roll(FieldCoordinate::new(12, 14), 4);
         assert_eq!(dir, Direction::North);
     }
+
+    #[test]
+    fn distance_minimum_dice() {
+        assert_eq!(ThrowInMechanic.distance(&[1, 1]), 3);
+    }
+
+    #[test]
+    fn distance_maximum_dice() {
+        assert_eq!(ThrowInMechanic.distance(&[6, 6]), 13);
+    }
+
+    #[test]
+    fn is_corner_throw_in_always_false() {
+        // BB2020 ThrowInMechanic always returns false for corner throw-in
+        assert!(!ThrowInMechanic.is_corner_throw_in(FieldCoordinate::new(0, 0)));
+        assert!(!ThrowInMechanic.is_corner_throw_in(FieldCoordinate::new(24, 14)));
+    }
+
+    #[test]
+    fn direction_from_east_edge() {
+        // x > 24 → start template is West
+        let dir = ThrowInMechanic.interpret_throw_in_direction_roll(FieldCoordinate::new(25, 7), 4);
+        assert_eq!(dir, Direction::West);
+    }
+
+    #[test]
+    fn mechanic_type_is_throw_in() {
+        assert_eq!(crate::mechanic::Mechanic::get_type(&ThrowInMechanic), MechanicType::THROW_IN);
+    }
 }

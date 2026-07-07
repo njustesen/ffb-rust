@@ -88,4 +88,29 @@ mod tests {
         let m = MinimalPass;
         assert_eq!(m.calculate_modifiers(&[]), 0);
     }
+
+    #[test]
+    fn calculate_modifiers_negative_modifiers() {
+        let m = MinimalPass;
+        let mods = vec![
+            PassModifier::new("Penalty1", -1, ModifierType::DISTURBING_PRESENCE),
+            PassModifier::new("Penalty2", -2, ModifierType::DISTURBING_PRESENCE),
+        ];
+        assert_eq!(m.calculate_modifiers(&mods), -3);
+    }
+
+    #[test]
+    fn calculate_modifiers_mixed_signs() {
+        let m = MinimalPass;
+        let mods = vec![
+            PassModifier::new("Bonus", 3, ModifierType::REGULAR),
+            PassModifier::new("Penalty", -1, ModifierType::DISTURBING_PRESENCE),
+        ];
+        assert_eq!(m.calculate_modifiers(&mods), 2);
+    }
+
+    #[test]
+    fn mechanic_type_is_pass() {
+        assert_eq!(crate::mechanic::Mechanic::get_type(&MinimalPass), MechanicType::PASS);
+    }
 }
