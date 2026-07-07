@@ -29,4 +29,16 @@ mod tests {
     fn for_name_unknown_returns_none() {
         assert_eq!(SkillUseFactory::default().for_name("invalid"), None);
     }
+
+    #[test]
+    fn for_name_stop_opponent_returns_some() {
+        let f = SkillUseFactory::default();
+        assert!(f.for_name("stopOpponent").is_some());
+    }
+
+    #[test]
+    fn initialize_does_not_panic() {
+        let mut f = SkillUseFactory::default();
+        f.initialize();
+    }
 }

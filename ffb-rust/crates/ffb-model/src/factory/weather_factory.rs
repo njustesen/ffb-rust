@@ -32,4 +32,15 @@ mod tests {
     fn for_name_unknown() {
         assert_eq!(WeatherFactory.for_name("blizzard"), None);
     }
+
+    #[test]
+    fn for_short_name_nice_weather() {
+        let result = WeatherFactory.for_short_name("Nice");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn for_short_name_unknown() {
+        assert_eq!(WeatherFactory.for_short_name("XXXX"), None);
+    }
 }

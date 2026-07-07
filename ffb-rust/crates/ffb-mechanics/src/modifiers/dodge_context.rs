@@ -56,3 +56,68 @@ impl<'a> DodgeContext<'a> {
         self.acting_player.player_id.as_deref().and_then(|id| game.player(id))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::types::FieldCoordinate;
+
+    fn make_game() -> ffb_model::model::Game {
+        use ffb_model::enums::Rules;
+        ffb_model::model::Game::new(
+            ffb_model::model::Team {
+                id: "home".into(), name: "H".into(), race: "human".into(),
+                roster_id: "human".into(), coach: "c".into(),
+                rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+                prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+                cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
+                team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
+                vampire_lord: false, necromancer: false,
+            },
+            ffb_model::model::Team {
+                id: "away".into(), name: "A".into(), race: "human".into(),
+                roster_id: "human".into(), coach: "c".into(),
+                rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+                prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+                cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
+                team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
+                vampire_lord: false, necromancer: false,
+            },
+            Rules::Bb2025,
+        )
+    }
+
+    #[test]
+    fn new_has_expected_fields() {
+        let game = make_game();
+        let acting_player = ActingPlayer::default();
+        let src = FieldCoordinate { x: 3, y: 4 };
+        let tgt = FieldCoordinate { x: 5, y: 6 };
+        let ctx = DodgeContext::new(&game, &acting_player, src, tgt);
+        assert_eq!(ctx.source_coordinate, src);
+        assert_eq!(ctx.target_coordinate, tgt);
+        assert!(!ctx.use_break_tackle);
+    }
+
+    #[test]
+    fn getters_return_set_values() {
+        let game = make_game();
+        let acting_player = ActingPlayer::default();
+        let src = FieldCoordinate { x: 1, y: 2 };
+        let tgt = FieldCoordinate { x: 7, y: 8 };
+        let ctx = DodgeContext::new(&game, &acting_player, src, tgt);
+        assert_eq!(ctx.get_source_coordinate(), src);
+        assert_eq!(ctx.get_target_coordinate(), tgt);
+        assert!(!ctx.is_use_break_tackle());
+    }
+
+    #[test]
+    fn variant_constructor_sets_break_tackle() {
+        let game = make_game();
+        let acting_player = ActingPlayer::default();
+        let src = FieldCoordinate { x: 0, y: 0 };
+        let tgt = FieldCoordinate { x: 1, y: 1 };
+        let ctx = DodgeContext::new_with_break_tackle(&game, &acting_player, src, tgt, true);
+        assert!(ctx.is_use_break_tackle());
+    }
+}

@@ -59,4 +59,16 @@ mod tests {
         assert_eq!(transformed[0], Direction::North.transform());
         assert_eq!(transformed[1], Direction::South.transform());
     }
+
+    #[test]
+    fn for_name_known_direction() {
+        let f = DirectionFactory;
+        assert!(f.for_name("north").is_some());
+    }
+
+    #[test]
+    fn transform_empty_slice() {
+        let f = DirectionFactory;
+        assert_eq!(f.transform(&[]), vec![]);
+    }
 }

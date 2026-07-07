@@ -69,4 +69,15 @@ mod tests {
         let back: Usage = serde_json::from_str(&s).unwrap();
         assert_eq!(u, back);
     }
+
+    #[test]
+    fn exclude_from_result_contains_loner() {
+        assert!(Usage::exclude_from_result().contains(&Usage::LONER));
+    }
+
+    #[test]
+    fn variants_are_distinct() {
+        assert_ne!(Usage::REROLL, Usage::CONDITIONAL_REROLL);
+        assert_ne!(Usage::STAR, Usage::STAFF);
+    }
 }

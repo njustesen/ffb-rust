@@ -28,4 +28,16 @@ mod tests {
     fn for_name_unknown_returns_none() {
         assert_eq!(ServerStatusFactory::default().for_name("invalid"), None);
     }
+
+    #[test]
+    fn for_name_second_known_variant() {
+        let f = ServerStatusFactory::default();
+        assert!(f.for_name("Wrong Password").is_some());
+    }
+
+    #[test]
+    fn initialize_does_not_panic() {
+        let mut f = ServerStatusFactory::default();
+        f.initialize();
+    }
 }

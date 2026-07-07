@@ -22,3 +22,59 @@ impl<'a> JumpUpContext<'a> {
         self.acting_player.player_id.as_deref().and_then(|id| game.player(id))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::model::ActingPlayer;
+
+    fn make_game() -> ffb_model::model::Game {
+        use ffb_model::enums::Rules;
+        ffb_model::model::Game::new(
+            ffb_model::model::Team {
+                id: "home".into(), name: "H".into(), race: "human".into(),
+                roster_id: "human".into(), coach: "c".into(),
+                rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+                prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+                cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
+                team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
+                vampire_lord: false, necromancer: false,
+            },
+            ffb_model::model::Team {
+                id: "away".into(), name: "A".into(), race: "human".into(),
+                roster_id: "human".into(), coach: "c".into(),
+                rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+                prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+                cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
+                team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
+                vampire_lord: false, necromancer: false,
+            },
+            Rules::Bb2025,
+        )
+    }
+
+    #[test]
+    fn new_has_expected_fields() {
+        let game = make_game();
+        let acting_player = ActingPlayer::default();
+        let ctx = JumpUpContext::new(&game, &acting_player);
+        assert!(ctx.get_acting_player().player_id.is_none());
+    }
+
+    #[test]
+    fn getters_return_set_values() {
+        let game = make_game();
+        let mut acting_player = ActingPlayer::default();
+        acting_player.player_id = Some("p1".into());
+        let ctx = JumpUpContext::new(&game, &acting_player);
+        assert_eq!(ctx.get_acting_player().player_id.as_deref(), Some("p1"));
+    }
+
+    #[test]
+    fn get_player_returns_none_when_id_absent() {
+        let game = make_game();
+        let acting_player = ActingPlayer::default();
+        let ctx = JumpUpContext::new(&game, &acting_player);
+        assert!(ctx.get_player(&game).is_none());
+    }
+}

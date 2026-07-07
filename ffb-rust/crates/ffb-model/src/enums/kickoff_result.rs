@@ -105,4 +105,15 @@ mod tests {
     fn from_name_unknown() {
         assert_eq!(KickoffResult::from_name("unknown"), None);
     }
+
+    #[test]
+    fn from_name_pitch_invasion() {
+        assert_eq!(KickoffResult::from_name("Pitch Invasion"), Some(KickoffResult::PitchInvasion));
+    }
+
+    #[test]
+    fn variants_are_distinct() {
+        assert_ne!(KickoffResult::Blitz, KickoffResult::Riot);
+        assert_ne!(KickoffResult::Charge, KickoffResult::DodgySnack);
+    }
 }

@@ -29,4 +29,16 @@ mod tests {
     fn for_name_unknown_returns_none() {
         assert_eq!(SpecialEffectFactory::default().for_name("NOT_VALID"), None);
     }
+
+    #[test]
+    fn for_name_fireball_returns_some() {
+        let f = SpecialEffectFactory::default();
+        assert!(f.for_name("fireball").is_some());
+    }
+
+    #[test]
+    fn initialize_does_not_panic() {
+        let mut f = SpecialEffectFactory::default();
+        f.initialize();
+    }
 }

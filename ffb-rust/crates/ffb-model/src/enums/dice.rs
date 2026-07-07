@@ -65,4 +65,36 @@ mod tests {
         let back: BlockKind = serde_json::from_str(&json).unwrap();
         assert_eq!(k, back);
     }
+
+    #[test]
+    fn block_kind_names() {
+        assert_eq!(BlockKind::Normal.name(), "normal");
+        assert_eq!(BlockKind::Blitz.name(), "blitz");
+        assert_eq!(BlockKind::Foul.name(), "foul");
+    }
+
+    #[test]
+    fn dice_category_kind_names() {
+        assert_eq!(DiceCategoryKind::Block.name(), "Block");
+        assert_eq!(DiceCategoryKind::D6.name(), "D6");
+        assert_eq!(DiceCategoryKind::D8.name(), "D8");
+        assert_eq!(DiceCategoryKind::Scatter.name(), "Scatter");
+        assert_eq!(DiceCategoryKind::ThrowIn.name(), "ThrowIn");
+        assert_eq!(DiceCategoryKind::Direction.name(), "Direction");
+        assert_eq!(DiceCategoryKind::ArtiZan.name(), "ArtiZan");
+    }
+
+    #[test]
+    fn dice_decoration_fields() {
+        let d = DiceDecoration {
+            coordinate_x: 3,
+            coordinate_y: 7,
+            nr_of_dice: 2,
+            block_kind: BlockKind::Normal,
+        };
+        assert_eq!(d.coordinate_x, 3);
+        assert_eq!(d.coordinate_y, 7);
+        assert_eq!(d.nr_of_dice, 2);
+        assert_eq!(d.block_kind, BlockKind::Normal);
+    }
 }

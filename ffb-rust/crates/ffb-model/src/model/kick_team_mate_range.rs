@@ -29,4 +29,20 @@ mod tests {
         assert_eq!(KickTeamMateRange::MEDIUM.get_name(), "medium");
         assert_eq!(KickTeamMateRange::SHORT.get_name(), "short");
     }
+
+    #[test]
+    fn variants_are_distinct() {
+        assert_ne!(KickTeamMateRange::LONG, KickTeamMateRange::MEDIUM);
+        assert_ne!(KickTeamMateRange::MEDIUM, KickTeamMateRange::SHORT);
+        assert_ne!(KickTeamMateRange::LONG, KickTeamMateRange::SHORT);
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        for v in [KickTeamMateRange::LONG, KickTeamMateRange::MEDIUM, KickTeamMateRange::SHORT] {
+            let json = serde_json::to_string(&v).unwrap();
+            let back: KickTeamMateRange = serde_json::from_str(&json).unwrap();
+            assert_eq!(v, back);
+        }
+    }
 }

@@ -42,4 +42,14 @@ mod tests {
     fn min_target_number_is_2() {
         assert_eq!(MIN_TARGET_NUMBER, 2);
     }
+
+    #[test]
+    fn max_target_number_is_6() {
+        assert_eq!(MAX_TARGET_NUMBER, 6);
+    }
+
+    #[test]
+    fn halves_per_game_is_2() {
+        assert_eq!(HALVES_PER_GAME, 2);
+    }
 }

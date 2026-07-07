@@ -115,4 +115,15 @@ mod tests {
     fn dwarf_can_get_even_with() {
         assert!(Keyword::DWARF.is_can_get_even_with());
     }
+
+    #[test]
+    fn for_name_vampire_returns_vampire() {
+        assert_eq!(Keyword::for_name("Vampire"), Keyword::VAMPIRE);
+    }
+
+    #[test]
+    fn variants_are_distinct() {
+        assert_ne!(Keyword::GOBLIN, Keyword::ORC);
+        assert_ne!(Keyword::HUMAN, Keyword::ELF);
+    }
 }

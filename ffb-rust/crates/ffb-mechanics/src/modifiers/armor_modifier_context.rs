@@ -32,3 +32,65 @@ impl<'a> ArmorModifierContext<'a> {
     pub fn get_foul_assists(&self) -> i32 { self.foul_assists }
     pub fn is_ttm(&self) -> bool { self.is_ttm }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::model::Player;
+
+    fn make_game() -> ffb_model::model::Game {
+        use ffb_model::enums::Rules;
+        ffb_model::model::Game::new(
+            ffb_model::model::Team {
+                id: "home".into(), name: "H".into(), race: "human".into(),
+                roster_id: "human".into(), coach: "c".into(),
+                rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+                prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+                cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
+                team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
+                vampire_lord: false, necromancer: false,
+            },
+            ffb_model::model::Team {
+                id: "away".into(), name: "A".into(), race: "human".into(),
+                roster_id: "human".into(), coach: "c".into(),
+                rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+                prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
+                cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
+                team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
+                vampire_lord: false, necromancer: false,
+            },
+            Rules::Bb2025,
+        )
+    }
+
+    #[test]
+    fn new_has_expected_fields() {
+        let game = make_game();
+        let defender = Player::default();
+        let ctx = ArmorModifierContext::new(&game, None, &defender, false, false);
+        assert!(!ctx.is_stab());
+        assert!(!ctx.is_foul());
+        assert_eq!(ctx.get_foul_assists(), 0);
+        assert!(!ctx.is_ttm());
+    }
+
+    #[test]
+    fn getters_return_set_values() {
+        let game = make_game();
+        let defender = Player::default();
+        let ctx = ArmorModifierContext::new_with_foul_assists(&game, None, &defender, false, true, 3);
+        assert!(ctx.is_foul());
+        assert_eq!(ctx.get_foul_assists(), 3);
+        assert!(!ctx.is_ttm());
+    }
+
+    #[test]
+    fn variant_constructor_sets_ttm() {
+        let game = make_game();
+        let defender = Player::default();
+        let ctx = ArmorModifierContext::new_full(&game, None, &defender, true, false, 2, true);
+        assert!(ctx.is_stab());
+        assert!(ctx.is_ttm());
+        assert_eq!(ctx.get_foul_assists(), 2);
+    }
+}

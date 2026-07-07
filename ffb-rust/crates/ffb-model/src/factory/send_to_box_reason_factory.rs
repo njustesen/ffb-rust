@@ -29,4 +29,16 @@ mod tests {
     fn for_name_unknown_returns_none() {
         assert_eq!(SendToBoxReasonFactory::default().for_name("invalid"), None);
     }
+
+    #[test]
+    fn for_name_second_known_variant() {
+        let f = SendToBoxReasonFactory::default();
+        assert!(f.for_name("foulBan").is_some());
+    }
+
+    #[test]
+    fn initialize_does_not_panic() {
+        let mut f = SendToBoxReasonFactory::default();
+        f.initialize();
+    }
 }

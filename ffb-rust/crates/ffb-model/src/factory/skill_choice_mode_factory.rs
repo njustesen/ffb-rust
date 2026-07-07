@@ -29,4 +29,16 @@ mod tests {
     fn for_name_unknown_returns_none() {
         assert_eq!(SkillChoiceModeFactory::default().for_name("invalid"), None);
     }
+
+    #[test]
+    fn for_name_wisdom_returns_some() {
+        let f = SkillChoiceModeFactory::default();
+        assert!(f.for_name("wisdomOfTheWhiteDwarf").is_some());
+    }
+
+    #[test]
+    fn initialize_does_not_panic() {
+        let mut f = SkillChoiceModeFactory::default();
+        f.initialize();
+    }
 }

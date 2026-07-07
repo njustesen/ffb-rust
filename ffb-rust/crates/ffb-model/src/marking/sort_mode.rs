@@ -39,4 +39,15 @@ mod tests {
     fn from_name_unknown_returns_none() {
         assert!(SortMode::from_name("INVALID").is_none());
     }
+
+    #[test]
+    fn variants_are_distinct() {
+        assert_ne!(SortMode::Default, SortMode::None);
+    }
+
+    #[test]
+    fn from_name_round_trip_none_variant() {
+        let mode = SortMode::from_name("NONE").unwrap();
+        assert_eq!(mode, SortMode::None);
+    }
 }

@@ -29,4 +29,16 @@ mod tests {
     fn for_name_unknown_returns_none() {
         assert_eq!(SoundIdFactory::default().for_name("invalid"), None);
     }
+
+    #[test]
+    fn for_name_touchdown_returns_some() {
+        let f = SoundIdFactory::default();
+        assert!(f.for_name("touchdown").is_some());
+    }
+
+    #[test]
+    fn initialize_does_not_panic() {
+        let mut f = SoundIdFactory::default();
+        f.initialize();
+    }
 }
