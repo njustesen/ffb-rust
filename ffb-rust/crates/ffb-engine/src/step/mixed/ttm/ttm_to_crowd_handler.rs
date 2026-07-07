@@ -166,4 +166,9 @@ mod tests {
         let _ = TtmToCrowdHandler::new();
         let _ = TtmToCrowdHandler::default();
     }
+    #[test]
+    fn new_and_default_create_equivalent_instances() {
+        let _a = TtmToCrowdHandler::new();
+        let _b = TtmToCrowdHandler::default();
+    }
 }

@@ -87,4 +87,10 @@ mod tests {
     fn dialog_id_is_penalty_shootout() {
         assert_eq!(DialogPenaltyShootoutParameter::default().get_id(), DialogId::PENALTY_SHOOTOUT);
     }
+    #[test]
+    fn empty_has_no_rolls() {
+        let p = DialogPenaltyShootoutParameter::default();
+        assert!(p.get_home_rolls().is_empty());
+        assert!(p.get_away_rolls().is_empty());
+    }
 }

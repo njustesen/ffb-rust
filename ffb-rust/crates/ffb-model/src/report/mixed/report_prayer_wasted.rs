@@ -41,4 +41,8 @@ mod tests {
 
     #[test]
     fn get_player_id() { assert_eq!(make().get_player_id(), Some("p1")); }
+    #[test]
+    fn get_name_is_nonempty() {
+        assert!(!make().get_name().is_empty());
+    }
 }

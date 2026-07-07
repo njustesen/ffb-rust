@@ -75,4 +75,14 @@ mod tests {
         assert!(!params.injury_type_name.is_empty());
         assert_eq!(params.injury_type_name, "Crowd");
     }
+    #[test]
+    fn new_context_starts_with_no_injury() {
+        use ffb_model::enums::Rules;
+        use crate::step::framework::test_team;
+        let game = ffb_model::model::game::Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let mut rng = ffb_model::util::rng::GameRng::new(0);
+        let ctx = crate::injury::InjuryContext::new(ffb_model::enums::ApothecaryMode::Defender);
+        let params = ModificationParams::new(&game, &mut rng, ctx, "Test");
+        assert!(params.new_context.injury.is_none());
+    }
 }

@@ -62,4 +62,8 @@ mod tests {
 
     #[test]
     fn is_successful() { assert!(make().is_successful()); }
+    #[test]
+    fn get_name_is_nonempty() {
+        assert!(!make().get_name().is_empty());
+    }
 }

@@ -242,4 +242,11 @@ mod tests {
         assert_eq!(ctx.get_player_id(), Some("p2"));
         assert!(ctx.drop_player_context().is_some());
     }
+    #[test]
+    fn steady_footing_from_drop_player_context_stores_context() {
+        let ctx_drop = DropPlayerContext::new();
+        let sfctx = SteadyFootingContext::from_drop_player(ctx_drop);
+        assert!(sfctx.drop_player_context().is_some());
+        assert!(sfctx.injury_type_name().is_none());
+    }
 }

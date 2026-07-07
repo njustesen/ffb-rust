@@ -52,4 +52,8 @@ mod tests {
         let end_turn = params.iter().find(|p| matches!(p, StepParameter::EndTurn(_)));
         assert!(matches!(end_turn, Some(StepParameter::EndTurn(true))));
     }
+    #[test]
+    fn is_zero_sized_unit_struct() {
+        assert_eq!(std::mem::size_of::<HitPlayerTurnOverCommand>(), 0);
+    }
 }

@@ -56,4 +56,8 @@ mod tests {
         let coord = params.iter().find(|p| matches!(p, StepParameter::ThrownPlayerCoordinate(_)));
         assert!(matches!(coord, Some(StepParameter::ThrownPlayerCoordinate(None))));
     }
+    #[test]
+    fn is_zero_sized_unit_struct() {
+        assert_eq!(std::mem::size_of::<AnimalSavageryControlCommand>(), 0);
+    }
 }

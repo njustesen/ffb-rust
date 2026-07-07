@@ -47,4 +47,9 @@ mod tests {
         let param = DialogReRollParameter { player_id: Some("p2".into()), minimum_roll: 4, ..Default::default() };
         UtilDialogParameter::validate_dialog_id(&param, DialogId::BLOCK_ROLL);
     }
+    #[test]
+    fn validate_block_roll_passes() {
+        let param = DialogBlockRollParameter { choosing_team_id: Some("t1".into()), nr_of_dice: 2, ..Default::default() };
+        UtilDialogParameter::validate_dialog_id(&param, DialogId::BLOCK_ROLL);
+    }
 }

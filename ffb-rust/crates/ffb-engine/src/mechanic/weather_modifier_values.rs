@@ -44,4 +44,8 @@ mod tests {
     fn very_sunny_pass_is_1() {
         assert_eq!(WeatherModifierValues::VERY_SUNNY_PASS, 1);
     }
+    #[test]
+    fn blizzard_and_pouring_rain_are_different_effects() {
+        assert_ne!(WeatherModifierValues::BLIZZARD_GFI_BB2025, WeatherModifierValues::BLIZZARD_PASS_BB2016);
+    }
 }

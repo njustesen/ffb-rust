@@ -43,4 +43,8 @@ mod tests {
     fn for_short_name_unknown() {
         assert_eq!(WeatherFactory.for_short_name("XXXX"), None);
     }
+    #[test]
+    fn for_name_empty_string_returns_none() {
+        assert!(WeatherFactory.for_name("").is_none());
+    }
 }

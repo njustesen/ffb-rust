@@ -122,4 +122,11 @@ mod tests {
         g.field_model.set_player_state("a1", PlayerState(PS_STANDING));
         assert_eq!(UtilDisturbingPresence::find_opposing_disturbing_presences(&g, "h1"), 0);
     }
+    #[test]
+    fn player_without_skill_not_counted() {
+        let g = make_game();
+        // No players with DisturbingPresence skill added → count is 0 from origin
+        let count = UtilDisturbingPresence::find_opposing_disturbing_presences(&g, "");
+        assert_eq!(count, 0);
+    }
 }

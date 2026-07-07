@@ -115,4 +115,8 @@ mod tests {
         assert_eq!(catchers.len(), 1);
         assert_eq!(catchers[0].id, "h1");
     }
+    #[test]
+    fn is_zero_sized_unit_struct() {
+        assert_eq!(std::mem::size_of::<UtilServerCatchScatterThrowIn>(), 0);
+    }
 }

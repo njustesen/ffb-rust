@@ -84,4 +84,8 @@ mod tests {
         assert!(cmd.was_active);
         assert!(cmd.suppress_end_turn);
     }
+    #[test]
+    fn is_zero_sized_unit_struct() {
+        assert!(std::mem::size_of::<DropPlayerFromBombCommand>() > 0);
+    }
 }

@@ -40,4 +40,8 @@ mod tests {
         let mut f = ServerStatusFactory::default();
         f.initialize();
     }
+    #[test]
+    fn for_name_empty_string_returns_none() {
+        assert!(ServerStatusFactory.for_name("").is_none());
+    }
 }

@@ -87,4 +87,14 @@ mod tests {
         params.replace_index = 1;
         assert_eq!(params.replace_index, 1);
     }
+    #[test]
+    fn new_context_starts_with_no_injury() {
+        use ffb_model::enums::Rules;
+        use crate::step::framework::test_team;
+        let game = ffb_model::model::game::Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let mut rng = ffb_model::util::rng::GameRng::new(0);
+        let ctx = crate::injury::InjuryContext::new(ffb_model::enums::ApothecaryMode::Defender);
+        let params = OldProModificationParams::new(&game, &mut rng, ctx, "Test");
+        assert!(params.base.new_context.injury.is_none());
+    }
 }

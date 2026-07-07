@@ -140,4 +140,11 @@ mod tests {
         assert!(!ps.allow_move_after_bomb);
         assert_eq!(ps.catcher_id.as_deref(), Some("c"));
     }
+    #[test]
+    fn populate_with_none_leaves_fields_unchanged() {
+        let mut dst = PassState::new();
+        dst.populate(None);
+        assert!(dst.catcher_id.is_none());
+        assert!(!dst.pass_skill_used);
+    }
 }

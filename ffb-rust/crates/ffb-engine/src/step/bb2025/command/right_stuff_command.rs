@@ -81,4 +81,8 @@ mod tests {
             );
         }
     }
+    #[test]
+    fn is_zero_sized_unit_struct() {
+        assert!(std::mem::size_of::<RightStuffCommand>() > 0);
+    }
 }

@@ -60,4 +60,9 @@ mod tests {
         game.options.set("testMode", "true");
         assert!(is_option_enabled(&game, "testMode"));
     }
+    #[test]
+    fn get_str_option_missing_returns_default() {
+        let game = make_game();
+        assert_eq!(get_str_option(&game, "MISSING", "fallback"), "fallback");
+    }
 }

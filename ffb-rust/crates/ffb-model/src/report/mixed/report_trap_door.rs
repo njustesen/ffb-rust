@@ -42,4 +42,8 @@ mod tests {
 
     #[test]
     fn is_escaped() { assert!(make().is_escaped()); }
+    #[test]
+    fn get_name_is_nonempty() {
+        assert!(!make().get_name().is_empty());
+    }
 }

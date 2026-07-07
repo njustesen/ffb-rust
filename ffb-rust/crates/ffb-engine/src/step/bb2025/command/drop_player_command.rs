@@ -69,4 +69,8 @@ mod tests {
         let params = cmd.execute(&mut game);
         assert!(params.is_empty());
     }
+    #[test]
+    fn is_zero_sized_unit_struct() {
+        assert!(std::mem::size_of::<DropPlayerCommand>() > 0);
+    }
 }

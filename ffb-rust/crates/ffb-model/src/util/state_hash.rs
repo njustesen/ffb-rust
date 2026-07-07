@@ -158,4 +158,10 @@ mod tests {
         assert_ne!(fnv1a64(b"hello"), fnv1a64(b"world"));
         assert_ne!(fnv1a64(b"hello"), fnv1a64(b"hello world"));
     }
+    #[test]
+    fn same_rules_produce_same_hash() {
+        let g1 = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2025);
+        let g2 = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2025);
+        assert_eq!(state_hash(&g1), state_hash(&g2));
+    }
 }

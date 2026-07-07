@@ -158,4 +158,8 @@ mod tests {
         assert!(step.using_break_tackle);
         assert_eq!(step.using_diving_tackle, Some(true));
     }
+    #[test]
+    fn id_is_diving_tackle() {
+        assert_eq!(StepDivingTackle::new().id(), StepId::DivingTackle);
+    }
 }

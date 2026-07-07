@@ -97,4 +97,13 @@ mod tests {
         let params = init_pushback(&mut game);
         assert!(params.iter().all(|p| !matches!(p, StepParameter::StartingPushbackSquare(_))));
     }
+    #[test]
+    fn init_pushback_with_empty_board_clears_squares() {
+        use ffb_model::enums::Rules;
+        use crate::step::framework::test_team;
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        assert!(game.field_model.pushback_squares.is_empty());
+        init_pushback(&mut game);
+        assert!(game.field_model.pushback_squares.is_empty());
+    }
 }

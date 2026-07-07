@@ -41,4 +41,8 @@ mod tests {
 
     #[test]
     fn is_under_scrutiny() { assert!(!make().is_under_scrutiny()); }
+    #[test]
+    fn get_name_is_nonempty() {
+        assert!(!make().get_name().is_empty());
+    }
 }

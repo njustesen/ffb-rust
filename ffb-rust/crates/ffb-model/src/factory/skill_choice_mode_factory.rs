@@ -41,4 +41,8 @@ mod tests {
         let mut f = SkillChoiceModeFactory::default();
         f.initialize();
     }
+    #[test]
+    fn for_name_empty_string_returns_none() {
+        assert!(SkillChoiceModeFactory.for_name("").is_none());
+    }
 }

@@ -44,4 +44,8 @@ mod tests {
 
     #[test]
     fn is_home_team_receives_prayers() { assert!(make().is_home_team_receives_prayers()); }
+    #[test]
+    fn get_name_is_nonempty() {
+        assert!(!make().get_name().is_empty());
+    }
 }

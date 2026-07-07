@@ -58,4 +58,8 @@ mod tests {
 
     #[test]
     fn get_home_team_won_penalty() { assert_eq!(make().get_home_team_won_penalty(), Some(true)); }
+    #[test]
+    fn get_name_is_nonempty() {
+        assert!(!make().get_name().is_empty());
+    }
 }

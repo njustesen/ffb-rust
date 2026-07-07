@@ -89,4 +89,8 @@ mod tests {
 
     #[test]
     fn get_knockout_recoveries() { assert_eq!(make().get_knockout_recoveries().len(), 1); }
+    #[test]
+    fn get_name_is_nonempty() {
+        assert!(!make().get_name().is_empty());
+    }
 }

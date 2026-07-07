@@ -47,4 +47,8 @@ mod tests {
 
     #[test]
     fn get_direction() { assert_eq!(make().get_direction(), Some(Direction::Northeast)); }
+    #[test]
+    fn get_name_is_nonempty() {
+        assert!(!make().get_name().is_empty());
+    }
 }

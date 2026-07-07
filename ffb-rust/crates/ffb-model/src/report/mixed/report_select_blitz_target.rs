@@ -40,4 +40,8 @@ mod tests {
 
     #[test]
     fn get_defender() { assert_eq!(make().get_defender(), Some("d1")); }
+    #[test]
+    fn get_name_is_nonempty() {
+        assert!(!make().get_name().is_empty());
+    }
 }
