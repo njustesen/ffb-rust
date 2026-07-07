@@ -141,4 +141,27 @@ mod tests {
         let result = sel.select_players(&game, "home", 2, &mut GameRng::new(0), &[]);
         assert_eq!(result.len(), 2);
     }
+
+    #[test]
+    fn opponent_selector_selects_from_home_when_away_prays() {
+        let mut game = make_game();
+        game.turn_mode = TurnMode::StartGame;
+        add_player(&mut game, "home", "h1", PlayerState::new(PS_RESERVE));
+        // "away" is praying → opponent is "home"
+        let sel = OpponentPlayerSelector::new();
+        let result = sel.select_players(&game, "away", 1, &mut GameRng::new(0), &[]);
+        assert_eq!(result, vec!["h1".to_string()]);
+    }
+
+    #[test]
+    fn opponent_selector_returns_empty_when_no_opponent_players() {
+        let mut game = make_game();
+        game.turn_mode = TurnMode::StartGame;
+        // Only home players added; "away" has no players
+        add_player(&mut game, "home", "h2", PlayerState::new(PS_RESERVE));
+        // Praying team is "home" → opponent is "away" → empty
+        let sel = OpponentPlayerSelector::new();
+        let result = sel.select_players(&game, "home", 1, &mut GameRng::new(0), &[]);
+        assert!(result.is_empty());
+    }
 }

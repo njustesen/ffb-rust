@@ -125,4 +125,24 @@ mod tests {
         let result = init_effect_random_selection(&mut state, &mut game, &mut GameRng::new(0), "home", "BAD_HABITS", 3, &stub, &[]);
         assert!(result);
     }
+
+    #[test]
+    fn remove_effect_on_player_without_enhancement_is_safe() {
+        let mut game = make_game();
+        // Player h2 has no enhancement — remove should not panic.
+        add_player_reserve(&mut game, "home", "h2");
+        remove_effect_internal_random_selection(&mut game, "home", "GREASY_CLEATS");
+        assert!(!game.field_model.has_prayer_enhancement("h2", "GREASY_CLEATS"));
+    }
+
+    #[test]
+    fn init_effect_prayer_name_is_used_as_enhancement_key() {
+        let mut state = PrayerState::new();
+        let mut game = make_game();
+        game.turn_mode = ffb_model::enums::TurnMode::StartGame;
+        add_player_reserve(&mut game, "home", "h3");
+        let selector = BB2020Selector::new();
+        init_effect_random_selection(&mut state, &mut game, &mut GameRng::new(0), "home", "KNUCKLE_DUSTERS", 1, &selector, &[]);
+        assert!(game.field_model.has_prayer_enhancement("h3", "KNUCKLE_DUSTERS"));
+    }
 }

@@ -110,4 +110,23 @@ mod tests {
         let result = OpponentPlayerSelector::INSTANCE.select_players(&game, "home", 0, &mut GameRng::new(0), &[]);
         assert!(result.is_empty());
     }
+
+    #[test]
+    fn respects_nr_of_players_limit() {
+        let mut game = make_game();
+        for i in 0..3 {
+            let id = format!("a{i}");
+            add_player(&mut game, "away", &id);
+        }
+        let result = OpponentPlayerSelector::new().select_players(&game, "home", 2, &mut GameRng::new(0), &[]);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn returns_empty_when_opponent_has_no_players() {
+        let mut game = make_game();
+        // "away" prays; opponent is "home" — no home players added
+        let result = OpponentPlayerSelector::new().select_players(&game, "away", 1, &mut GameRng::new(0), &[]);
+        assert!(result.is_empty());
+    }
 }

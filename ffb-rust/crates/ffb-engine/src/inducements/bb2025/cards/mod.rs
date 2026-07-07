@@ -42,4 +42,16 @@ mod tests {
         ];
         assert_eq!(handlers.len(), 8);
     }
+
+    #[test]
+    fn bb2025_distract_handler_is_accessible() {
+        let h: Box<dyn CardHandler> = Box::new(DistractHandler::new());
+        assert_eq!(h.handler_key_name(), "DISTRACT");
+    }
+
+    #[test]
+    fn bb2025_illegal_substitution_handler_key_name() {
+        let h: Box<dyn CardHandler> = Box::new(IllegalSubstitutionHandler::new());
+        assert_eq!(h.handler_key_name(), "ILLEGAL_SUBSTITUTION");
+    }
 }

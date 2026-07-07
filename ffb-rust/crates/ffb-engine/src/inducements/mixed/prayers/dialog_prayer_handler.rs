@@ -46,4 +46,18 @@ mod tests {
         let game = make_game();
         assert!(!init_effect_dialog(&mut state, &game, "team1", "IRON_MAN"));
     }
+
+    #[test]
+    fn init_effect_dialog_returns_false_for_stiletto() {
+        let mut state = PrayerState::new();
+        let game = make_game();
+        assert!(!init_effect_dialog(&mut state, &game, "away", "STILETTO"));
+    }
+
+    #[test]
+    fn init_effect_dialog_returns_false_for_knuckle_dusters() {
+        let mut state = PrayerState::new();
+        let game = make_game();
+        assert!(!init_effect_dialog(&mut state, &game, "home", "KNUCKLE_DUSTERS"));
+    }
 }

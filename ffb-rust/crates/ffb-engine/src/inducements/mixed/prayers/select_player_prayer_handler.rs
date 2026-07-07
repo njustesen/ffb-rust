@@ -67,4 +67,17 @@ mod tests {
         init_effect_select_player(&mut state, &game, "team1", "GREASY_CLEATS");
         assert!(state.get_additional_completion_spp_teams().is_empty());
     }
+
+    #[test]
+    fn init_effect_returns_false_for_stiletto() {
+        let mut state = PrayerState::new();
+        let game = make_game();
+        assert!(!init_effect_select_player(&mut state, &game, "away", "STILETTO"));
+    }
+
+    #[test]
+    fn apply_selection_with_real_prayer_name_is_safe() {
+        let mut game = make_game();
+        apply_selection_select_player(&mut game, "player_abc", "IRON_MAN");
+    }
 }

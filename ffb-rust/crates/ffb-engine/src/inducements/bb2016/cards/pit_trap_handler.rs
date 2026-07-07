@@ -59,4 +59,19 @@ mod tests {
         let h = PitTrapHandler;
         assert_eq!(h.get_name(), "PitTrapHandler");
     }
+
+    #[test]
+    fn handler_key_name_is_pit_trap() {
+        let h = PitTrapHandler::new();
+        assert_eq!(h.handler_key_name(), "PIT_TRAP");
+    }
+
+    #[test]
+    fn activate_on_game_returns_true() {
+        let mut game = make_game();
+        let h = PitTrapHandler::new();
+        let card = Card::new("Pit Trap", Some("PIT_TRAP"));
+        let result = h.activate_on_game(&mut game, &card, "player1", &mut ffb_model::util::rng::GameRng::new(0));
+        assert!(result);
+    }
 }

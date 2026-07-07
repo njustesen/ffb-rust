@@ -68,4 +68,18 @@ mod tests {
         assert_eq!(cloned.get_player_id(), sel.get_player_id());
         assert_eq!(cloned.get_team_id(), sel.get_team_id());
     }
+
+    #[test]
+    fn default_and_new_are_equivalent() {
+        let a = PrayerDialogSelection::new();
+        let b = PrayerDialogSelection::default();
+        assert_eq!(a.get_player_id(), b.get_player_id());
+        assert_eq!(a.get_team_id(), b.get_team_id());
+    }
+
+    #[test]
+    fn with_player_and_team_team_id_is_correct() {
+        let sel = PrayerDialogSelection::with_player_and_team("px", "tx");
+        assert_eq!(sel.get_team_id(), Some("tx"));
+    }
 }
