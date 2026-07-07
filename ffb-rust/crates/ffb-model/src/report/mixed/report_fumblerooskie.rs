@@ -37,4 +37,14 @@ mod tests {
 
     #[test]
     fn is_used() { assert!(make().is_used()); }
+
+    #[test]
+    fn get_player_id() { assert_eq!(make().get_player_id(), Some("p1")); }
+
+    #[test]
+    fn not_used_with_none_player() {
+        let r = ReportFumblerooskie::new(None, false);
+        assert!(!r.is_used());
+        assert_eq!(r.get_player_id(), None);
+    }
 }

@@ -55,4 +55,17 @@ mod tests {
         assert_eq!(r.get_fan_factor_modifier_home(), 1);
         assert_eq!(r.get_fan_factor_modifier_away(), -1);
     }
+
+    #[test]
+    fn away_roll_stored() {
+        let r = make();
+        assert_eq!(r.get_fan_factor_roll_away(), &[2, 5]);
+    }
+
+    #[test]
+    fn zero_modifiers() {
+        let r = ReportFanFactorRollPostMatch::new(vec![1], 0, vec![2], 0);
+        assert_eq!(r.get_fan_factor_modifier_home(), 0);
+        assert_eq!(r.get_fan_factor_modifier_away(), 0);
+    }
 }

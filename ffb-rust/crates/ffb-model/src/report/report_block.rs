@@ -41,4 +41,15 @@ mod tests {
     fn get_defender_id() {
         assert_eq!(make().get_defender_id(), "def1");
     }
+
+    #[test]
+    fn different_defender_id() {
+        let r = ReportBlock::new("def99".into());
+        assert_eq!(r.get_defender_id(), "def99");
+    }
+
+    #[test]
+    fn report_name_is_block() {
+        assert_eq!(ReportBlock::new("x".into()).get_name(), "block");
+    }
 }

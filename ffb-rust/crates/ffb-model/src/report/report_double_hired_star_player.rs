@@ -46,4 +46,16 @@ mod tests {
     fn star_player_name_getter() {
         assert_eq!(make().get_star_player_name(), "Griff Oberwald");
     }
+
+    #[test]
+    fn different_star_player() {
+        let r = ReportDoubleHiredStarPlayer::new("Morg 'n' Thorg".into());
+        assert_eq!(r.get_star_player_name(), "Morg 'n' Thorg");
+    }
+
+    #[test]
+    fn star_player_name_matches_field() {
+        let r = make();
+        assert_eq!(r.get_star_player_name(), r.star_player_name.as_str());
+    }
 }

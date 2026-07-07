@@ -65,4 +65,19 @@ mod tests {
         assert_eq!(r.get_rolls(), &[3, 5]);
         assert_eq!(r.get_defectings(), &[true, false]);
     }
+
+    #[test]
+    fn empty_lists() {
+        let r = ReportDefectingPlayers::new(vec![], vec![], vec![]);
+        assert_eq!(r.get_player_ids().len(), 0);
+        assert_eq!(r.get_rolls().len(), 0);
+        assert_eq!(r.get_defectings().len(), 0);
+    }
+
+    #[test]
+    fn single_defecting_player() {
+        let r = ReportDefectingPlayers::new(vec!["p3".into()], vec![1], vec![true]);
+        assert_eq!(r.get_player_ids(), &["p3"]);
+        assert_eq!(r.get_defectings(), &[true]);
+    }
 }

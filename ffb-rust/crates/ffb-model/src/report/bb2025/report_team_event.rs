@@ -45,4 +45,17 @@ mod tests {
         assert_eq!(r.get_team_id(), "team1");
         assert_eq!(r.get_event_message(), "Player banned!");
     }
+
+    #[test]
+    fn different_message() {
+        let r = ReportTeamEvent::new("team2".into(), "Mascot injured!".into());
+        assert_eq!(r.get_event_message(), "Mascot injured!");
+        assert_eq!(r.get_team_id(), "team2");
+    }
+
+    #[test]
+    fn empty_message() {
+        let r = ReportTeamEvent::new("team3".into(), "".into());
+        assert_eq!(r.get_event_message(), "");
+    }
 }

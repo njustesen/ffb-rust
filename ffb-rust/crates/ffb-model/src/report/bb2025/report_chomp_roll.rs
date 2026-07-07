@@ -65,4 +65,19 @@ mod tests {
         assert_eq!(r.get_chompee(), "chompee1");
         assert!(r.is_successful());
     }
+
+    #[test]
+    fn minimum_roll_and_rerolled() {
+        let r = make();
+        assert_eq!(r.get_minimum_roll(), 3);
+        assert!(!r.is_re_rolled());
+    }
+
+    #[test]
+    fn unsuccessful_with_player_id() {
+        let r = ReportChompRoll::new(Some("p2".into()), false, 2, 4, true, "c1".into(), "c2".into());
+        assert!(!r.is_successful());
+        assert_eq!(r.get_player_id(), Some("p2"));
+        assert!(r.is_re_rolled());
+    }
 }

@@ -52,4 +52,17 @@ mod tests {
 
     #[test]
     fn get_roll_home() { assert_eq!(make().get_roll_home(), 3); }
+
+    #[test]
+    fn get_roll_away_and_conceded_team() {
+        assert_eq!(make().get_roll_away(), 2);
+        assert_eq!(make().get_conceded_team(), Some("away"));
+    }
+
+    #[test]
+    fn is_conceded_and_modifiers() {
+        assert!(make().is_conceded());
+        assert_eq!(make().get_modifier_home(), 1);
+        assert_eq!(make().get_modifier_away(), 0);
+    }
 }

@@ -98,4 +98,19 @@ mod tests {
         assert!(!r.is_right_stuff_cancels_tackle());
         assert!(r.is_piling_on_without_modifier());
     }
+
+    #[test]
+    fn no_overtime() {
+        let r = ReportGameOptions::new(false, 30, false, false, false, false);
+        assert!(!r.is_overtime());
+        assert_eq!(r.get_turntime(), 30);
+    }
+
+    #[test]
+    fn all_flags_true() {
+        let r = ReportGameOptions::new(true, 120, true, true, true, true);
+        assert!(r.is_sneaky_git_as_foul_guard());
+        assert!(r.is_right_stuff_cancels_tackle());
+        assert!(r.is_piling_on_without_modifier());
+    }
 }

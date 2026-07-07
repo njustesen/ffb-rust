@@ -37,4 +37,16 @@ mod tests {
 
     #[test]
     fn get_prayer() { assert_eq!(make().get_prayer(), Some("PRAYER_OF_DEATH")); }
+
+    #[test]
+    fn prayer_none() {
+        let r = ReportPrayerEnd::new(None);
+        assert!(r.get_prayer().is_none());
+    }
+
+    #[test]
+    fn different_prayer_name() {
+        let r = ReportPrayerEnd::new(Some("HAND_OF_GOD".into()));
+        assert_eq!(r.get_prayer(), Some("HAND_OF_GOD"));
+    }
 }

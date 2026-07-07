@@ -51,4 +51,19 @@ mod tests {
         assert_eq!(r.get_roll_away(), 3);
         assert_eq!(r.get_re_rolls_left_away(), 1);
     }
+
+    #[test]
+    fn zero_rerolls_left() {
+        let r = ReportPenaltyShootout::new(5, 0, 6, 0);
+        assert_eq!(r.get_re_rolls_left_home(), 0);
+        assert_eq!(r.get_re_rolls_left_away(), 0);
+    }
+
+    #[test]
+    fn asymmetric_values() {
+        let r = ReportPenaltyShootout::new(1, 3, 6, 0);
+        assert_eq!(r.get_roll_home(), 1);
+        assert_eq!(r.get_roll_away(), 6);
+        assert_eq!(r.get_re_rolls_left_home(), 3);
+    }
 }

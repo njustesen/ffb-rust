@@ -52,4 +52,18 @@ mod tests {
 
     #[test]
     fn get_defender_id() { assert_eq!(make().get_defender_id(), Some("d1")); }
+
+    #[test]
+    fn minimum_roll_and_rerolled() {
+        let r = ReportProjectileVomit::new(Some("p1".into()), true, 4, 3, true, None);
+        assert_eq!(r.get_minimum_roll(), 3);
+        assert!(r.is_re_rolled());
+    }
+
+    #[test]
+    fn unsuccessful_no_defender() {
+        let r = ReportProjectileVomit::new(None, false, 2, 4, false, None);
+        assert!(!r.is_successful());
+        assert!(r.get_defender_id().is_none());
+    }
 }

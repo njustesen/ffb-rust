@@ -50,4 +50,18 @@ mod tests {
         assert_eq!(r.get_minimum_roll(), 4);
         assert!(r.is_successful());
     }
+
+    #[test]
+    fn roll_value() {
+        let r = make();
+        assert_eq!(r.get_roll(), 5);
+    }
+
+    #[test]
+    fn unsuccessful_roll_below_minimum() {
+        let r = ReportTeamCaptainRoll::new("team2".into(), 4, 3, false);
+        assert!(!r.is_successful());
+        assert_eq!(r.get_roll(), 3);
+        assert_eq!(r.get_team_id(), "team2");
+    }
 }

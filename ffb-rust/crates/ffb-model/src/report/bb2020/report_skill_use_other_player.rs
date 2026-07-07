@@ -50,4 +50,18 @@ mod tests {
         assert_eq!(r.get_other_player_id(), "p2");
         assert_eq!(r.get_skill(), "Block");
     }
+
+    #[test]
+    fn skill_use_field() {
+        let r = make();
+        assert_eq!(r.get_skill_use(), "USE");
+    }
+
+    #[test]
+    fn different_skill_and_use() {
+        let r = ReportSkillUseOtherPlayer::new("p3".into(), "Dodge".into(), "CANCEL".into(), "p4".into());
+        assert_eq!(r.get_skill(), "Dodge");
+        assert_eq!(r.get_skill_use(), "CANCEL");
+        assert_eq!(r.get_other_player_id(), "p4");
+    }
 }

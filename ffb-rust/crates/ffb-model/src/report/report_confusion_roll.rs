@@ -62,4 +62,18 @@ mod tests {
         assert!(r.base.is_successful());
         assert_eq!(r.base.get_roll(), 4);
     }
+
+    #[test]
+    fn no_confusion_skill() {
+        let r = ReportConfusionRoll::new(Some("p2".into()), false, 1, 3, false, None);
+        assert_eq!(r.get_confusion_skill(), None);
+        assert!(!r.base.is_successful());
+    }
+
+    #[test]
+    fn rerolled_confusion() {
+        let r = ReportConfusionRoll::new(Some("p1".into()), true, 5, 2, true, Some("Bone Head".into()));
+        assert!(r.base.is_re_rolled());
+        assert_eq!(r.get_confusion_skill(), Some("Bone Head"));
+    }
 }

@@ -38,4 +38,14 @@ mod tests {
 
     #[test]
     fn get_direction() { assert_eq!(make().get_direction(), Some(Direction::North)); }
+
+    #[test]
+    fn get_player_id() { assert_eq!(make().get_player_id(), Some("p1")); }
+
+    #[test]
+    fn no_player_no_direction() {
+        let r = ReportPlaceBallDirection::new(None, None);
+        assert!(r.get_player_id().is_none());
+        assert!(r.get_direction().is_none());
+    }
 }

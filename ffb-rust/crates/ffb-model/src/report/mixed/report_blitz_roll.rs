@@ -39,4 +39,10 @@ mod tests {
 
     #[test]
     fn get_roll() { assert_eq!(make().get_roll(), 4); }
+
+    #[test]
+    fn get_team_id() { assert_eq!(make().get_team_id(), Some("team1")); }
+
+    #[test]
+    fn get_amount() { assert_eq!(make().get_amount(), 2); }
 }

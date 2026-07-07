@@ -45,4 +45,16 @@ mod tests {
         assert_eq!(r.get_team_id(), "team1");
         assert!(r.is_receive_choice());
     }
+
+    #[test]
+    fn different_team_id() {
+        let r = ReportReceiveChoice::new("team2".into(), false);
+        assert_eq!(r.get_team_id(), "team2");
+    }
+
+    #[test]
+    fn receive_choice_false() {
+        let r = ReportReceiveChoice::new("team1".into(), false);
+        assert!(!r.is_receive_choice());
+    }
 }

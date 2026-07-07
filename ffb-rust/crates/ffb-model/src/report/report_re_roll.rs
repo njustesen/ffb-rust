@@ -56,4 +56,17 @@ mod tests {
         assert!(r.is_successful());
         assert_eq!(r.get_roll(), 4);
     }
+
+    #[test]
+    fn no_player_id() {
+        let r = ReportReRoll::new(None, ReRollSource::new("teamReRoll"), true, 3);
+        assert_eq!(r.get_player_id(), None);
+    }
+
+    #[test]
+    fn unsuccessful_roll() {
+        let r = ReportReRoll::new(Some("p2".into()), ReRollSource::new("teamReRoll"), false, 2);
+        assert!(!r.is_successful());
+        assert_eq!(r.get_roll(), 2);
+    }
 }

@@ -36,4 +36,16 @@ mod tests {
 
     #[test]
     fn get_skill_id_none() { assert!(make().get_skill_id().is_none()); }
+
+    #[test]
+    fn get_skill_id_some() {
+        let r = ReportModifiedDodgeResultSuccessful::new(Some(SkillId::Dodge));
+        assert_eq!(r.get_skill_id(), Some(SkillId::Dodge));
+    }
+
+    #[test]
+    fn none_construction() {
+        let r = ReportModifiedDodgeResultSuccessful::new(None);
+        assert!(r.get_skill_id().is_none());
+    }
 }

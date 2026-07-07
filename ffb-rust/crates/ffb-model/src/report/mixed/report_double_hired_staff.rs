@@ -35,4 +35,16 @@ mod tests {
 
     #[test]
     fn get_staff_name() { assert_eq!(make().get_staff_name(), Some("apothecary")); }
+
+    #[test]
+    fn none_staff_name() {
+        let r = ReportDoubleHiredStaff::new(None);
+        assert_eq!(r.get_staff_name(), None);
+    }
+
+    #[test]
+    fn different_staff_name() {
+        let r = ReportDoubleHiredStaff::new(Some("cheerleader".into()));
+        assert_eq!(r.get_staff_name(), Some("cheerleader"));
+    }
 }

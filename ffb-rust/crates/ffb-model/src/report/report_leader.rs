@@ -55,4 +55,16 @@ mod tests {
         assert_eq!(r.get_team_id(), "team1");
         assert_eq!(r.get_leader_state(), LeaderState::Available);
     }
+
+    #[test]
+    fn different_team_id() {
+        let r = ReportLeader::new("team2".into(), LeaderState::Available);
+        assert_eq!(r.get_team_id(), "team2");
+    }
+
+    #[test]
+    fn used_leader_state() {
+        let r = ReportLeader::new("team1".into(), LeaderState::Used);
+        assert_eq!(r.get_leader_state(), LeaderState::Used);
+    }
 }

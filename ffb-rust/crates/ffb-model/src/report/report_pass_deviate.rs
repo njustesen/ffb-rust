@@ -94,4 +94,16 @@ mod tests {
         assert_eq!(r.get_roll_scatter_distance(), 3);
         assert!(!r.is_ttm());
     }
+
+    #[test]
+    fn ttm_flag() {
+        let r = ReportPassDeviate::new(FieldCoordinate::new(0, 0), Direction::North, 1, 2, true);
+        assert!(r.is_ttm());
+    }
+
+    #[test]
+    fn ball_coordinate_end() {
+        let r = make();
+        assert_eq!(r.get_ball_coordinate_end(), &FieldCoordinate::new(10, 5));
+    }
 }

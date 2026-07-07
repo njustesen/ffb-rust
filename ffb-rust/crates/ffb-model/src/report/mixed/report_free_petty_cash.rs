@@ -37,4 +37,14 @@ mod tests {
 
     #[test]
     fn get_gold() { assert_eq!(make().get_gold(), 50000); }
+
+    #[test]
+    fn get_team_id() { assert_eq!(make().get_team_id(), Some("team1")); }
+
+    #[test]
+    fn none_team_id() {
+        let r = ReportFreePettyCash::new(None, 10000);
+        assert_eq!(r.get_team_id(), None);
+        assert_eq!(r.get_gold(), 10000);
+    }
 }

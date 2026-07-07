@@ -48,4 +48,18 @@ mod tests {
 
     #[test]
     fn get_player_id() { assert_eq!(make().get_player_id(), Some("p1")); }
+
+    #[test]
+    fn minimum_roll_and_rerolled() {
+        let r = ReportLookIntoMyEyesRoll::new(Some("p1".into()), true, 4, 3, true);
+        assert_eq!(r.get_minimum_roll(), 3);
+        assert!(r.is_re_rolled());
+    }
+
+    #[test]
+    fn unsuccessful_roll_value() {
+        let r = ReportLookIntoMyEyesRoll::new(None, false, 2, 4, false);
+        assert!(!r.is_successful());
+        assert_eq!(r.get_roll(), 2);
+    }
 }

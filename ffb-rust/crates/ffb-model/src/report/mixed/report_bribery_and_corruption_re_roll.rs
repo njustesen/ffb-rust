@@ -37,4 +37,14 @@ mod tests {
 
     #[test]
     fn get_action() { assert_eq!(make().get_action(), "USE"); }
+
+    #[test]
+    fn get_team_id() { assert_eq!(make().get_team_id(), Some("team1")); }
+
+    #[test]
+    fn none_team_id() {
+        let r = ReportBriberyAndCorruptionReRoll::new(None, "DECLINE".into());
+        assert_eq!(r.get_team_id(), None);
+        assert_eq!(r.get_action(), "DECLINE");
+    }
 }

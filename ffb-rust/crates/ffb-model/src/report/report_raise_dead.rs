@@ -48,4 +48,17 @@ mod tests {
         assert_eq!(r.get_position(), Some("Zombie"));
         assert!(r.is_nurgles_rot());
     }
+
+    #[test]
+    fn no_position() {
+        let r = ReportRaiseDead::new("p2".into(), None, false);
+        assert_eq!(r.get_position(), None);
+    }
+
+    #[test]
+    fn nurgles_rot_false() {
+        let r = ReportRaiseDead::new("p3".into(), Some("Ghoul".into()), false);
+        assert!(!r.is_nurgles_rot());
+        assert_eq!(r.get_player_id(), "p3");
+    }
 }

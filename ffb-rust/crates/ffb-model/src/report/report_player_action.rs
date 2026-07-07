@@ -46,4 +46,17 @@ mod tests {
         assert_eq!(r.get_acting_player_id(), "p1");
         assert_eq!(r.get_player_action(), PlayerAction::Move);
     }
+
+    #[test]
+    fn different_player_id() {
+        let r = ReportPlayerAction::new("p99".into(), PlayerAction::Move);
+        assert_eq!(r.get_acting_player_id(), "p99");
+    }
+
+    #[test]
+    fn block_action() {
+        let r = ReportPlayerAction::new("p2".into(), PlayerAction::Block);
+        assert_eq!(r.get_player_action(), PlayerAction::Block);
+        assert_eq!(r.get_acting_player_id(), "p2");
+    }
 }

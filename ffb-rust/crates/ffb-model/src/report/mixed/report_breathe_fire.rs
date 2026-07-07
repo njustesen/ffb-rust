@@ -63,4 +63,13 @@ mod tests {
 
     #[test]
     fn get_result() { assert_eq!(make().get_result(), "HIT"); }
+
+    #[test]
+    fn get_defender_id_and_successful() {
+        assert_eq!(make().get_defender_id(), Some("d1"));
+        assert!(make().is_successful());
+    }
+
+    #[test]
+    fn strong_opponent_false() { assert!(!make().is_strong_opponent()); }
 }

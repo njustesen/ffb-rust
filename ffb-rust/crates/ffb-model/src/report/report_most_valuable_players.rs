@@ -65,4 +65,20 @@ mod tests {
         assert_eq!(r.get_player_ids_home(), &["h1", "h2"]);
         assert_eq!(r.get_player_ids_away(), &["a1"]);
     }
+
+    #[test]
+    fn add_player_ids() {
+        let mut r = ReportMostValuablePlayers::new(vec![], vec![]);
+        r.add_player_id_home("h3".into());
+        r.add_player_id_away("a2".into());
+        assert_eq!(r.get_player_ids_home(), &["h3"]);
+        assert_eq!(r.get_player_ids_away(), &["a2"]);
+    }
+
+    #[test]
+    fn empty_lists() {
+        let r = ReportMostValuablePlayers::new(vec![], vec![]);
+        assert!(r.get_player_ids_home().is_empty());
+        assert!(r.get_player_ids_away().is_empty());
+    }
 }

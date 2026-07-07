@@ -45,4 +45,14 @@ mod tests {
     fn get_coach() {
         assert_eq!(make().get_coach(), "CoachA");
     }
+
+    #[test]
+    fn coin_throw_heads() {
+        assert!(make().is_coin_throw_heads());
+    }
+
+    #[test]
+    fn coin_choice_tails() {
+        assert!(!make().is_coin_choice_heads());
+    }
 }

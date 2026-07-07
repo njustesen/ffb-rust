@@ -37,4 +37,14 @@ mod tests {
 
     #[test]
     fn get_player_id() { assert_eq!(make().get_player_id(), Some("p1")); }
+
+    #[test]
+    fn get_defender_id() { assert_eq!(make().get_defender_id(), Some("d1")); }
+
+    #[test]
+    fn none_ids() {
+        let r = ReportIndomitable::new(None, None);
+        assert_eq!(r.get_player_id(), None);
+        assert_eq!(r.get_defender_id(), None);
+    }
 }

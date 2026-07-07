@@ -45,4 +45,18 @@ mod tests {
     fn get_catcher_id() {
         assert_eq!(make().get_catcher_id(), "p1");
     }
+
+    #[test]
+    fn explodes_and_roll() {
+        let r = make();
+        assert!(r.explodes());
+        assert_eq!(r.get_roll(), 5);
+    }
+
+    #[test]
+    fn does_not_explode() {
+        let r = ReportBombExplodesAfterCatch::new("p2".into(), false, 3);
+        assert!(!r.explodes());
+        assert_eq!(r.get_catcher_id(), "p2");
+    }
 }

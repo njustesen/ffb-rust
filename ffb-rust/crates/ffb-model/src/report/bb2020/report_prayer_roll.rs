@@ -37,4 +37,14 @@ mod tests {
     fn fields() {
         assert_eq!(ReportPrayerRoll::new(5).get_roll(), 5);
     }
+
+    #[test]
+    fn roll_minimum() {
+        assert_eq!(ReportPrayerRoll::new(1).get_roll(), 1);
+    }
+
+    #[test]
+    fn roll_maximum() {
+        assert_eq!(ReportPrayerRoll::new(6).get_roll(), 6);
+    }
 }

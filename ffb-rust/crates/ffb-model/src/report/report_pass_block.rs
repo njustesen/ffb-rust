@@ -54,4 +54,17 @@ mod tests {
         assert_eq!(r.get_team_id(), "team1");
         assert!(r.is_pass_block_available());
     }
+
+    #[test]
+    fn pass_block_unavailable() {
+        let r = ReportPassBlock::new("team2".into(), false);
+        assert!(!r.is_pass_block_available());
+        assert_eq!(r.get_team_id(), "team2");
+    }
+
+    #[test]
+    fn different_team_id() {
+        let r = ReportPassBlock::new("teamX".into(), true);
+        assert_eq!(r.get_team_id(), "teamX");
+    }
 }

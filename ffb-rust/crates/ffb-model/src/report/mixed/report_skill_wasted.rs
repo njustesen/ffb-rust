@@ -40,4 +40,14 @@ mod tests {
 
     #[test]
     fn get_player_id() { assert_eq!(make().get_player_id(), Some("p1")); }
+
+    #[test]
+    fn get_skill_none() { assert!(make().get_skill().is_none()); }
+
+    #[test]
+    fn get_skill_some() {
+        let r = ReportSkillWasted::new(Some("p2".into()), Some(SkillId::Dodge));
+        assert_eq!(r.get_skill(), Some(SkillId::Dodge));
+        assert_eq!(r.get_player_id(), Some("p2"));
+    }
 }

@@ -45,4 +45,17 @@ mod tests {
         assert_eq!(r.get_roll(), 3);
         assert_eq!(r.get_turn_modifier(), -1);
     }
+
+    #[test]
+    fn positive_turn_modifier() {
+        let r = ReportKickoffRiot::new(5, 1);
+        assert_eq!(r.get_roll(), 5);
+        assert_eq!(r.get_turn_modifier(), 1);
+    }
+
+    #[test]
+    fn zero_modifier() {
+        let r = ReportKickoffRiot::new(4, 0);
+        assert_eq!(r.get_turn_modifier(), 0);
+    }
 }

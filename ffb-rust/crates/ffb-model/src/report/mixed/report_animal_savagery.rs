@@ -37,4 +37,14 @@ mod tests {
 
     #[test]
     fn get_attacker_id() { assert_eq!(make().get_attacker_id(), Some("a1")); }
+
+    #[test]
+    fn get_defender_id() { assert_eq!(make().get_defender_id(), Some("d1")); }
+
+    #[test]
+    fn none_ids() {
+        let r = ReportAnimalSavagery::new(None, None);
+        assert_eq!(r.get_attacker_id(), None);
+        assert_eq!(r.get_defender_id(), None);
+    }
 }

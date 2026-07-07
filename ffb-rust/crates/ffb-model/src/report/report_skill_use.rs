@@ -59,4 +59,18 @@ mod tests {
         assert!(r.is_used());
         assert_eq!(r.get_skill_use(), SkillUse::BRING_DOWN_OPPONENT);
     }
+
+    #[test]
+    fn not_used() {
+        let r = ReportSkillUse::new(Some("p2".into()), SkillId::Block, false, SkillUse::WOULD_NOT_HELP);
+        assert!(!r.is_used());
+        assert_eq!(r.get_skill_use(), SkillUse::WOULD_NOT_HELP);
+    }
+
+    #[test]
+    fn no_player_id() {
+        let r = ReportSkillUse::new(None, SkillId::Block, true, SkillUse::STOP_OPPONENT);
+        assert_eq!(r.get_player_id(), None);
+        assert_eq!(r.get_skill_use(), SkillUse::STOP_OPPONENT);
+    }
 }

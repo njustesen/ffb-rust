@@ -46,4 +46,16 @@ mod tests {
     fn defender_id_getter() {
         assert_eq!(make().get_defender_id(), "defender1");
     }
+
+    #[test]
+    fn different_defender_id() {
+        let r = ReportFoul::new("defender99".into());
+        assert_eq!(r.get_defender_id(), "defender99");
+    }
+
+    #[test]
+    fn defender_id_matches_field() {
+        let r = make();
+        assert_eq!(r.get_defender_id(), r.defender_id.as_str());
+    }
 }

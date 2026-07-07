@@ -47,4 +47,17 @@ mod tests {
         assert_eq!(r.get_roll_home(), 4);
         assert_eq!(r.get_players_hit().len(), 2);
     }
+
+    #[test]
+    fn roll_away_stored() {
+        let r = make();
+        assert_eq!(r.get_roll_away(), 2);
+    }
+
+    #[test]
+    fn players_hit_contents() {
+        let r = make();
+        assert_eq!(r.get_players_hit()[0], "p1");
+        assert_eq!(r.get_players_hit()[1], "p2");
+    }
 }

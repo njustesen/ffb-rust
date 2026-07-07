@@ -52,4 +52,19 @@ mod tests {
         assert!(r.is_successful());
         assert!(!r.is_fallback());
     }
+
+    #[test]
+    fn minimum_roll_and_roll() {
+        let r = make();
+        assert_eq!(r.get_minimum_roll(), 4);
+        assert_eq!(r.get_roll(), 5);
+    }
+
+    #[test]
+    fn fallback_and_unsuccessful() {
+        let r = ReportMascotUsed::new("team2".into(), 5, 3, false, true);
+        assert!(!r.is_successful());
+        assert!(r.is_fallback());
+        assert_eq!(r.get_team_id(), "team2");
+    }
 }

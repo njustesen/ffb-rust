@@ -57,4 +57,18 @@ mod tests {
         assert_eq!(r.get_roll(), 4);
         assert!(r.is_successful());
     }
+
+    #[test]
+    fn unsuccessful_no_player() {
+        let r = ReportSpecialEffectRoll::new(SpecialEffect::FIREBALL, None, 2, false);
+        assert!(!r.is_successful());
+        assert_eq!(r.get_player_id(), None);
+    }
+
+    #[test]
+    fn fireball_effect() {
+        let r = ReportSpecialEffectRoll::new(SpecialEffect::FIREBALL, Some("p2".into()), 5, true);
+        assert_eq!(r.get_special_effect(), SpecialEffect::FIREBALL);
+        assert_eq!(r.get_roll(), 5);
+    }
 }

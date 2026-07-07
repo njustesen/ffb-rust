@@ -48,4 +48,17 @@ mod tests {
         assert_eq!(r.get_partner_id(), "p2");
         assert!(r.is_used());
     }
+
+    #[test]
+    fn not_used() {
+        let r = ReportTwoForOne::new("p3".into(), "p4".into(), false);
+        assert!(!r.is_used());
+        assert_eq!(r.get_player_id(), "p3");
+    }
+
+    #[test]
+    fn partner_id() {
+        let r = ReportTwoForOne::new("a".into(), "b".into(), true);
+        assert_eq!(r.get_partner_id(), "b");
+    }
 }

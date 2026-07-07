@@ -60,4 +60,18 @@ mod tests {
         let r = ReportStandUpRoll::new(Some("p1".into()), true, 2, 3, false);
         assert_eq!(r.get_minimum_roll(), 2);
     }
+
+    #[test]
+    fn get_player_id() {
+        assert_eq!(make().get_player_id(), Some("p1"));
+        let r = ReportStandUpRoll::new(None, false, 1, 0, false);
+        assert_eq!(r.get_player_id(), None);
+    }
+
+    #[test]
+    fn is_re_rolled() {
+        assert!(!make().is_re_rolled());
+        let r = ReportStandUpRoll::new(Some("p1".into()), true, 4, 1, true);
+        assert!(r.is_re_rolled());
+    }
 }

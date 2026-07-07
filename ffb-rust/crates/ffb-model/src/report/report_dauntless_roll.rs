@@ -70,4 +70,18 @@ mod tests {
         assert_eq!(r.get_defender_id(), Some("d1"));
         assert!(r.base.is_successful());
     }
+
+    #[test]
+    fn no_defender_id() {
+        let r = ReportDauntlessRoll::new(Some("p2".into()), false, 2, 4, false, 3, None);
+        assert_eq!(r.get_defender_id(), None);
+        assert_eq!(r.get_strength(), 3);
+    }
+
+    #[test]
+    fn rerolled_dauntless() {
+        let r = ReportDauntlessRoll::new(Some("p1".into()), true, 6, 3, true, 5, Some("def2".into()));
+        assert!(r.base.is_re_rolled());
+        assert_eq!(r.get_defender_id(), Some("def2"));
+    }
 }

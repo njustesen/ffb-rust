@@ -41,4 +41,17 @@ mod tests {
         assert_eq!(r.get_player(), "p1");
         assert!(r.is_successful());
     }
+
+    #[test]
+    fn unsuccessful() {
+        let r = ReportChompRemoved::new("p2".into(), false);
+        assert!(!r.is_successful());
+        assert_eq!(r.get_player(), "p2");
+    }
+
+    #[test]
+    fn different_player() {
+        let r = ReportChompRemoved::new("bigGuy".into(), true);
+        assert_eq!(r.get_player(), "bigGuy");
+    }
 }

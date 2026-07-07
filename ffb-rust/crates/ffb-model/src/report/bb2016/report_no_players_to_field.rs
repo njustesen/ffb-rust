@@ -41,4 +41,16 @@ mod tests {
     fn fields() {
         assert_eq!(make().get_team_id(), "team1");
     }
+
+    #[test]
+    fn away_team_id() {
+        let r = ReportNoPlayersToField::new("away_team".into());
+        assert_eq!(r.get_team_id(), "away_team");
+    }
+
+    #[test]
+    fn empty_team_id() {
+        let r = ReportNoPlayersToField::new("".into());
+        assert_eq!(r.get_team_id(), "");
+    }
 }

@@ -49,4 +49,17 @@ mod tests {
         assert_eq!(r.get_direction_roll(), 3);
         assert_eq!(r.get_distance_roll(), &[2, 4]);
     }
+
+    #[test]
+    fn different_direction() {
+        let r = ReportThrowIn::new(Direction::South, 5, vec![3]);
+        assert_eq!(r.get_direction(), Direction::South);
+    }
+
+    #[test]
+    fn distance_roll_length() {
+        let r = ReportThrowIn::new(Direction::East, 2, vec![1, 2, 3]);
+        assert_eq!(r.get_distance_roll().len(), 3);
+        assert_eq!(r.get_direction_roll(), 2);
+    }
 }

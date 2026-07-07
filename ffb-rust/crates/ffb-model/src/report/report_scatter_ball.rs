@@ -49,4 +49,17 @@ mod tests {
         assert_eq!(r.get_rolls(), &[3, 5]);
         assert!(!r.is_gust_of_wind());
     }
+
+    #[test]
+    fn gust_of_wind_true() {
+        let r = ReportScatterBall::new(vec![Direction::South], vec![2], true);
+        assert!(r.is_gust_of_wind());
+    }
+
+    #[test]
+    fn single_direction_and_roll() {
+        let r = ReportScatterBall::new(vec![Direction::West], vec![6], false);
+        assert_eq!(r.get_directions(), &[Direction::West]);
+        assert_eq!(r.get_rolls(), &[6]);
+    }
 }

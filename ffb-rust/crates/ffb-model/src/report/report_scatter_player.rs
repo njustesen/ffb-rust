@@ -66,4 +66,23 @@ mod tests {
         assert_eq!(r.get_rolls(), &[3]);
         assert_eq!(r.get_scatter(), Some(true));
     }
+
+    #[test]
+    fn no_scatter() {
+        let r = ReportScatterPlayer::new(
+            FieldCoordinate::new(0, 0),
+            FieldCoordinate::new(1, 0),
+            vec![Direction::West],
+            vec![4],
+            None,
+        );
+        assert_eq!(r.get_scatter(), None);
+    }
+
+    #[test]
+    fn coordinates() {
+        let r = make();
+        assert_eq!(r.get_start_coordinate(), &FieldCoordinate::new(3, 5));
+        assert_eq!(r.get_end_coordinate(), &FieldCoordinate::new(4, 5));
+    }
 }

@@ -43,4 +43,10 @@ mod tests {
 
     #[test]
     fn get_thrower_id() { assert_eq!(make().get_thrower_id(), Some("t1")); }
+
+    #[test]
+    fn get_interceptor_id() { assert_eq!(make().get_interceptor_id(), Some("i1")); }
+
+    #[test]
+    fn get_thrower_team_id() { assert_eq!(make().get_thrower_team_id(), Some("team1")); }
 }

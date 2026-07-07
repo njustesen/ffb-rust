@@ -43,4 +43,16 @@ mod tests {
     fn get_card() {
         assert_eq!(make().get_card(), "CUSTARD_PIE");
     }
+
+    #[test]
+    fn different_card() {
+        let r = ReportCardDeactivated::new("ILLEGAL_PROCEDURE".into());
+        assert_eq!(r.get_card(), "ILLEGAL_PROCEDURE");
+    }
+
+    #[test]
+    fn card_matches_field() {
+        let r = make();
+        assert_eq!(r.get_card(), r.card.as_str());
+    }
 }

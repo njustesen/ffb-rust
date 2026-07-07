@@ -61,4 +61,19 @@ mod tests {
         assert_eq!(r.get_fame_home(), 1);
         assert_eq!(r.get_spectators_away(), 20000);
     }
+
+    #[test]
+    fn rolls_and_fame_away() {
+        let r = make();
+        assert_eq!(r.get_spectator_roll_home(), &[3, 4]);
+        assert_eq!(r.get_spectator_roll_away(), &[2, 5]);
+        assert_eq!(r.get_fame_away(), 0);
+    }
+
+    #[test]
+    fn equal_spectators() {
+        let r = ReportSpectators::new(vec![3], 30000, 2, vec![3], 30000, 2);
+        assert_eq!(r.get_spectators_home(), r.get_spectators_away());
+        assert_eq!(r.get_fame_home(), r.get_fame_away());
+    }
 }

@@ -44,4 +44,10 @@ mod tests {
 
     #[test]
     fn get_block_roll() { assert_eq!(make().get_block_roll(), &[2, 5]); }
+
+    #[test]
+    fn get_player_id() { assert_eq!(make().get_player_id(), Some("p1")); }
+
+    #[test]
+    fn re_roll_source_is_none() { assert!(make().get_re_roll_source().is_none()); }
 }

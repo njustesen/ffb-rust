@@ -62,4 +62,18 @@ mod tests {
         let bomb = ReportCatchRoll::new(Some("p1".into()), false, 2, 4, false, vec![], true);
         assert!(bomb.is_bomb());
     }
+
+    #[test]
+    fn minimum_roll_and_rerolled() {
+        let r = ReportCatchRoll::new(Some("p1".into()), true, 4, 3, true, vec![], false);
+        assert_eq!(r.get_minimum_roll(), 3);
+        assert!(r.is_re_rolled());
+    }
+
+    #[test]
+    fn unsuccessful_with_modifiers() {
+        let r = ReportCatchRoll::new(None, false, 2, 4, false, vec!["TackleZone".into()], false);
+        assert!(!r.is_successful());
+        assert_eq!(r.get_roll_modifiers().len(), 1);
+    }
 }

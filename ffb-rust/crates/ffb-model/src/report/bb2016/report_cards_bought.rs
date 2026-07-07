@@ -48,4 +48,18 @@ mod tests {
         assert_eq!(r.get_nr_of_cards(), 2);
         assert_eq!(r.get_gold(), 50000);
     }
+
+    #[test]
+    fn zero_cards_zero_gold() {
+        let r = ReportCardsBought::new("team2".into(), 0, 0);
+        assert_eq!(r.get_nr_of_cards(), 0);
+        assert_eq!(r.get_gold(), 0);
+    }
+
+    #[test]
+    fn different_team_id() {
+        let r = ReportCardsBought::new("away_team".into(), 5, 100000);
+        assert_eq!(r.get_team_id(), "away_team");
+        assert_eq!(r.get_nr_of_cards(), 5);
+    }
 }

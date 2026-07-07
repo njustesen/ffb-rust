@@ -35,4 +35,15 @@ mod tests {
 
     #[test]
     fn is_limit_reached() { assert!(make().is_limit_reached()); }
+
+    #[test]
+    fn not_limit_reached() {
+        let r = ReportKickoffSequenceActivationsExhausted::new(false);
+        assert!(!r.is_limit_reached());
+    }
+
+    #[test]
+    fn get_name_matches() {
+        assert_eq!(make().get_name(), "kickoffSequenceActivationsExhausted");
+    }
 }

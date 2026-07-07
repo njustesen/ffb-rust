@@ -99,4 +99,21 @@ mod tests {
         list.clear();
         assert!(list.is_empty());
     }
+
+    #[test]
+    fn get_reports_slice() {
+        let mut list = ReportList::new();
+        list.add(StubReport(ReportId::BLOCK));
+        list.add(StubReport(ReportId::INJURY));
+        assert_eq!(list.get_reports().len(), 2);
+        assert_eq!(list.get_reports()[0].get_id(), ReportId::BLOCK);
+    }
+
+    #[test]
+    fn add_boxed() {
+        let mut list = ReportList::new();
+        list.add_boxed(Box::new(StubReport(ReportId::INJURY)));
+        assert_eq!(list.size(), 1);
+        assert!(list.has_report(ReportId::INJURY));
+    }
 }

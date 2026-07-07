@@ -36,4 +36,16 @@ mod tests {
 
     #[test]
     fn get_weather_roll() { assert_eq!(make().get_weather_roll(), &[3, 4]); }
+
+    #[test]
+    fn empty_weather_roll() {
+        let r = ReportWeatherMageRoll::new(vec![]);
+        assert!(r.get_weather_roll().is_empty());
+    }
+
+    #[test]
+    fn single_roll_value() {
+        let r = ReportWeatherMageRoll::new(vec![6]);
+        assert_eq!(r.get_weather_roll(), &[6]);
+    }
 }

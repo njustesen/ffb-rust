@@ -78,4 +78,24 @@ mod tests {
         assert!(!r.is_bomb());
         assert_eq!(r.get_result(), "ACCURATE");
     }
+
+    #[test]
+    fn minimum_roll_and_rerolled() {
+        let r = make();
+        assert_eq!(r.get_minimum_roll(), 3);
+        assert!(!r.is_re_rolled());
+    }
+
+    #[test]
+    fn bomb_and_hail_mary_flags() {
+        let r = ReportPassRoll::new(
+            None, false, 1, 4, true, vec!["modifier".into()],
+            None, true, true, "INACCURATE".into(),
+        );
+        assert!(r.is_bomb());
+        assert!(r.is_hail_mary_pass());
+        assert!(r.is_re_rolled());
+        assert_eq!(r.get_roll_modifiers().len(), 1);
+        assert_eq!(r.get_passing_distance(), None);
+    }
 }

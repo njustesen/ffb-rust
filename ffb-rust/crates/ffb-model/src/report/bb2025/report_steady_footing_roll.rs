@@ -50,4 +50,19 @@ mod tests {
         assert!(!r.is_successful());
         assert!(r.is_re_rolled());
     }
+
+    #[test]
+    fn minimum_roll_and_player_id() {
+        let r = make();
+        assert_eq!(r.get_minimum_roll(), 4);
+        assert_eq!(r.get_player_id(), Some("p1"));
+    }
+
+    #[test]
+    fn successful_not_rerolled() {
+        let r = ReportSteadyFootingRoll::new(Some("p2".into()), true, 5, 3, false);
+        assert!(r.is_successful());
+        assert!(!r.is_re_rolled());
+        assert_eq!(r.get_roll(), 5);
+    }
 }

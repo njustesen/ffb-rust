@@ -51,4 +51,16 @@ mod tests {
     fn get_serious_injury() {
         assert_eq!(make().get_serious_injury(), Some("BROKEN_RIBS"));
     }
+
+    #[test]
+    fn get_player_id() {
+        assert_eq!(make().get_player_id(), "p1");
+    }
+
+    #[test]
+    fn no_serious_injury() {
+        let r = ReportApothecaryChoice::new("p2".into(), PlayerState::new(), None);
+        assert_eq!(r.get_serious_injury(), None);
+        assert_eq!(r.get_player_id(), "p2");
+    }
 }

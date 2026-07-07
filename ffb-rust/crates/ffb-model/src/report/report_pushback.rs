@@ -46,4 +46,16 @@ mod tests {
         assert_eq!(r.get_defender_id(), "def1");
         assert_eq!(r.get_pushback_mode(), PushbackMode::REGULAR);
     }
+
+    #[test]
+    fn different_defender_id() {
+        let r = ReportPushback::new("def2".into(), PushbackMode::SIDE_STEP);
+        assert_eq!(r.get_defender_id(), "def2");
+    }
+
+    #[test]
+    fn side_step_mode() {
+        let r = ReportPushback::new("def1".into(), PushbackMode::SIDE_STEP);
+        assert_eq!(r.get_pushback_mode(), PushbackMode::SIDE_STEP);
+    }
 }

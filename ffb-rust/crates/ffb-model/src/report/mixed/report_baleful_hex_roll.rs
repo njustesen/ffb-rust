@@ -52,4 +52,18 @@ mod tests {
 
     #[test]
     fn get_target() { assert_eq!(make().get_target(), Some("t1")); }
+
+    #[test]
+    fn minimum_roll_and_rerolled() {
+        let r = ReportBalefulHexRoll::new(Some("p1".into()), true, 4, 3, true, None);
+        assert_eq!(r.get_minimum_roll(), 3);
+        assert!(r.is_re_rolled());
+    }
+
+    #[test]
+    fn unsuccessful_with_no_target() {
+        let r = ReportBalefulHexRoll::new(None, false, 2, 4, false, None);
+        assert!(!r.is_successful());
+        assert_eq!(r.get_target(), None);
+    }
 }

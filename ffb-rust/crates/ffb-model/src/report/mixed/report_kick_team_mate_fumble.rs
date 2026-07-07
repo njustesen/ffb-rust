@@ -34,4 +34,17 @@ mod tests {
         let r = ReportKickTeamMateFumble::default();
         assert_eq!(r.get_id(), ReportId::KICK_TEAM_MATE_FUMBLE);
     }
+
+    #[test]
+    fn new_and_default_equal() {
+        let via_new = ReportKickTeamMateFumble::new();
+        let via_default = ReportKickTeamMateFumble::default();
+        assert_eq!(via_new.get_id(), via_default.get_id());
+    }
+
+    #[test]
+    fn unit_struct_has_no_fields() {
+        let r = make();
+        assert_eq!(r.get_name(), "kickTeamMateFumble");
+    }
 }

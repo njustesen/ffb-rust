@@ -85,4 +85,20 @@ mod tests {
     fn get_nr_of_dice() {
         assert_eq!(make().get_nr_of_dice(), 2);
     }
+
+    #[test]
+    fn block_roll_and_result() {
+        let r = make();
+        assert_eq!(r.get_block_roll(), &[3, 5]);
+        assert_eq!(r.get_block_result(), "PUSHED");
+    }
+
+    #[test]
+    fn defender_and_flags() {
+        let r = make();
+        assert_eq!(r.get_defender_id(), "def1");
+        assert!(!r.is_suppress_extra_effect_handling());
+        assert!(r.is_show_name_in_report());
+        assert_eq!(r.get_block_roll_id(), 42);
+    }
 }

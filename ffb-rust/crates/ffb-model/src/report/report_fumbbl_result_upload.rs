@@ -54,4 +54,18 @@ mod tests {
         assert!(r.is_successful());
         assert_eq!(r.get_upload_status(), "OK");
     }
+
+    #[test]
+    fn unsuccessful_upload() {
+        let r = ReportFumbblResultUpload::new(false, "ERROR".into());
+        assert!(!r.is_successful());
+        assert_eq!(r.get_upload_status(), "ERROR");
+    }
+
+    #[test]
+    fn different_status_string() {
+        let r = ReportFumbblResultUpload::new(true, "PENDING".into());
+        assert!(r.is_successful());
+        assert_eq!(r.get_upload_status(), "PENDING");
+    }
 }

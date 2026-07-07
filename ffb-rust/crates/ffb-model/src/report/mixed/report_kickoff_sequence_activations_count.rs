@@ -39,4 +39,10 @@ mod tests {
 
     #[test]
     fn get_limit() { assert_eq!(make().get_limit(), 3); }
+
+    #[test]
+    fn get_amount() { assert_eq!(make().get_amount(), 2); }
+
+    #[test]
+    fn get_available() { assert_eq!(make().get_available(), 5); }
 }

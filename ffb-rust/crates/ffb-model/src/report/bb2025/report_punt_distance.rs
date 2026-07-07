@@ -41,4 +41,17 @@ mod tests {
         assert_eq!(r.get_roll(), 4);
         assert!(r.is_out_of_bounds());
     }
+
+    #[test]
+    fn not_out_of_bounds() {
+        let r = ReportPuntDistance::new(3, false);
+        assert!(!r.is_out_of_bounds());
+        assert_eq!(r.get_roll(), 3);
+    }
+
+    #[test]
+    fn max_roll() {
+        let r = ReportPuntDistance::new(6, false);
+        assert_eq!(r.get_roll(), 6);
+    }
 }

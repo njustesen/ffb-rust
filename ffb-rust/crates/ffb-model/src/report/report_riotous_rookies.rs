@@ -48,4 +48,18 @@ mod tests {
         assert_eq!(r.get_amount(), 1);
         assert_eq!(r.get_team_id(), "team1");
     }
+
+    #[test]
+    fn empty_roll() {
+        let r = ReportRiotousRookies::new(vec![], 0, "team2".into());
+        assert_eq!(r.get_roll().len(), 0);
+        assert_eq!(r.get_amount(), 0);
+    }
+
+    #[test]
+    fn different_team_id() {
+        let r = ReportRiotousRookies::new(vec![5], 2, "team2".into());
+        assert_eq!(r.get_team_id(), "team2");
+        assert_eq!(r.get_amount(), 2);
+    }
 }

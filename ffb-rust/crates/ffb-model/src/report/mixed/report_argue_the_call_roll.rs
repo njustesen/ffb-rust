@@ -55,4 +55,16 @@ mod tests {
 
     #[test]
     fn get_roll() { assert_eq!(make().get_roll(), 5); }
+
+    #[test]
+    fn is_successful_and_stays_on_pitch() {
+        assert!(make().is_successful());
+        assert!(make().is_stays_on_pitch());
+    }
+
+    #[test]
+    fn coach_banned_and_biased_refs() {
+        assert!(!make().is_coach_banned());
+        assert_eq!(make().get_biased_refs(), 1);
+    }
 }

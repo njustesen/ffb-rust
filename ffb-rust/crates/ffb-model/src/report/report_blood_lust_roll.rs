@@ -56,4 +56,18 @@ mod tests {
     fn is_successful() {
         assert!(make().is_successful());
     }
+
+    #[test]
+    fn minimum_roll_and_rerolled() {
+        let r = ReportBloodLustRoll::new(Some("p1".into()), true, 4, 3, true, vec![]);
+        assert_eq!(r.get_minimum_roll(), 3);
+        assert!(r.is_re_rolled());
+    }
+
+    #[test]
+    fn unsuccessful_with_modifiers() {
+        let r = ReportBloodLustRoll::new(None, false, 2, 4, false, vec!["TackleZone".into()]);
+        assert!(!r.is_successful());
+        assert_eq!(r.get_roll_modifiers().len(), 1);
+    }
 }

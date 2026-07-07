@@ -60,4 +60,16 @@ mod tests {
 
     #[test]
     fn get_serious_injury() { assert_eq!(make().get_serious_injury(), Some("BROKEN_RIBS")); }
+
+    #[test]
+    fn get_player_id_and_casualty_roll() {
+        assert_eq!(make().get_player_id(), Some("p1"));
+        assert_eq!(make().get_casualty_roll(), &[3, 4]);
+    }
+
+    #[test]
+    fn get_casualty_modifiers_and_original_injury() {
+        assert_eq!(make().get_casualty_modifiers(), &[] as &[String]);
+        assert_eq!(make().get_original_injury(), None);
+    }
 }

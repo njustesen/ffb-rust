@@ -71,4 +71,18 @@ mod tests {
         assert!(!r.base.is_successful());
         assert!(r.base.is_re_rolled());
     }
+
+    #[test]
+    fn minimum_roll_and_rerolled() {
+        let r = ReportFoulAppearanceRoll::new(Some("p1".into()), true, 4, 3, true, vec![], None);
+        assert_eq!(r.base.get_minimum_roll(), 3);
+        assert!(r.base.is_re_rolled());
+    }
+
+    #[test]
+    fn unsuccessful_with_modifiers() {
+        let r = ReportFoulAppearanceRoll::new(None, false, 2, 4, false, vec!["TackleZone".into()], None);
+        assert!(!r.base.is_successful());
+        assert_eq!(r.base.get_roll_modifiers().len(), 1);
+    }
 }

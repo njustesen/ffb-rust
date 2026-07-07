@@ -45,4 +45,17 @@ mod tests {
         assert_eq!(r.get_team_id(), "team1");
         assert_eq!(r.get_gold(), 50);
     }
+
+    #[test]
+    fn zero_gold() {
+        let r = ReportPettyCash::new("team2".into(), 0);
+        assert_eq!(r.get_gold(), 0);
+        assert_eq!(r.get_team_id(), "team2");
+    }
+
+    #[test]
+    fn large_gold_value() {
+        let r = ReportPettyCash::new("team1".into(), 1000000);
+        assert_eq!(r.get_gold(), 1000000);
+    }
 }

@@ -45,4 +45,17 @@ mod tests {
     fn get_roll() {
         assert_eq!(make().get_roll(), 4);
     }
+
+    #[test]
+    fn is_successful() {
+        assert!(make().is_successful());
+    }
+
+    #[test]
+    fn unsuccessful_bribe() {
+        let r = ReportBribesRoll::new("p2".into(), false, 2);
+        assert!(!r.is_successful());
+        assert_eq!(r.get_player_id(), "p2");
+        assert_eq!(r.get_roll(), 2);
+    }
 }

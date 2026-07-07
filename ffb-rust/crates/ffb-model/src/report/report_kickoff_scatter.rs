@@ -84,4 +84,18 @@ mod tests {
         assert_eq!(r.get_roll_scatter_direction(), 3);
         assert_eq!(r.get_roll_scatter_distance(), 4);
     }
+
+    #[test]
+    fn ball_coordinate_end() {
+        let r = make();
+        assert_eq!(r.get_ball_coordinate_end(), &FieldCoordinate::new(5, 7));
+    }
+
+    #[test]
+    fn different_direction() {
+        let r = ReportKickoffScatter::new(FieldCoordinate::new(0, 0), Direction::South, 1, 6);
+        assert_eq!(r.get_scatter_direction(), Direction::South);
+        assert_eq!(r.get_roll_scatter_direction(), 1);
+        assert_eq!(r.get_roll_scatter_distance(), 6);
+    }
 }

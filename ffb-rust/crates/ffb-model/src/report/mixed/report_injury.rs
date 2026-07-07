@@ -95,4 +95,16 @@ mod tests {
 
     #[test]
     fn get_injury_type() { assert_eq!(make().get_injury_type(), "REGULAR"); }
+
+    #[test]
+    fn get_attacker_and_defender_id() {
+        assert_eq!(make().get_attacker_id(), Some("a1"));
+        assert_eq!(make().get_defender_id(), Some("d1"));
+    }
+
+    #[test]
+    fn is_armor_broken_and_armor_roll() {
+        assert!(make().is_armor_broken());
+        assert_eq!(make().get_armor_roll(), &[3, 4]);
+    }
 }

@@ -50,4 +50,18 @@ mod tests {
     fn get_choosing_team_id() {
         assert_eq!(make().get_choosing_team_id(), "team1");
     }
+
+    #[test]
+    fn get_block_roll_and_defender_id() {
+        let r = make();
+        assert_eq!(r.get_block_roll(), &[2, 4, 6]);
+        assert_eq!(r.get_defender_id(), Some("def1"));
+    }
+
+    #[test]
+    fn no_defender_id() {
+        let r = ReportBlockRoll::new("team2".into(), vec![1], None);
+        assert_eq!(r.get_defender_id(), None);
+        assert_eq!(r.get_choosing_team_id(), "team2");
+    }
 }

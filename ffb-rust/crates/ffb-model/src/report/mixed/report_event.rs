@@ -35,4 +35,16 @@ mod tests {
 
     #[test]
     fn get_event_message() { assert_eq!(make().get_event_message(), Some("something happened")); }
+
+    #[test]
+    fn none_event_message() {
+        let r = ReportEvent::new(None);
+        assert_eq!(r.get_event_message(), None);
+    }
+
+    #[test]
+    fn different_event_message() {
+        let r = ReportEvent::new(Some("touchdown".into()));
+        assert_eq!(r.get_event_message(), Some("touchdown"));
+    }
 }

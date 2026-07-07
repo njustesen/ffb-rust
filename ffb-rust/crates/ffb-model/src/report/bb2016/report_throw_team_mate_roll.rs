@@ -69,4 +69,23 @@ mod tests {
         assert_eq!(r.get_thrown_player_id(), "thrown");
         assert_eq!(r.get_passing_distance(), Some("SHORT_PASS"));
     }
+
+    #[test]
+    fn minimum_roll_and_rerolled() {
+        let r = make();
+        assert_eq!(r.get_minimum_roll(), 3);
+        assert!(!r.is_re_rolled());
+    }
+
+    #[test]
+    fn unsuccessful_with_modifiers() {
+        let r = ReportThrowTeamMateRoll::new(
+            None, false, 1, 4, true, vec!["Strong Arm".into()],
+            None, "victim".into(),
+        );
+        assert!(!r.is_successful());
+        assert!(r.is_re_rolled());
+        assert_eq!(r.get_roll_modifiers().len(), 1);
+        assert_eq!(r.get_passing_distance(), None);
+    }
 }

@@ -36,4 +36,16 @@ mod tests {
 
     #[test]
     fn get_player_id() { assert_eq!(make().get_player_id(), Some("p1")); }
+
+    #[test]
+    fn player_id_none() {
+        let r = ReportStallerDetected::new(None);
+        assert!(r.get_player_id().is_none());
+    }
+
+    #[test]
+    fn different_player_id() {
+        let r = ReportStallerDetected::new(Some("staller42".into()));
+        assert_eq!(r.get_player_id(), Some("staller42"));
+    }
 }

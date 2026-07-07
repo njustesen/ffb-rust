@@ -56,4 +56,16 @@ mod tests {
         assert_eq!(r.get_casualty_roll(), &[3, 4]);
         assert_eq!(r.get_serious_injury(), None);
     }
+
+    #[test]
+    fn serious_injury_stored() {
+        let r = ReportApothecaryRoll::new("p2".into(), vec![5, 6], None, Some("NIGGLING_INJURY".into()));
+        assert_eq!(r.get_serious_injury(), Some("NIGGLING_INJURY"));
+    }
+
+    #[test]
+    fn player_state_none_by_default() {
+        let r = make();
+        assert!(r.get_player_state().is_none());
+    }
 }

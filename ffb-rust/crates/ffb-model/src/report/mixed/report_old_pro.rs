@@ -41,4 +41,17 @@ mod tests {
 
     #[test]
     fn get_new_value() { assert_eq!(make().get_new_value(), 2); }
+
+    #[test]
+    fn get_old_value_and_player_id() {
+        let r = make();
+        assert_eq!(r.get_old_value(), 3);
+        assert_eq!(r.get_player_id(), Some("p1"));
+    }
+
+    #[test]
+    fn is_self_inflicted() {
+        let r = ReportOldPro::new(None, 1, 0, true);
+        assert!(r.is_self_inflicted());
+    }
 }

@@ -50,4 +50,18 @@ mod tests {
         assert_eq!(r.get_roll_home(), 4);
         assert_eq!(r.get_roll_away(), 2);
     }
+
+    #[test]
+    fn prayer_not_available() {
+        let r = ReportCheeringFans::new("team2".into(), false, 3, 5);
+        assert!(!r.is_prayer_available());
+        assert_eq!(r.get_team_id(), "team2");
+    }
+
+    #[test]
+    fn roll_away_value() {
+        let r = ReportCheeringFans::new("team3".into(), true, 1, 6);
+        assert_eq!(r.get_roll_away(), 6);
+        assert_eq!(r.get_roll_home(), 1);
+    }
 }

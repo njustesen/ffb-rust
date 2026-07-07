@@ -61,4 +61,19 @@ mod tests {
         assert_eq!(r.get_kick_distance(), 3);
         assert!(r.is_successful());
     }
+
+    #[test]
+    fn kicked_player_and_roll() {
+        let r = make();
+        assert_eq!(r.get_kicked_player_id(), "kicked");
+        assert_eq!(r.get_roll(), &[3, 4]);
+    }
+
+    #[test]
+    fn rerolled_unsuccessful() {
+        let r = ReportKickTeamMateRoll::new("k1".into(), "k2".into(), false, vec![1], true, 2);
+        assert!(!r.is_successful());
+        assert!(r.is_re_rolled());
+        assert_eq!(r.get_kick_distance(), 2);
+    }
 }

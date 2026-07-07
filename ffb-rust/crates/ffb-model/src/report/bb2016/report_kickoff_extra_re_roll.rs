@@ -59,4 +59,19 @@ mod tests {
         assert!(r.is_home_gains_re_roll());
         assert!(!r.is_away_gains_re_roll());
     }
+
+    #[test]
+    fn roll_away_and_kickoff_result() {
+        let r = make();
+        assert_eq!(r.get_roll_away(), 2);
+        assert_eq!(r.get_kickoff_result(), KickoffResult::BrilliantCoaching);
+    }
+
+    #[test]
+    fn away_gains_reroll() {
+        let r = ReportKickoffExtraReRoll::new(KickoffResult::BrilliantCoaching, 1, false, 5, true);
+        assert!(!r.is_home_gains_re_roll());
+        assert!(r.is_away_gains_re_roll());
+        assert_eq!(r.get_roll_away(), 5);
+    }
 }

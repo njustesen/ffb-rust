@@ -61,4 +61,19 @@ mod tests {
         assert_eq!(r.get_defender_id(), "d1");
         assert!(!r.is_successful());
     }
+
+    #[test]
+    fn minimum_roll_and_roll_values() {
+        let r = make();
+        assert_eq!(r.get_minimum_roll(), 5);
+        assert_eq!(r.get_roll(), &[3, 4]);
+    }
+
+    #[test]
+    fn rerolled_and_successful() {
+        let r = ReportTentaclesShadowingRoll::new("Shadowing".into(), "d2".into(), vec![6], true, 4, true);
+        assert!(r.is_successful());
+        assert!(r.is_re_rolled());
+        assert_eq!(r.get_skill(), "Shadowing");
+    }
 }

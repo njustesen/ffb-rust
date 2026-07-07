@@ -64,4 +64,19 @@ mod tests {
         assert_eq!(r.get_cards(), 2);
         assert_eq!(r.get_gold(), 100000);
     }
+
+    #[test]
+    fn stars_mercenaries_and_inducements() {
+        let r = make();
+        assert_eq!(r.get_inducements(), 1);
+        assert_eq!(r.get_stars(), 0);
+        assert_eq!(r.get_mercenaries(), 0);
+    }
+
+    #[test]
+    fn new_tv() {
+        let r = ReportCardsAndInducementsBought::new("team2".into(), 0, 0, 1, 2, 50000, 900000);
+        assert_eq!(r.get_new_tv(), 900000);
+        assert_eq!(r.get_team_id(), "team2");
+    }
 }

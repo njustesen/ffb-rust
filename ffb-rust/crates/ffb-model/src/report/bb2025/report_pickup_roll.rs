@@ -61,4 +61,19 @@ mod tests {
         assert_eq!(r.get_player_id(), Some("p1"));
         assert!(r.is_secure_the_ball());
     }
+
+    #[test]
+    fn minimum_roll_and_rerolled() {
+        let r = make();
+        assert_eq!(r.get_minimum_roll(), 3);
+        assert!(!r.is_re_rolled());
+    }
+
+    #[test]
+    fn unsuccessful_without_secure_the_ball() {
+        let r = ReportPickupRoll::new(None, false, 2, 4, true, vec!["TackleZone".into()], false);
+        assert!(!r.is_successful());
+        assert!(!r.is_secure_the_ball());
+        assert_eq!(r.get_player_id(), None);
+    }
 }

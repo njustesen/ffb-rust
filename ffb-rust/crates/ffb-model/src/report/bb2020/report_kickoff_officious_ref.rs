@@ -47,4 +47,18 @@ mod tests {
         assert_eq!(r.get_roll_home(), 3);
         assert_eq!(r.get_player_ids().len(), 1);
     }
+
+    #[test]
+    fn roll_away_and_player_id_content() {
+        let r = make();
+        assert_eq!(r.get_roll_away(), 2);
+        assert_eq!(r.get_player_ids()[0], "p1");
+    }
+
+    #[test]
+    fn empty_player_ids() {
+        let r = ReportKickoffOfficiousRef::new(5, 6, vec![]);
+        assert_eq!(r.get_player_ids().len(), 0);
+        assert_eq!(r.get_roll_home(), 5);
+    }
 }

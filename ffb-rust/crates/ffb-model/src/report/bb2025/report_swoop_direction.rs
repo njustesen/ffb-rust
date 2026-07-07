@@ -50,4 +50,19 @@ mod tests {
         assert_eq!(r.get_direction(), Some(Direction::East));
         assert_eq!(r.get_player_id(), "p1");
     }
+
+    #[test]
+    fn direction_roll_and_out_of_bounds() {
+        let r = make();
+        assert_eq!(r.get_direction_roll(), 5);
+        assert!(!r.is_out_of_bounds());
+    }
+
+    #[test]
+    fn out_of_bounds_no_direction() {
+        let r = ReportSwoopDirection::new(None, 8, "p2".into(), true);
+        assert_eq!(r.get_direction(), None);
+        assert!(r.is_out_of_bounds());
+        assert_eq!(r.get_player_id(), "p2");
+    }
 }

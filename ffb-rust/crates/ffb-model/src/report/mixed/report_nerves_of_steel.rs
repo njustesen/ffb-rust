@@ -39,4 +39,13 @@ mod tests {
 
     #[test]
     fn get_ball_action() { assert_eq!(make().get_ball_action(), Some("PASS")); }
+
+    #[test]
+    fn get_player_id() { assert_eq!(make().get_player_id(), Some("p1")); }
+
+    #[test]
+    fn is_bomb_true() {
+        let r = ReportNervesOfSteel::new(None, None, true);
+        assert!(r.is_bomb());
+    }
 }

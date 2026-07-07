@@ -53,4 +53,18 @@ mod tests {
         assert_eq!(r.get_card(), "BlockCard");
         assert_eq!(r.get_player_id(), Some("p1"));
     }
+
+    #[test]
+    fn new_without_player() {
+        let r = ReportPlayCard::new("team2".into(), "PoisonDagger".into());
+        assert_eq!(r.get_team_id(), "team2");
+        assert_eq!(r.get_card(), "PoisonDagger");
+        assert_eq!(r.get_player_id(), None);
+    }
+
+    #[test]
+    fn no_player_id() {
+        let r = ReportPlayCard::new_with_player("team1".into(), "SomeCard".into(), None);
+        assert_eq!(r.get_player_id(), None);
+    }
 }

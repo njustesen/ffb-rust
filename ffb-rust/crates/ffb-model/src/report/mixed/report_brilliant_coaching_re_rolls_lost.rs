@@ -37,4 +37,14 @@ mod tests {
 
     #[test]
     fn get_amount() { assert_eq!(make().get_amount(), 2); }
+
+    #[test]
+    fn get_team_id() { assert_eq!(make().get_team_id(), Some("team1")); }
+
+    #[test]
+    fn none_team_id() {
+        let r = ReportBrilliantCoachingReRollsLost::new(None, 0);
+        assert_eq!(r.get_team_id(), None);
+        assert_eq!(r.get_amount(), 0);
+    }
 }

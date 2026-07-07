@@ -38,4 +38,14 @@ mod tests {
 
     #[test]
     fn get_event_message() { assert_eq!(make().get_event_message(), Some("some event")); }
+
+    #[test]
+    fn get_player_id() { assert_eq!(make().get_player_id(), Some("p1")); }
+
+    #[test]
+    fn none_fields() {
+        let r = ReportPlayerEvent::new(None, None);
+        assert!(r.get_player_id().is_none());
+        assert!(r.get_event_message().is_none());
+    }
 }

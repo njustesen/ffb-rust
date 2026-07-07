@@ -50,4 +50,19 @@ mod tests {
         assert!(!r.is_coach_banned());
         assert_eq!(r.get_roll(), 5);
     }
+
+    #[test]
+    fn coach_banned_and_player_id() {
+        let r = ReportArgueTheCallRoll::new("coach1".into(), false, true, 2);
+        assert!(!r.is_successful());
+        assert!(r.is_coach_banned());
+        assert_eq!(r.get_player_id(), "coach1");
+    }
+
+    #[test]
+    fn unsuccessful_stores_roll() {
+        let r = ReportArgueTheCallRoll::new("p2".into(), false, false, 1);
+        assert_eq!(r.get_roll(), 1);
+        assert!(!r.is_successful());
+    }
 }

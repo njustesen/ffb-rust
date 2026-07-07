@@ -39,4 +39,13 @@ mod tests {
 
     #[test]
     fn get_roll_home() { assert_eq!(make().get_roll_home(), 4); }
+
+    #[test]
+    fn get_roll_away() { assert_eq!(make().get_roll_away(), 2); }
+
+    #[test]
+    fn get_team_id_none() {
+        let r = ReportKickoffExtraReRoll::new(1, 1, None);
+        assert!(r.get_team_id().is_none());
+    }
 }

@@ -117,4 +117,24 @@ mod tests {
         assert!(r.is_armor_broken());
         assert_eq!(r.get_attacker_id(), Some("attacker1"));
     }
+
+    #[test]
+    fn armor_and_injury_rolls_stored() {
+        let r = make();
+        assert_eq!(r.get_armor_roll(), &[3, 4]);
+        assert_eq!(r.get_injury_roll(), &[2, 5]);
+        assert_eq!(r.get_injury_type(), "casualty");
+    }
+
+    #[test]
+    fn no_attacker_and_serious_injury() {
+        let r = ReportInjury::new(
+            "d2".into(), "stun".into(), false, vec![], vec![2, 3],
+            vec![], vec![1], vec![4, 5], Some("BADLY_HURT".into()),
+            vec![], None, None, None, None,
+        );
+        assert_eq!(r.get_attacker_id(), None);
+        assert_eq!(r.get_serious_injury(), Some("BADLY_HURT"));
+        assert!(!r.is_armor_broken());
+    }
 }

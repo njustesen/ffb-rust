@@ -61,4 +61,20 @@ mod tests {
         assert_eq!(r.get_directions().len(), 2);
         assert_eq!(r.get_rolls(), &[3, 5]);
     }
+
+    #[test]
+    fn coordinates_stored() {
+        let r = make();
+        assert_eq!(r.get_start_coordinate().x, 5);
+        assert_eq!(r.get_start_coordinate().y, 7);
+        assert_eq!(r.get_end_coordinate().x, 8);
+        assert_eq!(r.get_end_coordinate().y, 7);
+    }
+
+    #[test]
+    fn directions_contents() {
+        let r = make();
+        assert_eq!(r.get_directions()[0], Direction::North);
+        assert_eq!(r.get_directions()[1], Direction::East);
+    }
 }

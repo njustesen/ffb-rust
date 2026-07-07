@@ -41,4 +41,17 @@ mod tests {
         assert_eq!(r.get_team_id(), "t1");
         assert_eq!(r.get_roll(), 2);
     }
+
+    #[test]
+    fn high_roll() {
+        let r = ReportSwarmingRoll::new("t2".into(), 6);
+        assert_eq!(r.get_roll(), 6);
+        assert_eq!(r.get_team_id(), "t2");
+    }
+
+    #[test]
+    fn low_roll() {
+        let r = ReportSwarmingRoll::new("t3".into(), 1);
+        assert_eq!(r.get_roll(), 1);
+    }
 }

@@ -59,4 +59,19 @@ mod tests {
         assert_eq!(r.get_roll(), 5);
         assert!(r.is_successful());
     }
+
+    #[test]
+    fn minimum_roll_and_rerolled() {
+        let r = ReportHypnoticGazeRoll::new(Some("p1".into()), true, 5, 3, true, vec![]);
+        assert_eq!(r.get_minimum_roll(), 3);
+        assert!(r.is_re_rolled());
+    }
+
+    #[test]
+    fn unsuccessful_with_modifiers() {
+        let r = ReportHypnoticGazeRoll::new(None, false, 2, 4, false, vec!["Dodge".into()]);
+        assert!(!r.is_successful());
+        assert_eq!(r.get_roll_modifiers().len(), 1);
+        assert_eq!(r.get_player_id(), None);
+    }
 }

@@ -47,4 +47,17 @@ mod tests {
         assert_eq!(r.get_team_id(), "team1");
         assert_eq!(r.get_wizard_spell(), SpecialEffect::FIREBALL);
     }
+
+    #[test]
+    fn lightning_spell() {
+        let r = ReportWizardUse::new("team2".into(), SpecialEffect::LIGHTNING);
+        assert_eq!(r.get_wizard_spell(), SpecialEffect::LIGHTNING);
+        assert_eq!(r.get_team_id(), "team2");
+    }
+
+    #[test]
+    fn different_team_id() {
+        let r = ReportWizardUse::new("team3".into(), SpecialEffect::FIREBALL);
+        assert_eq!(r.get_team_id(), "team3");
+    }
 }

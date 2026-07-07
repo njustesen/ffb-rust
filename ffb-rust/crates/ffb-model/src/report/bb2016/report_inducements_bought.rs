@@ -59,4 +59,18 @@ mod tests {
         assert_eq!(r.get_nr_of_stars(), 1);
         assert_eq!(r.get_gold(), 150000);
     }
+
+    #[test]
+    fn mercenaries_count() {
+        let r = ReportInducementsBought::new("team2".into(), 2, 0, 1, 80000);
+        assert_eq!(r.get_nr_of_mercenaries(), 1);
+        assert_eq!(r.get_nr_of_stars(), 0);
+    }
+
+    #[test]
+    fn zero_inducements() {
+        let r = ReportInducementsBought::new("team3".into(), 0, 0, 0, 0);
+        assert_eq!(r.get_nr_of_inducements(), 0);
+        assert_eq!(r.get_gold(), 0);
+    }
 }

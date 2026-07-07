@@ -55,4 +55,17 @@ mod tests {
         assert_eq!(r.get_players_affected_home(), &[true, false]);
         assert_eq!(r.get_rolls_away(), &[2, 5]);
     }
+
+    #[test]
+    fn players_affected_away() {
+        let r = make();
+        assert_eq!(r.get_players_affected_away(), &[false, true]);
+    }
+
+    #[test]
+    fn empty_vectors() {
+        let r = ReportKickoffPitchInvasion::new(vec![], vec![], vec![], vec![]);
+        assert!(r.get_rolls_home().is_empty());
+        assert!(r.get_players_affected_away().is_empty());
+    }
 }

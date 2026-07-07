@@ -61,4 +61,18 @@ mod tests {
         assert_eq!(r.get_master_chef_roll(), &[4, 5, 3]);
         assert_eq!(r.get_re_rolls_stolen(), 2);
     }
+
+    #[test]
+    fn different_team() {
+        let r = ReportMasterChefRoll::new("team2".into(), vec![1, 2, 3], 0);
+        assert_eq!(r.get_team_id(), "team2");
+        assert_eq!(r.get_re_rolls_stolen(), 0);
+    }
+
+    #[test]
+    fn roll_contents() {
+        let r = ReportMasterChefRoll::new("team1".into(), vec![6, 6, 6], 3);
+        assert_eq!(r.get_master_chef_roll(), &[6, 6, 6]);
+        assert_eq!(r.get_re_rolls_stolen(), 3);
+    }
 }

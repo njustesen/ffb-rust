@@ -42,4 +42,16 @@ mod tests {
         assert_eq!(make().get_half(), 1);
         assert_eq!(ReportStartHalf::new(2).get_half(), 2);
     }
+
+    #[test]
+    fn get_id_second_half() {
+        let r = ReportStartHalf::new(2);
+        assert_eq!(r.get_id(), ReportId::START_HALF);
+    }
+
+    #[test]
+    fn get_name_second_half() {
+        let r = ReportStartHalf::new(2);
+        assert_eq!(r.get_name(), "startHalf");
+    }
 }
