@@ -30,4 +30,22 @@ mod tests {
         let f = AnimationTypeFactory::default();
         assert_eq!(f.for_name("invalid"), None);
     }
+
+    #[test]
+    fn initialize_does_not_panic() {
+        let mut f = AnimationTypeFactory::default();
+        f.initialize();
+    }
+
+    #[test]
+    fn for_name_a_second_known_variant() {
+        let f = AnimationTypeFactory::default();
+        assert_eq!(f.for_name("kick"), Some(AnimationType::KICK));
+    }
+
+    #[test]
+    fn for_name_empty_string_returns_none() {
+        let f = AnimationTypeFactory::default();
+        assert_eq!(f.for_name(""), None);
+    }
 }

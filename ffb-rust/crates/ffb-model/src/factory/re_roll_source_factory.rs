@@ -35,4 +35,23 @@ mod tests {
         let f = ReRollSourceFactory::default();
         assert!(f.for_name("NOT_VALID").is_none());
     }
+
+    #[test]
+    fn initialize_does_not_panic() {
+        let mut f = ReRollSourceFactory::default();
+        f.initialize();
+    }
+
+    #[test]
+    fn for_name_a_second_known_variant() {
+        // "Team ReRoll" is stored lowercased; lookup is case-insensitive
+        let f = ReRollSourceFactory::default();
+        assert!(f.for_name("Team ReRoll").is_some());
+    }
+
+    #[test]
+    fn for_name_empty_string_returns_none() {
+        let f = ReRollSourceFactory::default();
+        assert!(f.for_name("").is_none());
+    }
 }

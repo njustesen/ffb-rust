@@ -29,4 +29,24 @@ mod tests {
     fn for_name_unknown_returns_none() {
         assert_eq!(PositionChoiceModeFactory::default().for_name("invalid"), None);
     }
+
+    #[test]
+    fn initialize_does_not_panic() {
+        let mut f = PositionChoiceModeFactory::default();
+        f.initialize();
+    }
+
+    #[test]
+    fn for_name_raise_dead_returns_variant() {
+        // PositionChoiceMode has only one variant; verify it round-trips correctly
+        assert_eq!(
+            PositionChoiceModeFactory::default().for_name("raiseDead"),
+            Some(PositionChoiceMode::RAISE_DEAD)
+        );
+    }
+
+    #[test]
+    fn for_name_empty_string_returns_none() {
+        assert_eq!(PositionChoiceModeFactory::default().for_name(""), None);
+    }
 }

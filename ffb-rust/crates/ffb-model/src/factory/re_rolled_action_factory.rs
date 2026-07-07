@@ -36,4 +36,22 @@ mod tests {
         let f = ReRolledActionFactory::default();
         assert!(f.for_name("NOT_AN_ACTION").is_none());
     }
+
+    #[test]
+    fn initialize_does_not_panic() {
+        let mut f = ReRolledActionFactory::default();
+        f.initialize();
+    }
+
+    #[test]
+    fn for_name_a_second_known_variant() {
+        let f = ReRolledActionFactory::default();
+        assert!(f.for_name("Go For It").is_some());
+    }
+
+    #[test]
+    fn for_name_empty_string_returns_none() {
+        let f = ReRolledActionFactory::default();
+        assert!(f.for_name("").is_none());
+    }
 }

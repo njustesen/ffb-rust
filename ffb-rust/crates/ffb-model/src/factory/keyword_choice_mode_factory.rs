@@ -28,4 +28,24 @@ mod tests {
     fn for_name_unknown_returns_none() {
         assert_eq!(KeywordChoiceModeFactory::default().for_name("invalid"), None);
     }
+
+    #[test]
+    fn initialize_does_not_panic() {
+        let mut f = KeywordChoiceModeFactory::default();
+        f.initialize();
+    }
+
+    #[test]
+    fn for_name_getting_even_returns_variant() {
+        // KeywordChoiceMode has only one variant; verify it round-trips correctly
+        assert_eq!(
+            KeywordChoiceModeFactory::default().for_name("gettingEven"),
+            Some(KeywordChoiceMode::GETTING_EVEN)
+        );
+    }
+
+    #[test]
+    fn for_name_empty_string_returns_none() {
+        assert_eq!(KeywordChoiceModeFactory::default().for_name(""), None);
+    }
 }

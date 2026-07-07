@@ -380,4 +380,26 @@ mod tests {
             ModelChangeDataType::Skill
         );
     }
+
+    #[test]
+    fn model_change_id_for_name_field_model_set_weather() {
+        assert_eq!(
+            ModelChangeId::for_name("fieldModelSetWeather"),
+            Some(ModelChangeId::FieldModelSetWeather)
+        );
+    }
+
+    #[test]
+    fn model_change_id_get_name_round_trips() {
+        let id = ModelChangeId::TurnDataSetTurnNr;
+        let name = id.get_name();
+        assert_eq!(ModelChangeId::for_name(&name), Some(id));
+    }
+
+    #[test]
+    fn model_change_data_type_name_method() {
+        assert_eq!(ModelChangeDataType::Skill.name(), "skill");
+        assert_eq!(ModelChangeDataType::Integer.name(), "integer");
+        assert_eq!(ModelChangeDataType::Boolean.name(), "boolean");
+    }
 }

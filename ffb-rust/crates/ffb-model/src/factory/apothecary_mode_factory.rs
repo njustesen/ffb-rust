@@ -27,4 +27,21 @@ mod tests {
     fn for_name_unknown_returns_none() {
         assert!(ApothecaryModeFactory.for_name("NOT_VALID").is_none());
     }
+
+    #[test]
+    fn initialize_does_not_panic() {
+        let mut f = ApothecaryModeFactory;
+        f.initialize();
+    }
+
+    #[test]
+    fn for_name_a_second_known_variant() {
+        let f = ApothecaryModeFactory;
+        assert_eq!(f.for_name("defender"), Some(ApothecaryMode::Defender));
+    }
+
+    #[test]
+    fn for_name_empty_string_returns_none() {
+        assert!(ApothecaryModeFactory.for_name("").is_none());
+    }
 }

@@ -61,4 +61,22 @@ mod tests {
         assert_eq!(PlayerStatKey::Pa.name(), "PA");
         assert_eq!(PlayerStatKey::Av.name(), "AV");
     }
+
+    #[test]
+    fn skill_id_for_increase_covers_all_variants() {
+        // Each stat key must map to a distinct skill id
+        let ids: Vec<_> = PlayerStatKey::all().iter().map(|k| k.skill_id_for_increase()).collect();
+        let unique: std::collections::HashSet<_> = ids.iter().collect();
+        assert_eq!(unique.len(), PlayerStatKey::all().len());
+    }
+
+    #[test]
+    fn av_skill_id_for_increase_is_armour_increase() {
+        assert_eq!(PlayerStatKey::Av.skill_id_for_increase(), SkillId::ArmourIncrease);
+    }
+
+    #[test]
+    fn pa_skill_id_for_increase_is_passing_increase() {
+        assert_eq!(PlayerStatKey::Pa.skill_id_for_increase(), SkillId::PassingIncrease);
+    }
 }

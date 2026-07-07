@@ -31,4 +31,23 @@ mod tests {
     fn for_name_unknown_returns_none() {
         assert_eq!(CatchScatterThrowInModeFactory::default().for_name("invalid"), None);
     }
+
+    #[test]
+    fn initialize_does_not_panic() {
+        let mut f = CatchScatterThrowInModeFactory::default();
+        f.initialize();
+    }
+
+    #[test]
+    fn for_name_a_second_known_variant() {
+        assert_eq!(
+            CatchScatterThrowInModeFactory::default().for_name("scatterBall"),
+            Some(CatchScatterThrowInMode::ScatterBall)
+        );
+    }
+
+    #[test]
+    fn for_name_empty_string_returns_none() {
+        assert_eq!(CatchScatterThrowInModeFactory::default().for_name(""), None);
+    }
 }
