@@ -29,4 +29,9 @@ mod tests {
         assert_eq!(cmd.setup_names.len(), 1);
         assert_eq!(cmd.setup_names[0], "Press");
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandTeamSetupList::default()).is_empty());
+    }
+
 }

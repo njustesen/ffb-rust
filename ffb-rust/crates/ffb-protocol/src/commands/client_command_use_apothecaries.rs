@@ -39,4 +39,9 @@ mod tests {
         };
         assert_eq!(cmd.get_injury_description_json().len(), 1);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUseApothecaries::default()).is_empty());
+    }
+
 }

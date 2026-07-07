@@ -22,4 +22,9 @@ mod tests {
     fn default_zero() {
         assert_eq!(ClientCommandUseProReRollForBlock::default().pro_index, 0);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUseProReRollForBlock::default()).is_empty());
+    }
+
 }

@@ -42,4 +42,9 @@ mod tests {
         assert!(cmd.coach.is_empty());
         assert!(cmd.label.is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandSketchSetLabel::default()).is_empty());
+    }
+
 }

@@ -28,4 +28,9 @@ mod tests {
         let cmd = ServerCommandPasswordChallenge::default();
         assert!(cmd.challenge.is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandPasswordChallenge::default()).is_empty());
+    }
+
 }

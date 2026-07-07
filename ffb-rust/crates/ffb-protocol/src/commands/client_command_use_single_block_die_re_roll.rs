@@ -27,4 +27,9 @@ mod tests {
     fn default_no_source() {
         assert!(ClientCommandUseSingleBlockDieReRoll::new(0).re_roll_source.is_none());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUseSingleBlockDieReRoll::default()).is_empty());
+    }
+
 }

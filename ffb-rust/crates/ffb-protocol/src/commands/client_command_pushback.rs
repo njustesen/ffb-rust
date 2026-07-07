@@ -33,4 +33,12 @@ mod tests {
         let cmd = ClientCommandPushback::new();
         assert!(cmd.pushback.is_none());
     }
+
+    #[test]
+    fn coordinate_accessible_via_pushback() {
+        let coord = FieldCoordinate::new(7, 2);
+        let p = Pushback::new("p2", coord);
+        let cmd = ClientCommandPushback::with_pushback(p);
+        assert_eq!(cmd.get_pushback().and_then(|p| p.get_coordinate()), Some(coord));
+    }
 }

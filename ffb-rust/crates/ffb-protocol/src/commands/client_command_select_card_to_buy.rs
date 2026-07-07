@@ -35,4 +35,11 @@ mod tests {
         assert!(!cmd.initial_deck_choice);
         assert!(!cmd.first_card_choice);
     }
+
+    #[test]
+    fn both_true_stored() {
+        let cmd = ClientCommandSelectCardToBuy::new(true, true);
+        assert!(cmd.is_initial_deck_choice());
+        assert!(cmd.is_first_card_choice());
+    }
 }

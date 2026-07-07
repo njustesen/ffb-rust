@@ -22,5 +22,14 @@ mod tests {
         assert!(cmd.concede_game_status.is_none());
     }
 
-#[test]    fn default_same_as_new() {        let _ = ClientCommandConcedeGame::default();    }
+    #[test]
+    fn default_same_as_new() { let _ = ClientCommandConcedeGame::default(); }
+
+    #[test]
+    fn stores_concede_status() {
+        let cmd = ClientCommandConcedeGame {
+            concede_game_status: Some(ConcedeGameStatus::REQUESTED),
+        };
+        assert!(cmd.get_concede_game_status().is_some());
+    }
 }

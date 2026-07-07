@@ -71,4 +71,9 @@ mod tests {
         assert_eq!(cmd.get_apothecary_type(), Some(ApothecaryType::Team));
         assert_eq!(cmd.get_serious_injury(), Some(SeriousInjuryKind::SeriouslyHurt));
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUseApothecary::default()).is_empty());
+    }
+
 }

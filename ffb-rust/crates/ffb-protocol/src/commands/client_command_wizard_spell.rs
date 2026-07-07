@@ -36,4 +36,9 @@ mod tests {
         assert!(cmd.get_wizard_spell().is_some());
         assert_eq!(cmd.get_target_coordinate(), Some(FieldCoordinate::new(3, 5)));
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandWizardSpell::default()).is_empty());
+    }
+
 }

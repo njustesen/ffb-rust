@@ -38,4 +38,9 @@ mod tests {
         assert!(cmd.sketch_id.is_none());
         assert!(cmd.coordinate.is_none());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandSketchAddCoordinate::new()).is_empty());
+    }
 }

@@ -33,4 +33,9 @@ mod tests {
         let cmd = ClientCommandUseBrawler::with_target_id("t-1");
         assert_eq!(cmd.get_target_id(), Some("t-1"));
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUseBrawler::default()).is_empty());
+    }
+
 }

@@ -35,4 +35,9 @@ mod tests {
         assert!(cmd.coach.is_empty());
         assert!(cmd.sketches.is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandAddSketches::default()).is_empty());
+    }
+
 }

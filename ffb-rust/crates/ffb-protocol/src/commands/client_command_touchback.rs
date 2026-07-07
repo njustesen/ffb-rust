@@ -35,4 +35,9 @@ mod tests {
         let cmd = ClientCommandTouchback::default();
         assert!(cmd.ball_coordinate.is_none());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandTouchback::default()).is_empty());
+    }
+
 }

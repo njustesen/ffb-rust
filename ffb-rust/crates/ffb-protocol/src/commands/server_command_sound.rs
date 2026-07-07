@@ -26,4 +26,9 @@ mod tests {
         let cmd = ServerCommandSound::new(SoundId::TOUCHDOWN);
         assert_eq!(cmd.get_sound(), SoundId::TOUCHDOWN);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandSound::default()).is_empty());
+    }
+
 }

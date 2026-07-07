@@ -37,4 +37,9 @@ mod tests {
         assert!(cmd.coach.is_empty());
         assert!(cmd.talks.is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandTalk::default()).is_empty());
+    }
+
 }

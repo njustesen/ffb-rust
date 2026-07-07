@@ -29,4 +29,9 @@ mod tests {
         let cmd = ClientCommandUseConsummateReRollForBlock::default();
         assert_eq!(cmd.get_pro_index(), 0);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUseConsummateReRollForBlock::default()).is_empty());
+    }
+
 }

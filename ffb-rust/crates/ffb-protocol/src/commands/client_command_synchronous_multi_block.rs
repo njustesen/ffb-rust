@@ -38,4 +38,9 @@ mod tests {
         let cmd = ClientCommandSynchronousMultiBlock::new();
         assert!(cmd.selected_block_targets.is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandSynchronousMultiBlock::default()).is_empty());
+    }
+
 }

@@ -38,4 +38,9 @@ mod tests {
         let cmd = ServerCommandUserSettings::default();
         assert!(cmd.get_user_setting_value(CommonProperty::SETTING_SOUND_VOLUME).is_none());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandUserSettings::default()).is_empty());
+    }
+
 }

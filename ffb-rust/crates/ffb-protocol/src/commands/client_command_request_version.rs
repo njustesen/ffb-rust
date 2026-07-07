@@ -21,4 +21,9 @@ mod tests {
     fn default_works() {
         let _cmd = ClientCommandRequestVersion::default();
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandRequestVersion::new()).is_empty());
+    }
 }

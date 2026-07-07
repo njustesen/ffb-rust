@@ -39,4 +39,9 @@ mod tests {
         assert!(cmd.sketch_ids.is_empty());
         assert_eq!(cmd.rgb, 0);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandSketchSetColor::default()).is_empty());
+    }
+
 }

@@ -51,4 +51,9 @@ mod tests {
         assert!(cmd.coordinate.is_none());
         assert!(cmd.text.is_none());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandSetMarker::new()).is_empty());
+    }
 }

@@ -45,4 +45,9 @@ mod tests {
         assert!(!cmd.running);
         assert_eq!(cmd.command_nr, 0);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandReplayStatus::default()).is_empty());
+    }
+
 }

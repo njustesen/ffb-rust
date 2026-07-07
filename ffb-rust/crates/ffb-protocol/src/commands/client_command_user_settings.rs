@@ -33,4 +33,9 @@ mod tests {
         cmd.set(CommonProperty::SETTING_SOUND_VOLUME, "80");
         assert_eq!(cmd.get(CommonProperty::SETTING_SOUND_VOLUME), Some("80"));
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUserSettings::default()).is_empty());
+    }
+
 }

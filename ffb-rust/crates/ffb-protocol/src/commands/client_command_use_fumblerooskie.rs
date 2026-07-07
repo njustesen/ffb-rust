@@ -21,4 +21,9 @@ mod tests {
     fn default_works() {
         let _cmd = ClientCommandUseFumblerooskie::default();
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUseFumblerooskie::default()).is_empty());
+    }
+
 }

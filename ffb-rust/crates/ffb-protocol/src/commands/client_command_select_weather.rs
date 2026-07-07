@@ -43,4 +43,11 @@ mod tests {
         assert_eq!(cmd.get_modifier(), 2);
         assert_eq!(cmd.get_weather_name(), Some("Nice"));
     }
+
+    #[test]
+    fn negative_modifier_stored() {
+        let cmd = ClientCommandSelectWeather::with_fields(-1, "Sweltering Heat");
+        assert_eq!(cmd.get_modifier(), -1);
+        assert_eq!(cmd.get_weather_name(), Some("Sweltering Heat"));
+    }
 }

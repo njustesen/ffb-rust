@@ -33,4 +33,9 @@ mod tests {
         let cmd = ClientCommandTalk::with_talk("hello");
         assert_eq!(cmd.get_talk(), Some("hello"));
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandTalk::default()).is_empty());
+    }
+
 }

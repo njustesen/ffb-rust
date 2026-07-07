@@ -27,4 +27,9 @@ mod tests {
     fn default_none() {
         assert!(ClientCommandUseReRollForTarget::new().target_id.is_none());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUseReRollForTarget::default()).is_empty());
+    }
+
 }

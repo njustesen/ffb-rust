@@ -28,4 +28,9 @@ mod tests {
         let cmd = ServerCommandRemovePlayer::default();
         assert!(cmd.player_id.is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandRemovePlayer::default()).is_empty());
+    }
+
 }

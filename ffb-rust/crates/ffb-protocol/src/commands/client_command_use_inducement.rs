@@ -34,4 +34,9 @@ mod tests {
         assert!(cmd.inducement_type_name.is_none());
         assert!(cmd.player_ids.is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUseInducement::default()).is_empty());
+    }
+
 }

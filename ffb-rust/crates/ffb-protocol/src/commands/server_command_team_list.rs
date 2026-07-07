@@ -27,4 +27,9 @@ mod tests {
     fn default_works() {
         let _ = ServerCommandTeamList::default();
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandTeamList::default()).is_empty());
+    }
+
 }

@@ -42,5 +42,11 @@ mod tests {
         assert!(cmd.acting_player_id.is_none());
         assert!(cmd.victim_id.is_none());
     }
-#[test]    fn new_constructor_creates_default() {        let cmd = ClientCommandGaze::new();        let _ = cmd;    }
+#[test]    fn new_constructor_creates_default() { let cmd = ClientCommandGaze::new(); let _ = cmd; }
+
+    #[test]
+    fn victim_id_stored() {
+        let cmd = ClientCommandGaze::with_players("g", "v");
+        assert_eq!(cmd.get_victim_id(), Some("v"));
+    }
 }

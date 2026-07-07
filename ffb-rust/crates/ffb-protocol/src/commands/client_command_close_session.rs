@@ -13,5 +13,11 @@ mod tests {
     #[test]
     fn can_construct() { let _ = ClientCommandCloseSession::new(); }
 
-#[test]    fn default_same_as_new() {        let _ = ClientCommandCloseSession::default();    }
+    #[test]
+    fn default_same_as_new() { let _ = ClientCommandCloseSession::default(); }
+
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandCloseSession::new()).is_empty());
+    }
 }

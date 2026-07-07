@@ -14,4 +14,9 @@ mod tests {
     fn can_construct() { let _ = ClientCommandUseTeamMatesWisdom::new(); }
     #[test]
     fn default_works() { let _ = ClientCommandUseTeamMatesWisdom::default(); }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUseTeamMatesWisdom::default()).is_empty());
+    }
+
 }

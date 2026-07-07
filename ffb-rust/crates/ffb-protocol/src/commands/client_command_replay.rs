@@ -44,4 +44,10 @@ mod tests {
         assert_eq!(cmd.replay_to_command_nr, 0);
         assert!(cmd.coach.is_none());
     }
+
+    #[test]
+    fn large_game_id_stored() {
+        let cmd = ClientCommandReplay::with_params(i64::MAX, 0, "coach");
+        assert_eq!(cmd.get_game_id(), i64::MAX);
+    }
 }

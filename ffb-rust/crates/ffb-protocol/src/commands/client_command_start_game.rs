@@ -21,4 +21,9 @@ mod tests {
     fn default_works() {
         let _cmd = ClientCommandStartGame::default();
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandStartGame::default()).is_empty());
+    }
+
 }

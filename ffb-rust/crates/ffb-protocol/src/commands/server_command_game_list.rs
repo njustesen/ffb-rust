@@ -27,4 +27,9 @@ mod tests {
     fn default_works() {
         let _ = ServerCommandGameList::default();
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandGameList::default()).is_empty());
+    }
+
 }

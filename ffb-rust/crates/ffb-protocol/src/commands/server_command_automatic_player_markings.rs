@@ -37,4 +37,9 @@ mod tests {
         assert!(cmd.markings.is_empty());
         assert_eq!(cmd.index, 0);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandAutomaticPlayerMarkings::default()).is_empty());
+    }
+
 }

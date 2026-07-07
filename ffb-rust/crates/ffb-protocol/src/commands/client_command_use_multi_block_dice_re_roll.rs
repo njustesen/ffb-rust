@@ -24,4 +24,9 @@ mod tests {
     fn default_empty() {
         assert!(ClientCommandUseMultiBlockDiceReRoll::new().dice_indexes.is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUseMultiBlockDiceReRoll::default()).is_empty());
+    }
+
 }

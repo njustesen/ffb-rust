@@ -37,4 +37,11 @@ mod tests {
         assert!(cmd.player_id.is_none());
         assert!(cmd.kind.is_none());
     }
+
+    #[test]
+    fn stab_kind_stored() {
+        let cmd = ClientCommandSetBlockTargetSelection::with_target("p2", BlockKind::STAB);
+        assert_eq!(cmd.get_kind(), Some(BlockKind::STAB));
+        assert_eq!(cmd.get_player_id(), Some("p2"));
+    }
 }

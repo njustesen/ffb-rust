@@ -33,4 +33,9 @@ mod tests {
         let cmd = ClientCommandTransferReplayControl::with_coach("coach-abc");
         assert_eq!(cmd.get_coach(), Some("coach-abc"));
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandTransferReplayControl::default()).is_empty());
+    }
+
 }

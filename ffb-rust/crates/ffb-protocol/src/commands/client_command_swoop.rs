@@ -44,4 +44,9 @@ mod tests {
         assert!(cmd.acting_player_id.is_none());
         assert!(cmd.target_coordinate.is_none());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandSwoop::default()).is_empty());
+    }
+
 }

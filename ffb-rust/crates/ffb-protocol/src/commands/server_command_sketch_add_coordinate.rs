@@ -46,4 +46,9 @@ mod tests {
         assert_eq!(cmd.get_sketch_id(), "sk1");
         assert_eq!(cmd.get_coordinate(), FieldCoordinate::new(5, 3));
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandSketchAddCoordinate::default()).is_empty());
+    }
+
 }

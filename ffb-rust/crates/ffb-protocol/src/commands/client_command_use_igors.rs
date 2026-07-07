@@ -26,4 +26,9 @@ mod tests {
         cmd.injury_description_json.push("{}".into());
         assert_eq!(cmd.get_injury_descriptions().len(), 1);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUseIgors::default()).is_empty());
+    }
+
 }

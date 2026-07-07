@@ -55,4 +55,9 @@ mod tests {
         assert!(cmd.thrown_player_id.is_none());
         assert!(!cmd.kicked);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandThrowTeamMate::default()).is_empty());
+    }
+
 }

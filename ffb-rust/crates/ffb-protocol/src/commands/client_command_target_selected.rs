@@ -33,4 +33,9 @@ mod tests {
         let cmd = ClientCommandTargetSelected::with_target("player-123");
         assert_eq!(cmd.get_target_player_id(), Some("player-123"));
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandTargetSelected::default()).is_empty());
+    }
+
 }

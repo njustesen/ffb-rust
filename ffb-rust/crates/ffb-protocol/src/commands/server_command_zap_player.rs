@@ -32,4 +32,9 @@ mod tests {
         let cmd = ServerCommandZapPlayer::default();
         assert!(cmd.player_id.is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandZapPlayer::default()).is_empty());
+    }
+
 }

@@ -35,4 +35,13 @@ mod tests {
         let cmd = ClientCommandRemoveSketches::new();
         assert!(cmd.ids.is_empty());
     }
+
+    #[test]
+    fn add_id_increments_len() {
+        let mut cmd = ClientCommandRemoveSketches::new();
+        cmd.add_id("sk-1");
+        assert_eq!(cmd.get_ids().len(), 1);
+        cmd.add_id("sk-2");
+        assert_eq!(cmd.get_ids().len(), 2);
+    }
 }

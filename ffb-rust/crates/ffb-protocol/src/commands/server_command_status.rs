@@ -32,4 +32,9 @@ mod tests {
         let cmd = ServerCommandStatus::default();
         assert!(cmd.server_status.is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandStatus::default()).is_empty());
+    }
+
 }

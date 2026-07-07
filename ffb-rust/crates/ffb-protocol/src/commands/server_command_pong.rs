@@ -26,4 +26,9 @@ mod tests {
         let cmd = ServerCommandPong::default();
         assert_eq!(cmd.timestamp, 0);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandPong::default()).is_empty());
+    }
+
 }

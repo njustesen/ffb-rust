@@ -33,4 +33,9 @@ mod tests {
         let cmd = ClientCommandTeamSetupLoad::with_setup_name("default-setup");
         assert_eq!(cmd.get_setup_name(), Some("default-setup"));
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandTeamSetupLoad::default()).is_empty());
+    }
+
 }

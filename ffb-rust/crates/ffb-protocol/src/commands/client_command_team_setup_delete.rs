@@ -33,4 +33,9 @@ mod tests {
         let cmd = ClientCommandTeamSetupDelete::with_setup_name("my-setup");
         assert_eq!(cmd.get_setup_name(), Some("my-setup"));
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandTeamSetupDelete::default()).is_empty());
+    }
+
 }

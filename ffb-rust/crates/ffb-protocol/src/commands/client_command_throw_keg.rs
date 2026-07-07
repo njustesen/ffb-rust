@@ -33,4 +33,9 @@ mod tests {
         let cmd = ClientCommandThrowKeg::with_player_id("p-42");
         assert_eq!(cmd.get_player_id(), Some("p-42"));
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandThrowKeg::default()).is_empty());
+    }
+
 }

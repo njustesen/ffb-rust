@@ -43,4 +43,10 @@ mod tests {
         assert_eq!(cmd.get_coach(), Some("coach-1"));
         assert!(cmd.is_prevent_sketching());
     }
+
+    #[test]
+    fn false_prevent_stored() {
+        let cmd = ClientCommandSetPreventSketching::with_fields("c", false);
+        assert!(!cmd.is_prevent_sketching());
+    }
 }

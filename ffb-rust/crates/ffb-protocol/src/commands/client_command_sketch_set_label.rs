@@ -38,4 +38,9 @@ mod tests {
         assert!(cmd.sketch_ids.is_empty());
         assert!(cmd.label.is_none());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandSketchSetLabel::default()).is_empty());
+    }
+
 }

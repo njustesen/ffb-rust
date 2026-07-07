@@ -65,4 +65,9 @@ mod tests {
         assert!(cmd.team_id.is_empty());
         assert!(cmd.send_to_box_reason.is_none());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandAddPlayer::default()).is_empty());
+    }
+
 }

@@ -30,4 +30,9 @@ mod tests {
         cmd.add_message("hi");
         assert_eq!(cmd.messages.len(), 1);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandAdminMessage::default()).is_empty());
+    }
+
 }

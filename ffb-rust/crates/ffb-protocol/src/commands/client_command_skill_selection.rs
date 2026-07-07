@@ -46,4 +46,9 @@ mod tests {
         assert_eq!(cmd.get_player_id(), Some("player_2"));
         assert_eq!(cmd.get_skill_id(), Some("BLOCK"));
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandSkillSelection::default()).is_empty());
+    }
+
 }

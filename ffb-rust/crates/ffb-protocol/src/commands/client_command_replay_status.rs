@@ -48,4 +48,11 @@ mod tests {
         assert!(!cmd.running);
         assert!(!cmd.skip);
     }
+
+    #[test]
+    fn skip_can_be_set() {
+        let cmd = ClientCommandReplayStatus::with_params(0, 1, false, false, true);
+        assert!(cmd.is_skip());
+        assert!(!cmd.is_running());
+    }
 }

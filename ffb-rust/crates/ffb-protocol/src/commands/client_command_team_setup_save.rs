@@ -51,4 +51,9 @@ mod tests {
         assert!(cmd.player_numbers.is_empty());
         assert!(cmd.player_coordinates.is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandTeamSetupSave::default()).is_empty());
+    }
+
 }

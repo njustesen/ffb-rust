@@ -39,4 +39,9 @@ mod tests {
         assert!(!cmd.skill_used);
         assert!(!cmd.never_use);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUseSkill::default()).is_empty());
+    }
+
 }

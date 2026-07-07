@@ -26,4 +26,9 @@ mod tests {
     fn default_none() {
         assert!(ClientCommandUseHatred::new().target_id.is_none());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUseHatred::default()).is_empty());
+    }
+
 }

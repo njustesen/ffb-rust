@@ -28,4 +28,9 @@ mod tests {
     fn default_false() {
         assert!(!ClientCommandUpdatePlayerMarkings::new().auto);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUpdatePlayerMarkings::default()).is_empty());
+    }
+
 }

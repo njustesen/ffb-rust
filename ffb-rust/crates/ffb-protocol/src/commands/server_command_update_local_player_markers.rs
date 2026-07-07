@@ -28,4 +28,9 @@ mod tests {
         let cmd = ServerCommandUpdateLocalPlayerMarkers::default();
         assert!(cmd.markers.is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandUpdateLocalPlayerMarkers::default()).is_empty());
+    }
+
 }

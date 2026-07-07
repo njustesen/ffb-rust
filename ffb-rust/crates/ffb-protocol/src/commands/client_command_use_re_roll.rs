@@ -37,4 +37,9 @@ mod tests {
         assert!(cmd.re_rolled_action.is_none());
         assert!(cmd.re_roll_source.is_none());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUseReRoll::default()).is_empty());
+    }
+
 }

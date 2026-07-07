@@ -17,5 +17,11 @@ mod tests {
         let _ = ServerCommandClearSketches::new();
     }
 
-#[test]    fn default_same_as_new() {        let _ = ServerCommandClearSketches::default();    }
+    #[test]
+    fn default_same_as_new() { let _ = ServerCommandClearSketches::default(); }
+
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandClearSketches::new()).is_empty());
+    }
 }

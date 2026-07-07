@@ -52,4 +52,9 @@ mod tests {
         assert!(cmd.server_version.is_empty());
         assert!(cmd.client_properties.is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandVersion::default()).is_empty());
+    }
+
 }

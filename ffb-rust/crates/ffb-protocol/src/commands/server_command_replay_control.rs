@@ -26,4 +26,9 @@ mod tests {
         let cmd = ServerCommandReplayControl::default();
         assert!(cmd.coach.is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandReplayControl::default()).is_empty());
+    }
+
 }

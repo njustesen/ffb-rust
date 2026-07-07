@@ -26,4 +26,9 @@ mod tests {
         let cmd = ServerCommandSetPreventSketching::default();
         assert!(!cmd.prevent_sketching);
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandSetPreventSketching::default()).is_empty());
+    }
+
 }

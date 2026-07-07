@@ -42,5 +42,11 @@ mod tests {
         assert!(cmd.acting_player_id.is_none());
         assert!(cmd.catcher_id.is_none());
     }
-#[test]    fn new_constructor_creates_default() {        let cmd = ClientCommandHandOver::new();        let _ = cmd;    }
+#[test]    fn new_constructor_creates_default() { let cmd = ClientCommandHandOver::new(); let _ = cmd; }
+
+    #[test]
+    fn catcher_id_stored() {
+        let cmd = ClientCommandHandOver::with_players("thrower", "catcher2");
+        assert_eq!(cmd.get_catcher_id(), Some("catcher2"));
+    }
 }

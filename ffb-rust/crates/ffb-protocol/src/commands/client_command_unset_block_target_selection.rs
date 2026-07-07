@@ -33,4 +33,9 @@ mod tests {
         let cmd = ClientCommandUnsetBlockTargetSelection::with_player_id("p-99");
         assert_eq!(cmd.get_player_id(), Some("p-99"));
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandUnsetBlockTargetSelection::default()).is_empty());
+    }
+
 }

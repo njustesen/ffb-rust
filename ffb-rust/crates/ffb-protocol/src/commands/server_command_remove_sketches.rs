@@ -32,4 +32,9 @@ mod tests {
         let cmd = ServerCommandRemoveSketches::default();
         assert!(cmd.ids.is_empty());
     }
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ServerCommandRemoveSketches::default()).is_empty());
+    }
+
 }

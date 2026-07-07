@@ -45,4 +45,9 @@ mod tests {
         assert!(cmd.player_id.is_none());
         assert!(cmd.coordinate.is_none());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        assert!(!format!("{:?}", ClientCommandSetupPlayer::new()).is_empty());
+    }
 }
