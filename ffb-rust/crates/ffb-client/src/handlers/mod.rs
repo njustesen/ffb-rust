@@ -102,6 +102,7 @@ mod tests {
             assistant_coaches: 0, cheerleaders: 0, dedicated_fans: 0,
             treasury: 0, team_value: 0, players: vec![], special_rules: vec![],
             vampire_lord: false,
+            necromancer: false,
         };
         let away = Team { id: "away".into(), ..home.clone() };
         Game::new(home, away, Rules::Bb2020)

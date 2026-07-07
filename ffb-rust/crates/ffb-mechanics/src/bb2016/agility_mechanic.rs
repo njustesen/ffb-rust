@@ -190,8 +190,8 @@ mod tests {
         let m = AgilityMechanic::new();
         let p = player_with_agility(3);
         let game = ffb_model::model::Game::new(
-            ffb_model::model::Team { id: "h".into(), name: "h".into(), race: "H".into(), roster_id: "r".into(), coach: "c".into(), rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0, special_rules: vec![], players: vec![], vampire_lord: false },
-            ffb_model::model::Team { id: "a".into(), name: "a".into(), race: "H".into(), roster_id: "r".into(), coach: "c".into(), rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0, special_rules: vec![], players: vec![], vampire_lord: false },
+            ffb_model::model::Team { id: "h".into(), name: "h".into(), race: "H".into(), roster_id: "r".into(), coach: "c".into(), rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0, special_rules: vec![], players: vec![], vampire_lord: false, necromancer: false },
+            ffb_model::model::Team { id: "a".into(), name: "a".into(), race: "H".into(), roster_id: "r".into(), coach: "c".into(), rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0, special_rules: vec![], players: vec![], vampire_lord: false, necromancer: false },
             ffb_model::enums::Rules::Bb2016,
         );
         assert_eq!(m.minimum_roll_dodge(&game, &p, &HashSet::new()), 3);
@@ -219,8 +219,8 @@ mod tests {
         let m = AgilityMechanic::new();
         let p = player_with_agility(6);
         let game = ffb_model::model::Game::new(
-            ffb_model::model::Team { id: "h".into(), name: "h".into(), race: "H".into(), roster_id: "r".into(), coach: "c".into(), rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0, special_rules: vec![], players: vec![], vampire_lord: false },
-            ffb_model::model::Team { id: "a".into(), name: "a".into(), race: "H".into(), roster_id: "r".into(), coach: "c".into(), rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0, special_rules: vec![], players: vec![], vampire_lord: false },
+            ffb_model::model::Team { id: "h".into(), name: "h".into(), race: "H".into(), roster_id: "r".into(), coach: "c".into(), rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0, special_rules: vec![], players: vec![], vampire_lord: false, necromancer: false },
+            ffb_model::model::Team { id: "a".into(), name: "a".into(), race: "H".into(), roster_id: "r".into(), coach: "c".into(), rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0, special_rules: vec![], players: vec![], vampire_lord: false, necromancer: false },
             ffb_model::enums::Rules::Bb2016,
         );
         assert_eq!(m.minimum_roll_dodge(&game, &p, &HashSet::new()), 2);

@@ -129,6 +129,7 @@ mod tests {
             team_value: 1_000_000, treasury: 0,
             special_rules: vec![], players: vec![],
             vampire_lord: false,
+            necromancer: false,
         }
     }
 

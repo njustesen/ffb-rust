@@ -3570,6 +3570,7 @@ pub(crate) fn test_team(side: &str, dedicated_fans: i32) -> ffb_model::model::te
         fan_factor: 0, dedicated_fans, team_value: 1_000_000, treasury: 0,
         special_rules: vec![], players: vec![],
         vampire_lord: false,
+        necromancer: false,
     }
 }
 

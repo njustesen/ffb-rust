@@ -156,6 +156,7 @@ mod tests {
             fan_factor: 3, dedicated_fans: 7, team_value: 0, treasury: 0,
             special_rules: vec![], players: vec![],
             vampire_lord: false,
+            necromancer: false,
         }
     }
 

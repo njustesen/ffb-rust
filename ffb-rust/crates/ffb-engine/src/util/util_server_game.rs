@@ -265,6 +265,7 @@ mod tests {
             special_rules: vec![],
             players,
             vampire_lord: false,
+            necromancer: false,
         }
     }
 

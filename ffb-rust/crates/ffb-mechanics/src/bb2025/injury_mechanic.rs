@@ -77,10 +77,12 @@ impl InjuryMechanicTrait for InjuryMechanic {
 
     fn raise_type(&self, team: &Team) -> RaiseType {
         if team.special_rules.iter().any(|r| r == SpecialRule::MASTERS_OF_UNDEATH.get_rule_name()) {
-            RaiseType::ZOMBIE
-        } else {
-            RaiseType::ROTTER
+            return RaiseType::ZOMBIE;
         }
+        if team.vampire_lord {
+            return RaiseType::THRALL;
+        }
+        RaiseType::ROTTER
     }
 }
 
@@ -94,6 +96,10 @@ mod tests {
     use crate::injury_mechanic::InjuryMechanic as InjuryMechanicTrait;
 
     fn empty_team(special_rules: Vec<String>) -> Team {
+        empty_team_with(special_rules, false)
+    }
+
+    fn empty_team_with(special_rules: Vec<String>, vampire_lord: bool) -> Team {
         Team {
             id: "t".into(), name: "T".into(), race: "human".into(),
             roster_id: "human".into(), coach: "Coach".into(),
@@ -101,7 +107,8 @@ mod tests {
             prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
             cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
             team_value: 0, treasury: 0, special_rules, players: vec![],
-            vampire_lord: false,
+            vampire_lord,
+            necromancer: false,
         }
     }
 
@@ -149,6 +156,23 @@ mod tests {
         let m = InjuryMechanic::new();
         let team = empty_team(vec![]);
         assert_eq!(m.raise_type(&team), RaiseType::ROTTER);
+    }
+
+    #[test]
+    fn raise_type_thrall_for_vampire_lord() {
+        let m = InjuryMechanic::new();
+        let team = empty_team_with(vec![], true);
+        assert_eq!(m.raise_type(&team), RaiseType::THRALL);
+    }
+
+    #[test]
+    fn raise_type_zombie_takes_priority_over_vampire_lord() {
+        let m = InjuryMechanic::new();
+        let team = empty_team_with(
+            vec![SpecialRule::MASTERS_OF_UNDEATH.get_rule_name().into()],
+            true,
+        );
+        assert_eq!(m.raise_type(&team), RaiseType::ZOMBIE);
     }
 
     #[test]

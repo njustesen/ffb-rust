@@ -189,6 +189,7 @@ mod tests {
             assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0,
             special_rules: vec![], players,
             vampire_lord: false,
+            necromancer: false,
         }
     }
 

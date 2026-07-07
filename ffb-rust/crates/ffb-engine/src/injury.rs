@@ -857,6 +857,7 @@ mod tests {
                 team_value: 0, treasury: 0, special_rules: vec![],
                 players: player_ids.iter().map(|pid| make_player(pid)).collect(),
                 vampire_lord: false,
+                necromancer: false,
             }
         };
         let home = make_team("home", home_ids);

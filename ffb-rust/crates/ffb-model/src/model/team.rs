@@ -35,6 +35,11 @@ pub struct Team {
     /// Java: team.getRoster().hasVampireLord() — stored here to avoid roster lookup at mechanic time.
     #[serde(default)]
     pub vampire_lord: bool,
+
+    /// True when this team's roster has `necromancer: true` (Necromantic Horror, Undead in BB2016).
+    /// Java: team.getRoster().hasNecromancer() — stored here to avoid roster lookup at mechanic time.
+    #[serde(default)]
+    pub necromancer: bool,
 }
 
 impl Team {
@@ -83,6 +88,7 @@ mod tests {
             special_rules: vec![],
             players: vec![],
             vampire_lord: false,
+            necromancer: false,
         }
     }
 

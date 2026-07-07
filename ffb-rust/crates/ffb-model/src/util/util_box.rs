@@ -164,6 +164,7 @@ mod tests {
             special_rules: vec![],
             players: player_ids.iter().map(|id| make_player(id)).collect(),
             vampire_lord: false,
+            necromancer: false,
         }
     }
 

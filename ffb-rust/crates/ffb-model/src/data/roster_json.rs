@@ -45,6 +45,11 @@ impl RosterJson {
     pub fn has_vampire_lord(&self) -> bool {
         self.keywords.iter().any(|k| k.eq_ignore_ascii_case("vampire lord"))
     }
+
+    /// Java: Roster.hasNecromancer() — true for Necromantic Horror and Undead rosters.
+    pub fn has_necromancer(&self) -> bool {
+        self.necromancer
+    }
 }
 
 #[derive(Debug, Deserialize)]
