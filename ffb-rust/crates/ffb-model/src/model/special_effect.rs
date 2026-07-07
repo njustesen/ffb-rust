@@ -51,4 +51,19 @@ mod tests {
     fn for_name_round_trip() {
         assert_eq!(SpecialEffect::for_name("lightning"), Some(SpecialEffect::LIGHTNING));
     }
+
+    #[test]
+    fn all_variants_get_name_round_trip() {
+        let variants = [SpecialEffect::LIGHTNING, SpecialEffect::FIREBALL, SpecialEffect::ZAP, SpecialEffect::BOMB];
+        for variant in variants {
+            assert_eq!(SpecialEffect::for_name(variant.get_name()), Some(variant),
+                "{:?} did not round-trip through get_name/for_name", variant);
+        }
+    }
+
+    #[test]
+    fn zap_and_fireball_are_wizard_spells() {
+        assert!(SpecialEffect::ZAP.is_wizard_spell());
+        assert!(SpecialEffect::FIREBALL.is_wizard_spell());
+    }
 }

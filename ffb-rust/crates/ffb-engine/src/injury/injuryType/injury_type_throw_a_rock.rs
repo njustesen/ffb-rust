@@ -45,4 +45,16 @@ mod tests {
         assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
     #[test] fn no_turnover() { assert!(!InjuryTypeThrowARock::new().falling_down_causes_turnover()); }
+    #[test]
+    fn new_creates_instance_with_correct_apo_mode() {
+        let t = InjuryTypeThrowARock::new();
+        assert_eq!(t.ctx.apothecary_mode, ApothecaryMode::Defender);
+    }
+    #[test]
+    fn sets_attacker_and_defender_ids() {
+        let mut t = InjuryTypeThrowARock::new(); let mut rng = GameRng::new(1);
+        t.handle_injury(&make_game(), &mut rng, Some("atk1"), "def1", coord(), None, None, ApothecaryMode::Defender);
+        assert_eq!(t.ctx.defender_id.as_deref(), Some("def1"));
+        assert_eq!(t.ctx.attacker_id.as_deref(), Some("atk1"));
+    }
 }

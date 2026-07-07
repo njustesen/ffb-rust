@@ -59,4 +59,19 @@ mod tests {
         assert_eq!(CardHandlerKey::WITCH_BREW, CardHandlerKey::WITCH_BREW);
         assert_ne!(CardHandlerKey::WITCH_BREW, CardHandlerKey::DISTRACT);
     }
+
+    #[test]
+    fn specific_variant_names_are_correct() {
+        assert_eq!(CardHandlerKey::CHOP_BLOCK.get_name(), "CHOP_BLOCK");
+        assert_eq!(CardHandlerKey::RABBITS_FOOT.get_name(), "RABBITS_FOOT");
+        assert_eq!(CardHandlerKey::ILLEGAL_SUBSTITUTION.get_name(), "ILLEGAL_SUBSTITUTION");
+    }
+
+    #[test]
+    fn copy_produces_independent_value() {
+        let original = CardHandlerKey::PIT_TRAP;
+        let copied = original;
+        assert_eq!(original, copied);
+        assert_eq!(copied.get_name(), "PIT_TRAP");
+    }
 }

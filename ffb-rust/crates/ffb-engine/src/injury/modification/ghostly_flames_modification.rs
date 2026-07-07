@@ -70,4 +70,17 @@ mod tests {
         use ffb_model::model::SkillUse;
         assert_eq!(GhostlyFlamesModification::new().skill_use(), SkillUse::INCREASE_CHAINSAW_DAMAGE);
     }
+    #[test]
+    fn try_armour_false_when_not_broken_but_no_active_player() {
+        // No acting player means acting_player_is_blitzing_attacker returns false
+        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let mut rng = GameRng::new(1);
+        let ctx = InjuryContext::new(ApothecaryMode::Defender);
+        let params = ModificationParams::new(&game, &mut rng, ctx, "Chainsaw");
+        assert!(!GhostlyFlamesModification::new().try_armour_roll_modification(&params));
+    }
+    #[test]
+    fn skill_id_starts_as_none() {
+        assert!(GhostlyFlamesModification::new().skill_id().is_none());
+    }
 }

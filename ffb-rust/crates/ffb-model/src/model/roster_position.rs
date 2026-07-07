@@ -107,4 +107,21 @@ mod tests {
         pos.player_type = PlayerType::Star;
         assert!(pos.is_star_player());
     }
+
+    #[test]
+    fn has_keyword_case_insensitive() {
+        let mut pos = minimal();
+        pos.keywords = vec!["Big Guy".into()];
+        // The stored keyword uses title-case; has_keyword must match regardless of case
+        assert!(pos.has_keyword(Keyword::BIG_GUY), "should match 'Big Guy' stored as title-case");
+    }
+
+    #[test]
+    fn has_keyword_returns_false_when_absent() {
+        let pos = minimal(); // keywords vec is empty
+        assert!(
+            !pos.has_keyword(Keyword::LINEMAN),
+            "empty keywords list should never match any keyword"
+        );
+    }
 }

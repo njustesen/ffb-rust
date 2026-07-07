@@ -224,4 +224,32 @@ mod tests {
         assert!(ys.contains(&0));
         assert!(ys.contains(&1));
     }
+
+    #[test]
+    fn put_player_into_box_badly_hurt_away_team() {
+        let mut game = make_game_with_players(&[], &["a1"]);
+        game.field_model.set_player_coordinate("a1", FieldCoordinate::new(7, 3));
+        game.field_model.set_player_state("a1", PlayerState::new(PS_BADLY_HURT));
+
+        UtilBox::put_player_into_box(&mut game, "a1");
+
+        let coord = game.field_model.player_coordinate("a1").expect("player should be in box");
+        assert_eq!(coord.x, BH_AWAY_X, "BH away player should be at BH_AWAY_X");
+        assert_eq!(coord.y, 0);
+    }
+
+    #[test]
+    fn put_player_into_box_unknown_state_leaves_player_unplaced() {
+        // A player with no state set should not be moved (box_x == 0 branch).
+        let mut game = make_game_with_players(&["h1"], &[]);
+        // Do NOT set a state — player_state returns None → box_x = 0.
+        let original = FieldCoordinate::new(6, 6);
+        game.field_model.set_player_coordinate("h1", original);
+
+        UtilBox::put_player_into_box(&mut game, "h1");
+
+        // Player coordinate should be unchanged (still at original position).
+        let coord = game.field_model.player_coordinate("h1").expect("player should still have a coordinate");
+        assert_eq!(coord, original);
+    }
 }

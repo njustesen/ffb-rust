@@ -53,4 +53,21 @@ mod tests {
     fn default_is_regular() {
         assert_eq!(PushbackMode::default(), PushbackMode::REGULAR);
     }
+
+    #[test]
+    fn for_name_covers_all_variants() {
+        assert_eq!(PushbackMode::for_name("regular"), Some(PushbackMode::REGULAR));
+        assert_eq!(PushbackMode::for_name("sideStep"), Some(PushbackMode::SIDE_STEP));
+        assert_eq!(PushbackMode::for_name("grab"), Some(PushbackMode::GRAB));
+        assert_eq!(PushbackMode::for_name("unknown"), None);
+    }
+
+    #[test]
+    fn copy_and_clone_produce_equal_values() {
+        let original = PushbackMode::SIDE_STEP;
+        let copied = original;
+        let cloned = original.clone();
+        assert_eq!(original, copied);
+        assert_eq!(original, cloned);
+    }
 }

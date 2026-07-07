@@ -53,4 +53,15 @@ mod tests {
     fn no_apo() { assert!(!InjuryTypePilingOnInjury::new().can_use_apo()); }
     #[test]
     fn no_turnover() { assert!(!InjuryTypePilingOnInjury::new().falling_down_causes_turnover()); }
+    #[test]
+    fn injury_context_returns_context() {
+        let t = InjuryTypePilingOnInjury::new();
+        assert_eq!(t.injury_context().apothecary_mode, ApothecaryMode::Defender);
+    }
+    #[test]
+    fn sets_defender_id_after_handle_injury() {
+        let mut t = InjuryTypePilingOnInjury::new(); let mut rng = GameRng::new(1);
+        t.handle_injury(&make_game(), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert_eq!(t.ctx.defender_id.as_deref(), Some("p1"));
+    }
 }

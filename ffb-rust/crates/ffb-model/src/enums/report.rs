@@ -107,4 +107,35 @@ mod tests {
         let s = serde_json::to_string(&id).unwrap();
         assert_eq!(s, "\"dodgeRoll\"");
     }
+
+    #[test]
+    fn from_name_covers_multi_word_camel_case() {
+        // Variants with more than two words must also deserialize correctly.
+        assert_eq!(
+            ReportId::from_name("foulAppearanceRoll"),
+            Some(ReportId::FoulAppearanceRoll)
+        );
+        assert_eq!(
+            ReportId::from_name("thenIStartedBlastin"),
+            Some(ReportId::ThenIStartedBlastin)
+        );
+    }
+
+    #[test]
+    fn deserialization_round_trips_all_variants() {
+        // Spot-check that serialise → deserialise is an identity for every
+        // variant we care about in the protocol.
+        let ids = [
+            ReportId::Injury,
+            ReportId::BlockRoll,
+            ReportId::KickoffResult,
+            ReportId::WinningsRoll,
+            ReportId::PrayerRoll,
+        ];
+        for id in ids {
+            let json = serde_json::to_string(&id).unwrap();
+            let back: ReportId = serde_json::from_str(&json).unwrap();
+            assert_eq!(id, back);
+        }
+    }
 }

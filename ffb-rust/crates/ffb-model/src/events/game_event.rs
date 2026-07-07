@@ -255,4 +255,30 @@ mod tests {
         let back: GameEvent = serde_json::from_str(&json).unwrap();
         assert_eq!(ev, back);
     }
+
+    #[test]
+    fn serde_block_roll_round_trips() {
+        let ev = GameEvent::BlockRoll {
+            attacker_id: "a1".into(),
+            defender_id: "d1".into(),
+            nr_of_dice: 2,
+            dice: vec![3, 5],
+            selected_index: 1,
+            own_choice: true,
+            rerolled: false,
+        };
+        let json = serde_json::to_string(&ev).unwrap();
+        let back: GameEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(ev, back);
+    }
+
+    #[test]
+    fn serde_kickoff_throw_a_rock_none_player() {
+        // KickoffThrowARock with no targeted player must round-trip with a null player_id.
+        let ev = GameEvent::KickoffThrowARock { player_id: None };
+        let json = serde_json::to_string(&ev).unwrap();
+        assert!(json.contains("null"), "expected null player_id in JSON: {}", json);
+        let back: GameEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(ev, back);
+    }
 }

@@ -463,4 +463,19 @@ mod tests {
     fn all_is_non_empty() {
         assert!(!CommonProperty::all().is_empty());
     }
+
+    #[test]
+    fn is_stored_remote_only_local_settings() {
+        assert!(CommonProperty::SETTING_LOCAL_SETTINGS.is_stored_remote());
+        assert!(!CommonProperty::CLIENT_COMMAND_COMPRESSION.is_stored_remote());
+        assert!(!CommonProperty::SETTING_SOUND_MODE.is_stored_remote());
+    }
+
+    #[test]
+    fn get_value_returns_none_for_client_props_and_some_for_settings() {
+        assert_eq!(CommonProperty::CLIENT_PING_INTERVAL.get_value(), None);
+        assert_eq!(CommonProperty::HTTPCLIENT_TIMEOUT_CONNECT.get_value(), None);
+        assert_eq!(CommonProperty::SETTING_SOUND_MODE.get_value(), Some("Sound"));
+        assert_eq!(CommonProperty::SETTING_AUTOCOMPLETE.get_value(), Some("Autocomplete"));
+    }
 }

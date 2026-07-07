@@ -113,4 +113,27 @@ mod tests {
         let r = ReRolledActions::new();
         assert!(!r.values().is_empty());
     }
+
+    #[test]
+    fn for_name_returns_action_with_original_casing() {
+        let r = ReRolledActions::new();
+        // Keys are lowercased, but the stored action preserves the original name
+        let action = r.for_name("DODGE").expect("should find Dodge case-insensitively");
+        assert_eq!(action.get_name(), "Dodge");
+    }
+
+    #[test]
+    fn default_equals_new() {
+        let via_new = ReRolledActions::new();
+        let via_default = ReRolledActions::default();
+        // Both must produce the same set of action names
+        assert_eq!(
+            via_new.values().len(),
+            via_default.values().len(),
+            "default() and new() should produce the same number of entries"
+        );
+        for key in via_new.values().keys() {
+            assert!(via_default.values().contains_key(key), "default() missing key: {key}");
+        }
+    }
 }

@@ -63,4 +63,22 @@ mod tests {
         assert_eq!(d.get_block_kind(), None);
         assert_eq!(d.get_nr_of_dice(), 0);
     }
+
+    #[test]
+    fn transform_mirrors_coordinate() {
+        let coord = FieldCoordinate::new(3, 5);
+        let d = DiceDecoration::new(coord, 1, BlockKind::BLOCK);
+        let t = d.transform();
+        assert_eq!(t.get_coordinate(), Some(&coord.transform()));
+        assert_ne!(t.get_coordinate(), Some(&coord));
+    }
+
+    #[test]
+    fn transform_of_default_keeps_none_coordinate() {
+        let d = DiceDecoration::default();
+        let t = d.transform();
+        assert_eq!(t.get_coordinate(), None);
+        assert_eq!(t.get_nr_of_dice(), 0);
+        assert_eq!(t.get_block_kind(), None);
+    }
 }

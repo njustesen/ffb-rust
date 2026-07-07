@@ -125,4 +125,34 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn get_unused_skill_with_property_returns_skill_id_when_present_and_none_when_absent() {
+        // Wrestle has "canTakeDownPlayersWithHimOnBothDown"
+        let property = "canTakeDownPlayersWithHimOnBothDown";
+        let p = player_with_skill(SkillId::Wrestle);
+        assert_eq!(
+            UtilCards::get_unused_skill_with_property(&p, property),
+            Some(SkillId::Wrestle),
+        );
+
+        // A player without Wrestle should return None for that property
+        let p2 = player_with_skill(SkillId::Block);
+        assert_eq!(
+            UtilCards::get_unused_skill_with_property(&p2, property),
+            None,
+        );
+    }
+
+    #[test]
+    fn has_skill_to_cancel_property_true_for_tackle_cancelling_dodge_reroll() {
+        // Tackle has "cancelsCanRerollDodge" which cancels the property "canRerollDodge".
+        // has_skill_to_cancel_property("canRerollDodge") should build "cancelsCanRerollDodge" and find Tackle.
+        let p = player_with_skill(SkillId::Tackle);
+        assert!(UtilCards::has_skill_to_cancel_property(&p, "canRerollDodge"));
+
+        // A player without Tackle should not cancel that property
+        let p2 = player_with_skill(SkillId::Block);
+        assert!(!UtilCards::has_skill_to_cancel_property(&p2, "canRerollDodge"));
+    }
 }

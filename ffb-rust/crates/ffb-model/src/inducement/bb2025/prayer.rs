@@ -133,4 +133,22 @@ mod tests {
         assert_eq!(Prayer::FOULING_FRENZY.get_duration(), InducementDuration::UNTIL_END_OF_GAME);
         assert_eq!(Prayer::FRIENDS_WITH_THE_REF.get_duration(), InducementDuration::UNTIL_END_OF_GAME);
     }
+
+    #[test]
+    fn event_message_returns_correct_strings() {
+        assert_eq!(Prayer::STILETTO.event_message(), " gains Stab");
+        assert_eq!(Prayer::BLESSED_STATUE_OF_NUFFLE.event_message(), " gains Pro");
+        assert_eq!(Prayer::DAZZLING_CATCHING.event_message(), "");
+        assert_eq!(Prayer::THROW_A_ROCK.event_message(), "");
+    }
+
+    #[test]
+    fn name_and_is_changing_player_for_bb2025_variants() {
+        assert_eq!(Prayer::DAZZLING_CATCHING.name(), "DAZZLING_CATCHING");
+        assert_eq!(Prayer::UNDER_SCRUTINY.name(), "UNDER_SCRUTINY");
+        assert!(Prayer::INTENSIVE_TRAINING.is_changing_player());
+        assert!(!Prayer::DAZZLING_CATCHING.is_changing_player());
+        assert!(Prayer::TREACHEROUS_TRAPDOOR.affects_both_teams());
+        assert!(!Prayer::FAN_INTERACTION.affects_both_teams());
+    }
 }

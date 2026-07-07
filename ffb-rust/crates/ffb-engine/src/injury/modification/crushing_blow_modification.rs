@@ -75,4 +75,12 @@ mod tests {
         // No acting player → no tacklezones → false
         assert!(!CrushingBlowModification::new().try_armour_roll_modification(&params));
     }
+    #[test]
+    fn skill_use_is_add_armour_modifier() {
+        assert_eq!(CrushingBlowModification::new().skill_use(), SkillUse::ADD_ARMOUR_MODIFIER);
+    }
+    #[test]
+    fn skill_id_starts_as_none() {
+        assert!(CrushingBlowModification::new().skill_id().is_none());
+    }
 }

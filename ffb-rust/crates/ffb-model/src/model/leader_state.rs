@@ -53,4 +53,18 @@ mod tests {
     fn default_is_none() {
         assert_eq!(LeaderState::default(), LeaderState::NONE);
     }
+
+    #[test]
+    fn get_name_matches_for_name_input() {
+        for &state in &[LeaderState::NONE, LeaderState::AVAILABLE, LeaderState::USED] {
+            assert_eq!(LeaderState::for_name(state.get_name()), Some(state));
+        }
+    }
+
+    #[test]
+    fn for_name_is_case_sensitive() {
+        assert_eq!(LeaderState::for_name("None"), None);
+        assert_eq!(LeaderState::for_name("USED"), None);
+        assert_eq!(LeaderState::for_name("Available"), None);
+    }
 }

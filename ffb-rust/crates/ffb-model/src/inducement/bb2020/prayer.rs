@@ -146,4 +146,22 @@ mod tests {
         assert!(!Prayer::FOULING_FRENZY.is_changing_player());
         assert!(!Prayer::FRIENDS_WITH_THE_REF.is_changing_player());
     }
+
+    #[test]
+    fn get_duration_distinguishes_end_of_game_from_drive_and_half() {
+        assert_eq!(Prayer::IRON_MAN.get_duration(), InducementDuration::UNTIL_END_OF_GAME);
+        assert_eq!(Prayer::PERFECT_PASSING.get_duration(), InducementDuration::UNTIL_END_OF_GAME);
+        assert_eq!(Prayer::FRIENDS_WITH_THE_REF.get_duration(), InducementDuration::UNTIL_END_OF_DRIVE);
+        assert_eq!(Prayer::TREACHEROUS_TRAPDOOR.get_duration(), InducementDuration::UNTIL_END_OF_HALF);
+        assert_eq!(Prayer::MOLES_UNDER_THE_PITCH.get_duration(), InducementDuration::UNTIL_END_OF_HALF);
+    }
+
+    #[test]
+    fn event_message_and_name_are_correct() {
+        assert_eq!(Prayer::GREASY_CLEATS.event_message(), " loses 1 MA");
+        assert_eq!(Prayer::KNUCKLE_DUSTERS.event_message(), " gains Mighty Blow (+1)");
+        assert_eq!(Prayer::FOULING_FRENZY.event_message(), "");
+        assert_eq!(Prayer::IRON_MAN.name(), "IRON_MAN");
+        assert_eq!(Prayer::THROW_A_ROCK.name(), "THROW_A_ROCK");
+    }
 }

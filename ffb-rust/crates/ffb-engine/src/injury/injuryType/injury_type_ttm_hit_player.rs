@@ -73,4 +73,16 @@ mod tests {
         assert!(t.ctx.armor_broken); assert!(t.ctx.injury.is_some());
     }
     #[test] fn no_turnover() { assert!(!InjuryTypeTTMHitPlayer::new().falling_down_causes_turnover()); }
+    #[test]
+    fn new_creates_instance_with_hit_player_apo_mode() {
+        let t = InjuryTypeTTMHitPlayer::new();
+        assert_eq!(t.ctx.apothecary_mode, ApothecaryMode::HitPlayer);
+    }
+    #[test]
+    fn sets_attacker_and_defender_ids() {
+        let mut t = InjuryTypeTTMHitPlayer::new(); let mut rng = GameRng::new(1);
+        t.handle_injury(&game_with_armor(13), &mut rng, Some("atk1"), "p1", coord(), None, None, ApothecaryMode::HitPlayer);
+        assert_eq!(t.ctx.defender_id.as_deref(), Some("p1"));
+        assert_eq!(t.ctx.attacker_id.as_deref(), Some("atk1"));
+    }
 }

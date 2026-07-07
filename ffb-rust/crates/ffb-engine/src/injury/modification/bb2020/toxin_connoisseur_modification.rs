@@ -56,4 +56,13 @@ mod tests {
         let ctx = InjuryContext::new(ApothecaryMode::Defender);
         assert!(ToxinConnoisseurModification::new().try_injury_modification(&game, &ctx, "Stab"));
     }
+    #[test]
+    fn skill_use_is_add_injury_modifier() {
+        use ffb_model::model::SkillUse;
+        assert_eq!(ToxinConnoisseurModification::new().skill_use(), SkillUse::ADD_INJURY_MODIFIER);
+    }
+    #[test]
+    fn block_is_not_valid_type() {
+        assert!(!ToxinConnoisseurModification::new().is_valid_type("Block"));
+    }
 }

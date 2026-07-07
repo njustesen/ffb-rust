@@ -90,4 +90,24 @@ mod tests {
     fn values_is_non_empty() {
         assert!(!ReRollSources::new().values().is_empty());
     }
+
+    #[test]
+    fn default_impl_produces_same_registry_as_new() {
+        let via_new = ReRollSources::new();
+        let via_default = ReRollSources::default();
+        assert_eq!(via_new.values().len(), via_default.values().len());
+        // Spot-check that both agree on a known entry
+        assert_eq!(
+            via_new.for_name("Pro").map(|s| &s.name),
+            via_default.for_name("Pro").map(|s| &s.name),
+        );
+    }
+
+    #[test]
+    fn the_ballista_is_registered_with_priority_two() {
+        let r = ReRollSources::new();
+        let ballista = r.for_name("The Ballista").expect("The Ballista must be in the registry");
+        assert_eq!(ballista.name, "The Ballista");
+        assert_eq!(ballista.priority, 2);
+    }
 }

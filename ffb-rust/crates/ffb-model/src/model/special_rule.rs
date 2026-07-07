@@ -83,4 +83,36 @@ mod tests {
     fn from_unknown() {
         assert_eq!(SpecialRule::from("unknown"), None);
     }
+
+    #[test]
+    fn all_variants_round_trip_through_get_rule_name() {
+        let variants = [
+            SpecialRule::BADLANDS_BRAWL, SpecialRule::ELVEN_KINGDOMS_LEAGUE,
+            SpecialRule::HALFLING_THIMBLE_CUP, SpecialRule::LUSTRIAN_SUPERLEAGUE,
+            SpecialRule::OLD_WORLD_CLASSIC, SpecialRule::SYLVANIAN_SPOTLIGHT,
+            SpecialRule::UNDERWORLD_CHALLENGE, SpecialRule::WORLDS_EDGE_SUPERLEAGUE,
+            SpecialRule::BRIBERY_AND_CORRUPTION, SpecialRule::FAVOURED_OF_UNDIVIDED,
+            SpecialRule::FAVOURED_OF_KHORNE, SpecialRule::FAVOURED_OF_NURGLE,
+            SpecialRule::FAVOURED_OF_TZEENTCH, SpecialRule::FAVOURED_OF_SLAANESH,
+            SpecialRule::LOW_COST_LINEMEN, SpecialRule::SWARMING,
+            SpecialRule::MASTERS_OF_UNDEATH, SpecialRule::BRAWLIN_BRUTES,
+        ];
+        for variant in variants {
+            assert_eq!(SpecialRule::from(variant.get_rule_name()), Some(variant),
+                "{:?} did not round-trip through get_rule_name/from", variant);
+        }
+    }
+
+    #[test]
+    fn favoured_of_variants_have_distinct_names() {
+        let names = [
+            SpecialRule::FAVOURED_OF_UNDIVIDED.get_rule_name(),
+            SpecialRule::FAVOURED_OF_KHORNE.get_rule_name(),
+            SpecialRule::FAVOURED_OF_NURGLE.get_rule_name(),
+            SpecialRule::FAVOURED_OF_TZEENTCH.get_rule_name(),
+            SpecialRule::FAVOURED_OF_SLAANESH.get_rule_name(),
+        ];
+        let unique: std::collections::HashSet<_> = names.iter().collect();
+        assert_eq!(names.len(), unique.len());
+    }
 }

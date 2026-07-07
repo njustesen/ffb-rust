@@ -56,4 +56,14 @@ mod tests {
         t.handle_injury(&make_game(), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
+    #[test]
+    fn new_creates_instance_with_correct_apo_mode() {
+        let t = InjuryTypeKTMInjury::new();
+        assert_eq!(t.ctx.apothecary_mode, ApothecaryMode::Defender);
+    }
+    #[test]
+    fn injury_context_returns_context() {
+        let t = InjuryTypeKTMInjury::new();
+        assert_eq!(t.injury_context().apothecary_mode, ApothecaryMode::Defender);
+    }
 }

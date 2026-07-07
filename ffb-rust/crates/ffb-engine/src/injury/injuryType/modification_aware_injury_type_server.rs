@@ -199,4 +199,22 @@ mod tests {
         assert!(!t.ctx.armor_broken);
         assert!(t.ctx.injury.is_none());
     }
+    #[test]
+    fn sets_defender_and_attacker_ids() {
+        let mut t = AlwaysBrokenType { ctx: InjuryContext::new(ApothecaryMode::Defender) };
+        let mut rng = GameRng::new(1);
+        let game = make_game();
+        t.handle_injury(&game, &mut rng, Some("atk1"), "def1", coord(), None, None, ApothecaryMode::Defender);
+        assert_eq!(t.ctx.defender_id.as_deref(), Some("def1"));
+        assert_eq!(t.ctx.attacker_id.as_deref(), Some("atk1"));
+    }
+    #[test]
+    fn sets_defender_coordinate() {
+        let mut t = NeverBrokenType { ctx: InjuryContext::new(ApothecaryMode::Defender) };
+        let mut rng = GameRng::new(1);
+        let game = make_game();
+        let c = FieldCoordinate::new(3, 4);
+        t.handle_injury(&game, &mut rng, None, "p1", c, None, None, ApothecaryMode::Defender);
+        assert_eq!(t.ctx.defender_coordinate, Some(c));
+    }
 }

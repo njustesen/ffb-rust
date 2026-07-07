@@ -84,4 +84,21 @@ mod tests {
             assert!(!d.get_description().is_empty());
         }
     }
+
+    #[test]
+    fn get_id_covers_all_middle_variants() {
+        assert_eq!(InducementDuration::UNTIL_END_OF_TURN.get_id(), 3);
+        assert_eq!(InducementDuration::WHILE_HOLDING_THE_BALL.get_id(), 4);
+        assert_eq!(InducementDuration::UNTIL_USED.get_id(), 5);
+        assert_eq!(InducementDuration::UNTIL_END_OF_OPPONENTS_TURN.get_id(), 6);
+    }
+
+    #[test]
+    fn get_description_returns_specific_strings() {
+        assert_eq!(InducementDuration::UNTIL_END_OF_TURN.get_description(), "For this turn");
+        assert_eq!(InducementDuration::WHILE_HOLDING_THE_BALL.get_description(), "While holding the ball");
+        assert_eq!(InducementDuration::UNTIL_USED.get_description(), "Single use");
+        assert_eq!(InducementDuration::UNTIL_END_OF_OPPONENTS_TURN.get_description(), "For opponent's turn");
+        assert_eq!(InducementDuration::UNTIL_END_OF_HALF.get_description(), "For this half");
+    }
 }

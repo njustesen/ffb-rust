@@ -75,4 +75,31 @@ mod tests {
         let back: MoveSquare = serde_json::from_str(&json).unwrap();
         assert_eq!(sq, back);
     }
+
+    #[test]
+    fn is_dodging_and_is_going_for_it_flags() {
+        let c = FieldCoordinate::new(5, 5);
+        let plain = MoveSquare::new(c, 0, 0);
+        assert!(!plain.is_dodging());
+        assert!(!plain.is_going_for_it());
+
+        let dodge = MoveSquare::new(c, 4, 0);
+        assert!(dodge.is_dodging());
+        assert!(!dodge.is_going_for_it());
+
+        let gfi = MoveSquare::new(c, 0, 2);
+        assert!(!gfi.is_dodging());
+        assert!(gfi.is_going_for_it());
+    }
+
+    #[test]
+    fn transform_preserves_rolls() {
+        let sq = MoveSquare::new(FieldCoordinate::new(8, 3), 4, 2);
+        let t = sq.transform();
+        // coordinate should be mirrored but rolls must be unchanged
+        assert_eq!(t.minimum_roll_dodge, 4);
+        assert_eq!(t.minimum_roll_gfi, 2);
+        // y coordinate is untouched by transform
+        assert_eq!(t.coordinate.y, 3);
+    }
 }

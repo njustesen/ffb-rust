@@ -226,4 +226,23 @@ mod tests {
     fn get_description_returns_non_empty() {
         assert!(!SkillUse::WOULD_NOT_HELP.get_description().is_empty());
     }
+
+    #[test]
+    fn for_name_returns_none_for_unknown() {
+        assert_eq!(SkillUse::for_name("nonexistentSkillUse"), None);
+    }
+
+    #[test]
+    fn all_variants_have_non_empty_description() {
+        let variants = [
+            SkillUse::STOP_OPPONENT, SkillUse::CATCH_BALL, SkillUse::STEAL_BALL,
+            SkillUse::RE_ROLL_ARMOUR, SkillUse::ADD_BLOCK_DIE, SkillUse::BULLSEYE,
+            SkillUse::GRANT_SKILL_TO_TEAM_MATE, SkillUse::AVOID_DODGING,
+            SkillUse::GAIN_CLAWS_FOR_BLITZ, SkillUse::SAVED_FUMBLE_BOMB,
+        ];
+        for variant in variants {
+            assert!(!variant.get_description().is_empty(),
+                "{:?} has an empty description", variant);
+        }
+    }
 }

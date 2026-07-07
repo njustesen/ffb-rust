@@ -56,4 +56,17 @@ mod tests {
             assert_eq!(ClientMode::for_name(mode.get_name()), Some(mode));
         }
     }
+
+    #[test]
+    fn get_argument_has_dash_prefix() {
+        assert_eq!(ClientMode::PLAYER.get_argument(), "-player");
+        assert_eq!(ClientMode::SPECTATOR.get_argument(), "-spectator");
+        assert_eq!(ClientMode::REPLAY.get_argument(), "-replay");
+    }
+
+    #[test]
+    fn for_name_spectator_and_replay() {
+        assert_eq!(ClientMode::for_name("spectator"), Some(ClientMode::SPECTATOR));
+        assert_eq!(ClientMode::for_name("replay"), Some(ClientMode::REPLAY));
+    }
 }

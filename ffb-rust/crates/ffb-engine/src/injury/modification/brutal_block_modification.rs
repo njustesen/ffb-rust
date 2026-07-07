@@ -57,4 +57,15 @@ mod tests {
         ctx.injury = Some(PlayerState::new(PS_SERIOUS_INJURY));
         assert!(!make().try_injury_modification(&game, &ctx, "Block"));
     }
+    #[test]
+    fn skill_id_starts_as_none() {
+        assert!(make().skill_id().is_none());
+    }
+    #[test]
+    fn try_injury_modification_false_when_no_active_player() {
+        // No acting player in game → no tacklezones → false even for non-casualty
+        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let ctx = InjuryContext::new(ApothecaryMode::Defender);
+        assert!(!make().try_injury_modification(&game, &ctx, "Block"));
+    }
 }

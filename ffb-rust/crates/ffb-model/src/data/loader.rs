@@ -228,4 +228,24 @@ mod tests {
         let _ = &*BB2020_SKILLS;
         let _ = &*COMMON_SKILLS;
     }
+
+    #[test]
+    fn bb2016_rosters_load_all() {
+        let rosters = bb2016_rosters();
+        assert_eq!(rosters.len(), 29, "expected 29 BB2016 rosters");
+        // Every roster must have at least one position defined.
+        for r in &rosters {
+            assert!(!r.positions.is_empty(), "roster '{}' has no positions", r.name);
+        }
+    }
+
+    #[test]
+    fn bb2025_rosters_load_all() {
+        let rosters = bb2025_rosters();
+        assert_eq!(rosters.len(), 29, "expected 29 BB2025 rosters");
+        // Every roster must have a positive reroll cost.
+        for r in &rosters {
+            assert!(r.reroll_cost > 0, "roster '{}' has zero reroll cost", r.name);
+        }
+    }
 }

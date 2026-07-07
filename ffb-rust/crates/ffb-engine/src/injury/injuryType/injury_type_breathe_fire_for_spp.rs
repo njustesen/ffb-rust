@@ -63,4 +63,14 @@ mod tests {
     }
     #[test]
     fn does_not_cause_turnover() { assert!(!InjuryTypeBreatheFireForSpp::new().falling_down_causes_turnover()); }
+    #[test]
+    fn new_creates_instance_with_correct_apo_mode() {
+        let t = InjuryTypeBreatheFireForSpp::new();
+        assert_eq!(t.ctx.apothecary_mode, ApothecaryMode::Defender);
+    }
+    #[test]
+    fn injury_context_returns_context() {
+        let t = InjuryTypeBreatheFireForSpp::new();
+        assert_eq!(t.injury_context().apothecary_mode, ApothecaryMode::Defender);
+    }
 }

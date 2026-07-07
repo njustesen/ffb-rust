@@ -69,4 +69,25 @@ mod tests {
         let header = SkillChoiceMode::INTENSIVE_TRAINING.get_dialog_header("Bob");
         assert!(header.contains("Bob"));
     }
+
+    #[test]
+    fn get_status_title_matches_both_variants() {
+        assert_eq!(SkillChoiceMode::INTENSIVE_TRAINING.get_status_title(), "Intensive Training");
+        assert_eq!(
+            SkillChoiceMode::WISDOM_OF_THE_WHITE_DWARF.get_status_title(),
+            "Wisdom of the White Dwarf"
+        );
+    }
+
+    #[test]
+    fn for_name_wisdom_round_trips_and_status_message_shared() {
+        let mode = SkillChoiceMode::for_name("wisdomOfTheWhiteDwarf")
+            .expect("wisdomOfTheWhiteDwarf must be recognized");
+        assert_eq!(mode, SkillChoiceMode::WISDOM_OF_THE_WHITE_DWARF);
+        // Both variants share the same status message
+        assert_eq!(
+            SkillChoiceMode::INTENSIVE_TRAINING.get_status_message(),
+            SkillChoiceMode::WISDOM_OF_THE_WHITE_DWARF.get_status_message(),
+        );
+    }
 }

@@ -68,4 +68,13 @@ mod tests {
         ctx.injury = Some(PlayerState::new(PS_STUNNED));
         assert!(MasterAssassinModification::new().try_injury_modification(&game, &ctx, "Stab"));
     }
+    #[test]
+    fn skill_use_is_re_roll_injury() {
+        use ffb_model::model::SkillUse;
+        assert_eq!(MasterAssassinModification::new().skill_use(), SkillUse::RE_ROLL_INJURY);
+    }
+    #[test]
+    fn skill_id_starts_as_none() {
+        assert!(MasterAssassinModification::new().skill_id().is_none());
+    }
 }

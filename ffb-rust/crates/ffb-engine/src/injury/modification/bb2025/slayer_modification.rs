@@ -74,4 +74,15 @@ mod tests {
     fn stab_is_not_valid_type() {
         assert!(!SlayerModification::new().is_valid_type("Stab"));
     }
+    #[test]
+    fn skill_use_is_add_armour_modifier() {
+        use ffb_model::model::SkillUse;
+        assert_eq!(SlayerModification::new().skill_use(), SkillUse::ADD_ARMOUR_MODIFIER);
+    }
+    #[test]
+    fn try_injury_false_without_big_guy_defender() {
+        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let ctx = InjuryContext::new(ApothecaryMode::Defender);
+        assert!(!SlayerModification::new().try_injury_modification(&game, &ctx, "Block"));
+    }
 }

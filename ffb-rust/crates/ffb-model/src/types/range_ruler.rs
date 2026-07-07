@@ -87,4 +87,27 @@ mod tests {
         let back: RangeRuler = serde_json::from_str(&json).unwrap();
         assert_eq!(r, back);
     }
+
+    #[test]
+    fn display_strings_all_in_range_values() {
+        let make = |roll| RangeRuler::new("p1".into(), None, roll, false);
+        // Every explicit in-range variant
+        assert_eq!(make(2).minimum_roll_display(), "2+");
+        assert_eq!(make(4).minimum_roll_display(), "4+");
+        assert_eq!(make(5).minimum_roll_display(), "5+");
+        // An unlisted in-range value falls through to "?+"
+        assert_eq!(make(1).minimum_roll_display(), "?+");
+    }
+
+    #[test]
+    fn transform_with_no_target_coordinate() {
+        let r = RangeRuler::new("p2".into(), None, 5, true);
+        let t = r.transform();
+        // None target should remain None after transform
+        assert!(t.target_coordinate.is_none());
+        // other fields preserved
+        assert_eq!(t.thrower_id, "p2");
+        assert_eq!(t.minimum_roll, 5);
+        assert!(t.throw_team_mate);
+    }
 }

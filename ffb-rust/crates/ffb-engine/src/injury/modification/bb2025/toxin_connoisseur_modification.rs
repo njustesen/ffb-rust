@@ -58,4 +58,13 @@ mod tests {
         let ctx = InjuryContext::new(ApothecaryMode::Defender);
         assert!(ToxinConnoisseurModification::new().try_injury_modification(&game, &ctx, "StabForSpp"));
     }
+    #[test]
+    fn skill_use_is_add_injury_modifier() {
+        use ffb_model::model::SkillUse;
+        assert_eq!(ToxinConnoisseurModification::new().skill_use(), SkillUse::ADD_INJURY_MODIFIER);
+    }
+    #[test]
+    fn skill_id_starts_as_none() {
+        assert!(ToxinConnoisseurModification::new().skill_id().is_none());
+    }
 }

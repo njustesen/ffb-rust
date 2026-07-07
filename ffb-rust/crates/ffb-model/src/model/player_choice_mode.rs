@@ -251,4 +251,21 @@ mod tests {
         let _ = PlayerChoiceMode::TENTACLES.is_use_player_position();
         let _ = PlayerChoiceMode::BLOCK.is_use_player_position();
     }
+
+    #[test]
+    fn is_preselect_only_true_for_pick_me_up() {
+        assert!(PlayerChoiceMode::PICK_ME_UP.is_preselect());
+        assert!(!PlayerChoiceMode::TENTACLES.is_preselect());
+        assert!(!PlayerChoiceMode::BLOCK.is_preselect());
+        assert!(!PlayerChoiceMode::CARD.is_preselect());
+    }
+
+    #[test]
+    fn get_dialog_header_mvp_interpolates_player_count() {
+        let header = PlayerChoiceMode::MVP.get_dialog_header(3);
+        assert_eq!(header, "Nominate 3 for the MVP");
+        // Non-MVP variants return a static string (no interpolation)
+        let tentacles_header = PlayerChoiceMode::TENTACLES.get_dialog_header(0);
+        assert_eq!(tentacles_header, "Select a player to use Tentacles");
+    }
 }
