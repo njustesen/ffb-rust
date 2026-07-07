@@ -46,4 +46,30 @@ mod tests {
     fn get_id_is_select_skill() {
         assert_eq!(DialogSelectSkillParameter::default().get_id(), DialogId::SELECT_SKILL);
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogSelectSkillParameter::default();
+        assert!(p.get_skills().is_empty());
+        assert!(p.get_player_id().is_none());
+        assert!(p.get_skill_choice_mode().is_none());
+    }
+
+    #[test]
+    fn skill_choice_mode_accessor() {
+        let p = DialogSelectSkillParameter {
+            skill_choice_mode: Some("MULTIPLE".into()),
+            ..Default::default()
+        };
+        assert_eq!(p.get_skill_choice_mode(), Some("MULTIPLE"));
+    }
+
+    #[test]
+    fn add_skill_appends_to_list() {
+        let mut p = DialogSelectSkillParameter::default();
+        p.add_skill(SkillId::Block);
+        p.add_skill(SkillId::Dodge);
+        assert_eq!(p.get_skills().len(), 2);
+        assert_eq!(p.get_skills()[0], SkillId::Block);
+    }
 }

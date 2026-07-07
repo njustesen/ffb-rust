@@ -32,4 +32,21 @@ mod tests {
         assert_eq!(p.get_amount(), 3);
         assert!(p.is_restrict_placement());
     }
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogSwarmingPlayersParameter::default();
+        assert_eq!(p.get_amount(), 0);
+        assert!(!p.is_restrict_placement());
+    }
+    #[test]
+    fn transform_preserves_id() {
+        let p = DialogSwarmingPlayersParameter { amount: 5, restrict_placement: false };
+        assert_eq!(p.transform().get_id(), DialogId::SWARMING);
+    }
+    #[test]
+    fn zero_amount_unrestricted() {
+        let p = DialogSwarmingPlayersParameter { amount: 0, restrict_placement: false };
+        assert_eq!(p.get_amount(), 0);
+        assert!(!p.is_restrict_placement());
+    }
 }

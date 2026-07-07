@@ -22,4 +22,25 @@ mod tests {
     fn transform_preserves_id() {
         assert_eq!(DialogConcedeGameParameter.transform().get_id(), DialogId::CONCEDE_GAME);
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogConcedeGameParameter::default();
+        assert_eq!(p.get_id(), DialogId::CONCEDE_GAME);
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let p = DialogConcedeGameParameter;
+        let json = serde_json::to_string(&p).unwrap();
+        let back: DialogConcedeGameParameter = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.get_id(), DialogId::CONCEDE_GAME);
+    }
+
+    #[test]
+    fn clone_preserves_id() {
+        let p = DialogConcedeGameParameter;
+        let cloned = p.clone();
+        assert_eq!(cloned.get_id(), DialogId::CONCEDE_GAME);
+    }
 }

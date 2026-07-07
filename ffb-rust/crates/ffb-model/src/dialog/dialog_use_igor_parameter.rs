@@ -29,4 +29,19 @@ mod tests {
         let p = DialogUseIgorParameter { player_id: Some("p1".into()) };
         assert_eq!(p.get_player_id(), Some("p1"));
     }
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogUseIgorParameter::default();
+        assert!(p.get_player_id().is_none());
+    }
+    #[test]
+    fn transform_preserves_id() {
+        let p = DialogUseIgorParameter { player_id: Some("p7".into()) };
+        assert_eq!(p.transform().get_id(), DialogId::USE_IGOR);
+    }
+    #[test]
+    fn player_id_none_when_unset() {
+        let p = DialogUseIgorParameter { player_id: None };
+        assert!(p.get_player_id().is_none());
+    }
 }

@@ -48,4 +48,34 @@ mod tests {
         assert_eq!(p.get_player_id(), Some("p1"));
         assert_eq!(p.get_minimum_roll(), 4);
     }
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogSkillUseParameter::default();
+        assert!(p.get_player_id().is_none());
+        assert!(p.get_skill().is_none());
+        assert!(p.get_modifying_skill().is_none());
+        assert_eq!(p.get_minimum_roll(), 0);
+        assert!(!p.is_show_never_use());
+        assert!(p.get_skill_use().is_none());
+        assert!(p.get_menu_property().is_none());
+    }
+    #[test]
+    fn stores_skill_and_show_never_use() {
+        let p = DialogSkillUseParameter {
+            skill: Some(SkillId::Block),
+            modifying_skill: Some(SkillId::Dodge),
+            show_never_use: true,
+            ..Default::default()
+        };
+        assert_eq!(p.get_skill(), Some(SkillId::Block));
+        assert_eq!(p.get_modifying_skill(), Some(SkillId::Dodge));
+        assert!(p.is_show_never_use());
+    }
+    #[test]
+    fn optional_strings_none_when_unset() {
+        let p = DialogSkillUseParameter { default_value_key: None, skill_use: None, menu_property: None, ..Default::default() };
+        assert!(p.get_default_value_key().is_none());
+        assert!(p.get_skill_use().is_none());
+        assert!(p.get_menu_property().is_none());
+    }
 }

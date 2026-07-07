@@ -38,4 +38,24 @@ mod tests {
         assert_eq!(p.get_setup_names().len(), 1);
         assert_eq!(p.get_setup_names()[0], "MySetup");
     }
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogTeamSetupParameter::default();
+        assert!(!p.is_load_dialog());
+        assert!(p.get_setup_names().is_empty());
+    }
+    #[test]
+    fn load_dialog_flag_readable() {
+        let p = DialogTeamSetupParameter { load_dialog: true, setup_names: vec!["A".into(), "B".into()] };
+        assert!(p.is_load_dialog());
+        assert_eq!(p.get_setup_names().len(), 2);
+    }
+    #[test]
+    fn multiple_names_added() {
+        let mut p = DialogTeamSetupParameter::default();
+        p.add_setup_name("Setup1");
+        p.add_setup_name("Setup2");
+        p.add_setup_name("");
+        assert_eq!(p.get_setup_names().len(), 2);
+    }
 }

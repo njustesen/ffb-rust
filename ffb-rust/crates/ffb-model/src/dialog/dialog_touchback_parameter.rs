@@ -22,4 +22,17 @@ mod tests {
     fn transform_preserves_id() {
         assert_eq!(DialogTouchbackParameter.transform().get_id(), DialogId::TOUCHBACK);
     }
+    #[test]
+    fn default_matches_unit_struct() {
+        assert_eq!(DialogTouchbackParameter::default().get_id(), DialogId::TOUCHBACK);
+    }
+    #[test]
+    fn double_transform_preserves_id() {
+        let once = DialogTouchbackParameter.transform();
+        assert_eq!(once.transform().get_id(), DialogId::TOUCHBACK);
+    }
+    #[test]
+    fn id_name_is_touchback() {
+        assert_eq!(DialogTouchbackParameter.get_id().get_name(), "touchback");
+    }
 }

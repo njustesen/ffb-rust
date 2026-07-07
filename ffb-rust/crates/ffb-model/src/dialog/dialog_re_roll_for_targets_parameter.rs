@@ -50,4 +50,35 @@ mod tests {
         assert!(p.is_pro_re_roll_available());
         assert!(!p.is_team_re_roll_available());
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogReRollForTargetsParameter::default();
+        assert!(p.get_player_id().is_none());
+        assert!(p.get_target_ids().is_empty());
+        assert!(p.get_minimum_rolls().is_empty());
+        assert!(p.get_re_rolled_action().is_none());
+        assert!(!p.is_pro_re_roll_available());
+        assert!(!p.is_team_re_roll_available());
+        assert!(!p.is_consummate_available());
+    }
+
+    #[test]
+    fn target_ids_and_minimum_rolls() {
+        let mut minimum_rolls = std::collections::HashMap::new();
+        minimum_rolls.insert("tgt1".to_string(), 4);
+        let p = DialogReRollForTargetsParameter {
+            target_ids: vec!["tgt1".into()],
+            minimum_rolls,
+            ..Default::default()
+        };
+        assert_eq!(p.get_target_ids(), &["tgt1"]);
+        assert_eq!(p.get_minimum_rolls().get("tgt1"), Some(&4));
+    }
+
+    #[test]
+    fn consummate_available_flag() {
+        let p = DialogReRollForTargetsParameter { consummate_available: true, ..Default::default() };
+        assert!(p.is_consummate_available());
+    }
 }

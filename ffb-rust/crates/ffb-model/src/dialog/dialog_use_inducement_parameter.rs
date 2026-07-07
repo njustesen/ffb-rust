@@ -43,4 +43,27 @@ mod tests {
         assert_eq!(p.get_team_id(), Some("home"));
         assert_eq!(p.get_cards().len(), 1);
     }
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogUseInducementParameter::default();
+        assert!(p.get_team_id().is_none());
+        assert!(p.get_inducement_types().is_empty());
+        assert!(p.get_cards().is_empty());
+        assert!(p.get_player_id().is_none());
+    }
+    #[test]
+    fn stores_inducement_types_and_player_id() {
+        let p = DialogUseInducementParameter {
+            inducement_types: vec!["WIZARD".into(), "BRIBE".into()],
+            player_id: Some("p5".into()),
+            ..Default::default()
+        };
+        assert_eq!(p.get_inducement_types().len(), 2);
+        assert_eq!(p.get_player_id(), Some("p5"));
+    }
+    #[test]
+    fn player_id_none_when_unset() {
+        let p = DialogUseInducementParameter { player_id: None, ..Default::default() };
+        assert!(p.get_player_id().is_none());
+    }
 }

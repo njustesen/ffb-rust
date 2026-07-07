@@ -39,4 +39,26 @@ mod tests {
         assert_eq!(p.get_team_value(), 1_000_000);
         assert_eq!(p.get_opponent_team_value(), 1_100_000);
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogPettyCashParameter::default();
+        assert!(p.get_team_id().is_none());
+        assert_eq!(p.get_treasury(), 0);
+        assert_eq!(p.get_team_value(), 0);
+        assert_eq!(p.get_opponent_team_value(), 0);
+    }
+
+    #[test]
+    fn team_id_accessor() {
+        let p = DialogPettyCashParameter { team_id: Some("home_team".into()), ..Default::default() };
+        assert_eq!(p.get_team_id(), Some("home_team"));
+    }
+
+    #[test]
+    fn zero_values_edge_case() {
+        let p = DialogPettyCashParameter { treasury: 0, team_value: 0, opponent_team_value: 0, team_id: None };
+        assert_eq!(p.get_treasury(), 0);
+        assert_eq!(p.get_team_id(), None);
+    }
 }

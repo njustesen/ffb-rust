@@ -31,4 +31,25 @@ mod tests {
         assert!(!DialogBloodlustActionParameter { change_to_move: false }.is_change_to_move());
         assert!(DialogBloodlustActionParameter { change_to_move: true }.is_change_to_move());
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogBloodlustActionParameter::default();
+        assert!(!p.is_change_to_move());
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let p = DialogBloodlustActionParameter { change_to_move: true };
+        let json = serde_json::to_string(&p).unwrap();
+        let back: DialogBloodlustActionParameter = serde_json::from_str(&json).unwrap();
+        assert!(back.is_change_to_move());
+    }
+
+    #[test]
+    fn false_change_to_move_is_edge_case() {
+        let p = DialogBloodlustActionParameter { change_to_move: false };
+        assert!(!p.is_change_to_move());
+        assert_eq!(p.get_id(), DialogId::BLOODLUST_ACTION);
+    }
 }

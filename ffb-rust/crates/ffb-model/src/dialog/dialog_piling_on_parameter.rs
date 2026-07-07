@@ -41,4 +41,24 @@ mod tests {
         assert!(p.is_re_roll_injury());
         assert!(!p.is_uses_a_team_reroll());
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogPilingOnParameter::default();
+        assert!(p.get_player_id().is_none());
+        assert!(!p.is_re_roll_injury());
+        assert!(!p.is_uses_a_team_reroll());
+    }
+
+    #[test]
+    fn uses_a_team_reroll_true() {
+        let p = DialogPilingOnParameter { uses_a_team_reroll: true, ..Default::default() };
+        assert!(p.is_uses_a_team_reroll());
+    }
+
+    #[test]
+    fn none_player_id_edge_case() {
+        let p = DialogPilingOnParameter { player_id: None, ..Default::default() };
+        assert_eq!(p.get_player_id(), None);
+    }
 }

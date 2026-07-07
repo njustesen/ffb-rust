@@ -22,4 +22,24 @@ mod tests {
     fn transform_preserves_id() {
         assert_eq!(DialogPassBlockParameter.transform().get_id(), DialogId::PASS_BLOCK);
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let _p = DialogPassBlockParameter::default();
+        // Unit struct — default constructs without panic
+    }
+
+    #[test]
+    fn clone_has_same_id() {
+        let p = DialogPassBlockParameter;
+        assert_eq!(p.clone().get_id(), DialogId::PASS_BLOCK);
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let p = DialogPassBlockParameter;
+        let json = serde_json::to_string(&p).unwrap();
+        let back: DialogPassBlockParameter = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.get_id(), DialogId::PASS_BLOCK);
+    }
 }

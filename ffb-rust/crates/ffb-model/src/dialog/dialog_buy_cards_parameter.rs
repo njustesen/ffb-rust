@@ -46,4 +46,37 @@ mod tests {
         assert_eq!(p.get_available_cards(), 3);
         assert_eq!(p.get_team_id(), Some("t1"));
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogBuyCardsParameter::default();
+        assert!(p.get_team_id().is_none());
+        assert_eq!(p.get_available_gold(), 0);
+        assert_eq!(p.get_available_cards(), 0);
+        assert!(p.get_nr_of_cards_per_type().is_empty());
+    }
+
+    #[test]
+    fn nr_of_cards_per_type_stores_entries() {
+        let mut map = std::collections::HashMap::new();
+        map.insert("Dirty Trick".to_string(), 2);
+        map.insert("Magic".to_string(), 1);
+        let p = DialogBuyCardsParameter {
+            nr_of_cards_per_type: map,
+            ..Default::default()
+        };
+        assert_eq!(p.get_nr_of_cards_per_type().get("Dirty Trick"), Some(&2));
+        assert_eq!(p.get_nr_of_cards_per_type().get("Magic"), Some(&1));
+    }
+
+    #[test]
+    fn none_team_id_is_edge_case() {
+        let p = DialogBuyCardsParameter {
+            team_id: None,
+            available_gold: 50_000,
+            ..Default::default()
+        };
+        assert!(p.get_team_id().is_none());
+        assert_eq!(p.get_available_gold(), 50_000);
+    }
 }

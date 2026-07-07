@@ -39,4 +39,24 @@ mod tests {
     fn dialog_id_is_pile_driver() {
         assert_eq!(DialogPileDriverParameter::default().get_id(), DialogId::PILE_DRIVER);
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogPileDriverParameter::default();
+        assert!(p.get_knocked_down_players().is_empty());
+        assert!(p.get_team_id().is_none());
+    }
+
+    #[test]
+    fn team_id_accessor() {
+        let p = DialogPileDriverParameter { knocked_down_players: vec![], team_id: Some("away".into()) };
+        assert_eq!(p.get_team_id(), Some("away"));
+    }
+
+    #[test]
+    fn add_empty_string_is_ignored() {
+        let mut p = DialogPileDriverParameter::default();
+        p.add_knocked_down_player("");
+        assert!(p.get_knocked_down_players().is_empty());
+    }
 }

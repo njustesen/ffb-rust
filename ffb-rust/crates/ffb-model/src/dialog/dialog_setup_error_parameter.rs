@@ -37,4 +37,24 @@ mod tests {
         p.add_setup_error("");
         assert_eq!(p.get_setup_errors().len(), 1);
     }
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogSetupErrorParameter::default();
+        assert!(p.get_team_id().is_none());
+        assert!(p.get_setup_errors().is_empty());
+    }
+    #[test]
+    fn stores_team_id_and_errors() {
+        let p = DialogSetupErrorParameter {
+            team_id: Some("home".into()),
+            setup_errors: vec!["TOO_MANY_BIG_GUYS".into()],
+        };
+        assert_eq!(p.get_team_id(), Some("home"));
+        assert_eq!(p.get_setup_errors()[0], "TOO_MANY_BIG_GUYS");
+    }
+    #[test]
+    fn team_id_none_when_unset() {
+        let p = DialogSetupErrorParameter { team_id: None, setup_errors: vec![] };
+        assert!(p.get_team_id().is_none());
+    }
 }

@@ -31,4 +31,25 @@ mod tests {
         let p = DialogBriberyAndCorruptionParameter { team_id: Some("t1".into()) };
         assert_eq!(p.get_team_id(), Some("t1"));
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogBriberyAndCorruptionParameter::default();
+        assert!(p.get_team_id().is_none());
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let p = DialogBriberyAndCorruptionParameter { team_id: Some("teamX".into()) };
+        let json = serde_json::to_string(&p).unwrap();
+        let back: DialogBriberyAndCorruptionParameter = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.get_team_id(), Some("teamX"));
+    }
+
+    #[test]
+    fn none_team_id_is_edge_case() {
+        let p = DialogBriberyAndCorruptionParameter { team_id: None };
+        assert!(p.get_team_id().is_none());
+        assert_eq!(p.get_id(), DialogId::BRIBERY_AND_CORRUPTION_RE_ROLL);
+    }
 }

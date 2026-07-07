@@ -22,4 +22,25 @@ mod tests {
     fn transform_preserves_id() {
         assert_eq!(DialogDefenderActionParameter.transform().get_id(), DialogId::DEFENDER_ACTION);
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogDefenderActionParameter::default();
+        assert_eq!(p.get_id(), DialogId::DEFENDER_ACTION);
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let p = DialogDefenderActionParameter;
+        let json = serde_json::to_string(&p).unwrap();
+        let back: DialogDefenderActionParameter = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.get_id(), DialogId::DEFENDER_ACTION);
+    }
+
+    #[test]
+    fn clone_preserves_id() {
+        let p = DialogDefenderActionParameter;
+        let cloned = p.clone();
+        assert_eq!(cloned.get_id(), DialogId::DEFENDER_ACTION);
+    }
 }

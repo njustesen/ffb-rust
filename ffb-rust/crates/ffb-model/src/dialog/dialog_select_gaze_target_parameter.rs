@@ -22,4 +22,24 @@ mod tests {
     fn transform_preserves_id() {
         assert_eq!(DialogSelectGazeTargetParameter.transform().get_id(), DialogId::SELECT_GAZE_TARGET);
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let _p = DialogSelectGazeTargetParameter::default();
+        // Unit struct — default constructs without panic
+    }
+
+    #[test]
+    fn clone_has_same_id() {
+        let p = DialogSelectGazeTargetParameter;
+        assert_eq!(p.clone().get_id(), DialogId::SELECT_GAZE_TARGET);
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let p = DialogSelectGazeTargetParameter;
+        let json = serde_json::to_string(&p).unwrap();
+        let back: DialogSelectGazeTargetParameter = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.get_id(), DialogId::SELECT_GAZE_TARGET);
+    }
 }

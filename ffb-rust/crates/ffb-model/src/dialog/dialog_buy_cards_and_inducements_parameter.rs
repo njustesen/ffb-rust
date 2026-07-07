@@ -46,4 +46,45 @@ mod tests {
         assert_eq!(p.get_card_slots(), 2);
         assert!(p.can_buy_cards());
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogBuyCardsAndInducementsParameter::default();
+        assert!(p.get_team_id().is_none());
+        assert_eq!(p.get_available_gold(), 0);
+        assert_eq!(p.get_card_slots(), 0);
+        assert_eq!(p.get_card_price(), 0);
+        assert!(!p.can_buy_cards());
+        assert!(!p.uses_treasury());
+    }
+
+    #[test]
+    fn accessor_methods_with_non_default_values() {
+        let p = DialogBuyCardsAndInducementsParameter {
+            team_id: Some("home".into()),
+            available_gold: 150_000,
+            card_slots: 3,
+            card_price: 10_000,
+            can_buy_cards: true,
+            uses_treasury: true,
+            ..Default::default()
+        };
+        assert_eq!(p.get_team_id(), Some("home"));
+        assert_eq!(p.get_available_gold(), 150_000);
+        assert_eq!(p.get_card_slots(), 3);
+        assert_eq!(p.get_card_price(), 10_000);
+        assert!(p.can_buy_cards());
+        assert!(p.uses_treasury());
+    }
+
+    #[test]
+    fn zero_gold_is_edge_case() {
+        let p = DialogBuyCardsAndInducementsParameter {
+            available_gold: 0,
+            can_buy_cards: false,
+            ..Default::default()
+        };
+        assert_eq!(p.get_available_gold(), 0);
+        assert!(!p.can_buy_cards());
+    }
 }

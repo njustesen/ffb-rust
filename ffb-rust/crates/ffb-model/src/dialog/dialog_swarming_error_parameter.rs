@@ -32,4 +32,21 @@ mod tests {
         assert_eq!(p.get_allowed(), 4);
         assert_eq!(p.get_actual(), 6);
     }
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogSwarmingErrorParameter::default();
+        assert_eq!(p.get_allowed(), 0);
+        assert_eq!(p.get_actual(), 0);
+    }
+    #[test]
+    fn transform_preserves_id() {
+        let p = DialogSwarmingErrorParameter { allowed: 2, actual: 5 };
+        assert_eq!(p.transform().get_id(), DialogId::SWARMING_ERROR);
+    }
+    #[test]
+    fn zero_allowed_zero_actual() {
+        let p = DialogSwarmingErrorParameter { allowed: 0, actual: 0 };
+        assert_eq!(p.get_allowed(), 0);
+        assert_eq!(p.get_actual(), 0);
+    }
 }

@@ -31,4 +31,25 @@ mod tests {
         let p = DialogReRollBlockForTargetsPropertiesParameter { player_id: Some("p2".into()), ..Default::default() };
         assert_eq!(p.get_player_id(), Some("p2"));
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogReRollBlockForTargetsPropertiesParameter::default();
+        assert!(p.get_player_id().is_none());
+        assert!(p.get_block_rolls().is_empty());
+    }
+
+    #[test]
+    fn block_rolls_stored_correctly() {
+        let roll = serde_json::json!({"result": "pushed"});
+        let p = DialogReRollBlockForTargetsPropertiesParameter { player_id: None, block_rolls: vec![roll.clone()] };
+        assert_eq!(p.get_block_rolls().len(), 1);
+        assert_eq!(p.get_block_rolls()[0], roll);
+    }
+
+    #[test]
+    fn none_player_id_edge_case() {
+        let p = DialogReRollBlockForTargetsPropertiesParameter { player_id: None, ..Default::default() };
+        assert_eq!(p.get_player_id(), None);
+    }
 }

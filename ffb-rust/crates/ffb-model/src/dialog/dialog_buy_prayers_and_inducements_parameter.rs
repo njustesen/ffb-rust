@@ -38,4 +38,41 @@ mod tests {
         assert_eq!(p.get_available_gold(), 100_000);
         assert_eq!(p.get_treasury(), 50_000);
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogBuyPrayersAndInducementsParameter::default();
+        assert!(p.get_team_id().is_none());
+        assert_eq!(p.get_available_gold(), 0);
+        assert_eq!(p.get_petty_cash(), 0);
+        assert_eq!(p.get_treasury(), 0);
+        assert!(!p.is_uses_treasury());
+    }
+
+    #[test]
+    fn accessor_methods_with_non_default_values() {
+        let p = DialogBuyPrayersAndInducementsParameter {
+            team_id: Some("home".into()),
+            available_gold: 120_000,
+            petty_cash: 30_000,
+            treasury: 90_000,
+            uses_treasury: true,
+        };
+        assert_eq!(p.get_team_id(), Some("home"));
+        assert_eq!(p.get_available_gold(), 120_000);
+        assert_eq!(p.get_petty_cash(), 30_000);
+        assert_eq!(p.get_treasury(), 90_000);
+        assert!(p.is_uses_treasury());
+    }
+
+    #[test]
+    fn zero_petty_cash_is_edge_case() {
+        let p = DialogBuyPrayersAndInducementsParameter {
+            petty_cash: 0,
+            uses_treasury: false,
+            ..Default::default()
+        };
+        assert_eq!(p.get_petty_cash(), 0);
+        assert!(!p.is_uses_treasury());
+    }
 }

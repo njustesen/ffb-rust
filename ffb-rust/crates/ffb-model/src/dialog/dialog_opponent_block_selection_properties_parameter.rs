@@ -32,4 +32,25 @@ mod tests {
         let p = DialogOpponentBlockSelectionPropertiesParameter { team_id: Some("away".into()), ..Default::default() };
         assert_eq!(p.get_team_id(), Some("away"));
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogOpponentBlockSelectionPropertiesParameter::default();
+        assert!(p.get_team_id().is_none());
+        assert!(p.get_block_rolls().is_empty());
+    }
+
+    #[test]
+    fn block_rolls_stored_correctly() {
+        let roll = serde_json::json!({"result": "pushed"});
+        let p = DialogOpponentBlockSelectionPropertiesParameter { team_id: None, block_rolls: vec![roll.clone()] };
+        assert_eq!(p.get_block_rolls().len(), 1);
+        assert_eq!(p.get_block_rolls()[0], roll);
+    }
+
+    #[test]
+    fn none_team_id_edge_case() {
+        let p = DialogOpponentBlockSelectionPropertiesParameter { team_id: None, ..Default::default() };
+        assert_eq!(p.get_team_id(), None);
+    }
 }

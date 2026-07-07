@@ -22,4 +22,24 @@ mod tests {
     fn transform_preserves_id() {
         assert_eq!(DialogPickUpChoiceParameter.transform().get_id(), DialogId::PICK_UP_CHOICE);
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let _p = DialogPickUpChoiceParameter::default();
+        // Unit struct — default constructs without panic
+    }
+
+    #[test]
+    fn clone_has_same_id() {
+        let p = DialogPickUpChoiceParameter;
+        assert_eq!(p.clone().get_id(), DialogId::PICK_UP_CHOICE);
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let p = DialogPickUpChoiceParameter;
+        let json = serde_json::to_string(&p).unwrap();
+        let back: DialogPickUpChoiceParameter = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.get_id(), DialogId::PICK_UP_CHOICE);
+    }
 }

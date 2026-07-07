@@ -29,4 +29,19 @@ mod tests {
         let p = DialogUseChainsawParameter { team_id: Some("home".into()) };
         assert_eq!(p.get_team_id(), Some("home"));
     }
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogUseChainsawParameter::default();
+        assert!(p.get_team_id().is_none());
+    }
+    #[test]
+    fn transform_preserves_id() {
+        let p = DialogUseChainsawParameter { team_id: Some("away".into()) };
+        assert_eq!(p.transform().get_id(), DialogId::USE_CHAINSAW);
+    }
+    #[test]
+    fn team_id_none_when_unset() {
+        let p = DialogUseChainsawParameter { team_id: None };
+        assert!(p.get_team_id().is_none());
+    }
 }

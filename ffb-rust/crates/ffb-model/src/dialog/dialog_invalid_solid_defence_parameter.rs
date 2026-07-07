@@ -34,4 +34,35 @@ mod tests {
         assert_eq!(p.get_amount(), 5);
         assert_eq!(p.get_limit(), 3);
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogInvalidSolidDefenceParameter::default();
+        assert!(p.get_team_id().is_none());
+        assert_eq!(p.get_amount(), 0);
+        assert_eq!(p.get_limit(), 0);
+    }
+
+    #[test]
+    fn accessor_methods_with_non_default_values() {
+        let p = DialogInvalidSolidDefenceParameter {
+            team_id: Some("home".into()),
+            amount: 7,
+            limit: 5,
+        };
+        assert_eq!(p.get_team_id(), Some("home"));
+        assert_eq!(p.get_amount(), 7);
+        assert_eq!(p.get_limit(), 5);
+    }
+
+    #[test]
+    fn amount_equals_limit_is_edge_case() {
+        let p = DialogInvalidSolidDefenceParameter {
+            team_id: None,
+            amount: 3,
+            limit: 3,
+        };
+        assert_eq!(p.get_amount(), p.get_limit());
+        assert!(p.get_team_id().is_none());
+    }
 }

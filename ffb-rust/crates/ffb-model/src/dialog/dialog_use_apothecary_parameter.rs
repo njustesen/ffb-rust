@@ -36,4 +36,27 @@ mod tests {
         let p = DialogUseApothecaryParameter { player_id: Some("p42".into()), ..Default::default() };
         assert_eq!(p.get_player_id(), Some("p42"));
     }
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogUseApothecaryParameter::default();
+        assert!(p.get_player_id().is_none());
+        assert!(p.get_player_state().is_none());
+        assert!(p.get_serious_injury().is_none());
+        assert!(p.get_apothecary_types().is_empty());
+    }
+    #[test]
+    fn stores_serious_injury_and_apothecary_types() {
+        let p = DialogUseApothecaryParameter {
+            serious_injury: Some(SeriousInjuryKind::Dead),
+            apothecary_types: vec![ApothecaryType::Team, ApothecaryType::Wandering],
+            ..Default::default()
+        };
+        assert_eq!(p.get_serious_injury(), Some(SeriousInjuryKind::Dead));
+        assert_eq!(p.get_apothecary_types().len(), 2);
+    }
+    #[test]
+    fn player_state_none_when_unset() {
+        let p = DialogUseApothecaryParameter { player_state: None, ..Default::default() };
+        assert!(p.get_player_state().is_none());
+    }
 }

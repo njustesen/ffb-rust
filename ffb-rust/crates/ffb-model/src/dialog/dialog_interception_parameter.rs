@@ -42,4 +42,35 @@ mod tests {
         assert_eq!(p.get_interception_skill(), Some(SkillId::Catch));
         assert_eq!(p.get_skill_mnemonic(), 42);
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogInterceptionParameter::default();
+        assert!(p.get_thrower_id().is_none());
+        assert!(p.get_interception_skill().is_none());
+        assert_eq!(p.get_skill_mnemonic(), 0);
+    }
+
+    #[test]
+    fn accessor_methods_with_non_default_values() {
+        let p = DialogInterceptionParameter {
+            thrower_id: Some("player42".into()),
+            interception_skill: Some(SkillId::DivingCatch),
+            skill_mnemonic: 7,
+        };
+        assert_eq!(p.get_thrower_id(), Some("player42"));
+        assert_eq!(p.get_interception_skill(), Some(SkillId::DivingCatch));
+        assert_eq!(p.get_skill_mnemonic(), 7);
+    }
+
+    #[test]
+    fn none_interception_skill_is_edge_case() {
+        let p = DialogInterceptionParameter {
+            thrower_id: Some("p1".into()),
+            interception_skill: None,
+            skill_mnemonic: 0,
+        };
+        assert!(p.get_interception_skill().is_none());
+        assert_eq!(p.get_skill_mnemonic(), 0);
+    }
 }

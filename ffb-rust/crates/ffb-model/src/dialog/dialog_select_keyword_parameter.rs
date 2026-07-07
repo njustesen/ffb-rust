@@ -39,4 +39,34 @@ mod tests {
         assert_eq!(p.get_min_select(), 1);
         assert_eq!(p.get_max_select(), 3);
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogSelectKeywordParameter::default();
+        assert!(p.get_keywords().is_empty());
+        assert!(p.get_player_id().is_none());
+        assert!(p.get_keyword_choice_mode().is_none());
+        assert_eq!(p.get_min_select(), 0);
+        assert_eq!(p.get_max_select(), 0);
+    }
+
+    #[test]
+    fn keywords_and_player_id_stored() {
+        let p = DialogSelectKeywordParameter {
+            keywords: vec!["PASS".into(), "RUSH".into()],
+            player_id: Some("p1".into()),
+            ..Default::default()
+        };
+        assert_eq!(p.get_keywords().len(), 2);
+        assert_eq!(p.get_player_id(), Some("p1"));
+    }
+
+    #[test]
+    fn keyword_choice_mode_accessor() {
+        let p = DialogSelectKeywordParameter {
+            keyword_choice_mode: Some("SINGLE".into()),
+            ..Default::default()
+        };
+        assert_eq!(p.get_keyword_choice_mode(), Some("SINGLE"));
+    }
 }

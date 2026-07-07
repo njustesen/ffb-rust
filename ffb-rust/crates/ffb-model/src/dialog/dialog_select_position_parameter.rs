@@ -44,4 +44,36 @@ mod tests {
         p.add_position("");
         assert_eq!(p.get_positions().len(), 1);
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogSelectPositionParameter::default();
+        assert!(p.get_positions().is_empty());
+        assert!(p.get_position_choice_mode().is_none());
+        assert_eq!(p.get_min_select(), 0);
+        assert_eq!(p.get_max_select(), 0);
+        assert!(p.get_team_id().is_none());
+    }
+
+    #[test]
+    fn team_id_and_min_max_select() {
+        let p = DialogSelectPositionParameter {
+            team_id: Some("home".into()),
+            min_select: 1,
+            max_select: 4,
+            ..Default::default()
+        };
+        assert_eq!(p.get_team_id(), Some("home"));
+        assert_eq!(p.get_min_select(), 1);
+        assert_eq!(p.get_max_select(), 4);
+    }
+
+    #[test]
+    fn position_choice_mode_accessor() {
+        let p = DialogSelectPositionParameter {
+            position_choice_mode: Some("SINGLE".into()),
+            ..Default::default()
+        };
+        assert_eq!(p.get_position_choice_mode(), Some("SINGLE"));
+    }
 }

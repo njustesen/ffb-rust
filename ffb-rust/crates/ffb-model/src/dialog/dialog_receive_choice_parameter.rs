@@ -29,4 +29,22 @@ mod tests {
         let p = DialogReceiveChoiceParameter { choosing_team_id: Some("home".into()) };
         assert_eq!(p.get_choosing_team_id(), Some("home"));
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogReceiveChoiceParameter::default();
+        assert!(p.get_choosing_team_id().is_none());
+    }
+
+    #[test]
+    fn transform_preserves_id() {
+        let p = DialogReceiveChoiceParameter::default();
+        assert_eq!(p.transform().get_id(), DialogId::RECEIVE_CHOICE);
+    }
+
+    #[test]
+    fn none_team_id_edge_case() {
+        let p = DialogReceiveChoiceParameter { choosing_team_id: None };
+        assert_eq!(p.get_choosing_team_id(), None);
+    }
 }

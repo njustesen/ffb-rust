@@ -35,4 +35,24 @@ mod tests {
         assert_eq!(p.get_team_id(), Some("home"));
         assert_eq!(p.get_max_igors(), 2);
     }
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogUseIgorsParameter::default();
+        assert!(p.get_team_id().is_none());
+        assert_eq!(p.get_max_igors(), 0);
+        assert!(p.get_injury_descriptions().is_empty());
+    }
+    #[test]
+    fn stores_injury_descriptions() {
+        let p = DialogUseIgorsParameter {
+            injury_descriptions: vec![serde_json::json!({"player": "p3"})],
+            ..Default::default()
+        };
+        assert_eq!(p.get_injury_descriptions().len(), 1);
+    }
+    #[test]
+    fn team_id_none_when_unset() {
+        let p = DialogUseIgorsParameter { team_id: None, ..Default::default() };
+        assert!(p.get_team_id().is_none());
+    }
 }

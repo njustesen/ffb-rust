@@ -51,4 +51,42 @@ mod tests {
     fn get_id_is_block_roll() {
         assert_eq!(DialogBlockRollParameter::default().get_id(), DialogId::BLOCK_ROLL);
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogBlockRollParameter::default();
+        assert!(p.get_choosing_team_id().is_none());
+        assert_eq!(p.get_nr_of_dice(), 0);
+        assert!(p.get_block_roll().is_empty());
+        assert!(!p.has_team_re_roll_option());
+        assert!(!p.has_pro_re_roll_option());
+    }
+
+    #[test]
+    fn accessor_methods_with_non_default_values() {
+        let p = DialogBlockRollParameter {
+            choosing_team_id: Some("home".into()),
+            nr_of_dice: 3,
+            block_roll: vec![1, 4, 6],
+            team_re_roll_option: true,
+            pro_re_roll_option: true,
+        };
+        assert_eq!(p.get_choosing_team_id(), Some("home"));
+        assert_eq!(p.get_nr_of_dice(), 3);
+        assert_eq!(p.get_block_roll(), &[1, 4, 6]);
+        assert!(p.has_team_re_roll_option());
+        assert!(p.has_pro_re_roll_option());
+    }
+
+    #[test]
+    fn none_choosing_team_id_is_edge_case() {
+        let p = DialogBlockRollParameter {
+            choosing_team_id: None,
+            nr_of_dice: 1,
+            block_roll: vec![2],
+            team_re_roll_option: false,
+            pro_re_roll_option: false,
+        };
+        assert!(p.get_choosing_team_id().is_none());
+    }
 }

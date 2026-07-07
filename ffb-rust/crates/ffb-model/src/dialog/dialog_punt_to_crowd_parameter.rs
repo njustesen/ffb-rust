@@ -22,4 +22,24 @@ mod tests {
     fn transform_preserves_id() {
         assert_eq!(DialogPuntToCrowdParameter.transform().get_id(), DialogId::PUNT_TO_CROWD);
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let _p = DialogPuntToCrowdParameter::default();
+        // Unit struct — default constructs without panic
+    }
+
+    #[test]
+    fn clone_has_same_id() {
+        let p = DialogPuntToCrowdParameter;
+        assert_eq!(p.clone().get_id(), DialogId::PUNT_TO_CROWD);
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let p = DialogPuntToCrowdParameter;
+        let json = serde_json::to_string(&p).unwrap();
+        let back: DialogPuntToCrowdParameter = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.get_id(), DialogId::PUNT_TO_CROWD);
+    }
 }

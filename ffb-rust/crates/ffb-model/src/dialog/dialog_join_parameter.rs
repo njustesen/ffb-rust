@@ -22,4 +22,25 @@ mod tests {
     fn transform_preserves_id() {
         assert_eq!(DialogJoinParameter.transform().get_id(), DialogId::JOIN);
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogJoinParameter::default();
+        assert_eq!(p.get_id(), DialogId::JOIN);
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let p = DialogJoinParameter;
+        let json = serde_json::to_string(&p).unwrap();
+        let back: DialogJoinParameter = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.get_id(), DialogId::JOIN);
+    }
+
+    #[test]
+    fn clone_preserves_id() {
+        let p = DialogJoinParameter;
+        let cloned = p.clone();
+        assert_eq!(cloned.get_id(), DialogId::JOIN);
+    }
 }

@@ -46,4 +46,39 @@ mod tests {
         assert_eq!(p.get_nr_of_dice(), 2);
         assert_eq!(p.get_block_roll(), &[3, 5]);
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogBlockRollPropertiesParameter::default();
+        assert!(p.get_choosing_team_id().is_none());
+        assert_eq!(p.get_nr_of_dice(), 0);
+        assert!(p.get_block_roll().is_empty());
+        assert!(p.get_re_roll_properties().is_empty());
+        assert!(p.rr_action_to_source.is_empty());
+    }
+
+    #[test]
+    fn accessor_methods_with_non_default_values() {
+        let p = DialogBlockRollPropertiesParameter {
+            choosing_team_id: Some("away".into()),
+            nr_of_dice: 3,
+            block_roll: vec![2, 4, 6],
+            re_roll_properties: vec![ReRollProperty::Trr],
+            rr_action_to_source: [("block".to_string(), "team".to_string())].into(),
+        };
+        assert_eq!(p.get_choosing_team_id(), Some("away"));
+        assert_eq!(p.get_nr_of_dice(), 3);
+        assert_eq!(p.get_block_roll(), &[2, 4, 6]);
+        assert_eq!(p.get_re_roll_properties(), &[ReRollProperty::Trr]);
+    }
+
+    #[test]
+    fn none_choosing_team_id_is_edge_case() {
+        let p = DialogBlockRollPropertiesParameter {
+            choosing_team_id: None,
+            ..Default::default()
+        };
+        assert!(p.get_choosing_team_id().is_none());
+        assert!(p.get_block_roll().is_empty());
+    }
 }

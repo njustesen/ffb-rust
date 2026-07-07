@@ -34,4 +34,26 @@ mod tests {
         let p = DialogUseMortuaryAssistantsParameter { max_mortuary_assistants: 3, ..Default::default() };
         assert_eq!(p.get_max_mortuary_assistants(), 3);
     }
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogUseMortuaryAssistantsParameter::default();
+        assert!(p.get_team_id().is_none());
+        assert_eq!(p.get_max_mortuary_assistants(), 0);
+        assert!(p.get_injury_descriptions().is_empty());
+    }
+    #[test]
+    fn stores_team_id_and_injury_descriptions() {
+        let p = DialogUseMortuaryAssistantsParameter {
+            team_id: Some("home".into()),
+            injury_descriptions: vec![serde_json::json!({"player": "p2"})],
+            ..Default::default()
+        };
+        assert_eq!(p.get_team_id(), Some("home"));
+        assert_eq!(p.get_injury_descriptions().len(), 1);
+    }
+    #[test]
+    fn team_id_none_when_unset() {
+        let p = DialogUseMortuaryAssistantsParameter { team_id: None, ..Default::default() };
+        assert!(p.get_team_id().is_none());
+    }
 }

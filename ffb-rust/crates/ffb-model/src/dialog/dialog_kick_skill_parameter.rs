@@ -40,4 +40,35 @@ mod tests {
         assert_eq!(p.get_player_id(), Some("p1"));
         assert_eq!(p.get_ball_coordinate(), Some(FieldCoordinate::new(3, 5)));
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogKickSkillParameter::default();
+        assert!(p.get_player_id().is_none());
+        assert!(p.get_ball_coordinate().is_none());
+        assert!(p.get_ball_coordinate_with_kick().is_none());
+    }
+
+    #[test]
+    fn accessor_methods_with_non_default_values() {
+        let p = DialogKickSkillParameter {
+            player_id: Some("kicker1".into()),
+            ball_coordinate: Some(FieldCoordinate::new(7, 3)),
+            ball_coordinate_with_kick: Some(FieldCoordinate::new(10, 3)),
+        };
+        assert_eq!(p.get_player_id(), Some("kicker1"));
+        assert_eq!(p.get_ball_coordinate(), Some(FieldCoordinate::new(7, 3)));
+        assert_eq!(p.get_ball_coordinate_with_kick(), Some(FieldCoordinate::new(10, 3)));
+    }
+
+    #[test]
+    fn none_ball_coordinate_with_kick_is_edge_case() {
+        let p = DialogKickSkillParameter {
+            player_id: Some("p2".into()),
+            ball_coordinate: Some(FieldCoordinate::new(5, 5)),
+            ball_coordinate_with_kick: None,
+        };
+        assert!(p.get_ball_coordinate_with_kick().is_none());
+        assert!(p.get_ball_coordinate().is_some());
+    }
 }

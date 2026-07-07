@@ -31,4 +31,21 @@ mod tests {
         let p = DialogWinningsReRollParameter { old_roll: 3, ..Default::default() };
         assert_eq!(p.get_old_roll(), 3);
     }
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogWinningsReRollParameter::default();
+        assert!(p.get_team_id().is_none());
+        assert_eq!(p.get_old_roll(), 0);
+    }
+    #[test]
+    fn stores_team_id() {
+        let p = DialogWinningsReRollParameter { team_id: Some("home".into()), old_roll: 5 };
+        assert_eq!(p.get_team_id(), Some("home"));
+        assert_eq!(p.get_old_roll(), 5);
+    }
+    #[test]
+    fn team_id_none_when_unset() {
+        let p = DialogWinningsReRollParameter { team_id: None, old_roll: 0 };
+        assert!(p.get_team_id().is_none());
+    }
 }

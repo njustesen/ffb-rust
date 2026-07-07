@@ -41,4 +41,37 @@ mod tests {
         assert_eq!(p.get_messages(), &["msg1"]);
         assert!(p.is_confirm());
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogInformationOkayParameter::default();
+        assert!(p.get_title().is_none());
+        assert!(p.get_messages().is_empty());
+        assert!(!p.is_confirm());
+    }
+
+    #[test]
+    fn accessor_methods_with_non_default_values() {
+        let p = DialogInformationOkayParameter {
+            title: Some("Alert".into()),
+            messages: vec!["line1".into(), "line2".into()],
+            confirm: true,
+        };
+        assert_eq!(p.get_title(), Some("Alert"));
+        assert_eq!(p.get_messages().len(), 2);
+        assert_eq!(p.get_messages()[1], "line2");
+        assert!(p.is_confirm());
+    }
+
+    #[test]
+    fn none_title_and_empty_messages_is_edge_case() {
+        let p = DialogInformationOkayParameter {
+            title: None,
+            messages: vec![],
+            confirm: false,
+        };
+        assert!(p.get_title().is_none());
+        assert!(p.get_messages().is_empty());
+        assert!(!p.is_confirm());
+    }
 }

@@ -31,4 +31,22 @@ mod tests {
         p.options.insert("sunny".into(), 1);
         assert_eq!(p.get_options().get("sunny"), Some(&1));
     }
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogSelectWeatherParameter::default();
+        assert!(p.options.is_empty());
+    }
+    #[test]
+    fn multiple_options_stored() {
+        let mut p = DialogSelectWeatherParameter::default();
+        p.options.insert("blizzard".into(), 3);
+        p.options.insert("sweltering_heat".into(), 6);
+        assert_eq!(p.get_options().len(), 2);
+        assert_eq!(p.get_options().get("blizzard"), Some(&3));
+    }
+    #[test]
+    fn missing_key_returns_none() {
+        let p = DialogSelectWeatherParameter::default();
+        assert_eq!(p.get_options().get("hurricane"), None);
+    }
 }

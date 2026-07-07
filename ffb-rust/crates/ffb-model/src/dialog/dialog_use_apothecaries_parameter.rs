@@ -32,4 +32,24 @@ mod tests {
         let p = DialogUseApothecariesParameter { team_id: Some("home".into()), ..Default::default() };
         assert_eq!(p.get_team_id(), Some("home"));
     }
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogUseApothecariesParameter::default();
+        assert!(p.get_team_id().is_none());
+        assert!(p.get_injury_descriptions().is_empty());
+    }
+    #[test]
+    fn stores_injury_descriptions() {
+        let p = DialogUseApothecariesParameter {
+            team_id: Some("away".into()),
+            injury_descriptions: vec![serde_json::json!({"player": "p1"})],
+        };
+        assert_eq!(p.get_injury_descriptions().len(), 1);
+        assert_eq!(p.get_team_id(), Some("away"));
+    }
+    #[test]
+    fn team_id_none_when_unset() {
+        let p = DialogUseApothecariesParameter { team_id: None, injury_descriptions: vec![] };
+        assert!(p.get_team_id().is_none());
+    }
 }

@@ -40,4 +40,31 @@ mod tests {
         assert_eq!(p.get_team_id(), Some("team1"));
         assert_eq!(p.get_player_action(), Some(PlayerAction::Move));
     }
+
+    #[test]
+    fn default_is_sensible() {
+        let p = DialogConfirmEndActionParameter::default();
+        assert!(p.get_team_id().is_none());
+        assert!(p.get_player_action().is_none());
+    }
+
+    #[test]
+    fn accessor_methods_with_non_default_values() {
+        let p = DialogConfirmEndActionParameter {
+            team_id: Some("away".into()),
+            player_action: Some(PlayerAction::Block),
+        };
+        assert_eq!(p.get_team_id(), Some("away"));
+        assert_eq!(p.get_player_action(), Some(PlayerAction::Block));
+    }
+
+    #[test]
+    fn none_player_action_is_edge_case() {
+        let p = DialogConfirmEndActionParameter {
+            team_id: Some("home".into()),
+            player_action: None,
+        };
+        assert_eq!(p.get_team_id(), Some("home"));
+        assert!(p.get_player_action().is_none());
+    }
 }
