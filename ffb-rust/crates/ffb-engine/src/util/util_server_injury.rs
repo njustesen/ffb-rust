@@ -28,4 +28,17 @@ mod tests {
     fn default_creates_instance() {
         let _ = UtilServerInjury::default();
     }
+
+    #[test]
+    fn new_and_default_are_equivalent() {
+        // Both paths produce a valid UtilServerInjury instance.
+        let _a = UtilServerInjury::new();
+        let _b = UtilServerInjury::default();
+    }
+
+    #[test]
+    fn util_server_injury_is_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<UtilServerInjury>();
+    }
 }

@@ -52,4 +52,19 @@ mod tests {
         remove_effect_internal(&mut state, "team_not_present");
         assert!(!state.is_friends_with_ref("team_not_present"));
     }
+
+    #[test]
+    fn init_effect_returns_true_always() {
+        let mut state = PrayerState::new();
+        assert!(init_effect(&mut state, "team2"));
+    }
+
+    #[test]
+    fn double_add_and_remove_leaves_clean_state() {
+        let mut state = PrayerState::new();
+        init_effect(&mut state, "team1");
+        init_effect(&mut state, "team1");
+        remove_effect_internal(&mut state, "team1");
+        assert!(!state.is_friends_with_ref("team1"));
+    }
 }

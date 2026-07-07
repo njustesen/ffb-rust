@@ -65,4 +65,26 @@ mod tests {
         params.spotted_foul = is_foul && both_equal;
         assert!(params.spotted_foul);
     }
+
+    #[test]
+    fn self_inflicted_can_be_set() {
+        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let mut rng = GameRng::new(0);
+        let ctx = InjuryContext::new(ApothecaryMode::Defender);
+        let mut params = OldProModificationParams::new(&game, &mut rng, ctx, "Block");
+        assert!(!params.self_inflicted);
+        params.self_inflicted = true;
+        assert!(params.self_inflicted);
+    }
+
+    #[test]
+    fn replace_index_can_be_set() {
+        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let mut rng = GameRng::new(0);
+        let ctx = InjuryContext::new(ApothecaryMode::Defender);
+        let mut params = OldProModificationParams::new(&game, &mut rng, ctx, "Block");
+        assert_eq!(params.replace_index, 0);
+        params.replace_index = 1;
+        assert_eq!(params.replace_index, 1);
+    }
 }

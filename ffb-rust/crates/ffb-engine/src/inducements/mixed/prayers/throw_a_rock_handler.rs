@@ -59,4 +59,20 @@ mod tests {
         let game = make_game();
         remove_effect_internal(&mut state, &game, "team_not_present");
     }
+
+    #[test]
+    fn init_effect_is_idempotent_for_different_teams() {
+        let mut state = PrayerState::new();
+        let game = make_game();
+        assert!(init_effect(&mut state, &game, "team1"));
+        assert!(init_effect(&mut state, &game, "team2"));
+    }
+
+    #[test]
+    fn remove_effect_after_init_is_safe() {
+        let mut state = PrayerState::new();
+        let game = make_game();
+        init_effect(&mut state, &game, "team1");
+        remove_effect_internal(&mut state, &game, "team1");
+    }
 }

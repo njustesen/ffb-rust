@@ -52,4 +52,19 @@ mod tests {
         remove_effect_internal(&mut state, "team_not_present");
         assert!(!state.get_moles_under_the_pitch().contains("team_not_present"));
     }
+
+    #[test]
+    fn init_effect_returns_true_always() {
+        let mut state = PrayerState::new();
+        assert!(init_effect(&mut state, "teamB"));
+    }
+
+    #[test]
+    fn double_add_and_remove_leaves_clean_state() {
+        let mut state = PrayerState::new();
+        init_effect(&mut state, "teamA");
+        init_effect(&mut state, "teamA");
+        remove_effect_internal(&mut state, "teamA");
+        assert!(!state.get_moles_under_the_pitch().contains("teamA"));
+    }
 }

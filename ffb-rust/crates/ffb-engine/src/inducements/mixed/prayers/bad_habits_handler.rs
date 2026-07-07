@@ -75,4 +75,14 @@ mod tests {
         let mut game = make_game();
         remove_effect_internal(&mut game, "home");
     }
+
+    #[test]
+    fn prayer_name_constant_is_bad_habits() {
+        assert_eq!(PRAYER_NAME, "BAD_HABITS");
+    }
+
+    #[test]
+    fn affected_players_returns_one_for_roll_one() {
+        assert_eq!(affected_players(1), 1);
+    }
 }

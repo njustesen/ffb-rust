@@ -79,4 +79,24 @@ mod tests {
             FieldCoordinate::new(0, 0), ApothecaryMode::Attacker);
         assert_eq!(ctx.apothecary_mode, ApothecaryMode::Attacker);
     }
+
+    #[test]
+    fn attacker_id_is_none_when_not_provided() {
+        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let mut rng = GameRng::new(1);
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        crowd_handle_injury(&mut ctx, &game, &mut rng, None, "def1",
+            FieldCoordinate::new(0, 0), ApothecaryMode::Defender);
+        assert_eq!(ctx.attacker_id, None);
+    }
+
+    #[test]
+    fn coordinate_values_are_preserved() {
+        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let mut rng = GameRng::new(1);
+        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
+        let coord = FieldCoordinate::new(5, 12);
+        crowd_handle_injury(&mut ctx, &game, &mut rng, None, "def1", coord, ApothecaryMode::Defender);
+        assert_eq!(ctx.defender_coordinate, Some(coord));
+    }
 }

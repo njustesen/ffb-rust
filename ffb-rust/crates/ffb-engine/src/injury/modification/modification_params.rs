@@ -56,4 +56,23 @@ mod tests {
         let params = ModificationParams::new(&game, &mut rng, ctx, "Stab");
         assert_eq!(params.injury_type_name, "Stab");
     }
+
+    #[test]
+    fn new_context_apo_mode_stored() {
+        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let mut rng = GameRng::new(0);
+        let ctx = InjuryContext::new(ApothecaryMode::Attacker);
+        let params = ModificationParams::new(&game, &mut rng, ctx, "Block");
+        assert_eq!(params.new_context.apothecary_mode, ApothecaryMode::Attacker);
+    }
+
+    #[test]
+    fn injury_type_name_is_accessible() {
+        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let mut rng = GameRng::new(0);
+        let ctx = InjuryContext::new(ApothecaryMode::Defender);
+        let params = ModificationParams::new(&game, &mut rng, ctx, "Crowd");
+        assert!(!params.injury_type_name.is_empty());
+        assert_eq!(params.injury_type_name, "Crowd");
+    }
 }

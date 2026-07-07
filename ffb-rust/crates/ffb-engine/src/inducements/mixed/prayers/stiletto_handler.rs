@@ -63,4 +63,18 @@ mod tests {
         let mut game = make_game();
         remove_effect_internal(&mut game, "home");
     }
+
+    #[test]
+    fn prayer_name_constant_is_stiletto() {
+        assert_eq!(PRAYER_NAME, "STILETTO");
+    }
+
+    #[test]
+    fn remove_effect_after_init_is_safe() {
+        let mut state = PrayerState::new();
+        let mut game = make_game();
+        let stub = StubPlayerSelector;
+        init_effect(&mut state, &mut game, &mut GameRng::new(0), "home", &stub);
+        remove_effect_internal(&mut game, "home");
+    }
 }

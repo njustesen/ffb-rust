@@ -71,4 +71,18 @@ mod tests {
         remove_effect_internal(&mut state, &game, "home");
         assert!(!state.is_under_scrutiny("away"));
     }
+
+    #[test]
+    fn animation_type_is_under_scrutiny() {
+        assert_eq!(animation_type(), AnimationType::PRAYER_UNDER_SCRUTINY);
+    }
+
+    #[test]
+    fn init_effect_away_team_adds_scrutiny_to_home() {
+        let mut state = PrayerState::new();
+        let game = make_game();
+        assert!(init_effect(&mut state, &game, "away"));
+        assert!(state.is_under_scrutiny("home"));
+        assert!(!state.is_under_scrutiny("away"));
+    }
 }

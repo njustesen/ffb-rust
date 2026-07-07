@@ -39,4 +39,17 @@ mod tests {
     // (DbPlayerMarkersQuery and FumbblRequestLoadPlayerMarkings). These are
     // server-side I/O operations with no pure calculation to extract or test.
     // Per translation rules, DB/HTTP/file-loading methods are skipped.
+
+    #[test]
+    fn default_and_new_are_equivalent() {
+        // Both construction paths produce a valid MarkerLoadingService.
+        let _a = MarkerLoadingService::new();
+        let _b = MarkerLoadingService::default();
+    }
+
+    #[test]
+    fn marker_loading_service_is_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<MarkerLoadingService>();
+    }
 }

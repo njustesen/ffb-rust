@@ -126,4 +126,27 @@ mod tests {
         ae.set_old_weather(Some(Weather::Blizzard));
         assert_eq!(ae.get_old_weather(), Some(Weather::Blizzard));
     }
+
+    #[test]
+    fn stalling_and_skip_restore_weather_can_be_toggled() {
+        let mut ae = ActiveEffects::new();
+        ae.set_stalling(true);
+        ae.set_skip_restore_weather(true);
+        assert!(ae.is_stalling());
+        assert!(ae.is_skip_restore_weather());
+        ae.set_stalling(false);
+        ae.set_skip_restore_weather(false);
+        assert!(!ae.is_stalling());
+        assert!(!ae.is_skip_restore_weather());
+    }
+
+    #[test]
+    fn multiple_leaders_are_tracked() {
+        let mut ae = ActiveEffects::new();
+        ae.add_leader("coach1");
+        ae.add_leader("coach2");
+        assert!(ae.get_leaders().contains("coach1"));
+        assert!(ae.get_leaders().contains("coach2"));
+        assert_eq!(ae.get_leaders().len(), 2);
+    }
 }
