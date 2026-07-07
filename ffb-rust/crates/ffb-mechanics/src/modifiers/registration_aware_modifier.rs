@@ -54,4 +54,11 @@ mod tests {
         m.set_registered_to(Some("Leap".into()));
         assert!(!m.is_registered_to_skill_with_property("canAvoidFallingDown"));
     }
+
+    #[test]
+    fn set_registered_to_stores_value() {
+        let mut m = RegistrationAwareModifier::new();
+        m.set_registered_to(Some("DODGE".to_string()));
+        assert_eq!(m.registered_to(), Some("DODGE"));
+    }
 }

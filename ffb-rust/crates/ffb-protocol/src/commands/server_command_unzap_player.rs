@@ -37,4 +37,10 @@ mod tests {
         let v = ServerCommandUnzapPlayer::new("t", "p");
         assert!(!format!("{:?}", v).is_empty());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ServerCommandUnzapPlayer::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

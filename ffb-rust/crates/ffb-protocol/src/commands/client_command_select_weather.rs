@@ -50,4 +50,10 @@ mod tests {
         assert_eq!(cmd.get_modifier(), -1);
         assert_eq!(cmd.get_weather_name(), Some("Sweltering Heat"));
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandSelectWeather::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

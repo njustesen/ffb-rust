@@ -86,4 +86,12 @@ mod tests {
         assert!(ctx.get_acting_player().player_id.is_none());
     }
 
+
+    #[test]
+    fn get_game_away_team_id_is_accessible() {
+        let game = make_game();
+        let ap = ActingPlayer::default();
+        let ctx = JumpUpContext::new(&game, &ap);
+        assert_eq!(ctx.get_game().team_away.id, "away");
+    }
 }

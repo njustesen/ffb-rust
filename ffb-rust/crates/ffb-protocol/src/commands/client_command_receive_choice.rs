@@ -36,4 +36,10 @@ mod tests {
         let cmd = ClientCommandReceiveChoice::default();
         assert!(!cmd.choice_receive);
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandReceiveChoice::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

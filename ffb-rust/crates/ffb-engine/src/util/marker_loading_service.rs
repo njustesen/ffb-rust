@@ -52,4 +52,8 @@ mod tests {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<MarkerLoadingService>();
     }
+    #[test]
+    fn marker_loading_service_is_zero_sized() {
+        assert_eq!(std::mem::size_of::<MarkerLoadingService>(), 0);
+    }
 }

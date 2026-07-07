@@ -53,4 +53,16 @@ mod tests {
         let cmd = ServerCommandLeave::default();
         assert!(cmd.coach.is_empty());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ServerCommandLeave::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
+
+    #[test]
+    fn clone_roundtrip() {
+        let cmd = ServerCommandLeave::default();
+        let _ = cmd.clone();
+    }
 }

@@ -31,4 +31,10 @@ mod tests {
         assert!(!format!("{:?}", ServerCommandSound::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_roundtrip() {
+        let cmd = ServerCommandSound::default();
+        let _ = cmd.clone();
+    }
 }

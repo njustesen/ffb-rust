@@ -132,4 +132,14 @@ mod tests {
         assert!(!ctx.is_use_break_tackle());
     }
 
+
+    #[test]
+    fn get_game_away_team_id_is_accessible() {
+        use ffb_model::model::ActingPlayer;
+        use ffb_model::types::FieldCoordinate;
+        let game = make_game();
+        let ap = ActingPlayer::default();
+        let ctx = DodgeContext::new(&game, &ap, FieldCoordinate::new(1,1), FieldCoordinate::new(2,2));
+        assert_eq!(ctx.get_game().team_away.id, "away");
+    }
 }

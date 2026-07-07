@@ -36,4 +36,10 @@ mod tests {
         let cmd = ClientCommandBlockChoice::new(-1);
         assert_eq!(cmd.get_dice_index(), -1);
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandBlockChoice::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

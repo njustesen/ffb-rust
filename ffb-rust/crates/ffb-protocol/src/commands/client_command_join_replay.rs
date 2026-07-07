@@ -58,4 +58,10 @@ mod tests {
         let cmd = ClientCommandJoinReplay::default();
         assert!(cmd.get_replay_name().is_none());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandJoinReplay::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

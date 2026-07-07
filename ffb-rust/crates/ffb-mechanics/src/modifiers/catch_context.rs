@@ -90,4 +90,12 @@ mod tests {
         assert!(ctx.get_player().is_none());
     }
 
+
+    #[test]
+    fn get_game_away_team_id_is_accessible() {
+        use ffb_model::model::CatchScatterThrowInMode;
+        let game = make_game();
+        let ctx = CatchContext::new(&game, None, CatchScatterThrowInMode::CatchScatter, None);
+        assert_eq!(ctx.get_game().team_away.id, "away");
+    }
 }

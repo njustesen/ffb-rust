@@ -51,4 +51,10 @@ mod tests {
         assert!(cmd.player_action.is_none());
         assert!(!cmd.jumping);
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandActingPlayer::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

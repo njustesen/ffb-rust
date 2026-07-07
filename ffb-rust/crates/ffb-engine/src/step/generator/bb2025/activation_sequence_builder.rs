@@ -179,4 +179,8 @@ mod tests {
         assert_eq!(steps.len(), 14);
         assert_eq!(steps[7].step_id, StepId::SetDefender);
     }
+    #[test]
+    fn new_creates_instance() {
+        let _builder = ActivationSequenceBuilder::new();
+    }
 }

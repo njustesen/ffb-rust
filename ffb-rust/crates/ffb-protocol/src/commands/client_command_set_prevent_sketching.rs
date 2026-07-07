@@ -49,4 +49,10 @@ mod tests {
         let cmd = ClientCommandSetPreventSketching::with_fields("c", false);
         assert!(!cmd.is_prevent_sketching());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandSetPreventSketching::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

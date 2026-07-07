@@ -70,4 +70,9 @@ mod tests {
     fn includes_pouring_rain_modifier() {
         assert!(CatchModifierCollection::new().get_modifiers().iter().any(|m| m.get_name() == "Pouring Rain"));
     }
+
+    #[test]
+    fn default_has_same_count_as_new() {
+        assert_eq!(CatchModifierCollection::default().get_modifiers().len(), CatchModifierCollection::new().get_modifiers().len());
+    }
 }

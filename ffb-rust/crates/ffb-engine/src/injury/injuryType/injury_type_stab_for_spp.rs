@@ -80,4 +80,18 @@ mod tests {
         assert!(!t.ctx.armor_broken);
         assert!(t.ctx.injury.is_none());
     }
+    #[test]
+    fn default_equivalent_to_new() {
+        let t1 = InjuryTypeStabForSpp::new();
+        let t2 = InjuryTypeStabForSpp::default();
+        assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
+        assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
+    }
+
+    #[test]
+    fn new_context_uses_defender_apo_mode() {
+        use ffb_model::enums::ApothecaryMode;
+        let t = InjuryTypeStabForSpp::new();
+        assert_eq!(t.injury_context().apothecary_mode, ApothecaryMode::Defender);
+    }
 }

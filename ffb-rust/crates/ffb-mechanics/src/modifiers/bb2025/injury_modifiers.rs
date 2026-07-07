@@ -50,4 +50,9 @@ mod tests {
         assert!(names.iter().any(|n| n.as_str() == "Fireball"));
         assert!(names.iter().any(|n| n.as_str() == "Lightning"));
     }
+
+    #[test]
+    fn get_name_is_nonempty() {
+        assert!(!Bb2025InjuryModifiers.get_name().is_empty());
+    }
 }

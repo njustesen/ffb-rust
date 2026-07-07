@@ -62,4 +62,10 @@ mod tests {
         assert!(cmd.acting_player_id.is_none());
         assert!(cmd.coordinates_to.is_empty());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandMove::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

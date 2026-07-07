@@ -90,4 +90,10 @@ mod tests {
         assert_eq!(cmd.get_team_id(), Some("team-abc"));
     }
 
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandJoin::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

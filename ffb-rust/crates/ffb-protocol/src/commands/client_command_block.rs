@@ -77,4 +77,10 @@ mod tests {
         assert!(!cmd.using_breathe_fire);
         assert!(!cmd.using_chomp);
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandBlock::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

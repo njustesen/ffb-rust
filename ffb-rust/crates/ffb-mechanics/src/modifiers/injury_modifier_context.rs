@@ -108,4 +108,15 @@ mod tests {
         assert!(ctx.get_attacker().is_none());
     }
 
+
+    #[test]
+    fn set_defender_mode_switches_mode() {
+        let game = make_game();
+        let defender = Player::default();
+        let mut ctx = InjuryModifierContext::new(&game, None, &defender, false, false, false, false);
+        assert!(ctx.is_attacker_mode());
+        ctx.set_defender_mode();
+        assert!(ctx.is_defender_mode());
+        assert!(!ctx.is_attacker_mode());
+    }
 }

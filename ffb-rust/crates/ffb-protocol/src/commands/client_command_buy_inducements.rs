@@ -89,4 +89,10 @@ mod tests {
         assert_eq!(cmd.get_star_player_position_ids().len(), 1);
     }
 
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandBuyInducements::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

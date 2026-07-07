@@ -115,4 +115,11 @@ mod tests {
         let defender = bare_player();
         assert!(!m.applies_to_context(&ctx_no_attacker(&game, &defender)));
     }
+
+    #[test]
+    fn set_registered_to_stores_value() {
+        let mut m = VariableInjuryModifierAttacker::new("x", false);
+        m.set_registered_to(Some("DODGE".to_string()));
+        assert_eq!(m.registered_to(), Some("DODGE"));
+    }
 }

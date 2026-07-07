@@ -70,4 +70,11 @@ mod tests {
         let _a = StepNextStepAndRepeat::new();
         let _b = StepNextStepAndRepeat::default();
     }
+    #[test]
+    fn handle_command_returns_next_step_action() {
+        let mut step = StepNextStepAndRepeat::new();
+        let mut game = make_game();
+        let out = step.handle_command(&crate::action::Action::Acknowledge, &mut game, &mut ffb_model::util::rng::GameRng::new(0));
+        assert_eq!(out.action, crate::step::framework::StepAction::NextStepAndRepeat);
+    }
 }

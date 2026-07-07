@@ -100,4 +100,11 @@ mod tests {
         defender.starting_skills.push(SkillWithValue::new(SkillId::Dodge));
         assert!(m.applies_to_context(&ctx(&game, &defender)));
     }
+
+    #[test]
+    fn set_registered_to_stores_value() {
+        let mut m = VariableInjuryModifierDefender::new("x", false);
+        m.set_registered_to(Some("DODGE".to_string()));
+        assert_eq!(m.registered_to(), Some("DODGE"));
+    }
 }

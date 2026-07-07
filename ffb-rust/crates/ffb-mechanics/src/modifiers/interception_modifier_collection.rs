@@ -78,4 +78,9 @@ mod tests {
     fn includes_disturbing_presence_modifier() {
         assert!(InterceptionModifierCollection::new().get_modifiers().iter().any(|m| m.get_name() == "1 Disturbing Presence"));
     }
+
+    #[test]
+    fn default_has_same_count_as_new() {
+        assert_eq!(InterceptionModifierCollection::default().get_modifiers().len(), InterceptionModifierCollection::new().get_modifiers().len());
+    }
 }

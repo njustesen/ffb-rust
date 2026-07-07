@@ -41,4 +41,10 @@ mod tests {
         let cmd = ClientCommandArgueTheCall::with_player_ids(vec!["a".into(), "b".into()]);
         assert_eq!(cmd.get_player_ids().len(), 2);
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandArgueTheCall::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

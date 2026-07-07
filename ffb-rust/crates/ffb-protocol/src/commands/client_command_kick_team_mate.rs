@@ -60,4 +60,10 @@ mod tests {
         assert!(cmd.get_acting_player_id().is_none());
     }
 
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandKickTeamMate::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

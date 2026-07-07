@@ -43,4 +43,10 @@ mod tests {
         };
         assert_eq!(cmd.get_kickoff_result(), Some(KickoffResult::Blitz));
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandKickOffResultChoice::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

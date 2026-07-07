@@ -66,4 +66,9 @@ mod tests {
         let col = DodgeModifierCollection::new();
         assert!(col.get_modifiers().iter().all(|m| m.get_type() == ModifierType::TACKLEZONE));
     }
+
+    #[test]
+    fn default_has_same_count_as_new() {
+        assert_eq!(DodgeModifierCollection::default().get_modifiers().len(), DodgeModifierCollection::new().get_modifiers().len());
+    }
 }

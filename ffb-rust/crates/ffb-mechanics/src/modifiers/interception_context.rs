@@ -93,4 +93,13 @@ mod tests {
         assert_eq!(ctx.get_pass_result(), PassResult::ACCURATE);
     }
 
+
+    #[test]
+    fn get_game_away_team_id_is_accessible() {
+        use crate::pass_result::PassResult;
+        let game = make_game();
+        let player = Player::default();
+        let ctx = InterceptionContext::new(&game, &player, PassResult::ACCURATE, false);
+        assert_eq!(ctx.get_game().team_away.id, "away");
+    }
 }

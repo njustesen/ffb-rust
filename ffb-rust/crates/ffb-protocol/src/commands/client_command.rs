@@ -29,4 +29,10 @@ mod tests {
         let cmd = ClientCommand { entropy: Some(255) };
         assert_eq!(cmd.get_entropy(), Some(255));
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommand::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

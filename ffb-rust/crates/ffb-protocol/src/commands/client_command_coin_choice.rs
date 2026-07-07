@@ -38,4 +38,10 @@ mod tests {
         let cmd = ClientCommandCoinChoice::default();
         assert!(!cmd.choice_heads);
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandCoinChoice::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

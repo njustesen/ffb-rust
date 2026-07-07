@@ -35,4 +35,10 @@ mod tests {
         let cmd = ClientCommandUseChainsaw::default();
         assert!(!cmd.is_using_chainsaw());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandUseChainsaw::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

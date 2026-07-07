@@ -76,4 +76,16 @@ mod tests {
         assert!(cmd.coach.is_empty());
         assert!(cmd.player_names.is_empty());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ServerCommandJoin::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
+
+    #[test]
+    fn clone_roundtrip() {
+        let cmd = ServerCommandJoin::default();
+        let _ = cmd.clone();
+    }
 }

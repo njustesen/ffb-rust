@@ -50,4 +50,10 @@ mod tests {
         let cmd = ClientCommandReplay::with_params(i64::MAX, 0, "coach");
         assert_eq!(cmd.get_game_id(), i64::MAX);
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandReplay::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

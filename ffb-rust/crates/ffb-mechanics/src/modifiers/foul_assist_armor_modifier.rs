@@ -100,4 +100,12 @@ mod tests {
         let ctx = ArmorModifierContext::new_with_foul_assists(&game, Some(&attacker), &defender, false, false, 2);
         assert!(!m.applies_to_context(&ctx));
     }
+
+    #[test]
+    fn get_modifier_returns_stored_value() {
+        use ffb_model::model::Player;
+        let p = Player::default();
+        let m = FoulAssistArmorModifier::new("test", 3, false);
+        assert_eq!(m.get_modifier(None, &p), 3);
+    }
 }

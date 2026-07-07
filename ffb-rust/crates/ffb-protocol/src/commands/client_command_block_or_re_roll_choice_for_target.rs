@@ -81,4 +81,16 @@ mod tests {
         assert_eq!(cmd.get_selected_index(), 2);
         assert_eq!(cmd.get_any_dice_indexes(), &[0, 2]);
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandBlockOrReRollChoiceForTarget::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
+
+    #[test]
+    fn clone_roundtrip() {
+        let cmd = ClientCommandBlockOrReRollChoiceForTarget::default();
+        let _ = cmd.clone();
+    }
 }

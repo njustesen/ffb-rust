@@ -61,4 +61,31 @@ mod tests {
         let ctx = GazeModifierContext::new(&game, &player);
         assert_eq!(ctx.get_game().team_home.id, "home");
     }
+
+    #[test]
+    fn get_game_away_team_id_is_accessible() {
+        let game = make_game();
+        let player = Player::default();
+        let ctx = GazeModifierContext::new(&game, &player);
+        assert_eq!(ctx.get_game().team_away.id, "away");
+    }
+
+    #[test]
+    fn player_name_is_accessible_via_get_player() {
+        let game = make_game();
+        let mut player = Player::default();
+        player.name = "Gazer".into();
+        let ctx = GazeModifierContext::new(&game, &player);
+        assert_eq!(ctx.get_player().name, "Gazer");
+    }
+
+    #[test]
+    fn two_contexts_can_share_same_game() {
+        let game = make_game();
+        let p1 = Player::default();
+        let p2 = Player::default();
+        let ctx1 = GazeModifierContext::new(&game, &p1);
+        let ctx2 = GazeModifierContext::new(&game, &p2);
+        assert_eq!(ctx1.get_game().team_home.id, ctx2.get_game().team_home.id);
+    }
 }

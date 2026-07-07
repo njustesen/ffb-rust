@@ -32,4 +32,10 @@ mod tests {
         };
         assert!(cmd.get_concede_game_status().is_some());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandConcedeGame::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

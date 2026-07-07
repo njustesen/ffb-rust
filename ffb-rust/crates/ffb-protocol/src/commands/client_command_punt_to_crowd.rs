@@ -31,4 +31,10 @@ mod tests {
         assert!(!cmd.is_punt_to_crowd());
     }
 
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandPuntToCrowd::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

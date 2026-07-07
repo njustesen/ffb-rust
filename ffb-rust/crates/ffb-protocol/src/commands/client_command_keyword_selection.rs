@@ -57,4 +57,10 @@ mod tests {
         let cmd = ClientCommandKeywordSelection::default();
         assert!(cmd.get_keywords().is_empty());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandKeywordSelection::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

@@ -60,4 +60,11 @@ mod tests {
         let m = VariableInjuryModifier::new_attacker("x", false);
         assert!(m.registered_to().is_none());
     }
+
+    #[test]
+    fn set_registered_to_stores_value() {
+        let mut m = VariableInjuryModifier::new_attacker("x", false);
+        m.set_registered_to(Some("DODGE".to_string()));
+        assert_eq!(m.registered_to(), Some("DODGE"));
+    }
 }

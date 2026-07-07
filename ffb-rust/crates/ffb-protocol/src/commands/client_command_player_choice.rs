@@ -51,4 +51,10 @@ mod tests {
         assert_eq!(cmd.get_player_ids().len(), 1);
     }
 
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandPlayerChoice::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

@@ -93,4 +93,9 @@ mod tests {
         col.add(PassModifier::new("extra", 1, ModifierType::REGULAR));
         assert_eq!(col.get_modifiers().len(), count_before + 1);
     }
+
+    #[test]
+    fn default_has_same_count_as_new() {
+        assert_eq!(PassModifierCollection::default().get_modifiers().len(), PassModifierCollection::new().get_modifiers().len());
+    }
 }

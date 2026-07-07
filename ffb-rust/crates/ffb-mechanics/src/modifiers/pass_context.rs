@@ -90,4 +90,12 @@ mod tests {
         let ctx = PassContext::new(&game, &player, PassingDistance::QuickPass, false);
         assert_eq!(ctx.get_player().id, "thrower");
     }
+
+    #[test]
+    fn get_game_away_team_id_is_accessible() {
+        let game = make_game();
+        let player = Player::default();
+        let ctx = PassContext::new(&game, &player, PassingDistance::QuickPass, false);
+        assert_eq!(ctx.get_game().team_away.id, "away");
+    }
 }

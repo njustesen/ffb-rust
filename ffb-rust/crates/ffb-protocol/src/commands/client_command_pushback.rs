@@ -41,4 +41,10 @@ mod tests {
         let cmd = ClientCommandPushback::with_pushback(p);
         assert_eq!(cmd.get_pushback().and_then(|p| p.get_coordinate()), Some(coord));
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandPushback::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

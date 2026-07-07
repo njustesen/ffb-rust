@@ -44,4 +44,10 @@ mod tests {
         assert_eq!(cmd.get_kind(), Some(BlockKind::STAB));
         assert_eq!(cmd.get_player_id(), Some("p2"));
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandSetBlockTargetSelection::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

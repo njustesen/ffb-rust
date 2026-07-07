@@ -53,4 +53,10 @@ mod tests {
         let cmd = ClientCommandLoadAutomaticPlayerMarkings::default();
         assert!(cmd.get_coach().is_none());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandLoadAutomaticPlayerMarkings::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

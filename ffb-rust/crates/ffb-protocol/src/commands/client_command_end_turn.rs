@@ -45,4 +45,10 @@ mod tests {
         cmd.player_coordinates.insert("p1".into(), FieldCoordinate::new(5, 5));
         assert_eq!(cmd.player_coordinates.len(), 1);
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandEndTurn::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

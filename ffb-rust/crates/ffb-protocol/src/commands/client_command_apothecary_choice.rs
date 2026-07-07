@@ -55,4 +55,16 @@ mod tests {
         assert_eq!(cmd.get_player_id(), Some("p1"));
         assert_eq!(cmd.get_serious_injury(), Some(SeriousInjuryKind::Dead));
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandApothecaryChoice::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
+
+    #[test]
+    fn clone_roundtrip() {
+        let cmd = ClientCommandApothecaryChoice::default();
+        let _ = cmd.clone();
+    }
 }

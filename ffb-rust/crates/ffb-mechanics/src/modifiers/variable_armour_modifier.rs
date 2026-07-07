@@ -52,4 +52,11 @@ mod tests {
         let m_no_foul = VariableArmourModifier::new("x", false);
         assert!(!m_no_foul.is_foul_assist_modifier());
     }
+
+    #[test]
+    fn set_registered_to_stores_value() {
+        let mut m = VariableArmourModifier::new("x", false);
+        m.set_registered_to(Some("DODGE".to_string()));
+        assert_eq!(m.registered_to(), Some("DODGE"));
+    }
 }

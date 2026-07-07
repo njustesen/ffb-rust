@@ -55,4 +55,10 @@ mod tests {
         assert!(cmd.is_skip());
         assert!(!cmd.is_running());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandReplayStatus::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

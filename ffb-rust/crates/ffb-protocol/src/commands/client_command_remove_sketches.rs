@@ -44,4 +44,10 @@ mod tests {
         cmd.add_id("sk-2");
         assert_eq!(cmd.get_ids().len(), 2);
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandRemoveSketches::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

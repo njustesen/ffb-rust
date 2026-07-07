@@ -59,4 +59,11 @@ mod tests {
         assert!(e.get_modifiers().is_empty());
         assert!(e.get_stat_modifiers().is_empty());
     }
+
+    #[test]
+    fn insert_skill_string_then_not_empty() {
+        let mut te = TemporaryEnhancements::new();
+        te.skills.insert("Dodge".to_string());
+        assert!(!te.get_skills().is_empty());
+    }
 }

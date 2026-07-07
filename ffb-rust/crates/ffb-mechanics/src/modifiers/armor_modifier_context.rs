@@ -101,4 +101,12 @@ mod tests {
         let ctx = ArmorModifierContext::new(&game, None, &defender, false, false);
         assert!(ctx.get_attacker().is_none());
     }
+
+    #[test]
+    fn get_game_returns_game_with_correct_home_id() {
+        let game = make_game();
+        let defender = Player::default();
+        let ctx = ArmorModifierContext::new(&game, None, &defender, false, false);
+        assert_eq!(ctx.get_game().team_home.id, "home");
+    }
 }

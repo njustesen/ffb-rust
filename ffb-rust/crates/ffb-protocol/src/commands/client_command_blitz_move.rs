@@ -61,4 +61,10 @@ mod tests {
         let cmd = ClientCommandBlitzMove::with_move("p2", from, to.clone());
         assert_eq!(cmd.get_coordinates_to(), to.as_slice());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandBlitzMove::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

@@ -35,4 +35,10 @@ mod tests {
         let cmd = ClientCommandPickUpChoice::default();
         assert!(!cmd.is_attempt_pick_up());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandPickUpChoice::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

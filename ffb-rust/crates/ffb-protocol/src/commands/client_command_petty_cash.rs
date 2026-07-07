@@ -36,4 +36,10 @@ mod tests {
         assert_eq!(cmd.get_petty_cash(), -1000);
     }
 
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandPettyCash::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

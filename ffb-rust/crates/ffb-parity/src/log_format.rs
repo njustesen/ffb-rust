@@ -171,4 +171,12 @@ mod tests {
         let back: LogLine = serde_json::from_str(&json).unwrap();
         assert_eq!(line, back);
     }
+
+    #[test]
+    fn final_hash_returns_last_game_end_hash() {
+        let lines = vec![
+            LogLine::GameEnd { i: 0, home_score: 1, away_score: 0, state_hash: "aabb".into() },
+        ];
+        assert_eq!(GameLog::final_hash(&lines), Some("aabb"));
+    }
 }

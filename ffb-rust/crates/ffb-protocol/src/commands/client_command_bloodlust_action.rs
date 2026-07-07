@@ -32,4 +32,10 @@ mod tests {
         let cmd = ClientCommandBloodlustAction::new(false);
         assert!(!cmd.is_change());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandBloodlustAction::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

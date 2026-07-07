@@ -36,4 +36,10 @@ mod tests {
         let cmd = ClientCommandFollowupChoice::default();
         assert!(!cmd.choice_followup);
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandFollowupChoice::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

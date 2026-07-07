@@ -55,4 +55,10 @@ mod tests {
         let cmd = ClientCommandFoul::with_players("a", "b", false);
         assert!(!cmd.is_using_chainsaw());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandFoul::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

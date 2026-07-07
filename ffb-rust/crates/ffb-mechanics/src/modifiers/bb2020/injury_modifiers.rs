@@ -73,4 +73,9 @@ mod tests {
         let names: Vec<String> = m.values().into_iter().map(|m| m.get_name().to_string()).collect::<Vec<String>>();
         assert!(names.iter().any(|n| n.as_str() == "Bomb"));
     }
+
+    #[test]
+    fn get_name_is_nonempty() {
+        assert!(!Bb2020InjuryModifiers::new().get_name().is_empty());
+    }
 }

@@ -77,4 +77,11 @@ mod tests {
         let m = StaticArmourModifier::new_with_chainsaw("Chainsaw +3", 3, false, true);
         assert!(m.is_chainsaw());
     }
+
+    #[test]
+    fn set_registered_to_stores_value() {
+        let mut m = StaticArmourModifier::new("x", 0, false);
+        m.set_registered_to(Some("DODGE".to_string()));
+        assert_eq!(m.registered_to(), Some("DODGE"));
+    }
 }

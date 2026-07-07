@@ -96,4 +96,12 @@ mod tests {
         assert_eq!(ctx.get_player().id, player.id);
     }
 
+
+    #[test]
+    fn get_game_away_team_id_is_accessible() {
+        let game = make_game();
+        let player = Player::default();
+        let ctx = RightStuffContext::new(&game, &player);
+        assert_eq!(ctx.get_game().team_away.id, "away");
+    }
 }

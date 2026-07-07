@@ -47,4 +47,10 @@ mod tests {
         let cmd = ClientCommandPass::new("p1", coord);
         assert!(cmd.get_acting_player_id().is_some());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandPass::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

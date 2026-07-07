@@ -78,4 +78,10 @@ mod tests {
         assert_eq!(cmd.game_time, 0);
         assert_eq!(cmd.turn_time, 0);
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ServerCommandModelSync::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

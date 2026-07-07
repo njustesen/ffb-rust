@@ -98,4 +98,12 @@ mod tests {
         assert!(ctx.get_teams_with_moles_under_pitch().is_empty());
     }
 
+
+    #[test]
+    fn get_game_away_team_id_is_accessible() {
+        let game = make_game();
+        let player = Player::default();
+        let ctx = GoForItContext::new(&game, &player);
+        assert_eq!(ctx.get_game().team_away.id, "away");
+    }
 }

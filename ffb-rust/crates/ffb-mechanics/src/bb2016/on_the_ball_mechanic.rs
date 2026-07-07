@@ -118,4 +118,9 @@ mod tests {
     fn display_string_kick_off_interference_is_kickoff_return() {
         assert_eq!(OnTheBallMechanic.display_string_kick_off_interference(), "Kick-Off Return");
     }
+
+    #[test]
+    fn pass_interference_status_description_is_nonempty() {
+        assert!(!OnTheBallMechanic.pass_interference_status_description().is_empty());
+    }
 }

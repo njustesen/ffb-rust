@@ -125,4 +125,13 @@ mod tests {
         assert_eq!(ctx.get_player().id, "jumper");
     }
 
+
+    #[test]
+    fn get_game_away_team_id_is_accessible() {
+        use ffb_model::types::FieldCoordinate;
+        let game = make_game();
+        let player = Player::default();
+        let ctx = JumpContext::new(&game, &player, FieldCoordinate::new(1,1), FieldCoordinate::new(2,2));
+        assert_eq!(ctx.get_game().team_away.id, "away");
+    }
 }

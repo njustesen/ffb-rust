@@ -42,4 +42,10 @@ mod tests {
         assert!(cmd.is_initial_deck_choice());
         assert!(cmd.is_first_card_choice());
     }
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandSelectCardToBuy::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }

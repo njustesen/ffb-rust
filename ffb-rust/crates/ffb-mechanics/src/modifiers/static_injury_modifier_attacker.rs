@@ -114,4 +114,11 @@ mod tests {
         let ctx = ctx_with_attacker(&game, &attacker, &defender);
         assert!(m.applies_to_context(&ctx));
     }
+
+    #[test]
+    fn set_registered_to_stores_value() {
+        let mut m = StaticInjuryModifierAttacker::new("x", 0, false);
+        m.set_registered_to(Some("DODGE".to_string()));
+        assert_eq!(m.registered_to(), Some("DODGE"));
+    }
 }

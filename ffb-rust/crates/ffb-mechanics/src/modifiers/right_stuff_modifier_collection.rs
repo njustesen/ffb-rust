@@ -71,4 +71,9 @@ mod tests {
         col.add(RightStuffModifier::new("reg", 1, ModifierType::REGULAR));
         assert_eq!(col.get_modifiers_by_type(ModifierType::REGULAR).len(), 1);
     }
+
+    #[test]
+    fn default_has_same_count_as_new() {
+        assert_eq!(RightStuffModifierCollection::default().get_modifiers().len(), RightStuffModifierCollection::new().get_modifiers().len());
+    }
 }

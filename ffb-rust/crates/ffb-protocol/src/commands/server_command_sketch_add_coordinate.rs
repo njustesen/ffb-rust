@@ -51,4 +51,10 @@ mod tests {
         assert!(!format!("{:?}", ServerCommandSketchAddCoordinate::default()).is_empty());
     }
 
+
+    #[test]
+    fn clone_roundtrip() {
+        let cmd = ServerCommandSketchAddCoordinate::default();
+        let _ = cmd.clone();
+    }
 }

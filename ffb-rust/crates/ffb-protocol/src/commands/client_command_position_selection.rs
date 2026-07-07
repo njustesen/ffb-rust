@@ -46,4 +46,10 @@ mod tests {
         assert_eq!(cmd.get_position(), positions.as_slice());
     }
 
+
+    #[test]
+    fn debug_format_nonempty() {
+        let cmd = ClientCommandPositionSelection::default();
+        assert!(!format!("{cmd:?}").is_empty());
+    }
 }
