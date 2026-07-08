@@ -8,9 +8,9 @@
 
 **Translation progress:** 2,521/2,521 files formally implemented = **100% ✓** (0 partial, 458 skip)
 
-**Tests:** 11,934 passing (1 ignored)
+**Tests:** 12,245 passing (1 ignored)
 
-**Current phase:** Phase ZG complete — All thin files (≥1 test) now have ≥5 tests (11,717 → 11,934)
+**Current phase:** Phase ZJ complete — Skill behaviour hook dispatch infrastructure: dispatch.rs, registry.rs, step_pushback+step_horns wired to dispatch, StandFirm/SideStep/Grab behaviours fully implemented (11,934 → 12,245)
 
 ---
 
@@ -421,6 +421,19 @@
   - **`bb2025/move_/step_move_dodge.rs`**: Same change. +2 tests.
   - **Files already done in ZB (bb2016)**: `step_block_chainsaw.rs`, `step_block_choice.rs`, `step_followup.rs` all fully wired.
   - **Remaining ZC scope**: bb2020/bb2025 block roll, pass/, foul/, mixed/, kickoff steps; bb2016 move_/ steps.
+
+- **Phase ZJ** (2026-07-08): Skill behaviour hook dispatch infrastructure — 11,934 → 12,245 tests (+311)
+  - **`dispatch.rs`**: `execute_step_hooks(game, rng, StepId, step_state: &mut dyn Any)` — mirrors Java `GameState.executeStepHooks()`. Collects registered modifiers for the edition, sorts by priority, calls each `handle_execute_step`, stops on first `true`.
+  - **`registry.rs`**: `SkillRegistry` per-edition static singletons (BB2025: 21 skills, BB2020/BB2016: 15 each). `registry_for(rules)` returns the appropriate `Arc<SkillRegistry>`.
+  - **`step_horns.rs`**: Wired to dispatch — creates `StepHornsHookState`, calls dispatch, reads `using_horns`.
+  - **`step_pushback.rs`**: Wired to dispatch — creates `StepPushbackHookState` (do_push, side_stepping, standing_firm, grabbing, pushback_squares, pushback_mode), calls dispatch for StandFirm/SideStep/Grab hooks.
+  - **`stand_firm_behaviour.rs`**: Full 1:1 translation — auto-stand-firm when Rooted, auto-decline when no tacklezones or Juggernaut cancels, headless auto-decline dialog; `ReportSkillUse(CANCEL_STAND_FIRM/NO_TACKLEZONE)`.
+  - **`sidestep_behaviour.rs`**: Full 1:1 translation — marks `side_stepping` for defenders with SideStep property; Juggernaut can cancel; headless auto-declines direction choice.
+  - **`grab_behaviour.rs`**: Full 1:1 translation — filters `pushback_squares` to corner-only when attacker has Grab; sets `pushback_mode = GRAB`.
+  - **`StepModifierTrait`**: Added `rng: &mut GameRng` parameter to `handle_execute_step` to support dice-rolling behaviours.
+  - **`ffb-server` crate**: Skeleton added (WebSocket game state host — `fantasy_football_server.rs`, `game_state.rs`, `game_cache.rs`, handlers, net layer).
+  - **Pathfinding stubs**: `path_find_context.rs`, `path_find_data.rs`, `path_find_node.rs`, `path_find_state.rs`, `path_finder_extension.rs`, `path_finder_with_multi_jump.rs`, `path_finder_with_pass_block_support.rs` — struct skeletons, no logic yet.
+  - **Remaining**: 17 other BB2025 behaviours (`bone_head_behaviour.rs`, `really_stupid_behaviour.rs`, etc.) registered in registry but `handle_execute_step` returns stub `false`. The corresponding steps still use inline logic.
 
 - **Phase ZG** (2026-07-07): Comprehensive test expansion — 9,556 → 10,835 tests (+1,279)
   - **Skill behaviour files**: Added `execute_step_hook_returns_false` + `apply_modifier_is_noop` to all 116 skill behaviour files in bb2016, bb2020, bb2025, mixed, common that had only 2 tests. ~232 new tests.

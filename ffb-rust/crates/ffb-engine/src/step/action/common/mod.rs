@@ -9,7 +9,7 @@ use ffb_model::model::game::Game;
 
 /// Shared helper: cancels the acting player's current action on a negatrait failure.
 /// Java: BoneHeadBehaviour.cancelPlayerAction (identical body to ReallyStupidBehaviour.cancelPlayerAction)
-pub(super) fn cancel_negatrait_player_action(game: &mut Game, player_id: &str) {
+pub fn cancel_negatrait_player_action(game: &mut Game, player_id: &str) {
     match game.acting_player.player_action {
         Some(PlayerAction::Blitz) | Some(PlayerAction::BlitzMove)
         | Some(PlayerAction::KickEmBlitz) | Some(PlayerAction::StandUpBlitz) => {

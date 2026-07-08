@@ -1,21 +1,35 @@
-/// 1:1 translation of com.fumbbl.ffb.server.step.action.common.StepBoneHead
-/// and its BB2025 hook com.fumbbl.ffb.server.skillbehaviour.bb2025.BoneHeadBehaviour.
+/// 1:1 translation of com.fumbbl.ffb.server.step.action.common.StepBoneHead.
 ///
 /// Resolves the Bone Head negatrait roll. Needs GOTO_LABEL_ON_FAILURE init parameter.
 /// On failure: publishes END_PLAYER_ACTION, cancels the current player action,
 /// and jumps to goToLabelOnFailure.
-use ffb_model::enums::{ReRollSource, SkillId};
-use ffb_model::events::GameEvent;
+///
+/// Logic lives in BoneHeadBehaviour.handleExecuteStepHook via dispatch::execute_step_hooks.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
-use ffb_mechanics::mechanics::minimum_roll_confusion;
-use ffb_model::report::report_confusion_roll::ReportConfusionRoll;
-use ffb_model::report::report_id::ReportId;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
-use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
-use super::cancel_negatrait_player_action;
+use crate::skill_behaviour::dispatch;
+
+// ── Hook state ────────────────────────────────────────────────────────────────
+
+/// Java: StepBoneHead.StepState { ActionStatus status; String goToLabelOnFailure }
+/// Extended with AbstractStepWithReRoll fields passed as inputs.
+#[derive(Debug)]
+pub struct StepBoneHeadHookState {
+    /// Input: Java state.goToLabelOnFailure
+    pub goto_label_on_failure: String,
+    /// Input: Java step.getReRolledAction()
+    pub re_rolled_action: Option<String>,
+    /// Input: Java step.getReRollSource()
+    pub re_roll_source: Option<String>,
+    /// Output: set by hook to control step flow (mirrors step.getResult().setNextAction)
+    pub outcome: Option<StepOutcome>,
+    /// Output: hook may update re-roll state (written back to step after dispatch)
+    pub updated_re_rolled_action: Option<String>,
+    pub updated_re_roll_source: Option<String>,
+}
 
 pub struct StepBoneHead {
     /// Java: state.goToLabelOnFailure — GOTO_LABEL_ON_FAILURE init parameter.
@@ -62,110 +76,36 @@ impl Step for StepBoneHead {
 }
 
 impl StepBoneHead {
-    /// Java: BoneHeadBehaviour.handleExecuteStepHook
+    /// Java: StepBoneHead.executeStep() → calls executeStepHooks(this, state).
+    /// Logic lives in BoneHeadBehaviour.handleExecuteStepHook (via dispatch).
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // Java: if (!game.getTurnMode().checkNegatraits()) → NEXT_STEP
-        if !game.turn_mode.check_negatraits() {
-            return StepOutcome::next();
-        }
-
-        let player_id = match game.acting_player.player_id.clone() {
-            Some(id) => id,
-            None => return StepOutcome::next(),
+        let mut hook_state = StepBoneHeadHookState {
+            goto_label_on_failure: self.goto_label_on_failure.clone(),
+            re_rolled_action: self.re_rolled_action.clone(),
+            re_roll_source: self.re_roll_source.clone(),
+            outcome: None,
+            updated_re_rolled_action: None,
+            updated_re_roll_source: None,
         };
-
-        // Java: if (UtilCards.hasSkill(actingPlayer, skill))
-        let has_bone_head = game.player(&player_id)
-            .map(|p| p.has_skill(SkillId::BoneHead))
-            .unwrap_or(false);
-
-        if !has_bone_head {
-            return StepOutcome::next();
+        dispatch::execute_step_hooks(game, rng, StepId::BoneHead, &mut hook_state);
+        if let Some(rra) = hook_state.updated_re_rolled_action {
+            self.re_rolled_action = Some(rra);
         }
-
-        // Java: if (BONE_HEAD == reRolledAction) { if (source == null || !useReRoll) doRoll = false }
-        let mut skip_roll = false;
-        if self.re_rolled_action.as_deref() == Some("BONE_HEAD") {
-            if let Some(ref source_name) = self.re_roll_source.clone() {
-                let source = ReRollSource::new(source_name.as_str());
-                if !use_reroll(game, &source, &player_id) {
-                    skip_roll = true; // token exhausted
-                }
-                // else: re-roll consumed, proceed to re-roll
-            } else {
-                skip_roll = true; // player declined (handle_command cleared source)
-            }
+        if let Some(rrs) = hook_state.updated_re_roll_source {
+            self.re_roll_source = Some(rrs);
         }
-
-        if skip_roll {
-            let confusion_event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll: 1, confused: true };
-            cancel_negatrait_player_action(game, &player_id);
-            return StepOutcome::goto(&self.goto_label_on_failure)
-                .with_event(confusion_event)
-                .publish(StepParameter::EndPlayerAction(true));
-        }
-
-        // Java: step.commitTargetSelection() → targetSelectionState.commit()
-        if let Some(ref mut ts) = game.field_model.target_selection_state {
-            ts.commit();
-        }
-        let roll = rng.d6();
-        // Java: minimumRollConfusion(true) — BoneHead always uses good-conditions threshold (2+)
-        let min_roll = minimum_roll_confusion(true);
-        let successful = roll >= min_roll;
-
-        // Java: actingPlayer.markSkillUsed(skill)
-        let is_home = game.team_home.player(&player_id).is_some();
-        if is_home {
-            if let Some(p) = game.team_home.player_mut(&player_id) {
-                p.used_skills.insert(SkillId::BoneHead);
-            }
-        } else if let Some(p) = game.team_away.player_mut(&player_id) {
-            p.used_skills.insert(SkillId::BoneHead);
-        }
-
-        // Java: addReport(new ReportConfusionRoll(...))
-        let re_rolled = self.re_rolled_action.as_deref() == Some("BONE_HEAD")
-            && self.re_roll_source.is_some();
-        game.report_list.add(ReportConfusionRoll::new(
-            Some(player_id.clone()),
-            successful,
-            roll,
-            min_roll,
-            re_rolled,
-            Some(SkillId::BoneHead.class_name().to_string()),
-        ));
-        let confusion_event = GameEvent::ConfusionRoll {
-            player_id: player_id.clone(),
-            roll,
-            confused: !successful,
-        };
-
-        if successful {
-            StepOutcome::next().with_event(confusion_event)
-        } else {
-            // Java: if (reRolledAction != BONE_HEAD && askForReRollIfAvailable(...)) → CONTINUE
-            if self.re_rolled_action.is_none() {
-                if let Some(prompt) = ask_for_reroll_if_available(game, "BONE_HEAD", min_roll, false) {
-                    self.re_rolled_action = Some("BONE_HEAD".into());
-                    self.re_roll_source = Some("TRR".into());
-                    return StepOutcome::cont().with_event(confusion_event).with_prompt(prompt);
-                }
-            }
-            cancel_negatrait_player_action(game, &player_id);
-            StepOutcome::goto(&self.goto_label_on_failure)
-                .with_event(confusion_event)
-                .publish(StepParameter::EndPlayerAction(true))
-        }
+        hook_state.outcome.unwrap_or_else(StepOutcome::next)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffb_model::enums::{Rules, TurnMode, PlayerAction, PS_STANDING, PS_PRONE};
+    use ffb_model::enums::{Rules, TurnMode, PlayerAction, PS_STANDING, PS_PRONE, SkillId};
     use ffb_model::enums::PlayerState;
+    use ffb_model::events::GameEvent;
     use ffb_model::model::skill_def::SkillWithValue;
+    use ffb_model::report::report_id::ReportId;
     use ffb_model::types::FieldCoordinate;
     use crate::action::Action;
     use crate::step::framework::{StepAction, StepParameter};
