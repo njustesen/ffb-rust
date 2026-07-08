@@ -160,6 +160,20 @@ pub fn make_step(id: StepId) -> Box<dyn Step> {
         StepId::BoneHead               => { use crate::step::action::common::step_bone_head::StepBoneHead; Box::new(StepBoneHead::new()) }
         StepId::ReallyStupid           => { use crate::step::action::common::step_really_stupid::StepReallyStupid; Box::new(StepReallyStupid::new()) }
         StepId::WildAnimal             => { use crate::step::bb2016::step_wild_animal::StepWildAnimal; Box::new(StepWildAnimal::new(String::new())) }
+        // ── Block skills ─────────────────────────────────────────────────────
+        StepId::Juggernaut             => { use crate::step::action::block::step_juggernaut::StepJuggernaut; Box::new(StepJuggernaut::new()) }
+        StepId::Dauntless              => { use crate::step::action::block::step_dauntless::StepDauntless; Box::new(StepDauntless::new()) }
+        StepId::DumpOff                => { use crate::step::action::block::step_dump_off::StepDumpOff; Box::new(StepDumpOff::new()) }
+        StepId::Stab                   => { use crate::step::action::block::step_stab::StepStab; Box::new(StepStab::new()) }
+        StepId::Wrestle                => { use crate::step::action::block::step_wrestle::StepWrestle; Box::new(StepWrestle::new()) }
+        // ── Move skills ──────────────────────────────────────────────────────
+        StepId::DivingTackle           => { use crate::step::action::move_::step_diving_tackle::StepDivingTackle; Box::new(StepDivingTackle::new()) }
+        StepId::Tentacles              => { use crate::step::mixed::move_::step_tentacles::StepTentacles; Box::new(StepTentacles::new()) }
+        // ── Select skills ────────────────────────────────────────────────────
+        StepId::JumpUp                 => { use crate::step::action::select::step_jump_up::StepJumpUp; Box::new(StepJumpUp::new()) }
+        // ── Pass/foul skills ─────────────────────────────────────────────────
+        StepId::Animosity              => { use crate::step::action::pass::step_animosity::StepAnimosity; Box::new(StepAnimosity::new(String::new())) }
+        StepId::FoulAppearance         => { use crate::step::mixed::step_foul_appearance::StepFoulAppearance; Box::new(StepFoulAppearance::new(String::new())) }
         // ── Shared ───────────────────────────────────────────────────────────
         StepId::BloodLust              => Box::new(step_blood_lust::StepBloodLust::new(String::new())),
         StepId::EndFeeding             => Box::new(step_end_feeding::StepEndFeeding::new()),
