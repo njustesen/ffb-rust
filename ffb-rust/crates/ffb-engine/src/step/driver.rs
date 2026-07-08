@@ -247,6 +247,79 @@ pub fn make_step(id: StepId) -> Box<dyn Step> {
         StepId::SetDefender            => Box::new(StepSetDefender::new()),
         // ── Control / framework ──────────────────────────────────────────────
         StepId::GotoLabel              => Box::new(StepGotoLabel::new()),
+        StepId::NextStep               => { use crate::step::step_next_step::StepNextStep; Box::new(StepNextStep::new()) }
+        StepId::NoOp                   => Box::new(NoOpStep(StepId::NoOp)),
+        StepId::ResetToMove            => { use crate::step::step_reset_to_move::StepResetToMove; Box::new(StepResetToMove::new()) }
+        // ── Block mechanics ──────────────────────────────────────────────────
+        StepId::BlockBallAndChain      => { use crate::step::mixed::block::step_block_ball_and_chain::StepBlockBallAndChain; Box::new(StepBlockBallAndChain::new()) }
+        StepId::BlockDodge             => { use crate::step::mixed::step_block_dodge::StepBlockDodge; Box::new(StepBlockDodge::new()) }
+        StepId::BlockStatistics        => { use crate::step::action::block::step_block_statistics::StepBlockStatistics; Box::new(StepBlockStatistics::new()) }
+        StepId::Horns                  => { use crate::step::action::block::step_horns::StepHorns; Box::new(StepHorns::new()) }
+        StepId::ProjectileVomit        => { use crate::step::mixed::block::step_projectile_vomit::StepProjectileVomit; Box::new(StepProjectileVomit::new()) }
+        // ── Multi-block skills ───────────────────────────────────────────────
+        StepId::DauntlessMultiple      => { use crate::step::mixed::multiblock::step_dauntless_multiple::StepDauntlessMultiple; Box::new(StepDauntlessMultiple::new()) }
+        StepId::FoulAppearanceMultiple => { use crate::step::mixed::multiblock::step_foul_appearance_multiple::StepFoulAppearanceMultiple; Box::new(StepFoulAppearanceMultiple::new(String::new())) }
+        StepId::ReportStabInjury       => { use crate::step::bb2020::multiblock::step_report_stab_injury::StepReportStabInjury; Box::new(StepReportStabInjury::new()) }
+        StepId::StateMultipleRolls     => { use crate::step::bb2020::step_state_multiple_rolls::StepStateMultipleRolls; Box::new(StepStateMultipleRolls::new()) }
+        // ── Foul mechanics ───────────────────────────────────────────────────
+        StepId::Foul                   => { use crate::step::mixed::foul::step_foul::StepFoul; Box::new(StepFoul::new()) }
+        StepId::FoulChainsaw           => { use crate::step::mixed::foul::step_foul_chainsaw::StepFoulChainsaw; Box::new(StepFoulChainsaw::new(String::new())) }
+        StepId::Referee                => { use crate::step::action::foul::step_referee::StepReferee; Box::new(StepReferee::new()) }
+        // ── Move mechanics ───────────────────────────────────────────────────
+        StepId::DropActingPlayer       => { use crate::step::mixed::step_drop_acting_player::StepDropActingPlayer; Box::new(StepDropActingPlayer::new()) }
+        StepId::DropDivingTackler      => { use crate::step::mixed::move_::step_drop_diving_tackler::StepDropDivingTackler; Box::new(StepDropDivingTackler::new()) }
+        StepId::MoveBallAndChain       => { use crate::step::mixed::move_::step_move_ball_and_chain::StepMoveBallAndChain; Box::new(StepMoveBallAndChain::new()) }
+        StepId::ResetFumblerooskie     => { use crate::step::mixed::move_::step_reset_fumblerooskie::StepResetFumblerooskie; Box::new(StepResetFumblerooskie::new()) }
+        StepId::TrapDoor               => { use crate::step::mixed::move_::step_trap_door::StepTrapDoor; Box::new(StepTrapDoor::new()) }
+        // ── Pass mechanics ───────────────────────────────────────────────────
+        StepId::AllYouCanEat           => { use crate::step::mixed::pass::step_all_you_can_eat::StepAllYouCanEat; Box::new(StepAllYouCanEat::new()) }
+        StepId::DispatchPassing        => { use crate::step::action::pass::step_dispatch_passing::StepDispatchPassing; Box::new(StepDispatchPassing::new(String::new(), String::new(), String::new())) }
+        StepId::InitPassing            => { use crate::step::mixed::pass::step_init_passing::StepInitPassing; Box::new(StepInitPassing::new()) }
+        // ── KickTeamMate ─────────────────────────────────────────────────────
+        StepId::InitKickTeamMate       => { use crate::step::action::ktm::step_init_kick_team_mate::StepInitKickTeamMate; Box::new(StepInitKickTeamMate::new(String::new())) }
+        StepId::KickTeamMate           => { use crate::step::action::ktm::step_kick_team_mate::StepKickTeamMate; Box::new(StepKickTeamMate::new(String::new())) }
+        StepId::KickTeamMateDoubleRolled => { use crate::step::action::ktm::step_kick_team_mate_double_rolled::StepKickTeamMateDoubleRolled; Box::new(StepKickTeamMateDoubleRolled::new()) }
+        StepId::EndKickTeamMate        => { use crate::step::action::ktm::step_end_kick_team_mate::StepEndKickTeamMate; Box::new(StepEndKickTeamMate::new()) }
+        // ── TTM ──────────────────────────────────────────────────────────────
+        StepId::EatTeamMate            => { use crate::step::action::ttm::step_eat_team_mate::StepEatTeamMate; Box::new(StepEatTeamMate::new()) }
+        StepId::FumbleTtmPass          => { use crate::step::bb2016::ttm::step_fumble_ttm_pass::StepFumbleTtmPass; Box::new(StepFumbleTtmPass::new()) }
+        // ── Kickoff events ───────────────────────────────────────────────────
+        StepId::KickoffAnimation       => { use crate::step::phase::kickoff::step_kickoff_animation::StepKickoffAnimation; Box::new(StepKickoffAnimation::new()) }
+        StepId::KickoffReturn          => { use crate::step::phase::kickoff::step_kickoff_return::StepKickoffReturn; Box::new(StepKickoffReturn::new()) }
+        StepId::RiotousRookies         => { use crate::step::phase::inducement::step_riotous_rookies::StepRiotousRookies; Box::new(StepRiotousRookies::new()) }
+        // ── Mixed special ────────────────────────────────────────────────────
+        StepId::EndBomb                => { use crate::step::mixed::special::step_end_bomb::StepEndBomb; Box::new(StepEndBomb::new()) }
+        StepId::EndThenIStartedBlastin => { use crate::step::mixed::step_end_then_i_started_blastin::StepEndThenIStartedBlastin; Box::new(StepEndThenIStartedBlastin::new()) }
+        StepId::EndThrowKeg            => { use crate::step::mixed::step_end_throw_keg::StepEndThrowKeg; Box::new(StepEndThrowKeg::new()) }
+        StepId::FirstMoveFuriousOutburst => { use crate::step::mixed::step_first_move_furious_outburst::StepFirstMoveFuriousOutburst; Box::new(StepFirstMoveFuriousOutburst::new(String::new())) }
+        StepId::InitFuriousOutburst    => { use crate::step::mixed::step_init_furious_outburst::StepInitFuriousOutburst; Box::new(StepInitFuriousOutburst::new(String::new())) }
+        StepId::SecondMoveFuriousOutburst => { use crate::step::mixed::step_second_move_furious_outburst::StepSecondMoveFuriousOutburst; Box::new(StepSecondMoveFuriousOutburst::new(String::new())) }
+        StepId::ThrowKeg               => { use crate::step::mixed::step_throw_keg::StepThrowKeg; Box::new(StepThrowKeg::new()) }
+        StepId::Wizard                 => { use crate::step::mixed::step_wizard::StepWizard; Box::new(StepWizard::new()) }
+        // ── Mixed blitz ──────────────────────────────────────────────────────
+        StepId::RemoveTargetSelectionState => { use crate::step::mixed::blitz::step_remove_target_selection_state::StepRemoveTargetSelectionState; Box::new(StepRemoveTargetSelectionState::new()) }
+        StepId::SelectBlitzTargetEnd   => { use crate::step::mixed::blitz::step_select_blitz_target_end::StepSelectBlitzTargetEnd; Box::new(StepSelectBlitzTargetEnd::new()) }
+        // ── Mixed shared/end ─────────────────────────────────────────────────
+        StepId::PickMeUp               => { use crate::step::mixed::shared::step_pick_me_up::StepPickMeUp; Box::new(StepPickMeUp::new()) }
+        StepId::PenaltyShootout        => { use crate::step::mixed::end::step_penalty_shootout::StepPenaltyShootout; Box::new(StepPenaltyShootout::new()) }
+        // ── Mixed inducements ────────────────────────────────────────────────
+        StepId::PlayCard               => { use crate::step::mixed::inducements::step_play_card::StepPlayCard; Box::new(StepPlayCard::new()) }
+        // ── Skills (mixed) ───────────────────────────────────────────────────
+        StepId::Pro                    => { use crate::step::mixed::step_pro::StepPro; Box::new(StepPro::new()) }
+        StepId::QuickBite              => { use crate::step::mixed::step_quick_bite::StepQuickBite; Box::new(StepQuickBite::new()) }
+        // ── End of game ──────────────────────────────────────────────────────
+        StepId::EndGame                => { use crate::step::game::end::step_end_game::StepEndGame; Box::new(StepEndGame::new()) }
+        // ── BB2020-specific ──────────────────────────────────────────────────
+        StepId::AssignTouchdowns       => { use crate::step::bb2020::end::step_assign_touchdowns::StepAssignTouchdowns; Box::new(StepAssignTouchdowns::new()) }
+        StepId::BuyCardsAndInducements => { use crate::step::bb2020::start::step_buy_cards_and_inducements::StepBuyCardsAndInducements; Box::new(StepBuyCardsAndInducements::new()) }
+        StepId::CheckStalling          => { use crate::step::bb2020::shared::step_check_stalling::StepCheckStalling; Box::new(StepCheckStalling::new()) }
+        StepId::SelectGazeTarget       => { use crate::step::bb2020::gaze::step_select_gaze_target::StepSelectGazeTarget; Box::new(StepSelectGazeTarget::new()) }
+        StepId::SelectGazeTargetEnd    => { use crate::step::bb2020::gaze::step_select_gaze_target_end::StepSelectGazeTargetEnd; Box::new(StepSelectGazeTargetEnd::new()) }
+        StepId::SetActingPlayerAndTeam => { use crate::step::bb2020::step_set_acting_player_and_team::StepSetActingPlayerAndTeam; Box::new(StepSetActingPlayerAndTeam::new()) }
+        StepId::SetActingTeam          => { use crate::step::bb2020::step_set_acting_team::StepSetActingTeam; Box::new(StepSetActingTeam::new()) }
+        // ── BB2016-specific ──────────────────────────────────────────────────
+        StepId::BuyCards               => { use crate::step::bb2016::start::step_buy_cards::StepBuyCards; Box::new(StepBuyCards::new()) }
+        StepId::FanFactor              => { use crate::step::bb2016::end::step_fan_factor::StepFanFactor; Box::new(StepFanFactor::new()) }
         // ── Everything else → NoOp ───────────────────────────────────────────
         other                          => Box::new(NoOpStep(other)),
     }
