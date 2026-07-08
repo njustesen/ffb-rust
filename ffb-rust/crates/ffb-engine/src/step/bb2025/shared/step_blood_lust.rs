@@ -9,6 +9,22 @@ use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
+// ── Hook state ────────────────────────────────────────────────────────────────
+
+/// Java: StepBloodLust.StepState (extended with AbstractStepWithReRoll fields).
+/// Used by BloodLustBehaviour.handleExecuteStepHook via dispatch::execute_step_hooks.
+#[derive(Debug)]
+pub struct StepBloodLustHookState {
+    pub goto_label_on_failure: Option<String>,
+    pub re_rolled_action: Option<String>,
+    pub re_roll_source: Option<String>,
+    pub bloodlust_action: Option<PlayerAction>,
+    pub wait_for_action_change: bool,
+    pub outcome: Option<StepOutcome>,
+    pub updated_re_rolled_action: Option<String>,
+    pub updated_re_roll_source: Option<String>,
+}
+
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.shared.StepBloodLust.
 ///
 /// Handles the Vampire blood-lust mechanic (BB2025).

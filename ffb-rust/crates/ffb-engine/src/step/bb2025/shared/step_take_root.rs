@@ -7,6 +7,20 @@ use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
+// ── Hook state ────────────────────────────────────────────────────────────────
+
+/// Java: StepTakeRoot.StepState (extended with AbstractStepWithReRoll fields).
+/// Used by TakeRootBehaviour.handleExecuteStepHook via dispatch::execute_step_hooks.
+#[derive(Debug)]
+pub struct StepTakeRootHookState {
+    pub re_rolled_action: Option<String>,
+    pub re_roll_source: Option<String>,
+    pub old_player_state: Option<PlayerState>,
+    pub outcome: Option<StepOutcome>,
+    pub updated_re_rolled_action: Option<String>,
+    pub updated_re_roll_source: Option<String>,
+}
+
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.shared.StepTakeRoot
 /// + com.fumbbl.ffb.server.skillbehaviour.bb2025.TakeRootBehaviour.
 ///

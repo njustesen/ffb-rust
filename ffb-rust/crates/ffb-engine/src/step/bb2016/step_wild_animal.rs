@@ -8,6 +8,20 @@ use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
+// ── Hook state ────────────────────────────────────────────────────────────────
+
+/// Java: StepWildAnimal.StepState (extended with AbstractStepWithReRoll fields).
+/// Used by WildAnimalBehaviour.handleExecuteStepHook via dispatch::execute_step_hooks.
+#[derive(Debug)]
+pub struct StepWildAnimalHookState {
+    pub goto_label_on_failure: String,
+    pub re_rolled_action: Option<String>,
+    pub re_roll_source: Option<String>,
+    pub outcome: Option<StepOutcome>,
+    pub updated_re_rolled_action: Option<String>,
+    pub updated_re_roll_source: Option<String>,
+}
+
 /// 1:1 translation of `com.fumbbl.ffb.server.step.bb2016.StepWildAnimal`.
 ///
 /// Resolves the Wild Animal negatrait check.

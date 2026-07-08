@@ -156,6 +156,10 @@ pub fn make_step(id: StepId) -> Box<dyn Step> {
         StepId::MultipleBlockFork      => Box::new(step_multiple_block_fork::StepMultipleBlockFork::new(vec![])),
         StepId::BlockRollMultiple      => Box::new(step_block_roll_multiple::StepBlockRollMultiple::new()),
         StepId::ApothecaryMultiple     => Box::new(step_apothecary_multiple::StepApothecaryMultiple::new(String::new())),
+        // ── Negatraits ───────────────────────────────────────────────────────
+        StepId::BoneHead               => { use crate::step::action::common::step_bone_head::StepBoneHead; Box::new(StepBoneHead::new()) }
+        StepId::ReallyStupid           => { use crate::step::action::common::step_really_stupid::StepReallyStupid; Box::new(StepReallyStupid::new()) }
+        StepId::WildAnimal             => { use crate::step::bb2016::step_wild_animal::StepWildAnimal; Box::new(StepWildAnimal::new(String::new())) }
         // ── Shared ───────────────────────────────────────────────────────────
         StepId::BloodLust              => Box::new(step_blood_lust::StepBloodLust::new(String::new())),
         StepId::EndFeeding             => Box::new(step_end_feeding::StepEndFeeding::new()),
