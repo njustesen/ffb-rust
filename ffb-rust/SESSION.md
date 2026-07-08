@@ -8,9 +8,9 @@
 
 **Translation progress:** 2,521/2,521 files formally implemented = **100% ✓** (0 partial, 458 skip)
 
-**Tests:** 12,245 passing (1 ignored)
+**Tests:** 12,258 passing (1 ignored)
 
-**Current phase:** Phase ZJ complete — Skill behaviour hook dispatch infrastructure: dispatch.rs, registry.rs, step_pushback+step_horns wired to dispatch, StandFirm/SideStep/Grab behaviours fully implemented (11,934 → 12,245)
+**Current phase:** Phase ZJ continued — driver.rs fully wired: all 57 existing step files added to make_step(), negatrait steps + 20 skill steps wired, WildAnimal/TakeRoot/BloodLust duplicate files resolved. Only 4 StepIds without implementation files remain (Bombardier2, EndPlayerAction, PrayerRoll, RevertEndTurn). Next: BB2025 behaviour hook implementations.
 
 ---
 
@@ -422,6 +422,12 @@
   - **Files already done in ZB (bb2016)**: `step_block_chainsaw.rs`, `step_block_choice.rs`, `step_followup.rs` all fully wired.
   - **Remaining ZC scope**: bb2020/bb2025 block roll, pass/, foul/, mixed/, kickoff steps; bb2016 move_/ steps.
 
+- **Phase ZJ session 2** (2026-07-08): driver.rs fully wired — 12,245 → 12,258 tests (+13)
+  - **driver.rs**: All 57 remaining step files wired into `make_step()`. Previously only ~82 steps had concrete implementations; now all 194 have real structs (4 without files still fall to NoOpStep: Bombardier2, EndPlayerAction, PrayerRoll, RevertEndTurn).
+  - **Negatrait steps**: BoneHead, ReallyStupid, WildAnimal — correct file locations confirmed, wired.
+  - **Skill steps wired**: Juggernaut, Dauntless, DumpOff, Stab, Wrestle, DivingTackle, Tentacles, JumpUp, Animosity, FoulAppearance, Bombardier, PassBlock, SafeThrow, AnimalSavagery, UnchannelledFury, BlockDodge, Foul, Referee, Horns, Pro, QuickBite, FoulAppearanceMultiple, DauntlessMultiple, + 33 more.
+  - **Duplicate files removed**: `step/action/common/step_wild_animal.rs`, `step_take_root.rs`, `step_blood_lust.rs` — wrong-location duplicates deleted; HookState structs moved to correct bb2016/bb2025 files.
+  - **WildAnimalBehaviour, TakeRootBehaviour, BloodLustBehaviour**: Full real implementations committed.
 - **Phase ZJ** (2026-07-08): Skill behaviour hook dispatch infrastructure — 11,934 → 12,245 tests (+311)
   - **`dispatch.rs`**: `execute_step_hooks(game, rng, StepId, step_state: &mut dyn Any)` — mirrors Java `GameState.executeStepHooks()`. Collects registered modifiers for the edition, sorts by priority, calls each `handle_execute_step`, stops on first `true`.
   - **`registry.rs`**: `SkillRegistry` per-edition static singletons (BB2025: 21 skills, BB2020/BB2016: 15 each). `registry_for(rules)` returns the appropriate `Arc<SkillRegistry>`.
