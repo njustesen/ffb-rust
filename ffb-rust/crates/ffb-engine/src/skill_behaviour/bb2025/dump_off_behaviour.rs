@@ -1,11 +1,44 @@
 use crate::skill_behaviour::SkillBehaviour;
+use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
+use crate::model::step_modifier::StepModifierTrait;
+use crate::step::framework::StepId;
+use crate::skill_behaviour::registry::SkillRegistry;
 use ffb_model::enums::SkillId;
+use ffb_model::model::game::Game;
+
+// ── DumpOffStepModifier ───────────────────────────────────────────────────────
+
+pub struct DumpOffStepModifier;
+
+impl StepModifierTrait for DumpOffStepModifier {
+    // TODO: map to correct StepId
+    fn applies_to(&self, step_id: StepId) -> bool { step_id == StepId::BlockRoll }
+
+    fn priority(&self) -> i32 { 0 }
+
+    // Java: Handles the Dump Off skill by prompting the defending ball-carrier to optionally make a pass before the block resolves, then pushing a Pass sequence onto the step stack if accepted.
+    fn handle_execute_step(
+        &self,
+        _game: &mut Game,
+        _step_state: &mut dyn std::any::Any,
+    ) -> bool {
+        false
+    }
+}
+
+// ── DumpOffBehaviour (marker + registration) ──────────────────────────────────
 
 /// Dump-Off: player may make a quick pass when targeted by a block.
 pub struct DumpOffBehaviour;
 
 impl DumpOffBehaviour {
     pub fn new() -> Self { Self }
+
+    pub fn register_into(registry: &mut SkillRegistry) {
+        let mut sb = SbContainer::new();
+        sb.register_step_modifier(Box::new(DumpOffStepModifier));
+        registry.register(SkillId::DumpOff, sb);
+    }
 }
 
 impl Default for DumpOffBehaviour {
@@ -32,6 +65,15 @@ impl SkillBehaviour for DumpOffBehaviour {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::skill_behaviour::registry::SkillRegistry;
+
+    #[test]
+    fn register_into_adds_step_modifier() {
+        let mut reg = SkillRegistry::empty();
+        DumpOffBehaviour::register_into(&mut reg);
+        let sb = reg.get(SkillId::DumpOff).expect("DumpOff must be registered");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
 
     fn test_game() -> ffb_model::model::game::Game {
         let home = ffb_model::model::team::Team {

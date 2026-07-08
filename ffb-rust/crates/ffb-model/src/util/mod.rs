@@ -1,5 +1,6 @@
 // Tier 2: Utility functions
 
+pub mod pathfinding;
 pub mod string_tool;
 pub mod rng;
 pub mod passing;

@@ -1,4 +1,8 @@
-use crate::skill_behaviour::SkillBehaviour;
+use crate::skill_behaviour::SkillBehaviour as SkillBehaviourTrait;
+use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
+use crate::model::step_modifier::StepModifierTrait;
+use crate::step::framework::StepId;
+use crate::skill_behaviour::registry::SkillRegistry;
 use ffb_model::enums::SkillId;
 
 /// Juggernaut: a Blitz block may treat Both-Down as a Push result.
@@ -12,7 +16,7 @@ impl Default for JuggernautBehaviour {
     fn default() -> Self { Self::new() }
 }
 
-impl SkillBehaviour for JuggernautBehaviour {
+impl SkillBehaviourTrait for JuggernautBehaviour {
     fn name(&self) -> &'static str { "JuggernautBehaviour" }
 
     fn execute_step_hook(&self, game: &mut ffb_model::model::game::Game) -> bool {
@@ -26,6 +30,33 @@ impl SkillBehaviour for JuggernautBehaviour {
         }
         // TODO(hook-infra): step-specific state access (action type BlitzAction check, block result BothDown check, dialog) not yet available
         false
+    }
+}
+
+// ── JuggernautStepModifier ────────────────────────────────────────────────────
+
+// Java: When the acting player uses Juggernaut on a Blitz action, forces a pushback result and initiates the pushback sequence, or declines and advances to the next step.
+pub struct JuggernautStepModifier;
+
+impl StepModifierTrait for JuggernautStepModifier {
+    fn applies_to(&self, step_id: StepId) -> bool { step_id == StepId::Juggernaut }
+
+    fn priority(&self) -> i32 { 0 }
+
+    fn handle_execute_step(
+        &self,
+        _game: &mut ffb_model::model::game::Game,
+        _step_state: &mut dyn std::any::Any,
+    ) -> bool {
+        false
+    }
+}
+
+impl JuggernautBehaviour {
+    pub fn register_into(registry: &mut SkillRegistry) {
+        let mut sb = SbContainer::new();
+        sb.register_step_modifier(Box::new(JuggernautStepModifier));
+        registry.register(SkillId::Juggernaut, sb);
     }
 }
 
@@ -83,5 +114,25 @@ mod tests {
         b.apply_modifier(&mut player, &pos);
         assert_eq!(player.movement, movement_before);
     }
-#[test]    fn name_is_not_empty() {        assert!(!JuggernautBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2025() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = JuggernautBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2025,        );        assert!(!b.execute_step_hook(&mut game));    }
+    #[test]    fn name_is_not_empty() {        assert!(!JuggernautBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2025() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = JuggernautBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2025,        );        assert!(!b.execute_step_hook(&mut game));    }
+
+    #[test]
+    fn register_into_adds_step_modifier() {
+        let mut reg = SkillRegistry::empty();
+        JuggernautBehaviour::register_into(&mut reg);
+        let sb = reg.get(SkillId::Juggernaut).expect("Juggernaut must be registered");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn step_modifier_applies_to_correct_step() {
+        let m = JuggernautStepModifier;
+        assert!(m.applies_to(StepId::Juggernaut));
+    }
+
+    #[test]
+    fn step_modifier_does_not_apply_to_wrong_step() {
+        let m = JuggernautStepModifier;
+        assert!(!m.applies_to(StepId::BlockRoll));
+    }
 }

@@ -79,7 +79,7 @@ impl GameMechanicTrait for GameMechanic {
         // Java shuffles; Rust returns the first matching position (no RNG here).
         // TODO: shuffle with an RNG source for full parity.
         let mut candidates: Vec<&RosterPosition> = roster.positions.iter()
-            .filter(|pos| (pos.quantity == 12 || pos.quantity == 16))
+            .filter(|pos| pos.quantity == 12 || pos.quantity == 16)
             .filter(|pos| pos.player_type != PlayerType::Irregular)
             .collect();
         if candidates.is_empty() {

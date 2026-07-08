@@ -60,9 +60,21 @@ impl GameMechanicTrait for GameMechanic {
 
     fn touchdown_ends_game(&self, game: &Game) -> bool { game.half == 3 }
 
-    fn riotous_rookies_position(&self, _roster: &Roster) -> Option<RosterPosition> {
-        // TODO: roster.get_riotous_position() — needs riotous_position_id on Roster
-        None
+    fn riotous_rookies_position(&self, roster: &Roster) -> Option<RosterPosition> {
+        use ffb_model::enums::PlayerType;
+        // Java: roster.getRiotousPosition() looks up by riotousPositionId (XML field).
+        // The JSON rosters don't carry that id; fall back to the same quantity filter
+        // used by BB2020/BB2025 (quantity==12 or 16, non-Irregular) which gives the
+        // correct result for all standard BB2016 rosters.
+        let mut candidates: Vec<&RosterPosition> = roster.positions.iter()
+            .filter(|pos| pos.quantity == 12 || pos.quantity == 16)
+            .filter(|pos| pos.player_type != PlayerType::Irregular)
+            .collect();
+        if candidates.is_empty() {
+            None
+        } else {
+            Some(candidates.remove(0).clone())
+        }
     }
 
     fn is_legal_concession(&self, game: &Game, team: &Team) -> bool {
@@ -167,5 +179,61 @@ mod tests {
     #[test]
     fn roll_for_chef_at_start_of_half_is_true() {
         assert!(GameMechanic.roll_for_chef_at_start_of_half());
+    }
+
+    // ── riotous_rookies_position ─────────────────────────────────────────────
+
+    fn make_roster(positions: Vec<(i32, ffb_model::enums::PlayerType)>) -> ffb_model::model::Roster {
+        ffb_model::model::Roster {
+            id: "test".into(), name: "Test".into(), race: "Test".into(),
+            reroll_cost: 50000, max_rerolls: 8,
+            positions: positions.into_iter().enumerate().map(|(i, (qty, ptype))| {
+                ffb_model::model::RosterPosition {
+                    id: format!("pos{}", i), name: format!("Pos{}", i),
+                    player_type: ptype, quantity: qty,
+                    ..Default::default()
+                }
+            }).collect(),
+            special_rules: vec![], necromancer: false, keywords: vec![],
+        }
+    }
+
+    #[test]
+    fn riotous_position_returns_none_for_empty_roster() {
+        use ffb_model::enums::PlayerType;
+        let roster = make_roster(vec![]);
+        assert!(GameMechanic.riotous_rookies_position(&roster).is_none());
+    }
+
+    #[test]
+    fn riotous_position_returns_first_quantity_16_position() {
+        use ffb_model::enums::PlayerType;
+        let roster = make_roster(vec![(4, PlayerType::Regular), (16, PlayerType::Regular)]);
+        let pos = GameMechanic.riotous_rookies_position(&roster).unwrap();
+        assert_eq!(pos.quantity, 16);
+    }
+
+    #[test]
+    fn riotous_position_returns_quantity_12_position() {
+        use ffb_model::enums::PlayerType;
+        let roster = make_roster(vec![(12, PlayerType::Regular), (4, PlayerType::Regular)]);
+        let pos = GameMechanic.riotous_rookies_position(&roster).unwrap();
+        assert_eq!(pos.quantity, 12);
+    }
+
+    #[test]
+    fn riotous_position_skips_irregular_positions() {
+        use ffb_model::enums::PlayerType;
+        let roster = make_roster(vec![(16, PlayerType::Irregular), (12, PlayerType::Regular)]);
+        let pos = GameMechanic.riotous_rookies_position(&roster).unwrap();
+        assert_eq!(pos.quantity, 12);
+        assert_ne!(pos.player_type, PlayerType::Irregular);
+    }
+
+    #[test]
+    fn riotous_position_all_irregular_returns_none() {
+        use ffb_model::enums::PlayerType;
+        let roster = make_roster(vec![(16, PlayerType::Irregular), (12, PlayerType::Irregular)]);
+        assert!(GameMechanic.riotous_rookies_position(&roster).is_none());
     }
 }

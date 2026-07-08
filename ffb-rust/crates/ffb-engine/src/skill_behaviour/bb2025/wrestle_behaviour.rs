@@ -1,4 +1,8 @@
 use crate::skill_behaviour::SkillBehaviour;
+use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
+use crate::model::step_modifier::StepModifierTrait;
+use crate::step::framework::StepId;
+use crate::skill_behaviour::registry::SkillRegistry;
 use ffb_model::enums::SkillId;
 
 /// Wrestle: player may use this skill to knock both themselves and their opponent down.
@@ -6,6 +10,12 @@ pub struct WrestleBehaviour;
 
 impl WrestleBehaviour {
     pub fn new() -> Self { Self }
+
+    pub fn register_into(registry: &mut SkillRegistry) {
+        let mut sb = SbContainer::new();
+        sb.register_step_modifier(Box::new(WrestleStepModifier));
+        registry.register(SkillId::Wrestle, sb);
+    }
 }
 
 impl Default for WrestleBehaviour {
@@ -25,6 +35,23 @@ impl SkillBehaviour for WrestleBehaviour {
             return false;
         }
         // TODO(hook-infra): step-specific state access (block result check, Wrestle dialog, both players knocked down mutation) not yet available
+        false
+    }
+}
+
+pub struct WrestleStepModifier;
+
+impl StepModifierTrait for WrestleStepModifier {
+    fn applies_to(&self, step_id: StepId) -> bool { step_id == StepId::Wrestle }
+
+    fn priority(&self) -> i32 { 0 }
+
+    // Java: Asks both attacker and defender if they want to use the Wrestle skill, then if either agrees, drops both players prone and handles any resulting injury rolls.
+    fn handle_execute_step(
+        &self,
+        _game: &mut ffb_model::model::game::Game,
+        _step_state: &mut dyn std::any::Any,
+    ) -> bool {
         false
     }
 }
@@ -84,4 +111,24 @@ mod tests {
         assert_eq!(player.movement, movement_before);
     }
 #[test]    fn name_is_not_empty() {        assert!(!WrestleBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2025() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = WrestleBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2025,        );        assert!(!b.execute_step_hook(&mut game));    }
+
+    #[test]
+    fn register_into_adds_step_modifier() {
+        let mut reg = SkillRegistry::empty();
+        WrestleBehaviour::register_into(&mut reg);
+        let sb = reg.get(SkillId::Wrestle).expect("Wrestle must be registered");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn step_modifier_applies_to_correct_step() {
+        let m = WrestleStepModifier;
+        assert!(m.applies_to(StepId::Wrestle));
+    }
+
+    #[test]
+    fn step_modifier_does_not_apply_to_wrong_step() {
+        let m = WrestleStepModifier;
+        assert!(!m.applies_to(StepId::BlockRoll));
+    }
 }

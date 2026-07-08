@@ -1,11 +1,22 @@
 use crate::skill_behaviour::SkillBehaviour;
+use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
+use crate::model::step_modifier::StepModifierTrait;
+use crate::step::framework::StepId;
+use crate::skill_behaviour::registry::SkillRegistry;
 use ffb_model::enums::SkillId;
+use ffb_model::model::game::Game;
 
 /// Shadowing: player may follow a dodging opponent one square, forcing continued dodging.
 pub struct ShadowingBehaviour;
 
 impl ShadowingBehaviour {
     pub fn new() -> Self { Self }
+
+    pub fn register_into(registry: &mut SkillRegistry) {
+        let mut sb = SbContainer::new();
+        sb.register_step_modifier(Box::new(ShadowingStepModifier));
+        registry.register(SkillId::Shadowing, sb);
+    }
 }
 
 impl Default for ShadowingBehaviour {
@@ -29,9 +40,30 @@ impl SkillBehaviour for ShadowingBehaviour {
     }
 }
 
+// ── ShadowingStepModifier ─────────────────────────────────────────────────────
+
+// Java: Finds adjacent opposing players with the Shadowing skill, prompts the defending team to choose a shadower, rolls a skill check (4+) with re-roll support, and if successful moves the shadowing player to follow the acting player's previous position.
+pub struct ShadowingStepModifier;
+
+impl StepModifierTrait for ShadowingStepModifier {
+    fn applies_to(&self, step_id: StepId) -> bool { step_id == StepId::Shadowing }
+
+    fn priority(&self) -> i32 { 0 }
+
+    fn handle_execute_step(
+        &self,
+        _game: &mut Game,
+        _step_state: &mut dyn std::any::Any,
+    ) -> bool {
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::step::framework::test_team;
+    use ffb_model::enums::Rules;
 
     fn test_game() -> ffb_model::model::game::Game {
         let home = ffb_model::model::team::Team {
@@ -64,8 +96,6 @@ mod tests {
 
     #[test]
     fn execute_step_hook_returns_false() {
-        use ffb_model::enums::Rules;
-        use crate::step::framework::test_team;
         let b = ShadowingBehaviour::new();
         let mut game = ffb_model::model::game::Game::new(
             test_team("home", 0), test_team("away", 0), Rules::Bb2025,
@@ -83,5 +113,25 @@ mod tests {
         b.apply_modifier(&mut player, &pos);
         assert_eq!(player.movement, movement_before);
     }
-#[test]    fn name_is_not_empty() {        assert!(!ShadowingBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2025() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = ShadowingBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2025,        );        assert!(!b.execute_step_hook(&mut game));    }
+    #[test]    fn name_is_not_empty() {        assert!(!ShadowingBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2025() {        let b = ShadowingBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2025,        );        assert!(!b.execute_step_hook(&mut game));    }
+
+    #[test]
+    fn register_into_adds_step_modifier() {
+        let mut reg = SkillRegistry::empty();
+        ShadowingBehaviour::register_into(&mut reg);
+        let sb = reg.get(SkillId::Shadowing).expect("Shadowing must be registered");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn step_modifier_applies_to_correct_step() {
+        let m = ShadowingStepModifier;
+        assert!(m.applies_to(StepId::Shadowing));
+    }
+
+    #[test]
+    fn step_modifier_does_not_apply_to_wrong_step() {
+        let m = ShadowingStepModifier;
+        assert!(!m.applies_to(StepId::BlockRoll));
+    }
 }

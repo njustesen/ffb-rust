@@ -14,3 +14,4 @@ rand_xoshiro = { workspace = true }
 rand_core = { workspace = true }
 thiserror = { workspace = true }
 log = { workspace = true }
+once_cell = { workspace = true }

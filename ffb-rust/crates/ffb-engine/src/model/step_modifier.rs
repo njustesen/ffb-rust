@@ -19,7 +19,9 @@ pub enum StepCommandStatus {
 }
 
 /// Rust analogue of Java's abstract `StepModifier<T, V>`.
-pub trait StepModifierTrait {
+///
+/// `Send + Sync` required so the modifier can live in `Arc<SkillRegistry>`.
+pub trait StepModifierTrait: Send + Sync {
     /// Java: `appliesTo(IStep step)` — true if this modifier targets the given step type.
     fn applies_to(&self, step_id: StepId) -> bool;
 
@@ -27,13 +29,24 @@ pub trait StepModifierTrait {
     fn priority(&self) -> i32 { 0 }
 
     /// Java: `handleExecuteStepHook(step, state)` — called before step execution.
-    /// Returns true if the step should be skipped (modifier handles it entirely).
-    fn handle_execute_step(&mut self) -> bool { false }
+    ///
+    /// `game` gives access to the full game state. `step_state` is a step-specific
+    /// struct passed by the calling step; concrete modifiers downcast it to the expected
+    /// type. Java passes an `Object state` for the same reason.
+    ///
+    /// Returns `true` if the step should stop further hook processing (modifier consumed it).
+    fn handle_execute_step(
+        &self,
+        _game: &mut ffb_model::model::game::Game,
+        _step_state: &mut dyn std::any::Any,
+    ) -> bool {
+        false
+    }
 }
 
 /// Comparator for sorting modifiers by priority (ascending).
 /// Java: `StepModifier.Comparator`
-pub fn sort_by_priority(modifiers: &mut Vec<Box<dyn StepModifierTrait>>) {
+pub fn sort_by_priority(modifiers: &mut [Box<dyn StepModifierTrait>]) {
     modifiers.sort_by_key(|m| m.priority());
 }
 
@@ -51,6 +64,20 @@ mod tests {
         fn priority(&self) -> i32 { self.priority }
     }
 
+    struct ReturningModifier {
+        target: StepId,
+        return_val: bool,
+        call_count: std::sync::Arc<std::sync::Mutex<u32>>,
+    }
+
+    impl StepModifierTrait for ReturningModifier {
+        fn applies_to(&self, step_id: StepId) -> bool { step_id == self.target }
+        fn handle_execute_step(&self, _game: &mut ffb_model::model::game::Game, _step_state: &mut dyn std::any::Any) -> bool {
+            *self.call_count.lock().unwrap() += 1;
+            self.return_val
+        }
+    }
+
     #[test]
     fn applies_to_matching_step() {
         let m = TestModifier { target: StepId::BlockRoll, priority: 0 };
@@ -65,8 +92,24 @@ mod tests {
 
     #[test]
     fn handle_execute_step_default_false() {
-        let mut m = TestModifier { target: StepId::BlockRoll, priority: 0 };
-        assert!(!m.handle_execute_step());
+        use ffb_model::enums::Rules;
+        use crate::step::framework::test_team;
+        let m = TestModifier { target: StepId::BlockRoll, priority: 0 };
+        let mut game = ffb_model::model::game::Game::new(test_team("h", 0), test_team("a", 0), Rules::Bb2025);
+        let mut state: () = ();
+        assert!(!m.handle_execute_step(&mut game, &mut state));
+    }
+
+    #[test]
+    fn handle_execute_step_concrete_can_return_true() {
+        use ffb_model::enums::Rules;
+        use crate::step::framework::test_team;
+        let counter = std::sync::Arc::new(std::sync::Mutex::new(0u32));
+        let m = ReturningModifier { target: StepId::BlockRoll, return_val: true, call_count: counter.clone() };
+        let mut game = ffb_model::model::game::Game::new(test_team("h", 0), test_team("a", 0), Rules::Bb2025);
+        let mut state: () = ();
+        assert!(m.handle_execute_step(&mut game, &mut state));
+        assert_eq!(*counter.lock().unwrap(), 1);
     }
 
     #[test]

@@ -14,7 +14,7 @@ use crate::injury::modification::ModificationParams;
 use crate::mechanic::roll_mechanic_for;
 
 /// Java: IInjuryContextModification interface + InjuryContextModification abstract class.
-pub trait InjuryContextModification {
+pub trait InjuryContextModification: Send + Sync {
     // ── Identifying information ──────────────────────────────────────────────
 
     /// Java: skillUse() — which SkillUse enum value this modification represents.

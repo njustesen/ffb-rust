@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-use ffb_model::enums::{ApothecaryMode, PlayerState, SkillId};
-use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::enums::{ApothecaryMode, PlayerState};
 use ffb_model::model::pushback_mode::PushbackMode;
 use ffb_model::report::report_pushback::ReportPushback;
 use ffb_model::types::{FieldCoordinate, PushbackSquare};
@@ -12,6 +11,67 @@ use crate::step::framework::{StepId, StepParameter};
 use crate::step::util_server_injury::handle_injury_by_name;
 use crate::util::UtilServerPlayerMove;
 use crate::util::util_server_pushback::UtilServerPushback;
+use crate::skill_behaviour::dispatch;
+
+// ── Hook state ─────────────────────────────────────────────────────────────────
+
+/// Java: StepPushback.StepState — mutable state passed through executeStepHooks.
+/// Exported so StandFirm/SideStep/Grab step-modifiers can downcast to it.
+#[derive(Debug)]
+pub struct StepPushbackHookState {
+    /// Java: state.doPush
+    pub do_push: bool,
+    /// Java: state.sideStepping (Map<String, Boolean>)
+    pub side_stepping: HashMap<String, bool>,
+    /// Java: state.standingFirm (Map<String, Boolean>)
+    pub standing_firm: HashMap<String, bool>,
+    /// Java: state.grabbing (Boolean — tristate)
+    pub grabbing: Option<bool>,
+    /// Java: state.startingPushbackSquare
+    pub starting_pushback_square: Option<PushbackSquare>,
+    /// Java: state.defender (Player) — carried as a player id for headless
+    pub defender_id: String,
+    /// Java: state.oldDefenderState
+    pub old_defender_state: Option<PlayerState>,
+    /// Java: state.pushbackStack (non-empty means player already chose coords)
+    pub pushback_stack_len: usize,
+    /// Java: state.freeSquareAroundDefender
+    pub free_square_around_defender: bool,
+    /// Java: state.pushbackSquares — the current candidate squares
+    pub pushback_squares: Vec<PushbackSquare>,
+    /// Java: state.pushbackMode
+    pub pushback_mode: PushbackMode,
+}
+
+impl StepPushbackHookState {
+    pub fn new(
+        defender_id: String,
+        old_defender_state: Option<PlayerState>,
+        starting_pushback_square: Option<PushbackSquare>,
+        pushback_stack_len: usize,
+        free_square_around_defender: bool,
+        pushback_squares: Vec<PushbackSquare>,
+        side_stepping: HashMap<String, bool>,
+        standing_firm: HashMap<String, bool>,
+        grabbing: Option<bool>,
+    ) -> Self {
+        Self {
+            do_push: false,
+            side_stepping,
+            standing_firm,
+            grabbing,
+            starting_pushback_square,
+            defender_id,
+            old_defender_state,
+            pushback_stack_len,
+            free_square_around_defender,
+            pushback_squares,
+            pushback_mode: PushbackMode::REGULAR,
+        }
+    }
+}
+
+// ── StepPushback ───────────────────────────────────────────────────────────────
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.block.StepPushback.
 /// Handles player pushback and crowd-push. The Java StepState fields are inlined here.
@@ -46,136 +106,6 @@ impl StepPushback {
             standing_firm: HashMap::new(),
             pushback_stack: Vec::new(),
         }
-    }
-
-    /// Java: StandFirmBehaviour.handleExecuteStepHook (priority 2).
-    ///
-    /// Returns `true` (stopProcessing) if Stand Firm was applied.
-    /// If stand firm used: sets `do_push = true` and clears the stack (push is cancelled).
-    fn apply_stand_firm_hook(
-        &mut self,
-        game: &mut Game,
-        defender_id: &str,
-        do_push: &mut bool,
-        _home_choice: bool,
-    ) -> bool {
-        let has_stand_firm = game.player(defender_id)
-            .map(|p| p.has_skill(SkillId::StandFirm))
-            .unwrap_or(false);
-
-        if !has_stand_firm {
-            return false;
-        }
-
-        let defender_state = game.field_model.player_state(defender_id);
-
-        // Java: auto-stand-firm if Rooted
-        if defender_state.map(|s| s.is_rooted()).unwrap_or(false) {
-            self.standing_firm.insert(defender_id.to_owned(), true);
-        }
-
-        // Java: auto NOT stand firm if no tackle zones (out of the play)
-        let has_tacklezones = defender_state.map(|s| s.has_tacklezones()).unwrap_or(true);
-        let old_has_tacklezones = self.old_defender_state.map(|s| s.has_tacklezones()).unwrap_or(true);
-        if !has_tacklezones || (self.pushback_stack.is_empty() && !old_has_tacklezones) {
-            self.standing_firm.insert(defender_id.to_owned(), false);
-        }
-
-        // Java: auto NOT stand firm if Blitz + cancelling skill (Juggernaut cancels Stand Firm)
-        let attacker_cancels = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill_property(NamedProperties::CANCELS_CAN_REFUSE_TO_BE_PUSHED))
-            .unwrap_or(false);
-        let is_blitz = game.acting_player.player_action
-            .map(|a| a.is_blitzing())
-            .unwrap_or(false);
-        if is_blitz && attacker_cancels {
-            self.standing_firm.insert(defender_id.to_owned(), false);
-        }
-
-        // Java: if hasSkill && standingFirm.getOrDefault(id, true)
-        let using_stand_firm = *self.standing_firm.get(defender_id).unwrap_or(&true);
-        if !using_stand_firm {
-            return false;
-        }
-
-        if !self.standing_firm.contains_key(defender_id) {
-            // client-only: Standing Firm skill-use dialog — headless auto-declines (false = do not use)
-            self.standing_firm.insert(defender_id.to_owned(), false);
-            return false;
-        }
-
-        // Decided to stand firm: cancel the push
-        *do_push = true;
-        self.pushback_stack.clear();
-        self.starting_pushback_square = None;
-        true
-    }
-
-    /// Java: SidestepBehaviour.handleExecuteStepHook (priority 4).
-    ///
-    /// Returns `Some(squares)` with new SIDE_STEP squares if Side Step was applied.
-    /// Returns `None` if Side Step was not used or not applicable.
-    fn apply_side_step_hook(
-        &mut self,
-        game: &Game,
-        defender_id: &str,
-        starting_sq: PushbackSquare,
-        free_square_around_defender: bool,
-        home_choice: bool,
-    ) -> Option<Vec<PushbackSquare>> {
-        let has_side_step = game.player(defender_id)
-            .map(|p| p.has_skill_property(NamedProperties::CAN_CHOOSE_OWN_PUSHED_BACK_SQUARE))
-            .unwrap_or(false);
-
-        if !has_side_step {
-            return None;
-        }
-
-        // Java: check if cancelling skill exists on attacker (for defender only)
-        // (simplified: attacker with Grab cancels SideStep)
-        let attacker_cancels = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill_property(NamedProperties::CAN_PUSH_BACK_TO_ANY_SQUARE))
-            .unwrap_or(false);
-
-        let defender_state = game.field_model.player_state(defender_id);
-        let has_tacklezones = defender_state.map(|s| s.has_tacklezones()).unwrap_or(true);
-        let old_has_tacklezones = self.old_defender_state.map(|s| s.has_tacklezones()).unwrap_or(true);
-        let in_tacklezone = if self.pushback_stack.is_empty() {
-            old_has_tacklezones
-        } else {
-            has_tacklezones
-        };
-
-        // Java: side step conditions
-        let using_side_step_default = *self.side_stepping.get(defender_id).unwrap_or(&true);
-        if !using_side_step_default || !free_square_around_defender || !in_tacklezone || attacker_cancels {
-            return None;
-        }
-
-        if !self.side_stepping.contains_key(defender_id) {
-            // client-only: Side Step skill-use dialog — headless auto-declines (false = do not use)
-            self.side_stepping.insert(defender_id.to_owned(), false);
-            return None;
-        }
-
-        if !self.side_stepping[defender_id] {
-            return None;
-        }
-
-        // Used Side Step: recalculate squares in SIDE_STEP mode (all adjacent free squares)
-        let side_step_squares = UtilServerPushback::find_pushback_squares_grab(
-            starting_sq,
-            &|c| game.field_model.player_at(c).is_some(),
-            &|_c| true,
-            home_choice,
-        );
-
-        // Java: set homeChoice based on whether defender is home team
-        let _defender_home = game.team_home.players.iter().any(|p| p.id == defender_id);
-        self.starting_pushback_square = None;
-        Some(side_step_squares)
     }
 }
 
@@ -253,7 +183,7 @@ impl StepPushback {
                 // Java: pushbackMode = REGULAR; findPushbackSquares; fieldModel.add
                 let home_choice = game.home_playing;
                 let occupied = |c: FieldCoordinate| game.field_model.player_at(c).is_some();
-                let mut pushback_squares = UtilServerPushback::find_pushback_squares_standard(
+                let pushback_squares = UtilServerPushback::find_pushback_squares_standard(
                     starting_sq, &occupied, home_choice,
                 );
 
@@ -262,29 +192,36 @@ impl StepPushback {
                 let free_square_around_defender = adjacent_squares.iter()
                     .any(|c| game.field_model.player_at(*c).is_none());
 
-                // ── StandFirm hook (priority 2) ─────────────────────────────────────
-                // Java: StandFirmBehaviour.handleExecuteStepHook — stop processing if stand firm used.
-                let stop_processing = self.apply_stand_firm_hook(
-                    game, &defender_id, &mut do_push, home_choice,
+                // ── Skill hooks via dispatch (StandFirm prio 2, Grab prio 3, SideStep prio 4) ──
+                // Java: GameState.executeStepHooks(this, state)
+                let mut hook_state = StepPushbackHookState::new(
+                    defender_id.clone(),
+                    self.old_defender_state,
+                    self.starting_pushback_square,
+                    self.pushback_stack.len(),
+                    free_square_around_defender,
+                    pushback_squares,
+                    self.side_stepping.clone(),
+                    self.standing_firm.clone(),
+                    self.grabbing,
                 );
 
-                // ── SideStep hook (priority 4) ────────────────────────────────────
-                // Java: SidestepBehaviour.handleExecuteStepHook — recalculate squares in SIDE_STEP mode.
-                if !stop_processing {
-                    if let Some(new_squares) = self.apply_side_step_hook(
-                        game, &defender_id, starting_sq, free_square_around_defender, home_choice,
-                    ) {
-                        pushback_squares = new_squares;
-                    }
-                }
+                let stop_processing = dispatch::execute_step_hooks(
+                    game, StepId::Pushback, &mut hook_state,
+                );
 
-                let pushback_squares_found = !pushback_squares.is_empty() || stop_processing;
+                // Merge hook state back into step state
+                self.side_stepping = hook_state.side_stepping;
+                self.standing_firm = hook_state.standing_firm;
+                self.grabbing = hook_state.grabbing;
+                self.starting_pushback_square = hook_state.starting_pushback_square;
+                do_push = hook_state.do_push;
+                let final_pushback_squares = hook_state.pushback_squares;
+
+                let pushback_squares_found = !final_pushback_squares.is_empty() || stop_processing;
 
                 // If StandFirm was used (stop_processing = true), push is cancelled — already handled.
-                if stop_processing {
-                    // StandFirm resolved the push: do_push = true, stack cleared, return next.
-                    // Fall through to the do_push path below.
-                }
+                // Fall through to the do_push path below.
 
                 // Java: if (!ArrayTool.isProvided(state.pushbackSquares)) → Crowd push
                 if !pushback_squares_found && !stop_processing {
@@ -342,7 +279,7 @@ impl StepPushback {
                 }
 
                 // Java: if (state.startingPushbackSquare == null) addReport(ReportPushback(...))
-                // SideStep hook may have cleared starting_pushback_square → add report now.
+                // SideStep/Grab hook may have cleared starting_pushback_square → add report now.
                 if self.starting_pushback_square.is_none() {
                     game.report_list.add(ReportPushback::new(
                         defender_id.clone(),
@@ -352,7 +289,7 @@ impl StepPushback {
 
                 // Java: fieldModel.add(state.pushbackSquares)
                 game.field_model.pushback_squares.clear();
-                game.field_model.pushback_squares.extend(pushback_squares);
+                game.field_model.pushback_squares.extend(final_pushback_squares);
                 return StepOutcome::cont();
             }
         }
@@ -635,7 +572,7 @@ mod tests {
             id: "def1".into(), name: "def1".into(), nr: 2, position_id: "lineman".into(),
             player_type: PlayerType::Regular, gender: PlayerGender::Male,
             movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
-            starting_skills: vec![SkillWithValue { skill_id: SkillId::SideStep, value: None }],
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Sidestep, value: None }],
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
@@ -666,5 +603,50 @@ mod tests {
         game.field_model.set_player_coordinate("p1", coord);
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.report_list.has_report(ReportId::PUSHBACK), "ReportPushback should NOT appear when starting square is not cleared");
+    }
+
+    // ── StepPushbackHookState ────────────────────────────────────────────────
+
+    #[test]
+    fn hook_state_new_has_correct_defaults() {
+        let hs = StepPushbackHookState::new(
+            "def".into(), None, None, 0, true, vec![],
+            HashMap::new(), HashMap::new(), None,
+        );
+        assert!(!hs.do_push);
+        assert_eq!(hs.defender_id, "def");
+        assert!(hs.starting_pushback_square.is_none());
+        assert!(hs.pushback_squares.is_empty());
+    }
+
+    #[test]
+    fn hook_state_carries_side_stepping_map() {
+        let mut side = HashMap::new();
+        side.insert("x".to_string(), true);
+        let hs = StepPushbackHookState::new(
+            "def".into(), None, None, 0, false, vec![],
+            side, HashMap::new(), None,
+        );
+        assert_eq!(hs.side_stepping.get("x"), Some(&true));
+    }
+
+    #[test]
+    fn hook_state_carries_standing_firm_map() {
+        let mut sf = HashMap::new();
+        sf.insert("y".to_string(), false);
+        let hs = StepPushbackHookState::new(
+            "def".into(), None, None, 0, false, vec![],
+            HashMap::new(), sf, None,
+        );
+        assert_eq!(hs.standing_firm.get("y"), Some(&false));
+    }
+
+    #[test]
+    fn hook_state_carries_grabbing() {
+        let hs = StepPushbackHookState::new(
+            "def".into(), None, None, 0, false, vec![],
+            HashMap::new(), HashMap::new(), Some(true),
+        );
+        assert_eq!(hs.grabbing, Some(true));
     }
 }

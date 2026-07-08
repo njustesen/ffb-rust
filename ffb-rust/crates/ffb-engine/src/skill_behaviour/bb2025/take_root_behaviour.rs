@@ -1,4 +1,8 @@
 use crate::skill_behaviour::SkillBehaviour;
+use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
+use crate::model::step_modifier::StepModifierTrait;
+use crate::step::framework::StepId;
+use crate::skill_behaviour::registry::SkillRegistry;
 use ffb_model::enums::SkillId;
 
 /// Take Root: roll 4+ or become rooted (cannot move) this turn.
@@ -6,6 +10,12 @@ pub struct TakeRootBehaviour;
 
 impl TakeRootBehaviour {
     pub fn new() -> Self { Self }
+
+    pub fn register_into(registry: &mut SkillRegistry) {
+        let mut sb = SbContainer::new();
+        sb.register_step_modifier(Box::new(TakeRootStepModifier));
+        registry.register(SkillId::TakeRoot, sb);
+    }
 }
 
 impl Default for TakeRootBehaviour {
@@ -29,6 +39,27 @@ impl SkillBehaviour for TakeRootBehaviour {
     }
 }
 
+// ── TakeRootStepModifier ──────────────────────────────────────────────────────
+
+// Java: primary anonymous StepModifier<StepTakeRoot, StepState> registered in TakeRootBehaviour
+//       constructor (priority 0): rolls confusion-style die when acting player started standing
+//       and is not yet rooted; applies Take Root skill and optionally requests re-roll on failure.
+pub struct TakeRootStepModifier;
+
+impl StepModifierTrait for TakeRootStepModifier {
+    fn applies_to(&self, step_id: StepId) -> bool { step_id == StepId::TakeRoot }
+
+    fn priority(&self) -> i32 { 0 }
+
+    fn handle_execute_step(
+        &self,
+        _game: &mut ffb_model::model::game::Game,
+        _step_state: &mut dyn std::any::Any,
+    ) -> bool {
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -46,6 +77,26 @@ mod tests {
         };
         let away = home.clone();
         ffb_model::model::game::Game::new(home, away, ffb_model::enums::Rules::Bb2025)
+    }
+
+    #[test]
+    fn register_into_adds_step_modifier() {
+        let mut reg = SkillRegistry::empty();
+        TakeRootBehaviour::register_into(&mut reg);
+        let sb = reg.get(SkillId::TakeRoot).expect("TakeRoot must be registered");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn step_modifier_applies_to_correct_step() {
+        let m = TakeRootStepModifier;
+        assert!(m.applies_to(StepId::TakeRoot));
+    }
+
+    #[test]
+    fn step_modifier_does_not_apply_to_wrong_step() {
+        let m = TakeRootStepModifier;
+        assert!(!m.applies_to(StepId::BlockRoll));
     }
 
     #[test]
@@ -83,5 +134,5 @@ mod tests {
         b.apply_modifier(&mut player, &pos);
         assert_eq!(player.movement, movement_before);
     }
-#[test]    fn name_is_not_empty() {        assert!(!TakeRootBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2025() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = TakeRootBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2025,        );        assert!(!b.execute_step_hook(&mut game));    }
+    #[test]    fn name_is_not_empty() {        assert!(!TakeRootBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2025() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = TakeRootBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2025,        );        assert!(!b.execute_step_hook(&mut game));    }
 }

@@ -1,4 +1,8 @@
 use crate::skill_behaviour::SkillBehaviour;
+use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
+use crate::model::step_modifier::StepModifierTrait;
+use crate::step::framework::StepId;
+use crate::skill_behaviour::registry::SkillRegistry;
 use ffb_model::enums::SkillId;
 
 /// Bone Head: player must roll 2+ each activation or stand still this turn.
@@ -6,6 +10,12 @@ pub struct BoneHeadBehaviour;
 
 impl BoneHeadBehaviour {
     pub fn new() -> Self { Self }
+
+    pub fn register_into(registry: &mut SkillRegistry) {
+        let mut sb = SbContainer::new();
+        sb.register_step_modifier(Box::new(BoneHeadStepModifier));
+        registry.register(SkillId::BoneHead, sb);
+    }
 }
 
 impl Default for BoneHeadBehaviour {
@@ -25,6 +35,25 @@ impl SkillBehaviour for BoneHeadBehaviour {
             return false;
         }
         // TODO(hook-infra): step-specific state access (die roll result, confused state mutation, re-roll dialog) not yet available
+        false
+    }
+}
+
+// ── BoneHeadStepModifier ──────────────────────────────────────────────────────
+
+pub struct BoneHeadStepModifier;
+
+impl StepModifierTrait for BoneHeadStepModifier {
+    fn applies_to(&self, step_id: StepId) -> bool { step_id == StepId::BoneHead }
+
+    fn priority(&self) -> i32 { 0 }
+
+    // Java: Rolls a confusion check for a player with the Bone Head skill; on failure marks the player confused and inactive, cancels the current player action, and jumps to the failure label, with optional re-roll support.
+    fn handle_execute_step(
+        &self,
+        _game: &mut ffb_model::model::game::Game,
+        _step_state: &mut dyn std::any::Any,
+    ) -> bool {
         false
     }
 }
@@ -83,5 +112,25 @@ mod tests {
         b.apply_modifier(&mut player, &pos);
         assert_eq!(player.movement, movement_before);
     }
-#[test]    fn name_is_not_empty() {        assert!(!BoneHeadBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2025() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = BoneHeadBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2025,        );        assert!(!b.execute_step_hook(&mut game));    }
+    #[test]    fn name_is_not_empty() {        assert!(!BoneHeadBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2025() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = BoneHeadBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2025,        );        assert!(!b.execute_step_hook(&mut game));    }
+
+    #[test]
+    fn register_into_adds_step_modifier() {
+        let mut reg = SkillRegistry::empty();
+        BoneHeadBehaviour::register_into(&mut reg);
+        let sb = reg.get(SkillId::BoneHead).expect("BoneHead must be registered");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn step_modifier_applies_to_correct_step() {
+        let m = BoneHeadStepModifier;
+        assert!(m.applies_to(StepId::BoneHead));
+    }
+
+    #[test]
+    fn step_modifier_does_not_apply_to_wrong_step() {
+        let m = BoneHeadStepModifier;
+        assert!(!m.applies_to(StepId::BlockRoll));
+    }
 }

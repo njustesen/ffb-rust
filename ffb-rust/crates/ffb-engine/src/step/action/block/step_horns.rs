@@ -1,24 +1,37 @@
-/// 1:1 translation of com.fumbbl.ffb.server.step.action.block.StepHorns (COMMON rules)
-/// and its COMMON hook com.fumbbl.ffb.server.skillbehaviour.common.HornsBehaviour.
+/// 1:1 translation of com.fumbbl.ffb.server.step.action.block.StepHorns (COMMON rules).
 ///
-/// Horns gives the attacker +1 ST during a Blitz action.  The actual ST bonus is applied
-/// in the block-dice calculation (ServerUtilBlock#getAttackerStrength); this step just marks
-/// the skill used and emits the event so the UI can show it.
+/// Horns gives the attacker +1 ST during a Blitz action. The actual ST bonus is applied
+/// in the block-dice calculation (ServerUtilBlock#getAttackerStrength); this step just
+/// marks the skill used and emits the event so the UI can show it.
 ///
-/// If the attacker has Horns and is performing a Blitz: mark used, emit SkillUse(true).
-/// Otherwise: no event.  Always NEXT_STEP.
-use ffb_model::enums::{PlayerAction, SkillId};
+/// Java: StepHorns.executeStep() → GameState.executeStepHooks(this, state)
+/// Rust: StepHorns.execute_step() → dispatch::execute_step_hooks(game, Horns, &mut hook_state)
+///
+/// All modifier logic lives in HornsBehaviour::HornsStepModifier (common/horns_behaviour.rs).
+/// This file defines the hook state struct shared with that modifier.
+use ffb_model::enums::SkillId;
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
-use ffb_model::model::skill_use::SkillUse;
 use ffb_model::util::rng::GameRng;
-use ffb_model::report::report_skill_use::ReportSkillUse;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::skill_behaviour::dispatch;
+
+// ── Hook state ────────────────────────────────────────────────────────────────
+
+/// Java: StepHorns.StepState — local mutable state passed through executeStepHooks.
+/// Exported so HornsBehaviour's HornsStepModifier can downcast to it.
+#[derive(Debug, Default)]
+pub struct StepHornsHookState {
+    /// Java: state.usingHorns
+    pub using_horns: Option<bool>,
+}
+
+// ── Step ──────────────────────────────────────────────────────────────────────
 
 pub struct StepHorns {
-    /// Java: state.usingHorns — set during executeStep, internal only (not published).
+    /// Persisted after hook execution — readable by tests and callers.
     pub using_horns: bool,
 }
 
@@ -45,42 +58,19 @@ impl Step for StepHorns {
 }
 
 impl StepHorns {
-    /// Java: HornsBehaviour.handleExecuteStepHook
+    /// Java: StepHorns.executeStep() — calls executeStepHooks, then sets NEXT_STEP.
     fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
-        let player_id = match game.acting_player.player_id.clone() {
-            Some(id) => id,
-            None => return StepOutcome::next(),
-        };
+        // Java: getGameState().executeStepHooks(this, state)
+        let mut hook_state = StepHornsHookState::default();
+        dispatch::execute_step_hooks(game, StepId::Horns, &mut hook_state);
+        self.using_horns = hook_state.using_horns.unwrap_or(false);
 
-        let has_horns = game.player(&player_id)
-            .map(|p| p.has_skill(SkillId::Horns))
-            .unwrap_or(false);
-        let is_blitz = game.acting_player.player_action == Some(PlayerAction::Blitz);
-
-        // Java: state.usingHorns = hasSkill(actingPlayer, Horns) && BLITZ == playerAction
-        self.using_horns = has_horns && is_blitz;
-
+        // Java: step.getResult().setNextAction(StepAction.NEXT_STEP) (set inside modifier)
+        // If the modifier set using_horns=true it also wrote the report; emit the GameEvent here.
         if self.using_horns {
-            // Java: actingPlayer.markSkillUsed(skill) → add to used_skills
-            let is_home = game.team_home.player(&player_id).is_some();
-            if is_home {
-                if let Some(p) = game.team_home.player_mut(&player_id) {
-                    p.used_skills.insert(SkillId::Horns);
-                }
-            } else if let Some(p) = game.team_away.player_mut(&player_id) {
-                p.used_skills.insert(SkillId::Horns);
-            }
-
-            // Java: addReport(new ReportSkillUse(actingPlayerId, skill, true, INCREASE_STRENGTH_BY_1))
-            game.report_list.add(ReportSkillUse::new(
-                Some(player_id.clone()),
-                SkillId::Horns,
-                true,
-                SkillUse::INCREASE_STRENGTH_BY_1,
-            ));
-
+            let player_id = game.acting_player.player_id.clone().unwrap_or_default();
             let event = GameEvent::SkillUse {
-                player_id: player_id.clone(),
+                player_id,
                 skill_id: SkillId::Horns as u16,
                 used: true,
             };
@@ -91,16 +81,16 @@ impl StepHorns {
     }
 }
 
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::step::framework::test_team;
-    use crate::step::framework::StepAction;
-    use ffb_model::enums::Rules;
+    use crate::step::framework::{test_team, StepAction};
+    use ffb_model::enums::{PlayerAction, PlayerState, Rules, PS_STANDING};
+    use ffb_model::model::game::Game;
     use ffb_model::model::skill_def::SkillWithValue;
     use ffb_model::types::FieldCoordinate;
-    use ffb_model::enums::PlayerState;
-    use ffb_model::enums::PS_STANDING;
 
     fn add_player(
         team: &mut ffb_model::model::team::Team,

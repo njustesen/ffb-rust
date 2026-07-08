@@ -1,11 +1,39 @@
 use crate::skill_behaviour::SkillBehaviour;
+use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
+use crate::model::step_modifier::StepModifierTrait;
+use crate::step::framework::StepId;
+use crate::skill_behaviour::registry::SkillRegistry;
 use ffb_model::enums::SkillId;
+use ffb_model::model::game::Game;
+
+// Java: During pushback, if the acting player has the Eye Gouge property (canRemoveOpponentAssists), marks the defender as eye-gouged and reports the skill use.
+pub struct EyeGougeStepModifier;
+
+impl StepModifierTrait for EyeGougeStepModifier {
+    fn applies_to(&self, step_id: StepId) -> bool { step_id == StepId::Pushback }
+
+    fn priority(&self) -> i32 { 3 }
+
+    fn handle_execute_step(
+        &self,
+        _game: &mut Game,
+        _step_state: &mut dyn std::any::Any,
+    ) -> bool {
+        false
+    }
+}
 
 /// Eye Gouge: on a POW/POW+Push result the player may gouge the defender's eye.
 pub struct EyeGougeBehaviour;
 
 impl EyeGougeBehaviour {
     pub fn new() -> Self { Self }
+
+    pub fn register_into(registry: &mut SkillRegistry) {
+        let mut sb = SbContainer::new();
+        sb.register_step_modifier(Box::new(EyeGougeStepModifier));
+        registry.register(SkillId::EyeGouge, sb);
+    }
 }
 
 impl Default for EyeGougeBehaviour {
@@ -32,6 +60,7 @@ impl SkillBehaviour for EyeGougeBehaviour {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::skill_behaviour::registry::SkillRegistry;
 
     fn test_game() -> ffb_model::model::game::Game {
         let home = ffb_model::model::team::Team {
@@ -84,4 +113,24 @@ mod tests {
         assert_eq!(player.movement, movement_before);
     }
 #[test]    fn name_is_not_empty() {        assert!(!EyeGougeBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2025() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = EyeGougeBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2025,        );        assert!(!b.execute_step_hook(&mut game));    }
+
+    #[test]
+    fn register_into_adds_step_modifier() {
+        let mut reg = SkillRegistry::empty();
+        EyeGougeBehaviour::register_into(&mut reg);
+        let sb = reg.get(SkillId::EyeGouge).expect("EyeGouge must be registered");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn step_modifier_applies_to_correct_step() {
+        let m = EyeGougeStepModifier;
+        assert!(m.applies_to(StepId::Pushback));
+    }
+
+    #[test]
+    fn step_modifier_does_not_apply_to_wrong_step() {
+        let m = EyeGougeStepModifier;
+        assert!(!m.applies_to(StepId::BlockRoll));
+    }
 }

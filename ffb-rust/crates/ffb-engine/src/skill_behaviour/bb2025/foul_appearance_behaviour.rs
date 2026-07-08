@@ -1,11 +1,34 @@
 use crate::skill_behaviour::SkillBehaviour;
+use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
+use crate::model::step_modifier::StepModifierTrait;
+use crate::step::framework::StepId;
+use crate::skill_behaviour::registry::SkillRegistry;
 use ffb_model::enums::SkillId;
+
+// Java: Rolls a dice check when the defender has Foul Appearance; on failure the attacker cannot block and the action ends, with optional re-roll support.
+pub struct FoulAppearanceStepModifier;
+
+impl StepModifierTrait for FoulAppearanceStepModifier {
+    fn applies_to(&self, step_id: StepId) -> bool { step_id == StepId::FoulAppearance }
+    fn priority(&self) -> i32 { 0 }
+    fn handle_execute_step(
+        &self,
+        _game: &mut ffb_model::model::game::Game,
+        _step_state: &mut dyn std::any::Any,
+    ) -> bool { false }
+}
 
 /// Foul Appearance: opponents must roll 2+ before performing a block or foul.
 pub struct FoulAppearanceBehaviour;
 
 impl FoulAppearanceBehaviour {
     pub fn new() -> Self { Self }
+
+    pub fn register_into(registry: &mut SkillRegistry) {
+        let mut sb = SbContainer::new();
+        sb.register_step_modifier(Box::new(FoulAppearanceStepModifier));
+        registry.register(SkillId::FoulAppearance, sb);
+    }
 }
 
 impl Default for FoulAppearanceBehaviour {
@@ -32,6 +55,27 @@ impl SkillBehaviour for FoulAppearanceBehaviour {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::skill_behaviour::registry::SkillRegistry;
+
+    #[test]
+    fn register_into_adds_step_modifier() {
+        let mut reg = SkillRegistry::empty();
+        FoulAppearanceBehaviour::register_into(&mut reg);
+        let sb = reg.get(SkillId::FoulAppearance).expect("FoulAppearance must be registered");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn step_modifier_applies_to_correct_step() {
+        let m = FoulAppearanceStepModifier;
+        assert!(m.applies_to(StepId::FoulAppearance));
+    }
+
+    #[test]
+    fn step_modifier_does_not_apply_to_wrong_step() {
+        let m = FoulAppearanceStepModifier;
+        assert!(!m.applies_to(StepId::BlockRoll));
+    }
 
     fn test_game() -> ffb_model::model::game::Game {
         let home = ffb_model::model::team::Team {

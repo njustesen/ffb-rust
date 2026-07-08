@@ -452,7 +452,7 @@ impl StepOutcome {
 
 /// Trait for individual step implementations (BB2016/BB2020 per-file pattern).
 /// Steps receive `&mut Game` and `&mut GameRng` only — the driver owns the stack.
-pub trait Step {
+pub trait Step: Send {
     fn id(&self) -> StepId;
     fn start(&mut self, game: &mut ffb_model::model::game::Game, rng: &mut ffb_model::util::rng::GameRng) -> StepOutcome;
     fn handle_command(&mut self, action: &crate::action::Action, game: &mut ffb_model::model::game::Game, rng: &mut ffb_model::util::rng::GameRng) -> StepOutcome;
