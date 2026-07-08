@@ -38,6 +38,7 @@ impl StepModifierTrait for GrabStepModifier {
     fn handle_execute_step(
         &self,
         game: &mut Game,
+        _rng: &mut ffb_model::util::rng::GameRng,
         step_state: &mut dyn std::any::Any,
     ) -> bool {
         let state = step_state
@@ -199,6 +200,7 @@ mod tests {
     use ffb_model::model::skill_def::SkillWithValue;
     use ffb_model::types::{FieldCoordinate, PushbackSquare};
     use ffb_model::enums::Direction;
+    use ffb_model::util::rng::GameRng;
     use std::collections::HashMap;
 
     fn make_game() -> Game {
@@ -267,7 +269,7 @@ mod tests {
         let sq = PushbackSquare::new(def_coord, Direction::North, true);
         let m = GrabStepModifier;
         let mut hs = default_hook_state_with_sq("def", sq);
-        assert!(!m.handle_execute_step(&mut game, &mut hs));
+        assert!(!m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs));
     }
 
     #[test]
@@ -287,7 +289,7 @@ mod tests {
         let sq = PushbackSquare::new(def_coord, Direction::North, true);
         let m = GrabStepModifier;
         let mut hs = default_hook_state_with_sq("def", sq);
-        assert!(!m.handle_execute_step(&mut game, &mut hs));
+        assert!(!m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs));
     }
 
     #[test]
@@ -312,7 +314,7 @@ mod tests {
             PushbackSquare::new(FieldCoordinate::new(4, 6), Direction::Northwest, true),
         ];
 
-        let result = m.handle_execute_step(&mut game, &mut hs);
+        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
         assert!(result, "Grab should fire when conditions met");
         // Mode should be switched to GRAB
         assert_eq!(hs.pushback_mode, PushbackMode::GRAB, "mode should switch to GRAB");
@@ -339,7 +341,7 @@ mod tests {
             PushbackSquare::new(FieldCoordinate::new(4, 6), Direction::Northwest, true),
         ];
 
-        m.handle_execute_step(&mut game, &mut hs);
+        m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
         assert!(hs.starting_pushback_square.is_none(), "starting square should be cleared when Grab applies");
     }
 

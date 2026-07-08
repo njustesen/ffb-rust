@@ -51,6 +51,7 @@ impl StepModifierTrait for TentaclesStepModifier {
     fn handle_execute_step(
         &self,
         _game: &mut Game,
+        _rng: &mut ffb_model::util::rng::GameRng,
         _step_state: &mut dyn std::any::Any,
     ) -> bool {
         false

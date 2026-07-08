@@ -46,12 +46,12 @@ impl Default for StepHorns {
 impl Step for StepHorns {
     fn id(&self) -> StepId { StepId::Horns }
 
-    fn start(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game)
+    fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game)
+    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        self.execute_step(game, rng)
     }
 
     fn set_parameter(&mut self, _param: &StepParameter) -> bool { false }
@@ -59,10 +59,10 @@ impl Step for StepHorns {
 
 impl StepHorns {
     /// Java: StepHorns.executeStep() — calls executeStepHooks, then sets NEXT_STEP.
-    fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: getGameState().executeStepHooks(this, state)
         let mut hook_state = StepHornsHookState::default();
-        dispatch::execute_step_hooks(game, StepId::Horns, &mut hook_state);
+        dispatch::execute_step_hooks(game, rng, StepId::Horns, &mut hook_state);
         self.using_horns = hook_state.using_horns.unwrap_or(false);
 
         // Java: step.getResult().setNextAction(StepAction.NEXT_STEP) (set inside modifier)

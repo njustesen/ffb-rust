@@ -12,7 +12,7 @@ pub struct DivingTackleStepModifier;
 impl StepModifierTrait for DivingTackleStepModifier {
     fn applies_to(&self, step_id: StepId) -> bool { step_id == StepId::DivingTackle }
     fn priority(&self) -> i32 { 0 }
-    fn handle_execute_step(&self, _game: &mut Game, _step_state: &mut dyn std::any::Any) -> bool { false }
+    fn handle_execute_step(&self, _game: &mut Game, _rng: &mut ffb_model::util::rng::GameRng, _step_state: &mut dyn std::any::Any) -> bool { false }
 }
 
 /// Diving Tackle: player may fall over to add -2 to a dodging opponent's roll.

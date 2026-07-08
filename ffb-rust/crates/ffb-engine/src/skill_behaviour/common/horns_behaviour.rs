@@ -37,6 +37,7 @@ impl StepModifierTrait for HornsStepModifier {
     fn handle_execute_step(
         &self,
         game: &mut Game,
+        _rng: &mut ffb_model::util::rng::GameRng,
         step_state: &mut dyn std::any::Any,
     ) -> bool {
         let state = step_state
@@ -121,6 +122,7 @@ mod tests {
     use ffb_model::model::game::Game;
     use ffb_model::model::skill_def::SkillWithValue;
     use ffb_model::types::FieldCoordinate;
+    use ffb_model::util::rng::GameRng;
 
     fn make_game_with_horns(action: PlayerAction) -> (Game, String) {
         let pid = "att".to_string();
@@ -173,7 +175,7 @@ mod tests {
         let (mut game, _) = make_game_with_horns(PlayerAction::Blitz);
         let mut hook_state = StepHornsHookState::default();
         let m = HornsStepModifier;
-        m.handle_execute_step(&mut game, &mut hook_state);
+        m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hook_state);
         assert_eq!(hook_state.using_horns, Some(true));
     }
 
@@ -181,7 +183,7 @@ mod tests {
     fn modifier_sets_using_horns_false_when_blocking() {
         let (mut game, _) = make_game_with_horns(PlayerAction::Block);
         let mut hook_state = StepHornsHookState::default();
-        HornsStepModifier.handle_execute_step(&mut game, &mut hook_state);
+        HornsStepModifier.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hook_state);
         assert_eq!(hook_state.using_horns, Some(false));
     }
 
@@ -189,7 +191,7 @@ mod tests {
     fn modifier_marks_skill_used_when_blitzing() {
         let (mut game, pid) = make_game_with_horns(PlayerAction::Blitz);
         let mut hook_state = StepHornsHookState::default();
-        HornsStepModifier.handle_execute_step(&mut game, &mut hook_state);
+        HornsStepModifier.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hook_state);
         assert!(game.team_home.player(&pid).unwrap().used_skills.contains(&SkillId::Horns));
     }
 
@@ -197,7 +199,7 @@ mod tests {
     fn modifier_adds_report_when_blitzing() {
         let (mut game, _) = make_game_with_horns(PlayerAction::Blitz);
         let mut hook_state = StepHornsHookState::default();
-        HornsStepModifier.handle_execute_step(&mut game, &mut hook_state);
+        HornsStepModifier.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hook_state);
         assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
     }
 
@@ -205,7 +207,7 @@ mod tests {
     fn modifier_no_report_when_not_blitzing() {
         let (mut game, _) = make_game_with_horns(PlayerAction::Block);
         let mut hook_state = StepHornsHookState::default();
-        HornsStepModifier.handle_execute_step(&mut game, &mut hook_state);
+        HornsStepModifier.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hook_state);
         assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
     }
 
@@ -213,7 +215,7 @@ mod tests {
     fn modifier_returns_false_always() {
         let (mut game, _) = make_game_with_horns(PlayerAction::Blitz);
         let mut hook_state = StepHornsHookState::default();
-        assert!(!HornsStepModifier.handle_execute_step(&mut game, &mut hook_state));
+        assert!(!HornsStepModifier.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hook_state));
     }
 
     #[test]

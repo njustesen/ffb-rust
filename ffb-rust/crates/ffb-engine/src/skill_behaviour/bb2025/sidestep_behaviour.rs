@@ -33,6 +33,7 @@ impl StepModifierTrait for SidestepStepModifier {
     fn handle_execute_step(
         &self,
         game: &mut Game,
+        _rng: &mut ffb_model::util::rng::GameRng,
         step_state: &mut dyn std::any::Any,
     ) -> bool {
         let state = step_state
@@ -186,6 +187,7 @@ mod tests {
     use ffb_model::model::player::Player;
     use ffb_model::model::skill_def::SkillWithValue;
     use ffb_model::types::FieldCoordinate;
+    use ffb_model::util::rng::GameRng;
     use std::collections::HashMap;
 
     fn make_game() -> Game {
@@ -249,7 +251,7 @@ mod tests {
 
         let m = SidestepStepModifier;
         let mut hs = default_hook_state("def1", true);
-        let result = m.handle_execute_step(&mut game, &mut hs);
+        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
         assert!(!result);
     }
 
@@ -264,7 +266,7 @@ mod tests {
         let m = SidestepStepModifier;
         // free_square_around_defender = false
         let mut hs = default_hook_state("def1", false);
-        let result = m.handle_execute_step(&mut game, &mut hs);
+        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
         assert!(!result, "SideStep should not fire when no free squares around defender");
     }
 
@@ -280,7 +282,7 @@ mod tests {
         let m = SidestepStepModifier;
         let mut hs = default_hook_state("def1", true);
         // side_stepping map is empty → auto-decline
-        let result = m.handle_execute_step(&mut game, &mut hs);
+        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
         // Returns true (was handled) but set to false (declined)
         assert!(result, "side step handled (declined) should return true");
         assert_eq!(hs.side_stepping.get("def1"), Some(&false));
@@ -300,7 +302,7 @@ mod tests {
         let mut hs = default_hook_state("def1", true);
         // Pre-set to declined (false) → getOrDefault returns false → outer if is false
         hs.side_stepping.insert("def1".into(), false);
-        let result = m.handle_execute_step(&mut game, &mut hs);
+        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
         // Returns false (outer if-condition was false)
         assert!(!result);
         // Mode should still be REGULAR since not entered
@@ -324,7 +326,7 @@ mod tests {
         let starting_sq = PushbackSquare::new(FieldCoordinate::new(10, 7), Direction::North, true);
         hs.starting_pushback_square = Some(starting_sq);
 
-        m.handle_execute_step(&mut game, &mut hs);
+        m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
         // Starting square should be cleared after SideStep is used
         assert!(hs.starting_pushback_square.is_none(), "starting square should be cleared when SideStep used");
     }
@@ -346,7 +348,7 @@ mod tests {
         let starting_sq = PushbackSquare::new(FieldCoordinate::new(10, 7), Direction::North, true);
         hs.starting_pushback_square = Some(starting_sq);
 
-        m.handle_execute_step(&mut game, &mut hs);
+        m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
         assert_eq!(hs.pushback_mode, PushbackMode::SIDE_STEP, "should switch to SIDE_STEP mode when accepted");
     }
 
@@ -367,7 +369,7 @@ mod tests {
             HashMap::new(), HashMap::new(), None,
         );
 
-        m.handle_execute_step(&mut game, &mut hs);
+        m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
         // Should add NO_TACKLEZONE report
         assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
     }

@@ -33,6 +33,7 @@ impl StepModifierTrait for StandFirmStepModifier {
     fn handle_execute_step(
         &self,
         game: &mut Game,
+        _rng: &mut ffb_model::util::rng::GameRng,
         step_state: &mut dyn std::any::Any,
     ) -> bool {
         let state = step_state
@@ -183,6 +184,7 @@ mod tests {
     use ffb_model::model::skill_def::SkillWithValue;
     use ffb_model::types::FieldCoordinate;
     use ffb_model::enums::PS_PRONE;
+    use ffb_model::util::rng::GameRng;
     use std::collections::HashMap;
 
     fn make_game() -> Game {
@@ -242,7 +244,7 @@ mod tests {
 
         let m = StandFirmStepModifier;
         let mut hs = default_hook_state("def1");
-        let result = m.handle_execute_step(&mut game, &mut hs);
+        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
         assert!(!result);
     }
 
@@ -257,7 +259,7 @@ mod tests {
         let m = StandFirmStepModifier;
         let mut hs = default_hook_state("def1");
         // standing_firm map is empty → auto-decline
-        let result = m.handle_execute_step(&mut game, &mut hs);
+        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
         // Should return false (declined) and have inserted false
         assert!(!result);
         assert_eq!(hs.standing_firm.get("def1"), Some(&false));
@@ -275,7 +277,7 @@ mod tests {
         let mut hs = default_hook_state("def1");
         hs.standing_firm.insert("def1".into(), true);
 
-        let result = m.handle_execute_step(&mut game, &mut hs);
+        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
         assert!(result, "should return true when stand firm is accepted");
         assert!(hs.do_push, "do_push should be true after stand firm");
         assert!(hs.starting_pushback_square.is_none(), "starting square should be cleared");
@@ -292,7 +294,7 @@ mod tests {
         let m = StandFirmStepModifier;
         let mut hs = default_hook_state("def1");
         hs.standing_firm.insert("def1".into(), true);
-        m.handle_execute_step(&mut game, &mut hs);
+        m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
 
         assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
     }
@@ -308,7 +310,7 @@ mod tests {
         let mut hs = default_hook_state("def1");
         hs.standing_firm.insert("def1".into(), false);
 
-        let result = m.handle_execute_step(&mut game, &mut hs);
+        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
         assert!(!result, "should return false when stand firm declined");
         assert!(!hs.do_push, "do_push should stay false when declined");
     }
@@ -350,7 +352,7 @@ mod tests {
         let mut hs = default_hook_state("def1");
         // old_defender_state also has no tacklezones (prone) → auto-decline
         hs.old_defender_state = Some(PlayerState::new(PS_PRONE));
-        m.handle_execute_step(&mut game, &mut hs);
+        m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
         // Should NOT stand firm (inserted false)
         assert_eq!(hs.standing_firm.get("def1"), Some(&false));
     }

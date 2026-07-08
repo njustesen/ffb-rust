@@ -38,6 +38,7 @@ pub trait StepModifierTrait: Send + Sync {
     fn handle_execute_step(
         &self,
         _game: &mut ffb_model::model::game::Game,
+        _rng: &mut ffb_model::util::rng::GameRng,
         _step_state: &mut dyn std::any::Any,
     ) -> bool {
         false
@@ -53,6 +54,7 @@ pub fn sort_by_priority(modifiers: &mut [Box<dyn StepModifierTrait>]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ffb_model::util::rng::GameRng;
 
     struct TestModifier {
         target: StepId,
@@ -72,7 +74,7 @@ mod tests {
 
     impl StepModifierTrait for ReturningModifier {
         fn applies_to(&self, step_id: StepId) -> bool { step_id == self.target }
-        fn handle_execute_step(&self, _game: &mut ffb_model::model::game::Game, _step_state: &mut dyn std::any::Any) -> bool {
+        fn handle_execute_step(&self, _game: &mut ffb_model::model::game::Game, _rng: &mut ffb_model::util::rng::GameRng, _step_state: &mut dyn std::any::Any) -> bool {
             *self.call_count.lock().unwrap() += 1;
             self.return_val
         }
@@ -97,7 +99,7 @@ mod tests {
         let m = TestModifier { target: StepId::BlockRoll, priority: 0 };
         let mut game = ffb_model::model::game::Game::new(test_team("h", 0), test_team("a", 0), Rules::Bb2025);
         let mut state: () = ();
-        assert!(!m.handle_execute_step(&mut game, &mut state));
+        assert!(!m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut state));
     }
 
     #[test]
@@ -108,7 +110,7 @@ mod tests {
         let m = ReturningModifier { target: StepId::BlockRoll, return_val: true, call_count: counter.clone() };
         let mut game = ffb_model::model::game::Game::new(test_team("h", 0), test_team("a", 0), Rules::Bb2025);
         let mut state: () = ();
-        assert!(m.handle_execute_step(&mut game, &mut state));
+        assert!(m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut state));
         assert_eq!(*counter.lock().unwrap(), 1);
     }
 

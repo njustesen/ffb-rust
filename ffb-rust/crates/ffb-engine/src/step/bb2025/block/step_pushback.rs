@@ -207,7 +207,7 @@ impl StepPushback {
                 );
 
                 let stop_processing = dispatch::execute_step_hooks(
-                    game, StepId::Pushback, &mut hook_state,
+                    game, rng, StepId::Pushback, &mut hook_state,
                 );
 
                 // Merge hook state back into step state

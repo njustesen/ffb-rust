@@ -20,11 +20,12 @@ use super::registry::{SkillRegistry, registry_for};
 /// Returns `true` if a modifier consumed the step (stop processing); `false` otherwise.
 pub fn execute_step_hooks(
     game: &mut Game,
+    rng: &mut ffb_model::util::rng::GameRng,
     step_id: StepId,
     step_state: &mut dyn Any,
 ) -> bool {
     let registry = registry_for(game.rules);
-    execute_step_hooks_with_registry(&registry, game, step_id, step_state)
+    execute_step_hooks_with_registry(&registry, game, rng, step_id, step_state)
 }
 
 /// Variant that accepts an explicit registry — used in tests where we want to inject a
@@ -32,6 +33,7 @@ pub fn execute_step_hooks(
 pub fn execute_step_hooks_with_registry(
     registry: &SkillRegistry,
     game: &mut Game,
+    rng: &mut ffb_model::util::rng::GameRng,
     step_id: StepId,
     step_state: &mut dyn Any,
 ) -> bool {
@@ -64,7 +66,7 @@ pub fn execute_step_hooks_with_registry(
                 .map(|m| m.as_ref());
 
             if let Some(modifier) = modifier {
-                modifier.handle_execute_step(game, step_state)
+                modifier.handle_execute_step(game, rng, step_state)
             } else {
                 false
             }
@@ -85,6 +87,7 @@ mod tests {
     use crate::model::step_modifier::StepModifierTrait;
     use crate::step::framework::test_team;
     use ffb_model::enums::Rules;
+    use ffb_model::util::rng::GameRng;
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
@@ -99,7 +102,7 @@ mod tests {
     impl StepModifierTrait for CountingModifier {
         fn applies_to(&self, id: StepId) -> bool { id == self.target }
         fn priority(&self) -> i32 { self.priority }
-        fn handle_execute_step(&self, _game: &mut Game, _state: &mut dyn Any) -> bool {
+        fn handle_execute_step(&self, _game: &mut Game, _rng: &mut ffb_model::util::rng::GameRng, _state: &mut dyn Any) -> bool {
             *self.counter.lock().unwrap() += 1;
             self.return_val
         }
@@ -126,7 +129,7 @@ mod tests {
         let reg = SkillRegistry::empty();
         let mut game = make_game();
         let mut state: () = ();
-        assert!(!execute_step_hooks_with_registry(&reg, &mut game, StepId::Horns, &mut state));
+        assert!(!execute_step_hooks_with_registry(&reg, &mut game, &mut GameRng::new(0), StepId::Horns, &mut state));
     }
 
     #[test]
@@ -141,7 +144,7 @@ mod tests {
         let mut game = make_game();
         let mut state: () = ();
         // Dispatch for StepId::Horns — modifier targets BlockRoll so should not fire
-        assert!(!execute_step_hooks_with_registry(&reg, &mut game, StepId::Horns, &mut state));
+        assert!(!execute_step_hooks_with_registry(&reg, &mut game, &mut GameRng::new(0), StepId::Horns, &mut state));
         assert_eq!(*counter.lock().unwrap(), 0);
     }
 
@@ -156,7 +159,7 @@ mod tests {
         }))]);
         let mut game = make_game();
         let mut state: () = ();
-        execute_step_hooks_with_registry(&reg, &mut game, StepId::Horns, &mut state);
+        execute_step_hooks_with_registry(&reg, &mut game, &mut GameRng::new(0), StepId::Horns, &mut state);
         assert_eq!(*counter.lock().unwrap(), 1);
     }
 
@@ -179,7 +182,7 @@ mod tests {
 
         let mut game = make_game();
         let mut state: () = ();
-        let result = execute_step_hooks_with_registry(&reg, &mut game, StepId::Horns, &mut state);
+        let result = execute_step_hooks_with_registry(&reg, &mut game, &mut GameRng::new(0), StepId::Horns, &mut state);
         assert!(result, "should return true when first modifier returns true");
         assert_eq!(*c1.lock().unwrap(), 1, "first modifier should be called");
         assert_eq!(*c2.lock().unwrap(), 0, "second modifier should NOT be called after stop");
@@ -196,7 +199,7 @@ mod tests {
         impl StepModifierTrait for OrderedModifier {
             fn applies_to(&self, id: StepId) -> bool { id == self.target }
             fn priority(&self) -> i32 { self.priority }
-            fn handle_execute_step(&self, _: &mut Game, _: &mut dyn Any) -> bool {
+            fn handle_execute_step(&self, _: &mut Game, _: &mut ffb_model::util::rng::GameRng, _: &mut dyn Any) -> bool {
                 self.order.lock().unwrap().push(self.priority);
                 false
             }
@@ -215,7 +218,7 @@ mod tests {
 
         let mut game = make_game();
         let mut state: () = ();
-        execute_step_hooks_with_registry(&reg, &mut game, StepId::Horns, &mut state);
+        execute_step_hooks_with_registry(&reg, &mut game, &mut GameRng::new(0), StepId::Horns, &mut state);
         let recorded = order.lock().unwrap().clone();
         assert_eq!(recorded, vec![1, 2, 3], "modifiers must run lowest-priority-first");
     }
@@ -225,7 +228,7 @@ mod tests {
         struct StateMutatingModifier;
         impl StepModifierTrait for StateMutatingModifier {
             fn applies_to(&self, id: StepId) -> bool { id == StepId::Horns }
-            fn handle_execute_step(&self, _: &mut Game, state: &mut dyn Any) -> bool {
+            fn handle_execute_step(&self, _: &mut Game, _: &mut ffb_model::util::rng::GameRng, state: &mut dyn Any) -> bool {
                 if let Some(val) = state.downcast_mut::<u32>() {
                     *val = 42;
                 }
@@ -240,7 +243,7 @@ mod tests {
 
         let mut game = make_game();
         let mut state: u32 = 0;
-        execute_step_hooks_with_registry(&reg, &mut game, StepId::Horns, &mut state);
+        execute_step_hooks_with_registry(&reg, &mut game, &mut GameRng::new(0), StepId::Horns, &mut state);
         assert_eq!(state, 42, "modifier must be able to mutate step_state via downcast");
     }
 }

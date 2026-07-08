@@ -46,6 +46,7 @@ impl StepModifierTrait for ReallyStupidStepModifier {
     fn handle_execute_step(
         &self,
         _game: &mut ffb_model::model::game::Game,
+        _rng: &mut ffb_model::util::rng::GameRng,
         _step_state: &mut dyn std::any::Any,
     ) -> bool {
         false
