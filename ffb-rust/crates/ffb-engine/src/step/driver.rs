@@ -174,6 +174,12 @@ pub fn make_step(id: StepId) -> Box<dyn Step> {
         // ── Pass/foul skills ─────────────────────────────────────────────────
         StepId::Animosity              => { use crate::step::action::pass::step_animosity::StepAnimosity; Box::new(StepAnimosity::new(String::new())) }
         StepId::FoulAppearance         => { use crate::step::mixed::step_foul_appearance::StepFoulAppearance; Box::new(StepFoulAppearance::new(String::new())) }
+        StepId::Bombardier             => { use crate::step::action::pass::step_bombardier::StepBombardier; Box::new(StepBombardier::new()) }
+        StepId::PassBlock              => { use crate::step::mixed::pass::step_pass_block::StepPassBlock; Box::new(StepPassBlock::new()) }
+        StepId::SafeThrow              => { use crate::step::bb2016::pass::step_safe_throw::StepSafeThrow; Box::new(StepSafeThrow::new()) }
+        // ── Mixed special skills ─────────────────────────────────────────────
+        StepId::AnimalSavagery         => { use crate::step::mixed::shared::step_animal_savagery::StepAnimalSavagery; Box::new(StepAnimalSavagery::new(String::new())) }
+        StepId::UnchannelledFury       => { use crate::step::mixed::step_unchannelled_fury::StepUnchannelledFury; Box::new(StepUnchannelledFury::new(String::new())) }
         // ── Shared ───────────────────────────────────────────────────────────
         StepId::BloodLust              => Box::new(step_blood_lust::StepBloodLust::new(String::new())),
         StepId::EndFeeding             => Box::new(step_end_feeding::StepEndFeeding::new()),
