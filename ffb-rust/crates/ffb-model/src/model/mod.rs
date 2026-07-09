@@ -1,5 +1,6 @@
 // Tier 3: Core data model
 
+pub mod skill;
 pub mod animation_type;
 pub mod block_roll_properties;
 pub mod catch_scatter_throw_in_mode;
@@ -66,7 +67,6 @@ pub mod game_list;
 pub mod team_list;
 pub mod report_list;
 pub mod change;
-pub mod skill;
 pub mod stadium;
 
 // Re-exported enum stubs (1:1 Java file mapping)
