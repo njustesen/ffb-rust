@@ -1,34 +1,75 @@
-use serde::{Deserialize, Serialize};
-
 /// 1:1 translation of com.fumbbl.ffb.model.skill.SkillDisplayInfo.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+use crate::model::skill::skill::Skill;
+
+/// Carries the display string, category classification, and the skill reference
+/// used to render a player's skill list in the UI.
 pub struct SkillDisplayInfo {
-    pub name: String,
-    pub short_name: String,
-    pub description: String,
+    info: String,
+    category: DisplayCategory,
+    skill: Skill,
+}
+
+/// Java inner enum `SkillDisplayInfo.Category`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DisplayCategory {
+    Roster,
+    Player,
+    Temporary,
 }
 
 impl SkillDisplayInfo {
-    pub fn new(name: String, short_name: String, description: String) -> Self {
-        Self { name, short_name, description }
+    /// `SkillDisplayInfo(String info, Category category, Skill skill)`.
+    pub fn new(info: impl Into<String>, category: DisplayCategory, skill: Skill) -> Self {
+        SkillDisplayInfo { info: info.into(), category, skill }
     }
-    pub fn get_name(&self) -> &str { &self.name }
-    pub fn get_short_name(&self) -> &str { &self.short_name }
+
+    /// Java `getInfo()`.
+    pub fn get_info(&self) -> &str {
+        &self.info
+    }
+
+    /// Java `getCategory()`.
+    pub fn get_category(&self) -> DisplayCategory {
+        self.category
+    }
+
+    /// Java `getSkill()`.
+    pub fn get_skill(&self) -> &Skill {
+        &self.skill
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillCategory;
 
-    #[test]
-    fn default_is_empty() {
-        assert!(SkillDisplayInfo::default().name.is_empty());
+    fn make_skill(name: &str) -> Skill {
+        Skill::new(name, SkillCategory::General)
     }
 
     #[test]
-    fn new_sets_fields() {
-        let info = SkillDisplayInfo::new("Block".to_string(), "Blk".to_string(), "desc".to_string());
-        assert_eq!(info.get_name(), "Block");
-        assert_eq!(info.get_short_name(), "Blk");
+    fn new_stores_info_and_category() {
+        let sdi = SkillDisplayInfo::new("Block", DisplayCategory::Roster, make_skill("Block"));
+        assert_eq!(sdi.get_info(), "Block");
+        assert_eq!(sdi.get_category(), DisplayCategory::Roster);
+    }
+
+    #[test]
+    fn get_skill_returns_correct_name() {
+        let sdi = SkillDisplayInfo::new("Dodge", DisplayCategory::Player, make_skill("Dodge"));
+        assert_eq!(sdi.get_skill().get_name(), "Dodge");
+    }
+
+    #[test]
+    fn temporary_category_stored() {
+        let sdi = SkillDisplayInfo::new("Mighty Blow (+2)", DisplayCategory::Temporary, make_skill("Mighty Blow"));
+        assert_eq!(sdi.get_category(), DisplayCategory::Temporary);
+    }
+
+    #[test]
+    fn info_stored_as_given() {
+        let sdi = SkillDisplayInfo::new("Tackle", DisplayCategory::Player, make_skill("Tackle"));
+        assert_eq!(sdi.get_info(), "Tackle");
     }
 }

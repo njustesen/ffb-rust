@@ -1,33 +1,63 @@
-use serde::{Deserialize, Serialize};
-use crate::enums::SkillId;
-
 /// 1:1 translation of com.fumbbl.ffb.model.skill.SkillClassWithValue.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// Java uses `Class<? extends Skill>` as the key; Rust uses the skill's string name
+/// (the closest equivalent without runtime reflection).
 pub struct SkillClassWithValue {
-    pub skill_id: SkillId,
-    pub value: i32,
+    /// The skill class name (replaces `Class<? extends Skill>` from Java).
+    skill_class_name: String,
+    value: Option<String>,
 }
 
 impl SkillClassWithValue {
-    pub fn new(skill_id: SkillId, value: i32) -> Self { Self { skill_id, value } }
-    pub fn get_skill_id(&self) -> SkillId { self.skill_id }
-    pub fn get_value(&self) -> i32 { self.value }
+    /// `SkillClassWithValue(Class<? extends Skill> skill)`.
+    pub fn new(skill_class_name: impl Into<String>) -> Self {
+        SkillClassWithValue { skill_class_name: skill_class_name.into(), value: None }
+    }
+
+    /// `SkillClassWithValue(Class<? extends Skill> skill, String value)`.
+    pub fn with_value(skill_class_name: impl Into<String>, value: impl Into<String>) -> Self {
+        SkillClassWithValue {
+            skill_class_name: skill_class_name.into(),
+            value: Some(value.into()),
+        }
+    }
+
+    /// Java `getSkill()` — returns the class name string (Rust equivalent of the Class reference).
+    pub fn get_skill(&self) -> &str {
+        &self.skill_class_name
+    }
+
+    /// Java `getValue()`.
+    pub fn get_value(&self) -> Option<&str> {
+        self.value.as_deref()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::enums::SkillId;
 
     #[test]
-    fn new_sets_fields() {
-        let s = SkillClassWithValue::new(SkillId::Block, 2);
-        assert_eq!(s.get_value(), 2);
+    fn new_has_no_value() {
+        let scv = SkillClassWithValue::new("Block");
+        assert!(scv.get_value().is_none());
     }
 
     #[test]
-    fn get_skill_id_returns_id() {
-        let s = SkillClassWithValue::new(SkillId::Block, 0);
-        assert_eq!(s.get_skill_id(), SkillId::Block);
+    fn with_value_stores_value() {
+        let scv = SkillClassWithValue::with_value("MightyBlow", "+1");
+        assert_eq!(scv.get_value(), Some("+1"));
+    }
+
+    #[test]
+    fn get_skill_returns_class_name() {
+        let scv = SkillClassWithValue::new("Dodge");
+        assert_eq!(scv.get_skill(), "Dodge");
+    }
+
+    #[test]
+    fn with_value_get_skill_name_unchanged() {
+        let scv = SkillClassWithValue::with_value("Tackle", "val");
+        assert_eq!(scv.get_skill(), "Tackle");
     }
 }

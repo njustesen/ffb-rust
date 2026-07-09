@@ -1,0 +1,21 @@
+/// Submodule declarations for com.fumbbl.ffb.skill.bb2025.special package.
+pub mod a_sneaky_pair;
+pub mod blast_it;
+pub mod blastin_solves_everything;
+pub mod dwarven_scourge;
+pub mod excuse_me_are_you_a_zoat;
+pub mod frenzied_rush;
+pub mod incorporeal;
+pub mod krump_and_smash;
+pub mod lord_of_chaos;
+pub mod master_assassin;
+pub mod mesmerising_dance;
+pub mod pump_up_the_crowd;
+pub mod putrid_regurgitation;
+pub mod slashing_nails;
+pub mod team_captain;
+pub mod the_ballista;
+pub mod whirling_dervish;
+pub mod wisdom_of_the_white_dwarf;
+pub mod woodland_fury;
+pub mod working_in_tandem;

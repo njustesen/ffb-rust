@@ -1,0 +1,24 @@
+/// Submodule declarations for common skills (shared across editions).
+pub mod block;
+pub mod catch;
+pub mod dauntless;
+pub mod disturbing_presence;
+pub mod diving_catch;
+pub mod dump_off;
+pub mod extra_arms;
+pub mod fend;
+pub mod foul_appearance;
+pub mod hail_mary_pass;
+pub mod horns;
+pub mod jump_up;
+pub mod movement_increase;
+pub mod pass;
+pub mod sprint;
+pub mod stand_firm;
+pub mod strip_ball;
+pub mod sure_hands;
+pub mod tackle;
+pub mod tentacles;
+pub mod thick_skull;
+pub mod two_heads;
+pub mod wrestle;
