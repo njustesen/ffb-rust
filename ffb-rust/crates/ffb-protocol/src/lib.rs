@@ -1,3 +1,12 @@
 pub mod commands;
 pub mod client_commands;
 pub mod server_commands;
+pub mod game_coach;
+pub mod i_connection_listener;
+pub mod i_net_command_handler;
+pub mod net_command;
+pub mod net_command_factory;
+pub mod net_command_id;
+pub mod net_command_log;
+pub mod server_status;
+pub mod socket_change_request;
