@@ -1,4 +1,6 @@
 use crate::skill_behaviour::SkillBehaviour;
+use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
+use crate::skill_behaviour::registry::SkillRegistry;
 use ffb_model::enums::SkillId;
 
 /// Animal Savagery: player may go wild before acting, potentially injuring a teammate.
@@ -6,6 +8,11 @@ pub struct AnimalSavageryBehaviour;
 
 impl AnimalSavageryBehaviour {
     pub fn new() -> Self { Self }
+
+    pub fn register_into(registry: &mut SkillRegistry) {
+        let sb = SbContainer::new();
+        registry.register(SkillId::AnimalSavagery, sb);
+    }
 }
 
 impl Default for AnimalSavageryBehaviour {

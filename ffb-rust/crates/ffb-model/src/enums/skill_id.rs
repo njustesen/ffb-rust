@@ -883,6 +883,8 @@ impl SkillId {
             SkillId::HailMaryPass => &["canGainHailMary"],
             // Java: SafePairOfHands.postConstruct registers canPlaceBallWhenKnockedDownOrPlacedProne
             SkillId::SafePairOfHands => &["canPlaceBallWhenKnockedDownOrPlacedProne"],
+            // Java: SaboteurBehaviour registers canSabotageBlockerOnKnockdown
+            SkillId::Saboteur => &["canSabotageBlockerOnKnockdown"],
             _ => &[],
         }
     }

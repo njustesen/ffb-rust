@@ -50,13 +50,27 @@ ffb-model → ffb-protocol → ffb-client
 | **ffb-client** | Client-side state machine and WebSocket handling | `ffb-client-logic` |
 | **ffb-parity** | Parity test harness: runs both Java and Rust headless, diffs JSONL logs | (Rust-only harness) |
 
-## Engine Architecture (in-progress translation)
+## Engine Architecture
 
-`ffb-engine/src/step/engine.rs` is a **3,920-line monolith** and the **current live code path** — parity tests run against it. It is NOT the source of truth for step implementations (the Java source files are). Each step class is being translated individually into `ffb-engine/src/step/bb2025/<step_name>.rs`. Once all steps and generators are translated, `engine.rs` will be deleted and replaced by a thin `driver.rs` (< 300 lines). **Parity tests do not yet pass against the rewrite** — that validation is deferred until the monolith is deleted and driver.rs is wired in.
+**`engine.rs` has been deleted (Phase ZR).** `driver.rs` is the live code path — `Box<dyn Step>` dispatch via `make_step()`, `DriverGameState` game loop, `GameState` type alias for backward compat. All 2,521 step/generator files are translated (100%).
 
 **Java step class → Rust:** `StepBlockRoll.java` → `step/bb2025/step_block_roll.rs` → `struct StepBlockRoll`
 
-**Generator classes → Rust:** Each `XxxSequence.java` or `XxxGenerator.java` → `step/generator/bb2025/xxx.rs`. Generators push ordered step sequences onto the stack. **All 31 BB2025 generator files are now fully implemented with unit tests** (2026-06-24). **All 142 BB2025 step files now have unit tests** (2026-06-24, 3,038 workspace tests as of 2026-06-25). Phase D (2026-06-25) cleared the re-roll infra blockers: `AbstractStepWithReRoll`/`ReRollState`, `UtilServerReRoll`, and re-roll branches for StepGoForIt, StepPickUp, StepMoveDodge, StepStandUp, StepJump are now fully translated. Phase G (2026-06-26) cleared both remaining blockers: `UtilServerInjury.handleInjury()` (full injury pipeline) and StepBlockRoll multi-die re-roll (Brawler/Hatred/Pro/SavageBlow). 3,233 tests as of 2026-06-26. **Phase H (planned):** `StepCatchScatterThrowIn` full implementation — the critical ball-resolution step covering catch, scatter, throw-in, and bomb paths.
+**Generator classes → Rust:** Each `XxxSequence.java` or `XxxGenerator.java` → `step/generator/bb2025/xxx.rs`. Generators push ordered step sequences onto the stack.
+
+### Engine output channels
+
+The Rust engine uses two output channels instead of Java's direct networking calls:
+
+| Java pattern | Rust equivalent |
+|---|---|
+| `server.sendXxx(...)` | Emit `GameEvent::Xxx` via `StepOutcome::with_event()` |
+| `UtilServerDialog.showDialog(dialog)` | Return `StepOutcome::cont().with_prompt(AgentPrompt::Xxx)` |
+
+`GameEvent` variants are defined in `ffb-model/src/events/game_event.rs`.  
+`AgentPrompt` variants are defined in `ffb-model/src/prompts/agent_prompt.rs`.
+
+The `ffb-server` layer (Phase ZT) will subscribe to these and serialize them as protocol commands to the Java GUI client over WebSocket.
 
 **Loop pattern:** Java `pushCurrentStepOnStack() + setNextAction(NEXT_STEP)` → Rust `StepAction::Repeat`. The driver re-calls `start()` on the same step instance (same struct, same mutable fields). `StepAction::Continue` = waiting for user dialog.
 

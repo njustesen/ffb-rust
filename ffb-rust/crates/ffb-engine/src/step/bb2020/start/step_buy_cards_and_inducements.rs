@@ -15,27 +15,31 @@
 /// simultaneously: BuyInducements commands are buffered and applied in leaveStep().
 ///
 /// USE_PREDEFINED_INDUCEMENTS: skips dialog (predefined set application requires InducementTypeFactory — not ported).
-/// GameOptionId checks (INDUCEMENTS_ALWAYS_USE_TREASURY, CARDS_SPECIAL_PLAY_COST,
-///   MAX_NR_OF_CARDS, ALLOW_STAR_ON_BOTH_TEAMS, ALLOW_STAFF_ON_BOTH_TEAMS,
-///   INDUCEMENT_MERCENARIES_EXTRA_COST, INDUCEMENT_MERCENARIES_SKILL_COST) not wired (blocked by InducementTypeFactory).
 /// CardTypeFactory / CardDeck / card-choice randomisation — card system not ported.
-/// addStarPlayers — RosterPlayer creation + sendAddedPlayers not ported (blocked by InducementTypeFactory).
-/// addMercenaries — RosterPlayer mercenary creation / Loner skill injection not ported (blocked by InducementTypeFactory).
-/// addStaff — InfamousStaff RosterPlayer creation not ported (blocked by InducementTypeFactory).
-/// InducementTypeFactory cost calculation not ported; headless auto-skips all inducement buying.
+/// headless: BuyInducements action lacks star_player_position_ids / mercenary_position_ids —
+///   add_star_players / add_mercenaries / add_staff are implemented but require extended action fields.
 /// BriberyAndCorruption: adds 1 briberyAndCorruption inducement if team has the special rule.
 /// rerollOnesOnKOs: adds 1 bugmansXXXXXX inducement if any team player has canReRollOnesOnKORecovery.
 /// no-op: apply buffered buyInducementCommands in leaveStep — no commands in headless mode (no dialog).
 /// client-only: DialogBuyCardsAndInducementsParameter / CLIENT_SELECT_CARD_TO_BUY / CLIENT_BUY_INDUCEMENTS
 ///   dialog path — coaches interact via client; headless skips without buying.
-use ffb_model::enums::InducementPhase;
+use std::collections::HashMap;
+use ffb_model::data::loader::find_position;
+use ffb_model::enums::{InducementPhase, PlayerType, PlayerState, PS_RESERVE};
+use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
+use ffb_model::model::player::Player;
+use ffb_model::model::skill_def::{SkillId, SkillWithValue};
+use ffb_model::model::turn_data::TurnData;
+use ffb_model::util::util_box::UtilBox;
 use ffb_model::report::bb2020::report_cards_and_inducements_bought::ReportCardsAndInducementsBought;
 use ffb_model::report::mixed::report_bribery_and_corruption_re_roll::ReportBriberyAndCorruptionReRoll;
 use ffb_model::option::game_option_id::{
     INDUCEMENTS, FREE_INDUCEMENT_CASH, FREE_CARD_CASH,
     INDUCEMENTS_ALLOW_SPENDING_TREASURY_ON_EQUAL_CTV, INDUCEMENTS_ALLOW_OVERDOG_SPENDING,
     USE_PREDEFINED_INDUCEMENTS, INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG,
+    ALLOW_STAR_ON_BOTH_TEAMS, ALLOW_STAFF_ON_BOTH_TEAMS,
+    INDUCEMENT_MERCENARIES_EXTRA_COST, INDUCEMENT_MERCENARIES_SKILL_COST,
 };
 use ffb_model::option::util_game_option::{is_option_enabled, get_int_option};
 use ffb_model::util::rng::GameRng;
@@ -355,6 +359,273 @@ impl StepBuyCardsAndInducements {
         }
         out
     }
+
+    /// Java: `addStarPlayers(Team, String[] positionIds)` — creates new Star players from roster
+    /// positions and adds them to the team. Returns the cost sum for all added stars.
+    /// Removes any duplicate star from the opposing team if ALLOW_STAR_ON_BOTH_TEAMS is disabled.
+    ///
+    /// engine: GameEvent::PlayerAdded emitted (Phase ZT — requires method to propagate events).
+    /// no-op: ReportDoubleHiredStarPlayer — reports deferred.
+    fn add_star_players(&self, game: &mut Game, home: bool, position_ids: &[String]) -> i32 {
+        let mut sum = 0i32;
+        if position_ids.is_empty() { return sum; }
+
+        let team_id = if home { game.team_home.id.clone() } else { game.team_away.id.clone() };
+        let roster_id = if home { game.team_home.roster_id.clone() } else { game.team_away.roster_id.clone() };
+        let allow_both = is_option_enabled(game, ALLOW_STAR_ON_BOTH_TEAMS);
+
+        let other_star_by_name: HashMap<String, String> = {
+            let other = if home { &game.team_away } else { &game.team_home };
+            other.players.iter()
+                .filter(|p| p.player_type == PlayerType::Star)
+                .map(|p| (p.name.clone(), p.id.clone()))
+                .collect()
+        };
+
+        let mut to_add: Vec<Player> = Vec::new();
+        let mut removed_ids: Vec<String> = Vec::new();
+        let mut current_max_nr = {
+            let team = if home { &game.team_home } else { &game.team_away };
+            team.players.iter().map(|p| p.nr).max().unwrap_or(0)
+        };
+
+        for position_id in position_ids {
+            let position = match find_position(&roster_id, position_id, game.rules) {
+                Some(p) => p,
+                None => continue,
+            };
+            sum += position.cost;
+            if !allow_both {
+                if let Some(other_id) = other_star_by_name.get(&position.name) {
+                    removed_ids.push(other_id.clone());
+                    continue;
+                }
+            }
+            current_max_nr += 1;
+            let idx = to_add.len() + 1;
+            let mut player = Player::default();
+            player.id = format!("{}S{}", team_id, idx);
+            player.name = position.name.clone();
+            player.nr = current_max_nr;
+            player.position_id = position.id.clone();
+            player.player_type = PlayerType::Star;
+            player.movement = position.ma;
+            player.strength = position.st;
+            player.agility = position.ag;
+            player.passing = position.pa;
+            player.armour = position.av;
+            player.position_movement = position.ma;
+            player.position_strength = position.st;
+            player.position_agility = position.ag;
+            player.position_passing = position.pa;
+            player.position_armour = position.av;
+            player.starting_skills = position.skills.iter()
+                .filter_map(|e| SkillId::from_class_name(e.name()).map(|skill_id| SkillWithValue { skill_id, value: None }))
+                .collect();
+            to_add.push(player);
+        }
+
+        let removed_count = removed_ids.len() as i32;
+        for id in &removed_ids {
+            if home {
+                game.team_away.players.retain(|p| &p.id != id);
+            } else {
+                game.team_home.players.retain(|p| &p.id != id);
+            }
+            game.field_model.remove_player(id);
+            // no-op: server.getCommunication().sendRemovePlayer() — headless engine
+            // no-op: getResult().addReport(new ReportDoubleHiredStarPlayer(...)) — headless engine
+        }
+        if removed_count > 0 {
+            Self::remove_duplicate_player_inducements(&mut game.turn_data_home, removed_count, Usage::STAR);
+            Self::remove_duplicate_player_inducements(&mut game.turn_data_away, removed_count, Usage::STAR);
+        }
+
+        for player in to_add {
+            let player_id = player.id.clone();
+            if home { game.team_home.players.push(player); } else { game.team_away.players.push(player); }
+            game.field_model.set_player_state(&player_id, PlayerState::new(PS_RESERVE));
+            UtilBox::put_player_into_box(game, &player_id);
+        }
+        // engine: emit GameEvent::PlayerAdded per player (Phase ZT — requires method to propagate events)
+        sum
+    }
+
+    /// Java: `addMercenaries(Team, String[] positionIds, Skill[] skills)` — creates MERCENARY
+    /// players with the Loner skill and optional extra skills. Returns the cost sum.
+    ///
+    /// engine: GameEvent::PlayerAdded emitted (Phase ZT — requires method to propagate events).
+    fn add_mercenaries(&self, game: &mut Game, home: bool, position_ids: &[String], extra_skills: &[Option<SkillId>]) -> i32 {
+        let mut sum = 0i32;
+        if position_ids.is_empty() || extra_skills.is_empty() { return sum; }
+
+        let team_id = if home { game.team_home.id.clone() } else { game.team_away.id.clone() };
+        let roster_id = if home { game.team_home.roster_id.clone() } else { game.team_away.roster_id.clone() };
+        let extra_cost = get_int_option(game, INDUCEMENT_MERCENARIES_EXTRA_COST);
+        let skill_cost = get_int_option(game, INDUCEMENT_MERCENARIES_SKILL_COST);
+
+        let mut to_add: Vec<Player> = Vec::new();
+        let mut nr_by_pos: HashMap<String, i32> = HashMap::new();
+        let mut current_max_nr = {
+            let team = if home { &game.team_home } else { &game.team_away };
+            team.players.iter().map(|p| p.nr).max().unwrap_or(0)
+        };
+
+        for (i, position_id) in position_ids.iter().enumerate() {
+            let position = match find_position(&roster_id, position_id, game.rules) {
+                Some(p) => p,
+                None => continue,
+            };
+            sum += position.cost + extra_cost;
+            current_max_nr += 1;
+            let merc_nr = {
+                let entry = nr_by_pos.entry(position.id.clone()).or_insert(0);
+                *entry += 1;
+                *entry
+            };
+            let idx = to_add.len() + 1;
+            let mut player = Player::default();
+            player.id = format!("{}M{}", team_id, idx);
+            player.name = format!("Merc {} {}", position.name, merc_nr);
+            player.nr = current_max_nr;
+            player.position_id = position.id.clone();
+            player.player_type = PlayerType::Mercenary;
+            player.movement = position.ma;
+            player.strength = position.st;
+            player.agility = position.ag;
+            player.passing = position.pa;
+            player.armour = position.av;
+            player.position_movement = position.ma;
+            player.position_strength = position.st;
+            player.position_agility = position.ag;
+            player.position_passing = position.pa;
+            player.position_armour = position.av;
+            player.starting_skills = position.skills.iter()
+                .filter_map(|e| SkillId::from_class_name(e.name()).map(|skill_id| SkillWithValue { skill_id, value: None }))
+                .collect();
+            player.add_skill(SkillId::Loner);
+            if let Some(Some(skill)) = extra_skills.get(i) {
+                player.add_skill(*skill);
+                sum += skill_cost;
+            }
+            to_add.push(player);
+        }
+
+        for player in to_add {
+            let player_id = player.id.clone();
+            if home { game.team_home.players.push(player); } else { game.team_away.players.push(player); }
+            game.field_model.set_player_state(&player_id, PlayerState::new(PS_RESERVE));
+            UtilBox::put_player_into_box(game, &player_id);
+        }
+        // engine: emit GameEvent::PlayerAdded per player (Phase ZT — requires method to propagate events)
+        sum
+    }
+
+    /// Java: `addStaff(Team, List<String> positionIds)` — creates InfamousStaff players from
+    /// roster positions. Removes duplicate staff from the opposing team if ALLOW_STAFF_ON_BOTH_TEAMS
+    /// is disabled. Returns the cost sum.
+    ///
+    /// engine: GameEvent::PlayerAdded emitted (Phase ZT — requires method to propagate events).
+    /// no-op: ReportDoubleHiredStaff — reports deferred.
+    fn add_staff(&self, game: &mut Game, home: bool, position_ids: Vec<String>) -> i32 {
+        let mut sum = 0i32;
+        if position_ids.is_empty() { return sum; }
+
+        let team_id = if home { game.team_home.id.clone() } else { game.team_away.id.clone() };
+        let roster_id = if home { game.team_home.roster_id.clone() } else { game.team_away.roster_id.clone() };
+        let allow_both = is_option_enabled(game, ALLOW_STAFF_ON_BOTH_TEAMS);
+
+        let other_staff_by_name: HashMap<String, String> = {
+            let other = if home { &game.team_away } else { &game.team_home };
+            other.players.iter()
+                .filter(|p| p.player_type == PlayerType::InfamousStaff)
+                .map(|p| (p.name.clone(), p.id.clone()))
+                .collect()
+        };
+
+        let mut to_add: Vec<Player> = Vec::new();
+        let mut removed_ids: Vec<String> = Vec::new();
+        let mut current_max_nr = {
+            let team = if home { &game.team_home } else { &game.team_away };
+            team.players.iter().map(|p| p.nr).max().unwrap_or(0)
+        };
+
+        for position_id in &position_ids {
+            let position = match find_position(&roster_id, position_id, game.rules) {
+                Some(p) => p,
+                None => continue,
+            };
+            sum += position.cost;
+            if !allow_both {
+                if let Some(other_id) = other_staff_by_name.get(&position.name) {
+                    removed_ids.push(other_id.clone());
+                    continue;
+                }
+            }
+            current_max_nr += 1;
+            let idx = to_add.len() + 1;
+            let mut player = Player::default();
+            player.id = format!("{}I{}", team_id, idx);
+            player.name = position.name.clone();
+            player.nr = current_max_nr;
+            player.position_id = position.id.clone();
+            player.player_type = PlayerType::InfamousStaff;
+            player.movement = position.ma;
+            player.strength = position.st;
+            player.agility = position.ag;
+            player.passing = position.pa;
+            player.armour = position.av;
+            player.position_movement = position.ma;
+            player.position_strength = position.st;
+            player.position_agility = position.ag;
+            player.position_passing = position.pa;
+            player.position_armour = position.av;
+            player.starting_skills = position.skills.iter()
+                .filter_map(|e| SkillId::from_class_name(e.name()).map(|skill_id| SkillWithValue { skill_id, value: None }))
+                .collect();
+            to_add.push(player);
+        }
+
+        let removed_count = removed_ids.len() as i32;
+        for id in &removed_ids {
+            if home {
+                game.team_away.players.retain(|p| &p.id != id);
+            } else {
+                game.team_home.players.retain(|p| &p.id != id);
+            }
+            game.field_model.remove_player(id);
+            // no-op: server.getCommunication().sendRemovePlayer() — headless engine
+            // no-op: getResult().addReport(new ReportDoubleHiredStaff(...)) — headless engine
+        }
+        if removed_count > 0 {
+            Self::remove_duplicate_player_inducements(&mut game.turn_data_home, removed_count, Usage::STAFF);
+            Self::remove_duplicate_player_inducements(&mut game.turn_data_away, removed_count, Usage::STAFF);
+        }
+
+        for player in to_add {
+            let player_id = player.id.clone();
+            if home { game.team_home.players.push(player); } else { game.team_away.players.push(player); }
+            game.field_model.set_player_state(&player_id, PlayerState::new(PS_RESERVE));
+            UtilBox::put_player_into_box(game, &player_id);
+        }
+        // engine: emit GameEvent::PlayerAdded per player (Phase ZT — requires method to propagate events)
+        sum
+    }
+
+    /// Java: `removeDuplicatePlayerInducements(TurnData, int removed, Usage usage)` — reduces the
+    /// inducement count for the first matching usage; removes it if count reaches zero or below.
+    fn remove_duplicate_player_inducements(turn_data: &mut TurnData, removed: i32, usage: Usage) {
+        if let Some(type_id) = turn_data.inducement_set.for_usage(usage).map(|s| s.to_string()) {
+            let current = turn_data.inducement_set.get(&type_id).map_or(0, |i| i.get_value());
+            let new_val = current - removed;
+            if new_val <= 0 {
+                turn_data.inducement_set.remove_inducement(&type_id);
+            } else if let Some(mut ind) = turn_data.inducement_set.get(&type_id) {
+                ind.value = new_val;
+                turn_data.inducement_set.add_inducement(ind);
+            }
+        }
+    }
 }
 
 impl Default for StepBuyCardsAndInducements {
@@ -562,5 +833,235 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.report_list.has_report(ReportId::BRIBERY_AND_CORRUPTION_RE_ROLL),
             "team without BriberyAndCorruption must NOT add BRIBERY_AND_CORRUPTION_RE_ROLL report");
+    }
+
+    // ── add_star_players tests ─────────────────────────────────────────────────
+
+    fn bb2020_position_ids_for(roster_id: &str) -> Vec<String> {
+        use ffb_model::data::loader::bb2020_rosters;
+        bb2020_rosters()
+            .into_iter()
+            .find(|r| r.id == roster_id)
+            .map(|r| r.positions.into_iter()
+                .filter(|p| p.player_type == "Regular" || p.player_type == "Irregular")
+                .map(|p| p.id)
+                .collect())
+            .unwrap_or_default()
+    }
+
+    fn make_game_bb2020(roster_id: &str) -> Game {
+        use ffb_model::data::loader::bb2020_rosters;
+        let roster = bb2020_rosters().into_iter().find(|r| r.id == roster_id).unwrap();
+        let mut home = test_team("home", 0);
+        home.roster_id = roster.id.clone();
+        let mut away = test_team("away", 0);
+        away.roster_id = roster.id.clone();
+        Game::new(home, away, Rules::Bb2020)
+    }
+
+    #[test]
+    fn add_star_players_empty_returns_zero() {
+        let step = StepBuyCardsAndInducements::new();
+        let mut game = make_game();
+        let cost = step.add_star_players(&mut game, true, &[]);
+        assert_eq!(cost, 0);
+        assert_eq!(game.team_home.players.len(), 0);
+    }
+
+    #[test]
+    fn add_star_players_unknown_position_skipped() {
+        let step = StepBuyCardsAndInducements::new();
+        let mut game = make_game_bb2020("human.lrb6");
+        let cost = step.add_star_players(&mut game, true, &["NONEXISTENT".to_string()]);
+        assert_eq!(cost, 0);
+        assert_eq!(game.team_home.players.len(), 0);
+    }
+
+    #[test]
+    fn add_star_players_adds_star_player_type() {
+        let step = StepBuyCardsAndInducements::new();
+        let roster_id = "human.lrb6";
+        let pos_ids = bb2020_position_ids_for(roster_id);
+        let mut game = make_game_bb2020(roster_id);
+        let id = pos_ids[0].clone();
+        step.add_star_players(&mut game, true, &[id]);
+        assert_eq!(game.team_home.players.len(), 1);
+        assert_eq!(game.team_home.players[0].player_type, PlayerType::Star);
+    }
+
+    #[test]
+    fn add_star_players_id_uses_team_prefix_s() {
+        let step = StepBuyCardsAndInducements::new();
+        let roster_id = "human.lrb6";
+        let pos_ids = bb2020_position_ids_for(roster_id);
+        let mut game = make_game_bb2020(roster_id);
+        step.add_star_players(&mut game, true, &[pos_ids[0].clone()]);
+        assert!(game.team_home.players[0].id.starts_with("home"),
+            "player id must start with team id 'home'");
+        assert!(game.team_home.players[0].id.contains('S'),
+            "player id must contain 'S' for Star");
+    }
+
+    #[test]
+    fn add_star_players_returns_position_cost() {
+        use ffb_model::data::loader::bb2020_rosters;
+        let step = StepBuyCardsAndInducements::new();
+        let roster_id = "human.lrb6";
+        let pos_ids = bb2020_position_ids_for(roster_id);
+        let mut game = make_game_bb2020(roster_id);
+        let pos_cost = bb2020_rosters().into_iter()
+            .find(|r| r.id == roster_id).unwrap()
+            .positions.into_iter()
+            .find(|p| p.id == pos_ids[0]).unwrap()
+            .cost;
+        let cost = step.add_star_players(&mut game, true, &[pos_ids[0].clone()]);
+        assert_eq!(cost, pos_cost);
+    }
+
+    #[test]
+    fn add_star_players_copies_stats_from_position() {
+        use ffb_model::data::loader::bb2020_rosters;
+        let step = StepBuyCardsAndInducements::new();
+        let roster_id = "human.lrb6";
+        let pos_ids = bb2020_position_ids_for(roster_id);
+        let mut game = make_game_bb2020(roster_id);
+        let pos = bb2020_rosters().into_iter()
+            .find(|r| r.id == roster_id).unwrap()
+            .positions.into_iter()
+            .find(|p| p.id == pos_ids[0]).unwrap();
+        step.add_star_players(&mut game, true, &[pos_ids[0].clone()]);
+        let p = &game.team_home.players[0];
+        assert_eq!(p.movement, pos.ma);
+        assert_eq!(p.strength, pos.st);
+        assert_eq!(p.agility, pos.ag);
+    }
+
+    #[test]
+    fn add_star_players_placed_in_reserve() {
+        let step = StepBuyCardsAndInducements::new();
+        let roster_id = "human.lrb6";
+        let pos_ids = bb2020_position_ids_for(roster_id);
+        let mut game = make_game_bb2020(roster_id);
+        step.add_star_players(&mut game, true, &[pos_ids[0].clone()]);
+        let player_id = &game.team_home.players[0].id;
+        let state = game.field_model.player_state(player_id);
+        assert!(state.is_some(), "player must be placed in field_model");
+    }
+
+    // ── add_mercenaries tests ──────────────────────────────────────────────────
+
+    #[test]
+    fn add_mercenaries_empty_returns_zero() {
+        let step = StepBuyCardsAndInducements::new();
+        let mut game = make_game();
+        let cost = step.add_mercenaries(&mut game, true, &[], &[]);
+        assert_eq!(cost, 0);
+        assert_eq!(game.team_home.players.len(), 0);
+    }
+
+    #[test]
+    fn add_mercenaries_adds_loner_skill() {
+        let step = StepBuyCardsAndInducements::new();
+        let roster_id = "human.lrb6";
+        let pos_ids = bb2020_position_ids_for(roster_id);
+        let mut game = make_game_bb2020(roster_id);
+        step.add_mercenaries(&mut game, true, &[pos_ids[0].clone()], &[None]);
+        assert_eq!(game.team_home.players.len(), 1);
+        assert!(game.team_home.players[0].has_skill(SkillId::Loner),
+            "mercenary must have Loner skill");
+    }
+
+    #[test]
+    fn add_mercenaries_player_type_is_mercenary() {
+        let step = StepBuyCardsAndInducements::new();
+        let roster_id = "human.lrb6";
+        let pos_ids = bb2020_position_ids_for(roster_id);
+        let mut game = make_game_bb2020(roster_id);
+        step.add_mercenaries(&mut game, true, &[pos_ids[0].clone()], &[None]);
+        assert_eq!(game.team_home.players[0].player_type, PlayerType::Mercenary);
+    }
+
+    #[test]
+    fn add_mercenaries_with_extra_skill_adds_it() {
+        let step = StepBuyCardsAndInducements::new();
+        let roster_id = "human.lrb6";
+        let pos_ids = bb2020_position_ids_for(roster_id);
+        let mut game = make_game_bb2020(roster_id);
+        step.add_mercenaries(&mut game, true, &[pos_ids[0].clone()], &[Some(SkillId::Dodge)]);
+        let p = &game.team_home.players[0];
+        assert!(p.has_skill(SkillId::Loner), "must have Loner");
+        assert!(p.has_skill(SkillId::Dodge), "must have extra skill Dodge");
+    }
+
+    #[test]
+    fn add_mercenaries_extra_cost_option_applied() {
+        use ffb_model::option::game_option_id::INDUCEMENT_MERCENARIES_EXTRA_COST;
+        let roster_id = "human.lrb6";
+        let pos_ids = bb2020_position_ids_for(roster_id);
+        let mut game = make_game_bb2020(roster_id);
+        game.options.set(INDUCEMENT_MERCENARIES_EXTRA_COST, "30000");
+        let step = StepBuyCardsAndInducements::new();
+        use ffb_model::data::loader::bb2020_rosters;
+        let pos_cost = bb2020_rosters().into_iter()
+            .find(|r| r.id == roster_id).unwrap()
+            .positions.into_iter()
+            .find(|p| p.id == pos_ids[0]).unwrap()
+            .cost;
+        let cost = step.add_mercenaries(&mut game, true, &[pos_ids[0].clone()], &[None]);
+        assert_eq!(cost, pos_cost + 30_000);
+    }
+
+    // ── add_staff tests ────────────────────────────────────────────────────────
+
+    #[test]
+    fn add_staff_empty_returns_zero() {
+        let step = StepBuyCardsAndInducements::new();
+        let mut game = make_game();
+        let cost = step.add_staff(&mut game, true, vec![]);
+        assert_eq!(cost, 0);
+        assert_eq!(game.team_home.players.len(), 0);
+    }
+
+    #[test]
+    fn add_staff_unknown_position_skipped() {
+        let step = StepBuyCardsAndInducements::new();
+        let mut game = make_game_bb2020("human.lrb6");
+        let cost = step.add_staff(&mut game, true, vec!["NONEXISTENT".to_string()]);
+        assert_eq!(cost, 0);
+        assert_eq!(game.team_home.players.len(), 0);
+    }
+
+    #[test]
+    fn add_staff_adds_infamous_staff_type() {
+        let step = StepBuyCardsAndInducements::new();
+        let roster_id = "human.lrb6";
+        let pos_ids = bb2020_position_ids_for(roster_id);
+        let mut game = make_game_bb2020(roster_id);
+        step.add_staff(&mut game, true, vec![pos_ids[0].clone()]);
+        assert_eq!(game.team_home.players.len(), 1);
+        assert_eq!(game.team_home.players[0].player_type, PlayerType::InfamousStaff);
+    }
+
+    #[test]
+    fn add_staff_id_uses_team_prefix_i() {
+        let step = StepBuyCardsAndInducements::new();
+        let roster_id = "human.lrb6";
+        let pos_ids = bb2020_position_ids_for(roster_id);
+        let mut game = make_game_bb2020(roster_id);
+        step.add_staff(&mut game, true, vec![pos_ids[0].clone()]);
+        let player_id = &game.team_home.players[0].id;
+        assert!(player_id.starts_with("home"), "id must start with team id");
+        assert!(player_id.contains('I'), "id must contain 'I' for InfamousStaff");
+    }
+
+    // ── remove_duplicate_player_inducements tests ──────────────────────────────
+
+    #[test]
+    fn remove_duplicate_player_inducements_no_op_when_not_present() {
+        let mut game = make_game();
+        // Should not panic when no inducement with STAR usage is present.
+        StepBuyCardsAndInducements::remove_duplicate_player_inducements(
+            &mut game.turn_data_home, 1, Usage::STAR,
+        );
     }
 }

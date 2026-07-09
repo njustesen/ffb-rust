@@ -189,10 +189,12 @@ impl StepPickUp {
             if let Some(player) = game.player(pid) {
                 let ctx = PickupContext::new(game, player);
                 let mods = factory.find_applicable(&ctx);
+                let skill_mods = factory.find_skill_modifiers(&ctx);
+                let all: Vec<&ffb_mechanics::modifiers::pickup_modifier::PickupModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
                 // Java: secureTheBall uses fixed agility 2; otherwise player agility
                 let effective_agility = if self.secure_the_ball { 2 } else { player.agility as i32 };
-                let min = PickupModifierFactory::minimum_roll(effective_agility, &mods);
-                let names: Vec<String> = mods.iter().map(|m| m.get_report_string().to_string()).collect();
+                let min = PickupModifierFactory::minimum_roll(effective_agility, &all);
+                let names: Vec<String> = all.iter().map(|m| m.get_report_string().to_string()).collect();
                 (min, names)
             } else {
                 (2, vec![])

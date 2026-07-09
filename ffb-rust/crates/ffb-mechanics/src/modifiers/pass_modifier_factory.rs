@@ -1,4 +1,4 @@
-use ffb_model::enums::{Rules, TurnMode};
+use ffb_model::enums::{PassingDistance, Rules, SkillId, TurnMode};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::util_disturbing_presence::UtilDisturbingPresence;
 use ffb_model::util::util_player::UtilPlayer;
@@ -120,6 +120,44 @@ impl PassModifierFactory {
         zones
     }
 
+    /// Returns skill-based pass modifiers for the thrower.
+    /// 1:1 translation of GenerifiedModifierFactory skill iteration for PassModifierFactory.
+    ///
+    /// Java: skills iterate their registered PassModifiers; applicable ones are included.
+    pub fn find_skill_modifiers(&self, context: &PassContext<'_>) -> Vec<PassModifier> {
+        let rules = context.game.rules;
+        let player = context.player;
+        let mut result = Vec::new();
+        for skill_id in player.all_skill_ids() {
+            match skill_id {
+                SkillId::Accurate if rules == Rules::Bb2016 => {
+                    // Java: bb2016.Accurate registers PassModifier("Accurate", -1, REGULAR).
+                    result.push(PassModifier::new("Accurate", -1, ModifierType::REGULAR));
+                }
+                SkillId::StrongArm if rules == Rules::Bb2016 => {
+                    // Java: bb2016.StrongArm registers PassModifier("Strong Arm", -1, REGULAR)
+                    // with predicate: distance != QUICK_PASS.
+                    if context.distance != PassingDistance::QuickPass {
+                        result.push(PassModifier::new("Strong Arm", -1, ModifierType::REGULAR));
+                    }
+                }
+                SkillId::ThrowTeamMate if rules == Rules::Bb2016 => {
+                    // Java: bb2016.ThrowTeamMate registers PassModifier("Throw Team-Mate", +1, REGULAR)
+                    // with predicate: context.isTtm().
+                    if context.ttm {
+                        result.push(PassModifier::new("Throw Team-Mate", 1, ModifierType::REGULAR));
+                    }
+                }
+                SkillId::Stunty if rules == Rules::Bb2016 => {
+                    // Java: bb2016.Stunty registers PassModifier("Stunty", +1, REGULAR) — penalty.
+                    result.push(PassModifier::new("Stunty", 1, ModifierType::REGULAR));
+                }
+                _ => {}
+            }
+        }
+        result
+    }
+
     /// Compute the pass minimum roll from the thrower and applicable modifiers.
     /// 1:1 translation of PassMechanic.minimumRoll (BB2025): max(2, passing + distance + sum(modifiers)).
     pub fn minimum_roll(passing: i32, distance_modifier: i32, modifiers: &[&PassModifier]) -> Option<i32> {
@@ -140,7 +178,7 @@ impl Default for PassModifierFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffb_model::enums::{Rules, Weather, PS_STANDING, PlayerState, PlayerType, PlayerGender, PassingDistance};
+    use ffb_model::enums::{Rules, SkillId, Weather, PS_STANDING, PlayerState, PlayerType, PlayerGender, PassingDistance};
     use ffb_model::model::{Game, Player, Team};
     use crate::modifiers::pass_context::PassContext;
 
@@ -238,5 +276,68 @@ mod tests {
     fn bb2016_has_blizzard_modifier() {
         let factory = PassModifierFactory::for_rules(Rules::Bb2016);
         assert!(factory.for_name("Blizzard").is_some(), "BB2016 should have Blizzard modifier");
+    }
+
+    fn player_with_skill(id: &str, skill_id: SkillId, passing: i32) -> Player {
+        use ffb_model::model::SkillWithValue;
+        let mut p = minimal_player(id, passing);
+        p.starting_skills.push(SkillWithValue::new(skill_id));
+        p
+    }
+
+    #[test]
+    fn find_skill_modifiers_accurate_applies_in_bb2016() {
+        let g = make_game(Rules::Bb2016, Weather::Nice);
+        let p = player_with_skill("h1", SkillId::Accurate, 4);
+        let factory = PassModifierFactory::for_rules(Rules::Bb2016);
+        let ctx = PassContext::new(&g, &p, PassingDistance::ShortPass, false);
+        let mods = factory.find_skill_modifiers(&ctx);
+        assert!(mods.iter().any(|m| m.get_name() == "Accurate"));
+        assert_eq!(mods.iter().find(|m| m.get_name() == "Accurate").unwrap().get_modifier(), -1);
+    }
+
+    #[test]
+    fn find_skill_modifiers_accurate_not_in_bb2025() {
+        let g = make_game(Rules::Bb2025, Weather::Nice);
+        let p = player_with_skill("h1", SkillId::Accurate, 4);
+        let factory = PassModifierFactory::for_rules(Rules::Bb2025);
+        let ctx = PassContext::new(&g, &p, PassingDistance::ShortPass, false);
+        let mods = factory.find_skill_modifiers(&ctx);
+        assert!(!mods.iter().any(|m| m.get_name() == "Accurate"), "Accurate should not appear in BB2025");
+    }
+
+    #[test]
+    fn find_skill_modifiers_strong_arm_no_quick_pass() {
+        let g = make_game(Rules::Bb2016, Weather::Nice);
+        let p = player_with_skill("h1", SkillId::StrongArm, 4);
+        let factory = PassModifierFactory::for_rules(Rules::Bb2016);
+        let ctx_short = PassContext::new(&g, &p, PassingDistance::ShortPass, false);
+        let ctx_quick = PassContext::new(&g, &p, PassingDistance::QuickPass, false);
+        assert!(factory.find_skill_modifiers(&ctx_short).iter().any(|m| m.get_name() == "Strong Arm"));
+        assert!(!factory.find_skill_modifiers(&ctx_quick).iter().any(|m| m.get_name() == "Strong Arm"),
+            "Strong Arm should not apply on Quick Pass");
+    }
+
+    #[test]
+    fn find_skill_modifiers_throw_team_mate_only_on_ttm() {
+        let g = make_game(Rules::Bb2016, Weather::Nice);
+        let p = player_with_skill("h1", SkillId::ThrowTeamMate, 4);
+        let factory = PassModifierFactory::for_rules(Rules::Bb2016);
+        let ctx_ttm = PassContext::new(&g, &p, PassingDistance::ShortPass, true);
+        let ctx_normal = PassContext::new(&g, &p, PassingDistance::ShortPass, false);
+        assert!(factory.find_skill_modifiers(&ctx_ttm).iter().any(|m| m.get_name() == "Throw Team-Mate"));
+        assert!(!factory.find_skill_modifiers(&ctx_normal).iter().any(|m| m.get_name() == "Throw Team-Mate"));
+    }
+
+    #[test]
+    fn find_skill_modifiers_stunty_penalty_in_bb2016() {
+        let g = make_game(Rules::Bb2016, Weather::Nice);
+        let p = player_with_skill("h1", SkillId::Stunty, 4);
+        let factory = PassModifierFactory::for_rules(Rules::Bb2016);
+        let ctx = PassContext::new(&g, &p, PassingDistance::ShortPass, false);
+        let mods = factory.find_skill_modifiers(&ctx);
+        let stunty = mods.iter().find(|m| m.get_name() == "Stunty");
+        assert!(stunty.is_some(), "Stunty pass penalty should apply in BB2016");
+        assert_eq!(stunty.unwrap().get_modifier(), 1, "Stunty is a penalty (+1)");
     }
 }

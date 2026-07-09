@@ -1,13 +1,23 @@
+/// 1:1 translation of com.fumbbl.ffb.server.skillbehaviour.bb2020.PilingOnBehaviour.
+///
+/// PilingOn also exists in BB2020 (inherited from BB2016). The step modifier hooks into
+/// StepDropFallingPlayers. Full logic is deferred until StepDropFallingPlayersHookState is ported.
 use crate::skill_behaviour::SkillBehaviour;
+use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
+use crate::skill_behaviour::registry::SkillRegistry;
+use ffb_model::enums::SkillId;
 
-/// BB2020 PilingOn skill behaviour. StepModifier on StepDropFallingPlayers: after knockdown checks
-/// if PilingOn player can re-roll injury, shows dialog, rolls 2+, handles Brawler reroll and
-/// WeepingDagger interaction. Mirrors Java
-/// `com.fumbbl.ffb.server.skillbehaviour.bb2020.PilingOnBehaviour`.
 pub struct PilingOnBehaviour;
 
 impl PilingOnBehaviour {
     pub fn new() -> Self { Self }
+
+    /// Register PilingOn into the BB2020 skill registry.
+    /// No step modifier yet — full logic deferred until StepDropFallingPlayersHookState is ported.
+    pub fn register_into(registry: &mut SkillRegistry) {
+        let sb = SbContainer::new();
+        registry.register(SkillId::PilingOn, sb);
+    }
 }
 
 impl Default for PilingOnBehaviour {
@@ -31,28 +41,30 @@ impl SkillBehaviour for PilingOnBehaviour {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ffb_model::enums::Rules;
+    use crate::step::framework::test_team;
+    use ffb_model::model::game::Game;
 
-    #[test]
-    fn hook_is_noop_returns_false() {
-        // Without step infra the hook always returns false.
-        let b = PilingOnBehaviour::new();
-        assert_eq!(b.name(), "PilingOnBehaviour");
+    fn test_game() -> Game {
+        let home = test_team("home", 0);
+        let away = test_team("away", 0);
+        Game::new(home, away, Rules::Bb2020)
     }
 
     #[test]
     fn name_is_correct() {
-        let b = PilingOnBehaviour::default();
-        assert_eq!(b.name(), "PilingOnBehaviour");
+        assert_eq!(PilingOnBehaviour::new().name(), "PilingOnBehaviour");
+    }
+
+    #[test]
+    fn name_is_not_empty() {
+        assert!(!PilingOnBehaviour::new().name().is_empty());
     }
 
     #[test]
     fn execute_step_hook_returns_false() {
-        use ffb_model::enums::Rules;
-        use crate::step::framework::test_team;
         let b = PilingOnBehaviour::new();
-        let mut game = ffb_model::model::game::Game::new(
-            test_team("home", 0), test_team("away", 0), Rules::Bb2020,
-        );
+        let mut game = test_game();
         assert!(!b.execute_step_hook(&mut game));
     }
 
@@ -66,5 +78,14 @@ mod tests {
         b.apply_modifier(&mut player, &pos);
         assert_eq!(player.movement, movement_before);
     }
-#[test]    fn name_is_not_empty() {        assert!(!PilingOnBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2020() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = PilingOnBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2020,        );        assert!(!b.execute_step_hook(&mut game));    }
+
+    #[test]
+    fn register_into_registers_piling_on_skill() {
+        let mut reg = SkillRegistry::empty();
+        PilingOnBehaviour::register_into(&mut reg);
+        let sb = reg.get(SkillId::PilingOn).expect("PilingOn must be registered");
+        // No step modifier yet — deferred until StepDropFallingPlayersHookState is ported
+        assert_eq!(sb.get_step_modifiers().len(), 0,
+            "PilingOn step modifier stub: no modifiers until hook infra is ported");
+    }
 }

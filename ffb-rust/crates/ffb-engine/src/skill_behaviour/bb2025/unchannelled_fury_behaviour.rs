@@ -1,4 +1,6 @@
 use crate::skill_behaviour::SkillBehaviour;
+use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
+use crate::skill_behaviour::registry::SkillRegistry;
 use ffb_model::enums::SkillId;
 
 /// Unchannelled Fury: if the player fails a Bone Head roll they must block an adjacent player.
@@ -6,6 +8,11 @@ pub struct UnchannelledFuryBehaviour;
 
 impl UnchannelledFuryBehaviour {
     pub fn new() -> Self { Self }
+
+    pub fn register_into(registry: &mut SkillRegistry) {
+        let sb = SbContainer::new();
+        registry.register(SkillId::UnchannelledFury, sb);
+    }
 }
 
 impl Default for UnchannelledFuryBehaviour {

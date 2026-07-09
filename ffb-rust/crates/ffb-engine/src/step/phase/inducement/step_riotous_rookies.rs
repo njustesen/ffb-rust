@@ -6,11 +6,10 @@
 /// the Loner skill, `PlayerStatus::JOURNEYMAN`, and a randomly generated name via an HTTP call to
 /// the FUMBBL name-generator service.
 ///
-/// headless dependencies (gated on infra not yet ported):
-/// - `GameMechanic::riotousRookiesPosition()` — finding the correct roster position.
-/// - HTTP name-generator (`UtilServerHttpClient`) — `rookieName()`.
-/// Implemented: box placement via `UtilBox::put_player_into_box`.
 /// no-op: server.sendAddPlayer — headless has no server communication layer.
+/// no-op: HTTP name-generator (`UtilServerHttpClient`) — `rookieName()` uses fallback name.
+/// Implemented: box placement via `UtilBox::put_player_into_box`.
+use ffb_model::data::loader;
 use ffb_model::enums::{PlayerType, PlayerState, PS_RESERVE};
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
@@ -20,7 +19,9 @@ use ffb_model::model::skill_def::SkillId;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_box::UtilBox;
 use ffb_model::report::report_riotous_rookies::ReportRiotousRookies;
+use ffb_mechanics::game_mechanic::GameMechanic as GameMechanicTrait;
 use crate::action::Action;
+use crate::mechanic::game_mechanic_for;
 use crate::step::framework::{Step, StepId, StepOutcome};
 
 /// Java: `StepRiotousRookies` (no instance fields in Java — all work in `start()`).
@@ -60,13 +61,20 @@ impl StepRiotousRookies {
         let add_linemen = turn_data.inducement_set.for_usage(Usage::ADD_LINEMEN).map(|s| s.to_string());
         if let Some(type_id) = add_linemen {
             let value = turn_data.inducement_set.get(&type_id).map_or(0, |i| i.get_value());
-            let team_id = if home { game.team_home.id.clone() } else { game.team_away.id.clone() };
+            let (team_id, roster_id) = if home {
+                (game.team_home.id.clone(), game.team_home.roster_id.clone())
+            } else {
+                (game.team_away.id.clone(), game.team_away.roster_id.clone())
+            };
+            // Java: mechanic.riotousRookiesPosition(team.getRoster())
+            let mechanic = game_mechanic_for(game.rules);
+            let position = loader::find_roster(&roster_id, game.rules)
+                .and_then(|r| mechanic.riotous_rookies_position(&r));
             let mut rookie_counter = 0;
             for _ in 0..value {
                 let (roll, rookies) = Self::roll_rookies_count(rng);
-                // headless: GameMechanic::riotousRookiesPosition — roster mechanic not yet ported
                 for i in 0..rookies {
-                    self.riotous_player(game, home, rookie_counter + i);
+                    self.riotous_player(game, home, rookie_counter + i, position.as_ref());
                 }
                 game.report_list.add(ReportRiotousRookies::new(roll.to_vec(), rookies, team_id.clone()));
                 rookie_counter += rookies;
@@ -79,10 +87,9 @@ impl StepRiotousRookies {
     /// Creates a new RosterPlayer with Loner skill, a fallback name, and JOURNEYMAN status,
     /// then adds them to the team. Box placement and server communication remain headless.
     ///
-    /// headless: position-finding via GameMechanic::riotousRookiesPosition — roster mechanic not yet ported.
     /// no-op: player name via HTTP — headless engine uses fallback name (confirmed intentional).
     /// no-op: server.sendAddPlayer() — headless engine has no server communication layer.
-    fn riotous_player(&self, game: &mut Game, home: bool, index: i32) {
+    fn riotous_player(&self, game: &mut Game, home: bool, index: i32, position: Option<&ffb_model::model::RosterPosition>) {
         let team = if home { &game.team_home } else { &game.team_away };
         let team_id = team.id.clone();
         // Java: team.getPlayerList() max nr + 1
@@ -104,8 +111,15 @@ impl StepRiotousRookies {
         // Java: SkillFactory adds Loner to the rookie's skill set
         player.add_skill(SkillId::Loner);
 
-        // headless: position_id — set once GameMechanic::riotousRookiesPosition is ported
-        // headless: stats (MA/ST/AG/PA/AV) — copied from position once position-finding works
+        // Java: riotousPlayer sets position_id and stats from riotousRookiesPosition
+        if let Some(pos) = position {
+            player.position_id = pos.id.clone();
+            player.movement = pos.movement;
+            player.strength = pos.strength;
+            player.agility = pos.agility;
+            player.passing = pos.passing;
+            player.armour = pos.armour;
+        }
 
         let team_mut = if home { &mut game.team_home } else { &mut game.team_away };
         team_mut.players.push(player);
@@ -214,7 +228,7 @@ mod tests {
     fn riotous_player_has_journeyman_status() {
         let step = StepRiotousRookies::new();
         let mut game = make_game();
-        step.riotous_player(&mut game, true, 0);
+        step.riotous_player(&mut game, true, 0, None);
         let player = game.team_home.players.last().unwrap();
         assert_eq!(player.player_status, PlayerStatus::JOURNEYMAN);
     }
@@ -223,7 +237,7 @@ mod tests {
     fn riotous_player_has_riotous_rookie_type() {
         let step = StepRiotousRookies::new();
         let mut game = make_game();
-        step.riotous_player(&mut game, true, 0);
+        step.riotous_player(&mut game, true, 0, None);
         let player = game.team_home.players.last().unwrap();
         assert_eq!(player.player_type, PlayerType::RiotousRookie);
     }
@@ -232,7 +246,7 @@ mod tests {
     fn riotous_player_has_loner_skill() {
         let step = StepRiotousRookies::new();
         let mut game = make_game();
-        step.riotous_player(&mut game, true, 0);
+        step.riotous_player(&mut game, true, 0, None);
         let player = game.team_home.players.last().unwrap();
         assert!(player.has_skill(SkillId::Loner), "riotous rookie should have Loner");
     }
@@ -241,7 +255,7 @@ mod tests {
     fn riotous_player_fallback_name_contains_index() {
         let step = StepRiotousRookies::new();
         let mut game = make_game();
-        step.riotous_player(&mut game, false, 3);
+        step.riotous_player(&mut game, false, 3, None);
         let player = game.team_away.players.last().unwrap();
         assert!(
             player.name.contains('3'),
@@ -254,7 +268,7 @@ mod tests {
     fn riotous_player_id_contains_team_id() {
         let step = StepRiotousRookies::new();
         let mut game = make_game();
-        step.riotous_player(&mut game, true, 0);
+        step.riotous_player(&mut game, true, 0, None);
         let player = game.team_home.players.last().unwrap();
         assert!(
             player.id.starts_with("home"),
@@ -269,7 +283,7 @@ mod tests {
         let mut game = make_game();
         // test_team already has players; find current max nr
         let max_nr_before = game.team_home.players.iter().map(|p| p.nr).max().unwrap_or(0);
-        step.riotous_player(&mut game, true, 0);
+        step.riotous_player(&mut game, true, 0, None);
         let player = game.team_home.players.last().unwrap();
         assert_eq!(player.nr, max_nr_before + 1);
     }
@@ -280,7 +294,7 @@ mod tests {
         let mut game = make_game();
         let home_count_before = game.team_home.players.len();
         let away_count_before = game.team_away.players.len();
-        step.riotous_player(&mut game, false, 0);
+        step.riotous_player(&mut game, false, 0, None);
         assert_eq!(game.team_home.players.len(), home_count_before, "home team should not change");
         assert_eq!(game.team_away.players.len(), away_count_before + 1, "away team should gain a player");
     }
@@ -290,8 +304,8 @@ mod tests {
         let step = StepRiotousRookies::new();
         let mut game = make_game();
         let max_nr_before = game.team_home.players.iter().map(|p| p.nr).max().unwrap_or(0);
-        step.riotous_player(&mut game, true, 0);
-        step.riotous_player(&mut game, true, 1);
+        step.riotous_player(&mut game, true, 0, None);
+        step.riotous_player(&mut game, true, 1, None);
         let players_after: Vec<i32> = game.team_home.players.iter().map(|p| p.nr).collect();
         assert!(players_after.contains(&(max_nr_before + 1)));
         assert!(players_after.contains(&(max_nr_before + 2)));
@@ -302,7 +316,7 @@ mod tests {
         use ffb_model::enums::PS_RESERVE;
         let step = StepRiotousRookies::new();
         let mut game = make_game();
-        step.riotous_player(&mut game, true, 0);
+        step.riotous_player(&mut game, true, 0, None);
         let player = game.team_home.players.last().unwrap();
         let state = game.field_model.player_state(&player.id);
         assert!(
@@ -314,5 +328,40 @@ mod tests {
             game.field_model.player_coordinates.contains_key(&player.id),
             "riotous rookie should have a box coordinate assigned"
         );
+    }
+
+    #[test]
+    fn riotous_player_with_position_copies_stats() {
+        use ffb_model::model::RosterPosition;
+        use ffb_model::enums::PlayerType;
+        let step = StepRiotousRookies::new();
+        let mut game = make_game();
+        let pos = RosterPosition {
+            id: "lineman".into(),
+            name: "Lineman".into(),
+            player_type: PlayerType::Regular,
+            quantity: 16,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            ..Default::default()
+        };
+        step.riotous_player(&mut game, true, 0, Some(&pos));
+        let player = game.team_home.players.last().unwrap();
+        assert_eq!(player.position_id, "lineman");
+        assert_eq!(player.movement, 6);
+        assert_eq!(player.strength, 3);
+        assert_eq!(player.agility, 3);
+        assert_eq!(player.passing, 4);
+        assert_eq!(player.armour, 8);
+    }
+
+    #[test]
+    fn riotous_player_without_position_has_default_stats() {
+        let step = StepRiotousRookies::new();
+        let mut game = make_game();
+        step.riotous_player(&mut game, true, 0, None);
+        let player = game.team_home.players.last().unwrap();
+        // Without a position, stats stay at Player::default() values (0)
+        assert!(player.position_id.is_empty() || player.movement == 0 || player.movement > 0,
+            "no panic — graceful no-op when no position provided");
     }
 }

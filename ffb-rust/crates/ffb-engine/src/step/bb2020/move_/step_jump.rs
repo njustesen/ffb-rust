@@ -123,8 +123,12 @@ impl StepJump {
                 let ctx = JumpContext::new(game, player, from, to);
                 let factory = JumpModifierFactory::for_rules(game.rules);
                 let mods = factory.find_applicable(&ctx);
-                let total: i32 = mods.iter().map(|m| m.get_modifier()).sum();
-                let names: Vec<String> = mods.iter().map(|m| m.get_report_string().to_owned()).collect();
+                let accumulated: i32 = mods.iter().map(|m| m.get_modifier()).sum();
+                let count = mods.len() as i32;
+                let skill_mods = factory.find_skill_modifiers(&ctx, accumulated, count);
+                let all: Vec<&ffb_mechanics::modifiers::jump_modifier::JumpModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
+                let total: i32 = all.iter().map(|m| m.get_modifier()).sum();
+                let names: Vec<String> = all.iter().map(|m| m.get_report_string().to_owned()).collect();
                 (total, names)
             } else { (0, vec![]) }
         } else { (0, vec![]) };

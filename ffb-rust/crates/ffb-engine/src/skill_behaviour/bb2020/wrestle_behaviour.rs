@@ -1,12 +1,30 @@
 use crate::skill_behaviour::SkillBehaviour;
 
-/// BB2020 Wrestle skill behaviour. StepModifier on StepBlock: if attacker has Wrestle and block
-/// would make attacker prone, may use Wrestle to make both players prone instead. Mirrors Java
-/// `com.fumbbl.ffb.server.skillbehaviour.bb2020.WrestleBehaviour`.
+/// BB2020 Wrestle skill behaviour.
+///
+/// Mirrors Java `com.fumbbl.ffb.server.skillbehaviour.bb2020.WrestleBehaviour`.
+///
+/// **BB2020 vs BB2025 difference:**
+///
+/// BB2025 publishes a `REVERT_END_TURN = true` step parameter when the Wrestle user (attacker)
+/// has the ball:
+/// ```java
+/// if (UtilPlayer.hasBall(game, actingPlayer.getPlayer())) {
+///     step.publishParameter(StepParameter.from(StepParameterKey.REVERT_END_TURN, true));
+/// }
+/// ```
+/// This reverts the end-of-turn state when the ball carrier wrestles (preventing accidental
+/// turn-end state pollution). BB2020 does not have this parameter.
 pub struct WrestleBehaviour;
 
 impl WrestleBehaviour {
     pub fn new() -> Self { Self }
+
+    /// Returns `true` when `REVERT_END_TURN = true` should be published if the Wrestle user has
+    /// the ball (BB2025 feature). BB2020 always returns `false`.
+    pub fn publish_revert_end_turn_when_attacker_has_ball_bb2020() -> bool {
+        false
+    }
 }
 
 impl Default for WrestleBehaviour {
@@ -16,12 +34,8 @@ impl Default for WrestleBehaviour {
 impl SkillBehaviour for WrestleBehaviour {
     fn name(&self) -> &'static str { "WrestleBehaviour" }
 
-    /// Java `StepModifier<StepBlock, StepState>.handleExecuteStepHook`: if attacker has Wrestle
-    /// and block would make attacker prone, may use Wrestle to make both players prone instead.
-    /// Returns false always.
-    /// TODO(hook-infra): needs block step state, both-down result check.
+    /// TODO(hook-infra): step-specific state access not yet wired.
     fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
-        // TODO(hook-infra): step-specific state access (StepState.xxx)
         false
     }
 }
@@ -30,17 +44,24 @@ impl SkillBehaviour for WrestleBehaviour {
 mod tests {
     use super::*;
 
+    /// BB2020 does not publish REVERT_END_TURN when attacker has the ball.
     #[test]
-    fn hook_is_noop_returns_false() {
-        // Without step infra the hook always returns false.
-        let b = WrestleBehaviour::new();
-        assert_eq!(b.name(), "WrestleBehaviour");
+    fn bb2020_does_not_publish_revert_end_turn() {
+        assert!(!WrestleBehaviour::publish_revert_end_turn_when_attacker_has_ball_bb2020());
+    }
+
+    /// The function returns false regardless of context in BB2020.
+    #[test]
+    fn revert_end_turn_always_false_in_bb2020() {
+        assert_eq!(
+            WrestleBehaviour::publish_revert_end_turn_when_attacker_has_ball_bb2020(),
+            false
+        );
     }
 
     #[test]
     fn name_is_correct() {
-        let b = WrestleBehaviour::default();
-        assert_eq!(b.name(), "WrestleBehaviour");
+        assert_eq!(WrestleBehaviour::new().name(), "WrestleBehaviour");
     }
 
     #[test]
@@ -60,9 +81,8 @@ mod tests {
         let b = WrestleBehaviour::new();
         let mut player = Player::default();
         let pos = RosterPosition::default();
-        let movement_before = player.movement;
+        let before = player.movement;
         b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
+        assert_eq!(player.movement, before);
     }
-#[test]    fn name_is_not_empty() {        assert!(!WrestleBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2020() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = WrestleBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2020,        );        assert!(!b.execute_step_hook(&mut game));    }
 }

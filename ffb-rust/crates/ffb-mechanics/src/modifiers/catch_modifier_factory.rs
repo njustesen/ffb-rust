@@ -1,5 +1,5 @@
-use ffb_model::enums::Rules;
-use ffb_model::model::Player;
+use ffb_model::enums::{Rules, SkillId};
+use ffb_model::model::{CatchScatterThrowInMode, Player};
 use crate::modifiers::bb2025::catch_modifier_collection::CatchModifierCollection as Bb2025Collection;
 use crate::modifiers::catch_context::CatchContext;
 use crate::modifiers::catch_modifier::CatchModifier;
@@ -48,6 +48,31 @@ impl CatchModifierFactory {
     /// 1:1 translation of GenerifiedModifierFactory.findModifiers.
     pub fn find_applicable<'a>(&'a self, context: &CatchContext<'_>) -> Vec<&'a CatchModifier> {
         self.collection.find_applicable(context)
+    }
+
+    /// Returns skill-based catch modifiers for the catcher.
+    /// 1:1 translation of GenerifiedModifierFactory skill iteration for CatchModifierFactory.
+    ///
+    /// Java: common.ExtraArms registers CatchModifier("Extra Arms", -1, REGULAR).
+    ///       common.DivingCatch registers CatchModifier("Diving Catch", -1, REGULAR) only on accurate pass/bomb.
+    pub fn find_skill_modifiers(&self, context: &CatchContext<'_>) -> Vec<CatchModifier> {
+        let Some(player) = context.player else { return vec![]; };
+        let mut result = Vec::new();
+        for skill_id in player.all_skill_ids() {
+            match skill_id {
+                SkillId::ExtraArms => {
+                    result.push(CatchModifier::new("Extra Arms", -1, crate::modifiers::modifier_type::ModifierType::REGULAR));
+                }
+                SkillId::DivingCatch => {
+                    // Only applies to accurate pass/bomb.
+                    if matches!(context.catch_mode, CatchScatterThrowInMode::CatchAccuratePass | CatchScatterThrowInMode::CatchAccurateBomb) {
+                        result.push(CatchModifier::new("Diving Catch", -1, crate::modifiers::modifier_type::ModifierType::REGULAR));
+                    }
+                }
+                _ => {}
+            }
+        }
+        result
     }
 
     /// Compute the catch minimum roll from the catcher and applicable modifiers.
@@ -161,5 +186,52 @@ mod tests {
         );
         let min = CatchModifierFactory::minimum_roll_catch(&player, &[&modifier]);
         assert_eq!(min, 4); // 3 + 1 = 4
+    }
+
+    fn player_with_skill(agility: i32, skill_id: ffb_model::enums::SkillId) -> Player {
+        use ffb_model::model::SkillWithValue;
+        let mut p = minimal_player(agility);
+        p.starting_skills.push(SkillWithValue::new(skill_id));
+        p
+    }
+
+    #[test]
+    fn find_skill_modifiers_extra_arms_always_applies() {
+        let game = make_game(Weather::Nice);
+        let player = player_with_skill(3, ffb_model::enums::SkillId::ExtraArms);
+        let factory = CatchModifierFactory::for_rules(Rules::Bb2025);
+        let ctx = CatchContext::new(&game, Some(&player), CatchScatterThrowInMode::CatchHandOff, None);
+        let mods = factory.find_skill_modifiers(&ctx);
+        assert!(mods.iter().any(|m| m.get_name() == "Extra Arms"));
+        assert_eq!(mods.iter().find(|m| m.get_name() == "Extra Arms").unwrap().get_modifier(), -1);
+    }
+
+    #[test]
+    fn find_skill_modifiers_diving_catch_on_accurate_pass() {
+        let game = make_game(Weather::Nice);
+        let player = player_with_skill(3, ffb_model::enums::SkillId::DivingCatch);
+        let factory = CatchModifierFactory::for_rules(Rules::Bb2025);
+        let ctx = CatchContext::new(&game, Some(&player), CatchScatterThrowInMode::CatchAccuratePass, None);
+        let mods = factory.find_skill_modifiers(&ctx);
+        assert!(mods.iter().any(|m| m.get_name() == "Diving Catch"), "Diving Catch should apply on accurate pass");
+    }
+
+    #[test]
+    fn find_skill_modifiers_diving_catch_not_on_inaccurate() {
+        let game = make_game(Weather::Nice);
+        let player = player_with_skill(3, ffb_model::enums::SkillId::DivingCatch);
+        let factory = CatchModifierFactory::for_rules(Rules::Bb2025);
+        let ctx = CatchContext::new(&game, Some(&player), CatchScatterThrowInMode::CatchScatter, None);
+        let mods = factory.find_skill_modifiers(&ctx);
+        assert!(!mods.iter().any(|m| m.get_name() == "Diving Catch"), "Diving Catch should NOT apply on scatter");
+    }
+
+    #[test]
+    fn find_skill_modifiers_no_player_returns_empty() {
+        let game = make_game(Weather::Nice);
+        let factory = CatchModifierFactory::for_rules(Rules::Bb2025);
+        let ctx = CatchContext::new(&game, None, CatchScatterThrowInMode::CatchAccuratePass, None);
+        let mods = factory.find_skill_modifiers(&ctx);
+        assert!(mods.is_empty());
     }
 }

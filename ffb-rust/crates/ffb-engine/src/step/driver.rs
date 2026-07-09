@@ -72,6 +72,7 @@ pub fn make_step(id: StepId) -> Box<dyn Step> {
     use crate::step::mixed::multiblock::step_dispatch_dump_off::StepDispatchDumpOff;
     use crate::step::mixed::multiblock::step_double_strength::StepDoubleStrength;
     use crate::step::mixed::shared::step_consume_parameter::StepConsumeParameter;
+    use crate::step::mixed::shared::step_end_player_action::StepEndPlayerAction;
     use crate::step::mixed::shared::step_set_defender::StepSetDefender;
     use crate::step::mixed::start::step_spectators::StepSpectators;
     use crate::step::phase::kickoff::step_coin_choice::StepCoinChoice;
@@ -244,6 +245,7 @@ pub fn make_step(id: StepId) -> Box<dyn Step> {
         // ── Mixed shared ────────────────────────────────────────────────────
         StepId::BothDown               => Box::new(StepBothDown::new()),
         StepId::ConsumeParameter       => Box::new(StepConsumeParameter::new()),
+        StepId::EndPlayerAction        => Box::new(StepEndPlayerAction::new()),
         StepId::SetDefender            => Box::new(StepSetDefender::new()),
         // ── Control / framework ──────────────────────────────────────────────
         StepId::GotoLabel              => Box::new(StepGotoLabel::new()),

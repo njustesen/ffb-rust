@@ -1,4 +1,4 @@
-use ffb_model::enums::Rules;
+use ffb_model::enums::{Rules, SkillId};
 use ffb_model::model::{Game, Player};
 use ffb_model::model::property::NamedProperties;
 use ffb_model::util::util_disturbing_presence::UtilDisturbingPresence;
@@ -90,6 +90,28 @@ impl InterceptionModifierFactory {
                         result.push(m);
                     }
                 }
+            }
+        }
+        result
+    }
+
+    /// Returns skill-based interception modifiers for the interceptor.
+    /// Java: common.ExtraArms registers InterceptionModifier("Extra Arms", -1, REGULAR).
+    ///       bb2016.VeryLongLegs registers InterceptionModifier("Very Long Legs", -1, REGULAR).
+    ///       bb2020/bb2025.VeryLongLegs registers InterceptionModifier("Very Long Legs", -2, REGULAR).
+    pub fn find_skill_modifiers(&self, game: &Game, interceptor: &Player) -> Vec<InterceptionModifier> {
+        let rules = game.rules;
+        let mut result = Vec::new();
+        for skill_id in interceptor.all_skill_ids() {
+            match skill_id {
+                SkillId::ExtraArms => {
+                    result.push(InterceptionModifier::new("Extra Arms", -1, ModifierType::REGULAR));
+                }
+                SkillId::VeryLongLegs => {
+                    let value = if rules == Rules::Bb2016 { -1 } else { -2 };
+                    result.push(InterceptionModifier::new("Very Long Legs", value, ModifierType::REGULAR));
+                }
+                _ => {}
             }
         }
         result
@@ -275,5 +297,43 @@ mod tests {
         p.agility = 6;
         let m = InterceptionModifier::new("bonus", -5, ModifierType::REGULAR);
         assert_eq!(InterceptionModifierFactory::minimum_roll_bb2016(&p, &[&m]), 2);
+    }
+
+    #[test]
+    fn find_skill_modifiers_extra_arms_applies() {
+        use ffb_model::model::SkillWithValue;
+        let game = make_game(Rules::Bb2025);
+        let mut interceptor = minimal_player("i1", 3);
+        interceptor.starting_skills.push(SkillWithValue::new(SkillId::ExtraArms));
+        let f = InterceptionModifierFactory::for_rules(Rules::Bb2025);
+        let mods = f.find_skill_modifiers(&game, &interceptor);
+        assert!(mods.iter().any(|m| m.get_name() == "Extra Arms"));
+        assert_eq!(mods.iter().find(|m| m.get_name() == "Extra Arms").unwrap().get_modifier(), -1);
+    }
+
+    #[test]
+    fn find_skill_modifiers_very_long_legs_bb2016_is_minus_one() {
+        use ffb_model::model::SkillWithValue;
+        let game = make_game(Rules::Bb2016);
+        let mut interceptor = minimal_player("i1", 3);
+        interceptor.starting_skills.push(SkillWithValue::new(SkillId::VeryLongLegs));
+        let f = InterceptionModifierFactory::for_rules(Rules::Bb2016);
+        let mods = f.find_skill_modifiers(&game, &interceptor);
+        let vll = mods.iter().find(|m| m.get_name() == "Very Long Legs");
+        assert!(vll.is_some());
+        assert_eq!(vll.unwrap().get_modifier(), -1);
+    }
+
+    #[test]
+    fn find_skill_modifiers_very_long_legs_bb2025_is_minus_two() {
+        use ffb_model::model::SkillWithValue;
+        let game = make_game(Rules::Bb2025);
+        let mut interceptor = minimal_player("i1", 3);
+        interceptor.starting_skills.push(SkillWithValue::new(SkillId::VeryLongLegs));
+        let f = InterceptionModifierFactory::for_rules(Rules::Bb2025);
+        let mods = f.find_skill_modifiers(&game, &interceptor);
+        let vll = mods.iter().find(|m| m.get_name() == "Very Long Legs");
+        assert!(vll.is_some());
+        assert_eq!(vll.unwrap().get_modifier(), -2);
     }
 }

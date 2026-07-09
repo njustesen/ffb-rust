@@ -404,6 +404,7 @@ impl CoverageReport {
             | GameEvent::KickoffPitchInvasionBb2016 { .. }
             | GameEvent::Inducement { .. }
             | GameEvent::PumpUpTheCrowdReRoll { .. }
+            | GameEvent::PlayerAdded { .. }
             => {}
         }
     }

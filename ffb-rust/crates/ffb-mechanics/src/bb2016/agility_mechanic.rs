@@ -88,9 +88,7 @@ impl AgilityMechanicTrait for AgilityMechanic {
     }
 
     fn format_dodge_result(&self, roll_modifiers: &[RollModifier], player: &Player, _stat_based_roll_modifier: Option<&StatBasedRollModifier>) -> String {
-        // headless: Break Tackle format — RollModifier doesn't carry is_use_strength flag;
-        // blocked until format interface carries DodgeModifier directly for report generation.
-        let uses_strength = false;
+        let uses_strength = roll_modifiers.iter().any(|m| m.name == "Break Tackle");
         let mut result = String::new();
         if uses_strength {
             result.push_str(&format!(" using Break Tackle (ST {}", player.strength_with_modifiers().min(6)));
@@ -211,6 +209,26 @@ mod tests {
         let m = AgilityMechanic::new();
         let p = player_with_agility(3);
         assert_eq!(m.minimum_roll_safe_throw(&p), 4);
+    }
+
+    #[test]
+    fn format_dodge_result_with_break_tackle_uses_strength() {
+        let m = AgilityMechanic::new();
+        let p = player_with_agility(3);
+        let modifiers = [crate::modifiers::RollModifier::new("Break Tackle", 0)];
+        let result = m.format_dodge_result(&modifiers, &p, None);
+        assert!(result.contains("Break Tackle"), "result should mention Break Tackle: {}", result);
+        assert!(result.contains("ST"), "result should show strength: {}", result);
+    }
+
+    #[test]
+    fn format_dodge_result_without_break_tackle_uses_agility() {
+        let m = AgilityMechanic::new();
+        let p = player_with_agility(3);
+        let modifiers = [crate::modifiers::RollModifier::new("Dodge", -1)];
+        let result = m.format_dodge_result(&modifiers, &p, None);
+        assert!(result.contains("AG"), "result should show agility: {}", result);
+        assert!(!result.contains("Break Tackle"), "result should not mention Break Tackle: {}", result);
     }
 
     #[test]

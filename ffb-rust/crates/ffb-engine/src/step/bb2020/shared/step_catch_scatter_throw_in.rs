@@ -846,7 +846,9 @@ impl StepCatchScatterThrowIn {
                 let player = unsafe { &*ptr };
                 let ctx = CatchContext::new(game, Some(player), mode, None);
                 let mods = factory.find_applicable(&ctx);
-                CatchModifierFactory::minimum_roll_catch(player, &mods)
+                let skill_mods = factory.find_skill_modifiers(&ctx);
+                let all: Vec<&ffb_mechanics::modifiers::catch_modifier::CatchModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
+                CatchModifierFactory::minimum_roll_catch(player, &all)
             } else {
                 2
             };

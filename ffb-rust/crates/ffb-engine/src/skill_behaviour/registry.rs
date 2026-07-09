@@ -80,10 +80,13 @@ impl SkillRegistry {
     fn build_bb2025() -> Self {
         use crate::skill_behaviour::common::horns_behaviour::HornsBehaviour;
         use crate::skill_behaviour::bb2025::{
+            animal_savagery_behaviour::AnimalSavageryBehaviour,
             animosity_behaviour::AnimosityBehaviour,
             blood_lust_behaviour::BloodLustBehaviour,
             bombardier_behaviour::BombardierBehaviour,
             bone_head_behaviour::BoneHeadBehaviour,
+            bullseye_behaviour::BullseyeBehaviour,
+            catch_behaviour::CatchBehaviour,
             diving_tackle_behaviour::DivingTackleBehaviour,
             dump_off_behaviour::DumpOffBehaviour,
             eye_gouge_behaviour::EyeGougeBehaviour,
@@ -91,13 +94,21 @@ impl SkillRegistry {
             grab_behaviour::GrabBehaviour,
             juggernaut_behaviour::JuggernautBehaviour,
             jump_up_behaviour::JumpUpBehaviour,
+            monstrous_mouth_behaviour::MonstrousMouthBehaviour,
+            pass_behaviour::PassBehaviour,
             really_stupid_behaviour::ReallyStupidBehaviour,
+            saboteur_behaviour::SaboteurBehaviour,
             shadowing_behaviour::ShadowingBehaviour,
             sidestep_behaviour::SidestepBehaviour,
+            sneaky_git_behaviour::SneakyGitBehaviour,
             stab_behaviour::StabBehaviour,
             stand_firm_behaviour::StandFirmBehaviour,
+            swoop_behaviour::SwoopBehaviour,
             take_root_behaviour::TakeRootBehaviour,
             tentacles_behaviour::TentaclesBehaviour,
+            the_ballista_behaviour::TheBallistaBehaviour,
+            throw_team_mate_behaviour::ThrowTeamMateBehaviour,
+            unchannelled_fury_behaviour::UnchannelledFuryBehaviour,
             wild_animal_behaviour::WildAnimalBehaviour,
             wrestle_behaviour::WrestleBehaviour,
         };
@@ -106,10 +117,13 @@ impl SkillRegistry {
         // Common (all editions)
         HornsBehaviour::register_into(&mut reg);
         // BB2025 skills
+        AnimalSavageryBehaviour::register_into(&mut reg);
         AnimosityBehaviour::register_into(&mut reg);
         BloodLustBehaviour::register_into(&mut reg);
         BombardierBehaviour::register_into(&mut reg);
         BoneHeadBehaviour::register_into(&mut reg);
+        BullseyeBehaviour::register_into(&mut reg);
+        CatchBehaviour::register_into(&mut reg);
         DivingTackleBehaviour::register_into(&mut reg);
         DumpOffBehaviour::register_into(&mut reg);
         EyeGougeBehaviour::register_into(&mut reg);
@@ -117,13 +131,21 @@ impl SkillRegistry {
         GrabBehaviour::register_into(&mut reg);
         JuggernautBehaviour::register_into(&mut reg);
         JumpUpBehaviour::register_into(&mut reg);
+        MonstrousMouthBehaviour::register_into(&mut reg);
+        PassBehaviour::register_into(&mut reg);
         ReallyStupidBehaviour::register_into(&mut reg);
+        SaboteurBehaviour::register_into(&mut reg);
         ShadowingBehaviour::register_into(&mut reg);
         SidestepBehaviour::register_into(&mut reg);
+        SneakyGitBehaviour::register_into(&mut reg);
         StabBehaviour::register_into(&mut reg);
         StandFirmBehaviour::register_into(&mut reg);
+        SwoopBehaviour::register_into(&mut reg);
         TakeRootBehaviour::register_into(&mut reg);
         TentaclesBehaviour::register_into(&mut reg);
+        TheBallistaBehaviour::register_into(&mut reg);
+        ThrowTeamMateBehaviour::register_into(&mut reg);
+        UnchannelledFuryBehaviour::register_into(&mut reg);
         WildAnimalBehaviour::register_into(&mut reg);
         WrestleBehaviour::register_into(&mut reg);
         // Mixed (shared logic across editions)
@@ -132,81 +154,103 @@ impl SkillRegistry {
     }
 
     /// Build the BB2020 registry.
-    /// NOTE: Uses BB2025 skill implementations for now. Replace each entry with the
-    /// edition-specific behaviour's register_into once it's ported.
+    /// Uses BB2020-specific implementations where they differ from BB2025;
+    /// falls back to BB2025 impls where the logic is identical.
     fn build_bb2020() -> Self {
         use crate::skill_behaviour::common::horns_behaviour::HornsBehaviour;
+        // BB2025 impls reused unchanged for BB2020
         use crate::skill_behaviour::bb2025::{
             animosity_behaviour::AnimosityBehaviour,
             blood_lust_behaviour::BloodLustBehaviour,
             bombardier_behaviour::BombardierBehaviour,
-            bone_head_behaviour::BoneHeadBehaviour,
             dump_off_behaviour::DumpOffBehaviour,
             foul_appearance_behaviour::FoulAppearanceBehaviour,
             jump_up_behaviour::JumpUpBehaviour,
-            really_stupid_behaviour::ReallyStupidBehaviour,
             shadowing_behaviour::ShadowingBehaviour,
             stab_behaviour::StabBehaviour,
             take_root_behaviour::TakeRootBehaviour,
             tentacles_behaviour::TentaclesBehaviour,
             wrestle_behaviour::WrestleBehaviour,
         };
+        // BB2020-specific implementations
+        use crate::skill_behaviour::bb2020::{
+            bone_head_behaviour::BoneHeadBehaviour,
+            piling_on_behaviour::PilingOnBehaviour,
+            really_stupid_behaviour::ReallyStupidBehaviour,
+        };
         use crate::skill_behaviour::mixed::dauntless_behaviour::DauntlessBehaviour;
         let mut reg = Self::empty();
+        // Common (all editions)
         HornsBehaviour::register_into(&mut reg);
+        // BB2025 impls (identical behaviour in BB2020)
         AnimosityBehaviour::register_into(&mut reg);
         BloodLustBehaviour::register_into(&mut reg);
         BombardierBehaviour::register_into(&mut reg);
-        BoneHeadBehaviour::register_into(&mut reg);
         DumpOffBehaviour::register_into(&mut reg);
         FoulAppearanceBehaviour::register_into(&mut reg);
         JumpUpBehaviour::register_into(&mut reg);
-        ReallyStupidBehaviour::register_into(&mut reg);
         ShadowingBehaviour::register_into(&mut reg);
         StabBehaviour::register_into(&mut reg);
         TakeRootBehaviour::register_into(&mut reg);
         TentaclesBehaviour::register_into(&mut reg);
         WrestleBehaviour::register_into(&mut reg);
+        // BB2020-specific behaviours
+        BoneHeadBehaviour::register_into(&mut reg);
+        PilingOnBehaviour::register_into(&mut reg);
+        ReallyStupidBehaviour::register_into(&mut reg);
+        // Mixed (shared logic across editions)
         DauntlessBehaviour::register_into(&mut reg);
         reg
     }
 
     /// Build the BB2016 registry.
-    /// NOTE: Uses BB2025 skill implementations for now. Replace each entry with the
-    /// edition-specific behaviour's register_into once it's ported.
+    /// Uses BB2016-specific implementations where they differ from BB2025;
+    /// falls back to BB2025 impls where the logic is identical.
     fn build_bb2016() -> Self {
         use crate::skill_behaviour::common::horns_behaviour::HornsBehaviour;
+        // BB2025 impls reused unchanged for BB2016
         use crate::skill_behaviour::bb2025::{
             animosity_behaviour::AnimosityBehaviour,
             blood_lust_behaviour::BloodLustBehaviour,
             bombardier_behaviour::BombardierBehaviour,
-            bone_head_behaviour::BoneHeadBehaviour,
             dump_off_behaviour::DumpOffBehaviour,
             foul_appearance_behaviour::FoulAppearanceBehaviour,
             jump_up_behaviour::JumpUpBehaviour,
-            really_stupid_behaviour::ReallyStupidBehaviour,
             shadowing_behaviour::ShadowingBehaviour,
             stab_behaviour::StabBehaviour,
             take_root_behaviour::TakeRootBehaviour,
             tentacles_behaviour::TentaclesBehaviour,
             wrestle_behaviour::WrestleBehaviour,
         };
+        // BB2016-specific implementations
+        use crate::skill_behaviour::bb2016::{
+            bone_head_behaviour::BoneHeadBehaviour,
+            piling_on_behaviour::PilingOnBehaviour,
+            really_stupid_behaviour::ReallyStupidBehaviour,
+            wild_animal_behaviour::WildAnimalBehaviour,
+        };
         use crate::skill_behaviour::mixed::dauntless_behaviour::DauntlessBehaviour;
         let mut reg = Self::empty();
+        // Common (all editions)
         HornsBehaviour::register_into(&mut reg);
+        // BB2025 impls (identical behaviour in BB2016)
         AnimosityBehaviour::register_into(&mut reg);
         BloodLustBehaviour::register_into(&mut reg);
         BombardierBehaviour::register_into(&mut reg);
-        BoneHeadBehaviour::register_into(&mut reg);
         DumpOffBehaviour::register_into(&mut reg);
         FoulAppearanceBehaviour::register_into(&mut reg);
         JumpUpBehaviour::register_into(&mut reg);
-        ReallyStupidBehaviour::register_into(&mut reg);
         ShadowingBehaviour::register_into(&mut reg);
         StabBehaviour::register_into(&mut reg);
         TakeRootBehaviour::register_into(&mut reg);
         TentaclesBehaviour::register_into(&mut reg);
         WrestleBehaviour::register_into(&mut reg);
+        // BB2016-specific behaviours
+        BoneHeadBehaviour::register_into(&mut reg);
+        PilingOnBehaviour::register_into(&mut reg);
+        ReallyStupidBehaviour::register_into(&mut reg);
+        WildAnimalBehaviour::register_into(&mut reg);
+        // Mixed (shared logic across editions)
         DauntlessBehaviour::register_into(&mut reg);
         reg
     }
@@ -296,14 +340,40 @@ mod tests {
     }
 
     #[test]
-    fn bb2025_registry_has_twenty_two_entries() {
+    fn bb2025_registry_has_thirty_three_entries() {
         let reg = SkillRegistry::build_bb2025();
-        assert_eq!(reg.len(), 22, "BB2025 registry should have 22 registered skill entries");
+        assert_eq!(reg.len(), 33, "BB2025 registry should have 33 registered skill entries");
     }
 
     #[test]
-    fn bb2016_registry_has_fifteen_entries() {
+    fn bb2016_registry_has_seventeen_entries() {
         let reg = SkillRegistry::build_bb2016();
-        assert_eq!(reg.len(), 15, "BB2016 registry should have 15 registered skill entries");
+        assert_eq!(reg.len(), 17, "BB2016 registry should have 17 registered skill entries");
+    }
+
+    #[test]
+    fn bb2020_registry_has_sixteen_entries() {
+        let reg = SkillRegistry::build_bb2020();
+        assert_eq!(reg.len(), 16, "BB2020 registry should have 16 registered skill entries");
+    }
+
+    #[test]
+    fn bb2020_registry_contains_bone_head_with_step_modifier() {
+        let reg = SkillRegistry::build_bb2020();
+        let sb = reg.get(SkillId::BoneHead).expect("BoneHead must be in BB2020 registry");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn bb2020_registry_contains_really_stupid_with_step_modifier() {
+        let reg = SkillRegistry::build_bb2020();
+        let sb = reg.get(SkillId::ReallyStupid).expect("ReallyStupid must be in BB2020 registry");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn bb2020_registry_contains_piling_on() {
+        let reg = SkillRegistry::build_bb2020();
+        assert!(reg.get(SkillId::PilingOn).is_some(), "PilingOn must be in BB2020 registry");
     }
 }

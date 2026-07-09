@@ -1,4 +1,4 @@
-use ffb_model::enums::Rules;
+use ffb_model::enums::{Rules, SkillId};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::util_player::UtilPlayer;
 use crate::modifiers::modifier_type::ModifierType;
@@ -50,6 +50,19 @@ impl PickupModifierFactory {
             }
         }
 
+        result
+    }
+
+    /// Returns skill-based pickup modifiers for the player.
+    /// Java: common.ExtraArms registers PickupModifier("Extra Arms", -1, REGULAR).
+    pub fn find_skill_modifiers(&self, context: &PickupContext<'_>) -> Vec<PickupModifier> {
+        let player = context.player;
+        let mut result = Vec::new();
+        for skill_id in player.all_skill_ids() {
+            if skill_id == SkillId::ExtraArms {
+                result.push(PickupModifier::new("Extra Arms", -1, ModifierType::REGULAR));
+            }
+        }
         result
     }
 
@@ -155,5 +168,29 @@ mod tests {
         let factory = PickupModifierFactory::for_rules(Rules::Bb2025);
         assert!(factory.for_name("Pouring Rain").is_some());
         assert!(factory.for_name("NonExistent").is_none());
+    }
+
+    #[test]
+    fn find_skill_modifiers_extra_arms_applies() {
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::SkillWithValue;
+        let game = make_game(Weather::Nice);
+        let mut player = minimal_player();
+        player.starting_skills.push(SkillWithValue::new(SkillId::ExtraArms));
+        let factory = PickupModifierFactory::for_rules(Rules::Bb2025);
+        let ctx = PickupContext::new(&game, &player);
+        let mods = factory.find_skill_modifiers(&ctx);
+        assert!(mods.iter().any(|m| m.get_name() == "Extra Arms"));
+        assert_eq!(mods.iter().find(|m| m.get_name() == "Extra Arms").unwrap().get_modifier(), -1);
+    }
+
+    #[test]
+    fn find_skill_modifiers_no_extra_arms_returns_empty() {
+        let game = make_game(Weather::Nice);
+        let player = minimal_player();
+        let factory = PickupModifierFactory::for_rules(Rules::Bb2025);
+        let ctx = PickupContext::new(&game, &player);
+        let mods = factory.find_skill_modifiers(&ctx);
+        assert!(mods.is_empty());
     }
 }

@@ -1,12 +1,28 @@
 use crate::skill_behaviour::SkillBehaviour;
 
-/// BB2020 SideStep skill behaviour. StepModifier on StepPushback: if defender has SideStep,
-/// changes pushback mode to allow player to choose destination square. Mirrors Java
-/// `com.fumbbl.ffb.server.skillbehaviour.bb2020.SideStepBehaviour`.
+/// BB2020 SideStep skill behaviour.
+///
+/// Mirrors Java `com.fumbbl.ffb.server.skillbehaviour.bb2020.SideStepBehaviour`.
+///
+/// **BB2020 vs BB2025 difference:**
+///
+/// 1. **Priority:** BB2020 registers the `StepPushback` modifier with priority **3**.
+///    BB2025 registers it with priority **4**.
+///
+/// 2. **Skill class name:** BB2020 uses `SideStep` / `SideStepBehaviour`; BB2025 renames them to
+///    `Sidestep` / `SidestepBehaviour` (lower-case 's' in "step"). The Rust side keeps
+///    `SideStepBehaviour` for BB2020 to match the Java naming.
 pub struct SideStepBehaviour;
 
 impl SideStepBehaviour {
     pub fn new() -> Self { Self }
+
+    /// Returns the priority used when registering the StepPushback modifier in BB2020.
+    ///
+    /// Java: `registerModifier(new StepModifier<StepPushback, StepState>(3) { ... })`
+    pub const fn pushback_modifier_priority() -> u32 {
+        3
+    }
 }
 
 impl Default for SideStepBehaviour {
@@ -16,13 +32,8 @@ impl Default for SideStepBehaviour {
 impl SkillBehaviour for SideStepBehaviour {
     fn name(&self) -> &'static str { "SideStepBehaviour" }
 
-    /// Java `StepModifier<StepPushback, StepState>.handleExecuteStepHook`: if defender has
-    /// SideStep, changes pushback mode to allow player to choose destination square. Returns false
-    /// always.
-    /// TODO(hook-infra): needs state.defender, state.pushbackSquares,
-    /// state.startingPushbackSquare.
+    /// TODO(hook-infra): step-specific state access not yet wired.
     fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
-        // TODO(hook-infra): step-specific state access (StepState.xxx)
         false
     }
 }
@@ -31,17 +42,21 @@ impl SkillBehaviour for SideStepBehaviour {
 mod tests {
     use super::*;
 
+    /// BB2020 registers the SideStep pushback modifier with priority 3.
     #[test]
-    fn hook_is_noop_returns_false() {
-        // Without step infra the hook always returns false.
-        let b = SideStepBehaviour::new();
-        assert_eq!(b.name(), "SideStepBehaviour");
+    fn pushback_modifier_priority_is_3_in_bb2020() {
+        assert_eq!(SideStepBehaviour::pushback_modifier_priority(), 3);
+    }
+
+    /// Priority is not 4 (BB2025 value).
+    #[test]
+    fn pushback_modifier_priority_is_not_4() {
+        assert_ne!(SideStepBehaviour::pushback_modifier_priority(), 4);
     }
 
     #[test]
     fn name_is_correct() {
-        let b = SideStepBehaviour::default();
-        assert_eq!(b.name(), "SideStepBehaviour");
+        assert_eq!(SideStepBehaviour::new().name(), "SideStepBehaviour");
     }
 
     #[test]
@@ -61,9 +76,8 @@ mod tests {
         let b = SideStepBehaviour::new();
         let mut player = Player::default();
         let pos = RosterPosition::default();
-        let movement_before = player.movement;
+        let before = player.movement;
         b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
+        assert_eq!(player.movement, before);
     }
-#[test]    fn name_is_not_empty() {        assert!(!SideStepBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2020() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = SideStepBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2020,        );        assert!(!b.execute_step_hook(&mut game));    }
 }

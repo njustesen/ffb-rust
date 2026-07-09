@@ -1,4 +1,6 @@
 use crate::skill_behaviour::SkillBehaviour;
+use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
+use crate::skill_behaviour::registry::SkillRegistry;
 use ffb_model::enums::SkillId;
 
 /// Catch: player may re-roll a failed catch roll once per action.
@@ -7,6 +9,11 @@ pub struct CatchBehaviour;
 
 impl CatchBehaviour {
     pub fn new() -> Self { Self }
+
+    pub fn register_into(registry: &mut SkillRegistry) {
+        let sb = SbContainer::new();
+        registry.register(SkillId::Catch, sb);
+    }
 }
 
 impl Default for CatchBehaviour {

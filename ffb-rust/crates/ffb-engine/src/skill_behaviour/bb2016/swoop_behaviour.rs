@@ -1,9 +1,37 @@
+/// 1:1 translation of com.fumbbl.ffb.server.skillbehaviour.bb2016.SwoopBehaviour.
+///
+/// BB2016 SwoopBehaviour differs substantially from BB2025 SwoopBehaviour:
+/// - BB2016: handles full TTM movement loop — scatters player 1 square per move step,
+///   handles out-of-bounds (InjuryTypeCrowdPush, throw-in), landing on player
+///   (InjuryTypeTTMHitPlayer), and continues until movement exhausted.
+/// - BB2025: only rolls scatter direction and asks for a re-roll; actual movement delegated
+///   to a different step.
+///
+/// **BB2016 `handleExecuteStepHook` logic:**
+/// 1. Guard: `player.hasSkillProperty(ttmScattersInSingleDirection)`, else skip.
+/// 2. Roll throw-in direction (D8) relative to current coordinateFrom → coordinateTo.
+/// 3. Compute `coordinateTo = findScatterCoordinate(coordinateFrom, direction, 1)`.
+/// 4. Publish `ReportSwoopPlayer(from, to, [direction], [roll])`.
+/// 5. If `coordinateTo` out of bounds:
+///    - Set player FALLING state.
+///    - `handleInjury(InjuryTypeCrowdPush, thrownPlayer, from)`.
+///    - If thrownPlayer has ball: publish THROW_IN + END_TURN.
+///    - Publish THROWN_PLAYER_COORDINATE=null.
+///    - `GOTO_LABEL(goToLabelOnFallDown)`.
+/// 6. Else (in bounds):
+///    - Move swooping player to `coordinateTo`, move ball if carrying.
+///    - Increment `actingPlayer.currentMove`.
+///    - If `currentMove < player.movementWithModifiers`:
+///      → `UtilServerPlayerSwoop.updateSwoopSquares()` (still swooping).
+///    - Else (landing):
+///      → For each other player in square: apply InjuryTypeTTMHitPlayer, possibly END_TURN.
+///      → `NEXT_STEP`.
+///
+/// TODO(hook-infra): `StepSwoopHookState` not yet ported.
+///   When `mixed/ttm/StepSwoop` gains a typed hook state, add `SwoopStepModifier` here.
 use crate::skill_behaviour::SkillBehaviour;
+use ffb_model::model::game::Game;
 
-/// Swoop: redirects a thrown player landing square for players with ttmScattersInSingleDirection.
-/// Rolls throw-in direction, scatters player 1 square. Handles out-of-bounds (crowd push + throw-in)
-/// and landing on a player (InjuryTypeTTMHitPlayer). If within movement range: continues swooping.
-/// Mirrors Java `com.fumbbl.ffb.server.skillbehaviour.bb2016.SwoopBehaviour`.
 pub struct SwoopBehaviour;
 
 impl SwoopBehaviour {
@@ -17,25 +45,8 @@ impl Default for SwoopBehaviour {
 impl SkillBehaviour for SwoopBehaviour {
     fn name(&self) -> &'static str { "SwoopBehaviour" }
 
-    /// Java logic (handleExecuteStepHook):
-    ///   1. Check if the thrown player has ttmScattersInSingleDirection; if not, skip.
-    ///   2. Roll throw-in direction (D8).
-    ///   3. Scatter the thrown player 1 square in that direction.
-    ///   4. If landing square is out of bounds:
-    ///      a. Apply InjuryTypeCrowdPush to the player.
-    ///      b. Execute throw-in sequence from the boundary square.
-    ///   5. If landing square is occupied by another player:
-    ///      a. Apply InjuryTypeTTMHitPlayer to both players.
-    ///   6. If player is still within their remaining movement range: continue swooping
-    ///      (push another ScatterPlayer step / repeat).
-    ///   7. Reads/writes: StepState.ttmScattersInSingleDirection, StepState.scatterDirection,
-    ///      StepState.remainingMovement, StepState.thrownPlayerCoordinate.
-    ///
-    // TODO(hook-infra): step-specific state (StepState.ttmScattersInSingleDirection)
-    // TODO(hook-infra): step-specific state (StepState.scatterDirection)
-    // TODO(hook-infra): step-specific state (StepState.remainingMovement)
-    // TODO(hook-infra): step-specific state (StepState.thrownPlayerCoordinate)
-    fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
+    fn execute_step_hook(&self, _game: &mut Game) -> bool {
+        // TODO(hook-infra): implement once StepSwoopHookState is ported
         false
     }
 }
@@ -43,27 +54,29 @@ impl SkillBehaviour for SwoopBehaviour {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ffb_model::enums::Rules;
+    use crate::step::framework::test_team;
+
+    fn test_game() -> Game {
+        let home = test_team("home", 0);
+        let away = test_team("away", 0);
+        Game::new(home, away, Rules::Bb2016)
+    }
 
     #[test]
     fn name_returns_correct_string() {
-        let b = SwoopBehaviour::new();
-        assert_eq!(b.name(), "SwoopBehaviour");
+        assert_eq!(SwoopBehaviour::new().name(), "SwoopBehaviour");
     }
 
     #[test]
     fn default_has_correct_name() {
-        let b = SwoopBehaviour::default();
-        assert_eq!(b.name(), "SwoopBehaviour");
+        assert_eq!(SwoopBehaviour::default().name(), "SwoopBehaviour");
     }
 
     #[test]
     fn execute_step_hook_returns_false() {
-        use ffb_model::enums::Rules;
-        use crate::step::framework::test_team;
         let b = SwoopBehaviour::new();
-        let mut game = ffb_model::model::game::Game::new(
-            test_team("home", 0), test_team("away", 0), Rules::Bb2016,
-        );
+        let mut game = test_game();
         assert!(!b.execute_step_hook(&mut game));
     }
 
@@ -77,5 +90,9 @@ mod tests {
         b.apply_modifier(&mut player, &pos);
         assert_eq!(player.movement, movement_before);
     }
-#[test]    fn name_is_not_empty() {        assert!(!SwoopBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2025() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = SwoopBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2025,        );        assert!(!b.execute_step_hook(&mut game));    }
+
+    #[test]
+    fn name_is_not_empty() {
+        assert!(!SwoopBehaviour::new().name().is_empty());
+    }
 }

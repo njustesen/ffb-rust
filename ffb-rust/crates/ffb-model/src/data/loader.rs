@@ -1,7 +1,10 @@
 //! Static data loaders using `include_str!` — zero runtime I/O, compiled into the binary.
 
 use once_cell::sync::Lazy;
-use crate::data::roster_json::{RosterJson, StarPlayersJson, SkillsJson, InducementsJson, PrayersJson};
+use crate::data::roster_json::{RosterJson, PositionJson, StarPlayersJson, SkillsJson, InducementsJson, PrayersJson, SkillEntry};
+use crate::enums::{PlayerGender, PlayerType, Rules, SkillCategory};
+use crate::model::{Roster, RosterPosition};
+use crate::model::skill_def::{SkillId, SkillWithValue};
 
 // ── Roster bundles ────────────────────────────────────────────────────────────
 
@@ -193,6 +196,102 @@ pub static BB2025_PRAYERS: Lazy<PrayersJson> = Lazy::new(|| {
 
 // ── Parsed roster accessors ───────────────────────────────────────────────────
 
+/// Java: `Team.getRoster().getPositionById(positionId)` — combined lookup from static data.
+///
+/// Searches the edition-appropriate roster list for a roster matching `roster_id`, then
+/// returns a clone of the position entry matching `position_id`.
+pub fn find_position(roster_id: &str, position_id: &str, rules: Rules) -> Option<PositionJson> {
+    let rosters = match rules {
+        Rules::Bb2016 | Rules::Common => bb2016_rosters(),
+        Rules::Bb2020 => bb2020_rosters(),
+        Rules::Bb2025 => bb2025_rosters(),
+    };
+    rosters.into_iter()
+        .find(|r| r.id == roster_id)
+        .and_then(|r| r.positions.into_iter().find(|p| p.id == position_id))
+}
+
+/// Finds the roster matching `roster_id` for the given rules edition and converts it to a `Roster`.
+///
+/// Returns `None` if no roster with that id exists in the static data.
+pub fn find_roster(roster_id: &str, rules: Rules) -> Option<Roster> {
+    let rosters = match rules {
+        Rules::Bb2016 | Rules::Common => bb2016_rosters(),
+        Rules::Bb2020 => bb2020_rosters(),
+        Rules::Bb2025 => bb2025_rosters(),
+    };
+    rosters.into_iter()
+        .find(|r| r.id == roster_id)
+        .map(|r| roster_json_to_roster(&r))
+}
+
+/// Converts a `RosterJson` (deserialized from data/) into a `Roster` model struct.
+pub fn roster_json_to_roster(rj: &RosterJson) -> Roster {
+    let positions = rj.positions.iter()
+        .map(|p| position_json_to_roster_position(p, &rj.id, rj.undead))
+        .collect();
+    Roster {
+        id: rj.id.clone(),
+        name: rj.name.clone(),
+        race: rj.name.clone(),
+        reroll_cost: rj.reroll_cost,
+        max_rerolls: rj.max_rerolls,
+        positions,
+        special_rules: rj.special_rules.clone(),
+        necromancer: rj.necromancer,
+        keywords: rj.keywords.clone(),
+    }
+}
+
+/// Converts a `PositionJson` to a `RosterPosition`.
+pub fn position_json_to_roster_position(pos: &PositionJson, roster_id: &str, is_undead: bool) -> RosterPosition {
+    let skills: Vec<SkillWithValue> = pos.skills.iter()
+        .filter_map(skill_entry_to_skill_with_value)
+        .collect();
+    let cats_normal: Vec<SkillCategory> = pos.skill_categories.normal.iter()
+        .filter_map(|s| SkillCategory::from_name(s))
+        .collect();
+    let cats_double: Vec<SkillCategory> = pos.skill_categories.double.iter()
+        .filter_map(|s| SkillCategory::from_name(s))
+        .collect();
+    let player_type = PlayerType::from_name(&pos.player_type).unwrap_or(PlayerType::Regular);
+    let is_big_guy = player_type == PlayerType::BigGuy
+        || pos.keywords.iter().any(|k| k == "Big Guy");
+    RosterPosition {
+        id: pos.id.clone(),
+        name: pos.name.clone(),
+        display_name: pos.display_name.clone(),
+        shorthand: None,
+        player_type,
+        gender: PlayerGender::Male,
+        quantity: pos.quantity,
+        cost: pos.cost,
+        movement: pos.ma,
+        strength: pos.st,
+        agility: pos.ag,
+        passing: pos.pa,
+        armour: pos.av,
+        skills,
+        skill_categories_normal: cats_normal,
+        skill_categories_double: cats_double,
+        keywords: pos.keywords.clone(),
+        is_big_guy,
+        is_undead,
+        is_thrall: false,
+        race: Some(roster_id.to_string()),
+        replaces_position: None,
+    }
+}
+
+fn skill_entry_to_skill_with_value(entry: &SkillEntry) -> Option<SkillWithValue> {
+    let skill_id = SkillId::from_class_name(entry.name())?;
+    let value = match entry {
+        SkillEntry::WithValue { value, .. } => Some(value.to_string()),
+        SkillEntry::Simple(_) => None,
+    };
+    Some(SkillWithValue { skill_id, value })
+}
+
 pub fn bb2020_rosters() -> Vec<RosterJson> {
     BB2020_ROSTERS_JSON.iter().map(|s| parse_roster(s)).collect()
 }
@@ -246,6 +345,45 @@ mod tests {
         // Every roster must have a positive reroll cost.
         for r in &rosters {
             assert!(r.reroll_cost > 0, "roster '{}' has zero reroll cost", r.name);
+        }
+    }
+
+    #[test]
+    fn find_roster_returns_human_for_bb2025() {
+        use crate::enums::Rules;
+        let roster = find_roster("human.lrb6", Rules::Bb2025).expect("human.lrb6 roster should exist");
+        assert_eq!(roster.id, "human.lrb6");
+        assert!(!roster.positions.is_empty());
+        assert!(roster.reroll_cost > 0);
+    }
+
+    #[test]
+    fn find_roster_returns_none_for_unknown_id() {
+        use crate::enums::Rules;
+        assert!(find_roster("not_a_real_race", Rules::Bb2025).is_none());
+    }
+
+    #[test]
+    fn find_roster_positions_have_stats() {
+        use crate::enums::Rules;
+        let roster = find_roster("human.lrb6", Rules::Bb2025).unwrap();
+        for pos in &roster.positions {
+            assert!(pos.movement > 0, "position '{}' has 0 movement", pos.name);
+            assert!(pos.armour > 0, "position '{}' has 0 armour", pos.name);
+        }
+    }
+
+    #[test]
+    fn roster_json_to_roster_converts_player_type() {
+        use crate::enums::{PlayerType, Rules};
+        let roster = find_roster("human.lrb6", Rules::Bb2016).unwrap();
+        // All human positions should be Regular or BigGuy, never Star/Irregular
+        for pos in &roster.positions {
+            assert!(
+                pos.player_type == PlayerType::Regular || pos.player_type == PlayerType::BigGuy,
+                "position '{}' has unexpected type {:?}",
+                pos.name, pos.player_type
+            );
         }
     }
 }

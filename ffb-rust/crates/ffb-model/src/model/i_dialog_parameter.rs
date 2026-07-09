@@ -1,10 +1,22 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct IDialogParameter;
-
-impl IDialogParameter {
-    pub fn new() -> Self { Self }
+/// 1:1 translation of com.fumbbl.ffb.IDialogParameter (Java interface).
+pub trait IDialogParameter {
+    fn get_dialog_id(&self) -> &str;
 }
 
-impl Default for IDialogParameter {
-    fn default() -> Self { Self::new() }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct Impl;
+    impl IDialogParameter for Impl { fn get_dialog_id(&self) -> &str { "testDialog" } }
+
+    #[test]
+    fn get_dialog_id_works() {
+        assert_eq!(Impl.get_dialog_id(), "testDialog");
+    }
+
+    #[test]
+    fn dialog_id_not_empty() {
+        assert!(!Impl.get_dialog_id().is_empty());
+    }
 }

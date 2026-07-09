@@ -143,9 +143,11 @@ impl StepMoveDodge {
             let tgt = self.coordinate_to.unwrap_or(FieldCoordinate::new(0, 0));
             let ctx = DodgeContext::new(game, &acting, src, tgt);
             let mods = factory.find_applicable(&ctx);
+            let skill_mods = factory.find_skill_modifiers(&ctx);
+            let all: Vec<&ffb_mechanics::modifiers::dodge_modifier::DodgeModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
             let agility = game.player(pid).map(|p| p.agility as i32).unwrap_or(3);
-            let min = DodgeModifierFactory::minimum_roll(agility, &mods);
-            let names: Vec<String> = mods.iter().map(|m| m.get_report_string().to_string()).collect();
+            let min = DodgeModifierFactory::minimum_roll(agility, &all);
+            let names: Vec<String> = all.iter().map(|m| m.get_report_string().to_string()).collect();
             (min, names)
         } else {
             (2, vec![])

@@ -154,6 +154,9 @@ pub enum GameEvent {
     ThenIStartedBlastin { attacker_id: PlayerId, defender_id: Option<PlayerId>, roll: i32, success: bool, fumble: bool },
 
     // ── Inducements & cards ────────────────────────────────────────────────────
+    /// Java: ServerCommandAddPlayer — new player added to game (star player, mercenary, staff).
+    /// Emitted once per added player from inducement steps.
+    PlayerAdded { team_id: String, player_id: String, position_id: String },
     /// Java: ReportApothecaryRoll — apo re-rolls the casualty die. roll/new_state are None when not used.
     ApothecaryRoll { player_id: PlayerId, roll: Option<i32>, new_state: Option<u16>, new_serious_injury: Option<SeriousInjuryKind> },
     ApothecaryChoice { player_id: PlayerId, healed: bool },

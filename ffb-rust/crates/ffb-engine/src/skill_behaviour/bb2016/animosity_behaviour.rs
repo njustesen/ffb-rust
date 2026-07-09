@@ -1,7 +1,18 @@
 use crate::skill_behaviour::SkillBehaviour;
 
-/// Animosity: player may refuse to pass/hand off to certain teammates.
-/// Mirrors Java `com.fumbbl.ffb.server.skillbehaviour.bb2016.AnimosityBehaviour`.
+/// 1:1 translation of `com.fumbbl.ffb.server.skillbehaviour.bb2016.AnimosityBehaviour`.
+///
+/// **BB2016 vs BB2025 logic differences** (both are stubs until StepAnimosityHookState is ported):
+/// - BB2016: `isSufferingAnimosity()` path checks `HAND_OVER` action for race-match first;
+///   pass aborted via `GOTO_LABEL` if target race mismatches.
+///   Then on fresh roll: `doRoll` check, roll `minimumRollAnimosity()`, re-roll path via
+///   `ANIMOSITY` reroll action.
+/// - BB2025: added `ReRolledActions.ANIMOSITY` re-roll handling at the top of the hook,
+///   `doRoll` flag, `SkillMechanic.minimumRollAnimosity()` call — slightly restructured.
+///   Both editions share the same `goodConditions` adjacency check.
+///
+/// TODO(hook-infra): implement once `StepAnimosityHookState` (catcherId, doRoll,
+///   sufferingAnimosity, gotoLabelOnFailure) is available.
 pub struct AnimosityBehaviour;
 
 impl AnimosityBehaviour {

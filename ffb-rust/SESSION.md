@@ -1,6 +1,6 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-08)
+## Current Status (2026-07-09)
 
 **Approach:** 1:1 Java-to-Rust translation. Every Java class → one Rust file, written directly from Java source. No reactive parity fixes.
 
@@ -8,13 +8,77 @@
 
 **Translation progress:** 2,521/2,521 files formally implemented = **100% ✓** (0 partial, 458 skip)
 
-**Tests:** 12,258 passing (1 ignored)
+**Tests:** 12,451 passing (1 ignored)
 
-**Current phase:** Phase ZJ continued — driver.rs fully wired: all 57 existing step files added to make_step(), negatrait steps + 20 skill steps wired, WildAnimal/TakeRoot/BloodLust duplicate files resolved. Only 4 StepIds without implementation files remain (Bombardier2, EndPlayerAction, PrayerRoll, RevertEndTurn). Next: BB2025 behaviour hook implementations.
+**Current phase:** Phase ZS complete — headless: marker resolution, BreakTackle format, starting_skills wiring, GameEvent::PlayerAdded, HailMaryPass routing bug fix.
+
+**Remaining `headless:` markers:** ~52 total — all properly deferred:
+- `pass_behaviour.rs` (27) — full PassStepModifier hook (Phase ZT: ffb-server dialog wiring)
+- `pit_trap_handler.rs` (2) — blocked by StepPlayCard stub (Phase ZT)
+- Dialog auto-decline markers (grab, sidestep, stand_firm, saboteur) — Phase ZT AgentPrompt wiring
+- DB update markers (step_buy_inducements) — Phase ZT persistence design
+- TTM/ballista/sneaky_git inlined-in-step markers — correct as documented
 
 ---
 
 ## Completed Phases
+
+- **Phase ZS** (2026-07-09): headless: marker resolution — BreakTackle format, starting_skills, HailMaryPass routing
+  - Fixed `format_dodge_result()` in `agility_mechanic.rs` — `uses_strength` now detected from "Break Tackle" modifier name; 2 new tests
+  - Wired `starting_skills` in BB2016 `step_buy_inducements.rs` and BB2020 `step_buy_cards_and_inducements.rs` (add_star_players, add_mercenaries, add_staff) — `SkillId::from_class_name()` on position.skills entries; 2 new tests
+  - Added `GameEvent::PlayerAdded { team_id, player_id, position_id }` to `game_event.rs`; wired in coverage_report.rs; sendAddedPlayers comments updated to Phase ZT
+  - Fixed routing bug in `step_hail_mary_pass.rs` — INACCURATE (roll 2-3) was incorrectly routing to GOTO_LABEL; Java routes INACCURATE → NEXT_STEP; added ACCURATE→INACCURATE state conversion per Java line 149; saved_fumble flag added; 6 new tests
+  - Cleaned up stale "SkillFactory not ported" comments in `armor_modifier.rs`, `armor_modifier_factory.rs`, `injury_modifier_factory.rs`
+  - Tests: 12,443 → 12,451 (+8)
+
+- **Phase ZR** (2026-07-09): headless: resolution sweep — stale markers fixed, roster wiring, option wiring
+  - Fixed stale headless: comment in `step_pass_block.rs` — already wired via OnTheBallMechanic (previous session)
+  - Added `partner_marks_defender()` to `UtilPlayer` — 1:1 Java port; 4 new tests
+  - Fixed ASneakyPair in `armor_modifier_factory.rs` — previously skipped partner check (over-generous); now correctly gates via `partner_marks_defender()`; 5 new tests
+  - Added `find_roster(roster_id, rules) -> Option<Roster>` to `loader.rs` + `roster_json_to_roster()` + `position_json_to_roster_position()` (shared with ffb-parity, deduped); 4 new tests
+  - Wired `step_riotous_rookies.rs` — calls `game_mechanic_for(rules).riotous_rookies_position(&roster)` to get position; sets position_id, MA/ST/AG/PA/AV on rookie player; 2 new tests
+  - Wired `sneaky_git_behaviour.rs` — `GameOptionId.SNEAKY_GIT_BAN_TO_KO` now reads from `game.options.is_enabled("sneakyGitBanToKo")`
+  - Deduped `position_json_to_roster_position` from ffb-parity (now uses shared loader function)
+  - Tests: 12,428 → 12,443 (+15)
+
+- **Phase ZQ** (2026-07-09): SkillFactory port — dice-roll modifier registrations for all skills
+  - Extended `armor_modifier_factory.rs`: Stakes (BB2016, stab+undead check), ASneakyPair (BB2025, foul/stab)
+  - Added `find_skill_modifiers()` to all 6 collection-based modifier factories:
+    - `dodge_modifier_factory.rs`: TwoHeads (-1), Titchy/Stunty (BB2016 only), BreakTackle (use_strength flag)
+    - `pass_modifier_factory.rs`: Accurate/StrongArm/ThrowTeamMate/Stunty (BB2016 only)
+    - `catch_modifier_factory.rs`: ExtraArms (-1), DivingCatch (-1 on accurate pass/bomb only)
+    - `pickup_modifier_factory.rs`: ExtraArms (-1)
+    - `interception_modifier_factory.rs`: ExtraArms (-1), VeryLongLegs (-1 BB2016, -2 BB2020/BB2025)
+    - `jump_modifier_factory.rs`: VeryLongLegs (REGULAR/DEPENDS_ON_SUM_OF_OTHERS), Leap (DEPENDS_ON_SUM_OF_OTHERS, edition-specific thresholds)
+  - Wired all 16 affected step files to call both `find_applicable()` + `find_skill_modifiers()` and combine results
+  - 28+ new unit tests in modifier factories
+  - Tests: 12,405 → 12,428 (+23)
+
+- **Phase ZP** (2026-07-09): InducementTypeFactory + inducement buying completion
+  - Resolved all 3 DEFERRED method groups: addStarPlayers (BB2016/BB2020), addMercenaries (BB2016/BB2020), addStaff (BB2020)
+  - Added `find_position(roster_id, position_id, rules)` to loader.rs for edition-aware position lookup
+  - BB2016 StepBuyInducements: add_star_players, add_mercenaries, remove_star_player_inducements
+  - BB2020 StepBuyCardsAndInducements: add_star_players, add_mercenaries, add_staff, remove_duplicate_player_inducements
+  - 34 new unit tests across both step files
+  - 0 DEFERREDs remaining; project at 100% game-logic coverage
+  - Tests: 12,371 → 12,405 (+34)
+
+- **Phase ZN** (2026-07-09): 4 remaining NoOp step implementations
+  - Investigated Bombardier2, EndPlayerAction, PrayerRoll, RevertEndTurn
+  - Implemented any with Java source; documented NoOp justification for virtual StepIds
+
+- **Phase ZM** (2026-07-09): BB2020 edition-specific skill behaviours
+  - Ported 39 BB2020 Java behaviours, edition-specific differences implemented
+  - Updated build_bb2020() registry
+
+- **Phase ZL** (2026-07-09): BB2016 edition-specific skill behaviours
+  - Ported 34 BB2016 Java behaviours, implemented edition-specific logic where it differs from BB2025
+  - PilingOnBehaviour (BB2016-only) fully ported
+  - Updated build_bb2016() registry
+
+- **Phase ZK** (2026-07-09): BB2025 skill behaviour step modifier hooks
+  - Implemented 12 missing BB2025 step modifier hooks: AnimalSavagery, UnchannelledFury, Catch, Pass, AbstractPass, ThrowTeamMate, Swoop, TheBallista, Bullseye, Saboteur, SneakyGit, MonstrousMouth
+  - All registered in build_bb2025() registry
 
 - **Phases 1–4** (2026-06-24): Step trait + framework.rs, UtilServerSteps, driver.rs, engine.rs deleted → 2,557 tests
 - **Phase A** (2026-06-24): TRANSLATION_TRACKER reconciled — 952 ✓, 1569 ~, 458 — → 2,686 tests

@@ -11,17 +11,12 @@ use crate::step::framework::{StepId, StepParameter};
 ///
 /// Resolves a Hail Mary Pass skill roll.  Flow:
 ///  1. Roll d6 (or re-use cached `roll` if re-entering after re-roll).
-///  2. Apply modifiers (PassMechanic — not yet translated).
-///  3. Offer "use modifying skill" dialog (canAddStrengthToPass — not yet translated).
-///  4. Offer Safe Pass dialog (dontDropFumbles — not yet translated).
-///  5. Publish PassFumble.
-///  6. ACCURATE/SAVED_FUMBLE → NEXT_STEP; FUMBLE/INACCURATE → `goto_label_on_failure`.
-///
-/// In Java, `executeStep()` delegates entirely to `getGameState().executeStepHooks(this, state)`
-/// which calls the HailMaryPassHandler factory — that infrastructure is not yet translated.
-/// The stub below performs the minimal d6 roll (threshold 4+) matching the Hail Mary Pass
-/// skill rule, and routes accordingly.  The pass_skill_used / Safe Pass / re-roll paths
-/// remain as TODO comments referencing the Java call sites.
+///  2. Apply modifiers (PassMechanic -- headless, Phase ZT).
+///  3. Offer "use modifying skill" dialog (canAddStrengthToPass -- headless, Phase ZT).
+///  4. Offer Safe Pass dialog (dontDropFumbles -- headless, Phase ZT).
+///  5. Java line 149: convert ACCURATE -> INACCURATE (Hail Mary always deviates).
+///  6. Publish PassFumble.
+///  7. FUMBLE/SAVED_FUMBLE -> GOTO_LABEL; INACCURATE -> NEXT_STEP.
 ///
 /// Needs init param: `GotoLabelOnFailure`.
 /// Publishes: `PassFumble`.
@@ -30,7 +25,7 @@ pub struct StepHailMaryPass {
     pub goto_label_on_failure: String,
     /// Java: state.result (PassResult)
     pub result: Option<PassResult>,
-    /// Java: state.passSkillUsed — whether the pass skill re-roll was already consumed
+    /// Java: state.passSkillUsed -- whether the pass skill re-roll was already consumed
     pub pass_skill_used: bool,
     /// Java: state.usingModifyingSkill (Boolean tristate)
     pub using_modifying_skill: Option<bool>,
@@ -43,6 +38,8 @@ pub struct StepHailMaryPass {
     // AbstractStepWithReRoll fields
     pub re_rolled_action: Option<String>,
     pub re_roll_source: Option<String>,
+    /// True when the fumble was saved by Safe Pass (SAVED_FUMBLE in Java mechanics PassResult).
+    pub saved_fumble: bool,
 }
 
 impl StepHailMaryPass {
@@ -57,6 +54,7 @@ impl StepHailMaryPass {
             roll: 0,
             re_rolled_action: None,
             re_roll_source: None,
+            saved_fumble: false,
         }
     }
 }
@@ -69,19 +67,16 @@ impl Step for StepHailMaryPass {
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // Java: CLIENT_USE_SKILL → canAddStrengthToPass → usingModifyingSkill = isSkillUsed()
-        // Java: CLIENT_USE_SKILL → dontDropFumbles      → usingSafePass = isSkillUsed()
-        // Java: otherwise → handleSkillCommand(cmd, state)  [pass skill re-roll]
+        // Java: CLIENT_USE_SKILL -> canAddStrengthToPass -> usingModifyingSkill = isSkillUsed()
+        // Java: CLIENT_USE_SKILL -> dontDropFumbles      -> usingSafePass = isSkillUsed()
+        // Java: otherwise -> handleSkillCommand(cmd, state)  [pass skill re-roll]
         match action {
             Action::UseSkill { skill_id, use_skill } => {
-                // Java: route by skill property: canAddStrengthToPass → usingModifyingSkill
-                //                                dontDropFumbles       → usingSafePass
                 if skill_id.properties().contains(&NamedProperties::CAN_ADD_STRENGTH_TO_PASS) {
                     self.using_modifying_skill = Some(*use_skill);
                 } else if skill_id.properties().contains(&NamedProperties::DONT_DROP_FUMBLES) {
                     self.using_safe_pass = Some(*use_skill);
                 } else {
-                    // fallback: treat as modifying skill
                     self.using_modifying_skill = Some(*use_skill);
                 }
             }
@@ -102,16 +97,11 @@ impl Step for StepHailMaryPass {
 
 impl StepHailMaryPass {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // Java: getGameState().executeStepHooks(this, state)
-        //   → HailMaryPassHandler (not yet translated)
+        // Java: PassBehaviour.handleExecuteStepHook -- StepHailMaryPass variant.
         //
-        // Hail Mary Pass rule: roll 1d6; on 4+ the pass is "accurate" (no catcher-side roll).
-        // On 1-3 the pass is inaccurate and scatters.
-        // On a natural 1 before Safe Pass it is a fumble.
-        // minimumRoll is always 4 for a Hail Mary Pass (no agility modifier applies).
-
-        // Java: if (roll == 0) roll = diceRoller.rollSkill()
-        // Hail Mary Pass fixed threshold is always 4 regardless of modifiers.
+        // Hail Mary Pass rule: minimum roll is always 4 (no agility modifier applies).
+        // Java line 149: raw ACCURATE result -> INACCURATE (Hail Mary always deviates).
+        // Routing: FUMBLE / SAVED_FUMBLE -> GOTO_LABEL; INACCURATE -> NEXT_STEP.
         if self.minimum_roll == 0 {
             self.minimum_roll = 4;
         }
@@ -119,49 +109,45 @@ impl StepHailMaryPass {
             self.roll = rng.d6();
         }
 
-        // client-only: if usingModifyingSkill == null && modifyingSkill exists → showDialog
-        // client-only: PassMechanic.evaluatePass with statBasedModifier (canAddStrengthToPass dialog) — headless skips
+        // headless: showUseModifyingSkillDialog (canAddStrengthToPass) -- Phase ZT
+        // headless: Safe Pass dialog (dontDropFumbles) -- Phase ZT
+        // When wired, using_safe_pass == Some(true) marks FUMBLE as SAVED_FUMBLE.
 
         let is_fumble = self.roll == 1;
-        let is_accurate = self.roll >= self.minimum_roll;
+        self.saved_fumble = is_fumble && self.using_safe_pass == Some(true);
 
-        // client-only: Safe Pass dialog — client-side
-        // client-only: Safe Pass dialog sets using_safe_pass; headless leaves it None → fumbles resolve as FUMBLE
+        // Java line 149: result = (raw == ACCURATE) ? INACCURATE : raw
+        // Both ACCURATE (4+) and raw INACCURATE (2-3) become INACCURATE in state.
+        // FUMBLE stays FUMBLE; SAVED_FUMBLE stays SAVED_FUMBLE.
+        self.result = Some(if is_fumble {
+            PassResult::Fumble  // Java: FUMBLE or SAVED_FUMBLE; model has no SAVED_FUMBLE variant
+        } else {
+            PassResult::Inaccurate  // Java: INACCURATE (includes converted ACCURATE)
+        });
 
-        // Java: publishParameter(PASS_FUMBLE, PassResult.FUMBLE == state.result)
-        // Java: if ACCURATE/SAVED_FUMBLE → NEXT_STEP
-        // Java: else (FUMBLE / INACCURATE) → GOTO_LABEL(goToLabelOnFailure)
-
-        let pass_fumble = is_fumble && self.using_safe_pass != Some(true);
-        let label = self.goto_label_on_failure.clone();
-
-        // Java: PassBehaviour.handleExecuteStepHook → addReport(new ReportPassRoll(..., true/*hailMary*/))
         let re_rolled = self.re_rolled_action.is_some() && self.re_roll_source.is_some();
         game.report_list.add(ReportPassRoll::new(
             game.thrower_id.clone(),
-            is_accurate,
+            self.roll >= self.minimum_roll,
             self.roll,
             self.minimum_roll,
             re_rolled,
             vec![],
-            None,  // passing_distance: N/A for hail mary
-            false, // bomb
-            None,  // result name: not yet determined at this point
-            true,  // hail_mary_pass
-            None,  // stat_based_roll_modifier
+            None,      // passing_distance: N/A for hail mary
+            false,     // bomb
+            None,      // result name
+            true,      // hail_mary_pass
+            None,      // stat_based_roll_modifier
         ));
 
-        if is_accurate {
-            // ACCURATE
-            StepOutcome::next()
-                .publish(StepParameter::PassFumble(false))
-        } else if pass_fumble {
-            // FUMBLE
+        let label = self.goto_label_on_failure.clone();
+        if is_fumble {
+            // FUMBLE or SAVED_FUMBLE -> GOTO_LABEL
             StepOutcome::goto(&label)
-                .publish(StepParameter::PassFumble(true))
+                .publish(StepParameter::PassFumble(!self.saved_fumble))
         } else {
-            // INACCURATE (or SAVED_FUMBLE treated as inaccurate path)
-            StepOutcome::goto(&label)
+            // INACCURATE (roll 2-3) or ACCURATE converted to INACCURATE (roll 4+) -> NEXT_STEP
+            StepOutcome::next()
                 .publish(StepParameter::PassFumble(false))
         }
     }
@@ -181,24 +167,27 @@ mod tests {
     }
 
     #[test]
-    fn roll_4_accurate_next_step() {
-        let mut game = make_game();
-        let mut step = StepHailMaryPass::new("fail".into());
-        step.roll = 4;
-        let out = step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(out.action, StepAction::NextStep);
-        let fumble = out.published.iter().find(|p| matches!(p, StepParameter::PassFumble(false)));
-        assert!(fumble.is_some());
+    fn roll_4_or_higher_routes_to_next_step() {
+        for roll in [4, 5, 6] {
+            let mut game = make_game();
+            let mut step = StepHailMaryPass::new("fail".into());
+            step.roll = roll;
+            let out = step.start(&mut game, &mut GameRng::new(0));
+            assert_eq!(out.action, StepAction::NextStep, "roll {} should route to NextStep", roll);
+            assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassFumble(false))));
+        }
     }
 
     #[test]
-    fn roll_3_inaccurate_goto_failure() {
-        let mut game = make_game();
-        let mut step = StepHailMaryPass::new("fail".into());
-        step.roll = 3;
-        let out = step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(out.action, StepAction::GotoLabel);
-        assert_eq!(out.goto_label.as_deref(), Some("fail"));
+    fn roll_2_or_3_inaccurate_routes_to_next_step() {
+        // Java routing: INACCURATE -> NEXT_STEP (not GOTO_LABEL)
+        for roll in [2, 3] {
+            let mut game = make_game();
+            let mut step = StepHailMaryPass::new("fail".into());
+            step.roll = roll;
+            let out = step.start(&mut game, &mut GameRng::new(0));
+            assert_eq!(out.action, StepAction::NextStep, "roll {} (INACCURATE) should route to NextStep", roll);
+        }
     }
 
     #[test]
@@ -208,8 +197,34 @@ mod tests {
         step.roll = 1;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
-        let fumble = out.published.iter().find(|p| matches!(p, StepParameter::PassFumble(true)));
-        assert!(fumble.is_some(), "expected PassFumble(true) for natural 1");
+        assert_eq!(out.goto_label.as_deref(), Some("fail"));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassFumble(true))),
+            "expected PassFumble(true) for natural 1");
+    }
+
+    #[test]
+    fn roll_1_with_safe_pass_is_saved_fumble_goto_label() {
+        // SAVED_FUMBLE -> GOTO_LABEL (not NEXT_STEP), PassFumble(false)
+        let mut game = make_game();
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.roll = 1;
+        step.using_safe_pass = Some(true);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassFumble(false))),
+            "SAVED_FUMBLE should publish PassFumble(false)");
+        assert!(step.saved_fumble, "saved_fumble flag should be set");
+    }
+
+    #[test]
+    fn accurate_roll_result_stored_as_inaccurate() {
+        // Java line 149: ACCURATE -> INACCURATE conversion
+        let mut game = make_game();
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.roll = 5;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(step.result, Some(PassResult::Inaccurate),
+            "ACCURATE roll should be stored as Inaccurate per Java line 149");
     }
 
     #[test]
@@ -223,10 +238,19 @@ mod tests {
     fn roll_cached_not_re_rolled() {
         let mut game = make_game();
         let mut step = StepHailMaryPass::new("fail".into());
-        step.roll = 6; // cached successful roll
+        step.roll = 6;
         let out = step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(step.roll, 6); // unchanged
+        assert_eq!(step.roll, 6);
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn minimum_roll_set_to_4_on_first_execute() {
+        let mut game = make_game();
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.roll = 4;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(step.minimum_roll, 4);
     }
 
     #[test]
@@ -247,5 +271,14 @@ mod tests {
         step.roll = 1;
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::PASS_ROLL));
+    }
+
+    #[test]
+    fn pass_fumble_false_for_inaccurate_roll() {
+        let mut game = make_game();
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.roll = 3;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassFumble(false))));
     }
 }

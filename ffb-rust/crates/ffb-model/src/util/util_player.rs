@@ -1,4 +1,5 @@
 use crate::enums::{PlayerState, TurnMode, PS_RESERVE};
+use crate::model::skill_def::SkillId;
 use crate::model::field_model::FieldModel;
 use crate::model::game::Game;
 use crate::model::player::{Player, PlayerId};
@@ -675,6 +676,28 @@ impl UtilPlayer {
         }
         result
     }
+
+    /// 1:1 translation of partnerMarksDefender(Game, Player, Skill).
+    ///
+    /// Returns true if MORE THAN ONE player from the opposing team (relative to `defender_id`)
+    /// is adjacent to the defender's coordinate AND has the given skill. "More than one" because
+    /// the main attacker counts as one; a second (partner) adjacent to the defender makes it true.
+    ///
+    /// Java: `ArrayTool.isProvided(players) && players.length > 1`
+    pub fn partner_marks_defender(game: &Game, defender_id: &str, skill_id: SkillId) -> bool {
+        let defender_coord = match game.field_model.player_coordinate(defender_id) {
+            Some(c) => c,
+            None => return false,
+        };
+        let other_team = Self::find_other_team(game, defender_id);
+        let adjacent = Self::find_adjacent_players_with_tacklezones(game, other_team, defender_coord, false);
+        let count = adjacent
+            .into_iter()
+            .filter_map(|id| game.team_home.player(id).or_else(|| game.team_away.player(id)))
+            .filter(|p| p.has_skill(skill_id))
+            .count();
+        count > 1
+    }
 }
 
 impl Default for UtilPlayer {
@@ -1136,5 +1159,57 @@ mod tests {
         let a1 = game.team_away.players.iter().find(|p| p.id == "a1").unwrap();
         assert!(!h1.temporary_skills.is_empty(), "active player keeps conditional skill");
         assert!(!a1.temporary_skills.is_empty(), "active player keeps conditional skill");
+    }
+
+    // ── partner_marks_defender ────────────────────────────────────────────────
+
+    fn add_skilled_player(game: &mut Game, home: bool, id: &str, coord: FieldCoordinate, state: PlayerState, skill: crate::enums::SkillId) {
+        use crate::model::skill_def::SkillWithValue;
+        let mut p = minimal_player(id);
+        p.starting_skills.push(SkillWithValue::new(skill));
+        if home { game.team_home.players.push(p); } else { game.team_away.players.push(p); }
+        game.field_model.set_player_coordinate(id, coord);
+        game.field_model.set_player_state(id, state);
+    }
+
+    #[test]
+    fn partner_marks_defender_returns_false_when_defender_not_on_field() {
+        use crate::enums::SkillId;
+        let mut game = minimal_game();
+        // defender added to team list but no coordinate → not on field
+        game.team_home.players.push(minimal_player("def"));
+        assert!(!UtilPlayer::partner_marks_defender(&game, "def", SkillId::ASneakyPair));
+    }
+
+    #[test]
+    fn partner_marks_defender_returns_false_with_one_adjacent_partner() {
+        use crate::enums::SkillId;
+        let mut game = minimal_game();
+        add_player(&mut game, true, "def", FieldCoordinate::new(5, 5), ACTIVE_STANDING);
+        add_skilled_player(&mut game, false, "a1", FieldCoordinate::new(6, 5), ACTIVE_STANDING, SkillId::ASneakyPair);
+        // Only 1 adjacent attacker with the skill — need more than 1
+        assert!(!UtilPlayer::partner_marks_defender(&game, "def", SkillId::ASneakyPair));
+    }
+
+    #[test]
+    fn partner_marks_defender_returns_true_with_two_adjacent_partners() {
+        use crate::enums::SkillId;
+        let mut game = minimal_game();
+        add_player(&mut game, true, "def", FieldCoordinate::new(5, 5), ACTIVE_STANDING);
+        add_skilled_player(&mut game, false, "a1", FieldCoordinate::new(6, 5), ACTIVE_STANDING, SkillId::ASneakyPair);
+        add_skilled_player(&mut game, false, "a2", FieldCoordinate::new(5, 6), ACTIVE_STANDING, SkillId::ASneakyPair);
+        // 2 adjacent attackers with the skill → true
+        assert!(UtilPlayer::partner_marks_defender(&game, "def", SkillId::ASneakyPair));
+    }
+
+    #[test]
+    fn partner_marks_defender_returns_false_when_only_one_has_skill() {
+        use crate::enums::SkillId;
+        let mut game = minimal_game();
+        add_player(&mut game, true, "def", FieldCoordinate::new(5, 5), ACTIVE_STANDING);
+        add_skilled_player(&mut game, false, "a1", FieldCoordinate::new(6, 5), ACTIVE_STANDING, SkillId::ASneakyPair);
+        // a2 is adjacent but has no skill
+        add_player(&mut game, false, "a2", FieldCoordinate::new(5, 6), ACTIVE_STANDING);
+        assert!(!UtilPlayer::partner_marks_defender(&game, "def", SkillId::ASneakyPair));
     }
 }

@@ -1,10 +1,23 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
+use crate::enums::DiceCategoryKind;
+
+/// 1:1 translation of com.fumbbl.ffb.model.BlockDiceCategory.
 pub struct BlockDiceCategory;
 
 impl BlockDiceCategory {
-    pub fn new() -> Self { Self }
+    pub fn kind() -> DiceCategoryKind { DiceCategoryKind::Block }
 }
 
-impl Default for BlockDiceCategory {
-    fn default() -> Self { Self::new() }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kind_is_block() {
+        assert_eq!(BlockDiceCategory::kind(), DiceCategoryKind::Block);
+    }
+
+    #[test]
+    fn kind_is_not_direction() {
+        assert_ne!(BlockDiceCategory::kind(), DiceCategoryKind::Direction);
+    }
 }

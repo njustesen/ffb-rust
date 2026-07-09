@@ -136,8 +136,10 @@ impl StepPickUp {
             if let Some(player) = game.player(player_id) {
                 let ctx = PickupContext::new(game, player);
                 let mods = factory.find_applicable(&ctx);
+                let skill_mods = factory.find_skill_modifiers(&ctx);
+                let all: Vec<&ffb_mechanics::modifiers::pickup_modifier::PickupModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
                 let agility = player.agility as i32;
-                PickupModifierFactory::minimum_roll(agility, &mods)
+                PickupModifierFactory::minimum_roll(agility, &all)
             } else {
                 2
             }

@@ -31,7 +31,7 @@ impl InjuryModifierFactory {
             .find(|m| m.get_name() == name);
         if from_collection.is_some() { return from_collection; }
 
-        // headless: modifier_aggregator.get_injury_modifiers() always empty — SkillFactory not ported
+        // ModifierAggregator is intentionally empty — per-skill injury modifier lookup uses direct matching.
         self.modifier_aggregator.get_injury_modifiers()
             .into_iter()
             .find(|m| m.get_name() == name)

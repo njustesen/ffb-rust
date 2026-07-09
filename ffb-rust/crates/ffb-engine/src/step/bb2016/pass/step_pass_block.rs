@@ -9,13 +9,14 @@
 /// Init parameter: GOTO_LABEL_ON_END (mandatory).
 /// Receives: END_PLAYER_ACTION (consumed in PASS_BLOCK mode), END_TURN (consumed in PASS_BLOCK mode).
 ///
-/// headless(PassBlock-mechanic): OnTheBallMechanic.findPassBlockers not yet ported.
 /// headless(PassBlock-turnMode): TurnMode::PassBlock + homePlaying flip not yet ported.
 /// headless(PassBlock-generators): Move/Select sequence generators not yet ported.
 use ffb_model::enums::TurnMode;
 use ffb_model::model::game::Game;
 use ffb_model::report::report_pass_block::ReportPassBlock;
 use ffb_model::util::rng::GameRng;
+use ffb_mechanics::bb2016::on_the_ball_mechanic::OnTheBallMechanic;
+use ffb_mechanics::on_the_ball_mechanic::OnTheBallMechanic as OnTheBallMechanicTrait;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -42,14 +43,22 @@ impl StepPassBlock {
     }
 
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
-        // headless: OnTheBallMechanic not ported — conservatively treats as no pass-blockers available.
-        // Java: if (availablePassBlockers.size() == 0) → addReport(new ReportPassBlock(opposingTeam.getId(), false))
-        let opposing_team_id = if game.home_playing {
-            game.team_away.id.clone()
+        // Java: List<Player> availablePassBlockers = onTheBallMechanic.findPassBlockers(game, opposingTeam, true)
+        let (opposing_team_id, opposing_team_clone) = if game.home_playing {
+            (game.team_away.id.clone(), game.team_away.clone())
         } else {
-            game.team_home.id.clone()
+            (game.team_home.id.clone(), game.team_home.clone())
         };
-        game.report_list.add(ReportPassBlock::new(opposing_team_id, false));
+        let available_pass_blockers = OnTheBallMechanic::new().find_pass_blockers(game, &opposing_team_clone, true);
+        if available_pass_blockers.is_empty() {
+            // Java: addReport(new ReportPassBlock(opposingTeam.getId(), false)) → NEXT_STEP
+            game.report_list.add(ReportPassBlock::new(opposing_team_id, false));
+            return StepOutcome::next();
+        }
+        // Java: availablePassBlockers non-empty → set TurnMode::PassBlock, flip homePlaying, push sequences.
+        // headless(PassBlock-turnMode): TurnMode::PassBlock + homePlaying flip not yet ported.
+        // headless(PassBlock-generators): Move/Select sequence generators not yet ported.
+        game.report_list.add(ReportPassBlock::new(opposing_team_id, true));
         StepOutcome::next()
     }
 }

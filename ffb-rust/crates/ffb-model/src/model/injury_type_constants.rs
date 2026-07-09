@@ -1,10 +1,21 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct InjuryTypeConstants;
+/// 1:1 translation of com.fumbbl.ffb.model.InjuryTypeConstants.
+pub const STUN: &str = "STUN";
+pub const KO: &str = "KO";
+pub const BH: &str = "BH";
+pub const SI: &str = "SI";
+pub const RIP: &str = "RIP";
 
-impl InjuryTypeConstants {
-    pub fn new() -> Self { Self }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-impl Default for InjuryTypeConstants {
-    fn default() -> Self { Self::new() }
+    #[test]
+    fn stun_is_stun() {
+        assert_eq!(STUN, "STUN");
+    }
+
+    #[test]
+    fn rip_is_rip() {
+        assert_eq!(RIP, "RIP");
+    }
 }

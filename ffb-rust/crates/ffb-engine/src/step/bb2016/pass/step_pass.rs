@@ -116,7 +116,9 @@ impl StepPass {
 
         let factory = PassModifierFactory::for_rules(game.rules);
         let ctx = PassContext::new(game, &thrower, passing_distance, false);
-        let modifier_total: i32 = factory.find_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum();
+        let collection_total: i32 = factory.find_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum();
+        let skill_total: i32 = factory.find_skill_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum();
+        let modifier_total: i32 = collection_total + skill_total;
         let modifiers_vec: Vec<PassModifier> = if modifier_total != 0 {
             vec![PassModifier::new("pass_mods", modifier_total, ModifierType::REGULAR)]
         } else {

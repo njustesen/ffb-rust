@@ -101,7 +101,9 @@ impl StepIntercept {
         let roll = rng.d6();
         let factory = InterceptionModifierFactory::for_rules(game.rules);
         let mods = factory.find_applicable(game, interceptor, PassResult::ACCURATE, false);
-        let minimum_roll = InterceptionModifierFactory::minimum_roll_bb2016(interceptor, &mods);
+        let skill_mods = factory.find_skill_modifiers(game, interceptor);
+        let all: Vec<&ffb_mechanics::modifiers::interception_modifier::InterceptionModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
+        let minimum_roll = InterceptionModifierFactory::minimum_roll_bb2016(interceptor, &all);
         (roll >= minimum_roll, roll, minimum_roll)
     }
 

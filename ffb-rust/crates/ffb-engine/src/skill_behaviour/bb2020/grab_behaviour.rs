@@ -1,13 +1,27 @@
 use crate::skill_behaviour::SkillBehaviour;
 
 /// BB2020 Grab skill behaviour.
-/// StepModifier on StepPushback: if attacker has Grab and conditions met (free square, no
-/// conflicting skill, block action), shows dialog or sets pushbackMode=GRAB. Returns true when
-/// consumed. Mirrors Java `com.fumbbl.ffb.server.skillbehaviour.bb2020.GrabBehaviour`.
+///
+/// Mirrors Java `com.fumbbl.ffb.server.skillbehaviour.bb2020.GrabBehaviour`.
+///
+/// **BB2020 vs BB2025 difference:**
+///
+/// The `StepModifier<StepPushback, StepState>` is registered with priority **4** in BB2020.
+/// BB2025 registers it with priority **5**.
+///
+/// Priority determines evaluation order when multiple modifiers apply to the same step. A higher
+/// number means lower priority (evaluated later). BB2025 deprioritises Grab relative to BB2020.
 pub struct GrabBehaviour;
 
 impl GrabBehaviour {
     pub fn new() -> Self { Self }
+
+    /// Returns the priority used when registering the StepPushback modifier in BB2020.
+    ///
+    /// Java: `registerModifier(new StepModifier<StepPushback, StepState>(4) { ... })`
+    pub const fn pushback_modifier_priority() -> u32 {
+        4
+    }
 }
 
 impl Default for GrabBehaviour {
@@ -17,18 +31,8 @@ impl Default for GrabBehaviour {
 impl SkillBehaviour for GrabBehaviour {
     fn name(&self) -> &'static str { "GrabBehaviour" }
 
-    /// Java `StepModifier<StepPushback, StepState>.handleExecuteStepHook`:
-    /// checks if attacker has Grab, no conflicting skill, defender has free square, action is
-    /// block type; if all pushback squares occupied shows dialog; changes pushbackMode to GRAB
-    /// and removes non-selected squares. Returns true when grab is active, false otherwise.
-    ///
-    /// TODO(hook-infra): needs state.grabbing, state.freeSquareAroundDefender,
-    /// state.startingPushbackSquare, state.pushbackSquares, state.pushbackMode,
-    /// state.defender.
+    /// TODO(hook-infra): step-specific state access not yet wired.
     fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
-        // TODO(hook-infra): step-specific state access (state.grabbing,
-        // state.freeSquareAroundDefender, state.startingPushbackSquare,
-        // state.pushbackSquares, state.pushbackMode, state.defender)
         false
     }
 }
@@ -37,17 +41,21 @@ impl SkillBehaviour for GrabBehaviour {
 mod tests {
     use super::*;
 
+    /// BB2020 registers the Grab pushback modifier with priority 4.
     #[test]
-    fn hook_is_noop_returns_false() {
-        // Without step infra the hook always returns false.
-        let b = GrabBehaviour::new();
-        assert_eq!(b.name(), "GrabBehaviour");
+    fn pushback_modifier_priority_is_4_in_bb2020() {
+        assert_eq!(GrabBehaviour::pushback_modifier_priority(), 4);
+    }
+
+    /// Priority is not 5 (that is the BB2025 value).
+    #[test]
+    fn pushback_modifier_priority_is_not_5() {
+        assert_ne!(GrabBehaviour::pushback_modifier_priority(), 5);
     }
 
     #[test]
     fn name_is_correct() {
-        let b = GrabBehaviour::default();
-        assert_eq!(b.name(), "GrabBehaviour");
+        assert_eq!(GrabBehaviour::new().name(), "GrabBehaviour");
     }
 
     #[test]
@@ -67,9 +75,8 @@ mod tests {
         let b = GrabBehaviour::new();
         let mut player = Player::default();
         let pos = RosterPosition::default();
-        let movement_before = player.movement;
+        let before = player.movement;
         b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
+        assert_eq!(player.movement, before);
     }
-#[test]    fn name_is_not_empty() {        assert!(!GrabBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2020() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = GrabBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2020,        );        assert!(!b.execute_step_hook(&mut game));    }
 }

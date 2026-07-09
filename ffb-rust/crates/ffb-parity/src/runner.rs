@@ -4,13 +4,13 @@ use ffb_engine::agent::{RandomAgent, Agent};
 use ffb_engine::step::GameState;
 use ffb_engine::legal_actions::TeamSide;
 use ffb_model::events::GameEvent;
-use ffb_model::data::roster_json::{PositionJson, SkillEntry};
+use ffb_model::data::loader::position_json_to_roster_position;
+use ffb_model::data::roster_json::PositionJson;
 use ffb_model::data::{bb2016_rosters, bb2020_rosters, bb2025_rosters};
-use ffb_model::enums::{PlayerGender, PlayerType, Rules, SkillCategory};
+use ffb_model::enums::{PlayerGender, PlayerType, Rules};
 use ffb_model::enums::SkillId;
 use ffb_model::model::player::Player;
 use ffb_model::model::roster_position::RosterPosition;
-use ffb_model::model::skill_def::SkillWithValue;
 use ffb_model::model::team::Team;
 use ffb_model::prompts::AgentPrompt;
 use crate::log_format::{GameLog, LogLine, java_log_path_for, rust_log_path_for, rust_events_path_for};
@@ -467,55 +467,6 @@ pub fn make_team_from_roster(roster_name: &str, side: &str, edition: &str) -> Re
     })
 }
 
-fn position_json_to_roster_position(pos: &PositionJson, roster_id: &str, is_undead: bool) -> RosterPosition {
-    let skills: Vec<SkillWithValue> = pos.skills.iter()
-        .filter_map(|e| skill_entry_to_skill_with_value(e))
-        .collect();
-    let cats_normal: Vec<SkillCategory> = pos.skill_categories.normal.iter()
-        .filter_map(|s| SkillCategory::from_name(s))
-        .collect();
-    let cats_double: Vec<SkillCategory> = pos.skill_categories.double.iter()
-        .filter_map(|s| SkillCategory::from_name(s))
-        .collect();
-    let player_type = PlayerType::from_name(&pos.player_type)
-        .unwrap_or(PlayerType::Regular);
-    let is_big_guy = player_type == PlayerType::BigGuy
-        || pos.keywords.iter().any(|k| k == "Big Guy");
-
-    RosterPosition {
-        id: pos.id.clone(),
-        name: pos.name.clone(),
-        display_name: pos.display_name.clone(),
-        shorthand: None,
-        player_type,
-        gender: PlayerGender::Male,
-        quantity: pos.quantity,
-        cost: pos.cost,
-        movement: pos.ma,
-        strength: pos.st,
-        agility: pos.ag,
-        passing: pos.pa,
-        armour: pos.av,
-        skills,
-        skill_categories_normal: cats_normal,
-        skill_categories_double: cats_double,
-        keywords: pos.keywords.clone(),
-        is_big_guy,
-        is_undead,
-        is_thrall: false,
-        race: Some(roster_id.to_string()),
-        replaces_position: None,
-    }
-}
-
-fn skill_entry_to_skill_with_value(entry: &SkillEntry) -> Option<SkillWithValue> {
-    let skill_id = SkillId::from_class_name(entry.name())?;
-    let value = match entry {
-        SkillEntry::WithValue { value, .. } => Some(value.to_string()),
-        SkillEntry::Simple(_) => None,
-    };
-    Some(SkillWithValue { skill_id, value })
-}
 
 pub(crate) fn edition_to_rules(edition: &str) -> Rules {
     match edition {

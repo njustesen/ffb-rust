@@ -1,10 +1,28 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct PasswordChallenge;
+use serde::{Deserialize, Serialize};
 
-impl PasswordChallenge {
-    pub fn new() -> Self { Self }
+/// 1:1 translation of com.fumbbl.ffb.model.PasswordChallenge.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PasswordChallenge {
+    pub challenge: String,
 }
 
-impl Default for PasswordChallenge {
-    fn default() -> Self { Self::new() }
+impl PasswordChallenge {
+    pub fn new(challenge: String) -> Self { Self { challenge } }
+    pub fn get_challenge(&self) -> &str { &self.challenge }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_is_empty() {
+        assert!(PasswordChallenge::default().challenge.is_empty());
+    }
+
+    #[test]
+    fn new_sets_challenge() {
+        let pc = PasswordChallenge::new("abc123".to_string());
+        assert_eq!(pc.get_challenge(), "abc123");
+    }
 }

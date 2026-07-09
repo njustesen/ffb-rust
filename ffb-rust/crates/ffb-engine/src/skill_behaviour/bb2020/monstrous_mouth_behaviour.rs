@@ -1,12 +1,38 @@
 use crate::skill_behaviour::SkillBehaviour;
 
-/// BB2020 MonstrousMouth skill behaviour. StepModifier on StepCatchScatterThrowIn: if catcher has
-/// MonstrousMouth, enables catch reroll (same as Catch skill). Returns true when consumed. Mirrors
-/// Java `com.fumbbl.ffb.server.skillbehaviour.bb2020.MonstrousMouthBehaviour`.
+/// BB2020 MonstrousMouth skill behaviour.
+///
+/// Mirrors Java `com.fumbbl.ffb.server.skillbehaviour.bb2020.MonstrousMouthBehaviour`.
+///
+/// **BB2020 vs BB2025 difference:**
+///
+/// BB2020 registers one modifier on `StepCatchScatterThrowIn`: when the catcher has MonstrousMouth
+/// the skill enables a catch re-roll (sets `rerolledAction = CATCH` and `rerollCatch = true`).
+///
+/// BB2025 completely replaces this with a modifier on `StepPushback` (priority 1): when the
+/// defender is in the "chomped" player-state it forces the pushback to proceed (clears
+/// `pushbackStack`, sets `doPush = true`) and suppresses strip-ball, emitting a report event if
+/// the chomped player had the ball.
+///
+/// The two editions therefore have **entirely different step targets and semantics**:
+/// - BB2020: catch-phase re-roll mechanic.
+/// - BB2025: pushback-phase chomped-state override (strip-ball prevention).
 pub struct MonstrousMouthBehaviour;
 
 impl MonstrousMouthBehaviour {
     pub fn new() -> Self { Self }
+
+    /// Returns `true` when this edition's MonstrousMouth modifier applies to the catch phase
+    /// (BB2020), or `false` when it applies to the pushback phase (BB2025).
+    pub const fn applies_in_catch_phase() -> bool {
+        true
+    }
+
+    /// Returns `true` when this edition's MonstrousMouth modifier applies to the pushback phase
+    /// (BB2025), or `false` when it applies to the catch phase (BB2020).
+    pub const fn applies_in_pushback_phase() -> bool {
+        false
+    }
 }
 
 impl Default for MonstrousMouthBehaviour {
@@ -16,12 +42,8 @@ impl Default for MonstrousMouthBehaviour {
 impl SkillBehaviour for MonstrousMouthBehaviour {
     fn name(&self) -> &'static str { "MonstrousMouthBehaviour" }
 
-    /// Java `StepModifier<StepCatchScatterThrowIn, StepState>.handleExecuteStepHook`: if catcher
-    /// has MonstrousMouth, sets reRolledAction=CATCH and reRollSource, sets
-    /// state.rerollCatch=true, returns true. Currently returns false as step state is unavailable.
-    /// TODO(hook-infra): needs state.catcher, step.setReRolledAction, state.rerollCatch.
+    /// TODO(hook-infra): step-specific state access not yet wired.
     fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
-        // TODO(hook-infra): step-specific state access (StepState.xxx)
         false
     }
 }
@@ -30,17 +52,30 @@ impl SkillBehaviour for MonstrousMouthBehaviour {
 mod tests {
     use super::*;
 
+    /// BB2020 MonstrousMouth applies in the catch phase.
     #[test]
-    fn hook_is_noop_returns_false() {
-        // Without step infra the hook always returns false.
-        let b = MonstrousMouthBehaviour::new();
-        assert_eq!(b.name(), "MonstrousMouthBehaviour");
+    fn bb2020_applies_in_catch_phase() {
+        assert!(MonstrousMouthBehaviour::applies_in_catch_phase());
+    }
+
+    /// BB2020 MonstrousMouth does NOT apply in the pushback phase.
+    #[test]
+    fn bb2020_does_not_apply_in_pushback_phase() {
+        assert!(!MonstrousMouthBehaviour::applies_in_pushback_phase());
+    }
+
+    /// The two constants are mutually exclusive.
+    #[test]
+    fn catch_and_pushback_phases_are_mutually_exclusive() {
+        assert_ne!(
+            MonstrousMouthBehaviour::applies_in_catch_phase(),
+            MonstrousMouthBehaviour::applies_in_pushback_phase()
+        );
     }
 
     #[test]
     fn name_is_correct() {
-        let b = MonstrousMouthBehaviour::default();
-        assert_eq!(b.name(), "MonstrousMouthBehaviour");
+        assert_eq!(MonstrousMouthBehaviour::new().name(), "MonstrousMouthBehaviour");
     }
 
     #[test]
@@ -60,9 +95,8 @@ mod tests {
         let b = MonstrousMouthBehaviour::new();
         let mut player = Player::default();
         let pos = RosterPosition::default();
-        let movement_before = player.movement;
+        let before = player.movement;
         b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
+        assert_eq!(player.movement, before);
     }
-#[test]    fn name_is_not_empty() {        assert!(!MonstrousMouthBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2020() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = MonstrousMouthBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2020,        );        assert!(!b.execute_step_hook(&mut game));    }
 }
