@@ -34,7 +34,7 @@ mod tests {
     use super::*;
 
     fn make() -> ReportApothecaryChoice {
-        ReportApothecaryChoice::new("p1".into(), PlayerState::new(), Some("BROKEN_RIBS".into()))
+        ReportApothecaryChoice::new("p1".into(), PlayerState::new(0), Some("BROKEN_RIBS".into()))
     }
 
     #[test]
@@ -59,7 +59,7 @@ mod tests {
 
     #[test]
     fn no_serious_injury() {
-        let r = ReportApothecaryChoice::new("p2".into(), PlayerState::new(), None);
+        let r = ReportApothecaryChoice::new("p2".into(), PlayerState::new(0), None);
         assert_eq!(r.get_serious_injury(), None);
         assert_eq!(r.get_player_id(), "p2");
     }

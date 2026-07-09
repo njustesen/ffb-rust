@@ -86,7 +86,7 @@ fn roll_apothecary_for_injury(result: &mut Box<InjuryResult>, rng: &mut GameRng,
         ctx_mut.injury = Some(final_state);
         ctx_mut.apothecary_status = ApothecaryStatus::DoNotUseApothecary;
 
-        game.report_list.add(ReportApothecaryChoice::new(defender_id, PlayerStateModel::new(), None));
+        game.report_list.add(ReportApothecaryChoice::new(defender_id, PlayerStateModel::new(0), None));
     } else {
         let cured = if base == PS_KNOCKED_OUT {
             PlayerState::new(PS_STUNNED)
@@ -97,7 +97,7 @@ fn roll_apothecary_for_injury(result: &mut Box<InjuryResult>, rng: &mut GameRng,
         ctx_mut.injury = Some(cured);
         ctx_mut.serious_injury = None;
         ctx_mut.apothecary_status = ApothecaryStatus::DoNotUseApothecary;
-        game.report_list.add(ReportApothecaryChoice::new(defender_id, PlayerStateModel::new(), None));
+        game.report_list.add(ReportApothecaryChoice::new(defender_id, PlayerStateModel::new(0), None));
     }
 }
 

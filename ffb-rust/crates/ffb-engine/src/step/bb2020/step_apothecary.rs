@@ -331,7 +331,7 @@ impl StepApothecary {
             // Java: addReport(new ReportApothecaryChoice(defenderId, playerState, null))
             game.report_list.add(ReportApothecaryChoice::new(
                 player_id.clone(),
-                ffb_model::model::player_state::PlayerState::new(),
+                ffb_model::model::player_state::PlayerState::new(0),
                 None,
             ));
             let choice_event = GameEvent::ApothecaryChoice {

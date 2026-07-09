@@ -111,7 +111,7 @@ fn roll_apothecary_for_injury(result: &mut Box<InjuryResult>, rng: &mut GameRng,
 
         game.report_list.add(ReportApothecaryChoice::new(
             defender_id,
-            PlayerStateModel::new(),
+            PlayerStateModel::new(0),
             None,
         ));
     } else {
@@ -128,7 +128,7 @@ fn roll_apothecary_for_injury(result: &mut Box<InjuryResult>, rng: &mut GameRng,
 
         game.report_list.add(ReportApothecaryChoice::new(
             defender_id,
-            PlayerStateModel::new(),
+            PlayerStateModel::new(0),
             None,
         ));
     }

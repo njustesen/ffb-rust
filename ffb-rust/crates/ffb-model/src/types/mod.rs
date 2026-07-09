@@ -5,7 +5,7 @@ mod move_square;
 mod pushback_square;
 mod range_ruler;
 mod block_types;
-mod constants;
+pub mod constants;
 
 pub use field_coordinate::*;
 pub use move_square::*;
