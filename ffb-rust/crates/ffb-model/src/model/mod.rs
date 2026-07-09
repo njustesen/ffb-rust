@@ -1,5 +1,6 @@
 // Tier 3: Core data model
 
+pub mod skill;
 pub mod animation_type;
 pub mod block_roll_properties;
 pub mod catch_scatter_throw_in_mode;

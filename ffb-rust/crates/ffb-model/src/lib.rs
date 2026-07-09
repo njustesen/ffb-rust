@@ -1,3 +1,4 @@
+pub mod skill;
 pub mod dialog;
 pub mod inducement;
 pub mod factory;
