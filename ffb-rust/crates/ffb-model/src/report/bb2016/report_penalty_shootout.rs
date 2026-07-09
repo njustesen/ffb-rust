@@ -19,6 +19,25 @@ impl ReportPenaltyShootout {
     pub fn get_re_rolls_left_home(&self) -> i32 { self.re_rolls_left_home }
     pub fn get_roll_away(&self) -> i32 { self.roll_away }
     pub fn get_re_rolls_left_away(&self) -> i32 { self.re_rolls_left_away }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "rollHome": self.roll_home,
+            "reRollsLeftHome": self.re_rolls_left_home,
+            "rollAway": self.roll_away,
+            "reRollsLeftAway": self.re_rolls_left_away,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            roll_home: json["rollHome"].as_i64().unwrap_or(0) as i32,
+            re_rolls_left_home: json["reRollsLeftHome"].as_i64().unwrap_or(0) as i32,
+            roll_away: json["rollAway"].as_i64().unwrap_or(0) as i32,
+            re_rolls_left_away: json["reRollsLeftAway"].as_i64().unwrap_or(0) as i32,
+        }
+    }
 }
 
 impl IReport for ReportPenaltyShootout {
@@ -65,5 +84,22 @@ mod tests {
         assert_eq!(r.get_roll_home(), 1);
         assert_eq!(r.get_roll_away(), 6);
         assert_eq!(r.get_re_rolls_left_home(), 3);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportPenaltyShootout::from_json(&json);
+        assert_eq!(restored.roll_home, original.roll_home);
+        assert_eq!(restored.re_rolls_left_home, original.re_rolls_left_home);
+        assert_eq!(restored.roll_away, original.roll_away);
+        assert_eq!(restored.re_rolls_left_away, original.re_rolls_left_away);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("penaltyShootout"));
     }
 }

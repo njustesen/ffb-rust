@@ -17,6 +17,23 @@ impl ReportTwoForOne {
     pub fn get_player_id(&self) -> &str { &self.player_id }
     pub fn get_partner_id(&self) -> &str { &self.partner_id }
     pub fn is_used(&self) -> bool { self.used }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.player_id,
+            "used": self.used,
+            "partnerId": self.partner_id,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_id: json["playerId"].as_str().unwrap_or("").to_string(),
+            partner_id: json["partnerId"].as_str().unwrap_or("").to_string(),
+            used: json["used"].as_bool().unwrap_or(false),
+        }
+    }
 }
 
 impl IReport for ReportTwoForOne {
@@ -60,5 +77,21 @@ mod tests {
     fn partner_id() {
         let r = ReportTwoForOne::new("a".into(), "b".into(), true);
         assert_eq!(r.get_partner_id(), "b");
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportTwoForOne::from_json(&json);
+        assert_eq!(restored.player_id, original.player_id);
+        assert_eq!(restored.partner_id, original.partner_id);
+        assert_eq!(restored.used, original.used);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("twoForOne"));
     }
 }

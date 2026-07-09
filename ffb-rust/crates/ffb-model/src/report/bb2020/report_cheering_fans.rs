@@ -19,6 +19,25 @@ impl ReportCheeringFans {
     pub fn is_prayer_available(&self) -> bool { self.prayer_available }
     pub fn get_roll_home(&self) -> i32 { self.roll_home }
     pub fn get_roll_away(&self) -> i32 { self.roll_away }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "teamId": self.team_id,
+            "prayerAvailable": self.prayer_available,
+            "rollHome": self.roll_home,
+            "rollAway": self.roll_away,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            team_id: json["teamId"].as_str().unwrap_or("").to_string(),
+            prayer_available: json["prayerAvailable"].as_bool().unwrap_or(false),
+            roll_home: json["rollHome"].as_i64().unwrap_or(0) as i32,
+            roll_away: json["rollAway"].as_i64().unwrap_or(0) as i32,
+        }
+    }
 }
 
 impl IReport for ReportCheeringFans {
@@ -63,5 +82,22 @@ mod tests {
         let r = ReportCheeringFans::new("team3".into(), true, 1, 6);
         assert_eq!(r.get_roll_away(), 6);
         assert_eq!(r.get_roll_home(), 1);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportCheeringFans::from_json(&json);
+        assert_eq!(restored.team_id, original.team_id);
+        assert_eq!(restored.prayer_available, original.prayer_available);
+        assert_eq!(restored.roll_home, original.roll_home);
+        assert_eq!(restored.roll_away, original.roll_away);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("cheeringFans"));
     }
 }

@@ -19,6 +19,25 @@ impl ReportSkillUseOtherPlayer {
     pub fn get_other_player_id(&self) -> &str { &self.other_player_id }
     pub fn get_skill(&self) -> &str { &self.skill }
     pub fn get_skill_use(&self) -> &str { &self.skill_use }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.player_id,
+            "playerIdOtherPlayer": self.other_player_id,
+            "skill": self.skill,
+            "skillUse": self.skill_use,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_id: json["playerId"].as_str().unwrap_or("").to_string(),
+            other_player_id: json["playerIdOtherPlayer"].as_str().unwrap_or("").to_string(),
+            skill: json["skill"].as_str().unwrap_or("").to_string(),
+            skill_use: json["skillUse"].as_str().unwrap_or("").to_string(),
+        }
+    }
 }
 
 impl IReport for ReportSkillUseOtherPlayer {
@@ -63,5 +82,22 @@ mod tests {
         assert_eq!(r.get_skill(), "Dodge");
         assert_eq!(r.get_skill_use(), "CANCEL");
         assert_eq!(r.get_other_player_id(), "p4");
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportSkillUseOtherPlayer::from_json(&json);
+        assert_eq!(restored.player_id, original.player_id);
+        assert_eq!(restored.other_player_id, original.other_player_id);
+        assert_eq!(restored.skill, original.skill);
+        assert_eq!(restored.skill_use, original.skill_use);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("skillUseOtherPlayer"));
     }
 }

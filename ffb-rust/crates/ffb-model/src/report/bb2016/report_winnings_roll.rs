@@ -24,6 +24,25 @@ impl ReportWinningsRoll {
     pub fn get_winnings_home(&self) -> i32 { self.winnings_home }
     pub fn get_winnings_roll_away(&self) -> i32 { self.winnings_roll_away }
     pub fn get_winnings_away(&self) -> i32 { self.winnings_away }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "winningsRollHome": self.winnings_roll_home,
+            "winningsHome": self.winnings_home,
+            "winningsRollAway": self.winnings_roll_away,
+            "winningsAway": self.winnings_away,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            winnings_roll_home: json["winningsRollHome"].as_i64().unwrap_or(0) as i32,
+            winnings_home: json["winningsHome"].as_i64().unwrap_or(0) as i32,
+            winnings_roll_away: json["winningsRollAway"].as_i64().unwrap_or(0) as i32,
+            winnings_away: json["winningsAway"].as_i64().unwrap_or(0) as i32,
+        }
+    }
 }
 
 impl IReport for ReportWinningsRoll {
@@ -67,5 +86,22 @@ mod tests {
         let r = ReportWinningsRoll::new(0, 0, 0, 0);
         assert_eq!(r.get_winnings_home(), 0);
         assert_eq!(r.get_winnings_away(), 0);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportWinningsRoll::from_json(&json);
+        assert_eq!(restored.winnings_roll_home, original.winnings_roll_home);
+        assert_eq!(restored.winnings_home, original.winnings_home);
+        assert_eq!(restored.winnings_roll_away, original.winnings_roll_away);
+        assert_eq!(restored.winnings_away, original.winnings_away);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("winningsRoll"));
     }
 }

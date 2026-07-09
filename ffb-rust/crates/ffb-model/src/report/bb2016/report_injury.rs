@@ -71,6 +71,45 @@ impl ReportInjury {
     pub fn get_serious_injury_decay(&self) -> Option<&str> { self.serious_injury_decay.as_deref() }
     pub fn get_injury(&self) -> Option<PlayerState> { self.injury }
     pub fn get_injury_decay(&self) -> Option<PlayerState> { self.injury_decay }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "defenderId": self.defender_id,
+            "injuryType": self.injury_type,
+            "armorBroken": self.armor_broken,
+            "armorModifiers": self.armor_modifier_names,
+            "armorRoll": self.armor_roll,
+            "injuryModifiers": self.injury_modifier_names,
+            "injuryRoll": self.injury_roll,
+            "casualtyRoll": self.casualty_roll,
+            "seriousInjury": self.serious_injury,
+            "casualtyRollDecay": self.casualty_roll_decay,
+            "seriousInjuryDecay": self.serious_injury_decay,
+            "injury": self.injury.map(|ps| ps.id()),
+            "injuryDecay": self.injury_decay.map(|ps| ps.id()),
+            "attackerId": self.attacker_id,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            attacker_id: json["attackerId"].as_str().map(str::to_string),
+            defender_id: json["defenderId"].as_str().unwrap_or("").to_string(),
+            injury_type: json["injuryType"].as_str().unwrap_or("").to_string(),
+            armor_broken: json["armorBroken"].as_bool().unwrap_or(false),
+            armor_modifier_names: json["armorModifiers"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default(),
+            armor_roll: json["armorRoll"].as_array().map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0) as i32).collect()).unwrap_or_default(),
+            injury_modifier_names: json["injuryModifiers"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default(),
+            injury_roll: json["injuryRoll"].as_array().map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0) as i32).collect()).unwrap_or_default(),
+            casualty_roll: json["casualtyRoll"].as_array().map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0) as i32).collect()).unwrap_or_default(),
+            serious_injury: json["seriousInjury"].as_str().map(str::to_string),
+            casualty_roll_decay: json["casualtyRollDecay"].as_array().map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0) as i32).collect()).unwrap_or_default(),
+            serious_injury_decay: json["seriousInjuryDecay"].as_str().map(str::to_string),
+            injury: json["injury"].as_u64().map(|n| PlayerState::new(n as u32)),
+            injury_decay: json["injuryDecay"].as_u64().map(|n| PlayerState::new(n as u32)),
+        }
+    }
 }
 
 impl IReport for ReportInjury {
@@ -136,5 +175,21 @@ mod tests {
         assert_eq!(r.get_attacker_id(), None);
         assert_eq!(r.get_serious_injury(), Some("BADLY_HURT"));
         assert!(!r.is_armor_broken());
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportInjury::from_json(&json);
+        assert_eq!(restored.defender_id, original.defender_id);
+        assert_eq!(restored.armor_broken, original.armor_broken);
+        assert_eq!(restored.injury_type, original.injury_type);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("injury"));
     }
 }

@@ -15,6 +15,21 @@ impl ReportNervesOfSteel {
 
     pub fn get_player_id(&self) -> &str { &self.player_id }
     pub fn get_ball_action(&self) -> &str { &self.ball_action }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.player_id,
+            "ballAction": self.ball_action,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_id: json["playerId"].as_str().unwrap_or("").to_string(),
+            ball_action: json["ballAction"].as_str().unwrap_or("").to_string(),
+        }
+    }
 }
 
 impl IReport for ReportNervesOfSteel {
@@ -57,5 +72,20 @@ mod tests {
         let r = ReportNervesOfSteel::new("p99".into(), "handoff".into());
         assert_eq!(r.get_player_id(), "p99");
         assert_eq!(r.get_ball_action(), "handoff");
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportNervesOfSteel::from_json(&json);
+        assert_eq!(restored.player_id, original.player_id);
+        assert_eq!(restored.ball_action, original.ball_action);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("nervesOfSteel"));
     }
 }

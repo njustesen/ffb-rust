@@ -30,6 +30,29 @@ impl ReportKickTeamMateRoll {
     pub fn is_successful(&self) -> bool { self.successful }
     pub fn is_re_rolled(&self) -> bool { self.re_rolled }
     pub fn get_roll(&self) -> &[i32] { &self.roll }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.kicking_player_id,
+            "kickedPlayerId": self.kicked_player_id,
+            "distance": self.kick_distance,
+            "successful": self.successful,
+            "reRolled": self.re_rolled,
+            "rolls": self.roll,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            kicking_player_id: json["playerId"].as_str().unwrap_or("").to_string(),
+            kicked_player_id: json["kickedPlayerId"].as_str().unwrap_or("").to_string(),
+            kick_distance: json["distance"].as_i64().unwrap_or(0) as i32,
+            successful: json["successful"].as_bool().unwrap_or(false),
+            re_rolled: json["reRolled"].as_bool().unwrap_or(false),
+            roll: json["rolls"].as_array().map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0) as i32).collect()).unwrap_or_default(),
+        }
+    }
 }
 
 impl IReport for ReportKickTeamMateRoll {
@@ -75,5 +98,23 @@ mod tests {
         assert!(!r.is_successful());
         assert!(r.is_re_rolled());
         assert_eq!(r.get_kick_distance(), 2);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportKickTeamMateRoll::from_json(&json);
+        assert_eq!(restored.kicking_player_id, original.kicking_player_id);
+        assert_eq!(restored.kicked_player_id, original.kicked_player_id);
+        assert_eq!(restored.kick_distance, original.kick_distance);
+        assert_eq!(restored.successful, original.successful);
+        assert_eq!(restored.roll, original.roll);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("kickTeamMateRoll"));
     }
 }
