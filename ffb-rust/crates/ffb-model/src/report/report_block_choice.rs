@@ -54,6 +54,37 @@ impl IReport for ReportBlockChoice {
     fn get_id(&self) -> ReportId { ReportId::BLOCK_CHOICE }
 }
 
+impl ReportBlockChoice {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "nrOfDice": self.nr_of_dice,
+            "blockRoll": self.block_roll,
+            "diceIndex": self.dice_index,
+            "blockResult": self.block_result,
+            "defenderId": self.defender_id,
+            "suppressExtraEffectHandling": self.suppress_extra_effect_handling,
+            "showNameInReport": self.show_name_in_report,
+            "blockRollId": self.block_roll_id,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            nr_of_dice: json["nrOfDice"].as_i64().unwrap_or(0) as i32,
+            block_roll: json["blockRoll"].as_array()
+                .map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0) as i32).collect())
+                .unwrap_or_default(),
+            dice_index: json["diceIndex"].as_i64().unwrap_or(0) as i32,
+            block_roll_id: json["blockRollId"].as_i64().unwrap_or(0) as i32,
+            block_result: json["blockResult"].as_str().unwrap_or("").to_string(),
+            defender_id: json["defenderId"].as_str().unwrap_or("").to_string(),
+            suppress_extra_effect_handling: json["suppressExtraEffectHandling"].as_bool().unwrap_or(false),
+            show_name_in_report: json["showNameInReport"].as_bool().unwrap_or(false),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -100,5 +131,26 @@ mod tests {
         assert!(!r.is_suppress_extra_effect_handling());
         assert!(r.is_show_name_in_report());
         assert_eq!(r.get_block_roll_id(), 42);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportBlockChoice::from_json(&json);
+        assert_eq!(restored.nr_of_dice, original.nr_of_dice);
+        assert_eq!(restored.block_roll, original.block_roll);
+        assert_eq!(restored.dice_index, original.dice_index);
+        assert_eq!(restored.block_roll_id, original.block_roll_id);
+        assert_eq!(restored.block_result, original.block_result);
+        assert_eq!(restored.defender_id, original.defender_id);
+        assert_eq!(restored.suppress_extra_effect_handling, original.suppress_extra_effect_handling);
+        assert_eq!(restored.show_name_in_report, original.show_name_in_report);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("blockChoice"));
     }
 }

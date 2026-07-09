@@ -22,6 +22,23 @@ impl ReportBlockRoll {
     pub fn get_choosing_team_id(&self) -> &str { &self.choosing_team_id }
     pub fn get_block_roll(&self) -> &[i32] { &self.block_roll }
     pub fn get_defender_id(&self) -> Option<&str> { self.defender_id.as_deref() }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "choosingTeamId": self.choosing_team_id,
+            "blockRoll": self.block_roll,
+            "defenderId": self.defender_id,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            choosing_team_id: json["choosingTeamId"].as_str().unwrap_or("").to_string(),
+            block_roll: json["blockRoll"].as_array().map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0) as i32).collect()).unwrap_or_default(),
+            defender_id: json["defenderId"].as_str().map(str::to_string),
+        }
+    }
 }
 
 impl IReport for ReportBlockRoll {
@@ -63,5 +80,21 @@ mod tests {
         let r = ReportBlockRoll::new("team2".into(), vec![1], None);
         assert_eq!(r.get_defender_id(), None);
         assert_eq!(r.get_choosing_team_id(), "team2");
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportBlockRoll::from_json(&json);
+        assert_eq!(restored.choosing_team_id, original.choosing_team_id);
+        assert_eq!(restored.block_roll, original.block_roll);
+        assert_eq!(restored.defender_id, original.defender_id);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("blockRoll"));
     }
 }

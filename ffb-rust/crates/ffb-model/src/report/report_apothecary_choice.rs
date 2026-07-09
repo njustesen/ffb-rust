@@ -29,12 +29,31 @@ impl IReport for ReportApothecaryChoice {
     fn get_id(&self) -> ReportId { ReportId::APOTHECARY_CHOICE }
 }
 
+impl ReportApothecaryChoice {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.player_id,
+            "playerState": serde_json::Value::Null,
+            "seriousInjury": self.serious_injury,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_id: json["playerId"].as_str().unwrap_or("").to_string(),
+            player_state: PlayerState::new(),
+            serious_injury: json["seriousInjury"].as_str().map(str::to_string),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn make() -> ReportApothecaryChoice {
-        ReportApothecaryChoice::new("p1".into(), PlayerState::new(0), Some("BROKEN_RIBS".into()))
+        ReportApothecaryChoice::new("p1".into(), PlayerState::new(), Some("BROKEN_RIBS".into()))
     }
 
     #[test]
@@ -59,8 +78,23 @@ mod tests {
 
     #[test]
     fn no_serious_injury() {
-        let r = ReportApothecaryChoice::new("p2".into(), PlayerState::new(0), None);
+        let r = ReportApothecaryChoice::new("p2".into(), PlayerState::new(), None);
         assert_eq!(r.get_serious_injury(), None);
         assert_eq!(r.get_player_id(), "p2");
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportApothecaryChoice::from_json(&json);
+        assert_eq!(restored.player_id, original.player_id);
+        assert_eq!(restored.serious_injury, original.serious_injury);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("apothecaryChoice"));
     }
 }
