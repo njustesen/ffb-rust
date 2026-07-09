@@ -66,6 +66,7 @@ pub mod game_list;
 pub mod team_list;
 pub mod report_list;
 pub mod change;
+pub mod skill;
 
 pub use animation_type::AnimationType;
 pub use block_roll_properties::BlockRollProperties;

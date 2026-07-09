@@ -1,10 +1,24 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct Skill;
+/// 1:1 translation of com.fumbbl.ffb.model.skill::Skill (minimal fields for skill identity).
+use crate::enums::SkillCategory;
 
-impl Skill {
-    pub fn new() -> Self { Self }
+pub struct Skill {
+    pub name: String,
+    pub category: SkillCategory,
 }
 
-impl Default for Skill {
-    fn default() -> Self { Self::new() }
+impl Skill {
+    pub fn new(name: &str, category: SkillCategory) -> Self {
+        Self {
+            name: name.to_string(),
+            category,
+        }
+    }
+
+    pub fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn get_category(&self) -> SkillCategory {
+        self.category
+    }
 }

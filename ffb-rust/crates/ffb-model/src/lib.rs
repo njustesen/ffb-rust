@@ -4,6 +4,7 @@ pub mod factory;
 pub mod enums;
 pub mod types;
 pub mod model;
+pub mod skill;
 pub mod marking;
 pub mod bb2016;
 pub mod bb2020;

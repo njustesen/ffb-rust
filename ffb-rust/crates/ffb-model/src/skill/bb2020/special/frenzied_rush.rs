@@ -1,10 +1,38 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct FrenziedRush;
+/// 1:1 translation of com.fumbbl.ffb.skill.bb2020::FrenziedRush.
+use crate::model::skill::skill::Skill;
+use crate::enums::SkillCategory;
+
+pub struct FrenziedRush {
+    pub base: Skill,
+}
 
 impl FrenziedRush {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        let base = Skill::new("Frenzied Rush", SkillCategory::Trait);
+        Self { base }
+    }
 }
 
 impl Default for FrenziedRush {
     fn default() -> Self { Self::new() }
+}
+
+impl std::ops::Deref for FrenziedRush {
+    type Target = Skill;
+    fn deref(&self) -> &Self::Target { &self.base }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn name_is_correct() {
+        assert_eq!(FrenziedRush::new().get_name(), "Frenzied Rush");
+    }
+
+    #[test]
+    fn category_is_correct() {
+        assert_eq!(FrenziedRush::new().get_category(), SkillCategory::Trait);
+    }
 }
