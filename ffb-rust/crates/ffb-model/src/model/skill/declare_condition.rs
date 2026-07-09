@@ -1,10 +1,22 @@
-// TODO: full implementation. Stub placeholder for TRANSLATION_TRACKER.md.
-pub struct DeclareCondition;
+/// 1:1 translation of com.fumbbl.ffb.model.skill.DeclareCondition.
+///
+/// NOTE: The canonical enum lives in `crate::enums::DeclareCondition` (enums/skill.rs).
+/// This file re-exports it for code that imports from `model::skill::declare_condition`.
+pub use crate::enums::DeclareCondition;
 
-impl DeclareCondition {
-    pub fn new() -> Self { Self }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-impl Default for DeclareCondition {
-    fn default() -> Self { Self::new() }
+    #[test]
+    fn none_is_always_fulfilled() {
+        assert!(DeclareCondition::None.fulfilled(true));
+        assert!(DeclareCondition::None.fulfilled(false));
+    }
+
+    #[test]
+    fn standing_requires_standing() {
+        assert!(DeclareCondition::Standing.fulfilled(true));
+        assert!(!DeclareCondition::Standing.fulfilled(false));
+    }
 }

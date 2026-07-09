@@ -15,4 +15,5 @@ pub mod kickoff;
 pub mod data;
 pub mod option;
 pub mod injury;
+pub mod skill;
 pub mod report;
