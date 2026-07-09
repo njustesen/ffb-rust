@@ -25,6 +25,27 @@ impl IReport for ReportOldPro {
     fn get_id(&self) -> ReportId { ReportId::OLD_PRO }
 }
 
+impl ReportOldPro {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.player_id,
+            "oldRoll": self.old_value,
+            "roll": self.new_value,
+            "selfInflicted": self.self_inflicted,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_id: json["playerId"].as_str().map(str::to_string),
+            old_value: json["oldRoll"].as_i64().unwrap_or(0) as i32,
+            new_value: json["roll"].as_i64().unwrap_or(0) as i32,
+            self_inflicted: json["selfInflicted"].as_bool().unwrap_or(false),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -53,5 +74,22 @@ mod tests {
     fn is_self_inflicted() {
         let r = ReportOldPro::new(None, 1, 0, true);
         assert!(r.is_self_inflicted());
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportOldPro::from_json(&json);
+        assert_eq!(restored.player_id, original.player_id);
+        assert_eq!(restored.old_value, original.old_value);
+        assert_eq!(restored.new_value, original.new_value);
+        assert_eq!(restored.self_inflicted, original.self_inflicted);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("oldPro"));
     }
 }

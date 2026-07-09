@@ -21,6 +21,23 @@ impl IReport for ReportAnimalSavagery {
     fn get_id(&self) -> ReportId { ReportId::ANIMAL_SAVAGERY }
 }
 
+impl ReportAnimalSavagery {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "attackerId": self.attacker_id,
+            "defenderId": self.defender_id,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            attacker_id: json["attackerId"].as_str().map(str::to_string),
+            defender_id: json["defenderId"].as_str().map(str::to_string),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -46,5 +63,20 @@ mod tests {
         let r = ReportAnimalSavagery::new(None, None);
         assert_eq!(r.get_attacker_id(), None);
         assert_eq!(r.get_defender_id(), None);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportAnimalSavagery::from_json(&json);
+        assert_eq!(restored.attacker_id, original.attacker_id);
+        assert_eq!(restored.defender_id, original.defender_id);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("animalSavagery"));
     }
 }

@@ -42,7 +42,7 @@ impl ReportApothecaryChoice {
     pub fn from_json(json: &serde_json::Value) -> Self {
         Self {
             player_id: json["playerId"].as_str().unwrap_or("").to_string(),
-            player_state: PlayerState::new(),
+            player_state: PlayerState::new(0),
             serious_injury: json["seriousInjury"].as_str().map(str::to_string),
         }
     }
@@ -53,7 +53,7 @@ mod tests {
     use super::*;
 
     fn make() -> ReportApothecaryChoice {
-        ReportApothecaryChoice::new("p1".into(), PlayerState::new(), Some("BROKEN_RIBS".into()))
+        ReportApothecaryChoice::new("p1".into(), PlayerState::new(1), Some("BROKEN_RIBS".into()))
     }
 
     #[test]
@@ -78,7 +78,7 @@ mod tests {
 
     #[test]
     fn no_serious_injury() {
-        let r = ReportApothecaryChoice::new("p2".into(), PlayerState::new(), None);
+        let r = ReportApothecaryChoice::new("p2".into(), PlayerState::new(2), None);
         assert_eq!(r.get_serious_injury(), None);
         assert_eq!(r.get_player_id(), "p2");
     }

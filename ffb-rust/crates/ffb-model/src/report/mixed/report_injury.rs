@@ -75,6 +75,53 @@ impl IReport for ReportInjury {
     fn get_id(&self) -> ReportId { ReportId::INJURY }
 }
 
+impl ReportInjury {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "defenderId": self.defender_id,
+            "injuryType": self.injury_type,
+            "armorBroken": self.armor_broken,
+            "armorRoll": self.armor_roll,
+            "injuryRoll": self.injury_roll,
+            "casualtyRoll": self.casualty_roll,
+            "seriousInjury": self.serious_injury,
+            "casualtyRollDecay": self.casualty_roll_decay,
+            "seriousInjuryDecay": self.serious_injury_decay,
+            "seriousInjuryOld": self.original_injury,
+            "injury": self.injury.map(|s| s.id()),
+            "injuryDecay": self.injury_decay.map(|s| s.id()),
+            "attackerId": self.attacker_id,
+            "armorModifiers": self.armor_modifiers,
+            "injuryModifiers": self.injury_modifiers,
+            "casualtyModifiers": self.casualty_modifiers,
+            "skipInjuryParts": self.skip,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            attacker_id: json["attackerId"].as_str().map(str::to_string),
+            defender_id: json["defenderId"].as_str().map(str::to_string),
+            injury_type: json["injuryType"].as_str().unwrap_or("").to_string(),
+            armor_broken: json["armorBroken"].as_bool().unwrap_or(false),
+            armor_modifiers: json["armorModifiers"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default(),
+            armor_roll: json["armorRoll"].as_array().map(|a| a.iter().filter_map(|v| v.as_i64().map(|n| n as i32)).collect()).unwrap_or_default(),
+            injury_modifiers: json["injuryModifiers"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default(),
+            injury_roll: json["injuryRoll"].as_array().map(|a| a.iter().filter_map(|v| v.as_i64().map(|n| n as i32)).collect()).unwrap_or_default(),
+            casualty_roll: json["casualtyRoll"].as_array().map(|a| a.iter().filter_map(|v| v.as_i64().map(|n| n as i32)).collect()).unwrap_or_default(),
+            serious_injury: json["seriousInjury"].as_str().map(str::to_string),
+            casualty_roll_decay: json["casualtyRollDecay"].as_array().map(|a| a.iter().filter_map(|v| v.as_i64().map(|n| n as i32)).collect()).unwrap_or_default(),
+            serious_injury_decay: json["seriousInjuryDecay"].as_str().map(str::to_string),
+            original_injury: json["seriousInjuryOld"].as_str().map(str::to_string),
+            injury: json["injury"].as_u64().map(|n| PlayerState::new(n as u32)),
+            injury_decay: json["injuryDecay"].as_u64().map(|n| PlayerState::new(n as u32)),
+            casualty_modifiers: json["casualtyModifiers"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default(),
+            skip: json["skipInjuryParts"].as_str().unwrap_or("").to_string(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -106,5 +153,25 @@ mod tests {
     fn is_armor_broken_and_armor_roll() {
         assert!(make().is_armor_broken());
         assert_eq!(make().get_armor_roll(), &[3, 4]);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportInjury::from_json(&json);
+        assert_eq!(restored.attacker_id, original.attacker_id);
+        assert_eq!(restored.defender_id, original.defender_id);
+        assert_eq!(restored.injury_type, original.injury_type);
+        assert_eq!(restored.armor_broken, original.armor_broken);
+        assert_eq!(restored.armor_roll, original.armor_roll);
+        assert_eq!(restored.injury_roll, original.injury_roll);
+        assert_eq!(restored.skip, original.skip);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("injury"));
     }
 }

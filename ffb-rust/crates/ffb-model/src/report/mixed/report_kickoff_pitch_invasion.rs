@@ -30,6 +30,27 @@ impl IReport for ReportKickoffPitchInvasion {
     fn get_id(&self) -> ReportId { ReportId::KICKOFF_PITCH_INVASION }
 }
 
+impl ReportKickoffPitchInvasion {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "rollHome": self.roll_home,
+            "rollAway": self.roll_away,
+            "amount": self.amount,
+            "playerIds": self.affected_players,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            roll_home: json["rollHome"].as_i64().unwrap_or(0) as i32,
+            roll_away: json["rollAway"].as_i64().unwrap_or(0) as i32,
+            amount: json["amount"].as_i64().unwrap_or(0) as i32,
+            affected_players: json["playerIds"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -58,5 +79,22 @@ mod tests {
     fn get_affected_players() {
         let r = make();
         assert_eq!(r.get_affected_players(), &["p1".to_string()]);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportKickoffPitchInvasion::from_json(&json);
+        assert_eq!(restored.roll_home, original.roll_home);
+        assert_eq!(restored.roll_away, original.roll_away);
+        assert_eq!(restored.amount, original.amount);
+        assert_eq!(restored.affected_players, original.affected_players);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("kickoffPitchInvasion"));
     }
 }

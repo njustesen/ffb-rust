@@ -23,6 +23,25 @@ impl IReport for ReportKickoffExtraReRoll {
     fn get_id(&self) -> ReportId { ReportId::KICKOFF_EXTRA_RE_ROLL }
 }
 
+impl ReportKickoffExtraReRoll {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "teamId": self.team_id,
+            "rollHome": self.roll_home,
+            "rollAway": self.roll_away,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            roll_home: json["rollHome"].as_i64().unwrap_or(0) as i32,
+            roll_away: json["rollAway"].as_i64().unwrap_or(0) as i32,
+            team_id: json["teamId"].as_str().map(str::to_string),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -47,5 +66,21 @@ mod tests {
     fn get_team_id_none() {
         let r = ReportKickoffExtraReRoll::new(1, 1, None);
         assert!(r.get_team_id().is_none());
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportKickoffExtraReRoll::from_json(&json);
+        assert_eq!(restored.roll_home, original.roll_home);
+        assert_eq!(restored.roll_away, original.roll_away);
+        assert_eq!(restored.team_id, original.team_id);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("extraReRoll"));
     }
 }

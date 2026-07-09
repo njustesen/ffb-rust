@@ -14,6 +14,19 @@ impl ReportStallerDetected {
     }
 
     pub fn get_player_id(&self) -> Option<&str> { self.player_id.as_deref() }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.player_id,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_id: json["playerId"].as_str().map(str::to_string),
+        }
+    }
 }
 
 impl IReport for ReportStallerDetected {
@@ -47,5 +60,19 @@ mod tests {
     fn different_player_id() {
         let r = ReportStallerDetected::new(Some("staller42".into()));
         assert_eq!(r.get_player_id(), Some("staller42"));
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportStallerDetected::from_json(&json);
+        assert_eq!(restored.player_id, original.player_id);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("stallerDetected"));
     }
 }

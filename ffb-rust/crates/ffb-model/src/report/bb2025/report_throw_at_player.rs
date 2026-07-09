@@ -17,6 +17,23 @@ impl ReportThrowAtPlayer {
     pub fn get_player_id(&self) -> &str { &self.player_id }
     pub fn get_roll(&self) -> i32 { self.roll }
     pub fn is_successful(&self) -> bool { self.successful }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.player_id,
+            "roll": self.roll,
+            "successful": self.successful,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_id: json["playerId"].as_str().unwrap_or("").to_string(),
+            roll: json["roll"].as_i64().unwrap_or(0) as i32,
+            successful: json["successful"].as_bool().unwrap_or(false),
+        }
+    }
 }
 
 impl IReport for ReportThrowAtPlayer {
@@ -62,5 +79,21 @@ mod tests {
         let r = ReportThrowAtPlayer::new("p3".into(), 6, true);
         assert_eq!(r.get_roll(), 6);
         assert!(r.is_successful());
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportThrowAtPlayer::from_json(&json);
+        assert_eq!(restored.player_id, original.player_id);
+        assert_eq!(restored.roll, original.roll);
+        assert_eq!(restored.successful, original.successful);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("throwAtPlayer"));
     }
 }

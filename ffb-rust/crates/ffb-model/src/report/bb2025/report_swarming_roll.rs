@@ -15,6 +15,21 @@ impl ReportSwarmingRoll {
 
     pub fn get_team_id(&self) -> &str { &self.team_id }
     pub fn get_roll(&self) -> i32 { self.roll }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "teamId": self.team_id,
+            "swarmingPlayerRoll": self.roll,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            team_id: json["teamId"].as_str().unwrap_or("").to_string(),
+            roll: json["swarmingPlayerRoll"].as_i64().unwrap_or(0) as i32,
+        }
+    }
 }
 
 impl IReport for ReportSwarmingRoll {
@@ -53,5 +68,20 @@ mod tests {
     fn low_roll() {
         let r = ReportSwarmingRoll::new("t3".into(), 1);
         assert_eq!(r.get_roll(), 1);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = ReportSwarmingRoll::new("t1".into(), 2);
+        let json = original.to_json_value();
+        let restored = ReportSwarmingRoll::from_json(&json);
+        assert_eq!(restored.team_id, original.team_id);
+        assert_eq!(restored.roll, original.roll);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = ReportSwarmingRoll::new("t1".into(), 2).to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("swarmingPlayersRoll"));
     }
 }

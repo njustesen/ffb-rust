@@ -21,6 +21,23 @@ impl IReport for ReportBiasedRef {
     fn get_id(&self) -> ReportId { ReportId::BIASED_REF }
 }
 
+impl ReportBiasedRef {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "foulingPlayerBanned": self.foul_spotted,
+            "roll": self.roll,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            foul_spotted: json["foulingPlayerBanned"].as_bool().unwrap_or(false),
+            roll: json["roll"].as_i64().unwrap_or(0) as i32,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -46,5 +63,20 @@ mod tests {
         let r = ReportBiasedRef::new(false, 1);
         assert!(!r.is_foul_spotted());
         assert_eq!(r.get_roll(), 1);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportBiasedRef::from_json(&json);
+        assert_eq!(restored.foul_spotted, original.foul_spotted);
+        assert_eq!(restored.roll, original.roll);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("biasedRef"));
     }
 }

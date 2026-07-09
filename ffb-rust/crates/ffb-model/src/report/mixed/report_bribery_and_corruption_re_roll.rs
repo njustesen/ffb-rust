@@ -21,6 +21,23 @@ impl IReport for ReportBriberyAndCorruptionReRoll {
     fn get_id(&self) -> ReportId { ReportId::BRIBERY_AND_CORRUPTION_RE_ROLL }
 }
 
+impl ReportBriberyAndCorruptionReRoll {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "teamId": self.team_id,
+            "briberyAncCorruptionAction": self.action,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            team_id: json["teamId"].as_str().map(str::to_string),
+            action: json["briberyAncCorruptionAction"].as_str().unwrap_or("").to_string(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -46,5 +63,20 @@ mod tests {
         let r = ReportBriberyAndCorruptionReRoll::new(None, "DECLINE".into());
         assert_eq!(r.get_team_id(), None);
         assert_eq!(r.get_action(), "DECLINE");
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportBriberyAndCorruptionReRoll::from_json(&json);
+        assert_eq!(restored.team_id, original.team_id);
+        assert_eq!(restored.action, original.action);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("briberyAndCorruptionReRoll"));
     }
 }

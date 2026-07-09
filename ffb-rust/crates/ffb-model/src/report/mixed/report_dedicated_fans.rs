@@ -36,6 +36,31 @@ impl IReport for ReportDedicatedFans {
     fn get_id(&self) -> ReportId { ReportId::DEDICATED_FANS }
 }
 
+impl ReportDedicatedFans {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "rollHome": self.roll_home,
+            "dedicatedFansModifierHome": self.modifier_home,
+            "rollAway": self.roll_away,
+            "dedicatedFansModifierAway": self.modifier_away,
+            "teamId": self.conceded_team,
+            "conceded": self.conceded,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            roll_home: json["rollHome"].as_i64().unwrap_or(0) as i32,
+            modifier_home: json["dedicatedFansModifierHome"].as_i64().unwrap_or(0) as i32,
+            roll_away: json["rollAway"].as_i64().unwrap_or(0) as i32,
+            modifier_away: json["dedicatedFansModifierAway"].as_i64().unwrap_or(0) as i32,
+            conceded_team: json["teamId"].as_str().map(str::to_string),
+            conceded: json["conceded"].as_bool().unwrap_or(false),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -64,5 +89,24 @@ mod tests {
         assert!(make().is_conceded());
         assert_eq!(make().get_modifier_home(), 1);
         assert_eq!(make().get_modifier_away(), 0);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportDedicatedFans::from_json(&json);
+        assert_eq!(restored.roll_home, original.roll_home);
+        assert_eq!(restored.modifier_home, original.modifier_home);
+        assert_eq!(restored.roll_away, original.roll_away);
+        assert_eq!(restored.modifier_away, original.modifier_away);
+        assert_eq!(restored.conceded_team, original.conceded_team);
+        assert_eq!(restored.conceded, original.conceded);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("dedicatedFans"));
     }
 }

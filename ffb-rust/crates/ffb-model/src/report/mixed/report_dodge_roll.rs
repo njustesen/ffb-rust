@@ -38,6 +38,35 @@ impl IReport for ReportDodgeRoll {
     fn get_id(&self) -> ReportId { ReportId::DODGE_ROLL }
 }
 
+impl ReportDodgeRoll {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.base.player_id,
+            "successful": self.base.successful,
+            "roll": self.base.roll,
+            "minimumRoll": self.base.minimum_roll,
+            "reRolled": self.base.re_rolled,
+            "rollModifiers": self.base.roll_modifier_names,
+            "statBasedRollModifier": self.stat_based_roll_modifier,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            base: ReportSkillRoll::new(
+                json["playerId"].as_str().map(str::to_string),
+                json["successful"].as_bool().unwrap_or(false),
+                json["roll"].as_i64().unwrap_or(0) as i32,
+                json["minimumRoll"].as_i64().unwrap_or(0) as i32,
+                json["reRolled"].as_bool().unwrap_or(false),
+                json["rollModifiers"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default(),
+            ),
+            stat_based_roll_modifier: json["statBasedRollModifier"].as_str().map(str::to_string),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -67,5 +96,25 @@ mod tests {
         let r = ReportDodgeRoll::new(None, false, 2, 4, false, vec!["TackleZone".into()], None);
         assert!(!r.is_successful());
         assert_eq!(r.get_roll_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportDodgeRoll::from_json(&json);
+        assert_eq!(restored.base.player_id, original.base.player_id);
+        assert_eq!(restored.base.successful, original.base.successful);
+        assert_eq!(restored.base.roll, original.base.roll);
+        assert_eq!(restored.base.minimum_roll, original.base.minimum_roll);
+        assert_eq!(restored.base.re_rolled, original.base.re_rolled);
+        assert_eq!(restored.base.roll_modifier_names, original.base.roll_modifier_names);
+        assert_eq!(restored.stat_based_roll_modifier, original.stat_based_roll_modifier);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("dodgeRoll"));
     }
 }

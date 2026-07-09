@@ -17,6 +17,23 @@ impl ReportPrayerRoll {
     pub fn get_team_name(&self) -> &str { &self.team_name }
     pub fn get_roll(&self) -> i32 { self.roll }
     pub fn is_home_team(&self) -> bool { self.home_team }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "teamName": self.team_name,
+            "roll": self.roll,
+            "homeTeam": self.home_team,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            team_name: json["teamName"].as_str().unwrap_or("").to_string(),
+            roll: json["roll"].as_i64().unwrap_or(0) as i32,
+            home_team: json["homeTeam"].as_bool().unwrap_or(false),
+        }
+    }
 }
 
 impl IReport for ReportPrayerRoll {
@@ -60,5 +77,21 @@ mod tests {
     fn roll_value() {
         let r = ReportPrayerRoll::new("Team".into(), 6, true);
         assert_eq!(r.get_roll(), 6);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportPrayerRoll::from_json(&json);
+        assert_eq!(restored.team_name, original.team_name);
+        assert_eq!(restored.roll, original.roll);
+        assert_eq!(restored.home_team, original.home_team);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("prayerRoll"));
     }
 }

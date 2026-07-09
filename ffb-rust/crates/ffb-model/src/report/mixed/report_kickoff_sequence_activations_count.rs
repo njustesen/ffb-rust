@@ -23,6 +23,25 @@ impl IReport for ReportKickoffSequenceActivationsCount {
     fn get_id(&self) -> ReportId { ReportId::KICKOFF_SEQUENCE_ACTIVATIONS_COUNT }
 }
 
+impl ReportKickoffSequenceActivationsCount {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "nrOfPlayers": self.amount,
+            "number": self.available,
+            "nrOfPlayersAllowed": self.limit,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            amount: json["nrOfPlayers"].as_i64().unwrap_or(0) as i32,
+            available: json["number"].as_i64().unwrap_or(0) as i32,
+            limit: json["nrOfPlayersAllowed"].as_i64().unwrap_or(0) as i32,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -45,4 +64,20 @@ mod tests {
 
     #[test]
     fn get_available() { assert_eq!(make().get_available(), 5); }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportKickoffSequenceActivationsCount::from_json(&json);
+        assert_eq!(restored.amount, original.amount);
+        assert_eq!(restored.available, original.available);
+        assert_eq!(restored.limit, original.limit);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("kickoffSequenceActivationsCount"));
+    }
 }

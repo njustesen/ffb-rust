@@ -27,6 +27,27 @@ impl ReportThenIStartedBlastin {
     pub fn get_roll(&self) -> i32 { self.roll }
     pub fn is_success(&self) -> bool { self.success }
     pub fn is_fumble(&self) -> bool { self.fumble }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.player_id,
+            "roll": self.roll,
+            "targetPlayerId": self.target_player_id,
+            "successful": self.success,
+            "fumble": self.fumble,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_id: json["playerId"].as_str().map(str::to_string),
+            target_player_id: json["targetPlayerId"].as_str().map(str::to_string),
+            roll: json["roll"].as_i64().unwrap_or(0) as i32,
+            success: json["successful"].as_bool().unwrap_or(false),
+            fumble: json["fumble"].as_bool().unwrap_or(false),
+        }
+    }
 }
 
 impl IReport for ReportThenIStartedBlastin {
@@ -55,4 +76,22 @@ mod tests {
 
     #[test]
     fn is_fumble() { assert!(!make().is_fumble()); }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportThenIStartedBlastin::from_json(&json);
+        assert_eq!(restored.player_id, original.player_id);
+        assert_eq!(restored.target_player_id, original.target_player_id);
+        assert_eq!(restored.roll, original.roll);
+        assert_eq!(restored.success, original.success);
+        assert_eq!(restored.fumble, original.fumble);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("thenIStartedBlastin"));
+    }
 }

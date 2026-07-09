@@ -15,6 +15,18 @@ impl IReport for ReportKickTeamMateFumble {
     fn get_id(&self) -> ReportId { ReportId::KICK_TEAM_MATE_FUMBLE }
 }
 
+impl ReportKickTeamMateFumble {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+        })
+    }
+
+    pub fn from_json(_json: &serde_json::Value) -> Self {
+        Self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -46,5 +58,19 @@ mod tests {
     fn unit_struct_has_no_fields() {
         let r = make();
         assert_eq!(r.get_name(), "kickTeamMateFumble");
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportKickTeamMateFumble::from_json(&json);
+        assert_eq!(restored.get_id(), original.get_id());
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("kickTeamMateFumble"));
     }
 }

@@ -39,6 +39,33 @@ impl IReport for ReportArgueTheCallRoll {
     fn get_id(&self) -> ReportId { ReportId::ARGUE_THE_CALL }
 }
 
+impl ReportArgueTheCallRoll {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.player_id,
+            "successful": self.successful,
+            "coachBanned": self.coach_banned,
+            "roll": self.roll,
+            "staysOnPitch": self.stays_on_pitch,
+            "friendsWithRef": self.friends_with_ref,
+            "biasedRefs": self.biased_refs,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_id: json["playerId"].as_str().map(str::to_string),
+            successful: json["successful"].as_bool().unwrap_or(false),
+            coach_banned: json["coachBanned"].as_bool().unwrap_or(false),
+            roll: json["roll"].as_i64().unwrap_or(0) as i32,
+            stays_on_pitch: json["staysOnPitch"].as_bool().unwrap_or(false),
+            friends_with_ref: json["friendsWithRef"].as_bool().unwrap_or(false),
+            biased_refs: json["biasedRefs"].as_i64().unwrap_or(0) as i32,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -66,5 +93,25 @@ mod tests {
     fn coach_banned_and_biased_refs() {
         assert!(!make().is_coach_banned());
         assert_eq!(make().get_biased_refs(), 1);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportArgueTheCallRoll::from_json(&json);
+        assert_eq!(restored.player_id, original.player_id);
+        assert_eq!(restored.successful, original.successful);
+        assert_eq!(restored.coach_banned, original.coach_banned);
+        assert_eq!(restored.roll, original.roll);
+        assert_eq!(restored.stays_on_pitch, original.stays_on_pitch);
+        assert_eq!(restored.friends_with_ref, original.friends_with_ref);
+        assert_eq!(restored.biased_refs, original.biased_refs);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("argueTheCall"));
     }
 }

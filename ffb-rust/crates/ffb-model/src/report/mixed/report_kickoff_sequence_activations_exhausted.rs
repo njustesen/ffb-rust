@@ -19,6 +19,21 @@ impl IReport for ReportKickoffSequenceActivationsExhausted {
     fn get_id(&self) -> ReportId { ReportId::KICKOFF_SEQUENCE_ACTIVATIONS_EXHAUSTED }
 }
 
+impl ReportKickoffSequenceActivationsExhausted {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "limitReached": self.limit_reached,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            limit_reached: json["limitReached"].as_bool().unwrap_or(false),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -45,5 +60,19 @@ mod tests {
     #[test]
     fn get_name_matches() {
         assert_eq!(make().get_name(), "kickoffSequenceActivationsExhausted");
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportKickoffSequenceActivationsExhausted::from_json(&json);
+        assert_eq!(restored.limit_reached, original.limit_reached);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("kickoffSequenceActivationsExhausted"));
     }
 }

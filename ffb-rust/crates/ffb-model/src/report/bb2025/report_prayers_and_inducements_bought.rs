@@ -23,6 +23,29 @@ impl ReportPrayersAndInducementsBought {
     pub fn get_mercenaries(&self) -> i32 { self.mercenaries }
     pub fn get_gold(&self) -> i32 { self.gold }
     pub fn get_new_tv(&self) -> i32 { self.new_tv }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "teamId": self.team_id,
+            "nrOfInducements": self.inducements,
+            "nrOfStars": self.stars,
+            "nrOfMercenaries": self.mercenaries,
+            "gold": self.gold,
+            "teamValue": self.new_tv,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            team_id: json["teamId"].as_str().unwrap_or("").to_string(),
+            inducements: json["nrOfInducements"].as_i64().unwrap_or(0) as i32,
+            stars: json["nrOfStars"].as_i64().unwrap_or(0) as i32,
+            mercenaries: json["nrOfMercenaries"].as_i64().unwrap_or(0) as i32,
+            gold: json["gold"].as_i64().unwrap_or(0) as i32,
+            new_tv: json["teamValue"].as_i64().unwrap_or(0) as i32,
+        }
+    }
 }
 
 impl IReport for ReportPrayersAndInducementsBought {
@@ -69,5 +92,24 @@ mod tests {
         assert_eq!(r.get_team_id(), "team2");
         assert_eq!(r.get_stars(), 2);
         assert_eq!(r.get_mercenaries(), 1);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportPrayersAndInducementsBought::from_json(&json);
+        assert_eq!(restored.team_id, original.team_id);
+        assert_eq!(restored.inducements, original.inducements);
+        assert_eq!(restored.stars, original.stars);
+        assert_eq!(restored.mercenaries, original.mercenaries);
+        assert_eq!(restored.gold, original.gold);
+        assert_eq!(restored.new_tv, original.new_tv);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("prayersAndInducementsBought"));
     }
 }

@@ -37,6 +37,31 @@ impl IReport for ReportApothecaryRoll {
     fn get_id(&self) -> ReportId { ReportId::APOTHECARY_ROLL }
 }
 
+impl ReportApothecaryRoll {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.player_id,
+            "casualtyRoll": self.casualty_roll,
+            "playerState": self.player_state.map(|ps| ps.0),
+            "seriousInjury": self.serious_injury,
+            "seriousInjuryOld": self.original_injury,
+            "casualtyModifiers": self.casualty_modifiers,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_id: json["playerId"].as_str().map(str::to_string),
+            casualty_roll: json["casualtyRoll"].as_array().map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0) as i32).collect()).unwrap_or_default(),
+            player_state: json["playerState"].as_u64().map(|v| PlayerState(v as u32)),
+            serious_injury: json["seriousInjury"].as_str().map(str::to_string),
+            original_injury: json["seriousInjuryOld"].as_str().map(str::to_string),
+            casualty_modifiers: json["casualtyModifiers"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -71,5 +96,24 @@ mod tests {
     fn get_casualty_modifiers_and_original_injury() {
         assert_eq!(make().get_casualty_modifiers(), &[] as &[String]);
         assert_eq!(make().get_original_injury(), None);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportApothecaryRoll::from_json(&json);
+        assert_eq!(restored.player_id, original.player_id);
+        assert_eq!(restored.casualty_roll, original.casualty_roll);
+        assert_eq!(restored.player_state, original.player_state);
+        assert_eq!(restored.serious_injury, original.serious_injury);
+        assert_eq!(restored.original_injury, original.original_injury);
+        assert_eq!(restored.casualty_modifiers, original.casualty_modifiers);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("apothecaryRoll"));
     }
 }

@@ -21,6 +21,23 @@ impl IReport for ReportKickoffTimeout {
     fn get_id(&self) -> ReportId { ReportId::KICKOFF_TIMEOUT }
 }
 
+impl ReportKickoffTimeout {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "turnModifier": self.turn_modifier,
+            "turnNr": self.turn_number,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            turn_modifier: json["turnModifier"].as_i64().unwrap_or(0) as i32,
+            turn_number: json["turnNr"].as_i64().unwrap_or(0) as i32,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -46,5 +63,20 @@ mod tests {
         let r = ReportKickoffTimeout::new(-1, 8);
         assert_eq!(r.get_turn_modifier(), -1);
         assert_eq!(r.get_turn_number(), 8);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportKickoffTimeout::from_json(&json);
+        assert_eq!(restored.turn_modifier, original.turn_modifier);
+        assert_eq!(restored.turn_number, original.turn_number);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("kickoffTimeout"));
     }
 }

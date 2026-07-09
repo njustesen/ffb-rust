@@ -19,6 +19,21 @@ impl IReport for ReportEvent {
     fn get_id(&self) -> ReportId { ReportId::EVENT }
 }
 
+impl ReportEvent {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "message": self.event_message,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            event_message: json["message"].as_str().map(str::to_string),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -46,5 +61,19 @@ mod tests {
     fn different_event_message() {
         let r = ReportEvent::new(Some("touchdown".into()));
         assert_eq!(r.get_event_message(), Some("touchdown"));
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportEvent::from_json(&json);
+        assert_eq!(restored.event_message, original.event_message);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("event"));
     }
 }

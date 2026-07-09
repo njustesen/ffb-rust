@@ -39,6 +39,33 @@ impl IReport for ReportPenaltyShootout {
     fn get_id(&self) -> ReportId { ReportId::PENALTY_SHOOTOUT }
 }
 
+impl ReportPenaltyShootout {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "rollHome": self.roll_home,
+            "rollAway": self.roll_away,
+            "homeTeam": self.home_team_won_penalty,
+            "rollCount": self.roll_count,
+            "penaltyScoreHome": self.score_home,
+            "penaltyScoreAway": self.score_away,
+            "teamId": self.winning_team,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            roll_home: json["rollHome"].as_i64().unwrap_or(0) as i32,
+            roll_away: json["rollAway"].as_i64().unwrap_or(0) as i32,
+            score_home: json["penaltyScoreHome"].as_i64().unwrap_or(0) as i32,
+            score_away: json["penaltyScoreAway"].as_i64().unwrap_or(0) as i32,
+            roll_count: json["rollCount"].as_str().map(str::to_string),
+            winning_team: json["teamId"].as_str().map(str::to_string),
+            home_team_won_penalty: json["homeTeam"].as_bool(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -61,5 +88,25 @@ mod tests {
     #[test]
     fn get_name_is_nonempty() {
         assert!(!make().get_name().is_empty());
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportPenaltyShootout::from_json(&json);
+        assert_eq!(restored.roll_home, original.roll_home);
+        assert_eq!(restored.roll_away, original.roll_away);
+        assert_eq!(restored.score_home, original.score_home);
+        assert_eq!(restored.score_away, original.score_away);
+        assert_eq!(restored.roll_count, original.roll_count);
+        assert_eq!(restored.winning_team, original.winning_team);
+        assert_eq!(restored.home_team_won_penalty, original.home_team_won_penalty);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("penaltyShootout"));
     }
 }

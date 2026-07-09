@@ -36,6 +36,35 @@ impl IReport for ReportHypnoticGazeRoll {
     fn get_id(&self) -> ReportId { ReportId::HYPNOTIC_GAZE_ROLL }
 }
 
+impl ReportHypnoticGazeRoll {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.base.player_id,
+            "successful": self.base.successful,
+            "roll": self.base.roll,
+            "minimumRoll": self.base.minimum_roll,
+            "reRolled": self.base.re_rolled,
+            "rollModifiers": self.base.roll_modifier_names,
+            "defenderId": self.defender_id,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            base: ReportSkillRoll::new(
+                json["playerId"].as_str().map(str::to_string),
+                json["successful"].as_bool().unwrap_or(false),
+                json["roll"].as_i64().unwrap_or(0) as i32,
+                json["minimumRoll"].as_i64().unwrap_or(0) as i32,
+                json["reRolled"].as_bool().unwrap_or(false),
+                json["rollModifiers"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default(),
+            ),
+            defender_id: json["defenderId"].as_str().map(str::to_string),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -65,5 +94,24 @@ mod tests {
         let r = ReportHypnoticGazeRoll::new(None, false, 2, 4, false, None);
         assert!(!r.is_successful());
         assert_eq!(r.get_defender_id(), None);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportHypnoticGazeRoll::from_json(&json);
+        assert_eq!(restored.base.player_id, original.base.player_id);
+        assert_eq!(restored.base.successful, original.base.successful);
+        assert_eq!(restored.base.roll, original.base.roll);
+        assert_eq!(restored.base.minimum_roll, original.base.minimum_roll);
+        assert_eq!(restored.base.re_rolled, original.base.re_rolled);
+        assert_eq!(restored.defender_id, original.defender_id);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("hypnoticGazeRoll"));
     }
 }

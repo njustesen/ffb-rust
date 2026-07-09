@@ -23,6 +23,25 @@ impl IReport for ReportNervesOfSteel {
     fn get_id(&self) -> ReportId { ReportId::NERVES_OF_STEEL }
 }
 
+impl ReportNervesOfSteel {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.player_id,
+            "ballAction": self.ball_action,
+            "bomb": self.bomb,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_id: json["playerId"].as_str().map(str::to_string),
+            ball_action: json["ballAction"].as_str().map(str::to_string),
+            bomb: json["bomb"].as_bool().unwrap_or(false),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -47,5 +66,21 @@ mod tests {
     fn is_bomb_true() {
         let r = ReportNervesOfSteel::new(None, None, true);
         assert!(r.is_bomb());
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportNervesOfSteel::from_json(&json);
+        assert_eq!(restored.player_id, original.player_id);
+        assert_eq!(restored.ball_action, original.ball_action);
+        assert_eq!(restored.bomb, original.bomb);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("nervesOfSteel"));
     }
 }

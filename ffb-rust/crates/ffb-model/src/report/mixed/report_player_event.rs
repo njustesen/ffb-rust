@@ -22,6 +22,23 @@ impl IReport for ReportPlayerEvent {
     fn get_id(&self) -> ReportId { ReportId::PLAYER_EVENT }
 }
 
+impl ReportPlayerEvent {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.player_id,
+            "message": self.event_message,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_id: json["playerId"].as_str().map(str::to_string),
+            event_message: json["message"].as_str().map(str::to_string),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -47,5 +64,20 @@ mod tests {
         let r = ReportPlayerEvent::new(None, None);
         assert!(r.get_player_id().is_none());
         assert!(r.get_event_message().is_none());
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportPlayerEvent::from_json(&json);
+        assert_eq!(restored.player_id, original.player_id);
+        assert_eq!(restored.event_message, original.event_message);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("playerEvent"));
     }
 }
