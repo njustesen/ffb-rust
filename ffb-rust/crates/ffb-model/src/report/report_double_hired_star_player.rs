@@ -24,6 +24,21 @@ impl IReport for ReportDoubleHiredStarPlayer {
     }
 }
 
+impl ReportDoubleHiredStarPlayer {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "starPlayerName": self.star_player_name,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            star_player_name: json["starPlayerName"].as_str().unwrap_or("").to_string(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -57,5 +72,19 @@ mod tests {
     fn star_player_name_matches_field() {
         let r = make();
         assert_eq!(r.get_star_player_name(), r.star_player_name.as_str());
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportDoubleHiredStarPlayer::from_json(&json);
+        assert_eq!(restored.star_player_name, original.star_player_name);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("doubleHiredStarPlayer"));
     }
 }

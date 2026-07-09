@@ -35,6 +35,29 @@ impl IReport for ReportStandUpRoll {
     fn get_id(&self) -> ReportId { ReportId::STAND_UP_ROLL }
 }
 
+impl ReportStandUpRoll {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.player_id,
+            "successful": self.successful,
+            "roll": self.roll,
+            "modifier": self.modifier,
+            "reRolled": self.re_rolled,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_id: json["playerId"].as_str().map(str::to_string),
+            successful: json["successful"].as_bool().unwrap_or(false),
+            roll: json["roll"].as_i64().unwrap_or(0) as i32,
+            modifier: json["modifier"].as_i64().unwrap_or(0) as i32,
+            re_rolled: json["reRolled"].as_bool().unwrap_or(false),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -73,5 +96,23 @@ mod tests {
         assert!(!make().is_re_rolled());
         let r = ReportStandUpRoll::new(Some("p1".into()), true, 4, 1, true);
         assert!(r.is_re_rolled());
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportStandUpRoll::from_json(&json);
+        assert_eq!(restored.player_id, original.player_id);
+        assert_eq!(restored.successful, original.successful);
+        assert_eq!(restored.roll, original.roll);
+        assert_eq!(restored.modifier, original.modifier);
+        assert_eq!(restored.re_rolled, original.re_rolled);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("standUpRoll"));
     }
 }

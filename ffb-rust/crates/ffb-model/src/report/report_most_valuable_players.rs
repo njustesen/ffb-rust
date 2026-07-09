@@ -30,6 +30,21 @@ impl ReportMostValuablePlayers {
     pub fn get_player_ids_away(&self) -> &[String] {
         &self.player_ids_away
     }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerIdsHome": self.player_ids_home,
+            "playerIdsAway": self.player_ids_away,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_ids_home: json["playerIdsHome"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default(),
+            player_ids_away: json["playerIdsAway"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default(),
+        }
+    }
 }
 
 impl IReport for ReportMostValuablePlayers {
@@ -80,5 +95,20 @@ mod tests {
         let r = ReportMostValuablePlayers::new(vec![], vec![]);
         assert!(r.get_player_ids_home().is_empty());
         assert!(r.get_player_ids_away().is_empty());
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportMostValuablePlayers::from_json(&json);
+        assert_eq!(restored.player_ids_home, original.player_ids_home);
+        assert_eq!(restored.player_ids_away, original.player_ids_away);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("mostValuablePlayers"));
     }
 }

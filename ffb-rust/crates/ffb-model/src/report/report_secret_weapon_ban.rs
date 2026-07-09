@@ -24,6 +24,22 @@ impl ReportSecretWeaponBan {
     pub fn get_player_ids(&self) -> &[String] { &self.player_ids }
     pub fn get_rolls(&self) -> &[i32] { &self.rolls }
     pub fn get_bans(&self) -> &[bool] { &self.bans }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerIds": self.player_ids,
+            "rolls": self.rolls,
+            "banArray": self.bans,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        let player_ids: Vec<String> = json["playerIds"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
+        let rolls: Vec<i32> = json["rolls"].as_array().map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0) as i32).collect()).unwrap_or_default();
+        let bans: Vec<bool> = json["banArray"].as_array().map(|a| a.iter().map(|v| v.as_bool().unwrap_or(false)).collect()).unwrap_or_default();
+        Self { player_ids, rolls, bans }
+    }
 }
 
 impl IReport for ReportSecretWeaponBan {
@@ -74,5 +90,21 @@ mod tests {
         assert_eq!(r.get_player_ids(), &["p3"]);
         assert_eq!(r.get_rolls(), &[6]);
         assert_eq!(r.get_bans(), &[false]);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportSecretWeaponBan::from_json(&json);
+        assert_eq!(restored.player_ids, original.player_ids);
+        assert_eq!(restored.rolls, original.rolls);
+        assert_eq!(restored.bans, original.bans);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("secretWeaponBan"));
     }
 }

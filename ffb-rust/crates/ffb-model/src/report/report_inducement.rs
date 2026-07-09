@@ -37,6 +37,25 @@ impl IReport for ReportInducement {
     }
 }
 
+impl ReportInducement {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "teamId": self.team_id,
+            "inducementType": self.inducement_type,
+            "value": self.value,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            team_id: json["teamId"].as_str().unwrap_or("").to_string(),
+            inducement_type: json["inducementType"].as_str().unwrap_or("").to_string(),
+            value: json["value"].as_i64().unwrap_or(0) as i32,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -74,5 +93,21 @@ mod tests {
     fn zero_value() {
         let r = ReportInducement::new("team1".into(), "FREE".into(), 0);
         assert_eq!(r.get_value(), 0);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportInducement::from_json(&json);
+        assert_eq!(restored.team_id, original.team_id);
+        assert_eq!(restored.inducement_type, original.inducement_type);
+        assert_eq!(restored.value, original.value);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("inducement"));
     }
 }

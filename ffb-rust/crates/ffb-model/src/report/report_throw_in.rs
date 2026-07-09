@@ -24,6 +24,29 @@ impl IReport for ReportThrowIn {
     fn get_id(&self) -> ReportId { ReportId::THROW_IN }
 }
 
+impl ReportThrowIn {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "direction": self.direction.name(),
+            "directionRoll": self.direction_roll,
+            "distanceRoll": self.distance_roll,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            direction: json["direction"].as_str()
+                .and_then(Direction::from_name)
+                .unwrap_or(Direction::North),
+            direction_roll: json["directionRoll"].as_i64().unwrap_or(0) as i32,
+            distance_roll: json["distanceRoll"].as_array()
+                .map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0) as i32).collect())
+                .unwrap_or_default(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -61,5 +84,21 @@ mod tests {
         let r = ReportThrowIn::new(Direction::East, 2, vec![1, 2, 3]);
         assert_eq!(r.get_distance_roll().len(), 3);
         assert_eq!(r.get_direction_roll(), 2);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportThrowIn::from_json(&json);
+        assert_eq!(restored.direction, original.direction);
+        assert_eq!(restored.direction_roll, original.direction_roll);
+        assert_eq!(restored.distance_roll, original.distance_roll);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("throwIn"));
     }
 }

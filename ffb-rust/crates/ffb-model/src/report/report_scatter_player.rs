@@ -29,6 +29,33 @@ impl ReportScatterPlayer {
     pub fn get_directions(&self) -> &[Direction] { &self.directions }
     pub fn get_rolls(&self) -> &[i32] { &self.rolls }
     pub fn get_scatter(&self) -> Option<bool> { self.scatter }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "startCoordinate": { "x": self.start_coordinate.x, "y": self.start_coordinate.y },
+            "endCoordinate": { "x": self.end_coordinate.x, "y": self.end_coordinate.y },
+            "directionArray": self.directions.iter().map(|d| d.name()).collect::<Vec<_>>(),
+            "rolls": self.rolls,
+            "isScatter": self.scatter,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            start_coordinate: FieldCoordinate::new(
+                json["startCoordinate"]["x"].as_i64().unwrap_or(0) as i32,
+                json["startCoordinate"]["y"].as_i64().unwrap_or(0) as i32,
+            ),
+            end_coordinate: FieldCoordinate::new(
+                json["endCoordinate"]["x"].as_i64().unwrap_or(0) as i32,
+                json["endCoordinate"]["y"].as_i64().unwrap_or(0) as i32,
+            ),
+            directions: json["directionArray"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().and_then(Direction::from_name)).collect()).unwrap_or_default(),
+            rolls: json["rolls"].as_array().map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0) as i32).collect()).unwrap_or_default(),
+            scatter: json["isScatter"].as_bool(),
+        }
+    }
 }
 
 impl IReport for ReportScatterPlayer {
@@ -84,5 +111,23 @@ mod tests {
         let r = make();
         assert_eq!(r.get_start_coordinate(), &FieldCoordinate::new(3, 5));
         assert_eq!(r.get_end_coordinate(), &FieldCoordinate::new(4, 5));
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportScatterPlayer::from_json(&json);
+        assert_eq!(restored.start_coordinate, original.start_coordinate);
+        assert_eq!(restored.end_coordinate, original.end_coordinate);
+        assert_eq!(restored.directions, original.directions);
+        assert_eq!(restored.rolls, original.rolls);
+        assert_eq!(restored.scatter, original.scatter);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("scatterPlayer"));
     }
 }

@@ -28,6 +28,23 @@ impl ReportMasterChefRoll {
     pub fn get_re_rolls_stolen(&self) -> i32 {
         self.re_rolls_stolen
     }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "teamId": self.team_id,
+            "masterChefRoll": self.master_chef_roll,
+            "reRollsStolen": self.re_rolls_stolen,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            team_id: json["teamId"].as_str().unwrap_or("").to_string(),
+            master_chef_roll: json["masterChefRoll"].as_array().map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0) as i32).collect()).unwrap_or_default(),
+            re_rolls_stolen: json["reRollsStolen"].as_i64().unwrap_or(0) as i32,
+        }
+    }
 }
 
 impl IReport for ReportMasterChefRoll {
@@ -74,5 +91,21 @@ mod tests {
         let r = ReportMasterChefRoll::new("team1".into(), vec![6, 6, 6], 3);
         assert_eq!(r.get_master_chef_roll(), &[6, 6, 6]);
         assert_eq!(r.get_re_rolls_stolen(), 3);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportMasterChefRoll::from_json(&json);
+        assert_eq!(restored.team_id, original.team_id);
+        assert_eq!(restored.master_chef_roll, original.master_chef_roll);
+        assert_eq!(restored.re_rolls_stolen, original.re_rolls_stolen);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("masterChefRoll"));
     }
 }

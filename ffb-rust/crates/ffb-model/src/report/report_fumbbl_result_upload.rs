@@ -30,6 +30,23 @@ impl IReport for ReportFumbblResultUpload {
     }
 }
 
+impl ReportFumbblResultUpload {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "successful": self.successful,
+            "uploadStatus": self.upload_status,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            successful: json["successful"].as_bool().unwrap_or(false),
+            upload_status: json["uploadStatus"].as_str().unwrap_or("").to_string(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -67,5 +84,20 @@ mod tests {
         let r = ReportFumbblResultUpload::new(true, "PENDING".into());
         assert!(r.is_successful());
         assert_eq!(r.get_upload_status(), "PENDING");
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportFumbblResultUpload::from_json(&json);
+        assert_eq!(restored.successful, original.successful);
+        assert_eq!(restored.upload_status, original.upload_status);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("fumbblResultUpload"));
     }
 }

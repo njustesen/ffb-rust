@@ -70,6 +70,18 @@ impl IReport for ReportGameOptions {
     }
 }
 
+impl ReportGameOptions {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+        })
+    }
+
+    pub fn from_json(_json: &serde_json::Value) -> Self {
+        Self::default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -112,5 +124,20 @@ mod tests {
         assert!(r.is_sneaky_git_as_foul_guard());
         assert!(r.is_right_stuff_cancels_tackle());
         assert!(r.is_piling_on_without_modifier());
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let _restored = ReportGameOptions::from_json(&json);
+        // Java only serializes reportId; fields are not persisted
+        assert_eq!(json["reportId"].as_str(), Some("gameOptions"));
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("gameOptions"));
     }
 }

@@ -23,6 +23,25 @@ impl IReport for ReportCoinThrow {
     fn get_id(&self) -> ReportId { ReportId::COIN_THROW }
 }
 
+impl ReportCoinThrow {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "coach": self.coach,
+            "coinThrowHeads": self.coin_throw_heads,
+            "coinChoiceHeads": self.coin_choice_heads,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            coach: json["coach"].as_str().unwrap_or("").to_string(),
+            coin_throw_heads: json["coinThrowHeads"].as_bool().unwrap_or(false),
+            coin_choice_heads: json["coinChoiceHeads"].as_bool().unwrap_or(false),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -54,5 +73,21 @@ mod tests {
     #[test]
     fn coin_choice_tails() {
         assert!(!make().is_coin_choice_heads());
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportCoinThrow::from_json(&json);
+        assert_eq!(restored.coach, original.coach);
+        assert_eq!(restored.coin_throw_heads, original.coin_throw_heads);
+        assert_eq!(restored.coin_choice_heads, original.coin_choice_heads);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("coinThrow"));
     }
 }

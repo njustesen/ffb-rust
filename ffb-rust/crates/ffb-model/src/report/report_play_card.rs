@@ -22,6 +22,23 @@ impl ReportPlayCard {
     pub fn get_team_id(&self) -> &str { &self.team_id }
     pub fn get_card(&self) -> &str { &self.card }
     pub fn get_player_id(&self) -> Option<&str> { self.player_id.as_deref() }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "teamId": self.team_id,
+            "card": self.card,
+            "playerId": self.player_id,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            team_id: json["teamId"].as_str().unwrap_or("").to_string(),
+            card: json["card"].as_str().unwrap_or("").to_string(),
+            player_id: json["playerId"].as_str().map(str::to_string),
+        }
+    }
 }
 
 impl IReport for ReportPlayCard {
@@ -66,5 +83,21 @@ mod tests {
     fn no_player_id() {
         let r = ReportPlayCard::new_with_player("team1".into(), "SomeCard".into(), None);
         assert_eq!(r.get_player_id(), None);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportPlayCard::from_json(&json);
+        assert_eq!(restored.team_id, original.team_id);
+        assert_eq!(restored.card, original.card);
+        assert_eq!(restored.player_id, original.player_id);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("playCard"));
     }
 }

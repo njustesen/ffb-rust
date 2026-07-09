@@ -31,6 +31,27 @@ impl IReport for ReportKickoffResult {
     }
 }
 
+impl ReportKickoffResult {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "kickoffResult": self.kickoff_result.name(),
+            "kickoffRoll": self.kickoff_roll,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            kickoff_result: json["kickoffResult"].as_str()
+                .and_then(KickoffResult::from_name)
+                .unwrap_or(KickoffResult::Blitz),
+            kickoff_roll: json["kickoffRoll"].as_array()
+                .map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0) as i32).collect())
+                .unwrap_or_default(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -67,5 +88,20 @@ mod tests {
         let r = ReportKickoffResult::new(KickoffResult::QuickSnap, vec![2, 5]);
         assert_eq!(r.get_kickoff_result(), &KickoffResult::QuickSnap);
         assert_eq!(r.get_kickoff_roll(), &[2, 5]);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportKickoffResult::from_json(&json);
+        assert_eq!(restored.kickoff_result, original.kickoff_result);
+        assert_eq!(restored.kickoff_roll, original.kickoff_roll);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("kickoffResult"));
     }
 }

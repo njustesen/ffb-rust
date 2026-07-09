@@ -45,6 +45,38 @@ impl IReport for ReportDauntlessRoll {
     }
 }
 
+impl ReportDauntlessRoll {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.base.player_id,
+            "successful": self.base.successful,
+            "roll": self.base.roll,
+            "minimumRoll": self.base.minimum_roll,
+            "reRolled": self.base.re_rolled,
+            "rollModifiers": self.base.roll_modifier_names,
+            "strength": self.strength,
+            "defenderId": self.defender_id,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        use crate::report::report_skill_roll::ReportSkillRoll;
+        Self {
+            base: ReportSkillRoll {
+                player_id: json["playerId"].as_str().map(str::to_string),
+                successful: json["successful"].as_bool().unwrap_or(false),
+                roll: json["roll"].as_i64().unwrap_or(0) as i32,
+                minimum_roll: json["minimumRoll"].as_i64().unwrap_or(0) as i32,
+                re_rolled: json["reRolled"].as_bool().unwrap_or(false),
+                roll_modifier_names: json["rollModifiers"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default(),
+            },
+            strength: json["strength"].as_i64().unwrap_or(0) as i32,
+            defender_id: json["defenderId"].as_str().map(str::to_string),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,5 +115,26 @@ mod tests {
         let r = ReportDauntlessRoll::new(Some("p1".into()), true, 6, 3, true, 5, Some("def2".into()));
         assert!(r.base.is_re_rolled());
         assert_eq!(r.get_defender_id(), Some("def2"));
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportDauntlessRoll::from_json(&json);
+        assert_eq!(restored.base.player_id, original.base.player_id);
+        assert_eq!(restored.base.successful, original.base.successful);
+        assert_eq!(restored.base.roll, original.base.roll);
+        assert_eq!(restored.base.minimum_roll, original.base.minimum_roll);
+        assert_eq!(restored.base.re_rolled, original.base.re_rolled);
+        assert_eq!(restored.base.roll_modifier_names, original.base.roll_modifier_names);
+        assert_eq!(restored.strength, original.strength);
+        assert_eq!(restored.defender_id, original.defender_id);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("dauntlessRoll"));
     }
 }

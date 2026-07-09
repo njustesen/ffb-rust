@@ -54,6 +54,33 @@ impl IReport for ReportKickoffScatter {
     }
 }
 
+impl ReportKickoffScatter {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "ballCoordinateEnd": { "x": self.ball_coordinate_end.x, "y": self.ball_coordinate_end.y },
+            "scatterDirection": self.scatter_direction.name(),
+            "rollScatterDirection": self.roll_scatter_direction,
+            "rollScatterDistance": self.roll_scatter_distance,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        let coord = &json["ballCoordinateEnd"];
+        Self {
+            ball_coordinate_end: FieldCoordinate::new(
+                coord["x"].as_i64().unwrap_or(0) as i32,
+                coord["y"].as_i64().unwrap_or(0) as i32,
+            ),
+            scatter_direction: json["scatterDirection"].as_str()
+                .and_then(Direction::from_name)
+                .unwrap_or(Direction::North),
+            roll_scatter_direction: json["rollScatterDirection"].as_i64().unwrap_or(0) as i32,
+            roll_scatter_distance: json["rollScatterDistance"].as_i64().unwrap_or(0) as i32,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -97,5 +124,22 @@ mod tests {
         assert_eq!(r.get_scatter_direction(), Direction::South);
         assert_eq!(r.get_roll_scatter_direction(), 1);
         assert_eq!(r.get_roll_scatter_distance(), 6);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportKickoffScatter::from_json(&json);
+        assert_eq!(restored.ball_coordinate_end, original.ball_coordinate_end);
+        assert_eq!(restored.scatter_direction, original.scatter_direction);
+        assert_eq!(restored.roll_scatter_direction, original.roll_scatter_direction);
+        assert_eq!(restored.roll_scatter_distance, original.roll_scatter_distance);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("kickoffScatter"));
     }
 }

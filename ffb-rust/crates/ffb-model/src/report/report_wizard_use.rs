@@ -23,6 +23,25 @@ impl IReport for ReportWizardUse {
     fn get_id(&self) -> ReportId { ReportId::WIZARD_USE }
 }
 
+impl ReportWizardUse {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "teamId": self.team_id,
+            "wizardSpell": self.wizard_spell.get_name(),
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            team_id: json["teamId"].as_str().unwrap_or("").to_string(),
+            wizard_spell: json["wizardSpell"].as_str()
+                .and_then(SpecialEffect::for_name)
+                .unwrap_or(SpecialEffect::FIREBALL),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -59,5 +78,20 @@ mod tests {
     fn different_team_id() {
         let r = ReportWizardUse::new("team3".into(), SpecialEffect::FIREBALL);
         assert_eq!(r.get_team_id(), "team3");
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportWizardUse::from_json(&json);
+        assert_eq!(restored.team_id, original.team_id);
+        assert_eq!(restored.wizard_spell, original.wizard_spell);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("wizardUse"));
     }
 }

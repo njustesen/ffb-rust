@@ -36,6 +36,25 @@ impl IReport for ReportDefectingPlayers {
     }
 }
 
+impl ReportDefectingPlayers {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerIds": self.player_ids,
+            "rolls": self.rolls,
+            "defectingArray": self.defectings,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_ids: json["playerIds"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default(),
+            rolls: json["rolls"].as_array().map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0) as i32).collect()).unwrap_or_default(),
+            defectings: json["defectingArray"].as_array().map(|a| a.iter().map(|v| v.as_bool().unwrap_or(false)).collect()).unwrap_or_default(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -79,5 +98,21 @@ mod tests {
         let r = ReportDefectingPlayers::new(vec!["p3".into()], vec![1], vec![true]);
         assert_eq!(r.get_player_ids(), &["p3"]);
         assert_eq!(r.get_defectings(), &[true]);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportDefectingPlayers::from_json(&json);
+        assert_eq!(restored.player_ids, original.player_ids);
+        assert_eq!(restored.rolls, original.rolls);
+        assert_eq!(restored.defectings, original.defectings);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("defectingPlayers"));
     }
 }

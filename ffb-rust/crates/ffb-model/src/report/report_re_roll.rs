@@ -25,6 +25,25 @@ impl ReportReRoll {
     pub fn get_re_roll_source(&self) -> &ReRollSource { &self.re_roll_source }
     pub fn is_successful(&self) -> bool { self.successful }
     pub fn get_roll(&self) -> i32 { self.roll }
+
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "playerId": self.player_id,
+            "reRollSource": self.re_roll_source.name,
+            "successful": self.successful,
+            "roll": self.roll,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_id: json["playerId"].as_str().map(str::to_string),
+            re_roll_source: ReRollSource::new(json["reRollSource"].as_str().unwrap_or("")),
+            successful: json["successful"].as_bool().unwrap_or(false),
+            roll: json["roll"].as_i64().unwrap_or(0) as i32,
+        }
+    }
 }
 
 impl IReport for ReportReRoll {
@@ -68,5 +87,22 @@ mod tests {
         let r = ReportReRoll::new(Some("p2".into()), ReRollSource::new("teamReRoll"), false, 2);
         assert!(!r.is_successful());
         assert_eq!(r.get_roll(), 2);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportReRoll::from_json(&json);
+        assert_eq!(restored.player_id, original.player_id);
+        assert_eq!(restored.re_roll_source.name, original.re_roll_source.name);
+        assert_eq!(restored.successful, original.successful);
+        assert_eq!(restored.roll, original.roll);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("reRoll"));
     }
 }

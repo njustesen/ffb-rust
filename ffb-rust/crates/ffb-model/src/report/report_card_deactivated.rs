@@ -21,6 +21,21 @@ impl IReport for ReportCardDeactivated {
     fn get_id(&self) -> ReportId { ReportId::CARD_DEACTIVATED }
 }
 
+impl ReportCardDeactivated {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "card": self.card,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            card: json["card"].as_str().unwrap_or("").to_string(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -54,5 +69,19 @@ mod tests {
     fn card_matches_field() {
         let r = make();
         assert_eq!(r.get_card(), r.card.as_str());
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportCardDeactivated::from_json(&json);
+        assert_eq!(restored.card, original.card);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("cardDeactivated"));
     }
 }

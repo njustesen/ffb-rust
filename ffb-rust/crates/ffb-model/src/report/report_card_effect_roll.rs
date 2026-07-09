@@ -27,6 +27,25 @@ impl IReport for ReportCardEffectRoll {
     fn get_id(&self) -> ReportId { ReportId::CARD_EFFECT_ROLL }
 }
 
+impl ReportCardEffectRoll {
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "reportId": self.get_id().get_name(),
+            "card": self.card,
+            "roll": self.roll,
+            "cardEffect": self.card_effect,
+        })
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            card: json["card"].as_str().unwrap_or("").to_string(),
+            roll: json["roll"].as_i64().unwrap_or(0) as i32,
+            card_effect: json["cardEffect"].as_str().map(str::to_string),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -64,5 +83,21 @@ mod tests {
         let r = ReportCardEffectRoll::new("BRIBE".into(), 5);
         assert_eq!(r.get_card_effect(), None);
         assert_eq!(r.get_roll(), 5);
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let original = make();
+        let json = original.to_json_value();
+        let restored = ReportCardEffectRoll::from_json(&json);
+        assert_eq!(restored.card, original.card);
+        assert_eq!(restored.roll, original.roll);
+        assert_eq!(restored.card_effect, original.card_effect);
+    }
+
+    #[test]
+    fn to_json_value_has_report_id() {
+        let json = make().to_json_value();
+        assert_eq!(json["reportId"].as_str(), Some("cardEffectRoll"));
     }
 }
