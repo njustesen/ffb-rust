@@ -2,6 +2,23 @@ use rand::RngCore;
 use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256StarStar;
 
+// ── EntropySource (translated from com.fumbbl.ffb.util.rng.EntropySource) ──
+
+/// 1:1 translation of `com.fumbbl.ffb.util.rng.EntropySource`.
+pub trait EntropySource {
+    fn has_enough_entropy(&self) -> bool;
+    fn get_entropy(&mut self) -> u8;
+}
+
+/// Minimal counter-based implementation for testing.
+#[derive(Debug, Default)]
+pub struct CounterEntropySource { counter: u8 }
+impl CounterEntropySource { pub fn new() -> Self { Self::default() } }
+impl EntropySource for CounterEntropySource {
+    fn has_enough_entropy(&self) -> bool { true }
+    fn get_entropy(&mut self) -> u8 { let v = self.counter; self.counter = self.counter.wrapping_add(1); v }
+}
+
 /// Per-roll stderr tracing, enabled by the FFB_DICE_TRACE env var.
 fn dice_trace_enabled() -> bool {
     static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
@@ -151,3 +168,4 @@ mod tests {
         }
     }
 }
+

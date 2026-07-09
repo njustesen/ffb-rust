@@ -1,6 +1,24 @@
 use serde::{Deserialize, Serialize};
 use crate::enums::Rules;
 
+pub mod kickoff_result;
+pub mod kickoff_result_mapping;
+
+pub mod bb2016 {
+    pub mod kickoff_result;
+    pub mod kickoff_result_mapping;
+}
+
+pub mod bb2020 {
+    pub mod kickoff_result;
+    pub mod kickoff_result_mapping;
+}
+
+pub mod bb2025 {
+    pub mod kickoff_result;
+    pub mod kickoff_result_mapping;
+}
+
 /// All kickoff event variants across all editions.
 ///
 /// Some variants only exist in specific editions (noted in doc comments).

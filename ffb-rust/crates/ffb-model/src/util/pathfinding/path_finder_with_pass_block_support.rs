@@ -532,3 +532,22 @@ mod tests {
         assert!(result.is_empty());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normal_move_blocks_tacklezones() {
+        let pf = PathFinderWithPassBlockSupport::new();
+        assert!(pf.normal_move_context.is_block_tacklezones());
+        assert!(!pf.normal_move_context.is_allow_jump());
+    }
+
+    #[test]
+    fn pass_block_allows_jump_and_endzone_exit() {
+        let pf = PathFinderWithPassBlockSupport::new();
+        assert!(pf.pass_block_context.is_allow_jump());
+        assert!(pf.pass_block_context.is_allow_exit_endzone_with_ball());
+    }
+}

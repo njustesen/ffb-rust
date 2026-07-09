@@ -8,9 +8,9 @@
 
 **Translation progress:** 2,521/2,521 files formally implemented = **100% ✓** (0 partial, 458 skip)
 
-**Tests:** 12,451 passing (1 ignored)
+**Tests:** 12,931 passing (1 ignored)
 
-**Current phase:** Phase ZS complete — headless: marker resolution, BreakTackle format, starting_skills wiring, GameEvent::PlayerAdded, HailMaryPass routing bug fix.
+**Current phase:** Phase ZT in progress — compile fixes, working-tree commit, Agent C merge — headless: marker resolution, BreakTackle format, starting_skills wiring, GameEvent::PlayerAdded, HailMaryPass routing bug fix.
 
 **Remaining `headless:` markers:** ~52 total — all properly deferred:
 - `pass_behaviour.rs` (27) — full PassStepModifier hook (Phase ZT: ffb-server dialog wiring)
