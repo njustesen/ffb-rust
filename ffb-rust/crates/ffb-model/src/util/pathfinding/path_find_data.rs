@@ -146,25 +146,3 @@ mod tests {
         assert!(Rc::ptr_eq(&blocked, &from_jumped));
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn new_has_no_processed_nodes() {
-        let data = PathFindData::new();
-        assert!(!data.is_processed(PathFindState::NORMAL, 0, 0));
-    }
-
-    #[test]
-    fn set_and_get_node() {
-        let mut data = PathFindData::new();
-        let coord = FieldCoordinate::new(3, 4);
-        let node = PathFindNode::new(PathFindState::NORMAL, coord, 2, false, vec![], None);
-        data.set_node(coord, node);
-        assert!(data.is_processed(PathFindState::NORMAL, 3, 4));
-        let n = data.get_neighbour(PathFindState::NORMAL, coord).unwrap();
-        assert_eq!(n.get_distance(), 2);
-    }
-}

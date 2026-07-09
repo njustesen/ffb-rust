@@ -469,20 +469,3 @@ mod tests {
         assert!(pf.theoretical_range_context.is_allow_jump());
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn instance_has_jump_context() {
-        let pf = PathFinderWithMultiJump::new();
-        assert!(pf.theoretical_range_context.is_allow_jump());
-    }
-
-    #[test]
-    fn default_and_new_equivalent() {
-        let _a = PathFinderWithMultiJump::new();
-        let _b = PathFinderWithMultiJump::default();
-    }
-}
