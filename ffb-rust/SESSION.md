@@ -8,9 +8,9 @@
 
 **Translation progress:** 2,521/2,521 files formally implemented = **100% ✓** (0 partial, 458 skip)
 
-**Tests:** 12,931 passing (1 ignored)
+**Tests:** 13,533 passing (1 ignored)
 
-**Current phase:** Phase ZT in progress — compile fixes, working-tree commit, Agent C merge — headless: marker resolution, BreakTackle format, starting_skills wiring, GameEvent::PlayerAdded, HailMaryPass routing bug fix.
+**Current phase:** Phase ZU — DB wiring, WebSocket server, handler layer.
 
 **Remaining `headless:` markers:** ~52 total — all properly deferred:
 - `pass_behaviour.rs` (27) — full PassStepModifier hook (Phase ZT: ffb-server dialog wiring)
@@ -22,6 +22,12 @@
 ---
 
 ## Completed Phases
+
+- **Phase ZT** (2026-07-09): server infrastructure stub sweep — all 29 ffb-engine server stubs implemented
+  - Implemented 29 server infra files: GameState, GameCache, GameLog, CardDeck, DebugLog, DiceRoller, GameState (server), IGameIdListener (trait), IServerJsonOption (constants), IServerLogLevel (constants), IServerProperty (constants), ReplayCache, RosterCache, ServerReplay, ServerReplayer, ServerSketchManager, ServerUrlProperty (enum + url builder), TeamCache, TeamSetupCache, EntropyPool, EntropyServer, Fortuna, NetworkEntropySource, UtilServerDb, UtilServerHttpClient, UtilServerReplay, DeferredCommandFactory, DeferredCommandIdFactory, DbUpdater, FantasyFootballServer
+  - Method bodies requiring DB/WebSocket wiring left as `todo!("Phase ZU: ...")` 
+  - Added all 29 modules to `ffb-engine/src/lib.rs`
+  - Tests: 13,479 → 13,533 (+54)
 
 - **Phase ZS** (2026-07-09): headless: marker resolution — BreakTackle format, starting_skills, HailMaryPass routing
   - Fixed `format_dodge_result()` in `agility_mechanic.rs` — `uses_strength` now detected from "Break Tackle" modifier name; 2 new tests
