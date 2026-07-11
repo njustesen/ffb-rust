@@ -92,7 +92,8 @@ mod tests {
     fn setup() -> (Arc<Mutex<GameCache>>, Arc<Mutex<SessionManager>>, ServerCommunication, DbConnectionManager) {
         let gc = Arc::new(Mutex::new(GameCache::new()));
         let sm = Arc::new(Mutex::new(SessionManager::new()));
-        let communication = ServerCommunication::new(Arc::clone(&gc), Arc::clone(&sm));
+        let db = Arc::new(Mutex::new(DbConnectionManager::new()));
+        let communication = ServerCommunication::new(Arc::clone(&gc), Arc::clone(&sm), Arc::clone(&db));
         (gc, sm, communication, DbConnectionManager::new())
     }
 

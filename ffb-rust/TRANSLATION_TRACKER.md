@@ -29,6 +29,69 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase ZZ (async dispatch + Join/JoinApproved wiring, completed, 2026-07-11):**
+Closed the two remaining server handler gaps Phase ZY narrowed but left blocked
+(`ServerCommandHandlerJoin`/`JoinApproved`) by threading async/DB access through the
+dispatch path they'd been waiting on since Phase ZX.
+
+- `net::server_communication::dispatch_loop` is now `async` (awaits `factory.handle_command`
+  inside its existing `tokio::spawn`), and `ServerCommunication::new`/
+  `ServerCommandHandlerFactory::{new,with_replay_session_manager}` take a
+  `db_connection_manager: Arc<Mutex<DbConnectionManager>>` parameter, threaded to two new
+  factory fields (`team_cache`, `roster_cache`, `client_properties`, defaulted empty — no
+  server-startup wiring exists yet to populate them for real) and two new handler instances
+  (`join_handler`, `join_approved_handler`).
+- `SessionManager::sender_for` (new accessor) exposes a registered session's outgoing sender
+  by id, since Java re-queries a live `Session` object this crate's `SessionManager` doesn't
+  hold — needed so the factory's new `AnyInternalServerCommand::JoinApproved` dispatch arm
+  can supply `join_approved_handler.handle_command` its `sender` parameter.
+- `ServerCommandHandlerJoin::handle_command` is now `async`: the targeted-join branch calls
+  `DbPasswordForCoachQuery::execute` (gated by `pool_ready()`), then either redispatches
+  `InternalServerCommandJoinApproved` through a cloned dispatch-queue sender or sends
+  `ERROR_WRONG_PASSWORD`. FUMBBL-mode authorization stays a documented no-op (no
+  `ServerMode`/request-processor plumbing here, same class of gap as `ScheduleGame`'s own
+  FUMBBL branch).
+- `ServerCommandHandlerJoinApproved::handle_command` is now `async` with all three
+  previously-`todo!()`'d branches implemented: SPECTATOR calls the real `send_server_join`
+  (removing the redundant manual `add_session` call — `send_server_join` already does this
+  internally); REPLAY calls the real `send_user_settings`; PLAYER translates
+  `joinWithoutTeam`/`joinWithTeam`/`sendTeamList` 1:1, resolving teams via
+  `GameCache::get_team_by_id`/`TeamCache`/`RosterCache` and calling
+  `join_game_as_player_and_check_if_ready_to_start` + `start_game`. `GameCache::take_game_state`
+  (new) lets `start_game`'s awaited DB calls run without holding the cache's `Mutex` guard
+  across an `.await` (required for the `tokio::spawn`ed dispatch loop to stay `Send`).
+- Two structural gaps, documented rather than invented: (1) this crate's `GameState` has no
+  `Game` at all until both teams are attached via `start_game` (no empty/skeleton `Game`
+  slot, unlike Java's always-present blank `Game`), so a freshly-created-by-name game with no
+  team id yet degrades to `sendTeamList`/`joinWithTeam` against blank coach fields — matching
+  Java's practical outcome, just derived differently; (2) `GameState::is_started()` (the
+  engine driver being initialized) doubles as the proxy for both Java's
+  `GameStatus.SCHEDULED` gate and its separate `game.getStarted() != null` check, since this
+  crate's `Game` has neither a `scheduled` nor `started` timestamp field (an existing,
+  previously-documented gap elsewhere in this crate).
+- `ServerRequestProcessor`'s queued-request trait object gained a `+ Send + Sync` bound
+  (compile-time-only tightening — every existing `ServerRequest` implementor already stores
+  only `Send + Sync` data) so the now-async `JoinApproved` path, reached from inside
+  `dispatch_loop`'s `tokio::spawn`, type-checks; no behavior change.
+- Cleanup: deleted 4 confirmed-orphaned `ffb-engine` stub files (`roster_cache.rs`,
+  `team_cache.rs`, `util/util_server_replay.rs`, `util/marker_loading_service.rs` — dead
+  duplicates superseded by the real, live `ffb-server` versions) and 55 confirmed-orphaned
+  stub files under `ffb-model/src/factory/*` (superseded by the real implementations in
+  `ffb-mechanics`; verified via grep that every real cross-crate usage of these names routes
+  through `ffb_mechanics::modifiers::*`, never `ffb_model::factory::*` — more than the ~24
+  the plan estimated, since independent re-verification found a larger safely-orphaned set).
+
+Result: **7 of the 11 originally-deferred server handlers are now fully wired and
+`todo!`-free** (adds `ServerCommandHandlerJoin`/`JoinApproved` to Phase ZX/ZY's 5). **4
+remain genuinely blocked**: `JoinReplay`/`Replay`/`ReplayLoaded` (the ~1,330-Java-LOC
+replay-record/playback engine) and `UploadGame`'s missing-game branch (HTTP backup-service
+dispatch) — both named as the next major step, not started here. `command_socket.rs` still
+special-cases `ClientJoin` inline before the factory ever sees it, so `ServerCommandHandlerJoin`
+is not yet reachable from live WebSocket traffic — bridging the two parallel command
+hierarchies remains the separately-documented, out-of-scope gap `ServerCommandHandlerFactory`'s
+own doc comment already flagged. No parity/integration testing this phase (per plan). Tests:
+17,399 → 17,238 (net -161: cleanup deleted more orphaned-stub tests than the phase added).
+
 **Phase ZY (close 2 more server handler gaps + redispatch sink infra, completed, 2026-07-11):**
 Followed up on Phase ZX's 8 remaining blocked `ServerCommandHandler*` files by building two
 of the four named missing infra pieces and using them to close two more handlers for real.
@@ -1818,8 +1881,8 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/handler/ServerCommandHandlerFactory.java` | `ffb-server` | `src/handler/server_command_handler_factory.rs` | ✓ |
 | `server/handler/ServerCommandHandlerFumbblGameChecked.java` | `ffb-server` | `src/handler/server_command_handler_fumbbl_game_checked.rs` | ✓ |
 | `server/handler/ServerCommandHandlerFumbblTeamLoaded.java` | `ffb-server` | `src/handler/server_command_handler_fumbbl_team_loaded.rs` | ✓ |
-| `server/handler/ServerCommandHandlerJoin.java` | `ffb-server` | `src/handler/server_command_handler_join.rs` | ~ |
-| `server/handler/ServerCommandHandlerJoinApproved.java` | `ffb-server` | `src/handler/server_command_handler_join_approved.rs` | ~ |
+| `server/handler/ServerCommandHandlerJoin.java` | `ffb-server` | `src/handler/server_command_handler_join.rs` | ✓ |
+| `server/handler/ServerCommandHandlerJoinApproved.java` | `ffb-server` | `src/handler/server_command_handler_join_approved.rs` | ✓ |
 | `server/handler/ServerCommandHandlerJoinReplay.java` | `ffb-server` | `src/handler/server_command_handler_join_replay.rs` | ~ |
 | `server/handler/ServerCommandHandlerLoadAutomaticPlayerMarkings.java` | `ffb-server` | `src/handler/server_command_handler_load_automatic_player_markings.rs` | ✓ |
 | `server/handler/ServerCommandHandlerPasswordChallenge.java` | `ffb-server` | `src/handler/server_command_handler_password_challenge.rs` | ✓ |

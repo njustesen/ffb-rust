@@ -97,6 +97,7 @@ impl FantasyFootballServer {
         let server_comms = Arc::new(ServerCommunication::new(
             Arc::clone(&self.game_cache),
             Arc::clone(&self.session_manager),
+            Arc::clone(&self.db_connection_manager),
         ));
 
         let state = AppState {

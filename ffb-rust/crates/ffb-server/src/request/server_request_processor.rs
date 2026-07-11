@@ -5,9 +5,20 @@
 /// threading/websocket layer yet, so `run()` here is a synchronous drain of whatever is
 /// currently queued rather than a blocking loop that waits for new work forever; `add`/
 /// `shutdown` preserve the same queue/stop semantics as the Java version.
+///
+/// `+ Send + Sync` on the trait object (added Phase ZZ) is not a Java concept — Java's
+/// queue is read by a dedicated `Thread`, with no cross-thread `Send` requirement to
+/// express. This crate's `MarkerContext` (`util/server_start_game.rs`) holds a
+/// `&Arc<Mutex<ServerRequestProcessor>>`, and Phase ZZ's newly-`async`
+/// `ServerCommandHandlerJoinApproved::handle_command` is reached from a `tokio::spawn`ed
+/// task (`net::server_communication::dispatch_loop`), which requires every type held
+/// across an `.await` — including this one, by reference — to be `Send`. All existing
+/// `ServerRequest` implementors already store only `Send + Sync` data (see
+/// `util/marker_loading_service.rs`'s `QueuedLoadPlayerMarkingsRequest` for an example), so
+/// this bound is a compile-time-only tightening, not a behavior change.
 pub struct ServerRequestProcessor {
     stopped: bool,
-    queue: std::collections::VecDeque<Box<dyn super::server_request::ServerRequest>>,
+    queue: std::collections::VecDeque<Box<dyn super::server_request::ServerRequest + Send + Sync>>,
 }
 
 impl ServerRequestProcessor {
@@ -27,7 +38,7 @@ impl ServerRequestProcessor {
     }
 
     /// Enqueues a request for processing. Returns false if the processor is stopped.
-    pub fn add(&mut self, request: Box<dyn super::server_request::ServerRequest>) -> bool {
+    pub fn add(&mut self, request: Box<dyn super::server_request::ServerRequest + Send + Sync>) -> bool {
         if self.stopped {
             return false;
         }
@@ -47,7 +58,7 @@ impl ServerRequestProcessor {
         Ok(())
     }
 
-    fn handle_request_internal(&self, request: Box<dyn super::server_request::ServerRequest>) {
+    fn handle_request_internal(&self, request: Box<dyn super::server_request::ServerRequest + Send + Sync>) {
         // Unlike Java's infinite retry loop (which sleeps 1s and retries the SAME request
         // forever on error), this logs the error once and moves on — there is no debug log /
         // sleep infra wired into this simplified crate yet.

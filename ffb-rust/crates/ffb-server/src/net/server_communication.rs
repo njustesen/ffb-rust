@@ -4,6 +4,7 @@
 /// Rust uses a tokio mpsc channel + single async task.
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
+use crate::db::db_connection_manager::DbConnectionManager;
 use crate::game_cache::GameCache;
 use crate::handler::ServerCommandHandlerFactory;
 use crate::model::received_command::{ReceivedCommand, SessionId};
@@ -24,6 +25,7 @@ impl ServerCommunication {
     pub fn new(
         game_cache: Arc<Mutex<GameCache>>,
         session_manager: Arc<Mutex<SessionManager>>,
+        db_connection_manager: Arc<Mutex<DbConnectionManager>>,
     ) -> Self {
         let (tx, rx) = mpsc::unbounded_channel::<ReceivedCommand>();
         // Own the ReplaySessionManager here and share it with the handler
@@ -36,6 +38,8 @@ impl ServerCommunication {
             Arc::clone(&game_cache),
             Arc::clone(&session_manager),
             Arc::clone(&replay_session_manager),
+            db_connection_manager,
+            tx.clone(),
         );
         tokio::spawn(dispatch_loop(rx, factory));
         Self { tx, session_manager, replay_session_manager }
@@ -147,7 +151,7 @@ async fn dispatch_loop(
 ) {
     log::info!("ServerCommunication dispatch loop started");
     while let Some(received) = rx.recv().await {
-        factory.handle_command(received);
+        factory.handle_command(received).await;
     }
     log::info!("ServerCommunication dispatch loop ended (channel closed)");
 }
@@ -157,11 +161,15 @@ mod tests {
     use super::*;
     use ffb_protocol::client_commands::{ClientCommand, ClientPing};
 
+    fn db() -> Arc<Mutex<DbConnectionManager>> {
+        Arc::new(Mutex::new(DbConnectionManager::new()))
+    }
+
     #[tokio::test]
     async fn enqueue_ping_does_not_panic() {
         let gc = Arc::new(Mutex::new(GameCache::new()));
         let sm = Arc::new(Mutex::new(SessionManager::new()));
-        let sc = ServerCommunication::new(gc, sm);
+        let sc = ServerCommunication::new(gc, sm, db());
         sc.receive_command(ReceivedCommand::new(ClientCommand::ClientPing(ClientPing { timestamp: 42 }), 0));
         // Give the dispatch task a chance to run
         tokio::task::yield_now().await;
@@ -178,7 +186,7 @@ mod tests {
             let (tx, _rx) = mpsc::unbounded_channel();
             sm.lock().unwrap().add_session(1, 0, "Coach".into(), ClientMode::PLAYER, true, vec![], tx);
         }
-        let sc = ServerCommunication::new(Arc::clone(&gc), Arc::clone(&sm));
+        let sc = ServerCommunication::new(Arc::clone(&gc), Arc::clone(&sm), db());
 
         assert!(sm.lock().unwrap().get_coach_for_session(1).is_some());
         sc.receive_internal(AnyInternalServerCommand::SocketClosed(InternalServerCommandSocketClosed), 1);
@@ -197,7 +205,7 @@ mod tests {
         rt.block_on(async {
             let gc = Arc::new(Mutex::new(GameCache::new()));
             let sm = Arc::new(Mutex::new(SessionManager::new()));
-            let sc = ServerCommunication::new(gc, sm);
+            let sc = ServerCommunication::new(gc, sm, db());
             let _clone = sc.sender();
         });
     }
@@ -209,7 +217,7 @@ mod tests {
         let sm = Arc::new(Mutex::new(SessionManager::new()));
         let (tx, _rx) = mpsc::unbounded_channel();
         sm.lock().unwrap().add_session(1, 100, "Coach".into(), ClientMode::PLAYER, true, vec![], tx);
-        let sc = ServerCommunication::new(Arc::clone(&gc), Arc::clone(&sm));
+        let sc = ServerCommunication::new(Arc::clone(&gc), Arc::clone(&sm), db());
 
         sc.close(1);
 
@@ -220,7 +228,7 @@ mod tests {
     async fn close_removes_replay_session() {
         let gc = Arc::new(Mutex::new(GameCache::new()));
         let sm = Arc::new(Mutex::new(SessionManager::new()));
-        let sc = ServerCommunication::new(gc, sm);
+        let sc = ServerCommunication::new(gc, sm, db());
         sc.replay_session_manager().lock().unwrap().add_session(7, "replay".into(), "Coach".into());
 
         sc.close(7);
@@ -232,7 +240,7 @@ mod tests {
     async fn send_to_replay_session_delivers_message() {
         let gc = Arc::new(Mutex::new(GameCache::new()));
         let sm = Arc::new(Mutex::new(SessionManager::new()));
-        let sc = ServerCommunication::new(gc, sm);
+        let sc = ServerCommunication::new(gc, sm, db());
         let (tx, mut rx) = mpsc::unbounded_channel();
         {
             let rsm = sc.replay_session_manager();
@@ -253,7 +261,7 @@ mod tests {
         let sm = Arc::new(Mutex::new(SessionManager::new()));
         let (tx, mut rx) = mpsc::unbounded_channel();
         sm.lock().unwrap().add_session(1, 100, "Coach".into(), ClientMode::PLAYER, true, vec![], tx);
-        let sc = ServerCommunication::new(gc, Arc::clone(&sm));
+        let sc = ServerCommunication::new(gc, Arc::clone(&sm), db());
 
         sc.send_game_time(100, "tick");
 
@@ -264,7 +272,7 @@ mod tests {
     async fn session_manager_accessor_shares_same_arc() {
         let gc = Arc::new(Mutex::new(GameCache::new()));
         let sm = Arc::new(Mutex::new(SessionManager::new()));
-        let sc = ServerCommunication::new(gc, Arc::clone(&sm));
+        let sc = ServerCommunication::new(gc, Arc::clone(&sm), db());
         assert!(Arc::ptr_eq(&sm, &sc.session_manager()));
     }
 }

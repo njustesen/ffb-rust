@@ -157,6 +157,16 @@ impl SessionManager {
         *self.last_ping_by_session.get(&session_id).unwrap_or(&0)
     }
 
+    /// Not a direct Java method — Java's `InternalServerCommandJoinApproved` handling
+    /// re-uses the already-connected Jetty `Session` object it was handed; this crate's
+    /// `SessionManager` has no live `Session` handle to re-query, only the `senders` map,
+    /// so this exposes a clone of a previously-registered session's outgoing sender for
+    /// callers (e.g. `ServerCommandHandlerFactory`'s internal-command redispatch) that need
+    /// to hand it to a handler taking `sender` as an explicit parameter.
+    pub fn sender_for(&self, session_id: SessionId) -> Option<mpsc::UnboundedSender<String>> {
+        self.senders.get(&session_id).cloned()
+    }
+
     /// Send a JSON string to a single session.
     pub fn send_to(&self, session_id: SessionId, msg: &str) {
         if let Some(sender) = self.senders.get(&session_id) {
@@ -245,6 +255,22 @@ mod tests {
         assert!(without_away.contains(&1));
         assert!(without_away.contains(&3));
         assert!(!without_away.contains(&2));
+    }
+
+    #[test]
+    fn sender_for_returns_clone_of_registered_sender() {
+        let mut sm = SessionManager::new();
+        let (tx, mut rx) = make_sender();
+        sm.add_session(1, 100, "Home".into(), ClientMode::PLAYER, true, vec![], tx);
+        let sender = sm.sender_for(1).expect("sender should be registered");
+        sender.send("hello".to_string()).unwrap();
+        assert_eq!(rx.try_recv().unwrap(), "hello");
+    }
+
+    #[test]
+    fn sender_for_unknown_session_is_none() {
+        let sm = SessionManager::new();
+        assert!(sm.sender_for(999).is_none());
     }
 
     #[test]

@@ -103,7 +103,8 @@ mod tests {
     ) {
         let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
         let sm = Arc::new(Mutex::new(SessionManager::new()));
-        let comm = Arc::new(ServerCommunication::new(Arc::clone(&gc), Arc::clone(&sm)));
+        let db = Arc::new(Mutex::new(crate::db::db_connection_manager::DbConnectionManager::new()));
+        let comm = Arc::new(ServerCommunication::new(Arc::clone(&gc), Arc::clone(&sm), db));
         (comm, gc, sm)
     }
 

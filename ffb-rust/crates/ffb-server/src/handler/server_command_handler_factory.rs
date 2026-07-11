@@ -23,12 +23,16 @@
 /// `ServerCommandHandlerSocketClosed::handle_command` directly rather than
 /// through this factory.
 use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc;
 use ffb_engine::action::{Action, PlayerActionChoice};
 use ffb_engine::legal_actions::TeamSide;
 use ffb_engine::server_sketch_manager::ServerSketchManager;
 use ffb_model::enums::{PlayerAction, SkillId};
 use ffb_protocol::client_commands::ClientCommand;
+use crate::db::db_connection_manager::DbConnectionManager;
 use crate::game_cache::GameCache;
+use crate::handler::server_command_handler_join::ServerCommandHandlerJoin;
+use crate::handler::server_command_handler_join_approved::ServerCommandHandlerJoinApproved;
 use crate::handler::server_command_handler_ping::ServerCommandHandlerPing;
 use crate::handler::server_command_handler_socket_closed::ServerCommandHandlerSocketClosed;
 use crate::model::received_command::{ReceivedCommand, ReceivedNetCommand};
@@ -36,6 +40,8 @@ use crate::net::commands::any_internal_server_command::AnyInternalServerCommand;
 use crate::net::replay_session_manager::ReplaySessionManager;
 use crate::net::session_manager::SessionManager;
 use crate::net::wire::{OutgoingModelSync, events_to_reports};
+use crate::roster_cache::RosterCache;
+use crate::team_cache::TeamCache;
 
 /// Errors returned when a `ClientCommand` cannot be decoded to an `Action`.
 #[derive(Debug)]
@@ -58,29 +64,54 @@ pub struct ServerCommandHandlerFactory {
     pub game_cache: Arc<Mutex<GameCache>>,
     pub session_manager: Arc<Mutex<SessionManager>>,
     pub replay_session_manager: Arc<Mutex<ReplaySessionManager>>,
+    pub db_connection_manager: Arc<Mutex<DbConnectionManager>>,
+    pub team_cache: Arc<TeamCache>,
+    pub roster_cache: Arc<RosterCache>,
+    pub client_properties: Arc<Vec<(String, String)>>,
     ping_handler: ServerCommandHandlerPing,
     socket_closed_handler: ServerCommandHandlerSocketClosed,
+    /// `pub` (like this struct's other fields) rather than private: unlike
+    /// `join_approved_handler` (dispatched to from `handle_internal_command` below), this
+    /// handler isn't reachable from `handle_command`'s `ClientCommand::ClientJoin` arm yet —
+    /// that bridging is the separately-documented, out-of-scope gap this file's own "Known
+    /// gap" doc comment already flagged — so it's exposed for direct use (see this file's
+    /// own tests) instead of sitting unread.
+    pub join_handler: ServerCommandHandlerJoin,
+    join_approved_handler: ServerCommandHandlerJoinApproved,
 }
 
 impl ServerCommandHandlerFactory {
     pub fn new(
         game_cache: Arc<Mutex<GameCache>>,
         session_manager: Arc<Mutex<SessionManager>>,
+        db_connection_manager: Arc<Mutex<DbConnectionManager>>,
     ) -> Self {
+        // Not wired to a real `ServerCommunication`'s dispatch queue — callers that need
+        // `ServerCommandHandlerJoin`'s redispatch to actually reach `handle_internal_command`
+        // should go through `with_replay_session_manager` (which `ServerCommunication::new`
+        // uses) instead, passing its own live sender.
+        let (dispatch_tx, _dispatch_rx) = mpsc::unbounded_channel();
         Self::with_replay_session_manager(
             game_cache,
             session_manager,
             Arc::new(Mutex::new(ReplaySessionManager::new())),
+            db_connection_manager,
+            dispatch_tx,
         )
     }
 
     /// Same as `new`, but lets a caller share an existing `ReplaySessionManager`
     /// (e.g. one already wired into `command_socket.rs`) instead of creating a
-    /// private one that replay-session pings would never actually reach.
+    /// private one that replay-session pings would never actually reach, and takes the
+    /// `mpsc::UnboundedSender<ReceivedCommand>` that feeds
+    /// `net::server_communication::dispatch_loop` so `ServerCommandHandlerJoin`'s
+    /// `InternalServerCommandJoinApproved` redispatch lands back on the real dispatch queue.
     pub fn with_replay_session_manager(
         game_cache: Arc<Mutex<GameCache>>,
         session_manager: Arc<Mutex<SessionManager>>,
         replay_session_manager: Arc<Mutex<ReplaySessionManager>>,
+        db_connection_manager: Arc<Mutex<DbConnectionManager>>,
+        dispatch_tx: mpsc::UnboundedSender<ReceivedCommand>,
     ) -> Self {
         let ping_handler = ServerCommandHandlerPing::new(
             Arc::clone(&session_manager),
@@ -93,7 +124,40 @@ impl ServerCommandHandlerFactory {
             Arc::clone(&replay_session_manager),
             sketch_manager,
         );
-        Self { game_cache, session_manager, replay_session_manager, ping_handler, socket_closed_handler }
+        // Sensible empty defaults for the standalone-mode disk-XML lookup tables and the
+        // `client.*` server properties — a real deployment would build these once at server
+        // startup and share them here (no such startup wiring exists yet for this trio, same
+        // as `ServerCommandHandlerScheduleGame`'s own `Default` impl).
+        let team_cache = Arc::new(TeamCache::new());
+        let roster_cache = Arc::new(RosterCache::new());
+        let client_properties: Arc<Vec<(String, String)>> = Arc::new(Vec::new());
+        let join_handler = ServerCommandHandlerJoin::new(
+            Arc::clone(&game_cache),
+            Arc::clone(&session_manager),
+            Arc::clone(&db_connection_manager),
+            dispatch_tx,
+        );
+        let join_approved_handler = ServerCommandHandlerJoinApproved::new(
+            Arc::clone(&game_cache),
+            Arc::clone(&session_manager),
+            Arc::clone(&db_connection_manager),
+            Arc::clone(&team_cache),
+            Arc::clone(&roster_cache),
+            Arc::clone(&client_properties),
+        );
+        Self {
+            game_cache,
+            session_manager,
+            replay_session_manager,
+            db_connection_manager,
+            team_cache,
+            roster_cache,
+            client_properties,
+            ping_handler,
+            socket_closed_handler,
+            join_handler,
+            join_approved_handler,
+        }
     }
 
     /// Java: `handleCommand(ReceivedCommand)` — the main dispatch entry point.
@@ -104,18 +168,18 @@ impl ServerCommandHandlerFactory {
     /// ReceivedCommand(internalCommand, session))`, landing it back on this same dispatch
     /// point. Phase ZY.4 wires that redispatch sink through for real
     /// (`ServerCommunication::receive_internal`) and adds the `Internal` match arm below —
-    /// currently routing only `SocketClosed` (already flagged in this file's own "Known gap"
-    /// note as needing to move from `command_socket.rs` into this factory) to a real handler;
-    /// the other 13 internal command types need their own handler wired in with their own
-    /// dependencies (several are `async`/DB-backed, e.g. `CloseGame`/`DeleteGame`, which would
-    /// first need this whole `handle_command` made `async` — a separate, larger change) and
-    /// fall through to a logged no-op for now rather than a fabricated stand-in.
-    pub fn handle_command(&self, received: ReceivedCommand) {
+    /// routing `SocketClosed` and (Phase ZZ) `JoinApproved` to real handlers; the other 12
+    /// internal command types need their own handler wired in with their own dependencies
+    /// (several are `async`/DB-backed, e.g. `CloseGame`/`DeleteGame`) and fall through to a
+    /// logged no-op for now rather than a fabricated stand-in. Phase ZZ made this whole
+    /// method `async` (and `dispatch_loop` `.await`s it) specifically so `JoinApproved`
+    /// could be wired for real — see `handle_internal_command`.
+    pub async fn handle_command(&self, received: ReceivedCommand) {
         let session_id = received.session_id;
 
         let client_command = match received.command {
             ReceivedNetCommand::Internal(internal) => {
-                self.handle_internal_command(internal, session_id);
+                self.handle_internal_command(internal, session_id).await;
                 return;
             }
             ReceivedNetCommand::Client(cmd) => cmd,
@@ -195,10 +259,30 @@ impl ServerCommandHandlerFactory {
     /// Java: the `InternalServerCommand` half of `handleCommand`'s dispatch — routes each
     /// concrete internal command to its `ServerCommandHandler*`. See `handle_command`'s doc
     /// comment for which are wired vs. still gated behind their own missing infra.
-    fn handle_internal_command(&self, internal: AnyInternalServerCommand, session_id: crate::model::received_command::SessionId) {
+    async fn handle_internal_command(&self, internal: AnyInternalServerCommand, session_id: crate::model::received_command::SessionId) {
         match internal {
             AnyInternalServerCommand::SocketClosed(_) => {
                 self.socket_closed_handler.handle_command(session_id);
+            }
+            AnyInternalServerCommand::JoinApproved(cmd) => {
+                // Java re-uses the already-connected Jetty `Session` object it was handed;
+                // this crate's handler needs the session's outgoing sender explicitly, so it
+                // is fetched back out of `SessionManager` by id (Phase ZZ's `sender_for`
+                // accessor) — this only succeeds for a session that's already registered
+                // (e.g. one `ServerCommandHandlerJoin` redispatched this command for).
+                let sender = { self.session_manager.lock().unwrap().sender_for(session_id) };
+                match sender {
+                    Some(sender) => {
+                        self.join_approved_handler.handle_command(&cmd, session_id, sender).await;
+                    }
+                    None => {
+                        log::warn!(
+                            "session {}: JoinApproved received but no registered sender found — \
+                             session was never registered before this redispatch",
+                            session_id
+                        );
+                    }
+                }
             }
             other => {
                 log::debug!(
@@ -876,8 +960,12 @@ mod tests {
 
     // ── handle_command routing (unit level) ───────────────────────────────────
 
-    #[test]
-    fn handle_command_ping_updates_last_ping() {
+    fn db() -> Arc<Mutex<crate::db::db_connection_manager::DbConnectionManager>> {
+        Arc::new(Mutex::new(crate::db::db_connection_manager::DbConnectionManager::new()))
+    }
+
+    #[tokio::test]
+    async fn handle_command_ping_updates_last_ping() {
         use std::sync::{Arc, Mutex};
         use ffb_model::model::ClientMode;
         use tokio::sync::mpsc;
@@ -890,8 +978,8 @@ mod tests {
             let mut sm = sm_arc.lock().unwrap();
             sm.add_session(42, 1, "TestCoach".into(), ClientMode::PLAYER, true, vec![], tx);
         }
-        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc));
-        factory.handle_command(ReceivedCommand::new(ClientCommand::ClientPing(ClientPing { timestamp: 9999 }), 42));
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
+        factory.handle_command(ReceivedCommand::new(ClientCommand::ClientPing(ClientPing { timestamp: 9999 }), 42)).await;
         let sm = sm_arc.lock().unwrap();
         // ServerCommandHandlerPing stores the current wall-clock time as the
         // last-ping timestamp (matching Java's `System.currentTimeMillis()`)
@@ -900,15 +988,61 @@ mod tests {
         assert!(sm.get_last_ping(42) > 0);
     }
 
-    #[test]
-    fn handle_command_unknown_session_does_not_panic() {
+    #[tokio::test]
+    async fn handle_command_unknown_session_does_not_panic() {
         use std::sync::{Arc, Mutex};
         let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
         let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
-        let factory = ServerCommandHandlerFactory::new(gc, sm);
+        let factory = ServerCommandHandlerFactory::new(gc, sm, db());
         // session 99 was never registered — should log a warning and return cleanly
         factory.handle_command(crate::model::received_command::ReceivedCommand::new(
             ClientCommand::ClientEndTurn(ClientEndTurn), 99,
-        ));
+        )).await;
+    }
+
+    #[tokio::test]
+    async fn join_handler_field_is_directly_usable_for_lobby_listing() {
+        use ffb_model::model::ClientMode;
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        sm.lock().unwrap().add_session(1, 0, "Coach".into(), ClientMode::PLAYER, true, vec![], tx);
+        let factory = ServerCommandHandlerFactory::new(gc, sm, db());
+        let join = ffb_protocol::commands::client_command_join::ClientCommandJoin {
+            coach: Some("Coach".into()),
+            ..Default::default()
+        };
+        assert!(factory.join_handler.handle_command(&join, 1).await);
+        let _ = rx.try_recv();
+    }
+
+    /// End-to-end dispatch test (Phase ZZ): enqueuing `AnyInternalServerCommand::JoinApproved`
+    /// through the real `handle_command` → `handle_internal_command` → `join_approved_handler`
+    /// path, analogous to the existing `SocketClosed` dispatch coverage in
+    /// `net::server_communication`'s own tests.
+    #[tokio::test]
+    async fn factory_dispatches_join_approved_through_real_handler() {
+        use ffb_model::model::ClientMode;
+        use tokio::sync::mpsc;
+        use crate::model::received_command::ReceivedCommand;
+        use crate::net::commands::any_internal_server_command::AnyInternalServerCommand;
+        use crate::net::commands::internal_server_command_join_approved::InternalServerCommandJoinApproved;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        sm.lock().unwrap().add_session(9, 0, "Watcher".into(), ClientMode::SPECTATOR, false, vec![], tx);
+
+        let factory = ServerCommandHandlerFactory::new(gc, sm, db());
+        let cmd = InternalServerCommandJoinApproved::new(
+            0, "FactoryDispatchGame".to_string(), "Watcher".to_string(), String::new(), "SPECTATOR".to_string(), vec![],
+        );
+        factory.handle_command(ReceivedCommand::new_internal(AnyInternalServerCommand::JoinApproved(cmd), 9)).await;
+
+        assert!(factory.game_cache.lock().unwrap().get_game_state_by_name("FactoryDispatchGame").is_some());
+        let msg = rx.try_recv().expect("expected a real serverJoin broadcast via the dispatch path");
+        assert!(msg.contains("serverJoin"));
     }
 }

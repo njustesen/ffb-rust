@@ -93,8 +93,6 @@ pub mod i_server_log_level;
 pub mod i_server_property;
 /// 1:1 translation of com.fumbbl.ffb.server.ReplayCache.
 pub mod replay_cache;
-/// 1:1 translation of com.fumbbl.ffb.server.RosterCache.
-pub mod roster_cache;
 /// 1:1 translation of com.fumbbl.ffb.server.ServerReplay.
 pub mod server_replay;
 /// 1:1 translation of com.fumbbl.ffb.server.ServerReplayer.
@@ -103,8 +101,6 @@ pub mod server_replayer;
 pub mod server_sketch_manager;
 /// 1:1 translation of com.fumbbl.ffb.server.ServerUrlProperty.
 pub mod server_url_property;
-/// 1:1 translation of com.fumbbl.ffb.server.TeamCache.
-pub mod team_cache;
 /// 1:1 translation of com.fumbbl.ffb.server.TeamSetupCache.
 pub mod team_setup_cache;
 

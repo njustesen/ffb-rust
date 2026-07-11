@@ -91,6 +91,17 @@ impl GameCache {
         self.game_state_by_id.insert(game_state.get_id(), game_state);
     }
 
+    /// Not a direct Java method — lets async handlers (e.g.
+    /// `ServerCommandHandlerJoinApproved`) take temporary ownership of a `GameState` so
+    /// `util::server_start_game::start_game`'s awaited DB calls don't hold this cache's
+    /// `Mutex` guard across an `.await` point (which would make the enclosing future
+    /// non-`Send`, breaking `tokio::spawn` in `net::server_communication::dispatch_loop`).
+    /// The name mapping is left untouched, so a game taken this way must be handed back
+    /// via `add_game` before anything else looks it up by id or name.
+    pub fn take_game_state(&mut self, game_id: i64) -> Option<GameState> {
+        self.game_state_by_id.remove(&game_id)
+    }
+
     /// Java: `allGameStates()`
     pub fn all_game_ids(&self) -> Vec<i64> {
         self.game_state_by_id.keys().copied().collect()
@@ -533,6 +544,7 @@ mod tests {
         let communication = ServerCommunication::new(
             std::sync::Arc::new(std::sync::Mutex::new(GameCache::new())),
             std::sync::Arc::new(std::sync::Mutex::new(SessionManager::new())),
+            std::sync::Arc::new(std::sync::Mutex::new(DbConnectionManager::new())),
         );
 
         let result = cache.close_game(id, &session_manager, &communication);
@@ -547,6 +559,7 @@ mod tests {
         let communication = ServerCommunication::new(
             std::sync::Arc::new(std::sync::Mutex::new(GameCache::new())),
             std::sync::Arc::new(std::sync::Mutex::new(SessionManager::new())),
+            std::sync::Arc::new(std::sync::Mutex::new(DbConnectionManager::new())),
         );
         assert_eq!(cache.close_game(0, &session_manager, &communication), None);
         assert_eq!(cache.close_game(42, &session_manager, &communication), None);
