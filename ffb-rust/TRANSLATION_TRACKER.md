@@ -29,6 +29,63 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase ZY (close 2 more server handler gaps + redispatch sink infra, completed, 2026-07-11):**
+Followed up on Phase ZX's 8 remaining blocked `ServerCommandHandler*` files by building two
+of the four named missing infra pieces and using them to close two more handlers for real.
+
+- **ZY.1 — step-stack clear + EndGame dispatch** (`DriverStepStack::clear`,
+  `DriverGameState::clear_step_stack`/`push_end_game_sequence` in `ffb-engine`, bridged onto
+  the server `GameState` wrapper). Closes `ServerCommandHandlerUploadGame`'s known-game
+  branch (sets `GameResult` conceded flags, clears the stack, pushes `EndGame`, drives to
+  completion); the missing-game branch (`ServerRequestProcessor` + HTTP backup service)
+  stays a separate, narrower `todo!()`.
+- **ZY.2 — XML roster/team deserializer** (`ffb_model::xml`: `XmlHandler`/`IXmlReadable`/
+  `UtilXml`, a 1:1 port of `com.fumbbl.ffb.xml` over `quick-xml` instead of SAX). Implements
+  `IXmlReadable` on `Roster`, `RosterPosition`, `RosterSkeleton`, `Team`, `Player`,
+  `TeamSkeleton`, plus `Team::update_roster`/`Player::update_position`. Rewrote
+  `RosterCache`/`TeamCache` in `ffb-server` to return real `Roster`/`Team` objects (the
+  `RosterXml`/`TeamXml` raw-string stopgaps and hand-rolled scanners are gone). This was the
+  single largest remaining infra gap and the one most of the 8 handlers shared.
+- **ZY.3 — wire two handlers onto the real objects.** `ServerCommandHandlerFumbblGameChecked`
+  and `ServerCommandHandlerScheduleGame` are now fully `todo!`-free. Added
+  `GameCache::get_team_by_id`/`get_teams_for_coach` (Java's `GameCache.getTeamById` +
+  its private `updateRoster` helper: `TeamCache` lookup + `RosterCache.getRosterForTeam` +
+  `Team::update_roster` + `UtilTeamValue` re-derivation). `ScheduleGame` resolves both teams
+  and starts the engine in one `GameState::start_game` call rather than Java's two
+  incremental `addTeamToGame` calls onto an empty `Game` — this crate's `Game`/
+  `DriverGameState` need both teams at construction (no empty-`Game` state exists), so both
+  resolved teams are supplied together, the same substitution other team-attaching handlers
+  here already make. `ServerCommandHandlerJoinApproved`'s `todo!()`s were corrected (team
+  loading is no longer the blocker; `join_game_as_player_and_check_if_ready_to_start`/
+  `send_server_join`/`send_user_settings` are `async` + need a `DbConnectionManager` this
+  handler's sync signature doesn't carry — a different, larger gap) but not closed.
+- **ZY.4 — command redispatch sink.** `AnyInternalServerCommand` (sum type over the 14
+  `internal_server_command_*` structs, same pattern as `ffb-protocol`'s `AnyServerCommand`/
+  `AnyClientCommand`) + widened `ReceivedCommand`/`ReceivedNetCommand::{Client,Internal}` +
+  `ServerCommunication::receive_internal` (Java: `handleCommand(InternalServerCommand)` →
+  `fCommandQueue.offer(...)`) + a real `Internal` dispatch arm in
+  `ServerCommandHandlerFactory` routing `SocketClosed` to a real handler instance (previously
+  handled ad hoc in `command_socket.rs`, already flagged as a follow-up). An end-to-end test
+  proves enqueue → the real `dispatch_loop` task → factory → handler. The other 13 internal
+  command types fall through to a logged no-op (most need their own handler + dependencies
+  wired in; several are async/DB-backed, which would need `handle_command` itself made async
+  first). `ServerCommandHandlerJoin`'s targeted-join `todo!()` is corrected: the sink it would
+  use to redispatch `InternalServerCommandJoinApproved` now exists, but the real blocker is
+  `DbPasswordForCoachQuery` being async with no DB connection threaded through — same class
+  of gap as `JoinApproved`, not resolved by the sink alone.
+
+Result: **5 of the 11 handlers are now fully wired and `todo!`-free**
+(`ServerCommandHandlerCloseGame`, `AddLoadedTeam`, `FumbblTeamLoaded` from Phase ZX, plus
+`ScheduleGame` and `FumbblGameChecked` this phase). **6 remain genuinely blocked**:
+`ServerCommandHandlerJoin`, `JoinApproved`, `JoinReplay`, `Replay`, `ReplayLoaded` (all now
+narrowed to async DB/SessionManager plumbing or the replay-engine gap, not roster
+resolution), and `UploadGame`'s missing-game branch (`ServerRequestProcessor` + HTTP backup
+service). The replay/command-log playback engine (blocking `JoinReplay`/`Replay`/
+`ReplayLoaded`) is deliberately deferred to a future **Phase ZZ** — it is the largest and
+riskiest of the four originally-named infra pieces, and has a hidden prerequisite: nothing
+in the live engine currently records a typed, replayable `ServerCommand` log for it to play
+back. No parity testing this phase (per plan). Tests: 17,357 → 17,399 (+42).
+
 **Phase ZX (server handler subsystem gaps, completed, 2026-07-11):**
 Closed the majority of the last known genuine untranslated-Java gap in `ffb-server`: 11
 `ServerCommandHandler*` files carrying `todo!("Phase ZV: ...")` calls, each blocked on a
@@ -1759,7 +1816,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/handler/ServerCommandHandlerCloseSession.java` | `ffb-server` | `src/handler/server_command_handler_close_session.rs` | ✓ |
 | `server/handler/ServerCommandHandlerDeleteGame.java` | `ffb-server` | `src/handler/server_command_handler_delete_game.rs` | ✓ |
 | `server/handler/ServerCommandHandlerFactory.java` | `ffb-server` | `src/handler/server_command_handler_factory.rs` | ✓ |
-| `server/handler/ServerCommandHandlerFumbblGameChecked.java` | `ffb-server` | `src/handler/server_command_handler_fumbbl_game_checked.rs` | ~ |
+| `server/handler/ServerCommandHandlerFumbblGameChecked.java` | `ffb-server` | `src/handler/server_command_handler_fumbbl_game_checked.rs` | ✓ |
 | `server/handler/ServerCommandHandlerFumbblTeamLoaded.java` | `ffb-server` | `src/handler/server_command_handler_fumbbl_team_loaded.rs` | ✓ |
 | `server/handler/ServerCommandHandlerJoin.java` | `ffb-server` | `src/handler/server_command_handler_join.rs` | ~ |
 | `server/handler/ServerCommandHandlerJoinApproved.java` | `ffb-server` | `src/handler/server_command_handler_join_approved.rs` | ~ |
@@ -1772,7 +1829,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/handler/ServerCommandHandlerReplayLoaded.java` | `ffb-server` | `src/handler/server_command_handler_replay_loaded.rs` | ~ |
 | `server/handler/ServerCommandHandlerReplayStatus.java` | `ffb-server` | `src/handler/server_command_handler_replay_status.rs` | ✓ |
 | `server/handler/ServerCommandHandlerRequestVersion.java` | `ffb-server` | `src/handler/server_command_handler_request_version.rs` | ✓ |
-| `server/handler/ServerCommandHandlerScheduleGame.java` | `ffb-server` | `src/handler/server_command_handler_schedule_game.rs` | ~ |
+| `server/handler/ServerCommandHandlerScheduleGame.java` | `ffb-server` | `src/handler/server_command_handler_schedule_game.rs` | ✓ |
 | `server/handler/ServerCommandHandlerSetMarker.java` | `ffb-server` | `src/handler/server_command_handler_set_marker.rs` | ✓ |
 | `server/handler/ServerCommandHandlerSetPreventSketching.java` | `ffb-server` | `src/handler/server_command_handler_set_prevent_sketching.rs` | ✓ |
 | `server/handler/ServerCommandHandlerSketchAddCoordinate.java` | `ffb-server` | `src/handler/server_command_handler_sketch_add_coordinate.rs` | ✓ |
