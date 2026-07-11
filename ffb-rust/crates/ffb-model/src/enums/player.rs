@@ -376,6 +376,69 @@ impl PlayerAction {
         }
     }
 
+    /// Java: `getDescription()`.
+    pub fn description(self) -> Option<&'static str> {
+        match self {
+            PlayerAction::Move => Some("starts a Move Action"),
+            PlayerAction::Block => Some("starts a Block Action"),
+            PlayerAction::Blitz => None,
+            PlayerAction::BlitzMove => Some("starts a Blitz Action"),
+            PlayerAction::BlitzSelect => None,
+            PlayerAction::HandOver => None,
+            PlayerAction::HandOverMove => Some("starts a Hand Over Action"),
+            PlayerAction::Pass => None,
+            PlayerAction::PassMove => Some("starts a Pass Action"),
+            PlayerAction::Foul => None,
+            PlayerAction::FoulMove => Some("starts a Foul Action"),
+            PlayerAction::StandUp => Some("stands up"),
+            PlayerAction::ThrowTeamMate => None,
+            PlayerAction::ThrowTeamMateMove => Some("starts a Throw Team-mate action"),
+            PlayerAction::RemoveConfusion => None,
+            PlayerAction::Gaze => None,
+            PlayerAction::GazeSelect => None,
+            PlayerAction::GazeMove => Some("starts a Gaze action"),
+            PlayerAction::MultipleBlock => Some("starts a Multi-Block Action"),
+            PlayerAction::HailMaryPass => None,
+            PlayerAction::DumpOff => None,
+            PlayerAction::StandUpBlitz => Some("stands up with Blitz"),
+            PlayerAction::ThrowBomb => Some("starts a Bomb Action"),
+            PlayerAction::HailMaryBomb => None,
+            PlayerAction::Swoop => None,
+            PlayerAction::KickTeamMateMove => Some("starts a Kick Team-mate action"),
+            PlayerAction::KickTeamMate => None,
+            PlayerAction::Treacherous => None,
+            PlayerAction::WisdomOfTheWhiteDwarf => None,
+            PlayerAction::ThrowKeg => Some("readies a beer keg"),
+            PlayerAction::RaidingParty => None,
+            PlayerAction::MaximumCarnage => None,
+            PlayerAction::LookIntoMyEyes => Some("tries to steal the ball"),
+            PlayerAction::BalefulHex => None,
+            PlayerAction::AllYouCanEat => Some("starts an All You Can Eat action"),
+            PlayerAction::PutridRegurgitationMove => None,
+            PlayerAction::PutridRegurgitationBlitz => Some("performs an additional Projectile Vomit attack"),
+            PlayerAction::PutridRegurgitationBlock => Some("performs an additional Projectile Vomit attack"),
+            PlayerAction::KickEmBlock => Some("targets a downed opponent"),
+            PlayerAction::KickEmBlitz => Some("targets a downed opponent"),
+            PlayerAction::BlackInk => Some("uses Black Ink"),
+            PlayerAction::CatchOfTheDay => Some("uses Catch of the Day"),
+            PlayerAction::ThenIStartedBlastin => Some("starts blastin'"),
+            PlayerAction::TheFlashingBlade => Some("flashes the blade"),
+            PlayerAction::ViciousVines => Some("uses Vicious Vines"),
+            PlayerAction::FuriousOutburst => Some("has a furious outburst"),
+            PlayerAction::SecureTheBall => Some("secures the ball"),
+            PlayerAction::BreatheFire => Some("starts a Breathe Fire action"),
+            PlayerAction::Chainsaw => Some("starts a Chainsaw action"),
+            PlayerAction::Stab => Some("starts a Stab action"),
+            PlayerAction::ProjectileVomit => Some("starts a Projectile Vomit action"),
+            PlayerAction::AutoGazeZoat => Some("uses \"Excuse Me, Are You a Zoat?\""),
+            PlayerAction::Forgo => Some("forgoes the activation."),
+            PlayerAction::Incorporeal => Some("becomes incorporeal"),
+            PlayerAction::Chomp => Some("starts a Chomp action"),
+            PlayerAction::Punt => None,
+            PlayerAction::PuntMove => Some("starts a Punt action"),
+        }
+    }
+
     pub fn from_name(name: &str) -> Option<Self> {
         Self::all().iter().copied().find(|v| v.name().eq_ignore_ascii_case(name))
     }
@@ -616,6 +679,34 @@ impl PlayerGender {
             2 => PlayerGender::Female,
             3 => PlayerGender::Nonbinary,
             _ => PlayerGender::Neutral,
+        }
+    }
+
+    /// Java: `getDative()`.
+    pub fn dative(self) -> &'static str {
+        match self {
+            PlayerGender::Male => "him",
+            PlayerGender::Female => "her",
+            PlayerGender::Nonbinary => "them",
+            PlayerGender::Neutral => "it",
+        }
+    }
+
+    /// Java: `getSelf()`.
+    pub fn self_word(self) -> &'static str {
+        match self {
+            PlayerGender::Male => "himself",
+            PlayerGender::Female => "herself",
+            PlayerGender::Nonbinary => "themself",
+            PlayerGender::Neutral => "itself",
+        }
+    }
+
+    /// Java: `getVerbForm(String singularForm, String pluralForm)`.
+    pub fn verb_form<'a>(self, singular_form: &'a str, plural_form: &'a str) -> &'a str {
+        match self {
+            PlayerGender::Nonbinary => plural_form,
+            _ => singular_form,
         }
     }
 }
