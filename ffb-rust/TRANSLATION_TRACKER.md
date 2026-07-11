@@ -29,6 +29,82 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AAB (replay playback engine, mostly completed, this session):**
+Second of 3 planned sub-phases closing the last "translate more Java" gap: wiring the
+replay-playback engine (`ServerReplayer`/`ServerReplay`/`ReplayCache`/`ReplayState`/
+`ServerSketchManager`, all real in `ffb-engine` but never reachable from `ffb-server`) and
+the 3 handlers that were blocked on it (`ServerCommandHandlerJoinReplay`/`Replay`/
+`ReplayLoaded`).
+
+- **Architectural decision:** `ServerReplayer::run()` needs to push a serialized replay
+  batch out to a live session, which in this crate means going through `ffb-server`'s
+  `SessionManager`. Since `ffb-engine` must not depend on `ffb-server` (only the reverse),
+  `run()` is parametrized over a new `ffb_engine::server_replayer::ReplaySender` trait
+  (`fn send(&self, session: u64, message: &str)`) instead of moving `ServerReplayer`/
+  `ServerReplay`/`ReplayCache` into `ffb-server` — the dependency-inversion option the plan
+  called out as preferred. `ffb-server`'s `SessionManager` implements `ReplaySender` by
+  delegating to its existing `send_to` (`net/session_manager.rs`).
+- Fixed `ffb-engine::replay_cache::ReplayCache`, which had accidentally grown its own
+  duplicate 1-field `ReplayState` stub instead of using the real, already-fully-translated
+  `replay_state::ReplayState` (name/command_nr/speed/running/forward/prevented-coaches) —
+  merged onto the real type and added `replay_state_mut`.
+- Rewrote `ffb-engine::server_replay::ServerReplay` to actually snapshot a `GameLog`: its
+  single Java constructor (`ServerReplay(GameState, int, Session)`) decomposes into
+  `(game_id, to_command_nr, session, &GameLog)` (a `GameLog` reference, not a whole
+  `GameState`, since `GameLog` itself already lives in `ffb-engine`). Ported
+  `orderCommands()` (Java renumbers every command in the shared array in place via
+  `setCommandNr(i+1)`; since `AnyServerCommand` isn't `Clone` and only reachable through
+  `GameLog`'s `Mutex` guard, each command is instead serialized once via
+  `to_json_value()` with `commandNr` overwritten in that JSON copy — renumbered
+  command_nr always equals array position, so no parallel index needs tracking) and
+  `findRelevantCommandsInLog()` (filters those serialized strings by from/to command_nr).
+- Implemented `ServerReplayer::run()` for real against the Java source: drains the queue
+  (this crate's established "synchronous drain" convention for what Java runs as a
+  blocking background thread — see `ServerRequestProcessor::run`'s doc comment), chunks
+  each replay's relevant commands into `ServerCommandReplay::MAX_NR_OF_COMMANDS`-sized
+  batches, detects marking-affecting commands (`SERVER_ADD_PLAYER` always; `SERVER_MODEL_SYNC`
+  when its `modelChangeList.changes` contains one of the 7 `ModelChangeId`s Java's
+  `markingAffectingChanges` set names) by inspecting each batch entry's parsed JSON rather
+  than a typed `AnyServerCommand` match (the commands are already JSON strings by this
+  point — see `ServerReplay`'s doc comment), and sends one `ServerCommandReplay`-shaped
+  JSON message per batch via `ReplaySender::send`. Discovered and added a missing
+  `ModelChangeId::FieldModelRemovePrayer` variant in `ffb-model` (Java's
+  `FIELD_MODEL_REMOVE_PRAYER`, needed by the marking-affecting-changes set — falls through
+  to the existing `ModelChangeDataType::String` default, so no new match arm needed).
+- Completed `ffb-server::util::server_replay::start_server_replay` — replaced the
+  documented no-op with a real `ServerReplay::new(...)` + `ServerReplayer::add(...)` call,
+  now that both are reachable.
+- **`ServerCommandHandlerJoinReplay` — closed.** Both branches (new `ReplayState`
+  created and control granted; existing `ReplayState` resumed with status/control/
+  prevent-sketching/add-sketches replayed to the joining session) are real, using the now-
+  wired `ReplayCache`/`ReplayState`/`ServerSketchManager` and the `ServerCommandJoin`/
+  `ServerCommandReplayControl`/`ServerCommandReplayStatus`/`ServerCommandSetPreventSketching`/
+  `ServerCommandAddSketches` wire commands. One precise, documented fidelity gap: converting
+  `ffb_engine::server_sketch_manager::Sketch` (id/coordinates/label/rgb) to
+  `ffb_model::model::sketch::sketch::Sketch` (positions only — the type
+  `ServerCommandAddSketches` actually carries, from an earlier phase) can only carry the
+  coordinate list across; `id`/`label`/`rgb` have no field to land in and are dropped. Real
+  data, not fabricated — just lossy on those 3 fields; unifying the two `Sketch` models is
+  flagged as a separate follow-up.
+- **`ServerCommandHandlerReplayLoaded` — closed.** The found-game branch now really sets
+  `GameState::status` (a new field on `ffb-server`'s `GameState`, added to match Java's
+  separate `fStatus` — distinct from `Game.status`, `GameStatus::Replaying` was already
+  a defined variant) and starts the replay for real; the not-found branch (send
+  `ERROR_UNKNOWN_GAME_ID`) was already real from before this phase.
+- **`ServerCommandHandlerReplay` — partially closed.** The found-in-cache branch is real
+  (starts the replay). The not-found branch's `GameCache::query_from_db` call is real, but
+  per that method's own pre-existing doc comment it can only return raw gzipped blob bytes
+  (no gunzip-to-`GameState` pipeline exists in this crate), so there's no reconstructed
+  `GameState` to `addGame` even on a successful query — the final fallback (enqueue
+  `ServerRequestLoadReplay` on `ServerRequestProcessor`) stays a documented `todo!()`:
+  `ServerRequestLoadReplay` does not implement the `ServerRequest` trait (its `process`
+  takes an `HttpClient` + URL template, not `ServerRequest::process(&self)`) — checked this
+  session and confirmed still unfixed, that trait-signature fix is Phase AAC's scope.
+- No parity/integration testing this phase (per plan); unit tests only, one per handler
+  branch closed plus dedicated `ServerReplayer::run()` dispatch tests (enqueue real
+  `GameLog` commands → run the real drain/batch loop → observe a mock `ReplaySender`).
+  Tests: 17,249 → 17,265 (net +16).
+
 **Phase AAA (GameLog wiring, completed, this session):**
 First of 3 planned sub-phases closing the last "translate more Java" gap: wiring a typed,
 replayable command log into `ffb-server`'s live `GameState`, instead of the untyped
@@ -1927,13 +2003,13 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/handler/ServerCommandHandlerFumbblTeamLoaded.java` | `ffb-server` | `src/handler/server_command_handler_fumbbl_team_loaded.rs` | ✓ |
 | `server/handler/ServerCommandHandlerJoin.java` | `ffb-server` | `src/handler/server_command_handler_join.rs` | ✓ |
 | `server/handler/ServerCommandHandlerJoinApproved.java` | `ffb-server` | `src/handler/server_command_handler_join_approved.rs` | ✓ |
-| `server/handler/ServerCommandHandlerJoinReplay.java` | `ffb-server` | `src/handler/server_command_handler_join_replay.rs` | ~ |
+| `server/handler/ServerCommandHandlerJoinReplay.java` | `ffb-server` | `src/handler/server_command_handler_join_replay.rs` | ✓ |
 | `server/handler/ServerCommandHandlerLoadAutomaticPlayerMarkings.java` | `ffb-server` | `src/handler/server_command_handler_load_automatic_player_markings.rs` | ✓ |
 | `server/handler/ServerCommandHandlerPasswordChallenge.java` | `ffb-server` | `src/handler/server_command_handler_password_challenge.rs` | ✓ |
 | `server/handler/ServerCommandHandlerPing.java` | `ffb-server` | `src/handler/server_command_handler_ping.rs` | ✓ |
 | `server/handler/ServerCommandHandlerRemoveSketches.java` | `ffb-server` | `src/handler/server_command_handler_remove_sketches.rs` | ✓ |
 | `server/handler/ServerCommandHandlerReplay.java` | `ffb-server` | `src/handler/server_command_handler_replay.rs` | ~ |
-| `server/handler/ServerCommandHandlerReplayLoaded.java` | `ffb-server` | `src/handler/server_command_handler_replay_loaded.rs` | ~ |
+| `server/handler/ServerCommandHandlerReplayLoaded.java` | `ffb-server` | `src/handler/server_command_handler_replay_loaded.rs` | ✓ |
 | `server/handler/ServerCommandHandlerReplayStatus.java` | `ffb-server` | `src/handler/server_command_handler_replay_status.rs` | ✓ |
 | `server/handler/ServerCommandHandlerRequestVersion.java` | `ffb-server` | `src/handler/server_command_handler_request_version.rs` | ✓ |
 | `server/handler/ServerCommandHandlerScheduleGame.java` | `ffb-server` | `src/handler/server_command_handler_schedule_game.rs` | ✓ |

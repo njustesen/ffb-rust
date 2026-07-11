@@ -19,15 +19,17 @@
 /// `server_command_handler_password_challenge.rs`) they are threaded through explicitly
 /// instead as parameters.
 ///
-/// `ServerReplayer`/`ServerReplay` (the `server.getReplayer().add(...)` step) have no
-/// Rust equivalent in this crate — there is no ported replay-playback engine (confirmed
-/// by grep: no `ServerReplay`/`Replayer` struct exists under `crates/ffb-server/src`, only
-/// the unrelated `ReplaySessionManager` which tracks *sessions* watching a shared replay,
-/// not command-log playback). Building that subsystem is out of scope here (same
-/// documented gap as `ServerCommandHandlerJoinReplay`'s `ReplayCache`/`ReplayState` tail),
-/// so `start_server_replay` performs the real, portable half of the method — the null
-/// checks and the "send game state if not already tracking this game" call — and leaves
-/// the replayer registration as a documented no-op.
+/// Phase AAB wires the previously-missing `ServerReplayer`/`ServerReplay` (from
+/// `ffb-engine`) in for real: `game_state` now carries `(game_id, game_state_message,
+/// game_log)` — the `GameLog` is what `ServerReplay::new` needs to snapshot/renumber the
+/// replay's commands (see that struct's own doc comment for why a `GameLog` reference is
+/// threaded through directly rather than a whole `GameState`).
+use std::sync::Mutex;
+
+use ffb_engine::game_log::GameLog;
+use ffb_engine::server_replay::ServerReplay;
+use ffb_engine::server_replayer::ServerReplayer;
+
 use crate::model::received_command::SessionId;
 use crate::net::session_manager::SessionManager;
 
@@ -39,24 +41,22 @@ use crate::net::session_manager::SessionManager;
 /// to send, matching how `ServerCommandHandlerPasswordChallenge` builds its own command
 /// JSON before handing it to `SessionManager::send_to`).
 pub fn start_server_replay(
-    game_state: Option<(i64, &str)>,
+    game_state: Option<(i64, &str, &GameLog)>,
     replay_to_command_nr: i32,
     session_id: Option<SessionId>,
     session_manager: &SessionManager,
+    replayer: &Mutex<ServerReplayer>,
 ) {
-    let (game_id, game_state_message) = match (game_state, session_id) {
-        (Some(gs), Some(_)) => gs,
-        _ => return,
+    let (Some((game_id, game_state_message, game_log)), Some(session_id)) = (game_state, session_id) else {
+        return;
     };
-    let session_id = session_id.unwrap();
 
     if session_manager.get_game_id_for_session(session_id) != game_id {
         session_manager.send_to(session_id, game_state_message);
     }
 
-    // Java: `server.getReplayer().add(new ServerReplay(pGameState, pReplayToCommandNr, pSession))`.
-    // No `ServerReplayer`/`ServerReplay` exists in this crate — see module doc comment.
-    let _ = replay_to_command_nr;
+    let replay = ServerReplay::new(game_id, replay_to_command_nr, session_id, game_log);
+    replayer.lock().unwrap().add(replay);
 }
 
 #[cfg(test)]
@@ -75,22 +75,29 @@ mod tests {
     #[test]
     fn null_game_state_is_a_no_op() {
         let (sm, mut rx) = setup_session_manager();
-        start_server_replay(None, 5, Some(1), &sm);
+        let replayer = Mutex::new(ServerReplayer::new());
+        start_server_replay(None, 5, Some(1), &sm, &replayer);
         assert!(rx.try_recv().is_err());
+        assert_eq!(replayer.lock().unwrap().queue_size(), 0);
     }
 
     #[test]
     fn null_session_is_a_no_op() {
         let (sm, mut rx) = setup_session_manager();
-        start_server_replay(Some((100, "game-state-json")), 5, None, &sm);
+        let log = GameLog::new();
+        let replayer = Mutex::new(ServerReplayer::new());
+        start_server_replay(Some((100, "game-state-json", &log)), 5, None, &sm, &replayer);
         assert!(rx.try_recv().is_err());
+        assert_eq!(replayer.lock().unwrap().queue_size(), 0);
     }
 
     #[test]
     fn sends_game_state_when_session_is_tracking_a_different_game() {
         let (sm, mut rx) = setup_session_manager();
+        let log = GameLog::new();
+        let replayer = Mutex::new(ServerReplayer::new());
         // Session 1 is tracking game 100 (see setup); simulate replay into a different game.
-        start_server_replay(Some((999, "game-state-json")), 5, Some(1), &sm);
+        start_server_replay(Some((999, "game-state-json", &log)), 5, Some(1), &sm, &replayer);
         let msg = rx.try_recv().expect("expected sendGameState to fire");
         assert_eq!(msg, "game-state-json");
     }
@@ -98,7 +105,18 @@ mod tests {
     #[test]
     fn does_not_resend_game_state_when_already_tracking_the_same_game() {
         let (sm, mut rx) = setup_session_manager();
-        start_server_replay(Some((100, "game-state-json")), 5, Some(1), &sm);
+        let log = GameLog::new();
+        let replayer = Mutex::new(ServerReplayer::new());
+        start_server_replay(Some((100, "game-state-json", &log)), 5, Some(1), &sm, &replayer);
         assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn adds_a_replay_to_the_replayer_queue() {
+        let (sm, _rx) = setup_session_manager();
+        let log = GameLog::new();
+        let replayer = Mutex::new(ServerReplayer::new());
+        start_server_replay(Some((100, "game-state-json", &log)), 5, Some(1), &sm, &replayer);
+        assert_eq!(replayer.lock().unwrap().queue_size(), 1);
     }
 }

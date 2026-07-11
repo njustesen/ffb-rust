@@ -7,7 +7,7 @@
 /// the game log, command counter, and outgoing model-change list.
 use ffb_model::model::game::Game;
 use ffb_model::model::team::Team;
-use ffb_model::enums::Rules;
+use ffb_model::enums::{GameStatus, Rules};
 use ffb_model::events::GameEvent;
 use ffb_engine::step::driver::DriverGameState;
 use ffb_engine::action::Action;
@@ -24,6 +24,11 @@ pub struct GameState {
     command_nr: i64,
     /// Java: `fGameLog` — the replayable server command log for this game.
     pub game_log: GameLog,
+    /// Java: `fStatus` — the server-side `GameState`'s own lifecycle status
+    /// (distinct from `Game.status`; Java's field has no explicit
+    /// constructor initializer, so it defaults to `null` — modeled here as
+    /// `None`).
+    status: Option<GameStatus>,
 }
 
 impl GameState {
@@ -34,11 +39,18 @@ impl GameState {
             game_id,
             command_nr: 0,
             game_log: GameLog::new(),
+            status: None,
         }
     }
 
     /// Java: `getId()`
     pub fn get_id(&self) -> i64 { self.game_id }
+
+    /// Java: `getStatus()`.
+    pub fn get_status(&self) -> Option<GameStatus> { self.status }
+
+    /// Java: `setStatus(GameStatus)`.
+    pub fn set_status(&mut self, status: GameStatus) { self.status = Some(status); }
 
     /// Java: `getGame()`
     pub fn get_game(&self) -> Option<&Game> {
@@ -123,6 +135,19 @@ impl GameState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn new_game_has_no_status() {
+        let gs = GameState::new(1);
+        assert_eq!(gs.get_status(), None);
+    }
+
+    #[test]
+    fn set_status_updates_status() {
+        let mut gs = GameState::new(1);
+        gs.set_status(GameStatus::Replaying);
+        assert_eq!(gs.get_status(), Some(GameStatus::Replaying));
+    }
 
     #[test]
     fn new_game_not_started() {
