@@ -5,12 +5,15 @@
 //! `TRANSLATION_TRACKER.md`.
 
 pub mod abstract_block_logic_module;
+pub mod block_logic_extension;
 pub mod client_action;
 pub mod influences;
 pub mod interaction;
 pub mod logic_module;
+pub mod move_logic_module;
 pub mod plugin;
 pub mod range_grid_state;
+pub mod setup_logic_module;
 
 pub use client_action::ClientAction;
 pub use influences::Influences;
