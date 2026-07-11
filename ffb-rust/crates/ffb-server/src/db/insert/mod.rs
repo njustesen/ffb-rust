@@ -1,0 +1,10 @@
+pub mod db_games_serialized_insert;
+pub mod db_games_serialized_insert_parameter;
+pub mod db_player_markers_insert;
+pub mod db_player_markers_insert_parameter;
+pub mod db_player_markers_insert_parameter_list;
+pub mod db_team_setups_insert;
+pub mod db_team_setups_insert_parameter;
+pub mod db_user_settings_insert;
+pub mod db_user_settings_insert_parameter;
+pub mod db_user_settings_insert_parameter_list;

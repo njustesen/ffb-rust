@@ -1,0 +1,15 @@
+pub mod internal_server_command;
+pub mod internal_server_command_add_loaded_team;
+pub mod internal_server_command_apply_automated_player_markings;
+pub mod internal_server_command_calculate_automatic_player_markings;
+pub mod internal_server_command_clear_cache;
+pub mod internal_server_command_close_game;
+pub mod internal_server_command_delete_game;
+pub mod internal_server_command_fumbbl_game_checked;
+pub mod internal_server_command_fumbbl_game_created;
+pub mod internal_server_command_fumbbl_team_loaded;
+pub mod internal_server_command_join_approved;
+pub mod internal_server_command_replay_loaded;
+pub mod internal_server_command_schedule_game;
+pub mod internal_server_command_socket_closed;
+pub mod internal_server_command_upload_game;

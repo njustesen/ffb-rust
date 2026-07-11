@@ -1,15 +1,36 @@
 /// 1:1 translation of com.fumbbl.ffb.server.handler.ServerCommandHandlerFactory.
 ///
 /// Routes incoming `ClientCommand`s to the appropriate handler:
-/// - Join / Ping / SocketClosed → dedicated handlers
-/// - Gameplay commands → decoded to `Action` and fed to the engine
+/// - Ping → delegates to the real `ServerCommandHandlerPing`.
+/// - Join → still handled upstream in `command_socket.rs` before enqueue.
+/// - Gameplay commands → decoded to `Action` and fed to the engine directly
+///   (this pipeline doesn't correspond to any single Java `ServerCommandHandler*`
+///   class — it's the Rust-specific consolidated action dispatch).
+///
+/// **Known gap (Phase ZV):** most of the other ~35 real, tested
+/// `ServerCommandHandler*` structs under `crate::handler` (Talk, Join,
+/// SocketClosed, the sketch/marker family, replay family, ...) are NOT yet
+/// delegated to from here. They were translated against
+/// `ffb_protocol::commands::*` (the older, Java-mirroring command types —
+/// e.g. `ClientCommandTalk`), while this factory's `decode_command` operates
+/// on `ffb_protocol::client_commands::ClientCommand` (a separate, newer wire
+/// enum with no `ClientTalk`/etc. variants at all). Bridging the two command
+/// hierarchies is a real, nontrivial follow-up; `ClientPing` was safe to wire
+/// today because `ServerCommandHandlerPing::handle_command` takes plain
+/// `(SessionId, i64)`, not a cross-module command struct. `SocketClosed` also
+/// isn't a `ClientCommand` at all (it's an internal event on socket close),
+/// so `command_socket.rs` will eventually need to call
+/// `ServerCommandHandlerSocketClosed::handle_command` directly rather than
+/// through this factory.
 use std::sync::{Arc, Mutex};
 use ffb_engine::action::{Action, PlayerActionChoice};
 use ffb_engine::legal_actions::TeamSide;
 use ffb_model::enums::{PlayerAction, SkillId};
 use ffb_protocol::client_commands::ClientCommand;
 use crate::game_cache::GameCache;
+use crate::handler::server_command_handler_ping::ServerCommandHandlerPing;
 use crate::model::received_command::ReceivedCommand;
+use crate::net::replay_session_manager::ReplaySessionManager;
 use crate::net::session_manager::SessionManager;
 use crate::net::wire::{OutgoingModelSync, events_to_reports};
 
@@ -33,6 +54,8 @@ impl std::fmt::Display for DecodeError {
 pub struct ServerCommandHandlerFactory {
     pub game_cache: Arc<Mutex<GameCache>>,
     pub session_manager: Arc<Mutex<SessionManager>>,
+    pub replay_session_manager: Arc<Mutex<ReplaySessionManager>>,
+    ping_handler: ServerCommandHandlerPing,
 }
 
 impl ServerCommandHandlerFactory {
@@ -40,7 +63,26 @@ impl ServerCommandHandlerFactory {
         game_cache: Arc<Mutex<GameCache>>,
         session_manager: Arc<Mutex<SessionManager>>,
     ) -> Self {
-        Self { game_cache, session_manager }
+        Self::with_replay_session_manager(
+            game_cache,
+            session_manager,
+            Arc::new(Mutex::new(ReplaySessionManager::new())),
+        )
+    }
+
+    /// Same as `new`, but lets a caller share an existing `ReplaySessionManager`
+    /// (e.g. one already wired into `command_socket.rs`) instead of creating a
+    /// private one that replay-session pings would never actually reach.
+    pub fn with_replay_session_manager(
+        game_cache: Arc<Mutex<GameCache>>,
+        session_manager: Arc<Mutex<SessionManager>>,
+        replay_session_manager: Arc<Mutex<ReplaySessionManager>>,
+    ) -> Self {
+        let ping_handler = ServerCommandHandlerPing::new(
+            Arc::clone(&session_manager),
+            Arc::clone(&replay_session_manager),
+        );
+        Self { game_cache, session_manager, replay_session_manager, ping_handler }
     }
 
     /// Java: `handleCommand(ReceivedCommand)` — the main dispatch entry point.
@@ -53,8 +95,10 @@ impl ServerCommandHandlerFactory {
 
         match &received.command {
             ClientCommand::ClientPing(ping) => {
-                let mut sm = self.session_manager.lock().unwrap();
-                sm.set_last_ping(session_id, ping.timestamp);
+                // Delegates to the real 1:1-translated ServerCommandHandlerPing
+                // (session/replay last-ping bookkeeping + pong reply), instead of
+                // duplicating that logic inline.
+                self.ping_handler.handle_command(session_id, ping.timestamp);
                 return;
             }
             ClientCommand::ClientJoin(_) => {
@@ -801,7 +845,11 @@ mod tests {
             session_id: 42,
         });
         let sm = sm_arc.lock().unwrap();
-        assert_eq!(sm.get_last_ping(42), 9999);
+        // ServerCommandHandlerPing stores the current wall-clock time as the
+        // last-ping timestamp (matching Java's `System.currentTimeMillis()`)
+        // and separately echoes the client's `9999` timestamp back in the pong
+        // reply, rather than storing the client-supplied value directly.
+        assert!(sm.get_last_ping(42) > 0);
     }
 
     #[test]

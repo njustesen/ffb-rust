@@ -18,3 +18,5 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
+mysql_async = { workspace = true }
+reqwest = { workspace = true }

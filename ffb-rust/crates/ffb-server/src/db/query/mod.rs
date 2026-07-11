@@ -1,0 +1,11 @@
+pub mod db_admin_list_by_id_query;
+pub mod db_admin_list_by_status_query;
+pub mod db_game_list_query_open_games_by_coach;
+pub mod db_games_info_insert_query;
+pub mod db_games_serialized_query;
+pub mod db_password_for_coach_query;
+pub mod db_player_markers_query;
+pub mod db_team_setups_for_team_query;
+pub mod db_team_setups_query;
+pub mod db_test_game_list_query;
+pub mod db_user_settings_query;
