@@ -18,6 +18,8 @@ use crate::mechanic::roll_mechanic::RollMechanic as RollMechanicTrait;
 use crate::mechanic::setup_mechanic::SetupMechanic as SetupMechanicTrait;
 use crate::mechanic::state_mechanic::StateMechanic as StateMechanicTrait;
 use ffb_mechanics::game_mechanic::GameMechanic as GameMechanicTrait;
+use ffb_mechanics::jump_mechanic::JumpMechanic as JumpMechanicTrait;
+use ffb_mechanics::ttm_mechanic::TtmMechanic as TtmMechanicTrait;
 
 /// Returns the edition-appropriate `RollMechanic` for the given rules.
 /// Mirrors Java's `game.getFactory(MECHANIC).forName(Mechanic.Type.ROLL.name())`.
@@ -54,6 +56,26 @@ pub fn game_mechanic_for(rules: Rules) -> Box<dyn GameMechanicTrait> {
         Rules::Bb2025 | Rules::Common => Box::new(ffb_mechanics::bb2025::game_mechanic::GameMechanic::new()),
         Rules::Bb2020 => Box::new(ffb_mechanics::bb2020::game_mechanic::GameMechanic::new()),
         Rules::Bb2016 => Box::new(ffb_mechanics::bb2016::game_mechanic::GameMechanic::new()),
+    }
+}
+
+/// Returns the edition-appropriate `JumpMechanic` for the given rules.
+/// Mirrors Java's `game.getFactory(MECHANIC).forName(Mechanic.Type.JUMP.name())`.
+pub fn jump_mechanic_for(rules: Rules) -> Box<dyn JumpMechanicTrait> {
+    match rules {
+        Rules::Bb2025 | Rules::Common => Box::new(ffb_mechanics::bb2025::jump_mechanic::JumpMechanic::new()),
+        Rules::Bb2020 => Box::new(ffb_mechanics::bb2020::jump_mechanic::JumpMechanic::new()),
+        Rules::Bb2016 => Box::new(ffb_mechanics::bb2016::jump_mechanic::JumpMechanic::new()),
+    }
+}
+
+/// Returns the edition-appropriate `TtmMechanic` for the given rules.
+/// Mirrors Java's `game.getFactory(MECHANIC).forName(Mechanic.Type.TTM.name())`.
+pub fn ttm_mechanic_for(rules: Rules) -> Box<dyn TtmMechanicTrait> {
+    match rules {
+        Rules::Bb2025 | Rules::Common => Box::new(ffb_mechanics::bb2025::ttm_mechanic::TtmMechanic::new()),
+        Rules::Bb2020 => Box::new(ffb_mechanics::bb2020::ttm_mechanic::TtmMechanic::new()),
+        Rules::Bb2016 => Box::new(ffb_mechanics::bb2016::ttm_mechanic::TtmMechanic::new()),
     }
 }
 

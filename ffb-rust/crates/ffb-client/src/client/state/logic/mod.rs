@@ -4,10 +4,15 @@
 //! directory are placeholders for future batches — see
 //! `TRANSLATION_TRACKER.md`.
 
+pub mod abstract_block_logic_module;
 pub mod client_action;
 pub mod influences;
 pub mod interaction;
+pub mod logic_module;
 pub mod plugin;
+pub mod range_grid_state;
 
 pub use client_action::ClientAction;
 pub use influences::Influences;
+pub use logic_module::LogicModule;
+pub use range_grid_state::RangeGridState;

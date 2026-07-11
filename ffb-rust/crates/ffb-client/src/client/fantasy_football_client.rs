@@ -127,6 +127,13 @@ impl FantasyFootballClient {
         self.game.as_ref()
     }
 
+    /// Mutable counterpart of `game()`, matching the `communication()`/`communication_mut()`
+    /// convention already established on this struct — needed by `LogicModule` default
+    /// methods that mutate field-model state (e.g. `setRangeRuler(null)`).
+    pub fn game_mut(&mut self) -> Option<&mut Game> {
+        self.game.as_mut()
+    }
+
     /// Java: `public void setGame(Game pGame) { fGame = pGame; getClientData().clear(); }`.
     pub fn set_game(&mut self, game: Game) {
         self.game = Some(game);
