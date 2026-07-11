@@ -46,7 +46,12 @@ impl ServerCommandHandlerDeleteGame {
         let game_id = delete_game_command.get_game_id();
         let with_games_info = delete_game_command.is_with_games_info();
         if game_id > 0 {
-            let manager = self.db_connection_manager.lock().unwrap();
+            // `DbConnectionManager` is cloned out from behind the `std::sync::Mutex` before any
+            // `.await` (see that struct's own `Clone` doc comment) so this handler's future
+            // stays `Send` — required since `handle_command` is reachable from
+            // `ServerCommandHandlerFactory::handle_internal_command`, which runs inside
+            // `tokio::spawn(dispatch_loop(...))`.
+            let manager = self.db_connection_manager.lock().unwrap().clone();
             if manager.pool_ready() {
                 if let Ok(mut conn) = manager.open_db_connection().await {
                     if with_games_info {

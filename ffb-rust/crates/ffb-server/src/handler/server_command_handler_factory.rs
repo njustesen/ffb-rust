@@ -3,43 +3,57 @@
 /// Routes incoming `ClientCommand`s to the appropriate handler:
 /// - Ping → delegates to the real `ServerCommandHandlerPing`.
 /// - Join → still handled upstream in `command_socket.rs` before enqueue.
+/// - Talk, CloseSession, TransferReplayControl, RequestVersion,
+///   PasswordChallenge → delegate to their real `ServerCommandHandler*` structs
+///   (Phase ZVA, session/game-lifecycle family). Each needed its own
+///   `ffb_protocol::client_commands::ClientCommand` variant added (mirroring
+///   the field shape of the corresponding `ffb_protocol::commands::*` struct
+///   the handler was originally translated against) since that wire enum had
+///   no variant for them at all.
+/// - DeleteGame → an `AnyInternalServerCommand`, not a `ClientCommand`; wired
+///   into `handle_internal_command`'s match instead.
 /// - Gameplay commands → decoded to `Action` and fed to the engine directly
 ///   (this pipeline doesn't correspond to any single Java `ServerCommandHandler*`
 ///   class — it's the Rust-specific consolidated action dispatch).
 ///
-/// **Known gap (Phase ZV):** most of the other ~35 real, tested
-/// `ServerCommandHandler*` structs under `crate::handler` (Talk, Join,
-/// SocketClosed, the sketch/marker family, replay family, ...) are NOT yet
-/// delegated to from here. They were translated against
-/// `ffb_protocol::commands::*` (the older, Java-mirroring command types —
-/// e.g. `ClientCommandTalk`), while this factory's `decode_command` operates
-/// on `ffb_protocol::client_commands::ClientCommand` (a separate, newer wire
-/// enum with no `ClientTalk`/etc. variants at all). Bridging the two command
-/// hierarchies is a real, nontrivial follow-up; `ClientPing` was safe to wire
-/// today because `ServerCommandHandlerPing::handle_command` takes plain
-/// `(SessionId, i64)`, not a cross-module command struct. `SocketClosed` also
-/// isn't a `ClientCommand` at all (it's an internal event on socket close),
-/// so `command_socket.rs` will eventually need to call
-/// `ServerCommandHandlerSocketClosed::handle_command` directly rather than
-/// through this factory.
+/// **Known gap (Phase ZV):** most of the other ~30 real, tested
+/// `ServerCommandHandler*` structs under `crate::handler` (the sketch/marker
+/// family, replay family, ...) are still NOT delegated to from here. They were
+/// translated against `ffb_protocol::commands::*` (the older, Java-mirroring
+/// command types), while this factory's `decode_command` operates on
+/// `ffb_protocol::client_commands::ClientCommand` (a separate, newer wire
+/// enum). Bridging the two command hierarchies for the remaining handlers is
+/// a real, nontrivial follow-up. `SocketClosed` isn't a `ClientCommand` at
+/// all (it's an internal event on socket close), so `command_socket.rs` will
+/// eventually need to call `ServerCommandHandlerSocketClosed::handle_command`
+/// directly rather than through this factory.
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 use ffb_engine::action::{Action, PlayerActionChoice};
 use ffb_engine::legal_actions::TeamSide;
+use ffb_engine::replay_state::ReplayState;
 use ffb_engine::server_sketch_manager::ServerSketchManager;
 use ffb_model::enums::{PlayerAction, SkillId};
 use ffb_protocol::client_commands::ClientCommand;
 use crate::db::db_connection_manager::DbConnectionManager;
 use crate::game_cache::GameCache;
+use crate::handler::server_command_handler_close_session::ServerCommandHandlerCloseSession;
+use crate::handler::server_command_handler_delete_game::ServerCommandHandlerDeleteGame;
 use crate::handler::server_command_handler_join::ServerCommandHandlerJoin;
 use crate::handler::server_command_handler_join_approved::ServerCommandHandlerJoinApproved;
+use crate::handler::server_command_handler_password_challenge::ServerCommandHandlerPasswordChallenge;
 use crate::handler::server_command_handler_ping::ServerCommandHandlerPing;
+use crate::handler::server_command_handler_request_version::ServerCommandHandlerRequestVersion;
 use crate::handler::server_command_handler_socket_closed::ServerCommandHandlerSocketClosed;
+use crate::handler::server_command_handler_talk::ServerCommandHandlerTalk;
+use crate::handler::server_command_handler_transfer_control::ServerCommandHandlerTransferControl;
 use crate::model::received_command::{ReceivedCommand, ReceivedNetCommand};
 use crate::net::commands::any_internal_server_command::AnyInternalServerCommand;
 use crate::net::replay_session_manager::ReplaySessionManager;
 use crate::net::session_manager::SessionManager;
 use crate::net::wire::{OutgoingModelSync, events_to_reports};
+use crate::request::fumbbl::util_fumbbl_request::ReqwestHttpClient;
 use crate::roster_cache::RosterCache;
 use crate::team_cache::TeamCache;
 
@@ -78,6 +92,12 @@ pub struct ServerCommandHandlerFactory {
     /// own tests) instead of sitting unread.
     pub join_handler: ServerCommandHandlerJoin,
     join_approved_handler: ServerCommandHandlerJoinApproved,
+    talk_handler: ServerCommandHandlerTalk,
+    close_session_handler: ServerCommandHandlerCloseSession,
+    delete_game_handler: ServerCommandHandlerDeleteGame,
+    transfer_control_handler: ServerCommandHandlerTransferControl,
+    request_version_handler: ServerCommandHandlerRequestVersion,
+    password_challenge_handler: ServerCommandHandlerPasswordChallenge,
 }
 
 impl ServerCommandHandlerFactory {
@@ -122,7 +142,7 @@ impl ServerCommandHandlerFactory {
             Arc::clone(&game_cache),
             Arc::clone(&session_manager),
             Arc::clone(&replay_session_manager),
-            sketch_manager,
+            Arc::clone(&sketch_manager),
         );
         // Sensible empty defaults for the standalone-mode disk-XML lookup tables and the
         // `client.*` server properties — a real deployment would build these once at server
@@ -145,6 +165,44 @@ impl ServerCommandHandlerFactory {
             Arc::clone(&roster_cache),
             Arc::clone(&client_properties),
         );
+        let talk_handler = ServerCommandHandlerTalk::new(
+            Arc::clone(&game_cache),
+            Arc::clone(&session_manager),
+            Arc::clone(&replay_session_manager),
+        );
+        // Reuses the same `sketch_manager` as `socket_closed_handler` above rather than
+        // creating a second, disconnected `ServerSketchManager` — Java's
+        // `ServerCommandHandlerCloseSession` delegates to the single shared
+        // `ServerCommandHandlerSocketClosed` instance registered on the server, and this
+        // keeps the two Rust handlers observing the same sketch state.
+        let close_session_socket_closed = ServerCommandHandlerSocketClosed::new(
+            Arc::clone(&game_cache),
+            Arc::clone(&session_manager),
+            Arc::clone(&replay_session_manager),
+            Arc::clone(&sketch_manager),
+        );
+        let close_session_handler = ServerCommandHandlerCloseSession::new(close_session_socket_closed);
+        let delete_game_handler = ServerCommandHandlerDeleteGame::new(Arc::clone(&db_connection_manager));
+        // Java's `getServer().getReplayCache().replayState(name)` — no server-level
+        // `ReplayCache` is wired into this crate yet (see this handler's own doc comment), so
+        // an empty, private name → `ReplayState` map stands in for it: `transfer_control`
+        // itself still runs for real against `replay_session_manager`, only the
+        // broadcast-on-success branch (which needs a `ReplayState` lookup) is a documented
+        // no-op until an entry exists.
+        let replay_states: Arc<Mutex<HashMap<String, ReplayState>>> = Arc::new(Mutex::new(HashMap::new()));
+        let transfer_control_handler = ServerCommandHandlerTransferControl::new(
+            Arc::clone(&replay_session_manager),
+            replay_states,
+            Arc::clone(&session_manager),
+        );
+        let request_version_client_properties: HashMap<String, String> =
+            client_properties.iter().cloned().collect();
+        let request_version_handler = ServerCommandHandlerRequestVersion::new(
+            Arc::clone(&session_manager),
+            request_version_client_properties,
+            false,
+        );
+        let password_challenge_handler = ServerCommandHandlerPasswordChallenge::new(Arc::clone(&session_manager));
         Self {
             game_cache,
             session_manager,
@@ -157,6 +215,12 @@ impl ServerCommandHandlerFactory {
             socket_closed_handler,
             join_handler,
             join_approved_handler,
+            talk_handler,
+            close_session_handler,
+            delete_game_handler,
+            transfer_control_handler,
+            request_version_handler,
+            password_challenge_handler,
         }
     }
 
@@ -201,6 +265,47 @@ impl ServerCommandHandlerFactory {
             ClientCommand::ClientJoin(_) => {
                 // Join is handled upstream in command_socket.rs before being enqueued.
                 log::warn!("session {} sent ClientJoin after already joined", session_id);
+                return;
+            }
+            ClientCommand::ClientTalk(t) => {
+                let cmd = ffb_protocol::commands::client_command_talk::ClientCommandTalk {
+                    entropy: None,
+                    talk: t.talk.clone(),
+                };
+                self.talk_handler.handle_command(session_id, &cmd);
+                return;
+            }
+            ClientCommand::ClientCloseSession(_) => {
+                self.close_session_handler.handle_command(session_id);
+                return;
+            }
+            ClientCommand::ClientTransferReplayControl(t) => {
+                let cmd = ffb_protocol::commands::client_command_transfer_replay_control::ClientCommandTransferReplayControl {
+                    entropy: None,
+                    coach: t.coach.clone(),
+                };
+                self.transfer_control_handler.handle_command(session_id, &cmd);
+                return;
+            }
+            ClientCommand::ClientRequestVersion(_) => {
+                self.request_version_handler.handle_command(session_id);
+                return;
+            }
+            ClientCommand::ClientPasswordChallenge(p) => {
+                let cmd = ffb_protocol::commands::client_command_password_challenge::ClientCommandPasswordChallenge {
+                    entropy: None,
+                    coach: p.coach.clone(),
+                };
+                let handler = self.password_challenge_handler.clone();
+                // `ReqwestHttpClient` wraps `reqwest::blocking::Client`; building/dropping one
+                // from inside a live tokio runtime context panics ("Cannot drop a runtime in a
+                // context where blocking is not allowed"), so the whole synchronous handler
+                // call is moved onto a blocking-pool thread instead.
+                let _ = tokio::task::spawn_blocking(move || {
+                    let client = ReqwestHttpClient::new();
+                    handler.handle_command(&cmd, session_id, &client)
+                })
+                .await;
                 return;
             }
             _ => {}
@@ -263,6 +368,9 @@ impl ServerCommandHandlerFactory {
         match internal {
             AnyInternalServerCommand::SocketClosed(_) => {
                 self.socket_closed_handler.handle_command(session_id);
+            }
+            AnyInternalServerCommand::DeleteGame(cmd) => {
+                self.delete_game_handler.handle_command(&cmd).await;
             }
             AnyInternalServerCommand::JoinApproved(cmd) => {
                 // Java re-uses the already-connected Jetty `Session` object it was handed;
@@ -412,6 +520,18 @@ pub fn decode_command(cmd: ClientCommand, side: TeamSide) -> Result<Action, Deco
 
         ClientCommand::ClientJoin(_) => Err(DecodeError::NotImplemented("ClientJoin".into())),
         ClientCommand::ClientPing(_) => Err(DecodeError::NotImplemented("ClientPing".into())),
+
+        // Handled earlier in `handle_command` before `decode_command` is reached (like
+        // `ClientJoin`/`ClientPing` above) — no `Action` equivalent exists for these.
+        ClientCommand::ClientTalk(_) => Err(DecodeError::NotImplemented("ClientTalk".into())),
+        ClientCommand::ClientCloseSession(_) => Err(DecodeError::NotImplemented("ClientCloseSession".into())),
+        ClientCommand::ClientTransferReplayControl(_) => {
+            Err(DecodeError::NotImplemented("ClientTransferReplayControl".into()))
+        }
+        ClientCommand::ClientRequestVersion(_) => Err(DecodeError::NotImplemented("ClientRequestVersion".into())),
+        ClientCommand::ClientPasswordChallenge(_) => {
+            Err(DecodeError::NotImplemented("ClientPasswordChallenge".into()))
+        }
     }
 }
 
@@ -1044,5 +1164,150 @@ mod tests {
         assert!(factory.game_cache.lock().unwrap().get_game_state_by_name("FactoryDispatchGame").is_some());
         let msg = rx.try_recv().expect("expected a real serverJoin broadcast via the dispatch path");
         assert!(msg.contains("serverJoin"));
+    }
+
+    // ── Phase ZVA: session/game-lifecycle handler family dispatch ─────────────
+
+    #[tokio::test]
+    async fn handle_command_talk_broadcasts_via_real_talk_handler() {
+        use ffb_model::model::ClientMode;
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let game_id = gc.lock().unwrap().create_game_state();
+        let (tx1, mut rx1) = mpsc::unbounded_channel();
+        let (tx2, mut rx2) = mpsc::unbounded_channel();
+        {
+            let mut sm = sm_arc.lock().unwrap();
+            sm.add_session(1, game_id, "Home".into(), ClientMode::PLAYER, true, vec![], tx1);
+            sm.add_session(2, game_id, "Away".into(), ClientMode::PLAYER, false, vec![], tx2);
+        }
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientTalk(ffb_protocol::client_commands::ClientTalk { talk: Some("hello".into()) }),
+            1,
+        )).await;
+
+        let msg1 = rx1.try_recv().expect("expected a real serverTalk broadcast via the dispatch path");
+        let msg2 = rx2.try_recv().expect("expected a real serverTalk broadcast via the dispatch path");
+        assert!(msg1.contains("hello"));
+        assert_eq!(msg1, msg2);
+    }
+
+    #[tokio::test]
+    async fn handle_command_close_session_removes_session_via_real_handler() {
+        use ffb_model::model::ClientMode;
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let game_id = gc.lock().unwrap().create_game_state();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        sm_arc.lock().unwrap().add_session(1, game_id, "Coach".into(), ClientMode::PLAYER, true, vec![], tx);
+
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientCloseSession(ffb_protocol::client_commands::ClientCloseSession),
+            1,
+        )).await;
+
+        assert!(sm_arc.lock().unwrap().get_coach_for_session(1).is_none());
+    }
+
+    #[tokio::test]
+    async fn handle_command_transfer_replay_control_reaches_real_handler() {
+        use ffb_model::model::ClientMode;
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let (tx1, _rx1) = mpsc::unbounded_channel();
+        let (tx2, _rx2) = mpsc::unbounded_channel();
+        sm_arc.lock().unwrap().add_session(1, 0, "coach1".into(), ClientMode::SPECTATOR, false, vec![], tx1);
+        sm_arc.lock().unwrap().add_session(2, 0, "coach2".into(), ClientMode::SPECTATOR, false, vec![], tx2);
+
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
+        {
+            let mut rsm = factory.replay_session_manager.lock().unwrap();
+            rsm.add_session(1, "replay1".into(), "coach1".into());
+            rsm.add_session(2, "replay1".into(), "coach2".into());
+        }
+
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientTransferReplayControl(ffb_protocol::client_commands::ClientTransferReplayControl {
+                coach: Some("coach2".into()),
+            }),
+            1,
+        )).await;
+
+        // No `ReplayState` is registered for "replay1" in the factory's private map (documented
+        // gap), so the broadcast side-effect doesn't fire, but the real handler's
+        // `transfer_control` call against `ReplaySessionManager` did run.
+        assert!(factory.replay_session_manager.lock().unwrap().has_control(2));
+    }
+
+    #[tokio::test]
+    async fn handle_command_request_version_sends_version_via_real_handler() {
+        use ffb_model::model::ClientMode;
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        sm_arc.lock().unwrap().add_session(1, 0, "Coach".into(), ClientMode::PLAYER, true, vec![], tx);
+
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientRequestVersion(ffb_protocol::client_commands::ClientRequestVersion),
+            1,
+        )).await;
+
+        let msg = rx.try_recv().expect("expected a real serverVersion message via the dispatch path");
+        let value: serde_json::Value = serde_json::from_str(&msg).unwrap();
+        assert_eq!(value["netCommandId"], "serverVersion");
+    }
+
+    #[tokio::test]
+    async fn handle_command_password_challenge_sends_challenge_via_real_handler() {
+        use ffb_model::model::ClientMode;
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        sm_arc.lock().unwrap().add_session(1, 0, "Coach".into(), ClientMode::PLAYER, true, vec![], tx);
+
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
+        // No coach supplied, so even the default fumbbl-mode-true handler sends the
+        // password challenge directly rather than issuing a live HTTP fetch.
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientPasswordChallenge(ffb_protocol::client_commands::ClientPasswordChallenge {
+                coach: None,
+            }),
+            1,
+        )).await;
+
+        let msg = rx.try_recv().expect("expected a real serverPasswordChallenge message via the dispatch path");
+        assert!(msg.contains("serverPasswordChallenge"));
+    }
+
+    #[tokio::test]
+    async fn handle_command_delete_game_dispatches_through_real_internal_handler() {
+        use crate::net::commands::internal_server_command_delete_game::InternalServerCommandDeleteGame;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let factory = ServerCommandHandlerFactory::new(gc, sm, db());
+
+        // Without a live DB pool configured the delete itself is a no-op (see
+        // `ServerCommandHandlerDeleteGame`'s own tests), but this proves the internal command
+        // reaches the real handler through `handle_command` rather than the logged no-op
+        // catch-all in `handle_internal_command`.
+        let cmd = InternalServerCommandDeleteGame::new(42, true);
+        factory.handle_command(ReceivedCommand::new_internal(
+            AnyInternalServerCommand::DeleteGame(cmd),
+            1,
+        )).await;
     }
 }

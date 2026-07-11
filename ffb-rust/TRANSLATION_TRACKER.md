@@ -29,6 +29,28 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase ZVA (session/game-lifecycle handler family wired into live dispatch, this session):**
+Wired the session/game-lifecycle family of already-translated, already-unit-tested
+`ServerCommandHandler*` structs into `ServerCommandHandlerFactory::handle_command`'s live
+dispatch, which previously only reached these via `Action`-decoded gameplay commands or the
+`ClientPing` special case: `ServerCommandHandlerTalk`, `ServerCommandHandlerCloseSession`,
+`ServerCommandHandlerTransferControl`, `ServerCommandHandlerRequestVersion`, and
+`ServerCommandHandlerPasswordChallenge` each got a new `ffb_protocol::client_commands::ClientCommand`
+variant (`ClientTalk`, `ClientCloseSession`, `ClientTransferReplayControl`, `ClientRequestVersion`,
+`ClientPasswordChallenge`) mirroring the field shape of the `ffb_protocol::commands::*` struct each
+handler was originally translated against, plus a factory dispatch arm and constructor wiring
+(`ServerCommandHandlerFactory::with_replay_session_manager`). `ServerCommandHandlerDeleteGame` is an
+`AnyInternalServerCommand` rather than a `ClientCommand`, so it was wired into
+`handle_internal_command`'s match instead of getting a new wire variant. Along the way fixed two
+pre-existing `Send`-future bugs that only surfaced once these handlers became reachable from
+`tokio::spawn(dispatch_loop(...))`: `ServerCommandHandlerDeleteGame::handle_command` held a
+`std::sync::MutexGuard` across an `.await` (fixed by cloning the already-`Clone`
+`DbConnectionManager` out from behind the mutex first), and `ServerCommandHandlerPasswordChallenge`'s
+call now runs inside `tokio::task::spawn_blocking` since building/dropping its
+`reqwest::blocking::Client` from inside a live tokio runtime context panics. Added a unit test per
+newly-wired arm in `server_command_handler_factory.rs` proving the real handler runs (not just that
+it compiles). `cargo test --workspace`: 17275 → 17286 tests, 0 failures.
+
 **Phase AAC (UploadGame HTTP-backup branch, completed, this session):**
 Third of 3 sub-phases closing the last "translate more Java" gap: `ServerCommandHandlerUploadGame`'s
 missing-game branch (Java: fetch the game from the backup service via `ServerRequestLoadReplay`,

@@ -15,6 +15,7 @@ use crate::request::fumbbl::util_fumbbl_request::HttpClient;
 /// `db/db_query_factory.rs`'s `is_standalone()` comment), so the mode is
 /// threaded through explicitly as `fumbbl_mode`, defaulting to `true` to
 /// match the codebase's documented FUMBBL-mode default.
+#[derive(Clone)]
 pub struct ServerCommandHandlerPasswordChallenge {
     session_manager: Arc<Mutex<SessionManager>>,
     fumbbl_mode: bool,

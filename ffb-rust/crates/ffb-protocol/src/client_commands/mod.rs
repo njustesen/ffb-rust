@@ -85,6 +85,16 @@ pub enum ClientCommand {
     ClientKickOffResultChoice(ClientKickOffResultChoice),
     /// Keep-alive ping.
     ClientPing(ClientPing),
+    /// Chat message (game or replay session).
+    ClientTalk(ClientTalk),
+    /// Client-initiated session close.
+    ClientCloseSession(ClientCloseSession),
+    /// Transfer replay control to another coach.
+    ClientTransferReplayControl(ClientTransferReplayControl),
+    /// Request the server/client version and client properties.
+    ClientRequestVersion(ClientRequestVersion),
+    /// Request a password challenge for FUMBBL auth.
+    ClientPasswordChallenge(ClientPasswordChallenge),
 }
 
 // ── Individual client command structs ─────────────────────────────────────────
@@ -307,6 +317,27 @@ pub struct ClientPing {
     pub timestamp: i64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientTalk {
+    pub talk: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientCloseSession;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientTransferReplayControl {
+    pub coach: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientRequestVersion;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientPasswordChallenge {
+    pub coach: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -385,6 +416,36 @@ mod tests {
             team_id: "team1".into(),
             game_id: "game42".into(),
             password_hash: None,
+        }));
+    }
+
+    #[test]
+    fn client_talk_round_trip() {
+        rt(&ClientCommand::ClientTalk(ClientTalk { talk: Some("hello".into()) }));
+        rt(&ClientCommand::ClientTalk(ClientTalk { talk: None }));
+    }
+
+    #[test]
+    fn client_close_session_round_trip() {
+        rt(&ClientCommand::ClientCloseSession(ClientCloseSession));
+    }
+
+    #[test]
+    fn client_transfer_replay_control_round_trip() {
+        rt(&ClientCommand::ClientTransferReplayControl(ClientTransferReplayControl {
+            coach: Some("coach1".into()),
+        }));
+    }
+
+    #[test]
+    fn client_request_version_round_trip() {
+        rt(&ClientCommand::ClientRequestVersion(ClientRequestVersion));
+    }
+
+    #[test]
+    fn client_password_challenge_round_trip() {
+        rt(&ClientCommand::ClientPasswordChallenge(ClientPasswordChallenge {
+            coach: Some("coach2".into()),
         }));
     }
 }
