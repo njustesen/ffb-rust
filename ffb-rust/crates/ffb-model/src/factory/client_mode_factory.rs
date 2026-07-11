@@ -12,6 +12,13 @@ impl ClientModeFactory {
         ClientMode::for_name(name)
     }
 
+    /// Java: `forArgument(String pArgument)`.
+    pub fn for_argument(&self, argument: &str) -> Option<ClientMode> {
+        [ClientMode::PLAYER, ClientMode::SPECTATOR, ClientMode::REPLAY]
+            .into_iter()
+            .find(|mode| mode.get_argument().eq_ignore_ascii_case(argument))
+    }
+
     pub fn initialize(&mut self) {}
 }
 
@@ -44,5 +51,22 @@ mod tests {
     #[test]
     fn for_name_empty_string_returns_none() {
         assert_eq!(ClientModeFactory::default().for_name(""), None);
+    }
+
+    #[test]
+    fn for_argument_returns_known_mode() {
+        assert_eq!(ClientModeFactory::default().for_argument("-player"), Some(ClientMode::PLAYER));
+        assert_eq!(ClientModeFactory::default().for_argument("-spectator"), Some(ClientMode::SPECTATOR));
+        assert_eq!(ClientModeFactory::default().for_argument("-replay"), Some(ClientMode::REPLAY));
+    }
+
+    #[test]
+    fn for_argument_is_case_insensitive() {
+        assert_eq!(ClientModeFactory::default().for_argument("-PLAYER"), Some(ClientMode::PLAYER));
+    }
+
+    #[test]
+    fn for_argument_unknown_returns_none() {
+        assert_eq!(ClientModeFactory::default().for_argument("-bogus"), None);
     }
 }
