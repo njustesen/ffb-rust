@@ -29,6 +29,47 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase ZX (server handler subsystem gaps, completed, 2026-07-11):**
+Closed the majority of the last known genuine untranslated-Java gap in `ffb-server`: 11
+`ServerCommandHandler*` files carrying `todo!("Phase ZV: ...")` calls, each blocked on a
+named missing subsystem. Translated the 5 subsystem classes that unblock them —
+`RosterCache.java`, `TeamCache.java`, `UtilServerReplay.java`, `MarkerLoadingService.java`
+(all new files), and an extension of the existing in-memory `GameCache` MVP with
+`addTeamToGame`/`closeGame`/`removeGame`/`queueDbUpdate`/`queueDbDelete`/`queryFromDb`/
+`queueDbPlayerMarkersUpdate` — plus `UtilServerStartGame.java`'s
+`joinGameAsPlayerAndCheckIfReadyToStart`/`sendServerJoin`/`sendUserSettings`/`startGame`
+methods (its `addDefaultGameOptions` was already translated in a prior phase, in
+`ffb-engine`). All follow the established per-class, explicit-dependency-injection
+convention (no `FantasyFootballServer` god-object graph); most of the underlying DB/HTTP
+primitives (`DbPasswordForCoachQuery`, `FumbblRequestCheckAuthorization`,
+`ServerRequestProcessor`) were already translated and just needed wiring.
+
+Result: **3 of the 11 handlers are now fully wired and `todo!`-free** —
+`ServerCommandHandlerCloseGame`, `ServerCommandHandlerAddLoadedTeam`,
+`ServerCommandHandlerFumbblTeamLoaded`. **8 remain genuinely blocked**, each now with a
+narrower, more specific `todo!` than before: `ServerCommandHandlerJoin`,
+`ServerCommandHandlerJoinApproved`, `ServerCommandHandlerJoinReplay`,
+`ServerCommandHandlerReplay`, `ServerCommandHandlerReplayLoaded`,
+`ServerCommandHandlerScheduleGame`, `ServerCommandHandlerUploadGame`,
+`ServerCommandHandlerFumbblGameChecked`. The common blockers across these 8: no XML→`Team`
+roster deserializer (the client already parses roster XML via a different, JSON-based data
+pipeline — `RosterCache`/`TeamCache` in this phase return raw XML text rather than parsed
+objects, since no SAX-equivalent `XmlHandler` exists in this crate), no server-side command
+redispatch sink (`ServerCommandHandlerFactory`/`ServerCommunication`'s dispatch loop isn't
+built), no replay/command-log playback engine, and no step-stack + `EndGame` sequence
+dispatch. A future phase would need one or more of those four pieces of infrastructure
+before the remaining 8 can close. No parity testing this phase (per plan). Tests:
+17,305 → 17,357 (Phase ZX.1-2: +32; ZX.3-5: +25).
+
+Also discovered (not fixed, flagged for a future cleanup pass): a second pocket of
+fake-`✓` stub duplicates, this time in `ffb-engine` — `roster_cache.rs`, `team_cache.rs`,
+`util/util_server_replay.rs`, `util/marker_loading_service.rs` already existed there as
+10-line `todo!()` placeholders from the Phase ZT infra sweep, superseded by this phase's
+real translations in `ffb-server`. Same shape as the 36 orphaned `ffb-model/src/factory/*`
+stubs found during Phase ZX scoping (superseded by real `ffb-mechanics` implementations) —
+neither pocket was deleted this phase to avoid scope creep, but both are safe, low-risk
+cleanup candidates for a future session.
+
 **Phase ZW.3 + ZW.4 (client/report renderers + docs closeout, completed, 2026-07-11):**
 Translated the last major `ffb-client-logic` block: all 211 `client/report/*Message.java`
 report-to-text renderers (55 root + 32 `bb2016/` + 26 `bb2020/` + 39 `bb2025/` + 57
@@ -2860,20 +2901,20 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 
 | Java File | Rust Crate | Rust Target | Status |
 |-----------|-----------|-------------|--------|
-| `client/animation/AnimationFrame.java` | `ffb-client` | `src/client/animation/AnimationFrame.rs` | ○ |
-| `client/animation/AnimationProjector.java` | `ffb-client` | `src/client/animation/AnimationProjector.rs` | ○ |
-| `client/animation/AnimationSequenceCard.java` | `ffb-client` | `src/client/animation/AnimationSequenceCard.rs` | ○ |
-| `client/animation/AnimationSequenceChained.java` | `ffb-client` | `src/client/animation/AnimationSequenceChained.rs` | ○ |
-| `client/animation/AnimationSequenceFactory.java` | `ffb-client` | `src/client/animation/AnimationSequenceFactory.rs` | ○ |
-| `client/animation/AnimationSequenceKickoff.java` | `ffb-client` | `src/client/animation/AnimationSequenceKickoff.rs` | ○ |
-| `client/animation/AnimationSequenceMovingEffect.java` | `ffb-client` | `src/client/animation/AnimationSequenceMovingEffect.rs` | ○ |
-| `client/animation/AnimationSequenceSpecialEffect.java` | `ffb-client` | `src/client/animation/AnimationSequenceSpecialEffect.rs` | ○ |
-| `client/animation/AnimationSequenceThrowing.java` | `ffb-client` | `src/client/animation/AnimationSequenceThrowing.rs` | ○ |
-| `client/animation/CoordinateBasedSteppingStrategy.java` | `ffb-client` | `src/client/animation/CoordinateBasedSteppingStrategy.rs` | ○ |
-| `client/animation/IAnimationListener.java` | `ffb-client` | `src/client/animation/IAnimationListener.rs` | ○ |
-| `client/animation/IAnimationSequence.java` | `ffb-client` | `src/client/animation/IAnimationSequence.rs` | ○ |
-| `client/animation/SteppingStrategy.java` | `ffb-client` | `src/client/animation/SteppingStrategy.rs` | ○ |
-| `client/animation/TimerBasedSteppingStrategy.java` | `ffb-client` | `src/client/animation/TimerBasedSteppingStrategy.rs` | ○ |
+| `client/animation/AnimationFrame.java` | `ffb-client` | `src/client/animation/AnimationFrame.rs` | — |
+| `client/animation/AnimationProjector.java` | `ffb-client` | `src/client/animation/AnimationProjector.rs` | — |
+| `client/animation/AnimationSequenceCard.java` | `ffb-client` | `src/client/animation/AnimationSequenceCard.rs` | — |
+| `client/animation/AnimationSequenceChained.java` | `ffb-client` | `src/client/animation/AnimationSequenceChained.rs` | — |
+| `client/animation/AnimationSequenceFactory.java` | `ffb-client` | `src/client/animation/AnimationSequenceFactory.rs` | — |
+| `client/animation/AnimationSequenceKickoff.java` | `ffb-client` | `src/client/animation/AnimationSequenceKickoff.rs` | — |
+| `client/animation/AnimationSequenceMovingEffect.java` | `ffb-client` | `src/client/animation/AnimationSequenceMovingEffect.rs` | — |
+| `client/animation/AnimationSequenceSpecialEffect.java` | `ffb-client` | `src/client/animation/AnimationSequenceSpecialEffect.rs` | — |
+| `client/animation/AnimationSequenceThrowing.java` | `ffb-client` | `src/client/animation/AnimationSequenceThrowing.rs` | — |
+| `client/animation/CoordinateBasedSteppingStrategy.java` | `ffb-client` | `src/client/animation/CoordinateBasedSteppingStrategy.rs` | — |
+| `client/animation/IAnimationListener.java` | `ffb-client` | `src/client/animation/IAnimationListener.rs` | — |
+| `client/animation/IAnimationSequence.java` | `ffb-client` | `src/client/animation/IAnimationSequence.rs` | — |
+| `client/animation/SteppingStrategy.java` | `ffb-client` | `src/client/animation/SteppingStrategy.rs` | — |
+| `client/animation/TimerBasedSteppingStrategy.java` | `ffb-client` | `src/client/animation/TimerBasedSteppingStrategy.rs` | — |
 
 ### client/dialog/ (170 files)
 
