@@ -2848,7 +2848,8 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/util/UtilServerReplay.java` | `ffb-server` | `src/util/server_replay.rs` | ✓ |
 | `server/util/UtilServerReRoll.java` | `ffb-engine` | `src/util/util_server_re_roll.rs` | ✓ |
 | `server/util/UtilServerSetup.java` | `ffb-engine` | `src/util/util_server_setup.rs` | ✓ |
-| `server/util/UtilServerStartGame.java` | `ffb-engine` | `src/util/util_server_start_game.rs` | ✓ |
+| `server/util/UtilServerStartGame.java` | `ffb-engine` | `src/util/util_server_start_game.rs` (addDefaultGameOptions only) | ✓ |
+| `server/util/UtilServerStartGame.java` | `ffb-server` | `src/util/server_start_game.rs` (joinGameAsPlayerAndCheckIfReadyToStart, sendServerJoin, sendUserSettings, startGame — Phase ZX.3) | ✓ |
 | `server/util/UtilServerTimer.java` | `ffb-engine` | `src/util/util_server_timer.rs` | ✓ |
 | `server/util/UtilSkillBehaviours.java` | `ffb-engine` | `src/util/util_skill_behaviours.rs` | ✓ |
 | `server/util/WeatherCalc.java` | `ffb-engine` | `src/util/weather_calc.rs` | ✓ |
