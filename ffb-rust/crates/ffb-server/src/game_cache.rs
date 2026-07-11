@@ -22,6 +22,8 @@ use crate::db::update::db_games_serialized_update_parameter::DbGamesSerializedUp
 use crate::game_state::GameState;
 use crate::net::server_communication::ServerCommunication;
 use crate::net::session_manager::SessionManager;
+use crate::roster_cache::RosterCache;
+use crate::team_cache::TeamCache;
 
 static NEXT_GAME_ID: AtomicI64 = AtomicI64::new(1);
 
@@ -173,6 +175,41 @@ impl GameCache {
     /// Callers are responsible for the trailing `queueDbUpdate(gameState, true)` (see
     /// `GameCache::queue_db_update`), matching this crate's convention of threading DB
     /// access through explicitly rather than reaching a `getServer()` singleton.
+    /// Java: `GameCache.getTeamById(String, Game)` — `teamCache.getTeamById(id, game)` followed
+    /// by the private `updateRoster(Team, Game)` helper (standalone-mode roster resolution:
+    /// `RosterCache.getRosterForTeam` + `Team.updateRoster` + `UtilTeamValue.findTeamValue`).
+    /// Threaded through explicitly (this crate's convention — see `util/server_start_game.rs`'s
+    /// module doc comment) rather than owned as a `GameCache` field, since `TeamCache`/
+    /// `RosterCache` are read-only lookup tables built once at server startup.
+    pub fn get_team_by_id(team_id: &str, team_cache: &TeamCache, roster_cache: &RosterCache) -> std::io::Result<Team> {
+        let mut team = team_cache
+            .get_team_by_id(team_id)
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, format!("no team found for id {team_id}")))??;
+        Self::update_roster(&mut team, roster_cache)?;
+        Ok(team)
+    }
+
+    /// Java: `GameCache.getTeamsForCoach(String, Game)` — `teamCache.getTeamsForCoach` then,
+    /// in standalone mode, `updateRoster` on each result.
+    pub fn get_teams_for_coach(coach: &str, team_cache: &TeamCache, roster_cache: &RosterCache) -> std::io::Result<Vec<Team>> {
+        let mut teams = team_cache.get_teams_for_coach(coach)?;
+        for team in &mut teams {
+            Self::update_roster(team, roster_cache)?;
+        }
+        Ok(teams)
+    }
+
+    /// Java: `private Team updateRoster(Team team, Game game)` (standalone-mode branch only —
+    /// `ServerMode.FUMBBL == getServer().getMode()` is a no-op in that mode, matching this
+    /// crate's standalone-only disk-XML roster pipeline).
+    fn update_roster(team: &mut Team, roster_cache: &RosterCache) -> std::io::Result<()> {
+        let roster = roster_cache.get_roster_for_team(&team.id, &team.roster_id)?;
+        let reroll_cost = roster.reroll_cost;
+        team.update_roster(&roster);
+        team.team_value = ffb_model::util::util_team_value::UtilTeamValue::find_team_value_with_reroll_cost(team, reroll_cost);
+        Ok(())
+    }
+
     pub fn add_team_to_game(game: &mut Game, team: Team, home_team: bool) {
         let old_ids: Vec<String> = if home_team {
             game.team_home.players.iter().map(|p| p.id.clone()).collect()

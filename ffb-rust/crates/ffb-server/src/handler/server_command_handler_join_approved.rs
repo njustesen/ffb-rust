@@ -84,13 +84,21 @@ impl ServerCommandHandlerJoinApproved {
         if game_found {
             let client_mode = parse_client_mode(join_approved_command.get_client_mode());
             if client_mode == Some(ClientMode::PLAYER) {
-                // Java: `joinWithoutTeam` / `joinWithTeam` / `sendTeamList` — all
-                // depend on `Game.getTeamHome()/getTeamAway()` (populated before
-                // the engine starts) plus `GameCache.getTeamSkeleton` /
-                // `addTeamToGame` / `getTeamById` and `UtilServerStartGame`, none
-                // of which exist on the Rust `GameState`/`GameCache` yet.
+                // Java: `joinWithoutTeam` / `joinWithTeam` / `sendTeamList` — depend on
+                // `Game.getTeamHome()/getTeamAway()` plus `GameCache.getTeamSkeleton`/
+                // `getTeamById`/`addTeamToGame`, all of which now exist for real (Phase
+                // ZY.2/ZY.3's XML roster deserializer + `GameCache::get_team_by_id`). The
+                // remaining, genuinely different blocker is
+                // `UtilServerStartGame::join_game_as_player_and_check_if_ready_to_start`
+                // (Phase ZX.3) — it's `async` and needs a `DbConnectionManager`, neither of
+                // which this handler's signature threads through. Wiring that in means
+                // making `handle_command` async and adding a DB parameter to this struct's
+                // constructor — a separate, larger infra change from roster resolution,
+                // narrowly scoped out of this phase rather than attempted here.
                 todo!(
-                    "Phase ZV: needs Game team-slots + GameCache team loading + UtilServerStartGame (game_id = {})",
+                    "Phase ZY.4+: needs handle_command made async + DbConnectionManager threaded \
+                     through, to call join_game_as_player_and_check_if_ready_to_start / \
+                     addDefaultGameOptions / getTeamById(x2)+addTeamToGame(x2) / start_game (game_id = {})",
                     game_id
                 );
             } else {
@@ -112,17 +120,26 @@ impl ServerCommandHandlerJoinApproved {
                         sender,
                     );
                 }
-                // Java: `UtilServerStartGame.sendServerJoin(...)` and, if the
-                // game has already started, `UtilServerTimer.syncTime` +
-                // `communication.sendGameState`. Neither has a Rust equivalent.
+                // Java: `UtilServerStartGame.sendServerJoin(...)` and, if the game has already
+                // started, `UtilServerTimer.syncTime` + `communication.sendGameState`.
+                // `send_server_join` now exists for real (Phase ZX.3,
+                // `util::server_start_game::send_server_join`) but is `async` and needs a
+                // `DbConnectionManager` — the same handler-signature gap as the PLAYER branch
+                // above, not a roster-resolution gap.
                 todo!(
-                    "Phase ZV: needs UtilServerStartGame.sendServerJoin / sendGameState wiring (game_id = {})",
+                    "Phase ZY.4+: needs handle_command made async + DbConnectionManager threaded \
+                     through, to call send_server_join / UtilServerTimer.syncTime / sendGameState (game_id = {})",
                     game_id
                 );
             }
         } else if parse_client_mode(join_approved_command.get_client_mode()) == Some(ClientMode::REPLAY) {
-            // Java: `UtilServerStartGame.sendUserSettings(...)` — no Rust equivalent.
-            todo!("Phase ZV: needs UtilServerStartGame.sendUserSettings wiring");
+            // Java: `UtilServerStartGame.sendUserSettings(...)`. `send_user_settings` now
+            // exists for real (Phase ZX.3) but is `async` and needs a `DbConnectionManager` —
+            // same handler-signature gap as above.
+            todo!(
+                "Phase ZY.4+: needs handle_command made async + DbConnectionManager threaded \
+                 through, to call send_user_settings"
+            );
         }
 
         true
