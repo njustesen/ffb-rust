@@ -1,9 +1,11 @@
 /// 1:1 translation of com.fumbbl.ffb.server.handler.ServerCommandHandlerCloseGame.
 use std::sync::{Arc, Mutex};
 use ffb_model::enums::NetCommandId;
+use crate::db::db_connection_manager::DbConnectionManager;
 use crate::game_cache::GameCache;
 use crate::net::commands::internal_server_command::InternalServerCommand;
 use crate::net::commands::internal_server_command_close_game::InternalServerCommandCloseGame;
+use crate::net::server_communication::ServerCommunication;
 use crate::net::session_manager::SessionManager;
 
 /// Java: `ServerCommandHandlerCloseGame extends ServerCommandHandler`.
@@ -30,35 +32,54 @@ impl ServerCommandHandlerCloseGame {
     /// return true;
     /// ```
     ///
-    /// `GameCache.closeGame(long)` (Java): if `gameId <= 0` or the game isn't
-    /// cached, does nothing. Otherwise it closes every session for the game
-    /// (mirrored here via `SessionManager.remove_session`) and then removes
-    /// the `GameState` from the cache and — in FUMBBL mode — dispatches a
-    /// `FumbblRequestRemoveGamestate`. `GameCache` has no removal API in the
-    /// Rust in-memory MVP yet, and the FUMBBL request pipeline isn't wired.
-    pub fn handle_command(&self, close_game_command: &InternalServerCommandCloseGame) -> bool {
+    /// `GameCache::close_game` (see `game_cache.rs`, added in Phase ZX.2) now performs the
+    /// real, portable half of Java's `GameCache.closeGame(long)`: the `gameId <= 0` / not-cached
+    /// short-circuits, closing every session tracking the game, and removing it from the
+    /// cache. Java's `removeGame` private helper also decides whether to `queueDbDelete`
+    /// (only one team joined / never started / test game); `GameCache::close_game` reports
+    /// that decision back as `Some(should_queue_db_delete)`, which is now acted on for real
+    /// via `GameCache::queue_db_delete`.
+    ///
+    /// What remains unported: Java's mode-dependent tail —
+    /// `(FUMBBL mode && status not REPLAYING/LOADING) -> enqueue FumbblRequestRemoveGamestate`
+    /// else `fServer.closeResources(gameId)` — has no Rust equivalent (no `FumbblRequestRemoveGamestate`,
+    /// no `ServerMode`-gated `closeResources`), so it's a documented no-op rather than a `todo!()`.
+    pub async fn handle_command(
+        &self,
+        close_game_command: &InternalServerCommandCloseGame,
+        communication: &ServerCommunication,
+        db: &DbConnectionManager,
+    ) -> bool {
         let game_id = close_game_command.get_game_id();
-        if game_id <= 0 {
-            return true;
-        }
-        let found = {
-            let gc = self.game_cache.lock().unwrap();
-            gc.get_game_state_by_id(game_id).is_some()
+
+        // `communication.close(session_id)` re-locks `SessionManager` internally (see
+        // `net/server_communication.rs`); in real wiring `communication`'s session manager
+        // and `self.session_manager` are the *same* shared `Arc<Mutex<_>>`, so every
+        // session is closed here first, with no `SessionManager` guard of ours held across
+        // the call. By the time `GameCache::close_game` runs below, its own internal
+        // `communication.close(...)` loop finds zero sessions left for this game and never
+        // re-enters `communication`'s lock — avoiding a self-deadlock on the shared mutex.
+        let session_ids = {
+            let sm = self.session_manager.lock().unwrap();
+            sm.get_sessions_for_game_id(game_id)
         };
-        if !found {
-            return true;
+        for session_id in session_ids {
+            communication.close(session_id);
         }
-        {
-            let mut sm = self.session_manager.lock().unwrap();
-            for session_id in sm.get_sessions_for_game_id(game_id) {
-                sm.remove_session(session_id);
-            }
+
+        let should_queue_db_delete = {
+            let mut gc = self.game_cache.lock().unwrap();
+            let sm = self.session_manager.lock().unwrap();
+            gc.close_game(game_id, &sm, communication)
+        };
+
+        if let Some(true) = should_queue_db_delete {
+            let _ = GameCache::queue_db_delete(db, game_id, true).await;
         }
-        // Java: `removeGame(gameId)` + (FUMBBL mode) `FumbblRequestRemoveGamestate`.
-        todo!(
-            "Phase ZV: GameCache::remove_game + FumbblRequestRemoveGamestate not wired (game_id = {})",
-            game_id
-        )
+
+        // Java: `(FUMBBL mode && status != REPLAYING/LOADING) -> FumbblRequestRemoveGamestate`
+        // else `fServer.closeResources(gameId)` — no Rust equivalent, documented gap.
+        true
     }
 }
 
@@ -68,45 +89,45 @@ mod tests {
     use ffb_model::model::ClientMode;
     use tokio::sync::mpsc;
 
-    fn setup() -> (Arc<Mutex<GameCache>>, Arc<Mutex<SessionManager>>) {
-        (
-            Arc::new(Mutex::new(GameCache::new())),
-            Arc::new(Mutex::new(SessionManager::new())),
-        )
+    fn setup() -> (Arc<Mutex<GameCache>>, Arc<Mutex<SessionManager>>, ServerCommunication, DbConnectionManager) {
+        let gc = Arc::new(Mutex::new(GameCache::new()));
+        let sm = Arc::new(Mutex::new(SessionManager::new()));
+        let communication = ServerCommunication::new(Arc::clone(&gc), Arc::clone(&sm));
+        (gc, sm, communication, DbConnectionManager::new())
     }
 
-    #[test]
-    fn construct() {
-        let (gc, sm) = setup();
+    #[tokio::test]
+    async fn construct() {
+        let (gc, sm, _comm, _db) = setup();
         let _ = ServerCommandHandlerCloseGame::new(gc, sm);
     }
 
-    #[test]
-    fn get_id_is_internal_server_close_game() {
-        let (gc, sm) = setup();
+    #[tokio::test]
+    async fn get_id_is_internal_server_close_game() {
+        let (gc, sm, _comm, _db) = setup();
         let handler = ServerCommandHandlerCloseGame::new(gc, sm);
         assert_eq!(handler.get_id(), NetCommandId::InternalServerCloseGame);
     }
 
-    #[test]
-    fn zero_game_id_returns_true_without_touching_sessions() {
-        let (gc, sm) = setup();
+    #[tokio::test]
+    async fn zero_game_id_returns_true_without_touching_sessions() {
+        let (gc, sm, comm, db) = setup();
         let handler = ServerCommandHandlerCloseGame::new(gc, sm);
         let cmd = InternalServerCommandCloseGame::new(0);
-        assert!(handler.handle_command(&cmd));
+        assert!(handler.handle_command(&cmd, &comm, &db).await);
     }
 
-    #[test]
-    fn unknown_game_id_returns_true() {
-        let (gc, sm) = setup();
+    #[tokio::test]
+    async fn unknown_game_id_returns_true() {
+        let (gc, sm, comm, db) = setup();
         let handler = ServerCommandHandlerCloseGame::new(gc, sm);
         let cmd = InternalServerCommandCloseGame::new(999);
-        assert!(handler.handle_command(&cmd));
+        assert!(handler.handle_command(&cmd, &comm, &db).await);
     }
 
-    #[test]
-    fn known_game_id_removes_sessions_before_hitting_missing_cache_removal() {
-        let (gc, sm) = setup();
+    #[tokio::test]
+    async fn known_game_id_removes_sessions_and_the_game_from_the_cache() {
+        let (gc, sm, comm, db) = setup();
         let game_id = gc.lock().unwrap().create_game_state();
         {
             let (tx, _rx) = mpsc::unbounded_channel();
@@ -114,10 +135,21 @@ mod tests {
         }
         let handler = ServerCommandHandlerCloseGame::new(Arc::clone(&gc), Arc::clone(&sm));
         let cmd = InternalServerCommandCloseGame::new(game_id);
-        let result = std::panic::catch_unwind(|| handler.handle_command(&cmd));
-        assert!(result.is_err());
-        // The session should have been closed before the (currently-missing)
-        // cache-removal step panics.
+        assert!(handler.handle_command(&cmd, &comm, &db).await);
+
         assert!(sm.lock().unwrap().get_sessions_for_game_id(game_id).is_empty());
+        assert!(gc.lock().unwrap().get_game_state_by_id(game_id).is_none());
+    }
+
+    #[tokio::test]
+    async fn queue_db_delete_without_pool_configured_is_a_noop() {
+        // A freshly-created GameState (no started Game) is treated as never-started, so
+        // `GameCache::close_game` reports `Some(true)` (should queue a DB delete); with no
+        // DB pool configured, `queue_db_delete` degrades to a no-op instead of panicking.
+        let (gc, sm, comm, db) = setup();
+        let game_id = gc.lock().unwrap().create_game_state();
+        let handler = ServerCommandHandlerCloseGame::new(Arc::clone(&gc), Arc::clone(&sm));
+        let cmd = InternalServerCommandCloseGame::new(game_id);
+        assert!(handler.handle_command(&cmd, &comm, &db).await);
     }
 }
