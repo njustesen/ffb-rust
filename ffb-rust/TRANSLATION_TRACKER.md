@@ -29,6 +29,26 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase ZVC (replay handler family wired into live dispatch, this session):**
+Wired the replay-playback handler family — `ServerCommandHandlerJoinReplay`,
+`ServerCommandHandlerReplay`, `ServerCommandHandlerReplayLoaded`, `ServerCommandHandlerReplayStatus`
+(all already real and unit-tested from Phase AAB's replay-playback engine work) — into
+`ServerCommandHandlerFactory::handle_command`'s live dispatch, following the Phase ZVA/ZVB
+pattern. Adds `ClientJoinReplay`/`ClientReplay`/`ClientReplayStatus` variants to
+`ffb_protocol::client_commands::ClientCommand` (mirroring the real `ffb_protocol::commands::*`
+struct each handler was translated against); `ServerCommandHandlerReplayLoaded` is an
+`AnyInternalServerCommand::ReplayLoaded` (that variant already existed) rather than a
+`ClientCommand`, so it's wired into `handle_internal_command` instead. The factory gained a
+real `Arc<Mutex<ReplayCache>>` (`replay_cache`, shared with `join_replay_handler` — the only
+handler in this factory translated directly against `ReplayCache`) and a shared
+`Arc<Mutex<ServerReplayer>>` (`replayer`, shared between `replay_handler` and
+`replay_loaded_handler`, matching Java's single `getServer().getReplayer()`).
+`ServerCommandHandlerReplayStatus` reuses the factory's existing ad hoc `replay_states` map
+(now `pub(crate)` so this file's own tests can seed a cached `ReplayState`), the same
+documented "no server-level `ReplayCache` wired in yet" stand-in `transfer_control_handler`/
+`set_prevent_sketching_handler` already used — no new gap introduced, no fabricated logic.
+`cargo test --workspace`: 17306 -> 17310 tests, 0 failures.
+
 **Phase ZVB (sketch/marker handler family wired into live dispatch, this session):**
 Wired the sketch/marker family of already-translated, already-unit-tested `ServerCommandHandler*`
 structs into `ServerCommandHandlerFactory::handle_command`'s live dispatch, following the

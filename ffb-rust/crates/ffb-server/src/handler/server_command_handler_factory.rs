@@ -32,7 +32,9 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 use ffb_engine::action::{Action, PlayerActionChoice};
 use ffb_engine::legal_actions::TeamSide;
+use ffb_engine::replay_cache::ReplayCache;
 use ffb_engine::replay_state::ReplayState;
+use ffb_engine::server_replayer::ServerReplayer;
 use ffb_engine::server_sketch_manager::ServerSketchManager;
 use ffb_model::enums::{PlayerAction, SkillId};
 use ffb_protocol::client_commands::ClientCommand;
@@ -44,10 +46,14 @@ use crate::handler::server_command_handler_close_session::ServerCommandHandlerCl
 use crate::handler::server_command_handler_delete_game::ServerCommandHandlerDeleteGame;
 use crate::handler::server_command_handler_join::ServerCommandHandlerJoin;
 use crate::handler::server_command_handler_join_approved::ServerCommandHandlerJoinApproved;
+use crate::handler::server_command_handler_join_replay::ServerCommandHandlerJoinReplay;
 use crate::handler::server_command_handler_load_automatic_player_markings::ServerCommandHandlerLoadAutomaticPlayerMarkings;
 use crate::handler::server_command_handler_password_challenge::ServerCommandHandlerPasswordChallenge;
 use crate::handler::server_command_handler_ping::ServerCommandHandlerPing;
 use crate::handler::server_command_handler_remove_sketches::ServerCommandHandlerRemoveSketches;
+use crate::handler::server_command_handler_replay::ServerCommandHandlerReplay;
+use crate::handler::server_command_handler_replay_loaded::ServerCommandHandlerReplayLoaded;
+use crate::handler::server_command_handler_replay_status::ServerCommandHandlerReplayStatus;
 use crate::handler::server_command_handler_request_version::ServerCommandHandlerRequestVersion;
 use crate::handler::server_command_handler_set_marker::ServerCommandHandlerSetMarker;
 use crate::handler::server_command_handler_set_prevent_sketching::ServerCommandHandlerSetPreventSketching;
@@ -121,10 +127,28 @@ pub struct ServerCommandHandlerFactory {
     sketch_set_label_handler: ServerCommandHandlerSketchSetLabel,
     set_marker_handler: ServerCommandHandlerSetMarker,
     set_prevent_sketching_handler: ServerCommandHandlerSetPreventSketching,
+    /// `pub(crate)` so this file's own tests can seed a cached `ReplayState` directly (the
+    /// same ad hoc name → `ReplayState` map `transfer_control_handler`/
+    /// `set_prevent_sketching_handler`/`replay_status_handler` all share per their own
+    /// documented "no server-level `ReplayCache` wired in yet" gap).
+    pub(crate) replay_states: Arc<Mutex<HashMap<String, ReplayState>>>,
     update_player_markings_handler: ServerCommandHandlerUpdatePlayerMarkings,
     /// `pub(crate)` so this file's own tests can inspect the enqueued request without a
     /// network round trip (see `ServerCommandHandlerLoadAutomaticPlayerMarkings::request_processor`).
     pub(crate) load_automatic_player_markings_handler: ServerCommandHandlerLoadAutomaticPlayerMarkings,
+    /// Java: `getServer().getReplayCache()` — a real `ReplayCache` (unlike the ad hoc
+    /// name → `ReplayState` map `transfer_control_handler`/`set_prevent_sketching_handler`/
+    /// `replay_status_handler` fall back to per their own documented gaps), shared with
+    /// `join_replay_handler` below since that's the only handler in this factory translated
+    /// directly against `ReplayCache` rather than the stand-in map.
+    pub replay_cache: Arc<Mutex<ReplayCache>>,
+    join_replay_handler: ServerCommandHandlerJoinReplay,
+    /// Shared with `replay_loaded_handler` below — one server-wide replay-playback queue,
+    /// matching Java's single `getServer().getReplayer()`.
+    pub replayer: Arc<Mutex<ServerReplayer>>,
+    replay_handler: ServerCommandHandlerReplay,
+    replay_loaded_handler: ServerCommandHandlerReplayLoaded,
+    replay_status_handler: ServerCommandHandlerReplayStatus,
 }
 
 impl ServerCommandHandlerFactory {
@@ -182,7 +206,7 @@ impl ServerCommandHandlerFactory {
             Arc::clone(&game_cache),
             Arc::clone(&session_manager),
             Arc::clone(&db_connection_manager),
-            dispatch_tx,
+            dispatch_tx.clone(),
         );
         let join_approved_handler = ServerCommandHandlerJoinApproved::new(
             Arc::clone(&game_cache),
@@ -287,6 +311,41 @@ impl ServerCommandHandlerFactory {
             markings_url_template,
         );
 
+        // ── Replay handler family ───────────────────────────────────────────
+        let replay_cache: Arc<Mutex<ReplayCache>> = Arc::new(Mutex::new(ReplayCache::new()));
+        let join_replay_handler = ServerCommandHandlerJoinReplay::new(
+            Arc::clone(&replay_session_manager),
+            Arc::clone(&replay_cache),
+            Arc::clone(&sketch_manager),
+        );
+        let replayer: Arc<Mutex<ServerReplayer>> = Arc::new(Mutex::new(ServerReplayer::new()));
+        // No server-startup config wiring exists yet for the FUMBBL backup-service load-replay
+        // URL template (same documented gap as `markings_url_template` above), so it defaults
+        // to empty; the request processor/HTTP client are shared with the markings handlers
+        // above rather than standing up a second, disconnected pair.
+        let backup_url_load_template = String::new();
+        let replay_handler = ServerCommandHandlerReplay::new(
+            Arc::clone(&game_cache),
+            Arc::clone(&session_manager),
+            Arc::clone(&db_connection_manager),
+            Arc::clone(&replayer),
+            Arc::clone(&markings_request_processor),
+            Arc::clone(&markings_http_client),
+            backup_url_load_template,
+            dispatch_tx.clone(),
+        );
+        let replay_loaded_handler = ServerCommandHandlerReplayLoaded::new(
+            Arc::clone(&game_cache),
+            Arc::clone(&session_manager),
+            Arc::clone(&replayer),
+        );
+        // Reuses `replay_states` (see `transfer_control_handler` above) — same documented
+        // "no server-level ReplayCache yet" gap applies here.
+        let replay_status_handler = ServerCommandHandlerReplayStatus::new(
+            Arc::clone(&replay_session_manager),
+            Arc::clone(&replay_states),
+        );
+
         Self {
             game_cache,
             session_manager,
@@ -314,8 +373,15 @@ impl ServerCommandHandlerFactory {
             sketch_set_label_handler,
             set_marker_handler,
             set_prevent_sketching_handler,
+            replay_states,
             update_player_markings_handler,
             load_automatic_player_markings_handler,
+            replay_cache,
+            join_replay_handler,
+            replayer,
+            replay_handler,
+            replay_loaded_handler,
+            replay_status_handler,
         }
     }
 
@@ -494,6 +560,38 @@ impl ServerCommandHandlerFactory {
                     .await;
                 return;
             }
+            ClientCommand::ClientJoinReplay(j) => {
+                let cmd = ffb_protocol::commands::client_command_join_replay::ClientCommandJoinReplay {
+                    entropy: None,
+                    replay_name: j.replay_name.clone(),
+                    coach: j.coach.clone(),
+                    game_id: j.game_id,
+                };
+                self.join_replay_handler.handle_command(&cmd, session_id);
+                return;
+            }
+            ClientCommand::ClientReplay(r) => {
+                let cmd = ffb_protocol::commands::client_command_replay::ClientCommandReplay {
+                    entropy: None,
+                    game_id: r.game_id,
+                    replay_to_command_nr: r.replay_to_command_nr,
+                    coach: r.coach.clone(),
+                };
+                self.replay_handler.handle_command(&cmd, session_id).await;
+                return;
+            }
+            ClientCommand::ClientReplayStatus(s) => {
+                let cmd = ffb_protocol::commands::client_command_replay_status::ClientCommandReplayStatus {
+                    entropy: None,
+                    command_nr: s.command_nr,
+                    speed: s.speed,
+                    running: s.running,
+                    forward: s.forward,
+                    skip: s.skip,
+                };
+                self.replay_status_handler.handle_command(&cmd, session_id);
+                return;
+            }
             _ => {}
         }
 
@@ -577,6 +675,9 @@ impl ServerCommandHandlerFactory {
                         );
                     }
                 }
+            }
+            AnyInternalServerCommand::ReplayLoaded(cmd) => {
+                self.replay_loaded_handler.handle_command(&cmd, session_id);
             }
             AnyInternalServerCommand::ApplyAutomatedPlayerMarkings(cmd) => {
                 // java: `ServerCommandHandlerApplyAutomatedPlayerMarkings::handle_command` needs
@@ -770,6 +871,9 @@ pub fn decode_command(cmd: ClientCommand, side: TeamSide) -> Result<Action, Deco
         ClientCommand::ClientLoadAutomaticPlayerMarkings(_) => {
             Err(DecodeError::NotImplemented("ClientLoadAutomaticPlayerMarkings".into()))
         }
+        ClientCommand::ClientJoinReplay(_) => Err(DecodeError::NotImplemented("ClientJoinReplay".into())),
+        ClientCommand::ClientReplay(_) => Err(DecodeError::NotImplemented("ClientReplay".into())),
+        ClientCommand::ClientReplayStatus(_) => Err(DecodeError::NotImplemented("ClientReplayStatus".into())),
     }
 }
 
@@ -1821,5 +1925,111 @@ mod tests {
             factory.load_automatic_player_markings_handler.request_processor.lock().unwrap().queue_len(),
             1
         );
+    }
+
+    // ── Replay handler family dispatch ─────────────────────────────────────────
+
+    #[tokio::test]
+    async fn handle_command_join_replay_creates_replay_state_via_real_handler() {
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        factory.replay_session_manager.lock().unwrap().register_sender(1, tx);
+
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientJoinReplay(ffb_protocol::client_commands::ClientJoinReplay {
+                replay_name: Some("MyReplay".into()),
+                coach: Some("Alice".into()),
+                game_id: 42,
+            }),
+            1,
+        )).await;
+
+        assert_eq!(factory.replay_cache.lock().unwrap().replay_count(), 1);
+        // First (and only) session in the replay gets the `ServerCommandJoin` broadcast
+        // (it's already in `sessions_for_replay` by the time the handler builds that list)
+        // followed by the new-replay `ServerCommandReplayControl`.
+        let join_msg = rx.try_recv().expect("expected a real serverJoin broadcast");
+        assert!(join_msg.contains("serverJoin"));
+        let control_msg = rx.try_recv().expect("expected a real serverReplayControl message");
+        assert!(control_msg.contains("serverReplayControl"));
+    }
+
+    #[tokio::test]
+    async fn handle_command_replay_found_game_starts_a_real_replay() {
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let game_id = gc.lock().unwrap().create_game_state();
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
+
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientReplay(ffb_protocol::client_commands::ClientReplay {
+                game_id,
+                replay_to_command_nr: 0,
+                coach: Some("coach".into()),
+            }),
+            1,
+        )).await;
+
+        assert_eq!(factory.replayer.lock().unwrap().queue_size(), 1);
+    }
+
+    #[tokio::test]
+    async fn handle_command_replay_status_broadcasts_via_real_handler() {
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
+        {
+            let mut rsm = factory.replay_session_manager.lock().unwrap();
+            rsm.add_session(1, "replay1".to_string(), "coach1".to_string());
+            rsm.add_session(2, "replay1".to_string(), "coach2".to_string());
+        }
+        let (tx2, mut rx2) = mpsc::unbounded_channel();
+        factory.replay_session_manager.lock().unwrap().register_sender(2, tx2);
+        // Seed the factory's cached `ReplayState` for "replay1" (see `replay_states`'s own
+        // doc comment) so `requires_push_to_other_clients` has something to compare against —
+        // its default speed=0/running=false/forward=false differs from the command below.
+        factory.replay_states.lock().unwrap().insert(
+            "replay1".to_string(),
+            ffb_engine::replay_state::ReplayState::new("replay1"),
+        );
+
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientReplayStatus(ffb_protocol::client_commands::ClientReplayStatus {
+                command_nr: 10,
+                speed: 1,
+                running: true,
+                forward: true,
+                skip: false,
+            }),
+            1,
+        )).await;
+
+        let sent = rx2.try_recv().expect("expected a real serverReplayStatus broadcast to session 2");
+        assert!(sent.contains("serverReplayStatus"));
+    }
+
+    #[tokio::test]
+    async fn factory_dispatches_replay_loaded_through_real_handler() {
+        use crate::net::commands::internal_server_command_replay_loaded::InternalServerCommandReplayLoaded;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let game_id = gc.lock().unwrap().create_game_state();
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
+
+        let cmd = InternalServerCommandReplayLoaded::new(game_id, 0, "coach".to_string());
+        factory.handle_command(ReceivedCommand::new_internal(AnyInternalServerCommand::ReplayLoaded(cmd), 1)).await;
+
+        assert_eq!(
+            factory.game_cache.lock().unwrap().get_game_state_by_id(game_id).unwrap().get_status(),
+            Some(ffb_model::enums::GameStatus::Replaying)
+        );
+        assert_eq!(factory.replayer.lock().unwrap().queue_size(), 1);
     }
 }

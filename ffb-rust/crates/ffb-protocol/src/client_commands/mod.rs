@@ -115,6 +115,12 @@ pub enum ClientCommand {
     ClientUpdatePlayerMarkings(ClientUpdatePlayerMarkings),
     /// Load automatic player markings for a given game version.
     ClientLoadAutomaticPlayerMarkings(ClientLoadAutomaticPlayerMarkings),
+    /// Join an existing (or start a new) replay session.
+    ClientJoinReplay(ClientJoinReplay),
+    /// Request replay playback of a finished/backed-up game.
+    ClientReplay(ClientReplay),
+    /// Push a replay-playback status update (speed/running/forward/skip).
+    ClientReplayStatus(ClientReplayStatus),
 }
 
 // ── Individual client command structs ─────────────────────────────────────────
@@ -426,6 +432,32 @@ pub struct ClientUpdatePlayerMarkings {
 pub struct ClientLoadAutomaticPlayerMarkings {
     pub index: i32,
     pub coach: Option<String>,
+}
+
+/// Mirrors `ffb_protocol::commands::client_command_join_replay::ClientCommandJoinReplay`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientJoinReplay {
+    pub replay_name: Option<String>,
+    pub coach: Option<String>,
+    pub game_id: i64,
+}
+
+/// Mirrors `ffb_protocol::commands::client_command_replay::ClientCommandReplay`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientReplay {
+    pub game_id: i64,
+    pub replay_to_command_nr: i32,
+    pub coach: Option<String>,
+}
+
+/// Mirrors `ffb_protocol::commands::client_command_replay_status::ClientCommandReplayStatus`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientReplayStatus {
+    pub command_nr: i32,
+    pub speed: i32,
+    pub running: bool,
+    pub forward: bool,
+    pub skip: bool,
 }
 
 #[cfg(test)]
