@@ -96,6 +96,27 @@ impl GameState {
     pub fn active_side(&self) -> Option<TeamSide> {
         self.driver.as_ref().map(|d| d.active_side())
     }
+
+    /// Java: `gameState.getStepStack().clear()`.
+    pub fn clear_step_stack(&mut self) {
+        if let Some(driver) = &mut self.driver {
+            driver.clear_step_stack();
+        }
+    }
+
+    /// Java: `((EndGame) factory.forName("EndGame")).pushSequence(new EndGame.SequenceParams(gameState, adminMode))`.
+    pub fn push_end_game_sequence(&mut self, admin_mode: bool) {
+        if let Some(driver) = &mut self.driver {
+            driver.push_end_game_sequence(admin_mode);
+        }
+    }
+
+    /// Java: `gameState.startNextStep()`.
+    pub fn start_next_step(&mut self) {
+        if let Some(driver) = &mut self.driver {
+            driver.run_until_prompt();
+        }
+    }
 }
 
 #[cfg(test)]
@@ -115,5 +136,57 @@ mod tests {
         let mut gs = GameState::new(1);
         assert_eq!(gs.generate_command_nr(), 1);
         assert_eq!(gs.generate_command_nr(), 2);
+    }
+
+    fn empty_team(id: &str) -> Team {
+        Team {
+            id: id.into(),
+            name: id.into(),
+            race: "Human".into(),
+            roster_id: "human".into(),
+            coach: "coach".into(),
+            rerolls: 0,
+            apothecaries: 0,
+            bribes: 0,
+            master_chefs: 0,
+            prayers_to_nuffle: 0,
+            bloodweiser_kegs: 0,
+            riotous_rookies: 0,
+            cheerleaders: 0,
+            assistant_coaches: 0,
+            fan_factor: 0,
+            dedicated_fans: 0,
+            team_value: 0,
+            treasury: 0,
+            special_rules: vec![],
+            players: vec![],
+            vampire_lord: false,
+            necromancer: false,
+        }
+    }
+
+    fn started_game_state() -> GameState {
+        let mut gs = GameState::new(1);
+        gs.start_game(empty_team("home"), empty_team("away"), Rules::Bb2025, 42);
+        gs
+    }
+
+    #[test]
+    fn clear_step_stack_and_push_end_game_sequence_drives_game_to_finished() {
+        let mut gs = started_game_state();
+        assert!(!gs.is_finished());
+        gs.clear_step_stack();
+        gs.push_end_game_sequence(true);
+        gs.start_next_step();
+        assert!(gs.is_finished());
+    }
+
+    #[test]
+    fn bridge_methods_are_no_ops_before_game_started() {
+        let mut gs = GameState::new(1);
+        gs.clear_step_stack();
+        gs.push_end_game_sequence(true);
+        gs.start_next_step();
+        assert!(!gs.is_started());
     }
 }

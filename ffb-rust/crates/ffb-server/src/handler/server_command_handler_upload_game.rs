@@ -26,28 +26,33 @@ impl ServerCommandHandlerUploadGame {
     /// `ServerRequestProcessor` — the request object construction is real,
     /// but enqueueing requires the (separately stubbed) request-processor
     /// queue and an HTTP backup-service client, neither of which is wired
-    /// yet. If the game is present, Java clears the step stack, marks the
-    /// conceding team on the game result, and pushes an `EndGame` sequence —
-    /// none of `GameState.step_stack`, `Game.game_result`/`TeamResult.conceded`,
-    /// or the `EndGame` sequence-generator wiring exist on the server-side
-    /// `GameState` wrapper yet, so that branch is also a narrow todo.
+    /// yet, so that branch remains a narrow todo (Phase ZZ or later — unrelated
+    /// to the step-stack/EndGame wiring closed here in Phase ZY.1).
     pub fn handle_command(&self, cmd: &InternalServerCommandUploadGame) -> bool {
-        let found = {
-            let gc = self.game_cache.lock().unwrap();
-            gc.get_game_state_by_id(cmd.game_id).is_some()
-        };
+        let mut gc = self.game_cache.lock().unwrap();
+        let game_state = gc.get_game_state_by_id_mut(cmd.game_id);
 
-        if !found {
-            let _request = self.build_load_replay_request(cmd);
-            // Java: getServer().getRequestProcessor().add(request);
-            todo!("Phase ZV: ServerRequestProcessor.add + HTTP backup-service request need wiring")
-        } else {
-            let _has_conceding_team = cmd.get_conceding_team_id().is_some();
-            // Java: gameState.getStepStack().clear();
-            //       game.getGameResult().getTeamResultHome/Away().setConceded(...);
-            //       ((EndGame) factory.forName("EndGame")).pushSequence(...);
-            //       gameState.startNextStep();
-            todo!("Phase ZV: GameState step-stack clear + GameResult.setConceded + EndGame sequence need wiring")
+        match game_state {
+            None => {
+                let _request = self.build_load_replay_request(cmd);
+                // Java: getServer().getRequestProcessor().add(request);
+                todo!("Phase ZZ: ServerRequestProcessor.add + HTTP backup-service request need wiring")
+            }
+            Some(game_state) => {
+                // Java: StringTool.isProvided(concedingTeamId) — non-null and non-empty.
+                if let Some(conceding_team_id) = cmd.get_conceding_team_id().filter(|s| !s.is_empty()) {
+                    if let Some(game) = game_state.get_game_mut() {
+                        let home_conceded = game.team_home.id == conceding_team_id;
+                        let away_conceded = game.team_away.id == conceding_team_id;
+                        game.game_result.home.conceded = home_conceded;
+                        game.game_result.away.conceded = away_conceded;
+                    }
+                }
+                game_state.clear_step_stack();
+                game_state.push_end_game_sequence(true);
+                game_state.start_next_step();
+                true
+            }
         }
     }
 
@@ -101,13 +106,68 @@ mod tests {
         assert!(result.is_err(), "missing-game branch requires ServerRequestProcessor + HTTP wiring (narrow todo!)");
     }
 
+    fn team(id: &str) -> ffb_model::model::team::Team {
+        ffb_model::model::team::Team {
+            id: id.into(),
+            name: id.into(),
+            race: "Human".into(),
+            roster_id: "human".into(),
+            coach: "coach".into(),
+            rerolls: 0,
+            apothecaries: 0,
+            bribes: 0,
+            master_chefs: 0,
+            prayers_to_nuffle: 0,
+            bloodweiser_kegs: 0,
+            riotous_rookies: 0,
+            cheerleaders: 0,
+            assistant_coaches: 0,
+            fan_factor: 0,
+            dedicated_fans: 0,
+            team_value: 0,
+            treasury: 0,
+            special_rules: vec![],
+            players: vec![],
+            vampire_lord: false,
+            necromancer: false,
+        }
+    }
+
+    fn started_game_id(gc: &Arc<Mutex<GameCache>>) -> i64 {
+        let mut guard = gc.lock().unwrap();
+        let game_id = guard.create_game_state();
+        let gs = guard.get_game_state_by_id_mut(game_id).unwrap();
+        gs.start_game(team("home"), team("away"), ffb_model::enums::Rules::Bb2025, 0);
+        game_id
+    }
+
     #[test]
-    fn handle_command_known_game_hits_end_game_sequence_todo() {
+    fn handle_command_known_game_clears_stack_and_drives_to_finished() {
         let gc = Arc::new(Mutex::new(GameCache::new()));
-        let game_id = { gc.lock().unwrap().create_game_state() };
-        let h = ServerCommandHandlerUploadGame::new(gc);
+        let game_id = started_game_id(&gc);
+        let h = ServerCommandHandlerUploadGame::new(gc.clone());
         let cmd = InternalServerCommandUploadGame::new(game_id);
-        let result = std::panic::catch_unwind(|| h.handle_command(&cmd));
-        assert!(result.is_err(), "known-game branch requires step-stack + EndGame sequence wiring (narrow todo!)");
+
+        assert!(h.handle_command(&cmd));
+
+        let guard = gc.lock().unwrap();
+        let gs = guard.get_game_state_by_id(game_id).unwrap();
+        assert!(gs.is_finished());
+    }
+
+    #[test]
+    fn handle_command_known_game_marks_conceding_team() {
+        let gc = Arc::new(Mutex::new(GameCache::new()));
+        let game_id = started_game_id(&gc);
+        let h = ServerCommandHandlerUploadGame::new(gc.clone());
+        let cmd = InternalServerCommandUploadGame::new_with_conceding(game_id, Some("home".to_string()));
+
+        assert!(h.handle_command(&cmd));
+
+        let mut guard = gc.lock().unwrap();
+        let gs = guard.get_game_state_by_id_mut(game_id).unwrap();
+        let game = gs.get_game().unwrap();
+        assert!(game.game_result.home.conceded);
+        assert!(!game.game_result.away.conceded);
     }
 }

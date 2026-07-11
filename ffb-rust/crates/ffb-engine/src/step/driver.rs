@@ -367,6 +367,9 @@ impl DriverStepStack {
     pub fn len(&self) -> usize { self.steps.len() }
     pub fn is_empty(&self) -> bool { self.steps.is_empty() }
 
+    /// Java: `StepStack.clear()`.
+    pub fn clear(&mut self) { self.steps.clear(); }
+
     pub fn goto_label(&mut self, label: &str) -> Result<(), String> {
         while let Some(top) = self.steps.last() {
             if top.label.as_deref() == Some(label) { return Ok(()); }
@@ -436,6 +439,24 @@ impl DriverGameState {
     }
 
     pub fn push_sequence(&mut self, seq: Vec<SequenceStep>) { self.stack.push_sequence(seq); }
+
+    /// Java: `gameState.getStepStack().clear()`. Also drops the separately-held
+    /// running step — Java's `StepStack` has no split "current step" concept, so a
+    /// faithful clear must reset both halves of this driver's split representation
+    /// or the just-running step would resume after the stack is emptied.
+    pub fn clear_step_stack(&mut self) {
+        self.stack.clear();
+        self.current = None;
+        self.pending_prompt = None;
+        self.forwarded = None;
+    }
+
+    /// Java: `((EndGame) factory.forName("EndGame")).pushSequence(new EndGame.SequenceParams(gameState, adminMode))`.
+    /// Reuses the same `end_game_sequence` helper the in-engine `StepEndTurn` variants push.
+    pub fn push_end_game_sequence(&mut self, admin_mode: bool) {
+        use crate::step::sequences::end_game_sequence;
+        self.push_sequence(end_game_sequence(admin_mode));
+    }
 
     fn apply_effects(&mut self, outcome: &mut StepOutcome) {
         self.events.append(&mut outcome.events);
@@ -525,4 +546,44 @@ pub(crate) fn new_game(seed: u64) -> DriverGameState {
     use crate::step::framework::test_team;
     use ffb_model::enums::Rules;
     DriverGameState::new(test_team("home", 5), test_team("away", 7), Rules::Bb2025, seed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn step_stack_clear_empties_stack() {
+        let mut stack = DriverStepStack::new();
+        stack.push(DriverStepEntry::new(Box::new(NoOpStep(StepId::NoOp))));
+        stack.push(DriverStepEntry::new(Box::new(NoOpStep(StepId::NoOp))));
+        assert_eq!(stack.len(), 2);
+        stack.clear();
+        assert!(stack.is_empty());
+    }
+
+    #[test]
+    fn clear_step_stack_drops_stack_and_current() {
+        let mut gs = new_game(1);
+        // A fresh game is parked waiting on a prompt — `current` is populated.
+        assert!(gs.current_prompt().is_some());
+        gs.stack.push(DriverStepEntry::new(Box::new(NoOpStep(StepId::NoOp))));
+        assert!(!gs.stack.is_empty());
+
+        gs.clear_step_stack();
+
+        assert!(gs.stack.is_empty());
+        assert!(gs.current.is_none());
+        assert!(gs.pending_prompt.is_none());
+    }
+
+    #[test]
+    fn push_end_game_sequence_pushes_seven_steps_and_drives_to_finished() {
+        let mut gs = new_game(2);
+        gs.clear_step_stack();
+        gs.push_end_game_sequence(true);
+        assert_eq!(gs.stack.len(), 7);
+        gs.run_until_prompt();
+        assert!(gs.is_finished());
+    }
 }
