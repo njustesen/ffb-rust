@@ -203,6 +203,17 @@ impl SessionManager {
     }
 }
 
+/// Not a Java method — implements `ffb_engine::server_replayer::ReplaySender` against this
+/// crate's `SessionManager` so `ServerReplayer::run` (which lives in `ffb-engine` and must
+/// not depend on `ffb-server`) can actually deliver replay batches to a live session. See
+/// `ServerReplayer::run`'s doc comment for why this is a trait impl rather than a direct
+/// dependency.
+impl ffb_engine::server_replayer::ReplaySender for SessionManager {
+    fn send(&self, session: SessionId, message: &str) {
+        self.send_to(session, message);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

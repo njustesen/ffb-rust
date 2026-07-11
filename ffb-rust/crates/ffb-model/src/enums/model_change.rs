@@ -143,6 +143,7 @@ pub enum ModelChangeId {
     FieldModelRemoveMoveSquare,
     FieldModelRemovePlayer,
     FieldModelRemovePlayerMarker,
+    FieldModelRemovePrayer,
     FieldModelRemovePushbackSquare,
     FieldModelRemoveTrackNumber,
     FieldModelRemoveTrapDoor,

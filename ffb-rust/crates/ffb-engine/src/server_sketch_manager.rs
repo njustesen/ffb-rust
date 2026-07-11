@@ -23,6 +23,13 @@ impl Sketch {
         &self.id
     }
 
+    /// Not a direct Java getter (Java exposes this state ad hoc where needed) — added so
+    /// other crates (e.g. `ffb-server`'s `ServerCommandHandlerJoinReplay`) can read the
+    /// coordinate list without reaching into a private field.
+    pub fn coordinates(&self) -> &[(i32, i32)] {
+        &self.coordinates
+    }
+
     pub fn add_coordinate(&mut self, x: i32, y: i32) {
         self.coordinates.push((x, y));
     }

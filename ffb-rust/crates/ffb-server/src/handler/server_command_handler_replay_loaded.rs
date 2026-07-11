@@ -1,21 +1,29 @@
 /// 1:1 translation of com.fumbbl.ffb.server.handler.ServerCommandHandlerReplayLoaded.
 use std::sync::{Arc, Mutex};
-use ffb_model::enums::{NetCommandId, ServerStatus};
+use ffb_engine::server_replayer::ServerReplayer;
+use ffb_model::enums::{GameStatus, NetCommandId, ServerStatus};
+use ffb_protocol::commands::server_command_game_state::ServerCommandGameState;
 use ffb_protocol::commands::server_command_status::ServerCommandStatus;
 use crate::game_cache::GameCache;
 use crate::model::received_command::SessionId;
 use crate::net::commands::internal_server_command::InternalServerCommand;
 use crate::net::commands::internal_server_command_replay_loaded::InternalServerCommandReplayLoaded;
 use crate::net::session_manager::SessionManager;
+use crate::util::server_replay::start_server_replay;
 
 pub struct ServerCommandHandlerReplayLoaded {
     game_cache: Arc<Mutex<GameCache>>,
     session_manager: Arc<Mutex<SessionManager>>,
+    replayer: Arc<Mutex<ServerReplayer>>,
 }
 
 impl ServerCommandHandlerReplayLoaded {
-    pub fn new(game_cache: Arc<Mutex<GameCache>>, session_manager: Arc<Mutex<SessionManager>>) -> Self {
-        Self { game_cache, session_manager }
+    pub fn new(
+        game_cache: Arc<Mutex<GameCache>>,
+        session_manager: Arc<Mutex<SessionManager>>,
+        replayer: Arc<Mutex<ServerReplayer>>,
+    ) -> Self {
+        Self { game_cache, session_manager, replayer }
     }
 
     /// Java: getId() — returns NetCommandId for REPLAY_LOADED.
@@ -25,31 +33,51 @@ impl ServerCommandHandlerReplayLoaded {
 
     /// Java: `handleCommand(ReceivedCommand)` — handles notification that a replay has loaded.
     ///
-    /// If the game is found in the cache, Java marks it `GameStatus.REPLAYING`
-    /// and starts the replay via `UtilServerReplay.startServerReplay`; neither
-    /// a status field on the server-side `GameState` wrapper nor the replay
-    /// engine exist in the Rust MVP yet, so that branch stays a narrow todo.
-    /// The "game not found" branch (send an `ERROR_UNKNOWN_GAME_ID` status to
-    /// the session) is fully real.
+    /// ```java
+    /// if (replayCommand.getGameId() > 0) {
+    ///     GameState gameState = getServer().getGameCache().getGameStateById(replayCommand.getGameId());
+    ///     if (gameState != null) {
+    ///         gameState.setStatus(GameStatus.REPLAYING);
+    ///         UtilServerReplay.startServerReplay(gameState, replayCommand.getReplayToCommandNr(), pReceivedCommand.getSession());
+    ///     } else {
+    ///         getServer().getCommunication().sendStatus(pReceivedCommand.getSession(), ServerStatus.ERROR_UNKNOWN_GAME_ID, null);
+    ///     }
+    /// }
+    /// return true;
+    /// ```
+    ///
+    /// Both branches are fully real: the found branch marks the game
+    /// `GameStatus::Replaying` and starts the replay for real via
+    /// `start_server_replay` (Phase AAB); the not-found branch sends
+    /// `ERROR_UNKNOWN_GAME_ID` as before.
     pub fn handle_command(&self, cmd: &InternalServerCommandReplayLoaded, session_id: SessionId) -> bool {
         if cmd.get_game_id() > 0 {
-            let found = {
-                let gc = self.game_cache.lock().unwrap();
-                gc.get_game_state_by_id(cmd.get_game_id()).is_some()
-            };
-
-            if found {
-                // Java: gameState.setStatus(GameStatus.REPLAYING);
-                //       UtilServerReplay.startServerReplay(gameState, replayToCommandNr, session);
-                todo!("Phase ZV: GameState.setStatus(REPLAYING) + UtilServerReplay.startServerReplay need wiring")
-            } else {
-                let status = ServerCommandStatus::new(
-                    ServerStatus::ErrorUnknownGameId,
-                    ServerStatus::ErrorUnknownGameId.message(),
-                );
-                let json = status.to_json_value().to_string();
-                let sm = self.session_manager.lock().unwrap();
-                sm.send_to(session_id, &json);
+            let mut gc = self.game_cache.lock().unwrap();
+            match gc.get_game_state_by_id_mut(cmd.get_game_id()) {
+                Some(game_state) => {
+                    game_state.set_status(GameStatus::Replaying);
+                    let message = ServerCommandGameState::new(game_state.get_game().cloned())
+                        .to_json_value()
+                        .to_string();
+                    let sm = self.session_manager.lock().unwrap();
+                    start_server_replay(
+                        Some((game_state.get_id(), message.as_str(), &game_state.game_log)),
+                        cmd.get_replay_to_command_nr(),
+                        Some(session_id),
+                        &sm,
+                        &self.replayer,
+                    );
+                }
+                None => {
+                    drop(gc);
+                    let status = ServerCommandStatus::new(
+                        ServerStatus::ErrorUnknownGameId,
+                        ServerStatus::ErrorUnknownGameId.message(),
+                    );
+                    let json = status.to_json_value().to_string();
+                    let sm = self.session_manager.lock().unwrap();
+                    sm.send_to(session_id, &json);
+                }
             }
         }
 
@@ -59,7 +87,11 @@ impl ServerCommandHandlerReplayLoaded {
 
 impl Default for ServerCommandHandlerReplayLoaded {
     fn default() -> Self {
-        Self::new(Arc::new(Mutex::new(GameCache::new())), Arc::new(Mutex::new(SessionManager::new())))
+        Self::new(
+            Arc::new(Mutex::new(GameCache::new())),
+            Arc::new(Mutex::new(SessionManager::new())),
+            Arc::new(Mutex::new(ServerReplayer::new())),
+        )
     }
 }
 
@@ -96,7 +128,7 @@ mod tests {
             let mut sm = sm_arc.lock().unwrap();
             sm.add_session(7, 0, "Coach".into(), ClientMode::PLAYER, true, vec![], tx);
         }
-        let h = ServerCommandHandlerReplayLoaded::new(gc, sm_arc);
+        let h = ServerCommandHandlerReplayLoaded::new(gc, sm_arc, Arc::new(Mutex::new(ServerReplayer::new())));
         let cmd = InternalServerCommandReplayLoaded::new(999, 0, "coach".to_string());
         assert!(h.handle_command(&cmd, 7));
         let sent = rx.try_recv().expect("expected an ERROR_UNKNOWN_GAME_ID status message");
@@ -104,13 +136,34 @@ mod tests {
     }
 
     #[test]
-    fn handle_command_known_game_hits_replay_engine_todo() {
+    fn handle_command_known_game_sets_status_and_starts_replay() {
         let gc = Arc::new(Mutex::new(GameCache::new()));
         let game_id = { gc.lock().unwrap().create_game_state() };
         let sm = Arc::new(Mutex::new(SessionManager::new()));
-        let h = ServerCommandHandlerReplayLoaded::new(gc, sm);
+        let replayer = Arc::new(Mutex::new(ServerReplayer::new()));
+        let h = ServerCommandHandlerReplayLoaded::new(Arc::clone(&gc), Arc::clone(&sm), Arc::clone(&replayer));
         let cmd = InternalServerCommandReplayLoaded::new(game_id, 5, "coach".to_string());
-        let result = std::panic::catch_unwind(|| h.handle_command(&cmd, 1));
-        assert!(result.is_err(), "found branch requires GameState.status + replay engine wiring (narrow todo!)");
+        assert!(h.handle_command(&cmd, 1));
+
+        assert_eq!(
+            gc.lock().unwrap().get_game_state_by_id(game_id).unwrap().get_status(),
+            Some(GameStatus::Replaying)
+        );
+        assert_eq!(replayer.lock().unwrap().queue_size(), 1);
+    }
+
+    #[test]
+    fn handle_command_known_game_sends_game_state_when_session_tracks_different_game() {
+        let gc = Arc::new(Mutex::new(GameCache::new()));
+        let game_id = { gc.lock().unwrap().create_game_state() };
+        let sm = Arc::new(Mutex::new(SessionManager::new()));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        sm.lock().unwrap().add_session(1, 0, "Coach".into(), ClientMode::PLAYER, true, vec![], tx);
+        let replayer = Arc::new(Mutex::new(ServerReplayer::new()));
+        let h = ServerCommandHandlerReplayLoaded::new(Arc::clone(&gc), Arc::clone(&sm), replayer);
+        let cmd = InternalServerCommandReplayLoaded::new(game_id, 0, "coach".to_string());
+        assert!(h.handle_command(&cmd, 1));
+        let msg = rx.try_recv().expect("expected a serverGameState message");
+        assert!(msg.contains("serverGameState"));
     }
 }
