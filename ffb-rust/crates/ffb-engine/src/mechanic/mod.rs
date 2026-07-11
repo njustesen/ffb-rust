@@ -20,6 +20,8 @@ use crate::mechanic::state_mechanic::StateMechanic as StateMechanicTrait;
 use ffb_mechanics::game_mechanic::GameMechanic as GameMechanicTrait;
 use ffb_mechanics::jump_mechanic::JumpMechanic as JumpMechanicTrait;
 use ffb_mechanics::ttm_mechanic::TtmMechanic as TtmMechanicTrait;
+use ffb_mechanics::pass_mechanic::PassMechanic as PassMechanicTrait;
+use ffb_mechanics::on_the_ball_mechanic::OnTheBallMechanic as OnTheBallMechanicTrait;
 
 /// Returns the edition-appropriate `RollMechanic` for the given rules.
 /// Mirrors Java's `game.getFactory(MECHANIC).forName(Mechanic.Type.ROLL.name())`.
@@ -76,6 +78,27 @@ pub fn ttm_mechanic_for(rules: Rules) -> Box<dyn TtmMechanicTrait> {
         Rules::Bb2025 | Rules::Common => Box::new(ffb_mechanics::bb2025::ttm_mechanic::TtmMechanic::new()),
         Rules::Bb2020 => Box::new(ffb_mechanics::bb2020::ttm_mechanic::TtmMechanic::new()),
         Rules::Bb2016 => Box::new(ffb_mechanics::bb2016::ttm_mechanic::TtmMechanic::new()),
+    }
+}
+
+/// Returns the edition-appropriate `PassMechanic` for the given rules.
+/// Mirrors Java's `game.getFactory(MECHANIC).forName(Mechanic.Type.PASS.name())`.
+pub fn pass_mechanic_for(rules: Rules) -> Box<dyn PassMechanicTrait> {
+    match rules {
+        Rules::Bb2025 | Rules::Common => Box::new(ffb_mechanics::bb2025::pass_mechanic::PassMechanic::new()),
+        Rules::Bb2020 => Box::new(ffb_mechanics::bb2020::pass_mechanic::PassMechanic::new()),
+        Rules::Bb2016 => Box::new(ffb_mechanics::bb2016::pass_mechanic::PassMechanic::new()),
+    }
+}
+
+/// Returns the edition-appropriate `OnTheBallMechanic` for the given rules.
+/// Mirrors Java's `game.getFactory(MECHANIC).forName(Mechanic.Type.ON_THE_BALL.name())`.
+pub fn on_the_ball_mechanic_for(rules: Rules) -> Box<dyn OnTheBallMechanicTrait> {
+    match rules {
+        Rules::Bb2025 | Rules::Common | Rules::Bb2020 => {
+            Box::new(ffb_mechanics::mixed::on_the_ball_mechanic::OnTheBallMechanic::new())
+        }
+        Rules::Bb2016 => Box::new(ffb_mechanics::bb2016::on_the_ball_mechanic::OnTheBallMechanic::new()),
     }
 }
 
