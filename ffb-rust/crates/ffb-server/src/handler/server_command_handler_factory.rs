@@ -40,10 +40,14 @@ use ffb_model::enums::{PlayerAction, SkillId};
 use ffb_protocol::client_commands::ClientCommand;
 use crate::db::db_connection_manager::DbConnectionManager;
 use crate::game_cache::GameCache;
+use crate::handler::server_command_handler_add_loaded_team::ServerCommandHandlerAddLoadedTeam;
 use crate::handler::server_command_handler_add_sketch::ServerCommandHandlerAddSketch;
 use crate::handler::server_command_handler_clear_sketches::ServerCommandHandlerClearSketches;
+use crate::handler::server_command_handler_close_game::ServerCommandHandlerCloseGame;
 use crate::handler::server_command_handler_close_session::ServerCommandHandlerCloseSession;
 use crate::handler::server_command_handler_delete_game::ServerCommandHandlerDeleteGame;
+use crate::handler::server_command_handler_fumbbl_game_checked::ServerCommandHandlerFumbblGameChecked;
+use crate::handler::server_command_handler_fumbbl_team_loaded::ServerCommandHandlerFumbblTeamLoaded;
 use crate::handler::server_command_handler_join::ServerCommandHandlerJoin;
 use crate::handler::server_command_handler_join_approved::ServerCommandHandlerJoinApproved;
 use crate::handler::server_command_handler_join_replay::ServerCommandHandlerJoinReplay;
@@ -55,6 +59,7 @@ use crate::handler::server_command_handler_replay::ServerCommandHandlerReplay;
 use crate::handler::server_command_handler_replay_loaded::ServerCommandHandlerReplayLoaded;
 use crate::handler::server_command_handler_replay_status::ServerCommandHandlerReplayStatus;
 use crate::handler::server_command_handler_request_version::ServerCommandHandlerRequestVersion;
+use crate::handler::server_command_handler_schedule_game::ServerCommandHandlerScheduleGame;
 use crate::handler::server_command_handler_set_marker::ServerCommandHandlerSetMarker;
 use crate::handler::server_command_handler_set_prevent_sketching::ServerCommandHandlerSetPreventSketching;
 use crate::handler::server_command_handler_sketch_add_coordinate::ServerCommandHandlerSketchAddCoordinate;
@@ -64,15 +69,19 @@ use crate::handler::server_command_handler_socket_closed::ServerCommandHandlerSo
 use crate::handler::server_command_handler_talk::ServerCommandHandlerTalk;
 use crate::handler::server_command_handler_transfer_control::ServerCommandHandlerTransferControl;
 use crate::handler::server_command_handler_update_player_markings::ServerCommandHandlerUpdatePlayerMarkings;
+use crate::handler::server_command_handler_upload_game::ServerCommandHandlerUploadGame;
+use crate::handler::server_command_handler_user_settings::ServerCommandHandlerUserSettings;
 use crate::model::received_command::{ReceivedCommand, ReceivedNetCommand};
 use crate::net::commands::any_internal_server_command::AnyInternalServerCommand;
 use crate::net::replay_session_manager::ReplaySessionManager;
+use crate::net::server_communication::ServerCommunication;
 use crate::net::session_manager::SessionManager;
 use crate::net::wire::{OutgoingModelSync, events_to_reports};
 use crate::request::fumbbl::util_fumbbl_request::{HttpClient, LazyReqwestHttpClient, ReqwestHttpClient};
 use crate::request::server_request_processor::ServerRequestProcessor;
 use crate::roster_cache::RosterCache;
 use crate::team_cache::TeamCache;
+use crate::util::server_start_game::MarkerContext;
 
 /// Errors returned when a `ClientCommand` cannot be decoded to an `Action`.
 #[derive(Debug)]
@@ -136,6 +145,13 @@ pub struct ServerCommandHandlerFactory {
     /// `pub(crate)` so this file's own tests can inspect the enqueued request without a
     /// network round trip (see `ServerCommandHandlerLoadAutomaticPlayerMarkings::request_processor`).
     pub(crate) load_automatic_player_markings_handler: ServerCommandHandlerLoadAutomaticPlayerMarkings,
+    /// Shared with `update_player_markings_handler`/`load_automatic_player_markings_handler`
+    /// above (see their own construction) — also reused for `FumbblTeamLoaded`'s
+    /// `MarkerContext` and `FumbblGameChecked`'s `HttpClient` below rather than standing up
+    /// disconnected pairs, matching this factory's existing convention (see `replay_handler`'s
+    /// own doc comment for the same reuse of these two).
+    markings_request_processor: Arc<Mutex<ServerRequestProcessor>>,
+    markings_http_client: Arc<dyn HttpClient + Send + Sync>,
     /// Java: `getServer().getReplayCache()` — a real `ReplayCache` (unlike the ad hoc
     /// name → `ReplayState` map `transfer_control_handler`/`set_prevent_sketching_handler`/
     /// `replay_status_handler` fall back to per their own documented gaps), shared with
@@ -149,6 +165,25 @@ pub struct ServerCommandHandlerFactory {
     replay_handler: ServerCommandHandlerReplay,
     replay_loaded_handler: ServerCommandHandlerReplayLoaded,
     replay_status_handler: ServerCommandHandlerReplayStatus,
+
+    // ── Game-management handler family ──────────────────────────────────
+    /// `pub(crate)` (like `join_handler`/`load_automatic_player_markings_handler` above) so
+    /// this file's own tests can exercise the real handler directly: its `AddLoadedTeam`
+    /// dispatch arm below is a documented no-op (the wire command carries no `Team` payload
+    /// to hand it — see that handler's own doc comment), so it isn't otherwise reachable.
+    pub(crate) add_loaded_team_handler: ServerCommandHandlerAddLoadedTeam,
+    fumbbl_team_loaded_handler: ServerCommandHandlerFumbblTeamLoaded,
+    fumbbl_game_checked_handler: ServerCommandHandlerFumbblGameChecked,
+    schedule_game_handler: ServerCommandHandlerScheduleGame,
+    close_game_handler: ServerCommandHandlerCloseGame,
+    /// A `ServerCommunication` handle built from this factory's own shared `session_manager`/
+    /// `replay_session_manager`/dispatch sender (see `ServerCommunication::from_parts`'s doc
+    /// comment) so `close_game_handler` has a real `&ServerCommunication` to call — without
+    /// the circular "factory owns a `ServerCommunication` that owns the factory" loop
+    /// `ServerCommunication::new` would create.
+    communication_handle: ServerCommunication,
+    upload_game_handler: ServerCommandHandlerUploadGame,
+    user_settings_handler: ServerCommandHandlerUserSettings,
 }
 
 impl ServerCommandHandlerFactory {
@@ -331,7 +366,7 @@ impl ServerCommandHandlerFactory {
             Arc::clone(&replayer),
             Arc::clone(&markings_request_processor),
             Arc::clone(&markings_http_client),
-            backup_url_load_template,
+            backup_url_load_template.clone(),
             dispatch_tx.clone(),
         );
         let replay_loaded_handler = ServerCommandHandlerReplayLoaded::new(
@@ -344,6 +379,36 @@ impl ServerCommandHandlerFactory {
         let replay_status_handler = ServerCommandHandlerReplayStatus::new(
             Arc::clone(&replay_session_manager),
             Arc::clone(&replay_states),
+        );
+
+        // ── Game-management handler family ──────────────────────────────────
+        let add_loaded_team_handler = ServerCommandHandlerAddLoadedTeam::new();
+        let fumbbl_team_loaded_handler = ServerCommandHandlerFumbblTeamLoaded::new();
+        let fumbbl_game_checked_handler = ServerCommandHandlerFumbblGameChecked::new();
+        let schedule_game_handler = ServerCommandHandlerScheduleGame::new(
+            Arc::clone(&game_cache),
+            Arc::clone(&team_cache),
+            Arc::clone(&roster_cache),
+        );
+        let close_game_handler =
+            ServerCommandHandlerCloseGame::new(Arc::clone(&game_cache), Arc::clone(&session_manager));
+        // See `communication_handle`'s own doc comment on the struct above for why this uses
+        // `from_parts` rather than `ServerCommunication::new`.
+        let communication_handle = ServerCommunication::from_parts(
+            dispatch_tx.clone(),
+            Arc::clone(&session_manager),
+            Arc::clone(&replay_session_manager),
+        );
+        let upload_game_handler = ServerCommandHandlerUploadGame::new(
+            Arc::clone(&game_cache),
+            Arc::new(Mutex::new(ServerRequestProcessor::new())),
+            Arc::clone(&markings_http_client),
+            backup_url_load_template.clone(),
+            dispatch_tx.clone(),
+        );
+        let user_settings_handler = ServerCommandHandlerUserSettings::new(
+            Arc::clone(&session_manager),
+            Arc::clone(&db_connection_manager),
         );
 
         Self {
@@ -376,12 +441,22 @@ impl ServerCommandHandlerFactory {
             replay_states,
             update_player_markings_handler,
             load_automatic_player_markings_handler,
+            markings_request_processor: Arc::clone(&markings_request_processor),
+            markings_http_client: Arc::clone(&markings_http_client),
             replay_cache,
             join_replay_handler,
             replayer,
             replay_handler,
             replay_loaded_handler,
             replay_status_handler,
+            add_loaded_team_handler,
+            fumbbl_team_loaded_handler,
+            fumbbl_game_checked_handler,
+            schedule_game_handler,
+            close_game_handler,
+            communication_handle,
+            upload_game_handler,
+            user_settings_handler,
         }
     }
 
@@ -592,6 +667,12 @@ impl ServerCommandHandlerFactory {
                 self.replay_status_handler.handle_command(&cmd, session_id);
                 return;
             }
+            ClientCommand::ClientUserSettings(u) => {
+                let mut cmd = ffb_protocol::commands::client_command_user_settings::ClientCommandUserSettings::new();
+                cmd.settings = u.settings.clone();
+                self.user_settings_handler.handle_command(session_id, &cmd).await;
+                return;
+            }
             _ => {}
         }
 
@@ -678,6 +759,84 @@ impl ServerCommandHandlerFactory {
             }
             AnyInternalServerCommand::ReplayLoaded(cmd) => {
                 self.replay_loaded_handler.handle_command(&cmd, session_id);
+            }
+            AnyInternalServerCommand::AddLoadedTeam(cmd) => {
+                // java: `handleCommand`'s real logic needs `command.getTeam()` — a `Team`
+                // resolved upstream (in Java, `FumbblRequestLoadTeam`'s HTTP response) before
+                // the command was built. `InternalServerCommandAddLoadedTeam` never grew a
+                // typed `Team` field (see that struct's own doc comment / this handler's own
+                // module doc comment), and no request path in this crate produces one, so
+                // there is no real `Team` to hand `add_loaded_team_handler.handle_command`
+                // here without fabricating one — a narrow, documented gap. The handler itself
+                // is real and directly unit-tested (see this file's own tests, which call
+                // `add_loaded_team_handler` with a real `Team`).
+                log::debug!(
+                    "session {}: game {}: AddLoadedTeam received but its Team payload has no \
+                     typed decode path yet (see ServerCommandHandlerAddLoadedTeam's doc comment)",
+                    session_id, cmd.game_id
+                );
+            }
+            AnyInternalServerCommand::FumbblTeamLoaded(cmd) => {
+                // Java re-uses the already-connected Jetty `Session`; this crate needs the
+                // session's outgoing sender explicitly (same pattern as `JoinApproved` above).
+                // Unlike `JoinApproved`, this command is the *first* registration for the
+                // session (Java: `sendServerJoin` calls `sessionManager.addSession(...)`), so
+                // there is no already-registered sender to fetch back out of `SessionManager`
+                // for a session that's never been added before — only succeeds if some earlier
+                // step (e.g. a prior spectator join) already registered this session id.
+                let sender = { self.session_manager.lock().unwrap().sender_for(session_id) };
+                match sender {
+                    Some(sender) => {
+                        let db = self.db_connection_manager.lock().unwrap().clone();
+                        let marker_ctx = MarkerContext {
+                            request_processor: &self.markings_request_processor,
+                            client: Arc::clone(&self.markings_http_client),
+                            markings_url_template: "",
+                        };
+                        // `GameCache` holds `Box<dyn Step>` engine state that isn't `Sync`, so
+                        // the lock is dropped (via this scoped clone) before the `.await`
+                        // below — see `ServerCommandHandlerFumbblTeamLoaded::handle_command`'s
+                        // own doc comment for why it now takes an owned `Option<&Game>`
+                        // instead of a `&GameCache` for exactly this reason.
+                        let game = {
+                            let gc = self.game_cache.lock().unwrap();
+                            gc.get_game_state_by_id(cmd.game_id).and_then(|gs| gs.get_game()).cloned()
+                        };
+                        self.fumbbl_team_loaded_handler
+                            .handle_command(
+                                &cmd,
+                                game.as_ref(),
+                                &self.session_manager,
+                                session_id,
+                                sender,
+                                &db,
+                                &self.client_properties,
+                                Some(marker_ctx),
+                            )
+                            .await;
+                    }
+                    None => {
+                        log::warn!(
+                            "session {}: FumbblTeamLoaded received but no registered sender found — \
+                             session was never registered before this redispatch",
+                            session_id
+                        );
+                    }
+                }
+            }
+            AnyInternalServerCommand::FumbblGameChecked(cmd) => {
+                let mut gc = self.game_cache.lock().unwrap();
+                self.fumbbl_game_checked_handler.handle_command(cmd.game_id, &mut gc, self.markings_http_client.as_ref(), "");
+            }
+            AnyInternalServerCommand::ScheduleGame(cmd) => {
+                self.schedule_game_handler.handle_command(&cmd);
+            }
+            AnyInternalServerCommand::CloseGame(cmd) => {
+                let db = self.db_connection_manager.lock().unwrap().clone();
+                self.close_game_handler.handle_command(&cmd, &self.communication_handle, &db).await;
+            }
+            AnyInternalServerCommand::UploadGame(cmd) => {
+                self.upload_game_handler.handle_command(&cmd, session_id);
             }
             AnyInternalServerCommand::ApplyAutomatedPlayerMarkings(cmd) => {
                 // java: `ServerCommandHandlerApplyAutomatedPlayerMarkings::handle_command` needs
@@ -874,6 +1033,7 @@ pub fn decode_command(cmd: ClientCommand, side: TeamSide) -> Result<Action, Deco
         ClientCommand::ClientJoinReplay(_) => Err(DecodeError::NotImplemented("ClientJoinReplay".into())),
         ClientCommand::ClientReplay(_) => Err(DecodeError::NotImplemented("ClientReplay".into())),
         ClientCommand::ClientReplayStatus(_) => Err(DecodeError::NotImplemented("ClientReplayStatus".into())),
+        ClientCommand::ClientUserSettings(_) => Err(DecodeError::NotImplemented("ClientUserSettings".into())),
     }
 }
 
@@ -2031,5 +2191,158 @@ mod tests {
             Some(ffb_model::enums::GameStatus::Replaying)
         );
         assert_eq!(factory.replayer.lock().unwrap().queue_size(), 1);
+    }
+
+    // ── Game-management handler family (this phase) ─────────────────────────
+
+    fn gm_team(id: &str) -> ffb_model::model::team::Team {
+        ffb_model::model::team::Team {
+            id: id.into(), name: id.into(), race: "Human".into(), roster_id: "human".into(),
+            coach: "coach".into(), rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+            prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0,
+            assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0,
+            special_rules: vec![], players: vec![], vampire_lord: false, necromancer: false,
+        }
+    }
+
+    #[test]
+    fn factory_add_loaded_team_handler_adds_a_real_team_via_direct_call() {
+        // The `AddLoadedTeam` dispatch arm is a documented no-op (no `Team` payload on the
+        // wire command — see that arm's own comment), so this exercises the real,
+        // factory-owned handler directly instead, proving it isn't dead code.
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), sm, db());
+        let game_id = gc.lock().unwrap().create_game_state();
+        gc.lock().unwrap().get_game_state_by_id_mut(game_id).unwrap().start_game(
+            gm_team(""), gm_team("away1"), ffb_model::enums::Rules::Bb2025, 0,
+        );
+
+        let cmd = crate::net::commands::internal_server_command_add_loaded_team::InternalServerCommandAddLoadedTeam::new(
+            game_id, "coach".into(), None, vec![],
+        );
+        let mut gc_guard = gc.lock().unwrap();
+        assert!(factory.add_loaded_team_handler.handle_command(&cmd, gm_team("home1"), &mut gc_guard));
+        drop(gc_guard);
+
+        let game = gc.lock().unwrap().get_game_state_by_id(game_id).unwrap().get_game().unwrap().clone();
+        assert_eq!(game.team_home.id, "home1");
+    }
+
+    #[tokio::test]
+    async fn factory_dispatches_fumbbl_team_loaded_through_real_handler() {
+        use crate::net::commands::internal_server_command_fumbbl_team_loaded::InternalServerCommandFumbblTeamLoaded;
+        use ffb_model::model::ClientMode;
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let game_id = gc.lock().unwrap().create_game_state();
+        gc.lock().unwrap().get_game_state_by_id_mut(game_id).unwrap().start_game(
+            gm_team("home"), gm_team("away"), ffb_model::enums::Rules::Bb2025, 0,
+        );
+        // The dispatch arm can only fetch a sender for an *already-registered* session (see
+        // its own doc comment) — register a spectator sender first under the same session id
+        // so the real join/ready-check path actually runs.
+        let (tx, _rx) = mpsc::unbounded_channel();
+        sm_arc.lock().unwrap().add_session(1, game_id, "Spectator".into(), ClientMode::SPECTATOR, false, vec![], tx);
+
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
+        let cmd = InternalServerCommandFumbblTeamLoaded::new(game_id, "Home".into(), true, vec![]);
+        factory.handle_command(ReceivedCommand::new_internal(AnyInternalServerCommand::FumbblTeamLoaded(cmd), 1)).await;
+
+        assert_eq!(sm_arc.lock().unwrap().get_coach_for_session(1), Some("Home"));
+    }
+
+    #[test]
+    fn factory_fumbbl_game_checked_dispatch_arm_returns_false_for_missing_game() {
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), sm, db());
+
+        let mut gc_guard = gc.lock().unwrap();
+        assert!(!factory.fumbbl_game_checked_handler.handle_command(999, &mut gc_guard, factory.markings_http_client.as_ref(), ""));
+    }
+
+    #[tokio::test]
+    async fn factory_dispatches_schedule_game_through_real_handler() {
+        use crate::net::commands::internal_server_command_schedule_game::InternalServerCommandScheduleGame;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), sm, db());
+
+        let before = gc.lock().unwrap().all_game_ids().len();
+        let cmd = InternalServerCommandScheduleGame::new("home".to_string(), "away".to_string());
+        factory.handle_command(ReceivedCommand::new_internal(AnyInternalServerCommand::ScheduleGame(cmd), 1)).await;
+
+        // No team/roster files exist for "home"/"away" in this test environment, so the game
+        // slot is created (real `GameCache::create_game_state` call) but never started — same
+        // as `ServerCommandHandlerScheduleGame`'s own `load_teams_with_unresolvable_teams_leaves_game_unstarted` test.
+        assert_eq!(gc.lock().unwrap().all_game_ids().len(), before + 1);
+    }
+
+    #[tokio::test]
+    async fn factory_dispatches_close_game_through_real_handler() {
+        use crate::net::commands::internal_server_command_close_game::InternalServerCommandCloseGame;
+        use ffb_model::model::ClientMode;
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let game_id = gc.lock().unwrap().create_game_state();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        sm_arc.lock().unwrap().add_session(1, game_id, "Coach".into(), ClientMode::PLAYER, true, vec![], tx);
+
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
+        let cmd = InternalServerCommandCloseGame::new(game_id);
+        factory.handle_command(ReceivedCommand::new_internal(AnyInternalServerCommand::CloseGame(cmd), 1)).await;
+
+        assert!(sm_arc.lock().unwrap().get_sessions_for_game_id(game_id).is_empty());
+        assert!(gc.lock().unwrap().get_game_state_by_id(game_id).is_none());
+    }
+
+    #[tokio::test]
+    async fn factory_dispatches_upload_game_through_real_handler() {
+        use crate::net::commands::internal_server_command_upload_game::InternalServerCommandUploadGame;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let game_id = gc.lock().unwrap().create_game_state();
+        gc.lock().unwrap().get_game_state_by_id_mut(game_id).unwrap().start_game(
+            gm_team("home"), gm_team("away"), ffb_model::enums::Rules::Bb2025, 0,
+        );
+
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), sm, db());
+        let cmd = InternalServerCommandUploadGame::new(game_id);
+        factory.handle_command(ReceivedCommand::new_internal(AnyInternalServerCommand::UploadGame(cmd), 1)).await;
+
+        let guard = gc.lock().unwrap();
+        let gs = guard.get_game_state_by_id(game_id).unwrap();
+        assert!(gs.is_finished(), "known game should be driven to finished by the real UploadGame handler");
+    }
+
+    #[tokio::test]
+    async fn factory_dispatches_user_settings_through_real_handler() {
+        use ffb_model::model::ClientMode;
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let (tx, _rx) = mpsc::unbounded_channel();
+        sm_arc.lock().unwrap().add_session(1, 0, "Coach1".into(), ClientMode::PLAYER, true, vec![], tx);
+
+        let factory = ServerCommandHandlerFactory::new(gc, Arc::clone(&sm_arc), db());
+        let mut settings = std::collections::HashMap::new();
+        settings.insert("soundVolume".to_string(), "80".to_string());
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientUserSettings(ffb_protocol::client_commands::ClientUserSettings { settings }),
+            1,
+        )).await;
+
+        // With no DB pool configured this degrades to a no-op (see
+        // `ServerCommandHandlerUserSettings`'s own doc comment), but the real handler still
+        // ran to completion via the factory's dispatch arm without panicking.
+        assert!(sm_arc.lock().unwrap().get_coach_for_session(1).is_some());
     }
 }

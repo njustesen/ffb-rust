@@ -45,6 +45,22 @@ impl ServerCommunication {
         Self { tx, session_manager, replay_session_manager }
     }
 
+    /// Builds a `ServerCommunication` handle sharing an existing `tx`/`session_manager`/
+    /// `replay_session_manager` triple, instead of spawning a fresh dispatch task and private
+    /// `ReplaySessionManager` the way `new` does. `ServerCommandHandlerFactory` uses this to
+    /// get a real `&ServerCommunication` to hand to `ServerCommandHandlerCloseGame` (Java:
+    /// `getServer().getCommunication()`) — it already owns these same three cheaply-cloneable
+    /// handles, and calling `new` here would spawn a second, disconnected dispatch loop (and,
+    /// since the factory itself is what `new`'s spawned task owns, calling it from inside the
+    /// factory's own constructor would recurse indefinitely).
+    pub(crate) fn from_parts(
+        tx: mpsc::UnboundedSender<ReceivedCommand>,
+        session_manager: Arc<Mutex<SessionManager>>,
+        replay_session_manager: Arc<Mutex<ReplaySessionManager>>,
+    ) -> Self {
+        Self { tx, session_manager, replay_session_manager }
+    }
+
     /// Java: `receiveCommand(ReceivedCommand)` — enqueue for dispatch.
     pub fn receive_command(&self, cmd: ReceivedCommand) {
         if let Err(e) = self.tx.send(cmd) {

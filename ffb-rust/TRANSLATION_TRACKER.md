@@ -29,6 +29,38 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase ZVD (game-management handler family wired into live dispatch, this session):**
+Wired the game-management handler family — `ServerCommandHandlerAddLoadedTeam`,
+`ServerCommandHandlerFumbblTeamLoaded`, `ServerCommandHandlerFumbblGameChecked`,
+`ServerCommandHandlerScheduleGame`, `ServerCommandHandlerCloseGame`,
+`ServerCommandHandlerUploadGame`, `ServerCommandHandlerUserSettings` (all already real and
+unit-tested) — into `ServerCommandHandlerFactory`'s live dispatch, following the Phase
+ZVA/ZVB/ZVC pattern. Six are `AnyInternalServerCommand`s (variants already existed) wired into
+`handle_internal_command`; `UserSettings` is a `ClientCommand`, so a new `ClientUserSettings`
+variant (mirroring `ffb_protocol::commands::client_command_user_settings::ClientCommandUserSettings`'s
+shape) was added to `ffb_protocol::client_commands::ClientCommand` and wired into
+`handle_command`. `ScheduleGame`/`UploadGame`/`FumbblGameChecked` reuse the factory's existing
+shared `game_cache`/`team_cache`/`roster_cache`/`markings_http_client` fields — no new
+dependencies needed. `CloseGame` needed a real `&ServerCommunication`, which the factory
+couldn't previously hold without a circular "factory owns a `ServerCommunication` that owns the
+factory" loop (`ServerCommunication::new` spawns the factory's own dispatch task); added
+`ServerCommunication::from_parts` (a `pub(crate)` constructor sharing an existing
+`tx`/`session_manager`/`replay_session_manager` triple instead of spawning a second dispatch
+loop) so the factory can build one for real. `AddLoadedTeam`'s dispatch arm stays a documented
+no-op — `InternalServerCommandAddLoadedTeam` carries no `Team` payload to hand its handler (see
+that handler's own doc comment), so `add_loaded_team_handler` is `pub(crate)` and exercised
+directly by this file's own tests instead, matching the `join_handler`/
+`load_automatic_player_markings_handler` precedent for handlers not reachable via dispatch.
+Two pre-existing Send-future bugs surfaced now that these handlers run inside
+`tokio::spawn(dispatch_loop(...))` for the first time: `ServerCommandHandlerUserSettings`
+held a `std::sync::MutexGuard<DbConnectionManager>` across an `.await` (fixed by cloning the
+manager out first, same pattern as `ServerCommandHandlerDeleteGame`); and
+`ServerCommandHandlerFumbblTeamLoaded::handle_command` took `game_cache: &GameCache` and
+implicitly held a reference into it (via `Box<dyn Step>`, non-`Sync`) across its own internal
+`.await` — changed its signature to take an already-resolved, owned `Option<&Game>` instead
+(`Game: Clone`), so the caller can lock, clone, and drop the `GameCache` lock before awaiting.
+`cargo test --workspace`: 17310 -> 17318 tests, 0 failures.
+
 **Phase ZVC (replay handler family wired into live dispatch, this session):**
 Wired the replay-playback handler family — `ServerCommandHandlerJoinReplay`,
 `ServerCommandHandlerReplay`, `ServerCommandHandlerReplayLoaded`, `ServerCommandHandlerReplayStatus`

@@ -69,7 +69,13 @@ impl ServerCommandHandlerUserSettings {
                     })
                     .collect();
 
-                let manager = self.db_connection_manager.lock().unwrap();
+                // `DbConnectionManager` is cloned out from behind the `std::sync::Mutex`
+                // before any `.await` (see that struct's own `Clone` doc comment, and
+                // `ServerCommandHandlerDeleteGame::handle_command` for the same pattern) so
+                // this handler's future stays `Send` — required now that it's reachable from
+                // `ServerCommandHandlerFactory::handle_command`, which runs inside
+                // `tokio::spawn(dispatch_loop(...))`.
+                let manager = self.db_connection_manager.lock().unwrap().clone();
                 if manager.pool_ready() {
                     if let Ok(mut conn) = manager.open_db_connection().await {
                         let _ = DbUserSettingsDelete::new().execute(&mut conn, &coach).await;

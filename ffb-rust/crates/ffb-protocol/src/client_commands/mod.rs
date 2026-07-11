@@ -121,6 +121,8 @@ pub enum ClientCommand {
     ClientReplay(ClientReplay),
     /// Push a replay-playback status update (speed/running/forward/skip).
     ClientReplayStatus(ClientReplayStatus),
+    /// Store per-user preference settings.
+    ClientUserSettings(ClientUserSettings),
 }
 
 // ── Individual client command structs ─────────────────────────────────────────
@@ -460,6 +462,15 @@ pub struct ClientReplayStatus {
     pub skip: bool,
 }
 
+/// Mirrors the field shape of `ffb_protocol::commands::client_command_user_settings::ClientCommandUserSettings`
+/// (this wire enum's `settings` map is a plain `String`-keyed map rather than that struct's
+/// `CommonProperty`-keyed one, matching the convention already used by other `Client*` variants
+/// here that carry a simplified shape of their `commands::*` counterpart).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ClientUserSettings {
+    pub settings: std::collections::HashMap<String, String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -641,5 +652,12 @@ mod tests {
             index: 1,
             coach: Some("Coach".into()),
         }));
+    }
+
+    #[test]
+    fn client_user_settings_round_trip() {
+        let mut settings = std::collections::HashMap::new();
+        settings.insert("soundVolume".to_string(), "80".to_string());
+        rt(&ClientCommand::ClientUserSettings(ClientUserSettings { settings }));
     }
 }
