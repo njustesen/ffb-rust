@@ -1,7 +1,7 @@
 use crate::types::FieldCoordinate;
 
 /// 1:1 translation of `com.fumbbl.ffb.marking.FieldMarker`.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FieldMarker {
     /// Java: coordinate
     pub coordinate: Option<FieldCoordinate>,

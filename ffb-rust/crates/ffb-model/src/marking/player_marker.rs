@@ -1,5 +1,5 @@
 /// 1:1 translation of `com.fumbbl.ffb.marking.PlayerMarker`.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct PlayerMarker {
     /// Java: fPlayerId
     pub player_id: Option<String>,
@@ -28,6 +28,24 @@ impl PlayerMarker {
             player_id: self.player_id.clone(),
             home_text: self.away_text.clone(),
             away_text: self.home_text.clone(),
+        }
+    }
+
+    /// Java: `PlayerMarker.toJsonValue()`.
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "playerId": self.player_id,
+            "homeText": self.home_text,
+            "awayText": self.away_text,
+        })
+    }
+
+    /// Java: `PlayerMarker.initFrom(source, jsonValue)`.
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_id: json.get("playerId").and_then(|v| v.as_str()).map(str::to_string),
+            home_text: json.get("homeText").and_then(|v| v.as_str()).map(str::to_string),
+            away_text: json.get("awayText").and_then(|v| v.as_str()).map(str::to_string),
         }
     }
 }

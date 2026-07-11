@@ -40,6 +40,24 @@ impl FieldCoordinate {
         FieldCoordinate { x: self.x + dx, y: self.y + dy }
     }
 
+    /// Java: `UtilJson.toJsonValue(FieldCoordinate)` — wire shape is a
+    /// 2-element `[x, y]` array, not an object.
+    pub fn to_json_value(self) -> serde_json::Value {
+        serde_json::json!([self.x, self.y])
+    }
+
+    /// Java: `UtilJson.toFieldCoordinate(JsonValue)`.
+    pub fn from_json(json: &serde_json::Value) -> Option<FieldCoordinate> {
+        let arr = json.as_array()?;
+        if arr.len() != 2 {
+            return None;
+        }
+        Some(FieldCoordinate {
+            x: arr[0].as_i64()? as i32,
+            y: arr[1].as_i64()? as i32,
+        })
+    }
+
     /// Chebyshev distance (max of abs dx, abs dy).
     pub fn distance_in_steps(self, other: FieldCoordinate) -> i32 {
         (self.x - other.x).abs().max((self.y - other.y).abs())
@@ -241,6 +259,25 @@ impl FieldCoordinateBounds {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn to_json_value_is_two_element_array() {
+        let fc = FieldCoordinate::new(4, 9);
+        assert_eq!(fc.to_json_value(), serde_json::json!([4, 9]));
+    }
+
+    #[test]
+    fn from_json_round_trip() {
+        let fc = FieldCoordinate::new(11, 2);
+        let json = fc.to_json_value();
+        assert_eq!(FieldCoordinate::from_json(&json), Some(fc));
+    }
+
+    #[test]
+    fn from_json_rejects_wrong_shape() {
+        assert_eq!(FieldCoordinate::from_json(&serde_json::json!([1])), None);
+        assert_eq!(FieldCoordinate::from_json(&serde_json::json!({"x":1,"y":2})), None);
+    }
 
     #[test]
     fn distance_chebyshev() {

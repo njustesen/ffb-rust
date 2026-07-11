@@ -114,6 +114,25 @@ impl ApothecaryType {
             ApothecaryType::Plague => "Plague Doctor",
         }
     }
+
+    /// Java: `ApothecaryType.name()` (enum constant name).
+    pub fn name(self) -> &'static str {
+        match self {
+            ApothecaryType::Team => "TEAM",
+            ApothecaryType::Wandering => "WANDERING",
+            ApothecaryType::Plague => "PLAGUE",
+        }
+    }
+
+    /// Java: `ApothecaryType.valueOf(name)`.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "TEAM" => Some(ApothecaryType::Team),
+            "WANDERING" => Some(ApothecaryType::Wandering),
+            "PLAGUE" => Some(ApothecaryType::Plague),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]

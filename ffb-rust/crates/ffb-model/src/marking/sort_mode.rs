@@ -14,6 +14,14 @@ impl SortMode {
             _ => None,
         }
     }
+
+    /// Java: `SortMode.name()` (enum constant name).
+    pub fn name(self) -> &'static str {
+        match self {
+            SortMode::Default => "DEFAULT",
+            SortMode::None => "NONE",
+        }
+    }
 }
 
 #[cfg(test)]

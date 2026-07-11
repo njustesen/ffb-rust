@@ -44,6 +44,94 @@ pub enum SeriousInjuryKind {
 }
 
 impl SeriousInjuryKind {
+    /// Java: enum constant `.name()` used as the wire string by
+    /// `JsonEnumWithNameOption` (`IJsonOption.SERIOUS_INJURY`). BB2020/BB2025's
+    /// `SeriousInjury.java` and BB2016's `SeriousInjury.java` are separate Java
+    /// enums; this consolidated Rust enum maps each variant to its source
+    /// constant name. `SmashedKneeMa` (bb2020/bb2025 `SMASHED_KNEE`) and
+    /// `SmashedKneeB2016` (bb2016 `SMASHED_KNEE`) share Java's declared text —
+    /// only the enclosing (edition-specific) Java type disambiguates them, so
+    /// `from_name` here resolves to `SmashedKneeMa` for that string.
+    /// `ThighStrain`, `ThumbSprain`, `BrokenShoulder`, `ShatteredWrist`,
+    /// `SmashedElbow`, `BrokenNose` have no confirmed Java source constant
+    /// (not found in `bb2016/SeriousInjury.java`); their wire strings are a
+    /// best-effort SCREAMING_SNAKE_CASE of the Rust variant name pending
+    /// verification against the actual Java source.
+    pub fn name(self) -> &'static str {
+        match self {
+            SeriousInjuryKind::SeriouslyHurt => "SERIOUSLY_HURT",
+            SeriousInjuryKind::SeriousInjuryNi => "SERIOUS_INJURY",
+            SeriousInjuryKind::HeadInjuryAv => "HEAD_INJURY",
+            SeriousInjuryKind::SmashedKneeMa => "SMASHED_KNEE",
+            SeriousInjuryKind::BrokenArmPa => "BROKEN_ARM",
+            SeriousInjuryKind::NeckInjuryAg => "NECK_INJURY",
+            SeriousInjuryKind::DislocatedHipAg => "DISLOCATED_HIP",
+            SeriousInjuryKind::DislocatedShoulderSt => "DISLOCATED_SHOULDER",
+            SeriousInjuryKind::Dead => "DEAD",
+            SeriousInjuryKind::BrokenRibs => "BROKEN_RIBS",
+            SeriousInjuryKind::Groin => "GROIN_STRAIN",
+            SeriousInjuryKind::GougedEye => "GOUGED_EYE",
+            SeriousInjuryKind::BrokenJaw => "BROKEN_JAW",
+            SeriousInjuryKind::FracturedArm => "FRACTURED_ARM",
+            SeriousInjuryKind::FracturedLeg => "FRACTURED_LEG",
+            SeriousInjuryKind::SmashedHand => "SMASHED_HAND",
+            SeriousInjuryKind::PinchedNerve => "PINCHED_NERVE",
+            SeriousInjuryKind::DamagedBack => "DAMAGED_BACK",
+            SeriousInjuryKind::SmashedKneeB2016 => "SMASHED_KNEE",
+            SeriousInjuryKind::SmashedHip => "SMASHED_HIP",
+            SeriousInjuryKind::SmashedAnkle => "SMASHED_ANKLE",
+            SeriousInjuryKind::SeriousConcussion => "SERIOUS_CONCUSSION",
+            SeriousInjuryKind::FracturedSkull => "FRACTURED_SKULL",
+            SeriousInjuryKind::BrokenNeck => "BROKEN_NECK",
+            SeriousInjuryKind::BrokenCollarBone => "SMASHED_COLLAR_BONE",
+            SeriousInjuryKind::Poisoned => "POISONED",
+            SeriousInjuryKind::ThighStrain => "THIGH_STRAIN",
+            SeriousInjuryKind::ThumbSprain => "THUMB_SPRAIN",
+            SeriousInjuryKind::BrokenShoulder => "BROKEN_SHOULDER",
+            SeriousInjuryKind::ShatteredWrist => "SHATTERED_WRIST",
+            SeriousInjuryKind::SmashedElbow => "SMASHED_ELBOW",
+            SeriousInjuryKind::BrokenNose => "BROKEN_NOSE",
+        }
+    }
+
+    /// Java: `SeriousInjury.valueOf(name)` via the appropriate edition factory.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "SERIOUSLY_HURT" => Some(SeriousInjuryKind::SeriouslyHurt),
+            "SERIOUS_INJURY" => Some(SeriousInjuryKind::SeriousInjuryNi),
+            "HEAD_INJURY" => Some(SeriousInjuryKind::HeadInjuryAv),
+            "SMASHED_KNEE" => Some(SeriousInjuryKind::SmashedKneeMa),
+            "BROKEN_ARM" => Some(SeriousInjuryKind::BrokenArmPa),
+            "NECK_INJURY" => Some(SeriousInjuryKind::NeckInjuryAg),
+            "DISLOCATED_HIP" => Some(SeriousInjuryKind::DislocatedHipAg),
+            "DISLOCATED_SHOULDER" => Some(SeriousInjuryKind::DislocatedShoulderSt),
+            "DEAD" => Some(SeriousInjuryKind::Dead),
+            "BROKEN_RIBS" => Some(SeriousInjuryKind::BrokenRibs),
+            "GROIN_STRAIN" => Some(SeriousInjuryKind::Groin),
+            "GOUGED_EYE" => Some(SeriousInjuryKind::GougedEye),
+            "BROKEN_JAW" => Some(SeriousInjuryKind::BrokenJaw),
+            "FRACTURED_ARM" => Some(SeriousInjuryKind::FracturedArm),
+            "FRACTURED_LEG" => Some(SeriousInjuryKind::FracturedLeg),
+            "SMASHED_HAND" => Some(SeriousInjuryKind::SmashedHand),
+            "PINCHED_NERVE" => Some(SeriousInjuryKind::PinchedNerve),
+            "DAMAGED_BACK" => Some(SeriousInjuryKind::DamagedBack),
+            "SMASHED_HIP" => Some(SeriousInjuryKind::SmashedHip),
+            "SMASHED_ANKLE" => Some(SeriousInjuryKind::SmashedAnkle),
+            "SERIOUS_CONCUSSION" => Some(SeriousInjuryKind::SeriousConcussion),
+            "FRACTURED_SKULL" => Some(SeriousInjuryKind::FracturedSkull),
+            "BROKEN_NECK" => Some(SeriousInjuryKind::BrokenNeck),
+            "SMASHED_COLLAR_BONE" => Some(SeriousInjuryKind::BrokenCollarBone),
+            "POISONED" => Some(SeriousInjuryKind::Poisoned),
+            "THIGH_STRAIN" => Some(SeriousInjuryKind::ThighStrain),
+            "THUMB_SPRAIN" => Some(SeriousInjuryKind::ThumbSprain),
+            "BROKEN_SHOULDER" => Some(SeriousInjuryKind::BrokenShoulder),
+            "SHATTERED_WRIST" => Some(SeriousInjuryKind::ShatteredWrist),
+            "SMASHED_ELBOW" => Some(SeriousInjuryKind::SmashedElbow),
+            "BROKEN_NOSE" => Some(SeriousInjuryKind::BrokenNose),
+            _ => None,
+        }
+    }
+
     pub fn is_dead(self) -> bool {
         self == SeriousInjuryKind::Dead
     }

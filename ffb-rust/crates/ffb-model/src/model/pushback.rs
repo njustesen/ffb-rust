@@ -22,6 +22,26 @@ impl Pushback {
             coordinate: self.coordinate.map(|c| c.transform()),
         }
     }
+
+    /// Java: `Pushback.toJsonValue()`.
+    pub fn to_json_value(&self) -> serde_json::Value {
+        let mut map = serde_json::Map::new();
+        if let Some(player_id) = &self.player_id {
+            map.insert("playerId".to_string(), serde_json::json!(player_id));
+        }
+        if let Some(coordinate) = self.coordinate {
+            map.insert("coordinate".to_string(), coordinate.to_json_value());
+        }
+        serde_json::Value::Object(map)
+    }
+
+    /// Java: `Pushback.initFrom(source, jsonValue)`.
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        Self {
+            player_id: json.get("playerId").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            coordinate: json.get("coordinate").and_then(FieldCoordinate::from_json),
+        }
+    }
 }
 
 #[cfg(test)]

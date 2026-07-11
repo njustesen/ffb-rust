@@ -80,7 +80,7 @@ impl SoundId {
         Self::all().iter().copied().find(|v| v.get_name().eq_ignore_ascii_case(name))
     }
 
-    fn all() -> &'static [Self] {
+    pub fn all() -> &'static [Self] {
         &[
             Self::BLOCK, Self::BLUNDER, Self::BOUNCE, Self::CATCH, Self::CHAINSAW, Self::CLICK,
             Self::DING, Self::DODGE, Self::DUH, Self::EW, Self::EXPLODE, Self::FALL,

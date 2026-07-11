@@ -73,6 +73,11 @@ pub fn is_number(s: &str) -> bool {
     !s.is_empty() && s.chars().all(|c| c.is_ascii_digit())
 }
 
+/// Java: `StringTool.isProvided(Object)` — true if non-null and non-empty (`toString().length() > 0`).
+pub fn is_provided(s: Option<&str>) -> bool {
+    matches!(s, Some(v) if !v.is_empty())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -106,5 +111,12 @@ mod tests {
         assert!(is_number("42"));
         assert!(!is_number("4x"));
         assert!(!is_number(""));
+    }
+
+    #[test]
+    fn is_provided_checks() {
+        assert!(is_provided(Some("hi")));
+        assert!(!is_provided(Some("")));
+        assert!(!is_provided(None));
     }
 }

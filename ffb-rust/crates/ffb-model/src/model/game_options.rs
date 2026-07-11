@@ -1,5 +1,8 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use crate::factory::game_option_factory::GameOptionFactory;
+use crate::option::game_option_id::GameOptionId as GameOptionEnum;
+use crate::option::i_game_option::IGameOption;
 
 /// Game option key (maps to Java's GameOptionId).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -37,6 +40,25 @@ impl GameOptions {
     pub fn get_int(&self, key: &str) -> Option<i32> {
         self.get(key)?.parse().ok()
     }
+
+    /// Java: `GameOptions.getOptionWithDefault(GameOptionId pOptionId)`.
+    ///
+    /// Java stores fully materialized `IGameOption` instances in `fOptionById` and
+    /// falls back to `fGameOptionFactory.createGameOption(pOptionId)` when the id was
+    /// never explicitly added. This `GameOptions` stores raw key/value strings instead
+    /// of `IGameOption` objects, so the equivalent here is: build the id's default
+    /// `IGameOption` via `GameOptionFactory`, then overlay the stored string value (if
+    /// any) on top of it — same net behaviour (stored value wins, default otherwise).
+    pub fn get_option_with_default(&self, option_id: GameOptionEnum) -> Box<dyn IGameOption> {
+        let factory = GameOptionFactory::new();
+        let mut option = factory
+            .create_game_option(option_id)
+            .expect("every GameOptionId variant has a GameOptionFactory case");
+        if let Some(stored) = self.get(option_id.get_name()) {
+            option.set_value(stored);
+        }
+        option
+    }
 }
 
 #[cfg(test)]
@@ -50,6 +72,28 @@ mod tests {
         assert_eq!(opts.get("bribes"), Some("true"));
         assert!(opts.is_enabled("bribes"));
         assert!(!opts.is_enabled("missing"));
+    }
+
+    #[test]
+    fn get_option_with_default_returns_factory_default_when_unset() {
+        let opts = GameOptions::new();
+        let opt = opts.get_option_with_default(GameOptionEnum::TURNTIME);
+        assert_eq!(opt.get_value_as_string(), "240");
+    }
+
+    #[test]
+    fn get_option_with_default_returns_stored_value_when_set() {
+        let mut opts = GameOptions::new();
+        opts.set(GameOptionEnum::TURNTIME.get_name(), "120");
+        let opt = opts.get_option_with_default(GameOptionEnum::TURNTIME);
+        assert_eq!(opt.get_value_as_string(), "120");
+    }
+
+    #[test]
+    fn get_option_with_default_boolean_uses_default_when_unset() {
+        let opts = GameOptions::new();
+        let opt = opts.get_option_with_default(GameOptionEnum::TEST_MODE);
+        assert_eq!(opt.get_value_as_string(), "false");
     }
 
     #[test]

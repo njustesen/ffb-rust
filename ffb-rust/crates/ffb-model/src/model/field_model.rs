@@ -7,6 +7,8 @@ use crate::enums::PlayerState;
 use crate::model::player::PlayerId;
 use crate::model::target_selection_state::TargetSelectionState;
 use crate::model::dice_decoration::DiceDecoration;
+use crate::marking::player_marker::PlayerMarker;
+use crate::marking::field_marker::FieldMarker;
 
 /// The game board: player positions, ball position, and transient UI state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,6 +74,14 @@ pub struct FieldModel {
     /// Java: FieldModel.fCardsByPlayerId — cards currently assigned to players.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub player_cards: HashMap<PlayerId, Vec<Card>>,
+
+    /// Java: FieldModel.fPlayerMarkers — coach-authored text markers per player.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub player_markers: Vec<PlayerMarker>,
+
+    /// Java: FieldModel.fFieldMarkers — coach-authored text markers per pitch square.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub field_markers: Vec<FieldMarker>,
 }
 
 impl FieldModel {
@@ -99,6 +109,8 @@ impl FieldModel {
             card_effects: HashMap::new(),
             prayer_enhancements: HashMap::new(),
             player_cards: HashMap::new(),
+            player_markers: Vec::new(),
+            field_markers: Vec::new(),
         }
     }
 
@@ -453,6 +465,53 @@ impl FieldModel {
     pub fn clear_track_numbers(&mut self) {
         // No-op: track numbers are client-side visualisation data not stored in the engine model.
     }
+
+    /// Java: FieldModel.getPlayerMarkers()
+    pub fn get_player_markers(&self) -> &[PlayerMarker] {
+        &self.player_markers
+    }
+
+    /// Java: FieldModel.getPlayerMarker(String pPlayerId)
+    pub fn get_player_marker(&self, player_id: &str) -> Option<&PlayerMarker> {
+        self.player_markers
+            .iter()
+            .find(|m| m.get_player_id() == Some(player_id))
+    }
+
+    /// Java: FieldModel.add(PlayerMarker) — replaces any existing marker for the same player.
+    pub fn add_player_marker(&mut self, player_marker: PlayerMarker) {
+        let player_id = player_marker.get_player_id().map(|s| s.to_string());
+        self.player_markers.retain(|m| m.get_player_id().map(|s| s.to_string()) != player_id);
+        self.player_markers.push(player_marker);
+    }
+
+    /// Java: FieldModel.remove(PlayerMarker)
+    pub fn remove_player_marker(&mut self, player_id: &str) -> bool {
+        let before = self.player_markers.len();
+        self.player_markers.retain(|m| m.get_player_id() != Some(player_id));
+        self.player_markers.len() != before
+    }
+
+    /// Java: FieldModel.getFieldMarker(FieldCoordinate)
+    pub fn get_field_marker(&self, coordinate: FieldCoordinate) -> Option<&FieldMarker> {
+        self.field_markers
+            .iter()
+            .find(|m| m.get_coordinate() == Some(&coordinate))
+    }
+
+    /// Java: FieldModel.add(FieldMarker) — replaces any existing marker at the same coordinate.
+    pub fn add_field_marker(&mut self, field_marker: FieldMarker) {
+        let coordinate = field_marker.coordinate;
+        self.field_markers.retain(|m| m.coordinate != coordinate);
+        self.field_markers.push(field_marker);
+    }
+
+    /// Java: FieldModel.remove(FieldMarker)
+    pub fn remove_field_marker(&mut self, coordinate: FieldCoordinate) -> bool {
+        let before = self.field_markers.len();
+        self.field_markers.retain(|m| m.get_coordinate() != Some(&coordinate));
+        self.field_markers.len() != before
+    }
 }
 
 impl Default for FieldModel {
@@ -730,5 +789,68 @@ mod tests {
         fm.remove_card("p1", "Chop Block");
         assert!(fm.get_cards("p1").is_empty());
         assert!(fm.find_player_with_card("Chop Block").is_none());
+    }
+
+    #[test]
+    fn player_markers_default_empty() {
+        let fm = FieldModel::new();
+        assert!(fm.get_player_markers().is_empty());
+        assert!(fm.get_player_marker("p1").is_none());
+    }
+
+    #[test]
+    fn add_player_marker_stores_and_replaces() {
+        let mut fm = FieldModel::new();
+        let mut m1 = crate::marking::player_marker::PlayerMarker::with_player_id("p1");
+        m1.set_home_text("first");
+        fm.add_player_marker(m1);
+        assert_eq!(fm.get_player_marker("p1").and_then(|m| m.get_home_text()), Some("first"));
+
+        let mut m2 = crate::marking::player_marker::PlayerMarker::with_player_id("p1");
+        m2.set_home_text("second");
+        fm.add_player_marker(m2);
+        assert_eq!(fm.get_player_markers().len(), 1);
+        assert_eq!(fm.get_player_marker("p1").and_then(|m| m.get_home_text()), Some("second"));
+    }
+
+    #[test]
+    fn remove_player_marker_removes_entry() {
+        let mut fm = FieldModel::new();
+        fm.add_player_marker(crate::marking::player_marker::PlayerMarker::with_player_id("p1"));
+        assert!(fm.remove_player_marker("p1"));
+        assert!(fm.get_player_marker("p1").is_none());
+        assert!(!fm.remove_player_marker("p1"));
+    }
+
+    #[test]
+    fn field_markers_default_empty() {
+        let fm = FieldModel::new();
+        assert!(fm.get_field_marker(FieldCoordinate::new(1, 1)).is_none());
+    }
+
+    #[test]
+    fn add_field_marker_stores_and_replaces() {
+        let mut fm = FieldModel::new();
+        let coord = FieldCoordinate::new(3, 3);
+        let mut m1 = crate::marking::field_marker::FieldMarker::with_coordinate(coord);
+        m1.set_home_text("first");
+        fm.add_field_marker(m1);
+        assert_eq!(fm.get_field_marker(coord).and_then(|m| m.get_home_text()), Some("first"));
+
+        let mut m2 = crate::marking::field_marker::FieldMarker::with_coordinate(coord);
+        m2.set_home_text("second");
+        fm.add_field_marker(m2);
+        assert_eq!(fm.field_markers.len(), 1);
+        assert_eq!(fm.get_field_marker(coord).and_then(|m| m.get_home_text()), Some("second"));
+    }
+
+    #[test]
+    fn remove_field_marker_removes_entry() {
+        let mut fm = FieldModel::new();
+        let coord = FieldCoordinate::new(4, 4);
+        fm.add_field_marker(crate::marking::field_marker::FieldMarker::with_coordinate(coord));
+        assert!(fm.remove_field_marker(coord));
+        assert!(fm.get_field_marker(coord).is_none());
+        assert!(!fm.remove_field_marker(coord));
     }
 }

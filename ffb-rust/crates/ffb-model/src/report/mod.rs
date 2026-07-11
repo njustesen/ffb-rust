@@ -34,6 +34,7 @@ pub mod report_game_options;
 pub mod report_go_for_it_roll;
 pub mod report_hand_over;
 pub mod report_inducement;
+pub mod report_injury;
 pub mod report_interception_roll;
 pub mod report_jump_roll;
 pub mod report_jump_up_roll;
@@ -69,6 +70,7 @@ pub mod report_timeout_enforced;
 pub mod report_weather;
 pub mod report_weeping_dagger_roll;
 pub mod report_wizard_use;
+pub mod util_report;
 
 // Edition-specific and mixed reports
 pub mod bb2016;
