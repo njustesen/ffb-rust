@@ -29,6 +29,57 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AAC (UploadGame HTTP-backup branch, completed, this session):**
+Third of 3 sub-phases closing the last "translate more Java" gap: `ServerCommandHandlerUploadGame`'s
+missing-game branch (Java: fetch the game from the backup service via `ServerRequestLoadReplay`,
+rehydrate it, re-add to the cache, and redispatch `InternalServerCommandUploadGame`), previously a
+`todo!("Phase ZZ: ...")`.
+
+- Added `GameState::init_from(&mut self, json: &str) -> Result<(), String>`
+  (`crates/ffb-server/src/game_state.rs`) — Java: `GameState.initFrom(IFactorySource, JsonValue)`.
+  Deserializes `json` directly into the already-`Serialize`/`Deserialize`-derived `Game` struct
+  and rehydrates via `DriverGameState::from_game`, resetting the command counter and game log —
+  the same *control-flow* shape as Java's method (deserialize → rehydrate → reset transient
+  step/log state). Documented narrowing: Java's real `initFrom` reconstructs `fCurrentStep`/
+  `fStepStack`/`fGameLog`/`passState`/`blitzTurnState`/`prayerState`/`activeEffects` from a
+  custom `IServerJsonOption`-keyed wire format that has no decoder in this crate; this uses this
+  crate's own serde shape instead of matching real FUMBBL backup JSON byte-for-byte, which would
+  be a separate, much larger follow-up.
+- Made `ServerRequestLoadReplay` genuinely queueable: added `QueuedServerRequestLoadReplay`
+  (`crates/ffb-server/src/request/server_request_load_replay.rs`), a `ServerRequest`-trait
+  adapter around the existing fetch-only `ServerRequestLoadReplay::process(client, url)`, matching
+  the established adapter pattern (`util/marker_loading_service.rs`'s
+  `QueuedLoadPlayerMarkingsRequest`). Ports all three of Java's `process()` mode branches
+  (`LOAD_GAME`/`DELETE_GAME`/`UPLOAD_GAME`, one shared Java method) since the dependencies
+  (`GameCache`, a `dispatch_tx: mpsc::UnboundedSender<ReceivedCommand>` redispatch sink) are
+  threaded through as adapter fields rather than reached via a `getServer()` singleton. The
+  `LOAD_GAME`-not-found sub-case (`communication.sendStatus(session, REPLAY_UNAVAILABLE, "")`)
+  is a documented no-op — no `SessionManager`/status-send dependency was threaded into this
+  adapter, being out of scope for the `UPLOAD_GAME` branch this phase actually targets.
+- Wired `ServerCommandHandlerUploadGame` (`crates/ffb-server/src/handler/server_command_handler_upload_game.rs`)
+  with a `request_processor: Arc<Mutex<ServerRequestProcessor>>`, an `Arc<dyn HttpClient + Send +
+  Sync>`, a `backup_url_load_template`, and a `dispatch_tx`, matching the DI convention already
+  established by `ServerCommandHandlerUpdatePlayerMarkings`/`ServerCommandHandlerJoin`. The
+  missing-game branch now builds the real `ServerRequestLoadReplay`, wraps it in
+  `QueuedServerRequestLoadReplay`, and enqueues it via `ServerRequestProcessor::add` — closing the
+  literal 4-line Java gap this sub-phase targeted. `handle_command` gained a `session_id`
+  parameter (Java's `receivedCommand.getSession()`) since nothing called it in production yet
+  (it isn't wired into `ServerCommandHandlerFactory`'s dispatch match — same pre-existing,
+  separately-scoped gap as ~12 other internal command types documented in that file).
+- Corrected a stale `TRANSLATION_TRACKER.md` mark: `server/util/UtilServerHttpClient.java` was
+  marked `✓` despite all three methods being `todo!()` with no real caller anywhere in
+  `ffb-engine` — per that crate's own architecture doc, `ffb-engine` is deliberately
+  networking-free (`GameEvent`/`AgentPrompt` output channels instead of direct HTTP), with real
+  HTTP already implemented one layer up in `ffb-server`'s `ReqwestHttpClient`. Left the `todo!()`s
+  in place (documented why: no caller, and implementing them would duplicate `ReqwestHttpClient`
+  rather than reuse it) and fixed the mark to `~`.
+- No parity/integration testing this phase (per plan); unit tests only. New tests cover
+  `GameState::init_from` (round-trip, command-nr/game-log reset, invalid-JSON error),
+  `QueuedServerRequestLoadReplay`'s three mode branches plus the missing-backup/invalid-JSON/
+  HTTP-error no-op paths, and `ServerCommandHandlerUploadGame`'s enqueue + full-round-trip
+  (enqueue → drain via `ServerRequestProcessor::run()` → cache re-add → redispatch observed on
+  the channel) paths. Tests: 17,249 → 17,259 (net +10), 0 failures.
+
 **Phase AAA (GameLog wiring, completed, this session):**
 First of 3 planned sub-phases closing the last "translate more Java" gap: wiring a typed,
 replayable command log into `ffb-server`'s live `GameState`, instead of the untyped
@@ -1946,7 +1997,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/handler/ServerCommandHandlerTalk.java` | `ffb-server` | `src/handler/server_command_handler_talk.rs` | ✓ |
 | `server/handler/ServerCommandHandlerTransferControl.java` | `ffb-server` | `src/handler/server_command_handler_transfer_control.rs` | ✓ |
 | `server/handler/ServerCommandHandlerUpdatePlayerMarkings.java` | `ffb-server` | `src/handler/server_command_handler_update_player_markings.rs` | ✓ |
-| `server/handler/ServerCommandHandlerUploadGame.java` | `ffb-server` | `src/handler/server_command_handler_upload_game.rs` | ~ |
+| `server/handler/ServerCommandHandlerUploadGame.java` | `ffb-server` | `src/handler/server_command_handler_upload_game.rs` | ✓ |
 | `server/handler/ServerCommandHandlerUserSettings.java` | `ffb-server` | `src/handler/server_command_handler_user_settings.rs` | ✓ |
 | `server/handler/talk/CommandAdapter.java` | `ffb-server` | `src/handler/talk/command_adapter.rs` | ✓ |
 | `server/handler/talk/DecoratingCommandAdapter.java` | `ffb-server` | `src/handler/talk/decorating_command_adapter.rs` | ✓ |
@@ -3044,7 +3095,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/util/UtilServerDb.java` | `ffb-engine` | `src/util/util_server_db.rs` | ✓ |
 | `server/util/UtilServerDialog.java` | `ffb-engine` | `src/util/util_server_dialog.rs` | ✓ |
 | `server/util/UtilServerGame.java` | `ffb-engine` | `src/util/util_server_game.rs` | ✓ |
-| `server/util/UtilServerHttpClient.java` | `ffb-engine` | `src/util/util_server_http_client.rs` | ✓ |
+| `server/util/UtilServerHttpClient.java` | `ffb-engine` | `src/util/util_server_http_client.rs` | ~ |
 | `server/util/UtilServerInducementUse.java` | `ffb-engine` | `src/util/util_server_inducement_use.rs` | ✓ |
 | `server/util/UtilServerInjury.java` | `ffb-engine` | `src/util/util_server_injury.rs` | ✓ |
 | `server/util/UtilServerPlayerMove.java` | `ffb-engine` | `src/util/util_server_player_move.rs` | ✓ |

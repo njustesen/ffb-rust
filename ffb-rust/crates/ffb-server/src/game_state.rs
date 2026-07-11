@@ -118,6 +118,33 @@ impl GameState {
             driver.run_until_prompt();
         }
     }
+
+    /// Java: `GameState.initFrom(IFactorySource emptySource, JsonValue jsonValue)` — rehydrates
+    /// this `GameState` from a JSON backup blob (used by `ServerRequestLoadReplay.process()`
+    /// when the backup/replay service returns a saved game).
+    ///
+    /// Java's real `initFrom` reconstructs `fCurrentStep`, `fStepStack`, `fGameLog`,
+    /// `passState`, `blitzTurnState`, `prayerState`, and `activeEffects` from a custom
+    /// `IServerJsonOption`-keyed wire format (minimal-json `JsonObject`s), on top of
+    /// `Game.initFrom` for the nested game model. This crate has no `IServerJsonOption`
+    /// equivalent decoder (no step-stack/game-log/pass-state/blitz-turn-state/prayer-state/
+    /// active-effects JSON schema has been ported), so this instead deserializes `json`
+    /// directly into the already-`Serialize`/`Deserialize`-derived `Game` struct (this
+    /// crate's own serde shape, not Java's wire format) via `DriverGameState::from_game`,
+    /// and resets the command counter / game log exactly like Java resets `fCurrentStep`/
+    /// `fStepStack`/`fGameLog` before repopulating them. This closes the same *control-flow*
+    /// shape Java's method has (deserialize -> rehydrate -> reset transient step/log state)
+    /// without claiming wire-format parity with real FUMBBL backup JSON -- matching this
+    /// backup JSON to Java's exact `IServerJsonOption` schema is a separate, much larger
+    /// follow-up (a full step-stack/game-log/pass-state/blitz-turn-state/prayer-state/
+    /// active-effects JSON decoder).
+    pub fn init_from(&mut self, json: &str) -> Result<(), String> {
+        let game: Game = serde_json::from_str(json).map_err(|e| e.to_string())?;
+        self.driver = Some(DriverGameState::from_game(game, 0));
+        self.command_nr = 0;
+        self.game_log = GameLog::new();
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -188,6 +215,37 @@ mod tests {
         gs.clear_step_stack();
         gs.push_end_game_sequence(true);
         gs.start_next_step();
+        assert!(!gs.is_started());
+    }
+
+    #[test]
+    fn init_from_round_trips_a_serialized_game() {
+        let started = started_game_state();
+        let json = serde_json::to_string(started.get_game().unwrap()).unwrap();
+
+        let mut restored = GameState::new(1);
+        restored.init_from(&json).unwrap();
+
+        assert!(restored.is_started());
+        assert_eq!(restored.get_game().unwrap().team_home.id, started.get_game().unwrap().team_home.id);
+    }
+
+    #[test]
+    fn init_from_resets_command_nr_and_game_log() {
+        let mut gs = started_game_state();
+        gs.generate_command_nr();
+        gs.generate_command_nr();
+        let json = serde_json::to_string(gs.get_game().unwrap()).unwrap();
+
+        gs.init_from(&json).unwrap();
+
+        assert_eq!(gs.generate_command_nr(), 1);
+    }
+
+    #[test]
+    fn init_from_invalid_json_returns_err() {
+        let mut gs = GameState::new(1);
+        assert!(gs.init_from("not json").is_err());
         assert!(!gs.is_started());
     }
 }
