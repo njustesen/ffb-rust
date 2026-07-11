@@ -29,6 +29,44 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase ZW.3 + ZW.4 (client/report renderers + docs closeout, completed, 2026-07-11):**
+Translated the last major `ffb-client-logic` block: all 211 `client/report/*Message.java`
+report-to-text renderers (55 root + 32 `bb2016/` + 26 `bb2020/` + 39 `bb2025/` + 57
+`mixed/`), each a `ReportMessage` trait impl that builds styled text runs from an
+already-translated `ffb-model` report object. Five batches translated in parallel
+(one per subdirectory, isolated git worktrees), then merged and reconciled.
+
+Prerequisite fix found before the batch could start: `client/StatusReport.java` (279
+lines, the shared rendering sink every message calls through) was still a 10-line stub,
+and its two style enums — `TextStyle`, `ParagraphStyle` — had been bulk-marked `—`
+(permanent Swing skip) during the ZW.0 audit, mis-lumped in with genuinely-Swing root
+files like `FontCache`/`IconCache` despite being plain 22-line string-keyed enums with
+zero AWT dependency. Un-skipped both enums and gave `StatusReport` a real translation:
+its one actual Swing call (`getUserInterface().getLog().append(...)`) became a headless
+`rendered_runs: Vec<RenderedRun>` capture, making every renderer's output assertable in a
+unit test without any UI. `ReportMessageBase` became a `ReportMessage` trait (Rust has no
+inheritance); `ReportMessageType`'s annotation-based dispatch became a `report_id()`
+method per renderer (Java's reflection-based `Scanner` registry has no faithful Rust
+equivalent, so this is a mechanical substitution, not new logic).
+
+Small legitimate gaps filled in `ffb-model` along the way (methods present on the Java
+enums but not yet ported): `PlayerGender::dative()`/`self_word()`/`verb_form()` and
+`PlayerAction::description()`, transcribed directly from `PlayerGender.java`/
+`PlayerAction.java`. Where a renderer depended on data the report layer doesn't retain
+(e.g. `RollModifier` magnitude/sign — the model only keeps resolved modifier *names*,
+per the Phase ZU report-serialization decision) or on unported mechanic/factory lookups,
+each file documents the gap inline with a `// java: <call>` comment rather than
+fabricating values — see individual batch commits for the full list per file.
+
+Tests: 16,412 → 17,305 (+893: ~250 root, ~126 bb2016, ~105 bb2020, ~179 bb2025, plus
+mixed and the prerequisite files). `cargo test --workspace` green, `client/report/` (211
+files) + the 5 prerequisite files now genuinely `✓`. This completes Phase ZW's
+translation scope: **all 373 in-scope `ffb-client-logic` files are now genuinely
+translated** (`client/model`, `client/util`, `client/factory`, `client/net`,
+`client/handler`, `client/` root, `client/state/` 85 files, `client/report/` 211 files).
+Remaining `—` rows (271 files, Swing dialog/ui/layer/animation/overlay/sound rendering)
+stay permanently skipped per the ZW plan's triage. No parity work this phase, as planned.
+
 **Phase ZW.2c (NetCommand wire-protocol layer, completed, 2026-07-10):** closed the blocker
 Batch B flagged (below) — and found a second, smaller instance of the ZW.0 fake-✓-stub
 pattern while doing it. `net/NetCommand.java`, `net/NetCommandFactory.java`, and all 123
@@ -221,7 +259,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | Phase ZW.2 Batch D (state/logic root) | 2026-07-11 | 15,974 | 28 | Translated all 28 root-level files in `client/state/logic/` (the plan's ~30 estimate was off by 2; actual directory listing had exactly 28 after excluding the already-done `ClientAction`/`Influences` and the `bb2016/bb2020/bb2025/mixed/interaction/plugin/` subdirs). Anchor: `LogicModule.java` (753 lines) → a slim `pub trait LogicModule` (4 always-abstract methods: `get_id`/`available_actions`/`action_context`/`perform_available_action`; ~15 default lifecycle/interaction methods taking `&FantasyFootballClient`/`&mut FantasyFootballClient` explicitly rather than storing it, matching the `client/handler/*` convention) plus ~60 free `is_xxx_available(game, player)`/`_ap(game, acting_player)` predicate functions factored out for direct unit-testing (48 tests on this file alone). `RangeGridState`/`AbstractBlockLogicModule` (small helpers) and `MoveLogicModule`/`SetupLogicModule`/`BlockLogicExtension` (base/extension classes other concrete modules build on) translated next, then the 22 remaining concrete `*LogicModule` structs (Blitz/DumpOff/HighKick/IllegalSubstitution/Interception/Kickoff/KickoffReturn/Login/PassBlock/PlaceBall/Pushback/QuickSnap/Replay/Setup/SolidDefence/Spectate/StartGame/Swoop/ThrowTeamMate/Touchback/WaitForOpponent/WaitForSetup/Wizard), each a struct implementing `LogicModule` (composition over a held `MoveLogicModule`/`SetupLogicModule` where Java `extends` one of those, direct impl otherwise). Added `jump_mechanic_for`/`ttm_mechanic_for`/`pass_mechanic_for`/`on_the_ball_mechanic_for` dispatch helpers to `ffb-engine::mechanic` (mirroring the existing `game_mechanic_for` precedent) and a `game_mut()` accessor on `FantasyFootballClient` (mirroring `communication_mut()`) — both small, precedented infra additions, not new game logic. **Rust-specific pitfall discovered and documented in-file:** a trait default method taking `&self` silently shadows a same-named inherent `&mut self` method at every call site (method-resolution tries the `&self` step first) — worked around per-file with `Cell<T>` fields or by keeping the inherent method `&self` where only reads were needed. **Documented gaps** (conservative fallbacks, `// java:` comments, no invented logic): `LogicPluginFactory` (still not translated — every `plugin()`/`BaseLogicPlugin`/`MoveLogicPlugin`/`BlockLogicExtensionPlugin` resolution is a no-op/false/empty fallback); `ActingPlayer.getOldPlayerState()`/`hasOnlyStandingUpMove()` and `Player.hasActiveEnhancement()` (no Rust-model fields); `FieldModel` multi-occupancy `getPlayers(coordinate)` (model is 1:1 coordinate→player); `FantasyFootballClient.getProperty()`/`getOverlays()`/`replayInitialized()` (abstract, no in-scope body); `ClientCommunication.send_acting_player` requiring a non-optional `PlayerAction` (no null-action variant); `UtilPassing.findInterceptors` (per-edition-private in `ffb-engine`, not a public API); `PasswordChallenge.createResponse` (MD5 HMAC, no crypto crate dependency); `ffb_protocol::ServerCommand`'s documented not-1:1 simplification (blocks most of `ReplayLogicModule.handle_command`'s cases beyond `SERVER_GAME_STATE`). Tests: 15,734 → 15,974 (+240). |
 | Phase ZW.2 Batch D (state/logic editions) | 2026-07-11 | 16,332 | 40 | Translated all 40 edition-specific logic modules under `client/state/logic/{bb2016,bb2020,bb2025,mixed}/` (the plan's ~40 estimate was exact: bb2016 1, bb2020 8, bb2025 13, mixed 18, confirmed via direct directory listing before starting). Parallelized across 5 isolated git worktrees (bb2016+bb2020; bb2025 split into two halves; mixed split into two halves) to avoid concurrent-compile contention in the shared `ffb-client` crate, then merged all worktree diffs back, hand-wrote the shared `bb2025/mod.rs`/`mixed/mod.rs` (each split across two agents, so neither owned the file), and wired `pub mod bb2016;`/`bb2020;`/`bb2025;`/`mixed;` into the parent `client/state/logic/mod.rs`. All 40 concrete structs implement `LogicModule`, composing over `MoveLogicModule`/`BlockLogicExtension`/`AbstractBlockLogicModule`/other Batch-D-root base types (a struct field, not inheritance) wherever the Java class `extends`/mixes one in, delegating to `logic_module`'s free predicate functions where available. Deleted all 40 old PascalCase stub files, corrected all 40 tracker rows to their snake_case Rust paths. **UI stub sites:** exactly the 2 documented in the batch plan (`bb2020::SelectBlitzTargetLogicModule::player_peek`, `bb2025::SelectBlitzTargetLogicModule::player_peek`) — both stubbed to skip only the `getUserInterface().getFieldComponent()...clearMovePath()` rendering side-effect line; no further `getUserInterface()` call sites were found anywhere else in the batch. **New documented gaps beyond the pre-existing list** (conservative fallbacks/local reimplementations, `// java:` comments, no invented logic): `ActingPlayer.isMustCompleteAction()` (no Rust field, conservatively `false`); `UtilPlayer.isFoulable(Game, Player)` (not in `ffb-model`, reimplemented locally in both `bb2025::FoulLogicModule` and `mixed::FoulLogicModule`); `UtilPlayer.canKickTeamMate`/`isKickable` (reimplemented locally in `bb2020::KickTeamMateLikeThrowLogicModule` and `mixed::KickEmBlitz/BlockLogicModule`); `FieldModel.findAdjacentCoordinates(coord, bounds, distance>1, withStart)` general form (no shared public helper beyond `adjacent_on_pitch`'s distance-1 case; reimplemented locally per call site, same pattern as the existing `logic_module.rs` private duplicate); `Game.playingTeamHasActingPLayer()`/`getDefender()`/`getOtherTeam(Team)` (no Rust `Game` equivalents, reimplemented locally in `mixed::ThenIStartedBlastinLogicModule`/`PutridRegurgitationBlitzLogicModule`); `Player.canDeclareSkillAction(property, playerState)` (no per-skill `DeclareCondition` data reachable from a bare `Player`; approximated as `has_unused_skill_with_property(property)` alone, matching the same simplification already made in `block_logic_extension.rs`); `Player.getPosition().getKeywords().contains(LINEMAN)` (`bb2025::SwarmingLogicModule`, no keyword lookup on `Player`, conservatively `false`); `MoveLogicModule`'s protected `actionAvailable` hook has no virtual-dispatch equivalent, so `bb2025::PuntLogicModule`'s acting-player interaction branch reimplements its own `action_available` directly; `mixed::BlockLogicModule` (the `Stab`/`KickEm*`/`MaximumCarnage`/`PutridRegurgitationBlock` superclass) was owned by a different parallel worktree than `bb2020::StabLogicModule`'s, so `Stab`'s unmodified inherited behavior was inlined directly (doc-commented) rather than composed over it; the other 3 sibling files' assumed `BlockLogicModule::new()`/inherent-method API was verified to match after merge (clean compile, no changes needed). Hit the known "`&self` trait default shadows `&mut self` inherent method" pitfall again in both `bb2020`'s and `bb2025`'s `SynchronousMultiBlockLogicModule` (mutable selection-state maps needed from a `player_interaction`-named method); worked around with `RefCell<HashMap<...>>` fields per the documented convention. Tests: 15,974 → 16,332 (+358, avg ~9/file across the 5 parallel batches: 72+41+84+79+90 reported individually, some overlap with shared-helper duplication not double counted in the final total). `cargo test --workspace`: 16,332 passed, 0 failed. |
 | Phase ZW.2 Batch D (state root) | 2026-07-11 | 16,412 | 3 | Final batch of `client/state/` — the 3 remaining root files. `ClientState.java` (148 lines, abstract `ClientState<T extends LogicModule, C extends FantasyFootballClient>`) → `client_state.rs`: generic only over `L: LogicModule` (the `C`/`FantasyFootballClient` type param is dropped — one real instantiation in this crate — and the held `fClient` field is likewise dropped, passed explicitly instead, per the `LogicModule`/`client/handler` convention); `enterState`/`leaveState`/`endTurn` (`final` in Java) translated as real inherent methods delegating to the held `logic_module`; `hideSelectSquare`/`showSelectSquare` translate the real coordinate-state transition; `drawSelectSquare` (Java's one always-`abstract` method) has no in-scope concrete body anywhere in this crate (all `ClientStateXxx` Swing subclasses live in `ffb-client`'s AWT layer, out of scope) — left as a documented no-op rather than invented or exposed as an unimplementable trait requirement; AWT `MouseEvent` handlers skipped, the non-`MouseEvent` default bodies (`actionKeyPressed`, drag/drop predicates) translated for real since Java's own bodies are trivial in-scope logic. `ClientStateFactory.java` (368 lines) → `client_state_factory.rs`: `registerStates()`/`registerStatesForRules()` (per-edition `abstract`, no in-scope concrete subclass) reduced to a documented no-op registry shell; the real translation target, `getStateForGame()`/`findPassiveState()` (a pure `Game`-state → `ClientStateId` dispatcher switching on `ClientMode`/`TurnMode`/`ActingPlayer.getPlayerAction()`/pushback squares), is ported branch-by-branch in full, including the `TtmMechanic.handleKickLikeThrow()` real mechanic dispatch (reusing the existing `ttm_mechanic_for` helper) and the `MULTIPLE_BLOCK`→`canBlockTwoAtOnce` skill-property ternary. Two documented gaps: `game.getFinished() != null` has no separate `Date` field on the Rust `Game` model, mapped to `game.status == GameStatus::Finished` instead; `getReplayer().isReplaying()` has no in-scope body (`ClientReplayer` remains a blocked stub) and is conservatively `false`. `IPlayerPopupMenuKeys.java` → `i_player_popup_menu_keys.rs`: 45 `KEY_*` AWT `VK_*` constant aliases, reproduced directly as their standard JDK virtual-key-code values (no AWT dependency in this crate). Corrected `state_dispatch::current_state`'s doc comment (it was already correctly *implemented* as a deliberately coarser TurnMode-only helper, but its old doc comment claimed to "mirror `ClientStateFactory.java`", which was never true and is now fixed) — kept as a separate helper, not merged. Deleted the 3 stale `// client-only: ... superseded by crate::state_dispatch::mod.` comments (never accurate) along with the 3 old PascalCase stub files. Wired all 3 into `client/state/mod.rs`, updated `client/mod.rs`'s stale "not yet wired in" comment. **`client/state/` is now 100% complete**: 85 files total across all 5 batches (4 interaction/value-type + 10 plugin + 28 logic-root + 40 logic-editions + 3 this batch — the original ~85 estimate landed exactly on the nose after all 5 batches' individual reconciliations). Total new tests across the whole `client/state/` effort: 21 + 21 + 240 + 358 + 80 = 720. Tests: 16,332 → 16,412 (+80: 77 in `client_state`/`client_state_factory` incl. one test per `TurnMode` branch and one per `PlayerAction` sub-branch, 3 in `i_player_popup_menu_keys`). `cargo test --workspace`: 16,412 passed, 0 failed. |
-| Phase ZW (planned, remainder) | — | target ~17,500 | 0 | See `docs/PHASE_ZW_PLAN.md`. `client/state/` is now fully complete. Next: `client/report/` (211 files, report-to-text rendering, ZW.3, would also unblock `StatusReport`) → ZW.4 docs closeout. Unit tests prioritized; **no parity work this phase**. |
+| Phase ZW.3 + ZW.4 | 2026-07-11 | 17,305 | 0 | Translated all 211 `client/report/*Message.java` renderers (55 root + 32 bb2016 + 26 bb2020 + 39 bb2025 + 57 mixed) in 5 parallel git-worktree batches, plus the prerequisite `StatusReport`/`TextStyle`/`ParagraphStyle`/`ReportMessageBase`/`ReportMessageType` (un-skipping the two style enums, miscategorized as Swing in ZW.0). See Progress Summary above for full detail. Tests: 16,412 → 17,305 (+893). `cargo test --workspace`: 17,305 passed, 0 failed. **This completes Phase ZW: all 373 in-scope `ffb-client-logic` files are genuinely translated.** Docs closeout (this row + Progress Summary + `docs/PHASE_ZW_PLAN.md` final numbers) done same session. |
 | ZW.1 (partial) | 2026-07-10 | 14,904 | 29 | Closed out 6 of the 35 remaining `~` `ffb-server/net` stub files: `CommandServlet`/`FileServlet` (Jetty servlet → axum route/handler, wired into `FantasyFootballServer::run()`'s router), `ServerDbKeepAliveTask`/`ServerGameTimeTask`/`ServerNetworkEntropyTask`/`SessionTimeoutTask` (`TimerTask` → `tokio::time::interval` loops, spawned from `run()`, gated by new `FFB_TIMER_*`/`FFB_SESSION_TIMEOUT_*` env vars mirroring the Java `IServerProperty` gates). **Discovered these 6 files (plus their existing stub tests) were never wired into `net/mod.rs` — dead code not compiled or counted** — fixed as part of this closeout. Along the way: added `Fortuna` to `FantasyFootballServer` (`getFortuna()`), gave `DbConnectionManager` a `Clone` impl (async tasks pull an owned copy out from behind `std::sync::Mutex` before `.await`, avoiding non-`Send` futures), and added the previously-missing `ServerCommunication.sendToReplaySession`/`close`/`sendGameTime` equivalents (`ServerCommunication` now owns a shared `ReplaySessionManager`, given `register_sender`/`send_to` so replay broadcasts have somewhere to write — `ServerCommunication.java` was already tracked `✓` before this, so its row is unchanged). Tests: 14,794 → 14,904 (+110). Remaining: 29 `~` files. |
 
 ---
@@ -3096,217 +3134,217 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 
 | Java File | Rust Crate | Rust Target | Status |
 |-----------|-----------|-------------|--------|
-| `client/report/AlwaysHungryMessage.java` | `ffb-client` | `src/client/report/AlwaysHungryMessage.rs` | ○ |
-| `client/report/AnimosityRollMessage.java` | `ffb-client` | `src/client/report/AnimosityRollMessage.rs` | ○ |
-| `client/report/ApothecaryChoiceMessage.java` | `ffb-client` | `src/client/report/ApothecaryChoiceMessage.rs` | ○ |
-| `client/report/bb2016/ApothecaryRollMessage.java` | `ffb-client` | `src/client/report/bb2016/ApothecaryRollMessage.rs` | ○ |
-| `client/report/bb2016/ArgueTheCallMessage.java` | `ffb-client` | `src/client/report/bb2016/ArgueTheCallMessage.rs` | ○ |
-| `client/report/bb2016/BlockChoiceMessage.java` | `ffb-client` | `src/client/report/bb2016/BlockChoiceMessage.rs` | ○ |
-| `client/report/bb2016/BloodLustRollMessage.java` | `ffb-client` | `src/client/report/bb2016/BloodLustRollMessage.rs` | ○ |
-| `client/report/bb2016/CardsBoughtMessage.java` | `ffb-client` | `src/client/report/bb2016/CardsBoughtMessage.rs` | ○ |
-| `client/report/bb2016/FanFactorRollPostMatchMessage.java` | `ffb-client` | `src/client/report/bb2016/FanFactorRollPostMatchMessage.rs` | ○ |
-| `client/report/bb2016/GoForItRollMessage.java` | `ffb-client` | `src/client/report/bb2016/GoForItRollMessage.rs` | ○ |
-| `client/report/bb2016/HypnoticGazeRollMessage.java` | `ffb-client` | `src/client/report/bb2016/HypnoticGazeRollMessage.rs` | ○ |
-| `client/report/bb2016/InducementMessage.java` | `ffb-client` | `src/client/report/bb2016/InducementMessage.rs` | ○ |
-| `client/report/bb2016/InducementsBoughtMessage.java` | `ffb-client` | `src/client/report/bb2016/InducementsBoughtMessage.rs` | ○ |
-| `client/report/bb2016/InjuryMessage.java` | `ffb-client` | `src/client/report/bb2016/InjuryMessage.rs` | ○ |
-| `client/report/bb2016/KickoffExtraReRollMessage.java` | `ffb-client` | `src/client/report/bb2016/KickoffExtraReRollMessage.rs` | ○ |
-| `client/report/bb2016/KickoffPitchInvasionMessage.java` | `ffb-client` | `src/client/report/bb2016/KickoffPitchInvasionMessage.rs` | ○ |
-| `client/report/bb2016/KickoffRiotMessage.java` | `ffb-client` | `src/client/report/bb2016/KickoffRiotMessage.rs` | ○ |
-| `client/report/bb2016/KickoffThrowARockMessage.java` | `ffb-client` | `src/client/report/bb2016/KickoffThrowARockMessage.rs` | ○ |
-| `client/report/bb2016/KickTeamMateRollMessage.java` | `ffb-client` | `src/client/report/bb2016/KickTeamMateRollMessage.rs` | ○ |
-| `client/report/bb2016/MostValuablePlayersMessage.java` | `ffb-client` | `src/client/report/bb2016/MostValuablePlayersMessage.rs` | ○ |
-| `client/report/bb2016/NervesOfSteelMessage.java` | `ffb-client` | `src/client/report/bb2016/NervesOfSteelMessage.rs` | ○ |
-| `client/report/bb2016/NoPlayersToFieldMessage.java` | `ffb-client` | `src/client/report/bb2016/NoPlayersToFieldMessage.rs` | ○ |
-| `client/report/bb2016/PassRollMessage.java` | `ffb-client` | `src/client/report/bb2016/PassRollMessage.rs` | ○ |
-| `client/report/bb2016/PenaltyShootoutMessage.java` | `ffb-client` | `src/client/report/bb2016/PenaltyShootoutMessage.rs` | ○ |
-| `client/report/bb2016/RaiseDeadMessage.java` | `ffb-client` | `src/client/report/bb2016/RaiseDeadMessage.rs` | ○ |
-| `client/report/bb2016/RefereeMessage.java` | `ffb-client` | `src/client/report/bb2016/RefereeMessage.rs` | ○ |
-| `client/report/bb2016/ScatterBallMessage.java` | `ffb-client` | `src/client/report/bb2016/ScatterBallMessage.rs` | ○ |
-| `client/report/bb2016/ScatterPlayerMessage.java` | `ffb-client` | `src/client/report/bb2016/ScatterPlayerMessage.rs` | ○ |
-| `client/report/bb2016/SpectatorsMessage.java` | `ffb-client` | `src/client/report/bb2016/SpectatorsMessage.rs` | ○ |
-| `client/report/bb2016/SwarmingPlayersRollMessage.java` | `ffb-client` | `src/client/report/bb2016/SwarmingPlayersRollMessage.rs` | ○ |
-| `client/report/bb2016/SwoopPlayerMessage.java` | `ffb-client` | `src/client/report/bb2016/SwoopPlayerMessage.rs` | ○ |
-| `client/report/bb2016/TentaclesShadowingMessage.java` | `ffb-client` | `src/client/report/bb2016/TentaclesShadowingMessage.rs` | ○ |
-| `client/report/bb2016/ThrowTeamMateRollMessage.java` | `ffb-client` | `src/client/report/bb2016/ThrowTeamMateRollMessage.rs` | ○ |
-| `client/report/bb2016/TurnEndMessage.java` | `ffb-client` | `src/client/report/bb2016/TurnEndMessage.rs` | ○ |
-| `client/report/bb2016/WinningsRollMessage.java` | `ffb-client` | `src/client/report/bb2016/WinningsRollMessage.rs` | ○ |
-| `client/report/bb2020/AnimalSavageryMessage.java` | `ffb-client` | `src/client/report/bb2020/AnimalSavageryMessage.rs` | ○ |
-| `client/report/bb2020/ApothecaryRollMessage.java` | `ffb-client` | `src/client/report/bb2020/ApothecaryRollMessage.rs` | ○ |
-| `client/report/bb2020/BlitzRollMessage.java` | `ffb-client` | `src/client/report/bb2020/BlitzRollMessage.rs` | ○ |
-| `client/report/bb2020/CardsAndInducementsBoughtMessage.java` | `ffb-client` | `src/client/report/bb2020/CardsAndInducementsBoughtMessage.rs` | ○ |
-| `client/report/bb2020/CheeringFansMessage.java` | `ffb-client` | `src/client/report/bb2020/CheeringFansMessage.rs` | ○ |
-| `client/report/bb2020/HypnoticGazeRollMessage.java` | `ffb-client` | `src/client/report/bb2020/HypnoticGazeRollMessage.rs` | ○ |
-| `client/report/bb2020/InjuryMessage.java` | `ffb-client` | `src/client/report/bb2020/InjuryMessage.rs` | ○ |
-| `client/report/bb2020/KickoffExtraReRollMessage.java` | `ffb-client` | `src/client/report/bb2020/KickoffExtraReRollMessage.rs` | ○ |
-| `client/report/bb2020/KickoffOfficiousRefMessage.java` | `ffb-client` | `src/client/report/bb2020/KickoffOfficiousRefMessage.rs` | ○ |
-| `client/report/bb2020/KickTeamMateFumbleMessage.java` | `ffb-client` | `src/client/report/bb2020/KickTeamMateFumbleMessage.rs` | ○ |
-| `client/report/bb2020/OfficiousRefRollMessage.java` | `ffb-client` | `src/client/report/bb2020/OfficiousRefRollMessage.rs` | ○ |
-| `client/report/bb2020/PassRollMessage.java` | `ffb-client` | `src/client/report/bb2020/PassRollMessage.rs` | ○ |
-| `client/report/bb2020/PrayerAmountMessage.java` | `ffb-client` | `src/client/report/bb2020/PrayerAmountMessage.rs` | ○ |
-| `client/report/bb2020/PrayerRollMessage.java` | `ffb-client` | `src/client/report/bb2020/PrayerRollMessage.rs` | ○ |
-| `client/report/bb2020/RaiseDeadMessage.java` | `ffb-client` | `src/client/report/bb2020/RaiseDeadMessage.rs` | ○ |
-| `client/report/bb2020/SolidDefenceRollMessage.java` | `ffb-client` | `src/client/report/bb2020/SolidDefenceRollMessage.rs` | ○ |
-| `client/report/bb2020/StallerDetectedMessage.java` | `ffb-client` | `src/client/report/bb2020/StallerDetectedMessage.rs` | ○ |
-| `client/report/bb2020/SwarmingPlayersRollMessage.java` | `ffb-client` | `src/client/report/bb2020/SwarmingPlayersRollMessage.rs` | ○ |
-| `client/report/bb2020/SwoopPlayerMessage.java` | `ffb-client` | `src/client/report/bb2020/SwoopPlayerMessage.rs` | ○ |
-| `client/report/bb2020/TentaclesShadowingMessage.java` | `ffb-client` | `src/client/report/bb2020/TentaclesShadowingMessage.rs` | ○ |
-| `client/report/bb2020/ThenIStartedBlastinMessage.java` | `ffb-client` | `src/client/report/bb2020/ThenIStartedBlastinMessage.rs` | ○ |
-| `client/report/bb2020/ThrowAtStallingPlayerMessage.java` | `ffb-client` | `src/client/report/bb2020/ThrowAtStallingPlayerMessage.rs` | ○ |
-| `client/report/bb2020/ThrowTeamMateRollMessage.java` | `ffb-client` | `src/client/report/bb2020/ThrowTeamMateRollMessage.rs` | ○ |
-| `client/report/bb2020/TwoForOneMessage.java` | `ffb-client` | `src/client/report/bb2020/TwoForOneMessage.rs` | ○ |
-| `client/report/bb2020/UseFumblerooskieMessage.java` | `ffb-client` | `src/client/report/bb2020/UseFumblerooskieMessage.rs` | ○ |
-| `client/report/bb2020/WeatherMageResultMessage.java` | `ffb-client` | `src/client/report/bb2020/WeatherMageResultMessage.rs` | ○ |
-| `client/report/bb2025/AnimalSavageryMessage.java` | `ffb-client` | `src/client/report/bb2025/AnimalSavageryMessage.rs` | ○ |
-| `client/report/bb2025/ApothecaryRollMessage.java` | `ffb-client` | `src/client/report/bb2025/ApothecaryRollMessage.rs` | ○ |
-| `client/report/bb2025/BlitzRollMessage.java` | `ffb-client` | `src/client/report/bb2025/BlitzRollMessage.rs` | ○ |
-| `client/report/bb2025/CheeringFansMessage.java` | `ffb-client` | `src/client/report/bb2025/CheeringFansMessage.rs` | ○ |
-| `client/report/bb2025/ChompRemovedMessage.java` | `ffb-client` | `src/client/report/bb2025/ChompRemovedMessage.rs` | ○ |
-| `client/report/bb2025/ChompRollMessage.java` | `ffb-client` | `src/client/report/bb2025/ChompRollMessage.rs` | ○ |
-| `client/report/bb2025/DodgySnackRollMessage.java` | `ffb-client` | `src/client/report/bb2025/DodgySnackRollMessage.rs` | ○ |
-| `client/report/bb2025/GettingEvenRollMessage.java` | `ffb-client` | `src/client/report/bb2025/GettingEvenRollMessage.rs` | ○ |
-| `client/report/bb2025/HypnoticGazeRollMessage.java` | `ffb-client` | `src/client/report/bb2025/HypnoticGazeRollMessage.rs` | ○ |
-| `client/report/bb2025/InjuryMessage.java` | `ffb-client` | `src/client/report/bb2025/InjuryMessage.rs` | ○ |
-| `client/report/bb2025/KickoffDodgySnackMessage.java` | `ffb-client` | `src/client/report/bb2025/KickoffDodgySnackMessage.rs` | ○ |
-| `client/report/bb2025/KickoffExtraReRollMessage.java` | `ffb-client` | `src/client/report/bb2025/KickoffExtraReRollMessage.rs` | ○ |
-| `client/report/bb2025/KickTeamMateFumbleMessage.java` | `ffb-client` | `src/client/report/bb2025/KickTeamMateFumbleMessage.rs` | ○ |
-| `client/report/bb2025/MascotUsedMessage.java` | `ffb-client` | `src/client/report/bb2025/MascotUsedMessage.rs` | ○ |
-| `client/report/bb2025/PassRollMessage.java` | `ffb-client` | `src/client/report/bb2025/PassRollMessage.rs` | ○ |
-| `client/report/bb2025/PickUpRollMessage.java` | `ffb-client` | `src/client/report/bb2025/PickUpRollMessage.rs` | ○ |
-| `client/report/bb2025/PrayerAmountMessage.java` | `ffb-client` | `src/client/report/bb2025/PrayerAmountMessage.rs` | ○ |
-| `client/report/bb2025/PrayerRollMessage.java` | `ffb-client` | `src/client/report/bb2025/PrayerRollMessage.rs` | ○ |
-| `client/report/bb2025/PrayersAndInducementsBoughtMessage.java` | `ffb-client` | `src/client/report/bb2025/PrayersAndInducementsBoughtMessage.rs` | ○ |
-| `client/report/bb2025/PuntDirectionMessage.java` | `ffb-client` | `src/client/report/bb2025/PuntDirectionMessage.rs` | ○ |
-| `client/report/bb2025/PuntDistanceMessage.java` | `ffb-client` | `src/client/report/bb2025/PuntDistanceMessage.rs` | ○ |
-| `client/report/bb2025/PushbackMessage.java` | `ffb-client` | `src/client/report/bb2025/PushbackMessage.rs` | ○ |
-| `client/report/bb2025/RaiseDeadMessage.java` | `ffb-client` | `src/client/report/bb2025/RaiseDeadMessage.rs` | ○ |
-| `client/report/bb2025/SaboteurRollMessage.java` | `ffb-client` | `src/client/report/bb2025/SaboteurRollMessage.rs` | ○ |
-| `client/report/bb2025/SolidDefenceRollMessage.java` | `ffb-client` | `src/client/report/bb2025/SolidDefenceRollMessage.rs` | ○ |
-| `client/report/bb2025/StallerDetectedMessage.java` | `ffb-client` | `src/client/report/bb2025/StallerDetectedMessage.rs` | ○ |
-| `client/report/bb2025/SteadyFootingRollMessage.java` | `ffb-client` | `src/client/report/bb2025/SteadyFootingRollMessage.rs` | ○ |
-| `client/report/bb2025/SwarmingPlayersRollMessage.java` | `ffb-client` | `src/client/report/bb2025/SwarmingPlayersRollMessage.rs` | ○ |
-| `client/report/bb2025/SwoopDirectionMessage.java` | `ffb-client` | `src/client/report/bb2025/SwoopDirectionMessage.rs` | ○ |
-| `client/report/bb2025/SwoopPlayerMessage.java` | `ffb-client` | `src/client/report/bb2025/SwoopPlayerMessage.rs` | ○ |
-| `client/report/bb2025/TeamCaptainRollMessage.java` | `ffb-client` | `src/client/report/bb2025/TeamCaptainRollMessage.rs` | ○ |
-| `client/report/bb2025/TeamEventMessage.java` | `ffb-client` | `src/client/report/bb2025/TeamEventMessage.rs` | ○ |
-| `client/report/bb2025/TentaclesShadowingMessage.java` | `ffb-client` | `src/client/report/bb2025/TentaclesShadowingMessage.rs` | ○ |
-| `client/report/bb2025/ThenIStartedBlastinMessage.java` | `ffb-client` | `src/client/report/bb2025/ThenIStartedBlastinMessage.rs` | ○ |
-| `client/report/bb2025/ThrowAtPlayerMessage.java` | `ffb-client` | `src/client/report/bb2025/ThrowAtPlayerMessage.rs` | ○ |
-| `client/report/bb2025/ThrowAtStallingPlayerMessage.java` | `ffb-client` | `src/client/report/bb2025/ThrowAtStallingPlayerMessage.rs` | ○ |
-| `client/report/bb2025/ThrowTeamMateRollMessage.java` | `ffb-client` | `src/client/report/bb2025/ThrowTeamMateRollMessage.rs` | ○ |
-| `client/report/bb2025/UseFumblerooskieMessage.java` | `ffb-client` | `src/client/report/bb2025/UseFumblerooskieMessage.rs` | ○ |
-| `client/report/bb2025/WeatherMageResultMessage.java` | `ffb-client` | `src/client/report/bb2025/WeatherMageResultMessage.rs` | ○ |
-| `client/report/BiteSpectatorMessage.java` | `ffb-client` | `src/client/report/BiteSpectatorMessage.rs` | ○ |
-| `client/report/BlockMessage.java` | `ffb-client` | `src/client/report/BlockMessage.rs` | ○ |
-| `client/report/BlockRollMessage.java` | `ffb-client` | `src/client/report/BlockRollMessage.rs` | ○ |
-| `client/report/BombExplodesAfterCatchMessage.java` | `ffb-client` | `src/client/report/BombExplodesAfterCatchMessage.rs` | ○ |
-| `client/report/BombOutOfBoundsMessage.java` | `ffb-client` | `src/client/report/BombOutOfBoundsMessage.rs` | ○ |
-| `client/report/BribesRollMessage.java` | `ffb-client` | `src/client/report/BribesRollMessage.rs` | ○ |
-| `client/report/CardDeactivatedMessage.java` | `ffb-client` | `src/client/report/CardDeactivatedMessage.rs` | ○ |
-| `client/report/CardEffectRollMessage.java` | `ffb-client` | `src/client/report/CardEffectRollMessage.rs` | ○ |
-| `client/report/CatchRollMessage.java` | `ffb-client` | `src/client/report/CatchRollMessage.rs` | ○ |
-| `client/report/ChainsawRollMessage.java` | `ffb-client` | `src/client/report/ChainsawRollMessage.rs` | ○ |
-| `client/report/CoinThrowMessage.java` | `ffb-client` | `src/client/report/CoinThrowMessage.rs` | ○ |
-| `client/report/ConfusionRollMessage.java` | `ffb-client` | `src/client/report/ConfusionRollMessage.rs` | ○ |
-| `client/report/DauntlessRollMessage.java` | `ffb-client` | `src/client/report/DauntlessRollMessage.rs` | ○ |
-| `client/report/DefectingPlayersMessage.java` | `ffb-client` | `src/client/report/DefectingPlayersMessage.rs` | ○ |
-| `client/report/DodgeRollMessage.java` | `ffb-client` | `src/client/report/DodgeRollMessage.rs` | ○ |
-| `client/report/DoubleHiredStarPlayerMessage.java` | `ffb-client` | `src/client/report/DoubleHiredStarPlayerMessage.rs` | ○ |
-| `client/report/EscapeRollMessage.java` | `ffb-client` | `src/client/report/EscapeRollMessage.rs` | ○ |
-| `client/report/FoulAppearanceRollMessage.java` | `ffb-client` | `src/client/report/FoulAppearanceRollMessage.rs` | ○ |
-| `client/report/FoulMessage.java` | `ffb-client` | `src/client/report/FoulMessage.rs` | ○ |
-| `client/report/FumbblResultUploadMessage.java` | `ffb-client` | `src/client/report/FumbblResultUploadMessage.rs` | ○ |
-| `client/report/GameOptionsMessage.java` | `ffb-client` | `src/client/report/GameOptionsMessage.rs` | ○ |
-| `client/report/HandOverMessage.java` | `ffb-client` | `src/client/report/HandOverMessage.rs` | ○ |
-| `client/report/InterceptionRollMessage.java` | `ffb-client` | `src/client/report/InterceptionRollMessage.rs` | ○ |
-| `client/report/JumpRollMessage.java` | `ffb-client` | `src/client/report/JumpRollMessage.rs` | ○ |
-| `client/report/JumpUpRollMessage.java` | `ffb-client` | `src/client/report/JumpUpRollMessage.rs` | ○ |
-| `client/report/KickoffResultMessage.java` | `ffb-client` | `src/client/report/KickoffResultMessage.rs` | ○ |
-| `client/report/KickoffScatterMessage.java` | `ffb-client` | `src/client/report/KickoffScatterMessage.rs` | ○ |
-| `client/report/LeaderMessage.java` | `ffb-client` | `src/client/report/LeaderMessage.rs` | ○ |
-| `client/report/MasterChefRollMessage.java` | `ffb-client` | `src/client/report/MasterChefRollMessage.rs` | ○ |
-| `client/report/mixed/AllYouCanEatMessage.java` | `ffb-client` | `src/client/report/mixed/AllYouCanEatMessage.rs` | ○ |
-| `client/report/mixed/ArgueTheCallMessage.java` | `ffb-client` | `src/client/report/mixed/ArgueTheCallMessage.rs` | ○ |
-| `client/report/mixed/BalefulHexRollMessage.java` | `ffb-client` | `src/client/report/mixed/BalefulHexRollMessage.rs` | ○ |
-| `client/report/mixed/BiasedRefMessage.java` | `ffb-client` | `src/client/report/mixed/BiasedRefMessage.rs` | ○ |
-| `client/report/mixed/BlockChoiceMessage.java` | `ffb-client` | `src/client/report/mixed/BlockChoiceMessage.rs` | ○ |
-| `client/report/mixed/BlockReRollMessage.java` | `ffb-client` | `src/client/report/mixed/BlockReRollMessage.rs` | ○ |
-| `client/report/mixed/BloodLustRollMessage.java` | `ffb-client` | `src/client/report/mixed/BloodLustRollMessage.rs` | ○ |
-| `client/report/mixed/BreatheFireMessage.java` | `ffb-client` | `src/client/report/mixed/BreatheFireMessage.rs` | ○ |
-| `client/report/mixed/BriberyAndCorruptionReRollMessage.java` | `ffb-client` | `src/client/report/mixed/BriberyAndCorruptionReRollMessage.rs` | ○ |
-| `client/report/mixed/BrilliantCoachingReRollsLostMessage.java` | `ffb-client` | `src/client/report/mixed/BrilliantCoachingReRollsLostMessage.rs` | ○ |
-| `client/report/mixed/CatchOfTheDayMessage.java` | `ffb-client` | `src/client/report/mixed/CatchOfTheDayMessage.rs` | ○ |
-| `client/report/mixed/CloudBursterMessage.java` | `ffb-client` | `src/client/report/mixed/CloudBursterMessage.rs` | ○ |
-| `client/report/mixed/DedicatedFansMessage.java` | `ffb-client` | `src/client/report/mixed/DedicatedFansMessage.rs` | ○ |
-| `client/report/mixed/DoubleHiredStaffMessage.java` | `ffb-client` | `src/client/report/mixed/DoubleHiredStaffMessage.rs` | ○ |
-| `client/report/mixed/EventMessage.java` | `ffb-client` | `src/client/report/mixed/EventMessage.rs` | ○ |
-| `client/report/mixed/FanFactorMessage.java` | `ffb-client` | `src/client/report/mixed/FanFactorMessage.rs` | ○ |
-| `client/report/mixed/FreePettyCashMessage.java` | `ffb-client` | `src/client/report/mixed/FreePettyCashMessage.rs` | ○ |
-| `client/report/mixed/GoForItRollMessage.java` | `ffb-client` | `src/client/report/mixed/GoForItRollMessage.rs` | ○ |
-| `client/report/mixed/HitAndRunMessage.java` | `ffb-client` | `src/client/report/mixed/HitAndRunMessage.rs` | ○ |
-| `client/report/mixed/IndomitableMessage.java` | `ffb-client` | `src/client/report/mixed/IndomitableMessage.rs` | ○ |
-| `client/report/mixed/InducementMessage.java` | `ffb-client` | `src/client/report/mixed/InducementMessage.rs` | ○ |
-| `client/report/mixed/KickoffPitchInvasionMessage.java` | `ffb-client` | `src/client/report/mixed/KickoffPitchInvasionMessage.rs` | ○ |
-| `client/report/mixed/KickoffSequenceActivationsCountMessage.java` | `ffb-client` | `src/client/report/mixed/KickoffSequenceActivationsCountMessage.rs` | ○ |
-| `client/report/mixed/KickoffSequenceActivationsExhaustedMessage.java` | `ffb-client` | `src/client/report/mixed/KickoffSequenceActivationsExhaustedMessage.rs` | ○ |
-| `client/report/mixed/KickoffTimeoutMessage.java` | `ffb-client` | `src/client/report/mixed/KickoffTimeoutMessage.rs` | ○ |
-| `client/report/mixed/LookIntoMyEyesRollMessage.java` | `ffb-client` | `src/client/report/mixed/LookIntoMyEyesRollMessage.rs` | ○ |
-| `client/report/mixed/ModifiedDodgeResultSuccessfulMessage.java` | `ffb-client` | `src/client/report/mixed/ModifiedDodgeResultSuccessfulMessage.rs` | ○ |
-| `client/report/mixed/ModifiedPassResultMessage.java` | `ffb-client` | `src/client/report/mixed/ModifiedPassResultMessage.rs` | ○ |
-| `client/report/mixed/MostValuablePlayersMessage.java` | `ffb-client` | `src/client/report/mixed/MostValuablePlayersMessage.rs` | ○ |
-| `client/report/mixed/NervesOfSteelMessage.java` | `ffb-client` | `src/client/report/mixed/NervesOfSteelMessage.rs` | ○ |
-| `client/report/mixed/OldProMessage.java` | `ffb-client` | `src/client/report/mixed/OldProMessage.rs` | ○ |
-| `client/report/mixed/PenaltyShootoutMessage.java` | `ffb-client` | `src/client/report/mixed/PenaltyShootoutMessage.rs` | ○ |
-| `client/report/mixed/PickMeUpMessage.java` | `ffb-client` | `src/client/report/mixed/PickMeUpMessage.rs` | ○ |
-| `client/report/mixed/PickUpRollMessage.java` | `ffb-client` | `src/client/report/mixed/PickUpRollMessage.rs` | ○ |
-| `client/report/mixed/PlaceBallDirectionMessage.java` | `ffb-client` | `src/client/report/mixed/PlaceBallDirectionMessage.rs` | ○ |
-| `client/report/mixed/PlayerEventMessage.java` | `ffb-client` | `src/client/report/mixed/PlayerEventMessage.rs` | ○ |
-| `client/report/mixed/PrayerEndMessage.java` | `ffb-client` | `src/client/report/mixed/PrayerEndMessage.rs` | ○ |
-| `client/report/mixed/PrayerWastedMessage.java` | `ffb-client` | `src/client/report/mixed/PrayerWastedMessage.rs` | ○ |
-| `client/report/mixed/ProjectileVomitMessage.java` | `ffb-client` | `src/client/report/mixed/ProjectileVomitMessage.rs` | ○ |
-| `client/report/mixed/PumpUpTheCrowdReRollMessage.java` | `ffb-client` | `src/client/report/mixed/PumpUpTheCrowdReRollMessage.rs` | ○ |
-| `client/report/mixed/PumpUpTheCrowdReRollsLostMessage.java` | `ffb-client` | `src/client/report/mixed/PumpUpTheCrowdReRollsLostMessage.rs` | ○ |
-| `client/report/mixed/QuickSnapRollMessage.java` | `ffb-client` | `src/client/report/mixed/QuickSnapRollMessage.rs` | ○ |
-| `client/report/mixed/RaidingPartyMessage.java` | `ffb-client` | `src/client/report/mixed/RaidingPartyMessage.rs` | ○ |
-| `client/report/mixed/RefereeMessage.java` | `ffb-client` | `src/client/report/mixed/RefereeMessage.rs` | ○ |
-| `client/report/mixed/ScatterBallMessage.java` | `ffb-client` | `src/client/report/mixed/ScatterBallMessage.rs` | ○ |
-| `client/report/mixed/ScatterPlayerMessage.java` | `ffb-client` | `src/client/report/mixed/ScatterPlayerMessage.rs` | ○ |
-| `client/report/mixed/SelectBlitzTargetMessage.java` | `ffb-client` | `src/client/report/mixed/SelectBlitzTargetMessage.rs` | ○ |
-| `client/report/mixed/SelectGazeTargetMessage.java` | `ffb-client` | `src/client/report/mixed/SelectGazeTargetMessage.rs` | ○ |
-| `client/report/mixed/ShowStarReRollMessage.java` | `ffb-client` | `src/client/report/mixed/ShowStarReRollMessage.rs` | ○ |
-| `client/report/mixed/ShowStarReRollsLostMessage.java` | `ffb-client` | `src/client/report/mixed/ShowStarReRollsLostMessage.rs` | ○ |
-| `client/report/mixed/SkillUseOtherPlayerMessage.java` | `ffb-client` | `src/client/report/mixed/SkillUseOtherPlayerMessage.rs` | ○ |
-| `client/report/mixed/SkillWastedMessage.java` | `ffb-client` | `src/client/report/mixed/SkillWastedMessage.rs` | ○ |
-| `client/report/mixed/ThrownKegMessage.java` | `ffb-client` | `src/client/report/mixed/ThrownKegMessage.rs` | ○ |
-| `client/report/mixed/TrapDoorMessage.java` | `ffb-client` | `src/client/report/mixed/TrapDoorMessage.rs` | ○ |
-| `client/report/mixed/TurnEndMessage.java` | `ffb-client` | `src/client/report/mixed/TurnEndMessage.rs` | ○ |
-| `client/report/mixed/WeatherMageRollMessage.java` | `ffb-client` | `src/client/report/mixed/WeatherMageRollMessage.rs` | ○ |
-| `client/report/mixed/WinningsMessage.java` | `ffb-client` | `src/client/report/mixed/WinningsMessage.rs` | ○ |
-| `client/report/PassBlockMessage.java` | `ffb-client` | `src/client/report/PassBlockMessage.rs` | ○ |
-| `client/report/PassDeviateMessage.java` | `ffb-client` | `src/client/report/PassDeviateMessage.rs` | ○ |
-| `client/report/PettyCashMessage.java` | `ffb-client` | `src/client/report/PettyCashMessage.rs` | ○ |
-| `client/report/PilingOnMessage.java` | `ffb-client` | `src/client/report/PilingOnMessage.rs` | ○ |
-| `client/report/PlayCardMessage.java` | `ffb-client` | `src/client/report/PlayCardMessage.rs` | ○ |
-| `client/report/PlayerActionMessage.java` | `ffb-client` | `src/client/report/PlayerActionMessage.rs` | ○ |
-| `client/report/PushbackMessage.java` | `ffb-client` | `src/client/report/PushbackMessage.rs` | ○ |
-| `client/report/ReceiveChoiceMessage.java` | `ffb-client` | `src/client/report/ReceiveChoiceMessage.rs` | ○ |
-| `client/report/RegenerationRollMessage.java` | `ffb-client` | `src/client/report/RegenerationRollMessage.rs` | ○ |
-| `client/report/ReportMessageBase.java` | `ffb-client` | `src/client/report/ReportMessageBase.rs` | ○ |
-| `client/report/ReportMessageType.java` | `ffb-client` | `src/client/report/ReportMessageType.rs` | ○ |
-| `client/report/ReRollMessage.java` | `ffb-client` | `src/client/report/ReRollMessage.rs` | ○ |
-| `client/report/RightStuffRollMessage.java` | `ffb-client` | `src/client/report/RightStuffRollMessage.rs` | ○ |
-| `client/report/RiotousRookiesMessage.java` | `ffb-client` | `src/client/report/RiotousRookiesMessage.rs` | ○ |
-| `client/report/SafeThrowRollMessage.java` | `ffb-client` | `src/client/report/SafeThrowRollMessage.rs` | ○ |
-| `client/report/SecretWeaponBanMessage.java` | `ffb-client` | `src/client/report/SecretWeaponBanMessage.rs` | ○ |
-| `client/report/SkillUseMessage.java` | `ffb-client` | `src/client/report/SkillUseMessage.rs` | ○ |
-| `client/report/SpellEffectRollMessage.java` | `ffb-client` | `src/client/report/SpellEffectRollMessage.rs` | ○ |
-| `client/report/StandUpRollMessage.java` | `ffb-client` | `src/client/report/StandUpRollMessage.rs` | ○ |
-| `client/report/StartHalfMessage.java` | `ffb-client` | `src/client/report/StartHalfMessage.rs` | ○ |
-| `client/report/ThrowInMessage.java` | `ffb-client` | `src/client/report/ThrowInMessage.rs` | ○ |
-| `client/report/TimeoutEnforcedMessage.java` | `ffb-client` | `src/client/report/TimeoutEnforcedMessage.rs` | ○ |
-| `client/report/WeatherMessage.java` | `ffb-client` | `src/client/report/WeatherMessage.rs` | ○ |
-| `client/report/WeepingDaggerRollMessage.java` | `ffb-client` | `src/client/report/WeepingDaggerRollMessage.rs` | ○ |
-| `client/report/WizardUseMessage.java` | `ffb-client` | `src/client/report/WizardUseMessage.rs` | ○ |
+| `client/report/AlwaysHungryMessage.java` | `ffb-client` | `src/client/report/always_hungry_message.rs` | ✓ |
+| `client/report/AnimosityRollMessage.java` | `ffb-client` | `src/client/report/animosity_roll_message.rs` | ✓ |
+| `client/report/ApothecaryChoiceMessage.java` | `ffb-client` | `src/client/report/apothecary_choice_message.rs` | ✓ |
+| `client/report/bb2016/ApothecaryRollMessage.java` | `ffb-client` | `src/client/report/bb2016/apothecary_roll_message.rs` | ✓ |
+| `client/report/bb2016/ArgueTheCallMessage.java` | `ffb-client` | `src/client/report/bb2016/argue_the_call_message.rs` | ✓ |
+| `client/report/bb2016/BlockChoiceMessage.java` | `ffb-client` | `src/client/report/bb2016/block_choice_message.rs` | ✓ |
+| `client/report/bb2016/BloodLustRollMessage.java` | `ffb-client` | `src/client/report/bb2016/blood_lust_roll_message.rs` | ✓ |
+| `client/report/bb2016/CardsBoughtMessage.java` | `ffb-client` | `src/client/report/bb2016/cards_bought_message.rs` | ✓ |
+| `client/report/bb2016/FanFactorRollPostMatchMessage.java` | `ffb-client` | `src/client/report/bb2016/fan_factor_roll_post_match_message.rs` | ✓ |
+| `client/report/bb2016/GoForItRollMessage.java` | `ffb-client` | `src/client/report/bb2016/go_for_it_roll_message.rs` | ✓ |
+| `client/report/bb2016/HypnoticGazeRollMessage.java` | `ffb-client` | `src/client/report/bb2016/hypnotic_gaze_roll_message.rs` | ✓ |
+| `client/report/bb2016/InducementMessage.java` | `ffb-client` | `src/client/report/bb2016/inducement_message.rs` | ✓ |
+| `client/report/bb2016/InducementsBoughtMessage.java` | `ffb-client` | `src/client/report/bb2016/inducements_bought_message.rs` | ✓ |
+| `client/report/bb2016/InjuryMessage.java` | `ffb-client` | `src/client/report/bb2016/injury_message.rs` | ✓ |
+| `client/report/bb2016/KickoffExtraReRollMessage.java` | `ffb-client` | `src/client/report/bb2016/kickoff_extra_re_roll_message.rs` | ✓ |
+| `client/report/bb2016/KickoffPitchInvasionMessage.java` | `ffb-client` | `src/client/report/bb2016/kickoff_pitch_invasion_message.rs` | ✓ |
+| `client/report/bb2016/KickoffRiotMessage.java` | `ffb-client` | `src/client/report/bb2016/kickoff_riot_message.rs` | ✓ |
+| `client/report/bb2016/KickoffThrowARockMessage.java` | `ffb-client` | `src/client/report/bb2016/kickoff_throw_a_rock_message.rs` | ✓ |
+| `client/report/bb2016/KickTeamMateRollMessage.java` | `ffb-client` | `src/client/report/bb2016/kick_team_mate_roll_message.rs` | ✓ |
+| `client/report/bb2016/MostValuablePlayersMessage.java` | `ffb-client` | `src/client/report/bb2016/most_valuable_players_message.rs` | ✓ |
+| `client/report/bb2016/NervesOfSteelMessage.java` | `ffb-client` | `src/client/report/bb2016/nerves_of_steel_message.rs` | ✓ |
+| `client/report/bb2016/NoPlayersToFieldMessage.java` | `ffb-client` | `src/client/report/bb2016/no_players_to_field_message.rs` | ✓ |
+| `client/report/bb2016/PassRollMessage.java` | `ffb-client` | `src/client/report/bb2016/pass_roll_message.rs` | ✓ |
+| `client/report/bb2016/PenaltyShootoutMessage.java` | `ffb-client` | `src/client/report/bb2016/penalty_shootout_message.rs` | ✓ |
+| `client/report/bb2016/RaiseDeadMessage.java` | `ffb-client` | `src/client/report/bb2016/raise_dead_message.rs` | ✓ |
+| `client/report/bb2016/RefereeMessage.java` | `ffb-client` | `src/client/report/bb2016/referee_message.rs` | ✓ |
+| `client/report/bb2016/ScatterBallMessage.java` | `ffb-client` | `src/client/report/bb2016/scatter_ball_message.rs` | ✓ |
+| `client/report/bb2016/ScatterPlayerMessage.java` | `ffb-client` | `src/client/report/bb2016/scatter_player_message.rs` | ✓ |
+| `client/report/bb2016/SpectatorsMessage.java` | `ffb-client` | `src/client/report/bb2016/spectators_message.rs` | ✓ |
+| `client/report/bb2016/SwarmingPlayersRollMessage.java` | `ffb-client` | `src/client/report/bb2016/swarming_players_roll_message.rs` | ✓ |
+| `client/report/bb2016/SwoopPlayerMessage.java` | `ffb-client` | `src/client/report/bb2016/swoop_player_message.rs` | ✓ |
+| `client/report/bb2016/TentaclesShadowingMessage.java` | `ffb-client` | `src/client/report/bb2016/tentacles_shadowing_message.rs` | ✓ |
+| `client/report/bb2016/ThrowTeamMateRollMessage.java` | `ffb-client` | `src/client/report/bb2016/throw_team_mate_roll_message.rs` | ✓ |
+| `client/report/bb2016/TurnEndMessage.java` | `ffb-client` | `src/client/report/bb2016/turn_end_message.rs` | ✓ |
+| `client/report/bb2016/WinningsRollMessage.java` | `ffb-client` | `src/client/report/bb2016/winnings_roll_message.rs` | ✓ |
+| `client/report/bb2020/AnimalSavageryMessage.java` | `ffb-client` | `src/client/report/bb2020/animal_savagery_message.rs` | ✓ |
+| `client/report/bb2020/ApothecaryRollMessage.java` | `ffb-client` | `src/client/report/bb2020/apothecary_roll_message.rs` | ✓ |
+| `client/report/bb2020/BlitzRollMessage.java` | `ffb-client` | `src/client/report/bb2020/blitz_roll_message.rs` | ✓ |
+| `client/report/bb2020/CardsAndInducementsBoughtMessage.java` | `ffb-client` | `src/client/report/bb2020/cards_and_inducements_bought_message.rs` | ✓ |
+| `client/report/bb2020/CheeringFansMessage.java` | `ffb-client` | `src/client/report/bb2020/cheering_fans_message.rs` | ✓ |
+| `client/report/bb2020/HypnoticGazeRollMessage.java` | `ffb-client` | `src/client/report/bb2020/hypnotic_gaze_roll_message.rs` | ✓ |
+| `client/report/bb2020/InjuryMessage.java` | `ffb-client` | `src/client/report/bb2020/injury_message.rs` | ✓ |
+| `client/report/bb2020/KickoffExtraReRollMessage.java` | `ffb-client` | `src/client/report/bb2020/kickoff_extra_re_roll_message.rs` | ✓ |
+| `client/report/bb2020/KickoffOfficiousRefMessage.java` | `ffb-client` | `src/client/report/bb2020/kickoff_officious_ref_message.rs` | ✓ |
+| `client/report/bb2020/KickTeamMateFumbleMessage.java` | `ffb-client` | `src/client/report/bb2020/kick_team_mate_fumble_message.rs` | ✓ |
+| `client/report/bb2020/OfficiousRefRollMessage.java` | `ffb-client` | `src/client/report/bb2020/officious_ref_roll_message.rs` | ✓ |
+| `client/report/bb2020/PassRollMessage.java` | `ffb-client` | `src/client/report/bb2020/pass_roll_message.rs` | ✓ |
+| `client/report/bb2020/PrayerAmountMessage.java` | `ffb-client` | `src/client/report/bb2020/prayer_amount_message.rs` | ✓ |
+| `client/report/bb2020/PrayerRollMessage.java` | `ffb-client` | `src/client/report/bb2020/prayer_roll_message.rs` | ✓ |
+| `client/report/bb2020/RaiseDeadMessage.java` | `ffb-client` | `src/client/report/bb2020/raise_dead_message.rs` | ✓ |
+| `client/report/bb2020/SolidDefenceRollMessage.java` | `ffb-client` | `src/client/report/bb2020/solid_defence_roll_message.rs` | ✓ |
+| `client/report/bb2020/StallerDetectedMessage.java` | `ffb-client` | `src/client/report/bb2020/staller_detected_message.rs` | ✓ |
+| `client/report/bb2020/SwarmingPlayersRollMessage.java` | `ffb-client` | `src/client/report/bb2020/swarming_players_roll_message.rs` | ✓ |
+| `client/report/bb2020/SwoopPlayerMessage.java` | `ffb-client` | `src/client/report/bb2020/swoop_player_message.rs` | ✓ |
+| `client/report/bb2020/TentaclesShadowingMessage.java` | `ffb-client` | `src/client/report/bb2020/tentacles_shadowing_message.rs` | ✓ |
+| `client/report/bb2020/ThenIStartedBlastinMessage.java` | `ffb-client` | `src/client/report/bb2020/then_i_started_blastin_message.rs` | ✓ |
+| `client/report/bb2020/ThrowAtStallingPlayerMessage.java` | `ffb-client` | `src/client/report/bb2020/throw_at_stalling_player_message.rs` | ✓ |
+| `client/report/bb2020/ThrowTeamMateRollMessage.java` | `ffb-client` | `src/client/report/bb2020/throw_team_mate_roll_message.rs` | ✓ |
+| `client/report/bb2020/TwoForOneMessage.java` | `ffb-client` | `src/client/report/bb2020/two_for_one_message.rs` | ✓ |
+| `client/report/bb2020/UseFumblerooskieMessage.java` | `ffb-client` | `src/client/report/bb2020/use_fumblerooskie_message.rs` | ✓ |
+| `client/report/bb2020/WeatherMageResultMessage.java` | `ffb-client` | `src/client/report/bb2020/weather_mage_result_message.rs` | ✓ |
+| `client/report/bb2025/AnimalSavageryMessage.java` | `ffb-client` | `src/client/report/bb2025/animal_savagery_message.rs` | ✓ |
+| `client/report/bb2025/ApothecaryRollMessage.java` | `ffb-client` | `src/client/report/bb2025/apothecary_roll_message.rs` | ✓ |
+| `client/report/bb2025/BlitzRollMessage.java` | `ffb-client` | `src/client/report/bb2025/blitz_roll_message.rs` | ✓ |
+| `client/report/bb2025/CheeringFansMessage.java` | `ffb-client` | `src/client/report/bb2025/cheering_fans_message.rs` | ✓ |
+| `client/report/bb2025/ChompRemovedMessage.java` | `ffb-client` | `src/client/report/bb2025/chomp_removed_message.rs` | ✓ |
+| `client/report/bb2025/ChompRollMessage.java` | `ffb-client` | `src/client/report/bb2025/chomp_roll_message.rs` | ✓ |
+| `client/report/bb2025/DodgySnackRollMessage.java` | `ffb-client` | `src/client/report/bb2025/dodgy_snack_roll_message.rs` | ✓ |
+| `client/report/bb2025/GettingEvenRollMessage.java` | `ffb-client` | `src/client/report/bb2025/getting_even_roll_message.rs` | ✓ |
+| `client/report/bb2025/HypnoticGazeRollMessage.java` | `ffb-client` | `src/client/report/bb2025/hypnotic_gaze_roll_message.rs` | ✓ |
+| `client/report/bb2025/InjuryMessage.java` | `ffb-client` | `src/client/report/bb2025/injury_message.rs` | ✓ |
+| `client/report/bb2025/KickoffDodgySnackMessage.java` | `ffb-client` | `src/client/report/bb2025/kickoff_dodgy_snack_message.rs` | ✓ |
+| `client/report/bb2025/KickoffExtraReRollMessage.java` | `ffb-client` | `src/client/report/bb2025/kickoff_extra_re_roll_message.rs` | ✓ |
+| `client/report/bb2025/KickTeamMateFumbleMessage.java` | `ffb-client` | `src/client/report/bb2025/kick_team_mate_fumble_message.rs` | ✓ |
+| `client/report/bb2025/MascotUsedMessage.java` | `ffb-client` | `src/client/report/bb2025/mascot_used_message.rs` | ✓ |
+| `client/report/bb2025/PassRollMessage.java` | `ffb-client` | `src/client/report/bb2025/pass_roll_message.rs` | ✓ |
+| `client/report/bb2025/PickUpRollMessage.java` | `ffb-client` | `src/client/report/bb2025/pick_up_roll_message.rs` | ✓ |
+| `client/report/bb2025/PrayerAmountMessage.java` | `ffb-client` | `src/client/report/bb2025/prayer_amount_message.rs` | ✓ |
+| `client/report/bb2025/PrayerRollMessage.java` | `ffb-client` | `src/client/report/bb2025/prayer_roll_message.rs` | ✓ |
+| `client/report/bb2025/PrayersAndInducementsBoughtMessage.java` | `ffb-client` | `src/client/report/bb2025/prayers_and_inducements_bought_message.rs` | ✓ |
+| `client/report/bb2025/PuntDirectionMessage.java` | `ffb-client` | `src/client/report/bb2025/punt_direction_message.rs` | ✓ |
+| `client/report/bb2025/PuntDistanceMessage.java` | `ffb-client` | `src/client/report/bb2025/punt_distance_message.rs` | ✓ |
+| `client/report/bb2025/PushbackMessage.java` | `ffb-client` | `src/client/report/bb2025/pushback_message.rs` | ✓ |
+| `client/report/bb2025/RaiseDeadMessage.java` | `ffb-client` | `src/client/report/bb2025/raise_dead_message.rs` | ✓ |
+| `client/report/bb2025/SaboteurRollMessage.java` | `ffb-client` | `src/client/report/bb2025/saboteur_roll_message.rs` | ✓ |
+| `client/report/bb2025/SolidDefenceRollMessage.java` | `ffb-client` | `src/client/report/bb2025/solid_defence_roll_message.rs` | ✓ |
+| `client/report/bb2025/StallerDetectedMessage.java` | `ffb-client` | `src/client/report/bb2025/staller_detected_message.rs` | ✓ |
+| `client/report/bb2025/SteadyFootingRollMessage.java` | `ffb-client` | `src/client/report/bb2025/steady_footing_roll_message.rs` | ✓ |
+| `client/report/bb2025/SwarmingPlayersRollMessage.java` | `ffb-client` | `src/client/report/bb2025/swarming_players_roll_message.rs` | ✓ |
+| `client/report/bb2025/SwoopDirectionMessage.java` | `ffb-client` | `src/client/report/bb2025/swoop_direction_message.rs` | ✓ |
+| `client/report/bb2025/SwoopPlayerMessage.java` | `ffb-client` | `src/client/report/bb2025/swoop_player_message.rs` | ✓ |
+| `client/report/bb2025/TeamCaptainRollMessage.java` | `ffb-client` | `src/client/report/bb2025/team_captain_roll_message.rs` | ✓ |
+| `client/report/bb2025/TeamEventMessage.java` | `ffb-client` | `src/client/report/bb2025/team_event_message.rs` | ✓ |
+| `client/report/bb2025/TentaclesShadowingMessage.java` | `ffb-client` | `src/client/report/bb2025/tentacles_shadowing_message.rs` | ✓ |
+| `client/report/bb2025/ThenIStartedBlastinMessage.java` | `ffb-client` | `src/client/report/bb2025/then_i_started_blastin_message.rs` | ✓ |
+| `client/report/bb2025/ThrowAtPlayerMessage.java` | `ffb-client` | `src/client/report/bb2025/throw_at_player_message.rs` | ✓ |
+| `client/report/bb2025/ThrowAtStallingPlayerMessage.java` | `ffb-client` | `src/client/report/bb2025/throw_at_stalling_player_message.rs` | ✓ |
+| `client/report/bb2025/ThrowTeamMateRollMessage.java` | `ffb-client` | `src/client/report/bb2025/throw_team_mate_roll_message.rs` | ✓ |
+| `client/report/bb2025/UseFumblerooskieMessage.java` | `ffb-client` | `src/client/report/bb2025/use_fumblerooskie_message.rs` | ✓ |
+| `client/report/bb2025/WeatherMageResultMessage.java` | `ffb-client` | `src/client/report/bb2025/weather_mage_result_message.rs` | ✓ |
+| `client/report/BiteSpectatorMessage.java` | `ffb-client` | `src/client/report/bite_spectator_message.rs` | ✓ |
+| `client/report/BlockMessage.java` | `ffb-client` | `src/client/report/block_message.rs` | ✓ |
+| `client/report/BlockRollMessage.java` | `ffb-client` | `src/client/report/block_roll_message.rs` | ✓ |
+| `client/report/BombExplodesAfterCatchMessage.java` | `ffb-client` | `src/client/report/bomb_explodes_after_catch_message.rs` | ✓ |
+| `client/report/BombOutOfBoundsMessage.java` | `ffb-client` | `src/client/report/bomb_out_of_bounds_message.rs` | ✓ |
+| `client/report/BribesRollMessage.java` | `ffb-client` | `src/client/report/bribes_roll_message.rs` | ✓ |
+| `client/report/CardDeactivatedMessage.java` | `ffb-client` | `src/client/report/card_deactivated_message.rs` | ✓ |
+| `client/report/CardEffectRollMessage.java` | `ffb-client` | `src/client/report/card_effect_roll_message.rs` | ✓ |
+| `client/report/CatchRollMessage.java` | `ffb-client` | `src/client/report/catch_roll_message.rs` | ✓ |
+| `client/report/ChainsawRollMessage.java` | `ffb-client` | `src/client/report/chainsaw_roll_message.rs` | ✓ |
+| `client/report/CoinThrowMessage.java` | `ffb-client` | `src/client/report/coin_throw_message.rs` | ✓ |
+| `client/report/ConfusionRollMessage.java` | `ffb-client` | `src/client/report/confusion_roll_message.rs` | ✓ |
+| `client/report/DauntlessRollMessage.java` | `ffb-client` | `src/client/report/dauntless_roll_message.rs` | ✓ |
+| `client/report/DefectingPlayersMessage.java` | `ffb-client` | `src/client/report/defecting_players_message.rs` | ✓ |
+| `client/report/DodgeRollMessage.java` | `ffb-client` | `src/client/report/dodge_roll_message.rs` | ✓ |
+| `client/report/DoubleHiredStarPlayerMessage.java` | `ffb-client` | `src/client/report/double_hired_star_player_message.rs` | ✓ |
+| `client/report/EscapeRollMessage.java` | `ffb-client` | `src/client/report/escape_roll_message.rs` | ✓ |
+| `client/report/FoulAppearanceRollMessage.java` | `ffb-client` | `src/client/report/foul_appearance_roll_message.rs` | ✓ |
+| `client/report/FoulMessage.java` | `ffb-client` | `src/client/report/foul_message.rs` | ✓ |
+| `client/report/FumbblResultUploadMessage.java` | `ffb-client` | `src/client/report/fumbbl_result_upload_message.rs` | ✓ |
+| `client/report/GameOptionsMessage.java` | `ffb-client` | `src/client/report/game_options_message.rs` | ✓ |
+| `client/report/HandOverMessage.java` | `ffb-client` | `src/client/report/hand_over_message.rs` | ✓ |
+| `client/report/InterceptionRollMessage.java` | `ffb-client` | `src/client/report/interception_roll_message.rs` | ✓ |
+| `client/report/JumpRollMessage.java` | `ffb-client` | `src/client/report/jump_roll_message.rs` | ✓ |
+| `client/report/JumpUpRollMessage.java` | `ffb-client` | `src/client/report/jump_up_roll_message.rs` | ✓ |
+| `client/report/KickoffResultMessage.java` | `ffb-client` | `src/client/report/kickoff_result_message.rs` | ✓ |
+| `client/report/KickoffScatterMessage.java` | `ffb-client` | `src/client/report/kickoff_scatter_message.rs` | ✓ |
+| `client/report/LeaderMessage.java` | `ffb-client` | `src/client/report/leader_message.rs` | ✓ |
+| `client/report/MasterChefRollMessage.java` | `ffb-client` | `src/client/report/master_chef_roll_message.rs` | ✓ |
+| `client/report/mixed/AllYouCanEatMessage.java` | `ffb-client` | `src/client/report/mixed/all_you_can_eat_message.rs` | ✓ |
+| `client/report/mixed/ArgueTheCallMessage.java` | `ffb-client` | `src/client/report/mixed/argue_the_call_message.rs` | ✓ |
+| `client/report/mixed/BalefulHexRollMessage.java` | `ffb-client` | `src/client/report/mixed/baleful_hex_roll_message.rs` | ✓ |
+| `client/report/mixed/BiasedRefMessage.java` | `ffb-client` | `src/client/report/mixed/biased_ref_message.rs` | ✓ |
+| `client/report/mixed/BlockChoiceMessage.java` | `ffb-client` | `src/client/report/mixed/block_choice_message.rs` | ✓ |
+| `client/report/mixed/BlockReRollMessage.java` | `ffb-client` | `src/client/report/mixed/block_re_roll_message.rs` | ✓ |
+| `client/report/mixed/BloodLustRollMessage.java` | `ffb-client` | `src/client/report/mixed/blood_lust_roll_message.rs` | ✓ |
+| `client/report/mixed/BreatheFireMessage.java` | `ffb-client` | `src/client/report/mixed/breathe_fire_message.rs` | ✓ |
+| `client/report/mixed/BriberyAndCorruptionReRollMessage.java` | `ffb-client` | `src/client/report/mixed/bribery_and_corruption_re_roll_message.rs` | ✓ |
+| `client/report/mixed/BrilliantCoachingReRollsLostMessage.java` | `ffb-client` | `src/client/report/mixed/brilliant_coaching_re_rolls_lost_message.rs` | ✓ |
+| `client/report/mixed/CatchOfTheDayMessage.java` | `ffb-client` | `src/client/report/mixed/catch_of_the_day_message.rs` | ✓ |
+| `client/report/mixed/CloudBursterMessage.java` | `ffb-client` | `src/client/report/mixed/cloud_burster_message.rs` | ✓ |
+| `client/report/mixed/DedicatedFansMessage.java` | `ffb-client` | `src/client/report/mixed/dedicated_fans_message.rs` | ✓ |
+| `client/report/mixed/DoubleHiredStaffMessage.java` | `ffb-client` | `src/client/report/mixed/double_hired_staff_message.rs` | ✓ |
+| `client/report/mixed/EventMessage.java` | `ffb-client` | `src/client/report/mixed/event_message.rs` | ✓ |
+| `client/report/mixed/FanFactorMessage.java` | `ffb-client` | `src/client/report/mixed/fan_factor_message.rs` | ✓ |
+| `client/report/mixed/FreePettyCashMessage.java` | `ffb-client` | `src/client/report/mixed/free_petty_cash_message.rs` | ✓ |
+| `client/report/mixed/GoForItRollMessage.java` | `ffb-client` | `src/client/report/mixed/go_for_it_roll_message.rs` | ✓ |
+| `client/report/mixed/HitAndRunMessage.java` | `ffb-client` | `src/client/report/mixed/hit_and_run_message.rs` | ✓ |
+| `client/report/mixed/IndomitableMessage.java` | `ffb-client` | `src/client/report/mixed/indomitable_message.rs` | ✓ |
+| `client/report/mixed/InducementMessage.java` | `ffb-client` | `src/client/report/mixed/inducement_message.rs` | ✓ |
+| `client/report/mixed/KickoffPitchInvasionMessage.java` | `ffb-client` | `src/client/report/mixed/kickoff_pitch_invasion_message.rs` | ✓ |
+| `client/report/mixed/KickoffSequenceActivationsCountMessage.java` | `ffb-client` | `src/client/report/mixed/kickoff_sequence_activations_count_message.rs` | ✓ |
+| `client/report/mixed/KickoffSequenceActivationsExhaustedMessage.java` | `ffb-client` | `src/client/report/mixed/kickoff_sequence_activations_exhausted_message.rs` | ✓ |
+| `client/report/mixed/KickoffTimeoutMessage.java` | `ffb-client` | `src/client/report/mixed/kickoff_timeout_message.rs` | ✓ |
+| `client/report/mixed/LookIntoMyEyesRollMessage.java` | `ffb-client` | `src/client/report/mixed/look_into_my_eyes_roll_message.rs` | ✓ |
+| `client/report/mixed/ModifiedDodgeResultSuccessfulMessage.java` | `ffb-client` | `src/client/report/mixed/modified_dodge_result_successful_message.rs` | ✓ |
+| `client/report/mixed/ModifiedPassResultMessage.java` | `ffb-client` | `src/client/report/mixed/modified_pass_result_message.rs` | ✓ |
+| `client/report/mixed/MostValuablePlayersMessage.java` | `ffb-client` | `src/client/report/mixed/most_valuable_players_message.rs` | ✓ |
+| `client/report/mixed/NervesOfSteelMessage.java` | `ffb-client` | `src/client/report/mixed/nerves_of_steel_message.rs` | ✓ |
+| `client/report/mixed/OldProMessage.java` | `ffb-client` | `src/client/report/mixed/old_pro_message.rs` | ✓ |
+| `client/report/mixed/PenaltyShootoutMessage.java` | `ffb-client` | `src/client/report/mixed/penalty_shootout_message.rs` | ✓ |
+| `client/report/mixed/PickMeUpMessage.java` | `ffb-client` | `src/client/report/mixed/pick_me_up_message.rs` | ✓ |
+| `client/report/mixed/PickUpRollMessage.java` | `ffb-client` | `src/client/report/mixed/pick_up_roll_message.rs` | ✓ |
+| `client/report/mixed/PlaceBallDirectionMessage.java` | `ffb-client` | `src/client/report/mixed/place_ball_direction_message.rs` | ✓ |
+| `client/report/mixed/PlayerEventMessage.java` | `ffb-client` | `src/client/report/mixed/player_event_message.rs` | ✓ |
+| `client/report/mixed/PrayerEndMessage.java` | `ffb-client` | `src/client/report/mixed/prayer_end_message.rs` | ✓ |
+| `client/report/mixed/PrayerWastedMessage.java` | `ffb-client` | `src/client/report/mixed/prayer_wasted_message.rs` | ✓ |
+| `client/report/mixed/ProjectileVomitMessage.java` | `ffb-client` | `src/client/report/mixed/projectile_vomit_message.rs` | ✓ |
+| `client/report/mixed/PumpUpTheCrowdReRollMessage.java` | `ffb-client` | `src/client/report/mixed/pump_up_the_crowd_re_roll_message.rs` | ✓ |
+| `client/report/mixed/PumpUpTheCrowdReRollsLostMessage.java` | `ffb-client` | `src/client/report/mixed/pump_up_the_crowd_re_rolls_lost_message.rs` | ✓ |
+| `client/report/mixed/QuickSnapRollMessage.java` | `ffb-client` | `src/client/report/mixed/quick_snap_roll_message.rs` | ✓ |
+| `client/report/mixed/RaidingPartyMessage.java` | `ffb-client` | `src/client/report/mixed/raiding_party_message.rs` | ✓ |
+| `client/report/mixed/RefereeMessage.java` | `ffb-client` | `src/client/report/mixed/referee_message.rs` | ✓ |
+| `client/report/mixed/ScatterBallMessage.java` | `ffb-client` | `src/client/report/mixed/scatter_ball_message.rs` | ✓ |
+| `client/report/mixed/ScatterPlayerMessage.java` | `ffb-client` | `src/client/report/mixed/scatter_player_message.rs` | ✓ |
+| `client/report/mixed/SelectBlitzTargetMessage.java` | `ffb-client` | `src/client/report/mixed/select_blitz_target_message.rs` | ✓ |
+| `client/report/mixed/SelectGazeTargetMessage.java` | `ffb-client` | `src/client/report/mixed/select_gaze_target_message.rs` | ✓ |
+| `client/report/mixed/ShowStarReRollMessage.java` | `ffb-client` | `src/client/report/mixed/show_star_re_roll_message.rs` | ✓ |
+| `client/report/mixed/ShowStarReRollsLostMessage.java` | `ffb-client` | `src/client/report/mixed/show_star_re_rolls_lost_message.rs` | ✓ |
+| `client/report/mixed/SkillUseOtherPlayerMessage.java` | `ffb-client` | `src/client/report/mixed/skill_use_other_player_message.rs` | ✓ |
+| `client/report/mixed/SkillWastedMessage.java` | `ffb-client` | `src/client/report/mixed/skill_wasted_message.rs` | ✓ |
+| `client/report/mixed/ThrownKegMessage.java` | `ffb-client` | `src/client/report/mixed/thrown_keg_message.rs` | ✓ |
+| `client/report/mixed/TrapDoorMessage.java` | `ffb-client` | `src/client/report/mixed/trap_door_message.rs` | ✓ |
+| `client/report/mixed/TurnEndMessage.java` | `ffb-client` | `src/client/report/mixed/turn_end_message.rs` | ✓ |
+| `client/report/mixed/WeatherMageRollMessage.java` | `ffb-client` | `src/client/report/mixed/weather_mage_roll_message.rs` | ✓ |
+| `client/report/mixed/WinningsMessage.java` | `ffb-client` | `src/client/report/mixed/winnings_message.rs` | ✓ |
+| `client/report/PassBlockMessage.java` | `ffb-client` | `src/client/report/pass_block_message.rs` | ✓ |
+| `client/report/PassDeviateMessage.java` | `ffb-client` | `src/client/report/pass_deviate_message.rs` | ✓ |
+| `client/report/PettyCashMessage.java` | `ffb-client` | `src/client/report/petty_cash_message.rs` | ✓ |
+| `client/report/PilingOnMessage.java` | `ffb-client` | `src/client/report/piling_on_message.rs` | ✓ |
+| `client/report/PlayCardMessage.java` | `ffb-client` | `src/client/report/play_card_message.rs` | ✓ |
+| `client/report/PlayerActionMessage.java` | `ffb-client` | `src/client/report/player_action_message.rs` | ✓ |
+| `client/report/PushbackMessage.java` | `ffb-client` | `src/client/report/pushback_message.rs` | ✓ |
+| `client/report/ReceiveChoiceMessage.java` | `ffb-client` | `src/client/report/receive_choice_message.rs` | ✓ |
+| `client/report/RegenerationRollMessage.java` | `ffb-client` | `src/client/report/regeneration_roll_message.rs` | ✓ |
+| `client/report/ReportMessageBase.java` | `ffb-client` | `src/client/report/report_message_base.rs` | ✓ |
+| `client/report/ReportMessageType.java` | `ffb-client` | `src/client/report/report_message_type.rs` | ✓ |
+| `client/report/ReRollMessage.java` | `ffb-client` | `src/client/report/re_roll_message.rs` | ✓ |
+| `client/report/RightStuffRollMessage.java` | `ffb-client` | `src/client/report/right_stuff_roll_message.rs` | ✓ |
+| `client/report/RiotousRookiesMessage.java` | `ffb-client` | `src/client/report/riotous_rookies_message.rs` | ✓ |
+| `client/report/SafeThrowRollMessage.java` | `ffb-client` | `src/client/report/safe_throw_roll_message.rs` | ✓ |
+| `client/report/SecretWeaponBanMessage.java` | `ffb-client` | `src/client/report/secret_weapon_ban_message.rs` | ✓ |
+| `client/report/SkillUseMessage.java` | `ffb-client` | `src/client/report/skill_use_message.rs` | ✓ |
+| `client/report/SpellEffectRollMessage.java` | `ffb-client` | `src/client/report/spell_effect_roll_message.rs` | ✓ |
+| `client/report/StandUpRollMessage.java` | `ffb-client` | `src/client/report/stand_up_roll_message.rs` | ✓ |
+| `client/report/StartHalfMessage.java` | `ffb-client` | `src/client/report/start_half_message.rs` | ✓ |
+| `client/report/ThrowInMessage.java` | `ffb-client` | `src/client/report/throw_in_message.rs` | ✓ |
+| `client/report/TimeoutEnforcedMessage.java` | `ffb-client` | `src/client/report/timeout_enforced_message.rs` | ✓ |
+| `client/report/WeatherMessage.java` | `ffb-client` | `src/client/report/weather_message.rs` | ✓ |
+| `client/report/WeepingDaggerRollMessage.java` | `ffb-client` | `src/client/report/weeping_dagger_roll_message.rs` | ✓ |
+| `client/report/WizardUseMessage.java` | `ffb-client` | `src/client/report/wizard_use_message.rs` | ✓ |
 
 ### client/root/ (31 files)
 
@@ -3332,14 +3370,14 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `client/IconCache.java` | `ffb-client` | `src/client/IconCache.rs` | — |
 | `client/IProgressListener.java` | `ffb-client` | `src/client/i_progress_listener.rs` | ✓ |
 | `client/LayoutSettings.java` | `ffb-client` | `src/client/LayoutSettings.rs` | — |
-| `client/ParagraphStyle.java` | `ffb-client` | `src/client/ParagraphStyle.rs` | — |
+| `client/ParagraphStyle.java` | `ffb-client` | `src/client/paragraph_style.rs` | ✓ (un-skipped: plain string-keyed enum, no AWT/Swing — miscategorized in the ZW.0 bulk audit alongside genuinely-Swing root files) |
 | `client/PitchDimensionProvider.java` | `ffb-client` | `src/client/PitchDimensionProvider.rs` | — |
 | `client/PlayerIconFactory.java` | `ffb-client` | `src/client/PlayerIconFactory.rs` | — (triage correction: every method operates on `BufferedImage`/`Graphics2D` — genuine AWT icon compositing, not narrowly Swing-touched) |
 | `client/RenderContext.java` | `ffb-client` | `src/client/RenderContext.rs` | — |
 | `client/ReplayControl.java` | `ffb-client` | `src/client/ReplayControl.rs` | — (triage correction: `extends JPanel implements MouseInputListener` — a real Swing widget, not plain logic) |
-| `client/StatusReport.java` | `ffb-client` | `src/client/StatusReport.rs` | ~ (blocked: every `print`/`println` routes through `getUserInterface().getLog()` (GUI); `report()` dispatches to `client/report/ReportMessageBase` renderers, not yet translated — that's Phase ZW.3's 211-file `client/report/` work. Revisit once ZW.3 lands a headless log sink) |
+| `client/StatusReport.java` | `ffb-client` | `src/client/status_report.rs` | ✓ (unblocked by ZW.3: the one Swing sink, `getUserInterface().getLog().append(...)`, is now a headless `rendered_runs: Vec<RenderedRun>` capture) |
 | `client/StyleProvider.java` | `ffb-client` | `src/client/StyleProvider.rs` | — |
-| `client/TextStyle.java` | `ffb-client` | `src/client/TextStyle.rs` | — |
+| `client/TextStyle.java` | `ffb-client` | `src/client/text_style.rs` | ✓ (un-skipped: plain string-keyed enum, no AWT/Swing — miscategorized in the ZW.0 bulk audit alongside genuinely-Swing root files) |
 | `client/UiDimensionProvider.java` | `ffb-client` | `src/client/UiDimensionProvider.rs` | — |
 | `client/UserInterface.java` | `ffb-client` | `src/client/UserInterface.rs` | ○ |
 | `client/UtilStyle.java` | `ffb-client` | `src/client/UtilStyle.rs` | — |

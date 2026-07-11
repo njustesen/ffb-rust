@@ -117,16 +117,25 @@ closeout.
   resulting client state + emitted `ClientCommand`s (dice-free, so cheap to pin). Per
   handler: command in → model mutation + UI-event out. Target ≥3 tests/file average.
 
-### ZW.3 — Client report renderers (~½–1 session)
-211 `client/report` files: each `ReportMessage*` builds styled text paragraphs from a
-report object. Translate 1:1 with styles as data; unit test = construct report → assert
-exact text runs + style tags (pin a representative case per branch, like the Phase ZU
-round-trip convention).
+### ZW.3 — Client report renderers (~½–1 session) — DONE, 2026-07-11
+211 `client/report` files translated (55 root + 32 bb2016 + 26 bb2020 + 39 bb2025 + 57
+mixed), each a `ReportMessage` trait impl built 1:1 with styles as plain data. Unit tests
+construct a representative report → call `render()` → assert exact emitted text runs +
+style tags, per file (pinned per logical branch, mirroring the Phase ZU round-trip
+convention). Required un-skipping `TextStyle`/`ParagraphStyle` (miscategorized as Swing
+in ZW.0 — both are plain string-keyed enums) and giving `StatusReport` a real translation
+first, replacing its one Swing sink with a headless `Vec<RenderedRun>` capture. See
+`TRANSLATION_TRACKER.md`'s Progress Summary for full detail, including the small
+`ffb-model` gaps filled along the way (`PlayerGender`/`PlayerAction` missing getters) and
+the per-file `// java:` gap comments where the report data model doesn't retain enough
+(e.g. `RollModifier` magnitude).
 
-### ZW.4 — Docs & progress update (closeout)
-- Tracker: 373 rows `○`→`✓`, summary regenerated; Session History row for ZW.
-- SESSION.md phase entry; refresh `T3_COVERAGE.md` caveat that parity remains paused.
-- Progress claims in all docs use the honest LOC metric from this plan.
+### ZW.4 — Docs & progress update (closeout) — DONE, 2026-07-11
+- Tracker: 216 rows (211 `client/report/*` + 5 prerequisites) flipped to `✓`; Progress
+  Summary and Session History updated with the real test-count delta (+893).
+- SESSION.md phase entry added; `T3_COVERAGE.md` caveat re-confirmed (parity stays
+  paused this phase, as planned).
+- Progress claims below updated with the actual final numbers.
 
 ## Test budget
 
@@ -143,7 +152,7 @@ report +~800–1,000 (211 files × ~4), plus incidental model/protocol tests.
 | Post-ZV | ~87% | ~74% | 14,794 |
 | Post-ZW.2c (actual, 2026-07-10) | ~89% | ~75% | 15,647 |
 | Post-`client/state/` complete (actual, 2026-07-11) | ~93% | ~79% | 16,412 |
-| After full Phase ZW (projected) | **~100%** | ~85% | ~17,500 |
+| After full Phase ZW (actual, 2026-07-11) | **~100%** | ~85% | 17,305 |
 
 What remains after ZW, permanently or pending a separate decision: Swing dialog/ui/layer
 rendering (~31k), the AWT app (~9.4k), `ffb-tools` (0.7k) — plus the two big non-translation
