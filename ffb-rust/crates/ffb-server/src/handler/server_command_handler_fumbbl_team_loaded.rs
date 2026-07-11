@@ -1,8 +1,16 @@
 /// 1:1 translation of com.fumbbl.ffb.server.handler.ServerCommandHandlerFumbblTeamLoaded.
+use std::sync::Mutex;
+
+use tokio::sync::mpsc;
+
 use ffb_model::enums::NetCommandId;
+use crate::db::db_connection_manager::DbConnectionManager;
 use crate::game_cache::GameCache;
+use crate::model::received_command::SessionId;
 use crate::net::commands::internal_server_command::InternalServerCommand;
 use crate::net::commands::internal_server_command_fumbbl_team_loaded::InternalServerCommandFumbblTeamLoaded;
+use crate::net::session_manager::SessionManager;
+use crate::util::server_start_game::{self, MarkerContext};
 
 pub struct ServerCommandHandlerFumbblTeamLoaded;
 
@@ -29,30 +37,60 @@ impl ServerCommandHandlerFumbblTeamLoaded {
     /// return true;
     /// ```
     ///
-    /// `UtilServerStartGame::join_game_as_player_and_check_if_ready_to_start` is explicitly
-    /// unported in the Rust engine (see `ffb_engine::util::util_server_start_game`, which
-    /// documents it as skipped: it touches the DB, the WebSocket session, `SessionManager`, and
-    /// the step `SequenceGenerator` — none of which have a session-aware equivalent reachable
-    /// from here yet). The `GameCache` lookup and the null-gamestate short-circuit are ported
-    /// for real below; the join/ready-check dispatch is the single narrowly-gated remainder.
-    pub fn handle_command(
+    /// `UtilServerStartGame::join_game_as_player_and_check_if_ready_to_start` is now ported
+    /// for real (Phase ZX.3, `util::server_start_game`), so this handler calls it for real
+    /// below. `session_id`/`sender` stand in for Java's `pReceivedCommand.getSession()`
+    /// (per this crate's convention of threading the session explicitly rather than a
+    /// Jetty `Session` object — see `server_command_handler_join_approved.rs`).
+    /// `FumbblRequestCheckGamestate` has no Rust translation anywhere in this crate, so
+    /// that enqueue remains a documented, logged gap rather than a fabricated stand-in.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn handle_command(
         &self,
         command: &InternalServerCommandFumbblTeamLoaded,
         game_cache: &GameCache,
+        session_manager: &Mutex<SessionManager>,
+        session_id: SessionId,
+        sender: mpsc::UnboundedSender<String>,
+        db: &DbConnectionManager,
+        client_properties: &[(String, String)],
+        marker_ctx: Option<MarkerContext<'_>>,
     ) -> bool {
         let game_state = match game_cache.get_game_state_by_id(command.get_game_id()) {
             Some(gs) => gs,
             None => return false,
         };
 
-        let _ = game_state;
-        let _ = command.get_coach();
-        let _ = command.is_home_team();
-        let _ = command.get_account_properties();
-        todo!(
-            "Phase ZV: needs UtilServerStartGame::join_game_as_player_and_check_if_ready_to_start \
-             (+ FumbblRequestCheckGamestate enqueue), not yet wired"
+        let game = match game_state.get_game() {
+            Some(g) => g,
+            None => return false,
+        };
+
+        let ready_to_start = server_start_game::join_game_as_player_and_check_if_ready_to_start(
+            game,
+            command.get_game_id(),
+            session_manager,
+            session_id,
+            command.get_coach().to_string(),
+            command.is_home_team(),
+            command.get_account_properties().to_vec(),
+            sender,
+            db,
+            client_properties,
+            marker_ctx,
         )
+        .await;
+
+        if ready_to_start {
+            // Java: `getServer().getRequestProcessor().add(new FumbblRequestCheckGamestate(gameState))`.
+            // No `FumbblRequestCheckGamestate` exists in this crate — documented gap.
+            log::debug!(
+                "game {}: ready to start — FumbblRequestCheckGamestate not ported",
+                command.get_game_id()
+            );
+        }
+
+        true
     }
 }
 
@@ -65,6 +103,35 @@ impl Default for ServerCommandHandlerFumbblTeamLoaded {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ffb_model::enums::Rules;
+    use ffb_model::model::team::Team;
+
+    fn team(id: &str, coach: &str) -> Team {
+        Team {
+            id: id.into(),
+            name: format!("Team {}", id),
+            race: "Human".into(),
+            roster_id: "human".into(),
+            coach: coach.into(),
+            rerolls: 0,
+            apothecaries: 0,
+            bribes: 0,
+            master_chefs: 0,
+            prayers_to_nuffle: 0,
+            bloodweiser_kegs: 0,
+            riotous_rookies: 0,
+            cheerleaders: 0,
+            assistant_coaches: 0,
+            fan_factor: 0,
+            dedicated_fans: 0,
+            team_value: 0,
+            treasury: 0,
+            special_rules: vec![],
+            players: vec![],
+            vampire_lord: false,
+            necromancer: false,
+        }
+    }
 
     #[test]
     fn construct() {
@@ -77,26 +144,51 @@ mod tests {
         assert_eq!(h.get_id(), NetCommandId::InternalServerFumbblTeamLoaded);
     }
 
-    #[test]
-    fn handle_command_missing_gamestate_returns_false() {
+    #[tokio::test]
+    async fn handle_command_missing_gamestate_returns_false() {
         let h = ServerCommandHandlerFumbblTeamLoaded::new();
         let cache = GameCache::new();
+        let sm = Mutex::new(SessionManager::new());
+        let db = DbConnectionManager::new();
+        let (tx, _rx) = mpsc::unbounded_channel();
         let command = InternalServerCommandFumbblTeamLoaded::new(999, "coach".into(), true, vec![]);
-        assert!(!h.handle_command(&command, &cache));
+        assert!(!h.handle_command(&command, &cache, &sm, 1, tx, &db, &[], None).await);
     }
 
-    #[test]
-    fn handle_command_missing_gamestate_does_not_reach_join_dispatch() {
+    #[tokio::test]
+    async fn handle_command_missing_gamestate_does_not_reach_join_dispatch() {
         // A game id that was never created in the cache must short-circuit before the
-        // (currently unwired) join/ready-check dispatch, for any coach/home-team combination.
+        // join/ready-check dispatch, for any coach/home-team combination.
         let h = ServerCommandHandlerFumbblTeamLoaded::new();
         let cache = GameCache::new();
+        let sm = Mutex::new(SessionManager::new());
+        let db = DbConnectionManager::new();
+        let (tx, _rx) = mpsc::unbounded_channel();
         let command = InternalServerCommandFumbblTeamLoaded::new(
             424242,
             "AwayCoach".into(),
             false,
             vec!["DEV".into()],
         );
-        assert!(!h.handle_command(&command, &cache));
+        assert!(!h.handle_command(&command, &cache, &sm, 1, tx, &db, &[], None).await);
+    }
+
+    #[tokio::test]
+    async fn handle_command_registers_the_joining_session() {
+        let h = ServerCommandHandlerFumbblTeamLoaded::new();
+        let mut cache = GameCache::new();
+        let game_id = cache.create_game_state();
+        cache
+            .get_game_state_by_id_mut(game_id)
+            .unwrap()
+            .start_game(team("home", "Home"), team("away", "Away"), Rules::Bb2025, 0);
+        let sm = Mutex::new(SessionManager::new());
+        let db = DbConnectionManager::new();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let command = InternalServerCommandFumbblTeamLoaded::new(game_id, "Home".into(), true, vec![]);
+
+        let result = h.handle_command(&command, &cache, &sm, 1, tx, &db, &[], None).await;
+        assert!(result);
+        assert_eq!(sm.lock().unwrap().get_coach_for_session(1), Some("Home"));
     }
 }
