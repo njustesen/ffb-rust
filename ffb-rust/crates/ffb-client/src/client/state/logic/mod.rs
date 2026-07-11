@@ -7,6 +7,7 @@
 pub mod client_action;
 pub mod influences;
 pub mod interaction;
+pub mod plugin;
 
 pub use client_action::ClientAction;
 pub use influences::Influences;
