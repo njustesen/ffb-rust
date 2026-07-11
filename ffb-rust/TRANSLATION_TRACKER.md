@@ -29,6 +29,48 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase ZVB (sketch/marker handler family wired into live dispatch, this session):**
+Wired the sketch/marker family of already-translated, already-unit-tested `ServerCommandHandler*`
+structs into `ServerCommandHandlerFactory::handle_command`'s live dispatch, following the
+Phase ZVA pattern: `ServerCommandHandlerAddSketch`, `ServerCommandHandlerClearSketches`,
+`ServerCommandHandlerRemoveSketches`, `ServerCommandHandlerSketchAddCoordinate`,
+`ServerCommandHandlerSketchSetColor`, `ServerCommandHandlerSketchSetLabel`,
+`ServerCommandHandlerSetMarker`, `ServerCommandHandlerSetPreventSketching`,
+`ServerCommandHandlerUpdatePlayerMarkings`, and `ServerCommandHandlerLoadAutomaticPlayerMarkings`
+each got a new `ffb_protocol::client_commands::ClientCommand` variant (`ClientAddSketch`,
+`ClientClearSketches`, `ClientRemoveSketches`, `ClientSketchAddCoordinate`,
+`ClientSketchSetColor`, `ClientSketchSetLabel`, `ClientSetMarker`, `ClientSetPreventSketching`,
+`ClientUpdatePlayerMarkings`, `ClientLoadAutomaticPlayerMarkings`) mirroring the field shape of
+the `ffb_protocol::commands::*` struct each handler was originally translated against, plus a
+factory dispatch arm and constructor wiring. All six sketch handlers now share the factory's one
+`ServerSketchManager` (already built for `ServerCommandHandlerSocketClosed`), exposed as a new
+`pub sketch_manager` field; `SetMarker` reuses the factory's existing `game_cache`/
+`session_manager`; `SetPreventSketching` reuses the `replay_states` map already created for
+`TransferControl` (same documented "no server-level `ReplayCache` yet" gap); `UpdatePlayerMarkings`/
+`LoadAutomaticPlayerMarkings` share one new `ServerRequestProcessor` and HTTP client (URL template
+defaults to empty, same "no server-startup config wiring yet" gap as `team_cache`/`roster_cache`).
+`ServerCommandHandlerApplyAutomatedPlayerMarkings` and
+`ServerCommandHandlerCalculateAutomaticPlayerMarkings` are `AnyInternalServerCommand`s whose
+`InternalServerCommand*` payload carries `AutoMarkingConfig`/`Game` as opaque, undecoded `String`s
+(no serde impl exists for `AutoMarkingConfig`); rather than inventing a decode format, these two
+got explicit, documented no-op match arms in `handle_internal_command` (each handler itself
+remains real and unit-tested on its own).
+
+Fixed two more pre-existing `Send`-future bugs uncovered by making these handlers reachable from
+`tokio::spawn(dispatch_loop(...))`: `ServerCommandHandlerUpdatePlayerMarkings::handle_command` now
+takes `&Arc<Mutex<GameCache>>`/`&Arc<Mutex<SessionManager>>` instead of plain references, locking
+and dropping around each `.await` individually instead of the factory holding both `MutexGuard`s
+for the whole async call (same shape as `ServerCommandHandlerDeleteGame`'s existing
+`DbConnectionManager` clone-out fix); and a new `LazyReqwestHttpClient`
+(`crates/ffb-server/src/request/fumbbl/util_fumbbl_request.rs`) builds a transient
+`reqwest::blocking::Client` per `fetch_page` call instead of the factory eagerly constructing one
+`ReqwestHttpClient` up front — the latter panicked ("Cannot drop a runtime in a context where
+blocking is not allowed") the moment any `#[tokio::test]` constructed *and dropped* a factory,
+since `ServerRequestProcessor::run()` (the only real caller of `fetch_page`) runs off the async
+dispatch path so a transient client there is safe. Added a unit test per newly-wired arm in
+`server_command_handler_factory.rs` proving the real handler runs. `cargo test --workspace`:
+17286 → 17306 tests, 0 failures.
+
 **Phase ZVA (session/game-lifecycle handler family wired into live dispatch, this session):**
 Wired the session/game-lifecycle family of already-translated, already-unit-tested
 `ServerCommandHandler*` structs into `ServerCommandHandlerFactory::handle_command`'s live

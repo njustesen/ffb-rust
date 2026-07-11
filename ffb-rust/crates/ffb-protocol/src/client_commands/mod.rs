@@ -95,6 +95,26 @@ pub enum ClientCommand {
     ClientRequestVersion(ClientRequestVersion),
     /// Request a password challenge for FUMBBL auth.
     ClientPasswordChallenge(ClientPasswordChallenge),
+    /// Add a field sketch.
+    ClientAddSketch(ClientAddSketch),
+    /// Clear all field sketches for the sending session (and replay peers).
+    ClientClearSketches(ClientClearSketches),
+    /// Remove one or more field sketches by id.
+    ClientRemoveSketches(ClientRemoveSketches),
+    /// Append a path coordinate to an in-progress sketch.
+    ClientSketchAddCoordinate(ClientSketchAddCoordinate),
+    /// Set the color of one or more sketches.
+    ClientSketchSetColor(ClientSketchSetColor),
+    /// Set the label of one or more sketches.
+    ClientSketchSetLabel(ClientSketchSetLabel),
+    /// Set a field/player marker's text.
+    ClientSetMarker(ClientSetMarker),
+    /// Prevent (or allow) a coach from sketching during a replay.
+    ClientSetPreventSketching(ClientSetPreventSketching),
+    /// Update (or request) automatic/manual player markings.
+    ClientUpdatePlayerMarkings(ClientUpdatePlayerMarkings),
+    /// Load automatic player markings for a given game version.
+    ClientLoadAutomaticPlayerMarkings(ClientLoadAutomaticPlayerMarkings),
 }
 
 // ── Individual client command structs ─────────────────────────────────────────
@@ -338,6 +358,76 @@ pub struct ClientPasswordChallenge {
     pub coach: Option<String>,
 }
 
+/// Mirrors `ffb_protocol::commands::client_command_add_sketch::ClientCommandAddSketch`'s
+/// field shape (entropy dropped, matching the rest of this enum's variants).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientAddSketch {
+    pub sketch_id: Option<String>,
+}
+
+/// Mirrors `ClientCommandClearSketches` (no payload beyond entropy).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientClearSketches;
+
+/// Mirrors `ClientCommandRemoveSketches`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientRemoveSketches {
+    pub ids: Vec<String>,
+}
+
+/// Mirrors `ClientCommandSketchAddCoordinate`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientSketchAddCoordinate {
+    pub sketch_id: Option<String>,
+    pub coordinate: Option<FieldCoordinate>,
+}
+
+/// Mirrors `ClientCommandSketchSetColor`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientSketchSetColor {
+    pub sketch_ids: Vec<String>,
+    pub rgb: i32,
+}
+
+/// Mirrors `ClientCommandSketchSetLabel`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientSketchSetLabel {
+    pub sketch_ids: Vec<String>,
+    pub label: Option<String>,
+}
+
+/// Mirrors `ClientCommandSetMarker`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientSetMarker {
+    pub player_id: Option<String>,
+    pub coordinate: Option<FieldCoordinate>,
+    pub text: Option<String>,
+}
+
+/// Mirrors `ClientCommandSetPreventSketching`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientSetPreventSketching {
+    pub coach: Option<String>,
+    pub prevent_sketching: bool,
+}
+
+/// Mirrors `ClientCommandUpdatePlayerMarkings`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientUpdatePlayerMarkings {
+    pub auto: bool,
+    pub sort_mode_name: Option<String>,
+}
+
+/// Mirrors `ClientCommandLoadAutomaticPlayerMarkings`. The `game` field (full `Game` object)
+/// is omitted here as it's optional in Java and not needed to build
+/// `FumbblRequestLoadPlayerMarkingsForGameVersion`, whose Rust constructor was ported to take
+/// only `index`/`coach` — see `ServerCommandHandlerLoadAutomaticPlayerMarkings::build_request`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientLoadAutomaticPlayerMarkings {
+    pub index: i32,
+    pub coach: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -446,6 +536,78 @@ mod tests {
     fn client_password_challenge_round_trip() {
         rt(&ClientCommand::ClientPasswordChallenge(ClientPasswordChallenge {
             coach: Some("coach2".into()),
+        }));
+    }
+
+    #[test]
+    fn client_add_sketch_round_trip() {
+        rt(&ClientCommand::ClientAddSketch(ClientAddSketch { sketch_id: Some("sk-1".into()) }));
+    }
+
+    #[test]
+    fn client_clear_sketches_round_trip() {
+        rt(&ClientCommand::ClientClearSketches(ClientClearSketches));
+    }
+
+    #[test]
+    fn client_remove_sketches_round_trip() {
+        rt(&ClientCommand::ClientRemoveSketches(ClientRemoveSketches { ids: vec!["sk-1".into()] }));
+    }
+
+    #[test]
+    fn client_sketch_add_coordinate_round_trip() {
+        rt(&ClientCommand::ClientSketchAddCoordinate(ClientSketchAddCoordinate {
+            sketch_id: Some("sk-1".into()),
+            coordinate: Some(FieldCoordinate::new(3, 4)),
+        }));
+    }
+
+    #[test]
+    fn client_sketch_set_color_round_trip() {
+        rt(&ClientCommand::ClientSketchSetColor(ClientSketchSetColor {
+            sketch_ids: vec!["sk-1".into()],
+            rgb: 0xFF00FF,
+        }));
+    }
+
+    #[test]
+    fn client_sketch_set_label_round_trip() {
+        rt(&ClientCommand::ClientSketchSetLabel(ClientSketchSetLabel {
+            sketch_ids: vec!["sk-1".into()],
+            label: Some("Arrow".into()),
+        }));
+    }
+
+    #[test]
+    fn client_set_marker_round_trip() {
+        rt(&ClientCommand::ClientSetMarker(ClientSetMarker {
+            player_id: Some("p1".into()),
+            coordinate: Some(FieldCoordinate::new(1, 1)),
+            text: Some("Nice job".into()),
+        }));
+    }
+
+    #[test]
+    fn client_set_prevent_sketching_round_trip() {
+        rt(&ClientCommand::ClientSetPreventSketching(ClientSetPreventSketching {
+            coach: Some("coach1".into()),
+            prevent_sketching: true,
+        }));
+    }
+
+    #[test]
+    fn client_update_player_markings_round_trip() {
+        rt(&ClientCommand::ClientUpdatePlayerMarkings(ClientUpdatePlayerMarkings {
+            auto: true,
+            sort_mode_name: Some("NAME".into()),
+        }));
+    }
+
+    #[test]
+    fn client_load_automatic_player_markings_round_trip() {
+        rt(&ClientCommand::ClientLoadAutomaticPlayerMarkings(ClientLoadAutomaticPlayerMarkings {
+            index: 1,
+            coach: Some("Coach".into()),
         }));
     }
 }

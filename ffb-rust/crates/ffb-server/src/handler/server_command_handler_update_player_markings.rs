@@ -81,29 +81,38 @@ impl ServerCommandHandlerUpdatePlayerMarkings {
     }
 
     /// Java: handleCommand(ReceivedCommand) — handles updating player markings.
+    ///
+    /// Takes `Arc<Mutex<..>>` rather than plain references so every lock acquired here is
+    /// dropped before crossing an `.await` point (`std::sync::MutexGuard` is `!Send`, and this
+    /// method is reachable from `ServerCommandHandlerFactory::handle_command`, which runs
+    /// inside `tokio::spawn(dispatch_loop(...))` — same fix shape as
+    /// `ServerCommandHandlerDeleteGame::handle_command`'s own `DbConnectionManager` clone).
     pub async fn handle_command(
         &self,
         command: &ClientCommandUpdatePlayerMarkings,
         session_id: SessionId,
-        game_cache: &mut GameCache,
-        session_manager: &SessionManager,
+        game_cache: &Arc<Mutex<GameCache>>,
+        session_manager: &Arc<Mutex<SessionManager>>,
     ) -> bool {
         // Java: long gameId = sessionManager.getGameIdForSession(session);
         //       GameState gameState = getGameCache().getGameStateById(gameId);
         //       if (gameState == null) return false;
-        let game_id = session_manager.get_game_id_for_session(session_id);
-        if game_cache.get_game_state_by_id(game_id).is_none() {
-            return false;
-        }
-
         // Java: ClientMode mode = sessionManager.getModeForSession(session);
-        let mode = session_manager.get_mode_for_session(session_id);
-
         // Java: boolean isHome = UtilServerSteps.checkCommandIsFromHomePlayer(gameState, receivedCommand);
         // `checkCommandIsFromHomePlayer` ultimately compares the sending session against the
         // registered home coach session for the game — exactly what
         // `SessionManager::get_session_of_home_coach` already provides.
-        let is_home = session_manager.get_session_of_home_coach(game_id) == Some(session_id);
+        let (game_id, mode, is_home) = {
+            let sm = session_manager.lock().unwrap();
+            let game_id = sm.get_game_id_for_session(session_id);
+            (game_id, sm.get_mode_for_session(session_id), sm.get_session_of_home_coach(game_id) == Some(session_id))
+        };
+        {
+            let gc = game_cache.lock().unwrap();
+            if gc.get_game_state_by_id(game_id).is_none() {
+                return false;
+            }
+        }
 
         // Java: if (!commandUpdatePlayerMarkings.isAuto()) sessionManager.removeAutoMarking(session);
         // The Rust `SessionManager` tracks no per-session "auto marking" flag, so there is no
@@ -114,26 +123,32 @@ impl ServerCommandHandlerUpdatePlayerMarkings {
                 // Java: new MarkerLoadingService().loadMarker(gameState, session, isHome,
                 //     commandUpdatePlayerMarkings.isAuto(), commandUpdatePlayerMarkings.getSortMode());
                 if command.is_auto() {
-                    let coach = session_manager.get_coach_for_session(session_id).unwrap_or_default().to_string();
+                    let coach = {
+                        session_manager.lock().unwrap().get_coach_for_session(session_id).unwrap_or_default().to_string()
+                    };
                     self.enqueue_load_player_markings(coach);
                 } else {
                     // Java: `DbPlayerMarkersQuery.execute(gameState, isHome)` — clears the
                     // requesting side's marker text and repopulates it from the DB.
-                    let manager = self.db_connection_manager.lock().unwrap();
+                    let manager = self.db_connection_manager.lock().unwrap().clone();
                     if manager.pool_ready() {
                         if let Ok(mut conn) = manager.open_db_connection().await {
-                            if let Some(game_state) = game_cache.get_game_state_by_id_mut(game_id) {
-                                if let Some(game) = game_state.get_game_mut() {
-                                    let team_id = if is_home {
-                                        game.team_home.id.clone()
-                                    } else {
-                                        game.team_away.id.clone()
-                                    };
-                                    if !team_id.is_empty() {
-                                        if let Ok(rows) =
-                                            DbPlayerMarkersQuery::new().execute(&mut conn, &team_id).await
-                                        {
-                                            apply_player_markers(game, is_home, rows);
+                            let team_id = {
+                                let mut gc = game_cache.lock().unwrap();
+                                gc.get_game_state_by_id_mut(game_id).and_then(|gs| gs.get_game_mut()).map(|game| {
+                                    if is_home { game.team_home.id.clone() } else { game.team_away.id.clone() }
+                                })
+                            };
+                            if let Some(team_id) = team_id {
+                                if !team_id.is_empty() {
+                                    if let Ok(rows) =
+                                        DbPlayerMarkersQuery::new().execute(&mut conn, &team_id).await
+                                    {
+                                        let mut gc = game_cache.lock().unwrap();
+                                        if let Some(game_state) = gc.get_game_state_by_id_mut(game_id) {
+                                            if let Some(game) = game_state.get_game_mut() {
+                                                apply_player_markers(game, is_home, rows);
+                                            }
                                         }
                                     }
                                 }
@@ -146,11 +161,14 @@ impl ServerCommandHandlerUpdatePlayerMarkings {
             Some(ClientMode::SPECTATOR) => {
                 if command.is_auto() {
                     // Java: getRequestProcessor().add(new FumbblRequestLoadPlayerMarkings(gameState, session, sortMode));
-                    let coach = session_manager.get_coach_for_session(session_id).unwrap_or_default().to_string();
+                    let coach = {
+                        session_manager.lock().unwrap().get_coach_for_session(session_id).unwrap_or_default().to_string()
+                    };
                     self.enqueue_load_player_markings(coach);
                 } else {
                     // Java: getCommunication().sendUpdateLocalPlayerMarkers(session, Collections.emptyList());
-                    send_update_local_player_markers(session_manager, session_id, &[]);
+                    let sm = session_manager.lock().unwrap();
+                    send_update_local_player_markers(&sm, session_id, &[]);
                 }
             }
             _ => {}
@@ -222,25 +240,25 @@ mod tests {
     #[tokio::test]
     async fn handle_command_missing_gamestate_returns_false() {
         let h = handler();
-        let mut cache = GameCache::new();
-        let sm = SessionManager::new();
+        let cache = Arc::new(Mutex::new(GameCache::new()));
+        let sm = Arc::new(Mutex::new(SessionManager::new()));
         let command = ClientCommandUpdatePlayerMarkings { entropy: None, auto: false, sort_mode_name: None };
         // No session registered => get_game_id_for_session returns 0 => no gamestate found.
-        assert!(!h.handle_command(&command, 1, &mut cache, &sm).await);
+        assert!(!h.handle_command(&command, 1, &cache, &sm).await);
     }
 
     #[tokio::test]
     async fn handle_command_spectator_non_auto_sends_empty_markers() {
         let h = handler();
-        let mut cache = GameCache::new();
-        let game_id = cache.create_game_state();
+        let cache = Arc::new(Mutex::new(GameCache::new()));
+        let game_id = cache.lock().unwrap().create_game_state();
 
-        let mut sm = SessionManager::new();
+        let sm = Arc::new(Mutex::new(SessionManager::new()));
         let (tx, mut rx) = mpsc::unbounded_channel();
-        sm.add_session(1, game_id, "Spec".into(), ClientMode::SPECTATOR, false, vec![], tx);
+        sm.lock().unwrap().add_session(1, game_id, "Spec".into(), ClientMode::SPECTATOR, false, vec![], tx);
 
         let command = ClientCommandUpdatePlayerMarkings { entropy: None, auto: false, sort_mode_name: None };
-        assert!(h.handle_command(&command, 1, &mut cache, &sm).await);
+        assert!(h.handle_command(&command, 1, &cache, &sm).await);
 
         let sent = rx.try_recv().expect("expected an empty markers message");
         assert!(sent.contains("\"markers\":[]"));
@@ -249,46 +267,46 @@ mod tests {
     #[tokio::test]
     async fn handle_command_spectator_auto_enqueues_a_request() {
         let h = handler();
-        let mut cache = GameCache::new();
-        let game_id = cache.create_game_state();
+        let cache = Arc::new(Mutex::new(GameCache::new()));
+        let game_id = cache.lock().unwrap().create_game_state();
 
-        let mut sm = SessionManager::new();
+        let sm = Arc::new(Mutex::new(SessionManager::new()));
         let (tx, _rx) = mpsc::unbounded_channel();
-        sm.add_session(1, game_id, "Spec".into(), ClientMode::SPECTATOR, false, vec![], tx);
+        sm.lock().unwrap().add_session(1, game_id, "Spec".into(), ClientMode::SPECTATOR, false, vec![], tx);
 
         let command = ClientCommandUpdatePlayerMarkings { entropy: None, auto: true, sort_mode_name: None };
-        assert!(h.handle_command(&command, 1, &mut cache, &sm).await);
+        assert!(h.handle_command(&command, 1, &cache, &sm).await);
         assert_eq!(h.request_processor.lock().unwrap().queue_len(), 1);
     }
 
     #[tokio::test]
     async fn handle_command_unregistered_mode_is_a_noop_returning_true() {
         let h = handler();
-        let mut cache = GameCache::new();
-        let game_id = cache.create_game_state();
+        let cache = Arc::new(Mutex::new(GameCache::new()));
+        let game_id = cache.lock().unwrap().create_game_state();
 
-        let mut sm = SessionManager::new();
+        let sm = Arc::new(Mutex::new(SessionManager::new()));
         let (tx, _rx) = mpsc::unbounded_channel();
         // REPLAY mode has no handling branch in Java either — falls through to `return true`.
-        sm.add_session(1, game_id, "Replay".into(), ClientMode::REPLAY, false, vec![], tx);
+        sm.lock().unwrap().add_session(1, game_id, "Replay".into(), ClientMode::REPLAY, false, vec![], tx);
 
         let command = ClientCommandUpdatePlayerMarkings { entropy: None, auto: true, sort_mode_name: None };
-        assert!(h.handle_command(&command, 1, &mut cache, &sm).await);
+        assert!(h.handle_command(&command, 1, &cache, &sm).await);
     }
 
     #[tokio::test]
     async fn is_home_matches_session_of_home_coach() {
-        let mut cache = GameCache::new();
-        let game_id = cache.create_game_state();
-        let mut sm = SessionManager::new();
+        let cache = Arc::new(Mutex::new(GameCache::new()));
+        let game_id = cache.lock().unwrap().create_game_state();
+        let sm = Arc::new(Mutex::new(SessionManager::new()));
         let (tx1, _rx1) = mpsc::unbounded_channel();
         let (tx2, mut rx2) = mpsc::unbounded_channel();
-        sm.add_session(1, game_id, "Home".into(), ClientMode::PLAYER, true, vec![], tx1);
-        sm.add_session(2, game_id, "AwaySpec".into(), ClientMode::SPECTATOR, false, vec![], tx2);
+        sm.lock().unwrap().add_session(1, game_id, "Home".into(), ClientMode::PLAYER, true, vec![], tx1);
+        sm.lock().unwrap().add_session(2, game_id, "AwaySpec".into(), ClientMode::SPECTATOR, false, vec![], tx2);
 
         let h = handler();
         let command = ClientCommandUpdatePlayerMarkings { entropy: None, auto: false, sort_mode_name: None };
-        assert!(h.handle_command(&command, 2, &mut cache, &sm).await);
+        assert!(h.handle_command(&command, 2, &cache, &sm).await);
         let sent = rx2.try_recv().expect("spectator branch should send markers");
         assert!(sent.contains("\"markers\":[]"));
     }
@@ -298,27 +316,27 @@ mod tests {
     #[tokio::test]
     async fn handle_command_player_non_auto_without_db_pool_is_a_noop_returning_true() {
         let h = handler();
-        let mut cache = GameCache::new();
-        let game_id = cache.create_game_state();
-        let mut sm = SessionManager::new();
+        let cache = Arc::new(Mutex::new(GameCache::new()));
+        let game_id = cache.lock().unwrap().create_game_state();
+        let sm = Arc::new(Mutex::new(SessionManager::new()));
         let (tx, _rx) = mpsc::unbounded_channel();
-        sm.add_session(1, game_id, "Home".into(), ClientMode::PLAYER, true, vec![], tx);
+        sm.lock().unwrap().add_session(1, game_id, "Home".into(), ClientMode::PLAYER, true, vec![], tx);
 
         let command = ClientCommandUpdatePlayerMarkings { entropy: None, auto: false, sort_mode_name: None };
-        assert!(h.handle_command(&command, 1, &mut cache, &sm).await);
+        assert!(h.handle_command(&command, 1, &cache, &sm).await);
     }
 
     #[tokio::test]
     async fn handle_command_player_auto_enqueues_a_request() {
         let h = handler();
-        let mut cache = GameCache::new();
-        let game_id = cache.create_game_state();
-        let mut sm = SessionManager::new();
+        let cache = Arc::new(Mutex::new(GameCache::new()));
+        let game_id = cache.lock().unwrap().create_game_state();
+        let sm = Arc::new(Mutex::new(SessionManager::new()));
         let (tx, _rx) = mpsc::unbounded_channel();
-        sm.add_session(1, game_id, "Home".into(), ClientMode::PLAYER, true, vec![], tx);
+        sm.lock().unwrap().add_session(1, game_id, "Home".into(), ClientMode::PLAYER, true, vec![], tx);
 
         let command = ClientCommandUpdatePlayerMarkings { entropy: None, auto: true, sort_mode_name: None };
-        assert!(h.handle_command(&command, 1, &mut cache, &sm).await);
+        assert!(h.handle_command(&command, 1, &cache, &sm).await);
         assert_eq!(h.request_processor.lock().unwrap().queue_len(), 1);
     }
 

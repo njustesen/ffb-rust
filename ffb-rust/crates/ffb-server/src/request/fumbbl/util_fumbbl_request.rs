@@ -44,6 +44,27 @@ impl HttpClient for ReqwestHttpClient {
     }
 }
 
+/// Builds a fresh `ReqwestHttpClient` per call instead of holding one long-term.
+///
+/// Handlers like `ServerCommandHandlerUpdatePlayerMarkings`/`ServerCommandHandlerLoadAutomaticPlayerMarkings`
+/// store their `Arc<dyn HttpClient + Send + Sync>` for the lifetime of the
+/// `ServerCommandHandlerFactory`, which is frequently constructed and dropped from within a
+/// live tokio async context (every `#[tokio::test]`). Building or dropping a real
+/// `reqwest::blocking::Client` there panics ("Cannot drop a runtime in a context where
+/// blocking is not allowed" — see `ServerCommandHandlerPasswordChallenge`'s own
+/// `spawn_blocking` workaround for the same underlying issue). `fetch_page` here is only ever
+/// actually invoked from `ServerRequestProcessor::run()`, a plain synchronous call off the
+/// async dispatch path, so building (and immediately dropping) a transient client there is
+/// safe — nothing reqwest-related is held across the factory's own async lifetime.
+#[derive(Default)]
+pub struct LazyReqwestHttpClient;
+
+impl HttpClient for LazyReqwestHttpClient {
+    fn fetch_page(&self, url: &str) -> Result<String, String> {
+        ReqwestHttpClient::new().fetch_page(url)
+    }
+}
+
 impl UtilFumbblRequest {
     pub const CHARACTER_ENCODING: &'static str = "UTF-8";
 

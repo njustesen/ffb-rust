@@ -9,7 +9,9 @@ use crate::request::server_request::ServerRequest;
 use crate::request::server_request_processor::ServerRequestProcessor;
 
 pub struct ServerCommandHandlerLoadAutomaticPlayerMarkings {
-    request_processor: Arc<Mutex<ServerRequestProcessor>>,
+    /// `pub(crate)` (rather than private) so `ServerCommandHandlerFactory`'s own tests can
+    /// observe the enqueued request without a network round trip.
+    pub(crate) request_processor: Arc<Mutex<ServerRequestProcessor>>,
     client: Arc<dyn HttpClient + Send + Sync>,
     markings_url_template: String,
 }

@@ -38,22 +38,33 @@ use ffb_model::enums::{PlayerAction, SkillId};
 use ffb_protocol::client_commands::ClientCommand;
 use crate::db::db_connection_manager::DbConnectionManager;
 use crate::game_cache::GameCache;
+use crate::handler::server_command_handler_add_sketch::ServerCommandHandlerAddSketch;
+use crate::handler::server_command_handler_clear_sketches::ServerCommandHandlerClearSketches;
 use crate::handler::server_command_handler_close_session::ServerCommandHandlerCloseSession;
 use crate::handler::server_command_handler_delete_game::ServerCommandHandlerDeleteGame;
 use crate::handler::server_command_handler_join::ServerCommandHandlerJoin;
 use crate::handler::server_command_handler_join_approved::ServerCommandHandlerJoinApproved;
+use crate::handler::server_command_handler_load_automatic_player_markings::ServerCommandHandlerLoadAutomaticPlayerMarkings;
 use crate::handler::server_command_handler_password_challenge::ServerCommandHandlerPasswordChallenge;
 use crate::handler::server_command_handler_ping::ServerCommandHandlerPing;
+use crate::handler::server_command_handler_remove_sketches::ServerCommandHandlerRemoveSketches;
 use crate::handler::server_command_handler_request_version::ServerCommandHandlerRequestVersion;
+use crate::handler::server_command_handler_set_marker::ServerCommandHandlerSetMarker;
+use crate::handler::server_command_handler_set_prevent_sketching::ServerCommandHandlerSetPreventSketching;
+use crate::handler::server_command_handler_sketch_add_coordinate::ServerCommandHandlerSketchAddCoordinate;
+use crate::handler::server_command_handler_sketch_set_color::ServerCommandHandlerSketchSetColor;
+use crate::handler::server_command_handler_sketch_set_label::ServerCommandHandlerSketchSetLabel;
 use crate::handler::server_command_handler_socket_closed::ServerCommandHandlerSocketClosed;
 use crate::handler::server_command_handler_talk::ServerCommandHandlerTalk;
 use crate::handler::server_command_handler_transfer_control::ServerCommandHandlerTransferControl;
+use crate::handler::server_command_handler_update_player_markings::ServerCommandHandlerUpdatePlayerMarkings;
 use crate::model::received_command::{ReceivedCommand, ReceivedNetCommand};
 use crate::net::commands::any_internal_server_command::AnyInternalServerCommand;
 use crate::net::replay_session_manager::ReplaySessionManager;
 use crate::net::session_manager::SessionManager;
 use crate::net::wire::{OutgoingModelSync, events_to_reports};
-use crate::request::fumbbl::util_fumbbl_request::ReqwestHttpClient;
+use crate::request::fumbbl::util_fumbbl_request::{HttpClient, LazyReqwestHttpClient, ReqwestHttpClient};
+use crate::request::server_request_processor::ServerRequestProcessor;
 use crate::roster_cache::RosterCache;
 use crate::team_cache::TeamCache;
 
@@ -98,6 +109,22 @@ pub struct ServerCommandHandlerFactory {
     transfer_control_handler: ServerCommandHandlerTransferControl,
     request_version_handler: ServerCommandHandlerRequestVersion,
     password_challenge_handler: ServerCommandHandlerPasswordChallenge,
+    /// Shared with `socket_closed_handler`/`close_session_handler` (see their construction
+    /// below) and every sketch handler below — one `ServerSketchManager` instance per server,
+    /// matching Java's single `getServer().getSketchManager()`.
+    pub sketch_manager: Arc<Mutex<ServerSketchManager>>,
+    add_sketch_handler: ServerCommandHandlerAddSketch,
+    clear_sketches_handler: ServerCommandHandlerClearSketches,
+    remove_sketches_handler: ServerCommandHandlerRemoveSketches,
+    sketch_add_coordinate_handler: ServerCommandHandlerSketchAddCoordinate,
+    sketch_set_color_handler: ServerCommandHandlerSketchSetColor,
+    sketch_set_label_handler: ServerCommandHandlerSketchSetLabel,
+    set_marker_handler: ServerCommandHandlerSetMarker,
+    set_prevent_sketching_handler: ServerCommandHandlerSetPreventSketching,
+    update_player_markings_handler: ServerCommandHandlerUpdatePlayerMarkings,
+    /// `pub(crate)` so this file's own tests can inspect the enqueued request without a
+    /// network round trip (see `ServerCommandHandlerLoadAutomaticPlayerMarkings::request_processor`).
+    pub(crate) load_automatic_player_markings_handler: ServerCommandHandlerLoadAutomaticPlayerMarkings,
 }
 
 impl ServerCommandHandlerFactory {
@@ -192,7 +219,7 @@ impl ServerCommandHandlerFactory {
         let replay_states: Arc<Mutex<HashMap<String, ReplayState>>> = Arc::new(Mutex::new(HashMap::new()));
         let transfer_control_handler = ServerCommandHandlerTransferControl::new(
             Arc::clone(&replay_session_manager),
-            replay_states,
+            Arc::clone(&replay_states),
             Arc::clone(&session_manager),
         );
         let request_version_client_properties: HashMap<String, String> =
@@ -203,6 +230,63 @@ impl ServerCommandHandlerFactory {
             false,
         );
         let password_challenge_handler = ServerCommandHandlerPasswordChallenge::new(Arc::clone(&session_manager));
+
+        // ── Sketch/marker handler family (Phase ZVB) ────────────────────────
+        let add_sketch_handler = ServerCommandHandlerAddSketch::new(
+            Arc::clone(&sketch_manager),
+            Arc::clone(&replay_session_manager),
+        );
+        let clear_sketches_handler = ServerCommandHandlerClearSketches::new(
+            Arc::clone(&sketch_manager),
+            Arc::clone(&replay_session_manager),
+        );
+        let remove_sketches_handler = ServerCommandHandlerRemoveSketches::new(
+            Arc::clone(&sketch_manager),
+            Arc::clone(&replay_session_manager),
+        );
+        let sketch_add_coordinate_handler = ServerCommandHandlerSketchAddCoordinate::new(
+            Arc::clone(&sketch_manager),
+            Arc::clone(&replay_session_manager),
+        );
+        let sketch_set_color_handler = ServerCommandHandlerSketchSetColor::new(
+            Arc::clone(&sketch_manager),
+            Arc::clone(&replay_session_manager),
+        );
+        let sketch_set_label_handler = ServerCommandHandlerSketchSetLabel::new(
+            Arc::clone(&sketch_manager),
+            Arc::clone(&replay_session_manager),
+        );
+        let set_marker_handler = ServerCommandHandlerSetMarker::new(
+            Arc::clone(&game_cache),
+            Arc::clone(&session_manager),
+        );
+        // Reuses `replay_states` (see `transfer_control_handler` above) — same documented
+        // "no server-level ReplayCache yet" gap applies here.
+        let set_prevent_sketching_handler = ServerCommandHandlerSetPreventSketching::new(
+            Arc::clone(&replay_session_manager),
+            Arc::clone(&replay_states),
+            Arc::clone(&session_manager),
+        );
+        // No server-startup config wiring exists yet for the FUMBBL markings-fetch URL
+        // template (same documented gap as `team_cache`/`roster_cache`/`client_properties`
+        // above), so it defaults to empty — real HTTP calls built from it will simply fail
+        // to fetch anything until that config is threaded through.
+        let markings_url_template = String::new();
+        let markings_request_processor: Arc<Mutex<ServerRequestProcessor>> =
+            Arc::new(Mutex::new(ServerRequestProcessor::new()));
+        let markings_http_client: Arc<dyn HttpClient + Send + Sync> = Arc::new(LazyReqwestHttpClient);
+        let update_player_markings_handler = ServerCommandHandlerUpdatePlayerMarkings::new(
+            Arc::clone(&db_connection_manager),
+            Arc::clone(&markings_request_processor),
+            Arc::clone(&markings_http_client),
+            markings_url_template.clone(),
+        );
+        let load_automatic_player_markings_handler = ServerCommandHandlerLoadAutomaticPlayerMarkings::new(
+            Arc::clone(&markings_request_processor),
+            Arc::clone(&markings_http_client),
+            markings_url_template,
+        );
+
         Self {
             game_cache,
             session_manager,
@@ -221,6 +305,17 @@ impl ServerCommandHandlerFactory {
             transfer_control_handler,
             request_version_handler,
             password_challenge_handler,
+            sketch_manager,
+            add_sketch_handler,
+            clear_sketches_handler,
+            remove_sketches_handler,
+            sketch_add_coordinate_handler,
+            sketch_set_color_handler,
+            sketch_set_label_handler,
+            set_marker_handler,
+            set_prevent_sketching_handler,
+            update_player_markings_handler,
+            load_automatic_player_markings_handler,
         }
     }
 
@@ -308,6 +403,97 @@ impl ServerCommandHandlerFactory {
                 .await;
                 return;
             }
+            ClientCommand::ClientAddSketch(a) => {
+                let cmd = ffb_protocol::commands::client_command_add_sketch::ClientCommandAddSketch {
+                    entropy: None,
+                    sketch_id: a.sketch_id.clone(),
+                };
+                self.add_sketch_handler.handle_command(session_id, &cmd);
+                return;
+            }
+            ClientCommand::ClientClearSketches(_) => {
+                let cmd = ffb_protocol::commands::client_command_clear_sketches::ClientCommandClearSketches::new();
+                self.clear_sketches_handler.handle_command(session_id, &cmd);
+                return;
+            }
+            ClientCommand::ClientRemoveSketches(r) => {
+                let cmd = ffb_protocol::commands::client_command_remove_sketches::ClientCommandRemoveSketches {
+                    entropy: None,
+                    ids: r.ids.clone(),
+                };
+                self.remove_sketches_handler.handle_command(session_id, &cmd);
+                return;
+            }
+            ClientCommand::ClientSketchAddCoordinate(s) => {
+                let cmd = ffb_protocol::commands::client_command_sketch_add_coordinate::ClientCommandSketchAddCoordinate {
+                    entropy: None,
+                    sketch_id: s.sketch_id.clone(),
+                    coordinate: s.coordinate,
+                };
+                self.sketch_add_coordinate_handler.handle_command(session_id, &cmd);
+                return;
+            }
+            ClientCommand::ClientSketchSetColor(s) => {
+                let cmd = ffb_protocol::commands::client_command_sketch_set_color::ClientCommandSketchSetColor {
+                    entropy: None,
+                    sketch_ids: s.sketch_ids.clone(),
+                    rgb: s.rgb,
+                };
+                self.sketch_set_color_handler.handle_command(session_id, &cmd);
+                return;
+            }
+            ClientCommand::ClientSketchSetLabel(s) => {
+                let cmd = ffb_protocol::commands::client_command_sketch_set_label::ClientCommandSketchSetLabel {
+                    entropy: None,
+                    sketch_ids: s.sketch_ids.clone(),
+                    label: s.label.clone(),
+                };
+                self.sketch_set_label_handler.handle_command(session_id, &cmd);
+                return;
+            }
+            ClientCommand::ClientSetMarker(m) => {
+                let cmd = ffb_protocol::commands::client_command_set_marker::ClientCommandSetMarker {
+                    player_id: m.player_id.clone(),
+                    coordinate: m.coordinate,
+                    text: m.text.clone(),
+                    entropy: None,
+                };
+                self.set_marker_handler.handle_command(session_id, &cmd);
+                return;
+            }
+            ClientCommand::ClientSetPreventSketching(p) => {
+                let cmd = ffb_protocol::commands::client_command_set_prevent_sketching::ClientCommandSetPreventSketching {
+                    coach: p.coach.clone(),
+                    prevent_sketching: p.prevent_sketching,
+                    entropy: None,
+                };
+                self.set_prevent_sketching_handler.handle_command(session_id, &cmd);
+                return;
+            }
+            ClientCommand::ClientLoadAutomaticPlayerMarkings(l) => {
+                let cmd = ffb_protocol::commands::client_command_load_automatic_player_markings::ClientCommandLoadAutomaticPlayerMarkings {
+                    entropy: None,
+                    index: l.index,
+                    coach: l.coach.clone(),
+                    game: None,
+                };
+                self.load_automatic_player_markings_handler.handle_command(&cmd, session_id);
+                return;
+            }
+            ClientCommand::ClientUpdatePlayerMarkings(u) => {
+                let cmd = ffb_protocol::commands::client_command_update_player_markings::ClientCommandUpdatePlayerMarkings {
+                    entropy: None,
+                    auto: u.auto,
+                    sort_mode_name: u.sort_mode_name.clone(),
+                };
+                // `ServerCommandHandlerUpdatePlayerMarkings::handle_command` takes the shared
+                // `Arc<Mutex<..>>`s directly and locks/drops internally around its own
+                // `.await` points, so no lock is held here across this call.
+                self.update_player_markings_handler
+                    .handle_command(&cmd, session_id, &self.game_cache, &self.session_manager)
+                    .await;
+                return;
+            }
             _ => {}
         }
 
@@ -391,6 +577,32 @@ impl ServerCommandHandlerFactory {
                         );
                     }
                 }
+            }
+            AnyInternalServerCommand::ApplyAutomatedPlayerMarkings(cmd) => {
+                // java: `ServerCommandHandlerApplyAutomatedPlayerMarkings::handle_command` needs
+                // a real `&mut AutoMarkingConfig` (ffb_engine::marking::auto_marking_config), but
+                // `InternalServerCommandApplyAutomatedPlayerMarkings` only carries the config as
+                // an opaque `String` (no serde impl exists yet for `AutoMarkingConfig` — see that
+                // struct's own doc comment) — decoding it here would mean inventing a wire format
+                // that doesn't exist in Java or Rust, so this stays a documented no-op rather than
+                // a fabricated parse. `ServerCommandHandlerApplyAutomatedPlayerMarkings` itself is
+                // still real and unit-tested directly (see its own module).
+                log::debug!(
+                    "session {}: game {}: ApplyAutomatedPlayerMarkings received but its \
+                     AutoMarkingConfig payload has no typed decode path yet",
+                    session_id, cmd.game_id
+                );
+            }
+            AnyInternalServerCommand::CalculateAutomaticPlayerMarkings(cmd) => {
+                // java: same gap as `ApplyAutomatedPlayerMarkings` above — both the
+                // `AutoMarkingConfig` and `Game` payloads are opaque `String`s on this internal
+                // command with no typed decode path, so `ServerCommandHandlerCalculateAutomaticPlayerMarkings`
+                // (real and unit-tested on its own) isn't reachable from here yet.
+                log::debug!(
+                    "session {}: CalculateAutomaticPlayerMarkings (index {}) received but its \
+                     AutoMarkingConfig/Game payload has no typed decode path yet",
+                    session_id, cmd.index
+                );
             }
             other => {
                 log::debug!(
@@ -531,6 +743,32 @@ pub fn decode_command(cmd: ClientCommand, side: TeamSide) -> Result<Action, Deco
         ClientCommand::ClientRequestVersion(_) => Err(DecodeError::NotImplemented("ClientRequestVersion".into())),
         ClientCommand::ClientPasswordChallenge(_) => {
             Err(DecodeError::NotImplemented("ClientPasswordChallenge".into()))
+        }
+        ClientCommand::ClientAddSketch(_) => Err(DecodeError::NotImplemented("ClientAddSketch".into())),
+        ClientCommand::ClientClearSketches(_) => {
+            Err(DecodeError::NotImplemented("ClientClearSketches".into()))
+        }
+        ClientCommand::ClientRemoveSketches(_) => {
+            Err(DecodeError::NotImplemented("ClientRemoveSketches".into()))
+        }
+        ClientCommand::ClientSketchAddCoordinate(_) => {
+            Err(DecodeError::NotImplemented("ClientSketchAddCoordinate".into()))
+        }
+        ClientCommand::ClientSketchSetColor(_) => {
+            Err(DecodeError::NotImplemented("ClientSketchSetColor".into()))
+        }
+        ClientCommand::ClientSketchSetLabel(_) => {
+            Err(DecodeError::NotImplemented("ClientSketchSetLabel".into()))
+        }
+        ClientCommand::ClientSetMarker(_) => Err(DecodeError::NotImplemented("ClientSetMarker".into())),
+        ClientCommand::ClientSetPreventSketching(_) => {
+            Err(DecodeError::NotImplemented("ClientSetPreventSketching".into()))
+        }
+        ClientCommand::ClientUpdatePlayerMarkings(_) => {
+            Err(DecodeError::NotImplemented("ClientUpdatePlayerMarkings".into()))
+        }
+        ClientCommand::ClientLoadAutomaticPlayerMarkings(_) => {
+            Err(DecodeError::NotImplemented("ClientLoadAutomaticPlayerMarkings".into()))
         }
     }
 }
@@ -1309,5 +1547,279 @@ mod tests {
             AnyInternalServerCommand::DeleteGame(cmd),
             1,
         )).await;
+    }
+
+    // ── Phase ZVB: sketch/marker handler family dispatch ───────────────────────
+
+    #[tokio::test]
+    async fn handle_command_add_sketch_updates_shared_sketch_manager() {
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let factory = ServerCommandHandlerFactory::new(gc, sm, db());
+        factory.replay_session_manager.lock().unwrap().add_session(1, "replay".into(), "Alice".into());
+
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientAddSketch(ffb_protocol::client_commands::ClientAddSketch {
+                sketch_id: Some("sk-1".into()),
+            }),
+            1,
+        )).await;
+
+        let mut mgr = factory.sketch_manager.lock().unwrap();
+        assert_eq!(mgr.get_sketches("1").len(), 1);
+    }
+
+    #[tokio::test]
+    async fn handle_command_clear_sketches_clears_shared_sketch_manager() {
+        use ffb_engine::server_sketch_manager::Sketch as ManagerSketch;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let factory = ServerCommandHandlerFactory::new(gc, sm, db());
+        factory.replay_session_manager.lock().unwrap().add_session(1, "replay".into(), "Alice".into());
+        factory.sketch_manager.lock().unwrap().add_sketch("1", ManagerSketch::new("sk-1"));
+
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientClearSketches(ffb_protocol::client_commands::ClientClearSketches),
+            1,
+        )).await;
+
+        let mut mgr = factory.sketch_manager.lock().unwrap();
+        assert!(mgr.get_sketches("1").is_empty());
+    }
+
+    #[tokio::test]
+    async fn handle_command_remove_sketches_removes_matching_ids_from_shared_manager() {
+        use ffb_engine::server_sketch_manager::Sketch as ManagerSketch;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let factory = ServerCommandHandlerFactory::new(gc, sm, db());
+        factory.replay_session_manager.lock().unwrap().add_session(1, "replay".into(), "Alice".into());
+        {
+            let mut mgr = factory.sketch_manager.lock().unwrap();
+            mgr.add_sketch("1", ManagerSketch::new("sk-1"));
+            mgr.add_sketch("1", ManagerSketch::new("sk-2"));
+        }
+
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientRemoveSketches(ffb_protocol::client_commands::ClientRemoveSketches {
+                ids: vec!["sk-1".into()],
+            }),
+            1,
+        )).await;
+
+        let mut mgr = factory.sketch_manager.lock().unwrap();
+        let remaining = mgr.get_sketches("1");
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].get_id(), "sk-2");
+    }
+
+    #[tokio::test]
+    async fn handle_command_sketch_add_coordinate_reaches_shared_manager() {
+        use ffb_engine::server_sketch_manager::Sketch as ManagerSketch;
+        use ffb_model::types::FieldCoordinate;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let factory = ServerCommandHandlerFactory::new(gc, sm, db());
+        factory.replay_session_manager.lock().unwrap().add_session(1, "replay".into(), "Alice".into());
+        factory.sketch_manager.lock().unwrap().add_sketch("1", ManagerSketch::new("sk-1"));
+
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientSketchAddCoordinate(ffb_protocol::client_commands::ClientSketchAddCoordinate {
+                sketch_id: Some("sk-1".into()),
+                coordinate: Some(FieldCoordinate::new(3, 4)),
+            }),
+            1,
+        )).await;
+
+        // No panic and the sketch is still tracked; path-coordinate storage itself is
+        // exercised directly in `ServerCommandHandlerSketchAddCoordinate`'s own tests.
+        let mut mgr = factory.sketch_manager.lock().unwrap();
+        assert_eq!(mgr.get_sketches("1").len(), 1);
+    }
+
+    #[tokio::test]
+    async fn handle_command_sketch_set_color_delivers_to_replay_peer() {
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let factory = ServerCommandHandlerFactory::new(gc, sm, db());
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        {
+            let mut rsm = factory.replay_session_manager.lock().unwrap();
+            rsm.add_session(1, "replay".into(), "Alice".into());
+            rsm.add_session(2, "replay".into(), "Bob".into());
+            rsm.register_sender(2, tx);
+        }
+
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientSketchSetColor(ffb_protocol::client_commands::ClientSketchSetColor {
+                sketch_ids: vec!["sk-1".into()],
+                rgb: 0x00FF00,
+            }),
+            1,
+        )).await;
+
+        let sent = rx.try_recv().expect("expected a message forwarded to the replay peer");
+        assert!(sent.contains("serverSketchSetColor"));
+    }
+
+    #[tokio::test]
+    async fn handle_command_sketch_set_label_delivers_to_replay_peer() {
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let factory = ServerCommandHandlerFactory::new(gc, sm, db());
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        {
+            let mut rsm = factory.replay_session_manager.lock().unwrap();
+            rsm.add_session(1, "replay".into(), "Alice".into());
+            rsm.add_session(2, "replay".into(), "Bob".into());
+            rsm.register_sender(2, tx);
+        }
+
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientSketchSetLabel(ffb_protocol::client_commands::ClientSketchSetLabel {
+                sketch_ids: vec!["sk-1".into()],
+                label: Some("Arrow".into()),
+            }),
+            1,
+        )).await;
+
+        let sent = rx.try_recv().expect("expected a message forwarded to the replay peer");
+        assert!(sent.contains("serverSketchSetLabel"));
+        assert!(sent.contains("Arrow"));
+    }
+
+    #[tokio::test]
+    async fn handle_command_set_marker_writes_marker_into_shared_game_cache() {
+        use ffb_model::model::ClientMode;
+        use ffb_model::model::team::Team;
+        use ffb_model::types::FieldCoordinate;
+        use tokio::sync::mpsc;
+
+        fn team(id: &str) -> Team {
+            Team {
+                id: id.into(), name: id.into(), race: "Human".into(), roster_id: "human".into(),
+                coach: "coach".into(), rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+                prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0,
+                assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0,
+                special_rules: vec![], players: vec![], vampire_lord: false, necromancer: false,
+            }
+        }
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let game_id = gc.lock().unwrap().create_game_state();
+        gc.lock().unwrap().get_game_state_by_id_mut(game_id).unwrap().start_game(
+            team("home"), team("away"), ffb_model::enums::Rules::Bb2025, 0,
+        );
+        let (tx, _rx) = mpsc::unbounded_channel();
+        sm_arc.lock().unwrap().add_session(1, game_id, "Home".into(), ClientMode::PLAYER, true, vec![], tx);
+
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientSetMarker(ffb_protocol::client_commands::ClientSetMarker {
+                player_id: Some("p1".into()),
+                coordinate: Some(FieldCoordinate::new(1, 1)),
+                text: Some("Nice job".into()),
+            }),
+            1,
+        )).await;
+
+        let gc = gc.lock().unwrap();
+        let game = gc.get_game_state_by_id(game_id).unwrap().get_game().unwrap();
+        let marker = game.field_model.get_field_marker(FieldCoordinate::new(1, 1)).unwrap();
+        assert_eq!(marker.get_home_text(), Some("Nice job"));
+    }
+
+    #[tokio::test]
+    async fn handle_command_set_prevent_sketching_reaches_real_handler() {
+        use ffb_model::model::ClientMode;
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let (tx1, mut rx1) = mpsc::unbounded_channel();
+        let (tx2, _rx2) = mpsc::unbounded_channel();
+        sm_arc.lock().unwrap().add_session(1, 0, "coach1".into(), ClientMode::SPECTATOR, false, vec![], tx1);
+        sm_arc.lock().unwrap().add_session(2, 0, "coach2".into(), ClientMode::SPECTATOR, false, vec![], tx2);
+
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
+        {
+            let mut rsm = factory.replay_session_manager.lock().unwrap();
+            rsm.add_session(1, "replay1".into(), "coach1".into());
+        }
+
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientSetPreventSketching(ffb_protocol::client_commands::ClientSetPreventSketching {
+                coach: Some("coach2".into()),
+                prevent_sketching: true,
+            }),
+            1,
+        )).await;
+
+        // Session 1 has control (first to join replay1) and broadcasts the real
+        // `ServerCommandSetPreventSketching` message to itself and other sessions on the
+        // replay — no `ReplayState` is registered in the factory's private map (documented
+        // gap, same as `handle_command_transfer_replay_control_reaches_real_handler`), but the
+        // broadcast over `SessionManager` still runs for real.
+        let msg = rx1.try_recv().expect("expected a real serverSetPreventSketching broadcast");
+        assert!(msg.contains("serverSetPreventSketching"));
+    }
+
+    #[tokio::test]
+    async fn handle_command_update_player_markings_spectator_sends_empty_markers() {
+        use ffb_model::model::ClientMode;
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let game_id = gc.lock().unwrap().create_game_state();
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        sm_arc.lock().unwrap().add_session(1, game_id, "Spec".into(), ClientMode::SPECTATOR, false, vec![], tx);
+
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientUpdatePlayerMarkings(ffb_protocol::client_commands::ClientUpdatePlayerMarkings {
+                auto: false,
+                sort_mode_name: None,
+            }),
+            1,
+        )).await;
+
+        let sent = rx.try_recv().expect("expected a real serverUpdateLocalPlayerMarkers message");
+        assert!(sent.contains("\"markers\":[]"));
+    }
+
+    #[tokio::test]
+    async fn handle_command_load_automatic_player_markings_enqueues_via_real_handler() {
+        use ffb_model::model::ClientMode;
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let (tx, _rx) = mpsc::unbounded_channel();
+        sm_arc.lock().unwrap().add_session(1, 0, "Coach".into(), ClientMode::PLAYER, true, vec![], tx);
+
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
+        factory.handle_command(ReceivedCommand::new(
+            ClientCommand::ClientLoadAutomaticPlayerMarkings(
+                ffb_protocol::client_commands::ClientLoadAutomaticPlayerMarkings {
+                    index: 1,
+                    coach: Some("Coach".into()),
+                },
+            ),
+            1,
+        )).await;
+
+        assert_eq!(
+            factory.load_automatic_player_markings_handler.request_processor.lock().unwrap().queue_len(),
+            1
+        );
     }
 }
