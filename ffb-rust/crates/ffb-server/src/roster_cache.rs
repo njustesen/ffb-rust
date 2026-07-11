@@ -13,30 +13,18 @@
 /// crate. Both are kept separate deliberately, matching the Java source having two
 /// unrelated roster mechanisms.
 ///
-/// This crate has no SAX-based `XmlHandler`/general XML parser (that infrastructure was
-/// never ported — see `CLAUDE.md`'s translation ground rules on not inventing new
-/// infrastructure). Since the only fields `RosterSkeleton` needs are the `id`/`team`
-/// attributes of the root `<roster>` element, and the full `Roster` this cache returns
-/// is out of scope without a real XML parser, this file:
-///   - implements `init` faithfully (walk the directory, extract the root attributes,
-///     populate both maps, matching Java's error-handling/precedence exactly), using a
-///     narrow attribute-only extractor (`extract_root_attr`) as a documented stand-in
-///     for `XmlHandler.parse(null, xmlSource, new RosterSkeleton())`.
-///   - implements `get_roster_for_team`'s *lookup* logic (team-id first, falling back to
-///     roster-id, then the "not found" error) faithfully, but the final
-///     `XmlHandler.parse(game, xmlSource, new Roster())` step — inflating the file
-///     contents into a full `Roster` model — is left as a documented gap: there is no
-///     Rust XML-to-`Roster` deserializer in this crate, so the resolved file's raw
-///     contents are returned instead of a parsed `Roster`, mirroring the same real gap
-///     already noted against the other 11 blocked handlers (`RosterCache`/`TeamCache`
-///     in TRANSLATION_TRACKER.md's Phase ZW closeout note).
+/// Phase ZY.2 added `ffb_model::xml::XmlHandler` (a 1:1 port of the SAX-driven
+/// `com.fumbbl.ffb.xml.XmlHandler`), so this cache now returns real `Roster`/
+/// `RosterSkeleton` objects instead of raw XML text.
 use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use ffb_model::model::roster::Roster;
 use ffb_model::model::roster_skeleton::RosterSkeleton;
 use ffb_model::util::file_iterator::FileIterator;
+use ffb_model::xml::{IXmlReadable, XmlHandler};
 
 /// Java: `RosterCache`.
 pub struct RosterCache {
@@ -45,12 +33,6 @@ pub struct RosterCache {
     /// Java: `rosterFileByTeamId`
     roster_file_by_team_id: HashMap<String, PathBuf>,
 }
-
-/// Result of resolving a roster file for a team: the raw XML text of the resolved
-/// roster file. Java would go on to parse this into a full `Roster` via
-/// `XmlHandler.parse(game, xmlSource, new Roster())`; no such parser exists in this
-/// crate (see module doc comment), so callers get the raw XML instead.
-pub type RosterXml = String;
 
 impl RosterCache {
     /// Java: `public RosterCache()`
@@ -63,9 +45,8 @@ impl RosterCache {
 
     /// Java: `getRosterForTeam(Team team, Game game)`.
     ///
-    /// `team_id`/`roster_id` stand in for `team.getId()`/`team.getRosterId()`; `Game` is
-    /// not needed since we don't parse into a full `Roster` (see module doc comment).
-    pub fn get_roster_for_team(&self, team_id: &str, roster_id: &str) -> io::Result<RosterXml> {
+    /// `team_id`/`roster_id` stand in for `team.getId()`/`team.getRosterId()`.
+    pub fn get_roster_for_team(&self, team_id: &str, roster_id: &str) -> io::Result<Roster> {
         // In newer versions of the XML format, the `<rosterId>` is not used (but is still
         // present). So we first check for the presence of a roster matching the team id,
         // and only if no roster is found, do we fall back to looking up the roster using
@@ -76,7 +57,23 @@ impl RosterCache {
             .or_else(|| self.roster_file_by_roster_id.get(roster_id));
 
         match roster_file {
-            Some(file) => fs::read_to_string(file),
+            Some(file) => {
+                let content = fs::read_to_string(file)?;
+                let parsed = XmlHandler::parse(None, &content, Box::new(Roster {
+                    id: String::new(),
+                    name: String::new(),
+                    race: String::new(),
+                    reroll_cost: 0,
+                    max_rerolls: 0,
+                    positions: vec![],
+                    special_rules: vec![],
+                    necromancer: false,
+                    keywords: vec![],
+                }));
+                parsed.into_any().downcast::<Roster>().map(|r| *r).map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidData, "Roster XML did not parse into a Roster")
+                })
+            }
             None => Err(io::Error::new(
                 io::ErrorKind::NotFound,
                 format!(
@@ -122,51 +119,13 @@ impl Default for RosterCache {
     }
 }
 
-/// Narrow stand-in for `XmlHandler.parse(null, xmlSource, new RosterSkeleton())`: extracts
-/// the `id`/`team` attributes of the root `<roster ...>` element. Not a general XML
-/// parser — see module doc comment.
+/// Java: `XmlHandler.parse(null, xmlSource, new RosterSkeleton())`.
 fn parse_roster_skeleton(xml: &str) -> RosterSkeleton {
-    let mut skeleton = RosterSkeleton::default();
-    if let Some(id) = extract_root_attr(xml, "roster", "id") {
-        skeleton.set_id(id);
+    let parsed = XmlHandler::parse(None, xml, Box::new(RosterSkeleton::default()));
+    match parsed.into_any().downcast::<RosterSkeleton>() {
+        Ok(skeleton) => *skeleton,
+        Err(_) => RosterSkeleton::default(),
     }
-    if let Some(team_id) = extract_root_attr(xml, "roster", "team") {
-        skeleton.set_team_id(team_id);
-    }
-    skeleton
-}
-
-/// Extracts `attr="value"` from the first `<tag ...>` occurrence in `xml`.
-fn extract_root_attr(xml: &str, tag: &str, attr: &str) -> Option<String> {
-    let open = format!("<{}", tag);
-    let start = xml.find(&open)?;
-    let close = xml[start..].find('>')? + start;
-    let tag_text = &xml[start..close];
-
-    let needle = format!("{}=", attr);
-    let mut search_from = 0usize;
-    while let Some(rel) = tag_text[search_from..].find(&needle) {
-        let attr_start = search_from + rel;
-        // Ensure we matched a whole attribute name (preceded by whitespace), not a suffix
-        // of a longer attribute name (e.g. "team" inside "teamValue").
-        let preceded_by_boundary = tag_text[..attr_start]
-            .chars()
-            .last()
-            .map(|c| c.is_whitespace())
-            .unwrap_or(true);
-        if preceded_by_boundary {
-            let rest = &tag_text[attr_start + needle.len()..];
-            let quote = rest.chars().next()?;
-            if quote == '"' || quote == '\'' {
-                let value_start = 1;
-                if let Some(end_rel) = rest[value_start..].find(quote) {
-                    return Some(rest[value_start..value_start + end_rel].trim().to_string());
-                }
-            }
-        }
-        search_from = attr_start + needle.len();
-    }
-    None
 }
 
 #[cfg(test)]
@@ -182,16 +141,18 @@ mod tests {
     }
 
     #[test]
-    fn extract_root_attr_finds_id_and_team() {
+    fn parse_roster_skeleton_extracts_id_and_team() {
         let xml = r#"<roster id="human" team="284314"><name>Human</name></roster>"#;
-        assert_eq!(extract_root_attr(xml, "roster", "id").as_deref(), Some("human"));
-        assert_eq!(extract_root_attr(xml, "roster", "team").as_deref(), Some("284314"));
+        let skeleton = parse_roster_skeleton(xml);
+        assert_eq!(skeleton.get_id(), "human");
+        assert_eq!(skeleton.get_team_id(), "284314");
     }
 
     #[test]
-    fn extract_root_attr_missing_returns_none() {
+    fn parse_roster_skeleton_missing_team_is_empty() {
         let xml = r#"<roster id="human"></roster>"#;
-        assert_eq!(extract_root_attr(xml, "roster", "team"), None);
+        let skeleton = parse_roster_skeleton(xml);
+        assert_eq!(skeleton.get_team_id(), "");
     }
 
     #[test]
@@ -215,13 +176,17 @@ mod tests {
     #[test]
     fn get_roster_for_team_prefers_team_id_over_roster_id() {
         let dir = scratch_dir("lookup_team");
-        fs::write(dir.join("roster_human.xml"), r#"<roster id="human" team="284314">HUMAN_XML</roster>"#).unwrap();
+        fs::write(
+            dir.join("roster_human.xml"),
+            r#"<roster id="human" team="284314"><name>Human</name><reRollCost>50000</reRollCost></roster>"#,
+        ).unwrap();
 
         let mut cache = RosterCache::new();
         cache.init(&dir).unwrap();
 
-        let xml = cache.get_roster_for_team("284314", "human").unwrap();
-        assert!(xml.contains("HUMAN_XML"));
+        let roster = cache.get_roster_for_team("284314", "human").unwrap();
+        assert_eq!(roster.name, "Human");
+        assert_eq!(roster.reroll_cost, 50_000);
 
         let _ = fs::remove_dir_all(&dir);
     }
@@ -229,14 +194,14 @@ mod tests {
     #[test]
     fn get_roster_for_team_falls_back_to_roster_id() {
         let dir = scratch_dir("lookup_fallback");
-        fs::write(dir.join("roster_orc.xml"), r#"<roster id="orc">ORC_XML</roster>"#).unwrap();
+        fs::write(dir.join("roster_orc.xml"), r#"<roster id="orc"><name>Orc</name></roster>"#).unwrap();
 
         let mut cache = RosterCache::new();
         cache.init(&dir).unwrap();
 
         // No file is indexed by this team id, so it must fall back to roster id.
-        let xml = cache.get_roster_for_team("nonexistent-team", "orc").unwrap();
-        assert!(xml.contains("ORC_XML"));
+        let roster = cache.get_roster_for_team("nonexistent-team", "orc").unwrap();
+        assert_eq!(roster.name, "Orc");
 
         let _ = fs::remove_dir_all(&dir);
     }
@@ -246,5 +211,36 @@ mod tests {
         let cache = RosterCache::new();
         let result = cache.get_roster_for_team("no-team", "no-roster");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn get_roster_for_team_parses_positions() {
+        let dir = scratch_dir("positions");
+        fs::write(
+            dir.join("roster_orc.xml"),
+            r#"<roster id="orc">
+                <name>Orc</name>
+                <position id="orc.lineman">
+                    <name>Lineman</name>
+                    <quantity>16</quantity>
+                    <movement>5</movement>
+                    <strength>3</strength>
+                    <agility>2</agility>
+                    <passing>3</passing>
+                    <armour>9</armour>
+                </position>
+            </roster>"#,
+        ).unwrap();
+
+        let mut cache = RosterCache::new();
+        cache.init(&dir).unwrap();
+
+        let roster = cache.get_roster_for_team("no-team", "orc").unwrap();
+        assert_eq!(roster.positions.len(), 1);
+        let lineman = roster.position("orc.lineman").unwrap();
+        assert_eq!(lineman.movement, 5);
+        assert_eq!(lineman.armour, 9);
+
+        let _ = fs::remove_dir_all(&dir);
     }
 }

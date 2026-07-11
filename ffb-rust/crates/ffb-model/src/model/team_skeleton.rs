@@ -1,4 +1,17 @@
+use std::any::Any;
 use serde::{Deserialize, Serialize};
+use crate::model::game::Game;
+use crate::xml::{IXmlReadable, XmlAttributes};
+use crate::xml::util_xml::get_string_attribute;
+
+const XML_TAG: &str = "team";
+const XML_ATTRIBUTE_ID: &str = "id";
+const XML_TAG_NAME: &str = "name";
+const XML_TAG_TEAM_VALUE: &str = "teamValue";
+const XML_TAG_COACH: &str = "coach";
+/// Java: `RosterPlayer.XML_TAG` — referenced by `TeamSkeleton` to suppress a nested
+/// player's own `<name>` from overwriting the team name while `parsingPlayer` is set.
+const PLAYER_XML_TAG: &str = "player";
 
 /// 1:1 translation of com.fumbbl.ffb.model.TeamSkeleton.
 ///
@@ -15,6 +28,10 @@ pub struct TeamSkeleton {
     pub team_value: i32,
     pub coach: String,
     pub xml_content: String,
+    /// Java: `TeamSkeleton.parsingPlayer` (transient) — true while inside a `<player>`
+    /// element, so that player's own `<name>` doesn't overwrite the team name.
+    #[serde(skip)]
+    pub parsing_player: bool,
 }
 
 impl TeamSkeleton {
@@ -30,6 +47,45 @@ impl TeamSkeleton {
     pub fn set_xml_content(&mut self, xml_content: impl Into<String>) { self.xml_content = xml_content.into(); }
 }
 
+impl IXmlReadable for TeamSkeleton {
+    /// Java: `TeamSkeleton.startXmlElement(Game, String, Attributes)`.
+    fn start_xml_element(&mut self, _game: Option<&Game>, tag: &str, atts: &XmlAttributes) -> Option<Box<dyn IXmlReadable>> {
+        if tag == XML_TAG {
+            if let Some(id) = get_string_attribute(atts, XML_ATTRIBUTE_ID) {
+                self.id = id;
+            }
+        }
+        if tag == PLAYER_XML_TAG {
+            self.parsing_player = true;
+        }
+        None
+    }
+
+    /// Java: `TeamSkeleton.endXmlElement(Game, String, String)`.
+    fn end_xml_element(&mut self, _game: Option<&Game>, tag: &str, value: &str) -> bool {
+        let complete = tag == XML_TAG;
+        if !complete {
+            if tag == XML_TAG_NAME && !self.parsing_player {
+                self.name = value.to_string();
+            }
+            if tag == XML_TAG_COACH {
+                self.coach = value.to_string();
+            }
+            if tag == XML_TAG_TEAM_VALUE {
+                self.team_value = value.parse().unwrap_or(0);
+            }
+            if tag == PLAYER_XML_TAG {
+                self.parsing_player = false;
+            }
+        }
+        complete
+    }
+
+    fn as_any(&self) -> &dyn Any { self }
+    fn as_any_mut(&mut self) -> &mut dyn Any { self }
+    fn into_any(self: Box<Self>) -> Box<dyn Any> { self }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -41,7 +97,7 @@ mod tests {
 
     #[test]
     fn get_name_returns_name() {
-        let t = TeamSkeleton { id: "42".to_string(), name: "Chaos".to_string(), coach: "Kalimar".to_string(), team_value: 1_000_000, xml_content: String::new() };
+        let t = TeamSkeleton { id: "42".to_string(), name: "Chaos".to_string(), coach: "Kalimar".to_string(), team_value: 1_000_000, xml_content: String::new(), parsing_player: false };
         assert_eq!(t.get_name(), "Chaos");
         assert_eq!(t.get_coach(), "Kalimar");
         assert_eq!(t.get_team_value(), 1_000_000);
@@ -60,5 +116,32 @@ mod tests {
         assert_eq!(t.get_coach(), "Coach");
         assert_eq!(t.get_team_value(), 1_100_000);
         assert_eq!(t.get_xml_content(), "<team/>");
+    }
+
+    #[test]
+    fn parses_id_name_coach_from_xml() {
+        let xml = r#"<team id="42"><coach>Kalimar</coach><name>Chaos</name></team>"#;
+        let parsed = crate::xml::XmlHandler::parse(None, xml, Box::new(TeamSkeleton::default()));
+        let t = parsed.as_any().downcast_ref::<TeamSkeleton>().unwrap();
+        assert_eq!(t.get_id(), "42");
+        assert_eq!(t.get_coach(), "Kalimar");
+        assert_eq!(t.get_name(), "Chaos");
+    }
+
+    #[test]
+    fn parses_team_value_tag() {
+        let xml = r#"<team id="1"><teamValue>1100000</teamValue></team>"#;
+        let parsed = crate::xml::XmlHandler::parse(None, xml, Box::new(TeamSkeleton::default()));
+        let t = parsed.as_any().downcast_ref::<TeamSkeleton>().unwrap();
+        assert_eq!(t.get_team_value(), 1_100_000);
+    }
+
+    #[test]
+    fn nested_player_name_does_not_overwrite_team_name() {
+        let xml = r#"<team id="1"><name>Chaos</name><player id="p1"><name>Bob</name></player></team>"#;
+        let parsed = crate::xml::XmlHandler::parse(None, xml, Box::new(TeamSkeleton::default()));
+        let t = parsed.as_any().downcast_ref::<TeamSkeleton>().unwrap();
+        assert_eq!(t.get_name(), "Chaos");
+        assert!(!t.parsing_player);
     }
 }

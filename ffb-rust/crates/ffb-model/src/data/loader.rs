@@ -280,6 +280,9 @@ pub fn position_json_to_roster_position(pos: &PositionJson, roster_id: &str, is_
         is_thrall: false,
         race: Some(roster_id.to_string()),
         replaces_position: None,
+        inside_skill_list_tag: false,
+        inside_skill_category_list_tag: false,
+        current_skill_value: None,
     }
 }
 

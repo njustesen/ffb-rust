@@ -17,3 +17,4 @@ pub mod data;
 pub mod option;
 pub mod injury;
 pub mod report;
+pub mod xml;

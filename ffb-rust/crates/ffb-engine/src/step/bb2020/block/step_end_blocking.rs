@@ -1014,7 +1014,7 @@ mod tests {
             is_big_guy: false,
             temporary_stat_mods: vec![], temporary_skill_sources: vec![],
             recovering_injury: None, player_status: PlayerStatus::ACTIVE,
-            zapped: false,
+            zapped: false, inside_skill_list: false, inside_injury_list: false, injury_current: false, inside_player_statistics: false, current_skill_value: None,
         };
         atk.starting_skills.push(SkillWithValue { skill_id: SkillId::PileDriver, value: None });
         game.team_home.players.push(atk);
@@ -1034,7 +1034,7 @@ mod tests {
             is_big_guy: false,
             temporary_stat_mods: vec![], temporary_skill_sources: vec![],
             recovering_injury: None, player_status: PlayerStatus::ACTIVE,
-            zapped: false,
+            zapped: false, inside_skill_list: false, inside_injury_list: false, injury_current: false, inside_player_statistics: false, current_skill_value: None,
         };
         game.team_away.players.push(def);
         game.field_model.set_player_state(&def_id, PlayerState::new(PS_PRONE));

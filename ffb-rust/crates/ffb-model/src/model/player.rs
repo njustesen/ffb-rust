@@ -1,10 +1,46 @@
+use std::any::Any;
 use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use crate::enums::{PlayerType, PlayerGender, SeriousInjuryKind};
+use crate::factory::player_gender_factory::PlayerGenderFactory;
+use crate::factory::player_type_factory::PlayerTypeFactory;
+use crate::factory::serious_injury_factory::SeriousInjuryFactory;
+use crate::factory::skill_factory::SkillFactory;
+use crate::model::game::Game;
 use crate::model::player_status::PlayerStatus;
 use crate::model::property::named_properties::NamedProperties;
 use crate::model::skill_def::{SkillId, SkillWithValue};
 use crate::model::roster_position::RosterPosition;
+use crate::xml::{IXmlReadable, XmlAttributes};
+use crate::xml::util_xml::{get_string_attribute, get_int_attribute, get_int_attribute_or, get_boolean_attribute};
+
+/// Java: `Player.XML_TAG` (defined on the concrete `RosterPlayer` subclass).
+pub(crate) const XML_TAG: &str = "player";
+const XML_ATTRIBUTE_ID: &str = "id";
+const XML_ATTRIBUTE_NR: &str = "nr";
+const XML_ATTRIBUTE_STATUS: &str = "status";
+const XML_ATTRIBUTE_VALUE: &str = "value";
+
+const XML_TAG_NAME: &str = "name";
+const XML_TAG_TYPE: &str = "type";
+const XML_TAG_GENDER: &str = "gender";
+const XML_TAG_POSITION_ID: &str = "positionId";
+
+const XML_TAG_SKILL_LIST: &str = "skillList";
+const XML_TAG_SKILL: &str = "skill";
+
+const XML_TAG_INJURY_LIST: &str = "injuryList";
+const XML_TAG_INJURY: &str = "injury";
+const XML_ATTRIBUTE_RECOVERING: &str = "recovering";
+
+const XML_TAG_PLAYER_STATISTICS: &str = "playerStatistics";
+const XML_ATTRIBUTE_CURRENT_SPPS: &str = "currentSpps";
+
+const XML_TAG_MOVEMENT: &str = "movement";
+const XML_TAG_STRENGTH: &str = "strength";
+const XML_TAG_AGILITY: &str = "agility";
+const XML_TAG_PASSING: &str = "passing";
+const XML_TAG_ARMOUR: &str = "armour";
 
 /// Unique player identifier (string id as in the Java model).
 pub type PlayerId = String;
@@ -100,6 +136,22 @@ pub struct Player {
     /// Java: player instanceof ZappedPlayer check — tracked via GameState.isZapped().
     #[serde(default)]
     pub zapped: bool,
+
+    /// Java: `RosterPlayer.fInsideSkillList` (transient) — true while inside `<skillList>`.
+    #[serde(skip)]
+    pub inside_skill_list: bool,
+    /// Java: `RosterPlayer.fInsideInjuryList` (transient).
+    #[serde(skip)]
+    pub inside_injury_list: bool,
+    /// Java: `RosterPlayer.fInjuryCurrent` (transient) — recovering= attribute of `<injury>`.
+    #[serde(skip)]
+    pub injury_current: bool,
+    /// Java: `RosterPlayer.fInsidePlayerStatistics` (transient).
+    #[serde(skip)]
+    pub inside_player_statistics: bool,
+    /// Java: `RosterPlayer.fCurrentSkillValue` (transient) — value= attribute of `<skill>`.
+    #[serde(skip)]
+    pub current_skill_value: Option<String>,
 }
 
 impl Player {
@@ -293,8 +345,164 @@ impl Player {
             recovering_injury: None,
             player_status: PlayerStatus::ACTIVE,
             zapped: false,
+            inside_skill_list: false,
+            inside_injury_list: false,
+            injury_current: false,
+            inside_player_statistics: false,
+            current_skill_value: None,
         }
     }
+
+    /// Java: `RosterPlayer.updatePosition(RosterPosition, IFactorySource, long)`, called from
+    /// `Team.updateRoster` once a team's roster has been resolved (e.g. after XML-loading a
+    /// standalone-mode team). Bounded scope: applies stat/skill resolution from the roster
+    /// position; does not replay `PlayerModifier`/skill-behaviour effects (those apply once
+    /// the player enters an active game, at a different layer, not at roster-load time).
+    pub fn update_position(&mut self, position: Option<&RosterPosition>) {
+        let Some(position) = position else { return };
+        self.position_id = position.id.clone();
+        self.movement = position.movement;
+        self.strength = position.strength;
+        self.agility = position.agility;
+        self.passing = position.passing;
+        self.armour = position.armour;
+        self.position_movement = position.movement;
+        self.position_strength = position.strength;
+        self.position_agility = position.agility;
+        self.position_passing = position.passing;
+        self.position_armour = position.armour;
+        self.is_thrall = position.is_thrall;
+        self.is_big_guy = position.is_big_guy;
+        self.race = position.race.clone();
+        for sw in &position.skills {
+            self.add_skill(sw.skill_id);
+        }
+    }
+}
+
+impl IXmlReadable for Player {
+    /// Java: `RosterPlayer.startXmlElement(Game, String, Attributes)`.
+    fn start_xml_element(&mut self, _game: Option<&Game>, tag: &str, atts: &XmlAttributes) -> Option<Box<dyn IXmlReadable>> {
+        if self.inside_skill_list {
+            if tag == XML_TAG_SKILL {
+                self.current_skill_value = get_string_attribute(atts, XML_ATTRIBUTE_VALUE).filter(|v| !v.is_empty());
+                // Java also tracks `currentDisplayValue` (displayValueAs=) — cosmetic, discarded.
+            }
+        } else if self.inside_injury_list {
+            if tag == XML_TAG_INJURY {
+                self.injury_current = get_boolean_attribute(atts, XML_ATTRIBUTE_RECOVERING);
+            }
+        } else {
+            if tag == XML_TAG {
+                if let Some(id) = get_string_attribute(atts, XML_ATTRIBUTE_ID) {
+                    self.id = id;
+                }
+                self.nr = get_int_attribute(atts, XML_ATTRIBUTE_NR);
+                if let Some(status) = get_string_attribute(atts, XML_ATTRIBUTE_STATUS).and_then(|s| PlayerStatus::for_name(&s)) {
+                    self.player_status = status;
+                }
+                // Java: `iconSetIndex=` attribute — cosmetic client-rendering data, discarded.
+            }
+            if tag == XML_TAG_INJURY_LIST {
+                self.inside_injury_list = true;
+            }
+            // Java: `<iconSet size=...>` — cosmetic, no field here; discarded.
+            if tag == XML_TAG_SKILL_LIST {
+                self.inside_skill_list = true;
+            }
+            if tag == XML_TAG_PLAYER_STATISTICS {
+                self.current_spps = get_int_attribute_or(atts, XML_ATTRIBUTE_CURRENT_SPPS, 0);
+                self.inside_player_statistics = true;
+            }
+        }
+        None
+    }
+
+    /// Java: `RosterPlayer.endXmlElement(Game, String, String)`.
+    fn end_xml_element(&mut self, game: Option<&Game>, tag: &str, value: &str) -> bool {
+        let complete = tag == XML_TAG;
+        if !complete {
+            if self.inside_skill_list {
+                if tag == XML_TAG_SKILL_LIST {
+                    self.inside_skill_list = false;
+                }
+                if tag == XML_TAG_SKILL {
+                    if let Some(skill_id) = SkillFactory::new().for_name(value) {
+                        let sw = match self.current_skill_value.take() {
+                            Some(v) => SkillWithValue::with_value(skill_id, v),
+                            None => SkillWithValue::new(skill_id),
+                        };
+                        self.extra_skills.push(sw);
+                    }
+                }
+            } else if self.inside_injury_list {
+                if tag == XML_TAG_INJURY_LIST {
+                    self.inside_injury_list = false;
+                }
+                if tag == XML_TAG_INJURY {
+                    // Java: `((SeriousInjuryFactory) game.getFactory(SERIOUS_INJURY)).forName(pValue)`
+                    // — requires a real `Game` (for `rules`); skipped when parsing without one
+                    // (e.g. standalone roster/team caching before a game exists).
+                    if let Some(game) = game {
+                        let mut factory = SeriousInjuryFactory::new();
+                        factory.initialize(game);
+                        if let Some(injury) = factory.for_name(value) {
+                            let kind = injury.to_kind();
+                            self.stat_injuries.push(kind);
+                            if self.injury_current {
+                                self.recovering_injury = Some(kind);
+                            }
+                        }
+                    }
+                }
+            } else if self.inside_player_statistics {
+                if tag == XML_TAG_PLAYER_STATISTICS {
+                    self.inside_player_statistics = false;
+                }
+            } else {
+                // Java: `<portrait>`/`<iconSet>` — cosmetic client-rendering data, discarded.
+                if tag == XML_TAG_NAME {
+                    self.name = value.to_string();
+                }
+                if tag == XML_TAG_GENDER {
+                    self.gender = PlayerGenderFactory::default().for_name(value).unwrap_or(PlayerGender::Male);
+                }
+                if tag == XML_TAG_POSITION_ID {
+                    self.position_id = value.to_string();
+                }
+                if tag == XML_TAG_TYPE {
+                    if let Some(t) = PlayerTypeFactory::default().for_name(value) {
+                        self.player_type = t;
+                    }
+                }
+                // Java: special "player without rosterPosition" fields — set stats on this
+                // player directly, matching the RosterPlayer fallback path.
+                if tag == XML_TAG_MOVEMENT {
+                    self.movement = value.parse().unwrap_or(0);
+                }
+                if tag == XML_TAG_STRENGTH {
+                    self.strength = value.parse().unwrap_or(0);
+                }
+                if tag == XML_TAG_AGILITY {
+                    self.agility = value.parse().unwrap_or(0);
+                }
+                if tag == XML_TAG_PASSING {
+                    self.passing = if !value.is_empty() { value.parse().unwrap_or(0) } else { 0 };
+                }
+                if tag == XML_TAG_ARMOUR {
+                    self.armour = value.parse().unwrap_or(0);
+                }
+                // Java: `<race>`/`<shorthand>` write into `getPosition()` (the resolved
+                // RosterPosition) — this parse layer has no roster reference to mutate;
+                // discarded, same treatment as the other position-lookup-dependent tags.
+            }
+        }
+        complete
+    }
+
+    fn as_any(&self) -> &dyn Any { self }
+    fn as_any_mut(&mut self) -> &mut dyn Any { self }
+    fn into_any(self: Box<Self>) -> Box<dyn Any> { self }
 }
 
 #[cfg(test)]
@@ -337,6 +545,11 @@ mod tests {
             recovering_injury: None,
             player_status: PlayerStatus::ACTIVE,
             zapped: false,
+            inside_skill_list: false,
+            inside_injury_list: false,
+            injury_current: false,
+            inside_player_statistics: false,
+            current_skill_value: None,
         }
     }
 
@@ -462,6 +675,9 @@ mod tests {
             is_thrall: false,
             race: None,
             replaces_position: None,
+            inside_skill_list_tag: false,
+            inside_skill_category_list_tag: false,
+            current_skill_value: None,
         };
         let p = Player::from_position("p1", "Blitzer Joe", 3, &pos);
         assert_eq!(p.position_id, "blitzer");
