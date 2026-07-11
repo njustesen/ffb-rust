@@ -636,6 +636,7 @@ version = "0.1.0"
 dependencies = [
  "ffb-mechanics",
  "ffb-model",
+ "ffb-protocol",
  "log",
  "once_cell",
  "rand 0.8.6",

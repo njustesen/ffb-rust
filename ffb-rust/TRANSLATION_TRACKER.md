@@ -29,6 +29,50 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AAA (GameLog wiring, completed, this session):**
+First of 3 planned sub-phases closing the last "translate more Java" gap: wiring a typed,
+replayable command log into `ffb-server`'s live `GameState`, instead of the untyped
+`Vec<String>` placeholder it had carried since Phase ZT.
+
+- Added `AnyServerCommand::get_command_nr(&self) -> i32` and `is_replayable(&self) -> bool` in
+  `ffb-protocol` (`commands/any_server_command.rs`) — one match arm per of the 32 genuine
+  `ServerCommand*` variants, delegating to each struct's own `command_nr` field. For
+  `is_replayable`, 9 variants (`ServerAdminMessage`, `ServerAutomaticPlayerMarkings`,
+  `ServerGameList`, `ServerGameState`, `ServerGameTime`, `ServerJoin`, `ServerLeave`,
+  `ServerPasswordChallenge`, `ServerReplay`) have their own Java-side override and delegate to
+  it; the other 23 have no override in Java and fall back to the `ServerCommand` base class's
+  `true` default (`ServerCommandGameTime::is_replayable()` correctly returns `false`, exercised
+  by a dedicated unit test).
+- Rewrote `ffb_engine::GameLog` (`crates/ffb-engine/src/game_log.rs`) to store
+  `Vec<AnyServerCommand>` instead of `Vec<String>`, fixing a pre-existing bug where `add()` had
+  no `isReplayable()` guard (Java: `if (pServerCommand.isReplayable()) fServerCommands.add(...)`)
+  and implementing the two previously-`todo!()`'d methods: `get_uncommitted_server_commands()`
+  (filters by `command_nr > last_committed_command_nr`) and `find_max_command_nr()` (max
+  `command_nr` across stored commands, `0` for an empty log, matching Java's `maxCommandNr = 0`
+  seed). `get_server_commands()` now returns the locked `MutexGuard<Vec<AnyServerCommand>>`
+  rather than a cloned `Vec` — `AnyServerCommand` isn't `Clone` (holds a non-`Clone`
+  `ServerCommandModelSync` variant), and `get_uncommitted_server_commands()` returns `Vec<i32>`
+  of command numbers rather than command references for the same reason, since nothing
+  downstream yet needs the full payloads.
+- Added `ffb-protocol` as a new `ffb-engine` dependency (checked first: no cycle, since
+  `ffb-protocol` only depends on `ffb-model`).
+- Wired the live `ffb-server::GameState` (`crates/ffb-server/src/game_state.rs`) to use
+  `ffb_engine::GameLog` in place of its old `game_log: Vec<String>` field. Grepped
+  `crates/ffb-server/src` for every `.game_log` call site: there were none outside the field's
+  own declaration/initializer, so no downstream code needed to be ported to a real
+  `AnyServerCommand`-constructing call site this phase — the field exists but nothing in the
+  live server pushes to it yet. There was no pre-existing debug-string-pushing call site to
+  replace, unlike the scenario the plan anticipated, so no `// java:` gap comment was needed at
+  a call site.
+- Left `ffb-engine::game_state::GameState` (the separate, dead struct used only by
+  `ffb-engine::fantasy_football_server.rs`) untouched — it already held a `GameLog` field and
+  never called `.add()`, so the type change didn't require touching it, confirming it really is
+  unused dead code on this path.
+- No parity/integration testing this phase (per plan); unit tests only, colocated with the
+  changed files. Tests: 17,238 → 17,249 (net +11: new `AnyServerCommand` accessor tests plus
+  rewritten/added `GameLog` tests for the replayable-guard, uncommitted-filter, and
+  max-command-nr logic).
+
 **Phase ZZ (async dispatch + Join/JoinApproved wiring, completed, 2026-07-11):**
 Closed the two remaining server handler gaps Phase ZY narrowed but left blocked
 (`ServerCommandHandlerJoin`/`JoinApproved`) by threading async/DB access through the

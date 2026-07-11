@@ -12,6 +12,7 @@ use ffb_model::events::GameEvent;
 use ffb_engine::step::driver::DriverGameState;
 use ffb_engine::action::Action;
 use ffb_engine::legal_actions::TeamSide;
+use ffb_engine::game_log::GameLog;
 
 /// Server-side wrapper around `DriverGameState`.
 pub struct GameState {
@@ -21,8 +22,8 @@ pub struct GameState {
     game_id: i64,
     /// Java: `fCommandNrGenerator`
     command_nr: i64,
-    /// Java: `fGameLog` — JSON strings of each ServerCommand sent (for replay)
-    pub game_log: Vec<String>,
+    /// Java: `fGameLog` — the replayable server command log for this game.
+    pub game_log: GameLog,
 }
 
 impl GameState {
@@ -32,7 +33,7 @@ impl GameState {
             driver: None,
             game_id,
             command_nr: 0,
-            game_log: Vec::new(),
+            game_log: GameLog::new(),
         }
     }
 

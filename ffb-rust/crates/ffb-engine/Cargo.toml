@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 ffb-model = { path = "../ffb-model" }
 ffb-mechanics = { path = "../ffb-mechanics" }
+ffb-protocol = { path = "../ffb-protocol" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 rand = { workspace = true }

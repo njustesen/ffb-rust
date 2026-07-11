@@ -160,6 +160,89 @@ impl AnyServerCommand {
         }
     }
 
+    /// Java: `ServerCommand.getCommandNr()`, dispatched to the concrete subclass's
+    /// own `command_nr` field.
+    pub fn get_command_nr(&self) -> i32 {
+        match self {
+            AnyServerCommand::ServerAddPlayer(c) => c.command_nr,
+            AnyServerCommand::ServerAddSketches(c) => c.command_nr,
+            AnyServerCommand::ServerAdminMessage(c) => c.command_nr,
+            AnyServerCommand::ServerAutomaticPlayerMarkings(c) => c.command_nr,
+            AnyServerCommand::ServerClearSketches(c) => c.command_nr,
+            AnyServerCommand::ServerGameList(c) => c.command_nr,
+            AnyServerCommand::ServerGameState(c) => c.command_nr,
+            AnyServerCommand::ServerGameTime(c) => c.command_nr,
+            AnyServerCommand::ServerJoin(c) => c.command_nr,
+            AnyServerCommand::ServerLeave(c) => c.command_nr,
+            AnyServerCommand::ServerModelSync(c) => c.command_nr,
+            AnyServerCommand::ServerPasswordChallenge(c) => c.command_nr,
+            AnyServerCommand::ServerPong(c) => c.command_nr,
+            AnyServerCommand::ServerRemovePlayer(c) => c.command_nr,
+            AnyServerCommand::ServerRemoveSketches(c) => c.command_nr,
+            AnyServerCommand::ServerReplay(c) => c.command_nr,
+            AnyServerCommand::ServerReplayControl(c) => c.command_nr,
+            AnyServerCommand::ServerReplayStatus(c) => c.command_nr,
+            AnyServerCommand::ServerSetPreventSketching(c) => c.command_nr,
+            AnyServerCommand::ServerSketchAddCoordinate(c) => c.command_nr,
+            AnyServerCommand::ServerSketchSetColor(c) => c.command_nr,
+            AnyServerCommand::ServerSketchSetLabel(c) => c.command_nr,
+            AnyServerCommand::ServerSound(c) => c.command_nr,
+            AnyServerCommand::ServerStatus(c) => c.command_nr,
+            AnyServerCommand::ServerTalk(c) => c.command_nr,
+            AnyServerCommand::ServerTeamList(c) => c.command_nr,
+            AnyServerCommand::ServerTeamSetupList(c) => c.command_nr,
+            AnyServerCommand::ServerUnzapPlayer(c) => c.command_nr,
+            AnyServerCommand::ServerUpdateLocalPlayerMarkers(c) => c.command_nr,
+            AnyServerCommand::ServerUserSettings(c) => c.command_nr,
+            AnyServerCommand::ServerVersion(c) => c.command_nr,
+            AnyServerCommand::ServerZapPlayer(c) => c.command_nr,
+        }
+    }
+
+    /// Java: `ServerCommand.isReplayable()`, dispatched to the concrete subclass's
+    /// own override where one exists (`ServerCommandAdminMessage`,
+    /// `ServerCommandAutomaticPlayerMarkings`, `ServerCommandGameList`,
+    /// `ServerCommandGameState`, `ServerCommandGameTime`, `ServerCommandJoin`,
+    /// `ServerCommandLeave`, `ServerCommandPasswordChallenge`, `ServerCommandReplay`),
+    /// falling back to the `ServerCommand` base default of `true` for every other
+    /// leaf struct (none of which define their own `is_replayable()` override in Java).
+    pub fn is_replayable(&self) -> bool {
+        match self {
+            AnyServerCommand::ServerAdminMessage(c) => c.is_replayable(),
+            AnyServerCommand::ServerAutomaticPlayerMarkings(c) => c.is_replayable(),
+            AnyServerCommand::ServerGameList(c) => c.is_replayable(),
+            AnyServerCommand::ServerGameState(c) => c.is_replayable(),
+            AnyServerCommand::ServerGameTime(c) => c.is_replayable(),
+            AnyServerCommand::ServerJoin(c) => c.is_replayable(),
+            AnyServerCommand::ServerLeave(c) => c.is_replayable(),
+            AnyServerCommand::ServerPasswordChallenge(c) => c.is_replayable(),
+            AnyServerCommand::ServerReplay(c) => c.is_replayable(),
+            AnyServerCommand::ServerAddPlayer(_)
+            | AnyServerCommand::ServerAddSketches(_)
+            | AnyServerCommand::ServerClearSketches(_)
+            | AnyServerCommand::ServerModelSync(_)
+            | AnyServerCommand::ServerPong(_)
+            | AnyServerCommand::ServerRemovePlayer(_)
+            | AnyServerCommand::ServerRemoveSketches(_)
+            | AnyServerCommand::ServerReplayControl(_)
+            | AnyServerCommand::ServerReplayStatus(_)
+            | AnyServerCommand::ServerSetPreventSketching(_)
+            | AnyServerCommand::ServerSketchAddCoordinate(_)
+            | AnyServerCommand::ServerSketchSetColor(_)
+            | AnyServerCommand::ServerSketchSetLabel(_)
+            | AnyServerCommand::ServerSound(_)
+            | AnyServerCommand::ServerStatus(_)
+            | AnyServerCommand::ServerTalk(_)
+            | AnyServerCommand::ServerTeamList(_)
+            | AnyServerCommand::ServerTeamSetupList(_)
+            | AnyServerCommand::ServerUnzapPlayer(_)
+            | AnyServerCommand::ServerUpdateLocalPlayerMarkers(_)
+            | AnyServerCommand::ServerUserSettings(_)
+            | AnyServerCommand::ServerVersion(_)
+            | AnyServerCommand::ServerZapPlayer(_) => true,
+        }
+    }
+
     /// Java: `NetCommandId.createNetCommand()` + `NetCommand.initFrom(...)`.
     pub fn from_json(id: NetCommandId, json: &serde_json::Value) -> Option<Self> {
         Some(match id {
@@ -236,5 +319,28 @@ mod tests {
         let json = serde_json::json!({"netCommandId": "serverPong"});
         let restored = AnyServerCommand::from_json(NetCommandId::ServerPong, &json).unwrap();
         assert!(matches!(restored, AnyServerCommand::ServerPong(_)));
+    }
+
+    #[test]
+    fn get_command_nr_delegates_to_wrapped_command() {
+        let mut inner = ServerCommandGameTime::new(1, 2);
+        inner.command_nr = 42;
+        let cmd = AnyServerCommand::ServerGameTime(inner);
+        assert_eq!(cmd.get_command_nr(), 42);
+    }
+
+    #[test]
+    fn is_replayable_delegates_to_variant_override() {
+        // ServerCommandGameTime overrides isReplayable() to return false in Java.
+        let cmd = AnyServerCommand::ServerGameTime(ServerCommandGameTime::new(1, 2));
+        assert!(!cmd.is_replayable());
+    }
+
+    #[test]
+    fn is_replayable_defaults_true_for_variants_without_an_override() {
+        // ServerCommandPong has no isReplayable() override in Java, so it inherits
+        // the ServerCommand base class default of true.
+        let cmd = AnyServerCommand::ServerPong(ServerCommandPong::default());
+        assert!(cmd.is_replayable());
     }
 }
