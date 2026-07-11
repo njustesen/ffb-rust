@@ -2079,7 +2079,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/DiceInterpreter.java` | `ffb-engine` | `src/dice_interpreter.rs` | ✓ |
 | `server/DiceRoller.java` | `ffb-engine` | `src/dice_roller.rs` | ✓ |
 | `server/FantasyFootballServer.java` | `ffb-engine` | `src/fantasy_football_server.rs` | ✓ |
-| `server/GameCache.java` | `ffb-engine` | `src/game_cache.rs` | ✓ |
+| `server/GameCache.java` | `ffb-server` | `src/game_cache.rs` | ✓ |
 | `server/GameLog.java` | `ffb-engine` | `src/game_log.rs` | ✓ |
 | `server/GameStartMode.java` | `ffb-engine` | `src/game_start_mode.rs` | ✓ |
 | `server/GameState.java` | `ffb-engine` | `src/game_state.rs` | ✓ |
