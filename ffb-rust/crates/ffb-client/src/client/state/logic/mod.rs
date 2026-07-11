@@ -5,6 +5,9 @@
 //! `TRANSLATION_TRACKER.md`.
 
 pub mod abstract_block_logic_module;
+pub mod bb2016;
+pub mod bb2020;
+pub mod bb2025;
 pub mod blitz_logic_module;
 pub mod block_logic_extension;
 pub mod client_action;
@@ -18,6 +21,7 @@ pub mod kickoff_logic_module;
 pub mod kickoff_return_logic_module;
 pub mod logic_module;
 pub mod login_logic_module;
+pub mod mixed;
 pub mod move_logic_module;
 pub mod pass_block_logic_module;
 pub mod place_ball_logic_module;
