@@ -711,6 +711,16 @@ impl PlayerGender {
     }
 }
 
+// java: PlayerGender.getSelf() not yet in ffb-model enum
+pub fn gender_self(g: PlayerGender) -> &'static str {
+    match g {
+        PlayerGender::Male => "himself",
+        PlayerGender::Female => "herself",
+        PlayerGender::Nonbinary => "themself",
+        PlayerGender::Neutral => "itself",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
