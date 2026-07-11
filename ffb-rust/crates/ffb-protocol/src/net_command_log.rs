@@ -2,9 +2,9 @@ use crate::net_command::NetCommand;
 
 /// 1:1 translation of `com.fumbbl.ffb.net.NetCommandLog`.
 /// Accumulates `NetCommand` values for logging / replay purposes.
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct NetCommandLog {
-    commands: Vec<NetCommand>,
+    commands: Vec<Box<dyn NetCommand>>,
 }
 
 impl NetCommandLog {
@@ -13,12 +13,12 @@ impl NetCommandLog {
     }
 
     /// Append a command to the log.
-    pub fn add(&mut self, command: NetCommand) {
+    pub fn add(&mut self, command: Box<dyn NetCommand>) {
         self.commands.push(command);
     }
 
     /// Return a slice of all logged commands.
-    pub fn commands(&self) -> &[NetCommand] {
+    pub fn commands(&self) -> &[Box<dyn NetCommand>] {
         &self.commands
     }
 
@@ -35,6 +35,14 @@ impl NetCommandLog {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ffb_model::enums::NetCommandId;
+
+    struct Dummy;
+    impl NetCommand for Dummy {
+        fn get_id(&self) -> NetCommandId {
+            NetCommandId::ClientJoin
+        }
+    }
 
     #[test]
     fn new_log_is_empty() {
@@ -46,15 +54,15 @@ mod tests {
     #[test]
     fn add_increments_len() {
         let mut log = NetCommandLog::new();
-        log.add(NetCommand::Unknown);
-        log.add(NetCommand::Unknown);
+        log.add(Box::new(Dummy));
+        log.add(Box::new(Dummy));
         assert_eq!(log.len(), 2);
     }
 
     #[test]
     fn commands_returns_slice() {
         let mut log = NetCommandLog::new();
-        log.add(NetCommand::Unknown);
+        log.add(Box::new(Dummy));
         assert_eq!(log.commands().len(), 1);
     }
 }

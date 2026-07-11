@@ -1,3 +1,5 @@
+pub mod any_client_command;
+pub mod any_server_command;
 pub mod client_command;
 pub mod client_command_acting_player;
 pub mod client_command_add_sketch;
