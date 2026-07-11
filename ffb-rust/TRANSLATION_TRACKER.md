@@ -159,6 +159,33 @@ the 3 handlers that were blocked on it (`ServerCommandHandlerJoinReplay`/`Replay
   landed, `ServerCommandHandlerReplay`'s not-found branch's final fallback was closed for real —
   see the merge note below for the exact change and final test count.
 
+**Merge + final wiring pass (all 3 sub-phases, this session): 11/11 originally-deferred
+`ffb-server` handlers now closed — 0 remain.** Merged Phase AAA → AAC → AAB sequentially
+(AAC fast-forwarded cleanly onto AAA; AAB conflicted only in this file and `SESSION.md`,
+both resolved by concatenating each sub-phase's entry — no source-code conflicts). With
+both `ServerRequestLoadReplay`'s `ServerRequest`-trait fix (Phase AAC) and the replay
+playback engine (Phase AAB) now on `main` together, `ServerCommandHandlerReplay`'s
+not-found branch — the one piece both sub-phases had independently left as a documented
+`todo!()`, each blocked on the other's half — was wired for real: it now builds a
+`ServerRequestLoadReplay` (mode `LOAD_GAME`), wraps it in `QueuedServerRequestLoadReplay`,
+and enqueues it on a `ServerRequestProcessor` the handler's constructor now receives
+(matching the DI convention `ServerCommandHandlerUploadGame` established). Once the backup
+service answers, that adapter re-adds the rehydrated `GameState` to the cache and
+redispatches `InternalServerCommandReplayLoaded`, which `ServerCommandHandlerReplayLoaded`
+picks up to actually start the replay — closing the loop Java's own `handleCommand` describes.
+Fixed 3 pre-existing test failures surfaced by this change: 3 of this handler's
+`#[tokio::test]`s constructed a real `ReqwestHttpClient` (which builds its own tokio runtime)
+from inside an async test context, which panics on drop (`"Cannot drop a runtime in a
+context where blocking is not allowed"`) — switched those to the `MockHttpClient`-backed
+`handler_with` helper already used elsewhere in this crate's tests, matching the established
+pattern; no production-code behavior changed by that fix. Every ffb-server handler that was
+deliberately deferred as of Phase ZW.1 (35 files, 11 handlers) is now genuinely `todo!()`-free
+and unit-tested — remaining known gaps are the separately-documented, out-of-scope items
+(the two parallel command hierarchies not yet reconciled in `command_socket.rs`, and
+`UtilServerHttpClient`'s deliberate stub since its concern is already covered by
+`ReqwestHttpClient`). Tests: 17,265 (AAB alone) / 17,259 (AAC alone) → **17,275** after
+merging both plus this closing pass, 0 failures.
+
 **Phase AAA (GameLog wiring, completed, this session):**
 First of 3 planned sub-phases closing the last "translate more Java" gap: wiring a typed,
 replayable command log into `ffb-server`'s live `GameState`, instead of the untyped
@@ -2062,7 +2089,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/handler/ServerCommandHandlerPasswordChallenge.java` | `ffb-server` | `src/handler/server_command_handler_password_challenge.rs` | ✓ |
 | `server/handler/ServerCommandHandlerPing.java` | `ffb-server` | `src/handler/server_command_handler_ping.rs` | ✓ |
 | `server/handler/ServerCommandHandlerRemoveSketches.java` | `ffb-server` | `src/handler/server_command_handler_remove_sketches.rs` | ✓ |
-| `server/handler/ServerCommandHandlerReplay.java` | `ffb-server` | `src/handler/server_command_handler_replay.rs` | ~ |
+| `server/handler/ServerCommandHandlerReplay.java` | `ffb-server` | `src/handler/server_command_handler_replay.rs` | ✓ |
 | `server/handler/ServerCommandHandlerReplayLoaded.java` | `ffb-server` | `src/handler/server_command_handler_replay_loaded.rs` | ✓ |
 | `server/handler/ServerCommandHandlerReplayStatus.java` | `ffb-server` | `src/handler/server_command_handler_replay_status.rs` | ✓ |
 | `server/handler/ServerCommandHandlerRequestVersion.java` | `ffb-server` | `src/handler/server_command_handler_request_version.rs` | ✓ |
