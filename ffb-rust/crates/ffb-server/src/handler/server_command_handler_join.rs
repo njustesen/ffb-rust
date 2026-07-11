@@ -42,10 +42,16 @@ impl ServerCommandHandlerJoin {
     /// ```
     ///
     /// Targeted-join (by game id / name / replay) requires either the FUMBBL
-    /// authorization HTTP pipeline or the standalone `DbPasswordForCoachQuery`
-    /// — neither is wired in the Rust server yet, so that branch is a narrow
-    /// `todo!()`. The lobby-listing branch is fully implemented against the
-    /// in-memory `GameCache`.
+    /// authorization HTTP pipeline or the standalone `DbPasswordForCoachQuery` — Phase ZY.4
+    /// added the redispatch sink this branch would use to hand its result to
+    /// `InternalServerCommandJoinApproved` (`ServerCommunication::receive_internal`,
+    /// `AnyInternalServerCommand`), but the sink alone doesn't unblock this branch: the real
+    /// blocker is that `DbPasswordForCoachQuery::execute` is `async` and needs a live
+    /// `mysql_async::Conn`, which this handler's sync `handle_command` signature doesn't
+    /// thread through — the same class of gap as `ServerCommandHandlerJoinApproved`'s
+    /// remaining `todo!()`s. Making this async plus threading a `DbConnectionManager`
+    /// through the constructor is a separately-scoped follow-up. The lobby-listing branch is
+    /// fully implemented against the in-memory `GameCache`.
     pub fn handle_command(&self, join_command: &ClientCommandJoin, session_id: SessionId) -> bool {
         let has_target = join_command.get_game_id() > 0
             || join_command.get_game_name().map(|n| !n.is_empty()).unwrap_or(false)
@@ -53,7 +59,12 @@ impl ServerCommandHandlerJoin {
 
         if has_target {
             // Java: FumbblRequestCheckAuthorization (HTTP) or DbPasswordForCoachQuery (DB).
-            todo!("Phase ZV: needs FumbblRequestCheckAuthorization / DbPasswordForCoachQuery wiring");
+            todo!(
+                "Phase ZY.4+: needs handle_command made async + DbConnectionManager threaded \
+                 through, to call DbPasswordForCoachQuery::execute, then redispatch \
+                 InternalServerCommandJoinApproved via ServerCommunication::receive_internal \
+                 (sink now exists) or send ERROR_WRONG_PASSWORD"
+            );
         }
 
         // Java: `gameCache.findOpenGamesForCoach` / `findActiveGames` — the Rust

@@ -25,11 +25,14 @@
 use std::sync::{Arc, Mutex};
 use ffb_engine::action::{Action, PlayerActionChoice};
 use ffb_engine::legal_actions::TeamSide;
+use ffb_engine::server_sketch_manager::ServerSketchManager;
 use ffb_model::enums::{PlayerAction, SkillId};
 use ffb_protocol::client_commands::ClientCommand;
 use crate::game_cache::GameCache;
 use crate::handler::server_command_handler_ping::ServerCommandHandlerPing;
-use crate::model::received_command::ReceivedCommand;
+use crate::handler::server_command_handler_socket_closed::ServerCommandHandlerSocketClosed;
+use crate::model::received_command::{ReceivedCommand, ReceivedNetCommand};
+use crate::net::commands::any_internal_server_command::AnyInternalServerCommand;
 use crate::net::replay_session_manager::ReplaySessionManager;
 use crate::net::session_manager::SessionManager;
 use crate::net::wire::{OutgoingModelSync, events_to_reports};
@@ -56,6 +59,7 @@ pub struct ServerCommandHandlerFactory {
     pub session_manager: Arc<Mutex<SessionManager>>,
     pub replay_session_manager: Arc<Mutex<ReplaySessionManager>>,
     ping_handler: ServerCommandHandlerPing,
+    socket_closed_handler: ServerCommandHandlerSocketClosed,
 }
 
 impl ServerCommandHandlerFactory {
@@ -82,18 +86,47 @@ impl ServerCommandHandlerFactory {
             Arc::clone(&session_manager),
             Arc::clone(&replay_session_manager),
         );
-        Self { game_cache, session_manager, replay_session_manager, ping_handler }
+        let sketch_manager = Arc::new(Mutex::new(ServerSketchManager::new()));
+        let socket_closed_handler = ServerCommandHandlerSocketClosed::new(
+            Arc::clone(&game_cache),
+            Arc::clone(&session_manager),
+            Arc::clone(&replay_session_manager),
+            sketch_manager,
+        );
+        Self { game_cache, session_manager, replay_session_manager, ping_handler, socket_closed_handler }
     }
 
     /// Java: `handleCommand(ReceivedCommand)` — the main dispatch entry point.
+    ///
+    /// Java's `ReceivedCommand.fCommand` is a `NetCommand` that is either a `ClientCommand`
+    /// or an `InternalServerCommand` (see `ReceivedNetCommand`'s doc comment); a handler that
+    /// wants to enqueue a follow-up command calls `communication.handleCommand(new
+    /// ReceivedCommand(internalCommand, session))`, landing it back on this same dispatch
+    /// point. Phase ZY.4 wires that redispatch sink through for real
+    /// (`ServerCommunication::receive_internal`) and adds the `Internal` match arm below —
+    /// currently routing only `SocketClosed` (already flagged in this file's own "Known gap"
+    /// note as needing to move from `command_socket.rs` into this factory) to a real handler;
+    /// the other 13 internal command types need their own handler wired in with their own
+    /// dependencies (several are `async`/DB-backed, e.g. `CloseGame`/`DeleteGame`, which would
+    /// first need this whole `handle_command` made `async` — a separate, larger change) and
+    /// fall through to a logged no-op for now rather than a fabricated stand-in.
     pub fn handle_command(&self, received: ReceivedCommand) {
         let session_id = received.session_id;
+
+        let client_command = match received.command {
+            ReceivedNetCommand::Internal(internal) => {
+                self.handle_internal_command(internal, session_id);
+                return;
+            }
+            ReceivedNetCommand::Client(cmd) => cmd,
+        };
+
         let game_id = {
             let sm = self.session_manager.lock().unwrap();
             sm.get_game_id_for_session(session_id)
         };
 
-        match &received.command {
+        match &client_command {
             ClientCommand::ClientPing(ping) => {
                 // Delegates to the real 1:1-translated ServerCommandHandlerPing
                 // (session/replay last-ping bookkeeping + pong reply), instead of
@@ -118,7 +151,7 @@ impl ServerCommandHandlerFactory {
             }
         };
 
-        let action = match decode_command(received.command, side) {
+        let action = match decode_command(client_command, side) {
             Ok(a) => a,
             Err(e) => {
                 log::warn!("session {} decode error: {}", session_id, e);
@@ -156,6 +189,24 @@ impl ServerCommandHandlerFactory {
                 sm.send_all(game_id, &json);
             }
             Err(e) => log::error!("failed to serialize model sync: {}", e),
+        }
+    }
+
+    /// Java: the `InternalServerCommand` half of `handleCommand`'s dispatch — routes each
+    /// concrete internal command to its `ServerCommandHandler*`. See `handle_command`'s doc
+    /// comment for which are wired vs. still gated behind their own missing infra.
+    fn handle_internal_command(&self, internal: AnyInternalServerCommand, session_id: crate::model::received_command::SessionId) {
+        match internal {
+            AnyInternalServerCommand::SocketClosed(_) => {
+                self.socket_closed_handler.handle_command(session_id);
+            }
+            other => {
+                log::debug!(
+                    "session {}: internal command {} received but not yet wired into \
+                     ServerCommandHandlerFactory (needs its own handler + dependencies)",
+                    session_id, other.get_id()
+                );
+            }
         }
     }
 }
@@ -840,10 +891,7 @@ mod tests {
             sm.add_session(42, 1, "TestCoach".into(), ClientMode::PLAYER, true, vec![], tx);
         }
         let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc));
-        factory.handle_command(ReceivedCommand {
-            command: ClientCommand::ClientPing(ClientPing { timestamp: 9999 }),
-            session_id: 42,
-        });
+        factory.handle_command(ReceivedCommand::new(ClientCommand::ClientPing(ClientPing { timestamp: 9999 }), 42));
         let sm = sm_arc.lock().unwrap();
         // ServerCommandHandlerPing stores the current wall-clock time as the
         // last-ping timestamp (matching Java's `System.currentTimeMillis()`)
@@ -859,9 +907,8 @@ mod tests {
         let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
         let factory = ServerCommandHandlerFactory::new(gc, sm);
         // session 99 was never registered — should log a warning and return cleanly
-        factory.handle_command(crate::model::received_command::ReceivedCommand {
-            command: ClientCommand::ClientEndTurn(ClientEndTurn),
-            session_id: 99,
-        });
+        factory.handle_command(crate::model::received_command::ReceivedCommand::new(
+            ClientCommand::ClientEndTurn(ClientEndTurn), 99,
+        ));
     }
 }

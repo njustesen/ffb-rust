@@ -7,6 +7,7 @@ use tokio::sync::mpsc;
 use crate::game_cache::GameCache;
 use crate::handler::ServerCommandHandlerFactory;
 use crate::model::received_command::{ReceivedCommand, SessionId};
+use crate::net::commands::any_internal_server_command::AnyInternalServerCommand;
 use crate::net::replay_session_manager::ReplaySessionManager;
 use crate::net::session_manager::SessionManager;
 
@@ -44,6 +45,22 @@ impl ServerCommunication {
     pub fn receive_command(&self, cmd: ReceivedCommand) {
         if let Err(e) = self.tx.send(cmd) {
             log::error!("dispatch channel closed, could not enqueue command: {}", e);
+        }
+    }
+
+    /// Java: `handleCommand(InternalServerCommand)` — wraps the internal command in a
+    /// `ReceivedCommand` and enqueues it on the same dispatch queue as client commands
+    /// (`fCommandQueue.offer(new ReceivedCommand(internalCommand, null))`). This is the
+    /// redispatch sink a handler uses to hand a follow-up command back through dispatch —
+    /// e.g. `ServerCommandHandlerJoin` enqueuing an `InternalServerCommandJoinApproved`
+    /// (see that handler's doc comment for why it isn't wired to call this yet: its own
+    /// blocker is the async DB password check that must happen first, not this sink).
+    /// The single-consumer `dispatch_loop` task already serializes processing exactly like
+    /// Java's single `BlockingQueue` thread, so redispatching here needs no extra
+    /// synchronization beyond the existing channel.
+    pub fn receive_internal(&self, cmd: AnyInternalServerCommand, session_id: SessionId) {
+        if let Err(e) = self.tx.send(ReceivedCommand::new_internal(cmd, session_id)) {
+            log::error!("dispatch channel closed, could not enqueue internal command: {}", e);
         }
     }
 
@@ -145,12 +162,33 @@ mod tests {
         let gc = Arc::new(Mutex::new(GameCache::new()));
         let sm = Arc::new(Mutex::new(SessionManager::new()));
         let sc = ServerCommunication::new(gc, sm);
-        sc.receive_command(ReceivedCommand {
-            command: ClientCommand::ClientPing(ClientPing { timestamp: 42 }),
-            session_id: 0,
-        });
+        sc.receive_command(ReceivedCommand::new(ClientCommand::ClientPing(ClientPing { timestamp: 42 }), 0));
         // Give the dispatch task a chance to run
         tokio::task::yield_now().await;
+    }
+
+    #[tokio::test]
+    async fn receive_internal_reaches_socket_closed_handler_via_dispatch_loop() {
+        use crate::net::commands::internal_server_command_socket_closed::InternalServerCommandSocketClosed;
+        use ffb_model::model::ClientMode;
+
+        let gc = Arc::new(Mutex::new(GameCache::new()));
+        let sm = Arc::new(Mutex::new(SessionManager::new()));
+        {
+            let (tx, _rx) = mpsc::unbounded_channel();
+            sm.lock().unwrap().add_session(1, 0, "Coach".into(), ClientMode::PLAYER, true, vec![], tx);
+        }
+        let sc = ServerCommunication::new(Arc::clone(&gc), Arc::clone(&sm));
+
+        assert!(sm.lock().unwrap().get_coach_for_session(1).is_some());
+        sc.receive_internal(AnyInternalServerCommand::SocketClosed(InternalServerCommandSocketClosed), 1);
+
+        // Give the real dispatch loop task a chance to drain the queue.
+        for _ in 0..10 {
+            tokio::task::yield_now().await;
+        }
+
+        assert!(sm.lock().unwrap().get_coach_for_session(1).is_none(), "SocketClosed should have removed the session");
     }
 
     #[test]

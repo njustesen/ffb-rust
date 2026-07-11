@@ -126,10 +126,7 @@ async fn handle_connection(mut socket: WebSocket, state: AppState) {
                     Some(Ok(Message::Text(text))) => {
                         match serde_json::from_str::<ClientCommand>(&text) {
                             Ok(cmd) => {
-                                let _ = state.dispatch_tx.send(ReceivedCommand {
-                                    command: cmd,
-                                    session_id,
-                                });
+                                let _ = state.dispatch_tx.send(ReceivedCommand::new(cmd, session_id));
                             }
                             Err(e) => {
                                 log::warn!("session {} bad JSON: {} — msg: {}", session_id, e, text);
