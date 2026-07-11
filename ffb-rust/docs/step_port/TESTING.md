@@ -30,10 +30,11 @@ granularity — the authoritative expected values the Rust Layer-1 tests are wri
 `state_hash`. This is the ultimate cross-engine check and the phase gate. The coverage
 checklist (`t3_checklist.rs`) additionally proves every action/event actually occurred.
 
-**Current parity status:** Layer 3 passes against the 3,920-line monolith `engine.rs` (T2: 2,500
-games; T3 Amazon: 100/100). It does **not** yet pass against the step-by-step rewrite — that
-validation is deferred until `engine.rs` is deleted and replaced by `driver.rs`. Until then,
-treat parity as validating the monolith, not the translated step files.
+**Current parity status:** `engine.rs` (the former 3,920-line monolith) was deleted in Phase ZR;
+`driver.rs` is now the sole live code path (`Box<dyn Step>` dispatch via `make_step()`,
+`DriverGameState` game loop). Parity/integration testing against the Java engine is explicitly
+deferred again during the current client-logic translation phase (ZW) per project instruction —
+see `TRANSLATION_TRACKER.md`'s Progress Summary for the current phase's scope.
 
 ## How the layers fit the port loop (TDD against the Java oracle)
 For each step, in order:
@@ -53,8 +54,8 @@ directly). Instead verify a generator by:
 2. Add a `#[test]` that creates a minimal `Game` fixture, calls `YourGenerator::push_sequence()`,
    and asserts the resulting `StepStack` contains the exact steps in the documented order with
    the correct `StepParameter` values. No dice, no events — just stack contents.
-3. Once driver.rs replaces engine.rs, Layer 3 parity becomes the integration gate for generators
-   as well — the step order differences will surface immediately in the state_hash comparison.
+3. Layer 3 parity (`driver.rs`, the live code path) is the integration gate for generators
+   as well — step order differences surface immediately in the state_hash comparison.
 
 ## What NOT to test (low value)
 - Trivial model getters/setters and serde round-trips (ffb-model). Keep these minimal.

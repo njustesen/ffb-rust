@@ -1,16 +1,28 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-09)
+## Current Status (2026-07-10, Phase ZW.2c complete)
 
 **Approach:** 1:1 Java-to-Rust translation. Every Java class → one Rust file, written directly from Java source. No reactive parity fixes.
 
 **engine.rs deleted.** `driver.rs` is now the live code path — `Box<dyn Step>` dispatch via `make_step()`, `DriverGameState` game loop, `GameState` type alias for backward compat.
 
-**Translation progress:** 2,521/2,521 files formally implemented = **100% ✓** (0 partial, 458 skip)
+**Translation progress (honest, by Java LOC):** ~89% of in-scope (~235.2k LOC); ~75% of everything (279k). The common + server layers are genuinely done (2,278 files ✓, 11 `~` infra rows remaining — down from 35 — 87 `todo!` sites), **plus a second fake-✓-stub pocket found and fixed this session: the 123 `net/commands/ClientCommand*`/`ServerCommand*` structs + `NetCommand`/`NetCommandFactory` were marked ✓ but had no JSON serialization or dispatch — now genuinely done, see Phase ZW.2c below.** `ffb-client-logic`: `client/net/` (3 files) and `client/handler/` (27 files) are now genuinely `✓` (translated this session). Remaining `○`: `client/state/` (85 files), `client/report/` (211 files), ~30 `client/` root files.
 
-**Tests:** 13,533 passing (1 ignored)
+**Tests:** 15,647 passing, 0 failing.
 
-**Current phase:** Phase ZU — DB wiring, WebSocket server, handler layer.
+**Phase ZW.2c done this session:** built the real NetCommand wire-protocol layer that Batch B (below) flagged as its blocker. Rewrote `net_command.rs` as a genuine `NetCommand` trait; gave all 91 `ClientCommand*`/32 `ServerCommand*` structs their missing inherited field + `NetCommand` impl + real `to_json_value()`/`from_json()` (wire keys verified against `IJsonOption.java`, matching the Phase ZU report-serialization convention); built `AnyClientCommand`/`AnyServerCommand` sum types + `NetCommandFactory::for_json_value()` + `NetCommandId::from_name()`. This is additive — the pre-existing hand-rolled `client_commands`/`server_commands` simplification the live WebSocket layer depends on today is untouched, a documented follow-up. Unblocked and translated `client/net/` (3 files: `ClientCommunication`'s ~90 `send*` methods, `ClientPingTask`, `CommandEndpoint`) and `client/handler/` (27 files: the incoming-`ServerCommand` dispatch factory + one handler per command). Full detail in `TRANSLATION_TRACKER.md`'s Progress Summary. Tests: 14,940 → 15,647 (+707).
+
+**Incident this session (resolved, no data lost):** while 9 parallel subagents added JSON serialization to the protocol structs, one ran `git stash`/`git stash pop` in the shared working directory, which combined with concurrent edits to trigger a `git reset`-equivalent wipe of all uncommitted work — including an entire prior session's worth of never-committed work (this file, `TRANSLATION_TRACKER.md`, `ffb-server/src/net/wire.rs`, the ZW.2 Batch A files, etc.). Everything was recovered from `git stash@{0}` (preserved, not dropped) via targeted per-file `git show stash@{0}:<path>` extraction rather than a blanket apply, then several integration breaks between the recovered old `ffb-server` code and the newly-JSON-ified protocol structs were fixed by hand. **Takeaway for future sessions: don't run parallel subagents with unrestricted git access against the same working directory — restrict them to Read/Edit/Write + read-only git (log/show/diff/status), and consider committing more frequently to reduce blast radius.**
+
+**Phase ZW.1 (prior session):** server closeout — closed 24 of the 35 `~` `ffb-server` files (4 lower-level API gaps, all 6 `net/` servlet+task stubs, 14 of 25 DB/HTTP-dependent handlers). 11 handlers remain `~` on purpose — each needs a whole unported subsystem (`GameCache.addTeamToGame`, `RosterCache`/`TeamCache`, `UtilServerStartGame`, `ReplayCache`/`ReplayState`/`ServerSketchManager`, or a full replay-playback engine), confirmed against the real Java source, not a narrow gap. See `TRANSLATION_TRACKER.md`'s Phase ZW.1 row for specifics.
+
+**Phase ZW.0 done this session:** reclassified the 644 client-logic tracker rows (see above), recomputed the in-scope LOC denominator from actual per-directory counts, fixed stale `engine.rs`-as-live-path references in `docs/step_port/TESTING.md`. Approved plan for this phase: leave stub `.rs` files in place and delete each one only when its batch lands the real translation (not a bulk upfront deletion), to avoid breaking `mod.rs`/`lib.rs` module trees mid-phase.
+
+**Phase ZW.2 Batch A done this session (7 files):** `client/model/` (4: ChangeList, ControlAware, OnlineAware, VersionChangeList) + `util/action_keys.rs` + `util/chat.rs` + root `action_key.rs`. **Discovered `crates/ffb-client/src/client/` (649 files) was never wired into `lib.rs` — completely uncompiled dead code**, same pattern as the `net/mod.rs` gap found in ZW.1; fixed by adding `pub mod client;` and building out `client/mod.rs`/`client/model/mod.rs`/`client/util/mod.rs` from scratch with proper snake_case filenames. Found and corrected 9 tracker misclassifications while translating (expected — flagged as a risk in the plan): `ActionKey.java` is actually plain logic not GUI; 8 of 11 `util/` files are actually Swing/AWT-coupled despite `util/` being classified wholesale as logic in ZW.0. See `TRANSLATION_TRACKER.md`'s Phase ZW.2 Batch A row for the full list and reasoning.
+
+**ZW.2 Batch B (net, 3 files) investigated, blocked (prior session) — the blocker (no dispatch/serialization layer over the real `commands::` structs) was closed this session; see "Phase ZW.2c done this session" above. `client/net/` and `client/handler/` are now both fully translated.**
+
+**Next up:** `client/` root files (~30, builds the headless-izable `ClientData`/`FantasyFootballClient` core) → `client/state` (85 files, BB2016/2020/2025 state machines, 5 sub-batches) → ZW.3 (report renderers, 211 files) → ZW.4 docs closeout. Unit tests first, **no parity work**. Full plan: `docs/PHASE_ZW_PLAN.md`. Target after full ZW: ~100% of in-scope LOC, ~17,500 tests.
 
 **Remaining `headless:` markers:** ~52 total — all properly deferred:
 - `pass_behaviour.rs` (27) — full PassStepModifier hook (Phase ZT: ffb-server dialog wiring)
