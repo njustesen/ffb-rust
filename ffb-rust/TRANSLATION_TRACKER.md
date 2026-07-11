@@ -2092,7 +2092,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/PrayerState.java` | `ffb-engine` | `src/prayer_state.rs` | ✓ |
 | `server/ReplayCache.java` | `ffb-engine` | `src/replay_cache.rs` | ✓ |
 | `server/ReplayState.java` | `ffb-engine` | `src/replay_state.rs` | ✓ |
-| `server/RosterCache.java` | `ffb-engine` | `src/roster_cache.rs` | ✓ |
+| `server/RosterCache.java` | `ffb-server` | `src/roster_cache.rs` | ✓ |
 | `server/ServerMode.java` | `ffb-engine` | `src/server_mode.rs` | ✓ |
 | `server/ServerReplay.java` | `ffb-engine` | `src/server_replay.rs` | ✓ |
 | `server/ServerReplayer.java` | `ffb-engine` | `src/server_replayer.rs` | ✓ |
@@ -2100,7 +2100,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/ServerUrlProperty.java` | `ffb-engine` | `src/server_url_property.rs` | ✓ |
 | `server/SessionMode.java` | `ffb-engine` | `src/session_mode.rs` | ✓ |
 | `server/Talk.java` | `ffb-engine` | `src/talk.rs` | ✓ |
-| `server/TeamCache.java` | `ffb-engine` | `src/team_cache.rs` | ✓ |
+| `server/TeamCache.java` | `ffb-server` | `src/team_cache.rs` | ✓ |
 | `server/TeamSetupCache.java` | `ffb-engine` | `src/team_setup_cache.rs` | ✓ |
 
 ### server/skillbehaviour/ (1 files)
@@ -2818,7 +2818,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/util/CatchCalc.java` | `ffb-engine` | `src/util/catch_calc.rs` | ✓ |
 | `server/util/FoulCalc.java` | `ffb-engine` | `src/util/foul_calc.rs` | ✓ |
 | `server/util/KickoffEventCalc.java` | `ffb-engine` | `src/util/kickoff_event_calc.rs` | ✓ |
-| `server/util/MarkerLoadingService.java` | `ffb-engine` | `src/util/marker_loading_service.rs` | ✓ |
+| `server/util/MarkerLoadingService.java` | `ffb-server` | `src/util/marker_loading_service.rs` | ✓ |
 | `server/util/MovementCalc.java` | `ffb-engine` | `src/util/movement_calc.rs` | ✓ |
 | `server/util/PassCalc.java` | `ffb-engine` | `src/util/pass_calc.rs` | ✓ |
 | `server/util/PassingDistanceCalc.java` | `ffb-engine` | `src/util/passing_distance_calc.rs` | ✓ |
@@ -2845,7 +2845,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/util/UtilServerPlayerMove.java` | `ffb-engine` | `src/util/util_server_player_move.rs` | ✓ |
 | `server/util/UtilServerPlayerSwoop.java` | `ffb-engine` | `src/util/util_server_player_swoop.rs` | ✓ |
 | `server/util/UtilServerPushback.java` | `ffb-engine` | `src/util/util_server_pushback.rs` | ✓ |
-| `server/util/UtilServerReplay.java` | `ffb-engine` | `src/util/util_server_replay.rs` | ✓ |
+| `server/util/UtilServerReplay.java` | `ffb-server` | `src/util/server_replay.rs` | ✓ |
 | `server/util/UtilServerReRoll.java` | `ffb-engine` | `src/util/util_server_re_roll.rs` | ✓ |
 | `server/util/UtilServerSetup.java` | `ffb-engine` | `src/util/util_server_setup.rs` | ✓ |
 | `server/util/UtilServerStartGame.java` | `ffb-engine` | `src/util/util_server_start_game.rs` | ✓ |
