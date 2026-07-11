@@ -1,14 +1,16 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-10, Phase ZW.2c complete)
+## Current Status (2026-07-11, client/state/ complete)
 
 **Approach:** 1:1 Java-to-Rust translation. Every Java class → one Rust file, written directly from Java source. No reactive parity fixes.
 
 **engine.rs deleted.** `driver.rs` is now the live code path — `Box<dyn Step>` dispatch via `make_step()`, `DriverGameState` game loop, `GameState` type alias for backward compat.
 
-**Translation progress (honest, by Java LOC):** ~89% of in-scope (~235.2k LOC); ~75% of everything (279k). The common + server layers are genuinely done (2,278 files ✓, 11 `~` infra rows remaining — down from 35 — 87 `todo!` sites), **plus a second fake-✓-stub pocket found and fixed this session: the 123 `net/commands/ClientCommand*`/`ServerCommand*` structs + `NetCommand`/`NetCommandFactory` were marked ✓ but had no JSON serialization or dispatch — now genuinely done, see Phase ZW.2c below.** `ffb-client-logic`: `client/net/` (3 files) and `client/handler/` (27 files) are now genuinely `✓` (translated this session). Remaining `○`: `client/state/` (85 files), `client/report/` (211 files), ~30 `client/` root files.
+**Translation progress (honest, by Java LOC):** ~93% of in-scope (~235.2k LOC); ~79% of everything (279k). The common + server layers are genuinely done (2,278 files ✓, 11 `~` infra rows remaining — down from 35 — 87 `todo!` sites), **plus a second fake-✓-stub pocket found and fixed in a prior session: the 123 `net/commands/ClientCommand*`/`ServerCommand*` structs + `NetCommand`/`NetCommandFactory` were marked ✓ but had no JSON serialization or dispatch — now genuinely done, see Phase ZW.2c below.** `ffb-client-logic`: `client/net/` (3 files), `client/handler/` (27 files), `client/` root, and now `client/state/` (all 85 files, across 5 batches) are all genuinely `✓`. Remaining `○`: `client/report/` (211 files) — the only major work left before ZW.4 docs closeout.
 
-**Tests:** 15,647 passing, 0 failing.
+**Tests:** 16,412 passing, 0 failing.
+
+**Phase ZW.2 Batch D (state root) done this session — `client/state/` is now 100% complete.** Translated the final 3 root files: `ClientState.java` (148 lines, abstract generic base class) → `client_state.rs` (generic only over `L: LogicModule`, the `FantasyFootballClient` type param and held-client field dropped per the established convention; `enterState`/`leaveState`/`endTurn`/`hideSelectSquare`/`showSelectSquare` translated for real; the one always-abstract `drawSelectSquare()` has no in-scope concrete body anywhere in this crate — documented no-op, not invented); `ClientStateFactory.java` (368 lines) → `client_state_factory.rs` (registry shell + a fully, faithfully ported `get_state_for_game()`/`find_passive_state()` dispatcher — the real ground-truth `Game`→`ClientStateId` logic, including the `TtmMechanic.handleKickLikeThrow()` mechanic dispatch and the `MULTIPLE_BLOCK`/`canBlockTwoAtOnce` ternary); `IPlayerPopupMenuKeys.java` → `i_player_popup_menu_keys.rs` (45 `KEY_*` AWT virtual-key-code constants). Corrected `state_dispatch::current_state`'s doc comment (it never actually mirrored `ClientStateFactory`, despite its old doc comment's claim) to point at the new file as ground truth while keeping both as separate, deliberately-different-scope helpers. Tests: 16,332 → 16,412 (+80). Full detail in `TRANSLATION_TRACKER.md`'s Progress Summary.
 
 **Phase ZW.2c done this session:** built the real NetCommand wire-protocol layer that Batch B (below) flagged as its blocker. Rewrote `net_command.rs` as a genuine `NetCommand` trait; gave all 91 `ClientCommand*`/32 `ServerCommand*` structs their missing inherited field + `NetCommand` impl + real `to_json_value()`/`from_json()` (wire keys verified against `IJsonOption.java`, matching the Phase ZU report-serialization convention); built `AnyClientCommand`/`AnyServerCommand` sum types + `NetCommandFactory::for_json_value()` + `NetCommandId::from_name()`. This is additive — the pre-existing hand-rolled `client_commands`/`server_commands` simplification the live WebSocket layer depends on today is untouched, a documented follow-up. Unblocked and translated `client/net/` (3 files: `ClientCommunication`'s ~90 `send*` methods, `ClientPingTask`, `CommandEndpoint`) and `client/handler/` (27 files: the incoming-`ServerCommand` dispatch factory + one handler per command). Full detail in `TRANSLATION_TRACKER.md`'s Progress Summary. Tests: 14,940 → 15,647 (+707).
 
@@ -22,7 +24,7 @@
 
 **ZW.2 Batch B (net, 3 files) investigated, blocked (prior session) — the blocker (no dispatch/serialization layer over the real `commands::` structs) was closed this session; see "Phase ZW.2c done this session" above. `client/net/` and `client/handler/` are now both fully translated.**
 
-**Next up:** `client/` root files (~30, builds the headless-izable `ClientData`/`FantasyFootballClient` core) → `client/state` (85 files, BB2016/2020/2025 state machines, 5 sub-batches) → ZW.3 (report renderers, 211 files) → ZW.4 docs closeout. Unit tests first, **no parity work**. Full plan: `docs/PHASE_ZW_PLAN.md`. Target after full ZW: ~100% of in-scope LOC, ~17,500 tests.
+**Next up:** ZW.3 (report renderers, `client/report/`, 211 files) → ZW.4 docs closeout. Unit tests first, **no parity work**. Full plan: `docs/PHASE_ZW_PLAN.md`. Target after full ZW: ~100% of in-scope LOC, ~17,500 tests.
 
 **Remaining `headless:` markers:** ~52 total — all properly deferred:
 - `pass_behaviour.rs` (27) — full PassStepModifier hook (Phase ZT: ffb-server dialog wiring)

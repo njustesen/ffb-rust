@@ -93,12 +93,20 @@ Translate in dependency order: `client/model` + `client/util` + `client/factory`
 `ClientData`, `FantasyFootballClient` headless-izable core) → `client/state` (85 files,
 BB2016/2020/2025 state machines).
 
-**Status (2026-07-10): Batch A (model/util, 7 files) + a new sub-phase ZW.2c done.**
-`client/net` (3 files) and `client/handler` (27 files) are genuinely translated — Batch B's
-blocker (no dispatch/serialization layer over the real `commands::` structs) was closed by
-building `AnyClientCommand`/`AnyServerCommand` + a real `NetCommandFactory::for_json_value`
-(see `TRANSLATION_TRACKER.md`'s Progress Summary, "Phase ZW.2c"). **Recommended next: `client/`
-root files (~30) then `client/state` (85 files)** — not yet started.
+**Status (2026-07-11): Batch A (model/util, 7 files), sub-phase ZW.2c, Batch C (`client/`
+root), and Batch D (`client/state`, all 85 files) are done — `client/state/` is now 100%
+complete.** `client/net` (3 files) and `client/handler` (27 files) are genuinely translated —
+Batch B's blocker (no dispatch/serialization layer over the real `commands::` structs) was
+closed by building `AnyClientCommand`/`AnyServerCommand` + a real
+`NetCommandFactory::for_json_value` (see `TRANSLATION_TRACKER.md`'s Progress Summary, "Phase
+ZW.2c"). `client/` root promoted `FantasyFootballClient` to a real hybrid struct; `client/state`
+(85 files across 5 batches: interaction/value-types, plugin, logic root, logic editions,
+then this final root batch — `ClientState`/`ClientStateFactory`/`IPlayerPopupMenuKeys`) is
+fully translated and wired, with `ClientStateFactory::get_state_for_game` now the faithful,
+tested ground-truth dispatcher (see `crate::state_dispatch` for the pre-existing, deliberately
+coarser TurnMode-only helper it supersedes as ground truth — kept, not merged). **Recommended
+next: `client/report/` (211 files, ZW.3)** — the only remaining major work before ZW.4 docs
+closeout.
 - Same ground rules as everywhere: one Java file → one snake_case Rust file (replacing
   the PascalCase stub), every method in order, no untraceable logic.
 - Swing types that leak into logic signatures (e.g. `KeyEvent` constants, style enums)
@@ -134,6 +142,7 @@ report +~800–1,000 (211 files × ~4), plus incidental model/protocol tests.
 |---|---|---|---|
 | Post-ZV | ~87% | ~74% | 14,794 |
 | Post-ZW.2c (actual, 2026-07-10) | ~89% | ~75% | 15,647 |
+| Post-`client/state/` complete (actual, 2026-07-11) | ~93% | ~79% | 16,412 |
 | After full Phase ZW (projected) | **~100%** | ~85% | ~17,500 |
 
 What remains after ZW, permanently or pending a separate decision: Swing dialog/ui/layer

@@ -4,8 +4,11 @@ use ffb_model::enums::{ClientStateId, TurnMode};
 /// Determine which client state is currently active based on the game state
 /// and which side the Rust client is playing.
 ///
-/// Mirrors `ClientStateFactory.java` — a pure function mapping (TurnMode, game context)
-/// to a `ClientStateId`.
+/// Simplified TurnMode-only dispatch — NOT equivalent to
+/// `ClientStateFactory::get_state_for_game` (see `client::state::client_state_factory`), which
+/// additionally dispatches on `ActingPlayer::player_action`, pushback squares, and
+/// mode/replay/spectate checks. Kept as a separate, deliberately coarser helper; do not merge
+/// without auditing all callers.
 pub fn current_state(game: &Game, our_team_id: &str) -> ClientStateId {
     let is_our_turn = game.active_team().id == our_team_id;
 

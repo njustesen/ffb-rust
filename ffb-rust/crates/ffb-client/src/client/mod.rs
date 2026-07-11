@@ -19,7 +19,5 @@ pub use i_progress_listener::IProgressListener;
 
 // factory/ (LogicPluginFactory) and the remaining util/ GUI-coupled files are not yet
 // wired in — see ZW.2 Batch A notes in TRANSLATION_TRACKER.md and SESSION.md.
-// state/ is being translated incrementally (Phase ZW.2 Batch D onward); only the
-// modules declared in state/mod.rs and state/logic/mod.rs are wired so far —
-// the remaining PascalCase stub files in that subtree are placeholders for
-// future batches.
+// state/ is fully translated and wired (Phase ZW.2 Batch D complete) — see
+// TRANSLATION_TRACKER.md and SESSION.md.
