@@ -1,6 +1,70 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-11, Phases AAA + AAB + AAC done, merged, and closed out — **11/11 originally-deferred `ffb-server` handler gaps are now closed, 0 remain**. This was the last "translate more Java" work in the entire project.)
+## Current Status (2026-07-12, Phases ZVA–ZVE done — command-hierarchy reconciliation — plus the last 3 tracker gaps closed. **File-level translation is now 100% complete for everything with a feasible headless equivalent; 29/32 real `ServerCommandHandler*` structs are reachable from live dispatch (up from ~2 at session start).**)
+
+**Approach:** 1:1 Java-to-Rust translation. Every Java class → one Rust file, written directly from Java source. No reactive parity fixes.
+
+Session covers two pieces of the "next major step" plan (`docs/PHASE_ZV_PLAN.md` — see there for the full writeup): reconciling the two parallel protocol command hierarchies, and closing the tracker's last 3 `○` rows.
+
+**Command-hierarchy reconciliation (Phases ZVA–ZVE):** the live WebSocket dispatch path
+(`ServerCommandHandlerFactory::handle_command`) decoded every incoming message as
+`ffb_protocol::client_commands::ClientCommand` — a hand-rolled ~35-variant wire enum with no
+variants at all for most of the ~34 real, already-translated, already-unit-tested
+`ServerCommandHandler*` structs in `ffb-server`, which were built against the genuine 1:1 Java
+mirror (`ffb_protocol::commands::*`, 131 files). Only `ClientPing` reached its real handler at the
+start of this session. Closed in 5 sequential batches (one shared central match statement, so
+sequential foreground agents rather than parallel worktrees, following the Phase ZX precedent):
+- **ZVA** (`d1676c77`): `Talk`, `CloseSession`, `TransferControl`, `RequestVersion`,
+  `PasswordChallenge` (new `ClientCommand` variants), `DeleteGame` (internal command). Fixed 2
+  pre-existing `Send`-future bugs surfaced only once these ran inside `tokio::spawn`'d
+  `dispatch_loop` (a `MutexGuard` held across `.await`; a blocking `reqwest` client built inside an
+  async context). Tests: 17,275 → 17,286.
+- **ZVB** (`0eb0cf95`): the 12-handler sketch/marker family — 10 fully wired, 2
+  (`ApplyAutomatedPlayerMarkings`/`CalculateAutomaticPlayerMarkings`) left as documented no-ops
+  since their internal-command payload (`AutoMarkingConfig`/`Game`) has no serde decode format on
+  the wire yet — not fabricated, a real follow-up. Added `LazyReqwestHttpClient` (build the blocking
+  client per-call instead of eagerly) to fix the same class of `Send`/panic-on-drop bug as ZVA.
+  Tests: 17,286 → 17,306.
+- **ZVC** (`43981a32`): the 4-handler replay family (`JoinReplay`, `Replay`, `ReplayLoaded`,
+  `ReplayStatus`), all fully wired, reusing the factory's existing `ReplaySessionManager`/
+  `ReplayCache`/`ServerReplayer` instances. Tests: 17,306 → 17,310.
+- **ZVD** (`cc2b4e38`): the 7-handler game-management family — 6 fully wired
+  (`FumbblTeamLoaded`, `FumbblGameChecked`, `ScheduleGame`, `CloseGame`, `UploadGame`,
+  `UserSettings`), 1 (`AddLoadedTeam`) left as a documented no-op (its internal command carries no
+  `Team` payload on the wire). Added `ServerCommunication::from_parts` to give `CloseGame` a
+  non-circular handle back into dispatch. Tests: 17,310 → 17,318.
+- **ZVE** (`c4a1470d`): finished `Join` (re-join-mid-session now really calls `join_handler`,
+  matching Java — the very first join is still special-cased in `command_socket.rs` before enqueue,
+  a Rust-only optimization, not a Java behavior divergence) and wired `SocketClosed` directly from
+  `command_socket.rs`'s disconnect cleanup (replacing a bare `remove_session` call that had been
+  silently bypassing the real handler's sketch-cleanup/leave-broadcast/replay-handoff side effects).
+  Tests: 17,318 → 17,321.
+
+**Net result: 29/32 real `ServerCommandHandler*` structs now reachable from live dispatch.** The 3
+stragglers (`AddLoadedTeam`, `ApplyAutomatedPlayerMarkings`, `CalculateAutomaticPlayerMarkings`)
+are real, independently unit-tested, and blocked on a genuinely separate, narrower gap (typed wire
+payloads for `AutoMarkingConfig`/`Team` don't exist yet) — documented as the next follow-up, not
+invented around.
+
+**Tracker closeout (`8e930f99`):** translated the last 2 `○` files in the entire tracker —
+`LogicPluginFactory.java` (reflection-based `Scanner` substituted with explicit registration,
+same convention as `ReportMessageType::report_id()`) and `UtilClientTimeout.java` (unblocked by
+`StatusReport` having gone headless in Phase ZW.3) — and reclassified `UserInterface.java`
+(`extends JFrame`, genuinely Swing) from a mis-marked `○` to the correct `—`. Tests: 17,321 →
+17,331. **This closes out the last `○` row in the entire ~2,970-row tracker** — every in-scope
+file is now `✓` except the one intentionally-`~` `UtilServerHttpClient.java` (documented
+elsewhere: no real caller, would just duplicate `ReqwestHttpClient`).
+
+**Total this session: 17,275 → 17,331 tests (+56), 0 failures.** No parity/integration testing
+done (deferred, per instruction). What's left, none of it "translation" anymore: (1) the 3
+remaining unreachable handlers named above; (2) a standing, separate decision on whether to ever
+build headless/alt-UI equivalents for the 271 permanently-skipped Swing files (~31k LOC); (3)
+parity/integration testing against the real Java engine; (4) live production infra wiring (real
+MySQL, real Jetty↔axum wire compatibility) beyond compile-time.
+
+---
+
+## Prior Status (2026-07-11, Phases AAA + AAB + AAC done, merged, and closed out — **11/11 originally-deferred `ffb-server` handler gaps are now closed, 0 remain**. This was the last "translate more Java" work in the entire project.)
 
 **Approach:** 1:1 Java-to-Rust translation. Every Java class → one Rust file, written directly from Java source. No reactive parity fixes.
 
