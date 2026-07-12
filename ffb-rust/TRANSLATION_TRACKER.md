@@ -29,6 +29,32 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase ZW.5 (closed the last 3 `○` rows in the entire tracker, this session):**
+`LogicPluginFactory.java` (`client/factory/`, previously deferred pending `LogicPlugin` itself) →
+`client/factory/logic_plugin_factory.rs`: Java's `initialize(Game)` builds its `Map<LogicPlugin.Type,
+LogicPlugin>` via a reflection-based `Scanner<LogicPlugin>` that auto-discovers every
+`@RulesCollection`-annotated implementation; substituted per this project's established
+Java-reflection-to-Rust convention (`ReportMessageType::report_id()`, Phase ZW.3) with an explicit
+list of the two known concrete plugin sets already translated under
+`client/state/logic/plugin/{bb2025,mixed}/` (`BaseLogicPlugin`/`BlockLogicExtensionPlugin`/
+`MoveLogicPlugin`), selected by the game's `Rules` edition (`Bb2025` → `bb2025`, `Bb2020`/`Bb2016` →
+`mixed`) instead of scanning annotations. `forType`/`forName` translated 1:1. `UtilClientTimeout.java`
+(`client/util/`, previously deferred pending a headless `StatusReport` path) →
+`client/util/util_client_timeout.rs`: `StatusReport` was made real/headless in Phase ZW.2 Batch C
+and every report renderer already reaches it via an explicit `&mut StatusReport` parameter (not
+through `getUserInterface()`) — `showTimeoutStatus` follows that same convention, taking
+`&mut FantasyFootballClient` + `&mut StatusReport` explicitly; `game.isTimeoutPossible()`/
+`isHomePlaying()` map directly to the already-public `Game::timeout_possible`/`home_playing` fields.
+`UserInterface.java` (463 lines, `extends JFrame implements WindowListener, IDialogCloseListener`,
+`JDesktopPane`/icon/font/sound-engine fields throughout) was mis-marked `○` instead of `—`
+(genuinely Swing GUI, same category as the other permanently-skipped rows) — corrected, no Rust
+written. Deleted the 2 dead orphaned PascalCase stub files these two targets previously sat at
+(`UtilClientTimeout.rs`; `LogicPluginFactory.rs` never existed as a stub), matching the standing
+per-batch convention. **This closes out the last remaining `○` rows in the entire tracker** — every
+in-scope file (everything except the permanent Swing-GUI `—` rows) is now `✓`, except the one
+intentionally-`~` `UtilServerHttpClient.java` (documented elsewhere; live HTTP wiring gap, not
+touched this batch). Tests: 17,321 → 17,331 (+10, 5 per new file).
+
 **Phase ZVE (Join/JoinApproved/SocketClosed wired — final batch of command-hierarchy reconciliation, this session):**
 Closed the last 3 gaps from the ZVA–ZVD dispatch-wiring effort. `ClientCommand::ClientJoin`'s
 arm in `ServerCommandHandlerFactory::handle_command` (which only fires for a *repeat* Join —
@@ -3576,7 +3602,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 
 | Java File | Rust Crate | Rust Target | Status |
 |-----------|-----------|-------------|--------|
-| `client/factory/LogicPluginFactory.java` | `ffb-client` | `src/client/factory/LogicPluginFactory.rs` | ○ |
+| `client/factory/LogicPluginFactory.java` | `ffb-client` | `src/client/factory/logic_plugin_factory.rs` | ✓ |
 
 ### client/handler/ (27 files)
 
@@ -3902,7 +3928,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `client/StyleProvider.java` | `ffb-client` | `src/client/StyleProvider.rs` | — |
 | `client/TextStyle.java` | `ffb-client` | `src/client/text_style.rs` | ✓ (un-skipped: plain string-keyed enum, no AWT/Swing — miscategorized in the ZW.0 bulk audit alongside genuinely-Swing root files) |
 | `client/UiDimensionProvider.java` | `ffb-client` | `src/client/UiDimensionProvider.rs` | — |
-| `client/UserInterface.java` | `ffb-client` | `src/client/UserInterface.rs` | ○ |
+| `client/UserInterface.java` | `ffb-client` | `src/client/UserInterface.rs` | — |
 | `client/UtilStyle.java` | `ffb-client` | `src/client/UtilStyle.rs` | — |
 
 ### client/sound/ (2 files)
@@ -4090,5 +4116,5 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `client/util/UtilClientPlayerDrag.java` | `ffb-client` | `src/client/util/UtilClientPlayerDrag.rs` | — |
 | `client/util/UtilClientReflection.java` | `ffb-client` | `src/client/util/UtilClientReflection.rs` | — |
 | `client/util/UtilClientThrowTeamMate.java` | `ffb-client` | `src/client/util/UtilClientThrowTeamMate.rs` | — |
-| `client/util/UtilClientTimeout.java` | `ffb-client` | `src/client/util/UtilClientTimeout.rs` | ○ |
+| `client/util/UtilClientTimeout.java` | `ffb-client` | `src/client/util/util_client_timeout.rs` | ✓ |
 
