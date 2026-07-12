@@ -7,7 +7,10 @@ pub mod bb2020;
 pub mod bb2025;
 
 pub mod block_result_factory;
+pub mod card_factory;
+pub mod card_type_factory;
 pub mod client_mode_factory;
+pub mod inducement_type_factory;
 pub mod game_option_factory;
 pub mod game_option_id_factory;
 pub mod player_gender_factory;

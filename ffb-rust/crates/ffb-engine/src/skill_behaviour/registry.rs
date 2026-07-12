@@ -113,9 +113,13 @@ impl SkillRegistry {
             wrestle_behaviour::WrestleBehaviour,
         };
         use crate::skill_behaviour::mixed::dauntless_behaviour::DauntlessBehaviour;
+        use crate::skill_behaviour::mixed::abstract_dodging_behaviour::AbstractDodgingBehaviour;
         let mut reg = Self::empty();
         // Common (all editions)
         HornsBehaviour::register_into(&mut reg);
+        // Dodge-family (mixed AbstractDodgingBehaviour, priority/requireUnusedSkill per Java ctor)
+        AbstractDodgingBehaviour::register_into(&mut reg, SkillId::Dodge, 1, false);
+        AbstractDodgingBehaviour::register_into(&mut reg, SkillId::WatchOut, 2, true);
         // BB2025 skills
         AnimalSavageryBehaviour::register_into(&mut reg);
         AnimosityBehaviour::register_into(&mut reg);
@@ -179,9 +183,13 @@ impl SkillRegistry {
             really_stupid_behaviour::ReallyStupidBehaviour,
         };
         use crate::skill_behaviour::mixed::dauntless_behaviour::DauntlessBehaviour;
+        use crate::skill_behaviour::mixed::abstract_dodging_behaviour::AbstractDodgingBehaviour;
         let mut reg = Self::empty();
         // Common (all editions)
         HornsBehaviour::register_into(&mut reg);
+        // Dodge-family (mixed AbstractDodgingBehaviour, priority/requireUnusedSkill per Java ctor)
+        AbstractDodgingBehaviour::register_into(&mut reg, SkillId::Dodge, 1, false);
+        AbstractDodgingBehaviour::register_into(&mut reg, SkillId::WatchOut, 2, true);
         // BB2025 impls (identical behaviour in BB2020)
         AnimosityBehaviour::register_into(&mut reg);
         BloodLustBehaviour::register_into(&mut reg);
@@ -340,9 +348,9 @@ mod tests {
     }
 
     #[test]
-    fn bb2025_registry_has_thirty_three_entries() {
+    fn bb2025_registry_has_thirty_five_entries() {
         let reg = SkillRegistry::build_bb2025();
-        assert_eq!(reg.len(), 33, "BB2025 registry should have 33 registered skill entries");
+        assert_eq!(reg.len(), 35, "BB2025 registry should have 35 registered skill entries (33 + Dodge + WatchOut)");
     }
 
     #[test]
@@ -352,9 +360,30 @@ mod tests {
     }
 
     #[test]
-    fn bb2020_registry_has_sixteen_entries() {
+    fn bb2020_registry_has_eighteen_entries() {
         let reg = SkillRegistry::build_bb2020();
-        assert_eq!(reg.len(), 16, "BB2020 registry should have 16 registered skill entries");
+        assert_eq!(reg.len(), 18, "BB2020 registry should have 18 registered skill entries (16 + Dodge + WatchOut)");
+    }
+
+    #[test]
+    fn bb2025_registry_contains_dodge_with_step_modifier() {
+        let reg = SkillRegistry::build_bb2025();
+        let sb = reg.get(SkillId::Dodge).expect("Dodge must be in BB2025 registry");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn bb2025_registry_contains_watch_out_with_step_modifier() {
+        let reg = SkillRegistry::build_bb2025();
+        let sb = reg.get(SkillId::WatchOut).expect("WatchOut must be in BB2025 registry");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn bb2020_registry_contains_dodge_and_watch_out() {
+        let reg = SkillRegistry::build_bb2020();
+        assert!(reg.get(SkillId::Dodge).is_some());
+        assert!(reg.get(SkillId::WatchOut).is_some());
     }
 
     #[test]

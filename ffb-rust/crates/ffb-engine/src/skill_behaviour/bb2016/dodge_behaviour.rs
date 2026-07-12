@@ -1,9 +1,19 @@
 use crate::skill_behaviour::SkillBehaviour;
 
-/// Dodge: handles block-dodge pushback decisions and fall-through.
+/// Dodge (BB2016): handles block-dodge pushback decisions and fall-through.
 /// Mirrors Java `com.fumbbl.ffb.server.skillbehaviour.bb2016.DodgeBehaviour`.
 ///
-/// Player modifier: +1 on all dodge rolls (applied elsewhere via player-modifier hooks).
+/// Unlike the BB2020/BB2025 `AbstractDodgingBehaviour`-based translation (a real
+/// `StepModifierTrait` dispatched via `SkillRegistry`/`execute_step_hooks`, see
+/// `skill_behaviour/mixed/abstract_dodging_behaviour.rs`), BB2016's hand-rolled Java
+/// `DodgeBehaviour` (its own inline anonymous `StepModifier`, not the shared abstract
+/// base class) is translated directly into its target step:
+/// `step/bb2016/block/step_block_dodge.rs` — that file's `find_dodge_choice` +
+/// `execute_step` implement the real `findDodgeChoice`/`handleExecuteStepHook` logic
+/// (dodge-choice heuristic, headless-resolved skill use, `ReportSkillUse`, restore-or-fall
+/// state transition) with full unit test coverage. This type is therefore an intentionally
+/// inert marker — not registered in `registry.rs`, since registering it would double-process
+/// what the step already does directly.
 pub struct DodgeBehaviour;
 
 impl DodgeBehaviour {
@@ -16,24 +26,6 @@ impl Default for DodgeBehaviour {
 
 impl SkillBehaviour for DodgeBehaviour {
     fn name(&self) -> &'static str { "DodgeBehaviour" }
-
-    /// Java `StepModifier.handleExecuteStepHook` logic (StepBlockPush / StepBlockRoll context):
-    ///
-    /// 1. Check if push is a chain-push — if so, skip (dodge does not apply).
-    /// 2. Check if defender would be pushed to a sideline square — if so, skip.
-    /// 3. Check if defender would be pushed into the attacker's half — if so, skip.
-    /// 4. If none of the above apply, auto-use Dodge (usingDodge = true):
-    ///    - On use: restore `StepState.oldDefenderState` for the defender.
-    ///    - On decline: set defender to FALLING.
-    /// 5. Publish pushback-init parameters (pushback square list, pushback mode) to the step.
-    ///
-    /// All step-local state fields are unavailable in the current Rust signature:
-    // TODO(hook-infra): step-specific state (StepState.usingDodge)
-    // TODO(hook-infra): step-specific state (StepState.oldDefenderState)
-    // TODO(hook-infra): step-specific state (pushback square list / pushback mode parameters)
-    fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
-        false
-    }
 }
 
 #[cfg(test)]

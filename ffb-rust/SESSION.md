@@ -1,6 +1,95 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-12, Phase AAE done — closed the `FumbblRequest*` dispatch-tail gap named in Phase AAD Step 1, translated the 2 real remaining `ffb-model/factory` stub gaps (`PrayerFactory`, `CasualtyModifierFactory`), and deleted 11 confirmed-orphaned duplicate stub files. **Also surfaced a significant, previously-undocumented tracker-accuracy problem: 72 of 91 `ffb-model/src/factory/*.rs` paths marked `✓` in the tracker point to files that don't exist — the real translations live in `ffb-mechanics` (moved there in a past architecture change, e.g. Phase ZZ's 55-stub cleanup) or as inherent enum methods, and the tracker rows were never updated to match. This session fixed the ~15 rows it touched directly; the other ~57 are flagged, unverified, for a future dedicated tracker-accuracy audit — see below.**)
+## Current Status (2026-07-12, Phase AAF done — closed the `ffb-model/factory` tracker-accuracy audit flagged in Phase AAE (47 of 82 rows fixed: 43 moved, 3 genuinely translated, 4 orphaned-corrected), and found + closed a much bigger, previously-undocumented gap: **the skill-behaviour step-hook mechanism is real and proven (`StepHorns`/`HornsBehaviour`), but only a minority of skill-behaviour files are actually reachable through it — most either target a step that never calls `dispatch::execute_step_hooks`, or carry a dead `StepModifierTrait` stub. Concretely verified with Dodge: the skill had zero effect on BB2020/BB2025 gameplay** (the step computed everything needed but never ran the hook that would decide/report the outcome). Wired it for real this session; a full audit of the remaining ~20 genuine gaps (of 127 files audited) is now written up in `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md` for follow-up phases.**)
+
+Plan: no standalone `docs/PHASE_AAF_PLAN.md` — this was a plan-mode session, scoped via `ExitPlanMode`
+(three parallel tracks: factory tracker audit, skill-hook-infra audit, and a Dodge-family reference
+implementation).
+
+**What actually happened, in order:**
+
+1. **Factory tracker-accuracy audit** (closing the item flagged unverified in Phase AAE): re-audited
+   all 82 rows under `TRANSLATION_TRACKER.md`'s `factory/` section (superseding the ~57 originally
+   flagged). 47 rows had stale claimed paths:
+   - **43 moved** — real translations already existed, mostly merged into the relevant enum's
+     `for_name`/`from_name` method (e.g. `Direction::from_name`, `GameStatus::from_name`) or as real
+     files under `ffb-mechanics/src/modifiers/`. Tracker paths corrected in place.
+   - **3 genuinely missing**, confirmed via live `ffb-server` callers, translated for real:
+     `CardFactory`, `CardTypeFactory`, `InducementTypeFactory` (new files under
+     `ffb-model/src/factory/`, 13 new tests). Since Rust has no runtime reflection, each takes its
+     backing collection as a constructor argument instead of Java's `Scanner`-based `initialize(Game)`.
+   - **4 orphaned dead stubs** — corrected to `—` with explanatory notes (`InjuryTypeFactory` superseded
+     by the distinct `InjuryTypeServerFactory`; `SkillPropertiesFactory`/`TemporaryStatModifierFactory`
+     reflection-based with no live callers).
+   - **1 left `~`** — `JumpUpModifierFactory`: the modifier data exists in `ffb-mechanics`, but wiring
+     it into `step_jump_up.rs` is a `step/`-side change, out of scope for this audit (now also tracked
+     in the skill-hook audit doc's StepJumpUp row).
+
+2. **Skill-behaviour hook-infra discovery + audit.** Investigating whether the skill-registration
+   system (`SkillRegistry`/`register_into`/`StepModifierTrait`, proven real by `HornsBehaviour`) was
+   actually exercised end-to-end, found: **only 7 of ~584 step files call
+   `dispatch::execute_step_hooks` at all** (`step_horns.rs`, `step_bone_head.rs`,
+   `step_really_stupid.rs`, `step_wild_animal.rs`, `step_blood_lust.rs`, `step_take_root.rs`,
+   `step_pushback.rs`). Everything else routed through the skill-behaviour mechanism — registered or
+   not — is currently unreachable. Verified concretely with **Dodge**: Java's
+   `mixed/AbstractDodgingBehaviour.java` (used by BB2020/BB2025 `DodgeBehaviour`+`WatchOutBehaviour`)
+   registers a real `StepModifier` with genuine logic (dodge-choice default from
+   `oldDefenderState.hasTacklezones()`, skill-use dialog, `ReportSkillUse`); the Rust
+   `step/mixed/step_block_dodge.rs` already faithfully ported the geometric `findDodgeChoice` heuristic
+   with full tests, but its own doc comment admitted "hooks not yet ported — skip." **Result: Dodge had
+   zero effect on BB2020/BB2025 gameplay** before this session.
+   A full audit (`docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`) of all 127 skill-behaviour files found the real
+   gap surface is smaller than the raw `TODO(hook-infra)` count (77) suggests — many are dead
+   duplicates (registry.rs's `build_bb2016()`/`build_bb2020()` mostly reuse the `bb2025::` module
+   directly) or have real logic already inline in their `step_xxx.rs` file with no dependency on this
+   mechanism at all (confirmed: Wrestle, DumpOff, Stab, Bombardier). **~20 genuine gaps remain**,
+   grouped by target step class in the audit doc, with a recommended batching order for follow-up
+   phases (StepPushback cluster first — 5 skills share one already-wired step — then Catch, then
+   Dauntless/Juggernaut, large isolated items last). The audit also flagged one live wiring bug
+   (`bb2025/dump_off_behaviour.rs`'s `applies_to` checks `StepId::BlockRoll` instead of
+   `StepId::DumpOff` — inert today since DumpOff's real logic lives directly in `step_dump_off.rs` and
+   no step calls hooks for that StepId anyway, but worth a one-line fix next time that file is touched).
+
+3. **Wired the Dodge family for real** (the phase's reference implementation, proving the fix pattern
+   before scaling it out in future phases): added `StepBlockDodgeHookState` and a
+   `dispatch::execute_step_hooks(game, rng, StepId::BlockDodge, &mut hook_state)` call to
+   `step/mixed/step_block_dodge.rs` (BB2020/BB2025); ported the real `AbstractDodgingStepModifier`
+   logic into `skill_behaviour/mixed/abstract_dodging_behaviour.rs` (has-skill check,
+   `requireUnusedSkill` gate, tacklezones-based default, `ReportSkillUse`) and registered both Dodge
+   (`priority=1, requireUnusedSkill=false`) and WatchOut (`priority=2, requireUnusedSkill=true`) into
+   the BB2020/BB2025 registries. Java's dialog-then-wait branch (`return true` when
+   `askForSkill && hasTacklezones`) has no live dialog channel through this dispatch path — headless
+   mode resolves immediately using the already-computed default instead, following the same convention
+   already established by `StandFirmStepModifier` and BB2016's own hand-rolled `StepBlockDodge`
+   (which needed no changes — its logic already lived directly in the step, a valid alternate
+   translation of Java's non-shared bb2016 `DodgeBehaviour`). Corrected stale/misleading doc comments
+   on the now-clearly-inert BB2016/2020/2025 `DodgeBehaviour` and `WatchOutBehaviour` marker types.
+   22 new tests (14 in `abstract_dodging_behaviour.rs`, 5 in `step_block_dodge.rs`, 3 registry checks).
+
+4. **Verified `FumbblRequestLoadTeam`'s dispatch tail** (named as a possible remaining gap going into
+   this session): confirmed it was already fully closed in Phase AAE —
+   `QueuedFumbblRequestLoadTeam` has a real, tested `ServerRequest` impl dispatching
+   `InternalServerCommandAddLoadedTeam`. The one remaining nuance, Java's `handleInvalidTeam` (log +
+   send FUMBBL_ERROR status + close the game), would require threading `SessionManager`/
+   `ServerCommunication` into `ServerRequest` impls that don't currently have them — a separate,
+   larger plumbing change, left as the already-honestly-documented no-op it was.
+
+Tests: 17,387 → **17,417** (+30: +13 factory, +17 dodge-family). 0 failures. No parity/integration
+testing this session (per instruction).
+
+**Honest completion estimate:** tracker-reported ~100% in-scope translation was directionally right
+but overstated for gameplay-affecting logic. Correcting for the skill-hook gap (~20 confirmed genuine
+gaps remaining across 127 skill-behaviour files, only 7/584 steps wired to dispatch hooks at all),
+true behavioral completion is now roughly **~94–96%** of in-scope logic (up from ~93–95% pre-phase),
+**~81%** counting the permanently-skipped Swing GUI. The bigger deliverable is the audit worklist and
+the now twice-proven fix pattern (`StepHorns` → `StepBlockDodge`), which turns the remaining ~20 gaps
+into mechanical follow-up work rather than architecture invention. Expect roughly **5–8 more
+similarly-scoped phases** (per the audit doc's batching order) to close them and reach ~99–100% true
+in-scope completion, after which parity testing becomes meaningful.
+
+---
+
+## Prior Status (2026-07-12, Phase AAE done — closed the `FumbblRequest*` dispatch-tail gap named in Phase AAD Step 1, translated the 2 real remaining `ffb-model/factory` stub gaps (`PrayerFactory`, `CasualtyModifierFactory`), and deleted 11 confirmed-orphaned duplicate stub files. **Also surfaced a significant, previously-undocumented tracker-accuracy problem: 72 of 91 `ffb-model/src/factory/*.rs` paths marked `✓` in the tracker point to files that don't exist — the real translations live in `ffb-mechanics` (moved there in a past architecture change, e.g. Phase ZZ's 55-stub cleanup) or as inherent enum methods, and the tracker rows were never updated to match. This session fixed the ~15 rows it touched directly; the other ~57 are flagged, unverified, for a future dedicated tracker-accuracy audit — see below.**)
 
 Plan: `docs/PHASE_AAE_PLAN.md` isn't written (this was a plan-mode session, not a phase-doc session) —
 see the plan file passed to `ExitPlanMode` for the original scoping. The plan's premise (translate 13

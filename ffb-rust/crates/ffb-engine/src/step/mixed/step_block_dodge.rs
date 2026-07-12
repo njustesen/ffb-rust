@@ -15,18 +15,31 @@
 ///   4. Otherwise: set defender to `FALLING`.
 ///   5. Publish pushback-init parameters and advance to next step.
 ///
-/// Note: `findDodgeChoice` and `UtilServerPushback` are not yet fully ported.
-/// The step stores the fields faithfully; the pushback-square scan is stubbed (no-op)
-/// while the set_parameter and structural logic are correct.
+/// Java: `executeStep()` calls `getGameState().executeStepHooks(this, state)` before
+/// deciding `usingDodge` — dispatched to `DodgeBehaviour`/`WatchOutBehaviour`
+/// (`AbstractDodgingStepModifier`, see `skill_behaviour/mixed/abstract_dodging_behaviour.rs`).
 use ffb_model::enums::{PlayerState, PS_FALLING};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
+use crate::skill_behaviour::dispatch;
 use crate::step::action::block::util_block_sequence::init_pushback;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::util::util_server_pushback::UtilServerPushback;
+
+/// Java: `StepBlockDodge.StepState` — mutable state passed through `executeStepHooks`.
+/// Exported so `AbstractDodgingStepModifier` can downcast to it.
+#[derive(Debug, Default)]
+pub struct StepBlockDodgeHookState {
+    /// Java: `state.usingDodge` — None until dialog answered or defaulted by a hook.
+    pub using_dodge: Option<bool>,
+    /// Java: `state.askForSkill` — true = a dodge-choice dialog would be shown.
+    pub ask_for_skill: bool,
+    /// Java: `state.oldDefenderState`
+    pub old_defender_state: Option<PlayerState>,
+}
 
 /// Java: `StepBlockDodge` (mixed, BB2020 + BB2025).
 pub struct StepBlockDodge {
@@ -131,13 +144,25 @@ impl StepBlockDodge {
         chain_push || sideline_push || attacker_half_push
     }
 
-    fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java step 1: lazy-compute ask_for_skill
         if self.ask_for_skill.is_none() {
             self.ask_for_skill = Some(Self::find_dodge_choice(game));
         }
 
-        // Java: UtilServerDialog.hideDialog + executeStepHooks (hooks not yet ported — skip).
+        // Java: UtilServerDialog.hideDialog(); boolean waitForDialog = executeStepHooks(this, state);
+        // Dispatches to DodgeBehaviour/WatchOutBehaviour (AbstractDodgingStepModifier), which
+        // default `using_dodge` from `oldDefenderState.hasTacklezones()` and add the
+        // ReportSkillUse report. Headless mode never returns `stop_processing=true` (no dialog
+        // channel through this path — see AbstractDodgingStepModifier's doc comment), so we
+        // don't need to model Java's `if (waitForDialog) return;` branch.
+        let mut hook_state = StepBlockDodgeHookState {
+            using_dodge: self.using_dodge,
+            ask_for_skill: self.ask_for_skill.unwrap_or(false),
+            old_defender_state: self.old_defender_state,
+        };
+        dispatch::execute_step_hooks(game, rng, StepId::BlockDodge, &mut hook_state);
+        self.using_dodge = hook_state.using_dodge;
 
         // Java: if toPrimitive(usingDodge) → restore defender; else set FALLING.
         let using_dodge = self.using_dodge.unwrap_or(false);
@@ -171,17 +196,17 @@ impl Default for StepBlockDodge {
 impl Step for StepBlockDodge {
     fn id(&self) -> StepId { StepId::BlockDodge }
 
-    fn start(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game)
+    fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: CLIENT_USE_SKILL → handleSkillCommand sets state.usingDodge
         if let Action::UseSkill { use_skill, .. } = action {
             // Dodge skill use answer
             self.using_dodge = Some(*use_skill);
         }
-        self.execute_step(game)
+        self.execute_step(game, rng)
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
@@ -406,5 +431,97 @@ mod tests {
         // With GRAB mode, all adjacent empty squares are considered.
         // Defender at y=1, GRAB squares include y=0 (sideline) → sideline push detected.
         assert!(StepBlockDodge::find_dodge_choice(&game));
+    }
+
+    // ── AbstractDodgingStepModifier wiring (real registry dispatch) ──────────
+
+    fn add_defender_with_skills(game: &mut Game, id: &str, state: u32, skills: Vec<ffb_model::enums::SkillId>) {
+        use ffb_model::model::skill_def::SkillWithValue;
+        game.team_away.players.push(Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: skills.into_iter().map(|s| SkillWithValue { skill_id: s, value: None }).collect(),
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state(id, PlayerState::new(state));
+        game.defender_id = Some(id.into());
+    }
+
+    #[test]
+    fn dodge_skill_with_tacklezones_auto_uses_dodge_and_restores_old_state() {
+        let mut step = StepBlockDodge::new();
+        let old_state = PlayerState::new(PS_STANDING);
+        step.old_defender_state = Some(old_state);
+
+        let mut game = make_game();
+        add_defender_with_skills(&mut game, "def", ffb_model::enums::PS_STANDING, vec![ffb_model::enums::SkillId::Dodge]);
+
+        step.start(&mut game, &mut GameRng::new(0));
+        let state = game.field_model.player_state("def").unwrap();
+        assert_eq!(state.base(), PS_STANDING, "Dodge with tacklezones should auto-use dodge and restore old state");
+    }
+
+    #[test]
+    fn dodge_skill_without_tacklezones_falls() {
+        let mut step = StepBlockDodge::new();
+        step.old_defender_state = Some(PlayerState::new(ffb_model::enums::PS_PRONE));
+
+        let mut game = make_game();
+        add_defender_with_skills(&mut game, "def", PS_STANDING, vec![ffb_model::enums::SkillId::Dodge]);
+
+        step.start(&mut game, &mut GameRng::new(0));
+        let state = game.field_model.player_state("def").unwrap();
+        assert_eq!(state.base(), PS_FALLING, "Dodge with no tacklezones on old state should fall");
+    }
+
+    #[test]
+    fn dodge_skill_adds_skill_use_report() {
+        let mut step = StepBlockDodge::new();
+        step.old_defender_state = Some(PlayerState::new(PS_STANDING));
+
+        let mut game = make_game();
+        add_defender_with_skills(&mut game, "def", PS_STANDING, vec![ffb_model::enums::SkillId::Dodge]);
+
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
+    }
+
+    #[test]
+    fn no_dodge_skill_falls_with_no_report() {
+        let mut step = StepBlockDodge::new();
+        step.old_defender_state = Some(PlayerState::new(PS_STANDING));
+
+        let mut game = make_game();
+        add_defender_with_skills(&mut game, "def", PS_STANDING, vec![]);
+
+        step.start(&mut game, &mut GameRng::new(0));
+        let state = game.field_model.player_state("def").unwrap();
+        assert_eq!(state.base(), PS_FALLING, "No Dodge skill → defender falls (usingDodge stays null → false)");
+        assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
+    }
+
+    #[test]
+    fn explicit_use_skill_command_overrides_hook_default() {
+        // Defender has Dodge and tacklezones (default would be true), but explicitly declines
+        // via a prior CLIENT_USE_SKILL command — the hook must not override an already-set answer.
+        let mut step = StepBlockDodge::new();
+        step.old_defender_state = Some(PlayerState::new(PS_STANDING));
+
+        let mut game = make_game();
+        add_defender_with_skills(&mut game, "def", PS_STANDING, vec![ffb_model::enums::SkillId::Dodge]);
+
+        step.handle_command(
+            &Action::UseSkill { skill_id: ffb_mechanics::skills::SkillId::Dodge, use_skill: false },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        let state = game.field_model.player_state("def").unwrap();
+        assert_eq!(state.base(), PS_FALLING, "explicit decline must not be overridden by the hook's default");
     }
 }

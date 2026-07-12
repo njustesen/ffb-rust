@@ -1,9 +1,15 @@
 use crate::skill_behaviour::SkillBehaviour;
 
-/// BB2020 Dodge skill behaviour.
-/// Extends AbstractDodgingBehaviour with +1 dodge modifier. execute_step_hook delegates to
-/// AbstractDodgingBehaviour step modifier logic. Mirrors Java
-/// `com.fumbbl.ffb.server.skillbehaviour.bb2020.DodgeBehaviour`.
+/// BB2020 Dodge skill behaviour. Mirrors Java
+/// `com.fumbbl.ffb.server.skillbehaviour.bb2020.DodgeBehaviour`, which just calls
+/// `super(1, false)` on `AbstractDodgingBehaviour` with no BB2020-specific override.
+///
+/// The real `StepModifierTrait` logic (dodge-choice default, `ReportSkillUse`) is
+/// `AbstractDodgingStepModifier`, registered directly by
+/// `registry.rs::build_bb2020` as `AbstractDodgingBehaviour::register_into(&mut reg,
+/// SkillId::Dodge, 1, false)` — see `skill_behaviour/mixed/abstract_dodging_behaviour.rs`.
+/// This type is an intentionally inert marker (matches the BB2016 `DodgeBehaviour`
+/// precedent of not double-registering already-real logic).
 pub struct DodgeBehaviour;
 
 impl DodgeBehaviour {
@@ -16,17 +22,6 @@ impl Default for DodgeBehaviour {
 
 impl SkillBehaviour for DodgeBehaviour {
     fn name(&self) -> &'static str { "DodgeBehaviour" }
-
-    /// Extends AbstractDodgingBehaviour with +1 dodge modifier (BB2020).
-    /// execute_step_hook delegates to AbstractDodgingBehaviour step modifier logic.
-    ///
-    /// TODO(hook-infra): actual modifier application happens in StepModifier registered by
-    /// AbstractDodgingBehaviour.
-    fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
-        // TODO(hook-infra): step-specific state access (StepState.xxx) not yet
-        // available — implement fully once the step-hook infrastructure is ported.
-        false
-    }
 }
 
 #[cfg(test)]

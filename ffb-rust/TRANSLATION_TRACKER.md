@@ -29,6 +29,38 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AAF (closed the factory tracker-accuracy audit; discovered + closed the skill-hook-infra gap; Dodge-family reference implementation, this session):**
+Three-track session: (1) closed the `ffb-model/factory` tracker-accuracy audit flagged unverified in
+Phase AAE — re-checked all 82 `factory/` rows, fixed 47 (43 moved to their real location, mostly
+`ffb-mechanics/src/modifiers/*` or an enum's `for_name` method; 3 genuinely missing —
+`CardFactory`/`CardTypeFactory`/`InducementTypeFactory` — translated for real with 13 tests; 4
+orphaned dead stubs corrected to `—`; 1 left `~`, `JumpUpModifierFactory`, pending a `step/`-side
+wiring change). (2) **Discovered a bigger, tracker-invisible problem**: the skill-behaviour step-hook
+mechanism (`SkillRegistry`/`register_into`/`StepModifierTrait`/`dispatch::execute_step_hooks`,
+proven real by `HornsBehaviour`) is only actually reachable from **7 of ~584 step files** — every
+other skill routed through it, registered or not, currently has no effect on gameplay regardless of
+its tracker `✓` mark. Verified concretely with Dodge (zero effect on BB2020/BB2025 games before this
+session — the step computed its geometric dodge-choice heuristic but never ran the hook that decides/
+reports the outcome). A full audit of all 127 skill-behaviour files
+(`docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`) found ~20 genuine remaining gaps (fewer than the raw 77
+`TODO(hook-infra)` count suggests — many are dead duplicates or have real logic already inline in
+their step file), grouped by target step with a recommended batching order for follow-up phases. (3)
+**Wired the Dodge family for real** as the reference implementation: `step/mixed/step_block_dodge.rs`
+now calls `dispatch::execute_step_hooks`; `skill_behaviour/mixed/abstract_dodging_behaviour.rs` has
+the real `AbstractDodgingStepModifier` logic (has-skill check, `requireUnusedSkill` gate,
+tacklezones-based default, `ReportSkillUse`), registered for both Dodge and WatchOut in the BB2020/
+BB2025 registries. BB2016's own hand-rolled `StepBlockDodge` needed no changes — its logic already
+lived directly in the step (a valid alternate translation of Java's non-shared bb2016
+`DodgeBehaviour`). Also verified `FumbblRequestLoadTeam`'s dispatch tail (flagged as a possible
+remaining gap) was already closed in Phase AAE.
+
+Tests: 17,387 → 17,417 (+30: +13 factory, +17 dodge-family), 0 failures. No parity/integration testing
+(deferred, per instruction). **Honest completion estimate**: true behavioral completion (correcting
+for the skill-hook gap) is roughly ~94–96% of in-scope logic, ~81% counting the permanently-skipped
+Swing GUI — expect ~5–8 more similarly-scoped phases (per the audit doc's batching order) to close the
+remaining ~20 gaps and reach ~99–100%. Full writeup: `SESSION.md` Current Status;
+`docs/PHASE_AAF_SKILL_HOOK_AUDIT.md` for the follow-up worklist.
+
 **Phase AAD (32/32 server handlers reachable + behavioral-approximation fixes, this session):**
 Three-step follow-up to Phase ZV, closing the remaining non-file-level gaps rather than starting
 parity testing early (deferred per instruction).
@@ -950,9 +982,9 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 
 | Java File | Rust Crate | Rust Target | Status |
 |-----------|-----------|-------------|--------|
-| `factory/AnimationTypeFactory.java` | `ffb-model` | `src/factory/animation_type_factory.rs` | ✓ |
-| `factory/ApothecaryModeFactory.java` | `ffb-model` | `src/factory/apothecary_mode_factory.rs` | ✓ |
-| `factory/ApothecaryStatusFactory.java` | `ffb-model` | `src/factory/apothecary_status_factory.rs` | ✓ |
+| `factory/AnimationTypeFactory.java` | `ffb-model` | `src/model/animation_type.rs` (`AnimationType::for_name`) | ✓ |
+| `factory/ApothecaryModeFactory.java` | `ffb-model` | `src/enums/apothecary.rs` (`ApothecaryMode::from_name`) | ✓ |
+| `factory/ApothecaryStatusFactory.java` | `ffb-model` | `src/enums/apothecary.rs` (`ApothecaryStatus::from_name`) | ✓ |
 | `factory/application/NetCommandIdFactory.java` | `ffb-model` | `src/enums/net.rs` (`NetCommandId::from_name`) | ✓ |
 | `factory/ArmorModifierFactory.java` | `ffb-mechanics` | `src/modifiers/armor_modifier_factory.rs` | ✓ |
 | `factory/ArmorModifiers.java` | `ffb-mechanics` | `src/modifiers/armor_modifiers.rs` | ✓ |
@@ -966,71 +998,71 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `factory/bb2025/InjuryModifiers.java` | `ffb-mechanics` | `src/modifiers/bb2025/injury_modifiers.rs` | ✓ |
 | `factory/bb2025/PrayerFactory.java` | `ffb-model` | `src/factory/bb2025/prayer_factory.rs` | ✓ |
 | `factory/BlockResultFactory.java` | `ffb-model` | `src/factory/block_result_factory.rs` | ✓ |
-| `factory/CardEffectFactory.java` | `ffb-model` | `src/factory/card_effect_factory.rs` | ✓ |
+| `factory/CardEffectFactory.java` | `ffb-model` | `src/enums/card.rs` (`CardEffect::from_name`) | ✓ |
 | `factory/CardFactory.java` | `ffb-model` | `src/factory/card_factory.rs` | ✓ |
 | `factory/CardTypeFactory.java` | `ffb-model` | `src/factory/card_type_factory.rs` | ✓ |
-| `factory/CatchModifierFactory.java` | `ffb-model` | `src/factory/catch_modifier_factory.rs` | ✓ |
-| `factory/CatchScatterThrowInModeFactory.java` | `ffb-model` | `src/factory/catch_scatter_throw_in_mode_factory.rs` | ✓ |
+| `factory/CatchModifierFactory.java` | `ffb-mechanics` | `src/modifiers/catch_modifier_factory.rs` | ✓ |
+| `factory/CatchScatterThrowInModeFactory.java` | `ffb-model` | `src/model/catch_scatter_throw_in_mode.rs` (`CatchScatterThrowInMode::for_name`) | ✓ |
 | `factory/ClientModeFactory.java` | `ffb-model` | `src/factory/client_mode_factory.rs` | ✓ |
-| `factory/ClientStateIdFactory.java` | `ffb-model` | `src/factory/client_state_id_factory.rs` | ✓ |
+| `factory/ClientStateIdFactory.java` | `ffb-model` | `src/enums/client.rs` (`ClientStateId::from_name`) | ✓ |
 | `factory/common/GoForItModifierFactory.java` | `ffb-mechanics` | `src/modifiers/go_for_it_modifier_factory.rs` | ✓ |
-| `factory/ConcedeGameStatusFactory.java` | `ffb-model` | `src/factory/concede_game_status_factory.rs` | ✓ |
-| `factory/DialogIdFactory.java` | `ffb-model` | `src/factory/dialog_id_factory.rs` | ✓ |
-| `factory/DirectionFactory.java` | `ffb-model` | `src/factory/direction_factory.rs` | ✓ |
-| `factory/DodgeModifierFactory.java` | `ffb-model` | `src/factory/dodge_modifier_factory.rs` | ✓ |
-| `factory/FoulAssistArmorModifier.java` | `ffb-model` | `src/factory/foul_assist_armor_modifier.rs` | ✓ |
+| `factory/ConcedeGameStatusFactory.java` | `ffb-model` | `src/model/concede_game_status.rs` (`ConcedeGameStatus::from_name`) | ✓ |
+| `factory/DialogIdFactory.java` | `ffb-model` | `src/dialog/dialog_id.rs` (`DialogId::for_name`) | ✓ |
+| `factory/DirectionFactory.java` | `ffb-model` | `src/enums/direction.rs` (`Direction::from_name`) | ✓ |
+| `factory/DodgeModifierFactory.java` | `ffb-mechanics` | `src/modifiers/dodge_modifier_factory.rs` | ✓ |
+| `factory/FoulAssistArmorModifier.java` | `ffb-mechanics` | `src/modifiers/foul_assist_armor_modifier.rs` | ✓ |
 | `factory/GameOptionFactory.java` | `ffb-model` | `src/factory/game_option_factory.rs` | ✓ |
 | `factory/GameOptionIdFactory.java` | `ffb-model` | `src/factory/game_option_id_factory.rs` | ✓ |
-| `factory/GameStatusFactory.java` | `ffb-model` | `src/factory/game_status_factory.rs` | ✓ |
-| `factory/GazeModifierFactory.java` | `ffb-model` | `src/factory/gaze_modifier_factory.rs` | ✓ |
-| `factory/GenerifiedModifierFactory.java` | `ffb-model` | `src/factory/generified_modifier_factory.rs` | ✓ |
+| `factory/GameStatusFactory.java` | `ffb-model` | `src/enums/game.rs` (`GameStatus::from_name`) | ✓ |
+| `factory/GazeModifierFactory.java` | `ffb-mechanics` | `src/modifiers/gaze_modifier_collection.rs` (`GazeModifierCollection::find_applicable`, called directly from `ffb-engine`'s `step_hypnotic_gaze.rs` per edition — no separate factory indirection needed, same pattern as the other `Generified*`-based modifiers) | ✓ |
+| `factory/GenerifiedModifierFactory.java` | `ffb-mechanics` | `src/modifiers/gaze_modifier_collection.rs` (shared resolution logic inlined per modifier-type `*_collection.rs::find_applicable`, e.g. `catch_modifier_collection.rs`/`dodge_modifier_collection.rs`/`interception_modifier_collection.rs` — Rust has no runtime-generic factory base the way Java's abstract `<C,V,R>` class does, so each concrete collection carries its own `find_applicable`) | ✓ |
 | `factory/IFactorySource.java` | `ffb-model` | `src/factory/i_factory_source.rs` | ✓ |
 | `factory/ILoggingFacade.java` | `ffb-model` | `src/factory/i_logging_facade.rs` | ✓ |
 | `factory/INamedObjectFactory.java` | `ffb-model` | `src/factory/i_named_object_factory.rs` | ✓ |
-| `factory/InducementPhaseFactory.java` | `ffb-model` | `src/factory/inducement_phase_factory.rs` | ✓ |
+| `factory/InducementPhaseFactory.java` | `ffb-model` | `src/enums/card.rs` (`InducementPhase::from_name`) | ✓ |
 | `factory/InducementTypeFactory.java` | `ffb-model` | `src/factory/inducement_type_factory.rs` | ✓ |
 | `factory/InjuryModifierFactory.java` | `ffb-mechanics` | `src/modifiers/injury_modifier_factory.rs` | ✓ |
 | `factory/InjuryModifiers.java` | `ffb-mechanics` | `src/modifiers/injury_modifiers.rs` | ✓ |
-| `factory/InjuryTypeFactory.java` | `ffb-model` | `src/factory/injury_type_factory.rs` | ✓ |
-| `factory/InterceptionModifierFactory.java` | `ffb-model` | `src/factory/interception_modifier_factory.rs` | ✓ |
+| `factory/InjuryTypeFactory.java` | — | — | — (dead: no live `ffb-server` callers found; Java-side is superseded server-side by the distinct `server.factory.InjuryTypeServerFactory`, not this class — permanently skipped) |
+| `factory/InterceptionModifierFactory.java` | `ffb-mechanics` | `src/modifiers/interception_modifier_factory.rs` | ✓ |
 | `factory/IRollModifierFactory.java` | `ffb-model` | `src/factory/i_roll_modifier_factory.rs` | ✓ |
 | `factory/JumpModifierFactory.java` | `ffb-mechanics` | `src/modifiers/jump_modifier_factory.rs` | ✓ |
-| `factory/JumpUpModifierFactory.java` | `ffb-model` | `src/factory/jump_up_modifier_factory.rs` | ✓ |
-| `factory/KickoffResultFactory.java` | `ffb-model` | `src/factory/kickoff_result_factory.rs` | ✓ |
-| `factory/LeaderStateFactory.java` | `ffb-model` | `src/factory/leader_state_factory.rs` | ✓ |
-| `factory/MechanicsFactory.java` | `ffb-model` | `src/factory/mechanics_factory.rs` | ✓ |
+| `factory/JumpUpModifierFactory.java` | `ffb-mechanics` | `src/modifiers/jump_up_modifier_collection.rs` | `~` (collection/data classes translated, but resolution isn't wired into `ffb-engine`'s `step_jump_up.rs` yet — documented gap there: "No JumpUpModifier support yet → modifiers = empty"; wiring is a `step/` change, out of scope for this factory audit) |
+| `factory/KickoffResultFactory.java` | `ffb-model` | `src/enums/kickoff_result.rs` (`KickoffResult::from_name`) | ✓ |
+| `factory/LeaderStateFactory.java` | `ffb-model` | `src/enums/reroll.rs` (`LeaderState::from_name`) | ✓ |
+| `factory/MechanicsFactory.java` | `ffb-engine` | `src/mechanic/mod.rs` (`*_mechanic_for(rules)` per-`Mechanic.Type` edition dispatch helpers, e.g. `pass_mechanic_for`/`ttm_mechanic_for`/`state_mechanic_for` — replaces Java's reflection-populated `Map<Mechanic.Type, Mechanic>` registry with direct edition-keyed construction) | ✓ |
 | `factory/mixed/CasualtyModifierFactory.java` | `ffb-mechanics` | `src/modifiers/casualty_modifier_factory.rs` | ✓ |
 | `factory/mixed/JumpModifierFactory.java` | `ffb-mechanics` | `src/modifiers/jump_modifier_factory.rs` | ✓ |
-| `factory/ModelChangeDataTypeFactory.java` | `ffb-model` | `src/factory/model_change_data_type_factory.rs` | ✓ |
-| `factory/ModelChangeIdFactory.java` | `ffb-model` | `src/factory/model_change_id_factory.rs` | ✓ |
-| `factory/PassingDistanceFactory.java` | `ffb-model` | `src/factory/passing_distance_factory.rs` | ✓ |
-| `factory/PassModifierFactory.java` | `ffb-model` | `src/factory/pass_modifier_factory.rs` | ✓ |
-| `factory/PassResultFactory.java` | `ffb-model` | `src/factory/pass_result_factory.rs` | ✓ |
-| `factory/PickupModifierFactory.java` | `ffb-model` | `src/factory/pickup_modifier_factory.rs` | ✓ |
-| `factory/PlayerActionFactory.java` | `ffb-model` | `src/factory/player_action_factory.rs` | ✓ |
-| `factory/PlayerChoiceModeFactory.java` | `ffb-model` | `src/factory/player_choice_mode_factory.rs` | ✓ |
+| `factory/ModelChangeDataTypeFactory.java` | `ffb-model` | `src/enums/model_change.rs` (`ModelChangeDataType::for_name`) | ✓ |
+| `factory/ModelChangeIdFactory.java` | `ffb-model` | `src/enums/model_change.rs` (`ModelChangeId::for_name`) | ✓ |
+| `factory/PassingDistanceFactory.java` | `ffb-model` | `src/enums/pass.rs` (`PassingDistance::from_name`) | ✓ |
+| `factory/PassModifierFactory.java` | `ffb-mechanics` | `src/modifiers/pass_modifier_factory.rs` | ✓ |
+| `factory/PassResultFactory.java` | `ffb-model` | `src/enums/pass.rs` (`PassResult::from_name`) | ✓ |
+| `factory/PickupModifierFactory.java` | `ffb-mechanics` | `src/modifiers/pickup_modifier_factory.rs` | ✓ |
+| `factory/PlayerActionFactory.java` | `ffb-model` | `src/enums/player.rs` (`PlayerAction::from_name`) | ✓ |
+| `factory/PlayerChoiceModeFactory.java` | `ffb-model` | `src/model/player_choice_mode.rs` (`PlayerChoiceMode::for_name`) | ✓ |
 | `factory/PlayerGenderFactory.java` | `ffb-model` | `src/factory/player_gender_factory.rs` | ✓ |
 | `factory/PlayerTypeFactory.java` | `ffb-model` | `src/factory/player_type_factory.rs` | ✓ |
 | `factory/PrayerFactory.java` | `ffb-model` | `src/factory/prayer_factory.rs` | ✓ |
-| `factory/PushbackModeFactory.java` | `ffb-model` | `src/factory/pushback_mode_factory.rs` | ✓ |
-| `factory/ReportFactory.java` | `ffb-model` | `src/factory/report_factory.rs` | ✓ |
-| `factory/ReportIdFactory.java` | `ffb-model` | `src/factory/report_id_factory.rs` | ✓ |
-| `factory/ReRolledActionFactory.java` | `ffb-model` | `src/factory/re_rolled_action_factory.rs` | ✓ |
-| `factory/ReRollPropertyFactory.java` | `ffb-model` | `src/factory/re_roll_property_factory.rs` | ✓ |
+| `factory/PushbackModeFactory.java` | `ffb-model` | `src/model/pushback_mode.rs` (`PushbackMode::for_name`) | ✓ |
+| `factory/ReportFactory.java` | `ffb-engine` | `src/mechanic/state_mechanic.rs` (+ `bb2025`/`mixed` variants: `build_report_injury` and sibling direct `Report*::new` construction sites — replaces Java's reflection-populated `Map<ReportId, Constructor<? extends IReport>>` with direct construction at each call site) | ✓ |
+| `factory/ReportIdFactory.java` | `ffb-model` | `src/enums/report.rs` (`ReportId::from_name`) | ✓ |
+| `factory/ReRolledActionFactory.java` | `ffb-model` | `src/model/re_rolled_action.rs` (`ReRolledAction::new`, constructed directly by name at each `ffb-engine` skill-behaviour/step call site — replaces Java's `Map<String,ReRolledAction>` registry lookup with direct construction, same pattern as `ReportFactory`) | ✓ |
+| `factory/ReRollPropertyFactory.java` | `ffb-model` | `src/enums/reroll.rs` (`ReRollProperty::from_name`) | ✓ |
 | `factory/ReRollSourceFactory.java` | `ffb-model` | `src/factory/re_roll_source_factory.rs` | ✓ |
-| `factory/RightStuffModifierFactory.java` | `ffb-model` | `src/factory/right_stuff_modifier_factory.rs` | ✓ |
-| `factory/SendToBoxReasonFactory.java` | `ffb-model` | `src/factory/send_to_box_reason_factory.rs` | ✓ |
+| `factory/RightStuffModifierFactory.java` | `ffb-mechanics` | `src/modifiers/right_stuff_modifier_factory.rs` | ✓ |
+| `factory/SendToBoxReasonFactory.java` | `ffb-model` | `src/enums/team.rs` (`SendToBoxReason::from_name`) | ✓ |
 | `factory/SeriousInjuryFactory.java` | `ffb-model` | `src/factory/serious_injury_factory.rs` | ✓ |
-| `factory/ServerStatusFactory.java` | `ffb-model` | `src/factory/server_status_factory.rs` | ✓ |
+| `factory/ServerStatusFactory.java` | `ffb-model` | `src/enums/net.rs` (`ServerStatus::from_name`) | ✓ |
 | `factory/SkillCategoryFactory.java` | `ffb-model` | `src/factory/skill_category_factory.rs` | ✓ |
 | `factory/SkillFactory.java` | `ffb-model` | `src/factory/skill_factory.rs` | ✓ |
-| `factory/SkillPropertiesFactory.java` | `ffb-model` | `src/factory/skill_properties_factory.rs` | ✓ |
-| `factory/SkillUseFactory.java` | `ffb-model` | `src/factory/skill_use_factory.rs` | ✓ |
+| `factory/SkillPropertiesFactory.java` | — | — | — (dead: no live `ffb-server` callers found; reflection-populated registry over `NamedProperties` static fields, GUI/tooling-only — permanently skipped) |
+| `factory/SkillUseFactory.java` | `ffb-model` | `src/model/skill_use.rs` (`SkillUse::for_name`) | ✓ |
 | `factory/SoundIdFactory.java` | `ffb-model` | `src/factory/sound_id_factory.rs` | ✓ |
-| `factory/SpecialEffectFactory.java` | `ffb-model` | `src/factory/special_effect_factory.rs` | ✓ |
-| `factory/TeamStatusFactory.java` | `ffb-model` | `src/factory/team_status_factory.rs` | ✓ |
-| `factory/TemporaryStatModifierFactory.java` | `ffb-model` | `src/factory/temporary_stat_modifier_factory.rs` | ✓ |
-| `factory/TurnModeFactory.java` | `ffb-model` | `src/factory/turn_mode_factory.rs` | ✓ |
+| `factory/SpecialEffectFactory.java` | `ffb-model` | `src/model/special_effect.rs` (`SpecialEffect::for_name`) | ✓ |
+| `factory/TeamStatusFactory.java` | `ffb-model` | `src/enums/team.rs` (`TeamStatus::from_name`) | ✓ |
+| `factory/TemporaryStatModifierFactory.java` | — | — | — (dead: no live `ffb-server` callers found; Java's `forName` reflectively instantiates a `TemporaryStatModifier` via `Class.forName` + constructor lookup, which has no Rust equivalent and nothing in-scope needs it — permanently skipped) |
+| `factory/TurnModeFactory.java` | `ffb-model` | `src/enums/turn.rs` (`TurnMode::from_name`) | ✓ |
 | `factory/WeatherFactory.java` | `ffb-model` | `src/factory/weather_factory.rs` | ✓ |
 
 ### inducement/ (29 files)

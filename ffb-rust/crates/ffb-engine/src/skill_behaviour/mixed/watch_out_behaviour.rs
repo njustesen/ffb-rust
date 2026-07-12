@@ -5,8 +5,11 @@ use crate::skill_behaviour::SkillBehaviour;
 /// Extends `AbstractDodgingBehaviour` with `priority = 2` and `requireUnusedSkill = true`.
 /// Delegates entirely to the abstract parent's step logic; no additional override.
 ///
-/// The full step logic is documented on `AbstractDodgingBehaviour::execute_step_hook`.
-/// This struct adds no new behaviour on top of that base.
+/// The real `StepModifierTrait` logic is `AbstractDodgingStepModifier`, registered
+/// directly by `registry.rs::build_bb2020`/`build_bb2025` as
+/// `AbstractDodgingBehaviour::register_into(&mut reg, SkillId::WatchOut, 2, true)` —
+/// see `skill_behaviour/mixed/abstract_dodging_behaviour.rs`. This struct is an
+/// intentionally inert marker; it adds no behaviour on top of that registration.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.skillbehaviour.mixed.WatchOutBehaviour`.
 pub struct WatchOutBehaviour;
