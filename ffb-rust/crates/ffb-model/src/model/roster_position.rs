@@ -73,6 +73,10 @@ pub struct RosterPosition {
     pub keywords: Vec<String>,
 
     pub is_big_guy: bool,
+    /// Whether this position's keyword list contains `Keyword.LINEMAN`
+    /// (Java: `position.getKeywords().contains(Keyword.LINEMAN)`).
+    /// Stored here to avoid roster lookup at mechanic time, mirroring `is_big_guy`.
+    pub is_lineman: bool,
     pub is_undead: bool,
     pub is_thrall: bool,
     pub race: Option<String>,
@@ -130,6 +134,10 @@ impl IXmlReadable for RosterPosition {
             // Java computes "is this a Big Guy" at each call site instead of storing it.
             self.is_big_guy = self.player_type == PlayerType::BigGuy
                 || self.keywords.iter().any(|k| k.eq_ignore_ascii_case("Big Guy"));
+            // Rust-only derived field (mirrors data/loader.rs's position_json_to_roster_position):
+            // Java computes "does this position have the LINEMAN keyword" at each call site
+            // (`SwarmingLogicModule.squareHasSwarmingPlayer`) instead of storing it.
+            self.is_lineman = self.keywords.iter().any(|k| k.eq_ignore_ascii_case("Lineman"));
         } else if self.inside_skill_list_tag {
             if tag == XML_TAG_SKILL_LIST {
                 self.inside_skill_list_tag = false;
@@ -274,6 +282,7 @@ mod tests {
             ],
             keywords: vec![],
             is_big_guy: false,
+            is_lineman: false,
             is_undead: false,
             is_thrall: false,
             race: None,

@@ -5,13 +5,9 @@
 //! `SetupLogicModule` value and implements `LogicModule` by delegating every method to it,
 //! matching the "thin subclass" precedent already used elsewhere in this batch.
 //!
-//! Documented gap:
-//! - `squareHasSwarmingPlayer`: `player.getPosition().getKeywords().contains(Keyword.LINEMAN)` —
-//!   the Rust `Player` has no `Position`/keyword-set storage (only a precomputed `is_big_guy`
-//!   flag exists for the one keyword check already needed elsewhere; see `logic_module.rs`'s own
-//!   doc comment on this exact gap class). There is no roster-position lookup reachable from a
-//!   bare `Player` at this layer, so the LINEMAN check cannot be evaluated; conservatively
-//!   `false`.
+//! `squareHasSwarmingPlayer`'s `player.getPosition().getKeywords().contains(Keyword.LINEMAN)`
+//! uses the precomputed `Player::is_lineman` flag (mirrors `Player::is_big_guy`; see
+//! `ffb-model/src/model/player.rs`), set from the roster position's keyword list at load time.
 
 use ffb_model::enums::ClientStateId;
 use ffb_model::model::acting_player::ActingPlayer;
@@ -40,11 +36,8 @@ impl SwarmingLogicModule {
     /// java: `public boolean squareHasSwarmingPlayer(FieldCoordinate pCoordinate)`.
     pub fn square_has_swarming_player(&self, client: &FantasyFootballClient, coordinate: FieldCoordinate) -> bool {
         match self.get_player(client, coordinate) {
-            Some(_player) => {
-                // java: `player.getPosition().getKeywords().contains(Keyword.LINEMAN)` — see
-                // module doc gap; conservatively `false`.
-                false
-            }
+            // java: `player.getPosition().getKeywords().contains(Keyword.LINEMAN)`.
+            Some(player) => player.is_lineman,
             None => false,
         }
     }
@@ -134,8 +127,13 @@ mod tests {
     }
 
     fn add_player(game: &mut Game, home: bool, id: &str, coord: FieldCoordinate) {
+        add_player_with_lineman(game, home, id, coord, false);
+    }
+
+    fn add_player_with_lineman(game: &mut Game, home: bool, id: &str, coord: FieldCoordinate, is_lineman: bool) {
         let mut player = Player::default();
         player.id = id.to_string();
+        player.is_lineman = is_lineman;
         if home {
             game.team_home.players.push(player);
         } else {
@@ -183,14 +181,23 @@ mod tests {
     }
 
     #[test]
-    fn square_has_swarming_player_false_even_with_player_present() {
+    fn square_has_swarming_player_false_for_non_lineman_player() {
         let mut client = make_client();
         let mut game = make_game();
         add_player(&mut game, true, "p1", FieldCoordinate::new(3, 3));
         client.set_game(game);
         let module = SwarmingLogicModule::new();
-        // java: gap — LINEMAN keyword unavailable, so always false regardless of occupancy.
         assert!(!module.square_has_swarming_player(&client, FieldCoordinate::new(3, 3)));
+    }
+
+    #[test]
+    fn square_has_swarming_player_true_for_lineman_player() {
+        let mut client = make_client();
+        let mut game = make_game();
+        add_player_with_lineman(&mut game, true, "p1", FieldCoordinate::new(3, 3), true);
+        client.set_game(game);
+        let module = SwarmingLogicModule::new();
+        assert!(module.square_has_swarming_player(&client, FieldCoordinate::new(3, 3)));
     }
 
     #[test]

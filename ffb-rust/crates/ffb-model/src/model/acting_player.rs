@@ -50,6 +50,10 @@ pub struct ActingPlayer {
     /// Java: fSufferingAnimosity — true when the player failed an Animosity check
     /// and must re-select a passing target.
     pub suffering_animosity: bool,
+    /// Java: mustCompleteAction — true once the player must complete their current
+    /// action (e.g. `StepEndBomb` forces a second Ninja bomb throw) rather than being
+    /// allowed to voluntarily end the turn.
+    pub must_complete_action: bool,
 }
 
 impl ActingPlayer {
@@ -73,10 +77,21 @@ impl ActingPlayer {
         self.held_in_place = false;
         self.suffering_blood_lust = false;
         self.forgone = false;
+        self.must_complete_action = false;
     }
 
     pub fn is_active(&self) -> bool {
         self.player_id.is_some()
+    }
+
+    /// Java: `isMustCompleteAction()`.
+    pub fn is_must_complete_action(&self) -> bool {
+        self.must_complete_action
+    }
+
+    /// Java: `setMustCompleteAction(boolean)`.
+    pub fn set_must_complete_action(&mut self, must_complete_action: bool) {
+        self.must_complete_action = must_complete_action;
     }
 }
 
@@ -125,6 +140,22 @@ mod tests {
         ap.set_player("p1".into(), PlayerAction::Move);
         assert_eq!(ap.current_move, 0);
         assert!(!ap.goes_for_it);
+    }
+
+    #[test]
+    fn must_complete_action_defaults_false_and_can_be_set() {
+        let mut ap = ActingPlayer::new();
+        assert!(!ap.is_must_complete_action());
+        ap.set_must_complete_action(true);
+        assert!(ap.is_must_complete_action());
+    }
+
+    #[test]
+    fn set_player_resets_must_complete_action() {
+        let mut ap = ActingPlayer::new();
+        ap.set_must_complete_action(true);
+        ap.set_player("p1".into(), PlayerAction::Move);
+        assert!(!ap.is_must_complete_action());
     }
 
     #[test]

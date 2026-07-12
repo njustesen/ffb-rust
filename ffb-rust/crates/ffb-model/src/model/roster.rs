@@ -161,6 +161,7 @@ mod tests {
             skill_categories_double: vec![],
             keywords: vec![],
             is_big_guy: false,
+            is_lineman: false,
             is_undead: false,
             is_thrall: false,
             race: None,
@@ -186,7 +187,7 @@ mod tests {
             movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
             skills: vec![], skill_categories_normal: vec![],
             skill_categories_double: vec![], keywords: vec![],
-            is_big_guy: false, is_undead: false, is_thrall: false,
+            is_big_guy: false, is_lineman: false, is_undead: false, is_thrall: false,
             race: None, replaces_position: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None,
         });
         r.positions.push(crate::model::roster_position::RosterPosition {
@@ -199,7 +200,7 @@ mod tests {
             movement: 8, strength: 3, agility: 2, passing: 2, armour: 8,
             skills: vec![], skill_categories_normal: vec![],
             skill_categories_double: vec![], keywords: vec![],
-            is_big_guy: false, is_undead: false, is_thrall: false,
+            is_big_guy: false, is_lineman: false, is_undead: false, is_thrall: false,
             race: None, replaces_position: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None,
         });
         let non_stars: Vec<_> = r.non_star_positions().collect();
@@ -229,7 +230,7 @@ mod tests {
             movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
             skills: vec![], skill_categories_normal: vec![],
             skill_categories_double: vec![], keywords: vec![],
-            is_big_guy: false, is_undead: false, is_thrall: false,
+            is_big_guy: false, is_lineman: false, is_undead: false, is_thrall: false,
             race: None, replaces_position: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None,
         });
         assert_eq!(r.positions.len(), 1);

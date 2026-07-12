@@ -72,6 +72,15 @@ impl StepEndBomb {
             //   state.getThrowTwoBombs() == null → else: push EndPlayerAction
             //
             // We mirror the final else-branch which is the common path.
+            //
+            // Note: Java's `if (!fEndTurn && threwOnlyFirstBomb && skill != null && ...)`
+            // branch (StepEndBomb.java lines 114-118) is the only call site of
+            // `actingPlayer.setMustCompleteAction(true)` in the whole Java codebase. It
+            // requires `skill != null` (the `canUseThrowBombActionTwice` property, i.e.
+            // Ninja's second bomb throw), which is unreachable here because `skill` is
+            // always `null` given the PassState stub above — so there is currently no
+            // reachable call site to wire `ActingPlayer::set_must_complete_action(true)`
+            // to in this translation (see `acting_player.rs` for the now-real field/methods).
             let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
                 feeding_allowed: false,
                 end_player_action: true,

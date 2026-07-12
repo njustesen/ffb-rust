@@ -107,6 +107,11 @@ pub struct Player {
     #[serde(default)]
     pub is_big_guy: bool,
 
+    /// Whether this player's position has the LINEMAN keyword (Java: position.getKeywords().contains(LINEMAN)).
+    /// Stored here to avoid roster lookup at mechanic time, mirroring `is_big_guy`.
+    #[serde(default)]
+    pub is_lineman: bool,
+
     /// Race identifier for Animosity checks (e.g. "Hobgoblin", "Bull Centaur").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub race: Option<String>,
@@ -339,6 +344,7 @@ impl Player {
             career_spps: 0,
             is_thrall: pos.is_thrall,
             is_big_guy: pos.is_big_guy,
+            is_lineman: pos.is_lineman,
             race: pos.race.clone(),
             temporary_stat_mods: vec![],
             temporary_skill_sources: vec![],
@@ -373,6 +379,7 @@ impl Player {
         self.position_armour = position.armour;
         self.is_thrall = position.is_thrall;
         self.is_big_guy = position.is_big_guy;
+        self.is_lineman = position.is_lineman;
         self.race = position.race.clone();
         for sw in &position.skills {
             self.add_skill(sw.skill_id);
@@ -539,6 +546,7 @@ mod tests {
             career_spps: 0,
             is_thrall: false,
             is_big_guy: false,
+            is_lineman: false,
             race: None,
             temporary_stat_mods: vec![],
             temporary_skill_sources: vec![],
@@ -671,6 +679,7 @@ mod tests {
             skill_categories_double: vec![],
             keywords: vec![],
             is_big_guy: false,
+            is_lineman: false,
             is_undead: false,
             is_thrall: false,
             race: None,

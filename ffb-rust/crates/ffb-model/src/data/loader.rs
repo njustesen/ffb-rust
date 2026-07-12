@@ -257,6 +257,7 @@ pub fn position_json_to_roster_position(pos: &PositionJson, roster_id: &str, is_
     let player_type = PlayerType::from_name(&pos.player_type).unwrap_or(PlayerType::Regular);
     let is_big_guy = player_type == PlayerType::BigGuy
         || pos.keywords.iter().any(|k| k == "Big Guy");
+    let is_lineman = pos.keywords.iter().any(|k| k == "Lineman");
     RosterPosition {
         id: pos.id.clone(),
         name: pos.name.clone(),
@@ -276,6 +277,7 @@ pub fn position_json_to_roster_position(pos: &PositionJson, roster_id: &str, is_
         skill_categories_double: cats_double,
         keywords: pos.keywords.clone(),
         is_big_guy,
+        is_lineman,
         is_undead,
         is_thrall: false,
         race: Some(roster_id.to_string()),

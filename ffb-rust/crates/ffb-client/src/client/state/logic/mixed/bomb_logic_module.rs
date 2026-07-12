@@ -4,11 +4,6 @@
 //! mixin), holding one field (`showRangeRuler`, default `true`).
 //!
 //! Documented gaps:
-//! - `ActingPlayer.isMustCompleteAction()` — no equivalent field exists on the Rust
-//!   `ActingPlayer` (new gap beyond the ones already documented elsewhere in this crate);
-//!   conservatively treated as `false` (Java's own default before any state-machine code
-//!   sets it), matching the "no in-scope setter observed" convention used for other missing
-//!   flags.
 //! - `UtilRangeRuler.createRangeRuler(Game, Player<?>, FieldCoordinate, boolean)` is only a
 //!   placeholder struct in `ffb_model::util::util_range_ruler`; reimplemented locally as
 //!   `create_range_ruler`, mirroring the exact same helper already established in
@@ -106,10 +101,8 @@ impl BombLogicModule {
     pub fn is_end_turn_action_available(&self, client: &FantasyFootballClient) -> bool {
         match client.game() {
             Some(game) => {
-                // java: `!game.getActingPlayer().isMustCompleteAction()` — see module doc gap;
-                // `must_complete_action` conservatively treated as always `false`.
-                let must_complete_action = false;
-                !game.turn_mode.is_bomb_turn() && !must_complete_action
+                // java: `!game.getActingPlayer().isMustCompleteAction()`.
+                !game.turn_mode.is_bomb_turn() && !game.acting_player.is_must_complete_action()
             }
             None => false,
         }
@@ -254,9 +247,8 @@ impl LogicModule for BombLogicModule {
             }
         }
 
-        // java: `isEndTurnActionAvailable()` — see module doc gap (must_complete_action always
-        // `false`).
-        let end_turn_available = !game.turn_mode.is_bomb_turn();
+        // java: `isEndTurnActionAvailable()`.
+        let end_turn_available = !game.turn_mode.is_bomb_turn() && !acting_player.is_must_complete_action();
         if end_turn_available {
             action_context.add_action(ClientAction::END_MOVE);
         }
@@ -498,6 +490,26 @@ mod tests {
         client.set_game(make_game());
         let module = BombLogicModule::new();
         assert!(module.is_end_turn_action_available(&client));
+    }
+
+    #[test]
+    fn is_end_turn_action_available_false_when_must_complete_action() {
+        let mut client = make_client();
+        let mut game = make_game();
+        game.acting_player.set_must_complete_action(true);
+        client.set_game(game);
+        let module = BombLogicModule::new();
+        assert!(!module.is_end_turn_action_available(&client));
+    }
+
+    #[test]
+    fn action_context_omits_end_move_when_must_complete_action() {
+        let module = BombLogicModule::new();
+        let game = make_game();
+        let mut ap = ActingPlayer::new();
+        ap.set_must_complete_action(true);
+        let ctx = module.action_context(&game, &ap);
+        assert!(!ctx.get_actions().contains(&ClientAction::END_MOVE));
     }
 
     #[test]

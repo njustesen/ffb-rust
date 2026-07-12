@@ -5,11 +5,6 @@
 //! `showRangeRuler`/`setShowRangeRuler`/`isEndTurnActionAvailable`/`playerIsAboutToThrow`.
 //!
 //! Documented gaps:
-//! - `ActingPlayer.isMustCompleteAction()` — the Java `ActingPlayer` has a plain
-//!   `mustCompleteAction` boolean field (`ffb-common/model/ActingPlayer.java`); the Rust
-//!   `ActingPlayer` has no equivalent field. Conservatively treated as always `false` (matching
-//!   the "no fields set → nothing forces completion" default), so `isEndTurnActionAvailable`
-//!   reduces to `!game.turn_mode.is_bomb_turn()`.
 //! - `UtilRangeRuler.createRangeRuler(...)` is only a placeholder struct in the Rust model; its
 //!   real logic needs a live `PassMechanic` + `PassModifierFactory`, so it is reimplemented here
 //!   as a private `create_range_ruler` helper mirroring `UtilRangeRuler.java` exactly, matching
@@ -70,11 +65,9 @@ fn create_range_ruler(
     Some(RangeRuler::new(thrower.id.clone(), Some(target_coordinate), minimum_roll, throw_team_mate))
 }
 
-/// java: `public boolean isEndTurnActionAvailable()` — see module doc gap regarding
-/// `isMustCompleteAction()`.
+/// java: `public boolean isEndTurnActionAvailable()`.
 pub fn is_end_turn_action_available(game: &Game) -> bool {
-    let must_complete_action = false; // java: gap — see module doc comment.
-    !game.turn_mode.is_bomb_turn() && !must_complete_action
+    !game.turn_mode.is_bomb_turn() && !game.acting_player.is_must_complete_action()
 }
 
 /// java: `public boolean playerIsAboutToThrow()`.
@@ -465,6 +458,13 @@ mod tests {
     fn is_end_turn_action_available_true_when_not_bomb_turn() {
         let game = make_game();
         assert!(is_end_turn_action_available(&game));
+    }
+
+    #[test]
+    fn is_end_turn_action_available_false_when_must_complete_action() {
+        let mut game = make_game();
+        game.acting_player.set_must_complete_action(true);
+        assert!(!is_end_turn_action_available(&game));
     }
 
     #[test]
