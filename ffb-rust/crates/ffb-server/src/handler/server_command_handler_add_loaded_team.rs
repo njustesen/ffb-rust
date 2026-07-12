@@ -175,7 +175,7 @@ mod tests {
     fn handle_command_missing_gamestate_returns_true() {
         let h = ServerCommandHandlerAddLoadedTeam::new();
         let mut cache = GameCache::new();
-        let command = InternalServerCommandAddLoadedTeam::new(999, "coach".into(), None, vec![]);
+        let command = InternalServerCommandAddLoadedTeam::new(999, "coach".into(), None, team("t1"), vec![]);
         let t = team("t1");
         assert!(h.handle_command(&command, t, &mut cache));
     }
@@ -187,7 +187,7 @@ mod tests {
         let h = ServerCommandHandlerAddLoadedTeam::new();
         let mut cache = GameCache::new();
         let game_id = cache.create_game_state();
-        let command = InternalServerCommandAddLoadedTeam::new(game_id, "coach".into(), None, vec![]);
+        let command = InternalServerCommandAddLoadedTeam::new(game_id, "coach".into(), None, team("t1"), vec![]);
         let t = team("t1");
         assert!(h.handle_command(&command, t, &mut cache));
     }
@@ -206,7 +206,7 @@ mod tests {
             gs.start_game(home_placeholder, team("away1"), Rules::Bb2025, 0);
             gs.get_game_mut().unwrap().status = GameStatus::Scheduled;
         }
-        let command = InternalServerCommandAddLoadedTeam::new(game_id, "coach".into(), None, vec![]);
+        let command = InternalServerCommandAddLoadedTeam::new(game_id, "coach".into(), None, team("home1"), vec![]);
         let t = team("home1");
         assert!(h.handle_command(&command, t, &mut cache));
 
@@ -228,7 +228,7 @@ mod tests {
             // Default status from `GameState::start_game` is not `Scheduled`, so this
             // exercises the (currently unwired) redispatch branch instead of the log branch.
         }
-        let command = InternalServerCommandAddLoadedTeam::new(game_id, "coach".into(), Some(true), vec![]);
+        let command = InternalServerCommandAddLoadedTeam::new(game_id, "coach".into(), Some(true), team("newhome"), vec![]);
         let t = team("newhome");
         assert!(h.handle_command(&command, t, &mut cache));
 

@@ -16,24 +16,29 @@ impl FumbblRequestLoadPlayerMarkings {
         self.request_url = url;
     }
 
-    /// Loads the auto-marking config JSON for `coach` (see
-    /// `AbstractFumbblRequestLoadPlayerMarkings::load_automarking_config`). Java then adds it to
-    /// the session's marking config, applies `sort_mode`, and dispatches
-    /// `InternalServerCommandApplyAutomatedPlayerMarkings`; that session/command plumbing does
-    /// not exist yet in this simplified server crate.
+    /// Java: `FumbblRequestLoadPlayerMarkings.process(ServerRequestProcessor)` — the part that
+    /// loads the auto-marking config. Fetches the FUMBBL_PLAYER_MARKINGS URL for `coach` and
+    /// parses the JSON body into an `AutoMarkingConfig` via the shared
+    /// [`parse_markings_response`](super::abstract_fumbbl_request_load_player_markings::parse_markings_response)
+    /// (Java: `loadAutomarkingConfig` on the base class).
+    ///
+    /// Java then adds the config to the session's marking config, applies `sort_mode`, and
+    /// dispatches `InternalServerCommandApplyAutomatedPlayerMarkings` back through
+    /// `server.getCommunication().handleCommand(...)`. In this crate that dispatch happens from
+    /// the `ServerCommandHandlerFactory`'s `ApplyAutomatedPlayerMarkings` arm once the command
+    /// is built; there is no `ServerRequestProcessor`→dispatch channel wiring for this request
+    /// type yet (its only caller, `MarkerLoadingService`, discards the parsed result — a
+    /// documented gap), so this method just returns the parsed config for that caller to use.
     pub fn process(
         &mut self,
         client: &dyn super::util_fumbbl_request::HttpClient,
         markings_url_template: &str,
         coach: &str,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<ffb_engine::marking::auto_marking_config::AutoMarkingConfig>, String> {
         let url = super::util_fumbbl_request::UtilFumbblRequest::bind(markings_url_template, &[coach]);
         self.set_request_url(url);
         let response = client.fetch_page(self.get_request_url())?;
-        if response.is_empty() || response == "null" {
-            return Ok(None);
-        }
-        Ok(Some(response))
+        Ok(super::abstract_fumbbl_request_load_player_markings::parse_markings_response(&response))
     }
 }
 
@@ -54,13 +59,23 @@ mod tests {
     }
 
     #[test]
-    fn process_builds_url_and_returns_config_json() {
+    fn process_builds_url_and_parses_config() {
         let client = MockHttpClient {
-            response: Ok("{\"markings\":[1,2]}".to_string()),
+            response: Ok(r#"{"autoMarkingSeparator":"-","autoMarkingRecords":[{"skillArray":["Block"],"marking":"B","gainedOnly":true}]}"#.to_string()),
         };
         let mut r = FumbblRequestLoadPlayerMarkings::new();
-        let json = r.process(&client, "http://fumbbl/markings/$1", "coach").unwrap();
+        let config = r.process(&client, "http://fumbbl/markings/$1", "coach").unwrap().expect("config should parse");
         assert_eq!(r.get_request_url(), "http://fumbbl/markings/coach");
-        assert_eq!(json, Some("{\"markings\":[1,2]}".to_string()));
+        assert_eq!(config.get_separator(), "-");
+        assert_eq!(config.get_markings().len(), 1);
+        assert_eq!(config.get_markings()[0].marking(), "B");
+        assert!(config.get_markings()[0].is_gained_only());
+    }
+
+    #[test]
+    fn process_null_response_returns_none() {
+        let client = MockHttpClient { response: Ok("null".to_string()) };
+        let mut r = FumbblRequestLoadPlayerMarkings::new();
+        assert!(r.process(&client, "http://fumbbl/markings/$1", "coach").unwrap().is_none());
     }
 }

@@ -14,6 +14,29 @@ impl ApplyTo {
     pub fn applies_to_opponent(&self) -> bool {
         matches!(self, ApplyTo::Opponent | ApplyTo::Both)
     }
+
+    /// Java: `Enum.name()` — the variant's declared constant name, used verbatim as the
+    /// `IJsonOption.APPLY_TO` wire value in `AutoMarkingRecord.toJsonValue()`
+    /// (`applyTo.name()`).
+    pub fn name(&self) -> &'static str {
+        match self {
+            ApplyTo::Own => "OWN",
+            ApplyTo::Opponent => "OPPONENT",
+            ApplyTo::Both => "BOTH",
+        }
+    }
+
+    /// Java: `ApplyTo.valueOf(String)` — inverse of [`Self::name`], used in
+    /// `AutoMarkingRecord.initFrom` (`ApplyTo.valueOf(IJsonOption.APPLY_TO.getFrom(...))`).
+    /// Java throws `IllegalArgumentException` on an unknown name; this returns `None`.
+    pub fn value_of(name: &str) -> Option<ApplyTo> {
+        match name {
+            "OWN" => Some(ApplyTo::Own),
+            "OPPONENT" => Some(ApplyTo::Opponent),
+            "BOTH" => Some(ApplyTo::Both),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -75,5 +98,25 @@ mod tests {
         let a = ApplyTo::Both;
         let _b = a;
         let _c = a; // copy semantics: can use after "move"
+    }
+
+    #[test]
+    fn name_matches_java_constant_names() {
+        assert_eq!(ApplyTo::Own.name(), "OWN");
+        assert_eq!(ApplyTo::Opponent.name(), "OPPONENT");
+        assert_eq!(ApplyTo::Both.name(), "BOTH");
+    }
+
+    #[test]
+    fn value_of_round_trips_name() {
+        for variant in [ApplyTo::Own, ApplyTo::Opponent, ApplyTo::Both] {
+            assert_eq!(ApplyTo::value_of(variant.name()), Some(variant));
+        }
+    }
+
+    #[test]
+    fn value_of_unknown_is_none() {
+        assert_eq!(ApplyTo::value_of("SIDEWAYS"), None);
+        assert_eq!(ApplyTo::value_of("own"), None); // case-sensitive, like Java valueOf
     }
 }

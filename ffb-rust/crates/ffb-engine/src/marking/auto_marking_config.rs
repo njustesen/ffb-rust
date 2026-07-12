@@ -3,6 +3,7 @@ use ffb_model::marking::sort_mode::SortMode;
 use ffb_model::model::skill_def::SkillId;
 use crate::marking::auto_marking_record::{AutoMarkingRecord, Builder};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AutoMarkingConfig {
     pub separator: String,
     pub markings: Vec<AutoMarkingRecord>,
@@ -50,6 +51,39 @@ impl AutoMarkingConfig {
                 .build()
         })
         .collect()
+    }
+
+    /// Java: `AutoMarkingConfig.toJsonValue()`.
+    ///
+    /// Keys are the Java `IJsonOption` constants: `AUTO_MARKING_RECORDS` = `"autoMarkingRecords"`
+    /// and `SEPARATOR` = `"autoMarkingSeparator"`. The transient `sort_mode` is not serialized
+    /// (Java: `transient`).
+    pub fn to_json_value(&self) -> serde_json::Value {
+        let mut obj = serde_json::Map::new();
+        let records: Vec<serde_json::Value> = self.markings.iter().map(|r| r.to_json_value()).collect();
+        obj.insert("autoMarkingRecords".to_string(), serde_json::Value::Array(records));
+        obj.insert("autoMarkingSeparator".to_string(), serde_json::Value::String(self.separator.clone()));
+        serde_json::Value::Object(obj)
+    }
+
+    /// Java: `AutoMarkingConfig.initFrom(IFactorySource source, JsonValue jsonValue)`.
+    ///
+    /// Reads the `autoMarkingRecords` array (each element via [`AutoMarkingRecord::from_json`])
+    /// and the `autoMarkingSeparator` string. Java wraps this in a try/catch that logs and
+    /// leaves the (empty) config on failure; here missing/malformed keys simply yield the
+    /// empty defaults from [`Self::new`]. The transient `sort_mode` is left at its default and
+    /// set separately by the caller (Java: `config.setSortMode(...)`).
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        let mut config = AutoMarkingConfig::new();
+        if let Some(arr) = json.get("autoMarkingRecords").and_then(|v| v.as_array()) {
+            config.markings = arr.iter().map(AutoMarkingRecord::from_json).collect();
+        }
+        config.separator = json
+            .get("autoMarkingSeparator")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        config
     }
 }
 
@@ -127,5 +161,55 @@ mod tests {
             .find(|r| r.skills().contains(&ffb_model::model::skill_def::SkillId::Tackle));
         assert!(tackle.is_some());
         assert_eq!(tackle.unwrap().marking(), "T");
+    }
+
+    #[test]
+    fn to_json_value_uses_java_option_keys() {
+        let mut config = AutoMarkingConfig::new();
+        config.set_separator("/");
+        config.markings.push(
+            Builder::new()
+                .with_skill(ffb_model::model::skill_def::SkillId::Block)
+                .with_marking("B")
+                .build(),
+        );
+        let json = config.to_json_value();
+        assert_eq!(json["autoMarkingSeparator"], "/");
+        assert_eq!(json["autoMarkingRecords"].as_array().unwrap().len(), 1);
+        assert_eq!(json["autoMarkingRecords"][0]["marking"], "B");
+    }
+
+    #[test]
+    fn from_json_reads_records_and_separator() {
+        let json = serde_json::json!({
+            "autoMarkingSeparator": "-",
+            "autoMarkingRecords": [
+                { "skillArray": ["Block"], "marking": "B", "gainedOnly": true },
+                { "skillArray": ["Tackle"], "marking": "T" },
+            ],
+        });
+        let config = AutoMarkingConfig::from_json(&json);
+        assert_eq!(config.get_separator(), "-");
+        assert_eq!(config.get_markings().len(), 2);
+        assert_eq!(config.get_markings()[0].marking(), "B");
+        assert!(config.get_markings()[0].is_gained_only());
+        // Transient sort_mode is not part of the wire format — stays at the default.
+        assert_eq!(config.get_sort_mode(), SortMode::Default);
+    }
+
+    #[test]
+    fn from_json_missing_keys_yields_empty_config() {
+        let config = AutoMarkingConfig::from_json(&serde_json::json!({}));
+        assert!(config.get_markings().is_empty());
+        assert_eq!(config.get_separator(), "");
+    }
+
+    #[test]
+    fn json_round_trip_preserves_config() {
+        let mut original = AutoMarkingConfig::new();
+        original.set_separator("|");
+        original.markings = AutoMarkingConfig::defaults();
+        let restored = AutoMarkingConfig::from_json(&original.to_json_value());
+        assert_eq!(restored, original);
     }
 }

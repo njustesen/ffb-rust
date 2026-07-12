@@ -48,6 +48,8 @@ use crate::db::db_connection_manager::DbConnectionManager;
 use crate::game_cache::GameCache;
 use crate::handler::server_command_handler_add_loaded_team::ServerCommandHandlerAddLoadedTeam;
 use crate::handler::server_command_handler_add_sketch::ServerCommandHandlerAddSketch;
+use crate::handler::server_command_handler_apply_automated_player_markings::ServerCommandHandlerApplyAutomatedPlayerMarkings;
+use crate::handler::server_command_handler_calculate_automatic_player_markings::ServerCommandHandlerCalculateAutomaticPlayerMarkings;
 use crate::handler::server_command_handler_clear_sketches::ServerCommandHandlerClearSketches;
 use crate::handler::server_command_handler_close_game::ServerCommandHandlerCloseGame;
 use crate::handler::server_command_handler_close_session::ServerCommandHandlerCloseSession;
@@ -171,10 +173,17 @@ pub struct ServerCommandHandlerFactory {
 
     // ── Game-management handler family ──────────────────────────────────
     /// `pub(crate)` (like `join_handler`/`load_automatic_player_markings_handler` above) so
-    /// this file's own tests can exercise the real handler directly: its `AddLoadedTeam`
-    /// dispatch arm below is a documented no-op (the wire command carries no `Team` payload
-    /// to hand it — see that handler's own doc comment), so it isn't otherwise reachable.
+    /// this file's own tests can exercise the real handler directly, in addition to through the
+    /// `AddLoadedTeam` dispatch arm below (which now hands it the real `Team` the command
+    /// carries — see `InternalServerCommandAddLoadedTeam::team`).
     pub(crate) add_loaded_team_handler: ServerCommandHandlerAddLoadedTeam,
+    /// The two automated-player-marking handlers (distinct from
+    /// `load_automatic_player_markings_handler`, which serves the client-originated
+    /// `ClientLoadAutomaticPlayerMarkings` command). `pub(crate)` so this file's own tests can
+    /// exercise them directly; both are also reachable via their dispatch arms below now that
+    /// their internal commands carry a typed `AutoMarkingConfig`/`Game`.
+    pub(crate) apply_automated_player_markings_handler: ServerCommandHandlerApplyAutomatedPlayerMarkings,
+    pub(crate) calculate_automatic_player_markings_handler: ServerCommandHandlerCalculateAutomaticPlayerMarkings,
     fumbbl_team_loaded_handler: ServerCommandHandlerFumbblTeamLoaded,
     fumbbl_game_checked_handler: ServerCommandHandlerFumbblGameChecked,
     schedule_game_handler: ServerCommandHandlerScheduleGame,
@@ -386,6 +395,10 @@ impl ServerCommandHandlerFactory {
 
         // ── Game-management handler family ──────────────────────────────────
         let add_loaded_team_handler = ServerCommandHandlerAddLoadedTeam::new();
+        // Each of these owns only an internal `MarkerGenerator::new()` (see their handler
+        // files) — same trivial construction as `add_loaded_team_handler`.
+        let apply_automated_player_markings_handler = ServerCommandHandlerApplyAutomatedPlayerMarkings::new();
+        let calculate_automatic_player_markings_handler = ServerCommandHandlerCalculateAutomaticPlayerMarkings::new();
         let fumbbl_team_loaded_handler = ServerCommandHandlerFumbblTeamLoaded::new();
         let fumbbl_game_checked_handler = ServerCommandHandlerFumbblGameChecked::new();
         let schedule_game_handler = ServerCommandHandlerScheduleGame::new(
@@ -453,6 +466,8 @@ impl ServerCommandHandlerFactory {
             replay_loaded_handler,
             replay_status_handler,
             add_loaded_team_handler,
+            apply_automated_player_markings_handler,
+            calculate_automatic_player_markings_handler,
             fumbbl_team_loaded_handler,
             fumbbl_game_checked_handler,
             schedule_game_handler,
@@ -783,20 +798,12 @@ impl ServerCommandHandlerFactory {
                 self.replay_loaded_handler.handle_command(&cmd, session_id);
             }
             AnyInternalServerCommand::AddLoadedTeam(cmd) => {
-                // java: `handleCommand`'s real logic needs `command.getTeam()` — a `Team`
-                // resolved upstream (in Java, `FumbblRequestLoadTeam`'s HTTP response) before
-                // the command was built. `InternalServerCommandAddLoadedTeam` never grew a
-                // typed `Team` field (see that struct's own doc comment / this handler's own
-                // module doc comment), and no request path in this crate produces one, so
-                // there is no real `Team` to hand `add_loaded_team_handler.handle_command`
-                // here without fabricating one — a narrow, documented gap. The handler itself
-                // is real and directly unit-tested (see this file's own tests, which call
-                // `add_loaded_team_handler` with a real `Team`).
-                log::debug!(
-                    "session {}: game {}: AddLoadedTeam received but its Team payload has no \
-                     typed decode path yet (see ServerCommandHandlerAddLoadedTeam's doc comment)",
-                    session_id, cmd.game_id
-                );
+                // Java: `getServer().getCommunication().handleCommand(...)` for this command runs
+                // `ServerCommandHandlerAddLoadedTeam.handleCommand`, which needs `command.getTeam()`.
+                // The command now carries the real `Team` (parsed upstream in
+                // `FumbblRequestLoadTeam`), so it is handed straight to the handler.
+                let mut gc = self.game_cache.lock().unwrap();
+                self.add_loaded_team_handler.handle_command(&cmd, cmd.team.clone(), &mut gc);
             }
             AnyInternalServerCommand::FumbblTeamLoaded(cmd) => {
                 // Java re-uses the already-connected Jetty `Session`; this crate needs the
@@ -860,30 +867,34 @@ impl ServerCommandHandlerFactory {
             AnyInternalServerCommand::UploadGame(cmd) => {
                 self.upload_game_handler.handle_command(&cmd, session_id);
             }
-            AnyInternalServerCommand::ApplyAutomatedPlayerMarkings(cmd) => {
-                // java: `ServerCommandHandlerApplyAutomatedPlayerMarkings::handle_command` needs
-                // a real `&mut AutoMarkingConfig` (ffb_engine::marking::auto_marking_config), but
-                // `InternalServerCommandApplyAutomatedPlayerMarkings` only carries the config as
-                // an opaque `String` (no serde impl exists yet for `AutoMarkingConfig` — see that
-                // struct's own doc comment) — decoding it here would mean inventing a wire format
-                // that doesn't exist in Java or Rust, so this stays a documented no-op rather than
-                // a fabricated parse. `ServerCommandHandlerApplyAutomatedPlayerMarkings` itself is
-                // still real and unit-tested directly (see its own module).
-                log::debug!(
-                    "session {}: game {}: ApplyAutomatedPlayerMarkings received but its \
-                     AutoMarkingConfig payload has no typed decode path yet",
-                    session_id, cmd.game_id
+            AnyInternalServerCommand::ApplyAutomatedPlayerMarkings(mut cmd) => {
+                // Java: `ServerCommandHandlerApplyAutomatedPlayerMarkings.handleCommand`. The
+                // command now carries a real `AutoMarkingConfig`, so it is applied directly. The
+                // handler reads the game from `game_cache` and both reads the session mode and
+                // sends the resulting markers via `session_manager`; both are held for the
+                // duration of this synchronous call (no `.await` in between).
+                let gc = self.game_cache.lock().unwrap();
+                let sm = self.session_manager.lock().unwrap();
+                self.apply_automated_player_markings_handler.handle_command(
+                    &mut cmd.auto_marking_config,
+                    cmd.game_id,
+                    session_id,
+                    &gc,
+                    &sm,
                 );
             }
-            AnyInternalServerCommand::CalculateAutomaticPlayerMarkings(cmd) => {
-                // java: same gap as `ApplyAutomatedPlayerMarkings` above — both the
-                // `AutoMarkingConfig` and `Game` payloads are opaque `String`s on this internal
-                // command with no typed decode path, so `ServerCommandHandlerCalculateAutomaticPlayerMarkings`
-                // (real and unit-tested on its own) isn't reachable from here yet.
-                log::debug!(
-                    "session {}: CalculateAutomaticPlayerMarkings (index {}) received but its \
-                     AutoMarkingConfig/Game payload has no typed decode path yet",
-                    session_id, cmd.index
+            AnyInternalServerCommand::CalculateAutomaticPlayerMarkings(mut cmd) => {
+                // Java: `ServerCommandHandlerCalculateAutomaticPlayerMarkings.handleCommand`. The
+                // command carries the full `Game` and a real `AutoMarkingConfig`, so no
+                // `game_cache` lookup is needed — only `session_manager` (to send the computed
+                // markings back to the requesting session).
+                let sm = self.session_manager.lock().unwrap();
+                self.calculate_automatic_player_markings_handler.handle_command(
+                    &cmd.game,
+                    &mut cmd.auto_marking_config,
+                    cmd.index,
+                    session_id,
+                    &sm,
                 );
             }
             other => {
@@ -2285,28 +2296,93 @@ mod tests {
         }
     }
 
-    #[test]
-    fn factory_add_loaded_team_handler_adds_a_real_team_via_direct_call() {
-        // The `AddLoadedTeam` dispatch arm is a documented no-op (no `Team` payload on the
-        // wire command — see that arm's own comment), so this exercises the real,
-        // factory-owned handler directly instead, proving it isn't dead code.
+    #[tokio::test]
+    async fn factory_dispatches_add_loaded_team_through_real_handler() {
+        // The `AddLoadedTeam` dispatch arm now hands the handler the real `Team` the command
+        // carries, so dispatching the command end-to-end must actually swap the team into the game.
         let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
         let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
-        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), sm, db());
         let game_id = gc.lock().unwrap().create_game_state();
         gc.lock().unwrap().get_game_state_by_id_mut(game_id).unwrap().start_game(
             gm_team(""), gm_team("away1"), ffb_model::enums::Rules::Bb2025, 0,
         );
 
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), sm, db());
         let cmd = crate::net::commands::internal_server_command_add_loaded_team::InternalServerCommandAddLoadedTeam::new(
-            game_id, "coach".into(), None, vec![],
+            game_id, "coach".into(), None, gm_team("home1"), vec![],
         );
-        let mut gc_guard = gc.lock().unwrap();
-        assert!(factory.add_loaded_team_handler.handle_command(&cmd, gm_team("home1"), &mut gc_guard));
-        drop(gc_guard);
+        factory.handle_command(ReceivedCommand::new_internal(AnyInternalServerCommand::AddLoadedTeam(cmd), 1)).await;
 
         let game = gc.lock().unwrap().get_game_state_by_id(game_id).unwrap().get_game().unwrap().clone();
         assert_eq!(game.team_home.id, "home1");
+    }
+
+    #[tokio::test]
+    async fn factory_dispatches_apply_automated_player_markings_through_real_handler() {
+        use ffb_engine::marking::auto_marking_config::AutoMarkingConfig;
+        use ffb_engine::marking::auto_marking_record::Builder;
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::{SkillId, SkillWithValue};
+        use ffb_model::model::ClientMode;
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let game_id = gc.lock().unwrap().create_game_state();
+        gc.lock().unwrap().get_game_state_by_id_mut(game_id).unwrap().start_game(
+            gm_team("home"), gm_team("away"), ffb_model::enums::Rules::Bb2025, 0,
+        );
+        // A home player with Block so the marking generator produces a non-empty "B" marker.
+        {
+            let mut guard = gc.lock().unwrap();
+            let mut player = Player { id: "p1".into(), ..Default::default() };
+            player.extra_skills.push(SkillWithValue::new(SkillId::Block));
+            guard.get_game_state_by_id_mut(game_id).unwrap().get_game_mut().unwrap().team_home.players.push(player);
+        }
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        sm_arc.lock().unwrap().add_session(1, game_id, "Spec".into(), ClientMode::SPECTATOR, false, vec![], tx);
+
+        let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
+        let mut config = AutoMarkingConfig::new();
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_marking("B").with_gained_only(true).build());
+        let cmd = crate::net::commands::internal_server_command_apply_automated_player_markings::InternalServerCommandApplyAutomatedPlayerMarkings::new(config, game_id);
+        factory.handle_command(ReceivedCommand::new_internal(AnyInternalServerCommand::ApplyAutomatedPlayerMarkings(cmd), 1)).await;
+
+        let sent = rx.try_recv().expect("expected a markers message from the real handler");
+        assert!(sent.contains("\"B\""), "markers message should carry the Block marking: {sent}");
+    }
+
+    #[tokio::test]
+    async fn factory_dispatches_calculate_automatic_player_markings_through_real_handler() {
+        use ffb_engine::marking::auto_marking_config::AutoMarkingConfig;
+        use ffb_engine::marking::auto_marking_record::Builder;
+        use ffb_model::model::game::Game;
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::{SkillId, SkillWithValue};
+        use ffb_model::model::ClientMode;
+        use tokio::sync::mpsc;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm_arc = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        sm_arc.lock().unwrap().add_session(1, 0, "Spec".into(), ClientMode::SPECTATOR, false, vec![], tx);
+
+        let factory = ServerCommandHandlerFactory::new(gc, Arc::clone(&sm_arc), db());
+
+        let mut home = gm_team("home");
+        let mut player = Player { id: "p1".into(), ..Default::default() };
+        player.extra_skills.push(SkillWithValue::new(SkillId::Block));
+        home.players.push(player);
+        let game = Game::new(home, gm_team("away"), ffb_model::enums::Rules::Bb2025);
+
+        let mut config = AutoMarkingConfig::new();
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_marking("B").with_gained_only(true).build());
+        let cmd = crate::net::commands::internal_server_command_calculate_automatic_player_markings::InternalServerCommandCalculateAutomaticPlayerMarkings::new(config, 7, game);
+        factory.handle_command(ReceivedCommand::new_internal(AnyInternalServerCommand::CalculateAutomaticPlayerMarkings(cmd), 1)).await;
+
+        let sent = rx.try_recv().expect("expected a markings message from the real handler");
+        assert!(sent.contains("\"index\":7"), "markings message should carry the index: {sent}");
+        assert!(sent.contains("\"B\""), "markings message should carry the Block marking: {sent}");
     }
 
     #[tokio::test]

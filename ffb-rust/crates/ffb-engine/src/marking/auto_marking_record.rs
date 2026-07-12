@@ -1,4 +1,5 @@
 /// 1:1 translation of com.fumbbl.ffb.server.marking.AutoMarkingRecord.
+use ffb_model::factory::skill_factory::SkillFactory;
 use ffb_model::model::injury_attribute::InjuryAttribute;
 use ffb_model::model::skill_def::SkillId;
 use crate::marking::apply_to::ApplyTo;
@@ -42,6 +43,87 @@ impl AutoMarkingRecord {
     pub fn is_subset_of(&self, other: &AutoMarkingRecord) -> bool {
         self.skills.iter().all(|s| other.skills.contains(s))
             && self.injuries.iter().all(|inj| other.injuries.contains(inj))
+    }
+
+    /// Java: `AutoMarkingRecord.toJsonValue()`.
+    ///
+    /// Keys are the `IJsonOption` constants used in the Java source:
+    /// `SKILL_ARRAY` = `"skillArray"`, `INJURY_ATTRIBUTES` = `"injuryAttributes"`,
+    /// `APPLY_TO` = `"applyTo"`, `GAINED_ONLY` = `"gainedOnly"`, `MARKING` = `"marking"`,
+    /// `APPLY_REPEATEDLY` = `"applyRepeatedly"`.
+    ///
+    /// Java serializes each skill via `UtilJson.toJsonValue(skill)` = `skill.getName()` (the
+    /// human-readable display name). This crate's `SkillId` exposes only the Java class simple
+    /// name (`class_name()`), not a separate `getName()` display-name table, so the class name
+    /// is emitted here; it round-trips through [`Self::from_json`], which resolves names via
+    /// `SkillFactory::for_name` (whose normalisation accepts either form). Java's `applyTo`
+    /// is always non-null in this crate (`ApplyTo` has no null state), so it is always written.
+    pub fn to_json_value(&self) -> serde_json::Value {
+        let mut obj = serde_json::Map::new();
+        let skill_array: Vec<serde_json::Value> = self
+            .skills
+            .iter()
+            .map(|s| serde_json::Value::String(s.class_name().to_string()))
+            .collect();
+        obj.insert("skillArray".to_string(), serde_json::Value::Array(skill_array));
+        let injuries: Vec<serde_json::Value> = self
+            .injuries
+            .iter()
+            .map(|i| serde_json::Value::String(i.get_name().to_string()))
+            .collect();
+        obj.insert("injuryAttributes".to_string(), serde_json::Value::Array(injuries));
+        obj.insert("applyTo".to_string(), serde_json::Value::String(self.apply_to.name().to_string()));
+        obj.insert("gainedOnly".to_string(), serde_json::Value::Bool(self.gained_only));
+        obj.insert("marking".to_string(), serde_json::Value::String(self.marking.clone()));
+        obj.insert("applyRepeatedly".to_string(), serde_json::Value::Bool(self.apply_repeatedly));
+        serde_json::Value::Object(obj)
+    }
+
+    /// Java: `AutoMarkingRecord.initFrom(IFactorySource source, JsonValue jsonValue)`.
+    ///
+    /// Field order and semantics mirror the Java source: skills, then (optional) `applyTo`,
+    /// `gainedOnly`, `marking`, `applyRepeatedly`, then injuries. Skill names are resolved via
+    /// `SkillFactory::for_name` (Java: `UtilJson.toEnumWithName(skillFactory, ...)` →
+    /// `skillFactory.forName(name)`); a name the factory cannot resolve is skipped (Java would
+    /// add a `null` skill — this crate has no null `SkillId`, so it drops it rather than
+    /// fabricating one). `applyTo` is only overwritten when present (Java:
+    /// `IJsonOption.APPLY_TO.isDefinedIn(jsonObject)`), otherwise the `ApplyTo::Both` default
+    /// from `new()` stands.
+    pub fn from_json(json: &serde_json::Value) -> Self {
+        let factory = SkillFactory::new();
+        let mut record = AutoMarkingRecord::new();
+
+        if let Some(arr) = json.get("skillArray").and_then(|v| v.as_array()) {
+            for value in arr {
+                if let Some(name) = value.as_str() {
+                    if let Some(skill) = factory.for_name(name) {
+                        record.skills.push(skill);
+                    }
+                }
+            }
+        }
+
+        if let Some(name) = json.get("applyTo").and_then(|v| v.as_str()) {
+            if let Some(apply_to) = ApplyTo::value_of(name) {
+                record.apply_to = apply_to;
+            }
+        }
+
+        record.gained_only = json.get("gainedOnly").and_then(|v| v.as_bool()).unwrap_or(false);
+        record.marking = json.get("marking").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        record.apply_repeatedly = json.get("applyRepeatedly").and_then(|v| v.as_bool()).unwrap_or(false);
+
+        if let Some(arr) = json.get("injuryAttributes").and_then(|v| v.as_array()) {
+            for value in arr {
+                if let Some(name) = value.as_str() {
+                    if let Some(injury) = InjuryAttribute::for_name(name) {
+                        record.injuries.push(injury);
+                    }
+                }
+            }
+        }
+
+        record
     }
 }
 
@@ -191,5 +273,72 @@ mod tests {
         other.injuries.push(InjuryAttribute::AV);
 
         assert!(r.is_subset_of(&other));
+    }
+
+    #[test]
+    fn to_json_value_uses_java_option_keys() {
+        let record = Builder::new()
+            .with_skill(SkillId::Block)
+            .with_injury(InjuryAttribute::NI)
+            .with_marking("B")
+            .with_gained_only(true)
+            .with_apply_repeatedly(true)
+            .with_apply_to(ApplyTo::Opponent)
+            .build();
+        let json = record.to_json_value();
+        assert_eq!(json["skillArray"], serde_json::json!(["Block"]));
+        assert_eq!(json["injuryAttributes"], serde_json::json!(["NI"]));
+        assert_eq!(json["applyTo"], "OPPONENT");
+        assert_eq!(json["gainedOnly"], true);
+        assert_eq!(json["marking"], "B");
+        assert_eq!(json["applyRepeatedly"], true);
+    }
+
+    #[test]
+    fn from_json_reads_all_fields() {
+        let json = serde_json::json!({
+            "skillArray": ["Block", "Tackle"],
+            "injuryAttributes": ["MA", "AV"],
+            "applyTo": "OWN",
+            "gainedOnly": true,
+            "marking": "BT",
+            "applyRepeatedly": true,
+        });
+        let record = AutoMarkingRecord::from_json(&json);
+        assert_eq!(record.skills, vec![SkillId::Block, SkillId::Tackle]);
+        assert_eq!(record.injuries, vec![InjuryAttribute::MA, InjuryAttribute::AV]);
+        assert_eq!(record.apply_to(), ApplyTo::Own);
+        assert!(record.is_gained_only());
+        assert_eq!(record.marking(), "BT");
+        assert!(record.is_apply_repeatedly());
+    }
+
+    #[test]
+    fn from_json_defaults_apply_to_both_when_absent() {
+        let json = serde_json::json!({ "skillArray": ["Block"], "marking": "B" });
+        let record = AutoMarkingRecord::from_json(&json);
+        assert_eq!(record.apply_to(), ApplyTo::Both);
+        assert!(!record.is_gained_only());
+    }
+
+    #[test]
+    fn from_json_skips_unresolvable_skill_names() {
+        let json = serde_json::json!({ "skillArray": ["Block", "NoSuchSkillXyz"] });
+        let record = AutoMarkingRecord::from_json(&json);
+        assert_eq!(record.skills, vec![SkillId::Block]);
+    }
+
+    #[test]
+    fn json_round_trip_preserves_record() {
+        let original = Builder::new()
+            .with_skill(SkillId::Block)
+            .with_skill(SkillId::Tackle)
+            .with_injury(InjuryAttribute::NI)
+            .with_marking("BT")
+            .with_gained_only(true)
+            .with_apply_to(ApplyTo::Own)
+            .build();
+        let restored = AutoMarkingRecord::from_json(&original.to_json_value());
+        assert_eq!(restored, original);
     }
 }

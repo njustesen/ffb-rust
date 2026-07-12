@@ -1,18 +1,22 @@
 /// 1:1 translation of com.fumbbl.ffb.server.net.commands.InternalServerCommandApplyAutomatedPlayerMarkings.
-/// AutoMarkingConfig stored as opaque String; full type not yet available.
+use ffb_engine::marking::auto_marking_config::AutoMarkingConfig;
 use super::internal_server_command::InternalServerCommand;
 
 pub struct InternalServerCommandApplyAutomatedPlayerMarkings {
+    /// Java: `autoMarkingConfig` — a real, already-parsed config (built server-side in
+    /// `FumbblRequestLoadPlayerMarkings` before this command is dispatched).
+    pub auto_marking_config: AutoMarkingConfig,
     pub game_id: i64,
-    pub auto_marking_config: String,
 }
 
 impl InternalServerCommandApplyAutomatedPlayerMarkings {
-    pub fn new(game_id: i64, auto_marking_config: String) -> Self {
-        Self { game_id, auto_marking_config }
+    /// Java constructor order: `(autoMarkingConfig, gameId)`.
+    pub fn new(auto_marking_config: AutoMarkingConfig, game_id: i64) -> Self {
+        Self { auto_marking_config, game_id }
     }
 
-    pub fn get_auto_marking_config(&self) -> &str {
+    /// Java: `getAutoMarkingConfig()`.
+    pub fn get_auto_marking_config(&self) -> &AutoMarkingConfig {
         &self.auto_marking_config
     }
 }
@@ -31,32 +35,38 @@ impl InternalServerCommand for InternalServerCommandApplyAutomatedPlayerMarkings
 mod tests {
     use super::*;
 
+    fn config() -> AutoMarkingConfig {
+        let mut c = AutoMarkingConfig::new();
+        c.set_separator("/");
+        c
+    }
+
     #[test]
     fn construct() {
-        let _ = InternalServerCommandApplyAutomatedPlayerMarkings::new(1, "cfg".to_string());
+        let _ = InternalServerCommandApplyAutomatedPlayerMarkings::new(config(), 1);
     }
 
     #[test]
     fn get_id() {
-        let c = InternalServerCommandApplyAutomatedPlayerMarkings::new(1, "cfg".to_string());
+        let c = InternalServerCommandApplyAutomatedPlayerMarkings::new(config(), 1);
         assert_eq!(c.get_id(), "internalApplyAutomaticPlayerMarkings");
     }
 
     #[test]
     fn get_game_id() {
-        let c = InternalServerCommandApplyAutomatedPlayerMarkings::new(7, "cfg".to_string());
+        let c = InternalServerCommandApplyAutomatedPlayerMarkings::new(config(), 7);
         assert_eq!(c.get_game_id(), 7);
     }
 
     #[test]
     fn is_internal() {
-        let c = InternalServerCommandApplyAutomatedPlayerMarkings::new(1, "cfg".to_string());
+        let c = InternalServerCommandApplyAutomatedPlayerMarkings::new(config(), 1);
         assert!(c.is_internal());
     }
 
     #[test]
     fn get_auto_marking_config() {
-        let c = InternalServerCommandApplyAutomatedPlayerMarkings::new(1, "myConfig".to_string());
-        assert_eq!(c.get_auto_marking_config(), "myConfig");
+        let c = InternalServerCommandApplyAutomatedPlayerMarkings::new(config(), 1);
+        assert_eq!(c.get_auto_marking_config().get_separator(), "/");
     }
 }
