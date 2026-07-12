@@ -144,11 +144,12 @@ impl RollMechanicTrait for RollMechanic {
         &self,
         _game: &Game,
         ctx: &mut InjuryContext,
-        _defender: &Player,
+        defender: &Player,
         _is_decay_roll: bool,
     ) -> Option<PlayerState> {
         let roll = ctx.casualty_roll?;
-        // TODO: CasualtyModifierFactory not yet translated; no modifiers applied
+        let modifiers = ffb_mechanics::modifiers::CasualtyModifierFactory::new().find_modifiers(defender);
+        ctx.add_casualty_modifiers(modifiers);
         let total = roll[0] + ctx.casualty_modifier_sum();
         Some(PlayerState::new(map_casualty_roll_bb2025(total)))
     }

@@ -1,37 +1,21 @@
 use crate::client::report::report_message_base::ReportMessage;
 use crate::client::status_report::StatusReport;
 use crate::client::text_style::TextStyle;
+use ffb_model::factory::bb2025::prayer_factory::PrayerFactory as Bb2025PrayerFactory;
+use ffb_model::factory::prayer_factory::PrayerFactory as PrayerFactoryTrait;
 use ffb_model::inducement::bb2025::prayer::Prayer;
 use ffb_model::model::game::Game;
 use ffb_model::report::bb2025::report_prayer_roll::ReportPrayerRoll;
 use ffb_model::report::report_id::ReportId;
 
 /// Java: `game.<PrayerFactory>getFactory(FactoryType.Factory.PRAYER).forRoll(roll)`.
-/// `ffb_model::factory::bb2025::prayer_factory::PrayerFactory` and the root
-/// `ffb_model::factory::prayer_factory::PrayerFactory` are still unimplemented stubs (no
-/// `prayers` map, no `for_roll`), so this transcribes the roll table straight from
-/// `com.fumbbl.ffb.inducement.bb2025.Prayers.java` (the fixed BB2025 d16 prayer-to-Nuffle
-/// table) rather than fabricating a mapping.
+/// `ffb_model::factory::bb2025::prayer_factory::PrayerFactory` is now a real translation
+/// (no game-option dependency for BB2025, unlike BB2020's league-table branch), so this
+/// constructs and initializes it directly rather than duplicating its roll table.
 fn for_roll(roll: i32) -> Option<Prayer> {
-    match roll {
-        1 => Some(Prayer::TREACHEROUS_TRAPDOOR),
-        2 => Some(Prayer::FRIENDS_WITH_THE_REF),
-        3 => Some(Prayer::STILETTO),
-        4 => Some(Prayer::IRON_MAN),
-        5 => Some(Prayer::KNUCKLE_DUSTERS),
-        6 => Some(Prayer::BAD_HABITS),
-        7 => Some(Prayer::GREASY_CLEATS),
-        8 => Some(Prayer::BLESSED_STATUE_OF_NUFFLE),
-        9 => Some(Prayer::MOLES_UNDER_THE_PITCH),
-        10 => Some(Prayer::PERFECT_PASSING),
-        11 => Some(Prayer::DAZZLING_CATCHING),
-        12 => Some(Prayer::FAN_INTERACTION),
-        13 => Some(Prayer::FOULING_FRENZY),
-        14 => Some(Prayer::THROW_A_ROCK),
-        15 => Some(Prayer::UNDER_SCRUTINY),
-        16 => Some(Prayer::INTENSIVE_TRAINING),
-        _ => None,
-    }
+    let mut factory = Bb2025PrayerFactory::new();
+    factory.initialize();
+    factory.for_roll(roll)
 }
 
 pub struct PrayerRollMessage;

@@ -1,6 +1,84 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-12, Phase AAD done — closed the last handler gaps and two documented behavioral approximations. **32/32 real `ServerCommandHandler*` structs are now reachable from live dispatch (up from 29/32); the `ActingPlayer.mustCompleteAction`/`SwarmingLogicModule` LINEMAN-check hardcoded-`false` approximations are now real; one genuine bug found and fixed in `step_init_throw_team_mate.rs`.**)
+## Current Status (2026-07-12, Phase AAE done — closed the `FumbblRequest*` dispatch-tail gap named in Phase AAD Step 1, translated the 2 real remaining `ffb-model/factory` stub gaps (`PrayerFactory`, `CasualtyModifierFactory`), and deleted 11 confirmed-orphaned duplicate stub files. **Also surfaced a significant, previously-undocumented tracker-accuracy problem: 72 of 91 `ffb-model/src/factory/*.rs` paths marked `✓` in the tracker point to files that don't exist — the real translations live in `ffb-mechanics` (moved there in a past architecture change, e.g. Phase ZZ's 55-stub cleanup) or as inherent enum methods, and the tracker rows were never updated to match. This session fixed the ~15 rows it touched directly; the other ~57 are flagged, unverified, for a future dedicated tracker-accuracy audit — see below.**)
+
+Plan: `docs/PHASE_AAE_PLAN.md` isn't written (this was a plan-mode session, not a phase-doc session) —
+see the plan file passed to `ExitPlanMode` for the original scoping. The plan's premise (translate 13
+`ffb-model/src/factory/*` stub files) was revised mid-session after investigation showed most were
+dead code, not real gaps — see below.
+
+**What actually happened, in order:**
+1. **Investigated the 13 stub files** named in the original plan (armor/injury modifiers ×3 rulesets,
+   jump modifier ×2, go-for-it, casualty-modifier, net-command-id, prayer-factory ×3). Found **11 were
+   confirmed-orphaned dead code** — not even wired into `factory/mod.rs`'s module tree (so not
+   compiled at all), fully superseded by real, tested code in `ffb-mechanics/src/modifiers/*`
+   (`ArmorModifierFactory`, `InjuryModifierFactory`, `JumpModifierFactory`, `GoForItModifierFactory`
+   and their per-ruleset collections) or by `NetCommandId::from_name` in `ffb-model/src/enums/net.rs`.
+   Confirmed with the user before deleting (per the codebase's git-safety convention for irreversible
+   actions) and removed all 11 (`git rm`), along with their now-empty `mod.rs` files.
+2. **Translated the 2 genuine gaps for real:**
+   - `PrayerFactory` (Java abstract base + bb2020/bb2025 concrete subclasses) — ported as a Rust
+     trait (`ffb_model::factory::prayer_factory::PrayerFactory`, generic over the concrete ruleset's
+     `Prayer` enum type since Rust has no inheritance and bb2020/bb2025 `Prayer` are distinct enums)
+     with `bb2020`/`bb2025` concrete impls. Wired into all 3 places that were previously working
+     around the stub (`prayer_roll_message.rs` ×2, `talk_handler_prayer.rs`), replacing hand-duplicated
+     roll tables with real factory calls (bb2020's league-table game-option check now reads
+     `GameOptionId::INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE` via `GameOptions::get_option_with_default`,
+     matching Java exactly). 15 new unit tests.
+   - `CasualtyModifierFactory` — Java's `findModifiers` only ever produces a niggling-injury modifier
+     in practice (no real skill subclass overrides the per-skill hook), confirmed by grep across the
+     whole Java source before implementing — not a simplification. Placed in
+     `ffb-mechanics/src/modifiers/casualty_modifier_factory.rs` (not `ffb-model`, since it must produce
+     `ffb_mechanics::modifiers::Modifier` values used by `ffb-engine`'s `InjuryContext` — the stub's
+     original location in `ffb-model` was itself part of the mislocation problem below). Wired into
+     both `bb2020`/`bb2025` `roll_mechanic.rs`'s previously-`TODO`'d casualty-modifier gap. 8 new tests.
+3. **Wired all 3 `FumbblRequest*` dispatch-tail gaps** named in Phase AAD Step 1 (`FumbblRequestLoadTeam`,
+   `FumbblRequestLoadPlayerMarkings`, `FumbblRequestLoadPlayerMarkingsForGameVersion` — each parsed its
+   HTTP response but discarded the result instead of dispatching an `InternalServerCommand*`):
+   - `ServerCommandHandlerLoadAutomaticPlayerMarkings` — fully wired (the client command already
+     carries an optional `Game`, and the handler already had a `dispatch_tx`), redispatches
+     `InternalServerCommandCalculateAutomaticPlayerMarkings` for real.
+   - `MarkerLoadingService::load_marker_auto` — added an optional `MarkerDispatch` (dispatch
+     channel + session id + game id); when present, redispatches
+     `InternalServerCommandApplyAutomatedPlayerMarkings` for real. Its only current caller
+     (`server_start_game.rs`) doesn't yet thread a dispatch channel through its own call chain
+     (`MarkerContext`), so it passes `None` today — a narrower, separately-scoped follow-up, not
+     "the redispatch doesn't exist."
+   - `FumbblRequestLoadTeam` — added a `game_id` field (Java's `fGameState`, previously missing
+     entirely) and a new `QueuedFumbblRequestLoadTeam` `ServerRequest` adapter (this type had zero
+     real callers before or after; the adapter is real and tested, ready to be wired in once a caller
+     exists).
+   - 12 new unit tests total across the 3, each proving the internal command is actually enqueued
+     with the right fields (not just parsed).
+4. **Fixed tracker staleness directly touched by the above**: flipped `xml/XmlHandler.java`,
+   `xml/IXmlReadable.java`, `xml/UtilXml.java` from `—` to `✓` (real, ported in Phase ZY, just never
+   updated in the tracker); corrected ~15 `factory/*` rows' Rust Crate/Target columns from the
+   nonexistent `ffb-model` paths to their real `ffb-mechanics` locations (or `NetCommandId::from_name`
+   for the net-command-id one); marked `factory/bb2016/JumpModifierFactory.java` `~` rather than a
+   false `✓` (bb2016 has its own distinct Java class with different context-check overrides that
+   aren't confirmed to be faithfully mirrored by the shared `ffb-mechanics` factory — unverified, not
+   fabricated).
+
+**Newly-discovered, NOT fixed this session — flagged for a dedicated future audit:** while fixing the
+13 originally-scoped rows, a **grep across the entire tracker for `ffb-model`+`src/factory/*.rs` paths
+marked `✓` found 72 of 91 such rows point to files that don't exist anywhere in the crate.** Spot
+checks suggest most are the same "moved to `ffb-mechanics` (or became an inherent enum method) and the
+tracker was never updated" pattern as this session's confirmed cases, rather than genuinely missing
+translations — but this is **unverified for the other ~57 rows** and should not be assumed safe
+without checking each one individually (some could be genuine gaps mislabeled `✓`, which would be a
+correctness-relevant finding, not just paperwork). Recommended next step: a dedicated audit pass
+(likely scriptable — cross-reference every tracker row's claimed Rust path against the actual
+filesystem, then classify each miss as "moved" vs. "genuinely missing") before trusting the tracker's
+`✓` counts at face value for anything under `factory/`.
+
+Tests: 17,359 → **17,387** (+28 net: +8 casualty, +15 prayer, +1 load-automatic-markings dispatch,
++1 marker-loading dispatch, +3 fumbbl-load-team — no tests were lost from the 11 deletions since the
+orphaned stubs never had any). 0 failures. No parity/integration testing this session (per
+instruction).
+
+---
+
+## Prior Status (2026-07-12, Phase AAD done — closed the last handler gaps and two documented behavioral approximations. **32/32 real `ServerCommandHandler*` structs are now reachable from live dispatch (up from 29/32); the `ActingPlayer.mustCompleteAction`/`SwarmingLogicModule` LINEMAN-check hardcoded-`false` approximations are now real; one genuine bug found and fixed in `step_init_throw_team_mate.rs`.**)
 
 **Approach:** 1:1 Java-to-Rust translation. Every Java class → one Rust file, written directly from Java source. No reactive parity fixes.
 

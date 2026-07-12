@@ -171,12 +171,16 @@ pub async fn send_server_join(
                 None
             };
             if let (Some(sort_mode), Some(ctx)) = (sort_mode, &marker_ctx) {
+                // `dispatch` is `None`: this call chain doesn't thread a
+                // `mpsc::UnboundedSender<ReceivedCommand>` through `MarkerContext` yet — see
+                // `MarkerDispatch`'s doc comment in `marker_loading_service.rs`.
                 MarkerLoadingService::new().load_marker_auto(
                     ctx.request_processor,
                     Arc::clone(&ctx.client),
                     ctx.markings_url_template,
                     coach.clone(),
                     sort_mode,
+                    None,
                 );
             }
         }
@@ -397,6 +401,7 @@ async fn dispatch_marker_load(
                 ctx.markings_url_template,
                 coach.to_string(),
                 sort_mode,
+                None,
             );
         }
     } else if !team_id.is_empty() {

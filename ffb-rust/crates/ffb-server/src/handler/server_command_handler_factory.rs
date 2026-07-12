@@ -356,6 +356,7 @@ impl ServerCommandHandlerFactory {
             Arc::clone(&markings_request_processor),
             Arc::clone(&markings_http_client),
             markings_url_template,
+            dispatch_tx.clone(),
         );
 
         // ── Replay handler family ───────────────────────────────────────────

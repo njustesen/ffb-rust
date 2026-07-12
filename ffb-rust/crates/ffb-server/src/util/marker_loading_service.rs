@@ -30,33 +30,62 @@
 /// threaded through explicitly here instead of derived from a `GameState`/`Session`.
 use std::sync::{Arc, Mutex};
 
+use tokio::sync::mpsc;
+
 use ffb_model::marking::sort_mode::SortMode;
 use mysql_async::{Conn, Error as DbError};
 
 use crate::db::query::db_player_markers_query::DbPlayerMarkersQuery;
+use crate::model::received_command::{ReceivedCommand, SessionId};
+use crate::net::commands::any_internal_server_command::AnyInternalServerCommand;
+use crate::net::commands::internal_server_command_apply_automated_player_markings::InternalServerCommandApplyAutomatedPlayerMarkings;
 use crate::request::fumbbl::util_fumbbl_request::HttpClient;
 use crate::request::server_request::ServerRequest;
 use crate::request::server_request_processor::ServerRequestProcessor;
 
-/// `ServerRequest` adapter that performs the portable piece of
-/// `FumbblRequestLoadPlayerMarkings.process` — the HTTP fetch — matching the pattern used
-/// by `QueuedLoadAutomaticPlayerMarkingsRequest` in
-/// `handler/server_command_handler_load_automatic_player_markings.rs`. Applying the result
-/// to the session's marking config afterward is the still-missing tail step.
+/// Destination for the real `InternalServerCommandApplyAutomatedPlayerMarkings` redispatch —
+/// `game_id` matches Java's `gameState.getId()`, threaded through explicitly (this crate's
+/// established convention) rather than derived from a `GameState`/`Session` reference.
+pub struct MarkerDispatch {
+    pub dispatch_tx: mpsc::UnboundedSender<ReceivedCommand>,
+    pub session_id: SessionId,
+    pub game_id: i64,
+}
+
+/// `ServerRequest` adapter around `FumbblRequestLoadPlayerMarkings.process` — matching the
+/// pattern used by `QueuedLoadAutomaticPlayerMarkingsRequest` in
+/// `handler/server_command_handler_load_automatic_player_markings.rs`. Java applies the
+/// fetched config to the session's marking config and dispatches
+/// `InternalServerCommandApplyAutomatedPlayerMarkings`; the latter is real here (see
+/// `dispatch`), but `load_marker_auto`'s only current caller
+/// (`util/server_start_game.rs::send_server_join`) does not yet thread a game id/dispatch
+/// channel through its own call chain (`MarkerContext`), so `dispatch` is `None` there today
+/// — a narrower, separately-scoped wiring gap than "the redispatch doesn't exist."
 struct QueuedLoadPlayerMarkingsRequest {
     request: Mutex<crate::request::fumbbl::fumbbl_request_load_player_markings::FumbblRequestLoadPlayerMarkings>,
     client: Arc<dyn HttpClient + Send + Sync>,
     markings_url_template: String,
     coach: String,
-    /// Java: `sortMode`, passed through to the (unwired) apply-result step.
+    /// Java: `sortMode` — applied to the session's marking config, which this crate has no
+    /// equivalent for yet (same gap as the rest of this struct's session plumbing).
     #[allow(dead_code)]
     sort_mode: SortMode,
+    dispatch: Option<MarkerDispatch>,
 }
 
 impl ServerRequest for QueuedLoadPlayerMarkingsRequest {
     fn process(&self) -> Result<(), String> {
-        let mut request = self.request.lock().unwrap();
-        request.process(self.client.as_ref(), &self.markings_url_template, &self.coach)?;
+        let config = {
+            let mut request = self.request.lock().unwrap();
+            request.process(self.client.as_ref(), &self.markings_url_template, &self.coach)?
+        };
+        if let (Some(config), Some(dispatch)) = (config, &self.dispatch) {
+            let cmd = InternalServerCommandApplyAutomatedPlayerMarkings::new(config, dispatch.game_id);
+            let _ = dispatch.dispatch_tx.send(ReceivedCommand::new_internal(
+                AnyInternalServerCommand::ApplyAutomatedPlayerMarkings(cmd),
+                dispatch.session_id,
+            ));
+        }
         Ok(())
     }
 
@@ -86,6 +115,7 @@ impl MarkerLoadingService {
         markings_url_template: impl Into<String>,
         coach: impl Into<String>,
         sort_mode: SortMode,
+        dispatch: Option<MarkerDispatch>,
     ) -> bool {
         let request = Box::new(QueuedLoadPlayerMarkingsRequest {
             request: Mutex::new(crate::request::fumbbl::fumbbl_request_load_player_markings::FumbblRequestLoadPlayerMarkings::new()),
@@ -93,6 +123,7 @@ impl MarkerLoadingService {
             markings_url_template: markings_url_template.into(),
             coach: coach.into(),
             sort_mode,
+            dispatch,
         });
         request_processor.lock().unwrap().add(request)
     }
@@ -117,6 +148,7 @@ impl Default for MarkerLoadingService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::net::commands::internal_server_command::InternalServerCommand;
     use crate::request::fumbbl::util_fumbbl_request::MockHttpClient;
 
     #[test]
@@ -137,6 +169,7 @@ mod tests {
             "http://fumbbl/markings/$1",
             "Kalimar",
             SortMode::Default,
+            None,
         );
 
         assert!(enqueued);
@@ -156,8 +189,42 @@ mod tests {
             "http://fumbbl/markings/$1",
             "Kalimar",
             SortMode::Default,
+            None,
         );
 
         assert!(!enqueued);
+    }
+
+    #[test]
+    fn load_marker_auto_with_dispatch_redispatches_apply_automated_player_markings() {
+        let service = MarkerLoadingService::new();
+        let processor = Arc::new(Mutex::new(ServerRequestProcessor::new()));
+        let client: Arc<dyn HttpClient + Send + Sync> = Arc::new(MockHttpClient {
+            response: Ok(r#"{"autoMarkingSeparator":"-","autoMarkingRecords":[]}"#.to_string()),
+        });
+        let (dispatch_tx, mut dispatch_rx) = mpsc::unbounded_channel();
+
+        let enqueued = service.load_marker_auto(
+            &processor,
+            client,
+            "http://fumbbl/markings/$1",
+            "Kalimar",
+            SortMode::Default,
+            Some(MarkerDispatch { dispatch_tx, session_id: 3, game_id: 42 }),
+        );
+        assert!(enqueued);
+        assert!(processor.lock().unwrap().run().is_ok());
+
+        let received = dispatch_rx.try_recv().expect("expected a redispatched ApplyAutomatedPlayerMarkings command");
+        assert_eq!(received.session_id, 3);
+        match received.command {
+            crate::model::received_command::ReceivedNetCommand::Internal(
+                AnyInternalServerCommand::ApplyAutomatedPlayerMarkings(cmd),
+            ) => {
+                assert_eq!(cmd.get_game_id(), 42);
+                assert_eq!(cmd.get_auto_marking_config().get_separator(), "-");
+            }
+            _ => panic!("expected an internal ApplyAutomatedPlayerMarkings command"),
+        }
     }
 }

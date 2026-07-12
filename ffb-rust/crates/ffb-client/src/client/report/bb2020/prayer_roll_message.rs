@@ -2,7 +2,6 @@ use crate::client::report::report_message_base::ReportMessage;
 use crate::client::status_report::StatusReport;
 use crate::client::text_style::TextStyle;
 use ffb_model::inducement::bb2020::prayer::Prayer;
-use ffb_model::inducement::bb2020::prayers::Prayers;
 use ffb_model::model::game::Game;
 use ffb_model::report::bb2020::report_prayer_roll::ReportPrayerRoll;
 use ffb_model::report::report_id::ReportId;
@@ -65,12 +64,17 @@ impl ReportMessage for PrayerRollMessage {
         ReportId::PRAYER_ROLL
     }
 
-    fn render(&self, status_report: &mut StatusReport, _game: &Game, report: &Self::Report) {
+    fn render(&self, status_report: &mut StatusReport, game: &Game, report: &Self::Report) {
         // java: game.<PrayerFactory>getFactory(FactoryType.Factory.PRAYER).forRoll(report.getRoll())
-        // The Rust PrayerFactory (crates/ffb-model/src/factory/bb2020/prayer_factory.rs) is still
-        // a stub with no `for_roll` lookup; `Prayers::get_prayer(roll)` (the underlying bb2020
-        // roll table) is the reachable 1:1 equivalent.
-        let prayer = Prayers::new().get_prayer(report.get_roll());
+        // Java: `((GameOptionBoolean) game.getOptions().getOptionWithDefault(...)).isEnabled()`.
+        let use_league_table = game
+            .options
+            .get_option_with_default(ffb_model::option::game_option_id::GameOptionId::INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE)
+            .get_value_as_string()
+            == "true";
+        let mut factory = ffb_model::factory::bb2020::prayer_factory::PrayerFactory::new();
+        factory.initialize(use_league_table);
+        let prayer = ffb_model::factory::prayer_factory::PrayerFactory::for_roll(&factory, report.get_roll());
 
         status_report.println_indent_style(
             status_report.get_indent(),

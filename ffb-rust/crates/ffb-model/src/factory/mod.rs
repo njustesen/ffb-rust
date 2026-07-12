@@ -3,6 +3,9 @@ pub mod i_named_object_factory;
 pub mod i_roll_modifier_factory;
 pub mod i_factory_source;
 
+pub mod bb2020;
+pub mod bb2025;
+
 pub mod block_result_factory;
 pub mod client_mode_factory;
 pub mod game_option_factory;

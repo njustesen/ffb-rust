@@ -953,17 +953,17 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `factory/AnimationTypeFactory.java` | `ffb-model` | `src/factory/animation_type_factory.rs` | ✓ |
 | `factory/ApothecaryModeFactory.java` | `ffb-model` | `src/factory/apothecary_mode_factory.rs` | ✓ |
 | `factory/ApothecaryStatusFactory.java` | `ffb-model` | `src/factory/apothecary_status_factory.rs` | ✓ |
-| `factory/application/NetCommandIdFactory.java` | `ffb-model` | `src/factory/application/net_command_id_factory.rs` | ✓ |
-| `factory/ArmorModifierFactory.java` | `ffb-model` | `src/factory/armor_modifier_factory.rs` | ✓ |
-| `factory/ArmorModifiers.java` | `ffb-model` | `src/factory/armor_modifiers.rs` | ✓ |
-| `factory/bb2016/ArmorModifiers.java` | `ffb-model` | `src/factory/bb2016/armor_modifiers.rs` | ✓ |
-| `factory/bb2016/InjuryModifiers.java` | `ffb-model` | `src/factory/bb2016/injury_modifiers.rs` | ✓ |
-| `factory/bb2016/JumpModifierFactory.java` | `ffb-model` | `src/factory/bb2016/jump_modifier_factory.rs` | ✓ |
-| `factory/bb2020/ArmorModifiers.java` | `ffb-model` | `src/factory/bb2020/armor_modifiers.rs` | ✓ |
-| `factory/bb2020/InjuryModifiers.java` | `ffb-model` | `src/factory/bb2020/injury_modifiers.rs` | ✓ |
+| `factory/application/NetCommandIdFactory.java` | `ffb-model` | `src/enums/net.rs` (`NetCommandId::from_name`) | ✓ |
+| `factory/ArmorModifierFactory.java` | `ffb-mechanics` | `src/modifiers/armor_modifier_factory.rs` | ✓ |
+| `factory/ArmorModifiers.java` | `ffb-mechanics` | `src/modifiers/armor_modifiers.rs` | ✓ |
+| `factory/bb2016/ArmorModifiers.java` | `ffb-mechanics` | `src/modifiers/bb2016/armor_modifiers.rs` | ✓ |
+| `factory/bb2016/InjuryModifiers.java` | `ffb-mechanics` | `src/modifiers/bb2016/injury_modifiers.rs` | ✓ |
+| `factory/bb2016/JumpModifierFactory.java` | `ffb-mechanics` | `src/modifiers/jump_modifier_factory.rs` | `~` |
+| `factory/bb2020/ArmorModifiers.java` | `ffb-mechanics` | `src/modifiers/bb2020/armor_modifiers.rs` | ✓ |
+| `factory/bb2020/InjuryModifiers.java` | `ffb-mechanics` | `src/modifiers/bb2020/injury_modifiers.rs` | ✓ |
 | `factory/bb2020/PrayerFactory.java` | `ffb-model` | `src/factory/bb2020/prayer_factory.rs` | ✓ |
-| `factory/bb2025/ArmorModifiers.java` | `ffb-model` | `src/factory/bb2025/armor_modifiers.rs` | ✓ |
-| `factory/bb2025/InjuryModifiers.java` | `ffb-model` | `src/factory/bb2025/injury_modifiers.rs` | ✓ |
+| `factory/bb2025/ArmorModifiers.java` | `ffb-mechanics` | `src/modifiers/bb2025/armor_modifiers.rs` | ✓ |
+| `factory/bb2025/InjuryModifiers.java` | `ffb-mechanics` | `src/modifiers/bb2025/injury_modifiers.rs` | ✓ |
 | `factory/bb2025/PrayerFactory.java` | `ffb-model` | `src/factory/bb2025/prayer_factory.rs` | ✓ |
 | `factory/BlockResultFactory.java` | `ffb-model` | `src/factory/block_result_factory.rs` | ✓ |
 | `factory/CardEffectFactory.java` | `ffb-model` | `src/factory/card_effect_factory.rs` | ✓ |
@@ -973,7 +973,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `factory/CatchScatterThrowInModeFactory.java` | `ffb-model` | `src/factory/catch_scatter_throw_in_mode_factory.rs` | ✓ |
 | `factory/ClientModeFactory.java` | `ffb-model` | `src/factory/client_mode_factory.rs` | ✓ |
 | `factory/ClientStateIdFactory.java` | `ffb-model` | `src/factory/client_state_id_factory.rs` | ✓ |
-| `factory/common/GoForItModifierFactory.java` | `ffb-model` | `src/factory/common/go_for_it_modifier_factory.rs` | ✓ |
+| `factory/common/GoForItModifierFactory.java` | `ffb-mechanics` | `src/modifiers/go_for_it_modifier_factory.rs` | ✓ |
 | `factory/ConcedeGameStatusFactory.java` | `ffb-model` | `src/factory/concede_game_status_factory.rs` | ✓ |
 | `factory/DialogIdFactory.java` | `ffb-model` | `src/factory/dialog_id_factory.rs` | ✓ |
 | `factory/DirectionFactory.java` | `ffb-model` | `src/factory/direction_factory.rs` | ✓ |
@@ -989,18 +989,18 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `factory/INamedObjectFactory.java` | `ffb-model` | `src/factory/i_named_object_factory.rs` | ✓ |
 | `factory/InducementPhaseFactory.java` | `ffb-model` | `src/factory/inducement_phase_factory.rs` | ✓ |
 | `factory/InducementTypeFactory.java` | `ffb-model` | `src/factory/inducement_type_factory.rs` | ✓ |
-| `factory/InjuryModifierFactory.java` | `ffb-model` | `src/factory/injury_modifier_factory.rs` | ✓ |
-| `factory/InjuryModifiers.java` | `ffb-model` | `src/factory/injury_modifiers.rs` | ✓ |
+| `factory/InjuryModifierFactory.java` | `ffb-mechanics` | `src/modifiers/injury_modifier_factory.rs` | ✓ |
+| `factory/InjuryModifiers.java` | `ffb-mechanics` | `src/modifiers/injury_modifiers.rs` | ✓ |
 | `factory/InjuryTypeFactory.java` | `ffb-model` | `src/factory/injury_type_factory.rs` | ✓ |
 | `factory/InterceptionModifierFactory.java` | `ffb-model` | `src/factory/interception_modifier_factory.rs` | ✓ |
 | `factory/IRollModifierFactory.java` | `ffb-model` | `src/factory/i_roll_modifier_factory.rs` | ✓ |
-| `factory/JumpModifierFactory.java` | `ffb-model` | `src/factory/jump_modifier_factory.rs` | ✓ |
+| `factory/JumpModifierFactory.java` | `ffb-mechanics` | `src/modifiers/jump_modifier_factory.rs` | ✓ |
 | `factory/JumpUpModifierFactory.java` | `ffb-model` | `src/factory/jump_up_modifier_factory.rs` | ✓ |
 | `factory/KickoffResultFactory.java` | `ffb-model` | `src/factory/kickoff_result_factory.rs` | ✓ |
 | `factory/LeaderStateFactory.java` | `ffb-model` | `src/factory/leader_state_factory.rs` | ✓ |
 | `factory/MechanicsFactory.java` | `ffb-model` | `src/factory/mechanics_factory.rs` | ✓ |
-| `factory/mixed/CasualtyModifierFactory.java` | `ffb-model` | `src/factory/mixed/casualty_modifier_factory.rs` | ✓ |
-| `factory/mixed/JumpModifierFactory.java` | `ffb-model` | `src/factory/mixed/jump_modifier_factory.rs` | ✓ |
+| `factory/mixed/CasualtyModifierFactory.java` | `ffb-mechanics` | `src/modifiers/casualty_modifier_factory.rs` | ✓ |
+| `factory/mixed/JumpModifierFactory.java` | `ffb-mechanics` | `src/modifiers/jump_modifier_factory.rs` | ✓ |
 | `factory/ModelChangeDataTypeFactory.java` | `ffb-model` | `src/factory/model_change_data_type_factory.rs` | ✓ |
 | `factory/ModelChangeIdFactory.java` | `ffb-model` | `src/factory/model_change_id_factory.rs` | ✓ |
 | `factory/PassingDistanceFactory.java` | `ffb-model` | `src/factory/passing_distance_factory.rs` | ✓ |
@@ -2184,11 +2184,11 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 
 | Java File | Rust Crate | Rust Target | Status |
 |-----------|-----------|-------------|--------|
-| `xml/IXmlReadable.java` | `—` | `—` | — |
+| `xml/IXmlReadable.java` | `ffb-model` | `src/xml/i_xml_readable.rs` | ✓ |
 | `xml/IXmlSerializable.java` | `—` | `—` | — |
 | `xml/IXmlWriteable.java` | `—` | `—` | — |
-| `xml/UtilXml.java` | `—` | `—` | — |
-| `xml/XmlHandler.java` | `—` | `—` | — |
+| `xml/UtilXml.java` | `ffb-model` | `src/xml/util_xml.rs` | ✓ |
+| `xml/XmlHandler.java` | `ffb-model` | `src/xml/xml_handler.rs` | ✓ |
 
 ## Module: ffb-server
 

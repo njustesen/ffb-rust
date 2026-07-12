@@ -2,8 +2,8 @@
 /// Handles /prayer command — applies a prayer inducement effect.
 ///
 /// Ported using the real prayer subsystem that exists today:
-/// `ffb_model::inducement::{bb2020,bb2025}::prayers::Prayers` (roll → `Prayer` lookup,
-/// replacing Java's stub `PrayerFactory.forRoll`) and
+/// `ffb_model::factory::{bb2020,bb2025}::prayer_factory::PrayerFactory` (roll → `Prayer`
+/// lookup, matching Java's `PrayerFactory.forRoll`) and
 /// `ffb_engine::factory::mixed::prayer_handler_factory::PrayerHandlerFactory` +
 /// `PrayerHandler` trait (replacing Java's `PrayerHandlerFactory`/`PrayerHandler`).
 ///
@@ -63,14 +63,24 @@ impl TalkHandlerPrayer {
     /// Java: `game.<PrayerFactory>getFactory(FactoryType.Factory.PRAYER).forRoll(roll)`,
     /// then `prayer.getName()`. Returns `(enumConstantName, displayName)` so the caller
     /// gets both the `PrayerHandlerFactory::for_prayer` lookup key and the user-visible text.
-    fn prayer_for_roll(rules: Rules, roll: i32) -> Option<(String, String)> {
-        match rules {
-            Rules::Bb2025 => ffb_model::inducement::bb2025::prayers::Prayers::new()
-                .get_prayer(roll)
-                .map(|p| (p.name().to_string(), p.get_name().to_string())),
-            Rules::Bb2020 => ffb_model::inducement::bb2020::prayers::Prayers::new()
-                .get_prayer(roll)
-                .map(|p| (p.name().to_string(), p.get_name().to_string())),
+    fn prayer_for_roll(game: &Game, roll: i32) -> Option<(String, String)> {
+        use ffb_model::factory::prayer_factory::PrayerFactory as PrayerFactoryTrait;
+        match game.rules {
+            Rules::Bb2025 => {
+                let mut factory = ffb_model::factory::bb2025::prayer_factory::PrayerFactory::new();
+                factory.initialize();
+                factory.for_roll(roll).map(|p| (p.name().to_string(), p.get_name().to_string()))
+            }
+            Rules::Bb2020 => {
+                let use_league_table = game
+                    .options
+                    .get_option_with_default(ffb_model::option::game_option_id::GameOptionId::INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE)
+                    .get_value_as_string()
+                    == "true";
+                let mut factory = ffb_model::factory::bb2020::prayer_factory::PrayerFactory::new();
+                factory.initialize(use_league_table);
+                factory.for_roll(roll).map(|p| (p.name().to_string(), p.get_name().to_string()))
+            }
             _ => None,
         }
     }
@@ -99,7 +109,7 @@ impl TalkHandlerPrayer {
             Err(_) => return vec![format!("{} is not a number.", commands[1])],
         };
 
-        let (prayer_key, prayer_display_name) = match Self::prayer_for_roll(game.rules, roll) {
+        let (prayer_key, prayer_display_name) = match Self::prayer_for_roll(game, roll) {
             Some(p) => p,
             None => {
                 return vec![format!(
