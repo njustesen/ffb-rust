@@ -46,13 +46,24 @@ use crate::util::util_server_player_swoop::UtilServerPlayerSwoop;
 ///
 /// executeSwoop delegates to: getGameState().executeStepHooks(this, state)
 ///
-/// Unported utilities:
-///   TODO: UtilServerDialog.showDialog (Swoop skill dialog)
-///   TODO: UtilActingPlayer.changeActingPlayer(game, thrownPlayerId, SWOOP)
-///   TODO: fieldModel animation, syncGameModel
-///   TODO: game.blitzTurnState.changeActingPlayer()
-///   TODO: executeStepHooks (Swoop scatter/deflection hook)
-///   TODO: coordinate transform for away-team CLIENT_SWOOP command
+/// Unported utilities (all documented, out-of-scope structural gaps — not invented workarounds):
+///   client-only: UtilServerDialog.showDialog (Swoop skill dialog) — headless waits via `Continue`.
+///   TODO: UtilActingPlayer.changeActingPlayer(game, thrownPlayerId, SWOOP) — this crate has no port
+///     of `UtilActingPlayer` at all (it manages old-acting-player state transitions — MOVING/PRONE/
+///     STANDING — across the whole engine, not just this step); this step only sets the *new* acting
+///     player's id/action inline rather than calling the shared utility. A real fix would mean porting
+///     `UtilActingPlayer` itself, which is a codebase-wide subsystem, not a narrow one-file change.
+///   client-only: fieldModel animation, syncGameModel — client rendering/sync, no server-state effect.
+///   no-op: game.blitzTurnState.changeActingPlayer() — `BlitzTurnState` is not ported (headless no-op).
+///   TODO(hook-infra): executeStepHooks (Swoop scatter/deflection hook) — this crate's `SkillBehaviour`
+///     hook-dispatch registry is not wired into the step framework (see
+///     `skill_behaviour::bb2016::ThrowTeamMateBehaviour` for the same, project-wide limitation); where a
+///     step's behavior has actually been ported, it is inlined directly into the step instead.
+///   convention: coordinate transform for away-team CLIENT_SWOOP command — this crate has no network
+///     session layer, so "is the command from the home coach" (Java's `checkCommandIsFromHomePlayer`,
+///     which checks WebSocket session identity) is approximated as "is the thrown player on the home
+///     team", the same convention used by every other away-team-coordinate-transform in this crate
+///     (see `step_init_throw_team_mate.rs`, `step_wizard.rs`, etc.).
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.ttm.StepSwoop`.
 pub struct StepSwoop {

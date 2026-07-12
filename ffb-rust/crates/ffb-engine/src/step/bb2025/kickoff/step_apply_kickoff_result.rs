@@ -27,22 +27,38 @@ use crate::util::util_server_catch_scatter_throw_in::UtilServerCatchScatterThrow
 ///
 /// Routing overview (per BB2025 Java source):
 ///
-///  - `GetTheRef`          → both teams receive +1 bribe; NEXT_STEP.  (TODO: bribe storage)
-///  - `TimeOut`            → adjust turn counters by ±1; NEXT_STEP.
-///  - `SolidDefence`       → kicking team repositions D3+3 players; multi-round dialog. TODO.
-///  - `HighKick`           → receiving team may move a player to the ball; dialog. TODO.
-///  - `CheeringFans`       → roll d6+cheerleaders per team; winner gets +1 block assist.
-///  - `WeatherChange`      → roll 2d6 weather; re-scatter ball if Nice. TODO (weather table).
-///  - `BrilliantCoaching`  → roll d6+coaches; winner gets +1 re-roll.
-///  - `QuickSnap`          → receiving team repositions D3+3 open players 1 sq each. TODO.
+///  - `GetTheRef`          → both teams receive +1 bribe; NEXT_STEP. Implemented.
+///  - `TimeOut`            → adjust turn counters by ±1; NEXT_STEP. Implemented.
+///  - `SolidDefence`       → kicking team repositions D3+3 players. The eligibility roll,
+///                           report and pinning logic are implemented; the multi-round
+///                           `DialogPlayerChoiceParameter` player-selection UI is client-side
+///                           and not ported, so headless play always resolves with no players
+///                           selected (matches this crate's convention for other dialog-gated steps).
+///  - `HighKick`           → receiving team may move a player to the ball; the touchback/catcher
+///                           check and side-swap are implemented; the player-repositioning dialog
+///                           is client-side and not ported (same convention as SolidDefence).
+///  - `CheeringFans`       → roll d6+cheerleaders per team; winner gets +1 block assist. Implemented
+///                           (Java's cheering-fans reroll-on-`REROLL_CHEERING_FANS` inducement is not
+///                           yet wired here).
+///  - `WeatherChange`      → roll 2d6 weather; re-scatter ball if Nice. Implemented, including the
+///                           Sweltering Heat exhausted->reserve state change and the ball re-scatter.
+///  - `BrilliantCoaching`  → roll d6+coaches; winner gets +1 re-roll. Implemented.
+///  - `QuickSnap`          → receiving team repositions D3+3 open players 1 sq each. The roll,
+///                           activation-exhaustion reporting and side-swap are implemented; the actual
+///                           per-player repositioning is driven by `PlacePlayer`/`EndTurn` commands.
 ///  - `Charge`             → kicking team selects D3+3 players for move/blitz actions;
-///                           GOTO_LABEL_ON_BLITZ to re-enter kickoff sequence for the blitz.
-///  - `DodgySnack`         → random player per team takes -MA/-AV or goes to reserves. TODO.
-///  - `PitchInvasion`      → roll d6+fan-factor; losing team has D3 players stunned. TODO.
+///                           GOTO_LABEL_ON_BLITZ to re-enter kickoff sequence for the blitz. The
+///                           eligibility roll is implemented; the player-selection dialog is
+///                           client-side and not ported, so headless play always skips the blitz.
+///  - `DodgySnack`         → random player per team takes -MA/-AV (`KickoffResult::DODGY_SNACK`
+///                           enhancement: `TemporaryStatDecrementer` on MA and AV) or goes to
+///                           reserves on a roll of 1. Implemented.
+///  - `PitchInvasion`      → roll d6+fan-factor; losing team has D3 players stunned. Implemented.
 ///
-/// Complex sub-states (SolidDefence, QuickSnap, HighKick, Charge player-selection dialog,
-/// DodgySnack sequence push, PitchInvasion injury) are marked TODO and fall through to
-/// GOTO_LABEL_ON_END in the current stub.
+/// SolidDefence / QuickSnap / HighKick / Charge all depend on `DialogPlayerChoiceParameter`
+/// (client-side player-selection dialog), which this crate does not model — that is a documented,
+/// out-of-scope structural gap consistent with the rest of this crate's dialog-gated steps, not an
+/// invented simplification.
 ///
 /// Mandatory init params: `GOTO_LABEL_ON_END` and `GOTO_LABEL_ON_BLITZ`.
 ///

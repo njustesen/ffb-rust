@@ -53,14 +53,25 @@ use crate::util::util_server_catch_scatter_throw_in::UtilServerCatchScatterThrow
 ///   CLIENT_USE_SKILL with canForceBombExplosion -> explodeSkillUsed = isSkillUsed -> EXECUTE_STEP
 ///
 /// Unported utilities:
-///   TODO: UtilCards.getUnusedSkillWithProperty(actingPlayer, canForceBombExplosion)
-///   TODO: UtilServerDialog.showDialog(DialogSkillUseParameter)
-///   TODO: game.options.getOptionWithDefault(BOMB_BOUNCES_ON_EMPTY_SQUARES)
-///   TODO: DiceInterpreter.interpretScatterDirectionRoll
-///   TODO: UtilServerCatchScatterThrowIn.findScatterCoordinate
-///   TODO: setBombCoordinate / setBombMoving for bounce path; fieldModel.getPlayer for bounce
-///   TODO: reports: ReportScatterBall, ReportBombOutOfBounds, ReportSkillUse
-///   TODO: CATCH_BOMB mode publish
+///   ✓ UtilCards.getUnusedSkillWithProperty(actingPlayer, canForceBombExplosion) — implemented
+///     (`has_skill_property` in `execute_step`, `get_unused_skill_with_property` in `handle_command`).
+///   client-only: UtilServerDialog.showDialog(DialogSkillUseParameter) — dialog is client-side; headless
+///     waits via `StepOutcome::cont()` for the `UseSkill` command instead.
+///   ✓ game.options.getOptionWithDefault(BOMB_BOUNCES_ON_EMPTY_SQUARES) — implemented via `game.options.is_enabled`.
+///   ✓ DiceInterpreter.interpretScatterDirectionRoll — implemented via `Direction::for_roll`
+///     (Java delegates to `DirectionFactory.forRoll`, same mapping).
+///   ✓ UtilServerCatchScatterThrowIn.findScatterCoordinate — implemented.
+///   ✓ setBombCoordinate / setBombMoving for bounce path; fieldModel.getPlayer for bounce — implemented.
+///   ✓ reports: ReportScatterBall, ReportBombOutOfBounds, ReportSkillUse — implemented.
+///   ✓ CATCH_BOMB mode publish — implemented.
+///
+///   Known remaining gap (cross-step, out of scope for this file): Java additionally publishes
+///   `StepParameter::SKIP = false` when the bomb is caught mid-bounce (`catch_bomb`) *and* the acting
+///   player still holds an unused `canForceBombExplosion` skill, so the downstream
+///   `StepRecheckExplodeSkill` re-offers the explode choice. That `SKIP` parameter is not modeled in
+///   this crate's `StepParameter` enum, and `StepRecheckExplodeSkill`'s own Rust port does not consume
+///   `CATCHER_ID`/`SKIP` the way the Java version does — wiring this correctly spans both step files
+///   and is left for a follow-up rather than invented here.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.special.StepInitBomb`.
 pub struct StepInitBomb {

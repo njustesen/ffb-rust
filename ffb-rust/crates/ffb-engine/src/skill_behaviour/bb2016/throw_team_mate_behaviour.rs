@@ -32,6 +32,14 @@ impl SkillBehaviour for ThrowTeamMateBehaviour {
     ///      StepState.passReRollSource, StepState.reRolledAction,
     ///      StepState.thrownPlayerId, StepState.targetCoordinate.
     ///
+    /// This crate does not wire `SkillBehaviour` hooks (registered `StepModifier`s that Java's step
+    /// framework dispatches into via `executeStepHooks`) into the live step dispatch at all — that is a
+    /// project-wide, documented architectural gap, not specific to this file. Where the behavior has
+    /// actually been ported, it is inlined directly into the corresponding step instead: the BB2016/
+    /// BB2020/BB2025 `StepThrowTeamMate` step files each carry a doc comment ("Logic is inlined from
+    /// `ThrowTeamMateBehaviour.handleExecuteStepHook()`") and implement the roll/fumble/reroll logic
+    /// described above directly (see e.g. `step::bb2016::ttm::step_throw_team_mate::StepThrowTeamMate`).
+    /// This stub therefore never runs in practice; it exists only to document the unwired hook slot.
     // TODO(hook-infra): step-specific state (StepState.throwRoll)
     // TODO(hook-infra): step-specific state (StepState.minimumRoll)
     // TODO(hook-infra): step-specific state (StepState.passReRollSource)
