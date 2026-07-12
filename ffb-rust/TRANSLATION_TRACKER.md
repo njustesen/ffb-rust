@@ -29,6 +29,44 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AAD (32/32 server handlers reachable + behavioral-approximation fixes, this session):**
+Three-step follow-up to Phase ZV, closing the remaining non-file-level gaps rather than starting
+parity testing early (deferred per instruction).
+- **Step 1** (`fe03b161`): wired the last 3 dormant `ServerCommandHandler*` structs
+  (`AddLoadedTeam`, `ApplyAutomatedPlayerMarkings`, `CalculateAutomaticPlayerMarkings`) into live
+  dispatch — **32/32 handlers now reachable, up from 29/32**. Required giving
+  `InternalServerCommandAddLoadedTeam` a real `Team` field (parsed from FUMBBL team XML via the
+  existing `XmlHandler` path) and `InternalServerCommandApplyAutomatedPlayerMarkings`/
+  `InternalServerCommandCalculateAutomaticPlayerMarkings` real `AutoMarkingConfig`/`Game` fields
+  (added `to_json_value`/`from_json` to `AutoMarkingConfig`/`AutoMarkingRecord` using the real Java
+  `IJsonOption` keys) instead of the opaque `String` placeholders they carried before. Documented,
+  not fabricated: no `ServerRequestProcessor`→internal-command dispatch channel exists yet for the
+  3 `FumbblRequest*` types that would construct these commands from a real HTTP response, so their
+  callers still discard the newly-parsed result — a narrower, separately-scoped follow-up.
+- **Step 2** (`24d81084`): fixed two behavioral approximations found inside already-`✓` files.
+  `ActingPlayer.isMustCompleteAction()` was hardcoded `false` in both `bomb_logic_module.rs` files
+  (bb2025/mixed) — added the real `must_complete_action` field to `ActingPlayer` with real
+  getter/setter. `SwarmingLogicModule`'s bb2025 `squareHasSwarmingPlayer` LINEMAN keyword check was
+  hardcoded `false` — added `is_lineman` to `Player`/`RosterPosition` mirroring the existing
+  `is_big_guy` precomputed-flag pattern. (The `mixed`-edition `SwarmingLogicModule` was already
+  correct — it uses a different Java check, `hasSkillProperty`, not the LINEMAN keyword.) Also
+  confirmed the `unimplemented!()` bodies in `pass_block_logic_module.rs`/
+  `kickoff_return_logic_module.rs` are correct 1:1 translations (Java itself throws
+  `UnsupportedOperationException` there) — not gaps, left untouched.
+- **Step 3** (`01a8fded`): audited the 5 files with the highest `// TODO` comment counts despite
+  being `✓`. 4 of 5 had only stale/already-resolved TODOs (tightened the comments); found and fixed
+  one real bug in `step_init_throw_team_mate.rs` — it always advanced to the next step once a TTM
+  target coordinate was set, missing Java's `UtilRangeRuler` range-gate check (now uses
+  `PassMechanic::find_passing_distance`, matching `step_throw_team_mate.rs`'s existing use of the
+  same mechanic, to correctly wait instead of advance when the target is out of range).
+
+Tests: 17,331 → 17,359 (+28), 0 failures throughout. No parity/integration testing (deferred, per
+instruction). What's left, none of it "translation" anymore: (1) the `FumbblRequest*` dispatch-tail
+gap named in Step 1; (2) parity/integration testing against the real Java engine — still "the
+natural next phase"; (3) the standing decision on the 271 permanently-skipped Swing files; (4) live
+production infra wiring (real MySQL, real Jetty↔axum wire compatibility). Full writeup:
+`docs/PHASE_AAD_PLAN.md`.
+
 **Phase ZW.5 (closed the last 3 `○` rows in the entire tracker, this session):**
 `LogicPluginFactory.java` (`client/factory/`, previously deferred pending `LogicPlugin` itself) →
 `client/factory/logic_plugin_factory.rs`: Java's `initialize(Game)` builds its `Map<LogicPlugin.Type,

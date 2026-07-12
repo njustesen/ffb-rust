@@ -1,6 +1,54 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-12, Phases ZVA–ZVE done — command-hierarchy reconciliation — plus the last 3 tracker gaps closed. **File-level translation is now 100% complete for everything with a feasible headless equivalent; 29/32 real `ServerCommandHandler*` structs are reachable from live dispatch (up from ~2 at session start).**)
+## Current Status (2026-07-12, Phase AAD done — closed the last handler gaps and two documented behavioral approximations. **32/32 real `ServerCommandHandler*` structs are now reachable from live dispatch (up from 29/32); the `ActingPlayer.mustCompleteAction`/`SwarmingLogicModule` LINEMAN-check hardcoded-`false` approximations are now real; one genuine bug found and fixed in `step_init_throw_team_mate.rs`.**)
+
+**Approach:** 1:1 Java-to-Rust translation. Every Java class → one Rust file, written directly from Java source. No reactive parity fixes.
+
+Three-step follow-up to Phase ZV (`docs/PHASE_AAD_PLAN.md` has the full writeup), run as parallel
+foreground sessions in the same working directory (Steps 1 and 2 touched disjoint file sets —
+`ffb-server` vs. `ffb-model`/`ffb-client` — and were each instructed to avoid `git stash`/`reset`/
+`rebase`/`clean` and to verify their own staged diff before committing, given this repo's documented
+past incident where unrestricted concurrent git access wiped uncommitted work). Both pushed cleanly;
+Step 3 ran afterward, solo.
+
+- **Step 1** (`fe03b161`): wired `AddLoadedTeam`, `ApplyAutomatedPlayerMarkings`,
+  `CalculateAutomaticPlayerMarkings` into live dispatch — the last 3 of 32 `ServerCommandHandler*`
+  structs. Gave their `InternalServerCommand*` wrappers real typed fields (`Team`, `AutoMarkingConfig`,
+  `Game`) instead of opaque `String` placeholders: `FumbblRequestLoadTeam::process()` now parses FUMBBL
+  team XML into a real `Team` (reusing `team_cache.rs`'s existing `XmlHandler` path); `AutoMarkingConfig`/
+  `AutoMarkingRecord` gained `to_json_value`/`from_json` using the real Java `IJsonOption` keys. All 3
+  factory match arms in `server_command_handler_factory.rs` now call the real handlers with typed
+  payloads (added end-to-end dispatch tests per handler) instead of logging no-ops. Documented, not
+  invented: no `ServerRequestProcessor`→internal-command dispatch channel exists yet for the 3
+  `FumbblRequest*` types that would construct these commands from a live HTTP response — their callers
+  still discard the newly-parsed result, a narrower separately-scoped follow-up. Tests: 17,331 → 17,357.
+- **Step 2** (`24d81084`): fixed two hardcoded-`false` approximations found inside already-`✓` files —
+  `ActingPlayer.isMustCompleteAction()` (added a real `must_complete_action` field + accessors, used by
+  both `bomb_logic_module.rs` files instead of a hardcoded `false`) and `SwarmingLogicModule`'s bb2025
+  LINEMAN keyword check (added `is_lineman` to `Player`/`RosterPosition`, mirroring the existing
+  `is_big_guy` precomputed-flag pattern; confirmed the `mixed`-edition module was already correct — it
+  uses a different Java check entirely). Also confirmed `pass_block_logic_module.rs`/
+  `kickoff_return_logic_module.rs`'s `unimplemented!()` bodies are correct 1:1 translations (Java itself
+  throws `UnsupportedOperationException` there), not gaps — left untouched. Tests: 17,357 (unchanged
+  net after Step 1 landed first; new tests added for both fixes).
+- **Step 3** (`01a8fded`): audited the 5 `✓`-marked files with the highest `// TODO` counts
+  (`step_init_bomb.rs`, `step_apply_kickoff_result.rs`, `step_swoop.rs`,
+  `throw_team_mate_behaviour.rs`, `step_init_throw_team_mate.rs`). 4 of 5 had only stale/already-resolved
+  TODOs (comments tightened, no logic changes). Found and fixed one real bug: `step_init_throw_team_mate.rs`
+  always advanced to the next step once a TTM target coordinate was set, missing Java's
+  `UtilRangeRuler` range-gate — now uses `PassMechanic::find_passing_distance` (the same mechanic
+  `step_throw_team_mate.rs` already uses) to correctly wait instead of advance when the target is out of
+  range. Tests: 17,357 → 17,359.
+
+**Total this session: 17,331 → 17,359 tests (+28), 0 failures.** No parity/integration testing done
+(deferred, per instruction). What's left, none of it "translation" anymore: (1) the `FumbblRequest*`
+dispatch-tail gap named in Step 1; (2) parity/integration testing against the real Java engine — still
+"the natural next phase"; (3) the standing decision on the 271 permanently-skipped Swing files
+(~31k LOC); (4) live production infra wiring (real MySQL, real Jetty↔axum wire compatibility).
+
+---
+
+## Prior Status (2026-07-12, Phases ZVA–ZVE done — command-hierarchy reconciliation — plus the last 3 tracker gaps closed. **File-level translation is now 100% complete for everything with a feasible headless equivalent; 29/32 real `ServerCommandHandler*` structs are reachable from live dispatch (up from ~2 at session start).**)
 
 **Approach:** 1:1 Java-to-Rust translation. Every Java class → one Rust file, written directly from Java source. No reactive parity fixes.
 
