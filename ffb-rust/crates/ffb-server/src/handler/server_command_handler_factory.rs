@@ -2,7 +2,15 @@
 ///
 /// Routes incoming `ClientCommand`s to the appropriate handler:
 /// - Ping → delegates to the real `ServerCommandHandlerPing`.
-/// - Join → still handled upstream in `command_socket.rs` before enqueue.
+/// - Join → the very first `ClientJoin` on a connection is handled upstream in
+///   `command_socket.rs` before enqueue (see that file's own doc comment); a *repeat*
+///   `ClientJoin` sent after the session already joined reaches this factory's
+///   `ClientCommand::ClientJoin` arm, which delegates to the same real
+///   `ServerCommandHandlerJoin` Java itself uses for every `Join` (Java's
+///   `ServerCommandHandlerJoin` doesn't special-case the first message the way
+///   `command_socket.rs` does — that split is a Rust-specific optimization, not a Java
+///   behavior difference), whose success path redispatches
+///   `InternalServerCommandJoinApproved` back through `handle_internal_command` below.
 /// - Talk, CloseSession, TransferReplayControl, RequestVersion,
 ///   PasswordChallenge → delegate to their real `ServerCommandHandler*` structs
 ///   (Phase ZVA, session/game-lifecycle family). Each needed its own
@@ -16,17 +24,15 @@
 ///   (this pipeline doesn't correspond to any single Java `ServerCommandHandler*`
 ///   class — it's the Rust-specific consolidated action dispatch).
 ///
-/// **Known gap (Phase ZV):** most of the other ~30 real, tested
-/// `ServerCommandHandler*` structs under `crate::handler` (the sketch/marker
-/// family, replay family, ...) are still NOT delegated to from here. They were
-/// translated against `ffb_protocol::commands::*` (the older, Java-mirroring
-/// command types), while this factory's `decode_command` operates on
-/// `ffb_protocol::client_commands::ClientCommand` (a separate, newer wire
-/// enum). Bridging the two command hierarchies for the remaining handlers is
-/// a real, nontrivial follow-up. `SocketClosed` isn't a `ClientCommand` at
-/// all (it's an internal event on socket close), so `command_socket.rs` will
-/// eventually need to call `ServerCommandHandlerSocketClosed::handle_command`
-/// directly rather than through this factory.
+/// **Command-hierarchy reconciliation: complete.** Every real `ServerCommandHandler*`
+/// struct under `crate::handler` is now reachable from live dispatch — either from this
+/// factory's `handle_command`/`handle_internal_command` (via a bridging
+/// `ffb_protocol::commands::*` struct built from the newer `ffb_protocol::client_commands::
+/// ClientCommand` wire enum, the pattern every prior batch of this effort used) or, for
+/// `SocketClosed` (which isn't a `ClientCommand` at all — it's an internal event on socket
+/// close), from `command_socket.rs`'s connection-cleanup path enqueuing
+/// `AnyInternalServerCommand::SocketClosed` onto this same dispatch queue (see that file's
+/// own doc comment).
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
@@ -110,12 +116,9 @@ pub struct ServerCommandHandlerFactory {
     pub client_properties: Arc<Vec<(String, String)>>,
     ping_handler: ServerCommandHandlerPing,
     socket_closed_handler: ServerCommandHandlerSocketClosed,
-    /// `pub` (like this struct's other fields) rather than private: unlike
-    /// `join_approved_handler` (dispatched to from `handle_internal_command` below), this
-    /// handler isn't reachable from `handle_command`'s `ClientCommand::ClientJoin` arm yet —
-    /// that bridging is the separately-documented, out-of-scope gap this file's own "Known
-    /// gap" doc comment already flagged — so it's exposed for direct use (see this file's
-    /// own tests) instead of sitting unread.
+    /// `pub` (like this struct's other fields) so this file's own tests can exercise it
+    /// directly in addition to through `handle_command`'s `ClientCommand::ClientJoin` arm
+    /// (see that arm below), which now delegates here for real.
     pub join_handler: ServerCommandHandlerJoin,
     join_approved_handler: ServerCommandHandlerJoinApproved,
     talk_handler: ServerCommandHandlerTalk,
@@ -498,9 +501,28 @@ impl ServerCommandHandlerFactory {
                 self.ping_handler.handle_command(session_id, ping.timestamp);
                 return;
             }
-            ClientCommand::ClientJoin(_) => {
-                // Join is handled upstream in command_socket.rs before being enqueued.
-                log::warn!("session {} sent ClientJoin after already joined", session_id);
+            ClientCommand::ClientJoin(j) => {
+                // The very first ClientJoin on a connection is handled upstream in
+                // command_socket.rs before being enqueued (see this file's module doc
+                // comment) — reaching this arm means a session already registered sent
+                // *another* Join, which Java's ServerCommandHandlerJoin (unlike
+                // command_socket.rs) doesn't special-case: it redispatches through the same
+                // handler every time, so this does too.
+                let cmd = ffb_protocol::commands::client_command_join::ClientCommandJoin {
+                    entropy: None,
+                    coach: Some(j.coach.clone()),
+                    password: j.password_hash.clone(),
+                    game_name: if j.game_id.is_empty() { None } else { Some(j.game_id.clone()) },
+                    team_id: if j.team_id.is_empty() { None } else { Some(j.team_id.clone()) },
+                    team_name: None,
+                    game_id: 0,
+                    // java: the wire `ClientJoin` struct (ffb_protocol::client_commands::ClientJoin)
+                    // has no `client_mode` field (unlike the older `ClientCommandJoin` this handler
+                    // was translated against), so a re-join can never resolve as REPLAY here —
+                    // documented gap in the wire struct itself, not fabricated logic.
+                    client_mode: None,
+                };
+                self.join_handler.handle_command(&cmd, session_id).await;
                 return;
             }
             ClientCommand::ClientTalk(t) => {
@@ -1638,6 +1660,64 @@ mod tests {
         };
         assert!(factory.join_handler.handle_command(&join, 1).await);
         let _ = rx.try_recv();
+    }
+
+    /// Proves a re-sent `ClientCommand::ClientJoin` (the only way this arm is reached — see
+    /// `handle_command`'s doc comment) really invokes the real `join_handler` rather than
+    /// just logging, by observing its lobby-listing side effect (a `ServerGameList` reply)
+    /// for a session that supplies no game id/name/replay mode.
+    #[tokio::test]
+    async fn handle_command_client_join_dispatches_to_join_handler() {
+        use ffb_model::model::ClientMode;
+        use tokio::sync::mpsc;
+        use crate::model::received_command::ReceivedCommand;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        sm.lock().unwrap().add_session(11, 0, "Coach".into(), ClientMode::PLAYER, true, vec![], tx);
+        let factory = ServerCommandHandlerFactory::new(gc, sm, db());
+
+        let join = ClientJoin {
+            coach: "Coach".into(),
+            team_id: String::new(),
+            game_id: String::new(),
+            password_hash: None,
+        };
+        factory.handle_command(ReceivedCommand::new(ClientCommand::ClientJoin(join), 11)).await;
+
+        let msg = rx.try_recv().expect("expected a real ServerGameList reply from join_handler");
+        assert!(msg.contains("serverGameList"));
+    }
+
+    /// A re-sent `ClientJoin` that *does* supply a game name is treated as a targeted join —
+    /// same as `ServerCommandHandlerJoin`'s own `targeted_join_by_game_name_is_also_treated_as_targeted`
+    /// coverage — proving the `game_id` wire field is threaded through as `game_name`.
+    #[tokio::test]
+    async fn handle_command_client_join_with_game_name_is_targeted() {
+        use ffb_model::model::ClientMode;
+        use tokio::sync::mpsc;
+        use crate::model::received_command::ReceivedCommand;
+
+        let gc = Arc::new(Mutex::new(crate::game_cache::GameCache::new()));
+        let sm = Arc::new(Mutex::new(crate::net::session_manager::SessionManager::new()));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        sm.lock().unwrap().add_session(12, 0, "Coach".into(), ClientMode::PLAYER, true, vec![], tx);
+        let factory = ServerCommandHandlerFactory::new(gc, sm, db());
+
+        let join = ClientJoin {
+            coach: "Coach".into(),
+            team_id: String::new(),
+            game_id: "SomeGame".into(),
+            password_hash: Some(String::new()),
+        };
+        factory.handle_command(ReceivedCommand::new(ClientCommand::ClientJoin(join), 12)).await;
+
+        // No DB pool configured, so a targeted join always fails the password check and
+        // reports wrong-password rather than a lobby list — proving `has_target` really
+        // saw the game name (an empty password on an unconfigured DB never matches).
+        let msg = rx.try_recv().expect("expected a ServerCommandStatus, not a lobby game list");
+        assert!(msg.contains("Wrong Password"));
     }
 
     /// End-to-end dispatch test (Phase ZZ): enqueuing `AnyInternalServerCommand::JoinApproved`

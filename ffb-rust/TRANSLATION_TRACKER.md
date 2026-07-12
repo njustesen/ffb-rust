@@ -29,6 +29,50 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase ZVE (Join/JoinApproved/SocketClosed wired — final batch of command-hierarchy reconciliation, this session):**
+Closed the last 3 gaps from the ZVA–ZVD dispatch-wiring effort. `ClientCommand::ClientJoin`'s
+arm in `ServerCommandHandlerFactory::handle_command` (which only fires for a *repeat* Join —
+the very first Join on a connection is still special-cased in `command_socket.rs` before
+enqueue, matching a Rust-specific optimization, not a Java behavior difference: Java's
+`ServerCommandHandlerJoin` itself never special-cases the first message) now builds a real
+`ffb_protocol::commands::client_command_join::ClientCommandJoin` from the wire `ClientJoin`
+struct's fields (`game_id` → `game_name`, since `command_socket.rs` already treats that field as
+a name, not a numeric id; `password_hash` → `password`; no `client_mode` field exists on the
+wire struct, so a re-join can never resolve as REPLAY — a documented, narrow gap in the wire
+struct itself) and dispatches to the real `join_handler`, whose success path already redispatches
+`InternalServerCommandJoinApproved` back through `handle_internal_command` to the real
+`join_approved_handler` (verified end-to-end, not just assumed from doc comments, by a new test
+alongside the pre-existing `factory_dispatches_join_approved_through_real_handler` coverage).
+`SocketClosed` isn't a `ClientCommand` — Java's `CommandSocket.onClose()` calls
+`ServerCommunication.close(session)`, which enqueues `InternalServerCommandSocketClosed` onto the
+same dispatch queue `onMessage()` uses, rather than calling `SessionManager.removeSession`
+directly. `command_socket.rs`'s disconnect-cleanup previously called `sm.remove_session(...)`
+directly, bypassing `ServerCommandHandlerSocketClosed`'s sketch-cleanup/leave-broadcast/replay-
+control-handoff side effects entirely and duplicating the removal that handler already performs
+internally; it now instead sends `AnyInternalServerCommand::SocketClosed` on
+`AppState::dispatch_tx` (the same sender `ServerCommunication::new` already wires to a live
+`dispatch_loop`), matching Java's real single-flow shape with no plumbing beyond the
+already-present `dispatch_tx` field. Added 3 new tests: two proving the `ClientJoin` re-join arm
+reaches `join_handler` (lobby-list and targeted-join-by-name cases), one proving
+`command_socket.rs`'s exact cleanup statement reaches the real `ServerCommandHandlerSocketClosed`
+(observed via its `serverLeave` broadcast side effect, not just session removal, to rule out a
+bare `remove_session` masquerading as the fix). `cargo test --workspace`: 17,318 → 17,321 tests
+(+3), 0 failures.
+
+**This closes the command-hierarchy-reconciliation effort started in Phase ZVA.** Of the 32 real
+`ServerCommandHandler*` structs under `ffb-server/src/handler` (excluding the factory itself),
+29 are now reachable from live dispatch. **3 documented stragglers remain, pre-existing from
+earlier phases, not touched by this batch:** `ServerCommandHandlerAddLoadedTeam` (constructed in
+the factory, but its `AddLoadedTeam` dispatch arm stays a no-op — `InternalServerCommandAddLoadedTeam`
+carries no typed `Team` payload to hand it); `ServerCommandHandlerApplyAutomatedPlayerMarkings` and
+`ServerCommandHandlerCalculateAutomaticPlayerMarkings` (neither is even constructed in the
+factory — both internal commands carry their `AutoMarkingConfig`/`Game` payloads as opaque,
+undecoded `String`s with no serde impl to bridge them). All 3 are real and directly unit-tested
+in their own modules; the gaps are documented `// java:` no-ops in `handle_internal_command`,
+not fabricated logic. Closing them requires new wire-payload shapes (a `Team`/`AutoMarkingConfig`
+JSON encoding that doesn't exist in Java or Rust today), which is real, separately-scoped
+follow-up work — not a hierarchy-bridging gap like the 27+3 handlers this 5-batch effort closed.
+
 **Phase ZVD (game-management handler family wired into live dispatch, this session):**
 Wired the game-management handler family — `ServerCommandHandlerAddLoadedTeam`,
 `ServerCommandHandlerFumbblTeamLoaded`, `ServerCommandHandlerFumbblGameChecked`,

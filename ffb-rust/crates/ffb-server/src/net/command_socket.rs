@@ -2,6 +2,14 @@
 ///
 /// Java uses Jetty `@WebSocket` annotations with `onOpen`, `onClose`, `onMessage`.
 /// Rust uses axum's `WebSocketUpgrade` extractor + per-connection async tasks.
+///
+/// `handle_connection`'s disconnect cleanup enqueues `AnyInternalServerCommand::SocketClosed`
+/// onto `AppState::dispatch_tx` — the same queue `ServerCommunication`'s dispatch loop already
+/// drains into `ServerCommandHandlerFactory::handle_command` — rather than calling
+/// `SessionManager::remove_session` directly, matching Java's `CommandSocket.onClose()` →
+/// `ServerCommunication.close(session)` → enqueued `InternalServerCommandSocketClosed` flow
+/// (see `ServerCommunication::close`'s own doc comment for why `pSession.close()` itself is
+/// modeled separately, by simply letting this task's outgoing sender drop).
 use std::sync::{Arc, Mutex};
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
@@ -11,6 +19,8 @@ use ffb_model::model::ClientMode;
 use ffb_protocol::client_commands::ClientCommand;
 use crate::game_cache::GameCache;
 use crate::model::received_command::{ReceivedCommand, SessionId};
+use crate::net::commands::any_internal_server_command::AnyInternalServerCommand;
+use crate::net::commands::internal_server_command_socket_closed::InternalServerCommandSocketClosed;
 use crate::net::session_manager::SessionManager;
 
 static NEXT_SESSION_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
@@ -155,11 +165,23 @@ async fn handle_connection(mut socket: WebSocket, state: AppState) {
         }
     }
 
-    // Cleanup on disconnect
-    {
-        let mut sm = state.session_manager.lock().unwrap();
-        sm.remove_session(session_id);
-    }
+    // Cleanup on disconnect.
+    //
+    // Java: `CommandSocket.onClose()` calls `getServer().getCommunication().close(session)`,
+    // which itself enqueues `new ReceivedCommand(new InternalServerCommandSocketClosed(),
+    // session)` onto the same dispatch queue `onMessage()` uses (see
+    // `ServerCommunication::close`'s own doc comment) — it does not call
+    // `SessionManager.removeSession` directly itself; that removal (plus the sketch-cleanup/
+    // leave-broadcast/replay-control-handoff side effects) all live inside
+    // `ServerCommandHandlerSocketClosed::handle_command`, which is what actually runs when
+    // the enqueued command is dispatched. A bare `sm.remove_session(session_id)` here would
+    // both duplicate that removal and skip those other side effects entirely, so this now
+    // enqueues the same internal command Java's `close()` does instead of removing the
+    // session directly.
+    let _ = state.dispatch_tx.send(ReceivedCommand::new_internal(
+        AnyInternalServerCommand::SocketClosed(InternalServerCommandSocketClosed),
+        session_id,
+    ));
     log::debug!("WebSocket session {} closed", session_id);
 }
 
@@ -181,5 +203,52 @@ mod tests {
         let (tx, _rx) = mpsc::unbounded_channel();
         let state = AppState { game_cache: gc, session_manager: sm, dispatch_tx: tx };
         let _clone = state.clone();
+    }
+
+    /// Proves `handle_connection`'s disconnect-cleanup statement — enqueuing
+    /// `AnyInternalServerCommand::SocketClosed` on `AppState::dispatch_tx` — really reaches
+    /// the real `ServerCommandHandlerSocketClosed` (via `ServerCommunication`'s live dispatch
+    /// loop) rather than a bare `SessionManager::remove_session`, by running that exact
+    /// statement against a session and observing the handler's own additional side effect
+    /// (a `serverLeave` broadcast to a second, still-connected session in the same game —
+    /// something a raw `remove_session` call could never produce on its own).
+    #[tokio::test]
+    async fn disconnect_cleanup_reaches_real_socket_closed_handler() {
+        use crate::net::server_communication::ServerCommunication;
+        use crate::db::db_connection_manager::DbConnectionManager;
+
+        let gc = Arc::new(Mutex::new(GameCache::new()));
+        let sm = Arc::new(Mutex::new(SessionManager::new()));
+        let db = Arc::new(Mutex::new(DbConnectionManager::new()));
+        let game_id = gc.lock().unwrap().create_game_state();
+
+        let (tx1, _rx1) = mpsc::unbounded_channel();
+        let (tx2, mut rx2) = mpsc::unbounded_channel();
+        {
+            let mut guard = sm.lock().unwrap();
+            guard.add_session(1, game_id, "Home".into(), ClientMode::PLAYER, true, vec![], tx1);
+            guard.add_session(2, game_id, "Away".into(), ClientMode::PLAYER, false, vec![], tx2);
+        }
+
+        let comms = ServerCommunication::new(Arc::clone(&gc), Arc::clone(&sm), db);
+        let state = AppState {
+            game_cache: Arc::clone(&gc),
+            session_manager: Arc::clone(&sm),
+            dispatch_tx: comms.sender(),
+        };
+
+        // This is the exact statement `handle_connection`'s cleanup section runs.
+        let _ = state.dispatch_tx.send(ReceivedCommand::new_internal(
+            AnyInternalServerCommand::SocketClosed(InternalServerCommandSocketClosed),
+            1,
+        ));
+
+        for _ in 0..10 {
+            tokio::task::yield_now().await;
+        }
+
+        assert_eq!(sm.lock().unwrap().get_game_id_for_session(1), 0, "session should have been removed");
+        let msg = rx2.try_recv().expect("expected a real serverLeave broadcast from the handler");
+        assert!(msg.contains("serverLeave"));
     }
 }
