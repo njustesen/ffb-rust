@@ -29,6 +29,28 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AAL (closed skill-hook-audit item 9's AnimalSavagery, this session):**
+Unlike Shadowing/UnchannelledFury in the prior phase, this item's "fully unimplemented" audit
+claim was correct: `StepAnimalSavagery::execute_step()` was a no-op stub and both editions'
+`skill_behaviour/*/animal_savagery_behaviour.rs` hooks always returned `false`, despite correct
+surrounding scaffolding (step field plumbing, deferred commands, enums, reports, dice/injury/
+adjacency helpers). Ported the full mechanic directly into `execute_step()` (direct-in-step
+pattern, matching Dauntless/Wrestle/Stab/DumpOff — one modifier per step, no dispatch needed):
+negatrait gate, confusion roll + skill/team re-roll chain, `canLashOutAgainstOpponents` skill-use
+dialog + adjacent-target computation, multi-target `PlayerChoice` dialog, and `lash_out` (injury
+via `handle_injury` with edition-correct `InjuryTypeBlock::Mode`, end-turn deferred-command wiring,
+`fallbackAction`/`cancelPlayerAction` state machine). Added `BlockMode::DoNotUseModifiers`/
+`UseArmourModifiersOnlyAgainstTeamMates` to `injury_type_block.rs` and
+`SteadyFootingContext::from_drop_player_with_commands`. Reproduced 2 Java quirks bug-for-bug
+(no-skill lash-out target pool defaults to own team; already-used-this-drive proceeds without
+failure status).
+
+Tests: 17,552 → 17,585 (+33), 0 failures. No parity/integration testing (deferred, per
+instruction). **Honest completion estimate**: roughly ~99.6% true behavioral completion of
+in-scope logic — only Tentacles and CloudBurster remain; expect 2 more phases to close the rest,
+after which parity/integration testing against the Java engine becomes the natural next major
+workstream. Full writeup: `SESSION.md` Current Status.
+
 **Phase AAK (closed skill-hook-audit item 8, and Shadowing + UnchannelledFury of item 9, this
 session):**
 Planned as a verification-only pass on item 8 (FoulAppearance) plus a sizing check on Shadowing

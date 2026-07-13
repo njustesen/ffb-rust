@@ -11,6 +11,17 @@ use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_ro
 use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury};
 
 /// Java: InjuryTypeBlock.Mode enum (inner class).
+///
+/// `DoNotUseModifiers` and `UseArmourModifiersOnlyAgainstTeamMates` mirror the real Java
+/// `Mode.DO_NOT_USE_MODIFIERS` / `Mode.USE_ARMOUR_MODIFIERS_ONLY_AGAINST_TEAM_MATES` variants
+/// (see `InjuryTypeBlock.java` lines 55–56 and 89–102 for the team-mate/armour-only modifier
+/// gating logic they drive). This Rust port's `armour_roll`/`injury_roll` are already a
+/// simplified subset of Java's (see file-level TODOs re: CLAW_DOES_NOT_STACK, chainsaw) that
+/// only special-cases Mighty Blow, unconditioned on team-mate status — so, for now, these two
+/// new variants behave identically to `Regular`/`UseModifiersAgainstTeamMates` at the call
+/// sites that already exist. Added here (Phase AAK+1, Animal Savagery port) purely so callers
+/// can name the Java-correct mode; the fuller mode-gated modifier behaviour remains a
+/// pre-existing gap, not introduced by this change.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BlockMode {
     Regular,
@@ -18,6 +29,10 @@ pub enum BlockMode {
     UseMightyBlow,
     UseClaws,
     UseClawsAndMightyBlow,
+    /// Java: `Mode.DO_NOT_USE_MODIFIERS`.
+    DoNotUseModifiers,
+    /// Java: `Mode.USE_ARMOUR_MODIFIERS_ONLY_AGAINST_TEAM_MATES` (BB2025 Animal Savagery).
+    UseArmourModifiersOnlyAgainstTeamMates,
 }
 
 pub struct InjuryTypeBlock {

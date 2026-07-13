@@ -1,6 +1,58 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-13, Phase AAK done — closed batching-order items 8 and
+## Current Status (2026-07-13, Phase AAL done — closed batching-order item 9's
+AnimalSavagery of `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`, BB2020 + BB2025.)
+
+Unlike the other item-9 skills that turned out mostly done on re-verification (Shadowing,
+UnchannelledFury in Phase AAK), AnimalSavagery's audit claim of "fully unimplemented" was
+substantially correct: the scaffolding (step class, commands, enums, reports, dice/injury/
+adjacency helpers) all existed and were correct, but `StepAnimalSavagery::execute_step()` was a
+literal no-op stub and both editions' `skill_behaviour/*/animal_savagery_behaviour.rs` hook bodies
+always returned `false`.
+
+**What actually happened:**
+
+Ported the full mechanic directly into `execute_step()` (direct-in-step pattern, matching
+Dauntless/Wrestle/Stab/DumpOff — appropriate since AnimalSavagery has exactly one modifier per
+step, no multi-skill dispatch needed): negatrait gate (`TurnMode::check_negatraits`), the
+confusion-skill roll (`minimum_roll_confusion` + skill/team re-roll chain, same plain-string-tag
+convention as Dauntless/UnchannelledFury since `ReRolledActionFactory` isn't ported),
+`canLashOutAgainstOpponents` skill-use dialog, adjacent-target computation, multi-target
+`PlayerChoice` dialog, and `lash_out` (injury application via `handle_injury` with edition-correct
+`InjuryTypeBlock::Mode`, end-turn deferred-command wiring via `SteadyFootingContext`/
+`StandingUpCommand`/`AnimalSavageryCancelActionCommand`/`AnimalSavageryControlCommand`, and the
+`fallbackAction`/`cancelPlayerAction` state machine). Added `BlockMode::DoNotUseModifiers` /
+`UseArmourModifiersOnlyAgainstTeamMates` to `injury/injuryType/injury_type_block.rs` (matching
+Java's `Mode.DO_NOT_USE_MODIFIERS`/`Mode.USE_ARMOUR_MODIFIERS_ONLY_AGAINST_TEAM_MATES` — the fuller
+armour-modifier-gating behavior they're supposed to drive is a pre-existing, out-of-scope gap
+already documented in that file, they currently behave like `Regular`/
+`UseModifiersAgainstTeamMates`). Added `SteadyFootingContext::from_drop_player_with_commands`
+(missing constructor overload). Reproduced two Java quirks bug-for-bug: (a) with no unused
+`canLashOutAgainstOpponents` skill, the lash-out target pool defaults to the acting player's own
+team, not the opponent's (matches `team = game.getActingTeam()` default); (b) an
+already-used-this-drive AnimalSavagery silently proceeds with no failure status, matching Java's
+`hasUnusedSkill` gate never setting `ActionStatus.FAILURE`. Noted, did not fix: `InjuryTypeBlock`'s
+Rust `roll_armour` param is a pre-existing semantic drift from Java's `allowAttackerChainsaw` (same
+constructor position, different meaning) — passed `true` since the Rust field actually gates
+whether armor is rolled at all, and skipping it (matching Java's literal `false` argument) would
+silently drop the armor+injury roll entirely.
+
+Tests: 17,552 → **17,585** (+33). 0 failures. `cargo clippy` shows the same 2 pre-existing errors
+unrelated to this session's files (`step_eject_player.rs`/`step_reset_fumblerooskie.rs`). No
+parity/integration testing (per standing instruction).
+
+**What's left, not part of this phase's scope**: Tentacles and CloudBurster — both confirmed
+genuinely unimplemented (not sizing errors, per the AnimalSavagery precedent showing not every
+remaining item is a false alarm). CloudBurster additionally needs a whole new standalone
+`StepCloudBurster` (Java registers it as its own step, not a `StepModifier` hook — a different
+mechanism than every other item in this audit). Honest completion estimate: roughly **~99.6%**
+true behavioral completion of in-scope logic — expect **2 more phases** to close the rest, after
+which parity/integration testing against the Java engine becomes the natural next major
+workstream.
+
+---
+
+## Prior Status (2026-07-13, Phase AAK done — closed batching-order items 8 and
 9-partial (Shadowing, UnchannelledFury) of `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`;
 FoulAppearance re-verified as already complete.)
 

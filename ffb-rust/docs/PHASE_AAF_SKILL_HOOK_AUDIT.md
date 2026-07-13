@@ -222,6 +222,20 @@ pre-existing, out of scope.
 Remaining open items: AnimalSavagery, Tentacles, CloudBurster (all confirmed genuinely
 unimplemented, not sizing errors).
 
+## Phase AAL update (closed AnimalSavagery of item 9)
+
+**AnimalSavagery** is **closed**. Unlike Shadowing/UnchannelledFury above, this one genuinely was
+"fully unimplemented" as originally claimed: `StepAnimalSavagery::execute_step()` was a literal
+no-op stub, and both bb2020/bb2025 `skill_behaviour/*/animal_savagery_behaviour.rs` hook bodies
+always returned `false` — despite the surrounding scaffolding (step class field plumbing,
+deferred commands, enums, reports, dice/injury/adjacency helpers) being fully present and
+correct. Ported the full mechanic directly into `execute_step()` (direct-in-step, matching
+Dauntless/Wrestle/Stab/DumpOff): negatrait gate, confusion roll + re-roll chain, lash-out
+skill-use dialog + adjacent-target computation, multi-target `PlayerChoice` dialog, and
+`lash_out`'s injury application + end-turn deferred-command wiring + fallback/cancel state
+machine. Added two new `BlockMode` variants to `InjuryTypeBlock` for the edition-correct injury
+mode. 33 new tests. Remaining open items: Tentacles, CloudBurster.
+
 ## Recommended phase-batching order
 
 Ordered roughly by (a) how many skills unlock per unit of work and (b) how

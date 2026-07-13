@@ -138,6 +138,13 @@ impl SteadyFootingContext {
         Self { inner: SteadyFootingInner::DropPlayer(Box::new(ctx)), deferred_commands: Vec::new() }
     }
 
+    /// Java: `new SteadyFootingContext(dropPlayerContext, deferredCommands)` — drop-player
+    /// context with deferred commands (e.g. Animal Savagery's end-turn `StandingUpCommand` /
+    /// `AnimalSavageryCancelActionCommand` / `AnimalSavageryControlCommand` chain).
+    pub fn from_drop_player_with_commands(ctx: DropPlayerContext, commands: Vec<Arc<dyn DeferredCommand>>) -> Self {
+        Self { inner: SteadyFootingInner::DropPlayer(Box::new(ctx)), deferred_commands: commands }
+    }
+
     pub fn from_injury_result(result: InjuryResult) -> Self {
         Self { inner: SteadyFootingInner::InjuryResult(Box::new(result)), deferred_commands: Vec::new() }
     }
@@ -242,6 +249,14 @@ mod tests {
         assert_eq!(ctx.get_player_id(), Some("p2"));
         assert!(ctx.drop_player_context().is_some());
     }
+    #[test]
+    fn steady_footing_from_drop_player_with_commands_stores_both() {
+        let dpc = DropPlayerContext { player_id: Some("p3".into()), ..Default::default() };
+        let ctx = SteadyFootingContext::from_drop_player_with_commands(dpc, vec![]);
+        assert_eq!(ctx.get_player_id(), Some("p3"));
+        assert!(ctx.deferred_commands.is_empty());
+    }
+
     #[test]
     fn steady_footing_from_drop_player_context_stores_context() {
         let ctx_drop = DropPlayerContext::new();
