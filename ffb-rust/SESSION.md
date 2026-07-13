@@ -1,6 +1,46 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-13, Phase AAL done — closed batching-order item 9's
+## Current Status (2026-07-13, Phase AAM done — closed batching-order item 9's
+Tentacles of `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`.)
+
+Mixed result within a single item, same lesson as every phase in this series — verify before
+assuming the audit doc's size estimate: the **BB2016** variant (`step/bb2016/move_/
+step_tentacles.rs`) was already a complete, correct 1:1 port (holder lookup, 2d6 escape-roll
+contest, hold-in-place) and needed no change. The **BB2020/BB2025** variant (`step/mixed/move_/
+step_tentacles.rs`) really was a from-scratch gap: `execute_step` never looked up adjacent
+Tentacles holders, never rolled the strength contest, and never held the mover in place — it
+short-circuited straight to `NextStep`/a bare `goto`, with a comment admitting "in the absence of
+the full hook infrastructure, immediately advance."
+
+**What actually happened:** ported `TentaclesBehaviour.java` (bb2020 + bb2025, byte-identical
+except one trigger condition) directly into `step_tentacles.rs`'s `execute_step` (mirroring the
+BB2016 file's own established structure, plus the `StepShadowing`/re-roll plumbing pattern already
+in this codebase): eligible-holder lookup via `UtilPlayer::find_adjacent_opposing_players_with_skill`
+centred on the mover's `coordinate_from` (not the acting player's own square — the audit's
+flagged subtlety, correctly distinct from Shadowing's lookup), trigger condition `dodging ||
+jumping` (plus a BB2020-only extra `has_blocked && coordinate_from.is_some()` trigger BB2025
+lacks), 1d6 strength contest (`min_roll = max(6 - stDifference, 2)`) with re-roll offered to and
+consumed by the **defender** (the Tentacles player) — not the acting player, a real edition
+difference from BB2016 where the escaping player re-rolls — and hold-in-place resolution
+(cancels dodging/jumping, moves mover+ball back to `coordinate_from`). Reproduced one Java quirk
+faithfully: `goToLabelOnSuccess` is a mandatory init parameter that BB2020/2025's behaviour never
+actually reads (always resolves via `NEXT_STEP`, unlike BB2016 which does `GOTO_LABEL` on
+success) — kept as dead-but-required plumbing to match Java.
+
+Tests: 17,585 → **17,595** (+10). 0 failures. `cargo clippy` shows the same 2 pre-existing errors
+unrelated to this session's files (`step_eject_player.rs`/`step_reset_fumblerooskie.rs`). No
+parity/integration testing (per standing instruction).
+
+**What's left, not part of this phase's scope**: CloudBurster — the last item in the audit,
+confirmed genuinely unimplemented and structurally different from every other item (Java
+registers it as a whole standalone `StepCloudBurster` step, not a `StepModifier` hook; no Rust
+`StepCloudBurster` exists at all yet). Honest completion estimate: roughly **~99.8%** true
+behavioral completion of in-scope logic — expect **1 more phase** to close it, after which
+parity/integration testing against the Java engine becomes the natural next major workstream.
+
+---
+
+## Prior Status (2026-07-13, Phase AAL done — closed batching-order item 9's
 AnimalSavagery of `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`, BB2020 + BB2025.)
 
 Unlike the other item-9 skills that turned out mostly done on re-verification (Shadowing,

@@ -236,6 +236,18 @@ skill-use dialog + adjacent-target computation, multi-target `PlayerChoice` dial
 machine. Added two new `BlockMode` variants to `InjuryTypeBlock` for the edition-correct injury
 mode. 33 new tests. Remaining open items: Tentacles, CloudBurster.
 
+## Phase AAM update (closed Tentacles of item 9)
+
+**Tentacles** is **closed**. Mixed result: BB2016 (`step/bb2016/move_/step_tentacles.rs`) was
+already a complete, correct port needing no change — a false "large" like most of this series.
+BB2020/BB2025 (`step/mixed/move_/step_tentacles.rs`) was a genuine from-scratch gap like
+AnimalSavagery: `execute_step` short-circuited straight to `NextStep` with no holder lookup, roll,
+or hold-in-place logic at all. Ported `TentaclesBehaviour.java` (bb2020+bb2025) directly into the
+step: holder lookup centred on the mover's `coordinate_from` (not the acting player's square —
+confirmed distinct from Shadowing's lookup per this doc's original note), 1d6 strength contest
+w/ re-roll owned by the defender (Tentacles player, not the acting player — a real edition
+difference from BB2016), hold-in-place resolution. 10 new tests. Remaining open item: CloudBurster.
+
 ## Recommended phase-batching order
 
 Ordered roughly by (a) how many skills unlock per unit of work and (b) how

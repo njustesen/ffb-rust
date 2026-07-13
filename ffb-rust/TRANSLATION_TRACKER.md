@@ -29,6 +29,25 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AAM (closed skill-hook-audit item 9's Tentacles, this session):**
+Mixed result: BB2016 (`step/bb2016/move_/step_tentacles.rs`) was already complete and correct, no
+change needed. BB2020/BB2025 (`step/mixed/move_/step_tentacles.rs`) was a genuine from-scratch
+gap — `execute_step` short-circuited to `NextStep` with no holder lookup/roll/hold-in-place logic.
+Ported `TentaclesBehaviour.java` (bb2020+bb2025, byte-identical except one trigger condition)
+directly into the step: eligible-holder lookup via `UtilPlayer::find_adjacent_opposing_players_with_skill`
+centred on the mover's `coordinate_from`, `dodging || jumping` trigger (plus a BB2020-only
+`has_blocked` extra trigger), 1d6 strength contest (`min_roll = max(6 - stDifference, 2)`) with
+re-roll owned by the defender (Tentacles player) — a real edition difference from BB2016 where the
+escaping player re-rolls — and hold-in-place resolution (cancel dodging/jumping, move mover+ball
+back to `coordinate_from`). Reproduced one Java quirk: `goToLabelOnSuccess` is a mandatory but
+dead init parameter in BB2020/2025 (always resolves via `NEXT_STEP`, unlike BB2016).
+
+Tests: 17,585 → 17,595 (+10), 0 failures. No parity/integration testing
+(deferred, per instruction). **Honest completion estimate**: roughly ~99.8% true behavioral
+completion of in-scope logic — only CloudBurster remains; expect 1 more phase to close it, after
+which parity/integration testing against the Java engine becomes the natural next major
+workstream. Full writeup: `SESSION.md` Current Status.
+
 **Phase AAL (closed skill-hook-audit item 9's AnimalSavagery, this session):**
 Unlike Shadowing/UnchannelledFury in the prior phase, this item's "fully unimplemented" audit
 claim was correct: `StepAnimalSavagery::execute_step()` was a no-op stub and both editions'
