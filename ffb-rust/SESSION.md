@@ -1,6 +1,132 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-13, Phase AAN done — closed the last item of
+## Current Status (2026-07-13, Phase AAO done — closes the skill-hook audit's genuinely last
+loose thread (`insertHooks`/`PASS_INTERCEPT`), fixes one real correctness bug that 8 phases
+mistook for clippy noise, and reverses course on a planned dead-file cleanup after direct
+verification showed it wasn't safe.)
+
+Ran the user's "plan the next major step, prioritize unit tests, no parity yet" request as a
+fresh plan (`~/.claude/plans/plan-the-next-major-idempotent-charm.md`), since Phase AAN had just
+closed the entire skill-hook-audit series. Three parallel research sweeps (TODO/stub clusters,
+clippy health, and every "deferred"/"out of scope" note in this file's history) surfaced the next
+concrete, non-parity gaps. Four things happened, in priority order:
+
+**1. Real bug fix: `step_reset_fumblerooskie.rs`.** `cargo clippy` had flagged the exact same "2
+pre-existing errors" across ~8 phases without anyone checking if they were real. They turned out
+to be two *different* files than what recent memory claimed, and one was a genuine translation
+bug, not noise: the condition `self.end_player_action || (ball_carrier_standing &&
+self.end_player_action)` (crates/ffb-engine/src/step/mixed/move_/step_reset_fumblerooskie.rs:76)
+had silently dropped Java's `!isNextMovePossible(game, jumping)` clause from **both** of
+`StepResetFumblerooskie.start()`'s conditions (`ballMoving` reset and the
+sound+report branch), making the report-emission branch unreachable unless `endPlayerAction` was
+already true. `UtilPlayer::is_next_move_possible` already existed and was already used correctly
+elsewhere (`step_end_blocking.rs`, `step_end_moving.rs`, `step_end_fouling.rs`, `step_end_passing.rs`)
+— just never wired into this one file. Fixed to match Java exactly; added 2 regression tests
+(`fumblerooskie_report_added_when_standing_but_next_move_impossible`,
+`no_fumblerooskie_report_when_standing_and_next_move_possible`) proving the previously-unreachable
+branch now fires and the previously-forced branch now correctly does *not* fire when the player
+can still move.
+
+**2. Real bug fix: `step_eject_player.rs`.** The `has_sneaky_git && false` placeholder
+(bb2016/foul/step_eject_player.rs:56) was stale, not deliberate — its own comment said "hardcoded
+false until options are ported," but the `sneakyGitBanToKo` game option had in fact already been
+ported (used correctly in `skill_behaviour/bb2025/sneaky_git_behaviour.rs`). Wired
+`game.options.is_enabled("sneakyGitBanToKo")` in for real, matching the sibling BB2025 file's
+established pattern.
+
+**3. Also fixed a genuine `overly_complex_bool_expr` clippy error found via the actual
+`--all-targets` run** (the OLD "2 pre-existing errors" note in this file misnamed the second file
+for at least 8 phases — it was never `step_reset_fumblerooskie.rs`, it was
+`step::action::ttm::util_throw_team_mate_sequence.rs:127`'s `assert!(result.in_bounds ||
+!result.in_bounds)`, a tautological placeholder test assertion). Replaced with real assertions
+(`assert!(result.in_bounds); assert_ne!(result.last_valid_coordinate, start)`). `cargo clippy
+--workspace --all-targets` is now **fully clean** for the first time in this project's recorded
+history.
+
+**4. Built the generic `insertHooks`/`PASS_INTERCEPT` mechanism** — the one item explicitly named
+as the "known ~0.1% gap" when Phase AAN closed the skill-hook audit. Verified against Java
+(`StepFactory.getSteps`/`Sequence.insertHooks`) that this mechanism is much simpler than it
+sounds: across the *entire* Java server, exactly two `IStep` classes carry `@StepHook`, each
+scoped to one edition — `StepSafeThrow` (`@RulesCollection(BB2016)`) and the nested
+`CloudBursterBehaviour.StepCloudBurster` (`@RulesCollection(BB2020)`). BB2025 registers *nothing*
+for `PASS_INTERCEPT` — confirmed this is what real Java's own `StepFactory` produces for that
+edition too (not a gap this phase invented). Added `skill_behaviour::step_hook::hooked_steps(Rules,
+HookPoint) -> &[StepId]`, an explicit static table substituting for Java's reflection-based
+`Scanner` (same established convention as `LogicPluginFactory`), plus `Sequence::insert_hooks`
+wired into all three pass generators (`generator/bb2016/pass.rs`, `bb2020/pass.rs`,
+`bb2025/pass.rs`). `StepSafeThrow` and `StepCloudBurster` — both fully implemented and unit-tested
+since Phases AAF/AAN but previously unreachable from any live sequence — are now spliced into the
+pass sequence for real. 3 integration tests (one per edition) prove the step is inserted
+immediately after `INTERCEPT` with the right `GOTO_LABEL_ON_FAILURE`, and that BB2025 inserts
+nothing.
+
+**5. Reversed course on the planned dead-`skill_behaviour/*.rs` cleanup — this is the important
+finding of the session.** The plan's step 4 assumed `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`'s
+"confirmed dead duplicate" classification (~30 named files) was still safe to delete as pure
+hygiene. Direct re-verification (which the plan itself called for, anticipating 6 phases of
+`registry.rs` churn since the audit) found this premise **stale**: every single one of those ~30
+files is actually referenced — not by `registry.rs` (the `dispatch::execute_step_hooks` registry
+the audit checked), but by a *different*, previously-unnoticed registry:
+`UtilSkillBehaviours::register_behaviours` (`crates/ffb-engine/src/util/util_skill_behaviours.rs`).
+This is itself a real, faithful, well-tested 1:1 port of Java's `UtilSkillBehaviours.
+registerBehaviours` (explicit registration substituting for the reflection `Scanner`, same
+convention as everywhere else) — it builds the full per-edition `Vec<Box<dyn SkillBehaviour>>`
+and has 11 of its own passing unit tests asserting edition-specific composition (e.g. "bb2016
+includes Leap not in bb2025", "bb2020 includes BrutalBlock"). Deleting the "dead" files would have
+broken this real translation and destroyed its tests — a materially worse outcome than the "small,
+pure hygiene, no risk" the plan assumed. **No files were deleted this phase.** The genuinely new
+finding: `UtilSkillBehaviours::register_behaviours` itself is never called anywhere outside its
+own tests (confirmed via grep — the only two other references are TODO-style comments in
+`ffb-server/src/handler/server_command_handler_join_approved.rs` noting it isn't wired into
+`GameState`/`JoinApproved` construction yet). That's a real, scoped, well-defined future gap in
+its own right — arguably more valuable to close than the file-deletion task it replaces, since it
+would make ~30 currently-dead behaviour files newly reachable at once. Flagged for a future phase,
+not started here (out of this phase's approved scope).
+
+Tests: 17,609 → **17,621** (+12: +2 step_reset_fumblerooskie regression, +4 step_hook::hooked_steps
+unit tests, +3 Sequence::insert_hooks unit tests, +3 per-edition pass-generator integration tests).
+0 failures throughout. `cargo clippy --workspace --all-targets`: **0 errors** (down from 2,
+unchanged for ~8 prior phases — first time this project has had a fully clean clippy run).
+`cargo build -p ffb-server` reconfirmed green after touching `step/framework.rs`-adjacent types
+(past phases have broken this via non-exhaustive matches on shared enums). No parity/integration
+testing (per standing instruction).
+
+**Honest completion estimate**: roughly **~98%** true behavioral completion of in-scope logic —
+up from ~97-98% at the start of this phase. This closes the last named piece of the just-finished
+skill-hook-audit series and fixes a real, long-ignored correctness bug, but does not touch the
+larger remaining clusters surfaced by this session's research (all deliberately out of scope,
+sized during research, listed below).
+
+**What's left, roughly in priority order** (each its own future phase):
+1. **`UtilSkillBehaviours::register_behaviours` wiring** (new finding this phase, not previously
+   documented) — a real, tested, faithful translation that's simply never called from
+   `GameState`/`JoinApproved` construction. Wiring it in would make ~30 currently-unreachable
+   `skill_behaviour/*.rs` files (previously miscategorized as "dead duplicates") live for the
+   first time. Small-to-medium; needs care since some of those files may duplicate logic already
+   ported directly into `step_xxx.rs` files by past phases (Wrestle/Stab/DumpOff/Bombardier
+   precedent) — wiring this in could double-apply behavior if not checked file-by-file first.
+2. **InducementSet model port** — largest remaining item, unblocks ZappedPlayer substitution,
+   apothecary Igor/Raise-Dead/Getting-Even, PitTrap (needs `StepPlayCard`), WitchBrew RNG
+   threading into the `CardHandler` trait. Large.
+3. **`pass_behaviour.rs`'s full `PassStepModifier` hook** (27 "headless:" markers) — needs new
+   `AgentPrompt` dialog wiring for pass-related skill choices. Large.
+4. Armour-modifier-gating for `BlockMode::DoNotUseModifiers`/`UseArmourModifiersOnlyAgainstTeamMates`
+   (`injury_type_block.rs` + sibling files sharing the same "complex modifier stub" pattern).
+   Small-medium.
+5. Dialog-auto-decline simplifications (`step_juggernaut.rs`, `step_wrestle.rs`,
+   `step_dump_off.rs`, `step_drop_falling_players.rs`'s full team-reroll/Piling-On path). Small
+   each, several files.
+6. `util_server_db.rs`/`util_server_http_client.rs` — both intentionally-deferred `todo!()`
+   stubs, documented as such, not really "gaps."
+
+Expect **3-5 more phases** to close items 2-5 above and reach ~99.5-100% true in-scope behavioral
+completion — after which Java/Rust parity/integration testing (currently only 8 sample seeds in
+`progress.html`/`parity/`, one known FAIL) becomes the natural following workstream, as flagged by
+every recent phase's own closing note.
+
+---
+
+## Prior Status (2026-07-13, Phase AAN done — closed the last item of
 `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`: CloudBurster. **The skill-behaviour-hook audit is now
 fully closed, all 9 batching-order items resolved.**)
 

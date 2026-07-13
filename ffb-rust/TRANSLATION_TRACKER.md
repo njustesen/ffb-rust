@@ -29,6 +29,31 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AAO (closes the skill-hook audit's last loose thread, fixes a real correctness bug,
+reverses course on a planned dead-file cleanup):**
+1. Fixed `step_reset_fumblerooskie.rs`: a lost `!isNextMovePossible` clause made its
+   report-emission branch unreachable unless `end_player_action` was already true. Now matches
+   Java's `StepResetFumblerooskie.start()` exactly. 2 new regression tests.
+2. Fixed `step_eject_player.rs`'s stale `&& false` placeholder — the `sneakyGitBanToKo` option
+   was already ported elsewhere; wired it in for real.
+3. Fixed a genuine clippy `overly_complex_bool_expr` in
+   `util_throw_team_mate_sequence.rs` (tautological test assertion) — `cargo clippy --workspace
+   --all-targets` is now fully clean for the first time in this project.
+4. Built the generic `insertHooks`/`PASS_INTERCEPT` mechanism (`skill_behaviour::step_hook::
+   hooked_steps` + `Sequence::insert_hooks`), wired into all 3 pass generators. `StepSafeThrow`
+   (BB2016) and `StepCloudBurster` (BB2020) — implemented since Phases AAF/AAN but unreachable —
+   are now spliced into the live pass sequence. BB2025 correctly inserts nothing (matches real
+   Java). 3 edition-level integration tests.
+5. **Did not** delete the ~30 `skill_behaviour/*.rs` files the audit called "dead duplicates" —
+   direct re-verification found every one is actually referenced by
+   `UtilSkillBehaviours::register_behaviours`, a real, tested translation of Java's reflection
+   registry that just isn't wired into `GameState` construction yet. Flagged as a new, more
+   valuable future gap instead of deleting.
+
+Tests: 17,609 → 17,621 (+12), 0 failures. `cargo clippy --workspace --all-targets`: 0 errors (down
+from 2). No parity/integration testing (per instruction). Full writeup: `SESSION.md` Current
+Status.
+
 **Phase AAN (closed skill-hook-audit item 9's CloudBurster — audit fully complete, this
 session):**
 CloudBurster is a whole standalone step in Java (`registerStep`, not `StepModifier`) — no Rust
