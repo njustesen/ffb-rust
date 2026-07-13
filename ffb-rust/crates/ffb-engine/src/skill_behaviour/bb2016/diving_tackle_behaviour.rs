@@ -15,23 +15,12 @@ impl Default for DivingTackleBehaviour {
 impl SkillBehaviour for DivingTackleBehaviour {
     fn name(&self) -> &'static str { "DivingTackleBehaviour" }
 
-    /// Java `StepDivingTackle.handleExecuteStepHook` logic (condensed):
-    ///
-    /// 1. Compute the dodge roll that the dodging player must equal or beat,
-    ///    applying the −2 Diving Tackle modifier.
-    /// 2. If the dodge would still succeed even with the modifier → skip (no benefit).
-    /// 3. If the dodge would fail:
-    ///    a. Check for BreakTackle interaction: if the dodger has BreakTackle and
-    ///       their Strength offsets the DT penalty, skip.
-    ///    b. Ask the opposing team's coach to select a Diving Tackle player from
-    ///       the set of eligible tacklers adjacent to the target square.
-    ///    c. On confirmation:
-    ///       → publish `USING_DIVING_TACKLE`.
-    ///       → place the chosen defender in the target square (they are laid prone).
-    ///       → `setNextAction(GOTO_LABEL, state.gotoLabelOnSuccess)`.
-    ///
-    /// TODO(hook-infra): step-specific state (StepState diving-tackle player-id,
-    ///                   StepState.gotoLabelOnSuccess, dodge modifier context).
+    /// Dead stub (Phase AAJ): Diving Tackle's real logic — dodge-modifier recomputation
+    /// (with/without Break Tackle), eligible-tackler lookup, and the coach-choice dialog
+    /// round-trip — is ported directly into `step/action/move_/step_diving_tackle.rs`
+    /// (`execute_step_bb2016`), matching the established Wrestle/Stab/DumpOff/Dauntless
+    /// direct-in-step convention. This `skill_behaviour/` hook is never reached (not wired
+    /// through `dispatch::execute_step_hooks`) and stays a harmless registered no-op.
     fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
         false
     }

@@ -517,6 +517,7 @@ impl StepEndBlocking {
             return StepOutcome::cont().with_prompt(AgentPrompt::PlayerChoice {
                 eligible_players: eligible,
                 reason: "pileDriver".to_string(),
+                descriptions: vec![],
             });
         }
 

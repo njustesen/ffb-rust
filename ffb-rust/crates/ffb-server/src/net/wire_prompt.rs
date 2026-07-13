@@ -205,7 +205,11 @@ pub enum WireDialog {
     Journeymen { #[serde(rename = "teamId")] team_id: String, count: i32 },
 
     #[serde(rename = "PLAYER_CHOICE")]
-    PlayerChoice { #[serde(rename = "eligiblePlayers")] eligible_players: Vec<String>, reason: String },
+    PlayerChoice {
+        #[serde(rename = "eligiblePlayers")] eligible_players: Vec<String>,
+        reason: String,
+        #[serde(rename = "descriptions")] descriptions: Vec<String>,
+    },
 
     #[serde(rename = "SELECT_POSITION")]
     SelectPosition { #[serde(rename = "availablePositions")] available_positions: Vec<String> },
@@ -349,8 +353,8 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
             Some(WireDialog::WizardSpell { team_id: team_id.clone(), target_coord: *target_coord }),
         AgentPrompt::Journeymen { team_id, count } =>
             Some(WireDialog::Journeymen { team_id: team_id.clone(), count: *count }),
-        AgentPrompt::PlayerChoice { eligible_players, reason } =>
-            Some(WireDialog::PlayerChoice { eligible_players: eligible_players.clone(), reason: reason.clone() }),
+        AgentPrompt::PlayerChoice { eligible_players, reason, descriptions } =>
+            Some(WireDialog::PlayerChoice { eligible_players: eligible_players.clone(), reason: reason.clone(), descriptions: descriptions.clone() }),
         AgentPrompt::SelectPosition { available_positions } =>
             Some(WireDialog::SelectPosition { available_positions: available_positions.clone() }),
         AgentPrompt::SelectSkill { player_id, available } =>

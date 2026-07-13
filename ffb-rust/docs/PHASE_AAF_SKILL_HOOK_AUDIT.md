@@ -178,6 +178,20 @@ verified: no dodge-modifier math, no dialog round-trip, and no eligible-tackler 
 anywhere in Rust yet (contrary to a stale doc comment implying partial porting) — treat as its
 own phase, not bundled with anything else.
 
+## Phase AAJ update (closed item 7)
+
+Item 7 (StepDivingTackle) is **closed**. Ported all three editions' dodge-modifier math, the
+eligible-tackler lookup (`UtilPlayer::find_diving_tacklers`/`find_eligible_diving_tacklers`), and
+the coach-choice dialog round-trip (extending `AgentPrompt::PlayerChoice` with a `descriptions`
+field) directly into `step_diving_tackle.rs`. **Correction to this doc's own item-7 note**: the
+"likely dependency on the also-unported StepDropDivingTackler" concern was stale —
+`StepDropDivingTackler` (both variants) was already fully implemented, tested, and wired into
+every move/blitz-move sequence generator; direct verification found no work needed there. See
+`SESSION.md`'s Phase AAJ entry for full details, including one out-of-scope pre-existing gap
+surfaced along the way (BB2020/BB2025's Break Tackle/Incorporeal stat-based dodge modifiers are
+not wired into `step_move_dodge.rs`'s own base-dodge computation — `DivingTackle` reuses the same
+primitives and inherits the limitation rather than fixing it).
+
 ## Recommended phase-batching order
 
 Ordered roughly by (a) how many skills unlock per unit of work and (b) how

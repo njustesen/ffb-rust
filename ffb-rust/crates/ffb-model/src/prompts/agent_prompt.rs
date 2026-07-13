@@ -156,6 +156,11 @@ pub enum AgentPrompt {
     PlayerChoice {
         eligible_players: Vec<PlayerId>,
         reason: String,
+        /// Java: `DialogPlayerChoiceParameter.descriptions` — a flat list of explanatory
+        /// tooltip strings for the dialog as a whole (NOT parallel/indexed to
+        /// `eligible_players` — Java's own call sites pass 0 or 1 entries regardless of how
+        /// many eligible players there are). Empty when the Java call site passes `null`.
+        descriptions: Vec<String>,
     },
     SelectPosition {
         available_positions: Vec<String>,

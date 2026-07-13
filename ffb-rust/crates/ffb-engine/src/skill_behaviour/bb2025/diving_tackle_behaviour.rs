@@ -9,6 +9,11 @@ use ffb_model::model::game::Game;
 // Java: Prompts the defending team to activate Diving Tackle when eligible tacklers are adjacent, applying a dodge modifier that can cause the dodging player's roll to fail or force use of Break Tackle.
 pub struct DivingTackleStepModifier;
 
+/// Dead stub (Phase AAJ): registered for `StepId::DivingTackle` but unreachable — like Dauntless
+/// before Phase AAH, `step_diving_tackle.rs` never calls `dispatch::execute_step_hooks`. The real
+/// logic (dodge-modifier recomputation, eligible-tackler lookup, coach-choice dialog round-trip)
+/// is ported directly into `step/action/move_/step_diving_tackle.rs`'s `execute_step_stat_edition`,
+/// matching the established Wrestle/Stab/DumpOff/Dauntless direct-in-step convention.
 impl StepModifierTrait for DivingTackleStepModifier {
     fn applies_to(&self, step_id: StepId) -> bool { step_id == StepId::DivingTackle }
     fn priority(&self) -> i32 { 0 }
@@ -36,7 +41,7 @@ impl SkillBehaviour for DivingTackleBehaviour {
     fn name(&self) -> &'static str { "DivingTackleBehaviour" }
 
     fn execute_step_hook(&self, game: &mut ffb_model::model::game::Game) -> bool {
-        // Java StepModifier.handleExecuteStepHook: complex pushback/dodge interception logic; checks acting player has DivingTackle, shows dialog.
+        // Dead stub (Phase AAJ) — see DivingTackleStepModifier's doc comment above.
         let has_skill = game.acting_player.player_id.as_deref()
             .and_then(|id| game.player(id))
             .map(|p| p.has_skill(SkillId::DivingTackle))
@@ -44,7 +49,6 @@ impl SkillBehaviour for DivingTackleBehaviour {
         if !has_skill {
             return false;
         }
-        // TODO(hook-infra): step-specific state access (StepState pushback mode, dodge target selection, player prone mutation) not yet available
         false
     }
 }

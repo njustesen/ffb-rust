@@ -807,6 +807,7 @@ impl StepCatchScatterThrowIn {
                 self.pending_prompt = Some(AgentPrompt::PlayerChoice {
                     eligible_players: self.diving_catchers.clone(),
                     reason: ctrl_team,
+                    descriptions: vec![],
                 });
             }
         }

@@ -39,7 +39,13 @@ impl Default for DivingTackleBehaviour {
 impl SkillBehaviour for DivingTackleBehaviour {
     fn name(&self) -> &'static str { "DivingTackleBehaviour" }
 
-    /// TODO(hook-infra): step-specific state access not yet wired.
+    /// Dead stub (Phase AAJ): the BB2020 eligibility-lookup difference documented above is
+    /// ported for real in `UtilPlayer::find_diving_tacklers`/`find_eligible_diving_tacklers`
+    /// (`ffb-model/src/util/util_player.rs`), and the full dodge-math/dialog logic lives
+    /// directly in `step/action/move_/step_diving_tackle.rs` (`execute_step_stat_edition`),
+    /// matching the established Wrestle/Stab/DumpOff/Dauntless direct-in-step convention. This
+    /// `skill_behaviour/` hook is never reached (not wired through
+    /// `dispatch::execute_step_hooks`) and stays a harmless registered no-op.
     fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
         false
     }

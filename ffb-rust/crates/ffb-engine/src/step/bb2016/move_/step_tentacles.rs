@@ -69,6 +69,7 @@ impl StepTentacles {
                         let prompt = ffb_model::prompts::AgentPrompt::PlayerChoice {
                             eligible_players: tentaclers,
                             reason: "TENTACLES".into(),
+                            descriptions: vec![],
                         };
                         return StepOutcome::cont().with_prompt(prompt);
                     } else {

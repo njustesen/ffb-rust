@@ -1,6 +1,71 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-13, Phase AAI done — closed batching-order items 5 and 6 of
+## Current Status (2026-07-13, Phase AAJ done — closed batching-order item 7 of
+`docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`: Diving Tackle, all three rule editions.)
+
+**Key correction found this session (same lesson as every recent phase)**: the audit doc's item 7
+writeup claimed a likely dependency on "the also-unported StepDropDivingTackler" — direct
+verification found both `StepDropDivingTackler` variants (bb2016 and mixed/BB2020+BB2025) were
+already fully implemented, tested (5+4 tests), and wired into every move/blitz-move sequence
+generator across all three editions. No work was needed there; the actual gap was entirely in
+Diving Tackle itself, which two independent research passes confirmed was the largest remaining
+single-skill gap on the list (eligibility lookup, dodge-modifier math, and dialog round-trip all
+absent — only stub files with descriptive comments existed).
+
+**What actually happened:**
+
+1. **Eligibility lookup** (`ffb-model/src/util/util_player.rs`): added `filter_thrower`,
+   `filter_attacker_and_defender`, `find_diving_tacklers` (shared BB2016/BB2020 filter chain,
+   differing only in `checkAbleToMove`: bb2016 `true`, bb2020 `false`), and
+   `find_eligible_diving_tacklers` (BB2025 — reuses `find_diving_tacklers` then applies the
+   `GameOptionId::DivingTackleLeavingTzOnly`-gated destination-adjacency exclusion, a genuine
+   per-edition difference, not a shared default).
+2. **`AgentPrompt::PlayerChoice` extended** with a `descriptions: Vec<String>` field
+   (`ffb-model/src/prompts/agent_prompt.rs`) mirroring `DialogPlayerChoiceParameter`'s shape — a
+   flat list of dialog-level explanatory strings, *not* indexed per-player (Java's own call sites
+   only ever pass 0 or 1 entries regardless of how many eligible players exist; an earlier design
+   assumption that it should be parallel to `eligible_players` was wrong and corrected before
+   writing the step logic). Added the matching `WireDialog::PlayerChoice` field +
+   `wire_prompt.rs` conversion arm, and updated all 8 existing `AgentPrompt::PlayerChoice`
+   construction sites (Tentacles, Shadowing ×3, PileDriver ×2, diving-catch-choice ×2).
+3. **`step_diving_tackle.rs`** (`step/action/move_/`): ported BB2016's 3-way branch
+   (would-fail-regardless / fails-only-with-strength-modifier / would-succeed-regardless) and
+   BB2020/BB2025's shared 4-way branch (adds a `StatBasedRollModifier` axis — in this codebase
+   only ever produced by BB2020's Gretchen-only, once-per-game `Incorporeal` skill; BB2025's
+   differently-scoped `Incorporeal`, an unrelated dodge-avoidance mechanic, never produces one —
+   hardcoded rather than routed through `Skill.stat_based_roll_modifier_factory`, which is an
+   unwired `String` placeholder across the whole codebase, a separate pre-existing gap out of
+   scope here). Minimum-roll math is computed inline, matching the real per-edition
+   `AgilityMechanic.minimumRollDodge` formulas exactly (bb2016 swaps agility for strength when a
+   use-strength modifier is present; bb2020/2025 subtract the stat-based-modifier value) —
+   implemented this way rather than via the `AgilityMechanic` trait because `DodgeModifier` has no
+   `Hash`/`Eq` impl and can't populate the trait's real `HashSet<DodgeModifier>` signature (the
+   same reason `step_move_dodge.rs` already bypasses the trait for its own dodge step). One Java
+   quirk (`strengthModifierCanBeAdded` re-checking the wrong modifier set, always false in that
+   branch) was reproduced bug-for-bug per translation ground rules rather than "fixed." Also
+   found and reproduced a genuine Java asymmetry: bb2016's post-success tail recheck omits the
+   Diving-Tackle dodge modifier that every other call site includes — caught by a failing test
+   before being understood, not assumed.
+4. **Doc-comment cleanup**: corrected the 3 dead `skill_behaviour/{bb2016,bb2020,bb2025}/
+   diving_tackle_behaviour.rs` stub files to point at the real step-file implementation (left
+   registered, matching the Wrestle/Stab/DumpOff/Dauntless precedent — not deleted).
+
+Tests: 17,533 → **17,544** (+11: 16 new/replaced tests in `step_diving_tackle.rs`, net of 5 old
+stub tests removed). 0 failures. `cargo clippy` shows the same 2 pre-existing errors unrelated to
+this session's files (`step_eject_player.rs`/`step_reset_fumblerooskie.rs`). No parity/
+integration testing (per standing instruction).
+
+**What's left, not part of this phase's scope**: audit item 8 (StepFoulAppearance's own gate —
+already effectively closed as a byproduct of Phase AAI's multi-block work per the prior status
+below) and item 9's large isolated skills (AnimalSavagery, Shadowing, Tentacles,
+UnchannelledFury, CloudBurster — the last of which needs a whole new `StepCloudBurster`, a
+different mechanism entirely). Honest completion estimate: roughly **~98.5-99%** true behavioral
+completion of in-scope logic — expect **2-4 more phases** to close the rest, after which parity/
+integration testing against the Java engine becomes the natural next major workstream.
+
+---
+
+## Prior Status (2026-07-13, Phase AAI done — closed batching-order items 5 and 6 of
 `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`: AbstractStepModifierMultipleBlock's re-roll dialog,
 JumpUp modifier wiring, Animosity mechanic.)
 

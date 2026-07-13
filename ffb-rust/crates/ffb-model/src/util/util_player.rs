@@ -354,6 +354,73 @@ impl UtilPlayer {
             .collect()
     }
 
+    /// 1:1 translation of filterThrower.
+    pub fn filter_thrower<'a>(game: &Game, players: Vec<&'a PlayerId>) -> Vec<&'a PlayerId> {
+        let thrower_id = game.thrower_id.as_deref();
+        players.into_iter().filter(|id| Some(id.as_str()) != thrower_id).collect()
+    }
+
+    /// 1:1 translation of filterAttackerAndDefender.
+    pub fn filter_attacker_and_defender<'a>(game: &Game, players: Vec<&'a PlayerId>) -> Vec<&'a PlayerId> {
+        let acting_id = game.acting_player.player_id.as_deref();
+        let defender_id = game.defender_id.as_deref();
+        players
+            .into_iter()
+            .filter(|id| Some(id.as_str()) != acting_id && Some(id.as_str()) != defender_id)
+            .collect()
+    }
+
+    /// 1:1 translation of the shared body of `DivingTackleBehaviour.handleExecuteStepHook`
+    /// (bb2016/bb2020 editions): findAdjacentOpposingPlayersWithProperty + filterThrower +
+    /// (DUMP_OFF turn mode ? filterAttackerAndDefender : identity).
+    /// bb2016 passes `check_able_to_move = true`; bb2020 passes `false`.
+    pub fn find_diving_tacklers<'a>(
+        game: &'a Game,
+        from: FieldCoordinate,
+        check_able_to_move: bool,
+    ) -> Vec<&'a PlayerId> {
+        let Some(acting_id) = game.acting_player.player_id.clone() else { return Vec::new(); };
+        let found = Self::find_adjacent_opposing_players_with_property(
+            game,
+            &acting_id,
+            from,
+            NamedProperties::CAN_ATTEMPT_TO_TACKLE_DODGING_PLAYER,
+            check_able_to_move,
+        );
+        let found = Self::filter_thrower(game, found);
+        if game.turn_mode == TurnMode::DumpOff {
+            Self::filter_attacker_and_defender(game, found)
+        } else {
+            found
+        }
+    }
+
+    /// 1:1 translation of findEligibleDivingTacklers (BB2025). Reuses `find_diving_tacklers`
+    /// with `check_able_to_move = false` (matching bb2020), then applies BB2025's additional
+    /// destination-adjacency exclusion when `GameOptionId.DIVING_TACKLE_LEAVING_TZ_ONLY` is enabled:
+    /// tacklers still adjacent to the square being moved *into* don't trigger Diving Tackle,
+    /// only ones being left behind.
+    pub fn find_eligible_diving_tacklers<'a>(
+        game: &'a Game,
+        from: FieldCoordinate,
+        to: FieldCoordinate,
+        leaving_tz_only: bool,
+    ) -> Vec<&'a PlayerId> {
+        let diving_tacklers = Self::find_diving_tacklers(game, from, false);
+        if diving_tacklers.is_empty() || !leaving_tz_only {
+            return diving_tacklers;
+        }
+        diving_tacklers
+            .into_iter()
+            .filter(|id| {
+                game.field_model
+                    .player_coordinate(id)
+                    .map(|c| !c.is_adjacent(to))
+                    .unwrap_or(true)
+            })
+            .collect()
+    }
+
     /// 1:1 translation of canFoul.
     pub fn can_foul(game: &Game, player_id: &str) -> bool {
         if let Some(coord) = game.field_model.player_coordinate(player_id) {

@@ -85,6 +85,7 @@ impl StepShadowing {
                         let prompt = ffb_model::prompts::AgentPrompt::PlayerChoice {
                             eligible_players: shadowers,
                             reason: "SHADOWING".into(),
+                            descriptions: vec![],
                         };
                         return StepOutcome::cont().with_prompt(prompt);
                     } else {

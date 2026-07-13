@@ -29,6 +29,44 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AAJ (closed skill-hook-audit batching item 7: Diving Tackle, this session):**
+Ported Diving Tackle end-to-end for all three rule editions — the single largest itemized gap
+left in `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`'s batching order (confirmed by direct research this
+session: none of the eligibility lookup, dodge-modifier math, or dialog round-trip existed in
+Rust before this phase, only stub files with descriptive comments). Following the established
+Wrestle/Stab/DumpOff/Dauntless "logic lives directly in the step" convention: (1) added
+`UtilPlayer::find_diving_tacklers`/`find_eligible_diving_tacklers` + `filter_thrower`/
+`filter_attacker_and_defender` (`ffb-model/src/util/util_player.rs`) — BB2016/BB2020 share one
+filter chain (differing only in `checkAbleToMove`); BB2025 adds the `GameOptionId::
+DivingTackleLeavingTzOnly`-gated destination-adjacency exclusion, a genuine per-edition
+difference. (2) Extended `AgentPrompt::PlayerChoice` with a `descriptions: Vec<String>` field
+(matching `DialogPlayerChoiceParameter`'s flat, non-per-player message list — not indexed to
+`eligible_players`) plus the matching `WireDialog`/`wire_prompt.rs` conversion arm, updating all
+8 existing call sites. (3) Ported `step_diving_tackle.rs`'s real logic: BB2016's 3-way branch and
+BB2020/BB2025's shared 4-way branch (an extra `StatBasedRollModifier` axis, in this codebase only
+ever produced by BB2020's Gretchen-only `Incorporeal` skill — hardcoded since the generic
+`Skill.stat_based_roll_modifier_factory` field is an unwired `String` placeholder across the
+whole codebase, an out-of-scope pre-existing gap). Dodge-modifier minimum-roll math is computed
+inline (matching the real per-edition `AgilityMechanic.minimumRollDodge` formulas exactly) rather
+than via the `AgilityMechanic` trait, because `DodgeModifier` has no `Hash`/`Eq` impl and can't
+populate the trait's `HashSet<DodgeModifier>` signature — the same reason `step_move_dodge.rs`
+already bypasses the trait. Reproduced one bug-for-bug Java quirk (`strengthModifierCanBeAdded`
+re-checking the wrong modifier set, always false in that branch) rather than "fixing" it, per
+translation ground rules. (4) `StepDropDivingTackler` (both bb2016 and mixed/BB2020+BB2025
+variants) turned out to already be fully implemented, tested, and wired into every move/blitz-move
+sequence generator — a stale claim in the audit doc's item-7 writeup, corrected by direct
+verification. (5) Corrected the 3 dead `skill_behaviour/*/diving_tackle_behaviour.rs` stub doc
+comments to point at the real step-file implementation (left registered, matching the Wrestle/
+Stab/DumpOff/Dauntless precedent).
+
+Tests: 17,533 → 17,544 (+11), 0 failures. No parity/integration testing (deferred, per
+instruction). **Honest completion estimate**: roughly ~98.5-99% true behavioral completion of
+in-scope logic — item 8 (StepFoulAppearance's own gate) was already effectively closed as a
+byproduct of Phase AAI's multi-block work; that leaves only item 9's large isolated skills
+(AnimalSavagery, Shadowing, Tentacles, UnchannelledFury, CloudBurster) — expect 2-4 more phases to
+close the rest, after which parity/integration testing against the Java engine becomes the
+natural next major workstream. Full writeup: `SESSION.md` Current Status.
+
 **Phase AAH (closed skill-hook-audit batching item 4: Dauntless/Indomitable/Juggernaut, this
 session):**
 Found the audit's "large"+"small" sizing for this item was stale — the real game logic already
