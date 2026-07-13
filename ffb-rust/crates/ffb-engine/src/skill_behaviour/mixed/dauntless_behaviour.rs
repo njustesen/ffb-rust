@@ -7,24 +7,20 @@ use ffb_model::enums::SkillId;
 
 /// Dauntless: can attempt to reduce the opponent ST for a block (multi-edition).
 ///
-/// Two step modifiers in Java:
+/// **This modifier is dead/unreachable code** (Phase AAH audit): it targets `StepId::Dauntless`,
+/// which no step ever dispatches through `dispatch::execute_step_hooks`. The real logic for both
+/// of Java's `DauntlessBehaviour` modifiers is ported directly into the step files instead — the
+/// same "direct-in-step" pattern already established for Wrestle/Stab/DumpOff/Bombardier:
 ///
-/// **Modifier 1 — StepDauntless (single-block path):**
-/// 1. Roll the Dauntless die.
-/// 2. On success: publish `ReportId::SUCCESSFUL_DAUNTLESS`; if the player has Indomitable
-///    and a re-roll is available, show the Indomitable dialog.
-/// 3. On failure: ask for a team re-roll if available (shows re-roll dialog).
-/// 4. Advance state via `StepState.status`.
+/// - **Modifier 1 (single-block, priority 2)** → `step/action/block/step_dauntless.rs`: the
+///   die-roll/re-roll/Blind-Rage-silent-reroll logic, chained with Indomitable's own priority-3
+///   modifier (`IndomitableBehaviour.java`, also ported directly into that same file — Rust has
+///   no separate `IndomitableStepModifier`; see `skill_behaviour/mixed/indomitable_behaviour.rs`,
+///   itself dead for the same reason).
+/// - **Modifier 2 (multi-block)** → `step/mixed/multiblock/step_dauntless_multiple.rs`.
 ///
-/// **Modifier 2 — StepDauntlessMultiple (multi-block path):**
-/// - Uses the `AbstractStepModifierMultipleBlock` pattern: on first run rolls each
-///   block target that `requiresRoll()`, collects re-roll availability, shows dialog
-///   or goes `NEXT_STEP`; on second run applies the chosen re-roll.
-///
-/// All step-local state fields are unavailable in the current Rust signature:
-// TODO(hook-infra): step-specific state (StepState.status)
-// TODO(hook-infra): step reroll fields (StepState.reRollTarget, StepState.reRollSource)
-// TODO(hook-infra): step-specific state (StepState.firstRun, StepState.blockTargets)
+/// Left registered (harmless — Java's `StepModifier` shape is what registration validates against,
+/// not reachability) rather than deleted, matching the precedent set for Wrestle/Stab/DumpOff.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.skillbehaviour.mixed.DauntlessBehaviour`.
 pub struct DauntlessBehaviour;
@@ -64,9 +60,8 @@ impl StepModifierTrait for DauntlessStepModifier {
 
     fn priority(&self) -> i32 { 2 }
 
-    // Java: Rolls the Dauntless dice check (with re-roll support) to determine if a weaker
-    // attacker can temporarily match the defender's strength for the block, publishing a
-    // successful result and optionally prompting for the Indomitable skill use.
+    // Dead — real logic lives directly in step/action/block/step_dauntless.rs (see the module
+    // doc comment above). Kept as a no-op to avoid dead duplicate logic.
     fn handle_execute_step(
         &self,
         _game: &mut ffb_model::model::game::Game,

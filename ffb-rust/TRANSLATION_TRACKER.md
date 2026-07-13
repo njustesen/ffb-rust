@@ -29,6 +29,30 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AAH (closed skill-hook-audit batching item 4: Dauntless/Indomitable/Juggernaut, this
+session):**
+Found the audit's "large"+"small" sizing for this item was stale — the real game logic already
+lived directly in Rust step files (`step_dauntless.rs`, `step_dauntless_multiple.rs`,
+`step_double_strength.rs`, `step_juggernaut.rs`), same direct-in-step pattern as Wrestle/Stab/
+DumpOff/Bombardier. Closed 4 real gaps found by direct Java comparison: (1) ported Java's
+single-block Indomitable dialog chain (priority-3 `StepModifier` sharing `StepDauntless` with
+Dauntless's own priority-2 modifier — verified this distinction against source, not
+`StepDoubleStrength` as initially assumed) directly into `step_dauntless.rs`; (2) wired the
+already-defined-but-unused `Action::IndomitableChoice` into `step_double_strength.rs` so
+multi-target Dauntless successes let the coach pick which target to double, instead of always the
+first; (3) implemented Dauntless's silent Blind-Rage reroll (a real, data-present mechanic —
+`"Blind Rage"` is already a registered `ReRollSources` entry); (4) investigated
+`step_dauntless_multiple.rs`'s reroll-choice dialog and explicitly deferred it — closing it
+properly needs the same aggregation logic as the still-unbuilt `AbstractStepModifierMultipleBlock`
+base (audit item 5), so it wasn't force-fit into this phase. Corrected the 4 dead
+`skill_behaviour/*.rs` stubs' doc comments (left registered, matching the confirmed Wrestle/Stab/
+DumpOff precedent) rather than deleting them.
+
+Tests: 17,492 → 17,500 (+8), 0 failures. No parity/integration testing (deferred, per instruction).
+**Honest completion estimate**: roughly ~97% true behavioral completion (modest gain — most of this
+item was already done); expect 3-6 more phases (audit items 5-9) to close the rest. Full writeup:
+`SESSION.md` Current Status.
+
 **Phase AAG (closed skill-hook-audit batching items 1-3: DumpOff bug fix, StepPushback skill
 family, StepCatchScatterThrowIn Catch family, this session):**
 Closed the first 3 (of 9) batching-order items from `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`. (1)

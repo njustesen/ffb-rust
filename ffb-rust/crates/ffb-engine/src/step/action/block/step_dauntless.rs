@@ -10,6 +10,7 @@ use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::report_dauntless_roll::ReportDauntlessRoll;
+use ffb_model::report::mixed::report_indomitable::ReportIndomitable;
 use ffb_mechanics::mechanics::minimum_roll_dauntless;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -30,6 +31,12 @@ pub struct StepDauntless {
     // AbstractStepWithReRoll fields
     pub re_rolled_action: Option<String>,
     pub re_roll_source: Option<String>,
+    /// Java: state.status == null -> false; becomes true once the Dauntless roll succeeds.
+    /// Gates re-entry via `handle_command` (Indomitable's decision) from re-running the roll.
+    pub successful: bool,
+    /// Java: IndomitableBehaviour's `state.status` (SKILL_CHOICE_YES/NO), chained onto this same
+    /// step at priority 3 in Java. Tristate: `None` = undecided.
+    pub using_indomitable: Option<bool>,
 }
 
 impl StepDauntless {
@@ -42,6 +49,8 @@ impl StepDauntless {
             using_chomp: false,
             re_rolled_action: None,
             re_roll_source: None,
+            successful: false,
+            using_indomitable: None,
         }
     }
 
@@ -67,8 +76,14 @@ impl Step for StepDauntless {
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        if let Action::UseReRoll { use_reroll: false } = action {
-            self.re_roll_source = None;
+        match action {
+            Action::UseReRoll { use_reroll: false } => { self.re_roll_source = None; }
+            // Java: IndomitableBehaviour.handleCommandHook — records the coach's Indomitable
+            // choice; only meaningful once Dauntless has already succeeded.
+            Action::UseSkill { skill_id: SkillId::Indomitable, use_skill } if self.successful => {
+                self.using_indomitable = Some(*use_skill);
+            }
+            _ => {}
         }
         self.execute_step(game, rng)
     }
@@ -92,6 +107,14 @@ impl StepDauntless {
             Some(id) => id,
             None => return StepOutcome::next(),
         };
+
+        // Java: IndomitableBehaviour's StepModifier shares this same step (priority 3, after
+        // Dauntless's own priority 2). Once the roll has already succeeded, re-entry via
+        // handle_command (the coach's Indomitable choice) skips straight to resolving it —
+        // do not re-roll Dauntless a second time.
+        if self.successful {
+            return self.resolve_indomitable(game, &player_id, StepOutcome::next());
+        }
 
         let re_rolled = self.re_rolled_action.as_deref() == Some("DAUNTLESS");
 
@@ -137,14 +160,49 @@ impl StepDauntless {
             return StepOutcome::next();
         }
 
-        let roll = rng.d6();
-        let success = roll >= min_roll;
-
-        let event = GameEvent::DauntlessRoll {
+        let mut roll = rng.d6();
+        let mut success = roll >= min_roll;
+        let mut events: Vec<GameEvent> = vec![GameEvent::DauntlessRoll {
             player_id: player_id.clone(),
             roll,
             success,
-        };
+        }];
+
+        // Java: if (!successful) { reRollSource = UtilCards.getUnusedRerollSource(actingPlayer,
+        //         DAUNTLESS); if (reRollSource != null) { report; reroll silently; report again } }
+        // Only Blind Rage (Akhorne's unique skill) currently registers a non-TRR reroll source for
+        // ReRolledActions.DAUNTLESS in this codebase's data — checked directly (this codebase has
+        // no generic per-skill reroll-source registry, matching the established convention of
+        // hardcoding known skill->source mappings, e.g. Catch/DumpOff's ReRollSource::new(...)).
+        if !success && !re_rolled {
+            let has_blind_rage = game.player(&player_id)
+                .map(|p| p.has_skill(SkillId::BlindRage) && !p.used_skills.contains(&SkillId::BlindRage))
+                .unwrap_or(false);
+            if has_blind_rage {
+                game.report_list.add(ReportDauntlessRoll::new(
+                    Some(player_id.clone()),
+                    success,
+                    roll,
+                    min_roll,
+                    false,
+                    defender_st,
+                    game.defender_id.clone(),
+                ));
+                if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == player_id)
+                    .or_else(|| game.team_away.players.iter_mut().find(|p| p.id == player_id))
+                {
+                    p.used_skills.insert(SkillId::BlindRage);
+                }
+                roll = rng.d6();
+                success = roll >= min_roll;
+                self.re_rolled_action = Some("DAUNTLESS".into());
+                self.re_roll_source = Some("Blind Rage".into());
+                events.push(GameEvent::DauntlessRoll { player_id: player_id.clone(), roll, success });
+            }
+        }
+
+        let reported_rerolled = self.re_rolled_action.as_deref() == Some("DAUNTLESS")
+            && self.re_roll_source.is_some();
 
         // Java: step.getResult().addReport(new ReportDauntlessRoll(...))
         game.report_list.add(ReportDauntlessRoll::new(
@@ -152,26 +210,66 @@ impl StepDauntless {
             success,
             roll,
             min_roll,
-            re_rolled,
+            reported_rerolled,
             defender_st,
             game.defender_id.clone(),
         ));
 
+        let mut outcome = StepOutcome::next();
+        for event in events { outcome = outcome.with_event(event); }
+
         if success {
-            StepOutcome::next()
-                .with_event(event)
-                .publish(StepParameter::SuccessfulDauntless(true))
+            self.successful = true;
+            outcome = outcome.publish(StepParameter::SuccessfulDauntless(true));
+            self.resolve_indomitable(game, &player_id, outcome)
         } else {
             // Java: if (status == null && askForReRollIfAvailable(...)) → CONTINUE
             if !re_rolled {
                 if let Some(prompt) = ask_for_reroll_if_available(game, "DAUNTLESS", min_roll, false) {
                     self.re_rolled_action = Some("DAUNTLESS".into());
                     self.re_roll_source = Some("TRR".into());
-                    return StepOutcome::cont().with_event(event).with_prompt(prompt);
+                    outcome.action = crate::step::framework::StepAction::Continue;
+                    return outcome.with_prompt(prompt);
                 }
             }
-            StepOutcome::next().with_event(event)
+            outcome
         }
+    }
+
+    /// Java: IndomitableBehaviour.handleExecuteStepHook — chained (priority 3) onto this same
+    /// step. Only relevant once Dauntless has already succeeded.
+    ///
+    /// Headless simplification (matching the established Grab/StandFirm/SideStep precedent from
+    /// Phase AAG): when undecided, auto-decline immediately rather than waiting for a live dialog
+    /// — `using_indomitable` can still be pre-set (or set via a real `Action::UseSkill` command,
+    /// see `handle_command`) to exercise the accepted path.
+    fn resolve_indomitable(&mut self, game: &mut Game, player_id: &str, mut outcome: StepOutcome) -> StepOutcome {
+        let has_indomitable = game.player(player_id)
+            .map(|p| p.has_skill(SkillId::Indomitable) && !p.used_skills.contains(&SkillId::Indomitable))
+            .unwrap_or(false);
+        if !has_indomitable {
+            return outcome;
+        }
+
+        if self.using_indomitable.is_none() {
+            self.using_indomitable = Some(false);
+        }
+
+        if self.using_indomitable == Some(true) {
+            if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == *player_id)
+                .or_else(|| game.team_away.players.iter_mut().find(|p| p.id == *player_id))
+            {
+                p.used_skills.insert(SkillId::Indomitable);
+            }
+            // Java: addReport(new ReportIndomitable(actingPlayer.getPlayerId(), game.getDefenderId()))
+            game.report_list.add(ReportIndomitable::new(
+                Some(player_id.to_string()),
+                game.defender_id.clone(),
+            ));
+            outcome = outcome.publish(StepParameter::DoubleTargetStrength(true));
+        }
+
+        outcome
     }
 }
 
@@ -405,5 +503,97 @@ mod tests {
         );
         // Declined → doRoll = false → NEXT_STEP (dauntless failed, block proceeds normally)
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    // ── Indomitable chain ────────────────────────────────────────────────────
+
+    #[test]
+    fn successful_dauntless_without_indomitable_does_not_publish_double_strength() {
+        let seed = seed_for_d6(5);
+        let mut game = make_game(2, vec![SkillId::Dauntless], 4);
+        let out = StepDauntless::new().start(&mut game, &mut GameRng::new(seed));
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::DoubleTargetStrength(_))));
+    }
+
+    #[test]
+    fn successful_dauntless_with_indomitable_headless_auto_declines() {
+        let seed = seed_for_d6(5);
+        let mut game = make_game(2, vec![SkillId::Dauntless, SkillId::Indomitable], 4);
+        let mut step = StepDauntless::new();
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::DoubleTargetStrength(_))));
+        assert_eq!(step.using_indomitable, Some(false));
+        assert!(step.successful);
+    }
+
+    #[test]
+    fn indomitable_accepted_via_command_publishes_double_strength_and_reports() {
+        let seed = seed_for_d6(5);
+        let mut game = make_game(2, vec![SkillId::Dauntless, SkillId::Indomitable], 4);
+        let mut step = StepDauntless::new();
+        step.start(&mut game, &mut GameRng::new(seed));
+        assert!(step.successful, "precondition: dauntless roll must have succeeded");
+
+        let out = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Indomitable, use_skill: true },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DoubleTargetStrength(true))));
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::INDOMITABLE));
+        assert!(game.player("att").unwrap().used_skills.contains(&SkillId::Indomitable));
+    }
+
+    #[test]
+    fn indomitable_declined_via_command_does_not_publish_double_strength() {
+        let seed = seed_for_d6(5);
+        let mut game = make_game(2, vec![SkillId::Dauntless, SkillId::Indomitable], 4);
+        let mut step = StepDauntless::new();
+        step.start(&mut game, &mut GameRng::new(seed));
+
+        let out = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Indomitable, use_skill: false },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::DoubleTargetStrength(_))));
+        assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::INDOMITABLE));
+    }
+
+    // ── Blind Rage silent re-roll ────────────────────────────────────────────
+
+    fn seed_for_d6_pair(first: i32, second: i32) -> u64 {
+        for s in 0u64..50_000 {
+            let mut rng = GameRng::new(s);
+            if rng.d6() == first && rng.d6() == second {
+                return s;
+            }
+        }
+        panic!("no seed for d6 pair=({}, {})", first, second);
+    }
+
+    #[test]
+    fn blind_rage_silently_rerolls_on_failure() {
+        // attacker=2, defender=4 → min_roll=3. First roll fails (1), second succeeds (4).
+        let seed = seed_for_d6_pair(1, 4);
+        let mut game = make_game(2, vec![SkillId::Dauntless, SkillId::BlindRage], 4);
+        let mut step = StepDauntless::new();
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        assert_eq!(out.action, StepAction::NextStep, "Blind Rage reroll succeeds silently, no dialog");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::SuccessfulDauntless(true))));
+        assert!(game.player("att").unwrap().used_skills.contains(&SkillId::BlindRage));
+        assert_eq!(step.re_roll_source.as_deref(), Some("Blind Rage"));
+    }
+
+    #[test]
+    fn blind_rage_not_used_twice() {
+        let seed = seed_for_d6_pair(1, 1); // both rolls fail even with reroll
+        let mut game = make_game(2, vec![SkillId::Dauntless, SkillId::BlindRage], 4);
+        game.team_home.player_mut("att").unwrap().used_skills.insert(SkillId::BlindRage);
+        let out = StepDauntless::new().start(&mut game, &mut GameRng::new(seed));
+        // Blind Rage already used this game → no silent reroll → single failed roll → NEXT_STEP
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::SuccessfulDauntless(_))));
     }
 }

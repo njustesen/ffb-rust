@@ -6,6 +6,14 @@ use crate::skill_behaviour::registry::SkillRegistry;
 use ffb_model::enums::SkillId;
 
 /// Juggernaut: a Blitz block may treat Both-Down as a Push result.
+///
+/// **This modifier is dead/unreachable code** (Phase AAH audit): it targets `StepId::Juggernaut`,
+/// which no step ever dispatches through `dispatch::execute_step_hooks`. Java's edition-identical
+/// `JuggernautBehaviour.java` (bb2025 and mixed/bb2016/bb2020 copies) is ported directly into
+/// `step/action/block/step_juggernaut.rs` instead (one edition-agnostic file, confirmed complete
+/// during Phase AAH's investigation) — the same "direct-in-step" pattern already established for
+/// Wrestle/Stab/DumpOff/Bombardier/Dauntless. Left registered rather than deleted, matching that
+/// precedent.
 pub struct JuggernautBehaviour;
 
 impl JuggernautBehaviour {

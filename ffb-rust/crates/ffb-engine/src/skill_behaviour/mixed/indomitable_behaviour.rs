@@ -1,23 +1,17 @@
 use crate::skill_behaviour::SkillBehaviour;
 
-/// Indomitable: player may use this skill after a failed Dauntless roll (multi-edition).
+/// Indomitable: player may use this skill after a successful Dauntless roll (multi-edition),
+/// doubling the target's effective strength for the block.
 ///
-/// Registers on StepDauntless.
-///
-/// Java `handleCommandHook` sets `StepState.status` to `SKILL_CHOICE_YES` or
-/// `SKILL_CHOICE_NO` based on the coach's dialog response.
-///
-/// Java `execute_step_hook` logic:
-/// 1. If `StepState.status == SKILL_CHOICE_YES`:
-///    - Mark the skill as used.
-///    - Publish `ReportId::DOUBLE_TARGET_STRENGTH` with value `true`.
-///    - Add a `ReportIndomitable` report entry.
-/// 2. If `StepState.status == WAITING_FOR_SKILL_USE`:
-///    - Set `doNextStep = false` (hold — waiting for coach input).
-/// 3. Otherwise continue normally.
-///
-/// All step-local state fields are unavailable in the current Rust signature:
-// TODO(hook-infra): step-specific state (StepState.status)
+/// **This modifier is dead/unreachable code** (Phase AAH audit) — it has no `register_into` at
+/// all and is never inserted into `SkillRegistry`. In Java, `IndomitableBehaviour` registers a
+/// priority-3 `StepModifier<StepDauntless, StepState>` chained onto the *same* step as Dauntless's
+/// own priority-2 modifier (single-block path only — the multi-block equivalent is
+/// `StepDoubleStrength`/`step/mixed/multiblock/step_double_strength.rs`, a distinct mechanism).
+/// This single-block chain (headless-simplified: auto-declines when undecided rather than waiting
+/// on a live dialog) is now ported directly into
+/// `step/action/block/step_dauntless.rs::resolve_indomitable`, matching the "direct-in-step"
+/// pattern already established for Wrestle/Stab/DumpOff/Bombardier/Dauntless itself.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.skillbehaviour.mixed.IndomitableBehaviour`.
 pub struct IndomitableBehaviour;

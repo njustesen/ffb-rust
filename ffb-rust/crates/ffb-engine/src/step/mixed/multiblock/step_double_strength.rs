@@ -51,11 +51,16 @@ impl Step for StepDoubleStrength {
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // Java CLIENT_USE_SKILL (Indomitable) → use playerIds[0] if isSkillUsed
-        // Java CLIENT_PLAYER_CHOICE (INDOMITABLE) → use chosen player id
+        // Java: playerIds.size() == 1 → DialogSkillUseParameter → CLIENT_USE_SKILL (Indomitable),
+        // always targets the sole entry in playerIds.
+        // Java: playerIds.size() > 1 → DialogPlayerChoiceParameter(INDOMITABLE) →
+        // CLIENT_PLAYER_CHOICE, the coach picks which Dauntless-successful target to double.
         let chosen: Option<String> = match action {
             Action::UseSkill { skill_id, use_skill } if *skill_id == SkillId::Indomitable && *use_skill => {
                 self.player_ids.first().cloned()
+            }
+            Action::IndomitableChoice { player_id } if self.player_ids.contains(player_id) => {
+                Some(player_id.clone())
             }
             _ => None,
         };
@@ -195,6 +200,41 @@ mod tests {
             &mut game, &mut rng,
         );
         assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::INDOMITABLE));
+    }
+
+    #[test]
+    fn multi_target_choice_picks_chosen_player_not_first() {
+        let mut step = StepDoubleStrength::new();
+        step.set_parameter(&StepParameter::PlayerIdDauntlessSuccess("tgt1".into()));
+        step.set_parameter(&StepParameter::PlayerIdDauntlessSuccess("tgt2".into()));
+        let mut game = make_game();
+        add_player_with_skill(&mut game, "att", SkillId::Indomitable);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        let outcome = step.handle_command(
+            &Action::IndomitableChoice { player_id: "tgt2".into() },
+            &mut game, &mut rng,
+        );
+        assert!(outcome.published.iter().any(|p| {
+            matches!(p, StepParameter::DoubleTargetStrengthForPlayer(id) if id == "tgt2")
+        }), "should double the chosen target (tgt2), not the first (tgt1)");
+    }
+
+    #[test]
+    fn multi_target_choice_with_unknown_player_id_is_ignored() {
+        let mut step = StepDoubleStrength::new();
+        step.set_parameter(&StepParameter::PlayerIdDauntlessSuccess("tgt1".into()));
+        step.set_parameter(&StepParameter::PlayerIdDauntlessSuccess("tgt2".into()));
+        let mut game = make_game();
+        add_player_with_skill(&mut game, "att", SkillId::Indomitable);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        let outcome = step.handle_command(
+            &Action::IndomitableChoice { player_id: "not_a_target".into() },
+            &mut game, &mut rng,
+        );
+        assert!(matches!(outcome.action, StepAction::NextStep));
+        assert!(!outcome.published.iter().any(|p| matches!(p, StepParameter::DoubleTargetStrengthForPlayer(_))));
     }
 
     #[test]

@@ -1,6 +1,70 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-13, Phase AAG done — closed batching-order items 1-3 of
+## Current Status (2026-07-13, Phase AAH done — closed batching-order item 4 of
+`docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`: Dauntless/Indomitable/Juggernaut.)
+
+**Key correction found mid-session**: the audit doc sized this item as "large" (StepDauntless) +
+"small" (StepJuggernaut), assuming the Java logic was still unported. Direct research found this
+was **stale** — unlike Pushback and Catch (Phase AAG), Dauntless/Indomitable/Juggernaut's real game
+logic already lived directly in Rust step files (`step/action/block/step_dauntless.rs`,
+`step/mixed/multiblock/step_dauntless_multiple.rs`, `step/mixed/multiblock/step_double_strength.rs`,
+`step/action/block/step_juggernaut.rs`), the same "direct-in-step, skill_behaviour/ file is a dead
+duplicate" pattern already established for Wrestle/Stab/DumpOff/Bombardier. This reclassified the
+item from "port Java logic" to "close 4 narrow, real gaps found by direct comparison against Java
+source, then correct the dead stub doc comments (leaving them registered, matching the Wrestle/
+Stab/DumpOff precedent confirmed by checking their current state before assuming deletion)."
+
+**What actually happened:**
+
+1. **Single-block Indomitable dialog chain** (the largest real gap) — Java's `IndomitableBehaviour`
+   registers a priority-3 `StepModifier<StepDauntless, StepState>` chained onto the *same* step as
+   Dauntless's own priority-2 modifier (not `StepDoubleStrength`, which is multi-block-only —
+   verified this distinction directly against source before trusting the initial research pass).
+   Rust's `step_dauntless.rs` had zero Indomitable-related code. Ported directly into that file:
+   added `successful`/`using_indomitable` fields, a `resolve_indomitable` method chained after a
+   successful roll (headless: auto-decline when undecided, matching the Grab/StandFirm/SideStep
+   precedent from Phase AAG), and `handle_command` support for a real `Action::UseSkill` acceptance.
+2. **`step_double_strength.rs`'s multi-target branch always picked the first target** — Java shows
+   a coach-choice dialog when Dauntless succeeds against more than one opponent in a multi-block
+   action; Rust always used `player_ids.first()`. Found `Action::IndomitableChoice { player_id }`
+   already defined but never consumed anywhere — wired it into `handle_command`.
+3. **Dauntless's silent skill-granted-reroll-source path was missing** — Java auto-rerolls (no
+   dialog) when the actor has a Dauntless-tagged reroll source via `getUnusedRerollSource`. Found
+   this is a real, reachable mechanic in this codebase's data: `BlindRage.java` (a unique Akhorne
+   skill) registers exactly this for `ReRolledActions.DAUNTLESS`, and `"Blind Rage"` is already a
+   listed `ReRollSources` entry. Implemented the silent reroll directly (hardcoded skill check,
+   matching the Catch/DumpOff precedent of hardcoding known skill→source mappings rather than
+   building a generic per-skill reroll-source registry).
+4. **`step_dauntless_multiple.rs`'s re-roll-choice dialog** — investigated and explicitly deferred
+   (not implemented): closing it properly requires the same team-reroll/Pro/Consummate/
+   Lord-of-Chaos multi-target aggregation logic that IS `AbstractStepModifierMultipleBlock` (audit
+   item 5, deliberately scheduled after this one). Per the plan's own guidance for this exact
+   scenario ("stop and re-scope rather than silently expanding into item 5's territory"), left as
+   documented future work rather than half-building the shared base class here.
+5. **Cleanup**: corrected the doc comments on the 4 confirmed-dead `skill_behaviour/*.rs` files
+   (`mixed/dauntless_behaviour.rs`, `mixed/indomitable_behaviour.rs`, `bb2025/juggernaut_behaviour.rs`,
+   `mixed/juggernaut_behaviour.rs`) to point at the real direct-in-step implementations, rather than
+   deleting them — confirmed this (not deletion) is the established precedent by checking
+   `wrestle_behaviour.rs`'s current state (still present, still registered, just previously
+   corrected) before assuming. No registry.rs changes needed since these files were either already
+   harmlessly registered (Dauntless, bb2025 Juggernaut) or never registered at all (Indomitable,
+   mixed Juggernaut) — registry size assertions are unchanged.
+
+Tests: 17,492 → **17,500** (+8: Indomitable chain + Blind Rage + multi-target choice tests).
+0 failures. `cargo clippy` shows the same 2 pre-existing errors unrelated to this session's files.
+No parity/integration testing (per standing instruction).
+
+**What's left, not part of this phase's scope**: `step_dauntless_multiple.rs`'s reroll-choice
+dialog (deferred to when `AbstractStepModifierMultipleBlock` is built, audit item 5), and audit
+items 6-9 (StepJumpUp/StepAnimosity, StepDivingTackle, StepFoulAppearance, and the large isolated
+items AnimalSavagery/Shadowing/Tentacles/UnchannelledFury/CloudBurster). Honest completion estimate:
+roughly **~97%** true behavioral completion of in-scope logic (modest gain this phase since most of
+the audit's "large" sizing here turned out to already be done) — expect **3-6 more phases** to close
+the rest.
+
+---
+
+## Prior Status (2026-07-13, Phase AAG done — closed batching-order items 1-3 of
 `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`: the DumpOff `applies_to` wiring bug, the entire
 StepPushback skill family (Grab/SideStep/StandFirm/EyeGouge/MonstrousMouth), and the
 StepCatchScatterThrowIn Catch/MonstrousMouth reroll family.)

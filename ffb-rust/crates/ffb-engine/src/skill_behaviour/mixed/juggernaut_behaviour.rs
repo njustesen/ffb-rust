@@ -3,24 +3,15 @@ use crate::skill_behaviour::SkillBehaviour;
 /// Juggernaut: removes Wrestle/Sidestep/Stand Firm from block results on a Blitz action
 /// (multi-edition).
 ///
-/// Registers on StepJuggernaut.
-///
-/// Java `execute_step_hook` logic:
-/// 1. Only acts when the current action is `BLITZ` and the player has the Juggernaut skill.
-/// 2. If `StepState.usingJuggernaut` is null:
-///    - Show the skill-use dialog to the active coach and return `true` (waiting).
-/// 3. If `StepState.usingJuggernaut == true`:
-///    - Publish `ReportId::BLOCK_RESULT` with value `PUSHBACK`.
-///    - Restore `StepState.oldDefenderState` (undo any Wrestle/Sidestep/Stand Firm effect).
-///    - Initialise pushback.
-///    - GOTO `StepState.goToLabelOnSuccess`.
-/// 4. If `StepState.usingJuggernaut == false`:
-///    - Advance to `NEXT_STEP`.
-///
-/// All step-local state fields are unavailable in the current Rust signature:
-// TODO(hook-infra): step-specific state (StepState.usingJuggernaut)
-// TODO(hook-infra): step-specific state (StepState.goToLabelOnSuccess)
-// TODO(hook-infra): step-specific state (StepState.oldDefenderState)
+/// **This modifier is dead/unreachable code** (Phase AAH audit), same reason as
+/// `bb2025::juggernaut_behaviour` — targets `StepId::Juggernaut`, which nothing dispatches. Java's
+/// BB2016/BB2020 `JuggernautBehaviour.java` (byte-identical to the bb2025 copy modulo package/
+/// imports) is ported directly into `step/action/block/step_juggernaut.rs`, one shared
+/// edition-agnostic file used by all 3 rulesets (confirmed complete during Phase AAH's
+/// investigation). Left registered rather than deleted, matching the Wrestle/Stab/DumpOff
+/// precedent — though note this particular file has no `register_into`/`SkillRegistry` entry at
+/// all (only referenced from the separate, unrelated `util_skill_behaviours.rs` informational
+/// list), so there's nothing to unregister here either way.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.skillbehaviour.mixed.JuggernautBehaviour`.
 pub struct JuggernautBehaviour;
