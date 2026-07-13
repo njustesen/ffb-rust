@@ -3,8 +3,12 @@ use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
 use crate::skill_behaviour::registry::SkillRegistry;
+use crate::step::bb2025::block::step_pushback::StepPushbackHookState;
 use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::model::skill_use::SkillUse;
+use ffb_model::report::report_skill_use::ReportSkillUse;
 
 // Java: During pushback, if the acting player has the Eye Gouge property (canRemoveOpponentAssists), marks the defender as eye-gouged and reports the skill use.
 pub struct EyeGougeStepModifier;
@@ -14,12 +18,63 @@ impl StepModifierTrait for EyeGougeStepModifier {
 
     fn priority(&self) -> i32 { 3 }
 
+    /// Java: EyeGougeBehaviour.handleExecuteStepHook(StepPushback step, StepState state)
+    ///
+    /// ```text
+    /// Player<?> pusher = game.getActingPlayer().getPlayer();
+    /// if (!pusher.hasSkillProperty(NamedProperties.canRemoveOpponentAssists)
+    ///     || !state.defender.getId().equals(game.getDefenderId())) {
+    ///   return false;
+    /// }
+    /// PlayerState targetState = fieldModel.getPlayerState(state.defender);
+    /// fieldModel.setPlayerState(state.defender, targetState.changeEyeGouged(true));
+    /// UtilCards.getSkillWithProperty(pusher, NamedProperties.canRemoveOpponentAssists)
+    ///   .ifPresent(skill -> addReport(new ReportSkillUse(pusher.getId(), skill, true, EYE_GOUGED)));
+    /// return false; // always false — never stops hook processing
+    /// ```
     fn handle_execute_step(
         &self,
-        _game: &mut Game,
+        game: &mut Game,
         _rng: &mut ffb_model::util::rng::GameRng,
-        _step_state: &mut dyn std::any::Any,
+        step_state: &mut dyn std::any::Any,
     ) -> bool {
+        let state = step_state
+            .downcast_mut::<StepPushbackHookState>()
+            .expect("EyeGougeStepModifier: step_state must be StepPushbackHookState");
+
+        let pusher_id = match game.acting_player.player_id.clone() {
+            Some(id) => id,
+            None => return false,
+        };
+
+        // Java: pusher.hasSkillProperty(NamedProperties.canRemoveOpponentAssists)
+        let gouging_skill = game.player(&pusher_id)
+            .and_then(|p| p.all_skill_ids().find(|id| {
+                id.properties().contains(&NamedProperties::CAN_REMOVE_OPPONENT_ASSISTS)
+            }));
+        let gouging_skill = match gouging_skill {
+            Some(skill) => skill,
+            None => return false,
+        };
+
+        // Java: !state.defender.getId().equals(game.getDefenderId())
+        if game.defender_id.as_deref() != Some(state.defender_id.as_str()) {
+            return false;
+        }
+
+        // Java: fieldModel.setPlayerState(state.defender, targetState.changeEyeGouged(true))
+        if let Some(target_state) = game.field_model.player_state(&state.defender_id) {
+            game.field_model.set_player_state(&state.defender_id, target_state.change_eye_gouged(true));
+        }
+
+        // Java: addReport(ReportSkillUse(pusher.getId(), skill, true, EYE_GOUGED))
+        game.report_list.add(ReportSkillUse::new(
+            Some(pusher_id),
+            gouging_skill,
+            true,
+            SkillUse::EYE_GOUGED,
+        ));
+
         false
     }
 }
@@ -62,6 +117,87 @@ impl SkillBehaviour for EyeGougeBehaviour {
 mod tests {
     use super::*;
     use crate::skill_behaviour::registry::SkillRegistry;
+    use crate::step::bb2025::block::step_pushback::StepPushbackHookState;
+    use crate::step::framework::test_team;
+    use ffb_model::enums::{PlayerState, PS_STANDING, Rules};
+    use ffb_model::model::player::Player;
+    use ffb_model::model::skill_def::SkillWithValue;
+    use ffb_model::types::FieldCoordinate;
+    use ffb_model::util::rng::GameRng;
+    use std::collections::HashMap;
+
+    fn player_with_skills(id: &str, skills: Vec<SkillId>) -> Player {
+        Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "pos".into(),
+            player_type: ffb_model::enums::PlayerType::Regular,
+            gender: ffb_model::enums::PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: skills.into_iter().map(|s| SkillWithValue { skill_id: s, value: None }).collect(),
+            ..Default::default()
+        }
+    }
+
+    fn default_hook_state(defender_id: &str) -> StepPushbackHookState {
+        StepPushbackHookState::new(
+            defender_id.into(), None, None, 0, true, vec![],
+            HashMap::new(), HashMap::new(), None,
+        )
+    }
+
+    #[test]
+    fn no_eye_gouge_property_returns_false() {
+        let mut game = ffb_model::model::game::Game::new(
+            test_team("home", 0), test_team("away", 0), Rules::Bb2025,
+        );
+        game.team_home.players.push(player_with_skills("att", vec![]));
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+        game.team_away.players.push(player_with_skills("def", vec![]));
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+
+        let m = EyeGougeStepModifier;
+        let mut hs = default_hook_state("def");
+        assert!(!m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs));
+    }
+
+    #[test]
+    fn not_main_defender_returns_false_and_does_not_gouge() {
+        let mut game = ffb_model::model::game::Game::new(
+            test_team("home", 0), test_team("away", 0), Rules::Bb2025,
+        );
+        game.team_home.players.push(player_with_skills("att", vec![SkillId::EyeGouge]));
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("otherdef".into());
+        game.team_away.players.push(player_with_skills("def", vec![]));
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+
+        let m = EyeGougeStepModifier;
+        let mut hs = default_hook_state("def");
+        assert!(!m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs));
+        assert!(!game.field_model.player_state("def").unwrap().is_eye_gouged());
+    }
+
+    #[test]
+    fn main_defender_with_gouge_property_gets_gouged_and_reports() {
+        let mut game = ffb_model::model::game::Game::new(
+            test_team("home", 0), test_team("away", 0), Rules::Bb2025,
+        );
+        game.team_home.players.push(player_with_skills("att", vec![SkillId::EyeGouge]));
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+        game.team_away.players.push(player_with_skills("def", vec![]));
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+
+        let m = EyeGougeStepModifier;
+        let mut hs = default_hook_state("def");
+        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
+        assert!(!result, "EyeGouge never stops hook processing");
+        assert!(game.field_model.player_state("def").unwrap().is_eye_gouged());
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
+    }
 
     fn test_game() -> ffb_model::model::game::Game {
         let home = ffb_model::model::team::Team {

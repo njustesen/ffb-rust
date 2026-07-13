@@ -708,6 +708,8 @@ impl SkillId {
             SkillId::SideStep => &["canChooseOwnPushedBackSquare"],
             SkillId::Sidestep => &["canChooseOwnPushedBackSquare"],
             SkillId::Shadowing => &["canFollowPlayerLeavingTacklezones"],
+            // Java bb2025/EyeGouge.postConstruct: registerProperty(canRemoveOpponentAssists)
+            SkillId::EyeGouge => &["canRemoveOpponentAssists"],
             SkillId::HypnoticGaze => &["inflictsConfusion", "canGazeDuringMove"],
             SkillId::Leap => &["canLeap"],
             SkillId::PogoStick => &[
@@ -958,6 +960,11 @@ mod tests {
     #[test]
     fn properties_ball_and_chain_cancels_trickster() {
         assert!(SkillId::BallAndChain.properties().contains(&"cancelsCanMoveBeforeBeingBlocked"));
+    }
+
+    #[test]
+    fn properties_eye_gouge_can_remove_opponent_assists() {
+        assert!(SkillId::EyeGouge.properties().contains(&"canRemoveOpponentAssists"));
     }
 
     #[test]

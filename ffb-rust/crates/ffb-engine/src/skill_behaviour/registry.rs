@@ -179,8 +179,11 @@ impl SkillRegistry {
         // BB2020-specific implementations
         use crate::skill_behaviour::bb2020::{
             bone_head_behaviour::BoneHeadBehaviour,
+            grab_behaviour::GrabBehaviour,
             piling_on_behaviour::PilingOnBehaviour,
             really_stupid_behaviour::ReallyStupidBehaviour,
+            side_step_behaviour::SideStepBehaviour,
+            stand_firm_behaviour::StandFirmBehaviour,
         };
         use crate::skill_behaviour::mixed::dauntless_behaviour::DauntlessBehaviour;
         use crate::skill_behaviour::mixed::abstract_dodging_behaviour::AbstractDodgingBehaviour;
@@ -204,8 +207,11 @@ impl SkillRegistry {
         WrestleBehaviour::register_into(&mut reg);
         // BB2020-specific behaviours
         BoneHeadBehaviour::register_into(&mut reg);
+        GrabBehaviour::register_into(&mut reg);
         PilingOnBehaviour::register_into(&mut reg);
         ReallyStupidBehaviour::register_into(&mut reg);
+        SideStepBehaviour::register_into(&mut reg);
+        StandFirmBehaviour::register_into(&mut reg);
         // Mixed (shared logic across editions)
         DauntlessBehaviour::register_into(&mut reg);
         reg
@@ -233,8 +239,11 @@ impl SkillRegistry {
         // BB2016-specific implementations
         use crate::skill_behaviour::bb2016::{
             bone_head_behaviour::BoneHeadBehaviour,
+            grab_behaviour::GrabBehaviour,
             piling_on_behaviour::PilingOnBehaviour,
             really_stupid_behaviour::ReallyStupidBehaviour,
+            side_step_behaviour::SideStepBehaviour,
+            stand_firm_behaviour::StandFirmBehaviour,
             wild_animal_behaviour::WildAnimalBehaviour,
         };
         use crate::skill_behaviour::mixed::dauntless_behaviour::DauntlessBehaviour;
@@ -255,8 +264,11 @@ impl SkillRegistry {
         WrestleBehaviour::register_into(&mut reg);
         // BB2016-specific behaviours
         BoneHeadBehaviour::register_into(&mut reg);
+        GrabBehaviour::register_into(&mut reg);
         PilingOnBehaviour::register_into(&mut reg);
         ReallyStupidBehaviour::register_into(&mut reg);
+        SideStepBehaviour::register_into(&mut reg);
+        StandFirmBehaviour::register_into(&mut reg);
         WildAnimalBehaviour::register_into(&mut reg);
         // Mixed (shared logic across editions)
         DauntlessBehaviour::register_into(&mut reg);
@@ -354,15 +366,15 @@ mod tests {
     }
 
     #[test]
-    fn bb2016_registry_has_seventeen_entries() {
+    fn bb2016_registry_has_twenty_entries() {
         let reg = SkillRegistry::build_bb2016();
-        assert_eq!(reg.len(), 17, "BB2016 registry should have 17 registered skill entries");
+        assert_eq!(reg.len(), 20, "BB2016 registry should have 20 registered skill entries (17 + Grab + SideStep + StandFirm)");
     }
 
     #[test]
-    fn bb2020_registry_has_eighteen_entries() {
+    fn bb2020_registry_has_twenty_one_entries() {
         let reg = SkillRegistry::build_bb2020();
-        assert_eq!(reg.len(), 18, "BB2020 registry should have 18 registered skill entries (16 + Dodge + WatchOut)");
+        assert_eq!(reg.len(), 21, "BB2020 registry should have 21 registered skill entries (18 + Grab + SideStep + StandFirm)");
     }
 
     #[test]
@@ -404,5 +416,47 @@ mod tests {
     fn bb2020_registry_contains_piling_on() {
         let reg = SkillRegistry::build_bb2020();
         assert!(reg.get(SkillId::PilingOn).is_some(), "PilingOn must be in BB2020 registry");
+    }
+
+    #[test]
+    fn bb2020_registry_contains_grab_with_step_modifier() {
+        let reg = SkillRegistry::build_bb2020();
+        let sb = reg.get(SkillId::Grab).expect("Grab must be in BB2020 registry");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn bb2020_registry_contains_side_step_with_step_modifier() {
+        let reg = SkillRegistry::build_bb2020();
+        let sb = reg.get(SkillId::SideStep).expect("SideStep must be in BB2020 registry");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn bb2020_registry_contains_stand_firm_with_step_modifier() {
+        let reg = SkillRegistry::build_bb2020();
+        let sb = reg.get(SkillId::StandFirm).expect("StandFirm must be in BB2020 registry");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn bb2016_registry_contains_grab_with_step_modifier() {
+        let reg = SkillRegistry::build_bb2016();
+        let sb = reg.get(SkillId::Grab).expect("Grab must be in BB2016 registry");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn bb2016_registry_contains_side_step_with_step_modifier() {
+        let reg = SkillRegistry::build_bb2016();
+        let sb = reg.get(SkillId::SideStep).expect("SideStep must be in BB2016 registry");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn bb2016_registry_contains_stand_firm_with_step_modifier() {
+        let reg = SkillRegistry::build_bb2016();
+        let sb = reg.get(SkillId::StandFirm).expect("StandFirm must be in BB2016 registry");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
     }
 }

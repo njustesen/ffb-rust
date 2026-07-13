@@ -11,12 +11,15 @@ use ffb_model::model::game::Game;
 pub struct DumpOffStepModifier;
 
 impl StepModifierTrait for DumpOffStepModifier {
-    // TODO: map to correct StepId
-    fn applies_to(&self, step_id: StepId) -> bool { step_id == StepId::BlockRoll }
+    fn applies_to(&self, step_id: StepId) -> bool { step_id == StepId::DumpOff }
 
     fn priority(&self) -> i32 { 0 }
 
     // Java: Handles the Dump Off skill by prompting the defending ball-carrier to optionally make a pass before the block resolves, then pushing a Pass sequence onto the step stack if accepted.
+    // Real logic already lives directly in step/action/block/step_dump_off.rs (checks
+    // SkillId::DumpOff directly, dialog-gated, TurnMode switching) - this modifier body stays a
+    // no-op to avoid dead duplicate logic; registration is harmless now that applies_to targets
+    // the correct StepId.
     fn handle_execute_step(
         &self,
         _game: &mut Game,
@@ -67,6 +70,12 @@ impl SkillBehaviour for DumpOffBehaviour {
 mod tests {
     use super::*;
     use crate::skill_behaviour::registry::SkillRegistry;
+
+    #[test]
+    fn step_modifier_applies_to_dump_off_step() {
+        assert!(DumpOffStepModifier.applies_to(StepId::DumpOff));
+        assert!(!DumpOffStepModifier.applies_to(StepId::BlockRoll));
+    }
 
     #[test]
     fn register_into_adds_step_modifier() {

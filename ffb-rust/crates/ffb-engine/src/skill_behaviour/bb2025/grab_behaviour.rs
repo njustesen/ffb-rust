@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.server.skillbehaviour.bb2025.GrabBehaviour.
 ///
-/// Priority 3 modifier on StepPushback.
+/// Priority 5 modifier on StepPushback.
 use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
@@ -21,7 +21,7 @@ pub struct GrabStepModifier;
 impl StepModifierTrait for GrabStepModifier {
     fn applies_to(&self, step_id: StepId) -> bool { step_id == StepId::Pushback }
 
-    fn priority(&self) -> i32 { 3 }
+    fn priority(&self) -> i32 { 5 }
 
     /// Java: GrabBehaviour.handleExecuteStepHook(StepPushback step, StepState state)
     ///
@@ -73,7 +73,7 @@ impl StepModifierTrait for GrabStepModifier {
         // Java: Skill cancellingSkill = UtilCards.getSkillCancelling(state.defender, skill)
         let defender_id = state.defender_id.clone();
         let has_cancelling = game.player(&defender_id)
-            .map(|p| p.all_skill_ids().any(|id| id.properties().contains(&"cancelsCan PushBackToAnySquare")))
+            .map(|p| p.all_skill_ids().any(|id| id.properties().contains(&"cancelsCanPushBackToAnySquare")))
             .unwrap_or(false);
 
         // Java: boolean attackerHasConflictingSkill = skill.conflictsWithAnySkill(actingPlayer.getPlayer())
@@ -248,9 +248,9 @@ mod tests {
     }
 
     #[test]
-    fn step_modifier_priority_is_three() {
+    fn step_modifier_priority_is_five() {
         let m = GrabStepModifier;
-        assert_eq!(m.priority(), 3);
+        assert_eq!(m.priority(), 5);
     }
 
     #[test]
