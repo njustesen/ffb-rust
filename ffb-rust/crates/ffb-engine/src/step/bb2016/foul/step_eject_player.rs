@@ -50,11 +50,13 @@ impl StepEjectPlayer {
                 .map(|p| p.has_skill(SkillId::SneakyGit))
                 .unwrap_or(false);
 
+            // Java: game.getOptions().getGameOption(GameOptionId.SNEAKY_GIT_BAN_TO_KO).isEnabled()
+            let sneaky_git_ban_to_ko = game.options.is_enabled("sneakyGitBanToKo");
+
             // Java: state.argueTheCallSuccessful != null && state.argueTheCallSuccessful
             let state_new_base = if self.argue_the_call_successful == Some(true) {
                 PS_RESERVE // argue succeeded → not ejected
-            } else if has_sneaky_git && false {
-                // Java: SNEAKY_GIT_BAN_TO_KO option check (hardcoded false until options are ported)
+            } else if has_sneaky_git && sneaky_git_ban_to_ko {
                 PS_KNOCKED_OUT
             } else {
                 PS_BANNED

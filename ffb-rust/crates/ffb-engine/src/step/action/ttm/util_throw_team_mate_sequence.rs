@@ -123,11 +123,9 @@ mod tests {
         let mut rng = GameRng::new(42);
         let start = FieldCoordinate::new(12, 7); // mid-pitch
         let result = scatter_player(&game, &mut rng, start, true);
-        // Should have moved 3 squares in bounds (mid-pitch, 3 scatter steps stay in bounds)
-        assert!(result.in_bounds || !result.in_bounds); // in_bounds depends on direction
-        // Just verify it consumed 3 d8 rolls (can't check directly, but result is not equal to start)
-        // ... at least it returns a result without panic
-        let _ = result.last_valid_coordinate;
+        // Mid-pitch start with only 3 scatter steps stays in bounds, and must have moved.
+        assert!(result.in_bounds);
+        assert_ne!(result.last_valid_coordinate, start);
     }
 
     #[test]

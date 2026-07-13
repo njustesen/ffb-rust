@@ -10,6 +10,7 @@ use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::report::mixed::report_fumblerooskie::ReportFumblerooskie;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -64,16 +65,17 @@ impl StepResetFumblerooskie {
                     outcome = outcome.publish(StepParameter::DroppedBallCarrier(Some(player_id.clone())));
                 }
 
+                let next_move_possible = UtilPlayer::is_next_move_possible(game, jumping);
+
                 // Java: if (endPlayerAction || !ballCarrierStanding || !isNextMovePossible)
                 //           fieldModel.setBallMoving(false)
-                // Simplified: if endPlayerAction or player fell down, commit the ball
-                if self.end_player_action || !ball_carrier_standing {
+                if self.end_player_action || !ball_carrier_standing || !next_move_possible {
                     game.field_model.ball_moving = false;
                 }
 
                 // Java: if (endPlayerAction || (ballCarrierStanding && !isNextMovePossible))
                 //           setSound(PICKUP) + addReport(new ReportFumblerooskie(playerId, false))
-                if self.end_player_action || (ball_carrier_standing && self.end_player_action) {
+                if self.end_player_action || (ball_carrier_standing && !next_move_possible) {
                     // Java: getResult().addReport(new ReportFumblerooskie(actingPlayer.getPlayerId(), false))
                     game.report_list.add(ReportFumblerooskie::new(Some(player_id.clone()), false));
                     outcome = outcome.with_event(GameEvent::Fumblerooskie {
@@ -184,6 +186,58 @@ mod tests {
         let mut rng = GameRng::new(0);
         step.start(&mut game, &mut rng);
         assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::FUMBLEROOSKIE));
+    }
+
+    #[test]
+    fn fumblerooskie_report_added_when_standing_but_next_move_impossible() {
+        // Java: endPlayerAction=false, ballCarrierStanding=true, !isNextMovePossible=true
+        // (held_in_place forces isNextMovePossible to false) still triggers the report —
+        // regression test for a prior bug where this branch was unreachable unless
+        // end_player_action was already true.
+        let mut step = StepResetFumblerooskie::new();
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.has_moved = true;
+        game.acting_player.held_in_place = true;
+        let coord = ffb_model::types::FieldCoordinate::new(5, 5);
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_moving = true;
+        game.field_model.set_player_state("p1", ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING));
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::FUMBLEROOSKIE));
+        assert!(!game.field_model.ball_moving);
+    }
+
+    #[test]
+    fn no_fumblerooskie_report_when_standing_and_next_move_possible() {
+        // Java: endPlayerAction=false, ballCarrierStanding=true, isNextMovePossible=true
+        // → neither branch fires; ball stays moving, no report.
+        use ffb_model::enums::PlayerState;
+        use ffb_model::model::player::Player;
+        // PS_STANDING(0x1) | BIT_ACTIVE(0x100) = 0x101 — matches step_end_fouling.rs's
+        // established test convention for "able to move".
+        const ACTIVE_STANDING: PlayerState = PlayerState(0x101);
+
+        let mut step = StepResetFumblerooskie::new();
+        let mut game = make_game();
+        let mut p = Player::default();
+        p.id = "p1".into();
+        p.movement = 6;
+        game.team_home.players.push(p);
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.has_moved = true;
+        game.acting_player.current_move = 0;
+        let coord = ffb_model::types::FieldCoordinate::new(5, 5);
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_moving = true;
+        game.field_model.set_player_state("p1", ACTIVE_STANDING);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::FUMBLEROOSKIE));
+        assert!(game.field_model.ball_moving);
     }
 
     #[test]
