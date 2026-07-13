@@ -29,6 +29,36 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AAG (closed skill-hook-audit batching items 1-3: DumpOff bug fix, StepPushback skill
+family, StepCatchScatterThrowIn Catch family, this session):**
+Closed the first 3 (of 9) batching-order items from `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`. (1)
+Fixed `bb2025/dump_off_behaviour.rs`'s `applies_to` bug (`StepId::BlockRoll` → `StepId::DumpOff`);
+confirmed Bombardier/DumpOff/Stab/Wrestle's real logic already lives directly in their step files,
+no further work needed. (2) Ported real `StepModifierTrait` impls for **Grab, SideStep, StandFirm**
+across all 3 editions (BB2016/BB2020 were previously bare unregistered stubs; only BB2025 was real)
+— migrated BB2020's `step_pushback.rs` off its hand-inlined hook methods onto the shared
+`dispatch::execute_step_hooks` mechanism BB2025 already used, fixed a live priority bug (BB2025
+Grab was `3`, Java registers `5`) and a stray-space typo in a cancelling-skill property check, and
+replaced EyeGouge's stub body with a real translation. Also implemented BB2025's MonstrousMouth
+(chomped-defender forced-push) for real — a prior research pass claimed it was "already fully real
+and registered," which a direct read of the file disproved (still an unimplemented stub); corrected
+after verifying against source directly rather than trusting the stale claim. Fixed one small
+genuine pre-existing model gap found along the way: `SkillId::EyeGouge` had no `properties()` entry
+for `"canRemoveOpponentAssists"` despite Java's `EyeGouge.java` granting it. (3) Wired
+StepCatchScatterThrowIn's Catch/MonstrousMouth reroll family (new `StepCatchHookState` +
+`dispatch::execute_step_hooks` call in BB2020's and BB2025's `catch_ball()`, BB2016 inherits via its
+existing re-export) — verified the exact Java recursion semantics directly against source (fires
+once per failed roll, guarded against infinite recursion, automatic reroll with no dialog) before
+wiring; implemented real `CatchStepModifier`s (all 3 editions) and `MonstrousMouthStepModifier`s
+(BB2016/BB2020 — confirmed via direct Java read to be exact Catch-twins, unrelated to BB2025's
+same-named forced-push mechanic).
+
+Tests: 17,417 → 17,492 (+75: +61 Pushback family/DumpOff, +14 Catch family), 0 failures. No parity/
+integration testing (deferred, per instruction). **Honest completion estimate**: roughly ~96–97% true
+behavioral completion of in-scope logic (up from ~94–96% pre-phase); expect 4–7 more similarly-scoped
+phases (per the audit doc's remaining batching-order items 4-9) to close the rest. Full writeup:
+`SESSION.md` Current Status.
+
 **Phase AAF (closed the factory tracker-accuracy audit; discovered + closed the skill-hook-infra gap; Dodge-family reference implementation, this session):**
 Three-track session: (1) closed the `ffb-model/factory` tracker-accuracy audit flagged unverified in
 Phase AAE — re-checked all 82 `factory/` rows, fixed 47 (43 moved to their real location, mostly

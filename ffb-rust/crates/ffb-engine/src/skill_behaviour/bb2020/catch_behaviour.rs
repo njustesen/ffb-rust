@@ -1,13 +1,64 @@
+/// 1:1 translation of com.fumbbl.ffb.server.skillbehaviour.bb2020.CatchBehaviour.
+///
+/// Priority 0 modifier on StepCatchScatterThrowIn — byte-identical logic to BB2016/BB2025's
+/// CatchBehaviour.java (only package/imports differ per the Java diff).
 use crate::skill_behaviour::SkillBehaviour;
+use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
+use crate::model::step_modifier::StepModifierTrait;
+use crate::step::framework::StepId;
+use crate::skill_behaviour::registry::SkillRegistry;
+use crate::step::bb2020::shared::step_catch_scatter_throw_in::StepCatchHookState;
+use ffb_model::enums::{ReRollSource, SkillId};
+use ffb_model::model::game::Game;
+use ffb_model::model::re_rolled_action::ReRolledAction;
 
-/// BB2020 Catch skill behaviour.
-/// StepModifier on StepCatchScatterThrowIn: if catcher has Catch skill, enables catch reroll
-/// (reRolledAction=CATCH, state.rerollCatch=true). Returns true when consumed. Mirrors Java
-/// `com.fumbbl.ffb.server.skillbehaviour.bb2020.CatchBehaviour`.
+// ── CatchStepModifier ──────────────────────────────────────────────────────────
+
+pub struct CatchStepModifier;
+
+impl StepModifierTrait for CatchStepModifier {
+    fn applies_to(&self, step_id: StepId) -> bool { step_id == StepId::CatchScatterThrowIn }
+
+    fn priority(&self) -> i32 { 0 }
+
+    /// Java: CatchBehaviour.handleExecuteStepHook(StepCatchScatterThrowIn step, StepState state)
+    fn handle_execute_step(
+        &self,
+        game: &mut Game,
+        _rng: &mut ffb_model::util::rng::GameRng,
+        step_state: &mut dyn std::any::Any,
+    ) -> bool {
+        let state = step_state
+            .downcast_mut::<StepCatchHookState>()
+            .expect("CatchStepModifier: step_state must be StepCatchHookState");
+
+        let has_catch = game.player(&state.catcher_id)
+            .map(|p| p.has_skill(SkillId::Catch))
+            .unwrap_or(false);
+        if !has_catch {
+            return false;
+        }
+
+        state.re_rolled_action = Some(ReRolledAction::new("CATCH"));
+        state.re_roll_source = Some(ReRollSource::new("Catch"));
+        state.reroll_catch = true;
+        true
+    }
+}
+
+// ── CatchBehaviour ────────────────────────────────────────────────────────────
+
+/// Catch: player may re-roll a failed catch roll once per action.
 pub struct CatchBehaviour;
 
 impl CatchBehaviour {
     pub fn new() -> Self { Self }
+
+    pub fn register_into(registry: &mut SkillRegistry) {
+        let mut sb = SbContainer::new();
+        sb.register_step_modifier(Box::new(CatchStepModifier));
+        registry.register(SkillId::Catch, sb);
+    }
 }
 
 impl Default for CatchBehaviour {
@@ -17,16 +68,15 @@ impl Default for CatchBehaviour {
 impl SkillBehaviour for CatchBehaviour {
     fn name(&self) -> &'static str { "CatchBehaviour" }
 
-    /// Java `StepModifier<StepCatchScatterThrowIn, StepState>.handleExecuteStepHook`:
-    /// if catcher has Catch skill, sets reRolledAction=CATCH and reRollSource,
-    /// sets state.rerollCatch=true, returns true. Currently returns false as step state is
-    /// unavailable.
-    ///
-    /// TODO(hook-infra): needs state.catcher, step.setReRolledAction/setReRollSource,
-    /// state.rerollCatch.
-    fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
-        // TODO(hook-infra): step-specific state access (state.catcher,
-        // step.setReRolledAction, step.setReRollSource, state.rerollCatch)
+    fn execute_step_hook(&self, game: &mut ffb_model::model::game::Game) -> bool {
+        // Legacy hook path — logic lives in CatchStepModifier.
+        let has_skill = game.acting_player.player_id.as_deref()
+            .and_then(|id| game.player(id))
+            .map(|p| p.has_skill(SkillId::Catch))
+            .unwrap_or(false);
+        if !has_skill {
+            return false;
+        }
         false
     }
 }
@@ -34,26 +84,76 @@ impl SkillBehaviour for CatchBehaviour {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::skill_behaviour::registry::SkillRegistry;
+    use crate::step::framework::test_team;
+    use ffb_model::enums::Rules;
+    use ffb_model::model::player::Player;
+    use ffb_model::model::skill_def::SkillWithValue;
+    use ffb_model::util::rng::GameRng;
 
-    #[test]
-    fn hook_is_noop_returns_false() {
-        // Without step infra the hook always returns false.
-        let b = CatchBehaviour::new();
-        assert_eq!(b.name(), "CatchBehaviour");
+    fn player_with_skills(id: &str, skills: Vec<SkillId>) -> Player {
+        Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "pos".into(),
+            player_type: ffb_model::enums::PlayerType::Regular,
+            gender: ffb_model::enums::PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: skills.into_iter().map(|s| SkillWithValue { skill_id: s, value: None }).collect(),
+            ..Default::default()
+        }
     }
 
     #[test]
-    fn name_is_correct() {
-        let b = CatchBehaviour::default();
-        assert_eq!(b.name(), "CatchBehaviour");
+    fn register_into_adds_step_modifier() {
+        let mut reg = SkillRegistry::empty();
+        CatchBehaviour::register_into(&mut reg);
+        let sb = reg.get(SkillId::Catch).expect("Catch must be registered");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn step_modifier_applies_to_catch_step() {
+        let m = CatchStepModifier;
+        assert!(m.applies_to(StepId::CatchScatterThrowIn));
+        assert!(!m.applies_to(StepId::BlockRoll));
+    }
+
+    #[test]
+    fn step_modifier_priority_is_zero() {
+        assert_eq!(CatchStepModifier.priority(), 0);
+    }
+
+    #[test]
+    fn catcher_without_catch_returns_false() {
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        game.team_home.players.push(player_with_skills("catcher", vec![]));
+
+        let m = CatchStepModifier;
+        let mut hs = StepCatchHookState::new("catcher".into());
+        assert!(!m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs));
+        assert!(!hs.reroll_catch);
+    }
+
+    #[test]
+    fn catcher_with_catch_grants_reroll() {
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        game.team_home.players.push(player_with_skills("catcher", vec![SkillId::Catch]));
+
+        let m = CatchStepModifier;
+        let mut hs = StepCatchHookState::new("catcher".into());
+        let result = m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs);
+        assert!(result);
+        assert!(hs.reroll_catch);
+    }
+
+    #[test]
+    fn name_is_not_empty() {
+        assert!(!CatchBehaviour::new().name().is_empty());
     }
 
     #[test]
     fn execute_step_hook_returns_false() {
-        use ffb_model::enums::Rules;
-        use crate::step::framework::test_team;
         let b = CatchBehaviour::new();
-        let mut game = ffb_model::model::game::Game::new(
+        let mut game = Game::new(
             test_team("home", 0), test_team("away", 0), Rules::Bb2020,
         );
         assert!(!b.execute_step_hook(&mut game));
@@ -69,5 +169,4 @@ mod tests {
         b.apply_modifier(&mut player, &pos);
         assert_eq!(player.movement, movement_before);
     }
-#[test]    fn name_is_not_empty() {        assert!(!CatchBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2020() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = CatchBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2020,        );        assert!(!b.execute_step_hook(&mut game));    }
 }

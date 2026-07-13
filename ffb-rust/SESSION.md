@@ -1,6 +1,76 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-12, Phase AAF done — closed the `ffb-model/factory` tracker-accuracy audit flagged in Phase AAE (47 of 82 rows fixed: 43 moved, 3 genuinely translated, 4 orphaned-corrected), and found + closed a much bigger, previously-undocumented gap: **the skill-behaviour step-hook mechanism is real and proven (`StepHorns`/`HornsBehaviour`), but only a minority of skill-behaviour files are actually reachable through it — most either target a step that never calls `dispatch::execute_step_hooks`, or carry a dead `StepModifierTrait` stub. Concretely verified with Dodge: the skill had zero effect on BB2020/BB2025 gameplay** (the step computed everything needed but never ran the hook that would decide/report the outcome). Wired it for real this session; a full audit of the remaining ~20 genuine gaps (of 127 files audited) is now written up in `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md` for follow-up phases.**)
+## Current Status (2026-07-13, Phase AAG done — closed batching-order items 1-3 of
+`docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`: the DumpOff `applies_to` wiring bug, the entire
+StepPushback skill family (Grab/SideStep/StandFirm/EyeGouge/MonstrousMouth), and the
+StepCatchScatterThrowIn Catch/MonstrousMouth reroll family.)
+
+**What actually happened, in order:**
+
+1. **DumpOff bug fix + verification**: fixed `bb2025/dump_off_behaviour.rs`'s `applies_to`
+   (checked `StepId::BlockRoll`, should check `StepId::DumpOff`). Confirmed by direct read
+   that Bombardier/DumpOff/Stab/Wrestle's real game logic already lives directly in their
+   `step/action/block/*.rs` files (matching the audit's classification) — no further work
+   needed for those four, the `skill_behaviour/*.rs` files stay dead-but-harmless duplicates.
+
+2. **StepPushback skill family, for real, across all 3 editions**: migrated BB2020's
+   `step_pushback.rs` off its hand-inlined `apply_stand_firm_hook`/`apply_side_step_hook`
+   private methods onto the same `dispatch::execute_step_hooks` mechanism BB2025 already used
+   (BB2020 gets its own `StepPushbackHookState`, kept decoupled from BB2025's per-edition
+   convention). Ported real `StepModifierTrait` impls for **Grab, SideStep, StandFirm** in both
+   BB2016 and BB2020 (previously only BB2025 had real implementations; BB2016/BB2020 were bare
+   `SkillBehaviour`-only stubs never registered in `registry.rs` at all). Fixed a live priority
+   bug in BB2025's `GrabStepModifier` (returned `3`, Java registers `5` — this actually mattered:
+   Java's dispatch order is MonstrousMouth(1)→StandFirm(2)→EyeGouge(3)→SideStep(4)→Grab(5)) and a
+   stray-space typo in its cancelling-skill property check (`"cancelsCan PushBackToAnySquare"` →
+   `"cancelsCanPushBackToAnySquare"`, which meant the check could never match). Replaced
+   EyeGouge's stub body with a real translation (gates on the `canRemoveOpponentAssists` property
+   and main-defender-only, sets the eye-gouged `PlayerState` bit, reports skill use, never stops
+   hook processing).
+   **Correction to prior research mid-session**: the plan (informed by a Plan-agent's research
+   pass) claimed BB2025's MonstrousMouth (the chomped-defender forced-push mechanic, distinct
+   from BB2016/BB2020's Catch-twin sense of the same skill name) was "already fully real and
+   registered" — a direct read of the file showed it was still an unimplemented stub with no
+   `StepModifierTrait` at all. Implemented it for real rather than trusting the stale claim
+   (same "verify Plan-agent findings against actual source" lesson flagged in Phase ZY's
+   retrospective). Also found and fixed a genuine small pre-existing model gap surfaced while
+   implementing EyeGouge: `SkillId::EyeGouge` had no `properties()` entry for
+   `"canRemoveOpponentAssists"` even though Java's `EyeGouge.java` grants it — without this,
+   EyeGouge's own gate could never pass. Registered all 5 newly-real behaviours into
+   `registry.rs`'s `build_bb2016()`/`build_bb2020()` (BB2025 already had all 5 registered, just
+   with buggy bodies/priorities); bumped the registry's hardcoded size-assertion tests
+   (17→20, 18→21) to match.
+
+3. **StepCatchScatterThrowIn Catch/MonstrousMouth reroll family**: wired a new
+   `StepCatchHookState` + `dispatch::execute_step_hooks(..., StepId::CatchScatterThrowIn, ...)`
+   call into both BB2020's and BB2025's `catch_ball()` (BB2016 inherits via its existing
+   re-export of BB2025's file), replacing a long-standing "no-op" comment at the exact failure-
+   path spot. Verified the precise Java semantics directly against source (not just the audit's
+   paraphrase) before wiring: the hook fires once per failed roll (guarded by
+   `getReRolledAction() != CATCH` to prevent infinite recursion), and on success recurses
+   immediately into `catchBall()` with no dialog — a real automatic reroll, not a coach decision,
+   unlike the Pushback family's dialog-gated skills. Implemented real `CatchStepModifier`s (all
+   3 editions, byte-identical Java logic) and `MonstrousMouthStepModifier`s (BB2016/BB2020 —
+   confirmed via direct Java read to be exact Catch-twins, unrelated to BB2025's forced-push
+   mechanic of the same skill name). Registered both into `build_bb2016()`/`build_bb2020()`
+   (BB2025 already had Catch registered); bumped registry size assertions again (20→22, 18/21→23).
+
+Tests: 17,417 → **17,492** (+75: +61 Pushback family/DumpOff, +14 Catch family). 0 failures.
+`cargo clippy` shows the same 2 pre-existing errors unrelated to this session's files (in
+`step_eject_player.rs`/`step_reset_fumblerooskie.rs`, not touched this phase). No parity/
+integration testing (per standing instruction). 2 commits, both pushed to `main`.
+
+**What's left, not part of this phase's 3-item scope** (per
+`docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`'s remaining batching-order items 4-9): StepDauntless/
+StepJuggernaut, `AbstractStepModifierMultipleBlock` base, StepJumpUp/StepAnimosity,
+StepDivingTackle, StepFoulAppearance, and the large isolated items (AnimalSavagery, Shadowing,
+Tentacles, UnchannelledFury, CloudBurster). Honest completion estimate per the plan: roughly
+**~96–97%** true behavioral completion of in-scope logic now (up from ~94–96% pre-phase),
+expect **4–7 more similarly-scoped phases** to close the rest.
+
+---
+
+## Prior Status (2026-07-12, Phase AAF done — closed the `ffb-model/factory` tracker-accuracy audit flagged in Phase AAE (47 of 82 rows fixed: 43 moved, 3 genuinely translated, 4 orphaned-corrected), and found + closed a much bigger, previously-undocumented gap: **the skill-behaviour step-hook mechanism is real and proven (`StepHorns`/`HornsBehaviour`), but only a minority of skill-behaviour files are actually reachable through it — most either target a step that never calls `dispatch::execute_step_hooks`, or carry a dead `StepModifierTrait` stub. Concretely verified with Dodge: the skill had zero effect on BB2020/BB2025 gameplay** (the step computed everything needed but never ran the hook that would decide/report the outcome). Wired it for real this session; a full audit of the remaining ~20 genuine gaps (of 127 files audited) is now written up in `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md` for follow-up phases.**)
 
 Plan: no standalone `docs/PHASE_AAF_PLAN.md` — this was a plan-mode session, scoped via `ExitPlanMode`
 (three parallel tracks: factory tracker audit, skill-hook-infra audit, and a Dodge-family reference

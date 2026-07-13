@@ -24,6 +24,31 @@ use ffb_model::report::report_scatter_ball::ReportScatterBall;
 use ffb_model::report::report_throw_in::ReportThrowIn;
 use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::model::skill_use::SkillUse;
+use ffb_model::enums::ReRollSource;
+use crate::skill_behaviour::dispatch;
+
+// ── Hook state ─────────────────────────────────────────────────────────────────
+
+/// Java: StepCatchScatterThrowIn.StepState (the subset needed by the Catch/MonstrousMouth
+/// skill-modifier hooks) — mutable state passed through executeStepHooks.
+/// Exported so Catch/MonstrousMouth step-modifiers can downcast to it.
+#[derive(Debug)]
+pub struct StepCatchHookState {
+    /// Java: state.catcher.getId() — carried as a player id for headless
+    pub catcher_id: String,
+    /// Java: state.rerollCatch — out-param, true when a skill grants an automatic catch reroll
+    pub reroll_catch: bool,
+    /// Java: step.setReRolledAction(...) — out-param
+    pub re_rolled_action: Option<ReRolledAction>,
+    /// Java: step.setReRollSource(...) — out-param
+    pub re_roll_source: Option<ReRollSource>,
+}
+
+impl StepCatchHookState {
+    pub fn new(catcher_id: String) -> Self {
+        Self { catcher_id, reroll_catch: false, re_rolled_action: None, re_roll_source: None }
+    }
+}
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2020.shared.StepCatchScatterThrowIn.
 ///
@@ -909,7 +934,18 @@ impl StepCatchScatterThrowIn {
             // Java BB2020: no Blast-it (grantsCatchBonusToReceiver) check here
             // Java BB2020: state.rerollCatch check via executeStepHooks (if not already rerolled)
             if !already_rerolled {
-                // no-op: state.rerollCatch from Catch skill SkillBehaviour hook — registry not ported; auto-declines
+                let mut hook_state = StepCatchHookState::new(cid.clone());
+                dispatch::execute_step_hooks(game, rng, StepId::CatchScatterThrowIn, &mut hook_state);
+                self.re_roll_state.re_rolled_action = hook_state.re_rolled_action.or(self.re_roll_state.re_rolled_action.clone());
+                self.re_roll_state.re_roll_source = hook_state.re_roll_source.or(self.re_roll_state.re_roll_source.clone());
+
+                let catch_works_for_bombs = game.options
+                    .get_option_with_default(game_option_id::GameOptionId::CATCH_WORKS_FOR_BOMBS)
+                    .get_value_as_string() == "true";
+                if hook_state.reroll_catch && (!mode.is_bomb() || catch_works_for_bombs) {
+                    return self.catch_ball(game, rng);
+                }
+
                 if let Some(prompt) = ask_for_reroll_if_available(game, "CATCH", min_roll, false) {
                     self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("CATCH"));
                     self.re_roll_state.re_roll_source = Some(ffb_model::enums::ReRollSource::new("TRR"));

@@ -179,7 +179,9 @@ impl SkillRegistry {
         // BB2020-specific implementations
         use crate::skill_behaviour::bb2020::{
             bone_head_behaviour::BoneHeadBehaviour,
+            catch_behaviour::CatchBehaviour,
             grab_behaviour::GrabBehaviour,
+            monstrous_mouth_behaviour::MonstrousMouthBehaviour,
             piling_on_behaviour::PilingOnBehaviour,
             really_stupid_behaviour::ReallyStupidBehaviour,
             side_step_behaviour::SideStepBehaviour,
@@ -207,7 +209,9 @@ impl SkillRegistry {
         WrestleBehaviour::register_into(&mut reg);
         // BB2020-specific behaviours
         BoneHeadBehaviour::register_into(&mut reg);
+        CatchBehaviour::register_into(&mut reg);
         GrabBehaviour::register_into(&mut reg);
+        MonstrousMouthBehaviour::register_into(&mut reg);
         PilingOnBehaviour::register_into(&mut reg);
         ReallyStupidBehaviour::register_into(&mut reg);
         SideStepBehaviour::register_into(&mut reg);
@@ -239,7 +243,9 @@ impl SkillRegistry {
         // BB2016-specific implementations
         use crate::skill_behaviour::bb2016::{
             bone_head_behaviour::BoneHeadBehaviour,
+            catch_behaviour::CatchBehaviour,
             grab_behaviour::GrabBehaviour,
+            monstrous_mouth_behaviour::MonstrousMouthBehaviour,
             piling_on_behaviour::PilingOnBehaviour,
             really_stupid_behaviour::ReallyStupidBehaviour,
             side_step_behaviour::SideStepBehaviour,
@@ -264,7 +270,9 @@ impl SkillRegistry {
         WrestleBehaviour::register_into(&mut reg);
         // BB2016-specific behaviours
         BoneHeadBehaviour::register_into(&mut reg);
+        CatchBehaviour::register_into(&mut reg);
         GrabBehaviour::register_into(&mut reg);
+        MonstrousMouthBehaviour::register_into(&mut reg);
         PilingOnBehaviour::register_into(&mut reg);
         ReallyStupidBehaviour::register_into(&mut reg);
         SideStepBehaviour::register_into(&mut reg);
@@ -366,15 +374,15 @@ mod tests {
     }
 
     #[test]
-    fn bb2016_registry_has_twenty_entries() {
+    fn bb2016_registry_has_twenty_two_entries() {
         let reg = SkillRegistry::build_bb2016();
-        assert_eq!(reg.len(), 20, "BB2016 registry should have 20 registered skill entries (17 + Grab + SideStep + StandFirm)");
+        assert_eq!(reg.len(), 22, "BB2016 registry should have 22 registered skill entries (20 + Catch + MonstrousMouth)");
     }
 
     #[test]
-    fn bb2020_registry_has_twenty_one_entries() {
+    fn bb2020_registry_has_twenty_three_entries() {
         let reg = SkillRegistry::build_bb2020();
-        assert_eq!(reg.len(), 21, "BB2020 registry should have 21 registered skill entries (18 + Grab + SideStep + StandFirm)");
+        assert_eq!(reg.len(), 23, "BB2020 registry should have 23 registered skill entries (21 + Catch + MonstrousMouth)");
     }
 
     #[test]
@@ -457,6 +465,34 @@ mod tests {
     fn bb2016_registry_contains_stand_firm_with_step_modifier() {
         let reg = SkillRegistry::build_bb2016();
         let sb = reg.get(SkillId::StandFirm).expect("StandFirm must be in BB2016 registry");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn bb2016_registry_contains_catch_with_step_modifier() {
+        let reg = SkillRegistry::build_bb2016();
+        let sb = reg.get(SkillId::Catch).expect("Catch must be in BB2016 registry");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn bb2016_registry_contains_monstrous_mouth_with_step_modifier() {
+        let reg = SkillRegistry::build_bb2016();
+        let sb = reg.get(SkillId::MonstrousMouth).expect("MonstrousMouth must be in BB2016 registry");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn bb2020_registry_contains_catch_with_step_modifier() {
+        let reg = SkillRegistry::build_bb2020();
+        let sb = reg.get(SkillId::Catch).expect("Catch must be in BB2020 registry");
+        assert_eq!(sb.get_step_modifiers().len(), 1);
+    }
+
+    #[test]
+    fn bb2020_registry_contains_monstrous_mouth_with_step_modifier() {
+        let reg = SkillRegistry::build_bb2020();
+        let sb = reg.get(SkillId::MonstrousMouth).expect("MonstrousMouth must be in BB2020 registry");
         assert_eq!(sb.get_step_modifiers().len(), 1);
     }
 }
