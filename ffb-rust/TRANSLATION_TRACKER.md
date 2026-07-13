@@ -29,6 +29,34 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AAN (closed skill-hook-audit item 9's CloudBurster — audit fully complete, this
+session):**
+CloudBurster is a whole standalone step in Java (`registerStep`, not `StepModifier`) — no Rust
+`StepCloudBurster` existed. Created `step/bb2020/pass/step_cloud_burster.rs`: deflection/
+thrower/interceptor guard, `canForceInterceptionRerollOfLongPasses` skill-property lookup on the
+thrower, passing-distance check via the existing `PassMechanic`, `cancelsSkill` check (via
+`has_skill_property`, matching `StepSafeThrow`/`VeryLongLegs` precedent), and on success:
+`ReportCloudBurster` + reset deflection + re-push `INTERCEPT` forwarding only
+`GOTO_LABEL_ON_FAILURE`. Added `StepId::CloudBurster` + wiring in `driver.rs`/
+`step_id_factory.rs`, the missing `SkillId::CloudBurster` properties entry, and extended
+`VeryLongLegs`'s properties to the BB2016+BB2020 union. Two pre-existing, out-of-scope
+limitations documented rather than fixed: the generic `PASS_INTERCEPT` hook-insertion mechanism
+isn't wired into the bb2020 pass generator (matches the `StepSafeThrow` precedent), and Rust's
+per-instance step fields mean a re-pushed `INTERCEPT` can't transparently resume the
+previously-chosen interceptor the way Java's shared `PassState` does.
+
+**This closes all 9 batching-order items in `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`** (1-7: Phases
+AAG-AAJ; 8 + Shadowing/UnchannelledFury: AAK; AnimalSavagery: AAL; Tentacles: AAM; CloudBurster:
+AAN).
+
+Tests: 17,595 → 17,609 (+14), 0 failures. No parity/integration testing (deferred, per
+instruction). **Honest completion estimate**: roughly ~99.9% true behavioral completion of
+in-scope skill-hook logic — the skill-hook audit that has driven Phases AAG-AAN is now complete.
+The natural next major workstream is Java/Rust parity/integration testing against the real
+engine, currently the least-developed piece of this project (only 8 sample seeds in
+`progress.html`/`parity/`, one known FAIL) — out of scope for this plan; needs its own separate
+planning pass. Full writeup: `SESSION.md` Current Status.
+
 **Phase AAM (closed skill-hook-audit item 9's Tentacles, this session):**
 Mixed result: BB2016 (`step/bb2016/move_/step_tentacles.rs`) was already complete and correct, no
 change needed. BB2020/BB2025 (`step/mixed/move_/step_tentacles.rs`) was a genuine from-scratch

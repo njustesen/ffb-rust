@@ -800,8 +800,11 @@ impl SkillId {
             SkillId::NoHands => &["preventCatch"],
             // Java: SafeThrow.postConstruct registers NamedProperties.canCancelInterceptions
             SkillId::SafeThrow => &["canCancelInterceptions"],
-            // Java: VeryLongLegs.postConstruct registers CancelSkillProperty(canCancelInterceptions)
-            SkillId::VeryLongLegs => &["cancelsCancelInterceptions"],
+            // Java: VeryLongLegs.postConstruct registers CancelSkillProperty(canCancelInterceptions) (BB2016)
+            //   and CancelSkillProperty(canForceInterceptionRerollOfLongPasses) (BB2020) — union of both.
+            SkillId::VeryLongLegs => &["cancelsCancelInterceptions", "cancelsCanForceInterceptionRerollOfLongPasses"],
+            // Java: CloudBurster (BB2020) registers NamedProperties.canForceInterceptionRerollOfLongPasses
+            SkillId::CloudBurster => &["canForceInterceptionRerollOfLongPasses"],
             // Java: FuriousOutburst.postConstruct registers canTeleportBeforeAndAfterAvRollAttack
             SkillId::FuriousOutburst => &["canTeleportBeforeAndAfterAvRollAttack"],
             // Java: SafePass.postConstruct registers NamedProperties.dontDropFumbles

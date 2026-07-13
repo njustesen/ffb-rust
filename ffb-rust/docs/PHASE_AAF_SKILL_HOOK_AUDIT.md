@@ -248,6 +248,28 @@ confirmed distinct from Shadowing's lookup per this doc's original note), 1d6 st
 w/ re-roll owned by the defender (Tentacles player, not the acting player — a real edition
 difference from BB2016), hold-in-place resolution. 10 new tests. Remaining open item: CloudBurster.
 
+## Phase AAN update (closed CloudBurster — audit complete)
+
+**CloudBurster** is **closed**. This confirms the audit doc's original characterization: a
+different mechanism entirely (Java `registerStep`, not `StepModifier`), no Rust
+`StepCloudBurster` existed. Created `crates/ffb-engine/src/step/bb2020/pass/step_cloud_burster.rs`,
+a 1:1 port: deflection/thrower/interceptor guard, `canForceInterceptionRerollOfLongPasses`
+skill-property lookup, passing-distance check, `cancelsSkill` check (via `has_skill_property`,
+matching `StepSafeThrow`/`VeryLongLegs` precedent), and on success report + re-push `INTERCEPT`.
+Added `StepId::CloudBurster`, wired into `driver.rs`/`step_id_factory.rs`, added the missing
+`SkillId::CloudBurster` properties entry and extended `VeryLongLegs`'s to the BB2016+BB2020
+union. 14 new tests. Two pre-existing, out-of-scope limitations documented in the new file's own
+doc comment rather than silently glossed over: (a) the generic `PASS_INTERCEPT` hook-insertion
+mechanism (`insertHooks`) isn't wired into `generator/bb2020/pass.rs` — matches the existing
+`StepSafeThrow` precedent, a separate concern from the step body itself; (b) Rust's per-instance
+step fields mean a re-pushed `INTERCEPT` step can't transparently resume with the
+previously-chosen interceptor the way Java's shared `PassState` does.
+
+**All 9 batching-order items in this audit are now closed** (1-7: Phases AAG-AAJ; 8 +
+Shadowing/UnchannelledFury of item 9: Phase AAK; AnimalSavagery: Phase AAL; Tentacles: Phase AAM;
+CloudBurster: Phase AAN). See `SESSION.md`'s Phase AAN entry for the full completion estimate and
+the pre-existing gaps left deliberately out of scope. This audit's work is complete.
+
 ## Recommended phase-batching order
 
 Ordered roughly by (a) how many skills unlock per unit of work and (b) how

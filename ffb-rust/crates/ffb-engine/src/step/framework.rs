@@ -151,6 +151,8 @@ pub enum StepId {
     Pro, RevertEndTurn,
     // blood lust / cards
     BloodLust, PlayCard,
+    // pass special (BB2020)
+    CloudBurster,
 }
 
 /// Typed step parameter (Java `StepParameter`/`StepParameterKey`). The variant is the key;
@@ -379,6 +381,8 @@ pub enum StepParameter {
     IgnoreActedFlag(bool),
     /// Java: ORIGINAL_BOMBARDIER — PassState.originalBombardier (player ID of the bomb thrower).
     OriginalBombardier(Option<String>),
+    /// PassState.deflectionSuccessful — threaded to StepCloudBurster (Java `StepHook.HookPoint.PASS_INTERCEPT`).
+    DeflectionSuccessful(bool),
     // … grow per 20_steps entries as steps are ported.
 }
 

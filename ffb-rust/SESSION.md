@@ -1,6 +1,64 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-13, Phase AAM done — closed batching-order item 9's
+## Current Status (2026-07-13, Phase AAN done — closed the last item of
+`docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`: CloudBurster. **The skill-behaviour-hook audit is now
+fully closed, all 9 batching-order items resolved.**)
+
+CloudBurster is structurally different from every other item in this audit: Java registers it as
+a whole standalone step (`registerStep(StepId.CLOUD_BURSTER, StepCloudBurster.class)`, annotated
+`@StepHook(HookPoint.PASS_INTERCEPT)`), not a `StepModifier` hook. No Rust `StepCloudBurster`
+existed at all before this phase.
+
+**What actually happened:** created `crates/ffb-engine/src/step/bb2020/pass/step_cloud_burster.rs`,
+a 1:1 port of the nested `StepCloudBurster` class: guard (deflection not successful / no thrower /
+no interceptor → goto failure), `canForceInterceptionRerollOfLongPasses` skill-property lookup on
+the thrower, passing-distance computation via the existing `PassMechanic`, the
+`cancelsSkill(interceptor, skill)` check (translated as `interceptor.has_skill_property(...)`,
+matching the `StepSafeThrow`/`VeryLongLegs` precedent), and on success: `ReportCloudBurster` +
+reset deflection + push a fresh `INTERCEPT` step forwarding only `GOTO_LABEL_ON_FAILURE` (exactly
+the one parameter Java's literal `StepParameterSet` carries). Added: `StepId::CloudBurster` +
+`StepParameter::DeflectionSuccessful` to `framework.rs`; wired into `driver.rs`'s `make_step()`
+and `factory/step_id_factory.rs`'s name mapping; added the missing
+`SkillId::CloudBurster => ["canForceInterceptionRerollOfLongPasses"]` properties entry and
+extended `SkillId::VeryLongLegs`'s properties to the union of its BB2016
+(`cancelsCancelInterceptions`) and BB2020 (`cancelsCanForceInterceptionRerollOfLongPasses`)
+registrations (matching the established "union across editions" convention used elsewhere, e.g.
+Decay/Regeneration); corrected the stale `skill_behaviour/bb2020/cloud_burster_behaviour.rs` doc
+comment to point at the real step (Wrestle/Stab/DumpOff precedent). 14 new tests.
+
+**Known, explicitly-documented limitation** (not a bug, an architectural tradeoff inherited from
+this codebase's design, called out in the new file's own doc comment): Java's `PassState` is a
+single mutable object shared by reference across the pass sequence, so re-pushing `INTERCEPT`
+after a CloudBurster trigger transparently resumes with the *same* already-chosen interceptor (a
+true re-roll, no new dialog). Rust's per-step-instance fields mean a freshly constructed
+`StepIntercept` only receives the one parameter Java's literal `StepParameterSet` actually
+carries (`GOTO_LABEL_ON_FAILURE`) — faithful to the literal parameter list, but the interceptor
+re-use itself isn't observable without a shared `PassState`-equivalent. Also **not yet wired into
+`generator/bb2020/pass.rs`'s sequence** (no `insertHooks` translation) — this matches the existing
+precedent for the *other* `PASS_INTERCEPT` hook step, `StepSafeThrow` (bb2016), whose generator
+file already says "insertHooks skipped — StepHooks not yet ported." The step itself is fully
+implemented and unit-tested; wiring the generic hook-insertion mechanism is a separate,
+pre-existing gap this phase didn't expand scope to fix.
+
+Tests: 17,595 → **17,609** (+14). 0 failures. `cargo clippy` shows the same 2 pre-existing errors
+unrelated to this session's files (`step_eject_player.rs`/`step_reset_fumblerooskie.rs`). No
+parity/integration testing (per standing instruction).
+
+**Status of `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`**: all 9 batching-order items are now closed
+(items 1-7 in Phases AAG-AAJ; item 8 + Shadowing/UnchannelledFury of item 9 in Phase AAK;
+AnimalSavagery in Phase AAL; Tentacles in Phase AAM; CloudBurster in Phase AAN). Honest completion
+estimate: roughly **~99.9% true behavioral completion** of in-scope skill-hook logic — the
+remaining ~0.1% is the two pre-existing, out-of-scope gaps documented along the way (the generic
+`insertHooks`/`PASS_INTERCEPT` mechanism for `StepSafeThrow`/`StepCloudBurster`, and a couple of
+`skill_behaviour/*.rs` dead files' fuller armour-modifier-gating behavior). **The skill-hook audit
+that has driven Phases AAG-AAN is complete.** The natural next major workstream is Java/Rust
+parity/integration testing against the real engine (currently only 8 sample seeds in
+`progress.html`/`parity/`, one known FAIL) — not part of this plan's scope; a future planning
+session should scope that separately.
+
+---
+
+## Prior Status (2026-07-13, Phase AAM done — closed batching-order item 9's
 Tentacles of `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`.)
 
 Mixed result within a single item, same lesson as every phase in this series — verify before

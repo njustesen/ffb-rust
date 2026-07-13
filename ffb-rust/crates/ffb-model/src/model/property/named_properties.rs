@@ -64,6 +64,8 @@ impl NamedProperties {
     pub const CAN_FOLLOW_PLAYER_LEAVING_TACKLEZONES: &'static str = "canFollowPlayerLeavingTacklezones";
     pub const CAN_FORCE_BOMB_EXPLOSION: &'static str = "canForceBombExplosion";
     pub const CAN_FORCE_INTERCEPTION_REROLL_OF_LONG_PASSES: &'static str = "canForceInterceptionRerollOfLongPasses";
+    /// Java: CancelSkillProperty(NamedProperties.canForceInterceptionRerollOfLongPasses) — BB2020 VeryLongLegs cancels CloudBurster.
+    pub const CANCELS_CAN_FORCE_INTERCEPTION_REROLL_OF_LONG_PASSES: &'static str = "cancelsCanForceInterceptionRerollOfLongPasses";
     pub const CAN_FOUL_AFTER_BLOCK: &'static str = "canFoulAfterBlock";
     pub const CAN_GAIN_CLAWS_FOR_BLITZ: &'static str = "canGainClawsForBlitz";
     pub const CAN_GAIN_FRENZY_FOR_BLITZ: &'static str = "canGainFrenzyForBlitz";

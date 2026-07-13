@@ -178,6 +178,7 @@ pub fn make_step(id: StepId) -> Box<dyn Step> {
         StepId::Bombardier             => { use crate::step::action::pass::step_bombardier::StepBombardier; Box::new(StepBombardier::new()) }
         StepId::PassBlock              => { use crate::step::mixed::pass::step_pass_block::StepPassBlock; Box::new(StepPassBlock::new()) }
         StepId::SafeThrow              => { use crate::step::bb2016::pass::step_safe_throw::StepSafeThrow; Box::new(StepSafeThrow::new()) }
+        StepId::CloudBurster           => { use crate::step::bb2020::pass::step_cloud_burster::StepCloudBurster; Box::new(StepCloudBurster::new(String::new())) }
         // ── Mixed special skills ─────────────────────────────────────────────
         StepId::AnimalSavagery         => { use crate::step::mixed::shared::step_animal_savagery::StepAnimalSavagery; Box::new(StepAnimalSavagery::new(String::new())) }
         StepId::UnchannelledFury       => { use crate::step::mixed::step_unchannelled_fury::StepUnchannelledFury; Box::new(StepUnchannelledFury::new(String::new())) }

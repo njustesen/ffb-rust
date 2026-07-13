@@ -3,8 +3,9 @@ use crate::skill_behaviour::SkillBehaviour;
 /// BB2020 CloudBurster skill behaviour.
 /// Registers StepCloudBurster step (not a StepModifier): when a deflection occurs on a long pass,
 /// forces the interceptor to re-roll. execute_step_hook is not applicable — the logic lives in
-/// StepCloudBurster.executeStep(). Mirrors Java
-/// `com.fumbbl.ffb.server.skillbehaviour.bb2020.CloudBursterBehaviour`.
+/// `crate::step::bb2020::pass::step_cloud_burster::StepCloudBurster::execute_step` (a real,
+/// unit-tested step file — see that file for the 1:1 port of Java's `StepCloudBurster`).
+/// Mirrors Java `com.fumbbl.ffb.server.skillbehaviour.bb2020.CloudBursterBehaviour`.
 pub struct CloudBursterBehaviour;
 
 impl CloudBursterBehaviour {
