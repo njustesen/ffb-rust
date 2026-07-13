@@ -354,6 +354,34 @@ impl UtilPlayer {
             .collect()
     }
 
+    /// 1:1 translation of findAdjacentOpposingPlayersWithSkill (4-arg overload, using the
+    /// game's acting player as `player`). Unlike `find_adjacent_opposing_players_with_property`,
+    /// this checks for a specific skill (`UtilCards.hasSkill`) rather than a skill property.
+    pub fn find_adjacent_opposing_players_with_skill<'a>(
+        game: &'a Game,
+        acting_player_id: &str,
+        coord: FieldCoordinate,
+        skill_id: SkillId,
+        check_able_to_move: bool,
+    ) -> Vec<&'a PlayerId> {
+        let other_team = Self::find_other_team(game, acting_player_id);
+        let opponents =
+            Self::find_adjacent_players_with_tacklezones(game, other_team, coord, false);
+        let field_model = &game.field_model;
+        opponents
+            .into_iter()
+            .filter(|id| {
+                let state = field_model.player_state(id);
+                let has_tz = state.map(|s| s.has_tacklezones()).unwrap_or(false);
+                let able = !check_able_to_move
+                    || state.map(|s| s.is_able_to_move()).unwrap_or(false);
+                let player = game.team_home.player(id).or_else(|| game.team_away.player(id));
+                let skill_ok = player.map(|p| p.has_skill(skill_id)).unwrap_or(false);
+                has_tz && skill_ok && able
+            })
+            .collect()
+    }
+
     /// 1:1 translation of filterThrower.
     pub fn filter_thrower<'a>(game: &Game, players: Vec<&'a PlayerId>) -> Vec<&'a PlayerId> {
         let thrower_id = game.thrower_id.as_deref();

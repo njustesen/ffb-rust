@@ -1,6 +1,66 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-13, Phase AAJ done — closed batching-order item 7 of
+## Current Status (2026-07-13, Phase AAK done — closed batching-order items 8 and
+9-partial (Shadowing, UnchannelledFury) of `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`;
+FoulAppearance re-verified as already complete.)
+
+This phase was planned as a verification-only pass on item 8 (FoulAppearance) plus a sizing check
+on Shadowing/UnchannelledFury (both flagged in the audit doc as "may already be partially done —
+verify before assuming 'large'"). Item 8 came back genuinely already closed with no code changes
+needed. Shadowing and UnchannelledFury both turned out to have small, real, fixable bugs rather
+than large missing features, so both were closed in this same phase instead of being deferred to
+separate phases AAM/AAO as originally planned.
+
+**What actually happened:**
+
+1. **FoulAppearance (item 8) — confirmed already complete.** Direct comparison of
+   `step/mixed/step_foul_appearance.rs`, `step/bb2016/step_foul_appearance.rs`, and
+   `step/mixed/multiblock/step_foul_appearance_multiple.rs` against `FoulAppearanceBehaviour.java`
+   (all 3 editions) found the roll-2+-resist-check, skill/TRR re-roll, and prone+action-end logic
+   (including the BB2020/2025-only kicking-downed/GAZE branch) fully present and correct. No
+   changes made.
+2. **Shadowing — real gap found: the eligible-shadower lookup was silently broken.** All three
+   `step_shadowing.rs` variants (bb2016, bb2020, bb2025) filtered adjacent opponents by
+   `NamedProperties::CAN_ATTEMPT_TO_TACKLE_DODGING_PLAYER` — a property granted by `DivingTackle`,
+   not `Shadowing`. Java's `ShadowingBehaviour` calls `findAdjacentOpposingPlayersWithSkill`, a
+   direct skill check. As written, a legitimate Shadowing-skill defender would essentially never
+   be found (a pre-existing test comment even said as much). Fixed by adding
+   `UtilPlayer::find_adjacent_opposing_players_with_skill` (`ffb-model/src/util/util_player.rs`,
+   1:1 with Java's 4-arg `findAdjacentOpposingPlayersWithSkill` overload) and switching all three
+   step files to call it with `SkillId::Shadowing`. Also fixed a secondary BB2025-only bug: the
+   `shadowingCount` filter compared raw `p.movement` instead of `p.movement_with_modifiers()`
+   (Java: `getMovementWithModifiers()`). Added one regression test per edition proving a player
+   with the real Shadowing skill now triggers the `PlayerChoice` dialog.
+3. **UnchannelledFury — real gap found: the action-cancel turn-flag switch had drifted from
+   Java.** The main confusion-roll/re-roll/"second block"-dialog loop in
+   `step/mixed/step_unchannelled_fury.rs` was already correct. `cancel_unchannelled_fury_action`
+   had 4 divergences from the two Java editions: (a) set `foul_used` unconditionally, missing both
+   editions' `!hasSkillProperty(allowsAdditionalFoul)` guard; (b) merged `ThrowTeamMate`/
+   `ThrowTeamMateMove` into `pass_used` for both editions, but BB2025 Java routes them to a
+   separate `ttm_used` flag; (c) was missing BB2025's `PUNT`/`PUNT_MOVE` → `punt_used` case
+   entirely; (d) incorrectly included `PlayerAction::StandUpBlitz` in the blitz-used group (neither
+   Java switch has a `STAND_UP_BLITZ` case). Fixed by making the function edition-aware
+   (`game.rules == Rules::Bb2025`) and correcting all four. Added 5 regression tests, one per
+   divergence. Note: the `allowsAdditionalFoul` property has no skill mapped to it anywhere in the
+   Rust model yet (Java only grants it via the `SneakiestOfTheLot` star-player skill) — that guard
+   is currently always-false in practice; pre-existing, out of scope here, not introduced or
+   worsened by this fix.
+
+Tests: 17,544 → **17,552** (+8: 3 Shadowing regression tests, 5 UnchannelledFury regression
+tests). 0 failures. No parity/integration testing (per standing instruction).
+
+**What's left, not part of this phase's scope**: the remaining item-9 skills that are genuinely
+unimplemented from scratch: AnimalSavagery (344-line Java class, no `SkillId::AnimalSavagery`
+anywhere in Rust yet), Tentacles, and CloudBurster (needs a whole new standalone
+`StepCloudBurster`, a different mechanism than every other item in this audit — Java registers it
+as its own step, not a `StepModifier` hook). Honest completion estimate: roughly **~99.3%** true
+behavioral completion of in-scope logic — expect **3 more phases** (one per remaining skill) to
+close the rest, after which parity/integration testing against the Java engine becomes the
+natural next major workstream.
+
+---
+
+## Prior Status (2026-07-13, Phase AAJ done — closed batching-order item 7 of
 `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`: Diving Tackle, all three rule editions.)
 
 **Key correction found this session (same lesson as every recent phase)**: the audit doc's item 7

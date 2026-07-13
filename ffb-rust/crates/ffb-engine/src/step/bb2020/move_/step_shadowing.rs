@@ -1,6 +1,5 @@
-use ffb_model::enums::{ReRollSource, TurnMode};
+use ffb_model::enums::{ReRollSource, SkillId, TurnMode};
 use ffb_model::model::game::Game;
-use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
@@ -58,11 +57,11 @@ impl StepShadowing {
                 // Java: if (doShadowing && coordinateFrom != null && usingShadowing == null)
                 if self.using_shadowing.is_none() {
                     let actor_id = game.acting_player.player_id.clone().unwrap_or_default();
-                    let mut shadowers: Vec<String> = UtilPlayer::find_adjacent_opposing_players_with_property(
+                    let mut shadowers: Vec<String> = UtilPlayer::find_adjacent_opposing_players_with_skill(
                         game,
                         &actor_id,
                         coord_from,
-                        NamedProperties::CAN_ATTEMPT_TO_TACKLE_DODGING_PLAYER,
+                        SkillId::Shadowing,
                         true,
                     ).into_iter().cloned().collect();
 
@@ -310,6 +309,49 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(step.using_shadowing, Some(false));
+    }
+
+    #[test]
+    fn shadower_with_shadowing_skill_triggers_player_choice_prompt() {
+        // Regression test: the eligible-shadower lookup must key off the Shadowing skill
+        // itself, not the DivingTackle-only `canAttemptToTackleDodgingPlayer` property.
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_STANDING, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("actor".into());
+        game.team_home.players.push(Player {
+            id: "actor".into(), name: "actor".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("actor", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("actor", PlayerState::new(PS_STANDING).change_active(true));
+        game.team_away.players.push(Player {
+            id: "shadower".into(), name: "shadower".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Shadowing, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("shadower", FieldCoordinate::new(5, 4));
+        game.field_model.set_player_state("shadower", PlayerState::new(PS_STANDING).change_active(true));
+
+        let mut step = StepShadowing::new();
+        step.coordinate_from = Some(FieldCoordinate::new(5, 5));
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue, "eligible shadower must offer the PlayerChoice dialog");
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::PlayerChoice { .. })));
     }
 
     #[test]

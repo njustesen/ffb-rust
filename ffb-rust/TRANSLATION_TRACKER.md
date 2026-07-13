@@ -29,6 +29,30 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AAK (closed skill-hook-audit item 8, and Shadowing + UnchannelledFury of item 9, this
+session):**
+Planned as a verification-only pass on item 8 (FoulAppearance) plus a sizing check on Shadowing
+and UnchannelledFury (both flagged "may already be partially done"). Item 8 confirmed already
+fully complete — no code change needed. Shadowing and UnchannelledFury both turned out to have
+small, real, fixable bugs rather than large missing features, so both closed in this same phase.
+(1) **Shadowing**: all three `step_shadowing.rs` variants filtered eligible defenders by
+`NamedProperties::CAN_ATTEMPT_TO_TACKLE_DODGING_PLAYER` (a `DivingTackle` property) instead of a
+direct `SkillId::Shadowing` check — a real Shadowing-skill defender would essentially never be
+found. Fixed via new `UtilPlayer::find_adjacent_opposing_players_with_skill` (1:1 with Java's
+`findAdjacentOpposingPlayersWithSkill`) + a BB2025-only `movement_with_modifiers()` fix in the
+`shadowingCount` filter. (2) **UnchannelledFury**: the main roll/re-roll/dialog loop was already
+correct; `cancel_unchannelled_fury_action`'s turn-flag switch had drifted from Java in 4 small
+ways (missing `allowsAdditionalFoul` guard, BB2025's separate `ttm_used` flag merged into
+`pass_used`, missing BB2025 `PUNT`/`PUNT_MOVE` case, spurious `StandUpBlitz` in the blitz group) —
+fixed with an edition-aware branch.
+
+Tests: 17,544 → 17,552 (+8: 3 Shadowing + 5 UnchannelledFury regression tests), 0 failures. No
+parity/integration testing (deferred, per instruction). **Honest completion estimate**: roughly
+~99.3% true behavioral completion of in-scope logic — only AnimalSavagery, Tentacles, and
+CloudBurster remain, all confirmed genuinely unimplemented (not sizing errors); expect 3 more
+phases (one per skill) to close the rest, after which parity/integration testing against the Java
+engine becomes the natural next major workstream. Full writeup: `SESSION.md` Current Status.
+
 **Phase AAJ (closed skill-hook-audit batching item 7: Diving Tackle, this session):**
 Ported Diving Tackle end-to-end for all three rule editions — the single largest itemized gap
 left in `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`'s batching order (confirmed by direct research this

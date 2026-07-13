@@ -192,6 +192,36 @@ surfaced along the way (BB2020/BB2025's Break Tackle/Incorporeal stat-based dodg
 not wired into `step_move_dodge.rs`'s own base-dodge computation — `DivingTackle` reuses the same
 primitives and inherits the limitation rather than fixing it).
 
+## Phase AAK update (closed item 8; closed Shadowing and UnchannelledFury of item 9)
+
+**Item 8 (StepFoulAppearance)** is **closed** — re-verification confirmed it was already fully
+complete (no code change needed): the roll-2+-resist-check, skill/TRR re-roll, and
+prone+action-end logic (including the BB2020/2025-only kicking-downed/GAZE branch) all matched
+`FoulAppearanceBehaviour.java` exactly in both the singular (`step_foul_appearance.rs`) and
+multi-block (`step_foul_appearance_multiple.rs`) variants.
+
+**Shadowing (item 9)** is **closed**. Contrary to this doc's original "large" estimate assuming a
+from-scratch port, the dialog/roll/re-roll/vacated-square-move logic was already fully wired in
+all three `step_shadowing.rs` variants. The actual bug was narrower and more severe than
+"incomplete": the eligible-shadower lookup filtered by
+`NamedProperties::CAN_ATTEMPT_TO_TACKLE_DODGING_PLAYER` (a `DivingTackle` property) instead of a
+direct `SkillId::Shadowing` check, so a real Shadowing-skill defender would essentially never be
+found. Fixed via a new `UtilPlayer::find_adjacent_opposing_players_with_skill` (1:1 with Java's
+`findAdjacentOpposingPlayersWithSkill`) plus a BB2025-only `movement_with_modifiers()` fix in the
+`shadowingCount` filter. 3 new regression tests (one per edition).
+
+**UnchannelledFury (item 9)** is **closed**. The main confusion-roll/re-roll/second-block-dialog
+loop was already correct; `cancel_unchannelled_fury_action`'s turn-flag switch had drifted from
+Java in 4 small ways (missing `allowsAdditionalFoul` guard on `foul_used`, BB2025's separate
+`ttm_used` flag merged into `pass_used`, missing BB2025 `PUNT`/`PUNT_MOVE` case, and a spurious
+`StandUpBlitz` in the blitz-used group). Fixed with an edition-aware branch; 5 new regression
+tests. Note: `allowsAdditionalFoul` has no skill mapped to it in the Rust model yet (Java only
+grants it via `SneakiestOfTheLot`), so that guard is currently always-false in practice —
+pre-existing, out of scope.
+
+Remaining open items: AnimalSavagery, Tentacles, CloudBurster (all confirmed genuinely
+unimplemented, not sizing errors).
+
 ## Recommended phase-batching order
 
 Ordered roughly by (a) how many skills unlock per unit of work and (b) how

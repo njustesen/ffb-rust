@@ -7,9 +7,10 @@
 /// that lets the coach use FuryOfTheBloodGod to take a second block despite the failure.
 ///
 /// Java: `StepUnchannelledFury extends AbstractStepWithReRoll` (mixed, BB2020 + BB2025).
-use ffb_model::enums::{PlayerAction, PS_PRONE, PS_STANDING, ReRollSource, SkillId};
+use ffb_model::enums::{PlayerAction, PS_PRONE, PS_STANDING, ReRollSource, Rules, SkillId};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::skill_use::SkillUse;
 use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
@@ -212,27 +213,51 @@ impl StepUnchannelledFury {
 
 /// Java: UnchannelledFuryBehaviour.cancelPlayerAction — same as BoneHead but without confusion flag.
 /// On failure: set to STANDING (not confused) and deactivate.
+///
+/// BB2020 and BB2025 editions have slightly different `cancelPlayerAction` switch bodies:
+/// - BB2020: PASS/PASS_MOVE/THROW_TEAM_MATE/THROW_TEAM_MATE_MOVE all set `passUsed`; no
+///   KICK_EM_BLITZ or PUNT cases.
+/// - BB2025: PASS/PASS_MOVE set `passUsed`, THROW_TEAM_MATE/THROW_TEAM_MATE_MOVE set `ttmUsed`
+///   separately; BLITZ/BLITZ_MOVE/KICK_EM_BLITZ set `blitzUsed`; adds PUNT/PUNT_MOVE → `puntUsed`.
+/// Neither edition's switch includes STAND_UP_BLITZ.
 fn cancel_unchannelled_fury_action(game: &mut Game, player_id: &str) {
+    let is_bb2025 = game.rules == Rules::Bb2025;
     match game.acting_player.player_action {
-        Some(PlayerAction::Blitz) | Some(PlayerAction::BlitzMove)
-        | Some(PlayerAction::KickEmBlitz) | Some(PlayerAction::StandUpBlitz) => {
+        Some(PlayerAction::Blitz) | Some(PlayerAction::BlitzMove) => {
+            game.turn_data_mut().blitz_used = true;
+        }
+        Some(PlayerAction::KickEmBlitz) if is_bb2025 => {
             game.turn_data_mut().blitz_used = true;
         }
         Some(PlayerAction::KickTeamMate) | Some(PlayerAction::KickTeamMateMove) => {
             game.turn_data_mut().ktm_used = true;
         }
-        Some(PlayerAction::Pass) | Some(PlayerAction::PassMove)
-        | Some(PlayerAction::ThrowTeamMate) | Some(PlayerAction::ThrowTeamMateMove) => {
+        Some(PlayerAction::Pass) | Some(PlayerAction::PassMove) => {
             game.turn_data_mut().pass_used = true;
+        }
+        Some(PlayerAction::ThrowTeamMate) | Some(PlayerAction::ThrowTeamMateMove) => {
+            if is_bb2025 {
+                game.turn_data_mut().ttm_used = true;
+            } else {
+                game.turn_data_mut().pass_used = true;
+            }
         }
         Some(PlayerAction::HandOver) | Some(PlayerAction::HandOverMove) => {
             game.turn_data_mut().hand_over_used = true;
         }
         Some(PlayerAction::Foul) | Some(PlayerAction::FoulMove) => {
-            game.turn_data_mut().foul_used = true;
+            let allows_additional_foul = game.player(player_id)
+                .map(|p| p.has_skill_property(NamedProperties::ALLOWS_ADDITIONAL_FOUL))
+                .unwrap_or(false);
+            if !allows_additional_foul {
+                game.turn_data_mut().foul_used = true;
+            }
         }
         Some(PlayerAction::SecureTheBall) => {
             game.turn_data_mut().secure_the_ball_used = true;
+        }
+        Some(PlayerAction::Punt) | Some(PlayerAction::PuntMove) if is_bb2025 => {
+            game.turn_data_mut().punt_used = true;
         }
         _ => {}
     }
@@ -402,6 +427,69 @@ mod tests {
         assert_eq!(out.action, StepAction::GotoLabel);
         let published = out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true)));
         assert!(published);
+    }
+
+    #[test]
+    fn cancel_throw_team_mate_uses_pass_flag_in_bb2020() {
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        add_player_with_skill(&mut game, "p1", SkillId::UnchannelledFury);
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+        game.acting_player.player_action = Some(PlayerAction::ThrowTeamMate);
+        cancel_unchannelled_fury_action(&mut game, "p1");
+        assert!(game.turn_data().pass_used);
+        assert!(!game.turn_data().ttm_used);
+    }
+
+    #[test]
+    fn cancel_throw_team_mate_uses_ttm_flag_in_bb2025() {
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        add_player_with_skill(&mut game, "p1", SkillId::UnchannelledFury);
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+        game.acting_player.player_action = Some(PlayerAction::ThrowTeamMate);
+        cancel_unchannelled_fury_action(&mut game, "p1");
+        assert!(game.turn_data().ttm_used);
+        assert!(!game.turn_data().pass_used);
+    }
+
+    #[test]
+    fn cancel_punt_only_sets_flag_in_bb2025() {
+        let mut game_2020 = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        add_player_with_skill(&mut game_2020, "p1", SkillId::UnchannelledFury);
+        game_2020.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+        game_2020.acting_player.player_action = Some(PlayerAction::Punt);
+        cancel_unchannelled_fury_action(&mut game_2020, "p1");
+        assert!(!game_2020.turn_data().punt_used, "BB2020 has no PUNT case in cancelPlayerAction");
+
+        let mut game_2025 = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        add_player_with_skill(&mut game_2025, "p1", SkillId::UnchannelledFury);
+        game_2025.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+        game_2025.acting_player.player_action = Some(PlayerAction::Punt);
+        cancel_unchannelled_fury_action(&mut game_2025, "p1");
+        assert!(game_2025.turn_data().punt_used);
+    }
+
+    #[test]
+    fn cancel_foul_sets_flag_by_default() {
+        // No skill grants `allowsAdditionalFoul` (Java: SneakiestOfTheLot star-player skill
+        // only, which is not a general roster skill) so foul_used should be set for a plain
+        // player with the Foul action.
+        let mut game = make_game();
+        add_player_with_skill(&mut game, "p1", SkillId::UnchannelledFury);
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+        game.acting_player.player_action = Some(PlayerAction::Foul);
+        cancel_unchannelled_fury_action(&mut game, "p1");
+        assert!(game.turn_data().foul_used);
+    }
+
+    #[test]
+    fn cancel_stand_up_blitz_does_not_set_blitz_flag() {
+        // Java's cancelPlayerAction switch (both editions) has no STAND_UP_BLITZ case.
+        let mut game = make_game();
+        add_player_with_skill(&mut game, "p1", SkillId::UnchannelledFury);
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+        game.acting_player.player_action = Some(PlayerAction::StandUpBlitz);
+        cancel_unchannelled_fury_action(&mut game, "p1");
+        assert!(!game.turn_data().blitz_used);
     }
 
     #[test]
