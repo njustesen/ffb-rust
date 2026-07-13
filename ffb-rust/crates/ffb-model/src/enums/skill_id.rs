@@ -710,6 +710,8 @@ impl SkillId {
             SkillId::Shadowing => &["canFollowPlayerLeavingTacklezones"],
             // Java bb2025/EyeGouge.postConstruct: registerProperty(canRemoveOpponentAssists)
             SkillId::EyeGouge => &["canRemoveOpponentAssists"],
+            // Java Animosity.postConstruct (all editions): registerProperty(hasToRollToPassBallOn)
+            SkillId::Animosity => &["hasToRollToPassBallOn"],
             SkillId::HypnoticGaze => &["inflictsConfusion", "canGazeDuringMove"],
             SkillId::Leap => &["canLeap"],
             SkillId::PogoStick => &[
@@ -965,6 +967,11 @@ mod tests {
     #[test]
     fn properties_eye_gouge_can_remove_opponent_assists() {
         assert!(SkillId::EyeGouge.properties().contains(&"canRemoveOpponentAssists"));
+    }
+
+    #[test]
+    fn properties_animosity_has_to_roll_to_pass_ball_on() {
+        assert!(SkillId::Animosity.properties().contains(&"hasToRollToPassBallOn"));
     }
 
     #[test]

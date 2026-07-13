@@ -1081,7 +1081,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `factory/InterceptionModifierFactory.java` | `ffb-mechanics` | `src/modifiers/interception_modifier_factory.rs` | ✓ |
 | `factory/IRollModifierFactory.java` | `ffb-model` | `src/factory/i_roll_modifier_factory.rs` | ✓ |
 | `factory/JumpModifierFactory.java` | `ffb-mechanics` | `src/modifiers/jump_modifier_factory.rs` | ✓ |
-| `factory/JumpUpModifierFactory.java` | `ffb-mechanics` | `src/modifiers/jump_up_modifier_collection.rs` | `~` (collection/data classes translated, but resolution isn't wired into `ffb-engine`'s `step_jump_up.rs` yet — documented gap there: "No JumpUpModifier support yet → modifiers = empty"; wiring is a `step/` change, out of scope for this factory audit) |
+| `factory/JumpUpModifierFactory.java` | `ffb-mechanics` | `src/modifiers/jump_up_modifier_factory.rs` | ✓ (Phase AAI: wired into `step_jump_up.rs`, replacing the "modifiers = empty" stub) |
 | `factory/KickoffResultFactory.java` | `ffb-model` | `src/enums/kickoff_result.rs` (`KickoffResult::from_name`) | ✓ |
 | `factory/LeaderStateFactory.java` | `ffb-model` | `src/enums/reroll.rs` (`LeaderState::from_name`) | ✓ |
 | `factory/MechanicsFactory.java` | `ffb-engine` | `src/mechanic/mod.rs` (`*_mechanic_for(rules)` per-`Mechanic.Type` edition dispatch helpers, e.g. `pass_mechanic_for`/`ttm_mechanic_for`/`state_mechanic_for` — replaces Java's reflection-populated `Map<Mechanic.Type, Mechanic>` registry with direct edition-keyed construction) | ✓ |

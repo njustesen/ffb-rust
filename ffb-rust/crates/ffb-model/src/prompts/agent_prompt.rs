@@ -1,5 +1,6 @@
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use crate::enums::{PlayerAction, ReRollSource, SkillCategory, Weather};
+use crate::enums::{PlayerAction, ReRollSource, SkillCategory, SkillId, Weather};
 use crate::model::player::PlayerId;
 use crate::types::FieldCoordinate;
 
@@ -56,6 +57,22 @@ pub enum AgentPrompt {
         source: ReRollSource,
         action: String,
         team_id: String,
+    },
+    /// Java: `DialogReRollForTargetsParameter` (via `AbstractStepModifierMultipleBlock.
+    /// decideNextStep`/`createDialogParameter`) — lets the coach pick which still-failing
+    /// multi-block target to re-roll, and with what source, for Dauntless-multi/
+    /// FoulAppearance-multi.
+    ReRollForTargets {
+        player_id: PlayerId,
+        target_ids: Vec<String>,
+        minimum_rolls: HashMap<String, i32>,
+        re_rolled_action: String,
+        re_roll_available_against: Vec<String>,
+        pro_re_roll_available: bool,
+        team_re_roll_available: bool,
+        consummate_available: bool,
+        re_roll_skill: Option<SkillId>,
+        single_use_re_roll_source: Option<ReRollSource>,
     },
 
     // ── Skill use ──────────────────────────────────────────────────────────────
@@ -298,5 +315,26 @@ mod tests {
         let json = serde_json::to_string(&r).unwrap();
         let back: AgentResponse = serde_json::from_str(&json).unwrap();
         assert_eq!(r, back);
+    }
+
+    #[test]
+    fn serde_reroll_for_targets_prompt() {
+        let mut minimum_rolls = HashMap::new();
+        minimum_rolls.insert("t1".to_string(), 4);
+        let p = AgentPrompt::ReRollForTargets {
+            player_id: "p1".into(),
+            target_ids: vec!["t1".into()],
+            minimum_rolls,
+            re_rolled_action: "DAUNTLESS".into(),
+            re_roll_available_against: vec!["t1".into()],
+            pro_re_roll_available: false,
+            team_re_roll_available: true,
+            consummate_available: false,
+            re_roll_skill: None,
+            single_use_re_roll_source: Some(ReRollSource::new("LORD_OF_CHAOS")),
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        let back: AgentPrompt = serde_json::from_str(&json).unwrap();
+        assert_eq!(p, back);
     }
 }

@@ -116,6 +116,12 @@ pub struct Player {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub race: Option<String>,
 
+    /// Java: `Player.getPosition().getKeywords()` — copied from the roster position at
+    /// creation time (same convention as `is_big_guy`/`is_lineman`), used by Animosity's
+    /// race-matching check.
+    #[serde(default)]
+    pub keywords: Vec<String>,
+
     /// Temporary stat modifications from prayers/cards, keyed by source name for removal.
     /// Java: Player.addTemporaryModifiers(sourceName, modifiers) / removeTemporaryModifiers(sourceName).
     /// Each entry: (source_name, stat_code, delta). stat_code uses STAT_MA..STAT_AV constants.
@@ -267,6 +273,27 @@ impl Player {
             .any(|id| !self.used_skills.contains(&id))
     }
 
+    /// Java: `Player.getSkillValueExcludingTemporaryOnes(Skill)` (`RosterPlayer` override) —
+    /// the configured value for a non-temporary skill instance (starting or extra), e.g. the
+    /// `value="goblin"` attribute on an Animosity skill entry.
+    pub fn skill_value_excluding_temporary_ones(&self, skill_id: SkillId) -> Option<String> {
+        self.starting_skills
+            .iter()
+            .chain(self.extra_skills.iter())
+            .find(|sw| sw.skill_id == skill_id)
+            .and_then(|sw| sw.value.clone())
+    }
+
+    /// Java: `Player.temporarySkillValues(Skill)` — the set of configured values for a skill
+    /// granted temporarily (cards, prayers, etc.), excluding `None` values.
+    pub fn temporary_skill_values(&self, skill_id: SkillId) -> HashSet<String> {
+        self.temporary_skills
+            .iter()
+            .filter(|sw| sw.skill_id == skill_id)
+            .filter_map(|sw| sw.value.clone())
+            .collect()
+    }
+
     /// 1:1 translation of getSkillIntValue — returns the integer value for a skill with a numeric property.
     /// TODO: requires full Skill property lookup to be implemented.
     pub fn get_skill_int_value(&self, _property: &str) -> i32 {
@@ -346,6 +373,7 @@ impl Player {
             is_big_guy: pos.is_big_guy,
             is_lineman: pos.is_lineman,
             race: pos.race.clone(),
+            keywords: pos.keywords.clone(),
             temporary_stat_mods: vec![],
             temporary_skill_sources: vec![],
             recovering_injury: None,
@@ -381,6 +409,7 @@ impl Player {
         self.is_big_guy = position.is_big_guy;
         self.is_lineman = position.is_lineman;
         self.race = position.race.clone();
+        self.keywords = position.keywords.clone();
         for sw in &position.skills {
             self.add_skill(sw.skill_id);
         }
@@ -548,6 +577,7 @@ mod tests {
             is_big_guy: false,
             is_lineman: false,
             race: None,
+            keywords: vec![],
             temporary_stat_mods: vec![],
             temporary_skill_sources: vec![],
             recovering_injury: None,

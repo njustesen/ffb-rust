@@ -147,6 +147,37 @@ complete vs. the 87-line Java dialog logic), `bb2020/the_ballista_behaviour.rs`,
 incompleteness), `mixed/abstract_dodging_behaviour.rs` (fully wired, no TODO
 marker, included here only for completeness).
 
+## Phase AAI update (closed items 5 and 6)
+
+Re-verification against source (Phase AAI) found items 5 and 6 were sized wrong:
+
+- **Item 5 (`AbstractStepModifierMultipleBlock` base)**: NOT a from-scratch base-class port.
+  Both concrete call sites (`step_dauntless_multiple.rs`, `step_foul_appearance_multiple.rs`)
+  were already ~90% complete, tested, direct-in-step ports. Only two narrow pieces were
+  missing: the re-roll-choice dialog (`decideNextStep`'s `showDialog` branch — now wired via a
+  new `AgentPrompt::ReRollForTargets` variant + shared `build_reroll_prompt` helper in
+  `abstract_step_multiple.rs`) and the auto-immediate-reroll-on-failure inside the first-run
+  roll loop (ported for Dauntless via the same hardcoded Blind-Rage check already used by
+  `step_dauntless.rs`; FoulAppearance's equivalent branch is correctly a no-op since no skill in
+  this codebase registers a reroll source for `ReRolledActions.FOUL_APPEARANCE`). The hollow
+  `skill_behaviour/mixed/abstract_step_modifier_multiple_block.rs` file needed no real logic —
+  left in place, dead/unreferenced, per the established convention for confirmed-dead
+  `skill_behaviour/*.rs` files. **Closed.**
+- **Item 6 (StepJumpUp, StepAnimosity)**: both steps were already complete/tested; each had
+  exactly one stubbed dependency one layer down. JumpUp needed a `JumpUpModifierFactory` (new,
+  small — the collapsed Java logic reduces to just the edition's modifier collection, no
+  skill/card ever registers a `JumpUpModifier`). Animosity needed a real
+  `SkillMechanic::animosity_exists` per edition (bb2016 correctly always `false`; bb2020 matches
+  raw `positionId`/`race` strings; bb2025 matches `Keyword`-normalized position keywords — the
+  two editions have genuinely different `Animosity.Evaluator` implementations in Java, not a
+  shared one). Also filled a small pre-existing gap: `SkillId::Animosity` had no `properties()`
+  entry for `hasToRollToPassBallOn` (same shape as the EyeGouge gap fixed in Phase AAG). **Closed.**
+
+Item 7 (StepDivingTackle) turned out **larger** than originally estimated once directly
+verified: no dodge-modifier math, no dialog round-trip, and no eligible-tackler lookup exist
+anywhere in Rust yet (contrary to a stale doc comment implying partial porting) — treat as its
+own phase, not bundled with anything else.
+
 ## Recommended phase-batching order
 
 Ordered roughly by (a) how many skills unlock per unit of work and (b) how

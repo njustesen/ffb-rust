@@ -10,16 +10,17 @@
 ///
 /// Client command `CLIENT_USE_RE_ROLL_FOR_TARGET(DAUNTLESS)` triggers a per-target re-roll;
 /// `CLIENT_PLAYER_CHOICE(LORD_OF_CHAOS)` chooses the single-use team re-roll player.
+use std::collections::HashMap;
 use ffb_mechanics::mechanics::minimum_roll_dauntless;
-use ffb_model::enums::ReRollSource;
+use ffb_model::enums::{ReRollSource, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::model::player::Player;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
-use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
-use crate::step::mixed::multiblock::abstract_step_multiple::{AbstractStepMultiple, SingleReRollUseState};
+use crate::step::framework::{Step, StepOutcome, StepAction, StepId, StepParameter};
+use crate::step::mixed::multiblock::abstract_step_multiple::{build_reroll_prompt, AbstractStepMultiple, SingleReRollUseState};
 use crate::step::util_server_re_roll::use_reroll;
 
 /// Java: `StepDauntlessMultiple` (mixed/multiblock, BB2020 + BB2025).
@@ -38,6 +39,8 @@ pub struct StepDauntlessMultiple {
     re_roll_source: Option<ReRollSource>,
     /// Java: `state.reRollAvailableAgainst`
     re_roll_available_against: Vec<String>,
+    /// Java: `state.minimumRolls`
+    minimum_rolls: HashMap<String, i32>,
     /// Java: base `AbstractStepMultiple` / `SingleReRollUseState`
     base: AbstractStepMultiple,
 }
@@ -51,6 +54,7 @@ impl StepDauntlessMultiple {
             re_roll_target: None,
             re_roll_source: None,
             re_roll_available_against: Vec::new(),
+            minimum_rolls: HashMap::new(),
             base: AbstractStepMultiple::new(),
         }
     }
@@ -129,8 +133,33 @@ impl StepDauntlessMultiple {
             // Java: for (String targetId : ...) { roll(step, actingPlayer, targetId, false, ...) }
             let mut outcome = StepOutcome::next();
             for (target_id, min_roll) in targets_with_rolls {
-                let roll = rng.d6();
-                let successful = DiceInterpreter::is_skill_roll_successful(roll, min_roll);
+                self.minimum_rolls.insert(target_id.clone(), min_roll);
+                let mut roll = rng.d6();
+                let mut successful = DiceInterpreter::is_skill_roll_successful(roll, min_roll);
+
+                // Java: `roll()`'s inline auto-reroll — on a failed non-reRolling roll, try an
+                // unused reroll source immediately. Only Blind Rage (Akhorne's unique skill)
+                // registers a non-TRR reroll source for ReRolledActions.DAUNTLESS in this
+                // codebase's data (matches the same hardcoded check already used by the
+                // singular `step_dauntless.rs`); the target is removed from `block_targets`
+                // once this auto-reroll is attempted, win or lose, matching Java's unconditional
+                // `state.blockTargets.remove(currentTargetId)` inside that branch.
+                if !successful {
+                    let has_blind_rage = game.player(&attacker_id)
+                        .map(|p| p.has_skill(SkillId::BlindRage) && !p.used_skills.contains(&SkillId::BlindRage))
+                        .unwrap_or(false);
+                    if has_blind_rage {
+                        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == attacker_id)
+                            .or_else(|| game.team_away.players.iter_mut().find(|p| p.id == attacker_id))
+                        {
+                            p.used_skills.insert(SkillId::BlindRage);
+                        }
+                        roll = rng.d6();
+                        successful = DiceInterpreter::is_skill_roll_successful(roll, min_roll);
+                        self.block_targets.retain(|t| t != &target_id);
+                    }
+                }
+
                 if successful {
                     // Java: successFulRollCallback → publishParameter(PLAYER_ID_DAUNTLESS_SUCCESS)
                     self.block_targets.retain(|t| t != &target_id);
@@ -142,8 +171,18 @@ impl StepDauntlessMultiple {
             // Java: state.reRollAvailableAgainst.addAll(state.blockTargets)
             self.re_roll_available_against = self.block_targets.clone();
 
-            // Headless: skip dialog, go straight to nextStep
-            // For Dauntless: no goToLabelOnFailure, unhandledTargetsCallback is empty → NEXT_STEP
+            // Java: decideNextStep — offer the re-roll-choice dialog if any source is available.
+            match build_reroll_prompt(game, &attacker_id, "DAUNTLESS", &self.block_targets, &self.minimum_rolls, &self.re_roll_available_against) {
+                Some(prompt) => {
+                    self.re_roll_target = None;
+                    self.re_roll_source = None;
+                    outcome.action = StepAction::Continue;
+                    outcome.prompt = Some(prompt);
+                }
+                None => {
+                    // For Dauntless: no goToLabelOnFailure, unhandledTargetsCallback is empty → NEXT_STEP
+                }
+            }
             return outcome;
         }
 
@@ -160,6 +199,7 @@ impl StepDauntlessMultiple {
                         _ => 6,
                     }
                 };
+                self.minimum_rolls.insert(target.clone(), min_roll);
                 let roll = rng.d6();
                 let successful = DiceInterpreter::is_skill_roll_successful(roll, min_roll);
                 if successful {
@@ -170,7 +210,16 @@ impl StepDauntlessMultiple {
             self.re_roll_available_against.retain(|t| t != &target);
         }
 
-        // Java: decideNextStep → NEXT_STEP (Dauntless: no goto label, empty unhandled callback)
+        // Java: decideNextStep — offer the re-roll-choice dialog again if a source remains.
+        match build_reroll_prompt(game, &attacker_id, "DAUNTLESS", &self.block_targets, &self.minimum_rolls, &self.re_roll_available_against) {
+            Some(prompt) => {
+                self.re_roll_target = None;
+                self.re_roll_source = None;
+                outcome.action = StepAction::Continue;
+                outcome.prompt = Some(prompt);
+            }
+            None => {}
+        }
         outcome
     }
 }
@@ -395,5 +444,131 @@ mod tests {
         let attacker = Player { strength: 3, ..Default::default() };
         let opponent = Player { strength: 4, ..Default::default() };
         assert_eq!(StepDauntlessMultiple::compute_min_roll(&attacker, &opponent), 4);
+    }
+
+    fn seed_for_d6(target: i32) -> u64 {
+        for s in 0u64..10_000 {
+            if GameRng::new(s).d6() == target { return s; }
+        }
+        panic!("no seed for d6={}", target);
+    }
+
+    #[test]
+    fn failed_roll_with_team_reroll_available_offers_dialog() {
+        // Attacker str 3, defender str 4, effective = 1, min_roll = 4. Roll of 1 fails, no
+        // Blind Rage, but a team re-roll is available → decideNextStep should show the dialog.
+        let seed = seed_for_d6(1);
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        add_player(&mut game, true, "attacker", FieldCoordinate::new(5, 5), 3, vec![SkillId::Dauntless]);
+        add_player(&mut game, false, "defender", FieldCoordinate::new(5, 6), 4, vec![]);
+        game.acting_player.player_id = Some("attacker".into());
+
+        let mut step = StepDauntlessMultiple::new();
+        step.set_parameter(&StepParameter::BlockTargets(vec!["defender".into()]));
+
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        assert_eq!(out.action, StepAction::Continue, "team re-roll available → offer dialog");
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::ReRollForTargets { .. })));
+    }
+
+    #[test]
+    fn failed_roll_with_no_reroll_source_falls_through_to_next_step() {
+        // Same as above but no TRR available → straight to NEXT_STEP, no dialog.
+        let seed = seed_for_d6(1);
+        let mut game = make_game();
+        game.home_playing = true;
+        add_player(&mut game, true, "attacker", FieldCoordinate::new(5, 5), 3, vec![SkillId::Dauntless]);
+        add_player(&mut game, false, "defender", FieldCoordinate::new(5, 6), 4, vec![]);
+        game.acting_player.player_id = Some("attacker".into());
+
+        let mut step = StepDauntlessMultiple::new();
+        step.set_parameter(&StepParameter::BlockTargets(vec!["defender".into()]));
+
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.prompt.is_none());
+    }
+
+    #[test]
+    fn blind_rage_auto_rerolls_on_failure_and_can_succeed() {
+        // First roll fails (1), Blind Rage auto-reroll succeeds (4 >= min_roll 4).
+        let seed = seed_for_d6_pair(1, 4);
+        let mut game = make_game();
+        game.home_playing = true;
+        add_player(&mut game, true, "attacker", FieldCoordinate::new(5, 5), 3, vec![SkillId::Dauntless, SkillId::BlindRage]);
+        add_player(&mut game, false, "defender", FieldCoordinate::new(5, 6), 4, vec![]);
+        game.acting_player.player_id = Some("attacker".into());
+
+        let mut step = StepDauntlessMultiple::new();
+        step.set_parameter(&StepParameter::BlockTargets(vec!["defender".into()]));
+
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        assert_eq!(out.action, StepAction::NextStep, "silent Blind Rage reroll, no dialog");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::PlayerIdDauntlessSuccess(id) if id == "defender")));
+        assert!(game.player("attacker").unwrap().used_skills.contains(&SkillId::BlindRage));
+        assert!(step.block_targets.is_empty());
+    }
+
+    #[test]
+    fn blind_rage_auto_reroll_failure_still_removes_target() {
+        // Both rolls fail — target is still removed from block_targets per Java's
+        // unconditional `state.blockTargets.remove(currentTargetId)` inside the auto-reroll branch.
+        let seed = seed_for_d6_pair(1, 1);
+        let mut game = make_game();
+        game.home_playing = true;
+        add_player(&mut game, true, "attacker", FieldCoordinate::new(5, 5), 3, vec![SkillId::Dauntless, SkillId::BlindRage]);
+        add_player(&mut game, false, "defender", FieldCoordinate::new(5, 6), 4, vec![]);
+        game.acting_player.player_id = Some("attacker".into());
+
+        let mut step = StepDauntlessMultiple::new();
+        step.set_parameter(&StepParameter::BlockTargets(vec!["defender".into()]));
+
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::PlayerIdDauntlessSuccess(_))));
+        assert!(step.block_targets.is_empty(), "target removed even on failed auto-reroll");
+        assert!(game.player("attacker").unwrap().used_skills.contains(&SkillId::BlindRage));
+    }
+
+    fn seed_for_d6_pair(first: i32, second: i32) -> u64 {
+        for s in 0u64..50_000 {
+            let mut rng = GameRng::new(s);
+            if rng.d6() == first && rng.d6() == second {
+                return s;
+            }
+        }
+        panic!("no seed for d6 pair=({}, {})", first, second);
+    }
+
+    #[test]
+    fn full_reroll_round_trip_via_action_use_reroll_for_target() {
+        // Fail without Blind Rage, TRR available → dialog → coach picks TRR → re-roll succeeds.
+        let seed = seed_for_d6(1);
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        add_player(&mut game, true, "attacker", FieldCoordinate::new(5, 5), 3, vec![SkillId::Dauntless]);
+        add_player(&mut game, false, "defender", FieldCoordinate::new(5, 6), 4, vec![]);
+        game.acting_player.player_id = Some("attacker".into());
+
+        let mut step = StepDauntlessMultiple::new();
+        step.set_parameter(&StepParameter::BlockTargets(vec!["defender".into()]));
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        assert_eq!(out.action, StepAction::Continue);
+
+        let out2 = step.handle_command(
+            &Action::UseReRollForTarget {
+                re_rolled_action: Some("DAUNTLESS".into()),
+                re_roll_source: Some("TRR".into()),
+                target_id: Some("defender".into()),
+            },
+            &mut game,
+            &mut GameRng::new(seed_for_d6(4)),
+        );
+        assert_eq!(out2.action, StepAction::NextStep);
+        assert!(out2.published.iter().any(|p| matches!(p, StepParameter::PlayerIdDauntlessSuccess(id) if id == "defender")));
+        assert_eq!(game.turn_data_home.rerolls, 0, "TRR token consumed");
     }
 }

@@ -1,6 +1,77 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-13, Phase AAH done — closed batching-order item 4 of
+## Current Status (2026-07-13, Phase AAI done — closed batching-order items 5 and 6 of
+`docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`: AbstractStepModifierMultipleBlock's re-roll dialog,
+JumpUp modifier wiring, Animosity mechanic.)
+
+**Key correction found this session (same lesson as every recent phase)**: re-verifying the
+audit doc's sizing against direct source reads found items 5 and 6 were sized wrong, in both
+directions. Item 5 (`AbstractStepModifierMultipleBlock`) was sized "large" as if it needed a
+from-scratch generic base-class port — direct reads of `step_dauntless_multiple.rs`/
+`step_foul_appearance_multiple.rs` showed both were already ~90% complete, tested, direct-in-step
+ports, missing only two narrow pieces (the re-roll dialog itself, and an inline
+auto-immediate-reroll-on-failure). Item 6 (StepJumpUp/StepAnimosity) was similarly oversized —
+both steps were fully done, each with exactly one stubbed dependency one layer down. Conversely,
+scoping research for item 7 (StepDivingTackle, not touched this session) found it's actually
+**larger** than the audit assumed — flagged for the next phase, not bundled in here.
+
+**What actually happened:**
+
+1. **Animosity mechanic** (`ffb-mechanics/src/{bb2016,bb2020,bb2025}/skill_mechanic.rs`): bb2016
+   correctly stays hardcoded `false` (Java itself never overrides it meaningfully). bb2020 and
+   bb2025 got real, edition-distinct ports — Java's two `Animosity.java` skill classes have
+   genuinely different `Evaluator`s (bb2020: raw `positionId`/`race` string matching, no
+   `Keyword` normalization; bb2025: `Keyword.forName`-normalized position-keyword matching), not
+   a shared implementation. New `Player::keywords` field (mirrors the existing `is_big_guy`/
+   `is_lineman` convention: copied from `RosterPosition` at creation time) plus
+   `Player::skill_value_excluding_temporary_ones`/`temporary_skill_values` were needed to back
+   this. Also found and fixed a small pre-existing gap of the same shape as Phase AAG's EyeGouge
+   fix: `SkillId::Animosity` had no `properties()` entry for `hasToRollToPassBallOn`, without
+   which the skill's own gate could never resolve.
+2. **JumpUp modifier wiring** (`step_jump_up.rs` + new `ffb-mechanics/src/modifiers/
+   jump_up_modifier_factory.rs`): Java's `JumpUpModifierFactory.findModifiers` collapses to just
+   the edition's `JumpUpModifierCollection` (tacklezone/disturbing-presence effects are both
+   hardcoded `false`, and no skill/card registers a `JumpUpModifier`), so the new factory is
+   small — modeled directly on `dodge_modifier_factory.rs`'s `for_rules` pattern. bb2016 uses its
+   own collection ("Jump Up" −2); BB2020/BB2025 share the `mixed` collection ("Jump Up" −1).
+3. **Multi-block re-roll dialogs** (`step_dauntless_multiple.rs`, `step_foul_appearance_multiple.rs`):
+   added a new `AgentPrompt::ReRollForTargets` variant (mirrors `DialogReRollForTargetsParameter`'s
+   fields exactly) plus a shared `build_reroll_prompt` helper in `abstract_step_multiple.rs` that
+   both files call from a `decideNextStep`-equivalent gate, replacing the old "headless: skip
+   dialog" shortcuts. The `Action::UseReRollForTarget` round-trip plumbing was already fully wired
+   from a past phase and just needed the prompt to actually reach it. Also ported Dauntless's
+   inline auto-immediate-reroll-on-failure (Blind Rage, same hardcoded check as `step_dauntless.rs`)
+   into the multi-block first-run loop; FoulAppearance's equivalent branch is correctly a no-op
+   since no skill in this codebase's data registers a reroll source for
+   `ReRolledActions.FOUL_APPEARANCE`. New wire-protocol coverage: `ffb-server/src/net/
+   wire_prompt.rs` needed a new `WireDialog::ReRollForTargets` variant + conversion arm (a real,
+   separate outgoing-wire-encoding layer, distinct from `ffb-model`'s `AgentPrompt`/`AgentResponse`
+   abstraction — easy to miss, caught by a compile error on `cargo test --workspace`, not by
+   `cargo build`, since the match is only non-exhaustive in a `#[cfg(test)]`-adjacent path... no,
+   actually in real (non-test) code — caught immediately by the first `cargo build -p ffb-server`
+   after adding the variant).
+4. `skill_behaviour/mixed/abstract_step_modifier_multiple_block.rs` (87 lines, hollow) needed no
+   real logic — left in place, dead/unreferenced, matching the established convention for
+   confirmed-dead `skill_behaviour/*.rs` files (same as the 4 corrected in Phase AAH).
+
+Tests: 17,500 → **17,533** (+33: +10 animosity mechanic/step tests, +5 jump-up-modifier-factory
+tests, +18 multi-block dialog/Blind-Rage/round-trip tests). 0 failures. `cargo clippy` shows the
+same 2 pre-existing errors unrelated to this session's files
+(`step_eject_player.rs`/`step_reset_fumblerooskie.rs`). No parity/integration testing (per
+standing instruction).
+
+**What's left, not part of this phase's scope**: audit items 7-9 (StepDivingTackle — confirmed
+**larger** than originally scoped, no dodge-modifier math/dialog round-trip/eligible-tackler
+lookup exist anywhere yet; StepFoulAppearance's own gate — already effectively closed by this
+phase's Gap 3 since the "multiple" variant's shared dependency is done; and the large isolated
+items AnimalSavagery/Shadowing/Tentacles/UnchannelledFury/CloudBurster). Honest completion
+estimate: roughly **~98%** true behavioral completion of in-scope logic — expect **3-5 more
+phases** to close the rest (revised down from the prior 3-6 estimate), after which parity/
+integration testing against the Java engine becomes the natural next major workstream.
+
+---
+
+## Prior Status (2026-07-13, Phase AAH done — closed batching-order item 4 of
 `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`: Dauntless/Indomitable/Juggernaut.)
 
 **Key correction found mid-session**: the audit doc sized this item as "large" (StepDauntless) +

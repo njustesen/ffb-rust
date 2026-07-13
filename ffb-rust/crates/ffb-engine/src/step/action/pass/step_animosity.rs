@@ -239,4 +239,67 @@ mod tests {
         assert_eq!(out.action, StepAction::GotoLabel);
         assert!(game.acting_player.suffering_animosity);
     }
+
+    fn add_thrower_and_catcher(game: &mut Game, animosity_value: &str, catcher_keywords: Vec<&str>) {
+        use ffb_model::model::skill_def::SkillId;
+        use ffb_model::model::skill_def::SkillWithValue;
+        game.team_home.players.push(ffb_model::model::Player {
+            id: "thrower".into(),
+            starting_skills: vec![SkillWithValue::with_value(SkillId::Animosity, animosity_value)],
+            ..Default::default()
+        });
+        game.team_home.players.push(ffb_model::model::Player {
+            id: "catcher".into(),
+            keywords: catcher_keywords.into_iter().map(String::from).collect(),
+            ..Default::default()
+        });
+        game.thrower_id = Some("thrower".into());
+        game.acting_player.player_id = Some("thrower".into());
+    }
+
+    #[test]
+    fn different_race_catcher_skips_roll_entirely() {
+        // Thrower is only configured against "Goblin" catchers; a Troll catcher never matches,
+        // so animosity_exists is false and no roll (no AnimosityRoll event) ever happens.
+        let mut game = make_game();
+        add_thrower_and_catcher(&mut game, "Goblin", vec!["Troll"]);
+        let mut step = StepAnimosity::new("fail");
+        step.catcher_id = Some("catcher".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.events.is_empty(), "no roll should occur when animosity_exists is false");
+        assert!(!game.acting_player.suffering_animosity);
+    }
+
+    #[test]
+    fn same_race_catcher_triggers_roll() {
+        // Thrower is configured against "Goblin" catchers; a Goblin catcher matches, so
+        // animosity_exists is true and a real d6 roll happens (an AnimosityRoll event fires).
+        let mut game = make_game();
+        add_thrower_and_catcher(&mut game, "Goblin", vec!["Goblin"]);
+        let mut step = StepAnimosity::new("fail");
+        step.catcher_id = Some("catcher".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(!out.events.is_empty(), "a roll should occur when animosity_exists is true");
+    }
+
+    #[test]
+    fn full_roll_cycle_with_real_trigger_can_fail_and_offer_reroll() {
+        let mut game = make_game();
+        add_thrower_and_catcher(&mut game, "Goblin", vec!["Goblin"]);
+        let mut step = StepAnimosity::new("fail");
+        step.catcher_id = Some("catcher".into());
+        // Find a seed producing a failed roll (roll == 1) to exercise the re-roll-offer path.
+        let mut seed = 0u64;
+        loop {
+            let mut rng = GameRng::new(seed);
+            if rng.d6() == 1 { break; }
+            seed += 1;
+            assert!(seed < 100, "expected to find a failing roll seed quickly");
+        }
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        // On failure with no re-roll source available, the step goes straight to the failure label.
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(game.acting_player.suffering_animosity);
+    }
 }

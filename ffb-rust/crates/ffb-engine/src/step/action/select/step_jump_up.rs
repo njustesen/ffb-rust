@@ -15,6 +15,7 @@ use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::report_jump_up_roll::ReportJumpUpRoll;
 use ffb_mechanics::mechanics::minimum_roll_jump_up;
+use ffb_mechanics::modifiers::{Modifier, jump_up_context::JumpUpContext, jump_up_modifier_factory::JumpUpModifierFactory};
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -123,9 +124,16 @@ impl StepJumpUp {
             }
         }
 
-        // No JumpUpModifier support yet → modifiers = empty.
+        // Java: modifierFactory.findModifiers(new JumpUpContext(actingPlayer, game))
         let agility = game.player(&player_id).map(|p| p.agility).unwrap_or(3);
-        let min_roll = minimum_roll_jump_up(agility, &[]);
+        let factory = JumpUpModifierFactory::for_rules(game.rules);
+        let ctx = JumpUpContext::new(game, &game.acting_player);
+        let modifiers: Vec<Modifier> = factory
+            .find_modifiers(&ctx)
+            .iter()
+            .map(|m| Modifier::new("Jump Up", m.get_modifier(), game.rules))
+            .collect();
+        let min_roll = minimum_roll_jump_up(agility, &modifiers);
         let roll = rng.d6();
         let successful = roll >= min_roll;
 
@@ -405,6 +413,20 @@ mod tests {
             game.report_list.has_report(ffb_model::report::report_id::ReportId::JUMP_UP_ROLL),
             "failed roll should add ReportJumpUpRoll"
         );
+    }
+
+    #[test]
+    fn jump_up_modifier_lowers_minimum_roll() {
+        // Agility 4 without any modifier needs a 4+; the real "Jump Up" -1 modifier (BB2025)
+        // should shift this to a 3+, so a roll of exactly 3 succeeds.
+        let seed = seed_for_d6(3);
+        let (mut game, _) = make_game_block_standing_up(vec![SkillId::JumpUp], 4);
+        let mut step = StepJumpUp::new();
+        step.goto_label_on_failure = "FAIL".into();
+        let outcome = step.start(&mut game, &mut GameRng::new(seed));
+        assert!(outcome.events.iter().any(|e| matches!(
+            e, GameEvent::JumpUpRoll { success: true, target: 3, .. }
+        )), "modifier should lower the target from 4 to 3");
     }
 
     #[test]

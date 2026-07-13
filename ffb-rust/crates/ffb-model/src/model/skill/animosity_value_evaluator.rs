@@ -2,6 +2,13 @@
 ///
 /// Java: `interface AnimosityValueEvaluator extends SkillValueEvaluator { String allValue(); }`
 /// Rust: a trait extending the behaviour of `SkillValueEvaluator`.
+///
+/// Note: `values(Skill, Player)` is deliberately NOT a default method here — the two concrete
+/// Java `Animosity.Evaluator` implementations (bb2020, bb2025) compute it differently (bb2020's
+/// `split()` returns raw values; bb2025's `map()` normalizes each part through
+/// `Keyword.forName(...).getName()`), so each edition's `SkillMechanic::animosity_exists`
+/// inlines its own edition-specific value computation directly (see
+/// `ffb-mechanics/src/{bb2020,bb2025}/skill_mechanic.rs`).
 use crate::model::skill::skill_value_evaluator::SkillValueEvaluator;
 use std::collections::HashSet;
 

@@ -1,9 +1,21 @@
-use ffb_model::enums::{PlayerState, TurnMode};
+use ffb_model::enums::{Keyword, PlayerState, TurnMode};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::{FieldModel, Game, Player};
 use ffb_model::model::property::named_properties::NamedProperties;
 use crate::mechanic::{Mechanic, MechanicType};
 use crate::skill_mechanic::SkillMechanic as SkillMechanicTrait;
+
+/// Java `Animosity.Evaluator.values(Skill, Player)` (bb2025 variant) — temp values plus the
+/// non-temporary configured value (or "all" if unconfigured), each part normalized through
+/// `Keyword.forName(value).getName()`.
+fn animosity_values(thrower: &Player, animosity: ffb_model::model::skill_def::SkillId) -> std::collections::HashSet<String> {
+    let mut values = thrower.temporary_skill_values(animosity);
+    values.insert(thrower.skill_value_excluding_temporary_ones(animosity).unwrap_or_else(|| "all".to_string()));
+    values
+        .into_iter()
+        .flat_map(|v| v.split(';').map(|s| Keyword::for_name(s).get_name().to_string()).collect::<Vec<_>>())
+        .collect()
+}
 
 /// 1:1 translation of com.fumbbl.ffb.mechanics.bb2025.SkillMechanic.
 pub struct SkillMechanic;
@@ -63,9 +75,20 @@ impl SkillMechanicTrait for SkillMechanic {
     }
 
     fn animosity_exists(&self, thrower: &Player, catcher: &Player) -> bool {
-        // TODO: requires getSkillWithProperty(NamedProperties.hasToRollToPassBallOn) and AnimosityValueEvaluator
-        let _ = (thrower, catcher);
-        false
+        // Java: `thrower.getTeam().getId().equals(catcher.getTeam().getId())` is not checked
+        // here — thrower/catcher are always resolved from the same team by the caller (a
+        // pass/hand-off target is always a teammate), so the trait signature (no `Game`) is
+        // left unchanged rather than threading team lookup through every mechanic call site.
+        let Some(animosity) = thrower.skill_id_with_property(NamedProperties::HAS_TO_ROLL_TO_PASS_BALL_ON) else {
+            return false;
+        };
+        let pattern: std::collections::HashSet<String> = std::iter::once("all".to_string())
+            .chain(catcher.keywords.iter().map(|k| Keyword::for_name(k).get_name().to_lowercase()))
+            .collect();
+        animosity_values(thrower, animosity)
+            .iter()
+            .map(|v| v.to_lowercase())
+            .any(|v| pattern.contains(&v))
     }
 }
 
@@ -96,10 +119,55 @@ mod tests {
     }
 
     #[test]
-    fn animosity_exists_returns_false_stub() {
+    fn animosity_exists_false_without_skill() {
         use ffb_model::model::Player;
         let p1 = Player::default();
         let p2 = Player::default();
         assert!(!SkillMechanic.animosity_exists(&p1, &p2));
+    }
+
+    fn animosity_player(value: Option<&str>, catcher_keywords: Vec<&str>) -> (Player, Player) {
+        use ffb_model::model::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut thrower = Player::default();
+        thrower.starting_skills.push(match value {
+            Some(v) => SkillWithValue::with_value(ffb_model::model::SkillId::Animosity, v),
+            None => SkillWithValue::new(ffb_model::model::SkillId::Animosity),
+        });
+        let mut catcher = Player::default();
+        catcher.keywords = catcher_keywords.into_iter().map(String::from).collect();
+        (thrower, catcher)
+    }
+
+    #[test]
+    fn animosity_exists_true_when_configured_all() {
+        let (thrower, catcher) = animosity_player(Some("all"), vec!["Goblin"]);
+        assert!(SkillMechanic.animosity_exists(&thrower, &catcher));
+    }
+
+    #[test]
+    fn animosity_exists_true_when_unconfigured_defaults_to_all() {
+        let (thrower, catcher) = animosity_player(None, vec!["Goblin"]);
+        assert!(SkillMechanic.animosity_exists(&thrower, &catcher));
+    }
+
+    #[test]
+    fn animosity_exists_true_when_catcher_keyword_matches_configured_value() {
+        let (thrower, catcher) = animosity_player(Some("Goblin"), vec!["Lineman", "Goblin"]);
+        assert!(SkillMechanic.animosity_exists(&thrower, &catcher));
+    }
+
+    #[test]
+    fn animosity_exists_false_when_catcher_keyword_does_not_match() {
+        let (thrower, catcher) = animosity_player(Some("Goblin"), vec!["Troll"]);
+        assert!(!SkillMechanic.animosity_exists(&thrower, &catcher));
+    }
+
+    #[test]
+    fn animosity_exists_temporary_value_overrides_configured_value() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        let (mut thrower, catcher) = animosity_player(Some("Goblin"), vec!["Troll"]);
+        thrower.temporary_skills.push(SkillWithValue::with_value(ffb_model::model::SkillId::Animosity, "Troll"));
+        assert!(SkillMechanic.animosity_exists(&thrower, &catcher));
     }
 }

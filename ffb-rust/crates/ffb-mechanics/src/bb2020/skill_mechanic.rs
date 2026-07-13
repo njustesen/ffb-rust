@@ -1,9 +1,19 @@
-use ffb_model::enums::{PlayerState, TurnMode};
+use ffb_model::enums::{PlayerState, PlayerType, TurnMode};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::{FieldModel, Game, Player};
 use ffb_model::model::property::named_properties::NamedProperties;
 use crate::mechanic::{Mechanic, MechanicType};
 use crate::skill_mechanic::SkillMechanic as SkillMechanicTrait;
+
+/// Java `bb2020/Animosity.Evaluator.values(Skill, Player)` — unlike bb2025's evaluator, bb2020
+/// does NOT normalize through `Keyword.forName` (`split()` returns raw values), since bb2020
+/// configures Animosity against raw roster position ids (e.g. "underworld.skaven.thrower") or
+/// bare race names (e.g. "goblin"), matched directly against `catcher.getPositionId()`/`getRace()`.
+fn animosity_values(thrower: &Player, animosity: ffb_model::model::skill_def::SkillId) -> std::collections::HashSet<String> {
+    let mut values = thrower.temporary_skill_values(animosity);
+    values.insert(thrower.skill_value_excluding_temporary_ones(animosity).unwrap_or_else(|| "all".to_string()));
+    values.into_iter().flat_map(|v| v.split(';').map(str::to_string).collect::<Vec<_>>()).collect()
+}
 
 /// 1:1 translation of com.fumbbl.ffb.mechanics.bb2020.SkillMechanic.
 pub struct SkillMechanic;
@@ -63,10 +73,26 @@ impl SkillMechanicTrait for SkillMechanic {
     }
 
     fn animosity_exists(&self, thrower: &Player, catcher: &Player) -> bool {
-        // TODO: requires getSkillWithProperty(NamedProperties.hasToRollToPassBallOn), AnimosityValueEvaluator,
-        //       and catcher.player_type != PlayerType::Mercenary/Star checks
-        let _ = (thrower, catcher);
-        false
+        // Java: `thrower.getTeam().getId().equals(catcher.getTeam().getId())` is not checked
+        // here — see the identical note in bb2025's `animosity_exists`.
+        let Some(animosity) = thrower.skill_id_with_property(NamedProperties::HAS_TO_ROLL_TO_PASS_BALL_ON) else {
+            return false;
+        };
+        if catcher.player_type == PlayerType::Mercenary || catcher.player_type == PlayerType::Star {
+            return false;
+        }
+        let pattern: std::collections::HashSet<String> = [
+            Some("all".to_string()),
+            Some(catcher.position_id.to_lowercase()),
+            catcher.race.as_ref().map(|r| r.to_lowercase()),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        animosity_values(thrower, animosity)
+            .iter()
+            .map(|v| v.to_lowercase())
+            .any(|v| pattern.contains(&v))
     }
 }
 
@@ -99,10 +125,66 @@ mod tests {
     }
 
     #[test]
-    fn animosity_exists_returns_false_stub() {
+    fn animosity_exists_false_without_skill() {
         use ffb_model::model::Player;
         let p1 = Player::default();
         let p2 = Player::default();
         assert!(!SkillMechanic.animosity_exists(&p1, &p2));
+    }
+
+    fn animosity_player(value: Option<&str>, catcher_position_id: &str, catcher_race: Option<&str>) -> (Player, Player) {
+        use ffb_model::model::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut thrower = Player::default();
+        thrower.starting_skills.push(match value {
+            Some(v) => SkillWithValue::with_value(ffb_model::model::SkillId::Animosity, v),
+            None => SkillWithValue::new(ffb_model::model::SkillId::Animosity),
+        });
+        let mut catcher = Player::default();
+        catcher.position_id = catcher_position_id.to_string();
+        catcher.race = catcher_race.map(String::from);
+        (thrower, catcher)
+    }
+
+    #[test]
+    fn animosity_exists_true_when_configured_all() {
+        let (thrower, catcher) = animosity_player(Some("all"), "underworld.skaven.lineman", Some("underworld.lrb6"));
+        assert!(SkillMechanic.animosity_exists(&thrower, &catcher));
+    }
+
+    #[test]
+    fn animosity_exists_true_when_position_id_matches() {
+        let (thrower, catcher) = animosity_player(
+            Some("underworld.skaven.thrower;underworld.troll.warpstone"),
+            "underworld.skaven.thrower",
+            Some("underworld.lrb6"),
+        );
+        assert!(SkillMechanic.animosity_exists(&thrower, &catcher));
+    }
+
+    #[test]
+    fn animosity_exists_true_when_race_matches() {
+        let (thrower, catcher) = animosity_player(Some("Skaven"), "underworld.skaven.lineman", Some("Skaven"));
+        assert!(SkillMechanic.animosity_exists(&thrower, &catcher));
+    }
+
+    #[test]
+    fn animosity_exists_false_when_neither_matches() {
+        let (thrower, catcher) = animosity_player(Some("goblin"), "underworld.skaven.lineman", Some("Skaven"));
+        assert!(!SkillMechanic.animosity_exists(&thrower, &catcher));
+    }
+
+    #[test]
+    fn animosity_exists_false_for_mercenary_catcher() {
+        let (thrower, mut catcher) = animosity_player(Some("all"), "underworld.skaven.lineman", Some("Skaven"));
+        catcher.player_type = PlayerType::Mercenary;
+        assert!(!SkillMechanic.animosity_exists(&thrower, &catcher));
+    }
+
+    #[test]
+    fn animosity_exists_false_for_star_catcher() {
+        let (thrower, mut catcher) = animosity_player(Some("all"), "underworld.skaven.lineman", Some("Skaven"));
+        catcher.player_type = PlayerType::Star;
+        assert!(!SkillMechanic.animosity_exists(&thrower, &catcher));
     }
 }

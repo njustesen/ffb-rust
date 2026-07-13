@@ -10,6 +10,7 @@
 ///
 /// Client command `CLIENT_USE_RE_ROLL_FOR_TARGET(FOUL_APPEARANCE)` triggers a re-roll;
 /// `CLIENT_PLAYER_CHOICE(LORD_OF_CHAOS)` chooses the single-use re-roll player.
+use std::collections::HashMap;
 use ffb_mechanics::mechanics::minimum_roll_resisting_foul_appearance;
 use ffb_model::enums::ReRollSource;
 use ffb_model::model::game::Game;
@@ -20,7 +21,7 @@ use ffb_model::util::util_cards::UtilCards;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
-use crate::step::mixed::multiblock::abstract_step_multiple::{AbstractStepMultiple, SingleReRollUseState};
+use crate::step::mixed::multiblock::abstract_step_multiple::{build_reroll_prompt, AbstractStepMultiple, SingleReRollUseState};
 use crate::step::util_server_re_roll::use_reroll;
 
 /// Java: `StepFoulAppearanceMultiple` (mixed/multiblock, BB2020 + BB2025).
@@ -42,6 +43,8 @@ pub struct StepFoulAppearanceMultiple {
     re_roll_source: Option<ReRollSource>,
     /// Java: `state.reRollAvailableAgainst`
     re_roll_available_against: Vec<String>,
+    /// Java: `state.minimumRolls`
+    minimum_rolls: HashMap<String, i32>,
     /// Java: base `AbstractStepMultiple` / `SingleReRollUseState`
     base: AbstractStepMultiple,
 }
@@ -56,6 +59,7 @@ impl StepFoulAppearanceMultiple {
             re_roll_target: None,
             re_roll_source: None,
             re_roll_available_against: Vec::new(),
+            minimum_rolls: HashMap::new(),
             base: AbstractStepMultiple::new(),
         }
     }
@@ -114,8 +118,14 @@ impl StepFoulAppearanceMultiple {
             }
 
             // Java: for (String targetId : ...) { roll(step, actingPlayer, targetId, false, ...) }
+            // Java's `roll()` also tries an immediate auto-reroll on failure via
+            // `UtilCards.getUnusedRerollSource(actingPlayer, FOUL_APPEARANCE)` — no skill in this
+            // codebase registers a reroll source for `ReRolledActions.FOUL_APPEARANCE` (confirmed
+            // by grepping `ffb-common/.../skill/` for it), so that branch is correctly always a
+            // no-op here; not implemented as active code since there is nothing to trigger it.
             let targets_to_roll: Vec<String> = self.block_targets.clone();
             for target_id in targets_to_roll {
+                self.minimum_rolls.insert(target_id.clone(), min_roll);
                 let roll = rng.d6();
                 // Java: isSkillRollSuccessful(roll, minimumRoll) = roll==6 || (roll!=1 && roll>=min)
                 let successful = DiceInterpreter::is_skill_roll_successful(roll, min_roll);
@@ -129,12 +139,12 @@ impl StepFoulAppearanceMultiple {
             // Java: state.reRollAvailableAgainst.addAll(state.blockTargets)
             self.re_roll_available_against = self.block_targets.clone();
 
-            // Headless: skip dialog, go straight to nextStep logic
-            self.handle_remaining(game)
+            self.decide_next_step(game, &attacker_id)
         } else {
             // Java: re-roll path — called after UseReRollForTarget command
             if let (Some(target), Some(source)) = (self.re_roll_target.clone(), self.re_roll_source.clone()) {
                 if use_reroll(game, &source, &attacker_id) {
+                    self.minimum_rolls.insert(target.clone(), min_roll);
                     let roll = rng.d6();
                     let successful = DiceInterpreter::is_skill_roll_successful(roll, min_roll);
                     if successful {
@@ -143,7 +153,20 @@ impl StepFoulAppearanceMultiple {
                 }
                 self.re_roll_available_against.retain(|t| t != &target);
             }
-            self.handle_remaining(game)
+            self.decide_next_step(game, &attacker_id)
+        }
+    }
+
+    /// Java: `decideNextStep` — offer the re-roll-choice dialog if a source is available,
+    /// otherwise fall through to `nextStep` (`handle_remaining`).
+    fn decide_next_step(&mut self, game: &mut Game, attacker_id: &str) -> StepOutcome {
+        match build_reroll_prompt(game, attacker_id, "FOUL_APPEARANCE", &self.block_targets, &self.minimum_rolls, &self.re_roll_available_against) {
+            Some(prompt) => {
+                self.re_roll_target = None;
+                self.re_roll_source = None;
+                StepOutcome::cont().with_prompt(prompt)
+            }
+            None => self.handle_remaining(game),
         }
     }
 
@@ -422,5 +445,77 @@ mod tests {
         let mut rng = GameRng::new(0);
         let out = step.handle_command(&Action::Acknowledge, &mut game, &mut rng);
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    fn seed_for_d6(target: i32) -> u64 {
+        for s in 0u64..10_000 {
+            if GameRng::new(s).d6() == target { return s; }
+        }
+        panic!("no seed for d6={}", target);
+    }
+
+    #[test]
+    fn failed_roll_with_team_reroll_available_offers_dialog() {
+        let seed = seed_for_d6(1); // min_roll=2, roll 1 fails
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        add_player(&mut game, true, "attacker", FieldCoordinate::new(5, 5), vec![]);
+        add_player(&mut game, false, "def_fa", FieldCoordinate::new(5, 6), vec![SkillId::FoulAppearance]);
+        game.acting_player.player_id = Some("attacker".into());
+
+        let mut step = StepFoulAppearanceMultiple::new("fail");
+        step.set_parameter(&StepParameter::BlockTargets(vec!["def_fa".into()]));
+
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        assert_eq!(out.action, StepAction::Continue, "team re-roll available → offer dialog");
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::ReRollForTargets { .. })));
+    }
+
+    #[test]
+    fn failed_roll_with_no_reroll_source_falls_through_to_goto() {
+        let seed = seed_for_d6(1);
+        let mut game = make_game();
+        game.home_playing = true;
+        add_player(&mut game, true, "attacker", FieldCoordinate::new(5, 5), vec![]);
+        add_player(&mut game, false, "def_fa", FieldCoordinate::new(5, 6), vec![SkillId::FoulAppearance]);
+        game.acting_player.player_id = Some("attacker".into());
+
+        let mut step = StepFoulAppearanceMultiple::new("fail");
+        step.set_parameter(&StepParameter::BlockTargets(vec!["def_fa".into()]));
+
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        // No reroll source → falls straight through to nextStep's goto-on-total-failure
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(out.prompt.is_none());
+    }
+
+    #[test]
+    fn full_reroll_round_trip_via_action_use_reroll_for_target() {
+        let seed = seed_for_d6(1);
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        add_player(&mut game, true, "attacker", FieldCoordinate::new(5, 5), vec![]);
+        add_player(&mut game, false, "def_fa", FieldCoordinate::new(5, 6), vec![SkillId::FoulAppearance]);
+        game.acting_player.player_id = Some("attacker".into());
+
+        let mut step = StepFoulAppearanceMultiple::new("fail");
+        step.set_parameter(&StepParameter::BlockTargets(vec!["def_fa".into()]));
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        assert_eq!(out.action, StepAction::Continue);
+
+        let out2 = step.handle_command(
+            &Action::UseReRollForTarget {
+                re_rolled_action: Some("FOUL_APPEARANCE".into()),
+                re_roll_source: Some("TRR".into()),
+                target_id: Some("def_fa".into()),
+            },
+            &mut game,
+            &mut GameRng::new(seed_for_d6(4)),
+        );
+        assert_eq!(out2.action, StepAction::NextStep);
+        assert!(step.block_targets.is_empty());
+        assert_eq!(game.turn_data_home.rerolls, 0, "TRR token consumed");
     }
 }

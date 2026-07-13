@@ -120,6 +120,20 @@ pub enum WireDialog {
     #[serde(rename = "RE_ROLL_OFFER")]
     ReRollOffer { source: String, action: String, #[serde(rename = "teamId")] team_id: String },
 
+    #[serde(rename = "RE_ROLL_FOR_TARGETS")]
+    ReRollForTargets {
+        #[serde(rename = "playerId")] player_id: String,
+        #[serde(rename = "targetIds")] target_ids: Vec<String>,
+        #[serde(rename = "minimumRolls")] minimum_rolls: std::collections::HashMap<String, i32>,
+        #[serde(rename = "reRolledAction")] re_rolled_action: String,
+        #[serde(rename = "reRollAvailableAgainst")] re_roll_available_against: Vec<String>,
+        #[serde(rename = "proReRollAvailable")] pro_re_roll_available: bool,
+        #[serde(rename = "teamReRollAvailable")] team_re_roll_available: bool,
+        #[serde(rename = "consummateAvailable")] consummate_available: bool,
+        #[serde(rename = "reRollSkill")] re_roll_skill: Option<u16>,
+        #[serde(rename = "singleUseReRollSource")] single_use_re_roll_source: Option<String>,
+    },
+
     #[serde(rename = "SKILL_USE")]
     SkillUse {
         #[serde(rename = "playerId")] player_id: String,
@@ -268,6 +282,22 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
             Some(WireDialog::Pushback { attacker_id: attacker_id.clone(), defender_id: defender_id.clone(), squares: squares.clone() }),
         AgentPrompt::ReRollOffer { source, action, team_id } =>
             Some(WireDialog::ReRollOffer { source: source.name.clone(), action: action.clone(), team_id: team_id.clone() }),
+        AgentPrompt::ReRollForTargets {
+            player_id, target_ids, minimum_rolls, re_rolled_action, re_roll_available_against,
+            pro_re_roll_available, team_re_roll_available, consummate_available, re_roll_skill,
+            single_use_re_roll_source,
+        } => Some(WireDialog::ReRollForTargets {
+            player_id: player_id.clone(),
+            target_ids: target_ids.clone(),
+            minimum_rolls: minimum_rolls.clone(),
+            re_rolled_action: re_rolled_action.clone(),
+            re_roll_available_against: re_roll_available_against.clone(),
+            pro_re_roll_available: *pro_re_roll_available,
+            team_re_roll_available: *team_re_roll_available,
+            consummate_available: *consummate_available,
+            re_roll_skill: re_roll_skill.map(|id| id as u16),
+            single_use_re_roll_source: single_use_re_roll_source.as_ref().map(|s| s.name.clone()),
+        }),
         AgentPrompt::SkillUse { player_id, skill_id, skill_name } =>
             Some(WireDialog::SkillUse { player_id: player_id.clone(), skill_id: *skill_id, skill_name: skill_name.clone() }),
         AgentPrompt::PilingOn { player_id, target_id } =>
