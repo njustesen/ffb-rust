@@ -6,6 +6,9 @@
 /// The only defined hook point is `PASS_INTERCEPT` — used to inject intercept-eligibility
 /// checks into the pass resolution sequence.
 
+use ffb_model::enums::Rules;
+use crate::step::framework::StepId;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HookPoint {
     /// Java: `StepHook.HookPoint.PASS_INTERCEPT`
@@ -18,9 +21,50 @@ pub trait StepHookHandler {
     fn hook_points(&self) -> &[HookPoint];
 }
 
+/// 1:1 translation of `StepFactory.getSteps(HookPoint)`.
+///
+/// Java builds this table at `GameState` construction time by reflection-scanning every
+/// `IStep` class for a `@StepHook` annotation, filtered by the class's `@RulesCollection` to
+/// the current edition (`StepFactory.initialize()`). Rust has no reflection, so — following
+/// this codebase's established substitution convention for reflection-based registries (see
+/// `LogicPluginFactory`) — this is an explicit static table instead. It is exhaustive: across
+/// the whole Java server, exactly two `IStep` classes carry `@StepHook`, each scoped to a
+/// single edition: `StepSafeThrow` (`@RulesCollection(BB2016)`) and the nested
+/// `CloudBursterBehaviour.StepCloudBurster` (`@RulesCollection(BB2020)`). BB2025 registers
+/// nothing for `PASS_INTERCEPT` — not a gap, that's what the real Java `StepFactory` produces
+/// for that edition too, since neither annotated class matches its `RulesCollection`.
+pub fn hooked_steps(rules: Rules, hook_point: HookPoint) -> &'static [StepId] {
+    match (rules, hook_point) {
+        (Rules::Bb2016, HookPoint::PassIntercept) => &[StepId::SafeThrow],
+        (Rules::Bb2020, HookPoint::PassIntercept) => &[StepId::CloudBurster],
+        (Rules::Bb2025, HookPoint::PassIntercept) => &[],
+        (Rules::Common, _) => &[],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hooked_steps_bb2016_returns_safe_throw() {
+        assert_eq!(hooked_steps(Rules::Bb2016, HookPoint::PassIntercept), &[StepId::SafeThrow]);
+    }
+
+    #[test]
+    fn hooked_steps_bb2020_returns_cloud_burster() {
+        assert_eq!(hooked_steps(Rules::Bb2020, HookPoint::PassIntercept), &[StepId::CloudBurster]);
+    }
+
+    #[test]
+    fn hooked_steps_bb2025_returns_none() {
+        assert!(hooked_steps(Rules::Bb2025, HookPoint::PassIntercept).is_empty());
+    }
+
+    #[test]
+    fn hooked_steps_common_returns_none() {
+        assert!(hooked_steps(Rules::Common, HookPoint::PassIntercept).is_empty());
+    }
 
     #[test]
     fn hook_point_pass_intercept_eq() {

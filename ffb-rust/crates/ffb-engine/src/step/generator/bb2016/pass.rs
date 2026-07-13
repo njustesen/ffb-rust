@@ -1,7 +1,8 @@
 /// BB2016 pass action step sequence.
 /// Mirrors Java `com.fumbbl.ffb.server.step.generator.bb2016.Pass`.
-/// Note: Java `sequence.insertHooks(PASS_INTERCEPT)` is skipped — StepHooks not yet ported.
+use ffb_model::enums::Rules;
 use ffb_model::types::FieldCoordinate;
+use crate::skill_behaviour::step_hook::HookPoint;
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
 
@@ -54,7 +55,10 @@ impl Pass {
         seq.add(StepId::Intercept, vec![
             StepParameter::GotoLabelOnFailure(labels::PASS.into()),
         ]);
-        // NOTE: Java insertHooks(PASS_INTERCEPT) skipped — StepHooks not yet ported
+        // insertHooks(PASS_INTERCEPT) — StepSafeThrow, BB2016-only
+        seq.insert_hooks(Rules::Bb2016, HookPoint::PassIntercept, vec![
+            StepParameter::GotoLabelOnFailure(fl.into()),
+        ]);
         // 12 PASS [PASS]
         seq.add_labelled(StepId::Pass, labels::PASS, vec![
             StepParameter::GotoLabelOnEnd(fl.into()),
@@ -124,5 +128,20 @@ mod tests {
             s.step_id == StepId::CatchScatterThrowIn && s.label.as_deref() == Some(labels::SCATTER_BALL)
         });
         assert!(cst.is_some());
+    }
+
+    #[test]
+    fn pass_inserts_safe_throw_hook_after_intercept() {
+        // insertHooks(PASS_INTERCEPT) registers StepSafeThrow for BB2016 (see
+        // skill_behaviour::step_hook::hooked_steps) — it must be reachable from the live
+        // sequence, immediately after INTERCEPT, carrying GOTO_LABEL_ON_FAILURE = END_PASSING.
+        let steps = Pass::build_sequence(&PassParams::default());
+        let intercept_idx = steps.iter().position(|s| s.step_id == StepId::Intercept).unwrap();
+        let safe_throw = &steps[intercept_idx + 1];
+        assert_eq!(safe_throw.step_id, StepId::SafeThrow);
+        assert!(matches!(
+            safe_throw.params[0],
+            StepParameter::GotoLabelOnFailure(ref s) if s == labels::END_PASSING
+        ));
     }
 }

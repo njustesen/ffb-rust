@@ -1,6 +1,8 @@
 /// BB2025 pass action step sequence.
 /// Mirrors Java `com.fumbbl.ffb.server.step.generator.bb2025.Pass`.
+use ffb_model::enums::Rules;
 use ffb_model::types::FieldCoordinate;
+use crate::skill_behaviour::step_hook::HookPoint;
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
 use super::activation_sequence_builder::ActivationSequenceBuilder;
@@ -70,7 +72,12 @@ impl Pass {
         seq.add_labelled(StepId::Intercept, labels::INTERCEPT, vec![
             StepParameter::GotoLabelOnFailure(labels::RESOLVE_PASS.into()),
         ]);
-        // 12 insertHooks(PASS_INTERCEPT) — none for lineman; step would go here
+        // 12 insertHooks(PASS_INTERCEPT) — real call, but BB2025 has no @StepHook-annotated
+        // step registered for this hook point (StepSafeThrow is BB2016-only, StepCloudBurster
+        // is BB2020-only), so this is a genuine no-op, matching real Java's own StepFactory.
+        seq.insert_hooks(Rules::Bb2025, HookPoint::PassIntercept, vec![
+            StepParameter::GotoLabelOnFailure(labels::RESOLVE_PASS.into()),
+        ]);
         // 13 RESOLVE_PASS [RESOLVE_PASS]
         seq.add_labelled(StepId::ResolvePass, labels::RESOLVE_PASS, vec![]);
         // 14 GOTO_LABEL → SCATTER_BALL
@@ -122,6 +129,16 @@ mod tests {
             s.step_id == StepId::CatchScatterThrowIn && s.label.as_deref() == Some(labels::SCATTER_BALL)
         });
         assert!(cst.is_some());
+    }
+
+    #[test]
+    fn pass_inserts_no_intercept_hook_for_bb2025() {
+        // insertHooks(PASS_INTERCEPT) is a genuine no-op for BB2025 — neither StepSafeThrow
+        // (BB2016-only) nor StepCloudBurster (BB2020-only) is registered for this edition, so
+        // INTERCEPT must be followed directly by RESOLVE_PASS with nothing spliced in between.
+        let steps = Pass::build_sequence(&PassParams::default());
+        let intercept_idx = steps.iter().position(|s| s.step_id == StepId::Intercept).unwrap();
+        assert_eq!(steps[intercept_idx + 1].step_id, StepId::ResolvePass);
     }
 
     #[test]

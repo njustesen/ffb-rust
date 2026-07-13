@@ -5,6 +5,8 @@
 /// `push_sequence` reverses the vec so the first-authored step ends on top and runs first,
 /// matching Java's `StepStack.push(List<IStep>)` iterating back-to-front.
 
+use ffb_model::enums::Rules;
+use crate::skill_behaviour::step_hook::{hooked_steps, HookPoint};
 use crate::step::framework::{StepId, StepParameter};
 pub use crate::step::framework::SequenceStep;
 
@@ -34,6 +36,15 @@ impl Sequence {
     pub fn jump(&mut self, target_label: impl Into<String>) {
         let target = target_label.into();
         self.add(StepId::GotoLabel, vec![StepParameter::GotoLabel(target)]);
+    }
+
+    /// Java `sequence.insertHooks(HookPoint, params...)` — inserts every step registered for
+    /// this edition/hook-point combination (see `skill_behaviour::step_hook::hooked_steps`),
+    /// each carrying the same `params`, in registration order.
+    pub fn insert_hooks(&mut self, rules: Rules, hook_point: HookPoint, params: Vec<StepParameter>) {
+        for &step_id in hooked_steps(rules, hook_point) {
+            self.add(step_id, params.clone());
+        }
     }
 
     /// Consume the builder and return the accumulated steps in authored order.
@@ -143,6 +154,32 @@ mod tests {
         assert_eq!(steps[0].step_id, StepId::Apothecary);
         assert_eq!(steps[1].step_id, StepId::GotoLabel);
     }
+    #[test]
+    fn insert_hooks_bb2016_adds_safe_throw() {
+        let mut seq = Sequence::new();
+        seq.insert_hooks(Rules::Bb2016, HookPoint::PassIntercept, vec![StepParameter::GotoLabelOnFailure("END".into())]);
+        let steps = seq.build();
+        assert_eq!(steps.len(), 1);
+        assert_eq!(steps[0].step_id, StepId::SafeThrow);
+        assert!(matches!(steps[0].params[0], StepParameter::GotoLabelOnFailure(ref s) if s == "END"));
+    }
+
+    #[test]
+    fn insert_hooks_bb2020_adds_cloud_burster() {
+        let mut seq = Sequence::new();
+        seq.insert_hooks(Rules::Bb2020, HookPoint::PassIntercept, vec![]);
+        let steps = seq.build();
+        assert_eq!(steps.len(), 1);
+        assert_eq!(steps[0].step_id, StepId::CloudBurster);
+    }
+
+    #[test]
+    fn insert_hooks_bb2025_adds_nothing() {
+        let mut seq = Sequence::new();
+        seq.insert_hooks(Rules::Bb2025, HookPoint::PassIntercept, vec![]);
+        assert!(seq.build().is_empty());
+    }
+
     #[test]
     fn build_returns_multiple_steps_in_order() {
         let mut seq = Sequence::new();

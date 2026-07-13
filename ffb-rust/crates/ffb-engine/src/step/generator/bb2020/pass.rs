@@ -1,7 +1,8 @@
 /// BB2020 pass action step sequence.
 /// Mirrors Java `com.fumbbl.ffb.server.step.generator.bb2020.Pass`.
-use ffb_model::enums::ApothecaryMode;
+use ffb_model::enums::{ApothecaryMode, Rules};
 use ffb_model::types::FieldCoordinate;
+use crate::skill_behaviour::step_hook::HookPoint;
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
 
@@ -79,6 +80,10 @@ impl Pass {
         seq.add_labelled(StepId::Intercept, labels::INTERCEPT, vec![
             StepParameter::GotoLabelOnFailure(labels::RESOLVE_PASS.into()),
         ]);
+        // insertHooks(PASS_INTERCEPT) — StepCloudBurster, BB2020-only
+        seq.insert_hooks(Rules::Bb2020, HookPoint::PassIntercept, vec![
+            StepParameter::GotoLabelOnFailure(labels::RESOLVE_PASS.into()),
+        ]);
         // 23 RESOLVE_PASS [RESOLVE_PASS]
         seq.add_labelled(StepId::ResolvePass, labels::RESOLVE_PASS, vec![]);
         // 24 GOTO → SCATTER_BALL
@@ -136,5 +141,20 @@ mod tests {
             s.step_id == StepId::CatchScatterThrowIn && s.label.as_deref() == Some(labels::SCATTER_BALL)
         });
         assert!(cst.is_some());
+    }
+
+    #[test]
+    fn pass_inserts_cloud_burster_hook_after_intercept() {
+        // insertHooks(PASS_INTERCEPT) registers StepCloudBurster for BB2020 (see
+        // skill_behaviour::step_hook::hooked_steps) — it must be reachable from the live
+        // sequence, immediately after INTERCEPT, carrying GOTO_LABEL_ON_FAILURE = RESOLVE_PASS.
+        let steps = Pass::build_sequence(&PassParams::default());
+        let intercept_idx = steps.iter().position(|s| s.step_id == StepId::Intercept).unwrap();
+        let cloud_burster = &steps[intercept_idx + 1];
+        assert_eq!(cloud_burster.step_id, StepId::CloudBurster);
+        assert!(matches!(
+            cloud_burster.params[0],
+            StepParameter::GotoLabelOnFailure(ref s) if s == labels::RESOLVE_PASS
+        ));
     }
 }
