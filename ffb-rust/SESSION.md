@@ -1,6 +1,56 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-15, Phase AAS done — 3 of 6 in the AAQ-AAV backlog arc)
+## Current Status (2026-07-15, Phase AAT done — 4 of 6 in the AAQ-AAV backlog arc)
+
+**Phase AAT — Claws/Chainsaw/`CLAW_DOES_NOT_STACK`/`MB_STACKS_AGAINST_CHAINSAW` wiring, done.**
+
+`injury_type_block.rs`'s `armour_roll` was rewritten from a Mighty-Blow-only stub to a full port
+of `InjuryTypeBlock.java`'s real armor-roll logic (lines 66-161):
+
+1. **Bridging decision (per the plan): `Box::leak`.** `ArmorModifierFactory::find_armor_modifiers`
+   returns `Vec<Box<dyn ArmorModifier>>`, whose `get_name()` borrows from an owned `String` inside
+   the box — but `InjuryContext`'s `Modifier` needs `name: &'static str`. Added `leak_modifier()`,
+   which leaks the name string once per armor roll that has Claws/Mighty-Blow-family modifiers in
+   play — bounded, no workspace-wide `Modifier` type change.
+2. **Chainsaw**: resolves `blocksLikeChainsaw` on attacker (if `allow_attacker_chainsaw`, the real
+   Java 2nd constructor param — added as `InjuryTypeBlock::new_with_chainsaw`, with the existing
+   2-arg `new` defaulting it to `true` so both pre-existing call sites needed no changes) then
+   defender, gated by the defender's `ignoresArmourModifiersFromSkills`. Chainsaw's own registered
+   armor modifier is a flat +3 that never applies through the normal per-context scan (Java:
+   `appliesToContext` hardcoded `false`) — added directly as a `Modifier::new("Chainsaw", 3, ...)`
+   rather than round-tripped through the factory.
+3. **Claws vs `CLAW_DOES_NOT_STACK`**: full port of the claw-present branch — add Claws, recompute
+   broken; if still unbroken and the option is enabled, remove Claws, recompute with the remaining
+   modifiers (+ chainsaw if present), and if *still* unbroken and no chainsaw, re-add Claws purely
+   for display (a genuine, slightly odd Java quirk, preserved faithfully).
+4. **`handleChainsawAndMb`**: when no Claws is present but both a chainsaw and a Mighty-Blow-family
+   modifier are, evaluates without Mighty Blow first, only re-adding it if armor didn't already
+   break — preventing Mighty Blow from being credited when Chainsaw alone would have broken it.
+5. **Real gap found and fixed, one file at a time (not the shared formula)**: Claws' `ArmorModifier`
+   in `armor_modifier_factory.rs` is registered with modifier *value* `0` — Java's actual effect
+   ("reduces armour to a fixed value of 8") was never implemented anywhere in the codebase (dead
+   `REDUCES_ARMOUR_TO_FIXED_VALUE` constant, unused). Rather than changing the shared
+   `mech_armor_broken`/`recalc_armor_broken` (used by every injury type — too wide a blast radius
+   to verify in this phase), added a local `recalc_armor_broken_claws_aware` used only within this
+   file's `armour_roll`, capping effective armour at 8 when a "Claws" modifier is present. Confirmed
+   via new tests that Claws now actually breaks armor it couldn't reach normally.
+6. Existing Mighty-Blow tests updated: they previously checked the placeholder constant
+   `ARMOR_MIGHTY_BLOW_1` ("Mighty Blow +1"), which never matched Java's real armor-modifier name
+   ("Mighty Blow", from the factory) — the old inline "if attacker has MightyBlow, add
+   ARMOR_MIGHTY_BLOW_1" logic is now fully replaced by the real factory scan, so tests were fixed
+   to check the real name instead of being adjusted to keep passing against the old placeholder.
+
+7 new tests (Claws breaking via the fixed-value cap, Claws present but roll below cap, `CLAW_DOES_NOT_STACK`'s remove-and-redisplay quirk, Chainsaw's flat +3, `MB_STACKS_AGAINST_CHAINSAW`'s scan-path fallback, `allow_attacker_chainsaw=false`).
+
+Tests: 16,965 → **16,971** (net +6: 21 new Claws/Chainsaw/Mighty-Blow tests replacing/extending
+15 pre-existing ones in this file). 0 failures. `cargo clippy --workspace --all-targets`: still 0
+errors.
+
+**Next**: Phase AAU (PitTrapHandler injury wiring / `StepPlayCard` card-target routing).
+
+---
+
+## Prior Status (2026-07-15, Phase AAS done — 3 of 6 in the AAQ-AAV backlog arc)
 
 **Phase AAS — deleted the dead `SkillBehaviour` marker-trait system, done.**
 
