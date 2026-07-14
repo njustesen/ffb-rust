@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::enums::InducementDuration;
+use crate::inducement::card_target::CardTarget;
 
 /// 1:1 translation of `com.fumbbl.ffb.inducement.Card`.
 /// Represents a single inducement card with its handler key and properties.
@@ -12,6 +13,16 @@ pub struct Card {
     pub duration: Option<InducementDuration>,
     /// Java: Card.isRemainsInPlay() — card stays deactivated on field rather than being removed.
     pub remains_in_play: bool,
+    /// Java: `Card.getTarget()` — TURN (played on the turn, no player selection needed) or one of
+    /// the player-targeted variants. Defaults to `TURN`, matching most cards.
+    #[serde(default)]
+    pub target: CardTarget,
+    /// Java: `Card.requiresBlockablePlayerSelection()` — overridden per-card-subclass in Java
+    /// (e.g. Custard Pie); default `false`. No card catalog with per-card overrides exists yet
+    /// in this port (cards are constructed ad hoc, not data-driven) — this field lets a
+    /// specific `Card` instance opt in once a caller knows which card it's building.
+    #[serde(default)]
+    pub requires_blockable_player_selection: bool,
 }
 
 impl Card {
@@ -21,6 +32,8 @@ impl Card {
             handler_key_name: handler_key_name.map(|s| s.into()),
             duration: None,
             remains_in_play: false,
+            target: CardTarget::default(),
+            requires_blockable_player_selection: false,
         }
     }
 
@@ -33,6 +46,18 @@ impl Card {
     /// Builder: set remains_in_play.
     pub fn with_remains_in_play(mut self, remains: bool) -> Self {
         self.remains_in_play = remains;
+        self
+    }
+
+    /// Builder: set the card's target.
+    pub fn with_target(mut self, target: CardTarget) -> Self {
+        self.target = target;
+        self
+    }
+
+    /// Builder: set requires_blockable_player_selection.
+    pub fn with_requires_blockable_player_selection(mut self, requires: bool) -> Self {
+        self.requires_blockable_player_selection = requires;
         self
     }
 
@@ -54,6 +79,16 @@ impl Card {
     /// Java: Card.isRemainsInPlay()
     pub fn is_remains_in_play(&self) -> bool {
         self.remains_in_play
+    }
+
+    /// Java: Card.getTarget()
+    pub fn get_target(&self) -> CardTarget {
+        self.target
+    }
+
+    /// Java: Card.requiresBlockablePlayerSelection()
+    pub fn requires_blockable_player_selection(&self) -> bool {
+        self.requires_blockable_player_selection
     }
 }
 
@@ -115,5 +150,32 @@ mod tests {
         let c = Card::new("Distract", Some("DISTRACT"))
             .with_duration(InducementDuration::UntilEndOfOpponentsTurn);
         assert_eq!(c.get_duration(), Some(InducementDuration::UntilEndOfOpponentsTurn));
+    }
+
+    #[test]
+    fn card_default_target_is_turn() {
+        let c = Card::new("Pit Trap", Some("PIT_TRAP"));
+        assert_eq!(c.get_target(), CardTarget::TURN);
+        assert!(!c.get_target().is_played_on_player());
+    }
+
+    #[test]
+    fn card_with_target_sets_player_targeting() {
+        let c = Card::new("Custard Pie", Some("CUSTARD_PIE")).with_target(CardTarget::OPPOSING_PLAYER);
+        assert_eq!(c.get_target(), CardTarget::OPPOSING_PLAYER);
+        assert!(c.get_target().is_played_on_player());
+    }
+
+    #[test]
+    fn card_default_does_not_require_blockable_player_selection() {
+        let c = Card::new("Test", Some("TEST_KEY"));
+        assert!(!c.requires_blockable_player_selection());
+    }
+
+    #[test]
+    fn card_with_requires_blockable_player_selection() {
+        let c = Card::new("Custard Pie", Some("CUSTARD_PIE"))
+            .with_requires_blockable_player_selection(true);
+        assert!(c.requires_blockable_player_selection());
     }
 }

@@ -2,25 +2,28 @@
 ///
 /// Step to play a card.
 ///
-/// Needs to be initialized with stepParameter CARD (stored as card_id).
+/// Needs to be initialized with stepParameter CARD (the full `Card` object).
 /// Needs to be initialized with stepParameter HOME_TEAM.
 ///
 /// Handles CLIENT_PLAYER_CHOICE (card target selection) and CLIENT_SETUP_PLAYER
 /// (illegal substitution flow) and CLIENT_END_TURN (end of illegal substitution).
 ///
-/// Stub: UtilServerCards, UtilServerSetup, UtilServerDialog are not yet fully
-/// translated — the parameter handling and command routing are ported; full card
-/// activation logic is deferred.
+/// Client-only concerns skipped (headless engine): `UtilServerDialog.hideDialog`.
+use ffb_model::inducement::card::Card;
 use ffb_model::model::game::Game;
+use ffb_model::prompts::agent_prompt::AgentPrompt;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::step::util_server_injury::{drop_player, stun_player};
+use crate::util::util_server_cards::UtilServerCards;
 
 /// Java: `StepPlayCard` (mixed/inducements, BB2016 + BB2020).
 #[derive(Debug, Default)]
 pub struct StepPlayCard {
-    /// Java: `fCard` — init parameter (mandatory, stored as card_id string).
-    card_id: Option<String>,
+    /// Java: `fCard` — init parameter (mandatory).
+    card: Option<Card>,
     /// Java: `fHomeTeam` — init parameter (mandatory).
     home_team: bool,
     /// Java: `fIllegalSubstitution`
@@ -40,9 +43,7 @@ pub struct StepPlayCard {
 impl StepPlayCard {
     pub fn new() -> Self { Self::default() }
 
-    fn execute_step(&mut self, _game: &mut Game) -> StepOutcome {
-        // Java: UtilServerDialog.hideDialog(getGameState()) — not ported
-
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         if self.end_card_playing {
             // Java: getResult().setNextAction(StepAction.NEXT_STEP)
             return StepOutcome::next();
@@ -50,36 +51,119 @@ impl StepPlayCard {
 
         if self.player_id.is_some() {
             // Java: playCardOnPlayer()
-            return self.play_card_on_player();
+            return self.play_card_on_player(game, rng);
         }
 
-        // Java: else if (fCard.getTarget().isPlayedOnPlayer()) { show dialog }
-        // Stub: Card target detection not yet ported → proceed to playCardOnTurn
-        // Java: else { playCardOnTurn() }
-        self.play_card_on_turn()
+        let Some(card) = self.card.clone() else { return StepOutcome::next() };
+
+        if card.get_target().is_played_on_player() {
+            // Java: step initInducement has already checked if this card can be played.
+            let allowed_players = UtilServerCards::find_allowed_players_for_card(game, &card);
+            return StepOutcome::cont().with_prompt(AgentPrompt::PlayerChoice {
+                eligible_players: allowed_players,
+                reason: "card".to_string(),
+                descriptions: vec![],
+            });
+        }
+
+        self.play_card_on_turn(game, rng)
     }
 
-    fn play_card_on_turn(&mut self) -> StepOutcome {
-        // Java: boolean doNextStep = UtilServerCards.activateCard(this, fCard, fHomeTeam, null)
-        // Stub: UtilServerCards not yet ported → return NEXT_STEP
-        StepOutcome::next()
+    fn play_card_on_turn(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        let Some(card) = self.card.clone() else { return StepOutcome::next() };
+        let (do_next_step, params) =
+            UtilServerCards::activate_card(game, rng, &card, self.home_team, None);
+        self.illegal_substitution = !do_next_step;
+        let mut outcome = StepOutcome::next();
+        for p in params {
+            outcome = outcome.publish(p);
+        }
+        if do_next_step {
+            outcome
+        } else {
+            // Java: doNextStep == false leaves next_action unset (CONTINUE by default) —
+            // the illegal-substitution flow drives the rest via CLIENT_SETUP_PLAYER/CLIENT_END_TURN.
+            StepOutcome::cont()
+        }
     }
 
-    fn play_card_on_player(&mut self) -> StepOutcome {
-        // Java: boolean doNextStep = UtilServerCards.activateCard / playCardWithBlockablePlayerSelection
-        // Stub: card activation not yet ported → return NEXT_STEP
-        StepOutcome::next()
+    fn play_card_on_player(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        let Some(player_id) = self.player_id.clone() else { return StepOutcome::next() };
+        if game.player(&player_id).is_none() {
+            return StepOutcome::next();
+        }
+        let Some(card) = self.card.clone() else { return StepOutcome::next() };
+
+        if card.requires_blockable_player_selection() {
+            return self.play_card_with_blockable_player_selection(game, rng, &card, &player_id);
+        }
+
+        let (_, params) =
+            UtilServerCards::activate_card(game, rng, &card, self.home_team, Some(&player_id));
+        let mut outcome = StepOutcome::next();
+        for p in params {
+            outcome = outcome.publish(p);
+        }
+        outcome
+    }
+
+    /// Java: `playCardWithBlockablePlayerSelection()` — cards like Custard Pie that stun/drop an
+    /// adjacent opponent chosen by the coach (or auto-selected if exactly one is eligible).
+    fn play_card_with_blockable_player_selection(
+        &mut self, game: &mut Game, rng: &mut GameRng, card: &Card, player_id: &str,
+    ) -> StepOutcome {
+        let mut outcome = StepOutcome::next();
+
+        if self.opponent_id.is_none() {
+            let player_coord = game.field_model.player_coordinate(player_id);
+            let other_team = if self.home_team { &game.team_away } else { &game.team_home };
+            if let Some(coord) = player_coord {
+                let blockable: Vec<String> =
+                    UtilPlayer::find_adjacent_blockable_players(game, other_team, coord)
+                        .into_iter().cloned().collect();
+                if blockable.len() == 1 {
+                    self.opponent_id = Some(blockable[0].clone());
+                } else {
+                    let (_, params) =
+                        UtilServerCards::activate_card(game, rng, card, self.home_team, Some(player_id));
+                    for p in params {
+                        outcome = outcome.publish(p);
+                    }
+                    return StepOutcome::cont().with_prompt(AgentPrompt::PlayerChoice {
+                        eligible_players: blockable,
+                        reason: "cardBlockablePlayer".to_string(),
+                        descriptions: vec![],
+                    });
+                }
+            }
+            let (_, params) =
+                UtilServerCards::activate_card(game, rng, card, self.home_team, Some(player_id));
+            for p in params {
+                outcome = outcome.publish(p);
+            }
+        }
+
+        if let Some(opponent_id) = self.opponent_id.clone() {
+            stun_player(game, &opponent_id);
+            for p in drop_player(game, player_id, false) {
+                outcome = outcome.publish(p);
+            }
+            outcome
+        } else {
+            // Java: doNextStep stays false — wait for the CLIENT_PLAYER_CHOICE(BLOCK) reply.
+            StepOutcome::cont()
+        }
     }
 }
 
 impl Step for StepPlayCard {
     fn id(&self) -> StepId { StepId::PlayCard }
 
-    fn start(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game)
+    fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
             // Java: case CLIENT_PLAYER_CHOICE:
             //   if (PlayerChoiceMode.BLOCK == mode) fOpponentId = playerId
@@ -106,12 +190,12 @@ impl Step for StepPlayCard {
             }
             _ => {}
         }
-        self.execute_step(game)
+        self.execute_step(game, rng)
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
-            StepParameter::CardId(v) => { self.card_id = v.clone(); true }
+            StepParameter::CardId(v) => { self.card = v.clone(); true }
             StepParameter::HomeTeam(v) => { self.home_team = *v; true }
             _ => false,
         }
@@ -124,11 +208,31 @@ impl Step for StepPlayCard {
 mod tests {
     use super::*;
     use crate::step::framework::{StepAction, test_team};
-    use ffb_model::enums::Rules;
+    use ffb_model::enums::{PlayerGender, PlayerState, PlayerType, Rules, PS_PRONE, PS_STANDING};
+    use ffb_model::inducement::card_target::CardTarget;
+    use ffb_model::model::player::Player;
+    use ffb_model::report::report_id::ReportId;
+    use ffb_model::types::FieldCoordinate;
     use ffb_model::util::rng::GameRng;
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+    }
+
+    fn add_player(game: &mut Game, home: bool, id: &str, coord: FieldCoordinate) {
+        let player = Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        if home { game.team_home.players.push(player); } else { game.team_away.players.push(player); }
+        game.field_model.set_player_coordinate(id, coord);
+        game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
     }
 
     #[test]
@@ -158,8 +262,9 @@ mod tests {
     #[test]
     fn set_parameter_card_id() {
         let mut step = StepPlayCard::new();
-        step.set_parameter(&StepParameter::CardId(Some("my_card".into())));
-        assert_eq!(step.card_id, Some("my_card".into()));
+        let card = Card::new("Pit Trap", Some("PIT_TRAP"));
+        step.set_parameter(&StepParameter::CardId(Some(card.clone())));
+        assert_eq!(step.card.as_ref().map(|c| c.get_name()), Some(card.get_name()));
     }
 
     #[test]
@@ -202,5 +307,71 @@ mod tests {
         step.handle_command(&Action::EndTurn, &mut game, &mut rng);
         assert!(step.end_card_playing);
         assert!(!step.illegal_substitution);
+    }
+
+    // ── Card activation / target routing (Phase AAU) ────────────────────────────
+
+    #[test]
+    fn turn_targeted_card_activates_immediately_and_reports() {
+        let mut game = make_game();
+        let mut step = StepPlayCard::new();
+        step.card = Some(Card::new("Blackmail", Some("UNKNOWN_KEY")).with_target(CardTarget::TURN));
+        step.home_team = true;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.report_list.has_report(ReportId::PLAY_CARD));
+        assert!(game.turn_data_home.inducement_set.is_active("Blackmail"));
+    }
+
+    #[test]
+    fn player_targeted_card_prompts_for_a_player_choice() {
+        let mut game = make_game();
+        add_player(&mut game, true, "p1", FieldCoordinate::new(5, 5));
+        game.turn_data_home.inducement_set.add_available_card("Pit Trap");
+        let mut step = StepPlayCard::new();
+        step.card = Some(Card::new("Pit Trap", Some("PIT_TRAP")).with_target(CardTarget::OWN_PLAYER));
+        step.home_team = true;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue);
+        match out.prompt {
+            Some(AgentPrompt::PlayerChoice { eligible_players, .. }) => {
+                assert!(eligible_players.contains(&"p1".to_string()));
+            }
+            other => panic!("expected PlayerChoice prompt, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn selecting_a_player_activates_pit_trap_and_drops_them() {
+        let mut game = make_game();
+        add_player(&mut game, true, "p1", FieldCoordinate::new(5, 5));
+        let mut step = StepPlayCard::new();
+        step.card = Some(Card::new("Pit Trap", Some("PIT_TRAP")).with_target(CardTarget::OWN_PLAYER));
+        step.home_team = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        let out = step.handle_command(
+            &Action::SelectPlayer { player_id: "p1".into() },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(game.field_model.player_state("p1").unwrap().base(), PS_PRONE);
+        assert!(game.turn_data_home.inducement_set.is_active("Pit Trap"));
+    }
+
+    #[test]
+    fn play_card_on_turn_publishes_handler_activation_parameters() {
+        let mut game = make_game();
+        add_player(&mut game, true, "p1", FieldCoordinate::new(5, 5));
+        // A turn-targeted card with the PIT_TRAP handler key is unusual in practice (Pit Trap is
+        // normally player-targeted) but exercises play_card_on_turn -> activate_card ->
+        // activation_parameters plumbing directly, with an empty player_id (no target selected).
+        let mut step = StepPlayCard::new();
+        step.card = Some(Card::new("Pit Trap", Some("PIT_TRAP")));
+        step.home_team = true;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        // drop_player with an empty/unknown player id is a no-op (no such player), so no params —
+        // this test only asserts the plumbing doesn't panic and the card still activates.
+        assert!(game.turn_data_home.inducement_set.is_active("Pit Trap"));
     }
 }

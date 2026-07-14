@@ -1,13 +1,14 @@
 /// Builds the special card step sequence (BB2016/BB2020).
 /// Mirrors Java `com.fumbbl.ffb.server.step.generator.mixed.Card`.
+use ffb_model::inducement::card::Card as CardModel;
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep};
 
 /// Parameters for the mixed Card sequence.
 #[derive(Debug, Clone, Default)]
 pub struct CardParams {
-    /// ID of the inducement card to play.
-    pub card_id: Option<String>,
+    /// The inducement card to play.
+    pub card_id: Option<CardModel>,
     /// Whether the card is being played by the home team.
     pub home_team: bool,
 }
@@ -58,18 +59,18 @@ mod tests {
     #[test]
     fn params_with_fields_set() {
         let p = CardParams {
-            card_id: Some("card-1".into()),
+            card_id: Some(CardModel::new("card-1", None::<&str>)),
             home_team: true,
         };
-        assert_eq!(p.card_id.as_deref(), Some("card-1"));
+        assert_eq!(p.card_id.as_ref().map(|c| c.get_name()), Some("card-1"));
         assert!(p.home_team);
     }
 
     #[test]
     fn params_clone() {
-        let p = CardParams { card_id: Some("x".into()), home_team: true };
+        let p = CardParams { card_id: Some(CardModel::new("x", None::<&str>)), home_team: true };
         let q = p.clone();
-        assert_eq!(q.card_id.as_deref(), Some("x"));
+        assert_eq!(q.card_id.as_ref().map(|c| c.get_name()), Some("x"));
         assert!(q.home_team);
     }
 }

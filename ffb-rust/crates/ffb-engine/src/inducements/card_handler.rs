@@ -3,6 +3,7 @@
 use ffb_model::inducement::card::Card;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use crate::step::framework::StepParameter;
 
 pub trait CardHandler: Send + Sync {
     /// Java: handlerKey() — the name of the CardHandlerKey variant this handler is responsible for.
@@ -27,6 +28,17 @@ pub trait CardHandler: Send + Sync {
     /// Default: true (no effect; override in concrete handlers).
     fn activate_on_game(&self, _game: &mut Game, _card: &Card, _player_id: &str, _rng: &mut GameRng) -> bool {
         true
+    }
+
+    /// Java: `activate(Card, IStep, Player)`'s `step.publishParameters(...)` side effect — some
+    /// handlers (e.g. `PitTrapHandler`) need to push `StepParameter`s onto the calling step
+    /// (e.g. to trigger a ball-scatter/injury sequence) rather than just mutating `Game`
+    /// in-place via `activate_on_game`. Default: no parameters, matching handlers that only
+    /// need `activate_on_game`.
+    fn activation_parameters(
+        &self, _game: &mut Game, _card: &Card, _player_id: &str, _rng: &mut GameRng,
+    ) -> Vec<StepParameter> {
+        vec![]
     }
 
     /// Java: deactivate(Card, IStep, Player) — remove the card effect.

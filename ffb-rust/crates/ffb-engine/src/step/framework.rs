@@ -327,7 +327,9 @@ pub enum StepParameter {
     SuccessfulDauntless(bool),
     SuccessfulPro(bool),
     // ── card / inducement parameters ─────────────────────────────────────────
-    CardId(Option<String>),
+    /// Java: `StepParameterKey.CARD` — carries the full `Card` object (not just its name),
+    /// matching Java's `fCard: Card` field on `StepPlayCard`.
+    CardId(Option<ffb_model::inducement::card::Card>),
     PlayCard(bool),
     BombExploded(bool),
     BombOutOfBounds(bool),

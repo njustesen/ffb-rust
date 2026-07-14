@@ -3,6 +3,7 @@ pub mod card_choice;
 pub mod card_choices;
 pub mod card_handler_key;
 pub mod card_report;
+pub mod card_target;
 pub mod card_type;
 pub mod cards;
 pub mod bribery_and_corruption_action;

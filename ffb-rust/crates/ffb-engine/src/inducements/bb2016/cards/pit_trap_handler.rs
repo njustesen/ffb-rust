@@ -2,6 +2,8 @@
 use ffb_model::model::game::Game;
 use ffb_model::inducement::card::Card;
 use crate::inducements::card_handler::CardHandler;
+use crate::step::framework::StepParameter;
+use crate::step::util_server_injury::drop_player;
 
 pub struct PitTrapHandler;
 
@@ -18,12 +20,16 @@ impl CardHandler for PitTrapHandler {
 
     fn get_name(&self) -> &'static str { "PitTrapHandler" }
 
-    /// Java: step.publishParameters(UtilServerInjury.dropPlayer(step, player, ApothecaryMode.DEFENDER))
-    /// headless: PitTrap injury pipeline must be triggered by StepPlayCard (needs StepParameter publishing);
-    /// activate_on_game alone cannot push injury sequences — StepPlayCard.play_card_on_player() must call
-    /// drop_player() after calling this handler when the card is a PIT_TRAP.
     fn activate_on_game(&self, _game: &mut Game, _card: &Card, _player_id: &str, _rng: &mut ffb_model::util::rng::GameRng) -> bool {
         true
+    }
+
+    /// Java: `activate(Card, IStep, Player)`:
+    /// `step.publishParameters(UtilServerInjury.dropPlayer(step, player, ApothecaryMode.DEFENDER))`.
+    fn activation_parameters(
+        &self, game: &mut Game, _card: &Card, player_id: &str, _rng: &mut ffb_model::util::rng::GameRng,
+    ) -> Vec<StepParameter> {
+        drop_player(game, player_id, false)
     }
 }
 
@@ -73,5 +79,46 @@ mod tests {
         let card = Card::new("Pit Trap", Some("PIT_TRAP"));
         let result = h.activate_on_game(&mut game, &card, "player1", &mut ffb_model::util::rng::GameRng::new(0));
         assert!(result);
+    }
+
+    fn make_game_with_player(id: &str) -> Game {
+        use ffb_model::enums::{PlayerGender, PlayerType, PlayerState, PS_STANDING};
+        use ffb_model::model::player::Player;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate(id, FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+        game
+    }
+
+    #[test]
+    fn activation_parameters_drops_the_player_prone() {
+        use ffb_model::enums::PS_PRONE;
+        let mut game = make_game_with_player("player1");
+        let h = PitTrapHandler::new();
+        let card = Card::new("Pit Trap", Some("PIT_TRAP"));
+        h.activation_parameters(&mut game, &card, "player1", &mut ffb_model::util::rng::GameRng::new(0));
+        assert_eq!(game.field_model.player_state("player1").unwrap().base(), PS_PRONE);
+    }
+
+    #[test]
+    fn activation_parameters_scatters_the_ball_when_player_is_carrying_it() {
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game_with_player("player1");
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(5, 5));
+        let h = PitTrapHandler::new();
+        let card = Card::new("Pit Trap", Some("PIT_TRAP"));
+        let params = h.activation_parameters(&mut game, &card, "player1", &mut ffb_model::util::rng::GameRng::new(0));
+        assert!(params.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(_))));
     }
 }

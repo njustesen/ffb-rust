@@ -5,11 +5,106 @@ use ffb_model::enums::InducementDuration;
 use ffb_model::events::GameEvent;
 use ffb_model::inducement::card::Card;
 use ffb_model::model::game::Game;
+use ffb_model::report::report_play_card::ReportPlayCard;
+use ffb_model::util::rng::GameRng;
+use crate::step::framework::StepParameter;
 
 pub struct UtilServerCards;
 
 impl UtilServerCards {
     pub fn new() -> Self { Self }
+
+    /// Java: `UtilServerCards.findAllowedPlayersForCard(Game, Card)`.
+    pub fn find_allowed_players_for_card(game: &Game, card: &Card) -> Vec<String> {
+        use ffb_model::inducement::card_target::CardTarget;
+        use crate::factory::card_handler_factory::CardHandlerFactory;
+
+        if !card.get_target().is_played_on_player() {
+            return vec![];
+        }
+
+        let own_is_home = game.turn_data_home.inducement_set.is_available(&card.name);
+        let (own_team, other_team) = if own_is_home {
+            (&game.team_home, &game.team_away)
+        } else {
+            (&game.team_away, &game.team_home)
+        };
+
+        let mut factory = CardHandlerFactory::new();
+        factory.initialize(game.rules);
+        let handler = factory.for_card(card);
+
+        game.team_home.players.iter().chain(game.team_away.players.iter())
+            .filter(|player| {
+                let Some(state) = game.field_model.player_state(&player.id) else { return false };
+                let mut allowed = !state.is_casualty()
+                    && state.base() != ffb_model::enums::PS_BANNED
+                    && state.base() != ffb_model::enums::PS_MISSING;
+                if card.get_target() == CardTarget::OWN_PLAYER {
+                    allowed &= own_team.has_player(&player.id);
+                }
+                if card.get_target() == CardTarget::OPPOSING_PLAYER {
+                    allowed &= other_team.has_player(&player.id);
+                }
+                if let Some(handler) = handler {
+                    allowed &= handler.allows_player(game, card, &player.id);
+                }
+                allowed
+            })
+            .map(|player| player.id.clone())
+            .collect()
+    }
+
+    /// Java: `UtilServerCards.activateCard(IStep, Card, boolean homeTeam, String playerId)`.
+    ///
+    /// Client-only concerns skipped (headless engine, no rendering/network layer here):
+    /// `pStep.getResult().setAnimation(...)` and `UtilServerGame.syncGameModel(pStep)`.
+    ///
+    /// Returns `(do_next_step, params)`: `do_next_step` mirrors the card handler's `activate()`
+    /// boolean return (only `IllegalSubstitutionHandler` returns `false`, to hold the step open
+    /// for a follow-up dialog); `params` are collected from the handler's `activation_parameters`
+    /// (e.g. `PitTrapHandler`'s `dropPlayer`-derived `StepParameter`s, which Java pushes via
+    /// `step.publishParameters(...)` inside `activate()` itself).
+    pub fn activate_card(
+        game: &mut Game,
+        rng: &mut GameRng,
+        card: &Card,
+        home_team: bool,
+        player_id: Option<&str>,
+    ) -> (bool, Vec<StepParameter>) {
+        use crate::factory::card_handler_factory::CardHandlerFactory;
+
+        let team_id = if home_team { game.team_home.id.clone() } else { game.team_away.id.clone() };
+        let has_player_id = player_id.map(|p| !p.is_empty()).unwrap_or(false);
+        game.report_list.add(if has_player_id {
+            ReportPlayCard::new_with_player(team_id, card.name.clone(), player_id.map(str::to_string))
+        } else {
+            ReportPlayCard::new(team_id, card.name.clone())
+        });
+
+        // Java: `inducementSet.activateCard(pCard)` — moves the full Card (preserving
+        // handler_key/target/duration) from available to active.
+        if home_team {
+            game.turn_data_home.inducement_set.activate_card_full(card.clone());
+        } else {
+            game.turn_data_away.inducement_set.activate_card_full(card.clone());
+        }
+
+        if has_player_id {
+            if let Some(pid) = player_id {
+                game.field_model.add_card(pid, card.clone());
+            }
+        }
+
+        let mut factory = CardHandlerFactory::new();
+        factory.initialize(game.rules);
+        let Some(handler) = factory.for_card(card) else { return (true, vec![]) };
+
+        let pid = player_id.unwrap_or("");
+        let do_next_step = handler.activate_on_game(game, card, pid, rng);
+        let params = handler.activation_parameters(game, card, pid, rng);
+        (do_next_step, params)
+    }
 
     /// Java: UtilServerCards.deactivateCard (for a single card by name, in home or away set).
     /// Deactivates the card, emits GameEvent::CardDeactivated, calls the handler's deactivate_on_game.
@@ -179,6 +274,85 @@ mod tests {
 
     fn make_card(name: &str, duration: InducementDuration) -> Card {
         Card::new(name, None::<&str>).with_duration(duration)
+    }
+
+    fn add_player(game: &mut Game, home: bool, id: &str, coord: ffb_model::types::FieldCoordinate) {
+        use ffb_model::enums::{PlayerGender, PlayerState, PlayerType, PS_STANDING};
+        use ffb_model::model::player::Player;
+        let player = Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        if home { game.team_home.players.push(player); } else { game.team_away.players.push(player); }
+        game.field_model.set_player_coordinate(id, coord);
+        game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+    }
+
+    #[test]
+    fn activate_card_reports_and_activates() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let card = Card::new("Blackmail", None::<&str>);
+        let mut rng = GameRng::new(0);
+        let (do_next_step, params) = UtilServerCards::activate_card(&mut game, &mut rng, &card, true, None);
+        assert!(do_next_step);
+        assert!(params.is_empty());
+        assert!(game.report_list.has_report(ReportId::PLAY_CARD));
+        assert!(game.turn_data_home.inducement_set.is_active("Blackmail"));
+    }
+
+    #[test]
+    fn activate_card_with_pit_trap_handler_drops_the_player() {
+        use ffb_model::enums::PS_PRONE;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        add_player(&mut game, true, "p1", FieldCoordinate::new(5, 5));
+        let card = Card::new("Pit Trap", Some("PIT_TRAP"));
+        let mut rng = GameRng::new(0);
+        UtilServerCards::activate_card(&mut game, &mut rng, &card, true, Some("p1"));
+        assert_eq!(game.field_model.player_state("p1").unwrap().base(), PS_PRONE);
+        assert!(game.field_model.find_player_with_card("Pit Trap").is_some());
+    }
+
+    #[test]
+    fn find_allowed_players_for_card_excludes_non_player_targeted_cards() {
+        let game = make_game();
+        let card = Card::new("Blackmail", None::<&str>); // default target: TURN
+        assert!(UtilServerCards::find_allowed_players_for_card(&game, &card).is_empty());
+    }
+
+    #[test]
+    fn find_allowed_players_for_card_filters_by_own_player_target() {
+        use ffb_model::inducement::card_target::CardTarget;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        add_player(&mut game, true, "home1", FieldCoordinate::new(5, 5));
+        add_player(&mut game, false, "away1", FieldCoordinate::new(6, 5));
+        game.turn_data_home.inducement_set.add_available_card("Pit Trap");
+        let card = Card::new("Pit Trap", Some("PIT_TRAP")).with_target(CardTarget::OWN_PLAYER);
+        let allowed = UtilServerCards::find_allowed_players_for_card(&game, &card);
+        assert_eq!(allowed, vec!["home1".to_string()]);
+    }
+
+    #[test]
+    fn find_allowed_players_for_card_filters_by_opposing_player_target() {
+        use ffb_model::inducement::card_target::CardTarget;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        add_player(&mut game, true, "home1", FieldCoordinate::new(5, 5));
+        add_player(&mut game, false, "away1", FieldCoordinate::new(6, 5));
+        game.turn_data_home.inducement_set.add_available_card("Opponent Card");
+        // No registered handler for this key -> the handler-gate in
+        // find_allowed_players_for_card is skipped, isolating the OPPOSING_PLAYER filter itself.
+        let card = Card::new("Opponent Card", Some("UNKNOWN_KEY")).with_target(CardTarget::OPPOSING_PLAYER);
+        let allowed = UtilServerCards::find_allowed_players_for_card(&game, &card);
+        assert_eq!(allowed, vec!["away1".to_string()]);
     }
 
     #[test]

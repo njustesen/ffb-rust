@@ -1,6 +1,64 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-15, Phase AAT done — 4 of 6 in the AAQ-AAV backlog arc)
+## Current Status (2026-07-15, Phase AAU done — 5 of 6 in the AAQ-AAV backlog arc)
+
+**Phase AAU — PitTrapHandler injury wiring / StepPlayCard card-target routing, done — with one
+real architectural discovery that reshaped the scope.**
+
+**Discovery: there is no card catalog in this codebase.** Java's `Card` instances are full,
+richly-typed objects (target, handler key, duration, etc.) created once per real card and passed
+around by reference everywhere. Rust's `StepParameter::CardId` carried only a bare `Option<String>`
+name, and `InducementSet::activate_card(name: &str)` (the only method any live caller used) built a
+throwaway `Card::new(name, None)` on activation — discarding handler-key/target/duration
+permanently. This meant card-handler dispatch by name could never have worked correctly, in any
+phase, until now. Fixed at the root: `StepParameter::CardId` now carries the full `Card` object
+(matching Java's `fCard: Card` field exactly), threaded through the one producer
+(`step/generator/mixed/card.rs`) and `StepPlayCard`. `UtilServerCards::activate_card` takes `&Card`
+and uses the already-existing `InducementSet::activate_card_full` (preserves everything) instead of
+the name-only path.
+
+1. **`Card` model**: added `CardTarget` enum (`inducement/card_target.rs`, mirrors Java's
+   `CardTarget` exactly: TURN/OWN_PLAYER/OPPOSING_PLAYER/ANY_PLAYER + `is_played_on_player()`) and
+   `target`/`requires_blockable_player_selection` fields on `Card` (defaults: `TURN`/`false`,
+   matching Java's per-card-subclass default). No JSON card catalog exists to auto-populate these
+   from data — callers set them explicitly via new `with_target`/`with_requires_blockable_player_selection`
+   builders, same pattern as the existing `with_duration`/`with_remains_in_play`.
+2. **`CardHandler::activation_parameters`** — new trait method (default: empty vec) alongside the
+   existing `activate_on_game`, for handlers that need to push `StepParameter`s (not just mutate
+   `Game`) — e.g. `PitTrapHandler`'s `dropPlayer`. Chose a companion method over changing
+   `activate_on_game`'s return type, so the other 7 card handlers (Custard Pie, Distract, Illegal
+   Substitution, Witch Brew, etc.) needed zero changes — smaller blast radius than the plan
+   estimated.
+3. **`PitTrapHandler`** (bb2016 + bb2020): `activation_parameters` now calls the already-real
+   `util_server_injury::drop_player` and returns its `StepParameter`s — the actual injury/ball-
+   scatter effect, not just a bare `true`.
+4. **`UtilServerCards::activate_card`** (new) + **`find_allowed_players_for_card`** (new): full
+   ports of both Java methods, using the real `CardHandlerFactory`, `InducementSet::activate_card_full`,
+   and the existing `allows_player`/`has_skill_property` machinery.
+5. **`StepPlayCard`** rewritten: `execute_step` now branches on `card.get_target().is_played_on_player()`
+   and prompts via `AgentPrompt::PlayerChoice` (previously silently skipped to `playCardOnTurn`);
+   `play_card_on_turn`/`play_card_on_player` call the new `activate_card` and publish its returned
+   params; added `play_card_with_blockable_player_selection` (adjacent-blockable-player dialog +
+   `stun_player`/`drop_player`) — previously entirely absent.
+
+**Scoped-down from the plan, documented not dropped**: `stun_player` (used in the blockable-player-
+selection path) doesn't yet return `StepParameter`s the way `drop_player` does (Java's version can
+trigger a ball-scatter too) — calls it for its state-mutation effect only. A real card catalog
+(data-driven `Card` definitions with real target/duration/handler-key per actual card) remains a
+separate, larger follow-up; this phase only added the data model + plumbing, not the catalog itself.
+
+19 new/updated tests across `card.rs`, `card_target.rs` (new), `card_handler.rs`,
+`pit_trap_handler.rs` (×2 editions), `util_server_cards.rs`, `step_play_card.rs`.
+
+Tests: 16,971 → **16,990**. 0 failures. `cargo clippy --workspace --all-targets`: still 0 errors.
+
+**Next**: Phase AAV (the full `PassStepModifier` hook — largest remaining item, builds
+`PassMechanic`/`PassModifierFactory`/`PassState` from scratch; reuses the `handle_command` hook
+infra built in AAR).
+
+---
+
+## Prior Status (2026-07-15, Phase AAT done — 4 of 6 in the AAQ-AAV backlog arc)
 
 **Phase AAT — Claws/Chainsaw/`CLAW_DOES_NOT_STACK`/`MB_STACKS_AGAINST_CHAINSAW` wiring, done.**
 
