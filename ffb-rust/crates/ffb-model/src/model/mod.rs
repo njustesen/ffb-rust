@@ -105,7 +105,6 @@ pub mod i_icon_property;
 pub mod i_keyed_item;
 pub mod i_kick_off_result;
 pub mod i_named_object;
-pub mod i_skill_behaviour;
 pub mod injury_type_constants;
 pub mod keyed_item_registry;
 pub mod leader_state;

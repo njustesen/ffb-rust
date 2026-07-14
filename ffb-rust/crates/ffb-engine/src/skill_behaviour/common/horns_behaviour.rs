@@ -8,7 +8,6 @@
 ///   `registerModifier(new StepModifier<StepHorns, StepState>() { ... })`
 /// Rust equivalent:
 ///   `HornsBehaviour::register_into(sb)` adds a `HornsStepModifier` to the container.
-use crate::skill_behaviour::SkillBehaviour as SkillBehaviourTrait;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
@@ -106,10 +105,6 @@ impl HornsBehaviour {
 
 impl Default for HornsBehaviour {
     fn default() -> Self { Self::new() }
-}
-
-impl SkillBehaviourTrait for HornsBehaviour {
-    fn name(&self) -> &'static str { "HornsBehaviour" }
 }
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -216,11 +211,6 @@ mod tests {
         let (mut game, _) = make_game_with_horns(PlayerAction::Blitz);
         let mut hook_state = StepHornsHookState::default();
         assert!(!HornsStepModifier.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hook_state));
-    }
-
-    #[test]
-    fn name_returns_correct_string() {
-        assert_eq!(HornsBehaviour::new().name(), "HornsBehaviour");
     }
 
     #[test]

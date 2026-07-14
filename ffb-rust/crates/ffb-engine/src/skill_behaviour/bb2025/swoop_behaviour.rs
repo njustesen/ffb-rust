@@ -1,7 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.server.skillbehaviour.bb2025.SwoopBehaviour.
 ///
 /// Hook for the Swoop skill (vampire/gargoyle flying attack). Fires on StepSwoop.
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
@@ -44,18 +43,6 @@ impl SwoopBehaviour {
 
 impl Default for SwoopBehaviour {
     fn default() -> Self { Self::new() }
-}
-
-impl SkillBehaviour for SwoopBehaviour {
-    fn name(&self) -> &'static str { "SwoopBehaviour" }
-
-    fn execute_step_hook(&self, game: &mut ffb_model::model::game::Game) -> bool {
-        let _has_skill = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill(SkillId::Swoop))
-            .unwrap_or(false);
-        false
-    }
 }
 
 pub struct SwoopStepModifier;
@@ -196,41 +183,6 @@ mod tests {
             player_id: Some(player_id.into()),
             outcome: None,
         }
-    }
-
-    #[test]
-    fn name_is_swoop_behaviour() {
-        assert_eq!(SwoopBehaviour::new().name(), "SwoopBehaviour");
-    }
-
-    #[test]
-    fn name_is_not_empty() {
-        assert!(!SwoopBehaviour::new().name().is_empty());
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false_no_player() {
-        let b = SwoopBehaviour::new();
-        let mut game = make_game();
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = SwoopBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
-    }
-
-    #[test]
-    fn execute_step_hook_false_with_bb2025() {
-        let b = SwoopBehaviour::new();
-        let mut game = make_game();
-        assert!(!b.execute_step_hook(&mut game));
     }
 
     #[test]

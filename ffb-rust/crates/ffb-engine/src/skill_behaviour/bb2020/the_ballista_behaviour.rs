@@ -1,4 +1,3 @@
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::{RerollHookState, StepModifierTrait};
 use crate::step::framework::{StepCommandStatus, StepId};
@@ -60,14 +59,6 @@ pub enum RerolledActionKind {
 
 impl Default for TheBallistaBehaviour {
     fn default() -> Self { Self::new() }
-}
-
-impl SkillBehaviour for TheBallistaBehaviour {
-    fn name(&self) -> &'static str { "TheBallistaBehaviour" }
-
-    fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
-        false
-    }
 }
 
 // ── TheBallistaThrowTeamMateModifier ─────────────────────────────────────────
@@ -185,33 +176,6 @@ mod tests {
                 "BB2020 must never select KickTeamMate re-roll action"
             );
         }
-    }
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(TheBallistaBehaviour::new().name(), "TheBallistaBehaviour");
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false() {
-        use ffb_model::enums::Rules;
-        use crate::step::framework::test_team;
-        let b = TheBallistaBehaviour::new();
-        let mut game = ffb_model::model::game::Game::new(
-            test_team("home", 0), test_team("away", 0), Rules::Bb2020,
-        );
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = TheBallistaBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, before);
     }
 
     fn test_game() -> ffb_model::model::game::Game {

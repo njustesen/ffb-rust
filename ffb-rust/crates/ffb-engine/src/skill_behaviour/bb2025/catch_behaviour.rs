@@ -2,7 +2,6 @@
 ///
 /// Priority 0 (Java's no-arg StepModifier() constructor default) modifier on
 /// StepCatchScatterThrowIn.
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
@@ -75,22 +74,6 @@ impl Default for CatchBehaviour {
     fn default() -> Self { Self::new() }
 }
 
-impl SkillBehaviour for CatchBehaviour {
-    fn name(&self) -> &'static str { "CatchBehaviour" }
-
-    fn execute_step_hook(&self, game: &mut ffb_model::model::game::Game) -> bool {
-        // Legacy hook path — logic lives in CatchStepModifier.
-        let has_skill = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill(SkillId::Catch))
-            .unwrap_or(false);
-        if !has_skill {
-            return false;
-        }
-        false
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -157,28 +140,4 @@ mod tests {
         assert!(hs.re_roll_source.is_some());
     }
 
-    #[test]
-    fn name_is_not_empty() {
-        assert!(!CatchBehaviour::new().name().is_empty());
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false() {
-        let b = CatchBehaviour::new();
-        let mut game = Game::new(
-            test_team("home", 0), test_team("away", 0), Rules::Bb2025,
-        );
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = CatchBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
-    }
 }

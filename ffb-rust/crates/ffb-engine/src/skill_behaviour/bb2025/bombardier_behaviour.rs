@@ -1,4 +1,3 @@
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
@@ -21,19 +20,6 @@ impl BombardierBehaviour {
 
 impl Default for BombardierBehaviour {
     fn default() -> Self { Self::new() }
-}
-
-impl SkillBehaviour for BombardierBehaviour {
-    fn name(&self) -> &'static str { "BombardierBehaviour" }
-
-    fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
-        // Java StepModifier.handleExecuteStepHook: checks UtilCards.hasSkill(actingPlayer, skill)
-        // for the Bombardier skill (identified via canThrowBombs property).
-        // TODO(hook-infra): SkillId::Bombardier is not in the current SkillId enum;
-        //   has_skill_property("canThrowBombs") is not available in this crate version.
-        //   Full skill check deferred until hook infrastructure and property lookup are ported.
-        false
-    }
 }
 
 // Java: Marks the Bombardier skill as used and switches the game's turn mode to the appropriate bomb mode (BOMB_HOME, BOMB_AWAY, BOMB_HOME_BLITZ, or BOMB_AWAY_BLITZ) when a player performs a throw-bomb or hail-mary-bomb action outside a designated bomb turn.
@@ -70,43 +56,6 @@ mod tests {
         let away = home.clone();
         ffb_model::model::game::Game::new(home, away, ffb_model::enums::Rules::Bb2025)
     }
-
-    #[test]
-    fn hook_is_noop_returns_false() {
-        let behaviour = BombardierBehaviour::new();
-        let mut game = test_game();
-        assert!(!behaviour.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn execute_step_hook_returns_bool() {
-        let behaviour = BombardierBehaviour::new();
-        let mut game = test_game();
-        let _result: bool = behaviour.execute_step_hook(&mut game);
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false() {
-        use ffb_model::enums::Rules;
-        use crate::step::framework::test_team;
-        let b = BombardierBehaviour::new();
-        let mut game = ffb_model::model::game::Game::new(
-            test_team("home", 0), test_team("away", 0), Rules::Bb2025,
-        );
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = BombardierBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
-    }
-#[test]    fn name_is_not_empty() {        assert!(!BombardierBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2025() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = BombardierBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2025,        );        assert!(!b.execute_step_hook(&mut game));    }
 
     #[test]
     fn register_into_adds_step_modifier() {

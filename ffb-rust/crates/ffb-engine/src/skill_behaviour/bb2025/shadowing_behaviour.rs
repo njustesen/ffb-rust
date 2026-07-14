@@ -1,4 +1,3 @@
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
@@ -21,23 +20,6 @@ impl ShadowingBehaviour {
 
 impl Default for ShadowingBehaviour {
     fn default() -> Self { Self::new() }
-}
-
-impl SkillBehaviour for ShadowingBehaviour {
-    fn name(&self) -> &'static str { "ShadowingBehaviour" }
-
-    fn execute_step_hook(&self, game: &mut ffb_model::model::game::Game) -> bool {
-        // Java StepModifier.handleExecuteStepHook: checks acting player has Shadowing; complex shadow logic finds eligible shadowers and resolves contest.
-        let has_skill = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill(SkillId::Shadowing))
-            .unwrap_or(false);
-        if !has_skill {
-            return false;
-        }
-        // TODO(hook-infra): step-specific state access (dodging player position, shadow contest roll, player movement) not yet available
-        false
-    }
 }
 
 // ── ShadowingStepModifier ─────────────────────────────────────────────────────
@@ -80,41 +62,6 @@ mod tests {
         let away = home.clone();
         ffb_model::model::game::Game::new(home, away, ffb_model::enums::Rules::Bb2025)
     }
-
-    #[test]
-    fn hook_is_noop_returns_false() {
-        let behaviour = ShadowingBehaviour::new();
-        let mut game = test_game();
-        assert!(!behaviour.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn execute_step_hook_returns_bool() {
-        let behaviour = ShadowingBehaviour::new();
-        let mut game = test_game();
-        let _result: bool = behaviour.execute_step_hook(&mut game);
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false() {
-        let b = ShadowingBehaviour::new();
-        let mut game = ffb_model::model::game::Game::new(
-            test_team("home", 0), test_team("away", 0), Rules::Bb2025,
-        );
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = ShadowingBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
-    }
-    #[test]    fn name_is_not_empty() {        assert!(!ShadowingBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2025() {        let b = ShadowingBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2025,        );        assert!(!b.execute_step_hook(&mut game));    }
 
     #[test]
     fn register_into_adds_step_modifier() {

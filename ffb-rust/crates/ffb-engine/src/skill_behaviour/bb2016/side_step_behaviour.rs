@@ -8,7 +8,6 @@
 ///
 /// **Class name:** BB2016 uses `SideStep`/`SideStepBehaviour` like BB2020 (BB2025 renames to
 /// `Sidestep`/`SidestepBehaviour`).
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
@@ -136,20 +135,6 @@ impl SideStepBehaviour {
 
 impl Default for SideStepBehaviour {
     fn default() -> Self { Self::new() }
-}
-
-impl SkillBehaviour for SideStepBehaviour {
-    fn name(&self) -> &'static str { "SideStepBehaviour" }
-
-    fn execute_step_hook(&self, game: &mut ffb_model::model::game::Game) -> bool {
-        // Legacy hook path — logic lives in SideStepStepModifier.
-        let has_skill = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill(SkillId::SideStep))
-            .unwrap_or(false);
-        if !has_skill { return false; }
-        false
-    }
 }
 
 #[cfg(test)]
@@ -331,28 +316,4 @@ mod tests {
         assert_eq!(hs.pushback_mode, PushbackMode::SIDE_STEP, "should switch to SIDE_STEP mode when accepted");
     }
 
-    #[test]
-    fn name_is_not_empty() {
-        assert!(!SideStepBehaviour::new().name().is_empty());
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false() {
-        let b = SideStepBehaviour::new();
-        let mut game = Game::new(
-            test_team("home", 0), test_team("away", 0), Rules::Bb2016,
-        );
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = SideStepBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(movement_before, player.movement);
-    }
 }

@@ -1,5 +1,4 @@
 /// 1:1 translation of com.fumbbl.ffb.server.skillbehaviour.bb2025.WildAnimalBehaviour.
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
@@ -31,19 +30,6 @@ impl WildAnimalBehaviour {
 
 impl Default for WildAnimalBehaviour {
     fn default() -> Self { Self::new() }
-}
-
-impl SkillBehaviour for WildAnimalBehaviour {
-    fn name(&self) -> &'static str { "WildAnimalBehaviour" }
-
-    fn execute_step_hook(&self, game: &mut ffb_model::model::game::Game) -> bool {
-        let has_skill = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill(SkillId::WildAnimal))
-            .unwrap_or(false);
-        if !has_skill { return false; }
-        false
-    }
 }
 
 // ── WildAnimalStepModifier ──────────────────────────────────────────────────
@@ -208,43 +194,6 @@ mod tests {
     }
 
     #[test]
-    fn hook_is_noop_returns_false() {
-        let behaviour = WildAnimalBehaviour::new();
-        let mut game = test_game();
-        assert!(!behaviour.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn execute_step_hook_returns_bool() {
-        let behaviour = WildAnimalBehaviour::new();
-        let mut game = test_game();
-        let _result: bool = behaviour.execute_step_hook(&mut game);
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false() {
-        let b = WildAnimalBehaviour::new();
-        let mut game = test_game();
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = WildAnimalBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
-    }
-
-    #[test]
-    fn name_is_not_empty() {
-        assert!(!WildAnimalBehaviour::new().name().is_empty());
-    }
-
-    #[test]
     fn register_into_adds_step_modifier() {
         let mut reg = SkillRegistry::empty();
         WildAnimalBehaviour::register_into(&mut reg);
@@ -282,10 +231,4 @@ mod tests {
         assert!(hook.outcome.is_some());
     }
 
-    #[test]
-    fn execute_step_hook_false_with_bb2025() {
-        let b = WildAnimalBehaviour::new();
-        let mut game = test_game();
-        assert!(!b.execute_step_hook(&mut game));
-    }
 }

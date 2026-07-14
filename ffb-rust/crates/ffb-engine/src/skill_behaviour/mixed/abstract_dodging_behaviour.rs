@@ -1,4 +1,3 @@
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::skill_behaviour::registry::SkillRegistry;
@@ -30,10 +29,6 @@ impl AbstractDodgingBehaviour {
 
 impl Default for AbstractDodgingBehaviour {
     fn default() -> Self { Self::new() }
-}
-
-impl SkillBehaviour for AbstractDodgingBehaviour {
-    fn name(&self) -> &'static str { "AbstractDodgingBehaviour" }
 }
 
 // ── AbstractDodgingStepModifier ────────────────────────────────────────────────
@@ -138,29 +133,6 @@ mod tests {
 
     fn hook_state(old_defender_state: Option<PlayerState>) -> StepBlockDodgeHookState {
         StepBlockDodgeHookState { using_dodge: None, ask_for_skill: false, old_defender_state }
-    }
-
-    #[test]
-    fn name_returns_correct_string() {
-        let b = AbstractDodgingBehaviour::new();
-        assert_eq!(b.name(), "AbstractDodgingBehaviour");
-    }
-
-    #[test]
-    fn default_has_correct_name() {
-        let b = AbstractDodgingBehaviour::default();
-        assert_eq!(b.name(), "AbstractDodgingBehaviour");
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = AbstractDodgingBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
     }
 
     #[test]

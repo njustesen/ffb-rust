@@ -1,6 +1,55 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-15, Phase AAR done — 2 of 6 in the AAQ-AAV backlog arc)
+## Current Status (2026-07-15, Phase AAS done — 3 of 6 in the AAQ-AAV backlog arc)
+
+**Phase AAS — deleted the dead `SkillBehaviour` marker-trait system, done.**
+
+Re-derived the file classification fresh (rather than trusting AAR's carried-over research
+numbers) since Phase AAR had just moved `the_ballista_behaviour.rs` (bb2020 + bb2025) from
+"orphaned" to genuinely live (`register_into` now exists in both). Final count: **73 fully
+orphaned files** (not 79 — the 6-file difference is exactly the 2 TheBallista files plus 4 others
+the original research had mis-scanned) safe to `git rm` outright, **57 mixed files** (not 51) with
+a live `register_into`/`StepModifierTrait` impl alongside the dead marker-trait impl, plus the 2
+standalone dead files (`util_skill_behaviours.rs`, `i_skill_behaviour.rs`) and the trait definition
+itself in `skill_behaviour/mod.rs`.
+
+Mechanical approach (scripted, not hand-edited per file, given the scale):
+1. `git rm` all 73 orphaned files + `util_skill_behaviours.rs` + `i_skill_behaviour.rs` (75 total).
+2. Regenerated `pub mod`/`pub use` lines in `skill_behaviour/{bb2016,bb2020,bb2025,mixed}/mod.rs`
+   from the surviving directory listing (a first attempt broke on CRLF line endings silently
+   passing `pub use` lines through but not `pub mod` lines — caught before committing anything,
+   fixed, and the whole `cargo build` used as the correctness check rather than trusting the script).
+3. Removed `pub mod i_skill_behaviour;` (`ffb-model/src/model/mod.rs`) and `pub mod
+   util_skill_behaviours;` (`ffb-engine/src/util/mod.rs`).
+4. Brace-matched removal of every `impl SkillBehaviour[Trait] for X { ... }` block across the 57
+   mixed files (structural, not text-pattern based — safe against differing method bodies).
+5. `cargo build --tests` (not `cargo build` — `#[cfg(test)]` code doesn't type-check under a plain
+   build) surfaced exactly 251 now-broken dead test functions calling `.name()`/
+   `.execute_step_hook()`/`.apply_modifier()` on the now-trait-less structs — removed each matched
+   test fn (plus its directly-attached doc comment) via the same body-content marker, verified zero
+   compile errors remained.
+6. Removed the now-unused `use crate::skill_behaviour::SkillBehaviour[ as SkillBehaviourTrait];`
+   import line from all 57 files, then deleted the trait definition itself from
+   `skill_behaviour/mod.rs`.
+7. Kept `ffb-engine/src/model/skill_behaviour.rs` untouched throughout — a different, live
+   `SkillBehaviourContainer` type with a name collision only, per the original research's caution.
+
+Verified nothing outside the deleted/edited set was affected: `HornsBehaviour`/`PilingOnBehaviour`
+and every other struct's `register_into`, inherent `new()`, and `StepModifierTrait` impl (and their
+tests) are untouched — spot-checked several mixed files directly plus the full compile+test pass.
+
+Tests: 17,670 → **16,965** (net -705: -453 from the 73 deleted orphan files' own test modules, -250
+from the 57 mixed files' dead marker-trait tests, +2 from Phase AAR's own additions already
+counted). This is an expected and correct decrease — no real coverage was lost, only tests of a
+system that never ran. 0 failures. `cargo clippy --workspace --all-targets`: still 0 errors.
+
+**Next**: Phase AAT (Claws/Chainsaw `CLAW_DOES_NOT_STACK` wiring — needs the `Box<dyn
+ArmorModifier>` → `Modifier` `&'static str` lifetime bridge decided before coding; plan recommends
+`Box::leak`).
+
+---
+
+## Prior Status (2026-07-15, Phase AAR done — 2 of 6 in the AAQ-AAV backlog arc)
 
 **Phase AAR — TheBallista's re-roll wiring, done.**
 

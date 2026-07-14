@@ -31,7 +31,6 @@
 ///
 /// TODO(hook-infra): `StepDropFallingPlayersHookState` not yet ported — this behaviour
 ///   stub is documented but the step modifier cannot yet execute.
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::skill_behaviour::registry::SkillRegistry;
 use ffb_model::enums::SkillId;
@@ -55,15 +54,6 @@ impl Default for PilingOnBehaviour {
     fn default() -> Self { Self::new() }
 }
 
-impl SkillBehaviour for PilingOnBehaviour {
-    fn name(&self) -> &'static str { "PilingOnBehaviour" }
-
-    fn execute_step_hook(&self, _game: &mut Game) -> bool {
-        // TODO(hook-infra): implement once StepDropFallingPlayersHookState is ported
-        false
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -74,41 +64,6 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2016)
-    }
-
-    #[test]
-    fn name_returns_correct_string() {
-        let b = PilingOnBehaviour::new();
-        assert_eq!(b.name(), "PilingOnBehaviour");
-    }
-
-    #[test]
-    fn default_has_correct_name() {
-        let b = PilingOnBehaviour::default();
-        assert_eq!(b.name(), "PilingOnBehaviour");
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false() {
-        let b = PilingOnBehaviour::new();
-        let mut game = test_game();
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = PilingOnBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
-    }
-
-    #[test]
-    fn name_is_not_empty() {
-        assert!(!PilingOnBehaviour::new().name().is_empty());
     }
 
     /// PilingOn is BB2016-only — no BB2025 equivalent skill exists.

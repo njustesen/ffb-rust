@@ -34,7 +34,6 @@ pub mod util_server_re_roll;
 pub mod util_server_setup;
 pub mod util_server_start_game;
 pub mod util_server_timer;
-pub mod util_skill_behaviours;
 pub mod weather_calc;
 
 pub use server_util_block::ServerUtilBlock;

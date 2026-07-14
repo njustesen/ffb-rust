@@ -5,7 +5,6 @@
 /// **BB2016 vs BB2020/BB2025 differences:** no ViciousVines adjacency alternative, no
 /// attacker-conflicting-skill check, and uses an exact `PlayerAction::Block` match instead of
 /// the generic `is_block_action()`/`isBlockAction()` helper the later editions added.
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
@@ -148,20 +147,6 @@ impl GrabBehaviour {
 
 impl Default for GrabBehaviour {
     fn default() -> Self { Self::new() }
-}
-
-impl SkillBehaviour for GrabBehaviour {
-    fn name(&self) -> &'static str { "GrabBehaviour" }
-
-    fn execute_step_hook(&self, game: &mut ffb_model::model::game::Game) -> bool {
-        // Legacy hook path — logic lives in GrabStepModifier.
-        let has_skill = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill(SkillId::Grab))
-            .unwrap_or(false);
-        if !has_skill { return false; }
-        false
-    }
 }
 
 #[cfg(test)]
@@ -342,28 +327,4 @@ mod tests {
         assert!(m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hs));
     }
 
-    #[test]
-    fn name_is_not_empty() {
-        assert!(!GrabBehaviour::new().name().is_empty());
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false() {
-        let b = GrabBehaviour::new();
-        let mut game = Game::new(
-            test_team("home", 0), test_team("away", 0), Rules::Bb2016,
-        );
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = GrabBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
-    }
 }

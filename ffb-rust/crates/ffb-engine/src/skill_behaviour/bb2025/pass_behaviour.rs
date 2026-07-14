@@ -12,7 +12,6 @@
 /// (PassMechanic, PassModifierFactory, PassState, UtilServerDialog, dialogs).
 /// Those branches are marked // headless: and skipped; the safe default
 /// (return false, leave outcome unset) is used.
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
@@ -38,22 +37,6 @@ impl PassBehaviour {
 
 impl Default for PassBehaviour {
     fn default() -> Self { Self::new() }
-}
-
-impl SkillBehaviour for PassBehaviour {
-    fn name(&self) -> &'static str { "PassBehaviour" }
-
-    fn execute_step_hook(&self, game: &mut Game) -> bool {
-        let has_skill = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill(SkillId::Pass))
-            .unwrap_or(false);
-        if !has_skill {
-            return false;
-        }
-        // headless: full step hook logic delegated to PassStepModifier.handle_execute_step
-        false
-    }
 }
 
 // ---- Hook state --------------------------------------------------------------
@@ -172,30 +155,6 @@ mod tests {
     }
 
     // ---- PassBehaviour -------------------------------------------------------
-
-    #[test]
-    fn name_is_pass_behaviour() {
-        assert_eq!(PassBehaviour::new().name(), "PassBehaviour");
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false_no_player() {
-        let b = PassBehaviour::new();
-        let mut game = test_game();
-        // No acting player -> no skill -> false
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = PassBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
-    }
 
     // ---- register_into ------------------------------------------------------
 

@@ -9,7 +9,6 @@
 ///
 /// Both execute-step hooks are no-ops in Java (return false) — the real effect is
 /// `handleCommandHook` presetting the step's re-roll state before it re-executes.
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::{RerollHookState, StepModifierTrait};
 use crate::step::framework::{StepCommandStatus, StepId};
@@ -37,15 +36,6 @@ impl TheBallistaBehaviour {
 
 impl Default for TheBallistaBehaviour {
     fn default() -> Self { Self::new() }
-}
-
-impl SkillBehaviour for TheBallistaBehaviour {
-    fn name(&self) -> &'static str { "TheBallistaBehaviour" }
-
-    fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
-        // Both Java step modifiers return false from handleExecuteStepHook.
-        false
-    }
 }
 
 // ── TheBallistaThrowTeamMateModifier ─────────────────────────────────────────
@@ -143,29 +133,6 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         ffb_model::model::game::Game::new(home, away, Rules::Bb2025)
-    }
-
-    #[test]
-    fn name_is_not_empty() {
-        assert!(!TheBallistaBehaviour::new().name().is_empty());
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false() {
-        let b = TheBallistaBehaviour::new();
-        let mut game = test_game();
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = TheBallistaBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
     }
 
     #[test]

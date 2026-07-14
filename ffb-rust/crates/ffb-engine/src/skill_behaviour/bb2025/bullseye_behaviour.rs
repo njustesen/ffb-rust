@@ -1,4 +1,3 @@
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::skill_behaviour::registry::SkillRegistry;
 use ffb_model::enums::SkillId;
@@ -20,16 +19,6 @@ impl Default for BullseyeBehaviour {
     fn default() -> Self { Self::new() }
 }
 
-impl SkillBehaviour for BullseyeBehaviour {
-    fn name(&self) -> &'static str { "BullseyeBehaviour" }
-
-    fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
-        // Java StepModifier.handleExecuteStepHook: returns false -- real Bullseye logic
-        // is in handleCommandHook (scatter reduction applied at command time, not step time).
-        false
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -49,40 +38,4 @@ mod tests {
         ffb_model::model::game::Game::new(home, away, ffb_model::enums::Rules::Bb2025)
     }
 
-    #[test]
-    fn hook_is_noop_returns_false() {
-        let behaviour = BullseyeBehaviour::new();
-        let mut game = test_game();
-        assert!(!behaviour.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn execute_step_hook_returns_bool() {
-        let behaviour = BullseyeBehaviour::new();
-        let mut game = test_game();
-        let _result: bool = behaviour.execute_step_hook(&mut game);
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false() {
-        use ffb_model::enums::Rules;
-        use crate::step::framework::test_team;
-        let b = BullseyeBehaviour::new();
-        let mut game = ffb_model::model::game::Game::new(
-            test_team("home", 0), test_team("away", 0), Rules::Bb2025,
-        );
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = BullseyeBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
-    }
-#[test]    fn name_is_not_empty() {        assert!(!BullseyeBehaviour::new().name().is_empty());    }    #[test]    fn execute_step_hook_false_with_bb2025() {        use ffb_model::enums::Rules;        use crate::step::framework::test_team;        let b = BullseyeBehaviour::new();        let mut game = ffb_model::model::game::Game::new(            test_team("home", 0), test_team("away", 0), Rules::Bb2025,        );        assert!(!b.execute_step_hook(&mut game));    }
 }

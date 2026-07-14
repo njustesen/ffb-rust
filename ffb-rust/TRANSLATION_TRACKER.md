@@ -94,6 +94,18 @@ Tests: 17,609 → 17,621 (+12), 0 failures. `cargo clippy --workspace --all-targ
 from 2). No parity/integration testing (per instruction). Full writeup: `SESSION.md` Current
 Status.
 
+**Correction (Phase AAS, 2026-07-15):** item 5 above turned out to be itself stale — another
+instance of the recurring "verify the prior phase's own claims" lesson. `UtilSkillBehaviours::
+register_behaviours` was confirmed genuinely dead (only called from its own test module, no live
+call site anywhere) and deleted along with the entire dead `SkillBehaviour` marker-trait system:
+73 fully-orphaned `skill_behaviour/*.rs` files (not ~30), 57 more with the dead marker-trait impl
+stripped out while keeping their live `register_into`/`StepModifierTrait` code, plus
+`util_skill_behaviours.rs`, `i_skill_behaviour.rs`, and the trait definition itself. Full writeup:
+`SESSION.md` Current Status (Phase AAS). Per-file tracker rows below for the 73 deleted files are
+now stale (they predate this deletion) — treat the `skill_behaviour/*` rows as historical unless
+cross-checked against the current file listing; the live skill-dispatch mechanism is
+`skill_behaviour::registry`/`dispatch`, not these individual behaviour-marker rows.
+
 **Phase AAN (closed skill-hook-audit item 9's CloudBurster — audit fully complete, this
 session):**
 CloudBurster is a whole standalone step in Java (`registerStep`, not `StepModifier`) — no Rust

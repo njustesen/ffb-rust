@@ -1,4 +1,3 @@
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
@@ -43,14 +42,6 @@ impl Default for DauntlessBehaviour {
     fn default() -> Self { Self::new() }
 }
 
-impl SkillBehaviour for DauntlessBehaviour {
-    fn name(&self) -> &'static str { "DauntlessBehaviour" }
-
-    fn execute_step_hook(&self, _game: &mut ffb_model::model::game::Game) -> bool {
-        false
-    }
-}
-
 // ── DauntlessStepModifier ─────────────────────────────────────────────────────
 
 pub struct DauntlessStepModifier;
@@ -76,39 +67,6 @@ impl StepModifierTrait for DauntlessStepModifier {
 mod tests {
     use super::*;
 
-    #[test]
-    fn name_returns_correct_string() {
-        let b = DauntlessBehaviour::new();
-        assert_eq!(b.name(), "DauntlessBehaviour");
-    }
-
-    #[test]
-    fn default_has_correct_name() {
-        let b = DauntlessBehaviour::default();
-        assert_eq!(b.name(), "DauntlessBehaviour");
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false() {
-        use ffb_model::enums::Rules;
-        use crate::step::framework::test_team;
-        let b = DauntlessBehaviour::new();
-        let mut game = ffb_model::model::game::Game::new(
-            test_team("home", 0), test_team("away", 0), Rules::Bb2025,
-        );
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = DauntlessBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
-    }
     #[test]
     fn default_creates_instance_same_as_new() {
         let _a = DauntlessBehaviour::new();

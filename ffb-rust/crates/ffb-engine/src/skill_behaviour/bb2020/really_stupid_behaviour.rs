@@ -5,7 +5,6 @@
 /// - No SECURE_THE_BALL or PUNT cases (BB2025 additions).
 /// - `commitTargetSelection()` is called before the roll (same as BB2025; BB2016 omits it).
 /// - `targetSelectionState.failed()` is called on failure (same as BB2025; BB2016 omits it).
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
@@ -101,19 +100,6 @@ pub enum TurnDataFlag {
 
 impl Default for ReallyStupidBehaviour {
     fn default() -> Self { Self::new() }
-}
-
-impl SkillBehaviour for ReallyStupidBehaviour {
-    fn name(&self) -> &'static str { "ReallyStupidBehaviour" }
-
-    fn execute_step_hook(&self, game: &mut ffb_model::model::game::Game) -> bool {
-        let has_skill = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill(SkillId::ReallyStupid))
-            .unwrap_or(false);
-        if !has_skill { return false; }
-        false
-    }
 }
 
 // ── BB2020 cancel helper ──────────────────────────────────────────────────────
@@ -350,29 +336,6 @@ mod tests {
     }
 
     // --- infrastructure tests ---
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(ReallyStupidBehaviour::new().name(), "ReallyStupidBehaviour");
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false() {
-        let b = ReallyStupidBehaviour::new();
-        let mut game = test_game();
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = ReallyStupidBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
-    }
 
     #[test]
     fn register_into_adds_step_modifier() {

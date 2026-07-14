@@ -3,7 +3,6 @@
 /// Hooks into StepDropFallingPlayers (StepId::DropFallingPlayers).
 /// When attacker or defender has Saboteur and is falling after a block, they may
 /// attempt a roll (4+) to inflict a Saboteur-type injury on the opposing player.
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
@@ -64,21 +63,6 @@ impl SaboteurBehaviour {
 
 impl Default for SaboteurBehaviour {
     fn default() -> Self { Self::new() }
-}
-
-impl SkillBehaviour for SaboteurBehaviour {
-    fn name(&self) -> &'static str { "SaboteurBehaviour" }
-
-    fn execute_step_hook(&self, game: &mut ffb_model::model::game::Game) -> bool {
-        let has_skill = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill(SkillId::Saboteur))
-            .unwrap_or(false);
-        if !has_skill {
-            return false;
-        }
-        false
-    }
 }
 
 // ── SaboteurStepModifier ──────────────────────────────────────────────────────
@@ -299,29 +283,6 @@ mod tests {
     }
 
     // ── Behaviour shell tests ─────────────────────────────────────────────────
-
-    #[test]
-    fn name_is_not_empty() {
-        assert!(!SaboteurBehaviour::new().name().is_empty());
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false_no_acting_player() {
-        let b = SaboteurBehaviour::new();
-        let mut game = make_game();
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::roster_position::RosterPosition;
-        let b = SaboteurBehaviour::new();
-        let mut player = ffb_model::model::player::Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
-    }
 
     // ── StepModifier registration tests ──────────────────────────────────────
 

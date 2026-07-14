@@ -7,7 +7,6 @@
 /// Rust note: all hook logic is inlined into StepThrowTeamMate.execute_step.
 /// The StepModifier here mirrors the Java hook shape and applies the pre-roll
 /// game-state mutations (has_passed, thrower_id, concession, ttm/ktm_used).
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
@@ -76,20 +75,6 @@ impl Default for ThrowTeamMateBehaviour {
     fn default() -> Self { Self::new() }
 }
 
-impl SkillBehaviour for ThrowTeamMateBehaviour {
-    fn name(&self) -> &'static str { "ThrowTeamMateBehaviour" }
-
-    fn execute_step_hook(&self, game: &mut ffb_model::model::game::Game) -> bool {
-        let has_skill = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill(SkillId::ThrowTeamMate))
-            .unwrap_or(false);
-        if !has_skill { return false; }
-        // headless: TTM pass sequence inlined in StepThrowTeamMate.execute_step
-        false
-    }
-}
-
 // ── ThrowTeamMateStepModifier ─────────────────────────────────────────────────
 
 /// Java: anonymous StepModifier<StepThrowTeamMate, StepState> with priority 2.
@@ -155,42 +140,6 @@ mod tests {
 
     fn test_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
-    }
-
-    #[test]
-    fn name_is_not_empty() {
-        assert!(!ThrowTeamMateBehaviour::new().name().is_empty());
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false_no_player() {
-        let b = ThrowTeamMateBehaviour::new();
-        let mut game = test_game();
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false_player_lacks_skill() {
-        use ffb_model::model::player::Player;
-        let b = ThrowTeamMateBehaviour::new();
-        let mut game = test_game();
-        game.team_home.players.push(Player {
-            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
-            ..Default::default()
-        });
-        game.acting_player.player_id = Some("p1".into());
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = ThrowTeamMateBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
     }
 
     #[test]

@@ -1,5 +1,4 @@
 /// 1:1 translation of com.fumbbl.ffb.server.skillbehaviour.bb2025.TakeRootBehaviour.
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
@@ -27,21 +26,6 @@ impl TakeRootBehaviour {
 
 impl Default for TakeRootBehaviour {
     fn default() -> Self { Self::new() }
-}
-
-impl SkillBehaviour for TakeRootBehaviour {
-    fn name(&self) -> &'static str { "TakeRootBehaviour" }
-
-    fn execute_step_hook(&self, game: &mut ffb_model::model::game::Game) -> bool {
-        let has_skill = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill(SkillId::TakeRoot))
-            .unwrap_or(false);
-        if !has_skill {
-            return false;
-        }
-        false
-    }
 }
 
 // ── TakeRootStepModifier ──────────────────────────────────────────────────────
@@ -212,56 +196,6 @@ mod tests {
     fn step_modifier_does_not_apply_to_wrong_step() {
         let m = TakeRootStepModifier;
         assert!(!m.applies_to(StepId::BlockRoll));
-    }
-
-    #[test]
-    fn hook_is_noop_returns_false() {
-        let behaviour = TakeRootBehaviour::new();
-        let mut game = test_game();
-        assert!(!behaviour.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn execute_step_hook_returns_bool() {
-        let behaviour = TakeRootBehaviour::new();
-        let mut game = test_game();
-        let _result: bool = behaviour.execute_step_hook(&mut game);
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false() {
-        use crate::step::framework::test_team;
-        let b = TakeRootBehaviour::new();
-        let mut game = ffb_model::model::game::Game::new(
-            test_team("home", 0), test_team("away", 0), Rules::Bb2025,
-        );
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = TakeRootBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
-    }
-
-    #[test]
-    fn name_is_not_empty() {
-        assert!(!TakeRootBehaviour::new().name().is_empty());
-    }
-
-    #[test]
-    fn execute_step_hook_false_with_bb2025() {
-        use crate::step::framework::test_team;
-        let b = TakeRootBehaviour::new();
-        let mut game = ffb_model::model::game::Game::new(
-            test_team("home", 0), test_team("away", 0), Rules::Bb2025,
-        );
-        assert!(!b.execute_step_hook(&mut game));
     }
 
     #[test]

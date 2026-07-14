@@ -5,7 +5,6 @@
 /// and attributing the reroll to a "Monstrous Mouth" source. This is a **different mechanic**
 /// from BB2025's MonstrousMouth (a StepPushback chomped-defender forced-push, see
 /// `bb2025::monstrous_mouth_behaviour`) — the two editions' skills of the same name are unrelated.
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
@@ -66,22 +65,6 @@ impl MonstrousMouthBehaviour {
 
 impl Default for MonstrousMouthBehaviour {
     fn default() -> Self { Self::new() }
-}
-
-impl SkillBehaviour for MonstrousMouthBehaviour {
-    fn name(&self) -> &'static str { "MonstrousMouthBehaviour" }
-
-    fn execute_step_hook(&self, game: &mut ffb_model::model::game::Game) -> bool {
-        // Legacy hook path — logic lives in MonstrousMouthStepModifier.
-        let has_skill = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill(SkillId::MonstrousMouth))
-            .unwrap_or(false);
-        if !has_skill {
-            return false;
-        }
-        false
-    }
 }
 
 #[cfg(test)]
@@ -148,28 +131,4 @@ mod tests {
         assert!(hs.reroll_catch);
     }
 
-    #[test]
-    fn name_is_not_empty() {
-        assert!(!MonstrousMouthBehaviour::new().name().is_empty());
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false() {
-        let b = MonstrousMouthBehaviour::new();
-        let mut game = Game::new(
-            test_team("home", 0), test_team("away", 0), Rules::Bb2016,
-        );
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = MonstrousMouthBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
-    }
 }

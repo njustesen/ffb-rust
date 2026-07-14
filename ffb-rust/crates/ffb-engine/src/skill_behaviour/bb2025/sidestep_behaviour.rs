@@ -1,7 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.server.skillbehaviour.bb2025.SidestepBehaviour.
 ///
 /// Priority 4 modifier on StepPushback.
-use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
@@ -160,20 +159,6 @@ impl SidestepBehaviour {
 
 impl Default for SidestepBehaviour {
     fn default() -> Self { Self::new() }
-}
-
-impl SkillBehaviour for SidestepBehaviour {
-    fn name(&self) -> &'static str { "SidestepBehaviour" }
-
-    fn execute_step_hook(&self, game: &mut ffb_model::model::game::Game) -> bool {
-        // Legacy hook path — logic lives in SidestepStepModifier.
-        let has_skill = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill(SkillId::Sidestep))
-            .unwrap_or(false);
-        if !has_skill { return false; }
-        false
-    }
 }
 
 #[cfg(test)]
@@ -374,28 +359,4 @@ mod tests {
         assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
     }
 
-    #[test]
-    fn name_is_not_empty() {
-        assert!(!SidestepBehaviour::new().name().is_empty());
-    }
-
-    #[test]
-    fn execute_step_hook_returns_false() {
-        let b = SidestepBehaviour::new();
-        let mut game = Game::new(
-            test_team("home", 0), test_team("away", 0), Rules::Bb2025,
-        );
-        assert!(!b.execute_step_hook(&mut game));
-    }
-
-    #[test]
-    fn apply_modifier_is_noop() {
-        use ffb_model::model::{Player, roster_position::RosterPosition};
-        let b = SidestepBehaviour::new();
-        let mut player = Player::default();
-        let pos = RosterPosition::default();
-        let movement_before = player.movement;
-        b.apply_modifier(&mut player, &pos);
-        assert_eq!(player.movement, movement_before);
-    }
 }
