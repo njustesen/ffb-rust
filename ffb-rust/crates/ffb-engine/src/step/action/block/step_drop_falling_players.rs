@@ -1,28 +1,45 @@
 /// 1:1 translation of com.fumbbl.ffb.server.step.action.block.StepDropFallingPlayers (COMMON)
-/// and its BB2016/BB2020 hook com.fumbbl.ffb.server.skillbehaviour.bb2016.PilingOnBehaviour.
+/// and its BB2016 hook com.fumbbl.ffb.server.skillbehaviour.bb2016.PilingOnBehaviour.
 ///
 /// Drops any FALLING players (attacker and/or defender) and rolls armor+injury for them.
-/// Also handles the deprecated PilingOn skill prompt (BB2016/BB2020 only).
+/// Also handles the PilingOn skill prompt (BB2016-only skill).
 ///
-/// Random agent always declines PilingOn, so the simplified path is always taken:
-///   1. If defender FALLING: place PRONE, roll armor+injury → publish INJURY_RESULT
-///   2. If attacker FALLING: place PRONE, roll armor+injury → publish INJURY_RESULT, END_TURN
+/// Phase 1 (usingPilingOn == None): drop the defender, roll their initial injury, and — if the
+/// attacker is eligible (has an unused PilingOn skill, adjacent, not rooted/falling, defender not
+/// already a casualty, game-option gates satisfied) — prompt the attacker and return Continue.
+/// Phase 2 (usingPilingOn == Some): if accepted (and any required team re-roll is spent), mark the
+/// skill used, drop the attacker, and re-roll the defender's injury (armor-only re-roll, or a pure
+/// injury re-roll if armor was already broken) via InjuryTypePilingOnArmour/InjuryTypePilingOnInjury,
+/// with a possible InjuryTypePilingOnKnockedOut on the attacker if a double was rolled and
+/// PILING_ON_TO_KO_ON_DOUBLE is enabled.
 ///
-/// PilingOn full logic (team re-roll, dialog, etc.) is stubbed — conditions for showing the
-/// PilingOn dialog involve NamedProperties.canPileOnOpponent which is not yet implemented.
+/// Known follow-up (documented, not a silent gap): the BB2016 Weeping Dagger/poison side-effect on
+/// a badly-hurt result (Java's `rollWeepingDagger`) is not yet ported.
 ///
 /// Expects OLD_DEFENDER_STATE parameter from a preceding step.
-use ffb_model::dialog::dialog_id::DialogId;
-use ffb_model::enums::{ApothecaryMode, PS_FALLING, PS_PRONE};
+use ffb_model::enums::{ApothecaryMode, PlayerState, PS_FALLING};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::option::game_option_id::{
+    PILING_ON_ARMOR_ONLY, PILING_ON_INJURY_ONLY, PILING_ON_TO_KO_ON_DOUBLE,
+    PILING_ON_USES_A_TEAM_REROLL,
+};
+use ffb_model::option::util_game_option::is_option_enabled;
+use ffb_model::prompts::agent_prompt::AgentPrompt;
+use ffb_model::report::report_piling_on::ReportPilingOn;
+use ffb_model::enums::ReRollSource;
 use ffb_model::util::rng::GameRng;
-use ffb_mechanics::mechanics::armor_broken;
+use ffb_model::util::util_cards::UtilCards;
 use crate::action::Action;
-use crate::injury::{InjuryContext, InjuryResult};
+use crate::dice_interpreter::DiceInterpreter;
+use crate::injury::injuryType::injury_type_piling_on_armour::InjuryTypePilingOnArmour;
+use crate::injury::injuryType::injury_type_piling_on_injury::InjuryTypePilingOnInjury;
+use crate::injury::injuryType::injury_type_piling_on_knocked_out::InjuryTypePilingOnKnockedOut;
+use crate::injury::InjuryResult;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
-use crate::util::util_server_dialog::UtilServerDialog;
+use crate::step::util_server_injury::{drop_player, handle_injury, handle_injury_by_name};
+use crate::util::util_server_re_roll::UtilServerReRoll;
 
 pub struct StepDropFallingPlayers {
     /// Java: state.injuryResultDefender — populated after defender is dropped.
@@ -71,7 +88,7 @@ impl Step for StepDropFallingPlayers {
 }
 
 impl StepDropFallingPlayers {
-    /// Java: PilingOnBehaviour.handleExecuteStepHook (simplified: PilingOn always declined).
+    /// Java: PilingOnBehaviour.handleExecuteStepHook.
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let player_id = match game.acting_player.player_id.clone() {
             Some(id) => id,
@@ -79,65 +96,148 @@ impl StepDropFallingPlayers {
         };
         let defender_id = game.defender_id.clone();
 
-        // Java: unroot FALLING players before processing.
-        // (Rooted FALLING → just unroot; handled as normal prone below.)
-
         let defender_state = defender_id.as_deref()
             .and_then(|id| game.field_model.player_state(id));
         let defender_is_falling = defender_state.map(|s| s.base() == PS_FALLING).unwrap_or(false);
-
         let defender_coord = defender_id.as_deref()
             .and_then(|id| game.field_model.player_coordinate(id));
 
+        let attacker_state = game.field_model.player_state(&player_id);
+        let attacker_is_falling = attacker_state.map(|s| s.base() == PS_FALLING).unwrap_or(false);
+        let attacker_coord = game.field_model.player_coordinate(&player_id);
+
+        // Java: unroot FALLING players — a local-only adjustment used by the eligibility
+        // checks below (Java never persists this back to the field model either).
+        let defender_effective_rooted = !defender_is_falling
+            && defender_state.map(|s| s.is_rooted()).unwrap_or(false);
+        let attacker_effective_rooted = !attacker_is_falling
+            && attacker_state.map(|s| s.is_rooted()).unwrap_or(false);
+
         let mut outcome = StepOutcome::next();
 
-        // Java: if (usingPilingOn != null) { re-roll with PilingOn } else if (defenderFalling) { drop }
-        if self.using_piling_on.is_some() {
-            // PilingOn used or declined after dialog.
-            if let Some(ir) = &self.injury_result_defender {
-                outcome = outcome.publish(StepParameter::InjuryResult(ir.clone()));
+        if (defender_is_falling && defender_coord.is_some()) || self.using_piling_on.is_some() {
+            if let Some(using) = self.using_piling_on {
+                // Phase 2: PilingOn dialog answered.
+                let re_roll_injury = self.injury_result_defender.as_ref()
+                    .map(|ir| ir.injury_context.is_armor_broken())
+                    .unwrap_or(false);
+                game.report_list.add(ReportPilingOn::new(player_id.clone(), using, re_roll_injury));
+
+                let uses_a_team_reroll = is_option_enabled(game, PILING_ON_USES_A_TEAM_REROLL);
+                let reroll_spent = !uses_a_team_reroll
+                    || crate::step::util_server_re_roll::use_reroll(game, &ReRollSource::new("TRR"), &player_id);
+
+                if using && reroll_spent {
+                    game.mark_skill_used(&player_id, ffb_model::enums::SkillId::PilingOn);
+                    for p in drop_player(game, &player_id, false) {
+                        outcome = outcome.publish(p);
+                    }
+
+                    let dc = defender_coord.unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
+                    let did = defender_id.clone().unwrap_or_default();
+                    let (new_ir, rolled_double) = if re_roll_injury {
+                        let old = self.injury_result_defender.as_deref();
+                        let ir = handle_injury(
+                            game, rng, &mut InjuryTypePilingOnInjury::new(),
+                            Some(&player_id), &did, dc, None, old, ApothecaryMode::Defender,
+                        );
+                        let d = ir.injury_context.get_injury_roll()
+                            .map(|r| DiceInterpreter::is_double(&r))
+                            .unwrap_or(false);
+                        (ir, d)
+                    } else {
+                        let ir = handle_injury(
+                            game, rng, &mut InjuryTypePilingOnArmour::new(),
+                            Some(&player_id), &did, dc, None, None, ApothecaryMode::Defender,
+                        );
+                        let d = ir.injury_context.get_armor_roll()
+                            .map(|r| DiceInterpreter::is_double(&r))
+                            .unwrap_or(false);
+                        (ir, d)
+                    };
+                    self.injury_result_defender = Some(Box::new(new_ir));
+
+                    if rolled_double && is_option_enabled(game, PILING_ON_TO_KO_ON_DOUBLE) {
+                        let ac = attacker_coord.unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
+                        let ko = handle_injury(
+                            game, rng, &mut InjuryTypePilingOnKnockedOut::new(),
+                            None, &player_id, ac, None, None, ApothecaryMode::Attacker,
+                        );
+                        outcome = outcome.publish(StepParameter::InjuryResult(Box::new(ko)));
+                    }
+                }
+            } else {
+                // Phase 1: initial defender drop.
+                let did = defender_id.clone().unwrap_or_default();
+                for p in drop_player(game, &did, false) {
+                    outcome = outcome.publish(p);
+                }
+
+                let injury_type_name = match self.old_defender_state {
+                    Some(s) if s.is_stunned() => "InjuryTypeBlockStunned",
+                    Some(s) if s.is_prone_or_stunned() => "InjuryTypeBlockProne",
+                    _ => "InjuryTypeBlock",
+                };
+                let dc = defender_coord.unwrap();
+                let ir = handle_injury_by_name(
+                    game, rng, injury_type_name, Some(&player_id), &did, dc, None, None,
+                    ApothecaryMode::Defender,
+                );
+                self.injury_result_defender = Some(Box::new(ir));
+
+                // Known follow-up: BB2016 Weeping Dagger/poison side-effect on a badly-hurt
+                // result (Java `rollWeepingDagger`) is not yet ported — see SESSION.md.
+
+                let uses_a_team_reroll = is_option_enabled(game, PILING_ON_USES_A_TEAM_REROLL);
+                let armor_broken = self.injury_result_defender.as_ref()
+                    .map(|ir| ir.injury_context.is_armor_broken())
+                    .unwrap_or(false);
+                let is_casualty = self.injury_result_defender.as_ref()
+                    .map(|ir| ir.injury_context.is_casualty())
+                    .unwrap_or(false);
+                let piling_on_eligible = !attacker_is_falling
+                    && game.player(&player_id)
+                        .map(|p| p.has_unused_skill_with_property(NamedProperties::CAN_PILE_ON_OPPONENT))
+                        .unwrap_or(false)
+                    && (!uses_a_team_reroll
+                        || game.player(&player_id)
+                            .map(|p| UtilServerReRoll::is_team_re_roll_available(game, p))
+                            .unwrap_or(false))
+                    && attacker_coord.zip(defender_coord)
+                        .map(|(a, d)| a.is_adjacent(d))
+                        .unwrap_or(false)
+                    && !is_casualty
+                    && !attacker_effective_rooted
+                    && (!is_option_enabled(game, PILING_ON_INJURY_ONLY) || armor_broken)
+                    && (!is_option_enabled(game, PILING_ON_ARMOR_ONLY) || !armor_broken)
+                    && (!game.player(&did)
+                        .map(|p| p.has_skill_property(NamedProperties::PREVENT_ARMOUR_MODIFICATIONS))
+                        .unwrap_or(false)
+                        || armor_broken)
+                    && !game.player(&player_id)
+                        .map(|p| UtilCards::has_skill_to_cancel_property(p, NamedProperties::CAN_PILE_ON_OPPONENT))
+                        .unwrap_or(false)
+                    && !game.player(&did)
+                        .map(|p| p.has_skill_property(NamedProperties::PREVENT_DAMAGING_INJURY_MODIFICATIONS))
+                        .unwrap_or(false);
+
+                if piling_on_eligible {
+                    if let Some(ir) = self.injury_result_defender.as_deref_mut() {
+                        ir.report(game);
+                    }
+                    return StepOutcome::cont().with_prompt(AgentPrompt::PilingOn {
+                        player_id: player_id.clone(),
+                        target_id: did,
+                    });
+                }
             }
-            if let Some(v) = self.using_piling_on {
-                outcome = outcome.publish(StepParameter::UsingPilingOn(v));
-            }
-        } else if defender_is_falling && defender_coord.is_some() {
-            // Java: dropPlayer(defender) + handleInjury
-            let did = defender_id.as_deref().unwrap();
-            let defender_state_full = game.field_model.player_state(did).unwrap_or_default();
-            game.field_model.set_player_state(did, defender_state_full.change_base(PS_PRONE).change_active(false));
+        }
 
-            let av = game.player(did).map(|p| p.armour).unwrap_or(8);
-            let a1 = rng.d6();
-            let a2 = rng.d6();
-            let broke = armor_broken(av, [a1, a2], &[]);
-
-            let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
-            ctx.armor_roll = Some([a1, a2]);
-            ctx.armor_broken = broke;
-            if broke {
-                let i1 = rng.d6();
-                let i2 = rng.d6();
-                ctx.injury_roll = Some([i1, i2]);
-            }
-
-            let ir = Box::new(InjuryResult { injury_context: ctx, knocked_out: false, rip: false, already_reported: false, pre_regeneration: true });
-            self.injury_result_defender = Some(ir.clone());
-
-            // Java: PilingOnBehaviour.handleExecuteStepHook — check if attacker has canPileOnOpponent.
-            let piling_on_eligible = game.acting_player.player_id.as_deref()
-                .and_then(|id| game.player(id))
-                .map(|p| p.has_skill_property(NamedProperties::CAN_PILE_ON_OPPONENT))
-                .unwrap_or(false);
-
-            if piling_on_eligible && self.using_piling_on.is_none() {
-                // Attacker has PilingOn and hasn't decided yet → show dialog.
-                // Java: UtilServerDialog.showDialog(gameState, new DialogPilingOnParameter(...), false)
-                UtilServerDialog::show_dialog(game, DialogId::PILING_ON, false);
-                // Continue waiting for Action::UseSkill { use_skill } response.
-                return StepOutcome::cont();
-            }
-            // Not eligible or player already decided → publish result.
-            outcome = outcome.publish(StepParameter::InjuryResult(ir));
+        if let Some(ir) = &self.injury_result_defender {
+            outcome = outcome.publish(StepParameter::InjuryResult(ir.clone()));
+        }
+        if let Some(v) = self.using_piling_on {
+            outcome = outcome.publish(StepParameter::UsingPilingOn(v));
         }
 
         // Java: if (defenderFalling && defender is own team && !oldDefenderState.isProne) → END_TURN
@@ -156,32 +256,18 @@ impl StepDropFallingPlayers {
         }
 
         // Java: handle attacker FALLING.
-        let attacker_coord = game.field_model.player_coordinate(&player_id);
-        let attacker_state = game.field_model.player_state(&player_id);
-        let attacker_is_falling = attacker_state.map(|s| s.base() == PS_FALLING).unwrap_or(false);
-
         if attacker_is_falling && attacker_coord.is_some() {
-            // Java: dropPlayer(attacker) + handleInjury
-            let attacker_state_full = game.field_model.player_state(&player_id).unwrap_or_default();
-            game.field_model.set_player_state(&player_id, attacker_state_full.change_base(PS_PRONE).change_active(false));
-
-            let av = game.player(&player_id).map(|p| p.armour).unwrap_or(8);
-            let a1 = rng.d6();
-            let a2 = rng.d6();
-            let broke = armor_broken(av, [a1, a2], &[]);
-
-            let mut ctx = InjuryContext::new(ApothecaryMode::Attacker);
-            ctx.armor_roll = Some([a1, a2]);
-            ctx.armor_broken = broke;
-            if broke {
-                let i1 = rng.d6();
-                let i2 = rng.d6();
-                ctx.injury_roll = Some([i1, i2]);
+            for p in drop_player(game, &player_id, false) {
+                outcome = outcome.publish(p);
             }
-            let ir = Box::new(InjuryResult { injury_context: ctx, knocked_out: false, rip: false, already_reported: false, pre_regeneration: true });
+            let ac = attacker_coord.unwrap();
+            let ir = handle_injury_by_name(
+                game, rng, "InjuryTypeBlock", defender_id.as_deref(), &player_id, ac, None, None,
+                ApothecaryMode::Attacker,
+            );
             outcome = outcome
                 .publish(StepParameter::EndTurn(true))
-                .publish(StepParameter::InjuryResult(ir));
+                .publish(StepParameter::InjuryResult(Box::new(ir)));
         }
 
         outcome
@@ -193,7 +279,7 @@ mod tests {
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::StepAction;
-    use ffb_model::enums::{ApothecaryMode, Rules, PS_STANDING};
+    use ffb_model::enums::{ApothecaryMode, Rules, PS_PRONE, PS_STANDING};
     use ffb_model::model::skill_def::SkillWithValue;
     use ffb_model::enums::{PlayerState, SkillId};
     use ffb_model::types::FieldCoordinate;
@@ -337,5 +423,68 @@ mod tests {
         let outcome = StepDropFallingPlayers::new().start(&mut game, &mut GameRng::new(0));
         assert_eq!(outcome.action, StepAction::NextStep);
         assert!(outcome.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))));
+    }
+
+    #[test]
+    fn piling_on_accepted_marks_skill_used_and_drops_attacker() {
+        // Java: performWrestle-equivalent — accepting PilingOn marks the skill used and
+        // drops the attacker prone via UtilServerInjury.dropPlayer.
+        let mut game = make_game_with_falling(false, true);
+        add_piling_on_skill(&mut game, "att");
+        let mut step = StepDropFallingPlayers::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::PilingOn, use_skill: true },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert!(
+            game.player("att").unwrap().used_skills.contains(&SkillId::PilingOn),
+            "PilingOn should be marked as used on the attacker"
+        );
+        assert_eq!(game.field_model.player_state("att").unwrap().base(), PS_PRONE);
+    }
+
+    #[test]
+    fn piling_on_accepted_publishes_a_fresh_injury_result() {
+        // Accepting PilingOn re-rolls the defender's injury (armor-only, since the
+        // initial roll may not have broken armor) and publishes the re-rolled result.
+        let mut game = make_game_with_falling(false, true);
+        add_piling_on_skill(&mut game, "att");
+        let mut step = StepDropFallingPlayers::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        let outcome = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::PilingOn, use_skill: true },
+            &mut game, &mut GameRng::new(0),
+        );
+        let defender_result = outcome.published.iter().find_map(|p| {
+            if let StepParameter::InjuryResult(r) = p {
+                if r.injury_context().get_apothecary_mode() == ApothecaryMode::Defender {
+                    return Some(r.clone());
+                }
+            }
+            None
+        });
+        assert!(defender_result.is_some(), "re-rolled Defender InjuryResult should be published");
+    }
+
+    #[test]
+    fn piling_on_uses_a_team_reroll_option_requires_available_reroll() {
+        // Java: PILING_ON_USES_A_TEAM_REROLL — accepting PilingOn without an available
+        // team re-roll must NOT mark the skill used or drop the attacker.
+        let mut game = make_game_with_falling(false, true);
+        add_piling_on_skill(&mut game, "att");
+        game.options.set(ffb_model::option::game_option_id::PILING_ON_USES_A_TEAM_REROLL, "true");
+        game.turn_data_mut().rerolls = 0;
+        let mut step = StepDropFallingPlayers::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::PilingOn, use_skill: true },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert!(
+            !game.player("att").unwrap().used_skills.contains(&SkillId::PilingOn),
+            "PilingOn must not be marked used when the required team re-roll is unavailable"
+        );
+        assert_eq!(game.field_model.player_state("att").unwrap().base(), PS_STANDING);
     }
 }

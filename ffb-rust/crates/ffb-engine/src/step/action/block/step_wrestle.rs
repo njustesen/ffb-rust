@@ -13,6 +13,7 @@ use ffb_model::enums::PlayerState;
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::skill_use::SkillUse;
+use ffb_model::prompts::agent_prompt::AgentPrompt;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::report_skill_use::ReportSkillUse;
 use crate::action::Action;
@@ -77,15 +78,18 @@ impl StepWrestle {
             None => return StepOutcome::next(),
         };
 
-        // Java: askAttackerForWrestleUse: if attacker has Wrestle and is not Rooted → CONTINUE.
-        // Stub: random agent always declines → treat None as false.
+        // Java: askAttackerForWrestleUse: if attacker has Wrestle and is not Rooted → CONTINUE (prompt).
         if self.using_wrestle_attacker.is_none() {
-            let attacker_has_wrestle = game.player(&player_id)
+            let attacker_can_use = game.player(&player_id)
                 .map(|p| p.has_skill(SkillId::Wrestle))
-                .unwrap_or(false);
-            if attacker_has_wrestle {
-                // Show dialog in production — random agent never responds → stub as declined.
-                self.using_wrestle_attacker = Some(false);
+                .unwrap_or(false)
+                && !game.field_model.player_state(&player_id).map(|s| s.is_rooted()).unwrap_or(false);
+            if attacker_can_use {
+                return StepOutcome::cont().with_prompt(AgentPrompt::SkillUse {
+                    player_id,
+                    skill_id: SkillId::Wrestle as u16,
+                    skill_name: format!("{:?}", SkillId::Wrestle),
+                });
             } else {
                 self.using_wrestle_attacker = Some(false);
             }
@@ -94,17 +98,24 @@ impl StepWrestle {
         // Java: askDefenderForWrestleUse: if defender has Wrestle, not Rooted, not blitz-cancelled.
         if self.using_wrestle_defender.is_none() {
             let defender_id = game.defender_id.clone();
-            let defender_has_wrestle = defender_id.as_deref()
-                .and_then(|id| game.player(id))
-                .map(|p| p.has_skill(SkillId::Wrestle))
+            let defender_can_use = defender_id.as_deref()
+                .map(|id| {
+                    game.player(id).map(|p| p.has_skill(SkillId::Wrestle)).unwrap_or(false)
+                        && !game.field_model.player_state(id).map(|s| s.is_rooted()).unwrap_or(false)
+                })
                 .unwrap_or(false);
             let is_blitz = game.acting_player.player_action == Some(PlayerAction::Blitz);
             // Java: cancelsSkill(attacker, Wrestle) — Juggernaut or similar. Stub: always false.
             let attacker_cancels_wrestle = false;
             let attacker_declined = self.using_wrestle_attacker == Some(false);
-            if attacker_declined && defender_has_wrestle && !(is_blitz && attacker_cancels_wrestle) {
-                // Show dialog for defender — random agent declines.
-                self.using_wrestle_defender = Some(false);
+            if attacker_declined && defender_can_use && !(is_blitz && attacker_cancels_wrestle) {
+                if let Some(did) = defender_id {
+                    return StepOutcome::cont().with_prompt(AgentPrompt::SkillUse {
+                        player_id: did,
+                        skill_id: SkillId::Wrestle as u16,
+                        skill_name: format!("{:?}", SkillId::Wrestle),
+                    });
+                }
             } else {
                 self.using_wrestle_defender = Some(false);
             }
@@ -249,17 +260,31 @@ mod tests {
     }
 
     #[test]
-    fn attacker_has_wrestle_emits_declined_event() {
+    fn attacker_has_wrestle_prompts_skill_use() {
+        // Java: askAttackerForWrestleUse → CONTINUE with a dialog when attacker can use Wrestle.
         let mut game = make_game(vec![SkillId::Wrestle], vec![]);
         let outcome = StepWrestle::new().start(&mut game, &mut GameRng::new(0));
-        assert_eq!(outcome.action, StepAction::NextStep);
-        assert!(outcome.events.iter().any(|e| matches!(e, GameEvent::SkillUse { used: false, .. })));
+        assert_eq!(outcome.action, StepAction::Continue);
+        assert!(matches!(outcome.prompt, Some(AgentPrompt::SkillUse { .. })));
     }
 
     #[test]
-    fn defender_has_wrestle_emits_declined_event() {
+    fn defender_has_wrestle_prompts_skill_use_after_attacker_declines() {
+        // Attacker already declined; defender has Wrestle and isn't rooted → prompt defender.
         let mut game = make_game(vec![], vec![SkillId::Wrestle]);
-        let outcome = StepWrestle::new().start(&mut game, &mut GameRng::new(0));
+        let mut step = StepWrestle::new();
+        step.using_wrestle_attacker = Some(false);
+        let outcome = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(outcome.action, StepAction::Continue);
+        assert!(matches!(outcome.prompt, Some(AgentPrompt::SkillUse { .. })));
+    }
+
+    #[test]
+    fn neither_can_use_wrestle_after_decline_emits_declined_event() {
+        let mut game = make_game(vec![SkillId::Wrestle], vec![]);
+        let mut step = StepWrestle::new();
+        step.using_wrestle_attacker = Some(false);
+        let outcome = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(outcome.action, StepAction::NextStep);
         assert!(outcome.events.iter().any(|e| matches!(e, GameEvent::SkillUse { used: false, .. })));
     }

@@ -1,6 +1,57 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-14, Phase AAP done — closes 2 real gaps found while re-verifying
+## Current Status (2026-07-14, Phase AAQ done — 1 of 6 in the AAQ-AAV backlog arc)
+
+Plan mode produced a 6-phase arc (AAQ-AAV) to close SESSION.md's full "what's left" backlog from
+Phase AAP in one pass: dialog-auto-decline fixes (AAQ), TheBallista re-roll wiring (AAR), the dead
+`SkillBehaviour` marker-trait deletion (AAS), Claws/Chainsaw `CLAW_DOES_NOT_STACK` wiring (AAT),
+PitTrapHandler/StepPlayCard card routing (AAU), and the full `PassStepModifier` hook (AAV). Four
+parallel research passes verified/deepened every gap against source before implementation started,
+and corrected SESSION.md's own stale file counts for the AAS cleanup (see below).
+
+**Phase AAQ — dialog-auto-decline fixes + Piling-On full re-roll path, done.**
+
+1. `step_juggernaut.rs`, `step_wrestle.rs`, `step_dump_off.rs`: replaced the `unwrap_or(false)`/
+   `Some(false)` auto-decline stubs with `StepOutcome::cont().with_prompt(AgentPrompt::SkillUse
+   {...})`, reusing the exact pattern already live in `step_end_blocking.rs`. These three steps'
+   `handle_command` reply paths already worked correctly — only the prompt-emission half was
+   missing, so a real (non-stub) agent can now be asked and make an informed choice instead of the
+   engine hard-coding "never uses the skill." `step_wrestle.rs` also gained the missing `!isRooted()`
+   condition on both the attacker and defender eligibility checks (Java has it; the Rust stub
+   didn't check it at all).
+2. `step_drop_falling_players.rs` (BB2016 PilingOn): replaced the simplified inline d6-rolling stub
+   with a real port of `PilingOnBehaviour.handleExecuteStepHook`. Phase 1 (undecided): drops the
+   defender via the already-real `util_server_injury::drop_player`, rolls the initial injury via
+   `handle_injury_by_name` (InjuryTypeBlock/BlockStunned/BlockProne depending on old defender
+   state), then checks the *full* Java eligibility gate (unused-skill check via
+   `has_unused_skill_with_property`, not just `has_skill_property` as the old stub did — a real
+   correctness fix, since it now correctly ignores an already-used PilingOn skill; team-reroll
+   availability; adjacency; not-a-casualty; not-rooted; `PILING_ON_INJURY_ONLY`/`ARMOR_ONLY`/
+   `PREVENT_ARMOUR_MODIFICATIONS`/`PREVENT_DAMAGING_INJURY_MODIFICATIONS` gates; skill-cancel check)
+   before prompting via the (previously-defined-but-unused) `AgentPrompt::PilingOn`, replacing the
+   older `DialogId::PILING_ON` mechanism entirely. Phase 2 (decided): on acceptance, spends a team
+   re-roll if `PILING_ON_USES_A_TEAM_REROLL` is enabled (failing silently — no skill-use/drop — if
+   unavailable, matching Java), marks the skill used, drops the attacker, and re-rolls the
+   defender's injury via `InjuryTypePilingOnArmour`/`InjuryTypePilingOnInjury` (chosen by whether
+   armor was already broken) with a `InjuryTypePilingOnKnockedOut` follow-up on a rolled double when
+   `PILING_ON_TO_KO_ON_DOUBLE` is enabled — all 3 injury-type structs already existed, tested, and
+   unused before this phase. 4 new tests added (skill-used+drop, fresh injury result published,
+   team-reroll-unavailable blocks acceptance, plus the existing dialog/decline/accept tests updated
+   for the new Continue+prompt behavior).
+3. **Documented, not silently dropped**: the BB2016 Weeping Dagger/poison side-effect on a
+   badly-hurt result (Java's `rollWeepingDagger`, called from both the defender-drop and
+   attacker-falling branches) is not yet ported — flagged as a follow-up in the file's module doc
+   comment, per the approved plan's explicit instruction not to drop it silently from tracker notes.
+
+Tests: 17,634 → **17,638** (+4, net of removed/renamed stub-only tests plus new coverage).
+0 failures. `cargo clippy --workspace --all-targets`: still 0 errors.
+
+**Next**: Phase AAR (TheBallista re-roll wiring — add `handle_command` to `StepModifierTrait`, a
+first-of-its-kind step-command-time hook that Phase AAV will also need).
+
+---
+
+## Prior Status (2026-07-14, Phase AAP done — closes 2 real gaps found while re-verifying
 Phase AAO's own "what's left" list from scratch, and corrects 2 of AAO's 3 named items which
 turned out to be stale on direct source inspection.)
 

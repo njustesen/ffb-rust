@@ -17,6 +17,7 @@ use ffb_model::enums::BlockResult;
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::skill_use::SkillUse;
+use ffb_model::prompts::agent_prompt::AgentPrompt;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::report::report_id::ReportId;
@@ -89,11 +90,19 @@ impl StepJuggernaut {
             return StepOutcome::next();
         }
 
-        // Java: if usingJuggernaut == null → showDialog (prompt coach).
-        // Stub: random agent never answers dialogs → treat as declined (false).
-        let using = self.using_juggernaut.unwrap_or(false);
-
         let skill_num = SkillId::Juggernaut as u16;
+
+        // Java: if usingJuggernaut == null → showDialog (prompt coach).
+        let using = match self.using_juggernaut {
+            Some(v) => v,
+            None => {
+                return StepOutcome::cont().with_prompt(AgentPrompt::SkillUse {
+                    player_id,
+                    skill_id: skill_num,
+                    skill_name: format!("{:?}", SkillId::Juggernaut),
+                });
+            }
+        };
 
         if using {
             // Java: publish BLOCK_RESULT(Pushback), restore defender, initPushback, goto label.
@@ -222,14 +231,14 @@ mod tests {
     }
 
     #[test]
-    fn dialog_not_answered_declines_skill() {
-        // using_juggernaut == None → treated as declined (false) → NEXT_STEP
+    fn dialog_not_answered_prompts_skill_use() {
+        // using_juggernaut == None → Java: showDialog → CONTINUE with a SkillUse prompt.
         let mut game = make_blitz_game(vec![SkillId::Juggernaut]);
         let mut step = StepJuggernaut::new();
         step.goto_label_on_success = "JUG".into();
         let outcome = step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(outcome.action, StepAction::NextStep);
-        assert!(outcome.events.iter().any(|e| matches!(e, GameEvent::SkillUse { used: false, .. })));
+        assert_eq!(outcome.action, StepAction::Continue);
+        assert!(matches!(outcome.prompt, Some(AgentPrompt::SkillUse { .. })));
     }
 
     #[test]

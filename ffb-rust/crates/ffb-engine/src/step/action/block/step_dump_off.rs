@@ -9,6 +9,7 @@ use ffb_model::enums::{PlayerAction, SkillId, TurnMode};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::skill_use::SkillUse;
+use ffb_model::prompts::agent_prompt::AgentPrompt;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::report_skill_use::ReportSkillUse;
@@ -79,8 +80,12 @@ impl StepDumpOff {
         if self.using_dump_off.is_none() {
             let can_dump_off = self.can_use_dump_off(game);
             if can_dump_off {
-                // Java: showDialog → CONTINUE (random agent declines → stub as false).
-                self.using_dump_off = Some(false);
+                let defender_id = game.defender_id.clone().unwrap_or_default();
+                return StepOutcome::cont().with_prompt(AgentPrompt::SkillUse {
+                    player_id: defender_id,
+                    skill_id: SkillId::DumpOff as u16,
+                    skill_name: format!("{:?}", SkillId::DumpOff),
+                });
             } else {
                 self.using_dump_off = Some(false);
             }
@@ -235,16 +240,16 @@ mod tests {
     }
 
     #[test]
-    fn ball_at_defender_with_skill_declines_by_stub() {
+    fn ball_at_defender_with_skill_prompts_skill_use() {
+        // Java: showDialog → CONTINUE when the defender can use DumpOff.
         let mut game = make_game(vec![SkillId::DumpOff]);
         let def_pos = FieldCoordinate::new(6, 5);
         game.field_model.ball_coordinate = Some(def_pos);
         let mut step = StepDumpOff::new();
         step.defender_position = Some(def_pos);
         let outcome = step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(outcome.action, StepAction::NextStep);
-        // Stub: random agent declines → emit declined event
-        assert!(outcome.events.iter().any(|e| matches!(e, GameEvent::SkillUse { used: false, .. })));
+        assert_eq!(outcome.action, StepAction::Continue);
+        assert!(matches!(outcome.prompt, Some(AgentPrompt::SkillUse { .. })));
     }
 
     #[test]
