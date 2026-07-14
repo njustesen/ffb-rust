@@ -1,6 +1,74 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-15, Phase AAU done — 5 of 6 in the AAQ-AAV backlog arc)
+## Current Status (2026-07-15, Phase AAV done — 6 of 6, the AAQ-AAV backlog arc is complete)
+
+**Phase AAV — the full `PassStepModifier` hook — done, with a major scope correction found
+before writing any code.**
+
+The plan (based on research done before Phase AAS) assumed `PassMechanic`/`PassModifierFactory`/
+`PassContext`/`PassState` didn't exist in Rust at all ("nothing here exists yet — grep returns 0
+hits"). Direct verification at the start of this phase found that claim was **wrong** — all four
+already exist as complete, tested implementations in `ffb-mechanics` (`pass_mechanic.rs` +
+`bb2016/2020/2025/pass_mechanic.rs`, `modifiers/pass_modifier_factory.rs`,
+`modifiers/pass_context.rs`) and `ffb-engine` (`step/mixed/pass/state/pass_state.rs`) — the
+original research's grep must have missed them (possibly scoped too narrowly). Better still,
+`step_pass.rs` (the regular Pass action, all 3 editions) was **already fully wired** to this real
+infra before this phase started. The only genuine gap was `StepHailMaryPass` (bb2020 + bb2025),
+which still used a hardcoded "minimum roll is always 4" stub instead of calling into the same
+already-real mechanic.
+
+This matches the current BB2025 rules text directly (`rules/core_rules/08_skills_and_traits.md`):
+"Make a Passing Ability Test as normal treating the throw as a Long Bomb" — a Hail Mary Pass's
+minimum roll genuinely depends on the thrower's Passing stat + modifiers, not a fixed number.
+
+1. **`step_hail_mary_pass.rs` (bb2020)**: minimum roll and pass-result evaluation now go through
+   `Bb2020PassMechanic::minimum_roll_simple`/`evaluate_pass_simple` with real
+   `PassModifierFactory::find_modifiers` output (treated as a Long Bomb), instead of the fixed-4
+   stub. Falls back to 4 when no thrower is resolvable (preserves old test behavior exactly for
+   the many tests that set `step.roll` directly without a thrower in play).
+2. **`step_hail_mary_pass.rs` (bb2025)**: same real minimum-roll computation via
+   `Bb2025PassMechanic`. Lower-impact here since bb2025's routing is fumble (roll==1) vs.
+   not-fumble regardless of minimum_roll, and ACCURATE/INACCURATE already route identically (the
+   existing "line 149" conversion) — so this phase's fix here improves report/log fidelity
+   (the reported minimum roll is now real) without changing gameplay routing.
+3. **`PassModifier` isn't `Clone`** (holds a boxed predicate consumed during `find_modifiers`'
+   filtering) — rebuilt plain-data copies via `PassModifier::with_report(name, report_string,
+   modifier, type)` from the borrowed matches rather than trying to clone them.
+4. Updated `bb2025/pass_behaviour.rs`'s doc comments, which still described the "infra doesn't
+   exist" premise — corrected to reflect that the real fix lives directly in the step file
+   (matching the "registered but real logic lives in the step" pattern already established for
+   most other skills, per prior phases' own findings), not in this `PassStepModifier`'s
+   still-intentionally-inert `handle_execute_step`.
+5. **`bb2016`'s `StepHailMaryPass`** was left untouched — it already implements a full Pass-skill
+   +TRR re-roll cycle (more complete than bb2020/bb2025 in that respect) for a rule that appears to
+   genuinely be roll-only ("FUMBLE on 1, else INACCURATE", no passing-stat dependency) in that
+   edition, distinct from the newer editions' Passing-Ability-Test-based rule.
+
+5 new tests (minimum-roll-from-thrower-stat for both editions, fallback-to-4 without a thrower,
+and two routing tests proving a roll that would have passed under the old fixed-4 stub now
+correctly misses against a higher, stat-derived minimum in bb2020).
+
+Tests: 16,990 → **16,995**. 0 failures. `cargo clippy --workspace --all-targets`: still 0 errors.
+
+---
+
+**This closes the AAQ-AAV backlog arc from Phase AAP's "what's left" list.** Per SESSION.md's own
+recurring closing note across AAN/AAO/AAP, and reaffirmed by this arc's own findings, the natural
+next major workstream is Java/Rust parity/integration testing (currently dormant: 8 sample seeds in
+`progress.html`/`parity/`, one known FAIL) — out of scope for this arc per explicit user instruction
+(unit tests only, no parity). Two recurring lessons from this arc worth carrying forward: (1) prior
+phases' own claims about what infra "doesn't exist yet" should be verified fresh, not trusted
+carried-over — this happened twice in this arc alone (AAS's file-count correction, AAV's
+PassMechanic-already-exists correction); (2) this codebase has several **pairs of duplicate
+parallel implementations** of the same Java concept (two `InjuryTypeBlock`s — `injury.rs`'s
+`InjuryTypeBlockImpl` vs `injury/injuryType/injury_type_block.rs`'s `InjuryTypeBlock`; two
+`InducementDuration` enums; two `PassResult` enums) — not fixed in this arc (out of scope), but
+worth a dedicated future phase to reconcile, since they're a standing source of the kind of
+stale-assumption bugs this arc kept finding.
+
+---
+
+## Prior Status (2026-07-15, Phase AAU done — 5 of 6 in the AAQ-AAV backlog arc)
 
 **Phase AAU — PitTrapHandler injury wiring / StepPlayCard card-target routing, done — with one
 real architectural discovery that reshaped the scope.**

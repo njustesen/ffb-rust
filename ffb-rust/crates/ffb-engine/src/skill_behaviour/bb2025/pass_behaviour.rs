@@ -1,17 +1,20 @@
 /// 1:1 translation of com.fumbbl.ffb.server.skillbehaviour.bb2025.PassBehaviour.
 ///
 /// PassBehaviour extends AbstractPassBehaviour<Pass> and registers one StepModifier
-/// targeting StepHailMaryPass.  The modifier fires during the Hail Mary Pass step
-/// and handles:
+/// targeting StepHailMaryPass. Java's real hook handles:
 ///   - Pass skill re-roll offer on a fumble
 ///   - canAddStrengthToPass modifying-skill dialog / strength bonus
 ///   - dontDropFumbles (Safe Pass) dialog
 ///   - Full pass roll resolution with PassMechanic + PassModifierFactory
 ///
-/// Almost all of the hook body relies on infra not yet ported to Rust
-/// (PassMechanic, PassModifierFactory, PassState, UtilServerDialog, dialogs).
-/// Those branches are marked // headless: and skipped; the safe default
-/// (return false, leave outcome unset) is used.
+/// Phase AAV: `step_hail_mary_pass.rs` (bb2020 + bb2025) now computes its minimum roll and
+/// evaluates the pass via the real `PassMechanic`/`PassModifierFactory`/`PassContext` directly,
+/// matching the already-live pattern in `step_pass.rs` (the regular Pass action, which was
+/// already fully wired to this same infra before this phase). This `PassStepModifier` itself
+/// remains a documented no-op (`handle_execute_step` always returns `false`) since
+/// `StepHailMaryPass::execute_step` implements the real logic inline rather than by calling
+/// `dispatch::execute_step_hooks` — the same "registered but the real logic lives directly in
+/// the step file" pattern already established for most other skills in this codebase.
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;

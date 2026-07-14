@@ -1,8 +1,12 @@
-use ffb_model::enums::{PassResult, SkillId};
+use ffb_model::enums::{PassResult, PassingDistance, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::mixed::report_pass_roll::ReportPassRoll;
+use ffb_mechanics::bb2025::pass_mechanic::PassMechanic as Bb2025PassMechanic;
+use ffb_mechanics::modifiers::pass_context::PassContext;
+use ffb_mechanics::modifiers::pass_modifier_factory::PassModifierFactory;
+use ffb_mechanics::pass_mechanic::PassMechanic as PassMechanicTrait;
 use crate::action::Action;
 use crate::model::step_modifier::RerollHookState;
 use crate::skill_behaviour::dispatch;
@@ -121,11 +125,27 @@ impl StepHailMaryPass {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: PassBehaviour.handleExecuteStepHook -- StepHailMaryPass variant.
         //
-        // Hail Mary Pass rule: minimum roll is always 4 (no agility modifier applies).
+        // Hail Mary Pass rule (Phase AAV): a real Passing Ability Test treated as a Long Bomb,
+        // using the thrower's real Passing stat + modifiers (not a fixed "always 4" stub) — see
+        // step_hail_mary_pass.rs (bb2020) for the same fix. Note this only affects the *reported*
+        // minimum roll here: routing below is fumble (roll==1) vs not, independent of
+        // minimum_roll, and ACCURATE/INACCURATE both route identically (line 149's conversion),
+        // so this doesn't change gameplay outcomes in bb2025 — only report/log fidelity.
         // Java line 149: raw ACCURATE result -> INACCURATE (Hail Mary always deviates).
         // Routing: FUMBLE / SAVED_FUMBLE -> GOTO_LABEL; INACCURATE -> NEXT_STEP.
         if self.minimum_roll == 0 {
-            self.minimum_roll = 4;
+            let thrower = game.thrower_id.clone().and_then(|id| game.player(&id)).cloned();
+            self.minimum_roll = thrower.as_ref().map(|t| {
+                let factory = PassModifierFactory::for_rules(game.rules);
+                let ctx = PassContext::new(game, t, PassingDistance::LongBomb, false);
+                let modifiers: Vec<ffb_mechanics::modifiers::PassModifier> = factory.find_modifiers(&ctx)
+                    .into_iter()
+                    .map(|m| ffb_mechanics::modifiers::PassModifier::with_report(
+                        m.get_name(), m.get_report_string(), m.get_modifier(), m.get_type(),
+                    ))
+                    .collect();
+                Bb2025PassMechanic.minimum_roll_simple(t, PassingDistance::LongBomb, &modifiers)
+            }).flatten().unwrap_or(4);
         }
         if self.roll == 0 {
             self.roll = rng.d6();
@@ -273,6 +293,28 @@ mod tests {
         step.roll = 4;
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(step.minimum_roll, 4);
+    }
+
+    #[test]
+    fn minimum_roll_is_computed_from_thrower_passing_stat_as_a_long_bomb() {
+        use ffb_model::enums::{PlayerGender, PlayerType};
+        use ffb_model::model::player::Player;
+        // Bb2025PassMechanic::minimum_roll = passing + LongBomb's modifier_2020 (+3), floor 2.
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "thrower".into(), name: "thrower".into(), nr: 1, position_id: "thrower".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 2, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.thrower_id = Some("thrower".into());
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(step.minimum_roll, 5);
     }
 
     #[test]

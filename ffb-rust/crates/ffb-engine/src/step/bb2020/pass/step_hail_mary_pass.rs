@@ -1,8 +1,12 @@
-use ffb_model::enums::{PassResult, SkillId};
+use ffb_model::enums::{PassResult, PassingDistance, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::mixed::report_pass_roll::ReportPassRoll;
+use ffb_mechanics::bb2020::pass_mechanic::PassMechanic as Bb2020PassMechanic;
+use ffb_mechanics::modifiers::pass_context::PassContext;
+use ffb_mechanics::modifiers::pass_modifier_factory::PassModifierFactory;
+use ffb_mechanics::pass_mechanic::PassMechanic as PassMechanicTrait;
 use crate::action::Action;
 use crate::model::step_modifier::RerollHookState;
 use crate::skill_behaviour::dispatch;
@@ -14,14 +18,11 @@ use crate::step::framework::{StepId, StepParameter};
 /// Resolves a Hail Mary Pass skill roll (BB2020). Flow:
 ///  1. Roll d6 (or re-use cached `roll` if re-entering after re-roll).
 ///  2. Offer "use modifying skill" dialog (canAddStrengthToPass).
-///  3. Evaluate pass result.
+///  3. Evaluate pass result via the real `PassMechanic`/`PassModifierFactory` (Phase AAV) —
+///     a Hail Mary Pass is a genuine Passing Ability Test treated as a Long Bomb (per the current
+///     rules text), not a fixed "always need 4+" roll as the pre-AAV stub assumed.
 ///  4. Publish PassFumble.
 ///  5. ACCURATE/SAVED_FUMBLE → NEXT_STEP; FUMBLE/INACCURATE → `goto_label_on_failure`.
-///
-/// In Java, `executeStep()` delegates entirely to `getGameState().executeStepHooks(this, state)`.
-/// The Rust translation performs the minimal d6 roll (threshold 4+) matching the Hail Mary Pass
-/// skill rule, using BB2020 mechanics (no Safe Pass). The `state` inner class fields are
-/// flattened into the struct.
 ///
 /// Needs init param: `GotoLabelOnFailure`.
 /// Publishes: `PassFumble`.
@@ -113,26 +114,50 @@ impl Step for StepHailMaryPass {
 
 impl StepHailMaryPass {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // Java: getGameState().executeStepHooks(this, state)
-        //   → HailMaryPassHandler (not yet translated)
-        //
-        // Hail Mary Pass rule: roll 1d6; on 4+ the pass is accurate.
-        // On 1-3 the pass is inaccurate and scatters.
-        // On a natural 1 it is a fumble.
-        // BB2020: minimumRoll is always 4 for a Hail Mary Pass.
+        // Java: getGameState().executeStepHooks(this, state) → PassBehaviour's
+        // StepHailMaryPass modifier: a Hail Mary Pass is a real Passing Ability Test treated
+        // as a Long Bomb (current rules text), using the thrower's real Passing stat + modifiers
+        // — not a fixed "always need 4+" roll.
+        let thrower_id = game.thrower_id.clone();
+        let thrower = thrower_id.as_deref().and_then(|id| game.player(id)).cloned();
 
+        // PassModifier isn't Clone (holds a boxed predicate already consumed by find_modifiers'
+        // filtering) — rebuild plain-data copies from the borrowed matches.
+        let modifiers: Vec<ffb_mechanics::modifiers::PassModifier> = thrower.as_ref()
+            .map(|t| {
+                let factory = PassModifierFactory::for_rules(game.rules);
+                let ctx = PassContext::new(game, t, PassingDistance::LongBomb, false);
+                factory.find_modifiers(&ctx).into_iter()
+                    .map(|m| ffb_mechanics::modifiers::PassModifier::with_report(
+                        m.get_name(), m.get_report_string(), m.get_modifier(), m.get_type(),
+                    ))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let mechanic = Bb2020PassMechanic;
         if self.minimum_roll == 0 {
-            self.minimum_roll = 4;
+            self.minimum_roll = thrower.as_ref()
+                .and_then(|t| mechanic.minimum_roll_simple(t, PassingDistance::LongBomb, &modifiers))
+                .unwrap_or(4);
         }
         if self.roll == 0 {
             self.roll = rng.d6();
         }
 
         // client-only: DialogSkillUseParameter for canAddStrengthToPass — headless skips
-        // client-only: PassMechanic.evaluatePass with statBasedModifier (canAddStrengthToPass dialog) — headless skips
 
-        let is_fumble = self.roll == 1;
-        let is_accurate = self.roll >= self.minimum_roll;
+        let mechanic_result = thrower.as_ref().map(|t| {
+            mechanic.evaluate_pass_simple(t, self.roll, PassingDistance::LongBomb, &modifiers, false)
+        });
+
+        let is_fumble = matches!(
+            mechanic_result,
+            Some(ffb_mechanics::pass_result::PassResult::FUMBLE) | Some(ffb_mechanics::pass_result::PassResult::SAVED_FUMBLE)
+        ) || (mechanic_result.is_none() && self.roll == 1);
+        let is_accurate = mechanic_result
+            .map(|r| r == ffb_mechanics::pass_result::PassResult::ACCURATE)
+            .unwrap_or(self.roll >= self.minimum_roll);
 
         // BB2020 has no Safe Pass (dontDropFumbles) dialog on Hail Mary
         let pass_fumble = is_fumble;
@@ -181,6 +206,59 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2020)
+    }
+
+    fn make_game_with_thrower(passing: i32) -> Game {
+        use ffb_model::enums::{PlayerGender, PlayerType};
+        use ffb_model::model::player::Player;
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "thrower".into(), name: "thrower".into(), nr: 1, position_id: "thrower".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.thrower_id = Some("thrower".into());
+        game
+    }
+
+    #[test]
+    fn minimum_roll_is_computed_from_thrower_passing_stat_as_a_long_bomb() {
+        // Bb2020PassMechanic::minimum_roll = passing + LongBomb's modifier_2020 (+3), floor 2.
+        let mut game = make_game_with_thrower(2);
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(step.minimum_roll, 5);
+    }
+
+    #[test]
+    fn minimum_roll_falls_back_to_four_without_a_thrower() {
+        let mut game = make_game();
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(step.minimum_roll, 4);
+    }
+
+    #[test]
+    fn roll_meeting_computed_minimum_is_accurate() {
+        let mut game = make_game_with_thrower(2); // minimum_roll = 5
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.roll = 5;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn roll_below_computed_minimum_is_inaccurate() {
+        let mut game = make_game_with_thrower(2); // minimum_roll = 5
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.roll = 4; // would have been ACCURATE under the old fixed-4 stub
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel, "roll 4 must miss a higher, stat-derived minimum roll");
     }
 
     #[test]
