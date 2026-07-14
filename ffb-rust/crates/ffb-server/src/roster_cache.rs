@@ -69,6 +69,7 @@ impl RosterCache {
                     special_rules: vec![],
                     necromancer: false,
                     keywords: vec![],
+                    raised_position_id: None,
                 }));
                 parsed.into_any().downcast::<Roster>().map(|r| *r).map_err(|_| {
                     io::Error::new(io::ErrorKind::InvalidData, "Roster XML did not parse into a Roster")

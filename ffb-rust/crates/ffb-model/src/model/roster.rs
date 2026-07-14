@@ -27,11 +27,18 @@ pub struct Roster {
     pub necromancer: bool,
     #[serde(default)]
     pub keywords: Vec<String>,
+    #[serde(default)]
+    pub raised_position_id: Option<String>,
 }
 
 impl Roster {
     pub fn position(&self, id: &str) -> Option<&RosterPosition> {
         self.positions.iter().find(|p| p.id == id)
+    }
+
+    /// 1:1 translation of `Roster.getRaisedRosterPosition`.
+    pub fn raised_roster_position(&self) -> Option<&RosterPosition> {
+        self.raised_position_id.as_deref().and_then(|id| self.position(id))
     }
 
     pub fn non_star_positions(&self) -> impl Iterator<Item = &RosterPosition> {
@@ -127,6 +134,7 @@ mod tests {
             special_rules: vec![],
             necromancer: false,
             keywords: vec![],
+            raised_position_id: None,
         }
     }
 
@@ -236,6 +244,43 @@ mod tests {
         assert_eq!(r.positions.len(), 1);
     }
 
+    fn zombie_position() -> crate::model::roster_position::RosterPosition {
+        crate::model::roster_position::RosterPosition {
+            id: "necromantic.zombie".into(), name: "Zombie".into(),
+            display_name: None, shorthand: None,
+            player_type: crate::enums::PlayerType::Regular,
+            gender: crate::enums::PlayerGender::Male,
+            quantity: 16, cost: 40_000,
+            movement: 3, strength: 3, agility: 3, passing: 5, armour: 8,
+            skills: vec![], skill_categories_normal: vec![],
+            skill_categories_double: vec![], keywords: vec![],
+            is_big_guy: false, is_lineman: false, is_undead: true, is_thrall: false,
+            race: None, replaces_position: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None,
+        }
+    }
+
+    #[test]
+    fn raised_roster_position_none_by_default() {
+        let r = empty_roster();
+        assert!(r.raised_roster_position().is_none());
+    }
+
+    #[test]
+    fn raised_roster_position_resolves_by_id() {
+        let mut r = empty_roster();
+        r.positions.push(zombie_position());
+        r.raised_position_id = Some("necromantic.zombie".into());
+        let pos = r.raised_roster_position().expect("should resolve");
+        assert_eq!(pos.id, "necromantic.zombie");
+    }
+
+    #[test]
+    fn raised_roster_position_none_when_id_not_found() {
+        let mut r = empty_roster();
+        r.raised_position_id = Some("missing.position".into());
+        assert!(r.raised_roster_position().is_none());
+    }
+
     #[test]
     fn has_necromancer_false_by_default() {
         let r = empty_roster();
@@ -312,7 +357,7 @@ mod tests {
         let parsed = crate::xml::XmlHandler::parse(None, AMAZON_ROSTER_XML, Box::new(Roster {
             id: String::new(), name: String::new(), race: String::new(),
             reroll_cost: 0, max_rerolls: 0, positions: vec![], special_rules: vec![],
-            necromancer: false, keywords: vec![],
+            necromancer: false, keywords: vec![], raised_position_id: None,
         }));
         let roster = parsed.as_any().downcast_ref::<Roster>().unwrap();
         assert_eq!(roster.id, "amazon.lrb6");
@@ -326,7 +371,7 @@ mod tests {
         let parsed = crate::xml::XmlHandler::parse(None, AMAZON_ROSTER_XML, Box::new(Roster {
             id: String::new(), name: String::new(), race: String::new(),
             reroll_cost: 0, max_rerolls: 0, positions: vec![], special_rules: vec![],
-            necromancer: false, keywords: vec![],
+            necromancer: false, keywords: vec![], raised_position_id: None,
         }));
         let roster = parsed.as_any().downcast_ref::<Roster>().unwrap();
         assert_eq!(roster.positions.len(), 2);

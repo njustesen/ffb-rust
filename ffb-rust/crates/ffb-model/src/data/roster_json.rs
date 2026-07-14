@@ -38,6 +38,8 @@ pub struct RosterJson {
     pub positions: Vec<PositionJson>,
     #[serde(default)]
     pub special_rules: Vec<String>,
+    #[serde(default)]
+    pub raised_position_id: Option<String>,
 }
 
 impl RosterJson {
@@ -187,6 +189,7 @@ mod tests {
             keywords,
             positions: vec![],
             special_rules: vec![],
+            raised_position_id: None,
         }
     }
 

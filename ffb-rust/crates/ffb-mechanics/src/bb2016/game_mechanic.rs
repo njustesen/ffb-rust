@@ -195,6 +195,7 @@ mod tests {
                 }
             }).collect(),
             special_rules: vec![], necromancer: false, keywords: vec![],
+            raised_position_id: None,
         }
     }
 

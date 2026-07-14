@@ -456,6 +456,7 @@ mod tests {
             id: "amazon.lrb6".into(), name: "Amazon".into(), race: String::new(),
             reroll_cost: 50_000, max_rerolls: 8, positions: vec![blitzer_pos],
             special_rules: vec![], necromancer: false, keywords: vec![],
+            raised_position_id: None,
         };
 
         team.update_roster(&roster);

@@ -251,7 +251,6 @@ impl StepApothecary {
             // Java: UtilServerInjury.handleInjurySideEffects(this, fInjuryResult)
             let side_events = if let Some(ref ir) = self.injury_result {
                 crate::step::util_server_injury::handle_injury_side_effects(game, ir)
-                // no-op: handleRaiseDead — InjuryMechanic.canRaiseDead + player creation not ported
             } else {
                 vec![]
             };

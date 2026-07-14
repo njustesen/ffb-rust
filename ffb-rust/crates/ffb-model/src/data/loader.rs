@@ -240,6 +240,7 @@ pub fn roster_json_to_roster(rj: &RosterJson) -> Roster {
         special_rules: rj.special_rules.clone(),
         necromancer: rj.necromancer,
         keywords: rj.keywords.clone(),
+        raised_position_id: rj.raised_position_id.clone(),
     }
 }
 

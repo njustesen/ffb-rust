@@ -12,16 +12,18 @@ use crate::injury::injuryType::modification_aware_injury_type_server::{Modificat
 
 /// Java: InjuryTypeBlock.Mode enum (inner class).
 ///
-/// `DoNotUseModifiers` and `UseArmourModifiersOnlyAgainstTeamMates` mirror the real Java
-/// `Mode.DO_NOT_USE_MODIFIERS` / `Mode.USE_ARMOUR_MODIFIERS_ONLY_AGAINST_TEAM_MATES` variants
-/// (see `InjuryTypeBlock.java` lines 55–56 and 89–102 for the team-mate/armour-only modifier
-/// gating logic they drive). This Rust port's `armour_roll`/`injury_roll` are already a
-/// simplified subset of Java's (see file-level TODOs re: CLAW_DOES_NOT_STACK, chainsaw) that
-/// only special-cases Mighty Blow, unconditioned on team-mate status — so, for now, these two
-/// new variants behave identically to `Regular`/`UseModifiersAgainstTeamMates` at the call
-/// sites that already exist. Added here (Phase AAK+1, Animal Savagery port) purely so callers
-/// can name the Java-correct mode; the fuller mode-gated modifier behaviour remains a
-/// pre-existing gap, not introduced by this change.
+/// Java's real `Mode` has 4 variants (`REGULAR`, `USE_MODIFIERS_AGAINST_TEAM_MATES`,
+/// `DO_NOT_USE_MODIFIERS`, `USE_ARMOUR_MODIFIERS_ONLY_AGAINST_TEAM_MATES`); this port adds 3
+/// extra split-out variants (`UseMightyBlow`/`UseClaws`/`UseClawsAndMightyBlow`) predating the
+/// other 2, so callers can request Mighty Blow's modifier directly without a real team-mate
+/// check. `armour_roll`/`injury_roll` gate the (currently Mighty-Blow-only; full Claws/chainsaw/
+/// CLAW_DOES_NOT_STACK modifier-factory lookup remains a documented pre-existing TODO) modifier
+/// addition on `mode`, mirroring `InjuryTypeBlock.java`'s real per-roll conditions (lines 54–60
+/// for injury, 89–91 for armour): `DoNotUseModifiers` never adds modifiers;
+/// `UseArmourModifiersOnlyAgainstTeamMates` adds them for armour only (its own Java condition
+/// excludes it from the injury-roll condition, since it's specifically "armour modifiers only");
+/// `UseModifiersAgainstTeamMates` always adds them; `Regular` adds them only when attacker and
+/// defender are on different teams.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BlockMode {
     Regular,
@@ -60,11 +62,29 @@ impl InjuryTypeServer for InjuryTypeBlock {
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn java_class_name(&self) -> &'static str { "Block" }
 }
+/// Java: `pAttacker.getTeam() != pDefender.getTeam()`.
+fn different_teams(game: &Game, attacker_id: Option<&str>, defender_id: &str) -> bool {
+    match attacker_id {
+        Some(aid) => game.team_home.has_player(aid) != game.team_home.has_player(defender_id),
+        None => false,
+    }
+}
+
 impl ModificationAwareInjuryType for InjuryTypeBlock {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str, roll: bool) {
         if roll && self.roll_armour {
-            // MightyBlow: +1 to armor roll in MB or Claws+MB mode
-            if matches!(self.mode, BlockMode::UseMightyBlow | BlockMode::UseClawsAndMightyBlow) {
+            // Java armourRoll (lines 89-91): mode == USE_ARMOUR_MODIFIERS_ONLY_AGAINST_TEAM_MATES
+            // || mode == USE_MODIFIERS_AGAINST_TEAM_MATES || (mode != DO_NOT_USE_MODIFIERS && different teams).
+            let modifiers_apply = match self.mode {
+                BlockMode::DoNotUseModifiers => false,
+                BlockMode::UseArmourModifiersOnlyAgainstTeamMates
+                | BlockMode::UseModifiersAgainstTeamMates
+                | BlockMode::UseMightyBlow
+                | BlockMode::UseClaws
+                | BlockMode::UseClawsAndMightyBlow => true,
+                BlockMode::Regular => different_teams(game, attacker_id, defender_id),
+            };
+            if modifiers_apply {
                 if let Some(aid) = attacker_id {
                     if let Some(attacker) = game.player(aid) {
                         if attacker.has_skill(SkillId::MightyBlow) {
@@ -84,8 +104,18 @@ impl ModificationAwareInjuryType for InjuryTypeBlock {
                 self.ctx.add_injury_modifier(m);
             }
         }
-        // MightyBlow: +1 to injury roll in MB or Claws+MB mode
-        if matches!(self.mode, BlockMode::UseMightyBlow | BlockMode::UseClawsAndMightyBlow) {
+        // Java injuryRoll (lines 54-60): mode != USE_ARMOUR_MODIFIERS_ONLY_AGAINST_TEAM_MATES &&
+        // (mode == USE_MODIFIERS_AGAINST_TEAM_MATES || (mode != DO_NOT_USE_MODIFIERS && different teams)).
+        // Note USE_ARMOUR_MODIFIERS_ONLY_AGAINST_TEAM_MATES is excluded here (armour-only by name).
+        let modifiers_apply = match self.mode {
+            BlockMode::DoNotUseModifiers | BlockMode::UseArmourModifiersOnlyAgainstTeamMates => false,
+            BlockMode::UseModifiersAgainstTeamMates
+            | BlockMode::UseMightyBlow
+            | BlockMode::UseClaws
+            | BlockMode::UseClawsAndMightyBlow => true,
+            BlockMode::Regular => different_teams(game, attacker_id, defender_id),
+        };
+        if modifiers_apply {
             if let Some(aid) = attacker_id {
                 if let Some(attacker) = game.player(aid) {
                     if attacker.has_skill(SkillId::MightyBlow) {
@@ -134,6 +164,13 @@ mod tests {
         Game::new(home, away, Rules::Bb2025)
     }
 
+    fn game_with_same_team_attacker_and_defender(attacker_skills: Vec<SkillId>, defender_armour: i32) -> Game {
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(make_player("attacker", 7, attacker_skills));
+        home.players.push(make_player("defender", defender_armour, vec![]));
+        Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2025)
+    }
+
     fn coord() -> FieldCoordinate { FieldCoordinate::new(5, 5) }
 
     #[test]
@@ -163,8 +200,16 @@ mod tests {
         assert!(t.ctx.armor_modifiers.contains(&ARMOR_MIGHTY_BLOW_1));
     }
     #[test]
-    fn regular_mode_does_not_add_mighty_blow_armor_modifier() {
+    fn regular_mode_adds_mighty_blow_armor_modifier_against_different_team() {
         let game = game_with_attacker_and_defender(vec![SkillId::MightyBlow], 2);
+        let mut t = InjuryTypeBlock::new(BlockMode::Regular, true);
+        let mut rng = GameRng::new(1);
+        t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
+        assert!(t.ctx.armor_modifiers.contains(&ARMOR_MIGHTY_BLOW_1));
+    }
+    #[test]
+    fn regular_mode_does_not_add_mighty_blow_armor_modifier_against_same_team() {
+        let game = game_with_same_team_attacker_and_defender(vec![SkillId::MightyBlow], 2);
         let mut t = InjuryTypeBlock::new(BlockMode::Regular, true);
         let mut rng = GameRng::new(1);
         t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
@@ -188,9 +233,43 @@ mod tests {
         assert!(t.ctx.injury_modifiers.contains(&INJURY_MIGHTY_BLOW_1));
     }
     #[test]
-    fn regular_mode_does_not_add_mighty_blow_injury_modifier() {
+    fn regular_mode_adds_mighty_blow_injury_modifier_against_different_team() {
         let game = game_with_attacker_and_defender(vec![SkillId::MightyBlow], 2);
         let mut t = InjuryTypeBlock::new(BlockMode::Regular, true);
+        let mut rng = GameRng::new(1);
+        t.ctx.armor_broken = true;
+        t.injury_roll(&game, &mut rng, Some("attacker"), "defender");
+        assert!(t.ctx.injury_modifiers.contains(&INJURY_MIGHTY_BLOW_1));
+    }
+    #[test]
+    fn regular_mode_does_not_add_mighty_blow_injury_modifier_against_same_team() {
+        let game = game_with_same_team_attacker_and_defender(vec![SkillId::MightyBlow], 2);
+        let mut t = InjuryTypeBlock::new(BlockMode::Regular, true);
+        let mut rng = GameRng::new(1);
+        t.ctx.armor_broken = true;
+        t.injury_roll(&game, &mut rng, Some("attacker"), "defender");
+        assert!(!t.ctx.injury_modifiers.contains(&INJURY_MIGHTY_BLOW_1));
+    }
+    #[test]
+    fn do_not_use_modifiers_never_adds_armor_modifier() {
+        let game = game_with_attacker_and_defender(vec![SkillId::MightyBlow], 2);
+        let mut t = InjuryTypeBlock::new(BlockMode::DoNotUseModifiers, true);
+        let mut rng = GameRng::new(1);
+        t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
+        assert!(!t.ctx.armor_modifiers.contains(&ARMOR_MIGHTY_BLOW_1));
+    }
+    #[test]
+    fn use_armour_modifiers_only_against_team_mates_adds_armor_modifier_against_same_team() {
+        let game = game_with_same_team_attacker_and_defender(vec![SkillId::MightyBlow], 2);
+        let mut t = InjuryTypeBlock::new(BlockMode::UseArmourModifiersOnlyAgainstTeamMates, true);
+        let mut rng = GameRng::new(1);
+        t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
+        assert!(t.ctx.armor_modifiers.contains(&ARMOR_MIGHTY_BLOW_1));
+    }
+    #[test]
+    fn use_armour_modifiers_only_against_team_mates_never_adds_injury_modifier() {
+        let game = game_with_same_team_attacker_and_defender(vec![SkillId::MightyBlow], 2);
+        let mut t = InjuryTypeBlock::new(BlockMode::UseArmourModifiersOnlyAgainstTeamMates, true);
         let mut rng = GameRng::new(1);
         t.ctx.armor_broken = true;
         t.injury_roll(&game, &mut rng, Some("attacker"), "defender");

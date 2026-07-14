@@ -334,7 +334,7 @@ pub fn stun_player(game: &mut Game, player_id: &str) {
 /// Port of `UtilServerInjury.handleInjurySideEffects(IStep, InjuryResult)`.
 ///
 /// Called after injury resolution is finalised (apothecary done or declined).
-/// 1. `handleRaiseDead` — no-op: InjuryMechanic.canRaiseDead + player creation not ported.
+/// 1. `handleRaiseDead` — the opposing team may raise a RIP'd player as a Zombie/Thrall/Rotter.
 /// 2. `mechanic.handlePumpUp` — grant extra re-roll if attacker has PumpUpTheCrowd skill.
 ///    Emits `GameEvent::PumpUpTheCrowdReRoll` when a re-roll is granted.
 ///
@@ -347,7 +347,7 @@ pub fn handle_injury_side_effects(
     use ffb_model::events::GameEvent;
     use crate::mechanic::state_mechanic::StateMechanic as StateMechanicTrait;
 
-    // no-op: handleRaiseDead — InjuryMechanic.canRaiseDead + player creation not ported
+    let mut events = handle_raise_dead(game, injury_result.injury_context());
 
     // Java: mechanic.handlePumpUp(pStep, pInjuryResult) — dispatch on edition
     let injury_context = injury_result.injury_context();
@@ -365,10 +365,121 @@ pub fn handle_injury_side_effects(
     if pump_up_granted {
         let attacker_id = injury_result.injury_context().attacker_id.clone()
             .unwrap_or_default();
-        vec![GameEvent::PumpUpTheCrowdReRoll { player_id: attacker_id }]
-    } else {
-        vec![]
+        events.push(GameEvent::PumpUpTheCrowdReRoll { player_id: attacker_id });
     }
+    events
+}
+
+/// Dispatch `InjuryMechanic` to the appropriate edition mechanic (boxed, since callers need
+/// several of its methods together rather than one dispatched call at a time).
+fn injury_mechanic_for(rules: ffb_model::enums::Rules) -> Box<dyn ffb_mechanics::injury_mechanic::InjuryMechanic> {
+    use ffb_model::enums::Rules;
+    match rules {
+        Rules::Bb2016 => Box::new(ffb_mechanics::bb2016::injury_mechanic::InjuryMechanic::new()),
+        Rules::Bb2020 => Box::new(ffb_mechanics::bb2020::injury_mechanic::InjuryMechanic::new()),
+        Rules::Bb2025 | Rules::Common => Box::new(ffb_mechanics::bb2025::injury_mechanic::InjuryMechanic::new()),
+    }
+}
+
+/// Port of `UtilServerInjury.handleRaiseDead` + `raisePlayer` + `sendRaisedPlayer`.
+///
+/// After a fatal injury (RIP), the opposing team may raise the dead player as a Zombie/Thrall
+/// (necromancer/vampire-lord teams, via `canRaiseDead`) or a Rotter (infected-by-attacker teams
+/// with Nurgle's Rot, via `canRaiseInfectedPlayers`). Returns the `PlayerAdded` event if a
+/// player was raised; empty otherwise.
+fn handle_raise_dead(
+    game: &mut Game,
+    injury_context: &InjuryContext,
+) -> Vec<ffb_model::events::GameEvent> {
+    use ffb_model::enums::{PlayerState, PlayerType, SendToBoxReason, PS_MISSING, PS_RESERVE, PS_RIP};
+    use ffb_model::events::GameEvent;
+    use ffb_model::model::player::Player;
+    use ffb_model::report::report_raise_dead::ReportRaiseDead;
+    use ffb_model::util::raise_type::RaiseType;
+
+    let dead_player_id = match injury_context.defender_id.clone() {
+        Some(id) => id,
+        None => return vec![],
+    };
+    let is_rip = injury_context.injury.map(|ps| ps.base() == PS_RIP).unwrap_or(false);
+    if !is_rip {
+        return vec![];
+    }
+    let dead_player = match game.player(&dead_player_id) {
+        Some(p) => p.clone(),
+        None => return vec![],
+    };
+
+    // Java: UtilPlayer.findOtherTeam(game, deadPlayer) — the necromantic/vampire team is the
+    // opponent of the dead player's team.
+    let necro_is_home = !game.team_home.has_player(&dead_player_id);
+    let necro_team = if necro_is_home { game.team_home.clone() } else { game.team_away.clone() };
+    let team_result = game.game_result.team_result(necro_is_home).clone();
+    let mechanic = injury_mechanic_for(game.rules);
+
+    let mut nurgles_rot = false;
+    let raise_type = if mechanic.can_raise_dead(&necro_team, &team_result, &dead_player) {
+        mechanic.raise_type(&necro_team)
+    } else {
+        let attacker = injury_context.attacker_id.as_deref().and_then(|id| game.player(id).cloned());
+        if mechanic.can_raise_infected_players(&necro_team, &team_result, attacker.as_ref(), &dead_player) {
+            nurgles_rot = true;
+            RaiseType::ROTTER
+        } else {
+            return vec![];
+        }
+    };
+
+    let zombie_position = match ffb_model::data::loader::find_roster(&necro_team.roster_id, game.rules)
+        .and_then(|roster| roster.raised_roster_position().cloned())
+    {
+        Some(pos) => pos,
+        None => return vec![],
+    };
+
+    let team_result_mut = game.game_result.team_result_mut(necro_is_home);
+    team_result_mut.raised_dead += 1;
+    let raised_id = format!("{}R{}", dead_player_id, team_result_mut.raised_dead);
+
+    let player_type = if raise_type == RaiseType::ROTTER {
+        mechanic.raised_nurgle_type()
+    } else {
+        PlayerType::RaisedFromDead
+    };
+    let max_nr = necro_team.players.iter().map(|p| p.nr).max().unwrap_or(0);
+    let mut raised_player = Player::from_position(raised_id.clone(), dead_player.name.clone(), max_nr + 1, &zombie_position);
+    raised_player.player_type = player_type;
+
+    let (send_to_box_reason, new_state) = match raise_type {
+        RaiseType::ROTTER => (
+            Some(mechanic.raised_by_nurgle_reason()),
+            if mechanic.infected_goes_to_reserves() { PlayerState::new(PS_RESERVE) } else { PlayerState::new(PS_MISSING) },
+        ),
+        RaiseType::ZOMBIE => (Some(SendToBoxReason::Raised), PlayerState::new(PS_RESERVE)),
+        RaiseType::THRALL => (None, PlayerState::new(PS_MISSING)),
+    };
+
+    let player_result = team_result_mut.player_result_mut(&raised_id);
+    player_result.send_to_box_half = game.half;
+    player_result.send_to_box_turn = if necro_is_home { game.turn_data_home.turn_nr } else { game.turn_data_away.turn_nr };
+    player_result.send_to_box_reason = send_to_box_reason;
+
+    if necro_is_home {
+        game.team_home.players.push(raised_player);
+    } else {
+        game.team_away.players.push(raised_player);
+    }
+    game.field_model.set_player_state(&raised_id, new_state);
+    ffb_model::util::util_box::UtilBox::put_player_into_box(game, &raised_id);
+
+    game.report_list.add(ReportRaiseDead::new(raised_id.clone(), Some(zombie_position.name.clone()), nurgles_rot));
+    // Java: getResult().setSound(SoundId.ORGAN) — client-only, no-op in headless
+
+    vec![GameEvent::PlayerAdded {
+        team_id: necro_team.id.clone(),
+        player_id: raised_id,
+        position_id: zombie_position.id.clone(),
+    }]
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -832,5 +943,99 @@ mod tests {
         let events = handle_injury_side_effects(&mut game, &ir);
         assert_eq!(events.len(), 1);
         assert!(matches!(&events[0], GameEvent::PumpUpTheCrowdReRoll { .. }));
+    }
+
+    // ── handle_raise_dead tests ────────────────────────────────────────────────
+
+    fn make_rip_ir(defender_id: &str) -> InjuryResult {
+        use ffb_model::enums::{ApothecaryMode, PS_RIP, PlayerState};
+        let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+        ir.injury_context_mut().defender_id = Some(defender_id.into());
+        ir.injury_context_mut().injury = Some(PlayerState::new(PS_RIP));
+        ir
+    }
+
+    #[test]
+    fn handle_raise_dead_creates_zombie_for_necromancer_team() {
+        use ffb_model::enums::PS_RIP;
+        use ffb_model::events::GameEvent;
+        let mut away = test_team("away", 0);
+        away.roster_id = "necromantic.lrb6".into();
+        away.necromancer = true;
+        let mut game = Game::new(test_team("home", 0), away, Rules::Bb2016);
+        add_player(&mut game, "dead1", PS_RIP);
+
+        let ir = make_rip_ir("dead1");
+        let events = handle_injury_side_effects(&mut game, &ir);
+
+        assert_eq!(game.team_away.players.len(), 1, "zombie should be added to the necromancer team");
+        assert_eq!(game.team_away.players[0].position_id, "necromantic.zombie");
+        assert_eq!(game.game_result.away.raised_dead, 1);
+        assert!(events.iter().any(|e| matches!(e, GameEvent::PlayerAdded { team_id, .. } if team_id == "away")));
+    }
+
+    #[test]
+    fn handle_raise_dead_noop_when_not_rip() {
+        use ffb_model::enums::{ApothecaryMode, PS_KNOCKED_OUT, PlayerState};
+        let mut away = test_team("away", 0);
+        away.roster_id = "necromantic.lrb6".into();
+        away.necromancer = true;
+        let mut game = Game::new(test_team("home", 0), away, Rules::Bb2016);
+        add_player(&mut game, "dead1", PS_KNOCKED_OUT);
+
+        let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+        ir.injury_context_mut().defender_id = Some("dead1".into());
+        ir.injury_context_mut().injury = Some(PlayerState::new(PS_KNOCKED_OUT));
+        handle_injury_side_effects(&mut game, &ir);
+
+        assert!(game.team_away.players.is_empty());
+        assert_eq!(game.game_result.away.raised_dead, 0);
+    }
+
+    #[test]
+    fn handle_raise_dead_noop_without_necromancer_or_vampire_lord() {
+        use ffb_model::enums::PS_RIP;
+        let away = test_team("away", 0); // no necromancer, no vampire_lord
+        let mut game = Game::new(test_team("home", 0), away, Rules::Bb2016);
+        add_player(&mut game, "dead1", PS_RIP);
+
+        let ir = make_rip_ir("dead1");
+        handle_injury_side_effects(&mut game, &ir);
+
+        assert!(game.team_away.players.is_empty());
+        assert_eq!(game.game_result.away.raised_dead, 0);
+    }
+
+    #[test]
+    fn handle_raise_dead_raises_thrall_for_vampire_lord_team() {
+        use ffb_model::enums::PS_RIP;
+        let mut away = test_team("away", 0);
+        away.roster_id = "necromantic.lrb6".into();
+        away.vampire_lord = true;
+        let mut game = Game::new(test_team("home", 0), away, Rules::Bb2016);
+        add_player(&mut game, "dead1", PS_RIP);
+
+        let ir = make_rip_ir("dead1");
+        handle_injury_side_effects(&mut game, &ir);
+
+        assert_eq!(game.team_away.players.len(), 1);
+        assert_eq!(game.team_away.players[0].player_type, PlayerType::RaisedFromDead);
+        assert_eq!(game.game_result.away.raised_dead, 1);
+    }
+
+    #[test]
+    fn handle_raise_dead_emits_raise_dead_report() {
+        use ffb_model::enums::PS_RIP;
+        let mut away = test_team("away", 0);
+        away.roster_id = "necromantic.lrb6".into();
+        away.necromancer = true;
+        let mut game = Game::new(test_team("home", 0), away, Rules::Bb2016);
+        add_player(&mut game, "dead1", PS_RIP);
+
+        let ir = make_rip_ir("dead1");
+        handle_injury_side_effects(&mut game, &ir);
+
+        assert_eq!(game.report_list.size(), 1);
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::RAISE_DEAD));
     }
 }

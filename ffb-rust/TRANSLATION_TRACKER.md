@@ -29,6 +29,46 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AAP (closes 2 real gaps found via a from-scratch source audit of Phase AAO's own "what's
+left" list — 2 of its 3 named items turned out to be stale, corrected here):**
+1. **Real bug/gap closed: raise-dead never fired.** `UtilServerInjury.handleRaiseDead` +
+   `raisePlayer`/`sendRaisedPlayer` (Necromantic/vampire-lord teams raising a RIP'd opponent as
+   Zombie/Thrall, or Nurgle's-Rot teams raising as Rotter) was a documented no-op in all 3
+   `step_apothecary.rs` files despite `InjuryMechanic::can_raise_dead`/`can_raise_infected_players`/
+   `raise_type`/`raised_nurgle_type` already being real, tested, per-edition mechanics. Implemented
+   the missing piece in `util_server_injury.rs::handle_raise_dead`: added `Roster::
+   raised_position_id`/`raised_roster_position()` (the JSON data already carried
+   `raised_position_id`, just never consumed), reused the existing `Player::from_position`/
+   `find_roster`/`UtilBox::put_player_into_box` helpers. 5 new tests.
+2. **Correction of Phase AAO's own top-priority item**: AAO's closing note recommended wiring
+   `UtilSkillBehaviours::register_behaviours` into `GameState` construction. Direct investigation
+   found this recommendation was itself wrong — it would build a *third* parallel skill-dispatch
+   path alongside the already-live `skill_behaviour/registry.rs`/`dispatch::execute_step_hooks`
+   system. A full audit of that live registry's ~30 `StepModifierTrait::handle_execute_step`
+   bodies found: ~10 (Wrestle/Stab/Bombardier/Dauntless/Tentacles/Shadowing/JumpUp/Animosity/
+   DumpOff/Juggernaut) are confirmed dead-duplicate stubs with real logic already in direct
+   `step_xxx.rs` files (matches the established Phases AAG-AAI precedent, correctly left alone);
+   the rest are genuinely real and working. **One true gap found**: `TheBallista`'s both step
+   modifiers are real stubs blocked on step-specific re-roll-state plumbing
+   (`reRolledAction`/`reRollSource` from the `UseSkill` command) that was never built anywhere —
+   sized for its own future phase, not fixed here. Deleting the dead `SkillBehaviour` marker-trait
+   system itself (~30 mixed files + 21 fully-orphaned bb2016/bb2020 duplicates + ~129 dead-trait
+   test blocks) is a large, separate mechanical phase in its own right — scoped and documented,
+   not executed this session.
+3. **Correction: "InducementSet model port" (AAO's 2nd-priority item, flagged as the *largest*
+   remaining gap) was stale — it was already fully done as of Phase ZA (2026-07-06).** No phase
+   needed; the only real remainder in that cluster was item 1 above.
+4. **BlockMode armour-modifier gating**: `injury_type_block.rs`'s `armour_roll`/`injury_roll` now
+   gate the (still Mighty-Blow-only — full Claws/chainsaw/`CLAW_DOES_NOT_STACK` modifier-factory
+   lookup remains a documented separate TODO) modifier addition on `BlockMode` + same-team check,
+   matching `InjuryTypeBlock.java`'s real per-roll conditions exactly. Fixed 2 stale tests that had
+   encoded the old always-false `Regular`-mode behavior as correct; added 5 new tests.
+
+Tests: 17,621 → **17,634** (+13: +5 raise-dead, +3 `Roster::raised_roster_position`, +5 net
+BlockMode). 0 failures. `cargo clippy --workspace --all-targets`: still 0 errors. No parity/
+integration testing (per standing instruction). **Honest completion estimate: ~98.5-99%** (up from
+AAO's ~98%). Full writeup: `SESSION.md` Current Status.
+
 **Phase AAO (closes the skill-hook audit's last loose thread, fixes a real correctness bug,
 reverses course on a planned dead-file cleanup):**
 1. Fixed `step_reset_fumblerooskie.rs`: a lost `!isNextMovePossible` clause made its
