@@ -186,6 +186,7 @@ impl SkillRegistry {
             really_stupid_behaviour::ReallyStupidBehaviour,
             side_step_behaviour::SideStepBehaviour,
             stand_firm_behaviour::StandFirmBehaviour,
+            the_ballista_behaviour::TheBallistaBehaviour,
         };
         use crate::skill_behaviour::mixed::dauntless_behaviour::DauntlessBehaviour;
         use crate::skill_behaviour::mixed::abstract_dodging_behaviour::AbstractDodgingBehaviour;
@@ -216,6 +217,7 @@ impl SkillRegistry {
         ReallyStupidBehaviour::register_into(&mut reg);
         SideStepBehaviour::register_into(&mut reg);
         StandFirmBehaviour::register_into(&mut reg);
+        TheBallistaBehaviour::register_into(&mut reg);
         // Mixed (shared logic across editions)
         DauntlessBehaviour::register_into(&mut reg);
         reg
@@ -380,9 +382,16 @@ mod tests {
     }
 
     #[test]
-    fn bb2020_registry_has_twenty_three_entries() {
+    fn bb2020_registry_has_twenty_four_entries() {
         let reg = SkillRegistry::build_bb2020();
-        assert_eq!(reg.len(), 23, "BB2020 registry should have 23 registered skill entries (21 + Catch + MonstrousMouth)");
+        assert_eq!(reg.len(), 24, "BB2020 registry should have 24 registered skill entries (21 + Catch + MonstrousMouth + TheBallista)");
+    }
+
+    #[test]
+    fn bb2020_registry_contains_the_ballista_with_two_step_modifiers() {
+        let reg = SkillRegistry::build_bb2020();
+        let sb = reg.get(SkillId::TheBallista).expect("TheBallista must be registered in BB2020");
+        assert_eq!(sb.get_step_modifiers().len(), 2);
     }
 
     #[test]

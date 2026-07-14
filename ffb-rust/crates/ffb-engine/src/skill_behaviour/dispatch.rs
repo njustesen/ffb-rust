@@ -80,6 +80,61 @@ pub fn execute_step_hooks_with_registry(
     false
 }
 
+/// 1:1 translation of `AbstractStep.handleSkillCommand(ClientCommandUseSkill, Object state)`.
+///
+/// Unlike `execute_step_hooks` (which scans every registered skill), Java only looks at the
+/// modifiers registered under the *specific* skill named by the command, filtered to those
+/// `appliesTo` this step, and calls `handleCommand` on each in registration order — the last
+/// non-null status wins.
+pub fn handle_skill_command(
+    game: &mut Game,
+    step_id: StepId,
+    step_state: &mut dyn Any,
+    skill_id: SkillId,
+    skill_used: bool,
+) -> crate::step::framework::StepCommandStatus {
+    let registry = registry_for(game.rules);
+    handle_skill_command_with_registry(&registry, game, step_id, step_state, skill_id, skill_used)
+}
+
+/// Variant that accepts an explicit registry — used in tests.
+pub fn handle_skill_command_with_registry(
+    registry: &SkillRegistry,
+    game: &mut Game,
+    step_id: StepId,
+    step_state: &mut dyn Any,
+    skill_id: SkillId,
+    skill_used: bool,
+) -> crate::step::framework::StepCommandStatus {
+    use crate::step::framework::StepCommandStatus;
+
+    let mut command_status = StepCommandStatus::UnhandledCommand;
+    let modifier_count = registry.get(skill_id).map(|sb| sb.get_step_modifiers().len()).unwrap_or(0);
+
+    for idx in 0..modifier_count {
+        let applies = registry.get(skill_id)
+            .and_then(|sb| sb.get_step_modifiers().get(idx))
+            .map(|m| m.applies_to(step_id))
+            .unwrap_or(false);
+        if !applies {
+            continue;
+        }
+
+        let new_status = {
+            let modifier = registry.get(skill_id)
+                .and_then(|sb| sb.get_step_modifiers().get(idx))
+                .map(|m| m.as_ref());
+            modifier.map(|m| m.handle_command(game, step_state, skill_id, skill_used))
+        };
+
+        if let Some(status) = new_status {
+            command_status = status;
+        }
+    }
+
+    command_status
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -245,5 +300,104 @@ mod tests {
         let mut state: u32 = 0;
         execute_step_hooks_with_registry(&reg, &mut game, &mut GameRng::new(0), StepId::Horns, &mut state);
         assert_eq!(state, 42, "modifier must be able to mutate step_state via downcast");
+    }
+
+    // ── handle_skill_command tests ──────────────────────────────────────────────
+
+    struct CommandRecordingModifier {
+        target: StepId,
+        status: crate::step::framework::StepCommandStatus,
+        calls: std::sync::Arc<std::sync::Mutex<Vec<(SkillId, bool)>>>,
+    }
+
+    impl StepModifierTrait for CommandRecordingModifier {
+        fn applies_to(&self, id: StepId) -> bool { id == self.target }
+        fn handle_command(
+            &self, _game: &mut Game, _state: &mut dyn Any, skill_id: SkillId, skill_used: bool,
+        ) -> crate::step::framework::StepCommandStatus {
+            self.calls.lock().unwrap().push((skill_id, skill_used));
+            self.status
+        }
+    }
+
+    #[test]
+    fn handle_skill_command_no_modifiers_is_unhandled() {
+        let reg = SkillRegistry::empty();
+        let mut game = make_game();
+        let mut state: () = ();
+        let status = handle_skill_command_with_registry(
+            &reg, &mut game, StepId::ThrowTeamMate, &mut state, SkillId::TheBallista, true,
+        );
+        assert_eq!(status, crate::step::framework::StepCommandStatus::UnhandledCommand);
+    }
+
+    #[test]
+    fn handle_skill_command_only_looks_at_the_named_skill() {
+        let calls = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut reg = SkillRegistry::empty();
+        let mut sb = SbContainer::new();
+        sb.register_step_modifier(Box::new(CommandRecordingModifier {
+            target: StepId::ThrowTeamMate,
+            status: crate::step::framework::StepCommandStatus::ExecuteStep,
+            calls: calls.clone(),
+        }));
+        reg.register(SkillId::TheBallista, sb);
+        // A modifier registered under a different skill must never be consulted.
+        let mut sb2 = SbContainer::new();
+        sb2.register_step_modifier(Box::new(CommandRecordingModifier {
+            target: StepId::ThrowTeamMate,
+            status: crate::step::framework::StepCommandStatus::SkipStep,
+            calls: calls.clone(),
+        }));
+        reg.register(SkillId::Horns, sb2);
+
+        let mut game = make_game();
+        let mut state: () = ();
+        let status = handle_skill_command_with_registry(
+            &reg, &mut game, StepId::ThrowTeamMate, &mut state, SkillId::TheBallista, true,
+        );
+        assert_eq!(status, crate::step::framework::StepCommandStatus::ExecuteStep);
+        assert_eq!(*calls.lock().unwrap(), vec![(SkillId::TheBallista, true)]);
+    }
+
+    #[test]
+    fn handle_skill_command_skips_modifiers_not_applicable_to_step() {
+        let calls = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut reg = SkillRegistry::empty();
+        let mut sb = SbContainer::new();
+        sb.register_step_modifier(Box::new(CommandRecordingModifier {
+            target: StepId::HailMaryPass,
+            status: crate::step::framework::StepCommandStatus::ExecuteStep,
+            calls: calls.clone(),
+        }));
+        reg.register(SkillId::TheBallista, sb);
+
+        let mut game = make_game();
+        let mut state: () = ();
+        let status = handle_skill_command_with_registry(
+            &reg, &mut game, StepId::ThrowTeamMate, &mut state, SkillId::TheBallista, true,
+        );
+        assert_eq!(status, crate::step::framework::StepCommandStatus::UnhandledCommand);
+        assert!(calls.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn handle_skill_command_passes_skill_used_flag_through() {
+        let calls = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut reg = SkillRegistry::empty();
+        let mut sb = SbContainer::new();
+        sb.register_step_modifier(Box::new(CommandRecordingModifier {
+            target: StepId::ThrowTeamMate,
+            status: crate::step::framework::StepCommandStatus::ExecuteStep,
+            calls: calls.clone(),
+        }));
+        reg.register(SkillId::TheBallista, sb);
+
+        let mut game = make_game();
+        let mut state: () = ();
+        handle_skill_command_with_registry(
+            &reg, &mut game, StepId::ThrowTeamMate, &mut state, SkillId::TheBallista, false,
+        );
+        assert_eq!(*calls.lock().unwrap(), vec![(SkillId::TheBallista, false)]);
     }
 }

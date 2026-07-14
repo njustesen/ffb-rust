@@ -1,10 +1,12 @@
-use ffb_model::enums::PassResult;
+use ffb_model::enums::{PassResult, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::mixed::report_pass_roll::ReportPassRoll;
 use crate::action::Action;
-use crate::step::framework::{Step, StepOutcome};
+use crate::model::step_modifier::RerollHookState;
+use crate::skill_behaviour::dispatch;
+use crate::step::framework::{Step, StepCommandStatus, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2020.pass.StepHailMaryPass.
@@ -65,8 +67,27 @@ impl Step for StepHailMaryPass {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: CLIENT_USE_SKILL → canAddStrengthToPass → usingModifyingSkill = isSkillUsed()
-        // Java: otherwise → handleSkillCommand(cmd, state)  [pass skill re-roll]
+        // Java: otherwise → handleSkillCommand(cmd, state)  [pass skill re-roll, e.g. TheBallista]
         match action {
+            Action::UseSkill { skill_id, use_skill } if *skill_id == SkillId::TheBallista => {
+                // Java: AbstractStep.handleSkillCommand -> TheBallistaBehaviour's StepHailMaryPass
+                // modifier presets reRolledAction=PASS/reRollSource before the step re-executes.
+                // Known gap (documented, not silently dropped): this step doesn't yet implement a
+                // full re-roll-retry cycle (no reset of `roll`/re-roll prompt), so presetting these
+                // fields alone doesn't yet trigger an actual second roll — see SESSION.md.
+                let mut hook_state = RerollHookState {
+                    re_rolled_action: self.re_rolled_action.clone(),
+                    re_roll_source: self.re_roll_source.clone(),
+                    kicked: false,
+                };
+                let status = dispatch::handle_skill_command(
+                    game, StepId::HailMaryPass, &mut hook_state, *skill_id, *use_skill,
+                );
+                if status == StepCommandStatus::ExecuteStep {
+                    self.re_rolled_action = hook_state.re_rolled_action;
+                    self.re_roll_source = hook_state.re_roll_source;
+                }
+            }
             Action::UseSkill { skill_id, use_skill } => {
                 if skill_id.properties().contains(&NamedProperties::CAN_ADD_STRENGTH_TO_PASS) {
                     self.using_modifying_skill = Some(*use_skill);
@@ -240,5 +261,31 @@ mod tests {
         step.roll = 1;
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::PASS_ROLL));
+    }
+
+    #[test]
+    fn the_ballista_use_skill_true_sets_pass_rerolled_action_and_source() {
+        let mut game = make_game();
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.roll = 3;
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::TheBallista, use_skill: true },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_eq!(step.re_rolled_action.as_deref(), Some("PASS"));
+        assert_eq!(step.re_roll_source.as_deref(), Some("TheBallista"));
+    }
+
+    #[test]
+    fn the_ballista_use_skill_false_clears_source() {
+        let mut game = make_game();
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.roll = 3;
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::TheBallista, use_skill: false },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_eq!(step.re_rolled_action.as_deref(), Some("PASS"));
+        assert!(step.re_roll_source.is_none());
     }
 }

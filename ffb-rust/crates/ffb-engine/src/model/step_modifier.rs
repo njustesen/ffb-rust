@@ -43,6 +43,36 @@ pub trait StepModifierTrait: Send + Sync {
     ) -> bool {
         false
     }
+
+    /// Java: `handleCommandHook(step, state, useSkillCommand)` — called when a
+    /// `CLIENT_USE_SKILL` command names the skill this modifier is registered under,
+    /// for a step this modifier `applies_to`. Lets a skill preset step-local state
+    /// (e.g. a re-roll action/source) before the step is re-executed.
+    ///
+    /// Returns `StepCommandStatus::UnhandledCommand` by default — most skills only need
+    /// `handle_execute_step`.
+    fn handle_command(
+        &self,
+        _game: &mut ffb_model::model::game::Game,
+        _step_state: &mut dyn std::any::Any,
+        _skill_id: ffb_model::enums::SkillId,
+        _skill_used: bool,
+    ) -> crate::step::framework::StepCommandStatus {
+        crate::step::framework::StepCommandStatus::UnhandledCommand
+    }
+}
+
+/// Shared command-hook state for skills that preset a step's re-roll action/source
+/// before the step re-executes (Java: fields on the step's own `StepState`).
+///
+/// Java: `AbstractStepWithReRoll.fReRolledAction` / `fReRollSource` (and, for TTM steps,
+/// `StepState.kicked`). Concrete steps build one of these from their own fields, pass it
+/// through `dispatch::handle_skill_command`, then copy the (possibly-updated) fields back.
+#[derive(Debug, Clone, Default)]
+pub struct RerollHookState {
+    pub re_rolled_action: Option<String>,
+    pub re_roll_source: Option<String>,
+    pub kicked: bool,
 }
 
 /// Comparator for sorting modifiers by priority (ascending).
@@ -146,5 +176,27 @@ mod tests {
     fn step_command_status_eq() {
         assert_eq!(StepCommandStatus::Handled, StepCommandStatus::Handled);
         assert_ne!(StepCommandStatus::Handled, StepCommandStatus::NotHandled);
+    }
+
+    #[test]
+    fn handle_command_default_is_unhandled() {
+        use ffb_model::enums::{Rules, SkillId};
+        let m = TestModifier { target: StepId::ThrowTeamMate, priority: 0 };
+        let mut game = ffb_model::model::game::Game::new(test_team_helper("h"), test_team_helper("a"), Rules::Bb2025);
+        let mut state = RerollHookState::default();
+        let status = m.handle_command(&mut game, &mut state, SkillId::TheBallista, true);
+        assert_eq!(status, crate::step::framework::StepCommandStatus::UnhandledCommand);
+    }
+
+    fn test_team_helper(prefix: &str) -> ffb_model::model::team::Team {
+        crate::step::framework::test_team(prefix, 0)
+    }
+
+    #[test]
+    fn reroll_hook_state_default_is_empty() {
+        let s = RerollHookState::default();
+        assert!(s.re_rolled_action.is_none());
+        assert!(s.re_roll_source.is_none());
+        assert!(!s.kicked);
     }
 }

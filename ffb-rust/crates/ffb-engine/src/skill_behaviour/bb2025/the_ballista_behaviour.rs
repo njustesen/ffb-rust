@@ -1,18 +1,25 @@
 /// 1:1 translation of com.fumbbl.ffb.server.skillbehaviour.bb2025.TheBallistaBehaviour.
 ///
 /// TheBallistaBehaviour registers two step modifiers:
-///   1. StepModifier<StepThrowTeamMate> (priority 1) — handleExecuteStepHook returns false.
-///   2. StepModifier<StepHailMaryPass>  (priority 0) — handleExecuteStepHook returns false.
+///   1. StepModifier<StepThrowTeamMate> (priority 1) — handleExecuteStepHook returns false;
+///      handleCommandHook sets `reRolledAction` to KICK_TEAM_MATE or THROW_TEAM_MATE
+///      (depending on `state.kicked`) and `reRollSource` to THE_BALLISTA iff the skill was used.
+///   2. StepModifier<StepHailMaryPass>  (priority 0) — handleExecuteStepHook returns false;
+///      handleCommandHook always sets `reRolledAction` to PASS.
 ///
-/// Both execute-step hooks are no-ops in Java (return false). The command hook
-/// (handleCommandHook) sets re-roll state on the step from the UseSkill client command,
-/// but that path is headless infrastructure not yet ported.
+/// Both execute-step hooks are no-ops in Java (return false) — the real effect is
+/// `handleCommandHook` presetting the step's re-roll state before it re-executes.
 use crate::skill_behaviour::SkillBehaviour;
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
-use crate::model::step_modifier::StepModifierTrait;
-use crate::step::framework::StepId;
+use crate::model::step_modifier::{RerollHookState, StepModifierTrait};
+use crate::step::framework::{StepCommandStatus, StepId};
 use crate::skill_behaviour::registry::SkillRegistry;
 use ffb_model::enums::SkillId;
+
+/// Java: `ReRollSources.THE_BALLISTA` — the re-roll source name recorded on a step when
+/// TheBallista is used. Matches `SkillId::TheBallista`'s `Debug` name so
+/// `util_server_re_roll::use_reroll`'s skill-based fallback can mark it used.
+const THE_BALLISTA_RE_ROLL_SOURCE: &str = "TheBallista";
 
 pub struct TheBallistaBehaviour;
 
@@ -58,9 +65,30 @@ impl StepModifierTrait for TheBallistaThrowTeamMateModifier {
         _rng: &mut ffb_model::util::rng::GameRng,
         _step_state: &mut dyn std::any::Any,
     ) -> bool {
-        // headless: handleCommandHook sets reRolledAction/reRollSource from UseSkill command
-        //           (step-specific re-roll state access not yet ported)
         false
+    }
+
+    /// Java:
+    /// ```java
+    /// ReRolledAction action = state.kicked ? ReRolledActions.KICK_TEAM_MATE : ReRolledActions.THROW_TEAM_MATE;
+    /// step.setReRolledAction(action);
+    /// step.setReRollSource(useSkillCommand.isSkillUsed() ? getReRollSource() : null);
+    /// return StepCommandStatus.EXECUTE_STEP;
+    /// ```
+    fn handle_command(
+        &self,
+        _game: &mut ffb_model::model::game::Game,
+        step_state: &mut dyn std::any::Any,
+        _skill_id: SkillId,
+        skill_used: bool,
+    ) -> StepCommandStatus {
+        if let Some(state) = step_state.downcast_mut::<RerollHookState>() {
+            state.re_rolled_action = Some(
+                if state.kicked { "KICK_TEAM_MATE" } else { "THROW_TEAM_MATE" }.to_string(),
+            );
+            state.re_roll_source = skill_used.then(|| THE_BALLISTA_RE_ROLL_SOURCE.to_string());
+        }
+        StepCommandStatus::ExecuteStep
     }
 }
 
@@ -81,9 +109,27 @@ impl StepModifierTrait for TheBallistaHailMaryPassModifier {
         _rng: &mut ffb_model::util::rng::GameRng,
         _step_state: &mut dyn std::any::Any,
     ) -> bool {
-        // headless: handleCommandHook sets reRolledAction/reRollSource from UseSkill command
-        //           (step-specific re-roll state access not yet ported)
         false
+    }
+
+    /// Java:
+    /// ```java
+    /// step.setReRolledAction(ReRolledActions.PASS);
+    /// step.setReRollSource(useSkillCommand.isSkillUsed() ? getReRollSource() : null);
+    /// return StepCommandStatus.EXECUTE_STEP;
+    /// ```
+    fn handle_command(
+        &self,
+        _game: &mut ffb_model::model::game::Game,
+        step_state: &mut dyn std::any::Any,
+        _skill_id: SkillId,
+        skill_used: bool,
+    ) -> StepCommandStatus {
+        if let Some(state) = step_state.downcast_mut::<RerollHookState>() {
+            state.re_rolled_action = Some("PASS".to_string());
+            state.re_roll_source = skill_used.then(|| THE_BALLISTA_RE_ROLL_SOURCE.to_string());
+        }
+        StepCommandStatus::ExecuteStep
     }
 }
 
@@ -182,5 +228,55 @@ mod tests {
         let mut game = test_game();
         let mut state: () = ();
         assert!(!m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut state));
+    }
+
+    #[test]
+    fn throw_team_mate_handle_command_sets_throw_team_mate_when_not_kicked() {
+        let m = TheBallistaThrowTeamMateModifier;
+        let mut game = test_game();
+        let mut state = RerollHookState { kicked: false, ..Default::default() };
+        let status = m.handle_command(&mut game, &mut state, SkillId::TheBallista, true);
+        assert_eq!(status, StepCommandStatus::ExecuteStep);
+        assert_eq!(state.re_rolled_action.as_deref(), Some("THROW_TEAM_MATE"));
+        assert_eq!(state.re_roll_source.as_deref(), Some("TheBallista"));
+    }
+
+    #[test]
+    fn throw_team_mate_handle_command_sets_kick_team_mate_when_kicked() {
+        let m = TheBallistaThrowTeamMateModifier;
+        let mut game = test_game();
+        let mut state = RerollHookState { kicked: true, ..Default::default() };
+        m.handle_command(&mut game, &mut state, SkillId::TheBallista, true);
+        assert_eq!(state.re_rolled_action.as_deref(), Some("KICK_TEAM_MATE"));
+    }
+
+    #[test]
+    fn throw_team_mate_handle_command_clears_source_when_declined() {
+        let m = TheBallistaThrowTeamMateModifier;
+        let mut game = test_game();
+        let mut state = RerollHookState::default();
+        m.handle_command(&mut game, &mut state, SkillId::TheBallista, false);
+        assert_eq!(state.re_rolled_action.as_deref(), Some("THROW_TEAM_MATE"));
+        assert!(state.re_roll_source.is_none());
+    }
+
+    #[test]
+    fn hail_mary_pass_handle_command_sets_pass_action() {
+        let m = TheBallistaHailMaryPassModifier;
+        let mut game = test_game();
+        let mut state = RerollHookState::default();
+        let status = m.handle_command(&mut game, &mut state, SkillId::TheBallista, true);
+        assert_eq!(status, StepCommandStatus::ExecuteStep);
+        assert_eq!(state.re_rolled_action.as_deref(), Some("PASS"));
+        assert_eq!(state.re_roll_source.as_deref(), Some("TheBallista"));
+    }
+
+    #[test]
+    fn hail_mary_pass_handle_command_clears_source_when_declined() {
+        let m = TheBallistaHailMaryPassModifier;
+        let mut game = test_game();
+        let mut state = RerollHookState::default();
+        m.handle_command(&mut game, &mut state, SkillId::TheBallista, false);
+        assert!(state.re_roll_source.is_none());
     }
 }

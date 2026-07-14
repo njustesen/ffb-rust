@@ -1,6 +1,62 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-14, Phase AAQ done — 1 of 6 in the AAQ-AAV backlog arc)
+## Current Status (2026-07-15, Phase AAR done — 2 of 6 in the AAQ-AAV backlog arc)
+
+**Phase AAR — TheBallista's re-roll wiring, done.**
+
+Built the first-of-its-kind step-command-time hook infrastructure and used it to wire TheBallista
+(a BB2020/BB2025-only skill: a teammate can spend a re-roll on a Throw-Team-Mate/Kick-Team-Mate or
+Hail-Mary-Pass roll):
+
+1. **`StepModifierTrait::handle_command`** (`model/step_modifier.rs`) — new trait method mirroring
+   Java's `StepModifier.handleCommandHook(step, state, useSkillCommand)`, default no-op returning
+   `StepCommandStatus::UnhandledCommand` (the pre-existing 3-value `framework::StepCommandStatus`,
+   not the unrelated 2-value enum of the same name already living in this file — left alone,
+   AAS's job). Also added `RerollHookState { re_rolled_action, re_roll_source, kicked }`, a small
+   reusable owned struct any step can build from its own fields, pass through `dyn Any`, and copy
+   back — mirrors the existing `StepHornsHookState` pattern.
+2. **`dispatch::handle_skill_command`** (`skill_behaviour/dispatch.rs`) — new dispatcher mirroring
+   Java's `AbstractStep.handleSkillCommand`. Unlike `execute_step_hooks` (which scans every
+   registered skill), this only looks at the modifiers registered under the *specific* skill named
+   by the command, filtered to `applies_to` the current step, calling `handle_command` on each —
+   last non-unhandled status wins (verified this is genuinely simpler than initially planned: no
+   `Action::UseSkill.re_rolled_action` field was needed at all, since Java's handleCommandHook
+   decides the re-rolled-action *from which step it's registered against*, not from anything on
+   the wire command).
+3. **TheBallista modifier structs** — `skill_behaviour/bb2025/the_ballista_behaviour.rs` already
+   had a real `register_into` (this file was live, just missing `handle_command` — a correction to
+   Phase AAS's research, which had mis-filed it as one of the "79 orphaned" files). Added
+   `handle_command` bodies to both its `TheBallistaThrowTeamMateModifier` (picks KICK_TEAM_MATE vs
+   THROW_TEAM_MATE from `state.kicked`) and `TheBallistaHailMaryPassModifier` (always PASS).
+   `skill_behaviour/bb2020/the_ballista_behaviour.rs` was genuinely orphaned (no `register_into` at
+   all) — rewrote it to the same live pattern (BB2020 always THROW_TEAM_MATE, no KTM distinction)
+   and wired it into `registry.rs::build_bb2020()` (was missing entirely; BB2025's registration
+   already existed).
+4. **Step wiring** — `step/bb2020/ttm/step_throw_team_mate.rs` and the BB2025 counterpart: added a
+   `SkillId::TheBallista`-gated arm to `handle_command` that builds a `RerollHookState`, calls
+   `dispatch::handle_skill_command`, and copies the result back — preserving the BB2025 file's
+   pre-existing Bullseye-dialog handling for all other skill IDs untouched (verified with a
+   regression test). Both `step_hail_mary_pass.rs` files (bb2020 + bb2025) got the same command-hook
+   wiring; **documented, not silently dropped**: neither Hail Mary step yet implements a full
+   re-roll-*retry* cycle (no reset of `roll`, no re-roll prompt), so presetting
+   `re_rolled_action`/`re_roll_source` alone doesn't yet cause an actual second roll for that specific
+   step — a narrower, real gap than StepThrowTeamMate's (which already had the full retry cycle and
+   is now fully wired end-to-end).
+
+14 new tests (registry counts, both modifiers' `handle_command` behavior in both editions, the two
+`ThrowTeamMate` steps' Ballista wiring incl. a Bullseye-non-regression test, both `HailMaryPass`
+steps' wiring incl. a non-regression test for the pre-existing modifying-skill branch).
+
+Tests: 17,638 → **17,670** (+32). 0 failures. `cargo clippy --workspace --all-targets`: still 0 errors.
+
+**Next**: Phase AAS (delete the dead `SkillBehaviour` marker-trait system — corrected scope: 81
+whole-file deletions + 51 surgical strips, not SESSION.md's earlier stale 21/~30 estimate; also note
+the_ballista_behaviour.rs bb2025 was wrongly counted as one of the 79 orphans — it's live, exclude it
+from the deletion list).
+
+---
+
+## Prior Status (2026-07-14, Phase AAQ done — 1 of 6 in the AAQ-AAV backlog arc)
 
 Plan mode produced a 6-phase arc (AAQ-AAV) to close SESSION.md's full "what's left" backlog from
 Phase AAP in one pass: dialog-auto-decline fixes (AAQ), TheBallista re-roll wiring (AAR), the dead

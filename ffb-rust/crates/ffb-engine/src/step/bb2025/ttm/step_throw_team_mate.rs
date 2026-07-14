@@ -11,7 +11,7 @@
 /// Init param: IS_KICKED_PLAYER (optional).
 /// Consumed params: THROWN_PLAYER_ID, THROWN_PLAYER_STATE, THROWN_PLAYER_HAS_BALL.
 use std::collections::HashSet;
-use ffb_model::enums::{PassingDistance, PassResult, PlayerState, ReRollSource};
+use ffb_model::enums::{PassingDistance, PassResult, PlayerState, ReRollSource, SkillId};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -22,7 +22,9 @@ use ffb_mechanics::modifiers::pass_modifier::PassModifier;
 use ffb_mechanics::pass_mechanic::PassMechanic as PassMechanicTrait;
 use ffb_mechanics::ttm_mechanic::TtmMechanic as TtmMechanicTrait;
 use crate::action::Action;
-use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::model::step_modifier::RerollHookState;
+use crate::skill_behaviour::dispatch;
+use crate::step::framework::{Step, StepCommandStatus, StepOutcome, StepId, StepParameter};
 use crate::step::generator::bb2025::scatter_player::{ScatterPlayer, ScatterPlayerParams};
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
@@ -230,6 +232,26 @@ impl Step for StepThrowTeamMate {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
+            // Java: AbstractStep.handleSkillCommand — dispatches CLIENT_USE_SKILL to the
+            // registered SkillBehaviour's StepModifier (TheBallista's handleCommandHook
+            // presets reRolledAction/reRollSource before the step re-executes).
+            Action::UseSkill { skill_id, use_skill } if *skill_id == SkillId::TheBallista => {
+                let mut hook_state = RerollHookState {
+                    re_rolled_action: self.re_rolled_action.clone(),
+                    re_roll_source: self.re_roll_source.clone(),
+                    kicked: self.kicked,
+                };
+                let status = dispatch::handle_skill_command(
+                    game, StepId::ThrowTeamMate, &mut hook_state, *skill_id, *use_skill,
+                );
+                if status == StepCommandStatus::ExecuteStep {
+                    self.re_rolled_action = hook_state.re_rolled_action;
+                    self.re_roll_source = hook_state.re_roll_source;
+                } else if !*use_skill {
+                    self.re_rolled_action = None;
+                    self.re_roll_source = None;
+                }
+            }
             Action::UseSkill { use_skill, .. } => {
                 if !use_skill {
                     self.re_rolled_action = None;
@@ -365,6 +387,86 @@ mod tests {
         step.kicked = true;
         step.start(&mut game, &mut GameRng::new(42));
         assert!(game.turn_data_home.ktm_used);
+    }
+
+    #[test]
+    fn the_ballista_use_skill_true_sets_kick_team_mate_when_kicked() {
+        let mut game = make_game();
+        game.home_playing = true;
+        add_thrower(&mut game, "thrower", FieldCoordinate::new(10, 7), 4);
+        game.acting_player.player_id = Some("thrower".into());
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+
+        let mut step = StepThrowTeamMate::new();
+        step.thrown_player_id = Some("tp1".into());
+        step.kicked = true;
+
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::TheBallista, use_skill: true },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_eq!(step.re_rolled_action.as_deref(), Some("KICK_TEAM_MATE"));
+        assert_eq!(step.re_roll_source.as_deref(), Some("TheBallista"));
+    }
+
+    #[test]
+    fn the_ballista_use_skill_true_sets_throw_team_mate_when_not_kicked() {
+        let mut game = make_game();
+        game.home_playing = true;
+        add_thrower(&mut game, "thrower", FieldCoordinate::new(10, 7), 4);
+        game.acting_player.player_id = Some("thrower".into());
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+
+        let mut step = StepThrowTeamMate::new();
+        step.thrown_player_id = Some("tp1".into());
+
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::TheBallista, use_skill: true },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_eq!(step.re_rolled_action.as_deref(), Some("THROW_TEAM_MATE"));
+    }
+
+    #[test]
+    fn the_ballista_use_skill_false_clears_source_but_keeps_action() {
+        let mut game = make_game();
+        game.home_playing = true;
+        add_thrower(&mut game, "thrower", FieldCoordinate::new(10, 7), 4);
+        game.acting_player.player_id = Some("thrower".into());
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+
+        let mut step = StepThrowTeamMate::new();
+        step.thrown_player_id = Some("tp1".into());
+
+        let out = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::TheBallista, use_skill: false },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_eq!(step.re_rolled_action.as_deref(), Some("THROW_TEAM_MATE"));
+        assert!(step.re_roll_source.is_none());
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn bullseye_use_skill_true_unaffected_by_ballista_wiring() {
+        // A non-TheBallista skill-use command must still hit the pre-existing
+        // Bullseye branch, not the new TheBallista dispatch path.
+        let mut game = make_game();
+        game.home_playing = true;
+        add_thrower(&mut game, "thrower", FieldCoordinate::new(10, 7), 4);
+        game.acting_player.player_id = Some("thrower".into());
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+
+        let mut step = StepThrowTeamMate::new();
+        step.thrown_player_id = Some("tp1".into());
+        step.pass_result = Some(PassResult::Complete);
+
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Bullseye, use_skill: true },
+            &mut game, &mut GameRng::new(0),
+        );
+        assert_eq!(step.using_bullseye, Some(true));
+        assert!(step.re_rolled_action.is_none());
     }
 
     #[test]
