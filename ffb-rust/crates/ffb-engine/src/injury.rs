@@ -509,47 +509,6 @@ impl InjuryTypeServer for InjuryTypeDropFall {
     fn falling_down_causes_turnover(&self) -> bool { self.causes_turnover }
 }
 
-// ── InjuryTypeChainsaw ────────────────────────────────────────────────────────
-
-/// Java: InjuryTypeChainsaw — armor is always broken (chainsaw special rule).
-pub struct InjuryTypeChainsawImpl {
-    ctx: InjuryContext,
-    worth_spps: bool,
-}
-
-impl InjuryTypeChainsawImpl {
-    pub fn new() -> Self {
-        Self { ctx: InjuryContext::new(ApothecaryMode::Defender), worth_spps: false }
-    }
-
-    fn with_spps(mut self) -> Self {
-        self.worth_spps = true;
-        self
-    }
-}
-
-impl InjuryTypeServer for InjuryTypeChainsawImpl {
-    fn handle_injury(
-        &mut self, _game: &Game, rng: &mut GameRng,
-        attacker_id: Option<&str>, defender_id: &str,
-        coord: FieldCoordinate, _from_coord: Option<FieldCoordinate>,
-        _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode,
-    ) {
-        self.ctx.defender_id = Some(defender_id.to_owned());
-        self.ctx.attacker_id = attacker_id.map(str::to_owned);
-        self.ctx.defender_coordinate = Some(coord);
-        self.ctx.apothecary_mode = apo_mode;
-        // Chainsaw always breaks armor
-        self.ctx.armor_broken = true;
-        do_injury_roll(rng, &mut self.ctx);
-    }
-
-    fn injury_context(&self) -> &InjuryContext { &self.ctx }
-    fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn is_caused_by_opponent(&self) -> bool { true }
-    fn is_worth_spps(&self) -> bool { self.worth_spps }
-}
-
 // ── InjuryTypeThrowARock ──────────────────────────────────────────────────────
 
 /// Java: InjuryTypeThrowARock — kickoff event, no turnover, can use apo.
@@ -701,9 +660,9 @@ pub fn make_injury_type(name: &str) -> Box<dyn InjuryTypeServer> {
         "InjuryTypeBlockProneForSpp" =>
             Box::new(injuryType::injury_type_block_prone_for_spp::InjuryTypeBlockProneForSpp::new()),
         "InjuryTypeChainsaw" =>
-            Box::new(InjuryTypeChainsawImpl::new()),
+            Box::new(injuryType::injury_type_chainsaw::InjuryTypeChainsaw::new()),
         "InjuryTypeChainsawForSpp" =>
-            Box::new(InjuryTypeChainsawImpl::new().with_spps()),
+            Box::new(injuryType::injury_type_chainsaw_for_spp::InjuryTypeChainsawForSpp::new()),
         "InjuryTypeThrowARock" | "InjuryTypeThrowARockStalling" =>
             Box::new(InjuryTypeThrowARockImpl::new()),
         "InjuryTypeTTMLanding" | "InjuryTypeTtmLanding" =>
@@ -1008,5 +967,48 @@ mod tests {
         assert!(!it.falling_down_causes_turnover());
         let it = make_injury_type("InjuryTypeCrowdPush");
         assert!(!it.falling_down_causes_turnover());
+    }
+
+    // ── make_injury_type dispatch reaches the real InjuryTypeChainsaw structs (Phase ABH) ────
+    //
+    // Before this phase, both keys constructed a bare `InjuryTypeChainsawImpl` that always
+    // force-set armor_broken=true, skipping the armor roll and the Chainsaw +3 modifier entirely —
+    // these assertions were impossible to write against the old dispatch.
+
+    #[test]
+    fn dispatch_chainsaw_reaches_real_armor_roll_and_modifier() {
+        let mut game = make_game_with_players(&["attacker"], &["defender"]);
+        game.team_away.players[0].armour = 15; // isolate: base roll alone won't break armor
+        let mut it = make_injury_type("InjuryTypeChainsaw");
+        let mut rng = GameRng::new(1);
+        it.handle_injury(&game, &mut rng, Some("attacker"), "defender", FieldCoordinate::new(5, 5), None, None, ApothecaryMode::Defender);
+        assert!(it.injury_context().armor_roll.is_some(),
+            "InjuryTypeChainsaw dispatch should perform a real armor roll, not force-break armor");
+        assert!(it.injury_context().armor_modifiers.iter().any(|m| m.name == "Chainsaw"),
+            "InjuryTypeChainsaw dispatch should apply the Chainsaw +3 armor modifier");
+        assert!(!it.is_worth_spps());
+        assert!(it.is_caused_by_opponent());
+    }
+
+    #[test]
+    fn dispatch_chainsaw_for_spp_is_worth_spps() {
+        let game = make_game_with_players(&["attacker"], &["defender"]);
+        let mut it = make_injury_type("InjuryTypeChainsawForSpp");
+        let mut rng = GameRng::new(1);
+        it.handle_injury(&game, &mut rng, Some("attacker"), "defender", FieldCoordinate::new(5, 5), None, None, ApothecaryMode::Defender);
+        assert!(it.is_worth_spps());
+        assert!(it.is_caused_by_opponent());
+    }
+
+    #[test]
+    fn dispatch_chainsaw_armor_save_leaves_no_injury() {
+        let mut game = make_game_with_players(&["attacker"], &["defender"]);
+        game.team_away.players[0].armour = 15; // armor never breaks
+        let mut it = make_injury_type("InjuryTypeChainsaw");
+        let mut rng = GameRng::new(1);
+        it.handle_injury(&game, &mut rng, Some("attacker"), "defender", FieldCoordinate::new(5, 5), None, None, ApothecaryMode::Defender);
+        assert!(!it.injury_context().armor_broken);
+        assert!(it.injury_context().injury.is_none(),
+            "Chainsaw's real saved_by_armour clears injury; the bare Impl could never reach this path");
     }
 }

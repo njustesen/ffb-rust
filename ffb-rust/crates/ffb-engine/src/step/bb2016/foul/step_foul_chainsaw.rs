@@ -18,7 +18,7 @@ use ffb_model::model::re_rolled_action::ReRolledAction;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::report_chainsaw_roll::ReportChainsawRoll;
 use crate::action::Action;
-use crate::injury::InjuryTypeChainsawImpl;
+use crate::injury::injuryType::injury_type_chainsaw::InjuryTypeChainsaw;
 use crate::step::abstract_step_with_re_roll::ReRollState;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
@@ -118,7 +118,7 @@ impl StepFoulChainsaw {
         if drop_chainsaw_player {
             let attacker_coord = game.field_model.player_coordinate(&acting_id)
                 .unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
-            let mut injury_type = InjuryTypeChainsawImpl::new();
+            let mut injury_type = InjuryTypeChainsaw::new();
             let injury_result = handle_injury(
                 game, rng, &mut injury_type,
                 None, &acting_id,

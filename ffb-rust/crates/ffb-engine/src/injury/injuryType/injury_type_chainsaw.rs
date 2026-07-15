@@ -2,6 +2,7 @@
 /// ModificationAware: chainsaw armor roll (complex modifier stub) + injury roll.
 /// savedByArmour -> None (chainsaw always skips PRONE; attacker may go to reserves).
 use ffb_model::enums::ApothecaryMode;
+use ffb_model::model::property::NamedProperties;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
@@ -21,11 +22,24 @@ impl InjuryTypeServer for InjuryTypeChainsaw {
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn falling_down_causes_turnover(&self) -> bool { false }
+    /// Java: `InjuryTypeChainsaw()` constructor calls `setFailedArmourPlacesProne(false)`.
+    fn failed_armour_places_prone(&self) -> bool { false }
+    /// Java: `Chainsaw.isCausedByOpponent()` — true.
+    fn is_caused_by_opponent(&self) -> bool { true }
+    /// Java: `Chainsaw` constructor passes `SendToBoxReason.CHAINSAW`.
+    fn send_to_box_reason(&self) -> Option<ffb_model::enums::SendToBoxReason> {
+        Some(ffb_model::enums::SendToBoxReason::Chainsaw)
+    }
 }
 impl ModificationAwareInjuryType for InjuryTypeChainsaw {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
+        // Java: `UtilCards.hasUnusedSkillWithProperty(pDefender, ignoresArmourModifiersFromSkills)`
+        // (e.g. Iron Hard Skin) suppresses the Chainsaw +3 armor modifier.
+        let defender_ignores = game.player(defender_id)
+            .map(|p| p.has_unused_skill_with_property(NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS))
+            .unwrap_or(false);
         // Java: add chainsaw +3 armor modifier unless one is already present (blocksLikeChainsaw skills)
-        if !self.ctx.armor_modifiers.iter().any(|m| m.name == "Chainsaw") {
+        if !defender_ignores && !self.ctx.armor_modifiers.iter().any(|m| m.name == "Chainsaw") {
             self.ctx.add_armor_modifier(ARMOR_CHAINSAW_3);
         }
         do_armor_roll(game, rng, &mut self.ctx, defender_id);
@@ -136,5 +150,37 @@ mod tests {
             assert_eq!(t2.ctx.injury.map(|s| s.base()), Some(PS_STUNNED),
                 "non-Stunty at total 7 must be Stunned");
         }
+    }
+
+    #[test]
+    fn is_caused_by_opponent_is_true() {
+        assert!(InjuryTypeChainsaw::new().is_caused_by_opponent());
+    }
+
+    #[test]
+    fn is_worth_spps_is_false_for_base_chainsaw() {
+        assert!(!InjuryTypeChainsaw::new().is_worth_spps());
+    }
+
+    #[test]
+    fn failed_armour_places_prone_is_false() {
+        assert!(!InjuryTypeChainsaw::new().failed_armour_places_prone());
+    }
+
+    #[test]
+    fn send_to_box_reason_is_chainsaw() {
+        use ffb_model::enums::SendToBoxReason;
+        assert_eq!(InjuryTypeChainsaw::new().send_to_box_reason(), Some(SendToBoxReason::Chainsaw));
+    }
+
+    #[test]
+    fn iron_hard_skin_defender_suppresses_chainsaw_modifier() {
+        use ffb_model::model::SkillWithValue;
+        let mut game = game_with_armor(7);
+        game.team_home.players[0].extra_skills.push(SkillWithValue::new(SkillId::IronHardSkin));
+        let mut t = InjuryTypeChainsaw::new();
+        let mut rng = GameRng::new(1);
+        t.armour_roll(&game, &mut rng, None, "p1", true);
+        assert!(!t.ctx.armor_modifiers.contains(&ARMOR_CHAINSAW_3));
     }
 }

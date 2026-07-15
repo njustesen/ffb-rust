@@ -14,7 +14,7 @@ use ffb_model::model::re_rolled_action::ReRolledAction;
 use ffb_model::util::rng::GameRng;
 use ffb_model::events::GameEvent;
 use crate::action::Action;
-use crate::injury::InjuryTypeChainsawImpl;
+use crate::injury::injuryType::injury_type_chainsaw::InjuryTypeChainsaw;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::abstract_step_with_re_roll::ReRollState;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
@@ -115,7 +115,7 @@ impl StepBlockChainsaw {
                 // Java: InjuryResult injuryResultDefender = UtilServerInjury.handleInjury(
                 //         this, new InjuryTypeChainsaw(), actingPlayer.getPlayer(), game.getDefender(),
                 //         defenderCoordinate, null, null, ApothecaryMode.DEFENDER)
-                let mut injury_type = InjuryTypeChainsawImpl::new();
+                let mut injury_type = InjuryTypeChainsaw::new();
                 let injury_result = crate::step::util_server_injury::handle_injury(
                     game, rng, &mut injury_type,
                     Some(&acting_id), &defender_id,
@@ -154,7 +154,7 @@ impl StepBlockChainsaw {
             // Java: InjuryResult injuryResultAttacker = UtilServerInjury.handleInjury(
             //         this, new InjuryTypeChainsaw(), null, actingPlayer.getPlayer(),
             //         attackerCoordinate, null, null, ApothecaryMode.ATTACKER)
-            let mut injury_type = InjuryTypeChainsawImpl::new();
+            let mut injury_type = InjuryTypeChainsaw::new();
             let injury_result = crate::step::util_server_injury::handle_injury(
                 game, rng, &mut injury_type,
                 None, &acting_id,
