@@ -1,6 +1,88 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-15, Phase ABB done — 6 of 7 in the AAW-ABC arc)
+## Current Status (2026-07-15, Phase ABC done — 7 of 7, the AAW-ABC arc is complete)
+
+**Phase ABC — fresh from-scratch audit of all 47 live `StepModifierTrait::handle_execute_step`
+bodies in `skill_behaviour/`, done. Clean result: zero new genuine gaps found.**
+
+Ran the same method Phase AAP originally used (and every phase in the AAQ-AAV arc reused to find
+its own gap): read each modifier's `handle_execute_step` directly, and where it's a stub, verify
+the real logic actually exists in a direct `step_xxx.rs` port rather than assuming a prior audit's
+classification still holds. Three parallel passes covered all 47 files (bb2016 ×8, bb2020 ×9,
+bb2025 ×28, plus `common/horns_behaviour.rs` and `mixed/{abstract_dodging,dauntless}_behaviour.rs`).
+
+**Result, for the first time in this project's recent run of audits: nothing new to fix.** Every
+file classified as one of:
+- **REAL** (~26 files): the modifier's `handle_execute_step` itself contains the full, working
+  skill logic — BoneHead, Catch, Grab, MonstrousMouth, ReallyStupid, SideStep, StandFirm,
+  WildAnimal (all four across bb2016 and bb2020), plus bb2025's BloodLust, EyeGouge, Saboteur,
+  Swoop, TakeRoot, Horns, AbstractDodging, ThrowTeamMate's pre-roll state mutations, and
+  SneakyGit's EjectPlayer modifier.
+- **DEAD-DUPLICATE-CONFIRMED-FINE** (~19 files): a bare stub, with the real effect verified
+  present in a direct `step_xxx.rs` port — Animosity, Bombardier, DivingTackle, DumpOff,
+  FoulAppearance, Juggernaut, JumpUp, PassBehaviour (bb2025), Shadowing, Stab, Tentacles,
+  TheBallista's `handle_execute_step` (its real logic is in `handle_command`, already fixed in
+  Phase AAR/AAZ), Wrestle, Dauntless, and SneakyGit's second (referee) modifier — all matching the
+  established "registered but real logic lives in the step" pattern from Phases AAG-AAI, verified
+  fresh rather than trusted from the prior audit's notes.
+- Two files specifically flagged as "not explicitly audited before" (`eye_gouge_behaviour.rs`,
+  `foul_appearance_behaviour.rs`) checked out fine: EyeGouge is REAL (fully implemented, tested);
+  FoulAppearance is a confirmed dead-duplicate with 392+ lines of real logic in
+  `step/mixed/step_foul_appearance.rs` + edition variants.
+
+No code changes this phase — a clean audit is itself the useful result, closing out the "is there
+another TheBallista-shaped gap hiding here" question this arc's own findings kept raising. Tests
+unchanged at **17,000**, 0 failures, `cargo clippy --workspace --all-targets`: still 0 errors.
+
+---
+
+## AAW-ABC arc closed. Summary of the 7 phases:
+
+- **AAW**: BB2016 Weeping Dagger poison side-effect wired (+ found `SkillId::WeepingDagger` had no
+  `properties()` entry at all — a real gap alongside the documented one).
+- **AAX**: `stun_player` now returns the same ball-scatter/end-turn `StepParameter`s `drop_player`
+  already built (+ found Java always deactivates a stunned player regardless of who's acting — the
+  old stub never deactivated anyone).
+- **AAY**: all 24 BB2016 cards annotated with real target/duration from Java's `Cards.java` (+
+  found Chop Block's `requiresBlockablePlayerSelection` was unrepresented anywhere).
+- **AAZ**: TheBallista's Hail Mary Pass re-roll now actually triggers a second roll (+ added the
+  generic team-re-roll offering side, previously entirely absent for a failed Hail Mary Pass).
+- **ABA**: merged the duplicate `InducementDuration` enums (kept the one with more live call sites
+  after AAY changed the calculus from the initial recommendation).
+- **ABB**: `mechanics::pass.rs` turned out to be a whole dead duplicate pass-mechanic module, not
+  just a `PassResult` copy — stripped to the one genuinely live function (`passing_distance_bb2025`,
+  which had zero tests despite being gameplay-affecting — now has 5); documented
+  `enums::pass::PassResult`'s intentional split from the mechanics-layer enum of the same name.
+  Left `InjuryTypeBlockImpl` vs `InjuryTypeBlock` unreconciled (confirmed large, its own phase).
+- **ABC**: fresh full audit of the skill-hook registry — clean, no new gaps.
+
+Tests: 17,000 → 17,027 → 17,000 (net 0 across the arc: real fixes added tests, dead-code deletions
+in ABA/ABB removed an equal number of now-pointless tests for duplicate/dead code — the same
+"expected and correct" pattern as Phase AAS). 0 failures throughout. `cargo clippy --workspace
+--all-targets`: 0 errors throughout.
+
+**What's left, in priority order (per this arc's own findings, not carried over unverified):**
+1. **`InjuryTypeBlockImpl` vs `InjuryTypeBlock` consolidation** (flagged large in the AAW plan,
+   re-confirmed in Phase ABB's research) — the main injury-resolution path
+   (`step/util_server_injury.rs`) uses the simplified `Impl` missing real armor/injury modifier
+   logic; the fuller `BlockMode`-aware version is only reached via Animal Savagery. Needs its own
+   dedicated phase (or worktree-parallel batch) to reroute the main path and verify no regression
+   across every block/foul step depending on it.
+2. **`UtilServerHttpClient.java`** (`ffb-engine`'s one remaining `~` tracker row) — confirmed
+   intentionally blocked on an architectural decision (duplicate the real `ffb-server` HTTP client
+   inside the networking-free `ffb-engine`, or add a trait/callback boundary), not a translation
+   task. Needs a user decision before any phase touches it.
+3. **`enums::pass::PassResult` reporting-layer redesign** — intentionally not merged with
+   `mechanics::pass_result::PassResult` in Phase ABB; would need a real design decision about the
+   event-reporting layer, not a mechanical merge.
+4. Per this arc's own closing pattern (repeated across AAN/AAO/AAP/AAQ-AAV and now AAW-ABC):
+   Java/Rust parity/integration testing remains the natural larger workstream once unit-test-only
+   work like this arc is exhausted — still out of scope per standing user instruction until
+   explicitly requested.
+
+---
+
+## Prior Status (2026-07-15, Phase ABB done — 6 of 7 in the AAW-ABC arc)
 
 **Phase ABB — deleted the dead `PassResult` copy + documented the reporting-layer split, done —
 with a real scope correction found before touching anything.**
