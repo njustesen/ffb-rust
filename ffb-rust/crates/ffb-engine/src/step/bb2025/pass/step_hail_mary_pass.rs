@@ -1,4 +1,4 @@
-use ffb_model::enums::{PassResult, PassingDistance, SkillId};
+use ffb_model::enums::{PassResult, PassingDistance, ReRollSource, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
@@ -12,6 +12,10 @@ use crate::model::step_modifier::RerollHookState;
 use crate::skill_behaviour::dispatch;
 use crate::step::framework::{Step, StepCommandStatus, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+
+/// Java: `ReRolledActions.PASS` — the re-rolled-action key this step registers itself under.
+const REROLLED_ACTION_PASS: &str = "PASS";
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.pass.StepHailMaryPass.
 ///
@@ -79,11 +83,8 @@ impl Step for StepHailMaryPass {
         match action {
             Action::UseSkill { skill_id, use_skill } if *skill_id == SkillId::TheBallista => {
                 // Java: AbstractStep.handleSkillCommand -> TheBallistaBehaviour's StepHailMaryPass
-                // modifier presets reRolledAction=PASS/reRollSource before the step re-executes.
-                // Known gap (documented, not silently dropped): unlike StepThrowTeamMate, this
-                // step does not yet implement a full re-roll-retry cycle (it never resets `roll`
-                // or offers a re-roll prompt), so presetting these fields alone does not yet
-                // trigger an actual second roll — see SESSION.md.
+                // modifier presets reRolledAction=PASS/reRollSource before the step re-executes;
+                // execute_step's retry-consumption branch resets `roll` and re-rolls (Phase AAZ).
                 let mut hook_state = RerollHookState {
                     re_rolled_action: self.re_rolled_action.clone(),
                     re_roll_source: self.re_roll_source.clone(),
@@ -147,6 +148,18 @@ impl StepHailMaryPass {
                 Bb2025PassMechanic.minimum_roll_simple(t, PassingDistance::LongBomb, &modifiers)
             }).flatten().unwrap_or(4);
         }
+        // Java: AbstractStepWithReRoll retry contract — if a reroll was granted for this step's
+        // own action key (e.g. TheBallista's handleCommandHook), consuming it successfully forces
+        // a genuine second roll instead of reusing the cached one.
+        if self.re_rolled_action.as_deref() == Some(REROLLED_ACTION_PASS) {
+            if let Some(source_name) = self.re_roll_source.clone() {
+                let thrower_id_for_reroll = game.thrower_id.clone().unwrap_or_default();
+                if use_reroll(game, &ReRollSource::new(source_name), &thrower_id_for_reroll) {
+                    self.roll = 0;
+                }
+            }
+        }
+
         if self.roll == 0 {
             self.roll = rng.d6();
         }
@@ -157,6 +170,16 @@ impl StepHailMaryPass {
 
         let is_fumble = self.roll == 1;
         self.saved_fumble = is_fumble && self.using_safe_pass == Some(true);
+
+        // Java: AbstractStepWithReRoll — offer a re-roll on a fumbled roll not saved by Safe
+        // Pass, but only if this step hasn't already consumed one this action.
+        if is_fumble && !self.saved_fumble && self.re_rolled_action.is_none() {
+            if let Some(prompt) = ask_for_reroll_if_available(game, REROLLED_ACTION_PASS, self.minimum_roll, true) {
+                self.re_rolled_action = Some(REROLLED_ACTION_PASS.into());
+                self.re_roll_source = Some("TRR".into());
+                return StepOutcome::cont().with_prompt(prompt);
+            }
+        }
 
         // Java line 149: result = (raw == ACCURATE) ? INACCURATE : raw
         // Both ACCURATE (4+) and raw INACCURATE (2-3) become INACCURATE in state.
@@ -206,6 +229,24 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         Game::new(home, away, Rules::Bb2025)
+    }
+
+    fn make_game_with_thrower(passing: i32) -> Game {
+        use ffb_model::enums::{PlayerGender, PlayerType};
+        use ffb_model::model::player::Player;
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "thrower".into(), name: "thrower".into(), nr: 1, position_id: "thrower".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.thrower_id = Some("thrower".into());
+        game
     }
 
     #[test]
@@ -370,6 +411,73 @@ mod tests {
         );
         assert_eq!(step.re_rolled_action.as_deref(), Some("PASS"));
         assert!(step.re_roll_source.is_none());
+    }
+
+    #[test]
+    fn the_ballista_reroll_actually_consumes_the_skill_and_forces_a_second_roll() {
+        // Phase AAZ: previously, presetting re_rolled_action/re_roll_source alone never
+        // triggered a real second roll — execute_step never checked those fields at all.
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = make_game_with_thrower(4);
+        game.team_home.player_mut("thrower").unwrap().extra_skills
+            .push(SkillWithValue::new(SkillId::TheBallista));
+
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.roll = 1; // stale/fumble roll from before the reroll was granted
+        step.re_rolled_action = Some("PASS".into());
+        step.re_roll_source = Some("TheBallista".into());
+        step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(
+            game.player("thrower").unwrap().used_skills.contains(&SkillId::TheBallista),
+            "TheBallista should be marked used once its re-roll is actually consumed"
+        );
+    }
+
+    #[test]
+    fn fumbled_roll_offers_a_team_reroll_when_available() {
+        let mut game = make_game_with_thrower(2);
+        game.home_playing = true;
+        game.turn_data_mut().rerolls = 1;
+
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.roll = 1; // fumble
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue, "a reroll should be offered, not an immediate miss");
+        assert_eq!(step.re_rolled_action.as_deref(), Some("PASS"));
+        assert_eq!(step.re_roll_source.as_deref(), Some("TRR"));
+        assert_eq!(game.turn_data().rerolls, 1, "the reroll must only be offered, not yet consumed");
+    }
+
+    #[test]
+    fn accepting_the_offered_reroll_consumes_it_and_forces_a_second_roll() {
+        let mut game = make_game_with_thrower(2);
+        game.home_playing = true;
+        game.turn_data_mut().rerolls = 1;
+
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.roll = 1;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.turn_data().rerolls, 1, "sanity: not yet consumed");
+
+        step.handle_command(&Action::UseReRoll { use_reroll: true }, &mut game, &mut GameRng::new(1));
+        assert_eq!(game.turn_data().rerolls, 0, "accepting the offer should consume the team re-roll");
+        assert!(game.turn_data().reroll_used);
+    }
+
+    #[test]
+    fn no_reroll_available_falls_through_to_goto_failure_unchanged() {
+        // Regression guard: without an available re-roll, behavior matches the pre-AAZ stub.
+        let mut game = make_game_with_thrower(2);
+        game.home_playing = true;
+        game.turn_data_mut().rerolls = 0;
+
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(step.re_rolled_action.is_none());
     }
 
     #[test]

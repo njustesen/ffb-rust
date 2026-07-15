@@ -1,6 +1,49 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-15, Phase AAY done — 3 of 7 in the AAW-ABC arc)
+## Current Status (2026-07-15, Phase AAZ done — 4 of 7 in the AAW-ABC arc)
+
+**Phase AAZ — TheBallista's Hail Mary Pass full re-roll retry cycle (bb2020 + bb2025), done.**
+
+Confirmed precisely (research + direct source read of both editions' `StepHailMaryPass.java` and
+the real hook logic in `PassBehaviour.java`): `handle_command`'s `TheBallista` branch already
+preset `re_rolled_action`/`re_roll_source` via the AAR-era hook, but `execute_step` never checked
+those fields at all — it unconditionally did `if self.roll == 0 { self.roll = rng.d6(); }`, so a
+granted re-roll never actually triggered a second roll.
+
+1. **Retry-consumption branch** (both editions): before the existing roll-caching check, if
+   `re_rolled_action == Some("PASS")` and a `re_roll_source` is set, calls `use_reroll(...)` — on
+   success, resets `self.roll = 0` so the existing `if self.roll == 0` line genuinely re-rolls
+   instead of reusing the stale value. Mirrors `step_throw_team_mate.rs`'s already-working pattern
+   exactly, including reuse of the same `use_reroll`/`ask_for_reroll_if_available` helpers.
+2. **Offering side added** (previously entirely absent — a real, additional gap beyond just the
+   TheBallista wiring): on a failed roll (bb2020: not accurate; bb2025: fumbled and not saved by
+   Safe Pass) with no re-roll already consumed this step, calls
+   `ask_for_reroll_if_available(...)`; if a team re-roll is available, sets
+   `re_rolled_action`/`re_roll_source` and returns `StepOutcome::cont()` with the prompt instead of
+   immediately routing to the failure label — a normal failed Hail Mary Pass can now offer a team
+   re-roll at all, independent of TheBallista.
+3. **Deliberately not ported** (documented, matching this arc's own scoping discipline): Java's
+   full `PassBehaviour.handleExecuteStepHook` also has a Pass-skill-specific reroll dialog
+   (`passSkillUsed`/`DialogSkillUseParameter`) and a "modifying skill" (`canAddStrengthToPass`,
+   e.g. Accurate) stat-based-roll-modifier path — neither exists anywhere in this Rust step today
+   and porting them is materially larger than "wire the retry cycle"; only the generic
+   TRR/skill-re-roll offering (the same mechanism `StepThrowTeamMate` already uses) was added.
+4. bb2016's `StepHailMaryPass` untouched — already has its own full retry cycle (noted since
+   Phase AAV), a different, more complete rule for that edition.
+
+8 new tests (4 per edition): TheBallista's re-roll actually marks the skill used and forces a real
+second roll (previously a no-op), a failed roll offers a team re-roll when available (`Continue` +
+correct `re_rolled_action`/`source`, re-roll not yet consumed), accepting the offer consumes it
+(`turn_data().rerolls` decrements, `reroll_used` set), and a regression guard proving the pre-AAZ
+behavior (immediate `GotoLabel`, no reroll fields touched) is preserved when no re-roll is available.
+
+Tests: 17,019 → **17,027**. 0 failures. `cargo clippy --workspace --all-targets`: still 0 errors.
+
+**Next**: Phase ABA (merge duplicate `InducementDuration` enums).
+
+---
+
+## Prior Status (2026-07-15, Phase AAY done — 3 of 7 in the AAW-ABC arc)
 
 **Phase AAY — card catalog target/duration annotation for all 24 BB2016 cards, done.**
 
