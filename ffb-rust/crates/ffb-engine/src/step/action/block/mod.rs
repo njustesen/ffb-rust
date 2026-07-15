@@ -1,6 +1,5 @@
 pub mod step_block_statistics;
 pub mod step_dauntless;
-pub mod step_drop_falling_players;
 pub mod step_dump_off;
 pub mod step_horns;
 pub mod step_juggernaut;
@@ -10,7 +9,6 @@ pub mod util_block_sequence;
 
 pub use step_block_statistics::StepBlockStatistics;
 pub use step_dauntless::StepDauntless;
-pub use step_drop_falling_players::StepDropFallingPlayers;
 pub use step_dump_off::StepDumpOff;
 pub use step_horns::StepHorns;
 pub use step_juggernaut::StepJuggernaut;
