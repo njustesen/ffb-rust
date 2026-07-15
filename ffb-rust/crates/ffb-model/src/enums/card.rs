@@ -62,6 +62,19 @@ impl InducementDuration {
             _ => None,
         }
     }
+
+    /// Java: `InducementDuration.getDescription()`.
+    pub fn get_description(self) -> &'static str {
+        match self {
+            InducementDuration::UntilEndOfGame => "For the entire game",
+            InducementDuration::UntilEndOfDrive => "For this drive",
+            InducementDuration::UntilEndOfTurn => "For this turn",
+            InducementDuration::WhileHoldingTheBall => "While holding the ball",
+            InducementDuration::UntilUsed => "Single use",
+            InducementDuration::UntilEndOfOpponentsTurn => "For opponent's turn",
+            InducementDuration::UntilEndOfHalf => "For this half",
+        }
+    }
 }
 
 /// When a card may be played during a game (maps to Java's InducementPhase).
@@ -335,6 +348,30 @@ mod tests {
             InducementDuration::UntilEndOfHalf,
         ];
         assert_eq!(all.len(), 7);
+    }
+
+    #[test]
+    fn inducement_duration_all_variants_have_descriptions() {
+        // Phase ABA: get_description() was ported here from the now-deleted duplicate
+        // SCREAMING_SNAKE `inducement::inducement_duration::InducementDuration`.
+        let all = [
+            InducementDuration::UntilEndOfGame, InducementDuration::UntilEndOfDrive,
+            InducementDuration::UntilEndOfTurn, InducementDuration::WhileHoldingTheBall,
+            InducementDuration::UntilUsed, InducementDuration::UntilEndOfOpponentsTurn,
+            InducementDuration::UntilEndOfHalf,
+        ];
+        for d in all {
+            assert!(!d.get_description().is_empty());
+        }
+    }
+
+    #[test]
+    fn inducement_duration_get_description_specific_strings() {
+        assert_eq!(InducementDuration::UntilEndOfTurn.get_description(), "For this turn");
+        assert_eq!(InducementDuration::WhileHoldingTheBall.get_description(), "While holding the ball");
+        assert_eq!(InducementDuration::UntilUsed.get_description(), "Single use");
+        assert_eq!(InducementDuration::UntilEndOfOpponentsTurn.get_description(), "For opponent's turn");
+        assert_eq!(InducementDuration::UntilEndOfHalf.get_description(), "For this half");
     }
 
     #[test]

@@ -1,6 +1,43 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-15, Phase AAZ done — 4 of 7 in the AAW-ABC arc)
+## Current Status (2026-07-15, Phase ABA done — 5 of 7 in the AAW-ABC arc)
+
+**Phase ABA — merged the duplicate `InducementDuration` enums, done.**
+
+Two faithful-but-differently-named subsets of Java's single `InducementDuration.java` enum
+existed: `ffb-model/src/enums/card.rs` (PascalCase, `id()`/`from_id()`/`name()`/`from_name()`) and
+`ffb-model/src/inducement/inducement_duration.rs` (SCREAMING_SNAKE, `get_id()`/`get_name()`/
+`get_description()`). Research from earlier this arc recommended keeping the SCREAMING_SNAKE one,
+but a fresh check at the start of this phase found that recommendation stale: Phase AAY (this same
+arc) had just added a 7th live call site to the PascalCase version (`bb2016/cards.rs`), making it
+the one with less blast radius to keep — another instance of this project's standing lesson to
+verify a prior recommendation before acting on it, even one from earlier in the same arc.
+
+1. Kept `enums::card::InducementDuration` (7 call sites: `Card::with_duration`, `step_end_turn.rs`
+   ×3 editions, `util_server_cards.rs`, `inducement_set.rs`, `bb2016/cards.rs`); deleted
+   `inducement::inducement_duration::InducementDuration` (3 call sites, all in `prayer.rs`/
+   `bb2020/prayer.rs`/`bb2025/prayer.rs`) and its `pub mod` declaration.
+2. Added the one real method the kept enum was missing: `get_description()` (Java:
+   `InducementDuration.getDescription()`), needed by `client/report/bb2020/prayer_roll_message.rs`
+   and its bb2025 counterpart — the only two real callers of the deleted enum's `get_description`.
+3. Updated the 3 prayer files' imports and SCREAMING_SNAKE variant references to the kept
+   PascalCase names — same 7 variants, same ids, purely mechanical.
+
+2 new tests (`get_description()` non-empty for all variants, specific description strings) added
+to `enums/card.rs`'s existing `InducementDuration` test block; the deleted file's own 6-test block
+(id/name/description round-trips) is fully subsumed by tests already living alongside the kept enum.
+
+Tests: 17,027 → **17,023** (net -4: -6 from the deleted duplicate's own test module, +2 new
+`get_description` tests — expected and correct, no real coverage lost, matching this arc's own
+established pattern from Phase AAS's dead-code deletions). 0 failures. `cargo clippy --workspace
+--all-targets`: still 0 errors.
+
+**Next**: Phase ABB (delete the dead `mechanics::pass::PassResult` copy + document the
+`enums::pass::PassResult` reporting-layer split).
+
+---
+
+## Prior Status (2026-07-15, Phase AAZ done — 4 of 7 in the AAW-ABC arc)
 
 **Phase AAZ — TheBallista's Hail Mary Pass full re-roll retry cycle (bb2020 + bb2025), done.**
 

@@ -1,5 +1,5 @@
 /// 1:1 translation of `com.fumbbl.ffb.inducement.bb2020.Prayer`.
-use crate::inducement::inducement_duration::InducementDuration;
+use crate::enums::InducementDuration;
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -67,15 +67,15 @@ impl Prayer {
     /// Java: getDuration()
     pub fn get_duration(self) -> InducementDuration {
         match self {
-            Prayer::TREACHEROUS_TRAPDOOR => InducementDuration::UNTIL_END_OF_HALF,
-            Prayer::FRIENDS_WITH_THE_REF => InducementDuration::UNTIL_END_OF_DRIVE,
-            Prayer::MOLES_UNDER_THE_PITCH => InducementDuration::UNTIL_END_OF_HALF,
-            Prayer::UNDER_SCRUTINY => InducementDuration::UNTIL_END_OF_HALF,
-            Prayer::IRON_MAN => InducementDuration::UNTIL_END_OF_GAME,
-            Prayer::BLESSED_STATUE_OF_NUFFLE => InducementDuration::UNTIL_END_OF_GAME,
-            Prayer::PERFECT_PASSING => InducementDuration::UNTIL_END_OF_GAME,
-            Prayer::INTENSIVE_TRAINING => InducementDuration::UNTIL_END_OF_GAME,
-            _ => InducementDuration::UNTIL_END_OF_DRIVE,
+            Prayer::TREACHEROUS_TRAPDOOR => InducementDuration::UntilEndOfHalf,
+            Prayer::FRIENDS_WITH_THE_REF => InducementDuration::UntilEndOfDrive,
+            Prayer::MOLES_UNDER_THE_PITCH => InducementDuration::UntilEndOfHalf,
+            Prayer::UNDER_SCRUTINY => InducementDuration::UntilEndOfHalf,
+            Prayer::IRON_MAN => InducementDuration::UntilEndOfGame,
+            Prayer::BLESSED_STATUE_OF_NUFFLE => InducementDuration::UntilEndOfGame,
+            Prayer::PERFECT_PASSING => InducementDuration::UntilEndOfGame,
+            Prayer::INTENSIVE_TRAINING => InducementDuration::UntilEndOfGame,
+            _ => InducementDuration::UntilEndOfDrive,
         }
     }
 
@@ -149,11 +149,11 @@ mod tests {
 
     #[test]
     fn get_duration_distinguishes_end_of_game_from_drive_and_half() {
-        assert_eq!(Prayer::IRON_MAN.get_duration(), InducementDuration::UNTIL_END_OF_GAME);
-        assert_eq!(Prayer::PERFECT_PASSING.get_duration(), InducementDuration::UNTIL_END_OF_GAME);
-        assert_eq!(Prayer::FRIENDS_WITH_THE_REF.get_duration(), InducementDuration::UNTIL_END_OF_DRIVE);
-        assert_eq!(Prayer::TREACHEROUS_TRAPDOOR.get_duration(), InducementDuration::UNTIL_END_OF_HALF);
-        assert_eq!(Prayer::MOLES_UNDER_THE_PITCH.get_duration(), InducementDuration::UNTIL_END_OF_HALF);
+        assert_eq!(Prayer::IRON_MAN.get_duration(), InducementDuration::UntilEndOfGame);
+        assert_eq!(Prayer::PERFECT_PASSING.get_duration(), InducementDuration::UntilEndOfGame);
+        assert_eq!(Prayer::FRIENDS_WITH_THE_REF.get_duration(), InducementDuration::UntilEndOfDrive);
+        assert_eq!(Prayer::TREACHEROUS_TRAPDOOR.get_duration(), InducementDuration::UntilEndOfHalf);
+        assert_eq!(Prayer::MOLES_UNDER_THE_PITCH.get_duration(), InducementDuration::UntilEndOfHalf);
     }
 
     #[test]

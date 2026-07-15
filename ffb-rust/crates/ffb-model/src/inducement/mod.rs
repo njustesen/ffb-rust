@@ -10,7 +10,6 @@ pub mod bribery_and_corruption_action;
 pub mod enhancement_provider;
 pub mod inducement;
 pub mod inducement_collection;
-pub mod inducement_duration;
 pub mod inducement_phase;
 pub mod inducement_type;
 pub mod prayer;

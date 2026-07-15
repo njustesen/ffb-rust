@@ -1,4 +1,4 @@
-use crate::inducement::inducement_duration::InducementDuration;
+use crate::enums::InducementDuration;
 
 /// Trait for prayer effects — 1:1 translation of Java Prayer interface.
 pub trait Prayer {
@@ -20,7 +20,7 @@ mod tests {
         fn get_name(&self) -> &str { "Test" }
         fn affects_both_teams(&self) -> bool { false }
         fn get_description(&self) -> &str { "A test prayer" }
-        fn get_duration(&self) -> InducementDuration { InducementDuration::UNTIL_END_OF_HALF }
+        fn get_duration(&self) -> InducementDuration { InducementDuration::UntilEndOfHalf }
         fn is_changing_player(&self) -> bool { false }
     }
 

@@ -1,5 +1,5 @@
 /// 1:1 translation of `com.fumbbl.ffb.inducement.bb2025.Prayer`.
-use crate::inducement::inducement_duration::InducementDuration;
+use crate::enums::InducementDuration;
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -66,7 +66,7 @@ impl Prayer {
 
     /// Java: getDuration() — all BB2025 prayers last UNTIL_END_OF_GAME.
     pub fn get_duration(self) -> InducementDuration {
-        InducementDuration::UNTIL_END_OF_GAME
+        InducementDuration::UntilEndOfGame
     }
 
     /// Java: eventMessage() — the message appended to a player event report.
@@ -130,8 +130,8 @@ mod tests {
 
     #[test]
     fn all_bb2025_prayers_last_until_end_of_game() {
-        assert_eq!(Prayer::FOULING_FRENZY.get_duration(), InducementDuration::UNTIL_END_OF_GAME);
-        assert_eq!(Prayer::FRIENDS_WITH_THE_REF.get_duration(), InducementDuration::UNTIL_END_OF_GAME);
+        assert_eq!(Prayer::FOULING_FRENZY.get_duration(), InducementDuration::UntilEndOfGame);
+        assert_eq!(Prayer::FRIENDS_WITH_THE_REF.get_duration(), InducementDuration::UntilEndOfGame);
     }
 
     #[test]
