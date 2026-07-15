@@ -1,6 +1,88 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-15, Phase ABC done — 7 of 7, the AAW-ABC arc is complete)
+## Current Status (2026-07-15, Phase ABG done — the ABD-ABG arc is complete)
+
+**ABD-ABG arc: closed the #1 item on the AAW-ABC arc's own priority list — the
+`InjuryTypeBlockImpl`/`InjuryTypeBlock` consolidation — plus a bigger, previously-undiscovered
+sibling bug on the same code path, then closed two unit-test-coverage gaps.**
+
+- **Phase ABD (SPP/caused-by-opponent wiring, foundational):** Found, while researching the
+  consolidation, that `InjuryContext.is_worth_spps`/`is_caused_by_opponent` — which gate casualty-SPP
+  awarding and opponent-casualty stat counting in `InjuryResult::apply_to` — were **never populated by
+  production code at all**, only set directly in tests. So casualty SPPs and opponent-casualty
+  counters were never awarded for any injury type in the live engine, independent of the Claws/Mighty
+  Blow gap below. Added `is_worth_spps()`/`is_caused_by_opponent()` trait-method overrides (sourced
+  from the already-correct `ffb-model` injury data structs — `Block`/`Foul`/`BreatheFire`/`CrowdPush`
+  families, +ForSpp variants) and wired `util_server_injury::handle_injury()` to copy them onto the
+  context (primary + modified). Confirmed two genuine Java asymmetries survive the port: Foul vs.
+  FoulForSpp, and CrowdPush vs. CrowdPushForSpp, each flip `is_caused_by_opponent` independently of
+  `worth_spps`. Tests: 17,000 → 17,006 (+6 propagation tests, +1 casualty-counter end-to-end test).
+- **Phase ABE (the consolidation itself):** Six Java injury-type classes (Block, BlockProne(ForSpp),
+  BlockStunned(ForSpp), Foul(ForSpp), FoulChainsaw(ForSpp), BreatheFire(ForSpp), CrowdPush(ForSpp))
+  were dispatched through one bare-bones `InjuryTypeBlockImpl` in `make_injury_type` that never
+  touched the armor/injury modifier factories — Claws, Mighty Blow, and Chainsaw silently never
+  applied on ordinary Block/Foul hits, even though fully correct, already-tested per-class structs
+  already existed in `injury/injuryType/*.rs` and just weren't wired up. Rerouted all dispatch
+  entries to the real structs in 3 batches (Block family, Foul family, BreatheFire+CrowdPush family),
+  re-testing after each; deleted the dead `"InjuryTypeBlockForSpp"` key (no corresponding Java class,
+  zero callers, confirmed via grep before removing); deleted `InjuryTypeBlockImpl` once it had zero
+  remaining references. Also fixed an adjacent, narrower discrepancy: bb2025's
+  `StepDropFallingPlayers` has two call sites that both used the `"InjuryTypeBlock"` key, but Java's
+  two constructors there differ in `allowAttackerChainsaw` (false for the defender-fallback path, true
+  for the attacker path) — added a distinct `"InjuryTypeBlockNoAttackerChainsaw"` key for the
+  defender-fallback call site. Tests: 17,006 → 17,010 (+4 integration tests proving the dispatcher now
+  reaches real Mighty Blow/Chainsaw modifier logic — impossible to write against the old dispatch).
+- **Phase ABF (legal_actions unit tests):** `ffb-engine/src/legal_actions/mod.rs` (515 lines, 11
+  public functions) computes every legal action available to a player each turn — gameplay-critical
+  and had zero tests. Added 40 tests covering action-eligibility gating, move/blitz-move BFS
+  targeting, `bfs_path`, and the block/foul/handoff/pass/kickoff target-list helpers. Tests: 17,010 →
+  17,050 (+40).
+- **Phase ABG (ModifierAggregator audit):** `ffb-mechanics/src/modifiers/modifier_aggregator.rs` is a
+  stub (every method returns an empty `Vec`). Confirmed the skill-sourced half of this is a
+  non-issue — `ArmorModifierFactory`/`InjuryModifierFactory` already hardcode each skill's effect
+  directly, bypassing the aggregator entirely (same pattern as many prior "registered but real logic
+  lives elsewhere" audit findings). But the **card-sourced half is a genuine, live gap**: the Rust
+  `Card` struct (`ffb-model/src/inducement/card.rs`) carries no `roll_modifiers()`-equivalent method
+  at all — pure metadata (name/target/duration/handler_key), confirmed via a zero-hit repo-wide grep
+  for `fn roll_modifiers|fn armour_modifiers|fn injury_modifiers|fn casualty_modifiers`. Concrete
+  examples of currently-silent card effects: BB2016's **Fawndough's Headband** grants Pass/Accurate
+  skills but not its -1-to-opponent's-interception-roll modifier; **Greased Shoes** applies its
+  `setGfiRollToFive`-equivalent property but not the compensating GFI roll modifier the real roll-
+  target calculation needs; **Gromskull's Exploding Runes** grants Bombardier/NoHands/SecretWeapon but
+  not its -1 pass-roll penalty. This needs its own dedicated phase (add a `roll_modifiers()`-style
+  method to `Card`, wire it into `ArmorModifierFactory`/`InjuryModifierFactory`/the catch/dodge/pass/
+  GFI modifier collections, one card at a time) — too broad to fix as a side-effect of an audit.
+  No code changes this phase. Tests unchanged at 17,050.
+
+Tests across the arc: 17,000 → 17,050 (+50), 0 failures throughout, `cargo clippy --workspace
+--all-targets`: 0 errors throughout.
+
+**What's left, in priority order:**
+1. **Card roll-modifier gap** (Phase ABG finding) — cards that grant armor/injury/catch/dodge/pass/
+   GFI roll modifiers have no live effect; needs a dedicated phase, one card at a time, verified
+   against each card's Java `rollModifiers()` override.
+2. **`InjuryTypeChainsawImpl`** (found during Phase ABE research) — same bug pattern as the just-fixed
+   Block/Foul family (a simplified `Impl` struct used by live dispatch instead of the real, already-
+   ported `injury_type_chainsaw.rs`/`injury_type_chainsaw_for_spp.rs`), smaller in scope, flagged as
+   an immediate follow-up.
+3. **BB2020 PilingOn injury dispatch** (found during Phase ABE's regression sweep) — `skill_behaviour/
+   bb2020/piling_on_behaviour.rs` appears to have no injury-type dispatch wiring at all, unlike its
+   BB2016 counterpart; not investigated further this arc (separate concern from the Block/Foul
+   consolidation), needs its own scoping pass.
+4. **`UtilServerHttpClient.java`** — confirmed intentionally blocked on an architectural decision
+   (duplicate the real `ffb-server` HTTP client inside the networking-free `ffb-engine`, or add a
+   trait/callback boundary), not a translation task. Needs a user decision before any phase touches
+   it.
+5. **`enums::pass::PassResult` reporting-layer redesign** — intentionally not merged with
+   `mechanics::pass_result::PassResult` (Phase ABB); would need a real design decision about the
+   event-reporting layer, not a mechanical merge.
+6. Per the standing pattern across every recent arc: Java/Rust parity/integration testing remains the
+   natural larger workstream once unit-test-only work is exhausted — still out of scope per standing
+   user instruction until explicitly requested.
+
+---
+
+## Prior Status (2026-07-15, Phase ABC done — 7 of 7, the AAW-ABC arc is complete)
 
 **Phase ABC — fresh from-scratch audit of all 47 live `StepModifierTrait::handle_execute_step`
 bodies in `skill_behaviour/`, done. Clean result: zero new genuine gaps found.**
