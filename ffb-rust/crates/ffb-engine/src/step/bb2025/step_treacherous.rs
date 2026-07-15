@@ -5,20 +5,21 @@
 /// Init params: GOTO_LABEL_ON_FAILURE.
 /// Runtime params: END_TURN, END_PLAYER_ACTION.
 ///
-/// Stab injury: creates a minimal InjuryResult (armor bypassed, injury dice rolled).
-/// Full InjuryTypeStab mechanics not yet translated.
-use ffb_model::enums::{ApothecaryMode, SkillId, PlayerAction, PS_PRONE};
+/// Stab injury: Java `UtilServerInjury.handleInjury(this, new InjuryTypeStab(true, true), ...)`,
+/// published as a `DropPlayerContext` (not a raw `InjuryResult`).
+use ffb_model::enums::{ApothecaryMode, SkillId, PlayerAction};
 use ffb_model::model::game::Game;
 use ffb_model::model::skill_use::SkillUse;
 use ffb_model::report::mixed::report_skill_wasted::ReportSkillWasted;
 use ffb_model::report::report_id::ReportId;
 use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
-use ffb_mechanics::mechanics::armor_broken;
 use crate::action::Action;
-use crate::injury::{InjuryContext, InjuryResult};
+use crate::drop_player_context::DropPlayerContext;
+use crate::injury::injuryType::injury_type_stab::InjuryTypeStab;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::util_server_injury::handle_injury;
 
 pub struct StepTreacherous {
     /// Java: endPlayerAction — set by END_PLAYER_ACTION parameter.
@@ -110,27 +111,20 @@ impl StepTreacherous {
                 // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, SkillUse.TREACHEROUS))
                 game.report_list.add(ReportSkillUse::new(Some(player_id.clone()), SkillId::Treacherous, true, SkillUse::TREACHEROUS));
 
-                // Java: UtilServerInjury.handleInjury — InjuryTypeStab bypasses armor, rolls injury
-                // Simplified: create InjuryResult with armor broken and injury dice rolled
-                let defender_armour = game.player(&target_id).map(|p| p.armour).unwrap_or(8);
-                let a1 = rng.d6();
-                let a2 = rng.d6();
-                let broke = armor_broken(defender_armour, [a1, a2], &[]);
+                // Java: UtilServerInjury.handleInjury(this, new InjuryTypeStab(true, true), ...)
+                let defender_coord = game.field_model.player_coordinate(&target_id)
+                    .unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
+                let mut injury_type = InjuryTypeStab::new();
+                let injury_result = handle_injury(
+                    game, rng, &mut injury_type,
+                    Some(player_id.as_str()), &target_id,
+                    defender_coord, None, None,
+                    ApothecaryMode::Defender,
+                );
 
-                let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
-                ctx.armor_roll = Some([a1, a2]);
-                ctx.armor_broken = broke;
-
-                if broke {
-                    let state = game.field_model.player_state(&target_id).unwrap_or_default();
-                    game.field_model.set_player_state(&target_id, state.change_base(PS_PRONE).change_active(false));
-                    let i1 = rng.d6();
-                    let i2 = rng.d6();
-                    ctx.injury_roll = Some([i1, i2]);
-                }
-
-                let ir = Box::new(InjuryResult { injury_context: ctx, knocked_out: false, rip: false, already_reported: false, pre_regeneration: true });
-                StepOutcome::next().publish(StepParameter::InjuryResult(ir))
+                // Java: publishParameter(DROP_PLAYER_CONTEXT, new DropPlayerContext(injuryResultDefender, false, false, null, player.getId(), DEFENDER, false))
+                let dpc = DropPlayerContext::with_injury(injury_result, target_id, ApothecaryMode::Defender, false);
+                StepOutcome::next().publish(StepParameter::DropPlayerContext(Box::new(dpc)))
             } else {
                 StepOutcome::next()
             }
@@ -280,7 +274,7 @@ mod tests {
     }
 
     #[test]
-    fn target_with_ball_publishes_injury_result() {
+    fn target_with_ball_publishes_drop_player_context() {
         let (mut game, _) = make_game_with_treacherous();
         let mate_id = "mate".to_string();
         game.team_home.players.push(make_player(&mate_id, None));
@@ -292,8 +286,9 @@ mod tests {
         let mut step = StepTreacherous::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))),
-            "should publish InjuryResult");
+        // Java publishes DropPlayerContext (not a raw InjuryResult) — matches bb2020's StepTreacherous.
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DropPlayerContext(_))),
+            "should publish DropPlayerContext, matching the real ported InjuryTypeStab dispatch");
         // Ball should have moved to actor
         assert_eq!(game.field_model.ball_coordinate, Some(FieldCoordinate::new(10, 7)));
     }

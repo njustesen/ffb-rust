@@ -13,9 +13,10 @@ use ffb_model::model::game::Game;
 use ffb_model::model::player::Player;
 use ffb_mechanics::modifiers::armor_modifier::ArmorModifier;
 use ffb_mechanics::modifiers::armor_modifier_factory::ArmorModifierFactory;
-use ffb_mechanics::modifiers::{niggling_injury_modifier, Modifier, ARMOR_MIGHTY_BLOW_1, INJURY_MIGHTY_BLOW_1};
+use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
+use ffb_mechanics::modifiers::{niggling_injury_modifier, Modifier, ARMOR_MIGHTY_BLOW_1};
 use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
-use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury};
+use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury, leak_injury_modifier};
 
 /// Java: `ArmorModifier` instances are transient objects owned by their `Skill`; Rust's
 /// `Modifier` (used by `InjuryContext`) requires a `&'static str` name for cheap `Copy`-like
@@ -239,6 +240,9 @@ impl ModificationAwareInjuryType for InjuryTypeBlock {
         }
     }
     fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str) {
+        // Java: `factory.getNigglingInjuryModifier(pDefender)` — called directly, not via the
+        // with-niggling `findInjuryModifiers` variant (Block always adds niggling regardless of
+        // the mode gate below, unlike the mode-gated skill modifiers).
         if let Some(defender) = game.player(defender_id) {
             if let Some(m) = niggling_injury_modifier(defender.niggling_injuries) {
                 self.ctx.add_injury_modifier(m);
@@ -256,10 +260,17 @@ impl ModificationAwareInjuryType for InjuryTypeBlock {
             BlockMode::Regular => different_teams(game, attacker_id, defender_id),
         };
         if modifiers_apply {
-            if let Some(aid) = attacker_id {
+            if let (Some(aid), Some(defender)) = (attacker_id, game.player(defender_id)) {
                 if let Some(attacker) = game.player(aid) {
-                    if attacker.has_skill(SkillId::MightyBlow) {
-                        self.ctx.add_injury_modifier(INJURY_MIGHTY_BLOW_1);
+                    // Java: `factory.findInjuryModifiersWithoutNiggling(game, injuryContext,
+                    // pAttacker, pDefender, isStab(), isFoul(), isVomitLike(), isChainsaw())` —
+                    // Block is never stab/foul/vomit-like/chainsaw (those are separate InjuryType
+                    // classes), so all four flags are false here.
+                    let factory = InjuryModifierFactory::new(game.rules);
+                    for m in factory.find_injury_modifiers_without_niggling(
+                        game, Some(attacker), defender, false, false, false, false,
+                    ) {
+                        self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), Some(attacker), defender, game.rules));
                     }
                 }
             }
@@ -273,7 +284,7 @@ impl ModificationAwareInjuryType for InjuryTypeBlock {
 mod tests {
     use super::*;
     use ffb_model::enums::{Rules, SkillId};
-    use ffb_mechanics::modifiers::{ARMOR_MIGHTY_BLOW_1, INJURY_MIGHTY_BLOW_1};
+    use ffb_mechanics::modifiers::ARMOR_MIGHTY_BLOW_1;
 
     fn make_player(id: &str, armour: i32, skills: Vec<SkillId>) -> ffb_model::model::player::Player {
         use std::collections::HashSet;
@@ -338,6 +349,13 @@ mod tests {
     fn mighty_blow_armor_modifier(rules: ffb_model::enums::Rules) -> Modifier {
         Modifier::new("Mighty Blow", 1, rules)
     }
+    /// Real `InjuryModifierFactory`-sourced Mighty Blow injury modifier is named "Mighty Blow"
+    /// (not the pre-Phase-ABJ placeholder constant `INJURY_MIGHTY_BLOW_1` = "Mighty Blow +1") —
+    /// `injury_roll` now sources it from the real factory, matching Java, mirroring the armor
+    /// modifier's own rename above.
+    fn mighty_blow_injury_modifier(rules: ffb_model::enums::Rules) -> Modifier {
+        Modifier::new("Mighty Blow", 1, rules)
+    }
 
     #[test]
     fn use_mighty_blow_adds_armor_modifier() {
@@ -380,7 +398,7 @@ mod tests {
         let mut rng = GameRng::new(1);
         t.ctx.armor_broken = true;
         t.injury_roll(&game, &mut rng, Some("attacker"), "defender");
-        assert!(t.ctx.injury_modifiers.contains(&INJURY_MIGHTY_BLOW_1));
+        assert!(t.ctx.injury_modifiers.contains(&mighty_blow_injury_modifier(game.rules)));
     }
     #[test]
     fn regular_mode_adds_mighty_blow_injury_modifier_against_different_team() {
@@ -389,7 +407,7 @@ mod tests {
         let mut rng = GameRng::new(1);
         t.ctx.armor_broken = true;
         t.injury_roll(&game, &mut rng, Some("attacker"), "defender");
-        assert!(t.ctx.injury_modifiers.contains(&INJURY_MIGHTY_BLOW_1));
+        assert!(t.ctx.injury_modifiers.contains(&mighty_blow_injury_modifier(game.rules)));
     }
     #[test]
     fn regular_mode_does_not_add_mighty_blow_injury_modifier_against_same_team() {
@@ -398,7 +416,7 @@ mod tests {
         let mut rng = GameRng::new(1);
         t.ctx.armor_broken = true;
         t.injury_roll(&game, &mut rng, Some("attacker"), "defender");
-        assert!(!t.ctx.injury_modifiers.contains(&INJURY_MIGHTY_BLOW_1));
+        assert!(!t.ctx.injury_modifiers.contains(&mighty_blow_injury_modifier(game.rules)));
     }
     #[test]
     fn do_not_use_modifiers_never_adds_armor_modifier() {
@@ -423,7 +441,7 @@ mod tests {
         let mut rng = GameRng::new(1);
         t.ctx.armor_broken = true;
         t.injury_roll(&game, &mut rng, Some("attacker"), "defender");
-        assert!(!t.ctx.injury_modifiers.contains(&INJURY_MIGHTY_BLOW_1));
+        assert!(!t.ctx.injury_modifiers.contains(&mighty_blow_injury_modifier(game.rules)));
     }
     #[test]
     fn use_mighty_blow_without_skill_does_not_add_modifier() {

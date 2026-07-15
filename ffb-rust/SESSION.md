@@ -1,6 +1,111 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-15, Phase ABI done — the ABH-ABI arc is complete)
+## Current Status (2026-07-16, Phase ABJ done — injury-type dispatch + modifier-factory wiring)
+
+**Phase ABJ: closed the two items named in ABH-ABI's own closing note — `InjuryModifierFactory`
+non-wiring and the `injury_type_server_factory.rs` dead-registry audit — plus a newly-found
+third bug shape (hand-inlined injury logic bypassing the real ported struct entirely).**
+
+- **Sub-phase 1 (dispatch-table fix):** The "dead" `factory/injury_type_server_factory.rs`
+  registry turned out **not** to be simple dead code — direct investigation found it already
+  registers real, tested structs (`InjuryTypeQuickBite`, `InjuryTypeStab`/`ForSpp`,
+  `InjuryTypeSabotaged`, `InjuryTypeSaboteur`, `InjuryTypeTrapDoorFall`/`ForSpp`,
+  `InjuryTypeKegHit`, `InjuryTypeKTMCrowd`/`KTMInjury`, `InjuryTypeBallAndChain`,
+  `InjuryTypeBitten`, `InjuryTypeEatPlayer`, `InjuryTypeProjectileVomit`,
+  `InjuryTypeThenIStartedBlastin`, `InjuryTypeFumbledKtm`/`ApoKo`) under string keys the live
+  `injury.rs::make_injury_type` dispatcher had **no matching arm for at all** — confirmed **3
+  concretely live, currently-reachable bugs**: `step_quick_bite.rs`'s `"quickBite"` call fell
+  through to the generic `InjuryTypeDropFall` fallback (wrong armor/injury table entirely);
+  `step_drop_falling_players.rs`'s Saboteur/Sabotaged skill branches did the same (wrong
+  `stunIsTreatedAsKo`); bb2025's `step_right_stuff.rs` fumbled-KTM branch did too. Added all
+  missing PascalCase dispatch arms (reusing the exact real structs, no new logic), fixed the
+  `InjuryTypeFumbledKtmApoKo` arm which was *also* wrong (dispatched to the generic fallback
+  instead of the real struct, losing `stunIsTreatedAsKo=true`). Confirmed via source-read that
+  the three `PilingOn*` keys don't need arms — Phase ABI already wires those via direct struct
+  construction, bypassing the string dispatcher entirely (no gap). Once every real caller was
+  confirmed reachable (via the fixed dispatcher or pre-existing direct construction), deleted
+  `factory/injury_type_server_factory.rs` for real (8 tests removed with it — same
+  "dead-code-deletion offsets new-test-count" pattern as Phases ABA/ABB). 8 new dispatch tests.
+- **Sub-phase 2 (reroute hand-inlined callers onto the real ported structs):** Investigating the
+  ~13 call sites for the newly-dispatchable types surfaced a *third* bug shape, one tier
+  different from sub-phase 1's: some steps don't call the dispatcher at all — they hand-roll a
+  simplified inline copy of the injury logic instead of instantiating the real, already-tested
+  struct (same "bare logic instead of the real ported struct" shape as Phases ABE/ABH, just
+  inlined-in-step instead of routed through a bare `Impl` type). Fixed 2 confirmed instances:
+  `step/action/ttm/step_eat_team_mate.rs` (now calls the real `InjuryTypeEatPlayer` via
+  `handle_injury`, which additionally makes apothecary-eligibility evaluation reachable — the
+  old hand-inline skipped `evaluate_injury_context` entirely) and bb2025's
+  `step_treacherous.rs` (was hand-rolling a *simplified* stab armor/injury roll and publishing a
+  raw `InjuryResult`; Java's real source calls `InjuryTypeStab` via `handle_injury` and publishes
+  `DropPlayerContext` — bb2020's sibling file already did this correctly, used as the reference
+  pattern). **Found but explicitly deferred, larger than scoped:** `step/action/block/
+  step_stab.rs` has the same hand-inlined-logic bug, but its real fix is **not** a simple struct
+  swap — Java's `StepStab` is a near-empty COMMON shell; the real logic lives in three
+  genuinely-different per-edition `StabBehaviour.java` skill-hook classes (bb2016: plain
+  `hasSkill` gate, `InjuryTypeStab(false)`, raw `InjuryResult` publish, direct goto-on-success;
+  bb2020/bb2025: property-based gate, `InjuryTypeStab(true)`/`InjuryTypeStabForSpp(true)`
+  choice based on `grantsSppFromSpecialActionsCas`, `DropPlayerContext`-with-embedded-label
+  publish, unconditional `NEXT_STEP` — the label is consumed later by the already-real
+  `StepHandleDropPlayerContext`). None of these `StabBehaviour.java` classes have ever been
+  ported. Fixing `step_stab.rs` for real needs a `game.rules`-gated dispatch inside the shared
+  step (the Phase ABI-established convention) plus porting genuinely new per-edition logic —
+  sized for its own future phase, not force-fit into this one's narrower "swap the struct" scope.
+  2 new/updated tests.
+- **Sub-phase 3 (wire `InjuryModifierFactory` into real injury-roll paths):** Reference pattern
+  (already correct, used as the template): `InjuryTypeBlock::armour_roll` calls
+  `ArmorModifierFactory::find_armor_modifiers`. Wired the sibling `InjuryModifierFactory::
+  find_injury_modifiers`/`find_injury_modifiers_chainsaw` into `injury_roll` for **5 structs**
+  confirmed via direct Java source reads (`InjuryTypeBlock`, `InjuryTypeFoul`,
+  `InjuryTypeFoulForSpp`, `InjuryTypeChainsaw`, `InjuryTypeChainsawForSpp`), replacing hand-rolled
+  single-skill checks (Mighty Blow only for Block; Dirty Player only for Foul; nothing at all for
+  Chainsaw, which had *zero* modifier wiring including niggling). Added a shared
+  `leak_injury_modifier` bridge fn in `modification_aware_injury_type_server.rs` (same
+  `&'static str`-leaking convention as `injury_type_block.rs`'s pre-existing `leak_modifier` for
+  `ArmorModifierFactory`, now shared across all 3 files instead of duplicated). Fixed 4 tests
+  that compared against the old placeholder `INJURY_MIGHTY_BLOW_1`/`INJURY_DIRTY_PLAYER_1`
+  constants (wrong name — "Mighty Blow +1"/"Dirty Player +1" vs the real factory's "Mighty
+  Blow"/"Dirty Player" — and wrong hardcoded `Rules::Bb2020`) — same discrepancy Phase ABH already
+  found and fixed for the armor-modifier side of Chainsaw. 1 new test proving Chainsaw's niggling
+  modifier is now reachable (previously entirely absent — chainsaw hits on a niggling-injured
+  player got no modifier at all). **Remaining ~27 of the ~32 Java `InjuryType*.java` classes that
+  call `InjuryModifierFactory`** (BallAndChain, Bitten, Bomb family, BreatheFire(ForSpp),
+  Crowd, DropDodge(ForSpp), DropGFI, DropJump, Fireball, FumbledKtm(ApoKo), KegHit, KTMInjury,
+  Lightning, PilingOnArmour/Injury, ProjectileVomit, QuickBite, Stab(ForSpp), ThenIStartedBlastin,
+  ThrowARock(Stalling), TTMHitPlayer, TTMLanding) are **not yet wired** — the 5 done this phase
+  were the explicitly highest-impact ones (named in Java call-sites and prior arcs' own notes);
+  wiring the rest is a well-scoped, mechanical follow-up phase (same pattern, just more files).
+
+Tests: 17,052 → **17,053** (net +1: sub-phase 1 was net 0 — 8 new dispatch tests offset by the
+deleted dead factory's own 8 tests, same pattern as Phases ABA/ABB — sub-phase 3 added 1 new
+niggling-reachability test). 0 failures throughout. `cargo clippy --workspace --all-targets`: 0
+errors throughout.
+
+**What's left, in priority order:**
+1. **Finish wiring `InjuryModifierFactory` into the remaining ~27 `InjuryType*` structs** (this
+   phase's own finding) — mechanical, one struct at a time, verified against each one's Java
+   `injuryRoll`/`armourRoll` factory call signature.
+2. **Port `StabBehaviour.java` for real** (bb2016/bb2020/bb2025, this phase's own finding) — needs
+   per-edition skill-hook logic never before ported, gated inside the shared `step_stab.rs` via
+   `game.rules` per the Phase ABI convention; `step/action/ttm/step_eat_team_mate.rs`'s sibling fix
+   this phase is the template for the *mechanical* half, but Stab's control-flow (unconditional
+   `NEXT_STEP` + label-embedded-in-`DropPlayerContext`) needs its own careful port.
+3. **Card roll-modifier gap** (Phase ABG finding) — cards that grant armor/injury/catch/dodge/pass/
+   GFI roll modifiers have no live effect; needs a dedicated phase, one card at a time, verified
+   against each card's Java `rollModifiers()` override.
+4. **`UtilServerHttpClient.java`** — confirmed intentionally blocked on an architectural decision
+   (duplicate the real `ffb-server` HTTP client inside the networking-free `ffb-engine`, or add a
+   trait/callback boundary), not a translation task. Needs a user decision before any phase touches
+   it.
+5. **`enums::pass::PassResult` reporting-layer redesign** — intentionally not merged with
+   `mechanics::pass_result::PassResult` (Phase ABB); would need a real design decision about the
+   event-reporting layer, not a mechanical merge.
+6. Per the standing pattern across every recent arc: Java/Rust parity/integration testing remains
+   the natural larger workstream once unit-test-only work is exhausted — still out of scope per
+   standing user instruction until explicitly requested.
+
+---
+
+## Prior Status (2026-07-15, Phase ABI done — the ABH-ABI arc is complete)
 
 **ABH-ABI arc: closed the #2 and #3 items on the ABD-ABG arc's own priority list — the
 `InjuryTypeChainsaw` dispatch consolidation and the BB2020 PilingOn injury-dispatch gap.**

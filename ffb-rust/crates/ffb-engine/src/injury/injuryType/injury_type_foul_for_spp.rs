@@ -8,9 +8,10 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
 use ffb_model::model::game::Game;
-use ffb_mechanics::modifiers::{foul_assist_armor_modifier, niggling_injury_modifier, ARMOR_CHAINSAW_3, ARMOR_DIRTY_PLAYER_1, ARMOR_FOUL, INJURY_DIRTY_PLAYER_1};
+use ffb_mechanics::modifiers::{foul_assist_armor_modifier, ARMOR_CHAINSAW_3, ARMOR_DIRTY_PLAYER_1, ARMOR_FOUL};
+use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
 use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
-use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury};
+use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury, leak_injury_modifier};
 
 pub struct InjuryTypeFoulForSpp { ctx: InjuryContext, use_chainsaw: bool }
 impl InjuryTypeFoulForSpp {
@@ -78,17 +79,14 @@ impl ModificationAwareInjuryType for InjuryTypeFoulForSpp {
         }
     }
     fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str) {
+        // Java: `factory.findInjuryModifiers(game, injuryContext, pAttacker, pDefender, isStab(),
+        // isFoul(), isVomitLike())` — includes niggling internally. FoulForSpp is never
+        // stab/vomit-like (separate InjuryType classes), isFoul=true.
         if let Some(defender) = game.player(defender_id) {
-            if let Some(m) = niggling_injury_modifier(defender.niggling_injuries) {
-                self.ctx.add_injury_modifier(m);
-            }
-        }
-        // DirtyPlayer: +1 to injury roll for fouls
-        if let Some(aid) = attacker_id {
-            if let Some(attacker) = game.player(aid) {
-                if attacker.has_skill(SkillId::DirtyPlayer) {
-                    self.ctx.add_injury_modifier(INJURY_DIRTY_PLAYER_1);
-                }
+            let attacker = attacker_id.and_then(|aid| game.player(aid));
+            let factory = InjuryModifierFactory::new(game.rules);
+            for m in factory.find_injury_modifiers(game, attacker, defender, false, true, false) {
+                self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), attacker, defender, game.rules));
             }
         }
         do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
@@ -100,7 +98,13 @@ impl ModificationAwareInjuryType for InjuryTypeFoulForSpp {
 mod tests {
     use super::*;
     use ffb_model::enums::{Rules, SkillId};
-    use ffb_mechanics::modifiers::{ARMOR_DIRTY_PLAYER_1, INJURY_DIRTY_PLAYER_1};
+    use ffb_mechanics::modifiers::{ARMOR_DIRTY_PLAYER_1, Modifier};
+
+    /// Real `InjuryModifierFactory`-sourced Dirty Player injury modifier is named "Dirty Player"
+    /// (not the pre-Phase-ABJ placeholder constant `INJURY_DIRTY_PLAYER_1` = "Dirty Player +1").
+    fn dirty_player_injury_modifier(rules: Rules) -> Modifier {
+        Modifier::new("Dirty Player", 1, rules)
+    }
 
     fn make_player(id: &str, armour: i32, skills: Vec<SkillId>) -> ffb_model::model::player::Player {
         use std::collections::HashSet;
@@ -168,7 +172,7 @@ mod tests {
         let mut rng = GameRng::new(1);
         t.ctx.armor_broken = true;
         t.injury_roll(&game, &mut rng, Some("attacker"), "defender");
-        assert!(t.ctx.injury_modifiers.contains(&INJURY_DIRTY_PLAYER_1));
+        assert!(t.ctx.injury_modifiers.contains(&dirty_player_injury_modifier(game.rules)));
     }
     #[test]
     fn no_dirty_player_no_injury_modifier() {
@@ -177,7 +181,7 @@ mod tests {
         let mut rng = GameRng::new(1);
         t.ctx.armor_broken = true;
         t.injury_roll(&game, &mut rng, Some("attacker"), "defender");
-        assert!(!t.ctx.injury_modifiers.contains(&INJURY_DIRTY_PLAYER_1));
+        assert!(!t.ctx.injury_modifiers.contains(&dirty_player_injury_modifier(game.rules)));
     }
     #[test]
     fn chainsaw_foul_adds_chainsaw_modifier() {

@@ -7,8 +7,9 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
 use ffb_mechanics::modifiers::ARMOR_CHAINSAW_3;
+use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
 use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
-use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury};
+use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury, leak_injury_modifier};
 
 pub struct InjuryTypeChainsawForSpp { ctx: InjuryContext }
 impl InjuryTypeChainsawForSpp { pub fn new() -> Self { Self { ctx: InjuryContext::new(ApothecaryMode::Defender) } } }
@@ -43,7 +44,16 @@ impl ModificationAwareInjuryType for InjuryTypeChainsawForSpp {
         }
         do_armor_roll(game, rng, &mut self.ctx, defender_id);
     }
-    fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str) {
+    fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str) {
+        // Java: `factory.findInjuryModifiers(game, injuryContext, pAttacker, pDefender, isStab(),
+        // isFoul(), isVomitLike(), isChainsaw())` — includes niggling internally.
+        if let Some(defender) = game.player(defender_id) {
+            let attacker = attacker_id.and_then(|aid| game.player(aid));
+            let factory = InjuryModifierFactory::new(game.rules);
+            for m in factory.find_injury_modifiers_chainsaw(game, attacker, defender, false, false, false, true) {
+                self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), attacker, defender, game.rules));
+            }
+        }
         do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
     }
     fn saved_by_armour(&mut self) {

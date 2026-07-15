@@ -2574,7 +2574,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/factory/bb2025/DeferredCommandFactory.java` | `ffb-engine` | `src/factory/bb2025/deferred_command_factory.rs` | ✓ |
 | `server/factory/bb2025/DeferredCommandIdFactory.java` | `ffb-engine` | `src/factory/bb2025/deferred_command_id_factory.rs` | ✓ |
 | `server/factory/CardHandlerFactory.java` | `ffb-engine` | `src/factory/card_handler_factory.rs` | ✓ |
-| `server/factory/InjuryTypeServerFactory.java` | `ffb-engine` | `src/factory/injury_type_server_factory.rs` | ✓ |
+| `server/factory/InjuryTypeServerFactory.java` | `ffb-engine` | (deleted, Phase ABJ) | — (dead: zero callers; its real dispatch coverage — quickBite/stab/sabotaged/saboteur/trapdoorFall/kegHit/ktm\*/ballAndChain/bitten/eatPlayer/projectileVomit/startedBlastin/fumbledKtm(ApoKo) — was migrated into the live `injury.rs::make_injury_type` dispatch table before deletion, closing several previously-unreachable-injury-type gaps) |
 | `server/factory/mixed/PrayerHandlerFactory.java` | `ffb-engine` | `src/factory/mixed/prayer_handler_factory.rs` | ✓ |
 | `server/factory/ObserverFactory.java` | `ffb-engine` | `src/factory/observer_factory.rs` | ✓ |
 | `server/factory/SequenceGeneratorFactory.java` | `ffb-engine` | `src/factory/sequence_generator_factory.rs` | ✓ |

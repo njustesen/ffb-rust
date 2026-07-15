@@ -694,8 +694,48 @@ pub fn make_injury_type(name: &str) -> Box<dyn InjuryTypeServer> {
             Box::new(injuryType::injury_type_crowd_push::InjuryTypeCrowdPush::new()),
         "InjuryTypeCrowdPushForSpp" =>
             Box::new(injuryType::injury_type_crowd_push_for_spp::InjuryTypeCrowdPushForSpp::new()),
+        // Java: `new InjuryTypeFumbledKtmApoKo()` — armor always broken, stunIsTreatedAsKo=true.
+        // Was wrongly dispatched to the generic drop-fall stand-in (stunIsTreatedAsKo=false).
         "InjuryTypeFumbledKtmApoKo" =>
-            Box::new(InjuryTypeDropFall::new(false)),
+            Box::new(injuryType::injury_type_fumbled_ktm_apo_ko::InjuryTypeFumbledKtmApoKo::new()),
+        // Java: `new InjuryTypeFumbledKtm()` — armor always broken, stunIsTreatedAsKo=true.
+        // Live caller: bb2025 step_right_stuff.rs (fumbled KTM landing) previously fell through
+        // to the generic drop-fall stand-in (stunIsTreatedAsKo=false) since no arm existed here.
+        "InjuryTypeFumbledKtm" =>
+            Box::new(injuryType::injury_type_fumbled_ktm::InjuryTypeFumbledKtm::new()),
+        // Live callers: step_quick_bite.rs uses the Java lower-camel name "quickBite" directly.
+        "InjuryTypeQuickBite" | "quickBite" =>
+            Box::new(injuryType::injury_type_quick_bite::InjuryTypeQuickBite::new()),
+        "InjuryTypeStab" =>
+            Box::new(injuryType::injury_type_stab::InjuryTypeStab::new()),
+        "InjuryTypeStabForSpp" =>
+            Box::new(injuryType::injury_type_stab_for_spp::InjuryTypeStabForSpp::new()),
+        // Live callers: bb2025 step_drop_falling_players.rs's Saboteur/Sabotaged skill branches
+        // previously fell through to the generic drop-fall stand-in since no arms existed here.
+        "InjuryTypeSaboteur" =>
+            Box::new(injuryType::injury_type_saboteur::InjuryTypeSaboteur::new()),
+        "InjuryTypeSabotaged" =>
+            Box::new(injuryType::injury_type_sabotaged::InjuryTypeSabotaged::new()),
+        "InjuryTypeTrapDoorFall" =>
+            Box::new(injuryType::injury_type_trap_door_fall::InjuryTypeTrapDoorFall::new()),
+        "InjuryTypeTrapDoorFallForSpp" =>
+            Box::new(injuryType::injury_type_trap_door_fall_for_spp::InjuryTypeTrapDoorFallForSpp::new()),
+        "InjuryTypeKegHit" =>
+            Box::new(injuryType::injury_type_keg_hit::InjuryTypeKegHit::new()),
+        "InjuryTypeKTMCrowd" | "InjuryTypeKtmCrowd" =>
+            Box::new(injuryType::injury_type_ktm_crowd::InjuryTypeKTMCrowd::new()),
+        "InjuryTypeKTMInjury" | "InjuryTypeKtmInjury" =>
+            Box::new(injuryType::injury_type_ktm_injury::InjuryTypeKTMInjury::new()),
+        "InjuryTypeBallAndChain" =>
+            Box::new(injuryType::injury_type_ball_and_chain::InjuryTypeBallAndChain::new()),
+        "InjuryTypeBitten" =>
+            Box::new(injuryType::injury_type_bitten::InjuryTypeBitten::new()),
+        "InjuryTypeEatPlayer" =>
+            Box::new(injuryType::injury_type_eat_player::InjuryTypeEatPlayer::new()),
+        "InjuryTypeProjectileVomit" =>
+            Box::new(injuryType::injury_type_projectile_vomit::InjuryTypeProjectileVomit::new()),
+        "InjuryTypeThenIStartedBlastin" =>
+            Box::new(injuryType::injury_type_then_i_started_blastin::InjuryTypeThenIStartedBlastin::new()),
         "InjuryTypeBlockStunned" =>
             Box::new(injuryType::injury_type_block_stunned::InjuryTypeBlockStunned::new()),
         "InjuryTypeBlockStunnedForSpp" =>
@@ -1010,5 +1050,107 @@ mod tests {
         assert!(!it.injury_context().armor_broken);
         assert!(it.injury_context().injury.is_none(),
             "Chainsaw's real saved_by_armour clears injury; the bare Impl could never reach this path");
+    }
+
+    // ── make_injury_type dispatch reaches the real structs the dead
+    // `factory::injury_type_server_factory` registry already knew about (Phase ABJ) ───────────
+    //
+    // Before this phase these keys either fell through to the generic `InjuryTypeDropFall`
+    // fallback (Saboteur/Sabotaged/FumbledKtm/FumbledKtmApoKo/QuickBite — all with confirmed live
+    // callers using exactly these keys) or simply had no dispatch arm at all (Stab/TrapDoorFall/
+    // KegHit/Ktm*/BallAndChain/Bitten/EatPlayer/ProjectileVomit/ThenIStartedBlastin — reachable
+    // only via direct struct construction elsewhere, but now consistent for any string-based
+    // caller too).
+
+    #[test]
+    fn dispatch_saboteur_reaches_real_struct_not_generic_fallback() {
+        // Real InjuryTypeSaboteur force-breaks armor unconditionally; the generic
+        // InjuryTypeDropFall fallback actually rolls armor and won't break vs sky-high armour.
+        let mut game = make_game_with_players(&["attacker"], &["defender"]);
+        game.team_away.players[0].armour = 15;
+        let mut it = make_injury_type("InjuryTypeSaboteur");
+        let mut rng = GameRng::new(1);
+        it.handle_injury(&game, &mut rng, Some("attacker"), "defender", FieldCoordinate::new(5, 5), None, None, ApothecaryMode::Defender);
+        assert!(it.injury_context().armor_broken,
+            "InjuryTypeSaboteur always force-breaks armor; a fallback dispatch would not, given armour 15");
+    }
+
+    #[test]
+    fn dispatch_sabotaged_resolves_and_populates_context() {
+        // InjuryTypeSabotaged's roll-armor-then-roll-injury shape is behaviorally close to the
+        // generic fallback's, so there's no single distinguishing side effect — this proves the
+        // real struct is reachable and functions correctly rather than panicking or no-op'ing.
+        let game = make_game_with_players(&["attacker"], &["defender"]);
+        let mut it = make_injury_type("InjuryTypeSabotaged");
+        let mut rng = GameRng::new(1);
+        it.handle_injury(&game, &mut rng, Some("attacker"), "defender", FieldCoordinate::new(5, 5), None, None, ApothecaryMode::Defender);
+        assert_eq!(it.injury_context().attacker_id.as_deref(), Some("attacker"));
+        assert_eq!(it.injury_context().defender_id.as_deref(), Some("defender"));
+        assert!(it.injury_context().injury.is_some());
+    }
+
+    #[test]
+    fn dispatch_fumbled_ktm_and_apo_ko_reach_real_structs_not_generic_fallback() {
+        // Real stunIsTreatedAsKo=true; the generic InjuryTypeDropFall fallback defaults to false.
+        assert!(make_injury_type("InjuryTypeFumbledKtm").stun_is_treated_as_ko());
+        assert!(make_injury_type("InjuryTypeFumbledKtmApoKo").stun_is_treated_as_ko());
+    }
+
+    #[test]
+    fn dispatch_quick_bite_alias_reaches_real_struct_not_generic_fallback() {
+        // step_quick_bite.rs calls handle_injury_by_name with the Java lower-camel name directly.
+        // Real InjuryTypeQuickBite never causes a turnover; the generic fallback (unknown-name
+        // arm) defaults to true.
+        assert!(!make_injury_type("quickBite").falling_down_causes_turnover());
+        assert!(!make_injury_type("InjuryTypeQuickBite").falling_down_causes_turnover());
+    }
+
+    #[test]
+    fn dispatch_stab_variants_reach_real_structs() {
+        // Both override falling_down_causes_turnover to false; the generic fallback defaults true.
+        assert!(!make_injury_type("InjuryTypeStab").falling_down_causes_turnover());
+        assert!(!make_injury_type("InjuryTypeStabForSpp").falling_down_causes_turnover());
+    }
+
+    #[test]
+    fn dispatch_previously_missing_no_turnover_arms_all_resolve() {
+        // Every one of these overrides falling_down_causes_turnover to false; the generic
+        // `_ => InjuryTypeDropFall::new(true)` fallback (reached by any typo'd/unknown name)
+        // defaults to true, so this proves real dispatch occurred rather than the fallback.
+        for name in [
+            "InjuryTypeTrapDoorFall", "InjuryTypeTrapDoorFallForSpp",
+            "InjuryTypeKTMCrowd", "InjuryTypeKtmCrowd",
+            "InjuryTypeBitten", "InjuryTypeEatPlayer",
+            "InjuryTypeProjectileVomit", "InjuryTypeThenIStartedBlastin",
+        ] {
+            assert!(!make_injury_type(name).falling_down_causes_turnover(), "{name} should not use the generic fallback");
+        }
+    }
+
+    #[test]
+    fn dispatch_ktm_injury_and_ball_and_chain_force_armor_broken() {
+        // Both unconditionally force armor_broken=true (no real roll); the generic fallback
+        // rolls real dice and won't break vs sky-high armour.
+        let mut game = make_game_with_players(&["attacker"], &["defender"]);
+        game.team_away.players[0].armour = 15;
+        for name in ["InjuryTypeKTMInjury", "InjuryTypeKtmInjury", "InjuryTypeBallAndChain"] {
+            let mut it = make_injury_type(name);
+            let mut rng = GameRng::new(1);
+            it.handle_injury(&game, &mut rng, Some("attacker"), "defender", FieldCoordinate::new(5, 5), None, None, ApothecaryMode::Defender);
+            assert!(it.injury_context().armor_broken, "{name} should force armor_broken=true regardless of armour");
+        }
+    }
+
+    #[test]
+    fn dispatch_keg_hit_resolves_and_populates_context() {
+        // InjuryTypeKegHit rolls real armor (like the generic fallback), so there's no single
+        // distinguishing side effect for high armour — proves reachability and correct behavior
+        // instead (chainsaw-skill armor modifier + context population).
+        let game = make_game_with_players(&["attacker"], &["defender"]);
+        let mut it = make_injury_type("InjuryTypeKegHit");
+        let mut rng = GameRng::new(1);
+        it.handle_injury(&game, &mut rng, Some("attacker"), "defender", FieldCoordinate::new(5, 5), None, None, ApothecaryMode::Defender);
+        assert_eq!(it.injury_context().defender_id.as_deref(), Some("defender"));
+        assert!(it.injury_context().injury.is_some());
     }
 }

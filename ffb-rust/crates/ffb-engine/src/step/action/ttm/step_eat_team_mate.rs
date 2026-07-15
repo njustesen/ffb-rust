@@ -7,15 +7,16 @@
 ///   END_TURN(true), CATCH_SCATTER_THROW_IN_MODE(ScatterBall).
 /// Always returns NEXT_STEP.
 ///
-/// Injury: InjuryTypeEatPlayer → armorBroken=true, injury=RIP (no dice).
+/// Injury: real InjuryTypeEatPlayer via UtilServerInjury.handleInjury (armorBroken=true, injury=RIP, no dice).
 use ffb_model::enums::ApothecaryMode;
 use ffb_model::model::game::Game;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
-use crate::injury::{InjuryContext, InjuryResult};
+use crate::injury::injuryType::injury_type_eat_player::InjuryTypeEatPlayer;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter};
+use crate::step::util_server_injury::handle_injury;
 
 pub struct StepEatTeamMate {
     /// Java: fThrownPlayerCoordinate — set by preceding step parameter.
@@ -40,12 +41,12 @@ impl Default for StepEatTeamMate {
 impl Step for StepEatTeamMate {
     fn id(&self) -> StepId { StepId::EatTeamMate }
 
-    fn start(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game)
+    fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game)
+    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        self.execute_step(game, rng)
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
@@ -58,7 +59,7 @@ impl Step for StepEatTeamMate {
 }
 
 impl StepEatTeamMate {
-    fn execute_step(&self, game: &mut Game) -> StepOutcome {
+    fn execute_step(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let thrown_player_exists = self.thrown_player_id.as_deref()
             .and_then(|id| game.player(id))
             .is_some();
@@ -75,12 +76,15 @@ impl StepEatTeamMate {
                         .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall));
                 }
 
-                // Java: InjuryTypeEatPlayer → armorBroken=true, injury=RIP
-                let mut ctx = InjuryContext::new(ApothecaryMode::ThrownPlayer);
-                ctx.armor_broken = true;
-                let mut injury = InjuryResult::new(ApothecaryMode::ThrownPlayer);
-                injury.injury_context = ctx;
-                injury.rip = true;
+                // Java: UtilServerInjury.handleInjury(this, new InjuryTypeEatPlayer(), null, thrownPlayer, ...)
+                let thrown_player_id = self.thrown_player_id.as_deref().unwrap_or_default();
+                let mut injury_type = InjuryTypeEatPlayer::new();
+                let injury = handle_injury(
+                    game, rng, &mut injury_type,
+                    None, thrown_player_id,
+                    coord, None, None,
+                    ApothecaryMode::ThrownPlayer,
+                );
 
                 out = out
                     .publish(StepParameter::InjuryResult(Box::new(injury)))
@@ -148,6 +152,14 @@ mod tests {
 
         let has_injury = out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(ir) if ir.rip && ir.injury_context.armor_broken));
         assert!(has_injury, "should publish InjuryResult with rip=true and armor_broken=true");
+
+        // Real InjuryTypeEatPlayer dispatch (via handle_injury) populates defender_id/coordinate,
+        // unlike the old hand-inlined version which built a bare InjuryContext with only
+        // armor_broken/injury set — proves the real struct is now genuinely reached.
+        let has_context = out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(ir)
+            if ir.injury_context.defender_id.as_deref() == Some("eaten")
+            && ir.injury_context.defender_coordinate == Some(FieldCoordinate::new(5, 5))));
+        assert!(has_context, "InjuryResult should carry defender_id/coordinate from the real InjuryTypeEatPlayer dispatch");
 
         let has_null_coord = out.published.iter().any(|p| matches!(p, StepParameter::ThrownPlayerCoordinate(None)));
         assert!(has_null_coord, "should publish ThrownPlayerCoordinate(None) sentinel");

@@ -12,10 +12,25 @@
 /// yet ported — requires `Player::get_unused_injury_modification()` from the full modifier
 /// factory stack.
 use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE};
+use ffb_model::model::player::Player;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
+use ffb_mechanics::modifiers::injury_modifier::InjuryModifier;
+use ffb_mechanics::modifiers::Modifier;
 use crate::injury::{InjuryContext, InjuryTypeServer};
+
+/// Java: `InjuryModifier` instances are transient objects owned by their `Skill`; Rust's
+/// `Modifier` (used by `InjuryContext`) requires a `&'static str` name for cheap `Copy`-like use
+/// across the codebase. Bridging a `Box<dyn InjuryModifier>` (whose `get_name()` borrows from an
+/// owned `String`) into a `Modifier` needs *some* `'static`-ifying step; leaking the name is the
+/// chosen approach — same convention as `injury_type_block.rs`'s `leak_modifier` for
+/// `ArmorModifierFactory` results, shared here since Block/Foul/Chainsaw all need it for
+/// `InjuryModifierFactory` results.
+pub fn leak_injury_modifier(m: &dyn InjuryModifier, attacker: Option<&Player>, defender: &Player, rules: ffb_model::enums::Rules) -> Modifier {
+    let name: &'static str = Box::leak(m.get_name().to_owned().into_boxed_str());
+    Modifier::new(name, m.get_modifier(attacker, defender), rules)
+}
 
 /// Abstract methods of ModificationAwareInjuryTypeServer.
 /// Concrete types implement these; the free function calls them in the correct order.
