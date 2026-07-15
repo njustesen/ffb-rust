@@ -1,6 +1,52 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-15, Phase AAV done — 6 of 6, the AAQ-AAV backlog arc is complete)
+## Current Status (2026-07-15, Phase AAW done — 1 of 7 in the AAW-ABC arc)
+
+**Phase AAW — BB2016 Weeping Dagger poison side-effect wiring, done.**
+
+Ran the user's standing "plan the next major step, prioritize unit tests, no parity yet" request.
+The just-completed AAQ-AAV arc had documented several real, diagnosed-but-deferred gaps in its own
+closing note; three parallel research passes re-verified each one fresh against current source
+before starting (per this project's recurring lesson: never trust a carried-over claim). This opens
+a new 7-phase arc (AAW-ABC) to close them.
+
+1. **Real gap closed: `PilingOnBehaviour.rollWeepingDagger` was never wired**, despite
+   `step_drop_falling_players.rs` (BB2016/BB2020's shared `StepDropFallingPlayers` step) already
+   documenting the gap in its own doc comment. Both Java call sites (defender-drop branch and
+   attacker-falling branch) are now ported: when the badly-hurt player's opponent has a skill with
+   the `appliesPoisonOnBadlyHurt` property (WeepingDagger, BB2016-only), rolls a d6 against
+   `minimumRollWeepingDagger` (4), applies `CardEffect::Poisoned` to the target on success, and
+   reports via `ReportWeepingDaggerRoll` — publishing `DefenderPoisoned`/`AttackerPoisoned`
+   `StepParameter`s that `step_apothecary.rs` (bb2016) already fully consumed (its `cure_poison`
+   logic existed and was tested, just never fed by a real producer).
+2. **Real gap found and fixed along the way: `SkillId::WeepingDagger` had no `properties()` entry
+   at all** (`ffb-model/src/enums/skill_id.rs`) — meant `has_skill_property("appliesPoisonOnBadlyHurt")`
+   could never return true for a player with this skill, in any prior phase. Added the missing arm
+   (mirrors Java's `WeepingDagger.postConstruct()`).
+3. Added `InjuryContext::is_badly_hurt()` (`crates/ffb-engine/src/injury.rs`) — 1:1 port of Java's
+   `InjuryContext.isBadlyHurt()`, previously missing entirely from this `InjuryContext` (the one used
+   by the main injury-resolution path; see the still-open `InjuryTypeBlockImpl` vs `InjuryTypeBlock`
+   duplication noted below).
+4. Confirmed via source read that BB2020 has its own copy-pasted `PilingOnBehaviour.java` with
+   identical Weeping Dagger logic, but since Rust's `step_drop_falling_players.rs` is a single
+   shared (COMMON) step and the wiring is driven by the property string rather than by a
+   per-edition skill class, one implementation correctly covers both editions — no BB2020-specific
+   code needed. BB2025 has no `PilingOnBehaviour` at all (confirmed, no third Java file exists).
+
+7 new tests: `roll_weeping_dagger` helper tested directly (success applies `CardEffect::Poisoned` +
+reports, failure does neither), defender-badly-hurt-with-property publishes `DefenderPoisoned(true)`,
+without-property never publishes it (regression guard), attacker-badly-hurt-with-defender's-property
+publishes `AttackerPoisoned(true)` — all via the established seed-search pattern (`for seed in
+0u64..N`) already used elsewhere in this codebase for RNG-dependent step tests.
+
+Tests: 17,000 → **17,005**. 0 failures. `cargo clippy --workspace --all-targets`: still 0 errors.
+
+**Next**: Phase AAX (`stun_player` ball-scatter parity with `drop_player` — route through the same
+shared path so it returns `Vec<StepParameter>`, update the one `step_play_card.rs` caller).
+
+---
+
+## Prior Status (2026-07-15, Phase AAV done — 6 of 6, the AAQ-AAV backlog arc is complete)
 
 **Phase AAV — the full `PassStepModifier` hook — done, with a major scope correction found
 before writing any code.**

@@ -829,6 +829,8 @@ impl SkillId {
             SkillId::BeerBarrelBash => &["canThrowKeg"],
             // Java: PilingOnBehaviour registers canPileOnOpponent
             SkillId::PilingOn => &["canPileOnOpponent"],
+            // Java: bb2016/WeepingDagger.postConstruct registers appliesPoisonOnBadlyHurt
+            SkillId::WeepingDagger => &["appliesPoisonOnBadlyHurt"],
             // Java: bb2025/PumpUpTheCrowd.postConstruct registers grantsTeamReRollWhenCausingBlockCas
             // Java: bb2020/PumpUpTheCrowd.postConstruct registers grantsTeamReRollWhenCausingCas
             SkillId::PumpUpTheCrowd => &["grantsTeamReRollWhenCausingBlockCas", "grantsTeamReRollWhenCausingCas"],

@@ -176,6 +176,11 @@ impl InjuryContext {
         self.injury.map(|s| s.base() == PS_RESERVE).unwrap_or(false)
     }
 
+    // Java: InjuryContext.isBadlyHurt()
+    pub fn is_badly_hurt(&self) -> bool {
+        self.injury.map(|s| s.base() == PS_BADLY_HURT).unwrap_or(false)
+    }
+
     pub fn get_modified_injury_context(&self) -> Option<&InjuryContext> {
         self.modified_injury_context.as_deref()
     }

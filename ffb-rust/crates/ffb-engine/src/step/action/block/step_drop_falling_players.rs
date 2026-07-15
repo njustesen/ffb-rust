@@ -13,11 +13,12 @@
 /// with a possible InjuryTypePilingOnKnockedOut on the attacker if a double was rolled and
 /// PILING_ON_TO_KO_ON_DOUBLE is enabled.
 ///
-/// Known follow-up (documented, not a silent gap): the BB2016 Weeping Dagger/poison side-effect on
-/// a badly-hurt result (Java's `rollWeepingDagger`) is not yet ported.
+/// Also handles the Weeping Dagger/poison side-effect (Java's `rollWeepingDagger`, BB2016's
+/// `appliesPoisonOnBadlyHurt` property) on a badly-hurt result, for both the defender-drop and
+/// attacker-falling branches.
 ///
 /// Expects OLD_DEFENDER_STATE parameter from a preceding step.
-use ffb_model::enums::{ApothecaryMode, PlayerState, PS_FALLING};
+use ffb_model::enums::{ApothecaryMode, CardEffect, PlayerState, PS_FALLING};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::option::game_option_id::{
@@ -27,6 +28,7 @@ use ffb_model::option::game_option_id::{
 use ffb_model::option::util_game_option::is_option_enabled;
 use ffb_model::prompts::agent_prompt::AgentPrompt;
 use ffb_model::report::report_piling_on::ReportPilingOn;
+use ffb_model::report::report_weeping_dagger_roll::ReportWeepingDaggerRoll;
 use ffb_model::enums::ReRollSource;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_cards::UtilCards;
@@ -85,6 +87,21 @@ impl Step for StepDropFallingPlayers {
             _ => false,
         }
     }
+}
+
+/// Java: PilingOnBehaviour.rollWeepingDagger. Shared by both the defender-drop and
+/// attacker-falling branches of `execute_step`.
+fn roll_weeping_dagger(game: &mut Game, rng: &mut GameRng, source_id: &str, target_id: &str) -> bool {
+    let minimum_roll = DiceInterpreter::minimum_roll_weeping_dagger();
+    let roll = rng.d6();
+    let successful = DiceInterpreter::is_skill_roll_successful(roll, minimum_roll);
+    if successful {
+        game.field_model.add_card_effect(target_id, CardEffect::Poisoned);
+    }
+    game.report_list.add(ReportWeepingDaggerRoll::new(
+        Some(source_id.to_string()), successful, roll, minimum_roll, false, vec![],
+    ));
+    successful
 }
 
 impl StepDropFallingPlayers {
@@ -185,8 +202,17 @@ impl StepDropFallingPlayers {
                 );
                 self.injury_result_defender = Some(Box::new(ir));
 
-                // Known follow-up: BB2016 Weeping Dagger/poison side-effect on a badly-hurt
-                // result (Java `rollWeepingDagger`) is not yet ported — see SESSION.md.
+                if game.player(&player_id)
+                    .map(|p| p.has_skill_property(NamedProperties::APPLIES_POISON_ON_BADLY_HURT))
+                    .unwrap_or(false)
+                    && self.injury_result_defender.as_ref()
+                        .map(|ir| ir.injury_context.is_badly_hurt())
+                        .unwrap_or(false)
+                {
+                    if roll_weeping_dagger(game, rng, &player_id, &did) {
+                        outcome = outcome.publish(StepParameter::DefenderPoisoned(true));
+                    }
+                }
 
                 let uses_a_team_reroll = is_option_enabled(game, PILING_ON_USES_A_TEAM_REROLL);
                 let armor_broken = self.injury_result_defender.as_ref()
@@ -265,9 +291,21 @@ impl StepDropFallingPlayers {
                 game, rng, "InjuryTypeBlock", defender_id.as_deref(), &player_id, ac, None, None,
                 ApothecaryMode::Attacker,
             );
-            outcome = outcome
-                .publish(StepParameter::EndTurn(true))
-                .publish(StepParameter::InjuryResult(Box::new(ir)));
+            let attacker_badly_hurt = ir.injury_context.is_badly_hurt();
+            outcome = outcome.publish(StepParameter::EndTurn(true));
+
+            if let Some(did) = defender_id.as_deref() {
+                if attacker_badly_hurt
+                    && game.player(did)
+                        .map(|p| p.has_skill_property(NamedProperties::APPLIES_POISON_ON_BADLY_HURT))
+                        .unwrap_or(false)
+                    && roll_weeping_dagger(game, rng, did, &player_id)
+                {
+                    outcome = outcome.publish(StepParameter::AttackerPoisoned(true));
+                }
+            }
+
+            outcome = outcome.publish(StepParameter::InjuryResult(Box::new(ir)));
         }
 
         outcome
@@ -355,6 +393,102 @@ mod tests {
             None
         });
         assert!(defender_result.is_some(), "should have a Defender InjuryResult");
+    }
+
+    fn add_weeping_dagger_skill(game: &mut Game, player_id: &str) {
+        if let Some(p) = game.team_home.player_mut(player_id) {
+            p.extra_skills.push(SkillWithValue::new(SkillId::WeepingDagger));
+        }
+        if let Some(p) = game.team_away.player_mut(player_id) {
+            p.extra_skills.push(SkillWithValue::new(SkillId::WeepingDagger));
+        }
+    }
+
+    #[test]
+    fn roll_weeping_dagger_success_applies_poison_and_reports() {
+        // Java: PilingOnBehaviour.rollWeepingDagger — d6 >= 4 (minimumRollWeepingDagger) succeeds.
+        let mut game = make_game_with_falling(false, true);
+        // Find a seed where the d6 roll is >= 4 (successful).
+        let mut successful_seed = None;
+        for seed in 0u64..100 {
+            let roll = GameRng::new(seed).d6();
+            if roll >= 4 {
+                successful_seed = Some(seed);
+                break;
+            }
+        }
+        let seed = successful_seed.expect("no seed found with d6 >= 4");
+        let mut rng = GameRng::new(seed);
+        let successful = roll_weeping_dagger(&mut game, &mut rng, "att", "def");
+        assert!(successful);
+        assert!(game.field_model.has_card_effect("def", CardEffect::Poisoned));
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::WEEPING_DAGGER_ROLL));
+    }
+
+    #[test]
+    fn roll_weeping_dagger_failure_no_poison() {
+        // Find a seed where the d6 roll is < 4 (unsuccessful).
+        let mut failing_seed = None;
+        for seed in 0u64..100 {
+            let roll = GameRng::new(seed).d6();
+            if roll < 4 {
+                failing_seed = Some(seed);
+                break;
+            }
+        }
+        let seed = failing_seed.expect("no seed found with d6 < 4");
+        let mut game = make_game_with_falling(false, true);
+        let mut rng = GameRng::new(seed);
+        let successful = roll_weeping_dagger(&mut game, &mut rng, "att", "def");
+        assert!(!successful);
+        assert!(!game.field_model.has_card_effect("def", CardEffect::Poisoned));
+    }
+
+    #[test]
+    fn defender_badly_hurt_with_weeping_dagger_property_publishes_defender_poisoned() {
+        // Java: PilingOnBehaviour.handleExecuteStepHook — the attacker's WeepingDagger property
+        // applies poison to the defender when the defender's initial injury is Badly Hurt.
+        for seed in 0u64..3000 {
+            let mut game = make_game_with_falling(false, true);
+            add_weeping_dagger_skill(&mut game, "att");
+            let mut step = StepDropFallingPlayers::new();
+            let outcome = step.start(&mut game, &mut GameRng::new(seed));
+            if outcome.published.iter().any(|p| matches!(p, StepParameter::DefenderPoisoned(true))) {
+                return;
+            }
+        }
+        panic!("no seed found where WeepingDagger poisons the defender");
+    }
+
+    #[test]
+    fn defender_badly_hurt_without_weeping_dagger_property_no_poison_published() {
+        // Without the property, no DefenderPoisoned parameter should ever be published,
+        // regardless of the badly-hurt/dagger roll outcome.
+        for seed in 0u64..3000 {
+            let mut game = make_game_with_falling(false, true);
+            let mut step = StepDropFallingPlayers::new();
+            let outcome = step.start(&mut game, &mut GameRng::new(seed));
+            assert!(
+                !outcome.published.iter().any(|p| matches!(p, StepParameter::DefenderPoisoned(_))),
+                "seed={seed}: DefenderPoisoned must not be published without the WeepingDagger property"
+            );
+        }
+    }
+
+    #[test]
+    fn attacker_badly_hurt_with_defender_weeping_dagger_publishes_attacker_poisoned() {
+        // Java: PilingOnBehaviour.handleExecuteStepHook — the defender's WeepingDagger property
+        // applies poison to the attacker when the attacker's falling injury is Badly Hurt.
+        for seed in 0u64..3000 {
+            let mut game = make_game_with_falling(true, false);
+            add_weeping_dagger_skill(&mut game, "def");
+            let mut step = StepDropFallingPlayers::new();
+            let outcome = step.start(&mut game, &mut GameRng::new(seed));
+            if outcome.published.iter().any(|p| matches!(p, StepParameter::AttackerPoisoned(true))) {
+                return;
+            }
+        }
+        panic!("no seed found where WeepingDagger poisons the attacker");
     }
 
     #[test]
