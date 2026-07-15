@@ -26,6 +26,10 @@ impl InjuryTypeServer for InjuryTypeFoulForSpp {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
+    /// Java: `FoulForSpp.isWorthSpps()` — true.
+    fn is_worth_spps(&self) -> bool { true }
+    /// Java: `FoulForSpp.isCausedByOpponent()` — true (overridden, unlike base `Foul`).
+    fn is_caused_by_opponent(&self) -> bool { true }
 }
 impl ModificationAwareInjuryType for InjuryTypeFoulForSpp {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str, _roll: bool) {

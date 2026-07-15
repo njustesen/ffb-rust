@@ -19,6 +19,8 @@ impl InjuryTypeServer for InjuryTypeBreatheFire {
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn falling_down_causes_turnover(&self) -> bool { false }
+    /// Java: `BreatheFire.isCausedByOpponent()` — true.
+    fn is_caused_by_opponent(&self) -> bool { true }
 }
 impl ModificationAwareInjuryType for InjuryTypeBreatheFire {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {

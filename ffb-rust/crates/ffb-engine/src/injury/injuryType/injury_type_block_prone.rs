@@ -19,6 +19,8 @@ impl InjuryTypeServer for InjuryTypeBlockProne {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
+    /// Java: `BlockProne.isCausedByOpponent()` — true.
+    fn is_caused_by_opponent(&self) -> bool { true }
 }
 impl ModificationAwareInjuryType for InjuryTypeBlockProne {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {

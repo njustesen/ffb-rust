@@ -18,6 +18,10 @@ impl InjuryTypeServer for InjuryTypeCrowdPushForSpp {
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn falling_down_causes_turnover(&self) -> bool { false }
+    /// Java: `CrowdPushForSpp.isWorthSpps()` — true.
+    fn is_worth_spps(&self) -> bool { true }
+    /// Java: `CrowdPushForSpp.isCausedByOpponent()` — true (overridden, unlike base `CrowdPush`).
+    fn is_caused_by_opponent(&self) -> bool { true }
 }
 
 #[cfg(test)]

@@ -19,6 +19,10 @@ impl InjuryTypeServer for InjuryTypeBlockStunnedForSpp {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
+    /// Java: `BlockStunnedForSpp.isWorthSpps()` — true.
+    fn is_worth_spps(&self) -> bool { true }
+    /// Java: `BlockStunnedForSpp.isCausedByOpponent()` — true.
+    fn is_caused_by_opponent(&self) -> bool { true }
 }
 impl ModificationAwareInjuryType for InjuryTypeBlockStunnedForSpp {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {

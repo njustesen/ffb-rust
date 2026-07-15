@@ -44,6 +44,15 @@ pub fn handle_injury(
     let old_ctx = old_result.map(|r| r.injury_context());
     injury_type.handle_injury(game, rng, attacker_id, defender_id, coord, from_coord, old_ctx, apo_mode);
 
+    // Java: InjuryType.isCausedByOpponent()/isWorthSpps() — propagate onto the context(s) so
+    // InjuryResult::apply_to can gate casualty-SPP awarding and opponent-casualty counting.
+    // Previously never set in production (only in this module's own tests), so casualty SPPs
+    // and opponent-casualty stat counters were never awarded for any injury type.
+    let is_caused_by_opponent = injury_type.is_caused_by_opponent();
+    let is_worth_spps = injury_type.is_worth_spps();
+    injury_type.injury_context_mut().is_caused_by_opponent = is_caused_by_opponent;
+    injury_type.injury_context_mut().is_worth_spps = is_worth_spps;
+
     // Capture flags before any mutable borrow of the context
     let flags = InjuryTypeFlags {
         stun_is_ko: injury_type.stun_is_treated_as_ko(),
@@ -59,6 +68,8 @@ pub fn handle_injury(
     let has_modified = injury_type.injury_context().modified_injury_context.is_some();
     if has_modified {
         let mut modified = injury_type.injury_context_mut().modified_injury_context.take().unwrap();
+        modified.is_caused_by_opponent = is_caused_by_opponent;
+        modified.is_worth_spps = is_worth_spps;
         evaluate_injury_context(&flags, defender_id, &mut modified, game);
         injury_type.injury_context_mut().modified_injury_context = Some(modified);
     }
@@ -530,6 +541,29 @@ mod tests {
             is_big_guy: false,
             ..Default::default()
 });
+        game.field_model.set_player_coordinate(id, pos);
+        game.field_model.set_player_state(id, PlayerState::new(state));
+        pos
+    }
+
+    fn add_away_player(game: &mut Game, id: &str, state: u32) -> FieldCoordinate {
+        let pos = FieldCoordinate::new(6, 5);
+        game.team_away.players.push(Player {
+            id: id.into(),
+            name: id.into(),
+            nr: 1,
+            position_id: "lineman".into(),
+            player_type: PlayerType::Regular,
+            gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
         game.field_model.set_player_coordinate(id, pos);
         game.field_model.set_player_state(id, PlayerState::new(state));
         pos
@@ -1095,5 +1129,89 @@ mod tests {
 
         assert_eq!(game.report_list.size(), 1);
         assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::RAISE_DEAD));
+    }
+
+    // ── is_worth_spps / is_caused_by_opponent propagation (Phase ABD) ────────
+
+    #[test]
+    fn handle_injury_propagates_block_worth_spps_and_caused_by_opponent() {
+        use crate::injury::injuryType::injury_type_block::{BlockMode, InjuryTypeBlock};
+        let mut game = make_game();
+        add_player(&mut game, "p1", PS_STANDING);
+        let mut t = InjuryTypeBlock::new(BlockMode::Regular, true);
+        let mut rng = GameRng::new(1);
+        let result = run_handle_injury(&mut game, &mut rng, &mut t, "p1");
+        assert!(result.injury_context.is_worth_spps);
+        assert!(result.injury_context.is_caused_by_opponent);
+    }
+
+    #[test]
+    fn handle_injury_propagates_foul_neither_worth_spps_nor_caused_by_opponent() {
+        use crate::injury::injuryType::injury_type_foul::InjuryTypeFoul;
+        let mut game = make_game();
+        add_player(&mut game, "p1", PS_STANDING);
+        let mut t = InjuryTypeFoul::new();
+        let mut rng = GameRng::new(1);
+        let result = run_handle_injury(&mut game, &mut rng, &mut t, "p1");
+        assert!(!result.injury_context.is_worth_spps);
+        assert!(!result.injury_context.is_caused_by_opponent);
+    }
+
+    #[test]
+    fn handle_injury_propagates_foul_for_spp_both_true() {
+        use crate::injury::injuryType::injury_type_foul_for_spp::InjuryTypeFoulForSpp;
+        let mut game = make_game();
+        add_player(&mut game, "p1", PS_STANDING);
+        let mut t = InjuryTypeFoulForSpp::new();
+        let mut rng = GameRng::new(1);
+        let result = run_handle_injury(&mut game, &mut rng, &mut t, "p1");
+        assert!(result.injury_context.is_worth_spps);
+        assert!(result.injury_context.is_caused_by_opponent);
+    }
+
+    #[test]
+    fn handle_injury_propagates_crowd_push_neither_flag() {
+        use crate::injury::injuryType::injury_type_crowd_push::InjuryTypeCrowdPush;
+        let mut game = make_game();
+        add_player(&mut game, "p1", PS_STANDING);
+        let mut t = InjuryTypeCrowdPush::new();
+        let mut rng = GameRng::new(1);
+        let result = run_handle_injury(&mut game, &mut rng, &mut t, "p1");
+        assert!(!result.injury_context.is_worth_spps);
+        assert!(!result.injury_context.is_caused_by_opponent);
+    }
+
+    #[test]
+    fn handle_injury_propagates_crowd_push_for_spp_caused_by_opponent_only_asymmetry() {
+        // CrowdPushForSpp overrides isCausedByOpponent=true (unlike base CrowdPush), matching
+        // FoulForSpp's asymmetry — both flip independently of worth_spps.
+        use crate::injury::injuryType::injury_type_crowd_push_for_spp::InjuryTypeCrowdPushForSpp;
+        let mut game = make_game();
+        add_player(&mut game, "p1", PS_STANDING);
+        let mut t = InjuryTypeCrowdPushForSpp::new();
+        let mut rng = GameRng::new(1);
+        let result = run_handle_injury(&mut game, &mut rng, &mut t, "p1");
+        assert!(result.injury_context.is_worth_spps);
+        assert!(result.injury_context.is_caused_by_opponent);
+    }
+
+    #[test]
+    fn handle_injury_block_casualty_increments_attacker_casualty_counter() {
+        // Previously impossible: is_worth_spps/is_caused_by_opponent were never populated in
+        // production, so InjuryResult::apply_to's casualty-counter gate never fired for any
+        // injury type. Seed chosen to produce a casualty (d16 >= 9) on the injury roll.
+        use crate::injury::injuryType::injury_type_block::{BlockMode, InjuryTypeBlock};
+        let mut game = make_game();
+        add_player(&mut game, "attacker", PS_STANDING);
+        add_away_player(&mut game, "defender", PS_STANDING);
+        let mut t = InjuryTypeBlock::new(BlockMode::Regular, true);
+        let mut rng = GameRng::new(1);
+        let coord = game.field_model.player_coordinate("defender").unwrap();
+        let result = handle_injury(&mut game, &mut rng, &mut t, Some("attacker"), "defender", coord, None, None, ApothecaryMode::Defender);
+        result.apply_to(&mut game);
+        if result.injury_context.suffered_injury.map(|s| s.is_casualty()).unwrap_or(false) {
+            let pr = game.game_result.home.player_result("attacker");
+            assert!(pr.is_some() && pr.unwrap().casualties >= 1, "attacker casualty counter should increment");
+        }
     }
 }

@@ -105,6 +105,10 @@ impl InjuryTypeServer for InjuryTypeBlock {
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn java_class_name(&self) -> &'static str { "Block" }
+    /// Java: `Block.isWorthSpps()` — true.
+    fn is_worth_spps(&self) -> bool { true }
+    /// Java: `Block.isCausedByOpponent()` — true.
+    fn is_caused_by_opponent(&self) -> bool { true }
 }
 /// Java: `pAttacker.getTeam() != pDefender.getTeam()`.
 fn different_teams(game: &Game, attacker_id: Option<&str>, defender_id: &str) -> bool {
