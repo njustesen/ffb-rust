@@ -1,6 +1,45 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-15, Phase AAX done — 2 of 7 in the AAW-ABC arc)
+## Current Status (2026-07-15, Phase AAY done — 3 of 7 in the AAW-ABC arc)
+
+**Phase AAY — card catalog target/duration annotation for all 24 BB2016 cards, done.**
+
+`ffb-model/src/inducement/bb2016/cards.rs` already listed all 24 real Java cards by name and
+handler key (BB2016 is the only edition with real card data — confirmed `bb2020`/base `Cards.java`
+are empty stubs in Java itself, so no further catalog work is needed there), but every entry
+omitted `.with_target(...)`/`.with_duration(...)`, silently defaulting to `CardTarget::TURN`/no
+duration for cards that are actually player-targeted with a real duration.
+
+1. Hand-transcribed target + duration for all 24 cards directly from
+   `ffb-java/.../inducement/bb2016/Cards.java`'s 24 `new Card(...)` calls: 17 `OWN_PLAYER`,
+   2 `OPPOSING_PLAYER` (Custard Pie, Witch's Brew), 1 `ANY_PLAYER` (Pit Trap), 4 `TURN` (Blatant
+   Foul, Greased Shoes, Illegal Substitution, Spiked Ball). Durations: 7 `UntilEndOfGame`,
+   6 `UntilEndOfDrive`, 7 `UntilEndOfTurn`, 1 `WhileHoldingTheBall` (Force Shield), 1 `UntilUsed`
+   (Lucky Charm), 2 `UntilEndOfOpponentsTurn` (Distract, Greased Shoes).
+2. **Real gap found and fixed along the way**: Chop Block is the one BB2016 card whose Java
+   subclass overrides `requiresBlockablePlayerSelection()` to return `true` — previously
+   unrepresented anywhere in the Rust catalog (the `Card::with_requires_blockable_player_selection`
+   builder existed since Phase AAU but nothing populated it for a real card).
+3. No new architecture needed — `Card::with_target`/`with_duration`/
+   `with_requires_blockable_player_selection` builders already existed; this phase only populated
+   real per-card data. Confirmed via source read that `Card::with_target` uses the SCREAMING_SNAKE
+   `inducement::card_target::CardTarget` (not the PascalCase duplicate in `enums::card.rs`) and
+   `Card::with_duration` uses the PascalCase `enums::InducementDuration` (not the SCREAMING_SNAKE
+   duplicate in `inducement::inducement_duration.rs`) — both of these enum-duplication pairs are
+   already tracked for Phase ABA/left-as-is per this arc's plan.
+
+10 new tests: every card has a duration, target-by-category assertions (own/opposing/any/turn
+player groupings), Chop Block's blockable-selection flag is exclusive to it, a handful of specific
+per-card duration checks (Force Shield/Lucky Charm/Distract/Greased Shoes), and a full
+duration-distribution count cross-checked against the Java source's exact tally.
+
+Tests: 17,009 → **17,019**. 0 failures. `cargo clippy --workspace --all-targets`: still 0 errors.
+
+**Next**: Phase AAZ (TheBallista's Hail Mary Pass full re-roll retry cycle, bb2020 + bb2025).
+
+---
+
+## Prior Status (2026-07-15, Phase AAX done — 2 of 7 in the AAW-ABC arc)
 
 **Phase AAX — `stun_player` ball-scatter parity with `drop_player`, done.**
 
