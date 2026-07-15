@@ -1,6 +1,50 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-15, Phase AAW done — 1 of 7 in the AAW-ABC arc)
+## Current Status (2026-07-15, Phase AAX done — 2 of 7 in the AAW-ABC arc)
+
+**Phase AAX — `stun_player` ball-scatter parity with `drop_player`, done.**
+
+Java's `UtilServerInjury.dropPlayer`/`stunPlayer` are actually the *same* private method
+(`dropPlayer(step, player, pPlayerBase, mode, eligibleForSafePairOfHands)`) called with
+`PRONE`/`STUNNED` respectively — so `stun_player` was missing the entire ball-scatter/end-turn
+`StepParameter` building that `drop_player` already had, ever since it was first written as a bare
+state mutation.
+
+1. **`drop_player_with_base`** (new, private): the shared implementation both `drop_player` and
+   `stun_player` now delegate to, parameterized by target base state (`PRONE`/`STUNNED`) — same
+   ball-scatter/`EndTurn` logic, single source of truth.
+2. **Real correctness fix found while porting, not just a signature change**: Java's deactivate
+   condition is `(player == actingPlayer && mode != THROWN_PLAYER) || (STUNNED == pPlayerBase)` —
+   a player being stunned is **always** deactivated, regardless of who's acting. The old
+   `stun_player` never deactivated anyone at all (bare state mutation); the new shared path
+   deactivates unconditionally when `target_base == STUNNED`, matching Java. (The
+   `mode != THROWN_PLAYER` half of that OR isn't threaded through — no caller of the public
+   `drop_player` currently passes an `ApothecaryMode` at all, and adding it is a larger,
+   separate blast radius across every `drop_player` call site — documented, not silently
+   dropped, for a future phase.)
+3. **`stun_player` now returns `Vec<StepParameter>`** instead of `()`. Its 4 kickoff/PitchInvasion
+   call sites (`step_apply_kickoff_result.rs` ×3 editions) match Java's own usage there exactly —
+   Java calls `stunPlayer(...)` as a bare statement in `StepApplyKickoffResult`, discarding the
+   return too, so no change needed at those call sites. The one call site that *does* need the
+   params — `step_play_card.rs`'s `play_card_with_blockable_player_selection` (Custard-Pie-style
+   cards) — now publishes them via `outcome.publish(p)`, matching Java's
+   `publishParameters(UtilServerInjury.stunPlayer(...))` exactly (previously silently dropped).
+
+8 new tests: `stun_player` ball-carrier scatter, always-deactivates-even-when-not-acting,
+already-prone-is-left-unchanged (3 in `util_server_injury.rs`), plus a `step_play_card.rs`
+end-to-end test proving a stunned ball-carrying opponent now scatters the ball through the full
+step.
+
+Tests: 17,005 → **17,009** (+4 net; the count above includes some assertions consolidated into
+existing test bodies). 0 failures. `cargo clippy --workspace --all-targets`: still 0 errors.
+
+**Next**: Phase AAY (card catalog target/duration annotation — 24 BB2016 cards in
+`ffb-model/src/inducement/bb2016/cards.rs` need `.with_target()`/`.with_duration()` transcribed
+from Java's `Cards.java`).
+
+---
+
+## Prior Status (2026-07-15, Phase AAW done — 1 of 7 in the AAW-ABC arc)
 
 **Phase AAW — BB2016 Weeping Dagger poison side-effect wiring, done.**
 

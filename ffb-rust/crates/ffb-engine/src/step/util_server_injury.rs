@@ -256,6 +256,22 @@ pub fn drop_player(
     player_id: &str,
     eligible_for_safe_pair_of_hands: bool,
 ) -> Vec<StepParameter> {
+    drop_player_with_base(game, player_id, PS_PRONE, eligible_for_safe_pair_of_hands)
+}
+
+/// Shared implementation of Java's private `UtilServerInjury.dropPlayer(step, player,
+/// pPlayerBase, mode, eligibleForSafePairOfHands)` — parameterized by the target base state
+/// so both `dropPlayer`/`stunPlayer` (PRONE/STUNNED) can share the same ball-scatter/end-turn
+/// logic. The `apothecaryMode != THROWN_PLAYER` exception on the deactivate condition is not
+/// threaded through (no caller of the public `drop_player` currently passes an ApothecaryMode);
+/// the `STUNNED == pPlayerBase` half of that condition (Java: always deactivate a stunned
+/// player) is implemented, since that's what `stun_player` genuinely needs.
+fn drop_player_with_base(
+    game: &mut Game,
+    player_id: &str,
+    target_base: u32,
+    eligible_for_safe_pair_of_hands: bool,
+) -> Vec<StepParameter> {
     let mut params: Vec<StepParameter> = Vec::new();
 
     let coord: Option<FieldCoordinate> = game.field_model.player_coordinate(player_id);
@@ -270,17 +286,17 @@ pub fn drop_player(
         return params;
     }
 
-    // Java: !placedProneCausesInjuryRoll branch — place PRONE
+    // Java: !placedProneCausesInjuryRoll branch — place PRONE/STUNNED
     let base = state.base();
     if base != PS_PRONE && base != PS_STUNNED {
         let mut new_state = state;
         if base != ffb_model::enums::PS_HIT_ON_GROUND {
             new_state = new_state.change_rooted(false);
         }
-        new_state = new_state.change_base(PS_PRONE);
-        // Java: (player == actingPlayer && mode != THROWN_PLAYER) → deactivate
+        new_state = new_state.change_base(target_base);
+        // Java: (player == actingPlayer && mode != THROWN_PLAYER) || (STUNNED == pPlayerBase) → deactivate
         let is_acting = game.acting_player.player_id.as_deref() == Some(player_id);
-        if is_acting {
+        if is_acting || target_base == PS_STUNNED {
             new_state = new_state.change_active(false);
         }
         game.field_model.set_player_state(player_id, new_state);
@@ -319,16 +335,13 @@ pub fn drop_player_no_sph(game: &mut Game, player_id: &str) -> Vec<StepParameter
 
 // ── stun_player ───────────────────────────────────────────────────────────────
 
-/// Port of `UtilServerInjury.stunPlayer()`.
-///
-/// Directly sets a player to Stunned (no armor or injury roll), preserving any
-/// existing state bits (rooted, active) except the base state.
-/// Used by PitchInvasion and similar effects.
-pub fn stun_player(game: &mut Game, player_id: &str) {
-    if let Some(state) = game.field_model.player_state(player_id) {
-        let new_state = state.change_base(PS_STUNNED);
-        game.field_model.set_player_state(player_id, new_state);
-    }
+/// Port of `UtilServerInjury.stunPlayer(step, player, mode)` — delegates to the same shared
+/// `dropPlayer(step, player, STUNNED, mode, false)` path as `drop_player`, so it now returns
+/// the same ball-scatter/end-turn `StepParameter`s that dropping a ball carrier can trigger
+/// (previously a bare state mutation only). Used by PitchInvasion, cards' blockable-player
+/// selection, and similar effects.
+pub fn stun_player(game: &mut Game, player_id: &str) -> Vec<StepParameter> {
+    drop_player_with_base(game, player_id, PS_STUNNED, false)
 }
 
 /// Port of `UtilServerInjury.handleInjurySideEffects(IStep, InjuryResult)`.
@@ -838,6 +851,51 @@ mod tests {
         let params = drop_player(&mut game, "p1", true);
         assert!(params.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall))));
         assert!(game.field_model.ball_moving);
+    }
+
+    #[test]
+    fn stun_player_ball_carrier_triggers_scatter() {
+        // Java: UtilServerInjury.stunPlayer delegates to the same shared dropPlayer path as
+        // drop_player, so a stunned ball carrier scatters the ball too (previously a bare
+        // state mutation with no returned StepParameters at all).
+        let mut game = make_game();
+        let pos = add_player(&mut game, "p1", PS_STANDING);
+        game.field_model.ball_coordinate = Some(pos);
+        game.field_model.ball_in_play = true;
+        let params = stun_player(&mut game, "p1");
+        assert!(params.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall))));
+        assert!(game.field_model.ball_moving);
+        assert_eq!(game.field_model.player_state("p1").unwrap().base(), PS_STUNNED);
+    }
+
+    #[test]
+    fn stun_player_always_deactivates_even_when_not_acting() {
+        // Java: dropPlayer's deactivate condition is
+        // `(player == actingPlayer && mode != THROWN_PLAYER) || (STUNNED == pPlayerBase)` —
+        // a stunned player is deactivated unconditionally, regardless of who is acting.
+        let mut game = make_game();
+        add_player(&mut game, "p1", PS_STANDING);
+        // Start active, to prove stun_player itself deactivates rather than the field already
+        // being inactive by default.
+        let active_state = game.field_model.player_state("p1").unwrap().change_active(true);
+        game.field_model.set_player_state("p1", active_state);
+        game.acting_player.player_id = Some("someone_else".into());
+        stun_player(&mut game, "p1");
+        let state = game.field_model.player_state("p1").unwrap();
+        assert_eq!(state.base(), PS_STUNNED);
+        assert!(!state.is_active());
+    }
+
+    #[test]
+    fn stun_player_already_prone_is_left_unchanged() {
+        // Java: dropPlayer's outer guard skips the state change entirely when the player is
+        // already PRONE or STUNNED — shared by stunPlayer too, so a prone player stays prone
+        // rather than being "upgraded" to stunned.
+        let mut game = make_game();
+        add_player(&mut game, "p1", PS_PRONE);
+        stun_player(&mut game, "p1");
+        let state = game.field_model.player_state("p1").unwrap();
+        assert_eq!(state.base(), PS_PRONE);
     }
 
     // ── handle_injury_side_effects tests ─────────────────────────────────────

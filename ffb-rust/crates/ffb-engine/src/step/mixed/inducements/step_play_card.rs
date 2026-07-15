@@ -144,7 +144,9 @@ impl StepPlayCard {
         }
 
         if let Some(opponent_id) = self.opponent_id.clone() {
-            stun_player(game, &opponent_id);
+            for p in stun_player(game, &opponent_id) {
+                outcome = outcome.publish(p);
+            }
             for p in drop_player(game, player_id, false) {
                 outcome = outcome.publish(p);
             }
@@ -208,7 +210,8 @@ impl Step for StepPlayCard {
 mod tests {
     use super::*;
     use crate::step::framework::{StepAction, test_team};
-    use ffb_model::enums::{PlayerGender, PlayerState, PlayerType, Rules, PS_PRONE, PS_STANDING};
+    use ffb_model::enums::{PlayerGender, PlayerState, PlayerType, Rules, PS_PRONE, PS_STANDING, PS_STUNNED};
+    use crate::step::framework::CatchScatterThrowInMode;
     use ffb_model::inducement::card_target::CardTarget;
     use ffb_model::model::player::Player;
     use ffb_model::report::report_id::ReportId;
@@ -339,6 +342,34 @@ mod tests {
             }
             other => panic!("expected PlayerChoice prompt, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn blockable_player_selection_stun_publishes_ball_scatter() {
+        // Java: playCardWithBlockablePlayerSelection publishes stunPlayer's returned
+        // StepParameters (line: publishParameters(UtilServerInjury.stunPlayer(...))) — a
+        // stunned ball carrier scatters the ball, previously silently dropped since
+        // stun_player returned nothing.
+        let mut game = make_game();
+        add_player(&mut game, true, "p1", FieldCoordinate::new(5, 5));
+        add_player(&mut game, false, "p2", FieldCoordinate::new(6, 5));
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(6, 5));
+        game.field_model.ball_in_play = true;
+        let mut step = StepPlayCard::new();
+        step.card = Some(
+            Card::new("Custard Pie", Some("CUSTARD_PIE"))
+                .with_target(CardTarget::OPPOSING_PLAYER)
+                .with_requires_blockable_player_selection(true),
+        );
+        step.home_team = true;
+        step.player_id = Some("p1".into());
+        step.opponent_id = Some("p2".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(
+            p,
+            StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall)
+        )));
+        assert_eq!(game.field_model.player_state("p2").unwrap().base(), PS_STUNNED);
     }
 
     #[test]
