@@ -3176,7 +3176,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 |-----------|-----------|-------------|--------|
 | `server/step/action/block/StepBlockStatistics.java` | `ffb-engine` | `src/step/action/block/step_block_statistics.rs` | ✓ |
 | `server/step/action/block/StepDauntless.java` | `ffb-engine` | `src/step/action/block/step_dauntless.rs` | ✓ |
-| `server/step/action/block/StepDropFallingPlayers.java` | `ffb-engine` | `src/step/action/block/step_drop_falling_players.rs` | ✓ |
+| `server/step/action/block/StepDropFallingPlayers.java` | `ffb-engine` | merged into `src/step/bb2025/shared/step_drop_falling_players.rs` (Phase ABI — the standalone file was dead/unreachable, superseded) | ✓ |
 | `server/step/action/block/StepDumpOff.java` | `ffb-engine` | `src/step/action/block/step_dump_off.rs` | ✓ |
 | `server/step/action/block/StepHorns.java` | `ffb-engine` | `src/step/action/block/step_horns.rs` | ✓ |
 | `server/step/action/block/StepJuggernaut.java` | `ffb-engine` | `src/step/action/block/step_juggernaut.rs` | ✓ |

@@ -1,6 +1,78 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-15, Phase ABG done — the ABD-ABG arc is complete)
+## Current Status (2026-07-15, Phase ABI done — the ABH-ABI arc is complete)
+
+**ABH-ABI arc: closed the #2 and #3 items on the ABD-ABG arc's own priority list — the
+`InjuryTypeChainsaw` dispatch consolidation and the BB2020 PilingOn injury-dispatch gap.**
+
+- **Phase ABH (InjuryTypeChainsaw dispatch consolidation):** Same bug shape as Phase ABE's Block/
+  Foul/BreatheFire/CrowdPush fix, one tier over: `make_injury_type("InjuryTypeChainsaw"/
+  "InjuryTypeChainsawForSpp")` built a bare `InjuryTypeChainsawImpl` that force-set
+  `armor_broken = true` (skipping the armor roll, the Chainsaw +3 modifier, and any possibility of
+  an armor save) and used the non-Stunty/ThickSkull-aware injury table, while a correct, tested
+  `InjuryTypeChainsaw`/`InjuryTypeChainsawForSpp` pair already existed and was never reached.
+  BB2016's chainsaw steps bypassed the factory entirely, directly constructing the bare Impl.
+  Redirected dispatch (and bb2016's 3 direct call sites) to the real structs, deleted the dead
+  Impl, and added missing trait overrides confirmed against `Chainsaw.java`/`ChainsawForSpp.java`:
+  `is_caused_by_opponent` (both true), `is_worth_spps` (true only for ForSpp),
+  `failed_armour_places_prone` (false, both — matches the Java constructor's
+  `setFailedArmourPlacesProne(false)`), `send_to_box_reason` (`SendToBoxReason::Chainsaw`, both),
+  plus the previously-unimplemented IronHardSkin (`ignoresArmourModifiersFromSkills`) gating on
+  the Chainsaw armor modifier (mirrors the existing idiom in `injury_type_foul.rs`). Tests:
+  17,050 → 17,063 (+13). 0 failures.
+- **Phase ABI (PilingOn injury wiring):** The originally-reported "BB2020 has no PilingOn dispatch,
+  unlike BB2016" claim turned out to be a false alarm — both rulesets' `skill_behaviour/*/
+  piling_on_behaviour.rs` stubs are identically empty. The real, different gap: a fully-tested,
+  ~300-line BB2016 `PilingOnBehaviour.java` port lived in
+  `step/action/block/step_drop_falling_players.rs`, but `driver.rs::make_step()`'s single
+  `StepId::DropFallingPlayers` dispatch entry always resolves to the newer
+  `bb2025::shared::step_drop_falling_players.rs` (used for **all** rulesets, since this crate has
+  one global step-dispatch table, unlike Java's per-ruleset `StepFactory`), which has no PilingOn
+  logic at all — so the dead file was completely unreachable. Ported the dialog-eligibility check,
+  `AgentPrompt::PilingOn` round-trip, the armour/injury re-roll via `InjuryTypePilingOn{Armour,
+  Injury,KnockedOut}`, KO-on-double, and the Weeping Dagger side effect onto the live step, gated
+  on `Rules::Bb2016 | Rules::Bb2020` (confirmed no BB2025 `PilingOn` skill model exists — Java has
+  no BB2025 `PilingOnBehaviour` at all). While tracing the bb2016/bb2020 `PilingOnBehaviour.java`
+  sources line-by-line, found and fixed two adjacent, smaller pre-existing gaps in the *same*
+  step's non-PilingOn logic that would have been wrong for any BB2020 game regardless of the
+  PilingOn skill: (1) BB2020's regular-case defender injury type needs `BlockMode::
+  DoNotUseModifiers` (not `Regular`) when the attacker is *also* falling — no dispatch-by-name key
+  existed for that combination, so it's constructed directly; (2) BB2020's own attacker-fall branch
+  (separate from PilingOn's attacker-drop) needs a direct `drop_player` call before the injury roll
+  plus its own Weeping Dagger check, both previously entirely absent. Deleted the now-superseded
+  dead step file (confirmed zero live references first). Tests: 17,063 → 17,052 (net -11: lost the
+  dead file's ~15 tests, gained 6 new BB2016/BB2020/BB2025-gating tests on the live step — no
+  regression, the dead file's own tests were never exercising reachable code). 0 failures.
+
+Tests across the arc: 17,050 → 17,052 (net +2, dominated by the ABI dead-code swap), 0 failures
+throughout, `cargo clippy --workspace --all-targets`: 0 errors throughout.
+
+**What's left, in priority order** (unchanged items from ABG carried forward, renumbered):
+1. **`InjuryModifierFactory::find_injury_modifiers` pipeline-wide non-wiring** (surfaced during
+   Phase ABH's research, bigger than previously known) — confirmed fully implemented in
+   `ffb-mechanics/src/modifiers/injury_modifier_factory.rs` but wired into **none** of the
+   injury-roll paths (Block, Foul, or Chainsaw) — Phase ABE's Block/Foul fix didn't add this call
+   either. Needs its own dedicated phase touching every `*_roll` in `injury/injuryType/*.rs`.
+2. **Card roll-modifier gap** (Phase ABG finding) — cards that grant armor/injury/catch/dodge/pass/
+   GFI roll modifiers have no live effect; needs a dedicated phase, one card at a time, verified
+   against each card's Java `rollModifiers()` override.
+3. The apparently-dead `factory/injury_type_server_factory.rs` registry (flagged during Phase ABH
+   research) — already registers the real Chainsaw structs under different string keys, but is
+   never called by `handle_injury_by_name`; worth a follow-up dead-code audit, not fixed this arc.
+4. **`UtilServerHttpClient.java`** — confirmed intentionally blocked on an architectural decision
+   (duplicate the real `ffb-server` HTTP client inside the networking-free `ffb-engine`, or add a
+   trait/callback boundary), not a translation task. Needs a user decision before any phase touches
+   it.
+5. **`enums::pass::PassResult` reporting-layer redesign** — intentionally not merged with
+   `mechanics::pass_result::PassResult` (Phase ABB); would need a real design decision about the
+   event-reporting layer, not a mechanical merge.
+6. Per the standing pattern across every recent arc: Java/Rust parity/integration testing remains
+   the natural larger workstream once unit-test-only work is exhausted — still out of scope per
+   standing user instruction until explicitly requested.
+
+---
+
+## Prior Status (2026-07-15, Phase ABG done — the ABD-ABG arc is complete)
 
 **ABD-ABG arc: closed the #1 item on the AAW-ABC arc's own priority list — the
 `InjuryTypeBlockImpl`/`InjuryTypeBlock` consolidation — plus a bigger, previously-undiscovered
