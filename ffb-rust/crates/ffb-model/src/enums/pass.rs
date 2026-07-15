@@ -68,7 +68,15 @@ impl PassingDistance {
     }
 }
 
-/// The overall outcome of a pass attempt.
+/// The overall outcome of a pass attempt, for event reporting/`StepParameter` payloads.
+///
+/// This is intentionally distinct from `ffb_mechanics::pass_result::PassResult` (the 1:1 port of
+/// Java's single `mechanics.PassResult` enum, used internally by the pass-evaluation mechanics) —
+/// not a translation duplicate left over from an earlier phase. This one adds `Caught`/
+/// `MissedCatch`, outcomes the mechanics-layer enum has no concept of, because it also has to
+/// represent what happened to the ball after the throw, not just the throw roll itself. A future
+/// phase reconciling the two would need a real reporting-layer redesign (not attempted here — see
+/// SESSION.md Phase ABB).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PassResult {
     Complete,

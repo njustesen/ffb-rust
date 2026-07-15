@@ -1,6 +1,47 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-15, Phase ABA done — 5 of 7 in the AAW-ABC arc)
+## Current Status (2026-07-15, Phase ABB done — 6 of 7 in the AAW-ABC arc)
+
+**Phase ABB — deleted the dead `PassResult` copy + documented the reporting-layer split, done —
+with a real scope correction found before touching anything.**
+
+Direct re-verification at the start of this phase found the earlier research's framing was
+incomplete: `ffb-mechanics/src/mechanics/pass.rs` wasn't just a dead `PassResult` copy — it was an
+**entire dead duplicate pass-mechanic module** (`distance_modifier_bb2016`/`_bb2020`,
+`is_modified_fumble_bb2016`, `minimum_roll_pass_bb2016`/`_bb2020`, `evaluate_pass_bb2016`/`_bb2020`,
+a `PassResult` enum, and an `evaluate_pass` dispatcher — ~30 tests), every one of which is
+independently duplicated by real, live code elsewhere (`PassCalc` in `ffb-engine/src/util/
+pass_calc.rs` for the roll-target/fumble-boundary math; the real edition-specific `PassMechanic`
+trait impls in `ffb-mechanics/src/{bb2016,bb2020,bb2025}/pass_mechanic.rs` for `evaluate_pass`).
+**One function in the file was genuinely live**: `passing_distance_bb2025`, called directly from
+`ffb-engine/src/step/engine.rs` for the BB2025 passing-range table lookup — confirmed via a
+workspace-wide grep for every symbol in the file before deleting anything, not assumed.
+
+1. Stripped `mechanics/pass.rs` down to just `passing_distance_bb2025` (+ its `TABLE` constant) —
+   deleted the dead `PassResult` enum and all 7 dead evaluate/minimum-roll/distance-modifier
+   functions plus their ~30 tests. `pub use pass::*;` in `mechanics/mod.rs` needed no change (the
+   re-export now just exposes the one real function).
+2. **Real gap found and closed along the way**: `passing_distance_bb2025` had zero direct tests
+   despite being live, gameplay-affecting code (`step/engine.rs`'s BB2025 pass-distance/turnover
+   branch) — added 5 (same-square → None, adjacent → QuickPass, far → LongBomb, out-of-range →
+   None, from/to direction-independence).
+3. Added a doc comment on `enums::pass::PassResult` (the genuinely-different, still-live reporting
+   enum with `Caught`/`MissedCatch`) explaining it's intentionally distinct from `ffb_mechanics::
+   pass_result::PassResult` — a reporting payload vs. a rule-mechanic result — so a future phase
+   doesn't mistake it for a translation duplicate and try to merge it. Per this arc's plan, no
+   attempt was made to actually merge/redesign the reporting layer here.
+
+Tests: 17,023 → **17,000** (net -23: -28 from the deleted dead pass.rs functions' own test module,
++5 new for the one real function that survived — expected and correct, no real coverage lost,
+matching this arc's established pattern from Phases AAS/ABA's own dead-code deletions).
+0 failures. `cargo clippy --workspace --all-targets`: still 0 errors.
+
+**Next**: Phase ABC (fresh from-scratch audit of `StepModifierTrait::handle_execute_step` bodies —
+the arc's closing phase).
+
+---
+
+## Prior Status (2026-07-15, Phase ABA done — 5 of 7 in the AAW-ABC arc)
 
 **Phase ABA — merged the duplicate `InducementDuration` enums, done.**
 
