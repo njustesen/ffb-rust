@@ -511,5 +511,426 @@ pub fn legal_kickoff_targets(_game: &Game, side: TeamSide) -> Vec<FieldCoordinat
     targets
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::model::player::Player;
+    use ffb_model::enums::{PlayerState, PlayerType, PlayerGender, Rules, PS_PRONE, PS_STANDING, PS_STUNNED, PS_KNOCKED_OUT};
+
+    fn make_game(rules: Rules) -> Game {
+        Game::new(crate::step::framework::test_team("home", 0), crate::step::framework::test_team("away", 0), rules)
+    }
+
+    fn add_player(game: &mut Game, home: bool, id: &str, coord: FieldCoordinate, state_base: u32, skills: Vec<SkillId>) {
+        let p = Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: skills.into_iter().map(ffb_model::model::SkillWithValue::new).collect(),
+            extra_skills: vec![], temporary_skills: vec![], used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        if home { game.team_home.players.push(p); } else { game.team_away.players.push(p); }
+        game.field_model.set_player_coordinate(id, coord);
+        game.field_model.set_player_state(id, PlayerState::new(state_base));
+    }
+
+    fn c(x: i32, y: i32) -> FieldCoordinate { FieldCoordinate::new(x, y) }
+
+    fn has_action(actions: &[Action], player_id: &str, choice: PlayerActionChoice) -> bool {
+        actions.iter().any(|a| matches!(a, Action::ActivatePlayer { player_id: pid, player_action, .. }
+            if pid == player_id && *player_action == choice))
+    }
+
+    // ── legal_activate_player_actions ─────────────────────────────────────────
+
+    #[test]
+    fn already_acted_player_excluded() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        game.turn_data_home.acted_player_ids.push("p1".into());
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(actions.is_empty());
+    }
+
+    #[test]
+    fn off_pitch_player_excluded() {
+        let mut game = make_game(Rules::Bb2025);
+        game.team_home.players.push(Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None, is_big_guy: false,
+            ..Default::default()
+        });
+        // Never placed on the field: no coordinate/state set.
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(actions.is_empty());
+    }
+
+    #[test]
+    fn stunned_player_excluded() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STUNNED, vec![]);
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(actions.is_empty());
+    }
+
+    #[test]
+    fn knocked_out_player_excluded() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_KNOCKED_OUT, vec![]);
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(actions.is_empty());
+    }
+
+    #[test]
+    fn standing_player_offered_move() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&actions, "p1", PlayerActionChoice::Move));
+    }
+
+    #[test]
+    fn prone_player_offered_only_stand_up_without_adjacent_opponent() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_PRONE, vec![]);
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&actions, "p1", PlayerActionChoice::StandUp));
+        assert!(!has_action(&actions, "p1", PlayerActionChoice::Blitz));
+        assert!(!has_action(&actions, "p1", PlayerActionChoice::Move));
+    }
+
+    #[test]
+    fn prone_player_offered_blitz_with_adjacent_standing_opponent() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_PRONE, vec![]);
+        add_player(&mut game, false, "op1", c(6, 5), PS_STANDING, vec![]);
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&actions, "p1", PlayerActionChoice::Blitz));
+    }
+
+    #[test]
+    fn prone_player_blitz_omitted_when_blitz_used() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_PRONE, vec![]);
+        add_player(&mut game, false, "op1", c(6, 5), PS_STANDING, vec![]);
+        game.turn_data_home.blitz_used = true;
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&actions, "p1", PlayerActionChoice::Blitz));
+    }
+
+    #[test]
+    fn block_and_blitz_offered_with_adjacent_standing_opponent() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        add_player(&mut game, false, "op1", c(6, 5), PS_STANDING, vec![]);
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&actions, "p1", PlayerActionChoice::Block));
+        assert!(has_action(&actions, "p1", PlayerActionChoice::Blitz));
+    }
+
+    #[test]
+    fn block_and_blitz_omitted_without_adjacent_opponent() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        add_player(&mut game, false, "op1", c(20, 5), PS_STANDING, vec![]);
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&actions, "p1", PlayerActionChoice::Block));
+        assert!(!has_action(&actions, "p1", PlayerActionChoice::Blitz));
+    }
+
+    #[test]
+    fn block_omitted_against_prone_adjacent_opponent() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        add_player(&mut game, false, "op1", c(6, 5), PS_PRONE, vec![]);
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&actions, "p1", PlayerActionChoice::Block));
+    }
+
+    #[test]
+    fn pass_offered_only_to_ball_carrier() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        game.field_model.ball_coordinate = Some(c(5, 5));
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&actions, "p1", PlayerActionChoice::Pass));
+    }
+
+    #[test]
+    fn pass_omitted_without_ball() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&actions, "p1", PlayerActionChoice::Pass));
+    }
+
+    #[test]
+    fn pass_omitted_with_no_ball_skill() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![SkillId::NoBall]);
+        game.field_model.ball_coordinate = Some(c(5, 5));
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&actions, "p1", PlayerActionChoice::Pass));
+    }
+
+    #[test]
+    fn hand_off_offered_with_ball_and_adjacent_teammate() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        add_player(&mut game, true, "p2", c(6, 5), PS_STANDING, vec![]);
+        game.field_model.ball_coordinate = Some(c(5, 5));
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&actions, "p1", PlayerActionChoice::HandOff));
+    }
+
+    #[test]
+    fn hand_off_omitted_without_adjacent_teammate() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        game.field_model.ball_coordinate = Some(c(5, 5));
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&actions, "p1", PlayerActionChoice::HandOff));
+    }
+
+    #[test]
+    fn foul_offered_against_adjacent_prone_opponent() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        add_player(&mut game, false, "op1", c(6, 5), PS_PRONE, vec![]);
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&actions, "p1", PlayerActionChoice::Foul));
+    }
+
+    #[test]
+    fn foul_omitted_against_standing_opponent() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        add_player(&mut game, false, "op1", c(6, 5), PS_STANDING, vec![]);
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&actions, "p1", PlayerActionChoice::Foul));
+    }
+
+    #[test]
+    fn throw_bomb_offered_for_bombardier_skill() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![SkillId::Bombardier]);
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&actions, "p1", PlayerActionChoice::ThrowBomb));
+    }
+
+    #[test]
+    fn throw_team_mate_offered_with_skill_and_adjacent_teammate() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![SkillId::ThrowTeamMate]);
+        add_player(&mut game, true, "p2", c(6, 5), PS_STANDING, vec![]);
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&actions, "p1", PlayerActionChoice::ThrowTeamMate));
+    }
+
+    #[test]
+    fn kick_team_mate_only_offered_in_bb2025() {
+        let mut game16 = make_game(Rules::Bb2016);
+        add_player(&mut game16, true, "p1", c(5, 5), PS_STANDING, vec![SkillId::KickTeamMate]);
+        add_player(&mut game16, true, "p2", c(6, 5), PS_STANDING, vec![]);
+        let actions16 = legal_activate_player_actions(&game16, TeamSide::Home);
+        assert!(!has_action(&actions16, "p1", PlayerActionChoice::KickTeamMate));
+
+        let mut game25 = make_game(Rules::Bb2025);
+        add_player(&mut game25, true, "p1", c(5, 5), PS_STANDING, vec![SkillId::KickTeamMate]);
+        add_player(&mut game25, true, "p2", c(6, 5), PS_STANDING, vec![]);
+        let actions25 = legal_activate_player_actions(&game25, TeamSide::Home);
+        assert!(has_action(&actions25, "p1", PlayerActionChoice::KickTeamMate));
+    }
+
+    #[test]
+    fn punt_only_offered_in_bb2025_with_ball_in_play() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![SkillId::Punt]);
+        game.field_model.ball_coordinate = Some(c(5, 5));
+        game.field_model.ball_in_play = true;
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&actions, "p1", PlayerActionChoice::Punt));
+    }
+
+    #[test]
+    fn secure_the_ball_offered_when_ball_moving_at_coord() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        game.field_model.ball_coordinate = Some(c(5, 5));
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = true;
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&actions, "p1", PlayerActionChoice::SecureTheBall));
+    }
+
+    #[test]
+    fn secure_the_ball_omitted_for_unsteady_player() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![SkillId::Unsteady]);
+        game.field_model.ball_coordinate = Some(c(5, 5));
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = true;
+        let actions = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(!has_action(&actions, "p1", PlayerActionChoice::SecureTheBall));
+    }
+
+    // ── legal_move_targets / legal_blitz_move_targets ─────────────────────────
+
+    #[test]
+    fn legal_move_targets_returns_adjacent_empty_squares() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        let targets = legal_move_targets(&game, "p1");
+        assert!(targets.contains(&c(6, 5)));
+        assert!(!targets.is_empty());
+    }
+
+    #[test]
+    fn legal_move_targets_excludes_occupied_squares() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        add_player(&mut game, false, "op1", c(6, 5), PS_STANDING, vec![]);
+        let targets = legal_move_targets(&game, "p1");
+        assert!(!targets.contains(&c(6, 5)));
+    }
+
+    #[test]
+    fn legal_move_targets_empty_when_ma_and_gfi_exhausted() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        game.acting_player.current_move = 8; // movement 6 + STANDARD_GFI_SQUARES 2
+        let targets = legal_move_targets(&game, "p1");
+        assert!(targets.is_empty());
+    }
+
+    #[test]
+    fn legal_move_targets_unknown_player_returns_empty() {
+        let game = make_game(Rules::Bb2025);
+        let targets = legal_move_targets(&game, "ghost");
+        assert!(targets.is_empty());
+    }
+
+    #[test]
+    fn legal_blitz_move_targets_includes_zero_move_when_already_adjacent() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        add_player(&mut game, false, "op1", c(6, 5), PS_STANDING, vec![]);
+        let targets = legal_blitz_move_targets(&game, "p1", "op1");
+        assert!(targets.contains(&c(5, 5)));
+    }
+
+    #[test]
+    fn legal_blitz_move_targets_reachable_and_adjacent_to_defender() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        add_player(&mut game, false, "op1", c(8, 5), PS_STANDING, vec![]);
+        let targets = legal_blitz_move_targets(&game, "p1", "op1");
+        assert!(targets.iter().all(|t| t.is_adjacent(c(8, 5))));
+        assert!(!targets.is_empty());
+    }
+
+    // ── bfs_path ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn bfs_path_same_square_returns_empty() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        assert!(bfs_path(&game, "p1", c(5, 5), c(5, 5)).is_empty());
+    }
+
+    #[test]
+    fn bfs_path_unreachable_returns_empty() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        // Fully surround p1's destination-adjacent square isn't necessary; use an
+        // out-of-pitch destination to force unreachability.
+        let dest = c(-1, -1);
+        assert!(bfs_path(&game, "p1", c(5, 5), dest).is_empty());
+    }
+
+    #[test]
+    fn bfs_path_finds_short_path() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        let path = bfs_path(&game, "p1", c(5, 5), c(7, 5));
+        assert_eq!(path.last(), Some(&c(7, 5)));
+        assert!(!path.is_empty());
+    }
+
+    // ── legal_block_targets / legal_foul_targets / legal_handoff_receivers / legal_pass_receivers ──
+
+    #[test]
+    fn legal_block_targets_returns_adjacent_blockable_opponents_sorted() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        add_player(&mut game, false, "op_far", c(6, 4), PS_STANDING, vec![]);
+        add_player(&mut game, false, "op_near", c(4, 5), PS_STANDING, vec![]);
+        let targets = legal_block_targets(&game, "p1", TeamSide::Home);
+        assert_eq!(targets, vec!["op_near".to_string(), "op_far".to_string()]);
+    }
+
+    #[test]
+    fn legal_block_targets_excludes_prone_opponent() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        add_player(&mut game, false, "op1", c(6, 5), PS_PRONE, vec![]);
+        let targets = legal_block_targets(&game, "p1", TeamSide::Home);
+        assert!(targets.is_empty());
+    }
+
+    #[test]
+    fn legal_foul_targets_returns_adjacent_prone_or_stunned_opponents() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        add_player(&mut game, false, "op1", c(6, 5), PS_STUNNED, vec![]);
+        let targets = legal_foul_targets(&game, "p1", TeamSide::Home);
+        assert_eq!(targets, vec!["op1".to_string()]);
+    }
+
+    #[test]
+    fn legal_handoff_receivers_returns_adjacent_teammates_sorted() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        add_player(&mut game, true, "p2", c(6, 5), PS_STANDING, vec![]);
+        add_player(&mut game, true, "p3", c(4, 5), PS_STANDING, vec![]);
+        let targets = legal_handoff_receivers(&game, "p1", TeamSide::Home);
+        assert_eq!(targets, vec!["p3".to_string(), "p2".to_string()]);
+    }
+
+    #[test]
+    fn legal_pass_receivers_excludes_self_includes_all_onfield_teammates() {
+        let mut game = make_game(Rules::Bb2025);
+        add_player(&mut game, true, "p1", c(5, 5), PS_STANDING, vec![]);
+        add_player(&mut game, true, "p2", c(20, 10), PS_STANDING, vec![]);
+        let targets = legal_pass_receivers(&game, "p1", TeamSide::Home);
+        assert_eq!(targets, vec!["p2".to_string()]);
+    }
+
+    // ── legal_kickoff_targets ──────────────────────────────────────────────────
+
+    #[test]
+    fn legal_kickoff_targets_home_kicks_to_away_half() {
+        let game = make_game(Rules::Bb2025);
+        let targets = legal_kickoff_targets(&game, TeamSide::Home);
+        assert!(targets.iter().all(|t| t.x >= 13 && t.x <= 25));
+        assert!(!targets.is_empty());
+    }
+
+    #[test]
+    fn legal_kickoff_targets_away_kicks_to_home_half() {
+        let game = make_game(Rules::Bb2025);
+        let targets = legal_kickoff_targets(&game, TeamSide::Away);
+        assert!(targets.iter().all(|t| t.x >= 0 && t.x <= 12));
+        assert!(!targets.is_empty());
+    }
+}
+
 // Tests: legal_actions takes `&Game`, so its tests are rebuilt as `&Game` fixtures
 // (no engine dependency) when the first selection/action step consumes it in Phase D.
