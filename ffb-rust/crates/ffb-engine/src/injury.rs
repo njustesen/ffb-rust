@@ -509,69 +509,6 @@ impl InjuryTypeServer for InjuryTypeDropFall {
     fn falling_down_causes_turnover(&self) -> bool { self.causes_turnover }
 }
 
-// ── InjuryTypeBlock ───────────────────────────────────────────────────────────
-
-/// Java: InjuryTypeBlock — standard block injury involving attacker modifiers.
-/// Simplified: no armor/injury modifier factories yet.
-pub struct InjuryTypeBlockImpl {
-    ctx: InjuryContext,
-    pre_broken: bool,   // armor already forced broken (InjuryTypeBlockProne path)
-    worth_spps: bool,   // Java: worthSpps constructor param (true for "ForSpp" variants)
-    caused_by_opponent: bool, // Java: isCausedByOpponent() — true for Block/Foul/etc.
-}
-
-impl InjuryTypeBlockImpl {
-    fn new(pre_broken: bool) -> Self {
-        Self {
-            ctx: InjuryContext::new(ApothecaryMode::Defender),
-            pre_broken,
-            worth_spps: false,
-            caused_by_opponent: true, // Block injuries are always by opponent
-        }
-    }
-
-    fn with_spps(mut self) -> Self {
-        self.worth_spps = true;
-        self
-    }
-
-    fn not_by_opponent(mut self) -> Self {
-        self.caused_by_opponent = false;
-        self
-    }
-}
-
-impl InjuryTypeServer for InjuryTypeBlockImpl {
-    fn handle_injury(
-        &mut self, game: &Game, rng: &mut GameRng,
-        attacker_id: Option<&str>, defender_id: &str,
-        coord: FieldCoordinate, _from_coord: Option<FieldCoordinate>,
-        _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode,
-    ) {
-        self.ctx.defender_id = Some(defender_id.to_owned());
-        self.ctx.attacker_id = attacker_id.map(str::to_owned);
-        self.ctx.defender_coordinate = Some(coord);
-        self.ctx.apothecary_mode = apo_mode;
-
-        if self.pre_broken {
-            self.ctx.armor_broken = true;
-        } else if !self.ctx.armor_broken {
-            do_armor_roll(game, rng, &mut self.ctx, defender_id);
-        }
-
-        if self.ctx.armor_broken {
-            do_injury_roll(rng, &mut self.ctx);
-        } else {
-            self.ctx.injury = Some(PlayerState::new(PS_PRONE));
-        }
-    }
-
-    fn injury_context(&self) -> &InjuryContext { &self.ctx }
-    fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn is_caused_by_opponent(&self) -> bool { self.caused_by_opponent }
-    fn is_worth_spps(&self) -> bool { self.worth_spps }
-}
-
 // ── InjuryTypeChainsaw ────────────────────────────────────────────────────────
 
 /// Java: InjuryTypeChainsaw — armor is always broken (chainsaw special rule).
@@ -747,14 +684,22 @@ pub fn make_injury_type(name: &str) -> Box<dyn InjuryTypeServer> {
             Box::new(InjuryTypeDropFall::new(true)),
         "InjuryTypeDropJump" =>
             Box::new(InjuryTypeDropFall::new(true)),
+        // Java: `new InjuryTypeBlock()` — Mode.REGULAR, rollArmour=true, allowAttackerChainsaw=true.
         "InjuryTypeBlock" =>
-            Box::new(InjuryTypeBlockImpl::new(false)),
-        "InjuryTypeBlockForSpp" =>
-            Box::new(InjuryTypeBlockImpl::new(false).with_spps()),
+            Box::new(injuryType::injury_type_block::InjuryTypeBlock::new(
+                injuryType::injury_type_block::BlockMode::Regular, true)),
+        // Java: `new InjuryTypeBlock(Mode.REGULAR, false)` — the one call site
+        // (bb2025 StepDropFallingPlayers' defender-fallback path) that passes
+        // allowAttackerChainsaw=false; a single "InjuryTypeBlock" key can't represent both.
+        "InjuryTypeBlockNoAttackerChainsaw" =>
+            Box::new(injuryType::injury_type_block::InjuryTypeBlock::new_with_chainsaw(
+                injuryType::injury_type_block::BlockMode::Regular, true, false)),
+        // No Java class `BlockForSpp` exists (`Block` is already `worthSpps=true`); dead key,
+        // kept absent from the fallback so a caller constructing this literal would notice.
         "InjuryTypeBlockProne" =>
-            Box::new(InjuryTypeBlockImpl::new(true)),
+            Box::new(injuryType::injury_type_block_prone::InjuryTypeBlockProne::new()),
         "InjuryTypeBlockProneForSpp" =>
-            Box::new(InjuryTypeBlockImpl::new(true).with_spps()),
+            Box::new(injuryType::injury_type_block_prone_for_spp::InjuryTypeBlockProneForSpp::new()),
         "InjuryTypeChainsaw" =>
             Box::new(InjuryTypeChainsawImpl::new()),
         "InjuryTypeChainsawForSpp" =>
@@ -767,33 +712,35 @@ pub fn make_injury_type(name: &str) -> Box<dyn InjuryTypeServer> {
             Box::new(InjuryTypeTtmHitPlayerImpl::new()),
         "InjuryTypeTTMHitPlayerForSpp" =>
             Box::new(InjuryTypeTtmHitPlayerImpl::new()),  // TTM hit is by own team; SPP still tracked
-        // Foul injury: armor roll + injury roll (foul assist modifiers TODO).
+        // Foul injury: foul-assist + blatant-foul + DirtyPlayer armor/injury modifiers.
         "InjuryTypeFoul" =>
-            Box::new(InjuryTypeBlockImpl::new(false)),
+            Box::new(injuryType::injury_type_foul::InjuryTypeFoul::new()),
         "InjuryTypeFoulForSpp" =>
-            Box::new(InjuryTypeBlockImpl::new(false).with_spps()),
+            Box::new(injuryType::injury_type_foul_for_spp::InjuryTypeFoulForSpp::new()),
+        // Java: `new InjuryTypeFoul(true)` — wraps FoulWithChainsaw, same worthSpps/
+        // isCausedByOpponent as base Foul.
         "InjuryTypeFoulChainsaw" =>
-            Box::new(InjuryTypeBlockImpl::new(false)),
+            Box::new(injuryType::injury_type_foul::InjuryTypeFoul::new_with_chainsaw(true)),
         "InjuryTypeFoulChainsawForSpp" =>
-            Box::new(InjuryTypeBlockImpl::new(false).with_spps()),
+            Box::new(injuryType::injury_type_foul_for_spp::InjuryTypeFoulForSpp::new_with_chainsaw(true)),
         "InjuryTypeFallDown" =>
             Box::new(InjuryTypeDropFall::new(false)),
         "InjuryTypeFallDownForSpp" =>
             Box::new(InjuryTypeDropFall::new(false)),
         "InjuryTypeBreatheFire" =>
-            Box::new(InjuryTypeBlockImpl::new(false)),
+            Box::new(injuryType::injury_type_breathe_fire::InjuryTypeBreatheFire::new()),
         "InjuryTypeBreatheFireForSpp" =>
-            Box::new(InjuryTypeBlockImpl::new(false).with_spps()),
+            Box::new(injuryType::injury_type_breathe_fire_for_spp::InjuryTypeBreatheFireForSpp::new()),
         "InjuryTypeCrowdPush" =>
-            Box::new(InjuryTypeBlockImpl::new(false).not_by_opponent()),
+            Box::new(injuryType::injury_type_crowd_push::InjuryTypeCrowdPush::new()),
         "InjuryTypeCrowdPushForSpp" =>
-            Box::new(InjuryTypeBlockImpl::new(false).not_by_opponent().with_spps()),
+            Box::new(injuryType::injury_type_crowd_push_for_spp::InjuryTypeCrowdPushForSpp::new()),
         "InjuryTypeFumbledKtmApoKo" =>
             Box::new(InjuryTypeDropFall::new(false)),
         "InjuryTypeBlockStunned" =>
-            Box::new(InjuryTypeBlockImpl::new(true)),
+            Box::new(injuryType::injury_type_block_stunned::InjuryTypeBlockStunned::new()),
         "InjuryTypeBlockStunnedForSpp" =>
-            Box::new(InjuryTypeBlockImpl::new(true).with_spps()),
+            Box::new(injuryType::injury_type_block_stunned_for_spp::InjuryTypeBlockStunnedForSpp::new()),
         "InjuryTypeBombWithModifier" | "bombWithModifier" =>
             Box::new(injuryType::injury_type_bomb_with_modifier::InjuryTypeBombWithModifier::new()),
         "InjuryTypeBombWithModifierForSpp" | "bombForSpp" =>
@@ -1000,5 +947,66 @@ mod tests {
         assert!(!can_apo_ko_into_stun(Some("InjuryTypeCrowdPushForSpp")));
         assert!(!can_apo_ko_into_stun(Some("InjuryTypeTrapDoorFall")));
         assert!(!can_apo_ko_into_stun(Some("InjuryTypeTrapDoorFallForSpp")));
+    }
+
+    // ── make_injury_type dispatch reaches real modifier logic (Phase ABE) ────
+    //
+    // Before this phase, every one of these keys constructed the simplified
+    // `InjuryTypeBlockImpl`, which never touched the armor/injury modifier factories — these
+    // assertions were impossible to write against the old dispatch.
+
+    fn make_player_with_skill(id: &str, armour: i32, skill: ffb_model::model::skill_def::SkillId) -> Player {
+        let mut p = make_player(id);
+        p.armour = armour;
+        p.starting_skills.push(ffb_model::model::SkillWithValue::new(skill));
+        p
+    }
+
+    #[test]
+    fn dispatch_block_reaches_mighty_blow_armor_modifier() {
+        use ffb_model::model::skill_def::SkillId;
+        let mut game = make_game_with_players(&["attacker"], &["defender"]);
+        game.team_home.players[0] = make_player_with_skill("attacker", 7, SkillId::MightyBlow);
+        game.team_away.players[0].armour = 15; // isolate the modifier: base roll alone won't break
+        let mut it = make_injury_type("InjuryTypeBlock");
+        let mut rng = GameRng::new(1);
+        it.handle_injury(&game, &mut rng, Some("attacker"), "defender", FieldCoordinate::new(5, 5), None, None, ApothecaryMode::Defender);
+        assert!(it.injury_context().armor_modifiers.iter().any(|m| m.name == "Mighty Blow"),
+            "InjuryTypeBlock dispatch should apply Mighty Blow's armor modifier");
+    }
+
+    #[test]
+    fn dispatch_foul_chainsaw_reaches_chainsaw_armor_modifier() {
+        use ffb_model::model::skill_def::SkillId;
+        use ffb_mechanics::modifiers::ARMOR_CHAINSAW_3;
+        let mut game = make_game_with_players(&["attacker"], &["defender"]);
+        game.team_home.players[0] = make_player_with_skill("attacker", 7, SkillId::Chainsaw);
+        let mut it = make_injury_type("InjuryTypeFoulChainsaw");
+        let mut rng = GameRng::new(1);
+        it.handle_injury(&game, &mut rng, Some("attacker"), "defender", FieldCoordinate::new(5, 5), None, None, ApothecaryMode::Defender);
+        assert!(it.injury_context().armor_modifiers.contains(&ARMOR_CHAINSAW_3),
+            "InjuryTypeFoulChainsaw dispatch should apply the Chainsaw +3 armor modifier");
+    }
+
+    #[test]
+    fn dispatch_no_attacker_chainsaw_key_ignores_attackers_chainsaw() {
+        // The narrow allowAttackerChainsaw=false call site (bb2025 StepDropFallingPlayers'
+        // defender-fallback path) — attacker's own Chainsaw skill must not apply.
+        use ffb_model::model::skill_def::SkillId;
+        use ffb_mechanics::modifiers::ARMOR_CHAINSAW_3;
+        let mut game = make_game_with_players(&["attacker"], &["defender"]);
+        game.team_home.players[0] = make_player_with_skill("attacker", 7, SkillId::Chainsaw);
+        let mut it = make_injury_type("InjuryTypeBlockNoAttackerChainsaw");
+        let mut rng = GameRng::new(1);
+        it.handle_injury(&game, &mut rng, Some("attacker"), "defender", FieldCoordinate::new(5, 5), None, None, ApothecaryMode::Defender);
+        assert!(!it.injury_context().armor_modifiers.contains(&ARMOR_CHAINSAW_3));
+    }
+
+    #[test]
+    fn dispatch_breathe_fire_and_crowd_push_smoke_tests_survive_rewire() {
+        let it = make_injury_type("InjuryTypeBreatheFire");
+        assert!(!it.falling_down_causes_turnover());
+        let it = make_injury_type("InjuryTypeCrowdPush");
+        assert!(!it.falling_down_causes_turnover());
     }
 }

@@ -128,7 +128,9 @@ impl StepDropFallingPlayers {
                 Some(s) if s.is_prone_or_stunned() => {
                     if grants_spp { "InjuryTypeBlockProneForSpp" } else { "InjuryTypeBlockProne" }
                 }
-                _ => "InjuryTypeBlock",
+                // Java: `new InjuryTypeBlock(Mode.REGULAR, false)` — allowAttackerChainsaw=false,
+                // distinct from the attacker-fall path below which uses the true-by-default ctor.
+                _ => "InjuryTypeBlockNoAttackerChainsaw",
             };
             // Saboteur overrides (not yet ported)
             let injury_type_name = if self.saboteur_triggered_defender { "InjuryTypeSaboteur" }
