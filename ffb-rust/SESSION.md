@@ -1,6 +1,68 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-16, Phase ABK done — InjuryModifierFactory wiring sweep complete)
+## Current Status (2026-07-16, Phase ABL done — real per-edition StabBehaviour ported)
+
+**Phase ABL: closed item #1 on Phase ABK's own priority list — ported the real bb2016/bb2020/
+bb2025 `StabBehaviour.java` skill-hook logic into `step_stab.rs`, replacing the simplified
+edition-agnostic hand-inlined armor/injury roll that predated this phase.**
+
+- **Verified all three `StabBehaviour.java` classes against the Java source** (they were never
+  actually ported — `TRANSLATION_TRACKER.md`'s `✓` marks were stale: `bb2016/stab_behaviour.rs`
+  and `bb2020/stab_behaviour.rs` don't exist on disk at all, and the existing
+  `bb2025/stab_behaviour.rs` is a dead no-op stub). Per the Phase ABI convention, the three
+  editions' logic is now hand-inlined directly into the single shared `step_stab.rs`, matched on
+  `game.rules`, rather than routed through the generic (unused, for this family of skills)
+  `SkillBehaviour`/`StepModifier` hook dispatch:
+  - **bb2016**: `hasSkill(Stab)` gate, `InjuryTypeStab(useInjuryModifiers=false)`, separate
+    `dropPlayer` call + raw `InjuryResult` publish, `GOTO_LABEL` on success else `NEXT_STEP`.
+  - **bb2020**: `hasUnusedSkillWithProperty(canPerformArmourRollInsteadOfBlock)` gate,
+    `InjuryTypeStab(useInjuryModifiers=true)`, publishes a `DropPlayerContext` (embedding the goto
+    label + `requiresArmourBreak=true`) instead of a raw `InjuryResult`, always `NEXT_STEP`.
+  - **bb2025**: same gate as bb2020, plus `grantsSppFromSpecialActionsCas` picks
+    `InjuryTypeStabForSpp` vs `InjuryTypeStab` (both `useInjuryModifiers=true`); same
+    `DropPlayerContext` shape and unconditional `NEXT_STEP`.
+- **Restored the `useInjuryModifiers` constructor flag** on `InjuryTypeStab`/`InjuryTypeStabForSpp`
+  (`new(bool)`) — previously hardcoded to always apply `InjuryModifierFactory`, which was silently
+  wrong for bb2016 (Java constructs `new InjuryTypeStab(false)` there, applying no niggling/skill
+  injury modifiers at all). Updated the two live call sites in `step_treacherous.rs` (bb2020/
+  bb2025, both pass `true`, matching Java's `new InjuryTypeStab(true, true)`/`(true)`).
+- **Fixed a second latent bug found while wiring this**: neither `InjuryTypeStab` nor
+  `InjuryTypeStabForSpp` overrode `is_caused_by_opponent`/`is_worth_spps` (both silently defaulted
+  to `false`/`false`), which defeated the entire point of bb2025's `grantsSppFromSpecialActionsCas`
+  check — picking `InjuryTypeStabForSpp` over `InjuryTypeStab` granted no casualty SPP either way.
+  Added the Java-matching overrides (`Stab`: `isCausedByOpponent=true`, `isWorthSpps=false`;
+  `StabForSpp`: both `true`).
+- Replaced the 6 old edition-agnostic tests with 23 per-edition tests covering each gate, each
+  publish shape (raw `InjuryResult` vs `DropPlayerContext`), the bb2016 goto-on-success vs
+  bb2020/bb2025 unconditional-`NEXT_STEP` split, and the bb2025 SPP-grant selection.
+- Updated `TRANSLATION_TRACKER.md`'s three `StabBehaviour.java` rows to point at
+  `step_stab.rs` with a note explaining the real location, instead of the stale/nonexistent
+  `skill_behaviour/bb2016|bb2020/stab_behaviour.rs` paths.
+
+Tests: 17,115 → **17,124** (+9). 0 failures across `cargo test --workspace`. `cargo build
+--workspace` and `cargo clippy --workspace --all-targets` clean — no new warnings introduced by
+this diff.
+
+**What's left, in priority order:**
+1. **Card roll-modifier gap** (Phase ABG finding) — cards that grant armor/injury/catch/dodge/pass/
+   GFI roll modifiers have no live effect; needs a dedicated phase, one card at a time, verified
+   against each card's Java `rollModifiers()` override.
+2. **`UtilServerHttpClient.java`** — confirmed intentionally blocked on an architectural decision
+   (duplicate the real `ffb-server` HTTP client inside the networking-free `ffb-engine`, or add a
+   trait/callback boundary), not a translation task. Needs a user decision before any phase touches
+   it.
+3. **`enums::pass::PassResult` reporting-layer redesign** — intentionally not merged with
+   `mechanics::pass_result::PassResult` (Phase ABB); would need a real design decision about the
+   event-reporting layer, not a mechanical merge.
+4. Per the standing pattern across every recent arc: Java/Rust parity/integration testing remains
+   the natural larger workstream once unit-test-only work is exhausted — still out of scope per
+   standing user instruction until explicitly requested. No other "hand-inlined logic standing in
+   for an unported hook class" instances are currently known after this phase closes the last
+   confirmed one.
+
+---
+
+## Prior Status (2026-07-16, Phase ABK done — InjuryModifierFactory wiring sweep complete)
 
 **Phase ABK: closed item #1 on Phase ABJ's own priority list — finished wiring
 `InjuryModifierFactory` into every remaining `InjuryType*` struct.** Phase ABJ wired 5 of ~32

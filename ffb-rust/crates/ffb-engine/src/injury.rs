@@ -707,9 +707,9 @@ pub fn make_injury_type(name: &str) -> Box<dyn InjuryTypeServer> {
         "InjuryTypeQuickBite" | "quickBite" =>
             Box::new(injuryType::injury_type_quick_bite::InjuryTypeQuickBite::new()),
         "InjuryTypeStab" =>
-            Box::new(injuryType::injury_type_stab::InjuryTypeStab::new()),
+            Box::new(injuryType::injury_type_stab::InjuryTypeStab::new(true)),
         "InjuryTypeStabForSpp" =>
-            Box::new(injuryType::injury_type_stab_for_spp::InjuryTypeStabForSpp::new()),
+            Box::new(injuryType::injury_type_stab_for_spp::InjuryTypeStabForSpp::new(true)),
         // Live callers: bb2025 step_drop_falling_players.rs's Saboteur/Sabotaged skill branches
         // previously fell through to the generic drop-fall stand-in since no arms existed here.
         "InjuryTypeSaboteur" =>

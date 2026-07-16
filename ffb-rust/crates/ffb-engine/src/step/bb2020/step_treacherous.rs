@@ -106,7 +106,7 @@ impl StepTreacherous {
                     .unwrap_or(FieldCoordinate::new(0, 0));
 
                 // Java: UtilServerInjury.handleInjury(step, InjuryTypeStab(true,true), attacker, defender, coord, null, null, DEFENDER)
-                let mut injury_type = InjuryTypeStab::new();
+                let mut injury_type = InjuryTypeStab::new(true);
                 let injury_result = handle_injury(
                     game, rng, &mut injury_type,
                     Some(player_id.as_str()), &target_id,

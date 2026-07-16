@@ -114,7 +114,7 @@ impl StepTreacherous {
                 // Java: UtilServerInjury.handleInjury(this, new InjuryTypeStab(true, true), ...)
                 let defender_coord = game.field_model.player_coordinate(&target_id)
                     .unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
-                let mut injury_type = InjuryTypeStab::new();
+                let mut injury_type = InjuryTypeStab::new(true);
                 let injury_result = handle_injury(
                     game, rng, &mut injury_type,
                     Some(player_id.as_str()), &target_id,

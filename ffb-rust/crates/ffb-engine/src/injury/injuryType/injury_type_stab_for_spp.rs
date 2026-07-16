@@ -9,9 +9,14 @@ use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
 use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
 use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury, leak_injury_modifier};
 
-pub struct InjuryTypeStabForSpp { ctx: InjuryContext }
-impl InjuryTypeStabForSpp { pub fn new() -> Self { Self { ctx: InjuryContext::new(ApothecaryMode::Defender) } } }
-impl Default for InjuryTypeStabForSpp { fn default() -> Self { Self::new() } }
+pub struct InjuryTypeStabForSpp { ctx: InjuryContext, use_injury_modifiers: bool }
+impl InjuryTypeStabForSpp {
+    /// Java: `InjuryTypeStabForSpp(boolean useInjuryModifiers)`.
+    pub fn new(use_injury_modifiers: bool) -> Self {
+        Self { ctx: InjuryContext::new(ApothecaryMode::Defender), use_injury_modifiers }
+    }
+}
+impl Default for InjuryTypeStabForSpp { fn default() -> Self { Self::new(true) } }
 
 impl InjuryTypeServer for InjuryTypeStabForSpp {
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,
@@ -21,6 +26,10 @@ impl InjuryTypeServer for InjuryTypeStabForSpp {
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn falling_down_causes_turnover(&self) -> bool { false }
+    /// Java: `StabForSpp.isCausedByOpponent()` → true.
+    fn is_caused_by_opponent(&self) -> bool { true }
+    /// Java: `StabForSpp` constructed with `worthSpps=true`.
+    fn is_worth_spps(&self) -> bool { true }
 }
 impl ModificationAwareInjuryType for InjuryTypeStabForSpp {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
@@ -31,11 +40,13 @@ impl ModificationAwareInjuryType for InjuryTypeStabForSpp {
         // Java: `factory.findInjuryModifiers(game, injuryContext, pAttacker, pDefender, isStab(),
         // isFoul(), isVomitLike())` — StabForSpp has isStab=true, isFoul=false, isVomitLike=false. The
         // factory's `findInjuryModifiers` includes niggling internally, so no separate call is needed.
-        if let Some(defender) = game.player(defender_id) {
-            let attacker = attacker_id.and_then(|aid| game.player(aid));
-            let factory = InjuryModifierFactory::new(game.rules);
-            for m in factory.find_injury_modifiers(game, attacker, defender, true, false, false) {
-                self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), attacker, defender, game.rules));
+        if self.use_injury_modifiers {
+            if let Some(defender) = game.player(defender_id) {
+                let attacker = attacker_id.and_then(|aid| game.player(aid));
+                let factory = InjuryModifierFactory::new(game.rules);
+                for m in factory.find_injury_modifiers(game, attacker, defender, true, false, false) {
+                    self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), attacker, defender, game.rules));
+                }
             }
         }
         do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
@@ -85,26 +96,26 @@ mod tests {
     fn coord() -> FieldCoordinate { FieldCoordinate::new(5, 5) }
     #[test]
     fn armor_save_leaves_no_injury() {
-        let mut t = InjuryTypeStabForSpp::new(); let mut rng = GameRng::new(1);
+        let mut t = InjuryTypeStabForSpp::new(true); let mut rng = GameRng::new(1);
         t.handle_injury(&game_with_armor(13), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert!(!t.ctx.armor_broken); assert!(t.ctx.injury.is_none());
     }
     #[test]
     fn armor_break_results_in_injury_roll() {
-        let mut t = InjuryTypeStabForSpp::new(); let mut rng = GameRng::new(1);
+        let mut t = InjuryTypeStabForSpp::new(true); let mut rng = GameRng::new(1);
         t.handle_injury(&game_with_armor(2), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert!(t.ctx.armor_broken); assert!(t.ctx.injury.is_some());
     }
 
     #[test]
     fn initial_context_has_no_injury() {
-        let t = InjuryTypeStabForSpp::new();
+        let t = InjuryTypeStabForSpp::new(true);
         assert!(!t.ctx.armor_broken);
         assert!(t.ctx.injury.is_none());
     }
     #[test]
-    fn default_equivalent_to_new() {
-        let t1 = InjuryTypeStabForSpp::new();
+    fn default_equivalent_to_new_true() {
+        let t1 = InjuryTypeStabForSpp::new(true);
         let t2 = InjuryTypeStabForSpp::default();
         assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
         assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
@@ -113,7 +124,7 @@ mod tests {
     #[test]
     fn new_context_uses_defender_apo_mode() {
         use ffb_model::enums::ApothecaryMode;
-        let t = InjuryTypeStabForSpp::new();
+        let t = InjuryTypeStabForSpp::new(true);
         assert_eq!(t.injury_context().apothecary_mode, ApothecaryMode::Defender);
     }
 
@@ -121,7 +132,7 @@ mod tests {
     fn niggling_injury_modifier_applied_when_armor_breaks() {
         // Proves InjuryModifierFactory is now reached from injury_roll (fixes the bug where
         // StabForSpp silently skipped skill/niggling injury modifiers).
-        let mut t = InjuryTypeStabForSpp::new();
+        let mut t = InjuryTypeStabForSpp::new(true);
         let mut rng = GameRng::new(1);
         t.handle_injury(&game_with_armor_and_niggling(2, 1), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert!(t.ctx.armor_broken);
@@ -130,10 +141,23 @@ mod tests {
     }
     #[test]
     fn no_niggling_injury_no_modifier() {
-        let mut t = InjuryTypeStabForSpp::new();
+        let mut t = InjuryTypeStabForSpp::new(true);
         let mut rng = GameRng::new(1);
         t.handle_injury(&game_with_armor_and_niggling(2, 0), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert!(t.ctx.armor_broken);
         assert!(!t.ctx.injury_modifiers.iter().any(|m| m.name.contains("Niggling")));
+    }
+
+    #[test]
+    fn use_injury_modifiers_false_skips_niggling_modifier_even_when_present() {
+        // Java: bb2025 StabBehaviour never actually calls `new InjuryTypeStabForSpp(false)` in
+        // practice (always constructed with `true`), but the constructor param exists on the
+        // Java class and must behave consistently with InjuryTypeStab's equivalent flag.
+        let mut t = InjuryTypeStabForSpp::new(false);
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game_with_armor_and_niggling(2, 1), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert!(t.ctx.armor_broken);
+        assert!(t.ctx.injury_modifiers.is_empty(),
+            "expected no injury modifiers with use_injury_modifiers=false, got {:?}", t.ctx.injury_modifiers);
     }
 }

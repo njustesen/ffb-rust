@@ -3026,7 +3026,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/skillbehaviour/bb2016/ShadowingBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2016/shadowing_behaviour.rs` | ✓ |
 | `server/skillbehaviour/bb2016/SideStepBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2016/side_step_behaviour.rs` | ✓ |
 | `server/skillbehaviour/bb2016/SneakyGitBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2016/sneaky_git_behaviour.rs` | ✓ |
-| `server/skillbehaviour/bb2016/StabBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2016/stab_behaviour.rs` | ✓ |
+| `server/skillbehaviour/bb2016/StabBehaviour.java` | `ffb-engine` | `src/step/action/block/step_stab.rs` (real logic hand-inlined per `game.rules`, Phase ABL — no separate `bb2016/stab_behaviour.rs` file) | ✓ |
 | `server/skillbehaviour/bb2016/StandFirmBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2016/stand_firm_behaviour.rs` | ✓ |
 | `server/skillbehaviour/bb2016/StrengthIncreaseBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2016/strength_increase_behaviour.rs` | ✓ |
 | `server/skillbehaviour/bb2016/SwarmingBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2016/swarming_behaviour.rs` | ✓ |
@@ -3068,7 +3068,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/skillbehaviour/bb2020/SideStepBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2020/side_step_behaviour.rs` | ✓ |
 | `server/skillbehaviour/bb2020/SlayerBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2020/slayer_behaviour.rs` | ✓ |
 | `server/skillbehaviour/bb2020/SneakyGitBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2020/sneaky_git_behaviour.rs` | ✓ |
-| `server/skillbehaviour/bb2020/StabBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2020/stab_behaviour.rs` | ✓ |
+| `server/skillbehaviour/bb2020/StabBehaviour.java` | `ffb-engine` | `src/step/action/block/step_stab.rs` (real logic hand-inlined per `game.rules`, Phase ABL — no separate `bb2020/stab_behaviour.rs` file) | ✓ |
 | `server/skillbehaviour/bb2020/StandFirmBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2020/stand_firm_behaviour.rs` | ✓ |
 | `server/skillbehaviour/bb2020/StrengthIncreaseBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2020/strength_increase_behaviour.rs` | ✓ |
 | `server/skillbehaviour/bb2020/SwarmingBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2020/swarming_behaviour.rs` | ✓ |
@@ -3114,7 +3114,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/skillbehaviour/bb2025/SidestepBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2025/sidestep_behaviour.rs` | ✓ |
 | `server/skillbehaviour/bb2025/SlayerBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2025/slayer_behaviour.rs` | ✓ |
 | `server/skillbehaviour/bb2025/SneakyGitBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2025/sneaky_git_behaviour.rs` | ✓ |
-| `server/skillbehaviour/bb2025/StabBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2025/stab_behaviour.rs` | ✓ |
+| `server/skillbehaviour/bb2025/StabBehaviour.java` | `ffb-engine` | `src/step/action/block/step_stab.rs` (real logic hand-inlined per `game.rules`, Phase ABL — `src/skill_behaviour/bb2025/stab_behaviour.rs` is a dead no-op stub, matching the established pattern for this family of skills) | ✓ |
 | `server/skillbehaviour/bb2025/StandFirmBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2025/stand_firm_behaviour.rs` | ✓ |
 | `server/skillbehaviour/bb2025/StrengthIncreaseBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2025/strength_increase_behaviour.rs` | ✓ |
 | `server/skillbehaviour/bb2025/SwoopBehaviour.java` | `ffb-engine` | `src/skill_behaviour/bb2025/swoop_behaviour.rs` | ✓ |
