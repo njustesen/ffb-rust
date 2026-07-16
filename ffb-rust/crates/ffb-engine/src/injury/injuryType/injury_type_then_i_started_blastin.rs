@@ -4,8 +4,9 @@ use ffb_model::enums::ApothecaryMode;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
+use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
 use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
-use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury};
+use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury, leak_injury_modifier};
 
 pub struct InjuryTypeThenIStartedBlastin { ctx: InjuryContext }
 impl InjuryTypeThenIStartedBlastin { pub fn new() -> Self { Self { ctx: InjuryContext::new(ApothecaryMode::Defender) } } }
@@ -24,7 +25,17 @@ impl ModificationAwareInjuryType for InjuryTypeThenIStartedBlastin {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
         do_armor_roll(game, rng, &mut self.ctx, defender_id);
     }
-    fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str) {
+    fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str) {
+        // Java: `factory.findInjuryModifiers(game, injuryContext, pAttacker, pDefender, isStab(),
+        // isFoul(), isVomitLike())` — ThenIStartedBlastin does not override isStab/isFoul/
+        // isVomitLike (all default false in InjuryType).
+        if let Some(defender) = game.player(defender_id) {
+            let attacker = attacker_id.and_then(|aid| game.player(aid));
+            let factory = InjuryModifierFactory::new(game.rules);
+            for m in factory.find_injury_modifiers(game, attacker, defender, false, false, false) {
+                self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), attacker, defender, game.rules));
+            }
+        }
         do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
     }
     fn saved_by_armour(&mut self) {
@@ -79,5 +90,51 @@ mod tests {
         let t2 = InjuryTypeThenIStartedBlastin::default();
         assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
         assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
+    }
+
+    fn make_player(id: &str, skills: Vec<ffb_model::enums::SkillId>) -> ffb_model::model::player::Player {
+        use std::collections::HashSet;
+        use ffb_model::model::player::Player;
+        use ffb_model::model::SkillWithValue;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        Player { id: id.into(), name: id.into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 7, starting_skills: skills.into_iter().map(SkillWithValue::new).collect(), extra_skills: vec![],
+            temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default() }
+    }
+
+    fn game_with_attacker_and_defender(attacker_skills: Vec<ffb_model::enums::SkillId>) -> Game {
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(make_player("attacker", attacker_skills));
+        let mut away = crate::step::framework::test_team("away", 0);
+        away.players.push(make_player("defender", vec![]));
+        Game::new(home, away, Rules::Bb2025)
+    }
+
+    #[test]
+    fn mighty_blow_adds_injury_modifier() {
+        // MightyBlow applies when isStab/isFoul/isVomitLike are all false — ThenIStartedBlastin's
+        // defaults (InjuryType base class) — unlike DirtyPlayer, which requires isFoul=true.
+        use ffb_mechanics::modifiers::Modifier;
+        let game = game_with_attacker_and_defender(vec![ffb_model::enums::SkillId::MightyBlow]);
+        let mut t = InjuryTypeThenIStartedBlastin::new();
+        let mut rng = GameRng::new(1);
+        t.ctx.armor_broken = true;
+        t.injury_roll(&game, &mut rng, Some("attacker"), "defender");
+        assert!(t.ctx.injury_modifiers.contains(&Modifier::new("Mighty Blow", 1, game.rules)));
+    }
+    #[test]
+    fn no_mighty_blow_no_injury_modifier() {
+        use ffb_mechanics::modifiers::Modifier;
+        let game = game_with_attacker_and_defender(vec![]);
+        let mut t = InjuryTypeThenIStartedBlastin::new();
+        let mut rng = GameRng::new(1);
+        t.ctx.armor_broken = true;
+        t.injury_roll(&game, &mut rng, Some("attacker"), "defender");
+        assert!(!t.ctx.injury_modifiers.contains(&Modifier::new("Mighty Blow", 1, game.rules)));
     }
 }

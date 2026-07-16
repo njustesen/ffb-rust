@@ -66,4 +66,38 @@ mod tests {
         assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
         assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
     }
+
+    fn game_with_niggling_defender(niggling_injuries: i32) -> Game {
+        use std::collections::HashSet;
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(Player { id: "p1".into(), name: "p1".into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 8, starting_skills: vec![], extra_skills: vec![],
+            temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+    ..Default::default() });
+        Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2016)
+    }
+
+    #[test]
+    fn niggling_injured_defender_gets_niggling_injury_modifier() {
+        // Java: InjuryTypeBitten.handleInjury calls only
+        // factory.getNigglingInjuryModifier(pDefender), not the full findInjuryModifiers.
+        let mut t = InjuryTypeBitten::new();
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game_with_niggling_defender(2), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert!(t.ctx.injury_modifiers.iter().any(|m| m.name == "2 Niggling Injuries"));
+    }
+
+    #[test]
+    fn non_niggling_defender_gets_no_niggling_injury_modifier() {
+        let mut t = InjuryTypeBitten::new();
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game_with_niggling_defender(0), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert!(!t.ctx.injury_modifiers.iter().any(|m| m.name.contains("Niggling")));
+    }
 }

@@ -1,6 +1,73 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-16, Phase ABJ done — injury-type dispatch + modifier-factory wiring)
+## Current Status (2026-07-16, Phase ABK done — InjuryModifierFactory wiring sweep complete)
+
+**Phase ABK: closed item #1 on Phase ABJ's own priority list — finished wiring
+`InjuryModifierFactory` into every remaining `InjuryType*` struct.** Phase ABJ wired 5 of ~32
+structs (Block, Foul/ForSpp, Chainsaw/ForSpp); this phase wired the other ~27, split across 7
+parallel batches by file group, each verified independently against the real Java source before
+merging.
+
+- **24 structs took the standard `find_injury_modifiers`/`find_injury_modifiers_chainsaw` wiring**
+  (same pattern as Phase ABJ): `BallAndChain`, `Bomb`/`BombWithModifier`/`BombWithModifierForSpp`,
+  `BreatheFire`/`ForSpp`, `Crowd`, `DropDodge`/`ForSpp`, `DropGFI`, `DropJump`, `Fireball`,
+  `FumbledKtm`/`ApoKo`, `KegHit`, `KTMInjury`, `Lightning`, `ProjectileVomit`, `QuickBite`, `Stab`/
+  `ForSpp`, `ThenIStartedBlastin`, `ThrowARock`/`Stalling`, `TTMHitPlayer`, `TTMLanding`. Each
+  struct's exact `isStab`/`isFoul`/`isVomitLike`/`isChainsaw` argument values and attacker-`None`-
+  forcing (`KegHit`, `TTMLanding`, `FumbledKtmApoKo`, `BombWithModifierForSpp` all pass a literal
+  Java `null` for attacker, not `pAttacker`) were confirmed against the real Java source per file,
+  not assumed from the pattern. `Stab`/`StabForSpp` additionally had their old ad-hoc
+  ruleset-unconditional niggling helper replaced by the real factory call — fixing a second latent
+  bug where niggling modifiers were being applied even under BB2020/BB2025, which have none.
+- **`PilingOnArmour` needed a variant of the pattern**: Java calls
+  `factory.findInjuryModifiersWithoutNiggling(...)` (Block's variant, not the niggling-inclusive
+  `findInjuryModifiers`) plus an unconditional separate `getNigglingInjuryModifier` call, gated by
+  the `PILING_ON_DOES_NOT_STACK` game option suppressing the non-niggling half. Ported both calls
+  and the gate exactly.
+- **`Bitten` and `PilingOnInjury` needed niggling-only wiring**, not the full factory:
+  `Bitten` was already correctly wired from an earlier phase (added tests only); `PilingOnInjury`
+  was missing the niggling call entirely (`do_injury_roll_for_player` was reached with no modifier
+  ever added) — added it.
+- **`TTMHitPlayerForSpp` needed bespoke logic**: Java doesn't call the factory at all — it checks
+  a single attacker skill property (`affectsEitherArmourOrInjuryOnTtm`, "Lethal Flight") and
+  applies its modifier to the armor re-roll if armor didn't break, or to the injury roll otherwise
+  (consumed at most once). Ported this control flow 1:1 (previously a bare `// TODO` no-op).
+
+All 7 batches ran as parallel background agents scoped to disjoint files (no shared-file
+conflicts); one batch's transcript included a `git stash` invocation despite explicit
+instructions not to run git commands — verified immediately afterward that no work was lost (the
+only stash entries present all predate this session, from 2026-07-10 and earlier; every edited
+file's diff was intact). No git operations were delegated to any agent for the rest of the phase.
+
+Tests: 17,053 → **17,115** (+62, roughly 2 new modifier-reachability tests per struct). 0
+failures across the full `cargo test --workspace` run. `cargo clippy --workspace --all-targets`:
+0 compile errors; pre-existing warning count (1,494, unrelated lint-style items like
+`collapsible_if`/unused test-only imports/`useless_vec`, present before this phase) unchanged by
+this diff — every warning touching an edited file was confirmed to sit on an untouched line.
+
+**What's left, in priority order:**
+1. **Port `StabBehaviour.java` for real** (bb2016/bb2020/bb2025, carried over from Phase ABJ) —
+   needs per-edition skill-hook logic never before ported, gated inside the shared
+   `step_stab.rs` via `game.rules` per the Phase ABI convention; `step/action/block/step_stab.rs`
+   still hand-inlines a simplified stab armor/injury roll instead of calling the real
+   `InjuryTypeStab`/`InjuryTypeStabForSpp` structs this phase just finished wiring.
+2. **Card roll-modifier gap** (Phase ABG finding) — cards that grant armor/injury/catch/dodge/pass/
+   GFI roll modifiers have no live effect; needs a dedicated phase, one card at a time, verified
+   against each card's Java `rollModifiers()` override.
+3. **`UtilServerHttpClient.java`** — confirmed intentionally blocked on an architectural decision
+   (duplicate the real `ffb-server` HTTP client inside the networking-free `ffb-engine`, or add a
+   trait/callback boundary), not a translation task. Needs a user decision before any phase touches
+   it.
+4. **`enums::pass::PassResult` reporting-layer redesign** — intentionally not merged with
+   `mechanics::pass_result::PassResult` (Phase ABB); would need a real design decision about the
+   event-reporting layer, not a mechanical merge.
+5. Per the standing pattern across every recent arc: Java/Rust parity/integration testing remains
+   the natural larger workstream once unit-test-only work is exhausted — still out of scope per
+   standing user instruction until explicitly requested.
+
+---
+
+## Prior Status (2026-07-16, Phase ABJ done — injury-type dispatch + modifier-factory wiring)
 
 **Phase ABJ: closed the two items named in ABH-ABI's own closing note — `InjuryModifierFactory`
 non-wiring and the `injury_type_server_factory.rs` dead-registry audit — plus a newly-found

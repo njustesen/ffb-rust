@@ -5,7 +5,9 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
 use ffb_mechanics::modifiers::{ARMOR_BOMB, INJURY_BOMB};
+use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
 use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
+use crate::injury::injuryType::modification_aware_injury_type_server::leak_injury_modifier;
 
 pub struct InjuryTypeBombWithModifierForSpp { ctx: InjuryContext }
 impl InjuryTypeBombWithModifierForSpp { pub fn new() -> Self { Self { ctx: InjuryContext::new(ApothecaryMode::Defender) } } }
@@ -22,6 +24,15 @@ impl InjuryTypeServer for InjuryTypeBombWithModifierForSpp {
         do_armor_roll(game, rng, &mut self.ctx, defender_id);
         if self.ctx.armor_broken {
             self.ctx.add_injury_modifier(INJURY_BOMB);
+            // Java: `factory.findInjuryModifiers(game, injuryContext, null, pDefender, isStab(),
+            // isFoul(), isVomitLike())` — attacker is hardcoded to null here (unlike the other Bomb
+            // variants), so attacker-sourced injury modifiers (e.g. Mighty Blow) never apply.
+            if let Some(defender) = game.player(defender_id) {
+                let factory = InjuryModifierFactory::new(game.rules);
+                for m in factory.find_injury_modifiers(game, None, defender, false, false, false) {
+                    self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), None, defender, game.rules));
+                }
+            }
             do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
         } else {
             self.ctx.injury = Some(PlayerState::new(PS_PRONE));
@@ -78,5 +89,57 @@ mod tests {
         let t2 = InjuryTypeBombWithModifierForSpp::default();
         assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
         assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
+    }
+
+    fn game_with_attacker_and_defender_rules(rules: Rules, attacker_skills: Vec<ffb_model::enums::SkillId>, defender_armour: i32, defender_nigglings: i32) -> Game {
+        use std::collections::HashSet;
+        use ffb_model::model::player::Player;
+        use ffb_model::model::SkillWithValue;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(Player {
+            id: "attacker".into(), name: "attacker".into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 7, starting_skills: attacker_skills.into_iter().map(SkillWithValue::new).collect(), extra_skills: vec![],
+            temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        let mut away = crate::step::framework::test_team("away", 0);
+        away.players.push(Player {
+            id: "defender".into(), name: "defender".into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: defender_armour, starting_skills: vec![], extra_skills: vec![],
+            temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: defender_nigglings, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        Game::new(home, away, rules)
+    }
+
+    #[test]
+    fn attacker_mighty_blow_does_not_apply_because_attacker_is_ignored() {
+        // Java hardcodes `null` for the attacker in this findInjuryModifiers call, so even an
+        // attacker with Mighty Blow must not contribute an injury modifier here.
+        use ffb_model::enums::SkillId;
+        let game = game_with_attacker_and_defender_rules(Rules::Bb2025, vec![SkillId::MightyBlow], 2, 0);
+        let mut t = InjuryTypeBombWithModifierForSpp::new();
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game, &mut rng, Some("attacker"), "defender", coord(), None, None, ApothecaryMode::Defender);
+        assert!(!t.ctx.injury_modifiers.iter().any(|m| m.name == "Mighty Blow"));
+    }
+    #[test]
+    fn niggling_injury_modifier_still_applies() {
+        // Bb2016 has niggling injury modifiers; Bb2025's factory has none (see
+        // Bb2025InjuryModifiers), so this uses Bb2016 rules to prove the factory is wired in.
+        let game = game_with_attacker_and_defender_rules(Rules::Bb2016, vec![], 2, 1);
+        let mut t = InjuryTypeBombWithModifierForSpp::new();
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game, &mut rng, Some("attacker"), "defender", coord(), None, None, ApothecaryMode::Defender);
+        assert!(t.ctx.injury_modifiers.iter().any(|m| m.name.contains("Niggling")));
     }
 }

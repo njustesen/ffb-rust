@@ -6,7 +6,9 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
 use ffb_mechanics::modifiers::{ARMOR_LIGHTNING, INJURY_LIGHTNING};
+use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
 use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
+use crate::injury::injuryType::modification_aware_injury_type_server::leak_injury_modifier;
 
 pub struct InjuryTypeLightning { ctx: InjuryContext }
 impl InjuryTypeLightning { pub fn new() -> Self { Self { ctx: InjuryContext::new(ApothecaryMode::Defender) } } }
@@ -24,6 +26,16 @@ impl InjuryTypeServer for InjuryTypeLightning {
             do_armor_roll(game, rng, &mut self.ctx, defender_id);
         }
         if self.ctx.armor_broken {
+            // Java: `((InjuryModifierFactory) game.getFactory(...)).findInjuryModifiers(game,
+            // injuryContext, pAttacker, pDefender, isStab(), isFoul(), isVomitLike())` —
+            // Lightning isStab/isFoul/isVomitLike all default false (InjuryType base).
+            if let Some(defender) = game.player(defender_id) {
+                let attacker = attacker_id.and_then(|aid| game.player(aid));
+                let factory = InjuryModifierFactory::new(game.rules);
+                for m in factory.find_injury_modifiers(game, attacker, defender, false, false, false) {
+                    self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), attacker, defender, game.rules));
+                }
+            }
             self.ctx.add_injury_modifier(INJURY_LIGHTNING);
             do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
         } else {
@@ -38,7 +50,7 @@ impl InjuryTypeServer for InjuryTypeLightning {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffb_model::enums::Rules;
+    use ffb_model::enums::{Rules, SkillId};
     fn game_with_armor(armour: i32) -> Game {
         use std::collections::HashSet;
         use ffb_model::model::player::Player;
@@ -53,6 +65,27 @@ mod tests {
             is_big_guy: false,
     ..Default::default() });
         Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2025)
+    }
+    fn make_skilled_player(id: &str, armour: i32, skills: Vec<SkillId>) -> ffb_model::model::player::Player {
+        use std::collections::HashSet;
+        use ffb_model::model::player::Player;
+        use ffb_model::model::SkillWithValue;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        Player { id: id.into(), name: id.into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour, starting_skills: skills.into_iter().map(SkillWithValue::new).collect(), extra_skills: vec![],
+            temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default() }
+    }
+    fn game_with_attacker_and_defender(attacker_skills: Vec<SkillId>, defender_armour: i32) -> Game {
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(make_skilled_player("attacker", 7, attacker_skills));
+        let mut away = crate::step::framework::test_team("away", 0);
+        away.players.push(make_skilled_player("defender", defender_armour, vec![]));
+        Game::new(home, away, Rules::Bb2025)
     }
     fn coord() -> FieldCoordinate { FieldCoordinate::new(5, 5) }
     #[test]
@@ -78,5 +111,28 @@ mod tests {
     fn injury_context_returns_context() {
         let t = InjuryTypeLightning::new();
         assert_eq!(t.injury_context().apothecary_mode, ApothecaryMode::Defender);
+    }
+
+    #[test]
+    fn mighty_blow_adds_injury_modifier() {
+        // Proves InjuryModifierFactory is now reached from handle_injury (Phase ABJ bug fix):
+        // Mighty Blow applies since isStab/isFoul/isVomitLike are all false for Lightning.
+        let game = game_with_attacker_and_defender(vec![SkillId::MightyBlow], 2);
+        let mut t = InjuryTypeLightning::new();
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game, &mut rng, Some("attacker"), "defender", coord(), None, None, ApothecaryMode::Defender);
+        assert!(t.ctx.armor_broken);
+        assert!(t.ctx.injury_modifiers.iter().any(|m| m.name == "Mighty Blow"),
+            "expected Mighty Blow injury modifier, got {:?}", t.ctx.injury_modifiers);
+    }
+
+    #[test]
+    fn no_mighty_blow_no_injury_modifier() {
+        let game = game_with_attacker_and_defender(vec![], 2);
+        let mut t = InjuryTypeLightning::new();
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game, &mut rng, Some("attacker"), "defender", coord(), None, None, ApothecaryMode::Defender);
+        assert!(t.ctx.armor_broken);
+        assert!(!t.ctx.injury_modifiers.iter().any(|m| m.name == "Mighty Blow"));
     }
 }

@@ -4,8 +4,9 @@ use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
+use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
 use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
-use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury};
+use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury, leak_injury_modifier};
 
 pub struct InjuryTypeBreatheFireForSpp { ctx: InjuryContext }
 impl InjuryTypeBreatheFireForSpp { pub fn new() -> Self { Self { ctx: InjuryContext::new(ApothecaryMode::Defender) } } }
@@ -28,7 +29,17 @@ impl ModificationAwareInjuryType for InjuryTypeBreatheFireForSpp {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
         do_armor_roll(game, rng, &mut self.ctx, defender_id);
     }
-    fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str) {
+    fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str) {
+        // Java: `factory.findInjuryModifiers(game, injuryContext, pAttacker, pDefender,
+        // isStab(), isFoul(), isVomitLike())` — BreatheFireForSpp.isVomitLike() is true,
+        // isStab()/isFoul() are false (inherited InjuryType defaults).
+        if let Some(defender) = game.player(defender_id) {
+            let attacker = attacker_id.and_then(|aid| game.player(aid));
+            let factory = InjuryModifierFactory::new(game.rules);
+            for m in factory.find_injury_modifiers(game, attacker, defender, false, false, true) {
+                self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), attacker, defender, game.rules));
+            }
+        }
         do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
     }
 }
@@ -76,5 +87,44 @@ mod tests {
     fn injury_context_returns_context() {
         let t = InjuryTypeBreatheFireForSpp::new();
         assert_eq!(t.injury_context().apothecary_mode, ApothecaryMode::Defender);
+    }
+
+    /// isVomitLike=true blocks Mighty Blow, and DirtyPlayer needs isFoul=true, so no
+    /// attacker skill applies for BreatheFireForSpp. Niggling Injuries (defender-side,
+    /// BB2016-only since BB2025 has no niggling modifiers) proves the factory is reached.
+    fn game_with_niggling_defender(rules: Rules, niggling_injuries: i32) -> Game {
+        use std::collections::HashSet;
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(Player { id: "p1".into(), name: "p1".into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 8, starting_skills: vec![], extra_skills: vec![],
+            temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default() });
+        Game::new(home, crate::step::framework::test_team("away", 0), rules)
+    }
+
+    #[test]
+    fn niggling_injury_adds_injury_modifier() {
+        use ffb_mechanics::modifiers::Modifier;
+        let game = game_with_niggling_defender(Rules::Bb2016, 1);
+        let mut t = InjuryTypeBreatheFireForSpp::new();
+        let mut rng = GameRng::new(1);
+        t.injury_roll(&game, &mut rng, None, "p1");
+        assert!(t.ctx.injury_modifiers.contains(&Modifier::new("1 Niggling Injury", 1, game.rules)));
+    }
+
+    #[test]
+    fn no_niggling_injury_no_injury_modifier() {
+        use ffb_mechanics::modifiers::Modifier;
+        let game = game_with_niggling_defender(Rules::Bb2016, 0);
+        let mut t = InjuryTypeBreatheFireForSpp::new();
+        let mut rng = GameRng::new(1);
+        t.injury_roll(&game, &mut rng, None, "p1");
+        assert!(!t.ctx.injury_modifiers.contains(&Modifier::new("1 Niggling Injury", 1, game.rules)));
     }
 }

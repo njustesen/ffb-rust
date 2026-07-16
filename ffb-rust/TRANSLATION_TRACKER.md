@@ -29,6 +29,15 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase ABK (2026-07-16): finished wiring `InjuryModifierFactory`/niggling/bespoke modifier
+logic into all ~27 remaining `InjuryType*` structs that Phase ABJ left unwired** (Phase ABJ had
+done 5 of ~32: Block, Foul/ForSpp, Chainsaw/ForSpp). No tracker status cells changed — all these
+files were already `✓` (the struct existed and passed tests), but were missing a real,
+Java-confirmed modifier-pipeline call, i.e. a correctness gap within an already-`✓` file rather
+than a translation-status gap. See `SESSION.md` Current Status for the full per-struct
+breakdown. Tests: 17,053 → 17,115 (+62). This closes the largest known live-bug class in an
+otherwise essentially-complete port (0 `○` rows, 1 `~` row remaining in the entire tracker).
+
 **Phase AAP (closes 2 real gaps found via a from-scratch source audit of Phase AAO's own "what's
 left" list — 2 of its 3 named items turned out to be stale, corrected here):**
 1. **Real bug/gap closed: raise-dead never fired.** `UtilServerInjury.handleRaiseDead` +
