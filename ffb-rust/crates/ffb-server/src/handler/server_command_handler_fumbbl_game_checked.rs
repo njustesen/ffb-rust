@@ -280,6 +280,22 @@ mod tests {
             fn fetch_page(&self, _url: &str) -> Result<String, String> {
                 Ok(self.0.borrow_mut().pop().unwrap_or_default())
             }
+
+            fn load_file(&self, _url: &str) -> Result<String, String> {
+                unimplemented!("not exercised by this test")
+            }
+
+            fn post_multipart_xml(&self, _url: &str, _challenge_response: &str, _result_xml: &str) -> Result<String, String> {
+                unimplemented!("not exercised by this test")
+            }
+
+            fn post_authorized_form(&self, _url: &str, _challenge_response: &str, _key: &str, _payload: &str) -> Result<String, String> {
+                unimplemented!("not exercised by this test")
+            }
+
+            fn post_file(&self, _url: &str, _file_path: &std::path::Path) -> Result<String, String> {
+                unimplemented!("not exercised by this test")
+            }
         }
         let client = SequencedClient(responses);
 

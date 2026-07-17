@@ -17,24 +17,20 @@ impl FumbblRequestUploadTalk {
         self.request_url = url;
     }
 
-    /// Sets the FUMBBL_TALK request url and "POSTs" `chat_json` to it. Java's
-    /// `postAuthorizedForm` sends the challenge response and chat JSON as form fields and
-    /// swallows any error by logging it; this mirrors that by never returning `Err`.
+    /// Sets the FUMBBL_TALK request url and POSTs `chat_json` to it via
+    /// `postAuthorizedForm(url, challengeResponse, "chat", chatJson)`. Java swallows any error
+    /// by logging it; this mirrors that by never returning `Err`.
     pub fn process(
         &mut self,
         client: &dyn super::util_fumbbl_request::HttpClient,
         talk_url: &str,
-        _challenge_response: &str,
+        challenge_response: &str,
         chat_json: &str,
     ) -> String {
         self.set_request_url(talk_url.to_string());
-        let payload = chat_json.to_string();
-        match client.fetch_page(self.get_request_url()) {
+        match client.post_authorized_form(self.get_request_url(), challenge_response, "chat", chat_json) {
             Ok(response) => response,
-            Err(err) => {
-                let _ = payload;
-                err
-            }
+            Err(err) => err,
         }
     }
 }

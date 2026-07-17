@@ -3742,7 +3742,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `server/util/UtilServerDb.java` | `ffb-engine` | `src/util/util_server_db.rs` | ✓ |
 | `server/util/UtilServerDialog.java` | `ffb-engine` | `src/util/util_server_dialog.rs` | ✓ |
 | `server/util/UtilServerGame.java` | `ffb-engine` | `src/util/util_server_game.rs` | ✓ |
-| `server/util/UtilServerHttpClient.java` | `ffb-engine` | `src/util/util_server_http_client.rs` | ~ |
+| `server/util/UtilServerHttpClient.java` | `ffb-server` | `src/request/fumbbl/util_fumbbl_request.rs` (`HttpClient` trait/`ReqwestHttpClient`) | ✓ |
 | `server/util/UtilServerInducementUse.java` | `ffb-engine` | `src/util/util_server_inducement_use.rs` | ✓ |
 | `server/util/UtilServerInjury.java` | `ffb-engine` | `src/util/util_server_injury.rs` | ✓ |
 | `server/util/UtilServerPlayerMove.java` | `ffb-engine` | `src/util/util_server_player_move.rs` | ✓ |

@@ -45,6 +45,14 @@ impl GameStateConnector {
         let challenge = UtilFumbblRequest::extract_xml_tag_first(&challenge_xml, "challenge").unwrap_or_default();
         let response = Self::create_response(&challenge, admin_password);
 
+        if args[0] == "set" {
+            // Java's SET binds only the challenge response into the URL (`args[1]` is a local
+            // file path, not a URL parameter) and posts the file's raw bytes.
+            let url = UtilFumbblRequest::bind(url_template, &[response.as_str()]);
+            let file_path = args.get(1).map(String::as_str).unwrap_or_default();
+            return client.post_file(&url, std::path::Path::new(file_path));
+        }
+
         let mut bind_params: Vec<&str> = vec![response.as_str()];
         bind_params.extend(args[1..].iter().map(|s| s.as_str()));
         let url = UtilFumbblRequest::bind(url_template, &bind_params);
@@ -78,6 +86,24 @@ mod tests {
             } else {
                 Ok(self.result_response.clone())
             }
+        }
+
+        fn load_file(&self, _url: &str) -> Result<String, String> {
+            unimplemented!("not exercised by GameStateConnector")
+        }
+
+        fn post_multipart_xml(&self, _url: &str, _challenge_response: &str, _result_xml: &str) -> Result<String, String> {
+            unimplemented!("not exercised by GameStateConnector")
+        }
+
+        fn post_authorized_form(&self, _url: &str, _challenge_response: &str, _key: &str, _payload: &str) -> Result<String, String> {
+            unimplemented!("not exercised by GameStateConnector")
+        }
+
+        fn post_file(&self, url: &str, file_path: &std::path::Path) -> Result<String, String> {
+            self.urls.borrow_mut().push(url.to_string());
+            self.urls.borrow_mut().push(file_path.display().to_string());
+            Ok(self.result_response.clone())
         }
     }
 
@@ -115,5 +141,23 @@ mod tests {
         let urls = client.urls.borrow();
         assert_eq!(urls[0], "http://x/challenge");
         assert_eq!(urls[1], "http://x/get/abc:adminpw/42");
+    }
+
+    #[test]
+    fn run_set_binds_only_response_and_posts_the_file() {
+        let client = RecordingClient {
+            urls: RefCell::new(Vec::new()),
+            challenge_response: "<challenge>abc</challenge>".to_string(),
+            result_response: "{\"stored\":true}".to_string(),
+        };
+        let args = vec!["set".to_string(), "/tmp/state.json".to_string()];
+        let result = GameStateConnector::new()
+            .run(&args, &client, "http://x/challenge", "adminpw", "http://x/set/$1")
+            .unwrap();
+        assert_eq!(result, "{\"stored\":true}");
+        let urls = client.urls.borrow();
+        assert_eq!(urls[0], "http://x/challenge");
+        assert_eq!(urls[1], "http://x/set/abc:adminpw");
+        assert_eq!(urls[2], "/tmp/state.json");
     }
 }

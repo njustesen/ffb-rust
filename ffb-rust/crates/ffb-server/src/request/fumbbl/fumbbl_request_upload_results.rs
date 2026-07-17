@@ -31,19 +31,18 @@ impl FumbblRequestUploadResults {
         self.request_url = url;
     }
 
-    /// Builds the FumbblResult XML, "POSTs" it (via `client.fetch_page`, since the mock
-    /// `HttpClient` trait only models a single request/response leg rather than a full
-    /// multipart POST) to `result_url`, and parses the `<result>`/`<description>` tags from the
+    /// Builds the FumbblResult XML and POSTs it via `postMultipartXml(url, challengeResponse,
+    /// resultXml)` to `result_url`, then parses the `<result>`/`<description>` tags from the
     /// response to determine success.
     pub fn process(
         &mut self,
         client: &dyn super::util_fumbbl_request::HttpClient,
         result_url: &str,
+        challenge_response: &str,
     ) -> Result<(), String> {
         let result_xml = super::fumbbl_result::FumbblResult::new().to_xml();
-        let _ = result_xml; // built for parity with Java; not transmitted by the mock client
         self.set_request_url(result_url.to_string());
-        let response_xml = client.fetch_page(self.get_request_url())?;
+        let response_xml = client.post_multipart_xml(self.get_request_url(), challenge_response, &result_xml)?;
         if !response_xml.is_empty() {
             if let Some(result) = super::util_fumbbl_request::UtilFumbblRequest::extract_xml_tag_first(&response_xml, "result") {
                 self.upload_successful = result.eq_ignore_ascii_case("success");
@@ -81,7 +80,7 @@ mod tests {
             response: Ok("<response><result>success</result><description>ok</description></response>".to_string()),
         };
         let mut r = FumbblRequestUploadResults::new();
-        r.process(&client, "http://fumbbl/result").unwrap();
+        r.process(&client, "http://fumbbl/result", "chal").unwrap();
         assert!(r.is_upload_successful());
         assert_eq!(r.get_upload_status(), "ok");
         assert_eq!(r.get_request_url(), "http://fumbbl/result");
@@ -93,7 +92,7 @@ mod tests {
             response: Ok("<response><result>failure</result><description>bad teamvalue</description></response>".to_string()),
         };
         let mut r = FumbblRequestUploadResults::new();
-        r.process(&client, "http://fumbbl/result").unwrap();
+        r.process(&client, "http://fumbbl/result", "chal").unwrap();
         assert!(!r.is_upload_successful());
         assert_eq!(r.get_upload_status(), "bad teamvalue");
     }

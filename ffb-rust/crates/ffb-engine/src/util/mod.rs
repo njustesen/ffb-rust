@@ -24,7 +24,6 @@ pub mod util_server_catch_scatter_throw_in;
 pub mod util_server_db;
 pub mod util_server_dialog;
 pub mod util_server_game;
-pub mod util_server_http_client;
 pub mod util_server_inducement_use;
 pub mod util_server_injury;
 pub mod util_server_player_move;

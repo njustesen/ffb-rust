@@ -91,7 +91,11 @@ impl AdminConnector {
         bind_params.extend(extra_args.iter().map(|s| s.as_str()));
         let url = UtilFumbblRequest::bind(template, &bind_params);
 
-        client.fetch_page(&url)
+        if command == "logfile" {
+            client.load_file(&url)
+        } else {
+            client.fetch_page(&url)
+        }
     }
 }
 
@@ -121,6 +125,23 @@ mod tests {
                 Ok(self.result_response.clone())
             }
         }
+
+        fn load_file(&self, url: &str) -> Result<String, String> {
+            self.urls.borrow_mut().push(url.to_string());
+            Ok(format!("Stored in: {}", self.result_response))
+        }
+
+        fn post_multipart_xml(&self, _url: &str, _challenge_response: &str, _result_xml: &str) -> Result<String, String> {
+            unimplemented!("not exercised by AdminConnector")
+        }
+
+        fn post_authorized_form(&self, _url: &str, _challenge_response: &str, _key: &str, _payload: &str) -> Result<String, String> {
+            unimplemented!("not exercised by AdminConnector")
+        }
+
+        fn post_file(&self, _url: &str, _file_path: &std::path::Path) -> Result<String, String> {
+            unimplemented!("not exercised by AdminConnector")
+        }
     }
 
     fn templates() -> HashMap<String, String> {
@@ -130,6 +151,7 @@ mod tests {
         map.insert("list_status".to_string(), "http://x/list/status/$1/$2".to_string());
         map.insert("purgetest".to_string(), "http://x/purgetest/$1/$2/$3".to_string());
         map.insert("shutdown".to_string(), "http://x/shutdown/$1".to_string());
+        map.insert("logfile".to_string(), "http://x/logfile/$1/$2".to_string());
         map
     }
 
@@ -206,6 +228,21 @@ mod tests {
             .run(&args, &client, "http://x/challenge", "adminpw", &templates())
             .unwrap();
         assert_eq!(client.urls.borrow()[1], "http://x/purgetest/abc:adminpw/10/false");
+    }
+
+    #[test]
+    fn run_logfile_uses_load_file_not_fetch_page() {
+        let client = RecordingClient {
+            urls: RefCell::new(Vec::new()),
+            challenge_response: "<challenge>abc</challenge>".to_string(),
+            result_response: "app.log".to_string(),
+        };
+        let args = vec!["logfile".to_string(), "42".to_string()];
+        let result = AdminConnector::new()
+            .run(&args, &client, "http://x/challenge", "adminpw", &templates())
+            .unwrap();
+        assert_eq!(result, "Stored in: app.log");
+        assert_eq!(client.urls.borrow()[1], "http://x/logfile/abc:adminpw/42");
     }
 
     #[test]

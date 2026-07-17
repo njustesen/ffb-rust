@@ -2,10 +2,30 @@
 pub struct UtilFumbblRequest;
 
 /// Minimal HTTP client abstraction so the URL-building / response-parsing logic in the
-/// `request::fumbbl` module can be unit tested without an actual network round trip. Java's
-/// `UtilServerHttpClient.fetchPage` is the real equivalent.
+/// `request::fumbbl` module can be unit tested without an actual network round trip. Together
+/// the 5 methods are the real equivalent of Java's `com.fumbbl.ffb.server.util.
+/// UtilServerHttpClient` (`fetchPage`/`loadFile`/`postMultipartXml`/`postAuthorizedForm`/
+/// `post(String, File)`).
 pub trait HttpClient {
     fn fetch_page(&self, url: &str) -> Result<String, String>;
+
+    /// Java `UtilServerHttpClient.loadFile`: GETs `url`, saves the response body to the
+    /// filename from the response's `Content-Disposition` header, and returns
+    /// `"Stored in: <filename>"`.
+    fn load_file(&self, url: &str) -> Result<String, String>;
+
+    /// Java `UtilServerHttpClient.postMultipartXml`: POSTs a multipart body with a `response`
+    /// text field and an `f` field carrying `result_xml` as a `text/xml` part named
+    /// `result.xml`.
+    fn post_multipart_xml(&self, url: &str, challenge_response: &str, result_xml: &str) -> Result<String, String>;
+
+    /// Java `UtilServerHttpClient.postAuthorizedForm`: POSTs a URL-encoded form with a
+    /// `response` field and one caller-named field (`key`/`payload`).
+    fn post_authorized_form(&self, url: &str, challenge_response: &str, key: &str, payload: &str) -> Result<String, String>;
+
+    /// Java `UtilServerHttpClient.post(String, File)`: POSTs the raw bytes of the file at
+    /// `file_path` as the request body.
+    fn post_file(&self, url: &str, file_path: &std::path::Path) -> Result<String, String>;
 }
 
 /// 1:1-behavior translation of `com.fumbbl.ffb.server.util.UtilServerHttpClient.fetchPage`:
@@ -28,6 +48,17 @@ impl Default for ReqwestHttpClient {
     }
 }
 
+impl ReqwestHttpClient {
+    fn read_body(response: reqwest::blocking::Response, url: &str) -> Result<String, String> {
+        if !response.status().is_success() {
+            return Err(format!("request to {url} failed with status {}", response.status()));
+        }
+        response
+            .text()
+            .map_err(|e| format!("failed to read response body from {url}: {e}"))
+    }
+}
+
 impl HttpClient for ReqwestHttpClient {
     fn fetch_page(&self, url: &str) -> Result<String, String> {
         let response = self
@@ -41,6 +72,74 @@ impl HttpClient for ReqwestHttpClient {
         response
             .text()
             .map_err(|e| format!("failed to read response body from {url}: {e}"))
+    }
+
+    fn load_file(&self, url: &str) -> Result<String, String> {
+        let response = self
+            .client
+            .get(url)
+            .header("Accept-Encoding", "gzip")
+            .send()
+            .map_err(|e| format!("failed to fetch {url}: {e}"))?;
+        if !response.status().is_success() {
+            return Err(format!("fetch {url} failed with status {}", response.status()));
+        }
+        let content_disposition = response
+            .headers()
+            .get("Content-Disposition")
+            .and_then(|v| v.to_str().ok())
+            .ok_or_else(|| format!("missing Content-Disposition header from {url}"))?
+            .to_string();
+        let filename = content_disposition
+            .split('=')
+            .nth(1)
+            .ok_or_else(|| format!("malformed Content-Disposition header from {url}"))?
+            .to_string();
+        let bytes = response
+            .bytes()
+            .map_err(|e| format!("failed to read response body from {url}: {e}"))?;
+        std::fs::write(&filename, &bytes).map_err(|e| format!("failed to write {filename}: {e}"))?;
+        Ok(format!("Stored in: {filename}"))
+    }
+
+    fn post_multipart_xml(&self, url: &str, challenge_response: &str, result_xml: &str) -> Result<String, String> {
+        let part = reqwest::blocking::multipart::Part::bytes(result_xml.as_bytes().to_vec())
+            .file_name("result.xml")
+            .mime_str("text/xml")
+            .map_err(|e| format!("failed to build multipart body for {url}: {e}"))?;
+        let form = reqwest::blocking::multipart::Form::new()
+            .text("response", challenge_response.to_string())
+            .part("f", part);
+        let response = self
+            .client
+            .post(url)
+            .multipart(form)
+            .send()
+            .map_err(|e| format!("failed to post {url}: {e}"))?;
+        Self::read_body(response, url)
+    }
+
+    fn post_authorized_form(&self, url: &str, challenge_response: &str, key: &str, payload: &str) -> Result<String, String> {
+        let params = [("response", challenge_response), (key, payload)];
+        let response = self
+            .client
+            .post(url)
+            .form(&params)
+            .send()
+            .map_err(|e| format!("failed to post {url}: {e}"))?;
+        Self::read_body(response, url)
+    }
+
+    fn post_file(&self, url: &str, file_path: &std::path::Path) -> Result<String, String> {
+        let bytes = std::fs::read(file_path)
+            .map_err(|e| format!("failed to read {}: {e}", file_path.display()))?;
+        let response = self
+            .client
+            .post(url)
+            .body(bytes)
+            .send()
+            .map_err(|e| format!("failed to post {url}: {e}"))?;
+        Self::read_body(response, url)
     }
 }
 
@@ -62,6 +161,22 @@ pub struct LazyReqwestHttpClient;
 impl HttpClient for LazyReqwestHttpClient {
     fn fetch_page(&self, url: &str) -> Result<String, String> {
         ReqwestHttpClient::new().fetch_page(url)
+    }
+
+    fn load_file(&self, url: &str) -> Result<String, String> {
+        ReqwestHttpClient::new().load_file(url)
+    }
+
+    fn post_multipart_xml(&self, url: &str, challenge_response: &str, result_xml: &str) -> Result<String, String> {
+        ReqwestHttpClient::new().post_multipart_xml(url, challenge_response, result_xml)
+    }
+
+    fn post_authorized_form(&self, url: &str, challenge_response: &str, key: &str, payload: &str) -> Result<String, String> {
+        ReqwestHttpClient::new().post_authorized_form(url, challenge_response, key, payload)
+    }
+
+    fn post_file(&self, url: &str, file_path: &std::path::Path) -> Result<String, String> {
+        ReqwestHttpClient::new().post_file(url, file_path)
     }
 }
 
@@ -255,6 +370,22 @@ impl HttpClient for MockHttpClient {
     fn fetch_page(&self, _url: &str) -> Result<String, String> {
         self.response.clone()
     }
+
+    fn load_file(&self, _url: &str) -> Result<String, String> {
+        self.response.clone()
+    }
+
+    fn post_multipart_xml(&self, _url: &str, _challenge_response: &str, _result_xml: &str) -> Result<String, String> {
+        self.response.clone()
+    }
+
+    fn post_authorized_form(&self, _url: &str, _challenge_response: &str, _key: &str, _payload: &str) -> Result<String, String> {
+        self.response.clone()
+    }
+
+    fn post_file(&self, _url: &str, _file_path: &std::path::Path) -> Result<String, String> {
+        self.response.clone()
+    }
 }
 
 #[cfg(test)]
@@ -360,5 +491,46 @@ mod tests {
         let client = ReqwestHttpClient::new();
         let result = client.fetch_page("not-a-valid-url");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn reqwest_http_client_load_file_invalid_url_is_error() {
+        let client = ReqwestHttpClient::new();
+        assert!(client.load_file("not-a-valid-url").is_err());
+    }
+
+    #[test]
+    fn reqwest_http_client_post_multipart_xml_invalid_url_is_error() {
+        let client = ReqwestHttpClient::new();
+        assert!(client
+            .post_multipart_xml("not-a-valid-url", "chal", "<xml/>")
+            .is_err());
+    }
+
+    #[test]
+    fn reqwest_http_client_post_authorized_form_invalid_url_is_error() {
+        let client = ReqwestHttpClient::new();
+        assert!(client
+            .post_authorized_form("not-a-valid-url", "chal", "chat", "{}")
+            .is_err());
+    }
+
+    #[test]
+    fn reqwest_http_client_post_file_invalid_url_is_error() {
+        let client = ReqwestHttpClient::new();
+        let missing = std::path::Path::new("does-not-exist.tmp");
+        assert!(client.post_file("http://127.0.0.1:0", missing).is_err());
+    }
+
+    #[test]
+    fn mock_http_client_implements_extended_methods() {
+        let client = MockHttpClient { response: Ok("ok".to_string()) };
+        assert_eq!(client.load_file("http://x").unwrap(), "ok");
+        assert_eq!(client.post_multipart_xml("http://x", "c", "<xml/>").unwrap(), "ok");
+        assert_eq!(client.post_authorized_form("http://x", "c", "k", "v").unwrap(), "ok");
+        assert_eq!(
+            client.post_file("http://x", std::path::Path::new("f")).unwrap(),
+            "ok"
+        );
     }
 }
