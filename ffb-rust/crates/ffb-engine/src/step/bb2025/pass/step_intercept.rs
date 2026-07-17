@@ -140,7 +140,8 @@ impl StepIntercept {
             let is_bomb_flag = self.original_bombardier.is_some();
             let mods = factory.find_applicable(game, interceptor, self.pass_result, is_bomb_flag);
             let skill_mods = factory.find_skill_modifiers(game, interceptor);
-            let all: Vec<&ffb_mechanics::modifiers::interception_modifier::InterceptionModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
+            let card_mods = factory.find_card_modifiers(game, interceptor);
+            let all: Vec<&ffb_mechanics::modifiers::interception_modifier::InterceptionModifier> = mods.iter().copied().chain(skill_mods.iter()).chain(card_mods.iter()).collect();
             // Java: AgilityMechanic.minimumRollInterception(pInterceptor, interceptionModifiers)
             let min = InterceptionModifierFactory::minimum_roll_bb2020(interceptor, &all);
             (min, false)

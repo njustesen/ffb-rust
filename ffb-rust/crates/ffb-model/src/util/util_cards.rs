@@ -3,12 +3,32 @@
 /// Java uses a rich Skill object with getRerollSource() etc.; Rust uses SkillId + properties().
 /// Only the methods needed for BB2025 step translations are implemented here.
 use crate::enums::SkillId;
+use crate::inducement::card::Card;
+use crate::model::game::Game;
 use crate::model::player::Player;
 
 pub struct UtilCards;
 
 impl UtilCards {
     pub fn new() -> Self { Self }
+
+    /// Java: `UtilCards.findAllCards(Game)` — every card active or deactivated on
+    /// either team's `InducementSet`. Deactivated cards are omitted here: unlike Java's
+    /// `InducementSet`, the Rust port only retains deactivated cards by name (no `Card`
+    /// object), a pre-existing model gap outside this method's scope.
+    pub fn find_all_cards(game: &Game) -> Vec<&Card> {
+        game.turn_data_home.inducement_set.get_active_card_objects()
+            .into_iter()
+            .chain(game.turn_data_away.inducement_set.get_active_card_objects())
+            .collect()
+    }
+
+    /// Java: `UtilCards.hasCard(Game, Player, Card)` — true if `pCard` is assigned to
+    /// `pPlayer` via `FieldModel.getCards(Player)`. Compares by card name (Rust cards
+    /// are tracked by name, not object identity).
+    pub fn has_card(game: &Game, player_id: &str, card_name: &str) -> bool {
+        game.field_model.get_cards(player_id).iter().any(|c| c.name == card_name)
+    }
 
     /// Java: `hasUnusedSkillWithProperty(Player<?> player, ISkillProperty property)`.
     ///

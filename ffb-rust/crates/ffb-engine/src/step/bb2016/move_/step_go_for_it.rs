@@ -157,7 +157,9 @@ impl StepGoForIt {
                 if let Some(player) = game.player(pid) {
                     let ctx = GoForItContext::new(game, player);
                     let mods = factory.find_applicable(&ctx);
-                    GoForItModifierFactory::minimum_roll_going_for_it(&mods)
+                    let card_mods = factory.find_card_modifiers(&ctx);
+                    let all: Vec<&ffb_mechanics::modifiers::go_for_it_modifier::GoForItModifier> = mods.iter().copied().chain(card_mods.iter()).collect();
+                    GoForItModifierFactory::minimum_roll_going_for_it(&all)
                 } else { 2 }
             } else { 2 }
         };

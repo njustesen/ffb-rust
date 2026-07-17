@@ -29,6 +29,20 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AC (2026-07-17): closed the card roll-modifier gap flagged by Phase ABG — the last known
+live-logic gap from the AA–AB correctness-audit arc.** No tracker status cells changed (all
+touched files were already `✓` or newly-added supporting files, not translation-status gaps): the
+card half of `ModifierAggregator`/`GenerifiedModifierFactory.findModifiers()` is now wired into
+the 3 live modifier factories (Interception/Pass/GoForIt) and their 14 call sites across
+`step_pass.rs`/`step_hail_mary_pass.rs`/`step_intercept.rs`/`step_go_for_it.rs`. Only 4 of 24
+BB2016 cards override `rollModifiers()` (Fawndough's Headband, Magic Gloves of Jark Longarm,
+Greased Shoes, Gromskull's Exploding Runes); BB2020/BB2025 have no card catalogs in Java. See
+`SESSION.md` Current Status for full detail. Tests: 17,124 → 17,139 (+15). With this closed, the
+project's only remaining open items are 2 items needing a user decision
+(`UtilServerHttpClient.java`, the `PassResult` reporting-layer duplicate) plus a newly-surfaced,
+non-urgent `SkillFactory` translation gap (documented, not invented) and the deliberately-deferred
+parity/integration-testing workstream.
+
 **Phase ABK (2026-07-16): finished wiring `InjuryModifierFactory`/niggling/bespoke modifier
 logic into all ~27 remaining `InjuryType*` structs that Phase ABJ left unwired** (Phase ABJ had
 done 5 of ~32: Block, Foul/ForSpp, Chainsaw/ForSpp). No tracker status cells changed — all these

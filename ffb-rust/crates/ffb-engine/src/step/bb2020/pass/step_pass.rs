@@ -177,7 +177,8 @@ impl StepPass {
                 let ctx = PassContext::new(game, thrower, dist, false);
                 let collection_total: i32 = factory.find_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum();
                 let skill_total: i32 = factory.find_skill_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum();
-                collection_total + skill_total
+                let card_total: i32 = factory.find_card_modifiers(&ctx).iter().map(|m| m.get_modifier()).sum();
+                collection_total + skill_total + card_total
             } else {
                 0
             }

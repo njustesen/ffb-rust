@@ -1,6 +1,71 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-16, Phase ABL done — real per-edition StabBehaviour ported)
+## Current Status (2026-07-17, Phase AC done — card roll-modifier gap closed)
+
+**Phase AC: closed item #1 on Phase ABL's own priority list — wired the card half of
+`ModifierAggregator`/`GenerifiedModifierFactory.findModifiers()` into live gameplay, the last
+confirmed live-logic gap from the AA–AB correctness-audit arc.**
+
+- **Scoped via direct Java source read**: only 4 of 24 BB2016 cards override `rollModifiers()`
+  (`Fawndough's Headband`, `Magic Gloves of Jark Longarm`, `Greased Shoes`, `Gromskull's Exploding
+  Runes`); zero cards override `armourModifiers()`/`injuryModifiers()`/`casualtyModifiers()`.
+  BB2020/BB2025 have no card catalogs in Java at all. Confirmed the actual gameplay merge point is
+  `GenerifiedModifierFactory.findModifiers()` (which independently re-derives skill AND card
+  modifiers), not `ModifierAggregator` (whose only Java caller is the `forName()` replay-
+  deserialization path) — the skill half of interception/pass/GFI modifiers was already correctly
+  wired in the Rust factories; only the card half was missing.
+- **`UtilCards::find_all_cards`/`has_card`** (`ffb-model/src/util/util_cards.rs`): new — union of
+  both teams' active `Card` objects (Java's `findAllCards`, minus the deactivated half, which the
+  Rust `InducementSet` only tracks by name, a pre-existing model gap out of this phase's scope);
+  `has_card` checks `FieldModel::get_cards(player_id)` by name.
+- **`ffb-mechanics/src/modifiers/card_roll_modifiers.rs`** (new file): dispatches by card name
+  (Rust cards are plain data, not subclass instances) for the 4 cards — Fawndough's Headband/Magic
+  Gloves both `InterceptionModifier(-1, REGULAR)` gated on thrower/interceptor holding the card;
+  Greased Shoes `GoForItModifier(3)` gated on the non-turn side holding it active (a `TURN`-target
+  card, not player-scoped); Gromskull's Exploding Runes `PassModifier(1, REGULAR)` gated on the
+  passer holding it — substituting `UtilCards::has_card` for Java's `getEnhancementSources()`
+  check (no Rust `Player.enhancement_sources` field exists; equivalent for this
+  OWN_PLAYER-targeted, non-transferable card).
+- **Wired `find_card_modifiers` into all 3 live factories** (`interception_modifier_factory.rs`,
+  `pass_modifier_factory.rs`, `go_for_it_modifier_factory.rs`) and every one of their 14 call
+  sites across `step_pass.rs`/`step_hail_mary_pass.rs`/`step_intercept.rs`/`step_go_for_it.rs`
+  (all 3 editions each) — chained alongside the pre-existing skill-modifier merge at each site,
+  matching the codebase's established skill/collection-modifier split-method convention rather
+  than changing `find_modifiers`/`find_applicable`'s borrowed-`Vec<&Modifier>` return type.
+- **Filled in `ModifierAggregator`'s 3 card-bearing getters for real** (`get_interception_modifiers`,
+  `get_pass_modifiers`, `get_go_for_it_modifiers`, now parameterized with the game/context they
+  need since the struct holds no stored `Game` reference); the other 9 getters stay `Vec::new()`
+  with a doc comment confirming zero cards produce those types — the remaining gap is purely the
+  never-yet-translated `SkillFactory` half, documented, not invented.
+- Verified Greased Shoes doesn't double-apply: its `SetGfiRollToFive` global property (Phase ABG)
+  is wired on `Game::is_active()` but was never consumed by any roll computation — an orphan, not
+  a competing path — so the new roll modifier is the only live effect.
+
+Tests: 17,124 → **17,139** (+15: 9 in `card_roll_modifiers`, 6 in `modifier_aggregator`). 0
+failures across `cargo test --workspace`. `cargo build --workspace` and `cargo clippy --workspace
+--all-targets` clean — 0 errors, no new warnings introduced by this diff.
+
+**This closes the AA–AB correctness-audit arc's last known live-logic gap.** What's left in the
+whole project is now exactly:
+1. **`UtilServerHttpClient.java`** — confirmed intentionally blocked on an architectural decision
+   (duplicate the real `ffb-server` HTTP client inside the networking-free `ffb-engine`, or add a
+   trait/callback boundary), not a translation task. Needs a user decision before any phase touches
+   it.
+2. **`enums::pass::PassResult` reporting-layer redesign** — intentionally not merged with
+   `mechanics::pass_result::PassResult` (Phase ABB); would need a real design decision about the
+   event-reporting layer, not a mechanical merge.
+3. **`SkillFactory` translation** (newly surfaced by this phase) — `ModifierAggregator`'s 9
+   remaining empty getters are blocked on this, not invented; a future phase's scope, not urgent
+   (the skill half of every roll type these getters cover is already wired directly in each
+   `*ModifierFactory`, bypassing the aggregator — same "registered but real logic lives elsewhere"
+   pattern documented in Phase AA).
+4. Per the standing pattern across every recent arc: Java/Rust parity/integration testing remains
+   the natural larger workstream once unit-test-only work is exhausted — still out of scope per
+   standing user instruction until explicitly requested.
+
+---
+
+## Prior Status (2026-07-16, Phase ABL done — real per-edition StabBehaviour ported)
 
 **Phase ABL: closed item #1 on Phase ABK's own priority list — ported the real bb2016/bb2020/
 bb2025 `StabBehaviour.java` skill-hook logic into `step_stab.rs`, replacing the simplified

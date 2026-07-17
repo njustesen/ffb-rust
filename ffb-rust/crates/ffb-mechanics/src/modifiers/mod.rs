@@ -49,6 +49,7 @@ pub mod temporary_enhancements;
 pub mod temporary_stat_decrementer;
 pub mod temporary_stat_incrementer;
 pub mod temporary_stat_modifier;
+pub mod card_roll_modifiers;
 pub mod armor_modifier_context;
 pub mod injury_modifier_context;
 pub mod injury_modifier_factory;

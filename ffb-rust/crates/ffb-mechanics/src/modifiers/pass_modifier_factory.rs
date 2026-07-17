@@ -120,6 +120,12 @@ impl PassModifierFactory {
         zones
     }
 
+    /// Card-based pass modifiers (Gromskull's Exploding Runes).
+    /// Java: the card half of `GenerifiedModifierFactory.findModifiers`.
+    pub fn find_card_modifiers(&self, context: &PassContext<'_>) -> Vec<PassModifier> {
+        crate::modifiers::card_roll_modifiers::find_pass_card_modifiers(context)
+    }
+
     /// Returns skill-based pass modifiers for the thrower.
     /// 1:1 translation of GenerifiedModifierFactory skill iteration for PassModifierFactory.
     ///

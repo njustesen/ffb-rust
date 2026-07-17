@@ -54,6 +54,12 @@ impl GoForItModifierFactory {
         self.collection.find_applicable(context)
     }
 
+    /// Card-based GFI modifiers (Greased Shoes).
+    /// Java: the card half of `GenerifiedModifierFactory.findModifiers`.
+    pub fn find_card_modifiers(&self, context: &GoForItContext<'_>) -> Vec<GoForItModifier> {
+        crate::modifiers::card_roll_modifiers::find_go_for_it_card_modifiers(context)
+    }
+
     /// 1:1 translation of DiceInterpreter.minimumRollGoingForIt.
     /// `max(2, 2 + sum(modifier))`
     pub fn minimum_roll_going_for_it(modifiers: &[&GoForItModifier]) -> i32 {

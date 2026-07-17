@@ -95,6 +95,12 @@ impl InterceptionModifierFactory {
         result
     }
 
+    /// Card-based interception modifiers (Fawndough's Headband, Magic Gloves of Jark Longarm).
+    /// Java: the card half of `GenerifiedModifierFactory.findModifiers`.
+    pub fn find_card_modifiers(&self, game: &Game, interceptor: &Player) -> Vec<InterceptionModifier> {
+        crate::modifiers::card_roll_modifiers::find_interception_card_modifiers(game, interceptor)
+    }
+
     /// Returns skill-based interception modifiers for the interceptor.
     /// Java: common.ExtraArms registers InterceptionModifier("Extra Arms", -1, REGULAR).
     ///       bb2016.VeryLongLegs registers InterceptionModifier("Very Long Legs", -1, REGULAR).

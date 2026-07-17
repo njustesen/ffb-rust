@@ -133,11 +133,13 @@ impl StepHailMaryPass {
             .map(|t| {
                 let factory = PassModifierFactory::for_rules(game.rules);
                 let ctx = PassContext::new(game, t, PassingDistance::LongBomb, false);
-                factory.find_modifiers(&ctx).into_iter()
+                let mut mods: Vec<ffb_mechanics::modifiers::PassModifier> = factory.find_modifiers(&ctx).into_iter()
                     .map(|m| ffb_mechanics::modifiers::PassModifier::with_report(
                         m.get_name(), m.get_report_string(), m.get_modifier(), m.get_type(),
                     ))
-                    .collect()
+                    .collect();
+                mods.extend(factory.find_card_modifiers(&ctx));
+                mods
             })
             .unwrap_or_default();
 
