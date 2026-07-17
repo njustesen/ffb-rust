@@ -66,6 +66,18 @@ impl PickupModifierFactory {
         result
     }
 
+    /// Java: `ModifierAggregator.getPickupModifiers()`'s skill half. Only `common.ExtraArms`
+    /// registers a `PickupModifier` in the Java source, in every edition.
+    pub fn find_registered_modifiers(_rules: Rules) -> Vec<PickupModifier> {
+        let mut result = Vec::new();
+        for skill_id in ffb_model::factory::skill_factory::SkillFactory::new().get_skills() {
+            if skill_id == SkillId::ExtraArms {
+                result.push(PickupModifier::new("Extra Arms", -1, ModifierType::REGULAR));
+            }
+        }
+        result
+    }
+
     /// 1:1 translation of AgilityMechanic.minimumRollPickup.
     /// `max(2, agility + sum(modifier))` for BB2025.
     pub fn minimum_roll(agility: i32, modifiers: &[&PickupModifier]) -> i32 {
@@ -87,6 +99,13 @@ mod tests {
     use ffb_model::model::{Game, Team, Player};
     use ffb_model::enums::{PlayerType, PlayerGender};
     use crate::modifiers::pickup_context::PickupContext;
+
+    #[test]
+    fn find_registered_modifiers_includes_extra_arms() {
+        let mods = PickupModifierFactory::find_registered_modifiers(Rules::Bb2025);
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].get_name(), "Extra Arms");
+    }
 
     fn empty_team(id: &str) -> Team {
         Team {

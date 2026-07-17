@@ -151,6 +151,33 @@ impl JumpModifierFactory {
         result
     }
 
+    /// Java: `ModifierAggregator.getJumpModifiers()`'s skill half. Unlike `find_skill_modifiers`
+    /// (context-scoped: the `accumulated_modifier > 1`/`modifier_count > 1` guards are runtime
+    /// predicates evaluated by `GenerifiedModifierFactory.findModifiers`, not conditions on
+    /// whether the skill registers the modifier at all), this returns every edition-applicable
+    /// skill's raw registered `JumpModifier`, matching Java's `Skill.getJumpModifiers()`. Only
+    /// `VeryLongLegs` (all editions) and `Leap` (bb2020/bb2025 only) register one.
+    pub fn find_registered_modifiers(rules: Rules) -> Vec<JumpModifier> {
+        let mut result = Vec::new();
+        for skill_id in ffb_model::factory::skill_factory::SkillFactory::new().get_skills() {
+            match skill_id {
+                SkillId::VeryLongLegs => {
+                    let modifier_type = if rules == Rules::Bb2020 {
+                        ModifierType::DEPENDS_ON_SUM_OF_OTHERS
+                    } else {
+                        ModifierType::REGULAR
+                    };
+                    result.push(JumpModifier::new("Very Long Legs", -1, modifier_type));
+                }
+                SkillId::Leap if matches!(rules, Rules::Bb2020 | Rules::Bb2025 | Rules::Common) => {
+                    result.push(JumpModifier::new("Leap", -1, ModifierType::DEPENDS_ON_SUM_OF_OTHERS));
+                }
+                _ => {}
+            }
+        }
+        result
+    }
+
     /// Java: AgilityMechanic.minimumRollJump: agility + sum(modifiers), min 2.
     pub fn minimum_roll(agility: i32, modifiers: &[&JumpModifier]) -> i32 {
         let total: i32 = modifiers.iter().map(|m| m.get_modifier()).sum();
@@ -166,6 +193,22 @@ impl Default for JumpModifierFactory {
 mod tests {
     use super::*;
     use ffb_model::enums::Rules;
+
+    #[test]
+    fn find_registered_modifiers_bb2016_has_only_very_long_legs() {
+        let mods = JumpModifierFactory::find_registered_modifiers(Rules::Bb2016);
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].get_name(), "Very Long Legs");
+    }
+
+    #[test]
+    fn find_registered_modifiers_bb2025_has_both() {
+        let mods = JumpModifierFactory::find_registered_modifiers(Rules::Bb2025);
+        let names: Vec<&str> = mods.iter().map(|m| m.get_name()).collect();
+        assert!(names.contains(&"Very Long Legs"));
+        assert!(names.contains(&"Leap"));
+        assert_eq!(mods.len(), 2);
+    }
 
     #[test]
     fn for_rules_bb2025_has_tacklezone_modifiers() {

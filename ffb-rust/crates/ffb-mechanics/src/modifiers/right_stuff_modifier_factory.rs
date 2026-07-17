@@ -1,4 +1,4 @@
-use ffb_model::enums::Rules;
+use ffb_model::enums::{Rules, SkillId};
 use ffb_model::util::util_player::UtilPlayer;
 use crate::modifiers::bb2025::right_stuff_modifier_collection::RightStuffModifierCollection as Bb2025Collection;
 use crate::modifiers::bb2016::right_stuff_modifier_collection::RightStuffModifierCollection as Bb2016Collection;
@@ -66,6 +66,18 @@ impl RightStuffModifierFactory {
         result
     }
 
+    /// Java: `ModifierAggregator.getRightStuffModifiers()`'s skill half. Only bb2016's `Swoop`
+    /// registers a `RightStuffModifier` ("Swoop", -1, REGULAR) in the Java source.
+    pub fn find_registered_modifiers(rules: Rules) -> Vec<RightStuffModifier> {
+        let mut result = Vec::new();
+        for skill_id in ffb_model::factory::skill_factory::SkillFactory::new().get_skills() {
+            if skill_id == SkillId::Swoop && rules == Rules::Bb2016 {
+                result.push(RightStuffModifier::new("Swoop", -1, ModifierType::REGULAR));
+            }
+        }
+        result
+    }
+
     /// Java: AgilityMechanic.minimumRollRightStuff: agility + sum(modifiers), min 2.
     pub fn minimum_roll(agility: i32, modifiers: &[&RightStuffModifier]) -> i32 {
         let total: i32 = modifiers.iter().map(|m| m.get_modifier()).sum();
@@ -83,6 +95,19 @@ impl Default for RightStuffModifierFactory {
 mod tests {
     use super::*;
     use ffb_model::enums::Rules;
+
+    #[test]
+    fn find_registered_modifiers_bb2016_has_swoop() {
+        let mods = RightStuffModifierFactory::find_registered_modifiers(Rules::Bb2016);
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].get_name(), "Swoop");
+    }
+
+    #[test]
+    fn find_registered_modifiers_bb2025_is_empty() {
+        let mods = RightStuffModifierFactory::find_registered_modifiers(Rules::Bb2025);
+        assert!(mods.is_empty());
+    }
 
     #[test]
     fn minimum_roll_base_is_agility() {

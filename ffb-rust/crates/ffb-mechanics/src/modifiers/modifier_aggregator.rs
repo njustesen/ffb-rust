@@ -1,3 +1,4 @@
+use ffb_model::enums::Rules;
 use ffb_model::model::{Game, Player};
 use crate::modifiers::catch_modifier::CatchModifier;
 use crate::modifiers::go_for_it_context::GoForItContext;
@@ -17,19 +18,26 @@ use crate::modifiers::injury_modifier::InjuryModifier;
 /// 1:1 translation of com.fumbbl.ffb.modifiers.ModifierAggregator.
 ///
 /// Java's version is initialized once per `Game` and stores both a `SkillFactory` and a `Game`
-/// reference so its no-arg getters can look both up internally. Rust has no `SkillFactory`
-/// translation yet (a separate, undiscovered gap — not invented here), and holding a `&Game`
+/// reference so its no-arg getters can look both up internally. Holding a `&Game`/`&SkillFactory`
 /// reference on this struct would tie its lifetime to a single game instance for no benefit, so
-/// each getter takes the game/player/context it needs as a parameter instead.
+/// each getter takes the game/player/context/rules it needs as a parameter instead.
 ///
-/// Only the card half of the merge is implemented here (`UtilCards::find_all_cards` + the
-/// per-card dispatch in `card_roll_modifiers`) — confirmed by reading every BB2016 card that
-/// only 4 cards override `rollModifiers()`, all producing Interception/Pass/GoForIt modifiers.
-/// Zero cards produce Catch/Dodge/Pickup/Jump/JumpUp/Gaze/RightStuff/Armour/Injury modifiers, so
-/// those getters correctly stay empty. The skill half remains a documented gap.
-pub struct ModifierAggregator {
-    // TODO: skill_factory: SkillFactory (not yet translated)
-}
+/// **Correction (Phase AD):** this struct's prior doc comment claimed "Rust has no SkillFactory
+/// translation yet" — stale. `ffb_model::factory::skill_factory::SkillFactory` is a real, fully
+/// translated name/class registry (`for_name`/`for_class_name`/`get_skills`). It carries no
+/// per-skill modifier data itself (unlike Java's `Skill` subclasses, which register modifier
+/// objects in `postConstruct()`), so each getter below reuses the equivalent static catalog
+/// (`find_registered_modifiers`) already added to the corresponding `*ModifierFactory` — the
+/// same per-skill data `find_skill_modifiers`-style dispatch already encodes for live gameplay,
+/// restructured from "this player's skills" to "every registered skill for this ruleset" to
+/// match Java's `skillFactory.getSkills().flatMap(skill -> skill.getXxxModifiers())` union
+/// semantics (raw registered objects, not predicate-filtered).
+///
+/// The card half of the merge (`UtilCards::find_all_cards` + `card_roll_modifiers`) was wired in
+/// Phase AC. `Armour`/`Injury` getters remain empty: Java's real per-skill registrants for those
+/// two categories (~20 skills across bb2016/bb2020/bb2025/mixed) were not individually audited in
+/// this phase — a larger, separately-scoped task; see `SESSION.md` Phase AD.
+pub struct ModifierAggregator {}
 
 impl ModifierAggregator {
     pub fn new() -> Self {
@@ -37,12 +45,12 @@ impl ModifierAggregator {
     }
 
     pub fn init(&mut self, _game: &Game) {
-        // TODO: initialize skill_factory via game.get_factory(FactoryType::SKILL) once translated
+        // No per-instance state to initialize; SkillFactory/rules are passed to each getter.
     }
 
-    pub fn get_catch_modifiers(&self) -> Vec<CatchModifier> {
-        // No BB2016 card overrides CatchModifier rollModifiers(); TODO: skill_factory half.
-        Vec::new()
+    /// Java: `ModifierAggregator.getCatchModifiers()`.
+    pub fn get_catch_modifiers(&self, rules: Rules) -> Vec<CatchModifier> {
+        crate::modifiers::catch_modifier_factory::CatchModifierFactory::find_registered_modifiers(rules)
     }
 
     /// Java: `ModifierAggregator.getInterceptionModifiers()`.
@@ -55,28 +63,31 @@ impl ModifierAggregator {
         crate::modifiers::card_roll_modifiers::find_pass_card_modifiers(context)
     }
 
-    pub fn get_dodge_modifiers(&self) -> Vec<DodgeModifier> {
-        // No BB2016 card overrides DodgeModifier rollModifiers(); TODO: skill_factory half.
-        Vec::new()
+    /// Java: `ModifierAggregator.getDodgeModifiers()`.
+    pub fn get_dodge_modifiers(&self, rules: Rules) -> Vec<DodgeModifier> {
+        crate::modifiers::dodge_modifier_factory::DodgeModifierFactory::find_registered_modifiers(rules)
     }
 
-    pub fn get_pickup_modifiers(&self) -> Vec<PickupModifier> {
-        // No BB2016 card overrides PickupModifier rollModifiers(); TODO: skill_factory half.
-        Vec::new()
+    /// Java: `ModifierAggregator.getPickupModifiers()`.
+    pub fn get_pickup_modifiers(&self, rules: Rules) -> Vec<PickupModifier> {
+        crate::modifiers::pickup_modifier_factory::PickupModifierFactory::find_registered_modifiers(rules)
     }
 
-    pub fn get_jump_modifiers(&self) -> Vec<JumpModifier> {
-        // No BB2016 card overrides JumpModifier rollModifiers(); TODO: skill_factory half.
-        Vec::new()
+    /// Java: `ModifierAggregator.getJumpModifiers()`.
+    pub fn get_jump_modifiers(&self, rules: Rules) -> Vec<JumpModifier> {
+        crate::modifiers::jump_modifier_factory::JumpModifierFactory::find_registered_modifiers(rules)
     }
 
+    /// Java: `ModifierAggregator.getJumpUpModifiers()`. No skill/card in the Java source
+    /// registers a `JumpUpModifier` (confirmed via source read — see
+    /// `jump_up_modifier_factory.rs`'s own doc comment), so this correctly stays empty.
     pub fn get_jump_up_modifiers(&self) -> Vec<JumpUpModifier> {
-        // No BB2016 card overrides JumpUpModifier rollModifiers(); TODO: skill_factory half.
         Vec::new()
     }
 
+    /// Java: `ModifierAggregator.getGazeModifiers()`. No skill/card in the Java source
+    /// registers a `GazeModifier` (confirmed via source read), so this correctly stays empty.
     pub fn get_gaze_modifiers(&self) -> Vec<GazeModifier> {
-        // No BB2016 card overrides GazeModifier rollModifiers(); TODO: skill_factory half.
         Vec::new()
     }
 
@@ -85,19 +96,24 @@ impl ModifierAggregator {
         crate::modifiers::card_roll_modifiers::find_go_for_it_card_modifiers(context)
     }
 
-    pub fn get_right_stuff_modifiers(&self) -> Vec<RightStuffModifier> {
-        // No BB2016 card overrides RightStuffModifier rollModifiers(); TODO: skill_factory half.
-        Vec::new()
+    /// Java: `ModifierAggregator.getRightStuffModifiers()`.
+    pub fn get_right_stuff_modifiers(&self, rules: Rules) -> Vec<RightStuffModifier> {
+        crate::modifiers::right_stuff_modifier_factory::RightStuffModifierFactory::find_registered_modifiers(rules)
     }
 
+    /// Java: `ModifierAggregator.getArmourModifiers()`. Deferred — see struct doc.
     pub fn get_armour_modifiers(&self) -> Vec<Box<dyn ArmorModifier>> {
-        // No BB2016 card overrides armourModifiers(); TODO: skill_factory half.
         Vec::new()
     }
 
+    /// Java: `ModifierAggregator.getInjuryModifiers()`. Deferred — see struct doc.
     pub fn get_injury_modifiers(&self) -> Vec<Box<dyn InjuryModifier>> {
-        // No BB2016 card overrides injuryModifiers(); TODO: skill_factory half.
         Vec::new()
+    }
+
+    /// Java: `ModifierAggregator.getCasualtyModifiers()`.
+    pub fn get_casualty_modifiers(&self) -> Vec<crate::modifiers::modifiers::Modifier> {
+        crate::modifiers::casualty_modifier_factory::CasualtyModifierFactory::find_registered_modifiers()
     }
 }
 
@@ -130,9 +146,51 @@ mod tests {
     }
 
     #[test]
-    fn get_catch_modifiers_empty_no_cards() {
+    fn get_catch_modifiers_includes_extra_arms_and_diving_catch() {
         let agg = ModifierAggregator::new();
-        assert!(agg.get_catch_modifiers().is_empty());
+        let mods = agg.get_catch_modifiers(Rules::Bb2025);
+        assert_eq!(mods.len(), 2);
+    }
+
+    #[test]
+    fn get_dodge_modifiers_bb2016_includes_edition_specific_skills() {
+        let agg = ModifierAggregator::new();
+        let mods = agg.get_dodge_modifiers(Rules::Bb2016);
+        assert_eq!(mods.len(), 4);
+    }
+
+    #[test]
+    fn get_pickup_modifiers_includes_extra_arms() {
+        let agg = ModifierAggregator::new();
+        assert_eq!(agg.get_pickup_modifiers(Rules::Bb2025).len(), 1);
+    }
+
+    #[test]
+    fn get_jump_modifiers_bb2025_includes_very_long_legs_and_leap() {
+        let agg = ModifierAggregator::new();
+        assert_eq!(agg.get_jump_modifiers(Rules::Bb2025).len(), 2);
+    }
+
+    #[test]
+    fn get_jump_up_and_gaze_modifiers_stay_empty() {
+        let agg = ModifierAggregator::new();
+        assert!(agg.get_jump_up_modifiers().is_empty());
+        assert!(agg.get_gaze_modifiers().is_empty());
+    }
+
+    #[test]
+    fn get_right_stuff_modifiers_bb2016_includes_swoop() {
+        let agg = ModifierAggregator::new();
+        assert_eq!(agg.get_right_stuff_modifiers(Rules::Bb2016).len(), 1);
+        assert!(agg.get_right_stuff_modifiers(Rules::Bb2025).is_empty());
+    }
+
+    #[test]
+    fn get_casualty_modifiers_includes_decay() {
+        let agg = ModifierAggregator::new();
+        let mods = agg.get_casualty_modifiers();
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].name, "Decay");
     }
 
     #[test]

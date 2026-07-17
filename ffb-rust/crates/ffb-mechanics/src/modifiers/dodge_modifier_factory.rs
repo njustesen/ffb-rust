@@ -121,6 +121,34 @@ impl DodgeModifierFactory {
         result
     }
 
+    /// Java: `ModifierAggregator.getDodgeModifiers()`'s skill half — every skill's statically-
+    /// registered modifier objects, unfiltered by any predicate (unlike `find_skill_modifiers`,
+    /// which is context/player-scoped and evaluates `useBreakTackle` at call time; Java's
+    /// `Skill.getDodgeModifiers()` returns the raw registered list regardless). Only
+    /// `common.TwoHeads` (all editions) and bb2016's `Titchy`/`Stunty`/`BreakTackle` register a
+    /// `DodgeModifier` in the Java source.
+    pub fn find_registered_modifiers(rules: Rules) -> Vec<DodgeModifier> {
+        let mut result = Vec::new();
+        for skill_id in ffb_model::factory::skill_factory::SkillFactory::new().get_skills() {
+            match skill_id {
+                SkillId::TwoHeads => {
+                    result.push(DodgeModifier::new("Two Heads", -1, ModifierType::REGULAR));
+                }
+                SkillId::Titchy if rules == Rules::Bb2016 => {
+                    result.push(DodgeModifier::new("Titchy", -1, ModifierType::REGULAR));
+                }
+                SkillId::Stunty if rules == Rules::Bb2016 => {
+                    result.push(DodgeModifier::new("Stunty", 0, ModifierType::REGULAR));
+                }
+                SkillId::BreakTackle if rules == Rules::Bb2016 => {
+                    result.push(DodgeModifier::new_with_use_strength("Break Tackle", 0, ModifierType::REGULAR, true));
+                }
+                _ => {}
+            }
+        }
+        result
+    }
+
     /// 1:1 translation of AgilityMechanic.minimumRollDodge (BB2025).
     /// `max(2, agility + sum(modifier))`.
     pub fn minimum_roll(agility: i32, modifiers: &[&DodgeModifier]) -> i32 {
@@ -159,6 +187,24 @@ mod tests {
 
     fn make_game() -> Game {
         Game::new(empty_team("home"), empty_team("away"), Rules::Bb2025)
+    }
+
+    #[test]
+    fn find_registered_modifiers_bb2025_only_has_two_heads() {
+        let mods = DodgeModifierFactory::find_registered_modifiers(Rules::Bb2025);
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].get_name(), "Two Heads");
+    }
+
+    #[test]
+    fn find_registered_modifiers_bb2016_has_all_four() {
+        let mods = DodgeModifierFactory::find_registered_modifiers(Rules::Bb2016);
+        let names: Vec<&str> = mods.iter().map(|m| m.get_name()).collect();
+        assert!(names.contains(&"Two Heads"));
+        assert!(names.contains(&"Titchy"));
+        assert!(names.contains(&"Stunty"));
+        assert!(names.contains(&"Break Tackle"));
+        assert_eq!(mods.len(), 4);
     }
 
     #[test]

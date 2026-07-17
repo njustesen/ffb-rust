@@ -4,11 +4,18 @@ use crate::modifiers::modifiers::Modifier;
 
 /// 1:1 translation of com.fumbbl.ffb.factory.mixed.CasualtyModifierFactory.
 ///
-/// Java's `findModifiers` also scans `player.getSkillsIncludingTemporaryOnes()` for
-/// `Skill.getCasualtyModifiers()`, but no real skill subclass in the Java source ever
-/// overrides that hook (only `Skill`'s empty base implementation exists), so the skill
-/// scan always contributes an empty set — only the niggling-injury count ever produces a
-/// real modifier. That is reflected here directly rather than modeled as a no-op scan.
+/// **Correction (Phase AD):** this struct's prior doc comment claimed no real skill subclass
+/// ever overrides `Skill.getCasualtyModifiers()` — that was stale/wrong. `skill/mixed/Decay.java`
+/// (bb2020/bb2025) registers `new CasualtyModifier("Decay", 1)`. `find_registered_modifiers`
+/// below (backing `for_name`/the `ModifierAggregator.getCasualtyModifiers()` lookup path) now
+/// reflects that. **Not fixed here:** whether `find_modifiers(Player)` — the live per-roll path
+/// consumed by `roll_mechanic.rs`'s casualty-modifier-sum computation — should also add a Decay
+/// contribution is a separate, real question. `roll_mechanic.rs`'s
+/// `interpret_casualty_roll_and_add_modifiers` already carries an `_is_decay_roll` parameter
+/// (currently unused) suggesting Decay's "roll twice on the Casualty table" effect is meant to be
+/// a reroll trigger, not a numeric modifier-sum addition; wiring `find_registered_modifiers` into
+/// `find_modifiers` without first tracing that existing mechanism risks double-counting Decay's
+/// effect. Sized for its own phase, not attempted here.
 pub struct CasualtyModifierFactory;
 
 impl CasualtyModifierFactory {
@@ -16,9 +23,17 @@ impl CasualtyModifierFactory {
         Self
     }
 
-    /// Java: findModifiers(Player) — skill scan (always empty, see struct doc) + niggling count.
+    /// Java: findModifiers(Player) — skill scan + niggling count. The skill scan here only
+    /// covers the niggling-injury count; see the struct doc for the real, deferred Decay gap.
     pub fn find_modifiers(&self, player: &Player) -> Vec<Modifier> {
         self.for_number(player.niggling_injuries).into_iter().collect()
+    }
+
+    /// Java: `ModifierAggregator.getCasualtyModifiers()`'s skill half. This factory (per its
+    /// Java `@RulesCollection(BB2020)`/`@RulesCollection(BB2025)`) only ever exists for
+    /// bb2020/bb2025 games, so `Decay` applies unconditionally here (no further rules gating).
+    pub fn find_registered_modifiers() -> Vec<Modifier> {
+        vec![Modifier::new("Decay", 1, Rules::Common)]
     }
 
     /// Java: forNumber(int) — "<n> Niggling Injury"/"Injuries" modifier, or None if n <= 0.
@@ -37,10 +52,12 @@ impl CasualtyModifierFactory {
     }
 
     /// Java: forName(String) — checks `ModifierAggregator.getCasualtyModifiers()` first, then
-    /// falls back to `fromName`. The aggregator is always empty (see struct doc), so this
-    /// reduces to `from_name`.
+    /// falls back to `fromName`.
     pub fn for_name(&self, name: &str) -> Option<Modifier> {
-        self.from_name(name)
+        Self::find_registered_modifiers()
+            .into_iter()
+            .find(|m| m.name == name)
+            .or_else(|| self.from_name(name))
     }
 }
 
@@ -140,6 +157,21 @@ mod tests {
     fn for_name_matches_from_name() {
         let f = CasualtyModifierFactory::new();
         assert_eq!(f.for_name("1 Niggling Injury"), f.from_name("1 Niggling Injury"));
+    }
+
+    #[test]
+    fn find_registered_modifiers_includes_decay() {
+        let mods = CasualtyModifierFactory::find_registered_modifiers();
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].name, "Decay");
+        assert_eq!(mods[0].value, 1);
+    }
+
+    #[test]
+    fn for_name_finds_decay_via_registered_modifiers() {
+        let f = CasualtyModifierFactory::new();
+        let m = f.for_name("Decay").unwrap();
+        assert_eq!(m.value, 1);
     }
 
     #[test]

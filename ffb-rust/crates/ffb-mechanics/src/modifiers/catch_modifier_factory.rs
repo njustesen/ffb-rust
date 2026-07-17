@@ -75,6 +75,29 @@ impl CatchModifierFactory {
         result
     }
 
+    /// Java: `ModifierAggregator.getCatchModifiers()`'s skill half —
+    /// `skillFactory.getSkills().stream().flatMap(skill -> skill.getCatchModifiers().stream())`.
+    /// Every skill's statically-registered modifier objects, unfiltered by any predicate
+    /// (Java's `Skill.getCatchModifiers()` returns the raw registered list; predicates are only
+    /// evaluated later by callers like `GenerifiedModifierFactory.findModifiers`, not here).
+    /// Only `common.ExtraArms`/`common.DivingCatch` register a `CatchModifier` in the Java source.
+    pub fn find_registered_modifiers(rules: Rules) -> Vec<CatchModifier> {
+        let _ = rules; // Both registrants are edition-agnostic (no @RulesCollection restriction).
+        let mut result = Vec::new();
+        for skill_id in ffb_model::factory::skill_factory::SkillFactory::new().get_skills() {
+            match skill_id {
+                SkillId::ExtraArms => {
+                    result.push(CatchModifier::new("Extra Arms", -1, crate::modifiers::modifier_type::ModifierType::REGULAR));
+                }
+                SkillId::DivingCatch => {
+                    result.push(CatchModifier::new("Diving Catch", -1, crate::modifiers::modifier_type::ModifierType::REGULAR));
+                }
+                _ => {}
+            }
+        }
+        result
+    }
+
     /// Compute the catch minimum roll from the catcher and applicable modifiers.
     /// 1:1 translation of AgilityMechanic.minimumRollCatch (BB2025: max(2, agility + sum)).
     pub fn minimum_roll_catch(player: &Player, modifiers: &[&CatchModifier]) -> i32 {
@@ -186,6 +209,14 @@ mod tests {
         );
         let min = CatchModifierFactory::minimum_roll_catch(&player, &[&modifier]);
         assert_eq!(min, 4); // 3 + 1 = 4
+    }
+
+    #[test]
+    fn find_registered_modifiers_includes_extra_arms_and_diving_catch() {
+        let mods = CatchModifierFactory::find_registered_modifiers(Rules::Bb2025);
+        assert!(mods.iter().any(|m| m.get_name() == "Extra Arms"));
+        assert!(mods.iter().any(|m| m.get_name() == "Diving Catch"));
+        assert_eq!(mods.len(), 2);
     }
 
     fn player_with_skill(agility: i32, skill_id: ffb_model::enums::SkillId) -> Player {
