@@ -1,6 +1,84 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-17, Phase AC done — card roll-modifier gap closed)
+## Current Status (2026-07-18, Phase AD done — closed the last 3 named gaps from the AC arc)
+
+**Phase AD: re-audited Phase AC's own closing note (3 items, each described as "blocked on a
+user decision") and found 2 of the 3 weren't actually decision-blocked — same recurring
+"verify the prior phase's own claims" pattern as Phases AAS/AAO/ABJ. The user confirmed (via
+question) that the 3rd should also be tackled this phase rather than deferred. All 3 closed.**
+
+1. **`UtilServerHttpClient.java` — real completion, not an architecture decision.** The
+   "duplicate in `ffb-engine` vs. add a trait boundary" framing was stale: `ffb-engine`'s
+   `util_server_http_client.rs` was a correctly-identified dead stub (0 real callers, wrong
+   crate — `ffb-engine` is deliberately networking-free), and the real landing spot already
+   existed: `ffb-server`'s `HttpClient` trait/`ReqwestHttpClient` (which already depends on
+   `reqwest`). It only translated `fetchPage`. Added the missing `loadFile`/`postMultipartXml`/
+   `postAuthorizedForm`/`post(String, File)` to the trait, implemented on `ReqwestHttpClient` via
+   `reqwest`'s blocking client/multipart/form APIs, and rewired the 4 real call sites that were
+   standing in with `fetch_page`'s GET semantics where Java does a POST/file download:
+   `FumbblRequestUploadTalk`/`FumbblRequestUploadResults`/`AdminConnector`'s `logfile` command/
+   `GameStateConnector`'s `set` command. Deleted the dead `ffb-engine` stub. Tracker row flipped
+   `~` → `✓` (0 `~` rows left in the entire tracker, alongside 0 `○` rows).
+2. **Wired `SkillFactory` into `ModifierAggregator`'s 9 empty getters.** `SkillFactory`
+   (`ffb-model/src/factory/skill_factory.rs`) was already fully translated — the aggregator's own
+   doc comment claiming otherwise was itself stale. The real gap was that no per-skill static
+   modifier catalog existed to union over `SkillFactory::get_skills()`. Added
+   `find_registered_modifiers(rules)` to `CatchModifierFactory`/`DodgeModifierFactory`/
+   `PickupModifierFactory`/`JumpModifierFactory`/`RightStuffModifierFactory`/
+   `CasualtyModifierFactory`, reusing each factory's existing per-skill dispatch data (already
+   live for real gameplay via `find_skill_modifiers`), restructured from "this player's skills"
+   to "every registered skill for this ruleset" — matching Java's raw, unfiltered
+   `skillFactory.getSkills().flatMap(skill -> skill.getXxxModifiers())` union semantics.
+   `JumpUpModifier`/`GazeModifier` getters correctly stay empty (confirmed via source read: no
+   Java skill/card registers either). `Armour`/`Injury` getters stay empty, now honestly
+   documented as a larger, separately-scoped ~20-skill audit rather than blamed on the
+   (non-existent) `SkillFactory` gap.
+   - **Bonus real finding**: `CasualtyModifierFactory`'s doc comment claiming "no real skill
+     subclass ever overrides `getCasualtyModifiers()`" was also wrong — `skill/mixed/Decay.java`
+     (bb2020/bb2025) registers `new CasualtyModifier("Decay", 1)`. Wired it into `for_name()`/the
+     aggregator's new `get_casualty_modifiers()` (previously missing from the Rust struct
+     entirely — Java has 13 aggregator getters, Rust only had 12). **Left `find_modifiers(Player)`
+     — the live per-roll path consumed by `roll_mechanic.rs` — untouched**: that function already
+     carries an unused `_is_decay_roll` parameter suggesting Decay's "roll twice on the Casualty
+     table" effect is meant to be a separate reroll trigger, not a modifier-sum addition; wiring
+     `find_registered_modifiers` into it without first tracing that existing mechanism risked
+     double-counting Decay. Flagged as a distinct, real, deferred finding — not fixed here.
+3. **Renamed `enums::pass::PassResult` → `PassOutcome`** (per user's answer, tackled this phase
+   rather than deferred). It had no Java enum counterpart at all — a Rust-only reporting/event-
+   payload type that happened to share a name with the real 1:1 translation of Java's
+   `mechanics.PassResult` (`ffb_mechanics::pass_result::PassResult`). Pure rename (no logic
+   change) across the definition and ~19 call-site files; left the mechanics-layer type and all
+   its call sites untouched.
+
+Tests: 17,139 → **17,160** (+21: 11 from item 1, 10 from item 2's new `find_registered_modifiers`/
+aggregator tests; item 3 is a pure rename, 0 net). 0 failures across `cargo test --workspace`.
+`cargo build --workspace` and `cargo clippy --workspace --all-targets` clean — 0 errors, no new
+warnings introduced by this diff.
+
+**This closes all 3 items named in Phase AC's closing note.** What's left in the whole project:
+1. **Armour/Injury `ModifierAggregator` getters** — ~20 Java skills across bb2016/bb2020/bb2025/
+   mixed register an `ArmorModifier`/`InjuryModifier` (`Chainsaw`, `Claw`/`Claws`, `IronHardSkin`,
+   `CrushingBlow`, `Ram`, `Slayer`, `DwarfenScourge`/`DwarvenScourge`, `GhostlyFlames`, `Stunty`,
+   `ThickSkull`, `ArmBar`, and more); a real, bounded, but sizably larger per-skill audit than
+   this phase's other 6 categories — sized for its own future phase.
+2. **Decay's live "roll twice" casualty mechanic** — `roll_mechanic.rs`'s unused
+   `_is_decay_roll` parameter suggests a real, unfinished reroll-trigger mechanic; needs tracing
+   before any fix (see item 2 above).
+3. Per the standing pattern across every recent arc: Java/Rust parity/integration testing
+   remains the natural larger workstream once unit-test-only work is exhausted — still out of
+   scope per standing user instruction until explicitly requested.
+
+**Honest completion estimate: ~99.5%+** on the "every Java class/method has a Rust match" axis
+(up from Phase AAP's ~98.5-99%; Phase AC then closed the last known live-gameplay gap). The
+tracker itself is now at 0 `○` and 0 `~` rows — every named row is `✓`. What's left past this
+point is (a) the 2 residual items above, (b) an assumed-but-unquantified residual of
+undiscovered small gaps of the same "stale doc comment/claim" shape this project has repeatedly
+found via direct re-verification, and (c) the parity/integration-testing workstream, which is
+the only genuinely large remaining piece of work.
+
+---
+
+## Prior Status (2026-07-17, Phase AC done — card roll-modifier gap closed)
 
 **Phase AC: closed item #1 on Phase ABL's own priority list — wired the card half of
 `ModifierAggregator`/`GenerifiedModifierFactory.findModifiers()` into live gameplay, the last

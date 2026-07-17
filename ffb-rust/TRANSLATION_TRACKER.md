@@ -29,6 +29,14 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AD (2026-07-18): closed all 3 items named in Phase AC's own closing note** —
+`UtilServerHttpClient.java` (real completion: the 4 missing methods, not an architecture
+decision), `ModifierAggregator`'s 9 empty getters (wired to the already-real `SkillFactory`,
+plus a bonus real fix: `CasualtyModifierFactory` was missing `Decay`), and the
+`enums::pass::PassResult`/`PassOutcome` name-collision rename. Tracker now at **0 `○` and 0 `~`
+rows — every row is `✓`.** Tests: 17,139 → 17,160 (+21). Full writeup: `SESSION.md` Current
+Status (Phase AD).
+
 **Phase AC (2026-07-17): closed the card roll-modifier gap flagged by Phase ABG — the last known
 live-logic gap from the AA–AB correctness-audit arc.** No tracker status cells changed (all
 touched files were already `✓` or newly-added supporting files, not translation-status gaps): the
