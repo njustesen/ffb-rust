@@ -3,7 +3,7 @@
 /// Holds transient pass-sequence state shared across multiple step files
 /// (StepPass, StepIntercept, StepMissedPass, StepResolvePass, etc.).
 use ffb_model::types::FieldCoordinate;
-use ffb_model::enums::PassResult;
+use ffb_model::enums::PassOutcome;
 use ffb_model::enums::TurnMode;
 
 pub struct PassState {
@@ -24,7 +24,7 @@ pub struct PassState {
     /// Java: fAllowMoveAfterBomb
     pub allow_move_after_bomb: bool,
     /// Java: fResult
-    pub result: Option<PassResult>,
+    pub result: Option<PassOutcome>,
     /// Java: fThrowerCoordinate
     pub thrower_coordinate: Option<FieldCoordinate>,
     /// Java: fOldTurnMode

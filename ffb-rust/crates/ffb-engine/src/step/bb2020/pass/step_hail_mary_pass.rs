@@ -1,4 +1,4 @@
-use ffb_model::enums::{PassResult, PassingDistance, ReRollSource, SkillId};
+use ffb_model::enums::{PassOutcome, PassingDistance, ReRollSource, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
@@ -37,8 +37,8 @@ const REROLLED_ACTION_PASS: &str = "PASS";
 pub struct StepHailMaryPass {
     /// Java: state.goToLabelOnFailure (init param, mandatory)
     pub goto_label_on_failure: String,
-    /// Java: state.result (PassResult)
-    pub result: Option<PassResult>,
+    /// Java: state.result (PassOutcome)
+    pub result: Option<PassOutcome>,
     /// Java: state.passSkillUsed — whether the pass skill re-roll was already consumed
     pub pass_skill_used: bool,
     /// Java: state.usingModifyingSkill (Boolean tristate)

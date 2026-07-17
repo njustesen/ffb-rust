@@ -306,7 +306,7 @@ impl StepPass {
                 }
                 let label = self.goto_label_on_end.clone();
                 StepOutcome::goto(&label)
-                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassResult::Complete))
+                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Complete))
             }
             PassResult::SAVED_FUMBLE => {
                 // Java: handleFailedPass → SAVED_FUMBLE branch
@@ -323,7 +323,7 @@ impl StepPass {
                 StepOutcome::goto(&label)
                     .publish(StepParameter::PassFumble(false))
                     .publish(StepParameter::DontDropFumble(true))
-                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassResult::Fumble))
+                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Fumble))
             }
             PassResult::FUMBLE => {
                 // Java: mechanic.eligibleToReRoll → askForReRollIfAvailable
@@ -404,7 +404,7 @@ impl StepPass {
             .publish(StepParameter::DontDropFumble(false))
             .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall))
             .publish(StepParameter::CatcherId(None))
-            .publish(StepParameter::PassResultParam(ffb_model::enums::PassResult::Fumble))
+            .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Fumble))
     }
 
     /// Java: handleFailedPass() missed/inaccurate branch
@@ -422,7 +422,7 @@ impl StepPass {
         let label = self.goto_label_on_missed_pass.clone();
         StepOutcome::goto(&label)
             .publish(StepParameter::CatcherId(None))
-            .publish(StepParameter::PassResultParam(ffb_model::enums::PassResult::Inaccurate))
+            .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Inaccurate))
     }
 }
 

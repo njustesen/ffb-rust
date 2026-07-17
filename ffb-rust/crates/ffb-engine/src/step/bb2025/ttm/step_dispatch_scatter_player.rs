@@ -1,5 +1,5 @@
 use ffb_model::events::GameEvent;
-use ffb_model::enums::{PassResult, PlayerState};
+use ffb_model::enums::{PassOutcome, PlayerState};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
@@ -53,7 +53,7 @@ pub struct StepDispatchScatterPlayer {
     /// Java: usingBullseye
     pub using_bullseye: bool,
     /// Java: passResult (init FUMBLE)
-    pub pass_result: PassResult,
+    pub pass_result: PassOutcome,
 }
 
 impl StepDispatchScatterPlayer {
@@ -65,7 +65,7 @@ impl StepDispatchScatterPlayer {
             thrown_player_has_ball: false,
             is_kicked_player: false,
             using_bullseye: false,
-            pass_result: PassResult::Fumble,
+            pass_result: PassOutcome::Fumble,
         }
     }
 }
@@ -102,7 +102,7 @@ impl Step for StepDispatchScatterPlayer {
 impl StepDispatchScatterPlayer {
     fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: if passResult==FUMBLE && isKickedPlayer: report KickTeamMateFumble; NEXT_STEP
-        if self.pass_result == PassResult::Fumble && self.is_kicked_player {
+        if self.pass_result == PassOutcome::Fumble && self.is_kicked_player {
             // Java: getResult().addReport(new ReportKickTeamMateFumble());
             game.report_list.add(ReportKickTeamMateFumble::new());
             return StepOutcome::next().with_event(GameEvent::KickTeamMateFumble);
@@ -129,8 +129,8 @@ impl StepDispatchScatterPlayer {
         // Java: INACCURATE/ACCURATE + bullseye → throwScatter=false, scattersSingleDirection=false
         // Java: INACCURATE/ACCURATE → throwScatter=true
         let (throw_scatter, has_swoop) = match self.pass_result {
-            PassResult::Fumble => (false, false),
-            PassResult::Inaccurate | PassResult::Complete => {
+            PassOutcome::Fumble => (false, false),
+            PassOutcome::Inaccurate | PassOutcome::Complete => {
                 if self.using_bullseye { (false, false) }
                 else { (true, scatters_single_direction) }
             }
@@ -171,7 +171,7 @@ mod tests {
     fn fumble_kicked_returns_next_step() {
         let mut game = make_game();
         let mut step = StepDispatchScatterPlayer::new();
-        step.pass_result = PassResult::Fumble;
+        step.pass_result = PassOutcome::Fumble;
         step.is_kicked_player = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
@@ -181,7 +181,7 @@ mod tests {
     fn accurate_pass_pushes_scatter_player_sequence() {
         let mut game = make_game();
         let mut step = StepDispatchScatterPlayer::new();
-        step.pass_result = PassResult::Complete;
+        step.pass_result = PassOutcome::Complete;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(out.pushes.len(), 1);
@@ -192,7 +192,7 @@ mod tests {
     fn fumble_non_kicked_pushes_scatter_player_sequence_no_throw_scatter() {
         let mut game = make_game();
         let mut step = StepDispatchScatterPlayer::new();
-        step.pass_result = PassResult::Fumble;
+        step.pass_result = PassOutcome::Fumble;
         step.is_kicked_player = false;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.pushes.len(), 1);
@@ -203,7 +203,7 @@ mod tests {
     fn bullseye_accurate_pass_no_throw_scatter() {
         let mut game = make_game();
         let mut step = StepDispatchScatterPlayer::new();
-        step.pass_result = PassResult::Complete;
+        step.pass_result = PassOutcome::Complete;
         step.using_bullseye = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.pushes.len(), 1);
@@ -212,8 +212,8 @@ mod tests {
     #[test]
     fn set_pass_result_accepted() {
         let mut step = StepDispatchScatterPlayer::default();
-        assert!(step.set_parameter(&StepParameter::PassResultParam(PassResult::Complete)));
-        assert_eq!(step.pass_result, PassResult::Complete);
+        assert!(step.set_parameter(&StepParameter::PassResultParam(PassOutcome::Complete)));
+        assert_eq!(step.pass_result, PassOutcome::Complete);
     }
 
     #[test]
@@ -226,7 +226,7 @@ mod tests {
     #[test]
     fn default_pass_result_is_fumble() {
         let step = StepDispatchScatterPlayer::default();
-        assert_eq!(step.pass_result, PassResult::Fumble);
+        assert_eq!(step.pass_result, PassOutcome::Fumble);
     }
 
     // ── report wiring ─────────────────────────────────────────────────────────
@@ -236,7 +236,7 @@ mod tests {
         use ffb_model::report::report_id::ReportId;
         let mut game = make_game();
         let mut step = StepDispatchScatterPlayer::new();
-        step.pass_result = PassResult::Fumble;
+        step.pass_result = PassOutcome::Fumble;
         step.is_kicked_player = true;
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::KICK_TEAM_MATE_FUMBLE),
@@ -248,7 +248,7 @@ mod tests {
         use ffb_model::report::report_id::ReportId;
         let mut game = make_game();
         let mut step = StepDispatchScatterPlayer::new();
-        step.pass_result = PassResult::Fumble;
+        step.pass_result = PassOutcome::Fumble;
         step.is_kicked_player = false;
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.report_list.has_report(ReportId::KICK_TEAM_MATE_FUMBLE),

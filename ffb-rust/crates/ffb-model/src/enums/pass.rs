@@ -70,15 +70,14 @@ impl PassingDistance {
 
 /// The overall outcome of a pass attempt, for event reporting/`StepParameter` payloads.
 ///
-/// This is intentionally distinct from `ffb_mechanics::pass_result::PassResult` (the 1:1 port of
-/// Java's single `mechanics.PassResult` enum, used internally by the pass-evaluation mechanics) —
-/// not a translation duplicate left over from an earlier phase. This one adds `Caught`/
+/// **Renamed from `PassResult` (Phase AD)** to remove a name collision with
+/// `ffb_mechanics::pass_result::PassResult` (the 1:1 port of Java's single `mechanics.PassResult`
+/// enum, used internally by the pass-evaluation mechanics) — this type has no Java enum
+/// counterpart at all; it's a Rust-only reporting/event-payload type. It adds `Caught`/
 /// `MissedCatch`, outcomes the mechanics-layer enum has no concept of, because it also has to
-/// represent what happened to the ball after the throw, not just the throw roll itself. A future
-/// phase reconciling the two would need a real reporting-layer redesign (not attempted here — see
-/// SESSION.md Phase ABB).
+/// represent what happened to the ball after the throw, not just the throw roll itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum PassResult {
+pub enum PassOutcome {
     Complete,
     Inaccurate,
     Fumble,
@@ -87,28 +86,28 @@ pub enum PassResult {
     MissedCatch,
 }
 
-impl PassResult {
+impl PassOutcome {
     pub fn name(self) -> &'static str {
         match self {
-            PassResult::Complete => "complete",
-            PassResult::Inaccurate => "inaccurate",
-            PassResult::Fumble => "fumble",
-            PassResult::WildlyInaccurate => "wildlyInaccurate",
-            PassResult::Caught => "caught",
-            PassResult::MissedCatch => "missedCatch",
+            PassOutcome::Complete => "complete",
+            PassOutcome::Inaccurate => "inaccurate",
+            PassOutcome::Fumble => "fumble",
+            PassOutcome::WildlyInaccurate => "wildlyInaccurate",
+            PassOutcome::Caught => "caught",
+            PassOutcome::MissedCatch => "missedCatch",
         }
     }
 
     pub fn from_name(name: &str) -> Option<Self> {
         [
-            PassResult::Complete, PassResult::Inaccurate, PassResult::Fumble,
-            PassResult::WildlyInaccurate, PassResult::Caught, PassResult::MissedCatch,
+            PassOutcome::Complete, PassOutcome::Inaccurate, PassOutcome::Fumble,
+            PassOutcome::WildlyInaccurate, PassOutcome::Caught, PassOutcome::MissedCatch,
         ]
         .iter().copied().find(|v| v.name().eq_ignore_ascii_case(name))
     }
 
     pub fn is_successful(self) -> bool {
-        self == PassResult::Complete || self == PassResult::Caught
+        self == PassOutcome::Complete || self == PassOutcome::Caught
     }
 }
 

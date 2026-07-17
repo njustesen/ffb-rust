@@ -5,7 +5,7 @@
 ///   Phase 1 (doAlwaysHungry): thrower rolls d6 ≥ 2 or the thrown player escapes.
 ///   Phase 2 (doEscape):       thrown player rolls d6 ≥ 2 to escape (→ FUMBLE pass result);
 ///                              on failure the throw is cancelled (goto_label_on_failure).
-use ffb_model::enums::{PassResult, ReRollSource};
+use ffb_model::enums::{PassOutcome, ReRollSource};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
@@ -206,7 +206,7 @@ impl StepAlwaysHungry {
             if successful {
                 return StepOutcome::goto(&self.goto_label_on_success)
                     .with_event(escape_event)
-                    .publish(StepParameter::PassResultParam(PassResult::Fumble));
+                    .publish(StepParameter::PassResultParam(PassOutcome::Fumble));
             }
 
             // Java: if (reRolledAction != ESCAPE) { setReRolledAction(ESCAPE); if (askForReRoll) return; }
@@ -382,7 +382,7 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(seed));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("ok"));
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassResultParam(PassResult::Fumble))));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassResultParam(PassOutcome::Fumble))));
         assert!(out.events.iter().any(|e| matches!(e, GameEvent::EscapeRoll { success: true, .. })));
     }
 

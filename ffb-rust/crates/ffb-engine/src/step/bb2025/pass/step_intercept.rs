@@ -213,12 +213,12 @@ impl Step for StepIntercept {
             StepParameter::PassResultParam(v) => {
                 // Java: passState.getResult() — set by StepPass publishing PassResultParam
                 self.pass_result = match v {
-                    ffb_model::enums::PassResult::Complete => PassResult::ACCURATE,
-                    ffb_model::enums::PassResult::Inaccurate => PassResult::INACCURATE,
-                    ffb_model::enums::PassResult::WildlyInaccurate => PassResult::WILDLY_INACCURATE,
-                    ffb_model::enums::PassResult::Fumble
-                    | ffb_model::enums::PassResult::Caught
-                    | ffb_model::enums::PassResult::MissedCatch => PassResult::FUMBLE,
+                    ffb_model::enums::PassOutcome::Complete => PassResult::ACCURATE,
+                    ffb_model::enums::PassOutcome::Inaccurate => PassResult::INACCURATE,
+                    ffb_model::enums::PassOutcome::WildlyInaccurate => PassResult::WILDLY_INACCURATE,
+                    ffb_model::enums::PassOutcome::Fumble
+                    | ffb_model::enums::PassOutcome::Caught
+                    | ffb_model::enums::PassOutcome::MissedCatch => PassResult::FUMBLE,
                 };
                 true
             }
@@ -579,7 +579,7 @@ mod tests {
     #[test]
     fn set_parameter_pass_result_accepted() {
         let mut step = StepIntercept::new("fail".into());
-        let accepted = step.set_parameter(&StepParameter::PassResultParam(ffb_model::enums::PassResult::Complete));
+        let accepted = step.set_parameter(&StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Complete));
         assert!(accepted);
         assert_eq!(step.pass_result, PassResult::ACCURATE);
     }

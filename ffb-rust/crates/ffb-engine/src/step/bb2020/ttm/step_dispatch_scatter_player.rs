@@ -1,7 +1,7 @@
 /// 1:1 translation of `com.fumbbl.ffb.server.step.bb2020.ttm.StepDispatchScatterPlayer`.
 ///
 /// Dispatches a thrown/kicked player to the appropriate scatter sequence based on
-/// the `PassResult`. On a FUMBLE + isKickedPlayer it adds a KickTeamMateFumble report
+/// the `PassOutcome`. On a FUMBLE + isKickedPlayer it adds a KickTeamMateFumble report
 /// without pushing any scatter sequence; otherwise it pushes a ScatterPlayer sequence.
 ///
 /// BB2020-only step (no BB2016 equivalent). Reads: THROWN_PLAYER_ID, THROWN_PLAYER_STATE,
@@ -10,7 +10,7 @@ use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::NamedProperties;
 use ffb_model::util::rng::GameRng;
-use ffb_model::enums::{PlayerState, PassResult};
+use ffb_model::enums::{PlayerState, PassOutcome};
 use ffb_model::report::mixed::report_kick_team_mate_fumble::ReportKickTeamMateFumble;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -29,7 +29,7 @@ pub struct StepDispatchScatterPlayer {
     /// Java: `isKickedPlayer` — optional init param.
     is_kicked_player: bool,
     /// Java: `passResult` — defaults to FUMBLE (Java default).
-    pass_result: PassResult,
+    pass_result: PassOutcome,
 }
 
 impl StepDispatchScatterPlayer {
@@ -40,12 +40,12 @@ impl StepDispatchScatterPlayer {
             old_player_state: None,
             thrown_player_has_ball: false,
             is_kicked_player: false,
-            pass_result: PassResult::Fumble,
+            pass_result: PassOutcome::Fumble,
         }
     }
 
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
-        if self.pass_result == PassResult::Fumble && self.is_kicked_player {
+        if self.pass_result == PassOutcome::Fumble && self.is_kicked_player {
             // Java: getResult().addReport(new ReportKickTeamMateFumble());
             game.report_list.add(ReportKickTeamMateFumble::new());
             return StepOutcome::next().with_event(GameEvent::KickTeamMateFumble);
@@ -62,9 +62,9 @@ impl StepDispatchScatterPlayer {
             .unwrap_or(false);
 
         let (throw_scatter, deviate, scatters_single_direction) = match self.pass_result {
-            PassResult::Fumble          => (false, false, false),
-            PassResult::WildlyInaccurate => (false, true, false),
-            PassResult::Inaccurate | PassResult::Complete => (true, false, base_scatters_single_direction),
+            PassOutcome::Fumble          => (false, false, false),
+            PassOutcome::WildlyInaccurate => (false, true, false),
+            PassOutcome::Inaccurate | PassOutcome::Complete => (true, false, base_scatters_single_direction),
             _ => (false, false, false),
         };
 
@@ -137,7 +137,7 @@ mod tests {
         let mut game = make_game();
         let mut step = StepDispatchScatterPlayer::new();
         step.is_kicked_player = true;
-        step.pass_result = PassResult::Fumble;
+        step.pass_result = PassOutcome::Fumble;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(matches!(out.action, StepAction::NextStep));
     }
@@ -147,7 +147,7 @@ mod tests {
         use ffb_model::enums::{PlayerState, PS_STANDING};
         let mut game = make_game();
         let mut step = StepDispatchScatterPlayer::new();
-        step.pass_result = PassResult::Fumble;
+        step.pass_result = PassOutcome::Fumble;
         step.is_kicked_player = false;
         step.thrown_player_id = Some("p1".into());
         step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
@@ -162,7 +162,7 @@ mod tests {
         use ffb_model::enums::{PlayerState, PS_STANDING};
         let mut game = make_game();
         let mut step = StepDispatchScatterPlayer::new();
-        step.pass_result = PassResult::WildlyInaccurate;
+        step.pass_result = PassOutcome::WildlyInaccurate;
         step.thrown_player_id = Some("p1".into());
         step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
         step.old_player_state = Some(PlayerState::new(PS_STANDING));
@@ -181,8 +181,8 @@ mod tests {
     #[test]
     fn set_parameter_pass_result() {
         let mut step = StepDispatchScatterPlayer::new();
-        assert!(step.set_parameter(&StepParameter::PassResultParam(PassResult::Complete)));
-        assert_eq!(step.pass_result, PassResult::Complete);
+        assert!(step.set_parameter(&StepParameter::PassResultParam(PassOutcome::Complete)));
+        assert_eq!(step.pass_result, PassOutcome::Complete);
     }
 
     #[test]
@@ -208,7 +208,7 @@ mod tests {
         let mut game = make_game();
         let mut step = StepDispatchScatterPlayer::new();
         step.is_kicked_player = true;
-        step.pass_result = PassResult::Fumble;
+        step.pass_result = PassOutcome::Fumble;
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::KICK_TEAM_MATE_FUMBLE),
             "KICK_TEAM_MATE_FUMBLE report must be added when kicked player fumbles");
@@ -220,7 +220,7 @@ mod tests {
         use ffb_model::enums::{PlayerState, PS_STANDING};
         let mut game = make_game();
         let mut step = StepDispatchScatterPlayer::new();
-        step.pass_result = PassResult::Fumble;
+        step.pass_result = PassOutcome::Fumble;
         step.is_kicked_player = false;
         step.thrown_player_id = Some("p1".into());
         step.thrown_player_state = Some(PlayerState::new(PS_STANDING));

@@ -266,7 +266,7 @@ impl StepPass {
                 }
                 let label = self.goto_label_on_end.clone();
                 StepOutcome::goto(&label)
-                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassResult::Complete))
+                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Complete))
             }
             PassResult::SAVED_FUMBLE => {
                 // Java: handleSafePass → usingSafePass dialog / goto goToLabelOnSavedFumble
@@ -284,7 +284,7 @@ impl StepPass {
                 StepOutcome::goto(&label)
                     .publish(StepParameter::PassFumble(false))
                     .publish(StepParameter::DontDropFumble(true))
-                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassResult::Fumble))
+                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Fumble))
             }
             PassResult::FUMBLE => {
                 // Java: askForReRollIfAvailable before handling fumble
@@ -308,7 +308,7 @@ impl StepPass {
                     .publish(StepParameter::DontDropFumble(false))
                     .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall))
                     .publish(StepParameter::CatcherId(None))
-                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassResult::Fumble))
+                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Fumble))
             }
             PassResult::INACCURATE | PassResult::WILDLY_INACCURATE => {
                 // Java: askForReRollIfAvailable before routing to missed pass
@@ -329,7 +329,7 @@ impl StepPass {
                 let label = self.goto_label_on_missed_pass.clone();
                 StepOutcome::goto(&label)
                     .publish(StepParameter::CatcherId(None))
-                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassResult::Inaccurate))
+                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Inaccurate))
             }
         }
     }
@@ -546,7 +546,7 @@ mod tests {
         step.roll = 6; // accurate
         let out = step.start(&mut game, &mut GameRng::new(0));
         let param = out.published.iter().find(|p| {
-            matches!(p, StepParameter::PassResultParam(ffb_model::enums::PassResult::Complete))
+            matches!(p, StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Complete))
         });
         assert!(param.is_some(), "expected PassResultParam(Complete) published for accurate pass");
     }
@@ -558,7 +558,7 @@ mod tests {
         step.roll = 1; // natural 1 → fumble
         let out = step.start(&mut game, &mut GameRng::new(0));
         let param = out.published.iter().find(|p| {
-            matches!(p, StepParameter::PassResultParam(ffb_model::enums::PassResult::Fumble))
+            matches!(p, StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Fumble))
         });
         assert!(param.is_some(), "expected PassResultParam(Fumble) published");
     }

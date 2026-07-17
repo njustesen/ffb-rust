@@ -11,7 +11,7 @@ use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
 use crate::step::framework::StepId;
 use crate::skill_behaviour::registry::SkillRegistry;
-use ffb_model::enums::{PassResult, SkillId};
+use ffb_model::enums::{PassOutcome, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::step::framework::StepOutcome;
@@ -27,7 +27,7 @@ pub struct StepThrowTeamMateHookState {
     /// Java: state.kicked
     pub kicked: bool,
     /// Java: state.passResult
-    pub pass_result: Option<PassResult>,
+    pub pass_result: Option<PassOutcome>,
     /// Java: state.usingBullseye (tristate: None = not yet decided)
     pub using_bullseye: Option<bool>,
     /// Java: fReRolledAction

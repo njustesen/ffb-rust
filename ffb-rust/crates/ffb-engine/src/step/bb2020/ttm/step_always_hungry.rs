@@ -9,7 +9,7 @@
 ///
 /// BB2020 difference vs BB2025: uses `pass_used = true` (Java: `setPassUsed`)
 /// instead of `ttm_used = true` for non-kicked throws.
-use ffb_model::enums::{PassResult, ReRollSource};
+use ffb_model::enums::{PassOutcome, ReRollSource};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
@@ -212,7 +212,7 @@ impl StepAlwaysHungry {
             if successful {
                 return StepOutcome::goto(&self.goto_label_on_success)
                     .with_event(escape_event)
-                    .publish(StepParameter::PassResultParam(PassResult::Fumble));
+                    .publish(StepParameter::PassResultParam(PassOutcome::Fumble));
             }
 
             // Java: if (reRolledAction != ESCAPE) { setReRolledAction(ESCAPE); if (askForReRoll) return; }
@@ -430,7 +430,7 @@ mod tests {
         assert_eq!(out.action, StepAction::GotoLabel);
     }
 
-    // ── escape succeeds → goto_on_success + PassResult::Fumble ──────────────
+    // ── escape succeeds → goto_on_success + PassOutcome::Fumble ──────────────
 
     #[test]
     fn successful_escape_publishes_pass_result_fumble() {
@@ -445,7 +445,7 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(seed));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("ok"));
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassResultParam(PassResult::Fumble))));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassResultParam(PassOutcome::Fumble))));
         assert!(out.events.iter().any(|e| matches!(e, GameEvent::EscapeRoll { success: true, .. })));
     }
 

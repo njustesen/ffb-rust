@@ -14,7 +14,7 @@
 ///
 /// Init parameter: GOTO_LABEL_ON_FAILURE (mandatory).
 /// Sets stepParameter PASS_FUMBLE and CATCH_SCATTER_THROW_IN_MODE for all steps on the stack.
-use ffb_model::enums::{PassResult, PlayerAction, ReRollSource, SkillId};
+use ffb_model::enums::{PassOutcome, PlayerAction, ReRollSource, SkillId};
 use ffb_model::events::GameEvent;
 use ffb_model::enums::PassingDistance;
 use ffb_model::model::game::Game;
@@ -29,7 +29,7 @@ pub struct StepHailMaryPass {
     /// Java: `state.goToLabelOnFailure` — mandatory init param.
     pub goto_label_on_failure: String,
     /// Java: `state.result` — FUMBLE or INACCURATE, persisted across re-roll wait.
-    pub result: Option<PassResult>,
+    pub result: Option<PassOutcome>,
     /// Java: `state.passSkillUsed` — true after Pass skill dialog was shown.
     pub pass_skill_used: bool,
     /// Java: AbstractStepWithReRoll.reRolledAction — "PASS" when re-roll is pending.
@@ -128,7 +128,7 @@ impl StepHailMaryPass {
 
         if do_roll {
             let roll = rng.d6();
-            let result = if roll == 1 { PassResult::Fumble } else { PassResult::Inaccurate };
+            let result = if roll == 1 { PassOutcome::Fumble } else { PassOutcome::Inaccurate };
             self.result = Some(result);
             let rerolled = re_rolled && self.re_roll_source.is_some();
 
@@ -143,7 +143,7 @@ impl StepHailMaryPass {
 
             do_next_step = true;
 
-            if result == PassResult::Fumble && !re_rolled {
+            if result == PassOutcome::Fumble && !re_rolled {
                 // Java: if (reRolledAction != PASS) → offer re-roll
                 self.re_rolled_action = Some("PASS".into());
 
@@ -184,10 +184,10 @@ impl StepHailMaryPass {
 
     /// Publish final outcome after roll is settled (FUMBLE or INACCURATE).
     fn proceed(&self, game: &mut Game, thrower_id: &str, is_bomb: bool) -> StepOutcome {
-        let result = self.result.unwrap_or(PassResult::Inaccurate);
+        let result = self.result.unwrap_or(PassOutcome::Inaccurate);
         let thrower_coord = game.field_model.player_coordinate(thrower_id);
 
-        if result == PassResult::Fumble {
+        if result == PassOutcome::Fumble {
             if is_bomb {
                 game.field_model.bomb_coordinate = thrower_coord;
             } else {
@@ -218,7 +218,7 @@ impl StepHailMaryPass {
 mod tests {
     use super::*;
     use crate::step::framework::{StepAction, test_team};
-    use ffb_model::enums::{PassResult, PlayerType, PlayerGender, Rules};
+    use ffb_model::enums::{PassOutcome, PlayerType, PlayerGender, Rules};
     use ffb_model::model::player::Player;
     use ffb_model::model::skill_def::SkillWithValue;
     use ffb_model::types::FieldCoordinate;
@@ -276,8 +276,8 @@ mod tests {
     #[test]
     fn set_parameter_pass_result() {
         let mut step = StepHailMaryPass::new();
-        assert!(step.set_parameter(&StepParameter::PassResultParam(PassResult::Fumble)));
-        assert_eq!(step.result, Some(PassResult::Fumble));
+        assert!(step.set_parameter(&StepParameter::PassResultParam(PassOutcome::Fumble)));
+        assert_eq!(step.result, Some(PassOutcome::Fumble));
     }
 
     #[test]
@@ -288,7 +288,7 @@ mod tests {
         step.goto_label_on_failure = "fail".into();
         let out = step.start(&mut game, &mut GameRng::new(seed));
         assert_eq!(out.action, StepAction::NextStep);
-        assert_eq!(step.result, Some(PassResult::Inaccurate));
+        assert_eq!(step.result, Some(PassOutcome::Inaccurate));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassFumble(false))));
     }
 
@@ -391,7 +391,7 @@ mod tests {
         );
         // Re-roll succeeds → INACCURATE → NEXT_STEP
         assert_eq!(out.action, StepAction::NextStep);
-        assert_eq!(step.result, Some(PassResult::Inaccurate));
+        assert_eq!(step.result, Some(PassOutcome::Inaccurate));
     }
 
     #[test]

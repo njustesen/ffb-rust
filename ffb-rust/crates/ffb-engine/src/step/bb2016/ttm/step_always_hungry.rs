@@ -10,7 +10,7 @@
 /// Single re_roll_state tracks re-rolled action (ALWAYS_HUNGRY or ESCAPE).
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
-use ffb_model::enums::{SkillId, PassResult, ReRollSource};
+use ffb_model::enums::{SkillId, PassOutcome, ReRollSource};
 use ffb_model::report::report_always_hungry_roll::ReportAlwaysHungryRoll;
 use ffb_model::report::report_escape_roll::ReportEscapeRoll;
 use ffb_model::util::rng::GameRng;
@@ -173,7 +173,7 @@ impl StepAlwaysHungry {
                 if successful {
                     let label = self.goto_label_on_success.clone();
                     return StepOutcome::goto(&label)
-                        .publish(StepParameter::PassResultParam(PassResult::Fumble));
+                        .publish(StepParameter::PassResultParam(PassOutcome::Fumble));
                 }
 
                 // Failure: try re-roll
@@ -404,7 +404,7 @@ mod tests {
             s2.thrown_player_id = Some("gob".into());
             let out = s2.start(&mut g2, &mut GameRng::new(seed));
             if out.goto_label.as_deref() == Some("success") {
-                assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassResultParam(PassResult::Fumble))));
+                assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassResultParam(PassOutcome::Fumble))));
                 return;
             }
         }

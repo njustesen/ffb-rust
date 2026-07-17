@@ -1322,7 +1322,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `factory/ModelChangeIdFactory.java` | `ffb-model` | `src/enums/model_change.rs` (`ModelChangeId::for_name`) | ✓ |
 | `factory/PassingDistanceFactory.java` | `ffb-model` | `src/enums/pass.rs` (`PassingDistance::from_name`) | ✓ |
 | `factory/PassModifierFactory.java` | `ffb-mechanics` | `src/modifiers/pass_modifier_factory.rs` | ✓ |
-| `factory/PassResultFactory.java` | `ffb-model` | `src/enums/pass.rs` (`PassResult::from_name`) | ✓ |
+| `factory/PassResultFactory.java` | `ffb-model` | `src/enums/pass.rs` (`PassOutcome::from_name`, renamed from `PassResult` in Phase AD to remove a name collision with `ffb-mechanics`' `mechanics/PassResult.java` translation) | ✓ |
 | `factory/PickupModifierFactory.java` | `ffb-mechanics` | `src/modifiers/pickup_modifier_factory.rs` | ✓ |
 | `factory/PlayerActionFactory.java` | `ffb-model` | `src/enums/player.rs` (`PlayerAction::from_name`) | ✓ |
 | `factory/PlayerChoiceModeFactory.java` | `ffb-model` | `src/model/player_choice_mode.rs` (`PlayerChoiceMode::for_name`) | ✓ |

@@ -1,4 +1,4 @@
-use ffb_model::enums::{PassResult, PassingDistance, ReRollSource, SkillId};
+use ffb_model::enums::{PassOutcome, PassingDistance, ReRollSource, SkillId};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
@@ -33,8 +33,8 @@ const REROLLED_ACTION_PASS: &str = "PASS";
 pub struct StepHailMaryPass {
     /// Java: state.goToLabelOnFailure (init param, mandatory)
     pub goto_label_on_failure: String,
-    /// Java: state.result (PassResult)
-    pub result: Option<PassResult>,
+    /// Java: state.result (PassOutcome)
+    pub result: Option<PassOutcome>,
     /// Java: state.passSkillUsed -- whether the pass skill re-roll was already consumed
     pub pass_skill_used: bool,
     /// Java: state.usingModifyingSkill (Boolean tristate)
@@ -48,7 +48,7 @@ pub struct StepHailMaryPass {
     // AbstractStepWithReRoll fields
     pub re_rolled_action: Option<String>,
     pub re_roll_source: Option<String>,
-    /// True when the fumble was saved by Safe Pass (SAVED_FUMBLE in Java mechanics PassResult).
+    /// True when the fumble was saved by Safe Pass (SAVED_FUMBLE in Java mechanics PassOutcome).
     pub saved_fumble: bool,
 }
 
@@ -186,9 +186,9 @@ impl StepHailMaryPass {
         // Both ACCURATE (4+) and raw INACCURATE (2-3) become INACCURATE in state.
         // FUMBLE stays FUMBLE; SAVED_FUMBLE stays SAVED_FUMBLE.
         self.result = Some(if is_fumble {
-            PassResult::Fumble  // Java: FUMBLE or SAVED_FUMBLE; model has no SAVED_FUMBLE variant
+            PassOutcome::Fumble  // Java: FUMBLE or SAVED_FUMBLE; model has no SAVED_FUMBLE variant
         } else {
-            PassResult::Inaccurate  // Java: INACCURATE (includes converted ACCURATE)
+            PassOutcome::Inaccurate  // Java: INACCURATE (includes converted ACCURATE)
         });
 
         let re_rolled = self.re_rolled_action.is_some() && self.re_roll_source.is_some();
@@ -307,7 +307,7 @@ mod tests {
         let mut step = StepHailMaryPass::new("fail".into());
         step.roll = 5;
         step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(step.result, Some(PassResult::Inaccurate),
+        assert_eq!(step.result, Some(PassOutcome::Inaccurate),
             "ACCURATE roll should be stored as Inaccurate per Java line 149");
     }
 

@@ -6,12 +6,12 @@
 /// BB2020 differences vs BB2016:
 ///  - Adds `kicked` flag (KTM path uses `ktm_used` + KICK_TEAM_MATE rerolled action).
 ///  - Evaluates pass result using BB2020 logic (ACCURATE/INACCURATE/FUMBLE/WILDLY_INACCURATE).
-///  - Publishes `PassResult` for downstream steps.
+///  - Publishes `PassOutcome` for downstream steps.
 ///
 /// Init param: IS_KICKED_PLAYER (optional).
 /// Consumed params: THROWN_PLAYER_ID, THROWN_PLAYER_STATE, THROWN_PLAYER_HAS_BALL.
 use std::collections::HashSet;
-use ffb_model::enums::{PassingDistance, PassResult, PlayerState, ReRollSource, SkillId};
+use ffb_model::enums::{PassingDistance, PassOutcome, PlayerState, ReRollSource, SkillId};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -37,7 +37,7 @@ pub struct StepThrowTeamMate {
     /// Java: `state.thrownPlayerHasBall`
     thrown_player_has_ball: bool,
     /// Java: `state.passResult` — BB2020 addition.
-    pass_result: Option<PassResult>,
+    pass_result: Option<PassOutcome>,
     /// Java: `state.kicked` — BB2020 addition (IS_KICKED_PLAYER init param).
     kicked: bool,
     /// Java: `fReRolledAction`
@@ -132,7 +132,7 @@ impl StepThrowTeamMate {
             let pass_result = self.pass_result.unwrap();
 
             // Java: successful = passResult == ACCURATE || passResult == INACCURATE
-            let successful = pass_result == PassResult::Complete || pass_result == PassResult::Inaccurate;
+            let successful = pass_result == PassOutcome::Complete || pass_result == PassOutcome::Inaccurate;
 
             // Java: ThrowTeamMateBehaviour.handleExecuteStepHook → addReport(new ReportThrowTeamMateRoll(...))
             let re_rolled = self.re_rolled_action.is_some() && self.re_roll_source.is_some();
@@ -162,9 +162,9 @@ impl StepThrowTeamMate {
                     thrown_player_state: self.thrown_player_state,
                     thrown_player_has_ball: self.thrown_player_has_ball,
                     thrown_player_coordinate: thrower_coord,
-                    throw_scatter: pass_result == PassResult::Complete,
+                    throw_scatter: pass_result == PassOutcome::Complete,
                     has_swoop: scatters_single,
-                    deviates: pass_result == PassResult::Inaccurate,
+                    deviates: pass_result == PassOutcome::Inaccurate,
                     ..Default::default()
                 };
                 let seq = ScatterPlayer::build_sequence(&scatter_params);
@@ -172,7 +172,7 @@ impl StepThrowTeamMate {
             } else {
                 // Java: if (getReRolledAction() != rerolledAction && playerCanPass) → try reroll
                 if self.re_rolled_action.is_none() && player_can_pass {
-                    let is_fumble = pass_result == PassResult::Fumble;
+                    let is_fumble = pass_result == PassOutcome::Fumble;
                     if let Some(prompt) = ask_for_reroll_if_available(game, rerolled_action_key, self.minimum_roll, is_fumble) {
                         self.re_rolled_action = Some(rerolled_action_key.into());
                         self.re_roll_source = Some("TRR".into());
@@ -186,29 +186,29 @@ impl StepThrowTeamMate {
         StepOutcome::next()
     }
 
-    /// Java: handlePassResult — publish PassResult and set NEXT_STEP.
+    /// Java: handlePassResult — publish PassOutcome and set NEXT_STEP.
     fn handle_pass_result(&self, _game: &mut Game) -> StepOutcome {
-        let result = self.pass_result.unwrap_or(PassResult::Fumble);
+        let result = self.pass_result.unwrap_or(PassOutcome::Fumble);
         StepOutcome::next().publish(StepParameter::PassResultParam(result))
     }
 }
 
 /// Java: ThrowTeamMateBehaviour.evaluatePass (BB2020 version).
 /// Returns FUMBLE/WILDLY_INACCURATE/INACCURATE/ACCURATE based on roll + modifiers.
-fn evaluate_ttm_pass(player_can_pass: bool, passing_value: i32, roll: i32, modifier_sum: i32) -> PassResult {
+fn evaluate_ttm_pass(player_can_pass: bool, passing_value: i32, roll: i32, modifier_sum: i32) -> PassOutcome {
     if !player_can_pass || passing_value <= 0 {
-        return PassResult::Fumble;
+        return PassOutcome::Fumble;
     }
     if roll == 1 {
-        return PassResult::Fumble;
+        return PassOutcome::Fumble;
     }
     let result_after_modifiers = roll - modifier_sum;
     if roll == 6 || result_after_modifiers >= passing_value {
-        PassResult::Complete    // Java: ACCURATE → maps to Complete in our model
+        PassOutcome::Complete    // Java: ACCURATE → maps to Complete in our model
     } else if result_after_modifiers <= 1 {
-        PassResult::WildlyInaccurate
+        PassOutcome::WildlyInaccurate
     } else {
-        PassResult::Inaccurate
+        PassOutcome::Inaccurate
     }
 }
 
@@ -320,8 +320,8 @@ mod tests {
     #[test]
     fn set_parameter_pass_result() {
         let mut step = StepThrowTeamMate::new();
-        assert!(step.set_parameter(&StepParameter::PassResultParam(PassResult::Fumble)));
-        assert_eq!(step.pass_result, Some(PassResult::Fumble));
+        assert!(step.set_parameter(&StepParameter::PassResultParam(PassOutcome::Fumble)));
+        assert_eq!(step.pass_result, Some(PassOutcome::Fumble));
     }
 
     #[test]
@@ -441,29 +441,29 @@ mod tests {
 
     #[test]
     fn evaluate_ttm_pass_roll_1_is_fumble() {
-        assert_eq!(evaluate_ttm_pass(true, 4, 1, 0), PassResult::Fumble);
+        assert_eq!(evaluate_ttm_pass(true, 4, 1, 0), PassOutcome::Fumble);
     }
 
     #[test]
     fn evaluate_ttm_pass_roll_6_is_complete() {
-        assert_eq!(evaluate_ttm_pass(true, 4, 6, 0), PassResult::Complete);
+        assert_eq!(evaluate_ttm_pass(true, 4, 6, 0), PassOutcome::Complete);
     }
 
     #[test]
     fn evaluate_ttm_pass_no_passing_stat_is_fumble() {
-        assert_eq!(evaluate_ttm_pass(false, 0, 5, 0), PassResult::Fumble);
+        assert_eq!(evaluate_ttm_pass(false, 0, 5, 0), PassOutcome::Fumble);
     }
 
     #[test]
     fn evaluate_ttm_pass_wildly_inaccurate() {
         // passing=4, roll=3, modifier_sum=2 → 3-2=1 <= 1 → WILDLY_INACCURATE
-        assert_eq!(evaluate_ttm_pass(true, 4, 3, 2), PassResult::WildlyInaccurate);
+        assert_eq!(evaluate_ttm_pass(true, 4, 3, 2), PassOutcome::WildlyInaccurate);
     }
 
     #[test]
     fn evaluate_ttm_pass_inaccurate() {
         // passing=4, roll=3, modifier_sum=0 → 3 < 4, > 1 → INACCURATE
-        assert_eq!(evaluate_ttm_pass(true, 4, 3, 0), PassResult::Inaccurate);
+        assert_eq!(evaluate_ttm_pass(true, 4, 3, 0), PassOutcome::Inaccurate);
     }
 
     #[test]

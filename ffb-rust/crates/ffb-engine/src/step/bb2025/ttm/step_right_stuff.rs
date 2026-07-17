@@ -1,5 +1,5 @@
 use ffb_model::enums::{ApothecaryMode, PlayerState, PS_FALLING, SkillId};
-use ffb_model::enums::PassResult as ModelPassResult;
+use ffb_model::enums::PassOutcome as ModelPassResult;
 use ffb_model::enums::ReRollSource;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;

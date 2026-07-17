@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::enums::{
-    Direction, KickoffResult, PassResult, PassingDistance, PlayerAction,
+    Direction, KickoffResult, PassOutcome, PassingDistance, PlayerAction,
     ReRollSource, SeriousInjuryKind, Weather,
 };
 use crate::model::player::PlayerId;
@@ -39,7 +39,7 @@ pub enum GameEvent {
     JumpRoll { player_id: PlayerId, target: i32, roll: i32, success: bool },
     JumpUpRoll { player_id: PlayerId, target: i32, roll: i32, success: bool },
     MasterChefRoll { team_id: String, roll: i32, rerolls_stolen: i32 },
-    PassRoll { player_id: PlayerId, target: i32, distance: PassingDistance, roll: i32, result: PassResult, rerolled: bool },
+    PassRoll { player_id: PlayerId, target: i32, distance: PassingDistance, roll: i32, result: PassOutcome, rerolled: bool },
     PilingOn { player_id: PlayerId, target_id: PlayerId, rerolled: bool },
     PrayerRoll { team_id: String, roll: i32, prayer_id: String },
     RegenerationRoll { player_id: PlayerId, roll: i32, success: bool },
@@ -47,7 +47,7 @@ pub enum GameEvent {
     SafeThrowRoll { player_id: PlayerId, roll: i32, success: bool },
     StandUpRoll { player_id: PlayerId, target: i32, roll: i32, success: bool },
     SwarmingPlayersRoll { team_id: String, roll: i32 },
-    ThrowTeamMateRoll { thrower_id: PlayerId, thrown_id: PlayerId, roll: i32, result: PassResult },
+    ThrowTeamMateRoll { thrower_id: PlayerId, thrown_id: PlayerId, roll: i32, result: PassOutcome },
     WeepingDaggerRoll { player_id: PlayerId, roll: i32 },
     SpellEffectRoll { roll: i32 },
     BreatheFireRoll { attacker_id: PlayerId, defender_id: PlayerId, roll: i32, knock_down: bool, prone: bool, failure: bool, rerolled: bool },

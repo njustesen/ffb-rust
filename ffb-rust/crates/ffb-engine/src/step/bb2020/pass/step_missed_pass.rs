@@ -121,12 +121,12 @@ impl Step for StepMissedPass {
             StepParameter::PassResultParam(v) => {
                 use ffb_mechanics::pass_result::PassResult;
                 self.pass_result = Some(match v {
-                    ffb_model::enums::PassResult::Complete => PassResult::ACCURATE,
-                    ffb_model::enums::PassResult::Inaccurate => PassResult::INACCURATE,
-                    ffb_model::enums::PassResult::WildlyInaccurate => PassResult::WILDLY_INACCURATE,
-                    ffb_model::enums::PassResult::Fumble
-                    | ffb_model::enums::PassResult::Caught
-                    | ffb_model::enums::PassResult::MissedCatch => PassResult::FUMBLE,
+                    ffb_model::enums::PassOutcome::Complete => PassResult::ACCURATE,
+                    ffb_model::enums::PassOutcome::Inaccurate => PassResult::INACCURATE,
+                    ffb_model::enums::PassOutcome::WildlyInaccurate => PassResult::WILDLY_INACCURATE,
+                    ffb_model::enums::PassOutcome::Fumble
+                    | ffb_model::enums::PassOutcome::Caught
+                    | ffb_model::enums::PassOutcome::MissedCatch => PassResult::FUMBLE,
                 });
                 true
             }

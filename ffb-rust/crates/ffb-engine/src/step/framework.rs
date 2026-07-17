@@ -195,7 +195,7 @@ pub enum StepParameter {
     /// Whether the thrown player should be dropped on landing (TTM RightStuff).
     DropThrownPlayer(bool),
     /// Result of a pass/throw roll (TTM, pass sequence).
-    PassResultParam(ffb_model::enums::PassResult),
+    PassResultParam(ffb_model::enums::PassOutcome),
     /// Old defender state before the throw (StepInitThrowTeamMate → downstream).
     OldDefenderState(ffb_model::enums::PlayerState),
     /// Whether the thrown player should crash-land (BB2020 TTM sequence).

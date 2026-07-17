@@ -25,7 +25,7 @@
 /// `isBoxCoordinate()` guard wired — skips landing roll when player is in the dugout.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
-use ffb_model::enums::{PlayerState, PassResult as ModelPassResult, PS_FALLING, ApothecaryMode, ReRollSource};
+use ffb_model::enums::{PlayerState, PassOutcome as ModelPassResult, PS_FALLING, ApothecaryMode, ReRollSource};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::skill_use::SkillUse;
 use ffb_model::report::report_right_stuff_roll::ReportRightStuffRoll;
@@ -152,7 +152,7 @@ impl StepRightStuff {
             let mut successful = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
             let re_rolled = already_rerolled && self.re_roll_state.re_roll_source.is_some();
 
-            // Java: if (PassResult.FUMBLE == passResult && thrower.hasSkillProperty(fumbledPlayerLandsSafely))
+            // Java: if (PassOutcome.FUMBLE == passResult && thrower.hasSkillProperty(fumbledPlayerLandsSafely))
             //         { successful = true; addReport(ReportSkillUse(..., FUMBLED_PLAYER_LANDS_SAFELY)); }
             //       else { addReport(new ReportRightStuffRoll(...)); }
             let fumble_lands_safely_skill = if self.pass_result == Some(ModelPassResult::Fumble) {

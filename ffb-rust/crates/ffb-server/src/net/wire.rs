@@ -829,7 +829,7 @@ pub fn event_to_report(event: &GameEvent) -> Option<WireReport> {
         GameEvent::PassRoll { player_id, target, distance, roll, result, rerolled } =>
             Some(WireReport::PassRoll {
                 player_id: player_id.clone(),
-                successful: !matches!(result, ffb_model::enums::PassResult::Fumble),
+                successful: !matches!(result, ffb_model::enums::PassOutcome::Fumble),
                 roll: *roll,
                 minimum_roll: *target,
                 re_rolled: *rerolled,
@@ -1102,7 +1102,7 @@ pub fn events_to_reports(events: &[GameEvent]) -> Vec<WireReport> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffb_model::enums::{PassingDistance, PassResult, KickoffResult};
+    use ffb_model::enums::{PassingDistance, PassOutcome, KickoffResult};
     use ffb_model::enums::ReRollSource;
 
     fn jsn(report: &WireReport) -> String { serde_json::to_string(report).unwrap() }
@@ -1360,7 +1360,7 @@ mod tests {
     fn event_pass_roll_converts() {
         let event = GameEvent::PassRoll {
             player_id: "p".into(), target: 3, distance: PassingDistance::ShortPass,
-            roll: 4, result: PassResult::Complete, rerolled: false,
+            roll: 4, result: PassOutcome::Complete, rerolled: false,
         };
         let json = jsn(&event_to_report(&event).unwrap());
         assert!(json.contains("\"PASS_ROLL\""));
@@ -1371,7 +1371,7 @@ mod tests {
     fn event_pass_fumble_is_not_successful() {
         let event = GameEvent::PassRoll {
             player_id: "p".into(), target: 3, distance: PassingDistance::ShortPass,
-            roll: 1, result: PassResult::Fumble, rerolled: false,
+            roll: 1, result: PassOutcome::Fumble, rerolled: false,
         };
         let json = jsn(&event_to_report(&event).unwrap());
         assert!(json.contains("\"successful\":false"));
@@ -1719,7 +1719,7 @@ mod tests {
     fn event_throw_team_mate_roll_converts() {
         let event = GameEvent::ThrowTeamMateRoll {
             thrower_id: "t1".into(), thrown_id: "t2".into(), roll: 3,
-            result: ffb_model::enums::PassResult::Complete,
+            result: ffb_model::enums::PassOutcome::Complete,
         };
         let json = jsn(&event_to_report(&event).unwrap());
         assert!(json.contains("\"THROW_TEAM_MATE_ROLL\""));

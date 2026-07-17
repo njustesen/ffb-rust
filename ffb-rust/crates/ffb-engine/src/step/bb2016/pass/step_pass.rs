@@ -15,7 +15,7 @@
 ///
 /// client-only: DialogSkillUseParameter for passing skill re-roll — dialog is client-only.
 /// NOTE(Pass-modifiers): PassModifierFactory wired; individual modifier reporting deferred to reporting layer.
-use ffb_model::enums::{PassResult as ModelPassResult, PlayerAction, ReRollSource};
+use ffb_model::enums::{PassOutcome as ModelPassResult, PlayerAction, ReRollSource};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::mixed::report_pass_roll::ReportPassRoll;
@@ -43,7 +43,7 @@ pub struct StepPass {
     pass_skill_used: bool,
     /// Java: `state.result` — mechanics PassResult from evaluatePass
     mech_result: Option<PassResult>,
-    /// Model-level PassResult set via StepParameter (for test/replay).
+    /// Model-level PassOutcome set via StepParameter (for test/replay).
     result: Option<ModelPassResult>,
     /// Java: fReRolledAction — set when a re-roll is in progress.
     re_rolled_action: Option<String>,
@@ -291,7 +291,7 @@ impl Step for StepPass {
 mod tests {
     use super::*;
     use crate::step::framework::{StepAction, test_team};
-    use ffb_model::enums::{PassResult, Rules};
+    use ffb_model::enums::{PassOutcome, Rules};
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2016)
@@ -326,8 +326,8 @@ mod tests {
     #[test]
     fn set_parameter_pass_result() {
         let mut step = StepPass::new();
-        assert!(step.set_parameter(&StepParameter::PassResultParam(PassResult::Fumble)));
-        assert_eq!(step.result, Some(PassResult::Fumble));
+        assert!(step.set_parameter(&StepParameter::PassResultParam(PassOutcome::Fumble)));
+        assert_eq!(step.result, Some(PassOutcome::Fumble));
     }
 
     #[test]

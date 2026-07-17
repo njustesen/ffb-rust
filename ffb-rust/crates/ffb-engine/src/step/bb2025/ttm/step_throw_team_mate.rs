@@ -11,7 +11,7 @@
 /// Init param: IS_KICKED_PLAYER (optional).
 /// Consumed params: THROWN_PLAYER_ID, THROWN_PLAYER_STATE, THROWN_PLAYER_HAS_BALL.
 use std::collections::HashSet;
-use ffb_model::enums::{PassingDistance, PassResult, PlayerState, ReRollSource, SkillId};
+use ffb_model::enums::{PassingDistance, PassOutcome, PlayerState, ReRollSource, SkillId};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -37,7 +37,7 @@ pub struct StepThrowTeamMate {
     /// Java: `state.thrownPlayerHasBall`
     pub thrown_player_has_ball: bool,
     /// Java: `state.passResult`
-    pub pass_result: Option<PassResult>,
+    pub pass_result: Option<PassOutcome>,
     /// Java: `state.kicked`
     pub kicked: bool,
     /// Java: `state.usingBullseye` — tristate (None = not yet decided)
@@ -131,7 +131,7 @@ impl StepThrowTeamMate {
             let pass_result = self.pass_result.unwrap();
 
             // Java: successful = ACCURATE || INACCURATE
-            let successful = pass_result == PassResult::Complete || pass_result == PassResult::Inaccurate;
+            let successful = pass_result == PassOutcome::Complete || pass_result == PassOutcome::Inaccurate;
 
             // Java: ThrowTeamMateBehaviour.handleExecuteStepHook → addReport(new ReportThrowTeamMateRoll(...))
             let re_rolled = self.re_rolled_action.is_some() && self.re_roll_source.is_some();
@@ -156,7 +156,7 @@ impl StepThrowTeamMate {
                 let has_bullseye = game.player(&thrower_id)
                     .map(|p| p.has_skill_property(NamedProperties::CAN_SKIP_TTM_SCATTER_ON_SUPERB_THROW))
                     .unwrap_or(false);
-                if pass_result == PassResult::Complete && has_bullseye && self.using_bullseye.is_none() {
+                if pass_result == PassOutcome::Complete && has_bullseye && self.using_bullseye.is_none() {
                     // Server-side auto-decide: don't use Bullseye
                     self.using_bullseye = Some(false);
                 }
@@ -172,7 +172,7 @@ impl StepThrowTeamMate {
                     thrown_player_state: self.thrown_player_state,
                     thrown_player_has_ball: self.thrown_player_has_ball,
                     thrown_player_coordinate: thrower_coord,
-                    throw_scatter: pass_result == PassResult::Complete && self.using_bullseye != Some(true),
+                    throw_scatter: pass_result == PassOutcome::Complete && self.using_bullseye != Some(true),
                     has_swoop: scatters_single,
                     ..Default::default()
                 };
@@ -180,7 +180,7 @@ impl StepThrowTeamMate {
                 return self.handle_pass_result().push_seq(seq);
             } else {
                 if self.re_rolled_action.is_none() && player_can_pass {
-                    let is_fumble = pass_result == PassResult::Fumble;
+                    let is_fumble = pass_result == PassOutcome::Fumble;
                     if let Some(prompt) = ask_for_reroll_if_available(game, rerolled_action_key, self.minimum_roll, is_fumble) {
                         self.re_rolled_action = Some(rerolled_action_key.into());
                         self.re_roll_source = Some("TRR".into());
@@ -195,27 +195,27 @@ impl StepThrowTeamMate {
     }
 
     fn handle_pass_result(&self) -> StepOutcome {
-        let result = self.pass_result.unwrap_or(PassResult::Fumble);
+        let result = self.pass_result.unwrap_or(PassOutcome::Fumble);
         StepOutcome::next().publish(StepParameter::PassResultParam(result))
     }
 }
 
 /// Java: ThrowTeamMateBehaviour.evaluatePass (BB2025 version).
 /// BB2025 difference: resultAfterModifiers <= 1 → FUMBLE (not WILDLY_INACCURATE).
-fn evaluate_ttm_pass_bb2025(player_can_pass: bool, passing_value: i32, roll: i32, modifier_sum: i32) -> PassResult {
+fn evaluate_ttm_pass_bb2025(player_can_pass: bool, passing_value: i32, roll: i32, modifier_sum: i32) -> PassOutcome {
     if !player_can_pass || passing_value <= 0 {
-        return PassResult::Fumble;
+        return PassOutcome::Fumble;
     }
     if roll == 1 {
-        return PassResult::Fumble;
+        return PassOutcome::Fumble;
     }
     let result_after_modifiers = roll - modifier_sum;
     if roll == 6 || result_after_modifiers >= passing_value {
-        PassResult::Complete
+        PassOutcome::Complete
     } else if result_after_modifiers <= 1 {
-        PassResult::Fumble // BB2025: fumble (not wildly inaccurate)
+        PassOutcome::Fumble // BB2025: fumble (not wildly inaccurate)
     } else {
-        PassResult::Inaccurate
+        PassOutcome::Inaccurate
     }
 }
 
@@ -258,7 +258,7 @@ impl Step for StepThrowTeamMate {
                     self.re_roll_source = None;
                 } else {
                     // UseSkill true during Bullseye dialog: set using_bullseye
-                    if self.pass_result == Some(PassResult::Complete) && self.using_bullseye.is_none() {
+                    if self.pass_result == Some(PassOutcome::Complete) && self.using_bullseye.is_none() {
                         self.using_bullseye = Some(true);
                     }
                 }
@@ -337,8 +337,8 @@ mod tests {
     #[test]
     fn set_parameter_pass_result() {
         let mut step = StepThrowTeamMate::new();
-        assert!(step.set_parameter(&StepParameter::PassResultParam(PassResult::Fumble)));
-        assert_eq!(step.pass_result, Some(PassResult::Fumble));
+        assert!(step.set_parameter(&StepParameter::PassResultParam(PassOutcome::Fumble)));
+        assert_eq!(step.pass_result, Some(PassOutcome::Fumble));
     }
 
     #[test]
@@ -459,7 +459,7 @@ mod tests {
 
         let mut step = StepThrowTeamMate::new();
         step.thrown_player_id = Some("tp1".into());
-        step.pass_result = Some(PassResult::Complete);
+        step.pass_result = Some(PassOutcome::Complete);
 
         step.handle_command(
             &Action::UseSkill { skill_id: SkillId::Bullseye, use_skill: true },
@@ -488,28 +488,28 @@ mod tests {
 
     #[test]
     fn evaluate_ttm_pass_bb2025_roll_1_fumble() {
-        assert_eq!(evaluate_ttm_pass_bb2025(true, 4, 1, 0), PassResult::Fumble);
+        assert_eq!(evaluate_ttm_pass_bb2025(true, 4, 1, 0), PassOutcome::Fumble);
     }
 
     #[test]
     fn evaluate_ttm_pass_bb2025_roll_6_complete() {
-        assert_eq!(evaluate_ttm_pass_bb2025(true, 4, 6, 0), PassResult::Complete);
+        assert_eq!(evaluate_ttm_pass_bb2025(true, 4, 6, 0), PassOutcome::Complete);
     }
 
     #[test]
     fn evaluate_ttm_pass_bb2025_low_result_fumble_not_wildly_inaccurate() {
         // BB2025 specific: resultAfterModifiers <= 1 → FUMBLE (not WILDLY_INACCURATE)
-        assert_eq!(evaluate_ttm_pass_bb2025(true, 4, 3, 2), PassResult::Fumble);
+        assert_eq!(evaluate_ttm_pass_bb2025(true, 4, 3, 2), PassOutcome::Fumble);
     }
 
     #[test]
     fn evaluate_ttm_pass_bb2025_inaccurate() {
-        assert_eq!(evaluate_ttm_pass_bb2025(true, 4, 3, 0), PassResult::Inaccurate);
+        assert_eq!(evaluate_ttm_pass_bb2025(true, 4, 3, 0), PassOutcome::Inaccurate);
     }
 
     #[test]
     fn evaluate_ttm_pass_bb2025_no_passing_stat_fumble() {
-        assert_eq!(evaluate_ttm_pass_bb2025(false, 0, 5, 0), PassResult::Fumble);
+        assert_eq!(evaluate_ttm_pass_bb2025(false, 0, 5, 0), PassOutcome::Fumble);
     }
 
     #[test]
