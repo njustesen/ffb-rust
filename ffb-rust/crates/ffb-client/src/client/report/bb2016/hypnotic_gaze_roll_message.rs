@@ -45,8 +45,11 @@ impl ReportMessage for HypnoticGazeRollMessage {
             // locally since the mechanic expects unresolved RollModifier structs, while the
             // resolved ReportSkillRoll only carries modifier name strings.
             if let Some(player) = player {
+                // java: `" (AG " + AG + formatRollModifiers(mods) + " + Roll > 6)."` — the
+                // literal has a space before "+ Roll", which `formatRollModifiers` does not
+                // supply (it only prefixes/suffixes around each modifier, e.g. " - 1 Foo").
                 needed_roll.push_str(&format!(
-                    " (AG {}{}+ Roll > 6).",
+                    " (AG {}{} + Roll > 6).",
                     player.agility_with_modifiers().min(6),
                     status_report.format_roll_modifiers(report.get_roll_modifiers())
                 ));
@@ -119,6 +122,23 @@ mod tests {
         let report = ReportHypnoticGazeRoll::new(None, false, 1, 2, false, vec![]);
         HypnoticGazeRollMessage.render(&mut status_report, &game, &report);
         let needed = status_report.rendered_runs.iter().find(|r| r.text_style == Some(TextStyle::NEEDED_ROLL)).unwrap();
-        assert_eq!(needed.text.as_deref(), Some("Roll a 2+ to succeed (AG 4+ Roll > 6)."));
+        // java: `" (AG " + AG + formatRollModifiers(mods) + " + Roll > 6)."` — with no roll
+        // modifiers, this must keep the space between the AG value and "+ Roll" (previously
+        // rendered as "AG 4+ Roll", dropping the space).
+        assert_eq!(needed.text.as_deref(), Some("Roll a 2+ to succeed (AG 4 + Roll > 6)."));
+    }
+
+    #[test]
+    fn failed_roll_reports_needed_roll_with_agility_and_modifier() {
+        // Regression test: with a roll modifier present, `formatRollModifiers` returns
+        // " - 1 Foo" (no trailing space), so Java's literal `" + Roll > 6)."` must still
+        // contribute its own leading space, giving "... Foo + Roll > 6).". Previously the
+        // Rust format string glued them together as "...Foo+ Roll > 6)." with no space.
+        let mut status_report = StatusReport::new();
+        let game = make_game();
+        let report = ReportHypnoticGazeRoll::new(None, false, 1, 2, false, vec!["Foo".into()]);
+        HypnoticGazeRollMessage.render(&mut status_report, &game, &report);
+        let needed = status_report.rendered_runs.iter().find(|r| r.text_style == Some(TextStyle::NEEDED_ROLL)).unwrap();
+        assert_eq!(needed.text.as_deref(), Some("Roll a 2+ to succeed (AG 4 - Foo + Roll > 6)."));
     }
 }
