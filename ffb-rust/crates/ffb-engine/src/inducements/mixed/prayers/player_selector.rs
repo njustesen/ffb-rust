@@ -9,6 +9,13 @@ pub trait PlayerSelector: Send + Sync {
     /// Java: selectPlayers(Team, Game, int nrOfPlayers, Set<Skill> addedSkills)
     /// Returns selected player IDs (up to `nr_of_players`).
     fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, rng: &mut GameRng, added_skills: &[SkillId]) -> Vec<String>;
+
+    /// Java: `determineTeam(Team team, Game game)` — resolves which team is actually
+    /// affected by this selector. Default: the praying team itself (identity).
+    /// `OpponentPlayerSelector` overrides this to return the opposing team's id.
+    fn determine_team_id<'a>(&self, _game: &Game, team_id: &'a str) -> String {
+        team_id.to_string()
+    }
 }
 
 /// Null-object selector that selects no players.

@@ -34,8 +34,8 @@ pub fn apply_selection(_prayer_state: &mut PrayerState, _game: &mut Game, _playe
     // client-only: addIntensiveTrainingSkill — skill selection dialog skipped in headless mode.
 }
 
-pub fn remove_effect_internal(game: &mut Game, team_id: &str) {
-    remove_effect_internal_random_selection(game, team_id, PRAYER_NAME);
+pub fn remove_effect_internal(game: &mut Game, team_id: &str, selector: &dyn PlayerSelector) {
+    remove_effect_internal_random_selection(game, team_id, PRAYER_NAME, selector);
 }
 
 #[cfg(test)]
@@ -105,7 +105,7 @@ mod tests {
         add_reserve_player(&mut game, "h1");
         game.field_model.add_prayer_enhancement("h1", PRAYER_NAME);
         assert!(game.field_model.has_prayer_enhancement("h1", PRAYER_NAME));
-        remove_effect_internal(&mut game, "home");
+        remove_effect_internal(&mut game, "home", &StubPlayerSelector);
         assert!(!game.field_model.has_prayer_enhancement("h1", PRAYER_NAME));
     }
 }

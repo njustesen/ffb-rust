@@ -8,7 +8,7 @@ pub struct DirtyPlayer {
 
 impl DirtyPlayer {
     pub fn new() -> Self {
-        let base = Skill::new("Dirty Player", SkillCategory::General);
+        let base = Skill::with_default_value("Dirty Player", SkillCategory::General, 1);
         Self { base }
     }
 }
@@ -34,5 +34,10 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(DirtyPlayer::new().get_category(), SkillCategory::General);
+    }
+
+    #[test]
+    fn default_skill_value_is_correct() {
+        assert_eq!(DirtyPlayer::new().get_default_skill_value(), 1);
     }
 }

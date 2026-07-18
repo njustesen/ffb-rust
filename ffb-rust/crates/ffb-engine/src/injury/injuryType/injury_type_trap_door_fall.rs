@@ -1,5 +1,5 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeTrapDoorFall.
-use ffb_model::enums::{ApothecaryMode, PS_RESERVE};
+use ffb_model::enums::{ApothecaryMode, SendToBoxReason, PS_RESERVE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
@@ -17,7 +17,16 @@ impl InjuryTypeServer for InjuryTypeTrapDoorFall {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
+    /// Java: `TrapDoorFall.fallingDownCausesTurnover()` → false.
     fn falling_down_causes_turnover(&self) -> bool { false }
+    /// Java: `TrapDoorFall` constructed with `super("trapdoorFall", false, SendToBoxReason.TRAP_DOOR_FALL)`.
+    /// Was previously missing (defaulted to `None`).
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::TrapDoorFall) }
+    /// Java class simple name — was previously missing, which broke
+    /// `can_apo_ko_into_stun()`'s name-based lookup: with `injury_type_name` left `None`
+    /// (`java_class_name()` defaulting to `""`), the apothecary was incorrectly allowed to
+    /// revive a KO'd trap-door victim into stun (Java: `TrapDoorFall.canApoKoIntoStun()` → false).
+    fn java_class_name(&self) -> &'static str { "InjuryTypeTrapDoorFall" }
 }
 
 #[cfg(test)]
@@ -43,6 +52,18 @@ mod tests {
     }
     #[test]
     fn does_not_cause_turnover() { assert!(!InjuryTypeTrapDoorFall::new().falling_down_causes_turnover()); }
+    #[test]
+    fn send_to_box_reason_is_trap_door_fall() {
+        assert_eq!(InjuryTypeTrapDoorFall::new().send_to_box_reason(), Some(SendToBoxReason::TrapDoorFall));
+    }
+    #[test]
+    fn java_class_name_matches_can_apo_ko_into_stun_lookup() {
+        // Regression test: `can_apo_ko_into_stun` keys off this exact string to disallow
+        // reviving a KO'd trap-door victim into stun.
+        let t = InjuryTypeTrapDoorFall::new();
+        assert_eq!(t.java_class_name(), "InjuryTypeTrapDoorFall");
+        assert!(!crate::injury::can_apo_ko_into_stun(Some(t.java_class_name())));
+    }
     #[test]
     fn context_stores_defender_id() {
         let mut t = InjuryTypeTrapDoorFall::new(); let mut rng = GameRng::new(1);

@@ -1,12 +1,15 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeBomb.
-/// Armor roll with Bomb +1 armor modifier. If broken: injury roll with Bomb +1.
+/// Plain armor roll (no Bomb-specific modifier — Java's `InjuryTypeBomb.handleInjury()` never
+/// calls `specialEffectArmourModifiers`/`specialEffectInjuryModifiers`; that only happens in
+/// `AbstractInjuryTypeBombWithModifier`). Only the defender's `ignoresArmourModifiersFromSkills`/
+/// `blocksLikeChainsaw` skill properties affect the armor roll here.
 /// No PRONE fallback: if armor holds, injury stays None. falling_down_causes_turnover=false.
 use ffb_model::enums::ApothecaryMode;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::NamedProperties;
-use ffb_mechanics::modifiers::{ARMOR_BOMB, ARMOR_CHAINSAW_3, INJURY_BOMB};
+use ffb_mechanics::modifiers::ARMOR_CHAINSAW_3;
 use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
 use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
 use crate::injury::injuryType::modification_aware_injury_type_server::leak_injury_modifier;
@@ -23,7 +26,6 @@ impl InjuryTypeServer for InjuryTypeBomb {
         self.ctx.defender_coordinate = Some(coord);
         self.ctx.apothecary_mode = apo_mode;
         if !self.ctx.armor_broken {
-            self.ctx.add_armor_modifier(ARMOR_BOMB);
             // Java: check defender for ignoresArmourModifiersFromSkills / blocksLikeChainsaw
             let defender_ignores = game.player(defender_id)
                 .map(|p| p.has_unused_skill_with_property(NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS))
@@ -40,7 +42,6 @@ impl InjuryTypeServer for InjuryTypeBomb {
         }
         // Java: no PRONE fallback — bomb sets no injury if armor holds
         if self.ctx.armor_broken {
-            self.ctx.add_injury_modifier(INJURY_BOMB);
             // Java: `factory.findInjuryModifiers(game, injuryContext, pAttacker, pDefender, isStab(),
             // isFoul(), isVomitLike())` — Bomb never overrides isStab/isFoul/isVomitLike, all false.
             if let Some(defender) = game.player(defender_id) {
@@ -56,6 +57,10 @@ impl InjuryTypeServer for InjuryTypeBomb {
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn falling_down_causes_turnover(&self) -> bool { false }
+    /// Java: `new Bomb()` constructor passes `SendToBoxReason.BOMB` to the `InjuryType` base class.
+    fn send_to_box_reason(&self) -> Option<ffb_model::enums::SendToBoxReason> {
+        Some(ffb_model::enums::SendToBoxReason::Bomb)
+    }
 }
 
 #[cfg(test)]
@@ -92,6 +97,23 @@ mod tests {
     }
     #[test]
     fn no_turnover() { assert!(!InjuryTypeBomb::new().falling_down_causes_turnover()); }
+    #[test]
+    fn send_to_box_reason_is_bomb() {
+        use ffb_model::enums::SendToBoxReason;
+        assert_eq!(InjuryTypeBomb::new().send_to_box_reason(), Some(SendToBoxReason::Bomb));
+    }
+    #[test]
+    fn does_not_add_bomb_armor_or_injury_modifier() {
+        // Java InjuryTypeBomb.handleInjury() never calls specialEffectArmourModifiers /
+        // specialEffectInjuryModifiers (SpecialEffect.BOMB) — that only happens in
+        // AbstractInjuryTypeBombWithModifier. A plain InjuryTypeBomb hit must not get any
+        // "Bomb" +1 armor/injury bonus.
+        let mut t = InjuryTypeBomb::new();
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game_with_armor(2), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert!(!t.ctx.armor_modifiers.iter().any(|m| m.name == "Bomb"));
+        assert!(!t.ctx.injury_modifiers.iter().any(|m| m.name == "Bomb"));
+    }
     #[test]
     fn defender_with_chainsaw_gets_chainsaw_modifier() {
         use ffb_model::model::SkillWithValue;

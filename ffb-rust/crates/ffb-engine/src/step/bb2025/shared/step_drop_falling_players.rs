@@ -16,6 +16,8 @@ use ffb_model::util::util_cards::UtilCards;
 use crate::action::Action;
 use crate::dice_interpreter::DiceInterpreter;
 use crate::drop_player_context::{DropPlayerContext, SteadyFootingContext};
+use crate::skill_behaviour::bb2025::saboteur_behaviour::StepDropFallingPlayersHookState;
+use crate::skill_behaviour::dispatch;
 use crate::injury::injuryType::injury_type_block::{BlockMode, InjuryTypeBlock};
 use crate::injury::injuryType::injury_type_piling_on_armour::InjuryTypePilingOnArmour;
 use crate::injury::injuryType::injury_type_piling_on_injury::InjuryTypePilingOnInjury;
@@ -132,7 +134,27 @@ impl Step for StepDropFallingPlayers {
 impl StepDropFallingPlayers {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: if (getGameState().executeStepHooks(this, state)) return;
-        // client-only: Saboteur step hook / dialog — headless skips Saboteur activation
+        // Runs SaboteurBehaviour::SaboteurStepModifier (BB2025 only; no-op on other
+        // registries since Saboteur has no BB2016/BB2020 equivalent). The dialog-show
+        // branches are headless no-ops (return false, never `true`), so this never
+        // actually pauses the step here today — but it's what actually flips
+        // saboteur_triggered_attacker/defender and rolls the Saboteur d6, which nothing
+        // else in this file does.
+        let mut hook_state = StepDropFallingPlayersHookState {
+            old_defender_state: self.old_defender_state,
+            saboteur_triggered_attacker: self.saboteur_triggered_attacker,
+            using_saboteur_attacker: self.using_saboteur_attacker,
+            saboteur_triggered_defender: self.saboteur_triggered_defender,
+            using_saboteur_defender: self.using_saboteur_defender,
+        };
+        let hooked = dispatch::execute_step_hooks(game, rng, StepId::DropFallingPlayers, &mut hook_state);
+        self.saboteur_triggered_attacker = hook_state.saboteur_triggered_attacker;
+        self.using_saboteur_attacker = hook_state.using_saboteur_attacker;
+        self.saboteur_triggered_defender = hook_state.saboteur_triggered_defender;
+        self.using_saboteur_defender = hook_state.using_saboteur_defender;
+        if hooked {
+            return StepOutcome::cont();
+        }
 
         let attacker_id = game.acting_player.player_id.clone().unwrap_or_default();
         let defender_id = game.defender_id.clone().unwrap_or_default();
@@ -613,6 +635,55 @@ mod tests {
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::DropPlayerContext(_))));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))));
         assert!(!out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))));
+    }
+
+    // ── Saboteur hook wiring (BB2025 only) ───────────────────────────────────────────
+
+    fn add_saboteur(game: &mut Game, team: &str, player_id: &str) {
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::SkillId;
+        let player = if team == "home" { game.team_home.player_mut(player_id) }
+            else { game.team_away.player_mut(player_id) };
+        if let Some(p) = player {
+            p.extra_skills.push(SkillWithValue::new(SkillId::Saboteur));
+        }
+    }
+
+    #[test]
+    fn saboteur_hook_actually_runs_and_flips_defender_falling() {
+        // Before this step called dispatch::execute_step_hooks at all, self.saboteur_
+        // triggered_attacker/using_saboteur_attacker were dead fields — always their
+        // constructor defaults — since nothing ever invoked SaboteurStepModifier. With
+        // the hook wired, an attacker who is FALLING with Saboteur and the "using" answer
+        // pre-set to Some(true) should roll (deterministic seed chosen for a >=4 result)
+        // and (on success) push the previously-standing defender into FALLING too.
+        let mut found = false;
+        for seed in 0u64..100 {
+            let mut game = make_game_with_rules(Rules::Bb2025);
+            let coord = FieldCoordinate::new(5, 5);
+            add_player(&mut game, "home", "atk", coord, PS_FALLING);
+            add_player(&mut game, "away", "def", coord, PS_STANDING);
+            add_saboteur(&mut game, "home", "atk");
+            game.acting_player.player_id = Some("atk".into());
+            game.acting_player.player_action = Some(ffb_model::enums::PlayerAction::Block);
+            game.defender_id = Some("def".into());
+
+            let mut step = StepDropFallingPlayers::new();
+            step.using_saboteur_attacker = Some(true);
+            step.start(&mut game, &mut GameRng::new(seed));
+
+            if step.saboteur_triggered_attacker {
+                assert_eq!(
+                    game.field_model.player_state("def").unwrap().base(),
+                    PS_FALLING,
+                    "successful attacker Saboteur roll should push the defender to FALLING"
+                );
+                assert!(game.report_list.has_report(ffb_model::report::ReportId::SABOTEUR_ROLL));
+                found = true;
+                break;
+            }
+        }
+        assert!(found, "should find a seed where the wired Saboteur hook actually rolls >= 4");
     }
 
     // ── PilingOn (BB2016/BB2020 only) — Phase ABI ────────────────────────────────────

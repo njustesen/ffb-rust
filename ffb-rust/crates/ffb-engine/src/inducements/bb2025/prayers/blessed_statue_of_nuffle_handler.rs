@@ -30,7 +30,7 @@ impl PrayerHandler for BlessedStatueOfNuffleHandler {
     }
 
     fn remove_effect_internal(&self, _prayer_state: &mut PrayerState, game: &mut Game, team_id: &str) {
-        blessed_statue_of_nuffle_handler::remove_effect_internal(game, team_id);
+        blessed_statue_of_nuffle_handler::remove_effect_internal(game, team_id, &PlayerSelector::new());
     }
 }
 

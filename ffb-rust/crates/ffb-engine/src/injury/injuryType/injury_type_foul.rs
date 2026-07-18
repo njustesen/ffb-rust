@@ -1,7 +1,7 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeFoul.
 /// ModificationAware: foul armor roll (foul-assist + blatant-foul modifiers) + injury roll.
 /// savedByArmour -> PRONE (default). isFoul=true, isStab=false.
-use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE, SkillId};
+use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE, SendToBoxReason, SkillId};
 use ffb_model::model::property::NamedProperties;
 use ffb_model::option::game_option_id;
 use ffb_model::types::FieldCoordinate;
@@ -27,9 +27,17 @@ impl InjuryTypeServer for InjuryTypeFoul {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
+    /// Java: `Foul.shouldPlayFallSound()` — overridden to `false`.
+    fn should_play_fall_sound(&self) -> bool { false }
+    /// Java: `Foul()` constructor passes `SendToBoxReason.FOULED`.
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::Fouled) }
 }
 impl ModificationAwareInjuryType for InjuryTypeFoul {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
+        // TODO: Java (lines 75-91) additionally re-checks `armorModifierFactory.findArmorModifiers`
+        // (general attacker/defender skill-based armor modifiers, including a "sneaky pair"
+        // affectsEitherArmourOrInjuryWithPartner modifier held back for a second pass) when the
+        // roll above didn't break armor. Not modeled here yet — same known gap as InjuryTypeStab.
         // Add foul-assist armor modifier based on net offensive - defensive assists
         if let Some(aid) = attacker_id {
             let off = UtilPlayer::find_offensive_foul_assists(game, aid, defender_id) as i32;
@@ -145,6 +153,15 @@ mod tests {
         let mut t = InjuryTypeFoul::new(); let mut rng = GameRng::new(1);
         t.handle_injury(&game_with_armor(13), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert_eq!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
+    }
+    #[test]
+    fn should_play_fall_sound_is_false() {
+        assert!(!InjuryTypeFoul::new().should_play_fall_sound());
+    }
+    #[test]
+    fn send_to_box_reason_is_fouled() {
+        use ffb_model::enums::SendToBoxReason;
+        assert_eq!(InjuryTypeFoul::new().send_to_box_reason(), Some(SendToBoxReason::Fouled));
     }
     #[test]
     fn armor_break_results_in_injury_roll() {

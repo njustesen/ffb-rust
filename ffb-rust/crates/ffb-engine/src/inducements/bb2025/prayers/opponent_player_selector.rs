@@ -28,6 +28,15 @@ impl PlayerSelectorTrait for OpponentPlayerSelector {
         };
         PlayerSelector::new().select_players(game, opponent_id, nr_of_players, rng, added_skills)
     }
+
+    /// Java: `OpponentPlayerSelector.determineTeam(team, game)` returns `game.getOtherTeam(team)`.
+    fn determine_team_id<'a>(&self, game: &Game, team_id: &'a str) -> String {
+        if game.team_home.id == team_id {
+            game.team_away.id.clone()
+        } else {
+            game.team_home.id.clone()
+        }
+    }
 }
 
 #[cfg(test)]

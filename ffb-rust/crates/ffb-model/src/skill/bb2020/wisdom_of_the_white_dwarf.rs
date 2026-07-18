@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::WisdomOfTheWhiteDwarf.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct WisdomOfTheWhiteDwarf {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct WisdomOfTheWhiteDwarf {
 
 impl WisdomOfTheWhiteDwarf {
     pub fn new() -> Self {
-        let base = Skill::new("Wisdom of the White Dwarf", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Wisdom of the White Dwarf", SkillCategory::Trait, SkillUsageType::OncePerTurnByTeamMate);
         Self { base }
     }
 }
@@ -34,5 +34,10 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(WisdomOfTheWhiteDwarf::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn usage_type_is_correct() {
+        assert_eq!(WisdomOfTheWhiteDwarf::new().get_skill_usage_type(), SkillUsageType::OncePerTurnByTeamMate);
     }
 }

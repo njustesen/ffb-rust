@@ -1,6 +1,6 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeDropDodgeForSpp.
 /// Like DropDodge, arm bar player field kept for SPP variant.
-use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE};
+use ffb_model::enums::{ApothecaryMode, PlayerState, SendToBoxReason, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
@@ -27,7 +27,10 @@ impl InjuryTypeServer for InjuryTypeDropDodgeForSpp {
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,
         coord: FieldCoordinate, _from_coord: Option<FieldCoordinate>, _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode) {
         self.ctx.defender_id = Some(defender_id.to_owned());
-        self.ctx.attacker_id = attacker_id.map(str::to_owned);
+        // Java: `injuryContext.setAttackerId(armBarPlayer.getId())` — SPP/box credit always
+        // goes to the arm-bar/diving-tackle player, not the `pAttacker` handleInjury parameter
+        // (which is still used below, unchanged, for injury-modifier lookup).
+        self.ctx.attacker_id = self.arm_bar_player_id.clone();
         self.ctx.defender_coordinate = Some(coord);
         self.ctx.apothecary_mode = apo_mode;
         if !self.ctx.armor_broken {
@@ -43,7 +46,6 @@ impl InjuryTypeServer for InjuryTypeDropDodgeForSpp {
                 }
             }
             // TODO: add affectsEitherArmourOrInjuryOnDodge modifier (diving tackle) — needs UtilPlayer.findAdjacentPlayersWithTacklezones
-            let _ = self.arm_bar_player_id.as_deref();
             do_armor_roll(game, rng, &mut self.ctx, defender_id);
         }
         if self.ctx.armor_broken {
@@ -64,6 +66,12 @@ impl InjuryTypeServer for InjuryTypeDropDodgeForSpp {
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn falling_down_causes_turnover(&self) -> bool { true }
+    /// Java: `DropDodgeForSpp` constructed with `worthSpps=true`.
+    fn is_worth_spps(&self) -> bool { true }
+    /// Java: `DropDodgeForSpp.isCausedByOpponent()` — true (overridden, unlike base `DropDodge`).
+    fn is_caused_by_opponent(&self) -> bool { true }
+    /// Java: `DropDodgeForSpp()` constructor passes `SendToBoxReason.DODGE_FAIL`.
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::DodgeFail) }
 }
 
 #[cfg(test)]
@@ -103,11 +111,34 @@ mod tests {
     fn falling_down_causes_turnover() {
         assert!(InjuryTypeDropDodgeForSpp::new().falling_down_causes_turnover());
     }
+    #[test]
+    fn is_worth_spps_is_true() {
+        assert!(InjuryTypeDropDodgeForSpp::new().is_worth_spps());
+    }
+    #[test]
+    fn is_caused_by_opponent_is_true() {
+        assert!(InjuryTypeDropDodgeForSpp::new().is_caused_by_opponent());
+    }
+    #[test]
+    fn send_to_box_reason_is_dodge_fail() {
+        assert_eq!(InjuryTypeDropDodgeForSpp::new().send_to_box_reason(), Some(SendToBoxReason::DodgeFail));
+    }
 
     #[test]
     fn new_with_arm_bar_stores_player_id() {
         let t = InjuryTypeDropDodgeForSpp::new_with_arm_bar(Some("arm_bar_player".into()));
         assert_eq!(t.arm_bar_player_id.as_deref(), Some("arm_bar_player"));
+    }
+
+    #[test]
+    fn attacker_id_credited_to_arm_bar_player_not_handle_injury_attacker() {
+        // Java: `InjuryTypeDropDodgeForSpp.handleInjury` calls
+        // `injuryContext.setAttackerId(armBarPlayer.getId())` unconditionally, so SPP/box
+        // credit goes to the arm-bar/diving-tackle player, never to the `pAttacker` argument.
+        let mut t = InjuryTypeDropDodgeForSpp::new_with_arm_bar(Some("arm_bar_player".into()));
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game_with_armor(13), &mut rng, Some("real_attacker"), "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert_eq!(t.ctx.attacker_id.as_deref(), Some("arm_bar_player"));
     }
 
     #[test]

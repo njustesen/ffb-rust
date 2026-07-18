@@ -1,5 +1,5 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeEatPlayer.
-use ffb_model::enums::{ApothecaryMode, PlayerState, PS_RIP};
+use ffb_model::enums::{ApothecaryMode, PlayerState, SendToBoxReason, PS_RIP};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
@@ -21,7 +21,13 @@ impl InjuryTypeServer for InjuryTypeEatPlayer {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn falling_down_causes_turnover(&self) -> bool { false }
+    // Java: `EatPlayer` does not override `fallingDownCausesTurnover()`, so the `InjuryType`
+    // base default (`true`) applies — no override needed here.
+    /// Java: `EatPlayer.canUseApo()` — overridden to `false` (an apothecary cannot save a
+    /// player who has been eaten).
+    fn can_use_apo(&self) -> bool { false }
+    /// Java: `EatPlayer()` constructor passes `SendToBoxReason.EATEN`.
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::Eaten) }
 }
 
 #[cfg(test)]
@@ -43,7 +49,22 @@ mod tests {
         assert_eq!(t.ctx.injury.map(|s| s.base()), Some(PS_RIP));
     }
     #[test]
-    fn does_not_cause_turnover() { assert!(!InjuryTypeEatPlayer::new().falling_down_causes_turnover()); }
+    fn falling_down_causes_turnover_defaults_true() {
+        // Java: `EatPlayer` does not override `fallingDownCausesTurnover()`, so `InjuryType`'s
+        // base default (`true`) applies. Regression test for a previously-inverted override
+        // (`false`) that had no basis in the Java source.
+        assert!(InjuryTypeEatPlayer::new().falling_down_causes_turnover());
+    }
+    #[test]
+    fn can_use_apo_is_false() {
+        // Java: `EatPlayer.canUseApo()` overridden to `false`. Regression test for a
+        // previously-missing override (defaulted to the trait's `true`).
+        assert!(!InjuryTypeEatPlayer::new().can_use_apo());
+    }
+    #[test]
+    fn send_to_box_reason_is_eaten() {
+        assert_eq!(InjuryTypeEatPlayer::new().send_to_box_reason(), Some(SendToBoxReason::Eaten));
+    }
     #[test]
     fn context_stores_attacker_and_defender() {
         let mut t = InjuryTypeEatPlayer::new(); let mut rng = GameRng::new(1);

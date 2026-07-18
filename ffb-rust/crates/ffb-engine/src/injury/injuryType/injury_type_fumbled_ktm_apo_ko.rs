@@ -1,6 +1,6 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeFumbledKtmApoKo.
 /// Armor always broken. Injury roll (no special modifier filter). stunIsTreatedAsKo=true.
-use ffb_model::enums::{ApothecaryMode, PS_PRONE};
+use ffb_model::enums::{ApothecaryMode, SendToBoxReason, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
@@ -34,6 +34,8 @@ impl InjuryTypeServer for InjuryTypeFumbledKtmApoKo {
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn stun_is_treated_as_ko(&self) -> bool { true }
+    /// Java: `KTMFumbleApoKoInjury()` constructor passes `SendToBoxReason.KICKED`.
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::Kicked) }
 }
 
 #[cfg(test)]
@@ -50,6 +52,10 @@ mod tests {
         assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
     #[test] fn stun_is_ko() { assert!(InjuryTypeFumbledKtmApoKo::new().stun_is_treated_as_ko()); }
+    #[test]
+    fn send_to_box_reason_is_kicked() {
+        assert_eq!(InjuryTypeFumbledKtmApoKo::new().send_to_box_reason(), Some(SendToBoxReason::Kicked));
+    }
     #[test]
     fn causes_turnover_by_default() { assert!(InjuryTypeFumbledKtmApoKo::new().falling_down_causes_turnover()); }
     #[test]

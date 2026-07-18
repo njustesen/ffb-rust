@@ -2,6 +2,7 @@
 /// Mirrors Java `com.fumbbl.ffb.server.step.generator.bb2025.MultiBlock`.
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
+use super::activation_sequence_builder::ActivationSequenceBuilder;
 
 #[derive(Debug, Clone, Default)]
 pub struct MultiBlockParams {
@@ -16,6 +17,10 @@ impl MultiBlock {
     pub fn build_sequence(params: &MultiBlockParams) -> Vec<SequenceStep> {
         let mut seq = Sequence::new();
         let size = params.block_targets.len() as i32;
+        // 0 [ACTIVATION(END_BLOCKING)]
+        ActivationSequenceBuilder::new()
+            .with_failure_label(labels::END_BLOCKING)
+            .add_to(&mut seq);
         // 1 FOUL_APPEARANCE_MULTIPLE (fail → END_BLOCKING)
         seq.add(StepId::FoulAppearanceMultiple, vec![
             StepParameter::GotoLabelOnFailure(labels::END_BLOCKING.into()),
@@ -60,17 +65,36 @@ mod tests {
     use super::*;
 
     #[test]
-    fn multi_block_has_9_steps() {
+    fn multi_block_has_22_steps() {
         let steps = MultiBlock::build_sequence(&MultiBlockParams {
             block_targets: vec!["p1".into(), "p2".into()],
         });
-        assert_eq!(steps.len(), 9);
+        // 13 activation steps + 9 multi-block steps
+        assert_eq!(steps.len(), 22);
     }
 
     #[test]
-    fn multi_block_empty_targets_has_9_steps() {
+    fn multi_block_empty_targets_has_22_steps() {
         let steps = MultiBlock::build_sequence(&MultiBlockParams::default());
-        assert_eq!(steps.len(), 9);
+        assert_eq!(steps.len(), 22);
+    }
+
+    #[test]
+    fn multi_block_starts_with_activation_sequence() {
+        // Java: `ActivationSequenceBuilder.create().withFailureLabel(END_BLOCKING).addTo(sequence)`
+        // is called before FOUL_APPEARANCE_MULTIPLE (MultiBlock.java:29-32).
+        let steps = MultiBlock::build_sequence(&MultiBlockParams::default());
+        assert_eq!(steps[0].step_id, StepId::InitActivation);
+        assert!(steps.iter().any(|s| s.step_id == StepId::BoneHead));
+        assert!(steps.iter().any(|s| s.step_id == StepId::ReallyStupid));
+        assert!(steps.iter().any(|s| s.step_id == StepId::TakeRoot));
+        assert!(steps.iter().any(|s| s.step_id == StepId::UnchannelledFury));
+        assert!(steps.iter().any(|s| s.step_id == StepId::BloodLust));
+        assert!(steps.iter().any(|s| s.step_id == StepId::AnimalSavagery));
+        // FoulAppearanceMultiple must come after the activation sequence.
+        let init_pos = steps.iter().position(|s| s.step_id == StepId::InitActivation).unwrap();
+        let foul_pos = steps.iter().position(|s| s.step_id == StepId::FoulAppearanceMultiple).unwrap();
+        assert!(init_pos < foul_pos);
     }
 
     #[test]

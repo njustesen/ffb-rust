@@ -3,6 +3,7 @@
 ///
 /// Java: iterates `selector.determineTeam(team, game).getPlayers()` and calls
 /// `game.getFieldModel().removePrayerEnhancements(player, prayer)` for each.
+use crate::inducements::mixed::prayers::player_selector::PlayerSelector;
 use crate::inducements::mixed::prayers::prayer_player_effect::remove_prayer_player_effect;
 
 #[derive(Debug, Default, Clone)]
@@ -15,15 +16,17 @@ impl EnhancementRemover {
 
     /// Java: `removeEnhancement(GameState, Team, PlayerSelector, Prayer)`.
     /// Removes the prayer enhancement tracking for all players of the team
-    /// that the selector resolves (own or opponent).
+    /// that the selector resolves (own or opponent) via `determineTeam`.
     pub fn remove_enhancement(
         &self,
         game: &mut ffb_model::model::game::Game,
         team_id: &str,
         prayer_name: &str,
+        selector: &dyn PlayerSelector,
     ) {
+        let target_team_id = selector.determine_team_id(game, team_id);
         let player_ids: Vec<String> = {
-            let team = if game.team_home.id == team_id {
+            let team = if game.team_home.id == target_team_id {
                 &game.team_home
             } else {
                 &game.team_away
@@ -55,6 +58,23 @@ mod tests {
     use ffb_model::enums::{Rules, PS_STANDING};
     use ffb_model::enums::PlayerState;
     use crate::step::framework::test_team;
+    use crate::inducements::mixed::prayers::player_selector::StubPlayerSelector;
+
+    /// Selector whose `determine_team_id` returns the opposing team's id, mirroring
+    /// `bb2020::prayers::OpponentPlayerSelector` / `bb2025::prayers::OpponentPlayerSelector`.
+    struct TestOpponentSelector;
+    impl PlayerSelector for TestOpponentSelector {
+        fn select_players(&self, _game: &Game, _team_id: &str, _nr_of_players: i32, _rng: &mut ffb_model::util::rng::GameRng, _added_skills: &[ffb_model::enums::SkillId]) -> Vec<String> {
+            vec![]
+        }
+        fn determine_team_id<'a>(&self, game: &Game, team_id: &'a str) -> String {
+            if game.team_home.id == team_id {
+                game.team_away.id.clone()
+            } else {
+                game.team_home.id.clone()
+            }
+        }
+    }
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020)
@@ -89,7 +109,7 @@ mod tests {
     fn remove_enhancement_is_callable() {
         let remover = EnhancementRemover::new();
         let mut game = make_game();
-        remover.remove_enhancement(&mut game, "home", "STILETTO");
+        remover.remove_enhancement(&mut game, "home", "STILETTO", &StubPlayerSelector);
     }
 
     #[test]
@@ -99,7 +119,7 @@ mod tests {
         add_player(&mut game, "home", "h1");
         game.field_model.add_prayer_enhancement("h1", "STILETTO");
         assert!(game.field_model.has_prayer_enhancement("h1", "STILETTO"));
-        remover.remove_enhancement(&mut game, "home", "STILETTO");
+        remover.remove_enhancement(&mut game, "home", "STILETTO", &StubPlayerSelector);
         assert!(!game.field_model.has_prayer_enhancement("h1", "STILETTO"));
     }
 
@@ -111,9 +131,28 @@ mod tests {
         add_player(&mut game, "away", "a1");
         game.field_model.add_prayer_enhancement("h1", "STILETTO");
         game.field_model.add_prayer_enhancement("a1", "STILETTO");
-        remover.remove_enhancement(&mut game, "home", "STILETTO");
+        remover.remove_enhancement(&mut game, "home", "STILETTO", &StubPlayerSelector);
         assert!(!game.field_model.has_prayer_enhancement("h1", "STILETTO"));
         assert!(game.field_model.has_prayer_enhancement("a1", "STILETTO"));
+    }
+
+    /// Regression test: for prayers using an opponent-team selector (e.g. BAD_HABITS,
+    /// GREASY_CLEATS), the enhancement was granted to the OPPONENT team's players, so
+    /// removal must target the opponent team too — not the praying team's own roster.
+    /// Java: `enhancementRemover.removeEnhancement(gameState, team, selector(), handledPrayer())`
+    /// where `selector().determineTeam(team, game)` resolves to `game.getOtherTeam(team)`.
+    #[test]
+    fn remove_enhancement_targets_opponent_team_when_selector_resolves_to_opponent() {
+        let remover = EnhancementRemover::new();
+        let mut game = make_game();
+        add_player(&mut game, "home", "h1");
+        add_player(&mut game, "away", "a1");
+        // BAD_HABITS granted by "home" praying → enhancement lives on the opponent ("away").
+        game.field_model.add_prayer_enhancement("a1", "BAD_HABITS");
+        remover.remove_enhancement(&mut game, "home", "BAD_HABITS", &TestOpponentSelector);
+        assert!(!game.field_model.has_prayer_enhancement("a1", "BAD_HABITS"), "opponent's enhancement must be removed");
+        // Praying team's own roster is untouched (no enhancement there to begin with).
+        assert!(!game.field_model.has_prayer_enhancement("h1", "BAD_HABITS"));
     }
 
     #[test]

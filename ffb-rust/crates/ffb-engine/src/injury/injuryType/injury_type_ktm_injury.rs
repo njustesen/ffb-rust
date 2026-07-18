@@ -1,6 +1,6 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeKTMInjury.
 /// Armor always broken. Injury roll. If STUNNED result, upgrade to KNOCKED_OUT.
-use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE, PS_STUNNED, PS_KNOCKED_OUT};
+use ffb_model::enums::{ApothecaryMode, PlayerState, SendToBoxReason, PS_PRONE, PS_STUNNED, PS_KNOCKED_OUT};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
@@ -38,6 +38,8 @@ impl InjuryTypeServer for InjuryTypeKTMInjury {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
+    /// Java: `KTMInjury()` constructor passes `SendToBoxReason.KICKED`.
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::Kicked) }
 }
 
 #[cfg(test)]
@@ -121,5 +123,9 @@ mod tests {
     fn injury_context_returns_context() {
         let t = InjuryTypeKTMInjury::new();
         assert_eq!(t.injury_context().apothecary_mode, ApothecaryMode::Defender);
+    }
+    #[test]
+    fn send_to_box_reason_is_kicked() {
+        assert_eq!(InjuryTypeKTMInjury::new().send_to_box_reason(), Some(SendToBoxReason::Kicked));
     }
 }

@@ -110,6 +110,10 @@ impl InjuryTypeServer for InjuryTypeBlock {
     fn is_worth_spps(&self) -> bool { true }
     /// Java: `Block.isCausedByOpponent()` — true.
     fn is_caused_by_opponent(&self) -> bool { true }
+    /// Java: `new Block()` constructor passes `SendToBoxReason.BLOCKED`.
+    fn send_to_box_reason(&self) -> Option<ffb_model::enums::SendToBoxReason> {
+        Some(ffb_model::enums::SendToBoxReason::Blocked)
+    }
 }
 /// Java: `pAttacker.getTeam() != pDefender.getTeam()`.
 fn different_teams(game: &Game, attacker_id: Option<&str>, defender_id: &str) -> bool {
@@ -335,6 +339,11 @@ mod tests {
         let mut t = InjuryTypeBlock::new(BlockMode::Regular, true); let mut rng = GameRng::new(1);
         t.handle_injury(&game_with_armor(2), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert!(t.ctx.armor_broken); assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
+    }
+    #[test]
+    fn send_to_box_reason_is_blocked() {
+        use ffb_model::enums::SendToBoxReason;
+        assert_eq!(InjuryTypeBlock::default().send_to_box_reason(), Some(SendToBoxReason::Blocked));
     }
     #[test]
     fn no_roll_armour_skips_armor_check() {

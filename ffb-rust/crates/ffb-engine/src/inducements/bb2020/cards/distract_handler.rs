@@ -3,6 +3,7 @@ use ffb_model::enums::CardEffect;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::inducement::card::Card;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::inducements::card_handler::CardHandler;
 
 pub struct DistractHandler;
@@ -20,7 +21,8 @@ impl CardHandler for DistractHandler {
 
     fn get_name(&self) -> &'static str { "DistractHandler" }
 
-    /// Java: add DISTRACTED card effect to all adjacent opponent players (within 1 sq on pitch).
+    /// Java: add DISTRACTED card effect to all opponent players within 3 squares on pitch
+    /// (`findAdjacentCoordinates(playerCoordinate, FieldCoordinateBounds.FIELD, 3, false)`).
     fn activate_on_game(&self, game: &mut Game, _card: &Card, player_id: &str, _rng: &mut ffb_model::util::rng::GameRng) -> bool {
         let coord = match game.field_model.player_coordinate(player_id) {
             Some(c) => c,
@@ -33,8 +35,8 @@ impl CardHandler for DistractHandler {
             game.team_home.players.iter().map(|p| p.id.clone()).collect()
         };
 
-        let adjacent = game.field_model.adjacent_on_pitch(coord);
-        for adj_coord in adjacent {
+        let nearby = UtilPlayer::find_adjacent_coordinates(&game.field_model, coord, 3);
+        for adj_coord in nearby {
             if let Some(other_id) = game.field_model.player_at(adj_coord).cloned() {
                 if other_team_player_ids.contains(&other_id) {
                     game.field_model.add_card_effect(&other_id, CardEffect::Distracted);
@@ -128,5 +130,50 @@ mod tests {
     fn get_name_returns_struct_name() {
         let h = DistractHandler;
         assert_eq!(h.get_name(), "DistractHandler");
+    }
+
+    /// Java `activate` uses `findAdjacentCoordinates(..., 3, false)` — Distract reaches
+    /// opponents up to 3 squares away, not merely the 8 immediately-adjacent squares.
+    #[test]
+    fn activate_distracts_opponent_three_squares_away() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PS_STANDING, PlayerState};
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        let user_coord = FieldCoordinate::new(10, 5);
+        let far_coord = FieldCoordinate::new(13, 5); // 3 squares away in x, 0 in y
+        game.team_home.players.push(Player { id: "home1".into(), ..Default::default() });
+        game.team_away.players.push(Player { id: "away1".into(), ..Default::default() });
+        game.field_model.set_player_coordinate("home1", user_coord);
+        game.field_model.set_player_coordinate("away1", far_coord);
+        game.field_model.set_player_state("away1", PlayerState::new(PS_STANDING));
+
+        let h = DistractHandler;
+        let card = Card::new("Distract", Some("DISTRACT"));
+        h.activate_on_game(&mut game, &card, "home1", &mut ffb_model::util::rng::GameRng::new(0));
+
+        assert!(game.field_model.has_card_effect("away1", CardEffect::Distracted));
+    }
+
+    /// Regression: an opponent further than 3 squares away must NOT be distracted.
+    #[test]
+    fn activate_does_not_distract_opponent_beyond_three_squares() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PS_STANDING, PlayerState};
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        let user_coord = FieldCoordinate::new(5, 5);
+        let too_far_coord = FieldCoordinate::new(9, 5); // 4 squares away
+        game.team_home.players.push(Player { id: "home1".into(), ..Default::default() });
+        game.team_away.players.push(Player { id: "away1".into(), ..Default::default() });
+        game.field_model.set_player_coordinate("home1", user_coord);
+        game.field_model.set_player_coordinate("away1", too_far_coord);
+        game.field_model.set_player_state("away1", PlayerState::new(PS_STANDING));
+
+        let h = DistractHandler;
+        let card = Card::new("Distract", Some("DISTRACT"));
+        h.activate_on_game(&mut game, &card, "home1", &mut ffb_model::util::rng::GameRng::new(0));
+
+        assert!(!game.field_model.has_card_effect("away1", CardEffect::Distracted));
     }
 }

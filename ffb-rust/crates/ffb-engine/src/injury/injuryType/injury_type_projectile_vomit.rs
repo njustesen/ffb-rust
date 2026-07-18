@@ -1,6 +1,6 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeProjectileVomit.
 /// ModificationAware: armor roll + injury roll. savedByArmour -> None (no injury set, like Stab/Chainsaw).
-use ffb_model::enums::ApothecaryMode;
+use ffb_model::enums::{ApothecaryMode, SendToBoxReason};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
@@ -20,6 +20,15 @@ impl InjuryTypeServer for InjuryTypeProjectileVomit {
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn falling_down_causes_turnover(&self) -> bool { false }
+    /// Java: `ProjectileVomit()` constructor passes `SendToBoxReason.PROJECTILE_VOMIT`.
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::ProjectileVomit) }
+    /// Java: `ProjectileVomit.isCausedByOpponent()` — true.
+    fn is_caused_by_opponent(&self) -> bool { true }
+    /// Java: `ProjectileVomit()` constructor calls `super.setFailedArmourPlacesProne(false)` —
+    /// unlike the `InjuryType` base default of true (this was previously missing entirely, which
+    /// would have incorrectly force-broken armor for a defender with `placedProneCausesInjuryRoll`
+    /// via `UtilServerInjury.handleInjury`'s pre-roll check).
+    fn failed_armour_places_prone(&self) -> bool { false }
 }
 impl ModificationAwareInjuryType for InjuryTypeProjectileVomit {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
@@ -94,6 +103,18 @@ mod tests {
     }
     #[test]
     fn does_not_cause_turnover() { assert!(!InjuryTypeProjectileVomit::new().falling_down_causes_turnover()); }
+    #[test]
+    fn send_to_box_reason_is_projectile_vomit() {
+        assert_eq!(InjuryTypeProjectileVomit::new().send_to_box_reason(), Some(SendToBoxReason::ProjectileVomit));
+    }
+    #[test]
+    fn is_caused_by_opponent() {
+        assert!(InjuryTypeProjectileVomit::new().is_caused_by_opponent());
+    }
+    #[test]
+    fn failed_armour_does_not_place_prone() {
+        assert!(!InjuryTypeProjectileVomit::new().failed_armour_places_prone());
+    }
     #[test]
     fn context_stores_defender_id() {
         let mut t = InjuryTypeProjectileVomit::new(); let mut rng = GameRng::new(1);

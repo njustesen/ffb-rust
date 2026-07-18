@@ -1,11 +1,14 @@
 /// 1:1 translation of `com.fumbbl.ffb.server.inducements.bb2025.prayers.IronManHandler`.
-/// Extends mixed IronManHandler with BB2025 PlayerSelector (own team RESERVE).
-/// Selects 1 random player on the praying team, marks prayer, and grants +1 AV.
+/// Extends mixed IronManHandler with a BB2025 IronManPlayerSelector (own team RESERVE,
+/// filtered to players with armour < 11 — Java's private inner `IronManPlayerSelector`).
+/// Selects 1 random eligible player on the praying team, marks prayer, and grants +1 AV.
+use ffb_model::enums::{PS_RESERVE, PlayerType, SkillId};
 use ffb_model::model::animation_type::AnimationType;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::inducements::bb2025::prayers::player_selector::PlayerSelector;
 use crate::inducements::mixed::prayers::iron_man_handler::{self, PRAYER_NAME};
+use crate::inducements::mixed::prayers::player_selector::PlayerSelector as PlayerSelectorTrait;
 use crate::inducements::mixed::prayers::prayer_handler::PrayerHandler;
 use crate::prayer_state::PrayerState;
 
@@ -19,18 +22,53 @@ impl Default for IronManHandler {
     fn default() -> Self { Self::new() }
 }
 
+/// Java: private static class IronManPlayerSelector extends PlayerSelector —
+/// same eligibility as the base BB2025 PlayerSelector but additionally filters
+/// out players whose armour is already 11 or higher.
+struct IronManPlayerSelector;
+
+impl PlayerSelectorTrait for IronManPlayerSelector {
+    fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, rng: &mut GameRng, added_skills: &[SkillId]) -> Vec<String> {
+        let team = if game.team_home.id == team_id {
+            &game.team_home
+        } else {
+            &game.team_away
+        };
+
+        let mut eligible: Vec<&str> = team.players.iter()
+            .filter(|p| {
+                game.field_model.player_state(&p.id)
+                    .map_or(false, |s| s.base() == PS_RESERVE)
+            })
+            .filter(|p| p.player_type != PlayerType::Star)
+            .filter(|p| added_skills.is_empty() || !added_skills.iter().all(|s| p.has_skill(*s)))
+            .filter(|p| p.armour < 11)
+            .map(|p| p.id.as_str())
+            .collect();
+
+        // Java: shuffle then remove first for each slot — Fisher-Yates shuffle.
+        let n = eligible.len();
+        for i in (1..n).rev() {
+            let j = rng.range(i + 1);
+            eligible.swap(i, j);
+        }
+        eligible.truncate(nr_of_players as usize);
+        eligible.iter().map(|s| s.to_string()).collect()
+    }
+}
+
 impl PrayerHandler for IronManHandler {
     fn handled_prayer_name(&self) -> &'static str { PRAYER_NAME }
     fn animation_type(&self) -> AnimationType { AnimationType::PRAYER_IRON_MAN }
     fn get_name(&self) -> &'static str { "IronManHandler" }
 
-    /// Java: initEffect — selects 1 RESERVE player on the praying team, grants +1 AV.
+    /// Java: initEffect — selects 1 RESERVE player (armour < 11) on the praying team, grants +1 AV.
     fn init_effect(&self, prayer_state: &mut PrayerState, game: &mut Game, rng: &mut GameRng, team_id: &str) -> bool {
-        iron_man_handler::init_effect(prayer_state, game, rng, team_id, &PlayerSelector::new())
+        iron_man_handler::init_effect(prayer_state, game, rng, team_id, &IronManPlayerSelector)
     }
 
     fn remove_effect_internal(&self, _prayer_state: &mut PrayerState, game: &mut Game, team_id: &str) {
-        iron_man_handler::remove_effect_internal(game, team_id);
+        iron_man_handler::remove_effect_internal(game, team_id, &PlayerSelector::new());
     }
 }
 
@@ -98,5 +136,34 @@ mod tests {
         let h = IronManHandler;
         assert!(!h.handles_prayer("PERFECT_PASSING"));
         assert!(!h.handles_prayer(""));
+    }
+
+    /// Regression: Java's IronManHandler uses a private IronManPlayerSelector that filters
+    /// out players whose armour is already 11 or higher. A player with armour 11 must never
+    /// be selected (and thus never receives the enhancement or the +1 AV bonus).
+    #[test]
+    fn init_effect_excludes_players_with_armour_already_at_11() {
+        let h = IronManHandler;
+        let mut state = PrayerState::new();
+        let mut game = make_game();
+        add_reserve_player(&mut game, "maxed", 11);
+        h.init_effect(&mut state, &mut game, &mut GameRng::new(0), "home");
+        assert!(!game.field_model.has_prayer_enhancement("maxed", PRAYER_NAME));
+        assert_eq!(game.player("maxed").unwrap().armour_with_modifiers(), 11);
+    }
+
+    /// Regression: with a mix of an armour-11 player and an eligible player, only the
+    /// eligible (armour < 11) player should ever be selected.
+    #[test]
+    fn init_effect_selects_only_eligible_armour_player_from_mixed_pool() {
+        let h = IronManHandler;
+        let mut state = PrayerState::new();
+        let mut game = make_game();
+        add_reserve_player(&mut game, "maxed", 11);
+        add_reserve_player(&mut game, "eligible", 8);
+        h.init_effect(&mut state, &mut game, &mut GameRng::new(0), "home");
+        assert!(!game.field_model.has_prayer_enhancement("maxed", PRAYER_NAME));
+        assert!(game.field_model.has_prayer_enhancement("eligible", PRAYER_NAME));
+        assert_eq!(game.player("eligible").unwrap().armour_with_modifiers(), 9);
     }
 }

@@ -1,6 +1,6 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeDropDodge.
 /// Armor roll + injury or PRONE. Arm bar player modifier is TODO.
-use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE};
+use ffb_model::enums::{ApothecaryMode, PlayerState, SendToBoxReason, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
@@ -69,6 +69,8 @@ impl InjuryTypeServer for InjuryTypeDropDodge {
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn falling_down_causes_turnover(&self) -> bool { true }
+    /// Java: `DropDodge()` constructor passes `SendToBoxReason.DODGE_FAIL`.
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::DodgeFail) }
 }
 
 #[cfg(test)]
@@ -105,6 +107,10 @@ mod tests {
     }
     #[test]
     fn causes_turnover() { assert!(InjuryTypeDropDodge::new().falling_down_causes_turnover()); }
+    #[test]
+    fn send_to_box_reason_is_dodge_fail() {
+        assert_eq!(InjuryTypeDropDodge::new().send_to_box_reason(), Some(SendToBoxReason::DodgeFail));
+    }
 
     #[test]
     fn new_with_arm_bar_stores_arm_bar_player() {

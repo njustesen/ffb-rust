@@ -1,5 +1,5 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeTrapDoorFallForSpp.
-use ffb_model::enums::{ApothecaryMode, PS_RESERVE};
+use ffb_model::enums::{ApothecaryMode, SendToBoxReason, PS_RESERVE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
@@ -17,7 +17,22 @@ impl InjuryTypeServer for InjuryTypeTrapDoorFallForSpp {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
+    /// Java: `TrapDoorFallForSpp.fallingDownCausesTurnover()` → false.
     fn falling_down_causes_turnover(&self) -> bool { false }
+    /// Java: `TrapDoorFallForSpp.isCausedByOpponent()` → true. Was previously missing
+    /// (defaulted to `false`).
+    fn is_caused_by_opponent(&self) -> bool { true }
+    /// Java: `TrapDoorFallForSpp` constructed with `super("trapdoorFallForSpp", true, ...)`.
+    /// Was previously missing (defaulted to `false`).
+    fn is_worth_spps(&self) -> bool { true }
+    /// Java: `TrapDoorFallForSpp` constructed with
+    /// `super("trapdoorFallForSpp", true, SendToBoxReason.TRAP_DOOR_FALL)`. Was previously
+    /// missing (defaulted to `None`).
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::TrapDoorFall) }
+    /// Java class simple name — was previously missing, which broke
+    /// `can_apo_ko_into_stun()`'s name-based lookup (see `InjuryTypeTrapDoorFall`'s equivalent
+    /// fix for details).
+    fn java_class_name(&self) -> &'static str { "InjuryTypeTrapDoorFallForSpp" }
 }
 
 #[cfg(test)]
@@ -43,6 +58,22 @@ mod tests {
     }
     #[test]
     fn does_not_cause_turnover() { assert!(!InjuryTypeTrapDoorFallForSpp::new().falling_down_causes_turnover()); }
+    #[test]
+    fn is_caused_by_opponent_and_worth_spps() {
+        let t = InjuryTypeTrapDoorFallForSpp::new();
+        assert!(t.is_caused_by_opponent());
+        assert!(t.is_worth_spps());
+    }
+    #[test]
+    fn send_to_box_reason_is_trap_door_fall() {
+        assert_eq!(InjuryTypeTrapDoorFallForSpp::new().send_to_box_reason(), Some(SendToBoxReason::TrapDoorFall));
+    }
+    #[test]
+    fn java_class_name_matches_can_apo_ko_into_stun_lookup() {
+        let t = InjuryTypeTrapDoorFallForSpp::new();
+        assert_eq!(t.java_class_name(), "InjuryTypeTrapDoorFallForSpp");
+        assert!(!crate::injury::can_apo_ko_into_stun(Some(t.java_class_name())));
+    }
     #[test]
     fn context_stores_defender_id() {
         let mut t = InjuryTypeTrapDoorFallForSpp::new(); let mut rng = GameRng::new(1);

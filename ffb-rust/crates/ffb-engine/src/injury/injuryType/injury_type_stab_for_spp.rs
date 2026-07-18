@@ -1,19 +1,25 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeStabForSpp.
 /// ModificationAware: stab armor roll + injury roll. savedByArmour -> None.
 /// Sneaky git pair armor modifier is TODO.
-use ffb_model::enums::ApothecaryMode;
+use ffb_model::enums::{ApothecaryMode, SendToBoxReason};
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
 use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
-use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
+use ffb_mechanics::modifiers::Modifier;
+use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player, recalc_armor_broken};
 use crate::injury::injuryType::modification_aware_injury_type_server::{ModificationAwareInjuryType, modification_aware_handle_injury, leak_injury_modifier};
 
-pub struct InjuryTypeStabForSpp { ctx: InjuryContext, use_injury_modifiers: bool }
+pub struct InjuryTypeStabForSpp { ctx: InjuryContext, use_injury_modifiers: bool, add_defender_chainsaw: bool }
 impl InjuryTypeStabForSpp {
     /// Java: `InjuryTypeStabForSpp(boolean useInjuryModifiers)`.
     pub fn new(use_injury_modifiers: bool) -> Self {
-        Self { ctx: InjuryContext::new(ApothecaryMode::Defender), use_injury_modifiers }
+        Self::new_with_chainsaw(use_injury_modifiers, false)
+    }
+    /// Java: `InjuryTypeStabForSpp(boolean useInjuryModifiers, boolean addDefenderChainsaw)`.
+    pub fn new_with_chainsaw(use_injury_modifiers: bool, add_defender_chainsaw: bool) -> Self {
+        Self { ctx: InjuryContext::new(ApothecaryMode::Defender), use_injury_modifiers, add_defender_chainsaw }
     }
 }
 impl Default for InjuryTypeStabForSpp { fn default() -> Self { Self::new(true) } }
@@ -25,16 +31,37 @@ impl InjuryTypeServer for InjuryTypeStabForSpp {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn falling_down_causes_turnover(&self) -> bool { false }
+    // Java: `StabForSpp` does not override `fallingDownCausesTurnover()`, so the `InjuryType`
+    // base default (`true`) applies — no override needed here (trait default is already `true`).
     /// Java: `StabForSpp.isCausedByOpponent()` → true.
     fn is_caused_by_opponent(&self) -> bool { true }
     /// Java: `StabForSpp` constructed with `worthSpps=true`.
     fn is_worth_spps(&self) -> bool { true }
+    /// Java: `StabForSpp` constructed with `super("stabForSpp", true, SendToBoxReason.STABBED)`.
+    /// Was previously missing (defaulted to `None`).
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::Stabbed) }
+    /// Java: `InjuryTypeStabForSpp`'s constructor calls `super.setFailedArmourPlacesProne(false)`.
+    /// Was previously missing (defaulted to the trait's `true`) — see `InjuryTypeStab`'s
+    /// equivalent fix for the ball-and-chain armor-break implication.
+    fn failed_armour_places_prone(&self) -> bool { false }
 }
 impl ModificationAwareInjuryType for InjuryTypeStabForSpp {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
         // TODO: add sneaky git pair armor modifier when ArmorModifierFactory is ported
         do_armor_roll(game, rng, &mut self.ctx, defender_id);
+        // Java (lines 64-71): unless the defender has an unused
+        // `ignoresArmourModifiersFromSkills` skill (not modeled here — see TODO above), a
+        // defender-side Chainsaw skill contributes its own armor modifier when
+        // `addDefenderChainsaw` is set. Chainsaw's armor bonus is a flat +3 (see
+        // InjuryTypeBlock's `chainsaw_modifier`).
+        if self.add_defender_chainsaw {
+            if let Some(defender) = game.player(defender_id) {
+                if defender.has_skill_property(NamedProperties::BLOCKS_LIKE_CHAINSAW) {
+                    self.ctx.add_armor_modifier(Modifier::new("Chainsaw", 3, game.rules));
+                    recalc_armor_broken(game, &mut self.ctx, defender_id);
+                }
+            }
+        }
     }
     fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str) {
         // Java: `factory.findInjuryModifiers(game, injuryContext, pAttacker, pDefender, isStab(),
@@ -159,5 +186,59 @@ mod tests {
         assert!(t.ctx.armor_broken);
         assert!(t.ctx.injury_modifiers.is_empty(),
             "expected no injury modifiers with use_injury_modifiers=false, got {:?}", t.ctx.injury_modifiers);
+    }
+
+    fn game_with_chainsaw_defender(armour: i32) -> Game {
+        use std::collections::HashSet;
+        use ffb_model::model::player::Player;
+        use ffb_model::model::SkillWithValue;
+        use ffb_model::enums::{PlayerType, PlayerGender, SkillId};
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(Player { id: "p1".into(), name: "p1".into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour, starting_skills: vec![SkillWithValue::new(SkillId::Chainsaw)], extra_skills: vec![],
+            temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+    ..Default::default() });
+        Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2025)
+    }
+
+    #[test]
+    fn add_defender_chainsaw_true_applies_chainsaw_armor_modifier() {
+        // Java's `InjuryTypeStabForSpp(boolean, boolean)` constructor exists for parity with
+        // `InjuryTypeStab` even though no current call site passes `true` for the second arg;
+        // this proves the Rust constructor overload wires the chainsaw modifier identically.
+        let mut t = InjuryTypeStabForSpp::new_with_chainsaw(true, true);
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game_with_chainsaw_defender(8), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert!(t.ctx.armor_modifiers.iter().any(|m| m.name == "Chainsaw" && m.value == 3));
+    }
+
+    #[test]
+    fn send_to_box_reason_is_stabbed() {
+        let t = InjuryTypeStabForSpp::new(true);
+        assert_eq!(t.send_to_box_reason(), Some(ffb_model::enums::SendToBoxReason::Stabbed));
+    }
+
+    #[test]
+    fn falling_down_causes_turnover_defaults_true() {
+        let t = InjuryTypeStabForSpp::new(true);
+        assert!(t.falling_down_causes_turnover());
+    }
+
+    #[test]
+    fn failed_armour_places_prone_is_false() {
+        let t = InjuryTypeStabForSpp::new(true);
+        assert!(!t.failed_armour_places_prone());
+    }
+
+    #[test]
+    fn add_defender_chainsaw_false_does_not_apply_chainsaw_modifier() {
+        let mut t = InjuryTypeStabForSpp::new(true);
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game_with_chainsaw_defender(8), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert!(!t.ctx.armor_modifiers.iter().any(|m| m.name == "Chainsaw"));
     }
 }

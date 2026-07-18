@@ -9,11 +9,13 @@ pub enum SkipInjuryParts {
     Armour,
     /// Java: ARMOUR_AND_CAS(true, false, true) — skip armour + casualty rolls.
     ArmourAndCas,
-    /// Java: ARMOUR_AND_INJURY(true, true) — skip armour and injury rolls.
+    /// Java: ARMOUR_AND_INJURY(true, true) — two-arg ctor delegates to
+    /// `this(armour, injury, injury)`, so cas defaults to true here too.
     ArmourAndInjury,
     /// Java: EVERYTHING_BUT_CAS(true, true, false) — skip armour + injury, keep casualty.
     EverythingButCas,
-    /// Java: INJURY(false, true) — skip injury roll only.
+    /// Java: INJURY(false, true) — two-arg ctor delegates to `this(false, true, true)`,
+    /// so this also skips the casualty roll (not injury only).
     Injury,
     /// Java: CAS(false, false, true) — skip casualty roll.
     Cas,
@@ -42,9 +44,17 @@ impl SkipInjuryParts {
     }
 
     /// Java: isCas() — should the casualty roll be skipped?
+    ///
+    /// Note: Java's two-arg enum constructor `SkipInjuryParts(armour, injury)` delegates
+    /// to the three-arg one as `this(armour, injury, injury)`, so for variants declared
+    /// with only two constructor args, `cas` defaults to the `injury` value (not `false`).
+    /// This means `ARMOUR_AND_INJURY(true, true)` and `INJURY(false, true)` both skip
+    /// casualty too, in addition to `ARMOUR_AND_CAS` and `CAS`.
     pub fn is_cas(self) -> bool {
         matches!(self,
             SkipInjuryParts::ArmourAndCas |
+            SkipInjuryParts::ArmourAndInjury |
+            SkipInjuryParts::Injury |
             SkipInjuryParts::Cas
         )
     }
@@ -94,7 +104,19 @@ mod tests {
     fn injury_only_skips_injury() {
         assert!(!SkipInjuryParts::Injury.is_armour());
         assert!(SkipInjuryParts::Injury.is_injury());
-        assert!(!SkipInjuryParts::Injury.is_cas());
+        // Java's two-arg ctor `INJURY(false, true)` delegates to
+        // `this(false, true, true)`, so cas defaults to the injury value (true).
+        assert!(SkipInjuryParts::Injury.is_cas());
+    }
+
+    #[test]
+    fn armour_and_injury_also_skips_cas() {
+        // Java's two-arg ctor `ARMOUR_AND_INJURY(true, true)` delegates to
+        // `this(true, true, true)`, so cas is also true, unlike EVERYTHING_BUT_CAS
+        // which explicitly passes cas=false via the three-arg ctor.
+        assert!(SkipInjuryParts::ArmourAndInjury.is_armour());
+        assert!(SkipInjuryParts::ArmourAndInjury.is_injury());
+        assert!(SkipInjuryParts::ArmourAndInjury.is_cas());
     }
 
     #[test]

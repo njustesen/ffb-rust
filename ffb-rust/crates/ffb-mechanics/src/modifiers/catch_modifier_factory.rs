@@ -1,27 +1,30 @@
 use ffb_model::enums::{Rules, SkillId};
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::{CatchScatterThrowInMode, Player};
+use ffb_model::util::util_disturbing_presence::UtilDisturbingPresence;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::modifiers::bb2025::catch_modifier_collection::CatchModifierCollection as Bb2025Collection;
 use crate::modifiers::catch_context::CatchContext;
 use crate::modifiers::catch_modifier::CatchModifier;
 use crate::modifiers::catch_modifier_collection::CatchModifierCollection;
+use crate::modifiers::modifier_type::ModifierType;
 
 /// Edition-agnostic trait for a catch modifier collection.
+///
+/// Only `get_modifiers` is needed: `find_applicable` on `CatchModifierFactory` implements the
+/// full GenerifiedModifierFactory.findModifiers selection logic itself (REGULAR predicate filter
+/// + count-based TACKLEZONE/DISTURBING_PRESENCE selection) rather than delegating to a blanket
+/// per-collection `find_applicable`, which would incorrectly include every modifier regardless
+/// of the actual tacklezone/disturbing-presence count.
 trait CatchCollection: Send + Sync {
-    fn find_applicable<'a>(&'a self, ctx: &CatchContext<'_>) -> Vec<&'a CatchModifier>;
     fn get_modifiers(&self) -> &[CatchModifier];
 }
 
 impl CatchCollection for CatchModifierCollection {
-    fn find_applicable<'a>(&'a self, ctx: &CatchContext<'_>) -> Vec<&'a CatchModifier> {
-        self.find_applicable(ctx)
-    }
     fn get_modifiers(&self) -> &[CatchModifier] { self.get_modifiers() }
 }
 
 impl CatchCollection for Bb2025Collection {
-    fn find_applicable<'a>(&'a self, ctx: &CatchContext<'_>) -> Vec<&'a CatchModifier> {
-        self.find_applicable(ctx)
-    }
     fn get_modifiers(&self) -> &[CatchModifier] { self.get_modifiers() }
 }
 
@@ -45,9 +48,42 @@ impl CatchModifierFactory {
     }
 
     /// Returns the modifiers applicable to the given context.
-    /// 1:1 translation of GenerifiedModifierFactory.findModifiers.
+    /// 1:1 translation of GenerifiedModifierFactory.findModifiers + CatchModifierFactory overrides.
+    ///
+    /// REGULAR modifiers are filtered by predicate (e.g. Pouring Rain weather check).
+    /// TACKLEZONE: one modifier selected by counting opposing players with tacklezones
+    /// adjacent to the catcher, unless the catcher has ignoreTacklezonesWhenCatching.
+    /// DISTURBING_PRESENCE: one modifier selected by counting opposing Disturbing Presence
+    /// players within range (isAffectedByDisturbingPresence is always true for catch).
     pub fn find_applicable<'a>(&'a self, context: &CatchContext<'_>) -> Vec<&'a CatchModifier> {
-        self.collection.find_applicable(context)
+        let mut result: Vec<&'a CatchModifier> = self.collection.get_modifiers().iter()
+            .filter(|m| m.get_type() == ModifierType::REGULAR && m.applies_to_context(context))
+            .collect();
+
+        let Some(player) = context.player else { return result; };
+
+        // Java: isAffectedByTackleZones → !player.hasSkillProperty(ignoreTacklezonesWhenCatching)
+        // Note: CatchModifier does not override RollModifier.getMultiplier(), so Java's default
+        // (getMultiplier() == getModifier()) applies — selection is by get_modifier(), not a
+        // separate multiplier field.
+        if !player.has_skill_property(NamedProperties::IGNORE_TACKLEZONES_WHEN_CATCHING) {
+            let count = UtilPlayer::find_tacklezones(context.game, &player.id) as i32;
+            if let Some(tz_mod) = self.collection.get_modifiers().iter()
+                .find(|m| m.get_type() == ModifierType::TACKLEZONE && m.get_modifier() == count)
+            {
+                result.push(tz_mod);
+            }
+        }
+
+        // Java: isAffectedByDisturbingPresence is always true for CatchModifierFactory.
+        let dp_count = UtilDisturbingPresence::find_opposing_disturbing_presences(context.game, &player.id);
+        if let Some(dp_mod) = self.collection.get_modifiers().iter()
+            .find(|m| m.get_type() == ModifierType::DISTURBING_PRESENCE && m.get_modifier() == dp_count)
+        {
+            result.push(dp_mod);
+        }
+
+        result
     }
 
     /// Returns skill-based catch modifiers for the catcher.
@@ -180,6 +216,59 @@ mod tests {
         let mods = factory.find_applicable(&ctx);
         assert!(mods.iter().any(|m| m.get_name() == "Pouring Rain"),
             "Pouring rain modifier should be present");
+    }
+
+    /// Regression test: Java's GenerifiedModifierFactory.findModifiers selects exactly one
+    /// TACKLEZONE modifier matching the actual adjacent-opponent count, and exactly one
+    /// DISTURBING_PRESENCE modifier matching the actual count — not every registered modifier
+    /// in the collection. Previously find_applicable delegated to a blanket predicate filter
+    /// that returned all 8 tacklezone + 11 disturbing-presence modifiers unconditionally.
+    #[test]
+    fn find_applicable_selects_single_tacklezone_modifier_by_count() {
+        use ffb_model::model::Team;
+        use ffb_model::enums::{PS_STANDING, PlayerState};
+        use ffb_model::types::FieldCoordinate;
+
+        let catcher = minimal_player(3);
+        let mut opponent = minimal_player(3);
+        opponent.id = "opp1".into();
+
+        let home = Team {
+            id: "home".into(), name: "home".into(), race: "Human".into(),
+            roster_id: "human".into(), coach: "c".into(),
+            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0,
+            bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
+            fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0,
+            special_rules: vec![], players: vec![catcher.clone()],
+            vampire_lord: false, necromancer: false,
+        };
+        let away = Team {
+            id: "away".into(), name: "away".into(), race: "Human".into(),
+            roster_id: "human".into(), coach: "c".into(),
+            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0,
+            bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
+            fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0,
+            special_rules: vec![], players: vec![opponent.clone()],
+            vampire_lord: false, necromancer: false,
+        };
+        let mut game = Game::new(home, away, Rules::Bb2025);
+        game.field_model.weather = Weather::Nice;
+        game.field_model.set_player_coordinate(&catcher.id, FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state(&catcher.id, PlayerState(PS_STANDING));
+        game.field_model.set_player_coordinate(&opponent.id, FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state(&opponent.id, PlayerState(PS_STANDING));
+
+        let factory = CatchModifierFactory::for_rules(Rules::Bb2025);
+        let ctx = CatchContext::new(&game, Some(&catcher), CatchScatterThrowInMode::CatchHandOff, None);
+        let mods = factory.find_applicable(&ctx);
+
+        let tz_mods: Vec<_> = mods.iter().filter(|m| m.get_type() == crate::modifiers::modifier_type::ModifierType::TACKLEZONE).collect();
+        assert_eq!(tz_mods.len(), 1, "exactly one tacklezone modifier should be selected, got: {:?}",
+            mods.iter().map(|m| m.get_name()).collect::<Vec<_>>());
+        assert_eq!(tz_mods[0].get_name(), "1 Tacklezone");
+
+        // No disturbing-presence opponents in range → no DP modifier selected.
+        assert!(!mods.iter().any(|m| m.get_type() == crate::modifiers::modifier_type::ModifierType::DISTURBING_PRESENCE));
     }
 
     #[test]

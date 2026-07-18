@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::BlastIt.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct BlastIt {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct BlastIt {
 
 impl BlastIt {
     pub fn new() -> Self {
-        let base = Skill::new("Blast It!", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Blast It!", SkillCategory::Trait, SkillUsageType::OncePerGame);
         Self { base }
     }
 }
@@ -34,5 +34,10 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(BlastIt::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn usage_type_is_correct() {
+        assert_eq!(BlastIt::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
     }
 }

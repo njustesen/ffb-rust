@@ -22,6 +22,10 @@ impl InjuryTypeServer for InjuryTypeCrowdPushForSpp {
     fn is_worth_spps(&self) -> bool { true }
     /// Java: `CrowdPushForSpp.isCausedByOpponent()` — true (overridden, unlike base `CrowdPush`).
     fn is_caused_by_opponent(&self) -> bool { true }
+    /// Java: `CrowdPushForSpp()` constructor passes `SendToBoxReason.CROWD_PUSHED`.
+    fn send_to_box_reason(&self) -> Option<ffb_model::enums::SendToBoxReason> {
+        Some(ffb_model::enums::SendToBoxReason::CrowdPushed)
+    }
 }
 
 #[cfg(test)]
@@ -47,6 +51,11 @@ mod tests {
     }
     #[test]
     fn does_not_cause_turnover() { assert!(!InjuryTypeCrowdPushForSpp::new().falling_down_causes_turnover()); }
+    #[test]
+    fn send_to_box_reason_is_crowd_pushed() {
+        use ffb_model::enums::SendToBoxReason;
+        assert_eq!(InjuryTypeCrowdPushForSpp::new().send_to_box_reason(), Some(SendToBoxReason::CrowdPushed));
+    }
     #[test]
     fn context_stores_defender_id() {
         let mut t = InjuryTypeCrowdPushForSpp::new(); let mut rng = GameRng::new(1);

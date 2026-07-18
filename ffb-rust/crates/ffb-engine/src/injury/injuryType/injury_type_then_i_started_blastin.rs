@@ -1,6 +1,6 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeThenIStartedBlastin.
 /// ModificationAware: armor roll + injury roll. savedByArmour -> None (no injury set, like Stab/Chainsaw).
-use ffb_model::enums::ApothecaryMode;
+use ffb_model::enums::{ApothecaryMode, SendToBoxReason};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
@@ -19,7 +19,20 @@ impl InjuryTypeServer for InjuryTypeThenIStartedBlastin {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn falling_down_causes_turnover(&self) -> bool { false }
+    // Java: `ThenIStartedBlastin` does not override `fallingDownCausesTurnover()`, so the
+    // `InjuryType` base default (`true`) applies. Regression fix: was previously inverted to
+    // `false` here with no basis in the Java source.
+    /// Java: `ThenIStartedBlastin.isCausedByOpponent()` → true. Was previously missing
+    /// (defaulted to `false`).
+    fn is_caused_by_opponent(&self) -> bool { true }
+    /// Java: `ThenIStartedBlastin` constructed with
+    /// `super("startedBlastin", false, SendToBoxReason.THEN_I_STARTED_BLASTIN)`. Was previously
+    /// missing (defaulted to `None`).
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::ThenIStartedBlastin) }
+    /// Java: `InjuryTypeThenIStartedBlastin`'s constructor calls
+    /// `super.setFailedArmourPlacesProne(false)`. Was previously missing (defaulted to the
+    /// trait's `true`).
+    fn failed_armour_places_prone(&self) -> bool { false }
 }
 impl ModificationAwareInjuryType for InjuryTypeThenIStartedBlastin {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
@@ -77,7 +90,27 @@ mod tests {
         assert!(t.ctx.armor_broken); assert!(t.ctx.injury.is_some());
     }
     #[test]
-    fn does_not_cause_turnover() { assert!(!InjuryTypeThenIStartedBlastin::new().falling_down_causes_turnover()); }
+    fn causes_turnover_by_default() {
+        // Java: `ThenIStartedBlastin` does not override `fallingDownCausesTurnover()`, so the
+        // `InjuryType` base default (`true`) applies. Regression test for a previously-inverted
+        // override.
+        assert!(InjuryTypeThenIStartedBlastin::new().falling_down_causes_turnover());
+    }
+    #[test]
+    fn is_caused_by_opponent_is_true() {
+        assert!(InjuryTypeThenIStartedBlastin::new().is_caused_by_opponent());
+    }
+    #[test]
+    fn send_to_box_reason_is_then_i_started_blastin() {
+        assert_eq!(
+            InjuryTypeThenIStartedBlastin::new().send_to_box_reason(),
+            Some(ffb_model::enums::SendToBoxReason::ThenIStartedBlastin)
+        );
+    }
+    #[test]
+    fn failed_armour_places_prone_is_false() {
+        assert!(!InjuryTypeThenIStartedBlastin::new().failed_armour_places_prone());
+    }
     #[test]
     fn context_stores_defender_id() {
         let mut t = InjuryTypeThenIStartedBlastin::new(); let mut rng = GameRng::new(1);

@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::BurstOfSpeed.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct BurstOfSpeed {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct BurstOfSpeed {
 
 impl BurstOfSpeed {
     pub fn new() -> Self {
-        let base = Skill::new("Burst of Speed", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Burst of Speed", SkillCategory::Trait, SkillUsageType::OncePerGame);
         Self { base }
     }
 }
@@ -34,5 +34,10 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(BurstOfSpeed::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn usage_type_is_correct() {
+        assert_eq!(BurstOfSpeed::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
     }
 }

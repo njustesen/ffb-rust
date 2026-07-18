@@ -1,5 +1,5 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeTTMHitPlayer.
-use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE};
+use ffb_model::enums::{ApothecaryMode, PlayerState, SendToBoxReason, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
@@ -51,7 +51,13 @@ impl InjuryTypeServer for InjuryTypeTTMHitPlayer {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn falling_down_causes_turnover(&self) -> bool { false }
+    // Java: `TTMHitPlayer` does not override `fallingDownCausesTurnover()`, so the `InjuryType`
+    // base default (`true`) applies. Regression fix: was previously inverted to `false` here
+    // with no basis in the Java source.
+    /// Java: `TTMHitPlayer` constructed with
+    /// `super("ttmHitPlayer", false, SendToBoxReason.HIT_BY_THROWN_PLAYER)`. Was previously
+    /// missing (defaulted to `None`).
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::HitByThrownPlayer) }
 }
 
 #[cfg(test)]
@@ -86,7 +92,14 @@ mod tests {
         t.handle_injury(&game_with_armor(2), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::HitPlayer);
         assert!(t.ctx.armor_broken); assert!(t.ctx.injury.is_some());
     }
-    #[test] fn no_turnover() { assert!(!InjuryTypeTTMHitPlayer::new().falling_down_causes_turnover()); }
+    #[test]
+    fn causes_turnover_by_default() {
+        assert!(InjuryTypeTTMHitPlayer::new().falling_down_causes_turnover());
+    }
+    #[test]
+    fn send_to_box_reason_is_hit_by_thrown_player() {
+        assert_eq!(InjuryTypeTTMHitPlayer::new().send_to_box_reason(), Some(SendToBoxReason::HitByThrownPlayer));
+    }
     #[test]
     fn new_creates_instance_with_hit_player_apo_mode() {
         let t = InjuryTypeTTMHitPlayer::new();

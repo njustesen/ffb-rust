@@ -1,6 +1,6 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeThrowARock.
 /// Armor is always broken (no roll). Injury roll follows. No turnover.
-use ffb_model::enums::{ApothecaryMode, PS_PRONE};
+use ffb_model::enums::{ApothecaryMode, SendToBoxReason, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
@@ -34,7 +34,12 @@ impl InjuryTypeServer for InjuryTypeThrowARock {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn falling_down_causes_turnover(&self) -> bool { false }
+    // Java: `ThrowARock` does not override `fallingDownCausesTurnover()`, so the `InjuryType`
+    // base default (`true`) applies. Regression fix: was previously inverted to `false` here
+    // with no basis in the Java source.
+    /// Java: `ThrowARock` constructed with `super("throwARock", false, SendToBoxReason.HIT_BY_ROCK)`.
+    /// Was previously missing (defaulted to `None`).
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::HitByRock) }
 }
 
 #[cfg(test)]
@@ -56,7 +61,16 @@ mod tests {
         assert!(t.ctx.injury.is_some());
         assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
-    #[test] fn no_turnover() { assert!(!InjuryTypeThrowARock::new().falling_down_causes_turnover()); }
+    #[test]
+    fn causes_turnover_by_default() {
+        // Java: `ThrowARock` does not override `fallingDownCausesTurnover()`, so `InjuryType`'s
+        // base default (`true`) applies. Regression test for a previously-inverted override.
+        assert!(InjuryTypeThrowARock::new().falling_down_causes_turnover());
+    }
+    #[test]
+    fn send_to_box_reason_is_hit_by_rock() {
+        assert_eq!(InjuryTypeThrowARock::new().send_to_box_reason(), Some(SendToBoxReason::HitByRock));
+    }
     #[test]
     fn new_creates_instance_with_correct_apo_mode() {
         let t = InjuryTypeThrowARock::new();

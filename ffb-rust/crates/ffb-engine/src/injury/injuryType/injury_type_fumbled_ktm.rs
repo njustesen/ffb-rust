@@ -1,6 +1,6 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeFumbledKtm.
 /// Armor always broken. Injury roll with block-property modifiers (stub). stunIsTreatedAsKo=true.
-use ffb_model::enums::{ApothecaryMode, PS_PRONE, SkillId};
+use ffb_model::enums::{ApothecaryMode, SendToBoxReason, PS_PRONE, SkillId};
 use ffb_model::model::property::NamedProperties;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
@@ -42,6 +42,11 @@ impl InjuryTypeServer for InjuryTypeFumbledKtm {
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn stun_is_treated_as_ko(&self) -> bool { true }
+    /// Java: `KTMFumbleInjury()` constructor passes `SendToBoxReason.KICKED`.
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::Kicked) }
+    /// Java: `KTMFumbleInjury.canApoKoIntoStun()` — false (unlike the base `InjuryType` default
+    /// of true, and unlike `InjuryTypeFumbledKtmApoKo`'s sibling class).
+    fn java_class_name(&self) -> &'static str { "InjuryTypeFumbledKtm" }
 }
 
 #[cfg(test)]
@@ -59,6 +64,18 @@ mod tests {
         assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
     #[test] fn stun_is_ko() { assert!(InjuryTypeFumbledKtm::new().stun_is_treated_as_ko()); }
+    #[test]
+    fn send_to_box_reason_is_kicked() {
+        assert_eq!(InjuryTypeFumbledKtm::new().send_to_box_reason(), Some(ffb_model::enums::SendToBoxReason::Kicked));
+    }
+    #[test]
+    fn cannot_apo_ko_into_stun() {
+        // Regression test: Java `KTMFumbleInjury.canApoKoIntoStun()` returns false, unlike the
+        // `InjuryType` base default of true.
+        let t = InjuryTypeFumbledKtm::new();
+        assert_eq!(t.java_class_name(), "InjuryTypeFumbledKtm");
+        assert!(!crate::injury::can_apo_ko_into_stun(Some(t.java_class_name())));
+    }
     #[test]
     fn causes_turnover_by_default() { assert!(InjuryTypeFumbledKtm::new().falling_down_causes_turnover()); }
     #[test]

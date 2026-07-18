@@ -1,6 +1,6 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeQuickBite.
 /// ModificationAware: armor roll + injury roll. savedByArmour -> None (no injury set, like Stab/Chainsaw).
-use ffb_model::enums::ApothecaryMode;
+use ffb_model::enums::{ApothecaryMode, SendToBoxReason};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
@@ -20,6 +20,13 @@ impl InjuryTypeServer for InjuryTypeQuickBite {
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn falling_down_causes_turnover(&self) -> bool { false }
+    /// Java: `QuickBite()` constructor passes `SendToBoxReason.QUICK_BITE`.
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::QuickBite) }
+    /// Java: `QuickBite.isCausedByOpponent()` — true.
+    fn is_caused_by_opponent(&self) -> bool { true }
+    /// Java: `QuickBite()` constructor calls `super.setFailedArmourPlacesProne(false)` — unlike
+    /// the `InjuryType` base default of true (see `InjuryTypeProjectileVomit`'s equivalent fix).
+    fn failed_armour_places_prone(&self) -> bool { false }
 }
 impl ModificationAwareInjuryType for InjuryTypeQuickBite {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
@@ -94,6 +101,18 @@ mod tests {
     }
     #[test]
     fn does_not_cause_turnover() { assert!(!InjuryTypeQuickBite::new().falling_down_causes_turnover()); }
+    #[test]
+    fn send_to_box_reason_is_quick_bite() {
+        assert_eq!(InjuryTypeQuickBite::new().send_to_box_reason(), Some(SendToBoxReason::QuickBite));
+    }
+    #[test]
+    fn is_caused_by_opponent() {
+        assert!(InjuryTypeQuickBite::new().is_caused_by_opponent());
+    }
+    #[test]
+    fn failed_armour_does_not_place_prone() {
+        assert!(!InjuryTypeQuickBite::new().failed_armour_places_prone());
+    }
     #[test]
     fn context_stores_defender_and_apo_mode() {
         let mut t = InjuryTypeQuickBite::new(); let mut rng = GameRng::new(1);

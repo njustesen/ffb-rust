@@ -1,5 +1,5 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypePilingOnKnockedOut.
-use ffb_model::enums::{ApothecaryMode, PlayerState, PS_KNOCKED_OUT};
+use ffb_model::enums::{ApothecaryMode, PlayerState, SendToBoxReason, PS_KNOCKED_OUT};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
@@ -22,6 +22,12 @@ impl InjuryTypeServer for InjuryTypePilingOnKnockedOut {
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn falling_down_causes_turnover(&self) -> bool { false }
+    /// Java: `PilingOnKnockedOut()` constructor passes `SendToBoxReason.KO_ON_PILING_ON`.
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::KoOnPilingOn) }
+    /// Java: `PilingOnKnockedOut.canUseApo()` — false (unlike the base `InjuryType` default of true).
+    fn can_use_apo(&self) -> bool { false }
+    /// Java: `PilingOnKnockedOut.isCausedByOpponent()` — true.
+    fn is_caused_by_opponent(&self) -> bool { true }
 }
 
 #[cfg(test)]
@@ -44,6 +50,20 @@ mod tests {
     }
     #[test]
     fn does_not_cause_turnover() { assert!(!InjuryTypePilingOnKnockedOut::new().falling_down_causes_turnover()); }
+    #[test]
+    fn send_to_box_reason_is_ko_on_piling_on() {
+        assert_eq!(InjuryTypePilingOnKnockedOut::new().send_to_box_reason(), Some(SendToBoxReason::KoOnPilingOn));
+    }
+    #[test]
+    fn cannot_use_apo() {
+        // Regression test: Java `PilingOnKnockedOut.canUseApo()` returns false, unlike the
+        // `InjuryType` base default of true (this was previously missing entirely).
+        assert!(!InjuryTypePilingOnKnockedOut::new().can_use_apo());
+    }
+    #[test]
+    fn is_caused_by_opponent() {
+        assert!(InjuryTypePilingOnKnockedOut::new().is_caused_by_opponent());
+    }
     #[test]
     fn context_stores_attacker_and_defender() {
         let mut t = InjuryTypePilingOnKnockedOut::new(); let mut rng = GameRng::new(1);

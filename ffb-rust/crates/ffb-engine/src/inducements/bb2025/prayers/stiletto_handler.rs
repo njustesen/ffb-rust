@@ -30,7 +30,7 @@ impl PrayerHandler for StilettoHandler {
     }
 
     fn remove_effect_internal(&self, _prayer_state: &mut PrayerState, game: &mut Game, team_id: &str) {
-        stiletto_handler::remove_effect_internal(game, team_id);
+        stiletto_handler::remove_effect_internal(game, team_id, &PlayerSelector::new());
     }
 }
 

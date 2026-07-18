@@ -27,7 +27,7 @@ impl CardHandler for CustardPieHandler {
         };
         let is_home = game.team_home.players.iter().any(|p| p.id == player_id);
         let own_team = if is_home { &game.team_home } else { &game.team_away };
-        !UtilPlayer::find_adjacent_blockable_players(game, own_team, coord).is_empty()
+        !UtilPlayer::find_standing_or_prone_players(game, own_team, coord, 1).is_empty()
     }
 
     /// Java: game.getFieldModel().setPlayerState(player, playerState.changeHypnotized(true))
@@ -77,6 +77,51 @@ mod tests {
     fn get_name_returns_struct_name() {
         let h = CustardPieHandler;
         assert_eq!(h.get_name(), "CustardPieHandler");
+    }
+
+    /// Java `allowsPlayer` uses `findAdjacentStandingOrPronePlayers`, which allows prone
+    /// (but not stunned) teammates. It must not require `canBeBlocked` (standing/moving only).
+    #[test]
+    fn allows_player_true_for_adjacent_prone_teammate() {
+        use ffb_model::enums::{PS_PRONE, PS_STANDING, PlayerState};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::player_status::PlayerStatus;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::types::FieldCoordinate;
+
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            player_status: PlayerStatus::ACTIVE,
+            ..Default::default()
+        });
+        game.team_home.players.push(Player {
+            id: "p2".into(), name: "p2".into(), nr: 2, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            player_status: PlayerStatus::ACTIVE,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("p1", FieldCoordinate::new(13, 7));
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+        game.field_model.set_player_coordinate("p2", FieldCoordinate::new(14, 7));
+        // Prone but NOT stunned — canBeBlocked() would be false, but
+        // findAdjacentStandingOrPronePlayers only excludes stunned players.
+        game.field_model.set_player_state("p2", PlayerState::new(PS_PRONE));
+
+        let h = CustardPieHandler;
+        let card = Card::new("Custard Pie", Some("CUSTARD_PIE"));
+        assert!(h.allows_player(&game, &card, "p1"));
     }
 
     #[test]

@@ -22,7 +22,8 @@ impl InjuryTypeServer for InjuryTypeChainsaw {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn falling_down_causes_turnover(&self) -> bool { false }
+    // Java: `Chainsaw` does not override `fallingDownCausesTurnover()`, so the `InjuryType` base
+    // default (`true`) applies — no override needed here (trait default is already `true`).
     /// Java: `InjuryTypeChainsaw()` constructor calls `setFailedArmourPlacesProne(false)`.
     fn failed_armour_places_prone(&self) -> bool { false }
     /// Java: `Chainsaw.isCausedByOpponent()` — true.
@@ -166,6 +167,14 @@ mod tests {
     #[test]
     fn is_caused_by_opponent_is_true() {
         assert!(InjuryTypeChainsaw::new().is_caused_by_opponent());
+    }
+
+    #[test]
+    fn falling_down_causes_turnover_defaults_true() {
+        // Java: `Chainsaw` does not override `fallingDownCausesTurnover()`, so `InjuryType`'s
+        // base default (`true`) applies. Regression test for a previously-inverted override
+        // (`false`) that had no basis in the Java source.
+        assert!(InjuryTypeChainsaw::new().falling_down_causes_turnover());
     }
 
     #[test]

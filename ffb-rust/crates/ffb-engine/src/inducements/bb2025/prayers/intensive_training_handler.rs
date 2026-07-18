@@ -33,7 +33,7 @@ impl PrayerHandler for IntensiveTrainingHandler {
     }
 
     fn remove_effect_internal(&self, _prayer_state: &mut PrayerState, game: &mut Game, team_id: &str) {
-        intensive_training_handler::remove_effect_internal(game, team_id);
+        intensive_training_handler::remove_effect_internal(game, team_id, &PlayerSelector::new());
     }
 }
 

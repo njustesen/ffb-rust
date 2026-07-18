@@ -376,12 +376,14 @@ pub trait InjuryTypeServer {
 
 /// Java: `InjuryType.canApoKoIntoStun()` — whether an apothecary can revive a KO'd player as STUNNED.
 ///
-/// Default: `true` (most injury types). Returns `false` for crowd-push and trap-door injuries
-/// (Java: `CrowdPush`, `CrowdPushForSpp`, `TrapDoorFall`, `TrapDoorFallForSpp`).
+/// Default: `true` (most injury types). Returns `false` for crowd-push, trap-door, and
+/// fumbled-KTM injuries (Java: `CrowdPush`, `CrowdPushForSpp`, `TrapDoorFall`,
+/// `TrapDoorFallForSpp`, `KTMFumbleInjury.canApoKoIntoStun()`).
 pub fn can_apo_ko_into_stun(injury_type_name: Option<&str>) -> bool {
     match injury_type_name {
         Some("InjuryTypeCrowdPush") | Some("InjuryTypeCrowdPushForSpp")
-        | Some("InjuryTypeTrapDoorFall") | Some("InjuryTypeTrapDoorFallForSpp") => false,
+        | Some("InjuryTypeTrapDoorFall") | Some("InjuryTypeTrapDoorFallForSpp")
+        | Some("InjuryTypeFumbledKtm") => false,
         _ => true,
     }
 }
@@ -1004,6 +1006,13 @@ mod tests {
         assert!(!can_apo_ko_into_stun(Some("InjuryTypeTrapDoorFallForSpp")));
     }
 
+    #[test]
+    fn can_apo_ko_into_stun_false_for_fumbled_ktm() {
+        // Java: `KTMFumbleInjury.canApoKoIntoStun()` returns false, unlike its sibling
+        // `KTMFumbleApoKoInjury` (which keeps the base `true`).
+        assert!(!can_apo_ko_into_stun(Some("InjuryTypeFumbledKtm")));
+    }
+
     // ── make_injury_type dispatch reaches real modifier logic (Phase ABE) ────
     //
     // Before this phase, every one of these keys constructed the simplified
@@ -1163,9 +1172,13 @@ mod tests {
 
     #[test]
     fn dispatch_stab_variants_reach_real_structs() {
-        // Both override falling_down_causes_turnover to false; the generic fallback defaults true.
-        assert!(!make_injury_type("InjuryTypeStab").falling_down_causes_turnover());
-        assert!(!make_injury_type("InjuryTypeStabForSpp").falling_down_causes_turnover());
+        // Neither overrides falling_down_causes_turnover (Java: Stab doesn't override it, so
+        // the InjuryType base default of `true` applies) — verified via a marker distinct from
+        // the generic fallback's own `true` instead: can_use_apo(), which Stab doesn't override
+        // either (default true) while the *unrelated* dispatch check below still proves real
+        // struct resolution via send_to_box_reason.
+        assert_eq!(make_injury_type("InjuryTypeStab").send_to_box_reason(), Some(ffb_model::enums::SendToBoxReason::Stabbed));
+        assert_eq!(make_injury_type("InjuryTypeStabForSpp").send_to_box_reason(), Some(ffb_model::enums::SendToBoxReason::Stabbed));
     }
 
     #[test]
@@ -1173,14 +1186,23 @@ mod tests {
         // Every one of these overrides falling_down_causes_turnover to false; the generic
         // `_ => InjuryTypeDropFall::new(true)` fallback (reached by any typo'd/unknown name)
         // defaults to true, so this proves real dispatch occurred rather than the fallback.
+        // (InjuryTypeEatPlayer and InjuryTypeThenIStartedBlastin no longer belong here: neither
+        // Java class overrides fallingDownCausesTurnover, so both now correctly resolve to the
+        // base-default `true` — checked separately below via a marker field each does override.)
         for name in [
             "InjuryTypeTrapDoorFall", "InjuryTypeTrapDoorFallForSpp",
             "InjuryTypeKTMCrowd", "InjuryTypeKtmCrowd",
-            "InjuryTypeBitten", "InjuryTypeEatPlayer",
-            "InjuryTypeProjectileVomit", "InjuryTypeThenIStartedBlastin",
+            "InjuryTypeBitten",
+            "InjuryTypeProjectileVomit",
         ] {
             assert!(!make_injury_type(name).falling_down_causes_turnover(), "{name} should not use the generic fallback");
         }
+        assert!(!make_injury_type("InjuryTypeEatPlayer").can_use_apo(), "InjuryTypeEatPlayer should not use the generic fallback");
+        assert_eq!(
+            make_injury_type("InjuryTypeThenIStartedBlastin").send_to_box_reason(),
+            Some(ffb_model::enums::SendToBoxReason::ThenIStartedBlastin),
+            "InjuryTypeThenIStartedBlastin should not use the generic fallback"
+        );
     }
 
     #[test]

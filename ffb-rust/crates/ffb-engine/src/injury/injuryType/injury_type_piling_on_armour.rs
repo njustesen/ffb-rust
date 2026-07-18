@@ -1,15 +1,30 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypePilingOnArmour.
-/// Piling On armor roll: standard armor roll + ARMOR_PILING_ON (+2) modifier.
-/// If broken: injury roll. Else: PRONE. turnover=false, no apo, stun treated as KO = false.
-use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE};
+/// Piling On re-rolls the armor roll (no static bonus — the model class `PilingOnArmour`
+/// registers no armor/injury modifiers of its own). If the raw roll doesn't break armor and
+/// `PILING_ON_DOES_NOT_STACK` is disabled, the attacker's own armor-modifier skills (Claws,
+/// Mighty Blow, etc. via `ArmorModifierFactory.findArmorModifiers`) are layered on, with the
+/// same Claws/`CLAW_DOES_NOT_STACK` handling as `InjuryTypeBlock`.
+/// If broken: injury roll (niggling always added; other skill injury modifiers gated by
+/// `PILING_ON_DOES_NOT_STACK`). Else: PRONE. turnover=false, no apo, stun treated as KO = false.
+use ffb_model::enums::{ApothecaryMode, PlayerState, SendToBoxReason, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
-use ffb_mechanics::modifiers::ARMOR_PILING_ON;
+use ffb_model::model::player::Player;
+use ffb_mechanics::modifiers::armor_modifier::ArmorModifier;
+use ffb_mechanics::modifiers::armor_modifier_factory::ArmorModifierFactory;
 use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
-use ffb_model::option::game_option_id;
-use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
+use ffb_mechanics::modifiers::Modifier;
+use ffb_model::option::{game_option_id, util_game_option::is_option_enabled};
+use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, recalc_armor_broken, do_injury_roll_for_player};
 use crate::injury::injuryType::modification_aware_injury_type_server::leak_injury_modifier;
+
+/// See `injury_type_block.rs::leak_modifier` for why leaking the name is the chosen approach for
+/// bridging a `Box<dyn ArmorModifier>` into the `'static`-named `Modifier` struct.
+fn leak_modifier(m: &dyn ArmorModifier, attacker: Option<&Player>, defender: &Player, rules: ffb_model::enums::Rules) -> Modifier {
+    let name: &'static str = Box::leak(m.get_name().to_owned().into_boxed_str());
+    Modifier::new(name, m.get_modifier(attacker, defender), rules)
+}
 
 pub struct InjuryTypePilingOnArmour { ctx: InjuryContext }
 impl InjuryTypePilingOnArmour { pub fn new() -> Self { Self { ctx: InjuryContext::new(ApothecaryMode::Defender) } } }
@@ -22,10 +37,52 @@ impl InjuryTypeServer for InjuryTypePilingOnArmour {
         self.ctx.attacker_id = attacker_id.map(str::to_owned);
         self.ctx.defender_coordinate = Some(coord);
         self.ctx.apothecary_mode = apo_mode;
+
         if !self.ctx.armor_broken {
-            self.ctx.add_armor_modifier(ARMOR_PILING_ON);
             do_armor_roll(game, rng, &mut self.ctx, defender_id);
+            // Java: `!UtilGameOption.isOptionEnabled(game, GameOptionId.PILING_ON_DOES_NOT_STACK)
+            // && !injuryContext.isArmorBroken()`.
+            if !is_option_enabled(game, game_option_id::PILING_ON_DOES_NOT_STACK) && !self.ctx.armor_broken {
+                if let Some(defender) = game.player(defender_id) {
+                    let attacker = attacker_id.and_then(|aid| game.player(aid));
+                    let factory = ArmorModifierFactory::new(game.rules);
+                    // PilingOnArmour never overrides isStab()/isFoul() (InjuryType base: both false).
+                    let mut mods: Vec<Box<dyn ArmorModifier>> =
+                        factory.find_armor_modifiers(game, attacker, defender, false, false);
+                    let claw_idx = mods.iter().position(|m| m.get_name() == "Claws");
+                    if let Some(idx) = claw_idx {
+                        let claw = mods.remove(idx);
+                        self.ctx.add_armor_modifier(leak_modifier(claw.as_ref(), attacker, defender, game.rules));
+                        recalc_armor_broken(game, &mut self.ctx, defender_id);
+                        if !self.ctx.armor_broken {
+                            if is_option_enabled(game, game_option_id::CLAW_DOES_NOT_STACK) {
+                                self.ctx.clear_armor_modifiers();
+                                for m in &mods {
+                                    self.ctx.add_armor_modifier(leak_modifier(m.as_ref(), attacker, defender, game.rules));
+                                }
+                                recalc_armor_broken(game, &mut self.ctx, defender_id);
+                                if !self.ctx.armor_broken {
+                                    // Display Claws as used in the log even though it didn't stack.
+                                    self.ctx.clear_armor_modifiers();
+                                    self.ctx.add_armor_modifier(leak_modifier(claw.as_ref(), attacker, defender, game.rules));
+                                }
+                            } else {
+                                for m in &mods {
+                                    self.ctx.add_armor_modifier(leak_modifier(m.as_ref(), attacker, defender, game.rules));
+                                }
+                            }
+                            recalc_armor_broken(game, &mut self.ctx, defender_id);
+                        }
+                    } else {
+                        for m in &mods {
+                            self.ctx.add_armor_modifier(leak_modifier(m.as_ref(), attacker, defender, game.rules));
+                        }
+                        recalc_armor_broken(game, &mut self.ctx, defender_id);
+                    }
+                }
+            }
         }
+
         if self.ctx.armor_broken {
             // Java: `factory.getNigglingInjuryModifier(pDefender).ifPresent(...)` — always added.
             // Then, if PILING_ON_DOES_NOT_STACK is not enabled: `factory.findInjuryModifiersWithoutNiggling(
@@ -36,7 +93,7 @@ impl InjuryTypeServer for InjuryTypePilingOnArmour {
                 if let Some(niggling) = factory.get_niggling_injury_modifier(defender) {
                     self.ctx.add_injury_modifier(leak_injury_modifier(niggling.as_ref(), None, defender, game.rules));
                 }
-                if !game.options.is_enabled(game_option_id::PILING_ON_DOES_NOT_STACK) {
+                if !is_option_enabled(game, game_option_id::PILING_ON_DOES_NOT_STACK) {
                     let attacker = attacker_id.and_then(|aid| game.player(aid));
                     for m in factory.find_injury_modifiers_without_niggling(game, attacker, defender, false, false, false, false) {
                         self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), attacker, defender, game.rules));
@@ -51,6 +108,12 @@ impl InjuryTypeServer for InjuryTypePilingOnArmour {
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn falling_down_causes_turnover(&self) -> bool { false }
     fn can_use_apo(&self) -> bool { false }
+    /// Java: `PilingOnArmour()` constructor passes `SendToBoxReason.PILED_ON`.
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::PiledOn) }
+    /// Java: `PilingOnArmour()` constructor passes `isWorthSpps=true`.
+    fn is_worth_spps(&self) -> bool { true }
+    /// Java: `PilingOnArmour.isCausedByOpponent()` — true.
+    fn is_caused_by_opponent(&self) -> bool { true }
 }
 
 #[cfg(test)]
@@ -108,15 +171,61 @@ mod tests {
     }
     #[test]
     fn no_apo() { assert!(!InjuryTypePilingOnArmour::new().can_use_apo()); }
+    #[test]
+    fn send_to_box_reason_is_piled_on() {
+        assert_eq!(InjuryTypePilingOnArmour::new().send_to_box_reason(), Some(SendToBoxReason::PiledOn));
+    }
+    #[test]
+    fn is_worth_spps_and_caused_by_opponent() {
+        let t = InjuryTypePilingOnArmour::new();
+        assert!(t.is_worth_spps());
+        assert!(t.is_caused_by_opponent());
+    }
 
     #[test]
-    fn piling_on_armor_modifier_applied() {
+    fn no_static_piling_on_bonus_is_fabricated() {
+        // Java's `PilingOnArmour` model class registers no armor/injury modifiers of its own —
+        // Piling On is a reroll skill, not a static bonus. A raw roll against a high armour value
+        // with no attacker skills must not break armour (regression guard for the removed
+        // fabricated "Piling On +2" modifier).
+        let mut t = InjuryTypePilingOnArmour::new();
+        let mut rng = GameRng::new(0); // seed=0 -> roll (3,3) = 6
+        t.handle_injury(&game_with_armor(7), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert!(!t.ctx.armor_modifiers.iter().any(|m| m.name == "Piling On"));
+        assert!(!t.ctx.armor_broken, "6 vs armour 7 with no skills must not break armour");
+    }
+
+    #[test]
+    fn claw_armor_modifier_applied_when_not_broken_and_stacks_by_default() {
+        let game = game_with_attacker_and_defender(vec![SkillId::Claw], 13);
         let mut t = InjuryTypePilingOnArmour::new();
         let mut rng = GameRng::new(1);
-        t.handle_injury(&game_with_armor(7), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
-        assert!(t.ctx.armor_modifiers.contains(&ARMOR_PILING_ON),
-            "ARMOR_PILING_ON (+2) must be in armor_modifiers");
+        t.handle_injury(&game, &mut rng, Some("attacker"), "defender", coord(), None, None, ApothecaryMode::Defender);
+        assert!(t.ctx.armor_modifiers.iter().any(|m| m.name == "Claws"),
+            "Claws must be added from the attacker's own armor-modifier skills, got {:?}", t.ctx.armor_modifiers);
     }
+
+    #[test]
+    fn no_claw_skill_no_claws_modifier() {
+        let game = game_with_attacker_and_defender(vec![], 13);
+        let mut t = InjuryTypePilingOnArmour::new();
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game, &mut rng, Some("attacker"), "defender", coord(), None, None, ApothecaryMode::Defender);
+        assert!(!t.ctx.armor_modifiers.iter().any(|m| m.name == "Claws"));
+    }
+
+    #[test]
+    fn piling_on_does_not_stack_suppresses_all_armor_modifiers() {
+        // Java: PILING_ON_DOES_NOT_STACK gates the entire armor-modifier-finding block.
+        let mut game = game_with_attacker_and_defender(vec![SkillId::Claw], 13);
+        game.options.set(game_option_id::PILING_ON_DOES_NOT_STACK, "true");
+        let mut t = InjuryTypePilingOnArmour::new();
+        let mut rng = GameRng::new(1);
+        t.handle_injury(&game, &mut rng, Some("attacker"), "defender", coord(), None, None, ApothecaryMode::Defender);
+        assert!(t.ctx.armor_modifiers.is_empty(),
+            "PILING_ON_DOES_NOT_STACK must suppress all armor modifiers, got {:?}", t.ctx.armor_modifiers);
+    }
+
     #[test]
     fn default_equivalent_to_new() {
         let t1 = InjuryTypePilingOnArmour::new();
@@ -127,7 +236,7 @@ mod tests {
 
     #[test]
     fn mighty_blow_adds_injury_modifier() {
-        // Proves InjuryModifierFactory is now reached from handle_injury (Phase ABJ bug fix):
+        // Proves InjuryModifierFactory is reached from handle_injury on the injury side:
         // Mighty Blow applies since isStab/isFoul/isVomitLike are all false for PilingOnArmour,
         // and PILING_ON_DOES_NOT_STACK is not enabled by default.
         let game = game_with_attacker_and_defender(vec![SkillId::MightyBlow], 2);

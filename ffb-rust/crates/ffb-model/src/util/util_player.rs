@@ -747,7 +747,7 @@ impl UtilPlayer {
 
     /// Returns all coordinates within `distance` from `coord` that are on the pitch
     /// (Chebyshev distance — matches Java FieldModel.findAdjacentCoordinates).
-    fn find_adjacent_coordinates(
+    pub fn find_adjacent_coordinates(
         field_model: &FieldModel,
         coord: FieldCoordinate,
         distance: i32,

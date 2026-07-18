@@ -24,6 +24,11 @@ impl InjuryTypeServer for InjuryTypeBreatheFireForSpp {
     fn is_worth_spps(&self) -> bool { true }
     /// Java: `BreatheFireForSpp.isCausedByOpponent()` — true.
     fn is_caused_by_opponent(&self) -> bool { true }
+    /// Java: `new BreatheFireForSpp()` constructor passes `SendToBoxReason.BREATHE_FIRE` to the
+    /// `InjuryType` base class.
+    fn send_to_box_reason(&self) -> Option<ffb_model::enums::SendToBoxReason> {
+        Some(ffb_model::enums::SendToBoxReason::BreatheFire)
+    }
 }
 impl ModificationAwareInjuryType for InjuryTypeBreatheFireForSpp {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
@@ -78,6 +83,11 @@ mod tests {
     }
     #[test]
     fn does_not_cause_turnover() { assert!(!InjuryTypeBreatheFireForSpp::new().falling_down_causes_turnover()); }
+    #[test]
+    fn send_to_box_reason_is_breathe_fire() {
+        use ffb_model::enums::SendToBoxReason;
+        assert_eq!(InjuryTypeBreatheFireForSpp::new().send_to_box_reason(), Some(SendToBoxReason::BreatheFire));
+    }
     #[test]
     fn new_creates_instance_with_correct_apo_mode() {
         let t = InjuryTypeBreatheFireForSpp::new();

@@ -28,8 +28,8 @@ pub fn apply_selection(_prayer_state: &mut PrayerState, game: &mut Game, player_
     apply_prayer_player_effect(game, player_id, PRAYER_NAME);
 }
 
-pub fn remove_effect_internal(game: &mut Game, team_id: &str) {
-    remove_effect_internal_random_selection(game, team_id, PRAYER_NAME);
+pub fn remove_effect_internal(game: &mut Game, team_id: &str, selector: &dyn PlayerSelector) {
+    remove_effect_internal_random_selection(game, team_id, PRAYER_NAME, selector);
 }
 
 pub fn remove_effect_for_player(game: &mut Game, player_id: &str) {
@@ -106,7 +106,7 @@ mod tests {
         let mut game = make_game();
         add_reserve_player(&mut game, "h1");
         game.field_model.add_prayer_enhancement("h1", PRAYER_NAME);
-        remove_effect_internal(&mut game, "home");
+        remove_effect_internal(&mut game, "home", &BB2020Selector::new());
         assert!(!game.field_model.has_prayer_enhancement("h1", PRAYER_NAME));
     }
 }

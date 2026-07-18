@@ -18,6 +18,10 @@ impl InjuryTypeServer for InjuryTypeCrowdPush {
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn falling_down_causes_turnover(&self) -> bool { false }
+    /// Java: `CrowdPush()` constructor passes `SendToBoxReason.CROWD_PUSHED`.
+    fn send_to_box_reason(&self) -> Option<ffb_model::enums::SendToBoxReason> {
+        Some(ffb_model::enums::SendToBoxReason::CrowdPushed)
+    }
 }
 
 #[cfg(test)]
@@ -43,6 +47,11 @@ mod tests {
     }
     #[test]
     fn does_not_cause_turnover() { assert!(!InjuryTypeCrowdPush::new().falling_down_causes_turnover()); }
+    #[test]
+    fn send_to_box_reason_is_crowd_pushed() {
+        use ffb_model::enums::SendToBoxReason;
+        assert_eq!(InjuryTypeCrowdPush::new().send_to_box_reason(), Some(SendToBoxReason::CrowdPushed));
+    }
     #[test]
     fn context_stores_defender_id() {
         let mut t = InjuryTypeCrowdPush::new(); let mut rng = GameRng::new(1);

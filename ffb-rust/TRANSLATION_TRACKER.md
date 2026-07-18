@@ -29,6 +29,36 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AH (2026-07-18): closed all 5 follow-ups named by Phase AG, plus one more fresh-audit
+round on 4 newly-scoped areas — third consecutive phase where re-verification found real bugs in
+most of what it checked.** Tests: 17,261 → **17,396** (+135). No tracker status cells changed
+(all touched files were already `✓`). Highlights: (1) `step_play_card.rs` and the Saboteur/
+SneakyGit dispatch gaps (both named by AG) confirmed and fixed — the SneakyGit one meant **no
+ejected fouler was ever actually banned** in that codepath, since the hook that sets
+`PlayerState::BANNED` was never called; (2) non-special skill constructor-arg-drift audit (232
+files) found 19 real drifts in bb2020/mixed (bb2016/bb2025/common fully clean) — **and discovered
+`bb2020/special/` (20 files) is entirely dead, uncompiled code** (never declared as a module),
+meaning Phase AG's claimed 16/16 fix there had zero runtime effect; the real fixes landed in the
+separate, actually-compiled `bb2020/*.rs` duplicate files instead — tracker rows for those 20 Java
+files still point at the dead path (follow-up, not yet corrected); (3) card/inducement
+activation-effect cluster (75 handler files) found 10 real bugs, the largest being a systemic
+opponent-team enhancement-removal leak in `random_selection_prayer_handler.rs` affecting 6 prayers
+across all 3 editions (enhancement was applied to the opponent but always removed from the
+praying team's own roster — a permanent state leak, same shape as Phase AF's `deactivate_card`
+finding but systemic); (4) `Report*` data-struct sweep (71 files) found 1 bug
+(`skip_injury_parts.rs`'s `is_cas()` missing 2 of 4 variants); (5) one more fresh-audit round on
+`injury/injuryType/` (51 files, ~17 bugs — the largest single-cluster yield this phase, including
+missing `send_to_box_reason()` overrides on ~10 injury types and 4 inverted
+`falling_down_causes_turnover` overrides), `step/generator/` sequences (20 sampled, 1 bug — BB2025
+multi-block was missing its entire negatrait-activation sub-sequence), and `ffb-mechanics`
+modifier factories (25 sampled, 2 bugs — `catch_modifier_factory.rs` was applying all 19 catch
+modifiers simultaneously instead of selecting one). Dialog parameter files (24 sampled) came back
+fully clean. Full writeup: `SESSION.md` Current Status. **New follow-ups named**: fix the 20
+tracker rows pointing at dead `bb2020/special/` code; decide whether to delete that dead
+directory; several `ffb-mechanics`/dialog-parameter/generator files remain unsampled from this
+phase's partial sweeps and likely still have real yield. Parity/integration testing remains the
+only large out-of-scope workstream.
+
 **Phase AG (2026-07-18): closed both concrete follow-ups named by Phase AF, plus a fresh 6-batch
 re-verification audit sweep.** Stage 1 fixed `step_trap_door.rs`'s named re-roll bug and, while
 fixing it, found a second bug in the same code path: the reroll-offer outcome was built from

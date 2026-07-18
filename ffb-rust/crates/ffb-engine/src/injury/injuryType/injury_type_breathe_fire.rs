@@ -22,6 +22,11 @@ impl InjuryTypeServer for InjuryTypeBreatheFire {
     fn falling_down_causes_turnover(&self) -> bool { false }
     /// Java: `BreatheFire.isCausedByOpponent()` — true.
     fn is_caused_by_opponent(&self) -> bool { true }
+    /// Java: `new BreatheFire()` constructor passes `SendToBoxReason.BREATHE_FIRE` to the
+    /// `InjuryType` base class.
+    fn send_to_box_reason(&self) -> Option<ffb_model::enums::SendToBoxReason> {
+        Some(ffb_model::enums::SendToBoxReason::BreatheFire)
+    }
 }
 impl ModificationAwareInjuryType for InjuryTypeBreatheFire {
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
@@ -76,6 +81,11 @@ mod tests {
     }
     #[test]
     fn does_not_cause_turnover() { assert!(!InjuryTypeBreatheFire::new().falling_down_causes_turnover()); }
+    #[test]
+    fn send_to_box_reason_is_breathe_fire() {
+        use ffb_model::enums::SendToBoxReason;
+        assert_eq!(InjuryTypeBreatheFire::new().send_to_box_reason(), Some(SendToBoxReason::BreatheFire));
+    }
     #[test]
     fn context_stores_defender_and_coordinate() {
         let mut t = InjuryTypeBreatheFire::new(); let mut rng = GameRng::new(1);

@@ -1,6 +1,6 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeDropJump.
 /// Armor roll + injury or PRONE. Diving tackler modifier is TODO.
-use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE};
+use ffb_model::enums::{ApothecaryMode, PlayerState, SendToBoxReason, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
@@ -65,6 +65,8 @@ impl InjuryTypeServer for InjuryTypeDropJump {
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn falling_down_causes_turnover(&self) -> bool { true }
+    /// Java: `DropJump()` constructor passes `SendToBoxReason.JUMP_FAIL`.
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::JumpFail) }
 }
 
 #[cfg(test)]
@@ -101,6 +103,10 @@ mod tests {
     }
     #[test]
     fn causes_turnover() { assert!(InjuryTypeDropJump::new().falling_down_causes_turnover()); }
+    #[test]
+    fn send_to_box_reason_is_jump_fail() {
+        assert_eq!(InjuryTypeDropJump::new().send_to_box_reason(), Some(SendToBoxReason::JumpFail));
+    }
     #[test]
     fn pre_broken_skips_armor_roll() {
         let mut t = InjuryTypeDropJump::new();

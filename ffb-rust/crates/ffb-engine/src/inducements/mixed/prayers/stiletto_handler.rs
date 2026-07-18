@@ -24,8 +24,8 @@ pub fn init_effect(prayer_state: &mut PrayerState, game: &mut Game, rng: &mut Ga
     init_effect_random_selection(prayer_state, game, rng, team_id, PRAYER_NAME, AFFECTED_PLAYERS, selector, &[SkillId::Stab])
 }
 
-pub fn remove_effect_internal(game: &mut Game, team_id: &str) {
-    remove_effect_internal_random_selection(game, team_id, PRAYER_NAME);
+pub fn remove_effect_internal(game: &mut Game, team_id: &str, selector: &dyn PlayerSelector) {
+    remove_effect_internal_random_selection(game, team_id, PRAYER_NAME, selector);
 }
 
 #[cfg(test)]
@@ -61,7 +61,7 @@ mod tests {
     #[test]
     fn remove_effect_is_callable() {
         let mut game = make_game();
-        remove_effect_internal(&mut game, "home");
+        remove_effect_internal(&mut game, "home", &StubPlayerSelector);
     }
 
     #[test]
@@ -75,6 +75,6 @@ mod tests {
         let mut game = make_game();
         let stub = StubPlayerSelector;
         init_effect(&mut state, &mut game, &mut GameRng::new(0), "home", &stub);
-        remove_effect_internal(&mut game, "home");
+        remove_effect_internal(&mut game, "home", &stub);
     }
 }

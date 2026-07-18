@@ -31,7 +31,7 @@ impl PrayerHandler for BadHabitsHandler {
     }
 
     fn remove_effect_internal(&self, _prayer_state: &mut PrayerState, game: &mut Game, team_id: &str) {
-        bad_habits_handler::remove_effect_internal(game, team_id);
+        bad_habits_handler::remove_effect_internal(game, team_id, &OpponentPlayerSelector::new());
     }
 }
 

@@ -30,7 +30,7 @@ impl PrayerHandler for KnuckleDustersHandler {
     }
 
     fn remove_effect_internal(&self, _prayer_state: &mut PrayerState, game: &mut Game, team_id: &str) {
-        knuckle_dusters_handler::remove_effect_internal(game, team_id);
+        knuckle_dusters_handler::remove_effect_internal(game, team_id, &PlayerSelector::new());
     }
 }
 

@@ -26,7 +26,7 @@ impl PrayerHandler for BadHabitsHandler {
         base::init_effect(prayer_state, game, rng, team_id, d3_roll, &OpponentPlayerSelector::new())
     }
     fn remove_effect_internal(&self, _prayer_state: &mut PrayerState, game: &mut Game, team_id: &str) {
-        base::remove_effect_internal(game, team_id);
+        base::remove_effect_internal(game, team_id, &OpponentPlayerSelector::new());
     }
 }
 

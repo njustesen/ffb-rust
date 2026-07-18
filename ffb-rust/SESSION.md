@@ -1,6 +1,154 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-18, Phase AG done — closed AF's 2 named follow-ups + a fresh 6-batch audit sweep)
+## Current Status (2026-07-18, Phase AH done — closed all 5 of AG's named follow-ups + one more fresh-audit round)
+
+**Context: Phase AG's closing note named 5 concrete follow-ups and recommended one more round of the
+fresh re-verification-audit technique.** This phase closed all 5, then ran that additional round on
+4 newly-scoped areas. **Bugs kept turning up everywhere it looked** — this is now the *third*
+consecutive phase where fresh re-verification found real, confirmed bugs in most of what it checked.
+Tests: 17,261 → **17,396** (+135). 0 failures across `cargo test --workspace`; `cargo build --workspace`
+and `cargo clippy --workspace --all-targets` both clean.
+
+**Stage 1 — the 2 small named items (foreground, direct):**
+1. **`step_play_card.rs`**: confirmed the flagged bug — in the multi-blockable-player dialog branch,
+   `activate_card`'s accumulated report/animation params were dropped by returning a *fresh*
+   `StepOutcome::cont()` instead of attaching the prompt to the `outcome` that had actually
+   accumulated them. Fixed; 1 new regression test.
+2. **Saboteur/SneakyGit dispatch gaps**: `step_drop_falling_players.rs` (BB2025) never called
+   `dispatch::execute_step_hooks` at all, so `SaboteurStepModifier` was entirely dead code — the
+   struct's own `saboteur_triggered_attacker`/`using_saboteur_attacker` fields were always their
+   constructor defaults, since nothing ever ran the modifier that sets them. Wired the hook call
+   (mirroring the `step_horns.rs` pattern), threading state to/from `self` and returning `cont()`
+   early if the hook reports it consumed the step. Similarly, `step_eject_player.rs` (mixed,
+   BB2020+BB2025) had a stale "no hooks registered for this step in practice" comment — Java calls
+   `executeStepHooks(this, state)` unconditionally at the top of `executeStep()`, and its side
+   effect (`SneakyGitEjectPlayerModifier`) is the *only* code anywhere that sets an ejected fouler's
+   `PlayerState` to BANNED/KNOCKED_OUT and records send-to-box bookkeeping — without this wiring,
+   **no ejected fouler was ever actually banned in this codepath.** Fixed both; 2 new regression
+   tests confirm the hook now actually fires and mutates state.
+
+**Stage 2 — non-special skill constructor-arg-drift audit (232 files, 5 parallel worktree batches
+by subdirectory, mirroring how Phase AG closed the 73-file `SkillUsageType`-special cluster):**
+bb2016 (56), bb2025 (55), and common (23) came back **fully clean** — every constructor call
+already matched Java exactly. **bb2020 (56) and mixed (42) were not clean**:
+- **bb2020: 18 of 56 had real drift** — 16 missing `SkillUsageType` values (mostly `OncePerGame`,
+  2× `OncePerHalf`, 1× `OncePerTurnByTeamMate`, 1× `Special`), plus `DirtyPlayer` missing its
+  default skill value of 1. **Bonus discovery**: `bb2020/mod.rs` never declares `pub mod special;`
+  (unlike `bb2025`/`mixed`, which both do) — the entire `bb2020/special/` directory (20 files) is
+  dead, uncompiled code, never referenced anywhere. This means **Phase AG's claimed "100% fix" of
+  `bb2020/special` (16/16 files) had zero runtime effect** — those fixes landed in files that never
+  compile into the binary. The real, live translations of those same 20 Java classes are separate
+  top-level `bb2020/*.rs` duplicate files (e.g. `bb2020/blast_it.rs`, not `bb2020/special/blast_it.rs`),
+  which is what this phase actually fixed. `TRANSLATION_TRACKER.md`'s 20 rows for these Java files
+  point at the dead path and need re-pointing (not done this phase — see follow-ups). The dead
+  `bb2020/special/` directory itself was **not deleted** — an attempt was blocked by the harness's
+  destructive-action safeguard (pre-existing files, no explicit user authorization to delete);
+  left in place, flagged here for the user to decide.
+- **mixed: 1 of 42 had real drift** — `Loner` dropped its default skill value of 4
+  (`Skill::new` → should be `Skill::with_default_value(..., 4)`).
+
+**Stage 3 — card/inducement activation-effect cluster (75 handler files: 16 card handlers in
+bb2016/bb2020, 59 prayer handlers across bb2020/bb2025/mixed; 4 parallel worktree batches),
+following up Phase AF's single `deactivate_card` fix in the same area — 10 real bugs found:**
+1. **`distract_handler.rs` (bb2016 AND bb2020, same bug twice)**: used a radius-1 (8-square)
+   adjacency check instead of Java's `findAdjacentCoordinates(..., 3, false)` (Chebyshev radius 3,
+   7×7 area) — opponents 2–3 squares away were never marked Distracted. Fixed both; made
+   `UtilPlayer::find_adjacent_coordinates` `pub` to reuse it.
+2. **`custard_pie_handler.rs` (bb2020)**: `allows_player` used the wrong helper
+   (`find_adjacent_blockable_players`, which excludes prone players) instead of Java's
+   `findAdjacentStandingOrPronePlayers` (only excludes stunned) — a prone-but-not-stunned adjacent
+   teammate incorrectly made the card unplayable.
+3. **`opponent_player_selector.rs` (bb2020 prayers)**: missing the Loner-skill exclusion filter
+   that the sibling `player_selector.rs` had — an opponent-targeted prayer (Bad Habits, Greasy
+   Cleats, etc.) could illegally select a Loner-skilled opposing player.
+4. **`iron_man_handler.rs` (bb2025 prayers)**: missing Java's private `IronManPlayerSelector`
+   armour-filter override (`armour < 11`) — a player already at max armour could still be selected
+   and (harmlessly but incorrectly) "granted" a bonus that does nothing.
+5. **`random_selection_prayer_handler.rs` + `player_selector.rs` + `enhancement_remover.rs` (mixed,
+   shared by all 3 editions) — the single largest find this phase**: `remove_effect_internal`
+   always removed the prayer's enhancement from the *praying* team's own roster, ignoring that
+   Java resolves the actually-affected team via the handler's `selector()`. For every
+   opponent-targeting prayer (Bad Habits, Blessed Statue of Nuffle, Greasy Cleats, Iron Man,
+   Knuckle Dusters, Stiletto — 6 of the RandomSelectionPrayerHandler-based prayers, ×3 editions),
+   `remove_effect` silently no-op'd on the wrong team, meaning **the granted effect never actually
+   expired** — a permanent state leak, same bug shape as Phase AF's `deactivate_card` finding but
+   systemic across a whole handler family instead of one card. Fixed by adding
+   `PlayerSelector::determine_team_id()` (mirrors Java's team resolution, overridden by
+   `OpponentPlayerSelector`) and threading it through removal.
+
+**Stage 4 — `Report*` data-struct layer (71 files in `crates/ffb-model/src/report/`, root level
+only — not the renderer files audited in Phase AG, not the per-edition subdirectories; 3 parallel
+batches) — 1 bug found:** `skip_injury_parts.rs`'s `is_cas()` only matched 2 of the 4 enum variants.
+Java's `SkipInjuryParts(boolean armour, boolean injury)` 2-arg constructor delegates to the 3-arg
+one as `this(armour, injury, injury)` — meaning `cas` silently equals `injury` for that
+constructor, so `ARMOUR_AND_INJURY` and `INJURY` both actually resolve to `cas = true`, not `false`.
+Fixed `is_cas()` to include all 4 variants; corrected a pre-existing test that had encoded the old
+wrong behavior as its expected result.
+
+**Stage 5 — one more fresh re-verification round, 4 newly-scoped areas (per Phase AG's own
+recommendation to keep running this technique while it's still productive) — 3 of 4 batches found
+real bugs:**
+1. **`injury/injuryType/` (51 files, the single largest yield this phase)**: this cluster had only
+   ever had generic test-count padding (Phase ZB-7), never a real Java-fidelity sweep. Found and
+   fixed roughly 17 real bugs across ~20 files: missing `send_to_box_reason()` overrides on Block/
+   BlockProne/BlockStunned(+ForSpp variants)/BreatheFire(+ForSpp)/Bomb/Stab/EatPlayer/
+   ThenIStartedBlastin (each has a distinct Java `SendToBoxReason` the Rust struct silently
+   dropped); `InjuryTypeBomb`/`BombWithModifier`(+ForSpp) had phantom hardcoded +1/+1 armor/injury
+   modifiers Java never applies (or gates dynamically on the `bombUsesMb` option, wired to the
+   real factories instead) plus a missing Ball-and-Chain armor-roll-skip check; `BlockProne`
+   variants had an incorrectly-added niggling-injury modifier Java never adds there;
+   `InjuryTypeBitten` rolled a full generic casualty sub-roll instead of Java's direct
+   cap-at-Badly-Hurt; `InjuryTypeStab`/`StabForSpp`/`EatPlayer`/`ThenIStartedBlastin` all had an
+   **inverted** `falling_down_causes_turnover` override (hardcoded `false` when Java simply doesn't
+   override it, so the real value is the trait's `true` default) — a `SkillUsageType`-drift-shaped
+   bug in a completely different cluster; `InjuryTypeStab` was also missing a
+   `failed_armour_places_prone` override (was defaulting to the trait's `true`, which broke a
+   Ball-and-Chain armor interaction) and a dropped `addDefenderChainsaw` constructor argument
+   (needed by `StepTreacherous`'s `new InjuryTypeStab(true, true)`). Fixed all with regression
+   tests; also fixed 2 now-stale dispatch-sanity assertions in `injury.rs` that had encoded the old
+   (buggy) `falling_down_causes_turnover` values as correct.
+2. **`step/generator/` sequence files (20 of 114 sampled, spread across all editions)**: 1 bug —
+   BB2025's `multi_block.rs` was missing the entire `ActivationSequenceBuilder` sub-sequence Java
+   inserts before `FOUL_APPEARANCE_MULTIPLE`, meaning negatrait resolution (Bone Head, Really
+   Stupid, Take Root, Unchannelled Fury, Blood Lust, Animal Savagery) never ran before a BB2025
+   multi-block action. Fixed; step-count assertions updated (9 → 22 steps) plus a new test
+   asserting the activation steps precede `FoulAppearanceMultiple`.
+3. **`ffb-mechanics/src/modifiers/` factory files (25 of 77 sampled)**: 2 bugs — `dodge_modifier_
+   factory.rs` never computed the Prehensile Tail dodge penalty at all and always built the bare
+   base collection regardless of edition (ignoring the real per-edition mixed/bb2016 collections);
+   `catch_modifier_factory.rs` was returning **all 19 catch modifiers simultaneously** on every
+   catch roll (delegating to a blanket predicate-based filter) instead of selecting exactly one
+   Tacklezone modifier and one Disturbing Presence modifier by count, the way
+   `GenerifiedModifierFactory.findModifiers` actually works in Java — also missing the
+   `ignoreTacklezonesWhenCatching` skip. Both fixed with regression tests.
+4. **Dialog parameter files (24 of ~71 sampled, `crates/ffb-model/src/dialog/`)**: fully clean — 0
+   bugs. One non-bug method-completeness gap flagged, not fixed (out of field/constructor scope):
+   `dialog_block_roll_properties_parameter.rs` doesn't implement Java's `HasReRollProperties`
+   interface behavior.
+
+**Honest completion estimate: unchanged from Phase AG on the "every file/method has a Rust match"
+axis (~99.8–99.9%+, 0 `○`/`~` rows in the tracker) — but the behavioral-correctness residual this
+technique keeps finding shows no sign of drying up.** Every phase since AC has found real bugs in
+most of what it checked (6/7, 5/6, and now effectively the same pattern again this phase across 6
+separate clusters/sub-clusters). **What's left, in priority order:**
+1. **Fix the tracker mapping for the 20 `bb2020/special/*.java` rows** to point at the real
+   compiled `bb2020/*.rs` files instead of the dead `bb2020/special/*.rs` duplicates, and decide
+   (with the user) whether to delete the dead directory or repurpose it.
+2. `casualty_modifier_factory.rs` (Decay skill modifier), `armor_modifier_factory.rs` (2 Java
+   branches with no Rust equivalent, currently numerically inert), `go_for_it_modifier_factory.rs`
+   (card/skill-sourced GFI modifiers, currently inert, no live callers) — all flagged this phase as
+   pre-existing/documented gaps, not fixed (either already-tracked deferrals or currently-inert
+   with no regression-testable behavior).
+3. `dialog_block_roll_properties_parameter.rs`'s missing `HasReRollProperties` behavior.
+4. The remaining ~52 unsampled files in `ffb-mechanics/src/modifiers/`, ~92 remaining dialog
+   parameter files, and ~94 remaining `step/generator/` sequence files — this phase only sampled
+   a fraction of each; the hit rate on the samples suggests real yield remains in the rest.
+5. Continue the fresh re-verification technique on still-unswept areas — it has not run dry after
+   3 consecutive phases. Parity/integration testing remains the only large out-of-scope workstream.
+
+---
+
+## Prior Status (2026-07-18, Phase AG done — closed AF's 2 named follow-ups + a fresh 6-batch audit sweep)
 
 **Context: Phase AF's own closing note named exactly 2 concrete follow-ups** — `step_trap_door.rs`'s
 identical-to-BallAndChain missing-reroll-source-stash bug, and ~65 more `SkillUsageType`-special

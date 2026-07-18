@@ -1,5 +1,5 @@
 /// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeKTMCrowd.
-use ffb_model::enums::{ApothecaryMode, PlayerState, PS_KNOCKED_OUT};
+use ffb_model::enums::{ApothecaryMode, PlayerState, SendToBoxReason, PS_KNOCKED_OUT};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
@@ -22,6 +22,8 @@ impl InjuryTypeServer for InjuryTypeKTMCrowd {
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn falling_down_causes_turnover(&self) -> bool { false }
+    /// Java: `KTMCrowd()` constructor passes `SendToBoxReason.CROWD_KICKED`.
+    fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::CrowdKicked) }
 }
 
 #[cfg(test)]
@@ -44,6 +46,10 @@ mod tests {
     }
     #[test]
     fn does_not_cause_turnover() { assert!(!InjuryTypeKTMCrowd::new().falling_down_causes_turnover()); }
+    #[test]
+    fn send_to_box_reason_is_crowd_kicked() {
+        assert_eq!(InjuryTypeKTMCrowd::new().send_to_box_reason(), Some(SendToBoxReason::CrowdKicked));
+    }
     #[test]
     fn context_stores_attacker_and_defender() {
         let mut t = InjuryTypeKTMCrowd::new(); let mut rng = GameRng::new(1);

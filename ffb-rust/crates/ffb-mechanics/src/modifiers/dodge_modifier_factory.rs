@@ -3,22 +3,43 @@ use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::util_player::UtilPlayer;
 use crate::modifiers::dodge_context::DodgeContext;
 use crate::modifiers::dodge_modifier::DodgeModifier;
-use crate::modifiers::dodge_modifier_collection::DodgeModifierCollection;
+use crate::modifiers::mixed::dodge_modifier_collection::DodgeModifierCollection as MixedCollection;
+use crate::modifiers::bb2016::dodge_modifier_collection::DodgeModifierCollection as Bb2016Collection;
 use crate::modifiers::modifier_type::ModifierType;
 
 /// 1:1 translation of com.fumbbl.ffb.factory.DodgeModifierFactory.
 ///
-/// BB2025 uses the base DodgeModifierCollection (tackle zones only — no prehensile tail).
+/// BB2020/BB2025/Common use the mixed DodgeModifierCollection (tackle zones + prehensile tail).
+/// BB2016 uses the bb2016 DodgeModifierCollection (same shape).
 /// TACKLEZONE selection counts opposing players with tackle zones at the target coordinate.
+/// PREHENSILE_TAIL selection counts opponents adjacent to the source coordinate (including the
+/// source tile itself) with the makesDodgingHarder property.
 pub struct DodgeModifierFactory {
-    collection: DodgeModifierCollection,
+    collection: DodgeCollection,
+}
+
+enum DodgeCollection {
+    Mixed(MixedCollection),
+    Bb2016(Bb2016Collection),
+}
+
+impl DodgeCollection {
+    fn get_modifiers(&self) -> &[DodgeModifier] {
+        match self {
+            DodgeCollection::Mixed(c) => c.get_modifiers(),
+            DodgeCollection::Bb2016(c) => c.get_modifiers(),
+        }
+    }
 }
 
 impl DodgeModifierFactory {
     /// Construct a factory for the given rules edition.
-    /// BB2025 and all editions without an edition-specific subclass use the base collection.
-    pub fn for_rules(_rules: Rules) -> Self {
-        Self { collection: DodgeModifierCollection::new() }
+    pub fn for_rules(rules: Rules) -> Self {
+        let collection = match rules {
+            Rules::Bb2016 => DodgeCollection::Bb2016(Bb2016Collection::new()),
+            _ => DodgeCollection::Mixed(MixedCollection::new()),
+        };
+        Self { collection }
     }
 
     /// 1:1 translation of DodgeModifierFactory.forName.
@@ -29,9 +50,11 @@ impl DodgeModifierFactory {
     /// Returns the modifiers applicable to the given context.
     /// 1:1 translation of GenerifiedModifierFactory.findModifiers + DodgeModifierFactory overrides.
     ///
-    /// REGULAR modifiers filtered by predicate (base BB2025 collection has none).
+    /// REGULAR modifiers filtered by predicate (base collection has none).
     /// TACKLEZONE: one modifier selected by counting opponents with TZs at target coordinate.
-    /// PREHENSILE_TAIL: 0 for BB2025 (no such modifiers in base collection).
+    /// PREHENSILE_TAIL: one modifier selected by counting opponents adjacent to (or on) the
+    /// source coordinate with makesDodgingHarder. Always computed regardless of
+    /// isAffectedByTackleZones (Java: DodgeModifierFactory.findModifiers adds it unconditionally).
     pub fn find_applicable<'a>(&'a self, context: &DodgeContext<'_>) -> Vec<&'a DodgeModifier> {
         let mut result: Vec<&'a DodgeModifier> = self.collection.get_modifiers().iter()
             .filter(|m| m.get_type() == ModifierType::REGULAR && m.applies_to_context(context))
@@ -56,7 +79,40 @@ impl DodgeModifierFactory {
             }
         }
 
+        // Java: DodgeModifierFactory.findModifiers always adds prehensileTailModifier(...),
+        // independent of isAffectedByTackleZones.
+        let pt_count = self.count_prehensile_tails(context) as i32;
+        if pt_count > 0 {
+            if let Some(pt_mod) = self.collection.get_modifiers().iter()
+                .find(|m| m.get_type() == ModifierType::PREHENSILE_TAIL && m.get_multiplier() == pt_count)
+            {
+                result.push(pt_mod);
+            }
+        }
+
         result
+    }
+
+    /// Count opposing players adjacent to (or on) the source coordinate with the
+    /// makesDodgingHarder property.
+    /// Java: DodgeModifierFactory.findNumberOfPrehensileTails.
+    fn count_prehensile_tails(&self, context: &DodgeContext<'_>) -> usize {
+        let acting_player_id = match context.acting_player.player_id.as_deref() {
+            Some(id) => id,
+            None => return 0,
+        };
+        let other_team = UtilPlayer::find_other_team(context.game, acting_player_id);
+        let adjacent = UtilPlayer::find_adjacent_players_with_tacklezones(
+            context.game,
+            other_team,
+            context.source_coordinate,
+            true,
+        );
+        adjacent.iter()
+            .filter(|id| {
+                context.game.player(id).map(|p| p.has_skill_property(NamedProperties::MAKES_DODGING_HARDER)).unwrap_or(false)
+            })
+            .count()
     }
 
     /// Count opposing players with tackle zones at the target coordinate.
@@ -217,6 +273,79 @@ mod tests {
         let ctx = DodgeContext::new(&game, &acting, src, tgt);
         let mods = factory.find_applicable(&ctx);
         assert!(mods.is_empty(), "No opponents should yield no dodge modifiers");
+    }
+
+    /// Regression test: Java's DodgeModifierFactory.findModifiers() always adds a
+    /// PREHENSILE_TAIL modifier computed from opponents adjacent to (or on) the source
+    /// coordinate with the makesDodgingHarder property (PrehensileTail skill). This was
+    /// previously missing entirely from find_applicable — Prehensile Tail's dodge penalty
+    /// was never applied. Also verifies for_rules picks the mixed collection (which carries
+    /// PREHENSILE_TAIL modifiers) rather than the bare base collection.
+    #[test]
+    fn find_applicable_includes_prehensile_tail_modifier_for_marked_opponent() {
+        use ffb_model::model::{ActingPlayer, Game, Player, SkillWithValue, Team};
+        use ffb_model::enums::{PlayerType, PlayerGender, PS_STANDING, PlayerState};
+
+        let acting_id = "a1".to_string();
+        let opp_id = "o1".to_string();
+        let acting = Player {
+            id: acting_id.clone(), name: "Actor".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None, is_big_guy: false,
+            ..Default::default()
+        };
+        let mut opponent = Player {
+            id: opp_id.clone(), name: "Opponent".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None, is_big_guy: false,
+            ..Default::default()
+        };
+        opponent.starting_skills.push(SkillWithValue::new(SkillId::PrehensileTail));
+
+        let home = Team {
+            id: "home".into(), name: "home".into(), race: "human".into(),
+            roster_id: "human".into(), coach: "c".into(),
+            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0,
+            bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
+            fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0,
+            special_rules: vec![], players: vec![acting],
+            vampire_lord: false, necromancer: false,
+        };
+        let away = Team {
+            id: "away".into(), name: "away".into(), race: "human".into(),
+            roster_id: "human".into(), coach: "c".into(),
+            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0,
+            bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
+            fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0,
+            special_rules: vec![], players: vec![opponent],
+            vampire_lord: false, necromancer: false,
+        };
+        let mut game = Game::new(home, away, Rules::Bb2025);
+        let src = FieldCoordinate::new(5, 5);
+        let tgt = FieldCoordinate::new(7, 5);
+        game.field_model.set_player_coordinate(&acting_id, src);
+        game.field_model.set_player_state(&acting_id, PlayerState(PS_STANDING));
+        // Opponent is adjacent to the source coordinate (marking the acting player there),
+        // but not adjacent to the target coordinate, so no tacklezone modifier is expected.
+        game.field_model.set_player_coordinate(&opp_id, FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state(&opp_id, PlayerState(PS_STANDING));
+
+        let factory = DodgeModifierFactory::for_rules(Rules::Bb2025);
+        let mut acting_player = ActingPlayer::default();
+        acting_player.player_id = Some(acting_id);
+        let ctx = DodgeContext::new(&game, &acting_player, src, tgt);
+        let mods = factory.find_applicable(&ctx);
+        assert!(
+            mods.iter().any(|m| m.get_type() == ModifierType::PREHENSILE_TAIL && m.get_name() == "1 Prehensile Tail"),
+            "expected a '1 Prehensile Tail' modifier, got: {:?}",
+            mods.iter().map(|m| m.get_name()).collect::<Vec<_>>()
+        );
     }
 
     #[test]

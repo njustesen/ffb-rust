@@ -15,7 +15,7 @@ use ffb_model::prompts::agent_prompt::AgentPrompt;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
-use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::step::framework::{Step, StepAction, StepOutcome, StepId, StepParameter};
 use crate::step::util_server_injury::{drop_player, stun_player};
 use crate::util::util_server_cards::UtilServerCards;
 
@@ -129,7 +129,8 @@ impl StepPlayCard {
                     for p in params {
                         outcome = outcome.publish(p);
                     }
-                    return StepOutcome::cont().with_prompt(AgentPrompt::PlayerChoice {
+                    outcome.action = StepAction::Continue;
+                    return outcome.with_prompt(AgentPrompt::PlayerChoice {
                         eligible_players: blockable,
                         reason: "cardBlockablePlayer".to_string(),
                         descriptions: vec![],
@@ -370,6 +371,44 @@ mod tests {
             StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall)
         )));
         assert_eq!(game.field_model.player_state("p2").unwrap().base(), PS_STUNNED);
+    }
+
+    #[test]
+    fn blockable_player_selection_with_multiple_candidates_keeps_activation_params() {
+        // Java: playCardWithBlockablePlayerSelection() calls UtilServerCards.activateCard(...)
+        // *before* checking whether fOpponentId is provided — its side effects (report,
+        // publishParameters from the card handler's activate()) always land on the shared
+        // step Result, dialog-or-not. The Rust translation previously discarded the locally
+        // accumulated `outcome` (built from activate_card's returned params) by returning a
+        // brand-new `StepOutcome::cont().with_prompt(...)` instead of `outcome.with_prompt(...)`
+        // when more than one blockable player is found — silently dropping activate_card's
+        // published params in exactly that branch.
+        let mut game = make_game();
+        add_player(&mut game, true, "p1", FieldCoordinate::new(5, 5));
+        add_player(&mut game, false, "p2", FieldCoordinate::new(6, 5));
+        add_player(&mut game, false, "p3", FieldCoordinate::new(4, 5));
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(5, 5));
+        game.field_model.ball_in_play = true;
+        let mut step = StepPlayCard::new();
+        // Pit Trap's handler is the one with real activation_parameters (dropPlayer, which
+        // scatters the ball off a carrier) — reused here purely to exercise the plumbing;
+        // `requires_blockable_player_selection` is attached artificially since the real Pit
+        // Trap card doesn't normally carry it.
+        step.card = Some(
+            Card::new("Pit Trap", Some("PIT_TRAP"))
+                .with_target(CardTarget::OPPOSING_PLAYER)
+                .with_requires_blockable_player_selection(true),
+        );
+        step.home_team = true;
+        step.player_id = Some("p1".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(matches!(out.prompt, Some(AgentPrompt::PlayerChoice { .. })));
+        assert!(out.published.iter().any(|p| matches!(
+            p,
+            StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall)
+        )));
+        assert!(game.report_list.has_report(ReportId::PLAY_CARD));
     }
 
     #[test]

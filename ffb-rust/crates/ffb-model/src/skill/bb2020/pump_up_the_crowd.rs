@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::PumpUpTheCrowd.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct PumpUpTheCrowd {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct PumpUpTheCrowd {
 
 impl PumpUpTheCrowd {
     pub fn new() -> Self {
-        let base = Skill::new("Pump Up The Crowd", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Pump Up The Crowd", SkillCategory::Trait, SkillUsageType::OncePerGame);
         Self { base }
     }
 }
@@ -34,5 +34,10 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(PumpUpTheCrowd::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn usage_type_is_correct() {
+        assert_eq!(PumpUpTheCrowd::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
     }
 }

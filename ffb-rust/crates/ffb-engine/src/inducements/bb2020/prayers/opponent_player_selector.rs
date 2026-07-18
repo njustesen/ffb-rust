@@ -4,6 +4,7 @@
 /// Java: overrides `determineTeam(team, game)` to return `game.getOtherTeam(team)`.
 use ffb_model::model::game::Game;
 use ffb_model::enums::{TurnMode, PS_RESERVE, SkillId};
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::types::FieldCoordinateBounds;
 use ffb_model::util::rng::GameRng;
 use crate::inducements::mixed::prayers::player_selector::PlayerSelector as PlayerSelectorTrait;
@@ -47,6 +48,7 @@ impl PlayerSelectorTrait for OpponentPlayerSelector {
                         .map_or(false, |c| FieldCoordinateBounds::FIELD.is_in_bounds(c))
                 }
             })
+            .filter(|p| !p.has_skill_property(NamedProperties::HAS_TO_ROLL_TO_USE_TEAM_REROLL))
             .filter(|p| added_skills.is_empty() || !added_skills.iter().all(|s| p.has_skill(*s)))
             .map(|p| p.id.as_str())
             .collect();
@@ -59,6 +61,15 @@ impl PlayerSelectorTrait for OpponentPlayerSelector {
         }
         eligible.truncate(nr_of_players as usize);
         eligible.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// Java: `OpponentPlayerSelector.determineTeam(team, game)` returns `game.getOtherTeam(team)`.
+    fn determine_team_id<'a>(&self, game: &Game, team_id: &'a str) -> String {
+        if game.team_home.id == team_id {
+            game.team_away.id.clone()
+        } else {
+            game.team_home.id.clone()
+        }
     }
 }
 
@@ -163,5 +174,20 @@ mod tests {
         let sel = OpponentPlayerSelector::new();
         let result = sel.select_players(&game, "home", 1, &mut GameRng::new(0), &[]);
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn opponent_selector_excludes_loner_players() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::SkillId;
+        let mut game = make_game();
+        game.turn_mode = TurnMode::StartGame;
+        add_player(&mut game, "away", "a1", PlayerState::new(PS_RESERVE));
+        // Give the opposing player the Loner skill (hasToRollToUseTeamReroll property),
+        // matching Java's PlayerSelector.eligiblePlayers() filter which OpponentPlayerSelector inherits.
+        game.team_away.players[0].extra_skills.push(SkillWithValue { skill_id: SkillId::Loner, value: None });
+        let sel = OpponentPlayerSelector::new();
+        let result = sel.select_players(&game, "home", 1, &mut GameRng::new(0), &[]);
+        assert!(result.is_empty(), "Loner opponent player should be excluded");
     }
 }

@@ -8,7 +8,7 @@ pub struct Loner {
 
 impl Loner {
     pub fn new() -> Self {
-        let base = Skill::new("Loner", SkillCategory::Trait);
+        let base = Skill::with_default_value("Loner", SkillCategory::Trait, 4);
         Self { base }
     }
 }
@@ -29,4 +29,6 @@ mod tests {
     fn name_is_correct() { assert_eq!(Loner::new().get_name(), "Loner"); }
     #[test]
     fn category_is_correct() { assert_eq!(Loner::new().get_category(), SkillCategory::Trait); }
+    #[test]
+    fn default_value_is_four() { assert_eq!(Loner::new().get_default_skill_value(), 4); }
 }

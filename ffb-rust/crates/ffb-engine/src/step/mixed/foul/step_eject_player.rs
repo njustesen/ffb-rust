@@ -3,12 +3,18 @@
 /// Removes the spotted fouler from the field (puts them in the box) and ends the turn.
 /// If the fouler had the ball, also scatters it.
 ///
-/// Java: `executeStepHooks` is deferred (no hooks registered for this step in practice).
+/// Java: `executeStepHooks(this, state)` is called unconditionally at the top of
+/// `executeStep()` — its return value is discarded (void call), but its side effects
+/// (SneakyGit's BB2025 `SneakyGitEjectPlayerModifier`, which may change the ejected
+/// player's state to BANNED/KNOCKED_OUT and set the send-to-box reason/turn/half) must
+/// land on `game` before `UtilBox.putPlayerIntoBox` runs.
 /// `UtilServerGame.updatePlayerStateDependentProperties` is deferred.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_box::UtilBox;
 use crate::action::Action;
+use crate::skill_behaviour::bb2025::sneaky_git_behaviour::StepEjectPlayerHookState;
+use crate::skill_behaviour::dispatch;
 use crate::step::framework::{CatchScatterThrowInMode, Step, StepOutcome, StepId, StepParameter};
 use crate::util::util_server_game::UtilServerGame;
 
@@ -34,7 +40,13 @@ impl StepEjectPlayer {
         }
     }
 
-    fn execute_step(&self, game: &mut Game) -> StepOutcome {
+    fn execute_step(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        let mut hook_state = StepEjectPlayerHookState {
+            argue_the_call_successful: self.argue_the_call_successful,
+            officious_ref: self.officious_ref,
+        };
+        dispatch::execute_step_hooks(game, rng, StepId::EjectPlayer, &mut hook_state);
+
         if let Some(player_id) = game.acting_player.player_id.clone() {
             UtilBox::put_player_into_box(game, &player_id);
         }
@@ -61,12 +73,12 @@ impl Default for StepEjectPlayer {
 impl Step for StepEjectPlayer {
     fn id(&self) -> StepId { StepId::EjectPlayer }
 
-    fn start(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game)
+    fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game)
+    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        self.execute_step(game, rng)
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
@@ -165,6 +177,26 @@ mod tests {
         // Java: init() stores it but does NOT consume → return false
         let consumed = step.set_parameter(&StepParameter::GotoLabelOnEnd("end".into()));
         assert!(!consumed);
+    }
+
+    #[test]
+    fn sneaky_git_hook_actually_bans_the_fouler() {
+        // Java: executeStepHooks(this, state) is called unconditionally at the top of
+        // executeStep() — its side effect (SneakyGitEjectPlayerModifier setting the
+        // ejected player's state to BANNED and recording send-to-box bookkeeping) was
+        // previously never invoked at all in the Rust translation (stale "no hooks
+        // registered for this step in practice" comment). Without this wiring nothing in
+        // this file ever actually changes the fouler's PlayerState to BANNED.
+        use ffb_model::enums::PS_STANDING;
+        let mut step = StepEjectPlayer::new();
+        step.set_parameter(&StepParameter::GotoLabelOnEnd("end".into()));
+        let mut game = make_game_with_fouler("fouler1", PS_STANDING);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        let state = game.field_model.player_state("fouler1").expect("fouler state must exist");
+        assert_eq!(state.base(), PS_BANNED);
+        let pr = game.game_result.home.player_result("fouler1").expect("player result must exist");
+        assert_eq!(pr.send_to_box_reason, Some(ffb_model::enums::SendToBoxReason::FoulBan));
     }
 
     #[test]

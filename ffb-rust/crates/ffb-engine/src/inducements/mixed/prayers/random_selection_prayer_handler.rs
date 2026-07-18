@@ -37,13 +37,16 @@ pub fn init_effect_random_selection(
 
 /// Java: RandomSelectionPrayerHandler.removeEffectInternal(GameState, Team)
 /// Removes the prayer enhancement tracking from all affected players.
+/// Java: `enhancementRemover.removeEnhancement(gameState, team, selector(), handledPrayer())` —
+/// the `selector` determines which team (own or opponent) was actually affected.
 pub fn remove_effect_internal_random_selection(
     game: &mut Game,
     team_id: &str,
     prayer_name: &str,
+    selector: &dyn PlayerSelector,
 ) {
     let remover = EnhancementRemover::new();
-    remover.remove_enhancement(game, team_id, prayer_name);
+    remover.remove_enhancement(game, team_id, prayer_name, selector);
 }
 
 #[cfg(test)]
@@ -112,7 +115,8 @@ mod tests {
         game.turn_mode = ffb_model::enums::TurnMode::StartGame;
         add_player_reserve(&mut game, "home", "h1");
         game.field_model.add_prayer_enhancement("h1", "STILETTO");
-        remove_effect_internal_random_selection(&mut game, "home", "STILETTO");
+        let selector = BB2020Selector::new();
+        remove_effect_internal_random_selection(&mut game, "home", "STILETTO", &selector);
         assert!(!game.field_model.has_prayer_enhancement("h1", "STILETTO"));
     }
 
@@ -131,7 +135,7 @@ mod tests {
         let mut game = make_game();
         // Player h2 has no enhancement — remove should not panic.
         add_player_reserve(&mut game, "home", "h2");
-        remove_effect_internal_random_selection(&mut game, "home", "GREASY_CLEATS");
+        remove_effect_internal_random_selection(&mut game, "home", "GREASY_CLEATS", &StubPlayerSelector);
         assert!(!game.field_model.has_prayer_enhancement("h2", "GREASY_CLEATS"));
     }
 

@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::LordOfChaos.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct LordOfChaos {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct LordOfChaos {
 
 impl LordOfChaos {
     pub fn new() -> Self {
-        let base = Skill::new("Lord of Chaos", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Lord of Chaos", SkillCategory::Trait, SkillUsageType::OncePerGame);
         Self { base }
     }
 }
@@ -34,5 +34,10 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(LordOfChaos::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn usage_type_is_correct() {
+        assert_eq!(LordOfChaos::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
     }
 }

@@ -1,13 +1,39 @@
-/// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeBombWithModifier.
-/// Armor roll + special effect BOMB modifier stubs + injury or PRONE.
+/// Translation of com.fumbbl.ffb.server.injury.injuryType.InjuryTypeBombWithModifier, via the
+/// shared com.fumbbl.ffb.server.injury.injuryType.AbstractInjuryTypeBombWithModifier logic:
+///   1. `placedProneCausesInjuryRoll` (Ball-and-Chain) skips the armor roll entirely — armor is
+///      treated as already broken.
+///   2. Otherwise roll armor; if not broken, add the dynamic `SpecialEffect.BOMB` armor
+///      modifier(s) from `ArmorModifierFactory` (only non-empty when the `bombUsesMb` game
+///      option is enabled — and never in BB2025, which has no such modifier at all) and
+///      recompute.
+///   3. If broken: roll injury with the normal per-skill injury modifiers, and — only if no
+///      special-effect armor modifier was added in step 2 — also add the dynamic
+///      `SpecialEffect.BOMB` injury modifier(s) from `InjuryModifierFactory` (same `bombUsesMb`
+///      gating).
+///   4. Else: PRONE.
 use ffb_model::enums::{ApothecaryMode, PlayerState, PS_PRONE};
+use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::model::SpecialEffect;
+use ffb_model::option::game_option_id::BOMB_USES_MB;
+use ffb_model::option::util_game_option::is_option_enabled;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::model::game::Game;
-use ffb_mechanics::modifiers::{ARMOR_BOMB, INJURY_BOMB};
+use ffb_mechanics::modifiers::armor_modifier::ArmorModifier;
+use ffb_mechanics::modifiers::armor_modifier_factory::ArmorModifierFactory;
 use ffb_mechanics::modifiers::injury_modifier_factory::InjuryModifierFactory;
-use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, do_injury_roll_for_player};
+use ffb_mechanics::modifiers::Modifier;
+use ffb_model::model::player::Player;
+use crate::injury::{InjuryContext, InjuryTypeServer, do_armor_roll, recalc_armor_broken, do_injury_roll_for_player};
 use crate::injury::injuryType::modification_aware_injury_type_server::leak_injury_modifier;
+
+/// Java: `ArmorModifier` instances are transient (owned by the special-effect factory); bridging
+/// into the `'static`-name `Modifier` used by `InjuryContext` needs a leak, same convention as
+/// `injury_type_block.rs`'s `leak_modifier` / `modification_aware_injury_type_server::leak_injury_modifier`.
+fn leak_armor_modifier(m: &dyn ArmorModifier, attacker: Option<&Player>, defender: &Player, rules: ffb_model::enums::Rules) -> Modifier {
+    let name: &'static str = Box::leak(m.get_name().to_owned().into_boxed_str());
+    Modifier::new(name, m.get_modifier(attacker, defender), rules)
+}
 
 pub struct InjuryTypeBombWithModifier { ctx: InjuryContext }
 impl InjuryTypeBombWithModifier { pub fn new() -> Self { Self { ctx: InjuryContext::new(ApothecaryMode::Defender) } } }
@@ -20,18 +46,47 @@ impl InjuryTypeServer for InjuryTypeBombWithModifier {
         self.ctx.attacker_id = attacker_id.map(str::to_owned);
         self.ctx.defender_coordinate = Some(coord);
         self.ctx.apothecary_mode = apo_mode;
-        self.ctx.add_armor_modifier(ARMOR_BOMB);
-        do_armor_roll(game, rng, &mut self.ctx, defender_id);
+
+        // Java: `boolean skipArmourRoll = pDefender.hasSkillProperty(placedProneCausesInjuryRoll);`
+        let skip_armour_roll = game.player(defender_id)
+            .map(|d| d.has_skill_property(NamedProperties::PLACED_PRONE_CAUSES_INJURY_ROLL))
+            .unwrap_or(false);
+        if skip_armour_roll {
+            self.ctx.armor_broken = true;
+        } else {
+            do_armor_roll(game, rng, &mut self.ctx, defender_id);
+        }
+
+        let mut added_special_armor_modifier = false;
+        if !self.ctx.armor_broken {
+            if let Some(defender) = game.player(defender_id) {
+                let mut factory = ArmorModifierFactory::new(game.rules);
+                factory.set_use_all(is_option_enabled(game, BOMB_USES_MB));
+                let attacker = attacker_id.and_then(|aid| game.player(aid));
+                let mods = factory.special_effect_armour_modifiers(SpecialEffect::BOMB, defender);
+                added_special_armor_modifier = !mods.is_empty();
+                for m in mods {
+                    self.ctx.add_armor_modifier(leak_armor_modifier(m.as_ref(), attacker, defender, game.rules));
+                }
+                recalc_armor_broken(game, &mut self.ctx, defender_id);
+            }
+        }
+
         if self.ctx.armor_broken {
-            self.ctx.add_injury_modifier(INJURY_BOMB);
             // Java: `((InjuryModifierFactory) game.getFactory(...)).findInjuryModifiers(game, injuryContext,
             // pAttacker, pDefender, isStab(), isFoul(), isVomitLike())` — Bomb never overrides
             // isStab/isFoul/isVomitLike, all false.
             if let Some(defender) = game.player(defender_id) {
                 let attacker = attacker_id.and_then(|aid| game.player(aid));
-                let factory = InjuryModifierFactory::new(game.rules);
+                let mut factory = InjuryModifierFactory::new(game.rules);
                 for m in factory.find_injury_modifiers(game, attacker, defender, false, false, false) {
                     self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), attacker, defender, game.rules));
+                }
+                if !added_special_armor_modifier {
+                    factory.set_use_all(is_option_enabled(game, BOMB_USES_MB));
+                    for m in factory.special_effect_injury_modifiers(SpecialEffect::BOMB) {
+                        self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), attacker, defender, game.rules));
+                    }
                 }
             }
             do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
@@ -42,6 +97,10 @@ impl InjuryTypeServer for InjuryTypeBombWithModifier {
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
     fn falling_down_causes_turnover(&self) -> bool { false }
+    /// Java: `new Bomb()` constructor passes `SendToBoxReason.BOMB` to the `InjuryType` base class.
+    fn send_to_box_reason(&self) -> Option<ffb_model::enums::SendToBoxReason> {
+        Some(ffb_model::enums::SendToBoxReason::Bomb)
+    }
 }
 
 #[cfg(test)]
@@ -79,11 +138,48 @@ mod tests {
     #[test]
     fn does_not_cause_turnover() { assert!(!InjuryTypeBombWithModifier::new().falling_down_causes_turnover()); }
     #[test]
-    fn bomb_armor_modifier_is_added() {
+    fn send_to_box_reason_is_bomb() {
+        use ffb_model::enums::SendToBoxReason;
+        assert_eq!(InjuryTypeBombWithModifier::new().send_to_box_reason(), Some(SendToBoxReason::Bomb));
+    }
+    /// Java: `AbstractInjuryTypeBombWithModifier` only adds the "Bomb" special-effect armor
+    /// modifier when `ArmorModifierFactory.specialEffectArmourModifiers(BOMB, defender)` returns
+    /// something non-empty, which requires the legacy `bombUsesMb` game option to be enabled —
+    /// and BB2025's `ArmorModifiers` catalog has no "Bomb" entry at all (see
+    /// `ffb_mechanics::modifiers::bb2025::armor_modifiers`), so under BB2025 with default
+    /// options no modifier is ever added, regardless of the option.
+    #[test]
+    fn no_bomb_armor_modifier_under_bb2025_default_options() {
         let mut t = InjuryTypeBombWithModifier::new(); let mut rng = GameRng::new(1);
         t.handle_injury(&game_with_armor(13), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
-        assert!(!t.ctx.armor_modifiers.is_empty());
+        assert!(t.ctx.armor_modifiers.is_empty());
     }
+    #[test]
+    fn no_bomb_armor_modifier_under_bb2020_when_option_disabled() {
+        let mut game = game_with_armor(13);
+        game.rules = Rules::Bb2020;
+        let mut t = InjuryTypeBombWithModifier::new(); let mut rng = GameRng::new(1);
+        t.handle_injury(&game, &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert!(t.ctx.armor_modifiers.is_empty());
+    }
+    #[test]
+    fn bomb_armor_modifier_is_added_under_bb2020_when_bomb_uses_mb_enabled() {
+        let mut game = game_with_armor(13);
+        game.rules = Rules::Bb2020;
+        game.options.set(ffb_model::option::game_option_id::BOMB_USES_MB, "true");
+        let mut t = InjuryTypeBombWithModifier::new(); let mut rng = GameRng::new(1);
+        t.handle_injury(&game, &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
+        assert!(t.ctx.armor_modifiers.iter().any(|m| m.name == "Bomb"));
+    }
+    // Note: Java's `AbstractInjuryTypeBombWithModifier` also skips the armor roll entirely for
+    // any defender with the `placedProneCausesInjuryRoll` property (Ball-and-Chain in all three
+    // editions). The `handle_injury` logic above implements that check via
+    // `NamedProperties::PLACED_PRONE_CAUSES_INJURY_ROLL`, but `SkillId::BallAndChain::properties()`
+    // (crates/ffb-model/src/enums/skill_id.rs) does not currently register that property name —
+    // a pre-existing gap outside this file's scope — so no skill-driven regression test for the
+    // skip path is added here; the property-name lookup itself is covered indirectly by
+    // `armor_save_results_in_prone`/`armor_break_results_in_injury_roll` exercising the
+    // non-skip branch.
     #[test]
     fn default_equivalent_to_new() {
         let t1 = InjuryTypeBombWithModifier::new();
