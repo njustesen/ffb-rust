@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed.special::StrongPassingGame.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct StrongPassingGame {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct StrongPassingGame {
 
 impl StrongPassingGame {
     pub fn new() -> Self {
-        let base = Skill::new("Strong Passing Game", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Strong Passing Game", SkillCategory::Trait, SkillUsageType::OncePerGame);
         Self { base }
     }
 }
@@ -29,4 +29,6 @@ mod tests {
     fn name_is_correct() { assert_eq!(StrongPassingGame::new().get_name(), "Strong Passing Game"); }
     #[test]
     fn category_is_correct() { assert_eq!(StrongPassingGame::new().get_category(), SkillCategory::Trait); }
+    #[test]
+    fn usage_type_is_once_per_game() { assert_eq!(StrongPassingGame::new().skill_usage_type, SkillUsageType::OncePerGame); }
 }

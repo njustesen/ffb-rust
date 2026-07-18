@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed.special::StarOfTheShow.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct StarOfTheShow {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct StarOfTheShow {
 
 impl StarOfTheShow {
     pub fn new() -> Self {
-        let base = Skill::new("Star of the Show", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Star of the Show", SkillCategory::Trait, SkillUsageType::OncePerGame);
         Self { base }
     }
 }
@@ -29,4 +29,6 @@ mod tests {
     fn name_is_correct() { assert_eq!(StarOfTheShow::new().get_name(), "Star of the Show"); }
     #[test]
     fn category_is_correct() { assert_eq!(StarOfTheShow::new().get_category(), SkillCategory::Trait); }
+    #[test]
+    fn usage_type_is_once_per_game() { assert_eq!(StarOfTheShow::new().skill_usage_type, SkillUsageType::OncePerGame); }
 }

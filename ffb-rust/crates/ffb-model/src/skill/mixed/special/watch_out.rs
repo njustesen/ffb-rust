@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed.special::WatchOut.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct WatchOut {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct WatchOut {
 
 impl WatchOut {
     pub fn new() -> Self {
-        let base = Skill::new("Watch Out!", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Watch Out!", SkillCategory::Trait, SkillUsageType::OncePerHalf);
         Self { base }
     }
 }
@@ -29,4 +29,6 @@ mod tests {
     fn name_is_correct() { assert_eq!(WatchOut::new().get_name(), "Watch Out!"); }
     #[test]
     fn category_is_correct() { assert_eq!(WatchOut::new().get_category(), SkillCategory::Trait); }
+    #[test]
+    fn usage_type_is_once_per_half() { assert_eq!(WatchOut::new().skill_usage_type, SkillUsageType::OncePerHalf); }
 }
