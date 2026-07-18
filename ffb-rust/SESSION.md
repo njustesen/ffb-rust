@@ -1,6 +1,94 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-18, Phase AE done — Armour/Injury skill audit + Decay reroll mechanic)
+## Current Status (2026-07-18, Phase AF done — fresh re-verification audit, 7 parallel batches)
+
+**Context: Phase AE's own closing note named zero new concrete gaps** — the "every Java
+class/method has a Rust match" axis had no outstanding named work, only (1) parity/integration
+testing (out of scope per standing instruction) and (2) an unquantified "residual of undiscovered
+small gaps." `TRANSLATION_TRACKER.md` independently confirmed 0 `○`/0 `~` rows. **This phase's
+answer to "are we done": materially yes on that axis — but re-verifying already-`✓` files against
+the real Java source (the same pattern that found every real bug in Phases AC-AE) is still real,
+valid unit-test-scope work, and it found more.**
+
+Ran a scoping Explore agent to find candidate spots, then split into **7 parallel foreground
+`general-purpose` agents, each in its own git worktree**, each with a strict verify-first/
+only-fix-if-real brief. **6 of 7 batches found and fixed genuine correctness bugs; 1 batch (the
+`client/dialog/` sweep) confirmed clean — that whole 170-file directory is deliberate GUI-skip
+stub code (already `—` in the tracker), not an unaudited translation gap.**
+
+1. **Fumblerooskie-pending flag was never tracked** — Rust approximated
+   `isFumblerooskiePending()` as `has_moved && ball_moving`, unrelated to Java's real condition.
+   Added the real `ActingPlayer::fumblerooskie_pending` field, wired the actual
+   `CLIENT_USE_FUMBLEROOSKIE` gate (`playerAction.allowsFumblerooskie() && hasBall`) into both
+   bb2020/bb2025 `step_init_moving.rs`, and made `step_reset_fumblerooskie.rs` consume the real
+   field (including the missing "clear when ball stops moving" line).
+2. **bb2020 pass resolution treated every successful interception as an "easy" one** —
+   `interception_successful` defaulted to `true` whenever any interceptor was present, so normal
+   (non-Yoink) successful interceptions incorrectly skipped the catch roll Java requires. Added
+   `StepParameter::InterceptionSuccessful(bool)`, published only from the real easy-intercept
+   branch.
+3. **Witch's Brew card effect was silently unreported** — `card_effect_roll_message.rs` rendered
+   nothing for all cards on the (correct, for every other card) assumption that Java's base
+   `cardReport()` is always empty; Witch's Brew is the one real override in the whole catalog.
+   Added its specific rendering.
+4. **BB2025 apothecary roll omitted the "= total" line** that its BB2020 sibling renderer already
+   computes (ported the same `parse_leading_modifier` helper across).
+5. **Sketch relay silently dropped all real data** — `ClientCommandAddSketch` only carried
+   `sketch_id`; the already-translated, already-reachable `ServerCommandHandlerAddSketch` spectator
+   relay was fabricating an empty `Sketch::new()` instead of forwarding real color/coordinates/
+   label. Extended `Sketch`/`ClientCommandAddSketch` to carry the full struct (1:1 with Java) and
+   wired the real relay.
+6. **BallAndChain's re-roll offer never actually did anything** — accepting the dialog never
+   stashed `re_roll_source`, so the subsequent roll's reroll-source check was always `None` and no
+   re-roll (nor TRR/skill consumption) ever happened; `handle_command` also matched the wrong
+   `Action` variant (`UseSkill` instead of this codebase's actual `UseReRoll` reply convention for
+   `AgentPrompt::ReRollOffer`). Both fixed. **Flagged, not fixed this phase**: `step_trap_door.rs`
+   has the identical missing-stash bug in its own re-roll offer — same fix shape, small, well-
+   scoped for a future phase.
+7. **`util_server_cards.rs::deactivate_card` gated on the wrong condition** — checked "does this
+   card have a handler" instead of Java's real `card.getTarget().isPlayedOnPlayer()`, so
+   handlerless player-targeted cards (e.g. Beguiling Bracers) never had their `field_model`
+   player-card entry cleaned up on deactivation (stale-state leak, not a crash).
+8. **13 skill files had constructor-argument fidelity drift** (`ffb-model/src/skill/` sweep,
+   sampled ~35 of it): missing `negativeTrait` (bb2020 BoneHead/ReallyStupid, mixed
+   AnimalSavagery/TakeRoot/UnchannelledFury/Bloodlust), wrong/missing default skill value (bb2020
+   MightyBlow, Bloodlust), missing `SkillUsageType::OncePerGame`/`OncePerHalf`/`OncePerTurn`
+   (Ram, GoredByTheBull, Slayer, bb2020 BrutalBlock, bb2025 Leader/LoneFouler), and one wrong
+   `SkillCategory` (bb2025 Leader: `General` → `Passing`). Currently low live-impact (the
+   authoritative gating lives in `ffb-mechanics`' `SkillDef` table, not these constructor args),
+   but genuine translation-fidelity bugs that would resurface if ever wired up directly.
+   **Flagged, not fixed**: a grep for the same `SkillUsageType` special-value pattern turned up
+   76 Java skill files total; only a sample was checked — a dedicated follow-up phase auditing
+   all 76 for the same drift class would likely find more.
+9. **Verified clean, no action needed**: `client/dialog/` (170 deliberate GUI-skip stubs, real
+   logic lives in `ffb-model`'s dialog-parameter structs + engine steps + `network_encoder/mod.rs`
+   — confirmed by direct read, not assumed), the XML/roster parent-child-stack substitution
+   (verified line-by-line against `XmlHandler`/`IXmlReadable`/`Roster.java`), `util_cards.rs`
+   (honestly-scoped subset, not a half-migration), `dodge_roll_message.rs`/`catch_roll_message.rs`/
+   `block_roll_message.rs` (all faithful), and the BB2016/BB2020/BB2025 `mercenary_skill_ids`
+   simplification (Java's own wire format reduces `Skill`→name too; no live consumer needs more).
+
+Tests: 17,175 → **17,208** (+33 across the 6 fixing batches). 0 failures across
+`cargo test --workspace`. `cargo build --workspace` and `cargo clippy --workspace --all-targets`
+clean — 0 errors, warning count in the same pre-existing baseline range (no new lint categories).
+
+**This is the first phase in the AC-AE-AF arc where re-verification of already-`✓` files found
+real bugs in *most* of what it checked (6/7 batches) rather than mostly-false-alarms** — a signal
+that this residual-bug-hunting approach is still productive, not yet exhausted. Two concrete,
+well-scoped follow-ups are now named for a future phase: (a) `step_trap_door.rs`'s identical
+re-roll-source-stash bug, (b) the other ~65 unchecked `SkillUsageType`-special Java skill files
+for the same constructor-argument-drift pattern found in item 8.
+
+**Honest completion estimate: still ~99.8-99.9%+ on the "every file/method has a Rust match"
+axis** (unchanged — this phase found *behavioral* bugs in already-translated files, not new
+untranslated files) but a fresh reminder that behavioral fidelity within "done" files is not the
+same guarantee, and likely has more low-density residual bugs of this shape. Parity/integration
+testing against the real Java engine remains the only large remaining workstream, still gated on
+the user explicitly lifting the standing "no parity yet" instruction.
+
+---
+
+## Prior Status (2026-07-18, Phase AE done — Armour/Injury skill audit + Decay reroll mechanic)
 
 **Phase AE: closed both of the 2 concretely-named gaps left by Phase AD's closing note** (the
 ~20-skill Armour/Injury `ModifierAggregator` audit, and Decay's live "roll twice" casualty

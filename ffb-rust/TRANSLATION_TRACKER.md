@@ -29,6 +29,22 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AF (2026-07-18): fresh re-verification audit, 7 parallel worktree agents, no new gaps to
+name going in.** Phase AE's closing note named zero concrete gaps, so this phase re-read a batch
+of already-`✓` files directly against the Java source (same audit shape that produced every real
+fix in Phases AC-AE) instead of inventing new scope. **6 of 7 batches found real behavioral bugs**:
+Fumblerooskie-pending tracking, bb2020 pass resolution treating every interception as an easy one,
+an unreported Witch's Brew card effect, a missing apothecary-roll total line, a sketch-relay data
+drop, a BallAndChain re-roll that silently never fired, a card-deactivation state leak, and 13
+skill files with constructor-argument drift (missing negative-trait flags/usage types/values).
+1 batch (client/dialog/ sweep) confirmed clean — correctly identified as deliberate GUI-skip on
+day one. No tracker status cells changed (all touched files were already `✓` — behavioral fixes
+within already-translated files). Tests: 17,175 → 17,208 (+33). Full writeup: `SESSION.md`
+Current Status (Phase AF). Two follow-ups named for a future phase: `step_trap_door.rs`'s
+identical re-roll bug, and ~65 more `SkillUsageType`-special skill files unchecked for the same
+drift pattern as item 8 above. Parity/integration testing remains the only large out-of-scope
+workstream.
+
 **Phase AE (2026-07-18): closed both concretely-named gaps left by Phase AD's closing note** —
 the ~18-skill Armour/Injury `ModifierAggregator` audit (`get_armour_modifiers`/
 `get_injury_modifiers` now return real per-ruleset catalogs instead of empty vecs) and Decay's
