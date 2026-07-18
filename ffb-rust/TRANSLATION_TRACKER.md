@@ -29,6 +29,17 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AE (2026-07-18): closed both concretely-named gaps left by Phase AD's closing note** —
+the ~18-skill Armour/Injury `ModifierAggregator` audit (`get_armour_modifiers`/
+`get_injury_modifiers` now return real per-ruleset catalogs instead of empty vecs) and Decay's
+live "roll twice" casualty mechanic (`do_injury_roll_for_player` now rolls a genuinely
+independent second casualty pair for Decay-skilled defenders; `evaluate_injury_context` consumes
+it instead of re-interpreting the primary roll). No tracker status cells changed (all touched
+files were already `✓` — this closes *behavioral* gaps within already-translated files, not new
+file translations). Tests: 17,160 → 17,175 (+15). Full writeup: `SESSION.md` Current Status
+(Phase AE). With this closed, the only remaining named workstream is Java/Rust parity/integration
+testing (out of scope per standing instruction).
+
 **Phase AD (2026-07-18): closed all 3 items named in Phase AC's own closing note** —
 `UtilServerHttpClient.java` (real completion: the 4 missing methods, not an architecture
 decision), `ModifierAggregator`'s 9 empty getters (wired to the already-real `SkillFactory`,

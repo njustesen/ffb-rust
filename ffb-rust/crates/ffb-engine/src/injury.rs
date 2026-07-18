@@ -422,6 +422,7 @@ pub fn do_injury_roll(rng: &mut GameRng, ctx: &mut InjuryContext) {
 /// Falls back to a standard Casualty when `interpret_*` returns `None`.
 pub fn do_injury_roll_for_player(rng: &mut GameRng, ctx: &mut InjuryContext, game: &Game, defender_id: &str) {
     use ffb_model::enums::{Rules, SkillId};
+    use ffb_model::model::property::named_properties::NamedProperties;
     let d1 = rng.d6();
     let d2 = rng.d6();
     ctx.injury_roll = Some([d1, d2]);
@@ -439,6 +440,33 @@ pub fn do_injury_roll_for_player(rng: &mut GameRng, ctx: &mut InjuryContext, gam
         injury_result([d1, d2], &ctx.injury_modifiers)
     };
     ctx.injury = Some(outcome_to_player_state(rng, ctx, outcome));
+
+    // Java: InjuryTypeServer.setInjury() lines 96-98 — Decay skill (requiresSecondCasualtyRoll):
+    // after a Casualty result, roll a second, genuinely independent casualty pair and interpret
+    // it the same way, storing the result separately rather than replacing the primary roll.
+    if ctx.casualty_roll.is_some() {
+        let requires_decay = game.player(defender_id)
+            .map(|d| d.has_skill_property(NamedProperties::REQUIRES_SECOND_CASUALTY_ROLL))
+            .unwrap_or(false);
+        if requires_decay {
+            let d16 = rng.die(16);
+            let d6 = rng.d6();
+            ctx.casualty_roll_decay = Some([d16, d6]);
+            ctx.injury_decay = Some(casualty_tier_to_player_state(d16));
+        }
+    }
+}
+
+/// Java: the casualty-tier→PlayerState mapping shared by the primary and Decay rolls
+/// (`interpretCasualtyRollAndAddModifiers`'s tier selection).
+fn casualty_tier_to_player_state(d16: i32) -> PlayerState {
+    if d16 >= 15 {
+        PlayerState::new(PS_RIP)
+    } else if d16 >= 9 {
+        PlayerState::new(PS_SERIOUS_INJURY)
+    } else {
+        PlayerState::new(PS_BADLY_HURT)
+    }
 }
 
 fn outcome_to_player_state(rng: &mut GameRng, ctx: &mut InjuryContext, outcome: InjuryOutcome) -> PlayerState {
@@ -451,14 +479,7 @@ fn outcome_to_player_state(rng: &mut GameRng, ctx: &mut InjuryContext, outcome: 
             let d16 = rng.die(16);
             let d6 = rng.d6();
             ctx.casualty_roll = Some([d16, d6]);
-            let roll = d16;
-            if roll >= 15 {
-                PlayerState::new(PS_RIP)
-            } else if roll >= 9 {
-                PlayerState::new(PS_SERIOUS_INJURY)
-            } else {
-                PlayerState::new(PS_BADLY_HURT)
-            }
+            casualty_tier_to_player_state(d16)
         }
     }
 }
@@ -930,6 +951,41 @@ mod tests {
         // Should produce some injury result
         assert!(ctx.injury.is_some());
         assert!(ctx.injury_roll.is_some());
+    }
+
+    #[test]
+    fn do_injury_roll_for_player_decay_rolls_fresh_second_casualty() {
+        use ffb_model::enums::SkillId;
+        // Force a Casualty result regardless of dice via a large injury modifier sum, then
+        // verify a Decay-skilled defender gets a genuinely independent second casualty roll
+        // (Java: InjuryTypeServer.setInjury() lines 96-98).
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(make_player_with_skills("p1", vec![SkillId::Decay]));
+        let game = Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2020);
+        let mut ctx = InjuryContext::new(ffb_model::enums::ApothecaryMode::Defender);
+        ctx.injury_modifiers.push(Modifier::new("Test", 20, Rules::Common));
+        let mut rng = GameRng::new(42);
+        do_injury_roll_for_player(&mut rng, &mut ctx, &game, "p1");
+
+        assert!(ctx.casualty_roll.is_some(), "large modifier sum must force a Casualty result");
+        assert!(ctx.casualty_roll_decay.is_some(), "Decay must roll a fresh second casualty pair");
+        assert_ne!(ctx.casualty_roll, ctx.casualty_roll_decay, "the decay roll must be independent dice, not a copy");
+        assert!(ctx.injury_decay.is_some(), "Decay's second roll must be interpreted into an injury_decay outcome");
+    }
+
+    #[test]
+    fn do_injury_roll_for_player_without_decay_never_populates_casualty_roll_decay() {
+        let mut home = crate::step::framework::test_team("home", 0);
+        home.players.push(make_player_with_skills("p1", vec![]));
+        let game = Game::new(home, crate::step::framework::test_team("away", 0), Rules::Bb2020);
+        let mut ctx = InjuryContext::new(ffb_model::enums::ApothecaryMode::Defender);
+        ctx.injury_modifiers.push(Modifier::new("Test", 20, Rules::Common));
+        let mut rng = GameRng::new(42);
+        do_injury_roll_for_player(&mut rng, &mut ctx, &game, "p1");
+
+        assert!(ctx.casualty_roll.is_some());
+        assert!(ctx.casualty_roll_decay.is_none());
+        assert!(ctx.injury_decay.is_none());
     }
 
     #[test]

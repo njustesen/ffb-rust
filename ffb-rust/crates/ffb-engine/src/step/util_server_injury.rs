@@ -121,11 +121,12 @@ fn evaluate_injury_context(
     // Java lines 106–113: serious injury sub-table
     if ctx.is_serious_injury() {
         ctx.serious_injury = interpret_serious_injury_roll(ctx.casualty_roll);
-        // Java: requiresSecondCasualtyRoll (Decay skill) → second SI interpretation
+        // Java: requiresSecondCasualtyRoll (Decay skill) → second SI interpretation, using the
+        // fresh casualty_roll_decay dice rolled in `do_injury_roll_for_player`, not a
+        // reinterpretation of the primary roll.
         if defender.map(|d| d.has_skill_property(NamedProperties::REQUIRES_SECOND_CASUALTY_ROLL)).unwrap_or(false) {
-            ctx.serious_injury_decay = interpret_serious_injury_roll(ctx.casualty_roll);
+            ctx.serious_injury_decay = interpret_serious_injury_roll(ctx.casualty_roll_decay);
         }
-        // NOTE: decay roll (casualty_roll_decay) not yet implemented; Decay skill path deferred
     }
 
     // Java lines 115–118: stun → KO conversion

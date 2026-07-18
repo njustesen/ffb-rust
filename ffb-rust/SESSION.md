@@ -1,6 +1,78 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-18, Phase AD done — closed the last 3 named gaps from the AC arc)
+## Current Status (2026-07-18, Phase AE done — Armour/Injury skill audit + Decay reroll mechanic)
+
+**Phase AE: closed both of the 2 concretely-named gaps left by Phase AD's closing note** (the
+~20-skill Armour/Injury `ModifierAggregator` audit, and Decay's live "roll twice" casualty
+mechanic). The 3rd item (parity/integration testing) remains out of scope per standing
+instruction.
+
+1. **Armour/Injury `ModifierAggregator` audit — ~18 skills across bb2016/bb2020/bb2025/mixed.**
+   Added `find_registered_armour_modifiers(rules)`/`find_registered_injury_modifiers(rules)` to
+   `armor_modifier_factory.rs`/`injury_modifier_factory.rs` (same catalog pattern Phase AD used
+   for Catch/Dodge/Pickup/Jump/RightStuff/Casualty), and wired `ModifierAggregator`'s two
+   previously-empty getters to them (now take a `Rules` param, matching the other getters).
+   Covered: `Chainsaw`, `Claw`/`Claws`, `Stakes`, `A Sneaky Pair` (real per-context predicates,
+   matching/extending the existing live-dispatch arms), plus `Brutal Block`, `DwarfenScourge`/
+   `DwarvenScourge`, `Ghostly Flames`, `Thick Skull`, `Arm Bar`, `Iron Hard Skin`,
+   `Crushing Blow`, `Ram`, `Slayer`, `Toxin Connoisseur`, `Stunty` (all of these ONCE_PER_GAME/
+   ONCE_PER_HALF special-action or value-0 catalog entries whose Java `appliesToContext`
+   override unconditionally returns `false` — registered for `for_name()` lookup only, never
+   auto-applied, matching Java exactly).
+   - **Bonus real finding**: `skill_to_armor_modifier`'s `Claw` arm used a hardcoded ">8" armour
+     threshold for all rulesets, but Java's bb2016 `Claw.java` uses ">7" (only bb2020/2025's
+     `mixed/Claws.java` uses ">8") — a genuine edition-dependent correctness bug, now fixed and
+     regression-tested.
+   - **Bonus real finding**: `ASneakyPair`'s injury-side `StaticInjuryModifierAttacker` was never
+     live-wired into `skill_to_injury_modifier` at all (only its armor-side arm existed) — added.
+   - Added `with_predicate`/`with_modifier_fn` hooks to `StaticInjuryModifierAttacker`,
+     `VariableArmourModifier`, and `VariableInjuryModifierAttacker` (mirroring the hooks
+     `StaticArmourModifier`/`StaticInjuryModifier` already had) — needed to faithfully port the
+     always-`false` and custom-value Java overrides above.
+   - **Known limitation, left honest rather than invented**: `DwarfenScourge`/`DwarvenScourge`'s
+     `getModifier` (`defender.getPosition().isDwarf() ? 2 : 1`) can't be ported exactly — `Player`
+     carries only a `position_id`, not a resolved `RosterPosition`/keyword list, at this call
+     signature. Defaults to `1` with a comment, matching the existing precedent set by the
+     Stakes arm's Khemri gap. Low-impact: this modifier's predicate is unconditionally `false`
+     (manual application only), so `get_modifier` is never invoked in live play.
+2. **Decay's live "roll twice" casualty mechanic** — genuinely unported, not just stubbed. Traced
+   the real production casualty-roll path: `injury.rs::do_injury_roll_for_player` (the single
+   call site used by all ~40 `InjuryType*` structs) never checked
+   `NamedProperties::REQUIRES_SECOND_CASUALTY_ROLL` or rolled a second casualty pair, and
+   `util_server_injury.rs::evaluate_injury_context`'s serious-injury-decay branch reused the
+   *same* `ctx.casualty_roll` instead of a fresh roll (with its own `NOTE` admitting the gap).
+   Fixed both: `do_injury_roll_for_player` now rolls a genuinely independent `[d16, d6]` pair into
+   `ctx.casualty_roll_decay` and interprets it into `ctx.injury_decay` when the defender has
+   Decay, mirroring Java's `InjuryTypeServer.setInjury()` lines 96-98; `evaluate_injury_context`
+   now consumes `ctx.casualty_roll_decay` for the SI-decay interpretation instead of
+   re-interpreting the primary roll.
+
+Tests: 17,160 → **17,175** (+15: 13 from item 1's new skill/predicate/regression tests, 2 from
+item 2's Decay end-to-end tests). 0 failures across `cargo test --workspace`. `cargo build
+--workspace` clean. `cargo clippy` warning count is a pre-existing baseline issue unrelated to
+this diff (785 workspace-wide with `--all-targets`, largely `too_many_arguments`/
+`type_complexity`/`map_or`-style lints already present throughout the codebase before this
+phase, including in the exact files touched here) — no new *categories* of lint introduced, only
+a handful of instances matching patterns already present in the same files.
+
+**This closes both concretely-named gaps from Phase AD's closing note.** What's left in the whole
+project is now just the standing, larger workstream:
+1. Java/Rust parity/integration testing — remains out of scope per standing user instruction
+   until explicitly requested. Still the only genuinely large remaining piece of work (8 sample
+   seeds in `progress.html`/`parity/`, 1 known FAIL, several event categories flagged "MISSING"
+   in `T3_COVERAGE.md`).
+2. An assumed-but-unquantified residual of undiscovered small gaps of the same "stale doc
+   comment/claim" shape found via re-verification across many prior phases — no specific instance
+   currently known/named.
+
+**Honest completion estimate: ~99.8-99.9%+** on the "every Java class/method has a Rust match"
+axis (up from Phase AD's ~99.5%+ — both concretely-named residual gaps are now closed). No
+further named gaps remain outstanding on that axis; only the parity/integration-testing
+workstream and unknown/undiscovered small gaps remain.
+
+---
+
+## Prior Status (2026-07-18, Phase AD done — closed the last 3 named gaps from the AC arc)
 
 **Phase AD: re-audited Phase AC's own closing note (3 items, each described as "blocked on a
 user decision") and found 2 of the 3 weren't actually decision-blocked — same recurring
