@@ -52,9 +52,14 @@ impl Block {
         seq.add(StepId::PlaceBall, vec![]);
         seq.add(StepId::Apothecary, vec![StepParameter::ApothecaryMode(ApothecaryMode::AnimalSavagery)]);
         seq.add(StepId::CatchScatterThrowIn, vec![]);
+        // Java always pushes SET_DEFENDER, even with a null BLOCK_DEFENDER_ID — this clears any
+        // stale `game.defenderId` left over from a prior action (StepSetDefender defaults
+        // `ignoreNullValue` to false, so a missing/null id still resets the field).
+        let mut set_defender_params = vec![];
         if let Some(ref id) = params.block_defender_id {
-            seq.add(StepId::SetDefender, vec![StepParameter::BlockDefenderId(id.clone())]);
+            set_defender_params.push(StepParameter::BlockDefenderId(id.clone()));
         }
+        seq.add(StepId::SetDefender, set_defender_params);
         seq.add(StepId::GotoLabel, vec![
             StepParameter::GotoLabel(labels::NEXT.into()),
             StepParameter::AlternateGotoLabel(fl_s.clone()),
@@ -224,5 +229,20 @@ mod tests {
         let steps = Block::build_sequence(&BlockParams::default());
         let dfp = steps.iter().find(|s| s.step_id == StepId::DropFallingPlayers).unwrap();
         assert_eq!(dfp.label.as_deref(), Some(labels::DROP_FALLING_PLAYERS));
+    }
+
+    /// Java `Block.pushSequence` unconditionally pushes `SET_DEFENDER` (with a possibly-null
+    /// `BLOCK_DEFENDER_ID`), which clears any stale `game.defenderId` left over from a prior
+    /// action. Regression test: this step must be present in the sequence even when no
+    /// `block_defender_id` has been chosen yet (e.g. the initial block-action activation before
+    /// the defender is selected via dialog).
+    #[test]
+    fn block_sequence_always_includes_set_defender_even_without_defender_id() {
+        let steps = Block::build_sequence(&BlockParams::default());
+        assert!(
+            steps.iter().any(|s| s.step_id == StepId::SetDefender),
+            "SET_DEFENDER must be pushed unconditionally, matching Java, so a stale \
+             game.defender_id from a previous action gets cleared"
+        );
     }
 }
