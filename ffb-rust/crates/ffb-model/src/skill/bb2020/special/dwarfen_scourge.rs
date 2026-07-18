@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::DwarfenScourge.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct DwarfenScourge {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct DwarfenScourge {
 
 impl DwarfenScourge {
     pub fn new() -> Self {
-        let base = Skill::new("Dwarfen Scourge", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Dwarfen Scourge", SkillCategory::Trait, SkillUsageType::OncePerGame);
         Self { base }
     }
 }
@@ -34,5 +34,10 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(DwarfenScourge::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn usage_type_is_once_per_game() {
+        assert_eq!(DwarfenScourge::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
     }
 }
