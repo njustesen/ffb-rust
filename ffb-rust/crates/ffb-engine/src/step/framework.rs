@@ -385,6 +385,11 @@ pub enum StepParameter {
     OriginalBombardier(Option<String>),
     /// PassState.deflectionSuccessful — threaded to StepCloudBurster (Java `StepHook.HookPoint.PASS_INTERCEPT`).
     DeflectionSuccessful(bool),
+    /// Java: `PassState.interceptionSuccessful` (BB2020) — set true only for a successful
+    /// *easy* interception (`Yoink`-style skill); a normal successful interception only
+    /// sets `DeflectionSuccessful` and still requires a catch roll. Published by
+    /// `bb2020::pass::StepIntercept`, consumed by `bb2020::pass::StepResolvePass`.
+    InterceptionSuccessful(bool),
     // … grow per 20_steps entries as steps are ported.
 }
 

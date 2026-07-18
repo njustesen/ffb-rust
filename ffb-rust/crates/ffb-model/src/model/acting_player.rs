@@ -54,6 +54,10 @@ pub struct ActingPlayer {
     /// action (e.g. `StepEndBomb` forces a second Ninja bomb throw) rather than being
     /// allowed to voluntarily end the turn.
     pub must_complete_action: bool,
+    /// Java: fumblerooskiePending — true once CLIENT_USE_FUMBLEROOSKIE has been accepted
+    /// (player action allows it and the player has the ball); cleared once the ball stops
+    /// moving again. Consumed by `StepResetFumblerooskie`.
+    pub fumblerooskie_pending: bool,
 }
 
 impl ActingPlayer {
@@ -92,6 +96,16 @@ impl ActingPlayer {
     /// Java: `setMustCompleteAction(boolean)`.
     pub fn set_must_complete_action(&mut self, must_complete_action: bool) {
         self.must_complete_action = must_complete_action;
+    }
+
+    /// Java: `isFumblerooskiePending()`.
+    pub fn is_fumblerooskie_pending(&self) -> bool {
+        self.fumblerooskie_pending
+    }
+
+    /// Java: `setFumblerooskiePending(boolean)`.
+    pub fn set_fumblerooskie_pending(&mut self, fumblerooskie_pending: bool) {
+        self.fumblerooskie_pending = fumblerooskie_pending;
     }
 }
 

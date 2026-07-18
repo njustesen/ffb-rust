@@ -30,7 +30,9 @@ pub struct StepResolvePass {
     /// Note: both deflection (partial) and interception (full) go through this flag.
     pub deflection_successful: bool,
     /// Whether full interception (not just deflection) was successful.
-    /// Java: passState.isInterceptionSuccessful()
+    /// Java: passState.isInterceptionSuccessful() — true only for a successful *easy*
+    /// interception; consumed from the `InterceptionSuccessful` parameter published by
+    /// `StepIntercept`.
     pub interception_successful: bool,
 }
 
@@ -66,15 +68,19 @@ impl Step for StepResolvePass {
             StepParameter::PassAccurate(v) => { self.pass_accurate = *v; true }
             StepParameter::InterceptorId(v) => {
                 if v.is_some() {
-                    // An interceptor was set → deflection occurred
+                    // An interceptor was set → deflection occurred.
+                    // Java: state.setDeflectionSuccessful(doIntercept) is set whenever the
+                    // interception attempt succeeds (easy or not); interceptionSuccessful is
+                    // a separate flag (see InterceptionSuccessful parameter below) that is
+                    // only true for an *easy* interception.
                     self.deflection_successful = true;
-                    // Java: isInterceptionSuccessful is set separately; we default to true when interceptor present
-                    // (StepIntercept sets interceptionSuccessful=true on easy/successful intercept)
-                    self.interception_successful = true;
                 }
                 self.interceptor_id = v.clone();
                 true
             }
+            // Java: passState.isInterceptionSuccessful() — published by StepIntercept only
+            // when the successful interception was an "easy" one (Yoink-style skill).
+            StepParameter::InterceptionSuccessful(v) => { self.interception_successful = *v; true }
             StepParameter::CatcherId(v) => { self.catcher_id = v.clone(); true }
             _ => false,
         }
@@ -353,6 +359,39 @@ mod tests {
             matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::CatchAccuratePassEmptySquare))
         });
         assert!(mode.is_some());
+    }
+
+    #[test]
+    fn interceptor_id_alone_does_not_imply_interception_successful() {
+        // Regression test: a successful (non-easy) interception publishes InterceptorId
+        // and (via the caller of set_parameter, e.g. StepIntercept) sets deflection_successful,
+        // but must NOT be treated as a clean "interception successful" catch unless
+        // StepIntercept also published InterceptionSuccessful(true) — that only happens for
+        // an *easy* interception (Yoink-style skill). Absent that signal, the pass should
+        // route through the DEFLECTED path (still needs a catch roll), not skip straight
+        // to NextStep as if fully caught.
+        let mut game = make_game();
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.field_model.set_player_coordinate("i1", FieldCoordinate::new(8, 5));
+        let mut step = StepResolvePass::new();
+        step.set_parameter(&StepParameter::InterceptorId(Some("i1".into())));
+        assert!(step.deflection_successful, "InterceptorId alone should set deflection_successful");
+        assert!(
+            !step.interception_successful,
+            "InterceptorId alone must NOT set interception_successful"
+        );
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        let mode = out.published.iter().find(|p| {
+            matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::Deflected))
+        });
+        assert!(mode.is_some(), "expected Deflected mode when InterceptionSuccessful was never published");
+    }
+
+    #[test]
+    fn interception_successful_parameter_is_consumed() {
+        let mut step = StepResolvePass::new();
+        assert!(step.set_parameter(&StepParameter::InterceptionSuccessful(true)));
+        assert!(step.interception_successful);
     }
 
     #[test]

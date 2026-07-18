@@ -95,11 +95,17 @@ impl StepIntercept {
     }
 
     /// Java: intercept(pInterceptor, passState) — rolls agility, checks modifiers.
-    fn intercept(&self, interceptor_id: &str, game: &mut Game, rng: &mut GameRng) -> bool {
+    ///
+    /// Returns `(successful, easy_intercept)`. Java only sets
+    /// `passState.setInterceptionSuccessful(true)` when `successful && easyIntercept`
+    /// (see `StepIntercept.intercept()`); a normal (non-easy) successful interception
+    /// only flows into `state.setDeflectionSuccessful(true)` in `executeStep()` and
+    /// still requires a catch roll via `StepResolvePass`'s DEFLECTED path.
+    fn intercept(&self, interceptor_id: &str, game: &mut Game, rng: &mut GameRng) -> (bool, bool) {
         let (easy_intercept, minimum_roll, roll) = {
             let interceptor = match game.player(interceptor_id) {
                 Some(p) => p,
-                None => return false,
+                None => return (false, false),
             };
 
             // Java: easyIntercept = interceptionSkill != null && pInterceptor.hasUnused(interceptionSkill)
@@ -161,7 +167,7 @@ impl StepIntercept {
             easy_intercept,
         ));
 
-        successful
+        (successful, easy_intercept)
     }
 }
 
@@ -236,8 +242,8 @@ impl StepIntercept {
         }
 
         // Java: else if (interceptor != null) → intercept(interceptor, state)
-        let do_intercept = if let Some(ref interceptor_id) = self.interceptor_id.clone() {
-            let success = self.intercept(interceptor_id, game, rng);
+        let (do_intercept, easy_intercept) = if let Some(ref interceptor_id) = self.interceptor_id.clone() {
+            let (success, easy) = self.intercept(interceptor_id, game, rng);
             if success {
                 let is_bomb = matches!(
                     game.thrower_action,
@@ -249,15 +255,23 @@ impl StepIntercept {
                     game.field_model.ball_moving = false;
                 }
             }
-            success
+            (success, easy)
         } else {
-            false
+            (false, false)
         };
 
         if do_intercept {
             let interceptor_id = self.interceptor_id.clone();
-            StepOutcome::next()
-                .publish(StepParameter::InterceptorId(interceptor_id))
+            let mut outcome = StepOutcome::next()
+                .publish(StepParameter::InterceptorId(interceptor_id));
+            // Java: passState.setInterceptionSuccessful(true) is set ONLY inside the
+            // `easyIntercept` branch of `intercept()` on success — a normal successful
+            // interception leaves it false (and only sets deflectionSuccessful), so
+            // StepResolvePass still routes it through a catch roll (DEFLECTED path).
+            if easy_intercept {
+                outcome = outcome.publish(StepParameter::InterceptionSuccessful(true));
+            }
+            outcome
         } else {
             StepOutcome::goto(&label)
         }
@@ -387,6 +401,100 @@ mod tests {
         let interceptors = StepIntercept::find_interceptors(&game);
         assert_eq!(interceptors.len(), 1);
         assert_eq!(interceptors[0], "opp1");
+    }
+
+    #[test]
+    fn easy_intercept_success_publishes_interception_successful() {
+        // Java: passState.setInterceptionSuccessful(true) only fires inside the
+        // `easyIntercept` branch of `intercept()` on a successful roll (minimumRoll=2,
+        // so any d6 >= 2 succeeds — 5/6 chance per seed).
+        use ffb_model::enums::{PlayerState as PS, PS_STANDING, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut home = test_team("home", 0);
+        let mut away = test_team("away", 0);
+
+        let mut thrower = ffb_model::model::player::Player::default();
+        thrower.id = "t1".into();
+        home.players.push(thrower);
+
+        let mut interceptor = ffb_model::model::player::Player::default();
+        interceptor.id = "opp1".into();
+        interceptor.agility = 1;
+        interceptor.starting_skills.push(SkillWithValue::new(SkillId::Yoink));
+        away.players.push(interceptor);
+
+        let mut game = Game::new(home, away, Rules::Bb2020);
+        game.thrower_id = Some("t1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.pass_coordinate = Some(FieldCoordinate::new(14, 7));
+        game.field_model.set_player_coordinate("t1", FieldCoordinate::new(1, 7));
+        game.field_model.set_player_coordinate("opp1", FieldCoordinate::new(7, 7));
+        game.field_model.set_player_state("opp1", PS::new(PS_STANDING));
+
+        let mut found_success = false;
+        for seed in 0u64..30 {
+            let mut game2 = game.clone();
+            let mut step = StepIntercept::new("fail".into());
+            step.interceptor_chosen = true;
+            step.interceptor_id = Some("opp1".into());
+            step.interception_skill_name = Some("Yoink".into());
+            let out = step.start(&mut game2, &mut GameRng::new(seed));
+            if out.action == StepAction::NextStep {
+                let has_success = out.published.iter().any(|p| {
+                    matches!(p, StepParameter::InterceptionSuccessful(true))
+                });
+                assert!(has_success, "seed {seed}: expected InterceptionSuccessful(true) for easy intercept success");
+                found_success = true;
+                break;
+            }
+        }
+        assert!(found_success, "no seed in 0..30 produced a successful easy intercept roll");
+    }
+
+    #[test]
+    fn non_easy_intercept_success_does_not_publish_interception_successful() {
+        // A normal (non-easy) successful interception must NOT publish
+        // InterceptionSuccessful — only DeflectionSuccessful semantics apply (handled by
+        // StepResolvePass defaulting deflection_successful=true off InterceptorId alone).
+        use ffb_model::enums::{PlayerState as PS, PS_STANDING};
+        let mut home = test_team("home", 0);
+        let mut away = test_team("away", 0);
+
+        let mut thrower = ffb_model::model::player::Player::default();
+        thrower.id = "t1".into();
+        home.players.push(thrower);
+
+        let mut interceptor = ffb_model::model::player::Player::default();
+        interceptor.id = "opp1".into();
+        interceptor.agility = 1; // low minimum roll without easy-intercept skill
+        away.players.push(interceptor);
+
+        let mut game = Game::new(home, away, Rules::Bb2020);
+        game.thrower_id = Some("t1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.pass_coordinate = Some(FieldCoordinate::new(14, 7));
+        game.field_model.set_player_coordinate("t1", FieldCoordinate::new(1, 7));
+        game.field_model.set_player_coordinate("opp1", FieldCoordinate::new(7, 7));
+        game.field_model.set_player_state("opp1", PS::new(PS_STANDING));
+
+        let mut found_success = false;
+        for seed in 0u64..30 {
+            let mut game2 = game.clone();
+            let mut step = StepIntercept::new("fail".into());
+            step.interceptor_chosen = true;
+            step.interceptor_id = Some("opp1".into());
+            // no interception_skill_name set → easy_intercept is always false
+            let out = step.start(&mut game2, &mut GameRng::new(seed));
+            if out.action == StepAction::NextStep {
+                let has_interceptor = out.published.iter().any(|p| matches!(p, StepParameter::InterceptorId(Some(id)) if id == "opp1"));
+                assert!(has_interceptor, "seed {seed}: expected InterceptorId published");
+                let has_success = out.published.iter().any(|p| matches!(p, StepParameter::InterceptionSuccessful(_)));
+                assert!(!has_success, "seed {seed}: non-easy successful intercept must not publish InterceptionSuccessful");
+                found_success = true;
+                break;
+            }
+        }
+        assert!(found_success, "no seed in 0..30 produced a successful non-easy intercept roll");
     }
 
     #[test]

@@ -44,11 +44,9 @@ impl StepResetFumblerooskie {
             let ball_coord = game.field_model.ball_coordinate;
             let player_coord = game.field_model.player_coordinate(&player_id);
 
-            // Fumblerooskie pending flag — not yet on ActingPlayer; use a model-level stub
-            // Java: actingPlayer.isFumblerooskiePending()
-            // Approximation: check if the field model has ball_moving (the ball is a live
-            // fumblerooski ball only when both moving AND on the player's square).
-            let fumblerooskie_pending = game.acting_player.has_moved && ball_moving;
+            // Java: actingPlayer.isFumblerooskiePending() — set by StepInitMoving/StepInitSelecting
+            // on CLIENT_USE_FUMBLEROOSKIE, cleared below once the ball stops moving.
+            let fumblerooskie_pending = game.acting_player.is_fumblerooskie_pending();
             let ball_on_player = ball_coord.is_some() && player_coord.is_some()
                 && ball_coord == player_coord;
 
@@ -84,11 +82,16 @@ impl StepResetFumblerooskie {
                     });
                 }
 
+                if !game.field_model.ball_moving {
+                    game.acting_player.set_fumblerooskie_pending(false);
+                }
                 return outcome;
             }
 
             // Java: if (!fieldModel.isBallMoving()) actingPlayer.setFumblerooskiePending(false)
-            // (no-op for us; we use has_moved as a proxy)
+            if !game.field_model.ball_moving {
+                game.acting_player.set_fumblerooskie_pending(false);
+            }
         }
 
         StepOutcome::next()
@@ -177,6 +180,7 @@ mod tests {
         let mut game = make_game();
         game.acting_player.player_id = Some("p1".into());
         game.acting_player.has_moved = true;
+        game.acting_player.fumblerooskie_pending = true;
         let coord = ffb_model::types::FieldCoordinate::new(5, 5);
         game.field_model.set_player_coordinate("p1", coord);
         game.field_model.ball_coordinate = Some(coord);
@@ -198,6 +202,7 @@ mod tests {
         let mut game = make_game();
         game.acting_player.player_id = Some("p1".into());
         game.acting_player.has_moved = true;
+        game.acting_player.fumblerooskie_pending = true;
         game.acting_player.held_in_place = true;
         let coord = ffb_model::types::FieldCoordinate::new(5, 5);
         game.field_model.set_player_coordinate("p1", coord);
@@ -228,6 +233,7 @@ mod tests {
         game.team_home.players.push(p);
         game.acting_player.player_id = Some("p1".into());
         game.acting_player.has_moved = true;
+        game.acting_player.fumblerooskie_pending = true;
         game.acting_player.current_move = 0;
         let coord = ffb_model::types::FieldCoordinate::new(5, 5);
         game.field_model.set_player_coordinate("p1", coord);
@@ -238,6 +244,42 @@ mod tests {
         step.start(&mut game, &mut rng);
         assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::FUMBLEROOSKIE));
         assert!(game.field_model.ball_moving);
+    }
+
+    #[test]
+    fn no_fumblerooskie_report_when_pending_flag_not_set() {
+        // Regression test: `has_moved && ball_moving` is NOT a substitute for the real
+        // `actingPlayer.isFumblerooskiePending()` flag. Without the flag explicitly set
+        // (e.g. player never used CLIENT_USE_FUMBLEROOSKIE), no report should fire even
+        // though the player has moved and the ball happens to be moving on their square.
+        let mut step = StepResetFumblerooskie::new();
+        step.end_player_action = true;
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.has_moved = true;
+        // fumblerooskie_pending intentionally left false
+        let coord = ffb_model::types::FieldCoordinate::new(5, 5);
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_moving = true;
+        game.field_model.set_player_state("p1", ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING));
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::FUMBLEROOSKIE));
+        assert!(game.field_model.ball_moving, "ball should be untouched when pending flag is not set");
+    }
+
+    #[test]
+    fn fumblerooskie_pending_cleared_once_ball_stops_moving() {
+        // Java: if (!fieldModel.isBallMoving()) actingPlayer.setFumblerooskiePending(false);
+        let mut step = StepResetFumblerooskie::new();
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.fumblerooskie_pending = true;
+        game.field_model.ball_moving = false;
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(!game.acting_player.is_fumblerooskie_pending());
     }
 
     #[test]

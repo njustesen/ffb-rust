@@ -134,10 +134,22 @@ impl Step for StepInitMoving {
                 return self.execute_step(game, rng);
             }
 
-            // Java: CLIENT_USE_FUMBLEROOSKIE → ReportFumblerooskie(player.getId(), true)
+            // Java: CLIENT_USE_FUMBLEROOSKIE — if (playerAction != null && playerAction.allowsFumblerooskie()
+            //       && UtilPlayer.hasBall(game, player)) { setBallMoving(true); addReport(...); setFumblerooskiePending(true); }
             Action::UseSkill { skill_id: SkillId::Fumblerooskie, use_skill: true } => {
                 let player_id = game.acting_player.player_id.clone();
-                game.report_list.add(ReportFumblerooskie::new(player_id, true));
+                let allows = game.acting_player.player_action
+                    .map(|a| a.allows_fumblerooskie())
+                    .unwrap_or(false);
+                let has_ball = player_id.as_deref()
+                    .map(|id| ffb_model::util::util_player::UtilPlayer::has_ball(game, id))
+                    .unwrap_or(false);
+                if allows && has_ball {
+                    game.field_model.ball_moving = true;
+                    // client-only: getResult().setSound(SoundId.BOUNCE)
+                    game.report_list.add(ReportFumblerooskie::new(player_id, true));
+                    game.acting_player.fumblerooskie_pending = true;
+                }
                 return StepOutcome::cont();
             }
 
@@ -400,18 +412,69 @@ mod tests {
     }
 
     #[test]
-    fn use_fumblerooskie_adds_fumblerooskie_report() {
+    fn use_fumblerooskie_adds_report_and_sets_pending_when_moving_and_carrying_ball() {
+        // Java: playerAction.allowsFumblerooskie() (isMoving()) && UtilPlayer.hasBall(game, player)
         use ffb_model::enums::SkillId;
         use ffb_model::report::report_id::ReportId;
         let mut game = make_game();
         game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        let coord = FieldCoordinate::new(5, 5);
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = false;
         let mut step = StepInitMoving::new("end".into());
         let action = crate::action::Action::UseSkill { skill_id: SkillId::Fumblerooskie, use_skill: true };
         step.handle_command(&action, &mut game, &mut GameRng::new(0));
         assert!(
             game.report_list.has_report(ReportId::FUMBLEROOSKIE),
-            "expected FUMBLEROOSKIE report on UseFumblerooskie action"
+            "expected FUMBLEROOSKIE report when moving and carrying the ball"
         );
+        assert!(game.field_model.ball_moving, "ball should be set moving");
+        assert!(game.acting_player.is_fumblerooskie_pending(), "fumblerooskie_pending should be set");
+    }
+
+    #[test]
+    fn use_fumblerooskie_is_noop_without_ball() {
+        // Java: UtilPlayer.hasBall(game, player) is false → the whole if-body is skipped.
+        use ffb_model::enums::SkillId;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        // No ball placed on player's square.
+        let mut step = StepInitMoving::new("end".into());
+        let action = crate::action::Action::UseSkill { skill_id: SkillId::Fumblerooskie, use_skill: true };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(
+            !game.report_list.has_report(ReportId::FUMBLEROOSKIE),
+            "no FUMBLEROOSKIE report without the ball"
+        );
+        assert!(!game.acting_player.is_fumblerooskie_pending());
+    }
+
+    #[test]
+    fn use_fumblerooskie_is_noop_when_action_does_not_allow_it() {
+        // Java: playerAction.allowsFumblerooskie() is false for a non-moving action.
+        use ffb_model::enums::SkillId;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Block);
+        let coord = FieldCoordinate::new(5, 5);
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = false;
+        let mut step = StepInitMoving::new("end".into());
+        let action = crate::action::Action::UseSkill { skill_id: SkillId::Fumblerooskie, use_skill: true };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(
+            !game.report_list.has_report(ReportId::FUMBLEROOSKIE),
+            "no FUMBLEROOSKIE report when action does not allow it"
+        );
+        assert!(!game.acting_player.is_fumblerooskie_pending());
     }
 
     #[test]
