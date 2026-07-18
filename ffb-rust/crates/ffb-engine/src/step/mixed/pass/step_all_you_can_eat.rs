@@ -95,7 +95,13 @@ impl StepAllYouCanEat {
                     game, RE_ROLLED_ACTION, MINIMUM_ROLL, false,
                 ) {
                     self.re_roll_state.re_rolled_action = Some(ReRolledAction::new(RE_ROLLED_ACTION));
-                    return outcome_base.with_prompt(prompt);
+                    // `outcome_base` was built from `StepOutcome::next()` (action == NextStep),
+                    // which the driver's dispatch silently drops `.prompt` for. Rebuild from
+                    // `cont()` so the reroll dialog actually reaches the agent, carrying over
+                    // the already-queued `AllYouCanEatRoll` event.
+                    return StepOutcome::cont()
+                        .with_events(outcome_base.events)
+                        .with_prompt(prompt);
                 }
             }
 
@@ -244,5 +250,33 @@ mod tests {
         let mut step = StepAllYouCanEat::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::ALL_YOU_CAN_EAT));
+    }
+
+    /// Regression test for the bug where the re-roll offer's `.with_prompt(...)` was
+    /// attached to a `StepOutcome::next()` (action == NextStep) `outcome_base`. The
+    /// driver's dispatch (`driver.rs`) only honors `.prompt` for `Continue`/`Repeat`
+    /// actions, so a NextStep-based outcome carrying a prompt was silently discarded
+    /// and the reroll dialog never reached the agent. The outcome must be `Continue`
+    /// whenever a reroll offer prompt is attached.
+    #[test]
+    fn reroll_offer_returns_continue_action_with_prompt() {
+        let mut game = make_game();
+        game.thrower_id = Some("bard".into());
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        game.turn_data_home.reroll_used = false;
+        // Try seeds until we get a failing roll (1-3 for a 4+ target), which should
+        // trigger a reroll offer since a TRR is available.
+        let mut found_prompt = false;
+        for seed in 0u64..100 {
+            let mut step = StepAllYouCanEat::new();
+            let mut rng = GameRng::new(seed);
+            let out = step.start(&mut game, &mut rng);
+            if out.prompt.is_some() {
+                found_prompt = true;
+                assert_eq!(out.action, StepAction::Continue, "a StepOutcome carrying a prompt must use action Continue, not NextStep, or the driver silently drops the dialog");
+            }
+        }
+        assert!(found_prompt, "expected at least one seed to trigger a reroll offer prompt in 100 seeds");
     }
 }

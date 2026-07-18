@@ -103,7 +103,16 @@ impl StepTrapDoor {
             game, RE_ROLLED_ACTION, 2, false,
         ) {
             self.re_roll_state.re_rolled_action = Some(ReRolledAction::new(RE_ROLLED_ACTION));
-            return outcome_base.with_prompt(prompt);
+            // Java: `showDialog` waits for the client's reply — the step must not advance
+            // to the next step yet. `StepOutcome::next()` (action == NextStep) silently
+            // discards the `.prompt` field in the driver's dispatch (see `driver.rs`
+            // `dispatch`/`dispatch_after_start`, which only honor `.prompt` for
+            // `Continue`/`Repeat`), so the dialog would never actually reach the agent.
+            // Build the outcome from `cont()` instead, carrying over the already-queued
+            // `TrapDoor` event from `outcome_base`.
+            return StepOutcome::cont()
+                .with_events(outcome_base.events)
+                .with_prompt(prompt);
         }
 
         // No re-roll available — fall through
@@ -332,6 +341,31 @@ mod tests {
         });
         // Either the event is present or a re-roll was offered (either is correct behavior)
         assert!(trap_event.is_some() || !out.published.is_empty() || out.action == StepAction::NextStep);
+    }
+
+    /// Regression test for the bug where the re-roll offer's `.with_prompt(...)` was
+    /// attached to a `StepOutcome::next()` (action == NextStep). The driver's dispatch
+    /// (`driver.rs`) only honors `.prompt` for `Continue`/`Repeat` actions, so a
+    /// NextStep-based outcome carrying a prompt was silently discarded and the dialog
+    /// never reached the agent. The outcome must be `Continue` whenever a reroll offer
+    /// prompt is attached.
+    #[test]
+    fn reroll_offer_returns_continue_action_with_prompt() {
+        let mut step = StepTrapDoor::new();
+        step.player_id = Some("p1".into());
+        let coord = FieldCoordinate::new(5, 5);
+        let mut game = make_game();
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.trap_doors.push(coord);
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        game.turn_data_home.reroll_used = false;
+        // Seed 3 → d6 == 1 → falls through trap door → reroll should be offered.
+        let mut rng = GameRng::new(3);
+        let out = step.start(&mut game, &mut rng);
+        if out.prompt.is_some() {
+            assert_eq!(out.action, StepAction::Continue, "a StepOutcome carrying a prompt must use action Continue, not NextStep, or the driver silently drops the dialog");
+        }
     }
 
     #[test]
