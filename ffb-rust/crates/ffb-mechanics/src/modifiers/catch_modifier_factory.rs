@@ -3,6 +3,8 @@ use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::{CatchScatterThrowInMode, Player};
 use ffb_model::util::util_disturbing_presence::UtilDisturbingPresence;
 use ffb_model::util::util_player::UtilPlayer;
+use crate::modifiers::bb2016::catch_modifier_collection::CatchModifierCollection as Bb2016Collection;
+use crate::modifiers::bb2020::catch_modifier_collection::CatchModifierCollection as Bb2020Collection;
 use crate::modifiers::bb2025::catch_modifier_collection::CatchModifierCollection as Bb2025Collection;
 use crate::modifiers::catch_context::CatchContext;
 use crate::modifiers::catch_modifier::CatchModifier;
@@ -24,6 +26,14 @@ impl CatchCollection for CatchModifierCollection {
     fn get_modifiers(&self) -> &[CatchModifier] { self.get_modifiers() }
 }
 
+impl CatchCollection for Bb2016Collection {
+    fn get_modifiers(&self) -> &[CatchModifier] { self.get_modifiers() }
+}
+
+impl CatchCollection for Bb2020Collection {
+    fn get_modifiers(&self) -> &[CatchModifier] { self.get_modifiers() }
+}
+
 impl CatchCollection for Bb2025Collection {
     fn get_modifiers(&self) -> &[CatchModifier] { self.get_modifiers() }
 }
@@ -41,8 +51,9 @@ impl CatchModifierFactory {
     /// Construct a factory for the given rules edition.
     pub fn for_rules(rules: Rules) -> Self {
         let collection: Box<dyn CatchCollection> = match rules {
+            Rules::Bb2016 => Box::new(Bb2016Collection::new()),
+            Rules::Bb2020 => Box::new(Bb2020Collection::new()),
             Rules::Bb2025 | Rules::Common => Box::new(Bb2025Collection::new()),
-            _ => Box::new(CatchModifierCollection::new()),
         };
         Self { collection }
     }
@@ -353,5 +364,45 @@ mod tests {
         let ctx = CatchContext::new(&game, None, CatchScatterThrowInMode::CatchAccuratePass, None);
         let mods = factory.find_skill_modifiers(&ctx);
         assert!(mods.is_empty());
+    }
+
+    /// Regression test: `for_rules` previously fell through to the plain base
+    /// `CatchModifierCollection` for every non-BB2025 edition, so BB2016 games never got the
+    /// Accurate-Pass/Hand-Off modifiers from `bb2016::catch_modifier_collection`. Java's
+    /// `CatchModifierFactory` dispatches to the `@RulesCollection`-annotated per-edition
+    /// subclass, so BB2016 must expose "Accurate Pass" and "Hand Off".
+    #[test]
+    fn for_rules_bb2016_includes_accurate_pass_and_hand_off() {
+        let game = {
+            let mut g = make_game(Weather::Nice);
+            g.rules = Rules::Bb2016;
+            g
+        };
+        let player = minimal_player(3);
+        let factory = CatchModifierFactory::for_rules(Rules::Bb2016);
+        let ctx = CatchContext::new(&game, Some(&player), CatchScatterThrowInMode::CatchHandOff, None);
+        let mods = factory.find_applicable(&ctx);
+        assert!(mods.iter().any(|m| m.get_name() == "Hand Off"),
+            "BB2016 catch modifiers should include Hand Off, got: {:?}",
+            mods.iter().map(|m| m.get_name()).collect::<Vec<_>>());
+    }
+
+    /// Regression test: BB2020 must expose the "Deflected Pass" / "Blast It!" modifiers from
+    /// `bb2020::catch_modifier_collection`, which were previously unreachable because `for_rules`
+    /// only special-cased BB2025.
+    #[test]
+    fn for_rules_bb2020_includes_deflected_pass() {
+        let game = {
+            let mut g = make_game(Weather::Nice);
+            g.rules = Rules::Bb2020;
+            g
+        };
+        let player = minimal_player(3);
+        let factory = CatchModifierFactory::for_rules(Rules::Bb2020);
+        let ctx = CatchContext::new(&game, Some(&player), CatchScatterThrowInMode::Deflected, None);
+        let mods = factory.find_applicable(&ctx);
+        assert!(mods.iter().any(|m| m.get_name() == "Deflected Pass"),
+            "BB2020 catch modifiers should include Deflected Pass, got: {:?}",
+            mods.iter().map(|m| m.get_name()).collect::<Vec<_>>());
     }
 }
