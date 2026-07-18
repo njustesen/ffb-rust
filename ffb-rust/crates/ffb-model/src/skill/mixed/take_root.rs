@@ -8,7 +8,7 @@ pub struct TakeRoot {
 
 impl TakeRoot {
     pub fn new() -> Self {
-        let base = Skill::new("Take Root", SkillCategory::Trait);
+        let base = Skill::as_negative_trait("Take Root", SkillCategory::Trait);
         Self { base }
     }
 }
@@ -29,4 +29,6 @@ mod tests {
     fn name_is_correct() { assert_eq!(TakeRoot::new().get_name(), "Take Root"); }
     #[test]
     fn category_is_correct() { assert_eq!(TakeRoot::new().get_category(), SkillCategory::Trait); }
+    #[test]
+    fn is_negative_trait() { assert!(TakeRoot::new().is_negative_trait()); }
 }

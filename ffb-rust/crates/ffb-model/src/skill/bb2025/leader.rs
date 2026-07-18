@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2025::Leader.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct Leader {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct Leader {
 
 impl Leader {
     pub fn new() -> Self {
-        let base = Skill::new("Leader", SkillCategory::General);
+        let base = Skill::with_usage_type("Leader", SkillCategory::Passing, SkillUsageType::OncePerHalf);
         Self { base }
     }
 }
@@ -33,6 +33,11 @@ mod tests {
 
     #[test]
     fn category_is_correct() {
-        assert_eq!(Leader::new().get_category(), SkillCategory::General);
+        assert_eq!(Leader::new().get_category(), SkillCategory::Passing);
+    }
+
+    #[test]
+    fn usage_type_is_once_per_half() {
+        assert_eq!(Leader::new().skill_usage_type, SkillUsageType::OncePerHalf);
     }
 }

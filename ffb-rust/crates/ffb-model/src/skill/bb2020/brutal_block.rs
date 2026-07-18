@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::BrutalBlock.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct BrutalBlock {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct BrutalBlock {
 
 impl BrutalBlock {
     pub fn new() -> Self {
-        let base = Skill::new("Brutal Block", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Brutal Block", SkillCategory::Trait, SkillUsageType::OncePerGame);
         Self { base }
     }
 }
@@ -34,5 +34,10 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(BrutalBlock::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn usage_type_is_once_per_game() {
+        assert_eq!(BrutalBlock::new().skill_usage_type, SkillUsageType::OncePerGame);
     }
 }

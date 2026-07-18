@@ -8,7 +8,7 @@ pub struct UnchannelledFury {
 
 impl UnchannelledFury {
     pub fn new() -> Self {
-        let base = Skill::new("Unchannelled Fury", SkillCategory::Trait);
+        let base = Skill::as_negative_trait("Unchannelled Fury", SkillCategory::Trait);
         Self { base }
     }
 }
@@ -29,4 +29,6 @@ mod tests {
     fn name_is_correct() { assert_eq!(UnchannelledFury::new().get_name(), "Unchannelled Fury"); }
     #[test]
     fn category_is_correct() { assert_eq!(UnchannelledFury::new().get_category(), SkillCategory::Trait); }
+    #[test]
+    fn is_negative_trait() { assert!(UnchannelledFury::new().is_negative_trait()); }
 }

@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2025::LoneFouler.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct LoneFouler {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct LoneFouler {
 
 impl LoneFouler {
     pub fn new() -> Self {
-        let base = Skill::new("Lone Fouler", SkillCategory::Devious);
+        let base = Skill::with_usage_type("Lone Fouler", SkillCategory::Devious, SkillUsageType::OncePerTurn);
         Self { base }
     }
 }
@@ -34,5 +34,10 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(LoneFouler::new().get_category(), SkillCategory::Devious);
+    }
+
+    #[test]
+    fn usage_type_is_once_per_turn() {
+        assert_eq!(LoneFouler::new().skill_usage_type, SkillUsageType::OncePerTurn);
     }
 }
