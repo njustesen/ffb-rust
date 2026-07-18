@@ -8,16 +8,20 @@ use ffb_model::report::report_confusion_roll::ReportConfusionRoll;
 use ffb_model::report::report_id::ReportId;
 
 /// Java `Skill.getConfusionMessage()` — the base class returns `"is confused"`, and only
-/// specific skill subclasses override it (`WildAnimal` -> "roars in rage", bb2020/bb2025
-/// `BoneHead`/`ReallyStupid` -> "is distracted"). The Rust `Skill::get_confusion_message()`
-/// stub always returns the base-class default, so this local lookup (keyed off the resolved
-/// `SkillId`, matching the same subclasses) is a directly traceable translation of the
-/// override table.
+/// specific skill subclasses override it: `WildAnimal` (bb2016) and `UnchannelledFury`
+/// (bb2020/bb2025 mixed) -> "roars in rage"; bb2020/bb2025 `BoneHead`/`ReallyStupid` ->
+/// "is distracted"; `TakeRoot` (bb2016 and mixed) -> "takes root"; `AnimalSavagery`
+/// (bb2020/bb2025 mixed) -> "tries to lash out against a team mate". The Rust
+/// `Skill::get_confusion_message()` stub always returns the base-class default, so this local
+/// lookup (keyed off the resolved `SkillId`, matching the same subclasses) is a directly
+/// traceable translation of the override table.
 fn confusion_message_for(skill_id: ffb_model::enums::SkillId) -> &'static str {
     use ffb_model::enums::SkillId;
     match skill_id {
-        SkillId::WildAnimal => "roars in rage",
+        SkillId::WildAnimal | SkillId::UnchannelledFury => "roars in rage",
         SkillId::BoneHead | SkillId::ReallyStupid => "is distracted",
+        SkillId::TakeRoot => "takes root",
+        SkillId::AnimalSavagery => "tries to lash out against a team mate",
         _ => "is confused",
     }
 }
@@ -143,6 +147,39 @@ mod tests {
         let mut status_report = StatusReport::new();
         let game = make_game();
         let report = ReportConfusionRoll::new(Some("p1".into()), false, 1, 2, false, Some("Wild Animal".into()));
+        ConfusionRollMessage.render(&mut status_report, &game, &report);
+        let msg = status_report.rendered_runs.iter().find(|r| r.text.as_deref() == Some(" roars in rage."));
+        assert!(msg.is_some());
+    }
+
+    #[test]
+    fn failed_take_root_uses_takes_root_message() {
+        let mut status_report = StatusReport::new();
+        let game = make_game();
+        let report = ReportConfusionRoll::new(Some("p1".into()), false, 1, 2, false, Some("Take Root".into()));
+        ConfusionRollMessage.render(&mut status_report, &game, &report);
+        let msg = status_report.rendered_runs.iter().find(|r| r.text.as_deref() == Some(" takes root."));
+        assert!(msg.is_some());
+    }
+
+    #[test]
+    fn failed_animal_savagery_uses_lash_out_message() {
+        let mut status_report = StatusReport::new();
+        let game = make_game();
+        let report = ReportConfusionRoll::new(Some("p1".into()), false, 1, 2, false, Some("Animal Savagery".into()));
+        ConfusionRollMessage.render(&mut status_report, &game, &report);
+        let msg = status_report
+            .rendered_runs
+            .iter()
+            .find(|r| r.text.as_deref() == Some(" tries to lash out against a team mate."));
+        assert!(msg.is_some());
+    }
+
+    #[test]
+    fn failed_unchannelled_fury_uses_roars_in_rage_message() {
+        let mut status_report = StatusReport::new();
+        let game = make_game();
+        let report = ReportConfusionRoll::new(Some("p1".into()), false, 1, 2, false, Some("Unchannelled Fury".into()));
         ConfusionRollMessage.render(&mut status_report, &game, &report);
         let msg = status_report.rendered_runs.iter().find(|r| r.text.as_deref() == Some(" roars in rage."));
         assert!(msg.is_some());
