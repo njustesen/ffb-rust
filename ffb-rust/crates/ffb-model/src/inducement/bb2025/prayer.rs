@@ -45,6 +45,38 @@ impl Prayer {
         }
     }
 
+    /// Java: getDescription() — the prayer's rules text.
+    pub fn get_description(self) -> &'static str {
+        match self {
+            Prayer::TREACHEROUS_TRAPDOOR => {
+                "Trapdoors appear. On a roll of 1 a player stepping on them falls through them"
+            }
+            Prayer::FRIENDS_WITH_THE_REF => "Argue the call succeeds on 5+",
+            Prayer::STILETTO => "One random player available to play this game gains Stab",
+            Prayer::IRON_MAN => "One chosen player available to play this game improves AV by 1 (Max 11+)",
+            Prayer::KNUCKLE_DUSTERS => "One chosen player available to play this game gains Mighty Blow",
+            Prayer::BAD_HABITS => {
+                "D3 random opponent players available to play this game without Loner gain Loner (2+)"
+            }
+            Prayer::GREASY_CLEATS => {
+                "One random opponent player available to play this game has his MA reduced by 1"
+            }
+            Prayer::BLESSED_STATUE_OF_NUFFLE => "One random player available to play this game gains Pro",
+            Prayer::MOLES_UNDER_THE_PITCH => "Rushes from opposing players have a -1 modifier",
+            Prayer::PERFECT_PASSING => "Completions generate 2 instead of 1 spp",
+            Prayer::DAZZLING_CATCHING => {
+                "Caught passes generate 1 spp (from both teams, does not have to be accurate)"
+            }
+            Prayer::FAN_INTERACTION => "Casualties caused by crowd pushes generate 2 spp",
+            Prayer::FOULING_FRENZY => "Casualties caused by fouls generate 2 spp",
+            Prayer::THROW_A_ROCK => {
+                "Once a game at the start of any turn, a randomly selected opponent on the pitch gets knocked down on a 4+"
+            }
+            Prayer::UNDER_SCRUTINY => "Fouls by opposing players are always spotted if armour is broken",
+            Prayer::INTENSIVE_TRAINING => "One random player available to play this game gains a chosen Primary skill",
+        }
+    }
+
     /// Java: affectsBothTeams()
     pub fn affects_both_teams(self) -> bool {
         matches!(self, Prayer::TREACHEROUS_TRAPDOOR)
@@ -156,4 +188,13 @@ mod tests {
         assert!(!format!("{:?}", Prayer::TREACHEROUS_TRAPDOOR).is_empty());
     }
 
+    #[test]
+    fn get_description_returns_rules_text() {
+        assert_eq!(Prayer::FRIENDS_WITH_THE_REF.get_description(), "Argue the call succeeds on 5+");
+        assert_eq!(
+            Prayer::INTENSIVE_TRAINING.get_description(),
+            "One random player available to play this game gains a chosen Primary skill"
+        );
+        assert!(!Prayer::DAZZLING_CATCHING.get_description().is_empty());
+    }
 }
