@@ -23,11 +23,24 @@ impl DialogSelectPositionParameter {
         let s = pos.into();
         if !s.is_empty() { self.positions.push(s); }
     }
+
+    /// Java: `transform()` returns `new DialogSelectPositionParameter(positions,
+    /// positionChoiceMode, 1, 1, teamId)` — min/max select are hardcoded to 1, not
+    /// carried over from the original instance.
+    pub fn transform_typed(&self) -> Self {
+        DialogSelectPositionParameter {
+            positions: self.positions.clone(),
+            position_choice_mode: self.position_choice_mode.clone(),
+            min_select: 1,
+            max_select: 1,
+            team_id: self.team_id.clone(),
+        }
+    }
 }
 
 impl IDialogParameter for DialogSelectPositionParameter {
     fn get_id(&self) -> DialogId { DialogId::SELECT_POSITION }
-    fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
+    fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.transform_typed()) }
 }
 
 #[cfg(test)]
@@ -75,5 +88,23 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(p.get_position_choice_mode(), Some("SINGLE"));
+    }
+
+    #[test]
+    fn transform_resets_min_max_select_to_one() {
+        // Java's transform() always hardcodes minSelect/maxSelect to 1, regardless of
+        // the original values — it does NOT just clone the instance.
+        let p = DialogSelectPositionParameter {
+            positions: vec!["Blitzer".into()],
+            position_choice_mode: Some("MULTIPLE".into()),
+            min_select: 2,
+            max_select: 5,
+            team_id: Some("home".into()),
+        };
+        let transformed = p.transform_typed();
+        assert_eq!(transformed.get_min_select(), 1);
+        assert_eq!(transformed.get_max_select(), 1);
+        assert_eq!(transformed.get_team_id(), Some("home"));
+        assert_eq!(transformed.get_positions(), &["Blitzer".to_string()]);
     }
 }
