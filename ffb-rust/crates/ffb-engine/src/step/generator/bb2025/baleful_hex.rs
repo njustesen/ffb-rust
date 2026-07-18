@@ -2,6 +2,7 @@
 /// Mirrors Java `com.fumbbl.ffb.server.step.generator.bb2025.BalefulHex`.
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
+use super::activation_sequence_builder::ActivationSequenceBuilder;
 
 #[derive(Debug, Clone, Default)]
 pub struct BalefulHexParams {
@@ -15,6 +16,13 @@ impl BalefulHex {
 
     pub fn build_sequence(params: &BalefulHexParams) -> Vec<SequenceStep> {
         let mut seq = Sequence::new();
+
+        // 1-13 [ACTIVATION(END)]
+        ActivationSequenceBuilder::new()
+            .with_failure_label(labels::END)
+            .add_to(&mut seq);
+
+        // 14 BALEFUL_HEX [END]
         seq.add_labelled(StepId::BalefulHex, labels::END, vec![
             StepParameter::GotoLabelOnFailure(params.failure_label.clone()),
         ]);
@@ -31,26 +39,29 @@ mod tests {
     use super::*;
 
     #[test]
-    fn baleful_hex_single_step_labelled_end() {
+    fn baleful_hex_last_step_labelled_end() {
         let steps = BalefulHex::build_sequence(&BalefulHexParams { failure_label: "X".into() });
-        assert_eq!(steps.len(), 1);
-        assert_eq!(steps[0].step_id, StepId::BalefulHex);
-        assert_eq!(steps[0].label.as_deref(), Some(labels::END));
+        let last = steps.last().unwrap();
+        assert_eq!(last.step_id, StepId::BalefulHex);
+        assert_eq!(last.label.as_deref(), Some(labels::END));
     }
 
     #[test]
     fn failure_label_in_params() {
         let steps = BalefulHex::build_sequence(&BalefulHexParams { failure_label: "theLabel".into() });
-        let has = steps[0].params.iter().any(|p| {
+        let last = steps.last().unwrap();
+        let has = last.params.iter().any(|p| {
             matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "theLabel")
         });
         assert!(has);
     }
 
     #[test]
-    fn baleful_hex_step_count_is_one() {
+    fn baleful_hex_step_count_is_fourteen_with_activation() {
+        // Java pushSequence: ActivationSequenceBuilder.create()...addTo(sequence) before BALEFUL_HEX.
         let steps = BalefulHex::build_sequence(&BalefulHexParams::default());
-        assert_eq!(steps.len(), 1);
+        assert_eq!(steps.len(), 14);
+        assert_eq!(steps[0].step_id, StepId::InitActivation);
     }
 
     #[test]

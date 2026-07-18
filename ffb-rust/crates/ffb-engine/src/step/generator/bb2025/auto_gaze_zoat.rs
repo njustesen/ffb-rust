@@ -2,6 +2,7 @@
 /// Mirrors Java `com.fumbbl.ffb.server.step.generator.bb2025.AutoGazeZoat`.
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
+use super::activation_sequence_builder::ActivationSequenceBuilder;
 
 #[derive(Debug, Clone, Default)]
 pub struct AutoGazeZoatParams {
@@ -16,6 +17,13 @@ impl AutoGazeZoat {
 
     pub fn build_sequence(params: &AutoGazeZoatParams) -> Vec<SequenceStep> {
         let mut seq = Sequence::new();
+
+        // 1-13 [ACTIVATION(END)]
+        ActivationSequenceBuilder::new()
+            .with_failure_label(labels::END)
+            .add_to(&mut seq);
+
+        // 14 AUTO_GAZE_ZOAT [END]
         let mut p = vec![StepParameter::GotoLabelOnFailure(params.failure_label.clone())];
         if let Some(state) = params.old_player_state {
             p.push(StepParameter::OldPlayerState(state));
@@ -34,14 +42,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn auto_gaze_zoat_single_step_labelled_end() {
+    fn auto_gaze_zoat_last_step_labelled_end() {
         let steps = AutoGazeZoat::build_sequence(&AutoGazeZoatParams {
             failure_label: "someLabel".into(),
             old_player_state: None,
         });
-        assert_eq!(steps.len(), 1);
-        assert_eq!(steps[0].step_id, StepId::AutoGazeZoat);
-        assert_eq!(steps[0].label.as_deref(), Some(labels::END));
+        let last = steps.last().unwrap();
+        assert_eq!(last.step_id, StepId::AutoGazeZoat);
+        assert_eq!(last.label.as_deref(), Some(labels::END));
+    }
+
+    #[test]
+    fn activation_sub_sequence_precedes_auto_gaze_zoat() {
+        // Java pushSequence: ActivationSequenceBuilder.create()...addTo(sequence) before AUTO_GAZE_ZOAT.
+        let steps = AutoGazeZoat::build_sequence(&AutoGazeZoatParams::default());
+        assert_eq!(steps.len(), 14);
+        assert_eq!(steps[0].step_id, StepId::InitActivation);
+        assert_eq!(steps[13].step_id, StepId::AutoGazeZoat);
     }
 
     #[test]
@@ -50,7 +67,8 @@ mod tests {
             failure_label: "myLabel".into(),
             old_player_state: None,
         });
-        let has_label = steps[0].params.iter().any(|p| {
+        let last = steps.last().unwrap();
+        let has_label = last.params.iter().any(|p| {
             matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "myLabel")
         });
         assert!(has_label);
@@ -64,7 +82,8 @@ mod tests {
             failure_label: "X".into(),
             old_player_state: Some(state),
         });
-        let has_state = steps[0].params.iter().any(|p| matches!(p, StepParameter::OldPlayerState(_)));
+        let last = steps.last().unwrap();
+        let has_state = last.params.iter().any(|p| matches!(p, StepParameter::OldPlayerState(_)));
         assert!(has_state);
     }
 
@@ -74,7 +93,8 @@ mod tests {
             failure_label: "X".into(),
             old_player_state: None,
         });
-        let has_state = steps[0].params.iter().any(|p| matches!(p, StepParameter::OldPlayerState(_)));
+        let last = steps.last().unwrap();
+        let has_state = last.params.iter().any(|p| matches!(p, StepParameter::OldPlayerState(_)));
         assert!(!has_state);
     }
     #[test]

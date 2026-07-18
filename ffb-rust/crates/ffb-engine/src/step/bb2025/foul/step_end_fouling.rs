@@ -94,7 +94,7 @@ impl StepEndFouling {
 
         if !self.end_turn && is_on_pitch && can_move_after_foul && UtilPlayer::is_next_move_possible(game, false) {
             // Java: Select.pushSequence(new Select.SequenceParams(getGameState(), true))
-            let seq = Select::build_sequence(&SelectParams { update_persistence: true, is_blitz_move: false });
+            let seq = Select::build_sequence(&SelectParams { update_persistence: true, is_blitz_move: false, ..Default::default() });
             // Java: UtilServerSteps.changePlayerAction(this, player.getId(), PlayerAction.MOVE, false)
             if let Some(ref pid) = player_id {
                 util_server_steps::change_player_action(game, pid, PlayerAction::Move, false);

@@ -2,6 +2,7 @@
 /// Mirrors Java `com.fumbbl.ffb.server.step.generator.bb2025.SelectBlitzTarget`.
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
+use super::activation_sequence_builder::ActivationSequenceBuilder;
 
 pub struct SelectBlitzTarget;
 
@@ -14,6 +15,12 @@ impl SelectBlitzTarget {
         seq.add_labelled(StepId::SelectBlitzTarget, labels::SELECT, vec![
             StepParameter::GotoLabelOnEnd(labels::END_BLITZING.into()),
         ]);
+
+        // [ACTIVATION(END_BLITZING)]
+        ActivationSequenceBuilder::new()
+            .with_failure_label(labels::END_BLITZING)
+            .add_to(&mut seq);
+
         // 2 JUMP_UP
         seq.add(StepId::JumpUp, vec![
             StepParameter::GotoLabelOnFailure(labels::END_BLITZING.into()),
@@ -37,9 +44,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn select_blitz_target_has_4_steps() {
+    fn select_blitz_target_has_17_steps_with_activation() {
+        // Java pushSequence: SELECT_BLITZ_TARGET (1) + ActivationSequenceBuilder.create()...addTo(sequence)
+        // (13) + 3 own steps = 17.
         let steps = SelectBlitzTarget::build_sequence();
-        assert_eq!(steps.len(), 4);
+        assert_eq!(steps.len(), 17);
+        assert_eq!(steps[1].step_id, StepId::InitActivation);
     }
 
     #[test]

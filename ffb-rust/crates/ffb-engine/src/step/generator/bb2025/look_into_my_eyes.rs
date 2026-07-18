@@ -2,6 +2,7 @@
 /// Mirrors Java `com.fumbbl.ffb.server.step.generator.bb2025.LookIntoMyEyes`.
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
+use super::activation_sequence_builder::ActivationSequenceBuilder;
 
 #[derive(Debug, Clone, Default)]
 pub struct LookIntoMyEyesParams {
@@ -16,13 +17,19 @@ impl LookIntoMyEyes {
 
     pub fn build_sequence(params: &LookIntoMyEyesParams) -> Vec<SequenceStep> {
         let mut seq = Sequence::new();
-        // 1 INIT_LOOK_INTO_MY_EYES
+
+        // 1-13 [ACTIVATION(END)]
+        ActivationSequenceBuilder::new()
+            .with_failure_label(labels::END)
+            .add_to(&mut seq);
+
+        // 14 INIT_LOOK_INTO_MY_EYES
         seq.add(StepId::InitLookIntoMyEyes, vec![]);
-        // 2 FOUL_APPEARANCE (goto END on failure)
+        // 15 FOUL_APPEARANCE (goto END on failure)
         seq.add(StepId::FoulAppearance, vec![
             StepParameter::GotoLabelOnFailure(labels::END.into()),
         ]);
-        // 3 LOOK_INTO_MY_EYES [END]
+        // 16 LOOK_INTO_MY_EYES [END]
         seq.add_labelled(StepId::LookIntoMyEyes, labels::END, vec![
             StepParameter::PushSelect(params.push_select),
             StepParameter::GotoLabelOnEnd(params.goto_on_end.clone()),
@@ -40,9 +47,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn look_into_my_eyes_has_3_steps() {
+    fn look_into_my_eyes_has_16_steps_with_activation() {
+        // Java pushSequence: ActivationSequenceBuilder.create()...addTo(sequence) (13) +
+        // INIT_LOOK_INTO_MY_EYES + FOUL_APPEARANCE + LOOK_INTO_MY_EYES (3) = 16.
         let steps = LookIntoMyEyes::build_sequence(&LookIntoMyEyesParams::default());
-        assert_eq!(steps.len(), 3);
+        assert_eq!(steps.len(), 16);
+        assert_eq!(steps[0].step_id, StepId::InitActivation);
     }
 
     #[test]
@@ -67,8 +77,8 @@ mod tests {
     }
 
     #[test]
-    fn first_step_is_init_look_into_my_eyes() {
+    fn init_look_into_my_eyes_follows_activation_sub_sequence() {
         let steps = LookIntoMyEyes::build_sequence(&LookIntoMyEyesParams::default());
-        assert_eq!(steps[0].step_id, StepId::InitLookIntoMyEyes);
+        assert_eq!(steps[13].step_id, StepId::InitLookIntoMyEyes);
     }
 }

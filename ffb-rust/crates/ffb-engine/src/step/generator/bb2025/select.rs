@@ -10,6 +10,9 @@ pub struct SelectParams {
     pub update_persistence: bool,
     /// True when the current player action is a blitz move (affects ResetFumblerooskie).
     pub is_blitz_move: bool,
+    /// Java `blockTargets` — defender IDs threaded to END_SELECTING (here as strings, matching
+    /// the bb2020 sibling convention, since `BlockTarget` isn't threaded through this step layer).
+    pub block_targets: Vec<String>,
 }
 
 pub struct Select;
@@ -55,8 +58,14 @@ impl Select {
             StepParameter::ResetForFailedBlock(params.is_blitz_move),
         ]);
 
-        // 7 END_SELECTING (block_targets left empty — extended by skill hooks)
-        seq.add(StepId::EndSelecting, vec![]);
+        // 7 END_SELECTING (Java always passes params.getBlockTargets())
+        if params.block_targets.is_empty() {
+            seq.add(StepId::EndSelecting, vec![]);
+        } else {
+            seq.add(StepId::EndSelecting, vec![
+                StepParameter::BlockTargets(params.block_targets.clone()),
+            ]);
+        }
 
         seq.build()
     }
@@ -105,5 +114,20 @@ mod tests {
         let rfr = steps.iter().find(|s| s.step_id == StepId::ResetFumblerooskie).unwrap();
         let has = rfr.params.iter().any(|p| matches!(p, StepParameter::ResetForFailedBlock(true)));
         assert!(has);
+    }
+
+    #[test]
+    fn block_targets_wired_to_end_selecting_when_present() {
+        let params = SelectParams { block_targets: vec!["p1".into()], ..Default::default() };
+        let steps = Select::build_sequence(&params);
+        let end = steps.iter().find(|s| s.step_id == StepId::EndSelecting).unwrap();
+        assert!(end.params.iter().any(|p| matches!(p, StepParameter::BlockTargets(v) if v == &vec!["p1".to_string()])));
+    }
+
+    #[test]
+    fn block_targets_omitted_when_empty() {
+        let steps = Select::build_sequence(&SelectParams::default());
+        let end = steps.iter().find(|s| s.step_id == StepId::EndSelecting).unwrap();
+        assert!(end.params.is_empty());
     }
 }

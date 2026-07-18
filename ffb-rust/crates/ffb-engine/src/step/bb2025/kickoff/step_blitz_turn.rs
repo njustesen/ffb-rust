@@ -72,6 +72,7 @@ impl StepBlitzTurn {
             let select_seq = Select::build_sequence(&SelectParams {
                 update_persistence: true,
                 is_blitz_move: false,
+                ..Default::default()
             });
             return StepOutcome::next().push_seq(self_seq).push_seq(select_seq);
         }
