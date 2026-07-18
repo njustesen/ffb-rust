@@ -222,7 +222,7 @@ impl StepRightStuff {
                 });
                 let ctx = RightStuffContext::new_full(game, player, mechanic_pass_result, None);
                 let mods = factory.find_applicable(&ctx);
-                RightStuffModifierFactory::minimum_roll(player.agility as i32, &mods)
+                RightStuffModifierFactory::minimum_roll(player.agility_with_modifiers(), &mods)
             } else {
                 4
             };
@@ -521,5 +521,37 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(seed));
         assert!(game.report_list.has_report(ReportId::RIGHT_STUFF_ROLL),
             "RIGHT_STUFF_ROLL report must be added on a normal d6 roll (no FumbledPlayerLandsSafely)");
+    }
+
+    #[test]
+    fn minimum_roll_uses_agility_with_modifiers_not_raw_agility() {
+        // Java: AgilityMechanic.minimumRollRightStuff(Player, modifiers) uses
+        // player.getAgilityWithModifiers(), not the raw AG stat. A temporary AG
+        // penalty (e.g. from a spell/skill effect) must lower the effective
+        // agility used for the Right Stuff minimum-roll calculation.
+        use ffb_model::model::player::{Player, STAT_AG};
+        use ffb_model::enums::{PS_STANDING, PlayerState};
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        let mut p = Player::default();
+        p.id = "p1".into();
+        p.agility = 6;
+        // Raw agility 6 → minimum roll 6 (fails on a roll of 5).
+        // Effective agility (with -2 penalty) is 4 → minimum roll 4 (succeeds on a roll of 5).
+        p.add_temporary_stat_mod("test", STAT_AG, -2);
+        game.team_home.players.push(p);
+        let coord = FieldCoordinate::new(10, 7);
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+
+        let mut step = StepRightStuff::new("success".into());
+        step.thrown_player_id = Some("p1".into());
+        step.thrown_player_has_ball = Some(false);
+        step.old_player_state = Some(PlayerState::new(PS_STANDING));
+        step.roll = 5;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel,
+            "roll of 5 must succeed against the agility-with-modifiers threshold of 4, \
+             not fail against the raw-agility threshold of 6");
     }
 }
