@@ -7,6 +7,7 @@
 /// Init parameters (mandatory): GOTO_LABEL_ON_END, GOTO_LABEL_ON_FALL_DOWN.
 /// Incoming parameters: COORDINATE_FROM, COORDINATE_TO, BALL_AND_CHAIN_RE_ROLL_SETTING.
 use ffb_model::enums::Direction;
+use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
 use ffb_model::model::re_rolled_action::ReRolledAction;
 use ffb_model::model::skill_use::SkillUse;
@@ -109,6 +110,14 @@ impl StepMoveBallAndChain {
                         false,
                     ) {
                         self.re_roll_state.re_rolled_action = Some(ReRolledAction::new(RE_ROLLED_ACTION));
+                        // Java: `rerollSource` is only committed via `setReRollSource(rerollSource)`
+                        // in `handleCommand` once the player accepts (isSkillUsed()==true). We stash
+                        // the *offered* source here (mirroring `AgentPrompt::ReRollOffer.source`) so
+                        // `handle_command` has something to commit-or-discard based on the reply,
+                        // matching the pattern used by e.g. `StepGoForIt::execute_step`.
+                        if let ffb_model::prompts::AgentPrompt::ReRollOffer { ref source, .. } = prompt {
+                            self.re_roll_state.re_roll_source = Some(source.clone());
+                        }
                         return StepOutcome::cont().with_prompt(prompt);
                     }
                 }
@@ -166,15 +175,26 @@ impl Step for StepMoveBallAndChain {
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // Java: CLIENT_USE_SKILL for re-roll direction skill
-        // getResult().addReport(new ReportSkillUse(playerId, skill, skillUsed, SkillUse.RE_ROLL_DIRECTION))
-        if let Action::UseSkill { skill_id, use_skill } = action {
-            if self.re_roll_state.re_rolled_action.as_ref().map(|a| a.get_name() == RE_ROLLED_ACTION).unwrap_or(true) {
-                let actor_id = game.acting_player.player_id.clone();
-                game.report_list.add(ReportSkillUse::new(actor_id, *skill_id, *use_skill, SkillUse::RE_ROLL_DIRECTION));
-                if !use_skill {
-                    self.re_roll_state.re_roll_source = None;
-                }
+        // Java: CLIENT_USE_SKILL → `clientCommandUseSkill.getSkill().getRerollSource(RE_ROLLED_ACTION)`
+        //   != null → setReRolledAction(RE_ROLLED_ACTION);
+        //   getResult().addReport(new ReportSkillUse(playerId, skill, skillUsed, SkillUse.RE_ROLL_DIRECTION));
+        //   if (skillUsed) setReRollSource(rerollSource).
+        //
+        // Rust: `ask_for_reroll_if_available` returns `AgentPrompt::ReRollOffer`, and per the
+        // engine's uniform agent-response mapping (see `agent.rs`, `AgentPrompt::ReRollOffer =>
+        // Action::UseReRoll`), the reply always arrives as `Action::UseReRoll`, never
+        // `Action::UseSkill` — matching on `UseSkill` here left this branch permanently
+        // unreachable, so the offered `re_roll_source` (stashed in `execute_step` when the
+        // prompt was issued) was never committed on accept nor cleared on decline, and the
+        // scatter re-roll could never actually be consumed.
+        if let Action::UseReRoll { use_reroll } = action {
+            let actor_id = game.acting_player.player_id.clone();
+            // Java reports the *actual* skill backing the reroll; the Rust action carries no
+            // skill id for this generic re-roll reply, so we use the same placeholder
+            // (`SkillId::Block`) already established for skill-agnostic replies in `agent.rs`.
+            game.report_list.add(ReportSkillUse::new(actor_id, SkillId::Block, *use_reroll, SkillUse::RE_ROLL_DIRECTION));
+            if !use_reroll {
+                self.re_roll_state.re_roll_source = None;
             }
         }
         self.execute_step(game, rng)
@@ -394,5 +414,69 @@ mod tests {
         step.set_parameter(&StepParameter::CoordinateTo(coord));
         assert_eq!(step.coordinate_to, Some(coord));
         assert_eq!(step.original_coordinate_to, Some(coord));
+    }
+
+    /// Regression test for the bug where `re_roll_source` was never stashed when the
+    /// re-roll offer was made, and `handle_command` matched the wrong `Action` variant
+    /// (`UseSkill` instead of the `UseReRoll` the agent actually sends in reply to
+    /// `AgentPrompt::ReRollOffer` — see `agent.rs`). Before the fix, accepting the
+    /// re-roll offer had no effect: `re_roll_source` stayed `None`, so the next
+    /// `execute_step` call's `doRoll` check was always false and the reroll (and its
+    /// TRR consumption) never happened.
+    #[test]
+    fn accepting_reroll_offer_consumes_trr_and_rerolls() {
+        let mut step = StepMoveBallAndChain::new();
+        step.coordinate_from = Some(FieldCoordinate::new(10, 8));
+        step.coordinate_to = Some(FieldCoordinate::new(11, 8));
+        step.original_coordinate_to = Some(FieldCoordinate::new(11, 8));
+        step.goto_label_on_end = "end".into();
+        step.goto_label_on_fall_down = "fall".into();
+
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        game.turn_data_home.reroll_used = false;
+
+        let mut rng = GameRng::new(2);
+        let out = step.start(&mut game, &mut rng);
+
+        // A re-roll offer should have been made and the offered source stashed.
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(step.re_roll_state.re_roll_source.is_some(), "re_roll_source must be stashed when the offer is issued");
+        assert!(step.player_scatter.is_some());
+
+        // Agent accepts the re-roll (Action::UseReRoll, per agent.rs's uniform
+        // ReRollOffer -> UseReRoll mapping — never Action::UseSkill for this prompt).
+        let out2 = step.handle_command(&Action::UseReRoll { use_reroll: true }, &mut game, &mut rng);
+
+        // The TRR must actually be consumed and the step must not simply bail out to
+        // NextStep without re-rolling (the pre-fix behavior).
+        assert_eq!(game.turn_data_home.rerolls, 0, "accepting the offer must consume the TRR");
+        assert!(out2.action == StepAction::NextStep || out2.action == StepAction::GotoLabel || out2.action == StepAction::Continue);
+    }
+
+    #[test]
+    fn declining_reroll_offer_clears_source_and_does_not_consume_trr() {
+        let mut step = StepMoveBallAndChain::new();
+        step.coordinate_from = Some(FieldCoordinate::new(10, 8));
+        step.coordinate_to = Some(FieldCoordinate::new(11, 8));
+        step.original_coordinate_to = Some(FieldCoordinate::new(11, 8));
+        step.goto_label_on_end = "end".into();
+        step.goto_label_on_fall_down = "fall".into();
+
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        game.turn_data_home.reroll_used = false;
+
+        let mut rng = GameRng::new(2);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(step.re_roll_state.re_roll_source.is_some());
+
+        let _ = step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut rng);
+
+        assert!(step.re_roll_state.re_roll_source.is_none(), "declining must clear the stashed source");
+        assert_eq!(game.turn_data_home.rerolls, 1, "declining must not consume the TRR");
     }
 }
