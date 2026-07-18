@@ -1,54 +1,61 @@
 use ffb_model::enums::NetCommandId;
+use ffb_model::model::sketch::sketch::Sketch;
 use crate::commands::client_command::ClientCommand;
 use crate::net_command::NetCommand;
 
 /// 1:1 translation of `com.fumbbl.ffb.net.commands.ClientCommandAddSketch`.
-/// Java holds a `Sketch` which is a client-side rendering class (path data, color, label).
-/// Full Sketch serialization is deferred; only the sketch ID is carried here for now.
+/// Java: `private Sketch sketch;` — the full `Sketch` (id, rgb, label, path) round-trips
+/// on the wire (`IJsonOption.SKETCH.addTo(jsonObject, sketch.toJsonValue())`), which matters
+/// on the server side: `ServerCommandHandlerAddSketch` relays this exact sketch (including
+/// its initial color and first coordinate — see `ClientSketchManager.create()`/
+/// `PathSketchOverlay` in Java) to other sessions via `ServerCommandAddSketches`.
 #[derive(Debug, Clone, Default)]
 pub struct ClientCommandAddSketch {
     /// Java: base-class `ClientCommand.fEntropy`.
     pub entropy: Option<u8>,
-    /// Identifies the sketch being added. Full Sketch serialization is DEFERRED.
-    pub sketch_id: Option<String>,
+    /// Java: `sketch`.
+    pub sketch: Option<Sketch>,
 }
 
 impl ClientCommandAddSketch {
     pub fn new() -> Self { Self::default() }
 
-    pub fn with_sketch_id(sketch_id: impl Into<String>) -> Self {
-        Self { entropy: None, sketch_id: Some(sketch_id.into()) }
+    /// Java: `ClientCommandAddSketch(Sketch sketch)`.
+    pub fn with_sketch(sketch: Sketch) -> Self {
+        Self { entropy: None, sketch: Some(sketch) }
     }
 
-    pub fn get_sketch_id(&self) -> Option<&str> { self.sketch_id.as_deref() }
+    /// Convenience constructor for callers that only have a sketch id on hand
+    /// (e.g. tests) — builds a `Sketch` with just the id set.
+    pub fn with_sketch_id(sketch_id: impl Into<String>) -> Self {
+        let mut sketch = Sketch::new();
+        sketch.id = sketch_id.into();
+        Self::with_sketch(sketch)
+    }
+
+    /// Java: `getSketch()`.
+    pub fn get_sketch(&self) -> Option<&Sketch> { self.sketch.as_ref() }
+
+    pub fn get_sketch_id(&self) -> Option<&str> { self.sketch.as_ref().map(|s| s.get_id()) }
 
     /// Java: `ClientCommandAddSketch.toJsonValue()` (calls `super.toJsonValue()` first).
-    /// NOTE: Java's `IJsonOption.SKETCH.addTo(jsonObject, sketch.toJsonValue())` serializes
-    /// the full `Sketch` (id, rgb, label, path). The Rust `ClientCommandAddSketch` struct
-    /// only carries `sketch_id` (full `Sketch` translation is out of scope here — see the
-    /// struct doc comment), so only `sketch.id` (`IJsonOption.ID`, wire key "id") round-trips.
+    /// Java: `IJsonOption.SKETCH.addTo(jsonObject, sketch.toJsonValue())`, wire key "sketch".
     pub fn to_json_value(&self) -> serde_json::Value {
         let base = ClientCommand { entropy: self.entropy };
         let mut map = base.base_json_fields(self.get_id());
-        if let Some(sketch_id) = &self.sketch_id {
-            map.insert(
-                "sketch".to_string(),
-                serde_json::json!({ "id": sketch_id }),
-            );
+        if let Some(sketch) = &self.sketch {
+            map.insert("sketch".to_string(), sketch.to_json_value());
         }
         serde_json::Value::Object(map)
     }
 
-    /// Java: `ClientCommandAddSketch.initFrom(source, jsonValue)`.
+    /// Java: `ClientCommandAddSketch.initFrom(source, jsonValue)` —
+    /// `sketch = new Sketch(0).initFrom(source, IJsonOption.SKETCH.getFrom(source, jsonObject))`.
     pub fn from_json(json: &serde_json::Value) -> Self {
         let base = ClientCommand::base_from_json(json);
         Self {
             entropy: base.entropy,
-            sketch_id: json
-                .get("sketch")
-                .and_then(|v| v.get("id"))
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
+            sketch: json.get("sketch").map(Sketch::from_json),
         }
     }
 }
@@ -72,7 +79,38 @@ mod tests {
     #[test]
     fn default_is_none() {
         let cmd = ClientCommandAddSketch::new();
-        assert!(cmd.sketch_id.is_none());
+        assert!(cmd.sketch.is_none());
+    }
+
+    #[test]
+    fn with_sketch_carries_rgb_label_and_path() {
+        use ffb_model::types::FieldCoordinate;
+        let mut sketch = Sketch::with_rgb(255);
+        sketch.id = "sk-full".to_string();
+        sketch.set_label("note");
+        sketch.add_coordinate(FieldCoordinate::new(1, 2));
+        let cmd = ClientCommandAddSketch::with_sketch(sketch);
+        assert_eq!(cmd.get_sketch_id(), Some("sk-full"));
+        assert_eq!(cmd.get_sketch().unwrap().get_rgb(), 255);
+        assert_eq!(cmd.get_sketch().unwrap().get_label(), Some("note"));
+        assert_eq!(cmd.get_sketch().unwrap().get_path(), &[FieldCoordinate::new(1, 2)]);
+    }
+
+    #[test]
+    fn round_trip_preserves_rgb_label_and_path() {
+        use ffb_model::types::FieldCoordinate;
+        let mut sketch = Sketch::with_rgb(16);
+        sketch.id = "sk-rt".to_string();
+        sketch.set_label("lbl");
+        sketch.add_coordinate(FieldCoordinate::new(5, 6));
+        let cmd = ClientCommandAddSketch::with_sketch(sketch);
+        let json = cmd.to_json_value();
+        let restored = ClientCommandAddSketch::from_json(&json);
+        let restored_sketch = restored.get_sketch().unwrap();
+        assert_eq!(restored_sketch.get_id(), "sk-rt");
+        assert_eq!(restored_sketch.get_rgb(), 16);
+        assert_eq!(restored_sketch.get_label(), Some("lbl"));
+        assert_eq!(restored_sketch.get_path(), &[FieldCoordinate::new(5, 6)]);
     }
 
     #[test]
@@ -120,6 +158,6 @@ mod tests {
         let cmd = ClientCommandAddSketch::new();
         let json = cmd.to_json_value();
         let restored = ClientCommandAddSketch::from_json(&json);
-        assert!(restored.sketch_id.is_none());
+        assert!(restored.sketch.is_none());
     }
 }

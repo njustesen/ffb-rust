@@ -583,9 +583,15 @@ impl ServerCommandHandlerFactory {
                 return;
             }
             ClientCommand::ClientAddSketch(a) => {
-                let cmd = ffb_protocol::commands::client_command_add_sketch::ClientCommandAddSketch {
-                    entropy: None,
-                    sketch_id: a.sketch_id.clone(),
+                // `ClientAddSketch` (the internal Rust<->Rust wire enum) only ever carries a
+                // sketch id — the actual sketch-drawing UI that would populate rgb/label/path
+                // is Swing-only and out of scope, so there is no reachable source for those
+                // fields on this path. `ClientCommandAddSketch` (the 1:1-translated struct)
+                // does carry the full `Sketch` for the Java-wire-compatible decode path
+                // (`AnyClientCommand`/`ClientCommandAddSketch::from_json`).
+                let cmd = match a.sketch_id.clone() {
+                    Some(id) => ffb_protocol::commands::client_command_add_sketch::ClientCommandAddSketch::with_sketch_id(id),
+                    None => ffb_protocol::commands::client_command_add_sketch::ClientCommandAddSketch::new(),
                 };
                 self.add_sketch_handler.handle_command(session_id, &cmd);
                 return;

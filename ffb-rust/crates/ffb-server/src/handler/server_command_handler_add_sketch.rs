@@ -38,14 +38,18 @@ impl ServerCommandHandlerAddSketch {
 
     /// Java: `updateSketchManager(Session, ClientCommandAddSketch)` —
     /// `sketchManager.addSketch(session, command.getSketch())`.
-    ///
-    /// `ClientCommandAddSketch` in this crate only carries a `sketch_id` (full `Sketch`
-    /// serialization is deferred upstream in ffb-protocol), so the manager-side sketch is
-    /// constructed from the id alone.
     pub fn update_sketch_manager(&self, session_id: SessionId, command: &ClientCommandAddSketch) {
-        if let Some(id) = command.get_sketch_id() {
+        if let Some(sketch) = command.get_sketch() {
+            let mut manager_sketch = ManagerSketch::new(sketch.get_id());
+            manager_sketch.set_rgb(sketch.get_rgb());
+            if let Some(label) = sketch.get_label() {
+                manager_sketch.set_label(label);
+            }
+            for coordinate in sketch.get_path() {
+                manager_sketch.add_coordinate(coordinate.x, coordinate.y);
+            }
             let mut mgr = self.sketch_manager.lock().unwrap();
-            mgr.add_sketch(&session_id.to_string(), ManagerSketch::new(id));
+            mgr.add_sketch(&session_id.to_string(), manager_sketch);
         }
     }
 
@@ -56,8 +60,17 @@ impl ServerCommandHandlerAddSketch {
         coach: &str,
         command: &ClientCommandAddSketch,
     ) -> ServerCommandAddSketches {
-        let _ = command; // sketch payload not representable beyond its id (see update_sketch_manager)
-        ServerCommandAddSketches::new(coach, vec![ModelSketch::new()])
+        let sketch = command.get_sketch().cloned().unwrap_or_default();
+        let mut model_sketch = ModelSketch::new();
+        model_sketch.id = sketch.get_id().to_string();
+        model_sketch.set_rgb(sketch.get_rgb());
+        if let Some(label) = sketch.get_label() {
+            model_sketch.set_label(label);
+        }
+        for coordinate in sketch.get_path() {
+            model_sketch.add_position(*coordinate);
+        }
+        ServerCommandAddSketches::new(coach, vec![model_sketch])
     }
 
     /// Java: `getServer().getCommunication().sendToReplaySession(otherSession, serverCommand)`'s
