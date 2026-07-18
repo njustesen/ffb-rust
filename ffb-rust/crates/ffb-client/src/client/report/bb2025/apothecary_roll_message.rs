@@ -10,6 +10,8 @@ use ffb_model::report::report_id::ReportId;
 // java: PlayerState.getDescription() — not yet ported to the shared `PlayerState` bitmask
 // struct (crates/ffb-model/src/enums/player.rs), so the base -> description switch from
 // `ffb-common/src/main/java/com/fumbbl/ffb/PlayerState.java` is translated locally here.
+// Cross-checked line-for-line against `PlayerState.java`'s `getDescription()` switch (Phase
+// re-verification pass) — every variant string matches exactly; no drift found.
 fn player_state_description(base: u32) -> Option<&'static str> {
     match base {
         0x00000 => Some("is unknown"),
@@ -34,6 +36,21 @@ fn player_state_description(base: u32) -> Option<&'static str> {
         0x00015 => Some("is in the air"),
         _ => None,
     }
+}
+
+/// java: `CasualtyModifier.getModifier()` has no reachable equivalent here — the report
+/// model (`ReportApothecaryRoll.casualty_modifiers`) already flattens each `CasualtyModifier`
+/// down to its `reportString()` (format `"<modifier> <name>"`, see
+/// `ffb_mechanics::modifiers::bb2020::casualty_modifier::CasualtyModifier::report_string`),
+/// discarding the standalone numeric modifier needed to sum `Rolled X + ... = Y`. Mirrors the
+/// same fix already applied in the sibling `bb2020::ApothecaryRollMessage` translation: the
+/// leading numeric token is re-parsed out of each already-formatted string.
+fn parse_leading_modifier(report_string: &str) -> i32 {
+    report_string
+        .split_whitespace()
+        .next()
+        .and_then(|tok| tok.parse::<i32>().ok())
+        .unwrap_or(0)
 }
 
 /// 1:1 translation of `ApothecaryRollMessage.java`.
@@ -66,19 +83,20 @@ impl ReportMessage for ApothecaryRollMessage {
             status_report.println_indent_style(indent, TextStyle::ROLL, &status);
 
             if !report.get_casualty_modifiers().is_empty() {
+                let mut modifiers = 0;
                 let mut report_strings: Vec<String> = report.get_casualty_modifiers().to_vec();
+                for report_string in &report_strings {
+                    modifiers += parse_leading_modifier(report_string);
+                }
                 report_strings.sort();
                 let mut status = format!("Rolled {}", casualty_roll[0]);
                 for report_string in &report_strings {
                     status.push_str(" + ");
                     status.push_str(report_string);
                 }
-                // java: `status.append(" = ").append(casualtyRoll[0] + modifiers)` — Java sums
-                // each `CasualtyModifier.getModifier()`, but the ported report model
-                // (ReportApothecaryRoll.casualty_modifiers: Vec<String>) only carries
-                // pre-formatted strings with no retained numeric modifier value, so the final
-                // "= total" can't be reconstructed here.
-                status_report.println_indent(indent + 1, &status);
+                // java: status.append(" = ").append(casualtyRoll[0] + modifiers)
+                status.push_str(&format!(" = {}", casualty_roll[0] + modifiers));
+                status_report.println_indent_style(indent + 1, TextStyle::NONE, &status);
             }
 
             let injury = report.get_player_state();
@@ -174,12 +192,33 @@ mod tests {
             Some(PlayerState::new(0x00006)),
             None,
             None,
-            vec!["Zealous".into(), "Claws".into()],
+            vec!["1 Zealous".into(), "1 Claws".into()],
         );
         ApothecaryRollMessage.render(&mut status_report, &game, &report);
         let texts: Vec<_> = status_report.rendered_runs.iter().filter_map(|r| r.text.clone()).collect();
         let rolled_line = texts.iter().find(|t| t.starts_with("Rolled")).unwrap();
         assert!(rolled_line.find("Claws").unwrap() < rolled_line.find("Zealous").unwrap());
+    }
+
+    #[test]
+    fn casualty_modifiers_present_prints_sum_line() {
+        let mut status_report = StatusReport::new();
+        let game = make_game();
+        let report = ReportApothecaryRoll::new(
+            Some("p1".into()),
+            vec![3],
+            Some(PlayerState::new(0x00005)), // KNOCKED_OUT
+            None,
+            None,
+            vec!["1 Mighty Blow".into(), "-1 Thick Skull".into()],
+        );
+        ApothecaryRollMessage.render(&mut status_report, &game, &report);
+        let texts: Vec<_> = status_report.rendered_runs.iter().filter_map(|r| r.text.clone()).collect();
+        let rolled_line = texts.iter().find(|t| t.starts_with("Rolled")).unwrap();
+        assert!(rolled_line.contains("1 Mighty Blow"));
+        assert!(rolled_line.contains("-1 Thick Skull"));
+        // 3 + 1 + (-1) = 3
+        assert!(rolled_line.ends_with(" = 3"));
     }
 
     #[test]
