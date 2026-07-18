@@ -12,13 +12,16 @@ pub struct InterceptionModifier {
 }
 
 impl InterceptionModifier {
+    /// Java: `InterceptionModifier(String, int, ModifierType)` delegates to the 5-arg
+    /// constructor as `this(name, name, pModifier, pModifier, type)` — multiplier defaults
+    /// to the modifier value, not 1.
     pub fn new(name: impl Into<String>, modifier: i32, modifier_type: ModifierType) -> Self {
         let n = name.into();
         Self {
             reporting_string: n.clone(),
             name: n,
             modifier,
-            multiplier: 1,
+            multiplier: modifier,
             modifier_type,
             applies_to_context: None,
         }
@@ -76,7 +79,19 @@ mod tests {
         assert_eq!(m.get_name(), "Accurate Pass");
         assert_eq!(m.get_modifier(), -2);
         assert_eq!(m.get_type(), ModifierType::REGULAR);
-        assert_eq!(m.get_multiplier(), 1);
+        // Java: 3-arg ctor delegates as this(name, name, pModifier, pModifier, type) — multiplier
+        // equals the modifier value, not a hardcoded 1.
+        assert_eq!(m.get_multiplier(), -2);
+    }
+
+    #[test]
+    fn new_multiplier_equals_modifier_for_disturbing_presence() {
+        // Regression test: InterceptionModifierCollection's base DP modifiers are built via
+        // `new()`, and InterceptionModifierFactory selects by getMultiplier() in Java
+        // (GenerifiedModifierFactory.getDisturbingPresenceModifier). Multiplier must track
+        // the modifier value (here 3), not be hardcoded to 1.
+        let m = InterceptionModifier::new("3 Disturbing Presences", 3, ModifierType::DISTURBING_PRESENCE);
+        assert_eq!(m.get_multiplier(), 3);
     }
 
     #[test]

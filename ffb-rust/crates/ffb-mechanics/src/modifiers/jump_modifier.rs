@@ -12,13 +12,16 @@ pub struct JumpModifier {
 }
 
 impl JumpModifier {
+    /// Java: `JumpModifier(String, int, ModifierType)` delegates to the 5-arg constructor as
+    /// `this(name, name, pModifier, pModifier, type)` — multiplier defaults to the modifier
+    /// value, not 1.
     pub fn new(name: impl Into<String>, modifier: i32, modifier_type: ModifierType) -> Self {
         let n = name.into();
         Self {
             reporting_string: n.clone(),
             name: n,
             modifier,
-            multiplier: 1,
+            multiplier: modifier,
             modifier_type,
             applies_to_context: None,
         }
@@ -77,6 +80,14 @@ mod tests {
         assert_eq!(m.get_modifier(), 1);
         assert_eq!(m.get_type(), ModifierType::TACKLEZONE);
         assert_eq!(m.get_multiplier(), 1);
+    }
+
+    #[test]
+    fn new_multiplier_equals_modifier_not_hardcoded_one() {
+        // Java: 3-arg ctor delegates as this(name, name, pModifier, pModifier, type) —
+        // multiplier tracks the modifier value, not a hardcoded 1.
+        let m = JumpModifier::new("3 Tacklezones", 3, ModifierType::TACKLEZONE);
+        assert_eq!(m.get_multiplier(), 3);
     }
 
     #[test]
