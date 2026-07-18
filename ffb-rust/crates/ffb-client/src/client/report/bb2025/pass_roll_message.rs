@@ -1,9 +1,11 @@
+use crate::client::report::mixed::nerves_of_steel_message::NervesOfSteelMessage;
 use crate::client::report::report_message_base::{print_player, ReportMessage};
 use crate::client::status_report::StatusReport;
 use crate::client::text_style::TextStyle;
 use ffb_mechanics::pass_result::PassResult;
 use ffb_model::enums::PassingDistance;
 use ffb_model::model::game::Game;
+use ffb_model::report::mixed::report_nerves_of_steel::ReportNervesOfSteel;
 use ffb_model::report::mixed::report_pass_roll::ReportPassRoll;
 use ffb_model::report::report_id::ReportId;
 
@@ -92,12 +94,17 @@ impl ReportMessage for PassRollMessage {
         // (not-yet-ported) `PassModifierFactory`.
         if report.get_roll_modifiers().iter().any(|m| m == "Nerves of Steel") {
             // java: `Player<?> player = game.getActingPlayer().getPlayer();
-            // statusReport.report(new ReportNervesOfSteel(player.getId(), ...))` — no bb2025
-            // `NervesOfSteelMessage` render function exists yet in the Rust client (only
-            // PascalCase placeholder stubs exist for bb2016/mixed under
-            // `crates/ffb-client/src/client/report/`), so there is nothing to dispatch the
-            // constructed `ReportNervesOfSteel` to yet.
-            let _player = game.acting_player.player_id.as_deref().and_then(|id| game.player(id));
+            // if (report.isBomb()) { statusReport.report(new ReportNervesOfSteel(player.getId(),
+            // report.isBomb())); } else { statusReport.report(new ReportNervesOfSteel(player.getId(),
+            // "pass")); }`
+            if let Some(player) = game.acting_player.player_id.as_deref().and_then(|id| game.player(id)) {
+                let nerves_report = if report.is_bomb() {
+                    ReportNervesOfSteel::new(Some(player.id.clone()), None, report.is_bomb())
+                } else {
+                    ReportNervesOfSteel::new(Some(player.id.clone()), Some("pass".into()), false)
+                };
+                NervesOfSteelMessage.render(status_report, game, &nerves_report);
+            }
         }
 
         let mechanic = ffb_engine::mechanic::pass_mechanic_for(game.rules);
@@ -303,5 +310,56 @@ mod tests {
     #[test]
     fn report_id_is_pass_roll() {
         assert_eq!(PassRollMessage.report_id(), ReportId::PASS_ROLL);
+    }
+
+    #[test]
+    fn nerves_of_steel_modifier_renders_sub_report() {
+        // java: `if (report.hasRollModifier(pmf.forName("Nerves of Steel"))) { ...
+        // statusReport.report(new ReportNervesOfSteel(player.getId(), "pass")); }` — this must
+        // render "<player> is using Nerves of Steel to pass the ball." for a non-bomb pass.
+        let mut status_report = StatusReport::new();
+        let mut game = make_game();
+        game.acting_player.player_id = Some("t1".into());
+        let report = ReportPassRoll::new(
+            Some("t1".into()),
+            true,
+            4,
+            3,
+            false,
+            vec!["Nerves of Steel".into()],
+            Some("ShortPass".into()),
+            false,
+            Some("ACCURATE".into()),
+            false,
+            None,
+        );
+        PassRollMessage.render(&mut status_report, &game, &report);
+        let texts: Vec<_> = status_report.rendered_runs.iter().filter_map(|r| r.text.clone()).collect();
+        assert!(texts.iter().any(|t| t.contains("is using Nerves of Steel to")));
+        assert!(texts.iter().any(|t| t.contains("pass the ball.")));
+    }
+
+    #[test]
+    fn nerves_of_steel_modifier_with_bomb_renders_throw_bomb_text() {
+        let mut status_report = StatusReport::new();
+        let mut game = make_game();
+        game.acting_player.player_id = Some("t1".into());
+        let report = ReportPassRoll::new(
+            Some("t1".into()),
+            true,
+            4,
+            3,
+            false,
+            vec!["Nerves of Steel".into()],
+            Some("ShortPass".into()),
+            true,
+            Some("ACCURATE".into()),
+            false,
+            None,
+        );
+        PassRollMessage.render(&mut status_report, &game, &report);
+        let texts: Vec<_> = status_report.rendered_runs.iter().filter_map(|r| r.text.clone()).collect();
+        assert!(texts.iter().any(|t| t.contains("is using Nerves of Steel to")));
+        assert!(texts.iter().any(|t| t.contains("throw the bomb.")));
     }
 }

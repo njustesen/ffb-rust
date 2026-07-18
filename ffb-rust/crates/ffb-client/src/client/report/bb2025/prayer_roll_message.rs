@@ -37,16 +37,11 @@ impl ReportMessage for PrayerRollMessage {
 
         if let Some(prayer) = prayer {
             status_report.println_indent_style(indent + 1, TextStyle::BOLD, prayer.get_name());
-            // java: `prayer.getDescription()` returns the prayer's rules text (e.g. "Argue
-            // the call succeeds on 5+"), sourced from a per-variant `description` field on
-            // `com.fumbbl.ffb.inducement.bb2025.Prayer` that has no equivalent on the Rust
-            // `ffb_model::inducement::bb2025::prayer::Prayer` enum (it only exposes
-            // `event_message()`, a different, mostly-empty string used for player-event
-            // reports). Not fabricated here; falls back to the duration description alone.
+            // java: `prayer.getDuration().getDescription() + ": " + prayer.getDescription()`
             status_report.println_indent_style(
                 indent + 2,
                 TextStyle::EXPLANATION,
-                &format!("{}: ", prayer.get_duration().get_description()),
+                &format!("{}: {}", prayer.get_duration().get_description(), prayer.get_description()),
             );
         }
     }
@@ -132,5 +127,18 @@ mod tests {
     #[test]
     fn report_id_is_prayer_roll() {
         assert_eq!(PrayerRollMessage.report_id(), ReportId::PRAYER_ROLL);
+    }
+
+    #[test]
+    fn prayer_description_is_rendered_alongside_duration() {
+        // java: `println(getIndent() + 2, TextStyle.EXPLANATION,
+        // prayer.getDuration().getDescription() + ": " + prayer.getDescription());` — the
+        // prayer's actual rules text must be printed, not just the duration label.
+        let mut status_report = StatusReport::new();
+        let game = make_game();
+        let report = ReportPrayerRoll::new("Home Ultras".into(), 2, true);
+        PrayerRollMessage.render(&mut status_report, &game, &report);
+        let texts: Vec<_> = status_report.rendered_runs.iter().filter_map(|r| r.text.clone()).collect();
+        assert!(texts.iter().any(|t| t.contains("Argue the call succeeds on 5+")));
     }
 }
