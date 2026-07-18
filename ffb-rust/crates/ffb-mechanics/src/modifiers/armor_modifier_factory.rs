@@ -11,9 +11,11 @@ use crate::modifiers::bb2020::armor_modifiers::Bb2020ArmorModifiers;
 use crate::modifiers::bb2025::armor_modifiers::Bb2025ArmorModifiers;
 use crate::modifiers::modifier_aggregator::ModifierAggregator;
 use crate::modifiers::static_armour_modifier::StaticArmourModifier;
+use crate::modifiers::variable_armour_modifier::VariableArmourModifier;
 
 /// 1:1 translation of com.fumbbl.ffb.factory.ArmorModifierFactory.
 pub struct ArmorModifierFactory {
+    rules: Rules,
     armor_modifiers: Box<dyn ArmorModifiers>,
     modifier_aggregator: ModifierAggregator,
 }
@@ -21,6 +23,7 @@ pub struct ArmorModifierFactory {
 impl ArmorModifierFactory {
     pub fn new(rules: Rules) -> Self {
         Self {
+            rules,
             armor_modifiers: make_armor_modifiers(rules),
             modifier_aggregator: ModifierAggregator::new(),
         }
@@ -33,8 +36,7 @@ impl ArmorModifierFactory {
             .find(|m| m.get_name() == name);
         if from_collection.is_some() { return from_collection; }
 
-        // ModifierAggregator is intentionally empty — per-skill armor modifier lookup uses direct matching.
-        self.modifier_aggregator.get_armour_modifiers()
+        self.modifier_aggregator.get_armour_modifiers(self.rules)
             .into_iter()
             .find(|m| m.get_name() == name)
     }
@@ -93,6 +95,109 @@ impl ArmorModifierFactory {
     }
 }
 
+/// Java: `ModifierAggregator.getArmourModifiers()`'s skill half —
+/// `skillFactory.getSkills().flatMap(skill -> skill.getArmorModifiers())`, restructured as a
+/// static per-ruleset catalog of every skill-registered `ArmorModifier` (independent of any
+/// specific player's skill list). Predicates mirror each skill's Java `appliesToContext`
+/// override; skills whose Java override unconditionally returns `false` (manually-applied,
+/// once-per-game/half special actions) get `with_predicate(|_| false)` to match.
+pub fn find_registered_armour_modifiers(rules: Rules) -> Vec<Box<dyn ArmorModifier>> {
+    let mut mods: Vec<Box<dyn ArmorModifier>> = Vec::new();
+
+    // Chainsaw: bb2016/bb2020/bb2025, all `appliesToContext` → false (kick-back armor bonus is
+    // applied manually, not through this generic per-roll dispatch).
+    match rules {
+        Rules::Bb2016 => {
+            mods.push(Box::new(StaticArmourModifier::new("Chainsaw", 3, false).with_predicate(|_| false)));
+        }
+        Rules::Bb2020 | Rules::Bb2025 | Rules::Common => {
+            mods.push(Box::new(
+                StaticArmourModifier::new_with_chainsaw("Chainsaw", 3, false, true).with_predicate(|_| false),
+            ));
+        }
+    }
+
+    // Claw (bb2016) / Claws (bb2020+bb2025, mixed/Claws.java): real "> 7"/"> 8" threshold logic,
+    // same as the live-dispatch arm in `skill_to_armor_modifier` above.
+    match rules {
+        Rules::Bb2016 => {
+            mods.push(Box::new(StaticArmourModifier::new("Claws", 0, false).with_predicate(|ctx| {
+                if ctx.is_stab || ctx.is_foul { return false; }
+                if ctx.attacker.map_or(false, |a| a.has_skill_property(NamedProperties::BLOCKS_LIKE_CHAINSAW)) {
+                    return false;
+                }
+                ctx.defender.armour_with_modifiers() > 7
+            })));
+        }
+        Rules::Bb2020 | Rules::Bb2025 | Rules::Common => {
+            mods.push(Box::new(StaticArmourModifier::new("Claws", 0, false).with_predicate(|ctx| {
+                if ctx.is_stab || ctx.is_foul { return false; }
+                if ctx.attacker.map_or(false, |a| a.has_skill_property(NamedProperties::BLOCKS_LIKE_CHAINSAW)) {
+                    return false;
+                }
+                ctx.defender.armour_with_modifiers() > 8
+            })));
+        }
+    }
+
+    // Stakes (bb2016 only): real stab-vs-undead predicate, same as the live-dispatch arm above.
+    if rules == Rules::Bb2016 {
+        mods.push(Box::new(StaticArmourModifier::new("Stakes", 1, false).with_predicate(|ctx| {
+            if !ctx.is_stab { return false; }
+            if ctx.attacker.is_none() { return false; }
+            let defender_team = if ctx.game.team_home.has_player(&ctx.defender.id) {
+                &ctx.game.team_home
+            } else {
+                &ctx.game.team_away
+            };
+            defender_team.necromancer || defender_team.vampire_lord
+        })));
+    }
+
+    // ASneakyPair (bb2020+bb2025): real foul/stab + adjacent-partner predicate, same as the
+    // live-dispatch arm above.
+    if rules == Rules::Bb2020 || rules == Rules::Bb2025 {
+        mods.push(Box::new(StaticArmourModifier::new("A Sneaky Pair", 1, false).with_predicate(|ctx| {
+            (ctx.is_foul || ctx.is_stab)
+                && UtilPlayer::partner_marks_defender(ctx.game, &ctx.defender.id, SkillId::ASneakyPair)
+        })));
+    }
+
+    // The following are all ONCE_PER_GAME/ONCE_PER_HALF special-action modifiers whose Java
+    // `appliesToContext` override unconditionally returns `false` — registered purely so
+    // `for_name()` lookups (manual application via a not-yet-modeled dialog) can find them.
+    // NOTE: BrutalBlock (bb2020) only registers an InjuryModifier in Java, not an ArmorModifier —
+    // see find_registered_injury_modifiers.
+    if rules == Rules::Bb2020 {
+        // Java: `defender.getPosition().isDwarf() ? 2 : 1`. `Player` here carries only a
+        // `position_id`, not a resolved `RosterPosition`/keyword list (no `Game`/roster access at
+        // this signature) — matches the existing precedent in the Stakes arm above (Khemri gap)
+        // of leaving a known, honest simplification rather than fabricating a lookup path.
+        mods.push(Box::new(
+            VariableArmourModifier::new("DwarfenScourge", false)
+                .with_modifier_fn(|_a, _d| 1)
+                .with_predicate(|_| false),
+        ));
+        mods.push(Box::new(StaticArmourModifier::new_with_chainsaw("Ghostly Flames", 4, false, true).with_predicate(|_| false)));
+    }
+    if rules == Rules::Bb2025 {
+        mods.push(Box::new(
+            VariableArmourModifier::new("DwarvenScourge", false)
+                .with_modifier_fn(|_a, _d| 1)
+                .with_predicate(|_| false),
+        ));
+    }
+    if rules == Rules::Bb2020 || rules == Rules::Bb2025 {
+        mods.push(Box::new(StaticArmourModifier::new("Arm Bar", 1, false).with_predicate(|_| false)));
+        mods.push(Box::new(StaticArmourModifier::new("Iron Hard Skin", 0, false).with_predicate(|_| false)));
+        mods.push(Box::new(StaticArmourModifier::new("Crushing Blow", 1, false).with_predicate(|_| false)));
+        mods.push(Box::new(StaticArmourModifier::new("Ram", 1, false).with_predicate(|_| false)));
+        mods.push(Box::new(StaticArmourModifier::new("Slayer", 1, false).with_predicate(|_| false)));
+    }
+
+    mods
+}
+
 fn make_armor_modifiers(rules: Rules) -> Box<dyn ArmorModifiers> {
     match rules {
         Rules::Bb2016 => Box::new(Bb2016ArmorModifiers),
@@ -144,8 +249,9 @@ fn skill_to_armor_modifier(
             if context.attacker.map_or(false, |a| a.has_skill_property(NamedProperties::BLOCKS_LIKE_CHAINSAW)) {
                 return None;
             }
-            // Java: context.getDefender().getArmourWithModifiers() > 8
-            if context.defender.armour_with_modifiers() > 8 {
+            // Java: bb2016/Claw.java uses "> 7"; bb2020/2025's mixed/Claws.java uses "> 8".
+            let threshold = if context.game.rules == Rules::Bb2016 { 7 } else { 8 };
+            if context.defender.armour_with_modifiers() > threshold {
                 Some(Box::new(StaticArmourModifier::new("Claws", 0, false)))
             } else {
                 None
@@ -384,6 +490,28 @@ mod tests {
         let game = make_game(Rules::Bb2025);
         let attacker = player_with_skill("a", SkillId::Claw);
         let defender = player_with_armour("d", 8);
+        let mods = f.find_armor_modifiers(&game, Some(&attacker), &defender, false, false);
+        assert!(mods.is_empty());
+    }
+
+    #[test]
+    fn find_armor_modifiers_claws_bb2016_uses_lower_threshold() {
+        // Java bb2016/Claw.java uses "> 7" (not bb2020/2025's "> 8").
+        let f = ArmorModifierFactory::new(Rules::Bb2016);
+        let game = make_game(Rules::Bb2016);
+        let attacker = player_with_skill("a", SkillId::Claw);
+        let defender = player_with_armour("d", 8);
+        let mods = f.find_armor_modifiers(&game, Some(&attacker), &defender, false, false);
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].get_name(), "Claws");
+    }
+
+    #[test]
+    fn find_armor_modifiers_claws_bb2016_still_ignores_armour_at_threshold() {
+        let f = ArmorModifierFactory::new(Rules::Bb2016);
+        let game = make_game(Rules::Bb2016);
+        let attacker = player_with_skill("a", SkillId::Claw);
+        let defender = player_with_armour("d", 7);
         let mods = f.find_armor_modifiers(&game, Some(&attacker), &defender, false, false);
         assert!(mods.is_empty());
     }

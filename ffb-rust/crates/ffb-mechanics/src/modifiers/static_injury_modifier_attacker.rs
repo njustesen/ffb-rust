@@ -10,11 +10,17 @@ pub struct StaticInjuryModifierAttacker {
     pub modifier: i32,
     pub niggling_injury_modifier: bool,
     pub registered_to: Option<String>,
+    applies_to_context: Option<Box<dyn Fn(&InjuryModifierContext<'_>) -> bool + Send + Sync>>,
 }
 
 impl StaticInjuryModifierAttacker {
     pub fn new(name: impl Into<String>, modifier: i32, niggling_injury_modifier: bool) -> Self {
-        Self { name: name.into(), modifier, niggling_injury_modifier, registered_to: None }
+        Self { name: name.into(), modifier, niggling_injury_modifier, registered_to: None, applies_to_context: None }
+    }
+
+    pub fn with_predicate(mut self, f: impl Fn(&InjuryModifierContext<'_>) -> bool + Send + Sync + 'static) -> Self {
+        self.applies_to_context = Some(Box::new(f));
+        self
     }
 }
 
@@ -23,6 +29,9 @@ impl InjuryModifier for StaticInjuryModifierAttacker {
     fn get_name(&self) -> &str { &self.name }
     fn is_niggling_injury_modifier(&self) -> bool { self.niggling_injury_modifier }
     fn applies_to_context(&self, context: &InjuryModifierContext<'_>) -> bool {
+        if let Some(f) = &self.applies_to_context {
+            return f(context);
+        }
         let attacker = match context.get_attacker() {
             Some(a) => a,
             None => return false,
@@ -120,5 +129,15 @@ mod tests {
         let mut m = StaticInjuryModifierAttacker::new("x", 0, false);
         m.set_registered_to(Some("DODGE".to_string()));
         assert_eq!(m.registered_to(), Some("DODGE"));
+    }
+
+    #[test]
+    fn with_predicate_overrides_default_check() {
+        let m = StaticInjuryModifierAttacker::new("test", 1, false).with_predicate(|_ctx| false);
+        let game = minimal_game();
+        let attacker = bare_player();
+        let defender = bare_player();
+        let ctx = ctx_with_attacker(&game, &attacker, &defender);
+        assert!(!m.applies_to_context(&ctx));
     }
 }

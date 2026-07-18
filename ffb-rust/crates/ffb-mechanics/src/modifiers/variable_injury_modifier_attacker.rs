@@ -9,21 +9,39 @@ pub struct VariableInjuryModifierAttacker {
     pub name: String,
     pub niggling_injury_modifier: bool,
     pub registered_to: Option<String>,
+    modifier_fn: Option<Box<dyn Fn(Option<&Player>, &Player) -> i32 + Send + Sync>>,
+    applies_to_context: Option<Box<dyn Fn(&InjuryModifierContext<'_>) -> bool + Send + Sync>>,
 }
 
 impl VariableInjuryModifierAttacker {
     pub fn new(name: impl Into<String>, niggling_injury_modifier: bool) -> Self {
-        Self { name: name.into(), niggling_injury_modifier, registered_to: None }
+        Self { name: name.into(), niggling_injury_modifier, registered_to: None, modifier_fn: None, applies_to_context: None }
+    }
+
+    pub fn with_modifier_fn(mut self, f: impl Fn(Option<&Player>, &Player) -> i32 + Send + Sync + 'static) -> Self {
+        self.modifier_fn = Some(Box::new(f));
+        self
+    }
+
+    pub fn with_predicate(mut self, f: impl Fn(&InjuryModifierContext<'_>) -> bool + Send + Sync + 'static) -> Self {
+        self.applies_to_context = Some(Box::new(f));
+        self
     }
 }
 
 impl InjuryModifier for VariableInjuryModifierAttacker {
-    fn get_modifier(&self, attacker: Option<&Player>, _defender: &Player) -> i32 {
+    fn get_modifier(&self, attacker: Option<&Player>, defender: &Player) -> i32 {
+        if let Some(f) = &self.modifier_fn {
+            return f(attacker, defender);
+        }
         attacker.map(|a| a.get_skill_int_value(self.registered_to.as_deref().unwrap_or(""))).unwrap_or(0)
     }
     fn get_name(&self) -> &str { &self.name }
     fn is_niggling_injury_modifier(&self) -> bool { self.niggling_injury_modifier }
     fn applies_to_context(&self, context: &InjuryModifierContext<'_>) -> bool {
+        if let Some(f) = &self.applies_to_context {
+            return f(context);
+        }
         if !context.is_attacker_mode() {
             return false;
         }
@@ -121,5 +139,22 @@ mod tests {
         let mut m = VariableInjuryModifierAttacker::new("x", false);
         m.set_registered_to(Some("DODGE".to_string()));
         assert_eq!(m.registered_to(), Some("DODGE"));
+    }
+
+    #[test]
+    fn with_modifier_fn_overrides_default_lookup() {
+        let m = VariableInjuryModifierAttacker::new("test", false).with_modifier_fn(|_a, _d| 2);
+        let p = bare_player();
+        assert_eq!(m.get_modifier(Some(&p), &p), 2);
+    }
+
+    #[test]
+    fn with_predicate_overrides_default_check() {
+        let m = VariableInjuryModifierAttacker::new("test", false).with_predicate(|_ctx| false);
+        let game = minimal_game();
+        let attacker = bare_player();
+        let defender = bare_player();
+        let ctx = ctx_with_attacker(&game, &attacker, &defender);
+        assert!(!m.applies_to_context(&ctx));
     }
 }

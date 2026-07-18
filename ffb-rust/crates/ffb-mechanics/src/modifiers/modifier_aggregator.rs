@@ -34,9 +34,9 @@ use crate::modifiers::injury_modifier::InjuryModifier;
 /// semantics (raw registered objects, not predicate-filtered).
 ///
 /// The card half of the merge (`UtilCards::find_all_cards` + `card_roll_modifiers`) was wired in
-/// Phase AC. `Armour`/`Injury` getters remain empty: Java's real per-skill registrants for those
-/// two categories (~20 skills across bb2016/bb2020/bb2025/mixed) were not individually audited in
-/// this phase — a larger, separately-scoped task; see `SESSION.md` Phase AD.
+/// Phase AC. The `Armour`/`Injury` skill audit (~18 skills across bb2016/bb2020/bb2025/mixed) was
+/// completed in a later phase — see `armor_modifier_factory::find_registered_armour_modifiers`
+/// and `injury_modifier_factory::find_registered_injury_modifiers`.
 pub struct ModifierAggregator {}
 
 impl ModifierAggregator {
@@ -101,14 +101,14 @@ impl ModifierAggregator {
         crate::modifiers::right_stuff_modifier_factory::RightStuffModifierFactory::find_registered_modifiers(rules)
     }
 
-    /// Java: `ModifierAggregator.getArmourModifiers()`. Deferred — see struct doc.
-    pub fn get_armour_modifiers(&self) -> Vec<Box<dyn ArmorModifier>> {
-        Vec::new()
+    /// Java: `ModifierAggregator.getArmourModifiers()`.
+    pub fn get_armour_modifiers(&self, rules: Rules) -> Vec<Box<dyn ArmorModifier>> {
+        crate::modifiers::armor_modifier_factory::find_registered_armour_modifiers(rules)
     }
 
-    /// Java: `ModifierAggregator.getInjuryModifiers()`. Deferred — see struct doc.
-    pub fn get_injury_modifiers(&self) -> Vec<Box<dyn InjuryModifier>> {
-        Vec::new()
+    /// Java: `ModifierAggregator.getInjuryModifiers()`.
+    pub fn get_injury_modifiers(&self, rules: Rules) -> Vec<Box<dyn InjuryModifier>> {
+        crate::modifiers::injury_modifier_factory::find_registered_injury_modifiers(rules)
     }
 
     /// Java: `ModifierAggregator.getCasualtyModifiers()`.
@@ -246,9 +246,52 @@ mod tests {
     }
 
     #[test]
-    fn get_armour_and_injury_modifiers_stay_empty() {
+    fn get_armour_modifiers_bb2016_includes_chainsaw_claws_stakes() {
         let agg = ModifierAggregator::new();
-        assert!(agg.get_armour_modifiers().is_empty());
-        assert!(agg.get_injury_modifiers().is_empty());
+        let mods = agg.get_armour_modifiers(Rules::Bb2016);
+        let names: Vec<&str> = mods.iter().map(|m| m.get_name()).collect();
+        assert!(names.contains(&"Chainsaw"));
+        assert!(names.contains(&"Claws"));
+        assert!(names.contains(&"Stakes"));
+    }
+
+    #[test]
+    fn get_armour_modifiers_bb2025_includes_special_skills() {
+        let agg = ModifierAggregator::new();
+        let mods = agg.get_armour_modifiers(Rules::Bb2025);
+        let names: Vec<&str> = mods.iter().map(|m| m.get_name()).collect();
+        assert!(names.contains(&"Chainsaw"));
+        assert!(names.contains(&"Claws"));
+        assert!(names.contains(&"A Sneaky Pair"));
+        assert!(names.contains(&"DwarvenScourge"));
+        assert!(names.contains(&"Arm Bar"));
+        assert!(names.contains(&"Iron Hard Skin"));
+        assert!(names.contains(&"Crushing Blow"));
+        assert!(names.contains(&"Ram"));
+        assert!(names.contains(&"Slayer"));
+        assert!(!names.contains(&"Ghostly Flames"));
+        assert!(!names.contains(&"Stakes"));
+    }
+
+    #[test]
+    fn get_injury_modifiers_bb2020_includes_special_skills() {
+        let agg = ModifierAggregator::new();
+        let mods = agg.get_injury_modifiers(Rules::Bb2020);
+        let names: Vec<&str> = mods.iter().map(|m| m.get_name()).collect();
+        assert!(names.contains(&"Stunty"));
+        assert!(names.contains(&"Brutal Block"));
+        assert!(names.contains(&"Toxin Connoisseur"));
+        assert!(names.contains(&"Arm Bar"));
+        assert!(names.contains(&"Ram"));
+        assert!(names.contains(&"Slayer"));
+    }
+
+    #[test]
+    fn get_injury_modifiers_bb2016_includes_stunty_and_thick_skull() {
+        let agg = ModifierAggregator::new();
+        let mods = agg.get_injury_modifiers(Rules::Bb2016);
+        let names: Vec<&str> = mods.iter().map(|m| m.get_name()).collect();
+        assert!(names.contains(&"Stunty"));
+        assert!(names.contains(&"Thick Skull"));
     }
 }
