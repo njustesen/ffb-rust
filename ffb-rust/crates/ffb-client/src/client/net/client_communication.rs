@@ -31,10 +31,13 @@
 //!   `TeamSetup`; the ported `ffb_model::model::TeamSetup` only carries `name`/`coach`/
 //!   `positions` (no player-number/coordinate fields), so those are taken as explicit
 //!   parameters here instead.
-//! - `sendAddSketch` reads `sketch.getId()` off Java's `Sketch`; the ported
-//!   `ffb_model::model::sketch::Sketch` only carries `positions` (its own doc comment notes
-//!   `id`/`rgb`/`label` were never ported), so the sketch id is taken as an explicit
-//!   parameter here instead of `Sketch`.
+//! - `sendAddSketch` takes a sketch id directly rather than a full `Sketch`: the actual
+//!   sketch-drawing UI (`ClientSketchManager`/`PathSketchOverlay`) lives in the Swing
+//!   AWT client layer, which is permanently out of scope for this translation, so there is
+//!   no reachable Rust caller here with real rgb/label/path data to hand in. The
+//!   `ffb_model::model::sketch::Sketch` struct itself does carry `id`/`rgb`/`label`/`path`
+//!   (see `ClientCommandAddSketch::with_sketch`) — that matters on the server side, which
+//!   relays a full sketch received from a real Java client on to other sessions.
 
 use std::collections::{HashMap, VecDeque};
 
