@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed.special::BoundingLeap.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct BoundingLeap {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct BoundingLeap {
 
 impl BoundingLeap {
     pub fn new() -> Self {
-        let base = Skill::new("Bounding Leap", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Bounding Leap", SkillCategory::Trait, SkillUsageType::OncePerGame);
         Self { base }
     }
 }
@@ -29,4 +29,6 @@ mod tests {
     fn name_is_correct() { assert_eq!(BoundingLeap::new().get_name(), "Bounding Leap"); }
     #[test]
     fn category_is_correct() { assert_eq!(BoundingLeap::new().get_category(), SkillCategory::Trait); }
+    #[test]
+    fn usage_type_is_once_per_game() { assert_eq!(BoundingLeap::new().get_skill_usage_type(), SkillUsageType::OncePerGame); }
 }

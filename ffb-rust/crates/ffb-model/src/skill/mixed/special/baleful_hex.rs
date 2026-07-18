@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed.special::BalefulHex.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct BalefulHex {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct BalefulHex {
 
 impl BalefulHex {
     pub fn new() -> Self {
-        let base = Skill::new("Baleful Hex", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Baleful Hex", SkillCategory::Trait, SkillUsageType::OncePerGame);
         Self { base }
     }
 }
@@ -29,4 +29,6 @@ mod tests {
     fn name_is_correct() { assert_eq!(BalefulHex::new().get_name(), "Baleful Hex"); }
     #[test]
     fn category_is_correct() { assert_eq!(BalefulHex::new().get_category(), SkillCategory::Trait); }
+    #[test]
+    fn usage_type_is_once_per_game() { assert_eq!(BalefulHex::new().get_skill_usage_type(), SkillUsageType::OncePerGame); }
 }

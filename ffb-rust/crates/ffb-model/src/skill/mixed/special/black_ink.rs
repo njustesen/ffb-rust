@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed.special::BlackInk.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct BlackInk {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct BlackInk {
 
 impl BlackInk {
     pub fn new() -> Self {
-        let base = Skill::new("Black Ink", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Black Ink", SkillCategory::Trait, SkillUsageType::OncePerGame);
         Self { base }
     }
 }
@@ -29,4 +29,6 @@ mod tests {
     fn name_is_correct() { assert_eq!(BlackInk::new().get_name(), "Black Ink"); }
     #[test]
     fn category_is_correct() { assert_eq!(BlackInk::new().get_category(), SkillCategory::Trait); }
+    #[test]
+    fn usage_type_is_once_per_game() { assert_eq!(BlackInk::new().get_skill_usage_type(), SkillUsageType::OncePerGame); }
 }

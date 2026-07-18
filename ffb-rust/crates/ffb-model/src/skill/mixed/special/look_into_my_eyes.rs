@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed.special::LookIntoMyEyes.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct LookIntoMyEyes {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct LookIntoMyEyes {
 
 impl LookIntoMyEyes {
     pub fn new() -> Self {
-        let base = Skill::new("Look Into My Eyes", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Look Into My Eyes", SkillCategory::Trait, SkillUsageType::OncePerGame);
         Self { base }
     }
 }
@@ -29,4 +29,6 @@ mod tests {
     fn name_is_correct() { assert_eq!(LookIntoMyEyes::new().get_name(), "Look Into My Eyes"); }
     #[test]
     fn category_is_correct() { assert_eq!(LookIntoMyEyes::new().get_category(), SkillCategory::Trait); }
+    #[test]
+    fn usage_type_is_once_per_game() { assert_eq!(LookIntoMyEyes::new().get_skill_usage_type(), SkillUsageType::OncePerGame); }
 }
