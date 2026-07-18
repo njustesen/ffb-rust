@@ -116,7 +116,7 @@ impl StepEndFeeding {
 
         // Java: else → changePlayerAction(null, null, false); Select.pushSequence(false)
         game.acting_player.player_id = None;
-        let seq = Select::build_sequence(&SelectParams { update_persistence: false, is_blitz_move: false });
+        let seq = Select::build_sequence(&SelectParams { update_persistence: false, is_blitz_move: false, ..Default::default() });
         StepOutcome::next().push_seq(seq)
     }
 }

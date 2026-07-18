@@ -272,7 +272,7 @@ impl StepEndSelecting {
             .unwrap_or(false);
         if player_action == PlayerAction::Move && pinned_and_can_gaze && can_gaze {
             // Java: game.getFieldModel().clearMultiBlockTargets()
-            let seq = Select::build_sequence(&SelectParams { update_persistence: false, is_blitz_move: false });
+            let seq = Select::build_sequence(&SelectParams { update_persistence: false, is_blitz_move: false, ..Default::default() });
             return StepOutcome::next().push_seq(seq);
         }
 
@@ -284,9 +284,11 @@ impl StepEndSelecting {
             check_forgo: false,
         };
         // Select params used by special-skill cases (Treacherous, RaidingParty, etc.).
+        // Java: new Select.SequenceParams(getGameState(), true, blockTargets)
         let select_params = SelectParams {
             update_persistence: true,
             is_blitz_move: false,
+            block_targets: self.block_targets.clone(),
         };
 
         match player_action {
@@ -828,7 +830,10 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(out.pushes.len(), 1);
-        assert_eq!(out.pushes[0][0].step_id, StepId::ThrowKeg);
+        // ThrowKeg::build_sequence now starts with the ActivationSequenceBuilder sub-sequence
+        // (InitActivation first); the ThrowKeg step itself follows those 13 steps.
+        assert_eq!(out.pushes[0][0].step_id, StepId::InitActivation);
+        assert!(out.pushes[0].iter().any(|s| s.step_id == StepId::ThrowKeg));
     }
 
     #[test]

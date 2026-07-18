@@ -92,7 +92,7 @@ impl StepEndInducement {
                     return StepOutcome::next().push_seq(end_turn_seq);
                 }
                 InducementPhase::StartOfOwnTurn => {
-                    let seq = Select::build_sequence(&SelectParams { update_persistence: true, is_blitz_move: false });
+                    let seq = Select::build_sequence(&SelectParams { update_persistence: true, is_blitz_move: false, ..Default::default() });
                     return StepOutcome::next().push_seq(seq);
                 }
                 _ => {}

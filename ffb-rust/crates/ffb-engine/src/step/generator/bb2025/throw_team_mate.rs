@@ -4,6 +4,7 @@ use ffb_model::enums::ApothecaryMode;
 use ffb_model::types::FieldCoordinate;
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
+use super::activation_sequence_builder::ActivationSequenceBuilder;
 
 #[derive(Debug, Clone, Default)]
 pub struct ThrowTeamMateParams {
@@ -32,42 +33,48 @@ impl ThrowTeamMate {
         }
         seq.add(StepId::InitThrowTeamMate, init_p);
 
-        // 2 ALWAYS_HUNGRY (failure → EAT_TEAM_MATE, success → RESOLVE_PASS)
+        // 2-14 [ACTIVATION(END_THROW_TEAM_MATE; eventual defender = thrown player)]
+        ActivationSequenceBuilder::new()
+            .with_failure_label(labels::END_THROW_TEAM_MATE)
+            .with_eventual_defender(params.thrown_player_id.clone())
+            .add_to(&mut seq);
+
+        // ALWAYS_HUNGRY (failure → EAT_TEAM_MATE, success → RESOLVE_PASS)
         seq.add(StepId::AlwaysHungry, vec![
             StepParameter::IsKickedPlayer(params.is_kicked),
             StepParameter::GotoLabelOnFailure(labels::EAT_TEAM_MATE.into()),
             StepParameter::GotoLabelOnSuccess(labels::RESOLVE_PASS.into()),
         ]);
-        // 3 THROW_TEAM_MATE
+        // THROW_TEAM_MATE
         seq.add(StepId::ThrowTeamMate, vec![
             StepParameter::IsKickedPlayer(params.is_kicked),
         ]);
-        // 4 DISPATCH_SCATTER_PLAYER [RESOLVE_PASS]
+        // DISPATCH_SCATTER_PLAYER [RESOLVE_PASS]
         seq.add_labelled(StepId::DispatchScatterPlayer, labels::RESOLVE_PASS, vec![
             StepParameter::IsKickedPlayer(params.is_kicked),
         ]);
-        // 5 RIGHT_STUFF [RIGHT_STUFF]
+        // RIGHT_STUFF [RIGHT_STUFF]
         seq.add_labelled(StepId::RightStuff, labels::RIGHT_STUFF, vec![
             StepParameter::IsKickedPlayer(params.is_kicked),
             StepParameter::GotoLabelOnSuccess(labels::END_SCATTER_PLAYER.into()),
         ]);
-        // 6 STEADY_FOOTING (goto END_SCATTER_PLAYER on success)
+        // STEADY_FOOTING (goto END_SCATTER_PLAYER on success)
         seq.add(StepId::SteadyFooting, vec![
             StepParameter::GotoLabelOnSuccess(labels::END_SCATTER_PLAYER.into()),
         ]);
-        // 7 GOTO_LABEL → APOTHECARY_THROWN_PLAYER
+        // GOTO_LABEL → APOTHECARY_THROWN_PLAYER
         seq.jump(labels::APOTHECARY_THROWN_PLAYER);
-        // 8 EAT_TEAM_MATE [EAT_TEAM_MATE]
+        // EAT_TEAM_MATE [EAT_TEAM_MATE]
         seq.add_labelled(StepId::EatTeamMate, labels::EAT_TEAM_MATE, vec![]);
-        // 9 APOTHECARY [APOTHECARY_THROWN_PLAYER] (THROWN_PLAYER)
+        // APOTHECARY [APOTHECARY_THROWN_PLAYER] (THROWN_PLAYER)
         seq.add_labelled(StepId::Apothecary, labels::APOTHECARY_THROWN_PLAYER, vec![
             StepParameter::ApothecaryMode(ApothecaryMode::ThrownPlayer),
         ]);
-        // 10 CATCH_SCATTER_THROW_IN [END_SCATTER_PLAYER]
+        // CATCH_SCATTER_THROW_IN [END_SCATTER_PLAYER]
         seq.add_labelled(StepId::CatchScatterThrowIn, labels::END_SCATTER_PLAYER, vec![]);
-        // 11 RESET_TO_MOVE [END_THROW_TEAM_MATE]
+        // RESET_TO_MOVE [END_THROW_TEAM_MATE]
         seq.add_labelled(StepId::ResetToMove, labels::END_THROW_TEAM_MATE, vec![]);
-        // 12 END_THROW_TEAM_MATE
+        // END_THROW_TEAM_MATE
         seq.add(StepId::EndThrowTeamMate, vec![]);
         seq.build()
     }
@@ -82,9 +89,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn throw_team_mate_has_12_steps() {
+    fn throw_team_mate_has_25_steps_with_activation() {
+        // Java pushSequence: INIT_THROW_TEAM_MATE (1) + ActivationSequenceBuilder w/o eventual
+        // defender (13, no SET_DEFENDER since thrown_player_id is None) + 11 own steps = 25.
         let steps = ThrowTeamMate::build_sequence(&ThrowTeamMateParams::default());
-        assert_eq!(steps.len(), 12);
+        assert_eq!(steps.len(), 25);
+        assert_eq!(steps[1].step_id, StepId::InitActivation);
+    }
+
+    #[test]
+    fn throw_team_mate_sets_eventual_defender_when_thrown_player_id_present() {
+        // Java: ActivationSequenceBuilder.create()...withEventualDefender(params.getThrownPlayerId())
+        // adds a SET_DEFENDER step when the thrown player id is known.
+        let params = ThrowTeamMateParams { thrown_player_id: Some("p9".into()), ..Default::default() };
+        let steps = ThrowTeamMate::build_sequence(&params);
+        assert_eq!(steps.len(), 26);
+        let sd = steps.iter().find(|s| s.step_id == StepId::SetDefender).unwrap();
+        assert!(sd.params.iter().any(|p| matches!(p, StepParameter::BlockDefenderId(id) if id == "p9")));
     }
 
     #[test]

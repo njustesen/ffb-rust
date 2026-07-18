@@ -2,6 +2,7 @@
 /// Mirrors Java `com.fumbbl.ffb.server.step.generator.bb2025.RaidingParty`.
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
+use super::activation_sequence_builder::ActivationSequenceBuilder;
 
 #[derive(Debug, Clone, Default)]
 pub struct RaidingPartyParams {
@@ -16,6 +17,12 @@ impl RaidingParty {
 
     pub fn build_sequence(params: &RaidingPartyParams) -> Vec<SequenceStep> {
         let mut seq = Sequence::new();
+
+        // [ACTIVATION(END)]
+        ActivationSequenceBuilder::new()
+            .with_failure_label(labels::END)
+            .add_to(&mut seq);
+
         seq.add_labelled(StepId::RaidingParty, labels::END, vec![
             StepParameter::GotoLabelOnFailure(params.failure_label.clone()),
             StepParameter::GotoLabelOnSuccess(params.success_label.clone()),
@@ -33,14 +40,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn raiding_party_single_step_labelled_end() {
+    fn raiding_party_last_step_labelled_end() {
         let steps = RaidingParty::build_sequence(&RaidingPartyParams {
             failure_label: "fail".into(),
             success_label: "ok".into(),
         });
-        assert_eq!(steps.len(), 1);
-        assert_eq!(steps[0].step_id, StepId::RaidingParty);
-        assert_eq!(steps[0].label.as_deref(), Some(labels::END));
+        let last = steps.last().unwrap();
+        assert_eq!(last.step_id, StepId::RaidingParty);
+        assert_eq!(last.label.as_deref(), Some(labels::END));
+    }
+
+    #[test]
+    fn activation_sub_sequence_precedes_raiding_party() {
+        // Java pushSequence: ActivationSequenceBuilder.create()...addTo(sequence) before RAIDING_PARTY.
+        let steps = RaidingParty::build_sequence(&RaidingPartyParams::default());
+        assert_eq!(steps.len(), 14);
+        assert_eq!(steps[0].step_id, StepId::InitActivation);
     }
 
     #[test]
@@ -48,7 +63,8 @@ mod tests {
         let steps = RaidingParty::build_sequence(&RaidingPartyParams {
             failure_label: "FAIL_LABEL".into(), success_label: "OK".into()
         });
-        assert!(steps[0].params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "FAIL_LABEL")));
+        let last = steps.last().unwrap();
+        assert!(last.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnFailure(l) if l == "FAIL_LABEL")));
     }
 
     #[test]
@@ -56,7 +72,8 @@ mod tests {
         let steps = RaidingParty::build_sequence(&RaidingPartyParams {
             failure_label: "F".into(), success_label: "SUCCESS_LABEL".into()
         });
-        assert!(steps[0].params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnSuccess(l) if l == "SUCCESS_LABEL")));
+        let last = steps.last().unwrap();
+        assert!(last.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnSuccess(l) if l == "SUCCESS_LABEL")));
     }
 
     #[test]
