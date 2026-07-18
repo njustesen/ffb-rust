@@ -1,5 +1,6 @@
 use crate::client::report::report_message_base::ReportMessage;
 use crate::client::status_report::StatusReport;
+use crate::client::text_style::TextStyle;
 use ffb_model::model::game::Game;
 use ffb_model::report::report_card_effect_roll::ReportCardEffectRoll;
 use ffb_model::report::report_id::ReportId;
@@ -8,11 +9,14 @@ use ffb_model::report::report_id::ReportId;
 ///
 /// Java: `report.getCard().cardReport(report.getCardEffect(), report.getRoll())` looks up a
 /// per-card-subclass roll-table description via `Card.cardReport(CardEffect, int)`. The base
-/// `Card` class returns `Optional.empty()` and only specific card subclasses override it with
-/// real text; no such per-card override registry exists in the Rust model (`ReportCardEffectRoll`
-/// only carries the card's name string, and `ffb-model`/`ffb-mechanics` have no `cardReport`
-/// lookup). Since we cannot resolve which override (if any) applies without fabricating data,
-/// this renders nothing — the same behavior as the un-overridden base-class default.
+/// `Card` class (`ffb-common/.../inducement/Card.java`) returns `Optional.empty()` by default.
+/// Across the whole card catalog (`ffb-common/.../inducement/bb2016/Cards.java`) only a single
+/// card overrides it: `"Witch's Brew"` (see the anonymous `Card` subclass around line 600),
+/// which is ported in Rust as `WitchBrewHandler` (`ffb-engine/src/inducements/{bb2016,bb2020}
+/// /cards/witch_brew_handler.rs`) and is reachable at runtime (`Card::new("Witch's Brew", ...)`
+/// in `ffb-model/src/inducement/bb2016/cards.rs`). Every other card keeps the base-class
+/// no-op default, so this hardcodes the one real override rather than fabricating a full
+/// per-card registry.
 pub struct CardEffectRollMessage;
 
 impl ReportMessage for CardEffectRollMessage {
@@ -22,10 +26,25 @@ impl ReportMessage for CardEffectRollMessage {
         ReportId::CARD_EFFECT_ROLL
     }
 
-    fn render(&self, _status_report: &mut StatusReport, _game: &Game, _report: &Self::Report) {
-        // java: report.getCard().cardReport(report.getCardEffect(), report.getRoll()) -- no
-        // reachable per-card override registry in the Rust model; base Card.cardReport()
-        // returns Optional.empty(), so nothing is printed (see doc comment above).
+    fn render(&self, status_report: &mut StatusReport, _game: &Game, report: &Self::Report) {
+        // java: report.getCard().cardReport(report.getCardEffect(), report.getRoll())
+        // -- base Card.cardReport() returns Optional.empty() for every card except
+        // "Witch's Brew", whose override is translated here (see doc comment above).
+        if report.get_card() == "Witch's Brew" {
+            let indent = status_report.get_indent();
+            let roll_report = format!("Witch Brew Roll [ {} ]", report.get_roll());
+            let effect_report = match report.get_card_effect() {
+                Some("Sedative") => {
+                    "Sedative! The player gains the Really Stupid skill until the drive ends."
+                }
+                Some("MadCapMushroomPotion") => {
+                    "Mad Cap Mushroom potion! The player gains the Jump Up and No Hands skills until the drive ends."
+                }
+                _ => "Snake Oil! Bad taste, but no effect.",
+            };
+            status_report.println_indent_style(indent, TextStyle::ROLL, &roll_report);
+            status_report.println_indent(indent + 1, effect_report);
+        }
     }
 }
 
@@ -69,5 +88,40 @@ mod tests {
     #[test]
     fn report_id_is_card_effect_roll() {
         assert_eq!(CardEffectRollMessage.report_id(), ReportId::CARD_EFFECT_ROLL);
+    }
+
+    #[test]
+    fn witchs_brew_no_effect_renders_snake_oil() {
+        let mut status_report = StatusReport::new();
+        let game = make_game();
+        let report = ReportCardEffectRoll::new("Witch's Brew".into(), 2);
+        CardEffectRollMessage.render(&mut status_report, &game, &report);
+        let texts: Vec<_> = status_report.rendered_runs.iter().filter_map(|r| r.text.clone()).collect();
+        assert!(texts.iter().any(|t| t == "Witch Brew Roll [ 2 ]"));
+        assert!(texts.iter().any(|t| t == "Snake Oil! Bad taste, but no effect."));
+    }
+
+    #[test]
+    fn witchs_brew_sedative_renders_effect_text() {
+        let mut status_report = StatusReport::new();
+        let game = make_game();
+        let mut report = ReportCardEffectRoll::new("Witch's Brew".into(), 3);
+        report.set_card_effect(Some("Sedative".into()));
+        CardEffectRollMessage.render(&mut status_report, &game, &report);
+        let texts: Vec<_> = status_report.rendered_runs.iter().filter_map(|r| r.text.clone()).collect();
+        assert!(texts.iter().any(|t| t == "Witch Brew Roll [ 3 ]"));
+        assert!(texts.iter().any(|t| t == "Sedative! The player gains the Really Stupid skill until the drive ends."));
+    }
+
+    #[test]
+    fn witchs_brew_mad_cap_mushroom_potion_renders_effect_text() {
+        let mut status_report = StatusReport::new();
+        let game = make_game();
+        let mut report = ReportCardEffectRoll::new("Witch's Brew".into(), 1);
+        report.set_card_effect(Some("MadCapMushroomPotion".into()));
+        CardEffectRollMessage.render(&mut status_report, &game, &report);
+        let texts: Vec<_> = status_report.rendered_runs.iter().filter_map(|r| r.text.clone()).collect();
+        assert!(texts.iter().any(|t| t == "Witch Brew Roll [ 1 ]"));
+        assert!(texts.iter().any(|t| t == "Mad Cap Mushroom potion! The player gains the Jump Up and No Hands skills until the drive ends."));
     }
 }
