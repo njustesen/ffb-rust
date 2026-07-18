@@ -3,7 +3,7 @@
 /// Priority 2 modifier on StepPushback.
 use crate::model::skill_behaviour::SkillBehaviour as SbContainer;
 use crate::model::step_modifier::StepModifierTrait;
-use crate::step::framework::StepId;
+use crate::step::framework::{StepCommandStatus, StepId};
 use crate::skill_behaviour::registry::SkillRegistry;
 use crate::step::bb2025::block::step_pushback::StepPushbackHookState;
 use ffb_model::enums::SkillId;
@@ -19,6 +19,26 @@ impl StepModifierTrait for StandFirmStepModifier {
     fn applies_to(&self, step_id: StepId) -> bool { step_id == StepId::Pushback }
 
     fn priority(&self) -> i32 { 2 }
+
+    /// Java: StandFirmBehaviour's anonymous StepModifier.handleCommandHook(step, state, useSkillCommand):
+    /// `state.standingFirm.put(useSkillCommand.getPlayerId(), useSkillCommand.isSkillUsed()); return EXECUTE_STEP;`
+    ///
+    /// Records the player's dialog answer (accept/decline Stand Firm) into the
+    /// `standing_firm` map keyed by the defender being asked, then lets the step
+    /// re-run `handle_execute_step` to act on the recorded decision.
+    fn handle_command(
+        &self,
+        _game: &mut Game,
+        step_state: &mut dyn std::any::Any,
+        _skill_id: SkillId,
+        skill_used: bool,
+    ) -> StepCommandStatus {
+        let state = step_state
+            .downcast_mut::<StepPushbackHookState>()
+            .expect("StandFirmStepModifier::handle_command: step_state must be StepPushbackHookState");
+        state.standing_firm.insert(state.defender_id.clone(), skill_used);
+        StepCommandStatus::ExecuteStep
+    }
 
     /// Java: StandFirmBehaviour.handleExecuteStepHook(StepPushback step, StepState state)
     ///
@@ -218,6 +238,26 @@ mod tests {
     fn step_modifier_priority_is_two() {
         let m = StandFirmStepModifier;
         assert_eq!(m.priority(), 2);
+    }
+
+    #[test]
+    fn handle_command_records_accept_and_returns_execute_step() {
+        let m = StandFirmStepModifier;
+        let mut game = make_game();
+        let mut hs = default_hook_state("def1");
+        let status = m.handle_command(&mut game, &mut hs, SkillId::StandFirm, true);
+        assert_eq!(status, crate::step::framework::StepCommandStatus::ExecuteStep);
+        assert_eq!(hs.standing_firm.get("def1"), Some(&true));
+    }
+
+    #[test]
+    fn handle_command_records_decline() {
+        let m = StandFirmStepModifier;
+        let mut game = make_game();
+        let mut hs = default_hook_state("def1");
+        let status = m.handle_command(&mut game, &mut hs, SkillId::StandFirm, false);
+        assert_eq!(status, crate::step::framework::StepCommandStatus::ExecuteStep);
+        assert_eq!(hs.standing_firm.get("def1"), Some(&false));
     }
 
     #[test]

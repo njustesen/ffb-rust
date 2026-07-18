@@ -187,17 +187,34 @@ impl StepModifierTrait for ReallyStupidStepModifier {
             return false;
         }
 
-        // Java: if (REALLY_STUPID == reRolledAction && !useReRoll) doRoll = false
-        let mut skip_roll = false;
+        // Java:
+        //   boolean doRoll = true;
+        //   if ((reRolledAction != null) && (reRolledAction == step.getReRolledAction())) {
+        //       if (reRollSource == null || !useReRoll(...)) { doRoll = false; status = FAILURE; cancelPlayerAction(step); }
+        //   } else {
+        //       doRoll = UtilCards.hasUnusedSkill(actingPlayer, skill);
+        //   }
+        let mut do_roll = true;
+        let mut cancel_as_failure = false;
         if state.re_rolled_action.as_deref() == Some("REALLY_STUPID") {
             if let Some(ref source_name) = state.re_roll_source.clone() {
                 let source = ReRollSource::new(source_name.as_str());
                 if !use_reroll(game, &source, &player_id) {
-                    skip_roll = true;
+                    do_roll = false;
+                    cancel_as_failure = true;
                 }
             } else {
-                skip_roll = true; // player declined
+                do_roll = false;
+                cancel_as_failure = true; // player declined
             }
+        } else {
+            // Java: doRoll = UtilCards.hasUnusedSkill(actingPlayer, skill) — guards against
+            // re-firing the roll when StepReallyStupid is re-entered later in the same player
+            // action (e.g. Blitz's move phase and block phase both push StepId::ReallyStupid).
+            let already_used = game.player(&player_id)
+                .map(|p| p.used_skills.contains(&SkillId::ReallyStupid))
+                .unwrap_or(false);
+            do_roll = !already_used;
         }
 
         // goodConditions: TTM/KTM actions get good conditions, or adjacent non-RS teammate present
@@ -208,14 +225,20 @@ impl StepModifierTrait for ReallyStupidStepModifier {
 
         let min_roll = minimum_roll_confusion(good_conditions);
 
-        if skip_roll {
-            let confusion_event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll: 1, confused: true };
-            cancel_bb2020_really_stupid(game, &player_id);
-            state.outcome = Some(
-                StepOutcome::goto(&state.goto_label_on_failure)
-                    .with_event(confusion_event)
-                    .publish(StepParameter::EndPlayerAction(true))
-            );
+        if !do_roll {
+            if cancel_as_failure {
+                let confusion_event = GameEvent::ConfusionRoll { player_id: player_id.clone(), roll: 1, confused: true };
+                cancel_bb2020_really_stupid(game, &player_id);
+                state.outcome = Some(
+                    StepOutcome::goto(&state.goto_label_on_failure)
+                        .with_event(confusion_event)
+                        .publish(StepParameter::EndPlayerAction(true))
+                );
+            } else {
+                // Java: doRoll == false via hasUnusedSkill → status stays SUCCESS → NEXT_STEP,
+                // no roll, no report, no cancellation.
+                state.outcome = Some(StepOutcome::next());
+            }
             return false;
         }
 
@@ -373,6 +396,46 @@ mod tests {
         };
         m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hook);
         assert!(hook.outcome.is_some());
+    }
+
+    /// Java: `doRoll = UtilCards.hasUnusedSkill(actingPlayer, skill)` — when StepReallyStupid is
+    /// re-entered later in the same player action (e.g. Blitz's move phase already rolled and
+    /// marked the skill used), the block phase's re-entry must NOT roll again.
+    #[test]
+    fn already_used_this_action_skips_second_roll_silently() {
+        use crate::step::framework::StepAction;
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::report::report_id::ReportId;
+
+        let mut game = test_game();
+        let mut p = Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: ffb_model::enums::PlayerType::Regular,
+            gender: ffb_model::enums::PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::ReallyStupid, value: None }],
+            ..Default::default()
+        };
+        p.used_skills.insert(SkillId::ReallyStupid);
+        game.team_home.players.push(p);
+        game.acting_player.player_id = Some("p1".into());
+
+        let m = ReallyStupidStepModifier;
+        let mut hook = StepReallyStupidHookState {
+            goto_label_on_failure: "FAIL".into(),
+            re_rolled_action: None,
+            re_roll_source: None,
+            outcome: None,
+            updated_re_rolled_action: None,
+            updated_re_roll_source: None,
+        };
+        m.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hook);
+
+        let outcome = hook.outcome.expect("outcome must be set");
+        assert_eq!(outcome.action, StepAction::NextStep, "already-used skill must silently pass through");
+        assert!(!game.report_list.has_report(ReportId::CONFUSION_ROLL),
+            "no roll (and thus no report) should occur when the skill was already used this action");
     }
 
     /// BB2020: ThrowTeamMate cancel maps to pass_used (not ttm_used as in BB2025)
