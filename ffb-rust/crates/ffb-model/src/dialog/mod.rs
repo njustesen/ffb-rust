@@ -1,5 +1,6 @@
 pub mod dialog_id;
 pub mod i_dialog_parameter;
+pub mod has_re_roll_properties;
 pub mod dialog_without_parameter;
 pub mod util_dialog_parameter;
 

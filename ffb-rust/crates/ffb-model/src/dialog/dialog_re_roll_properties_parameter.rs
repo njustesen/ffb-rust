@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use crate::enums::ReRollProperty;
 use crate::enums::SkillId;
 use super::dialog_id::DialogId;
+use super::has_re_roll_properties::HasReRollProperties;
 use super::i_dialog_parameter::IDialogParameter;
 
 /// 1:1 translation of com.fumbbl.ffb.dialog.DialogReRollPropertiesParameter.
@@ -30,6 +31,12 @@ impl DialogReRollPropertiesParameter {
     pub fn get_messages(&self) -> &[String] { &self.messages }
     pub fn get_re_roll_properties(&self) -> &[ReRollProperty] { &self.re_roll_properties }
     pub fn get_menu_property(&self) -> Option<&str> { self.menu_property.as_deref() }
+}
+
+impl HasReRollProperties for DialogReRollPropertiesParameter {
+    fn has_property(&self, property: ReRollProperty) -> bool {
+        self.re_roll_properties.contains(&property)
+    }
 }
 
 impl IDialogParameter for DialogReRollPropertiesParameter {
@@ -85,5 +92,21 @@ mod tests {
         };
         assert_eq!(p.get_menu_property(), Some("prop_key"));
         assert_eq!(p.get_default_value_key(), Some("def_key"));
+    }
+
+    #[test]
+    fn has_property_true_when_present() {
+        let p = DialogReRollPropertiesParameter {
+            re_roll_properties: vec![ReRollProperty::Trr],
+            ..Default::default()
+        };
+        assert!(p.has_property(ReRollProperty::Trr));
+        assert!(!p.has_property(ReRollProperty::Loner));
+    }
+
+    #[test]
+    fn has_property_false_when_absent() {
+        let p = DialogReRollPropertiesParameter::default();
+        assert!(!p.has_property(ReRollProperty::Trr));
     }
 }
