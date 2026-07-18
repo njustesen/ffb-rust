@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::ThenIStartedBlastin.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct ThenIStartedBlastin {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct ThenIStartedBlastin {
 
 impl ThenIStartedBlastin {
     pub fn new() -> Self {
-        let base = Skill::new("\"Then I Started Blastin'!\"", SkillCategory::Trait);
+        let base = Skill::with_usage_type("\"Then I Started Blastin'!\"", SkillCategory::Trait, SkillUsageType::OncePerHalf);
         Self { base }
     }
 }
@@ -34,5 +34,10 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(ThenIStartedBlastin::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn usage_type_is_once_per_half() {
+        assert_eq!(ThenIStartedBlastin::new().get_skill_usage_type(), SkillUsageType::OncePerHalf);
     }
 }
