@@ -1,6 +1,7 @@
 use crate::client::report::report_message_base::{print_player, ReportMessage};
 use crate::client::status_report::StatusReport;
 use crate::client::text_style::TextStyle;
+use ffb_model::enums::Rules;
 use ffb_model::model::game::Game;
 use ffb_model::model::player::Player;
 use ffb_model::report::report_id::ReportId;
@@ -49,8 +50,21 @@ impl ReportMessage for JumpUpRollMessage {
                 // ReportSkillRoll only retains sorted modifier name strings. Approximated using
                 // the same " - <name>" convention as StatusReport::format_roll_modifiers, wrapped
                 // in the same "(Roll ... >= N+)" shape as AgilityMechanic::format_result.
+                //
+                // This formula is edition-specific: BB2016's `AgilityMechanic.formatJumpUpResult`
+                // uses the old "(AG X ... + Roll > 6)." phrasing (see
+                // `ffb-common/mechanics/bb2016/AgilityMechanic.java`), while BB2020/BB2025 use
+                // the "(Roll ... >= N+)" phrasing used below. Dropping this edition split (as an
+                // earlier version of this file did) silently renders the wrong needed-roll text
+                // for BB2016 games.
                 let modifiers = status_report.format_roll_modifiers(report.get_roll_modifiers());
-                needed_roll.push_str(&format!(" (Roll{} >= {}+)", modifiers, player.agility_with_modifiers().max(2)));
+                let suffix = match game.rules {
+                    Rules::Bb2016 => format!(" (AG {}{}+ Roll > 6).", player.agility_with_modifiers().min(6), modifiers),
+                    Rules::Bb2020 | Rules::Bb2025 | Rules::Common => {
+                        format!(" (Roll{} >= {}+)", modifiers, player.agility_with_modifiers().max(2))
+                    }
+                };
+                needed_roll.push_str(&suffix);
             }
             status_report.println_indent_style(status_report.get_indent() + 1, TextStyle::NEEDED_ROLL, &needed_roll);
         }
@@ -60,7 +74,7 @@ impl ReportMessage for JumpUpRollMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffb_model::enums::{PlayerGender, Rules};
+    use ffb_model::enums::PlayerGender;
     use ffb_model::model::team::Team;
 
     fn make_team(id: &str) -> Team {
@@ -123,5 +137,23 @@ mod tests {
     #[test]
     fn get_key_matches_report_id() {
         assert_eq!(JumpUpRollMessage.get_key(), "jumpUpRoll");
+    }
+
+    #[test]
+    fn bb2016_needed_roll_uses_ag_formula_not_bb2025_roll_formula() {
+        // Regression test: BB2016's AgilityMechanic.formatJumpUpResult uses the
+        // "(AG X ... + Roll > 6)." phrasing, not BB2020/BB2025's "(Roll ... >= N+)"
+        // phrasing. An earlier version of this render ignored `game.rules` and always
+        // emitted the BB2025 formula regardless of edition.
+        let mut home = make_team("home");
+        home.players.push(make_player("p1"));
+        let mut game = Game::new(home, make_team("away"), Rules::Bb2016);
+        game.acting_player.player_id = Some("p1".to_string());
+        let mut status_report = StatusReport::new();
+        let report = ReportJumpUpRoll::new(Some("p1".into()), false, 1, 3, false, vec![]);
+        JumpUpRollMessage.render(&mut status_report, &game, &report);
+        let texts: Vec<_> = status_report.rendered_runs.iter().filter_map(|r| r.text.as_deref()).collect();
+        assert!(texts.iter().any(|t| t.contains("(AG 3+ Roll > 6).")));
+        assert!(!texts.iter().any(|t| t.contains("(Roll >=")));
     }
 }

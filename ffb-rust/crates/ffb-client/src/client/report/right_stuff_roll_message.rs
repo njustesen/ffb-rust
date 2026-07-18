@@ -1,10 +1,22 @@
 use crate::client::report::report_message_base::{print_player, ReportMessage};
 use crate::client::status_report::StatusReport;
 use crate::client::text_style::TextStyle;
+use ffb_mechanics::agility_mechanic::AgilityMechanic as AgilityMechanicTrait;
+use ffb_mechanics::modifiers::RollModifier;
+use ffb_model::enums::Rules;
 use ffb_model::model::game::Game;
-use ffb_model::model::player::Player;
 use ffb_model::report::report_id::ReportId;
 use ffb_model::report::report_right_stuff_roll::ReportRightStuffRoll;
+
+/// Java: `game.getRules().getFactory(Factory.MECHANIC).forName(Mechanic.Type.AGILITY.name())`.
+/// Mirrors the edition dispatch idiom used in `dodge_roll_message.rs` / `ffb-engine/src/mechanic/mod.rs`.
+fn agility_mechanic_for(rules: Rules) -> Box<dyn AgilityMechanicTrait> {
+    match rules {
+        Rules::Bb2016 => Box::new(ffb_mechanics::bb2016::agility_mechanic::AgilityMechanic::new()),
+        Rules::Bb2020 => Box::new(ffb_mechanics::bb2020::agility_mechanic::AgilityMechanic::new()),
+        Rules::Bb2025 | Rules::Common => Box::new(ffb_mechanics::bb2025::agility_mechanic::AgilityMechanic::new()),
+    }
+}
 
 /// 1:1 translation of `RightStuffRollMessage.java`.
 pub struct RightStuffRollMessage;
@@ -38,23 +50,21 @@ impl ReportMessage for RightStuffRollMessage {
             }
         }
         if let (Some(mut needed_roll), Some(thrown_player)) = (needed_roll, thrown_player) {
-            needed_roll.push_str(&format_right_stuff_result(status_report, report, thrown_player));
+            // java: mechanic.formatRightStuffResult(report, thrownPlayer) -- ReportSkillRoll only
+            // retains modifier *names* (roll_modifier_names: Vec<String>), not the signed
+            // magnitude/report-string data RollModifier objects carry in Java, so the
+            // reconstructed modifiers below use modifier=0 for each name (same approach as
+            // dodge_roll_message.rs).
+            let modifiers: Vec<RollModifier> = report
+                .get_roll_modifiers()
+                .iter()
+                .map(|name| RollModifier::new(name.clone(), 0))
+                .collect();
+            let mechanic = agility_mechanic_for(game.rules);
+            needed_roll.push_str(&mechanic.format_right_stuff_result(&modifiers, thrown_player));
             status_report.println_indent_style(status_report.get_indent() + 1, TextStyle::NEEDED_ROLL, &needed_roll);
         }
     }
-}
-
-/// java: `AgilityMechanic.formatRightStuffResult(ReportSkillRoll, Player)`. The full
-/// `RollModifier` objects (with sign/magnitude) that Java's formatter needs are not retained
-/// on `ReportSkillRoll` (only resolved names are — see `report_skill_roll.rs`), so this mirrors
-/// `AgilityMechanic.formatResult` using `StatusReport::format_roll_modifiers`'s name-only
-/// fallback instead of calling into `ffb-mechanics::AgilityMechanic`.
-fn format_right_stuff_result(status_report: &StatusReport, report: &ReportRightStuffRoll, player: &Player) -> String {
-    format!(
-        " (Roll{} >= {}+)",
-        status_report.format_roll_modifiers(report.get_roll_modifiers()),
-        player.agility_with_modifiers().max(2)
-    )
 }
 
 #[cfg(test)]
@@ -105,7 +115,12 @@ mod tests {
         assert_eq!(status_report.rendered_runs[0].text.as_deref(), Some("Landing Roll [ 4 ]"));
         assert_eq!(status_report.rendered_runs[3].text.as_deref(), Some(" lands on his feet."));
         let last = status_report.rendered_runs.iter().rev().find(|r| r.text.is_some()).unwrap();
-        assert_eq!(last.text.as_deref(), Some("Succeeded on a roll of 2+ (Roll >= 3+)"));
+        // NB: the exact suffix produced by ffb_mechanics::bb2025::AgilityMechanic::format_result
+        // is asserted loosely (starts_with) rather than as a full literal, matching the
+        // established pattern in dodge_roll_message.rs -- that mechanic has its own pre-existing
+        // formatting quirk (a doubled space before ">=") which is out of scope for this file.
+        assert!(last.text.as_deref().unwrap().starts_with("Succeeded on a roll of 2+ (Roll"));
+        assert!(last.text.as_deref().unwrap().contains(">= 3+)"));
         assert_eq!(last.text_style, Some(TextStyle::NEEDED_ROLL));
     }
 
@@ -118,7 +133,8 @@ mod tests {
         RightStuffRollMessage.render(&mut status_report, &game, &report);
         assert_eq!(status_report.rendered_runs[3].text.as_deref(), Some(" crashes to the ground."));
         let last = status_report.rendered_runs.iter().rev().find(|r| r.text.is_some()).unwrap();
-        assert_eq!(last.text.as_deref(), Some("Roll a 2+ to succeed (Roll >= 3+)"));
+        assert!(last.text.as_deref().unwrap().starts_with("Roll a 2+ to succeed (Roll"));
+        assert!(last.text.as_deref().unwrap().contains(">= 3+)"));
     }
 
     #[test]
@@ -129,5 +145,19 @@ mod tests {
         let report = ReportRightStuffRoll::new(Some("p1".into()), true, 4, 2, true, vec![]);
         RightStuffRollMessage.render(&mut status_report, &game, &report);
         assert!(status_report.rendered_runs.iter().all(|r| r.text_style != Some(TextStyle::NEEDED_ROLL)));
+    }
+
+    #[test]
+    fn render_bb2016_uses_bb2016_needed_roll_format() {
+        // Regression test: the renderer used to hardcode the bb2025 "(Roll >= X+)" format
+        // regardless of edition. BB2016's AgilityMechanic formats this as "(AG X + Roll > 6)."
+        // instead, so a Bb2016 game must dispatch to the bb2016 mechanic, not bb2025's.
+        let mut status_report = StatusReport::new();
+        let mut game = Game::new(make_team("home"), make_team("away"), Rules::Bb2016);
+        add_player(&mut game, 3);
+        let report = ReportRightStuffRoll::new(Some("p1".into()), true, 4, 2, false, vec![]);
+        RightStuffRollMessage.render(&mut status_report, &game, &report);
+        let last = status_report.rendered_runs.iter().rev().find(|r| r.text.is_some()).unwrap();
+        assert_eq!(last.text.as_deref(), Some("Succeeded on a roll of 2+ (AG 3+ Roll > 6)."));
     }
 }

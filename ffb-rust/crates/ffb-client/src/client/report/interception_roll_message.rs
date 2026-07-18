@@ -27,15 +27,29 @@ fn interception_wording(rules: Rules, ignore_agility: bool) -> Wording {
 /// strings (no retained `RollModifier` objects with numeric magnitude), so this mirrors
 /// the mechanic's `formatResult` formula using `StatusReport.format_roll_modifiers` for the
 /// modifier text instead of calling the mechanic directly.
+///
+/// The formula itself is edition-specific (like `interception_wording` above): BB2016's
+/// `AgilityMechanic.formatInterceptionResult` uses the old "AG X - 2 Interception ... + Roll
+/// > 6)." phrasing (see `ffb-common/mechanics/bb2016/AgilityMechanic.java`), while
+/// BB2020/BB2025 use the "(Roll ... >= N+)" phrasing. Dropping this edition split (as an
+/// earlier version of this file did) silently renders the wrong needed-roll text for BB2016
+/// games.
 // java: AgilityMechanic.formatInterceptionResult(report, player) — approximated locally,
 // see comment above; no RollModifier objects are reachable from ReportInterceptionRoll.
-fn format_interception_result(status_report: &StatusReport, roll_modifier_names: &[String], player: Option<&Player>) -> String {
+fn format_interception_result(status_report: &StatusReport, rules: Rules, roll_modifier_names: &[String], player: Option<&Player>) -> String {
     let agility = player.map(|p| p.agility_with_modifiers()).unwrap_or(0);
-    format!(
-        " (Roll{} >= {}+)",
-        status_report.format_roll_modifiers(roll_modifier_names),
-        agility.max(2)
-    )
+    match rules {
+        Rules::Bb2016 => format!(
+            " (AG {} - 2 Interception{}+ Roll > 6).",
+            agility.min(6),
+            status_report.format_roll_modifiers(roll_modifier_names)
+        ),
+        Rules::Bb2020 | Rules::Bb2025 | Rules::Common => format!(
+            " (Roll{} >= {}+)",
+            status_report.format_roll_modifiers(roll_modifier_names),
+            agility.max(2)
+        ),
+    }
 }
 
 /// 1:1 translation of `InterceptionRollMessage.java`.
@@ -88,7 +102,7 @@ impl ReportMessage for InterceptionRollMessage {
 
         if let Some(mut needed_roll) = needed_roll {
             if !report.is_ignore_agility() {
-                needed_roll.push_str(&format_interception_result(status_report, report.base.get_roll_modifiers(), player));
+                needed_roll.push_str(&format_interception_result(status_report, game.rules, report.base.get_roll_modifiers(), player));
             }
             status_report.println_indent_style(status_report.get_indent() + 2, TextStyle::NEEDED_ROLL, &needed_roll);
         }
@@ -200,5 +214,23 @@ mod tests {
         let texts: Vec<_> = status_report.rendered_runs.iter().filter_map(|r| r.text.as_deref()).collect();
         let needed = texts.iter().find(|t| t.contains("Roll a 4+ to succeed")).unwrap();
         assert!(!needed.contains("(Roll"));
+    }
+
+    #[test]
+    fn bb2016_needed_roll_uses_ag_formula_not_bb2025_roll_formula() {
+        // Regression test: BB2016's AgilityMechanic.formatInterceptionResult uses the
+        // "(AG X - 2 Interception ... + Roll > 6)." phrasing, not BB2020/BB2025's
+        // "(Roll ... >= N+)" phrasing. An earlier version of format_interception_result
+        // ignored `game.rules` and always emitted the BB2025 formula.
+        let mut status_report = StatusReport::new();
+        let mut game = Game::new(make_team("home"), make_team("away"), Rules::Bb2016);
+        add_player(&mut game, true, "p1", 3);
+        let report = ReportInterceptionRoll::new(Some("p1".into()), false, 1, 4, false, vec![], false, false);
+        InterceptionRollMessage.render(&mut status_report, &game, &report);
+
+        let texts: Vec<_> = status_report.rendered_runs.iter().filter_map(|r| r.text.as_deref()).collect();
+        let needed = texts.iter().find(|t| t.contains("Roll a 4+ to succeed")).unwrap();
+        assert!(needed.contains("(AG 3 - 2 Interception+ Roll > 6)."));
+        assert!(!needed.contains("(Roll >="));
     }
 }
