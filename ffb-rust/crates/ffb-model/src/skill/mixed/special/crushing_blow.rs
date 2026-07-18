@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed.special::CrushingBlow.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct CrushingBlow {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct CrushingBlow {
 
 impl CrushingBlow {
     pub fn new() -> Self {
-        let base = Skill::new("Crushing Blow", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Crushing Blow", SkillCategory::Trait, SkillUsageType::OncePerGame);
         Self { base }
     }
 }
@@ -29,4 +29,6 @@ mod tests {
     fn name_is_correct() { assert_eq!(CrushingBlow::new().get_name(), "Crushing Blow"); }
     #[test]
     fn category_is_correct() { assert_eq!(CrushingBlow::new().get_category(), SkillCategory::Trait); }
+    #[test]
+    fn usage_type_is_once_per_game() { assert_eq!(CrushingBlow::new().get_skill_usage_type(), SkillUsageType::OncePerGame); }
 }
