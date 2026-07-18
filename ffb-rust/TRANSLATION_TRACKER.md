@@ -29,6 +29,32 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AG (2026-07-18): closed both concrete follow-ups named by Phase AF, plus a fresh 6-batch
+re-verification audit sweep.** Stage 1 fixed `step_trap_door.rs`'s named re-roll bug and, while
+fixing it, found a second bug in the same code path: the reroll-offer outcome was built from
+`StepOutcome::next()` (action `NextStep`), whose `.prompt` field the driver silently discards for
+non-`Continue`/`Repeat` actions — the dialog was never actually shown to the agent at all, not just
+mishandled on reply. Stage 2 finished the `SkillUsageType`-special skill audit Phase AF started:
+47 of the remaining 67 files had the identical missing-usage-type drift (100% hit rate in 3 of 4
+subdirectory batches), closing the full 73-file audit (66/73 total had real drift). Stage 3 ran one
+more fresh audit round (report renderers by ruleset, skill_behaviour reachability, and a targeted
+NextStep-swallows-prompt sweep) — **5 of 6 batches found real bugs**: 1 more live instance of the
+NextStep-swallows-prompt bug (`step_all_you_can_eat.rs`), a missing-space renderer bug (bb2016
+HypnoticGaze), a dropped Nerves-of-Steel sub-report + missing Prayer rules text (bb2025), 3 missing
+Confusion skill-message overrides + 5 renderers hardcoding the wrong ruleset's needed-roll formula
+(mixed/root), and 2 skill_behaviour dispatch-gating bugs (BoneHead/ReallyStupid re-firing without
+Java's `hasUnusedSkill` gate, StandFirm missing `handle_command` entirely). No tracker status cells
+changed (all touched files were already `✓` — behavioral fixes within already-translated files).
+Tests: 17,210 → 17,261 (+51). Full writeup: `SESSION.md` Current Status (Phase AG). **This is the
+second consecutive phase where fresh re-verification found bugs in most of what it checked (5/6,
+after 6/7 in Phase AF)** — the residual-bug-hunting approach still has real yield. New follow-ups
+named: a possible published-params-loss bug in `step_play_card.rs` (flagged, unconfirmed); `Saboteur`/
+`SneakyGit` dispatch-layer gaps in `step_drop_falling_players.rs`/`step_eject_player.rs`; the
+non-special bb2016/bb2020/common skill files never audited for constructor-arg drift; the
+card/inducement activation-effect cluster (~107 files) and `Report*` data-struct layer (72 files),
+neither yet swept as their own cluster. Parity/integration testing remains the only large
+out-of-scope workstream.
+
 **Phase AF (2026-07-18): fresh re-verification audit, 7 parallel worktree agents, no new gaps to
 name going in.** Phase AE's closing note named zero concrete gaps, so this phase re-read a batch
 of already-`✓` files directly against the Java source (same audit shape that produced every real

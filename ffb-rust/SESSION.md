@@ -1,6 +1,88 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-18, Phase AF done — fresh re-verification audit, 7 parallel batches)
+## Current Status (2026-07-18, Phase AG done — closed AF's 2 named follow-ups + a fresh 6-batch audit sweep)
+
+**Context: Phase AF's own closing note named exactly 2 concrete follow-ups** — `step_trap_door.rs`'s
+identical-to-BallAndChain missing-reroll-source-stash bug, and ~65 more `SkillUsageType`-special
+skill files unchecked for the same constructor-argument-drift class Phase AF found in 13/35
+sampled. Both closed this phase, plus one more round of the same fresh-re-verification-audit
+technique (still highly productive: found real bugs in 5 of 6 fresh batches).
+
+**Stage 1 — `step_trap_door.rs` (foreground, direct):** confirmed and fixed the named bug, plus
+found a *second*, more fundamental bug in the same code path while fixing it: the reroll-offer
+branch returned `outcome_base.with_prompt(prompt)` where `outcome_base` was built from
+`StepOutcome::next()` (action `NextStep`) — but `driver.rs`'s `dispatch`/`dispatch_after_start`
+only honor a `StepOutcome`'s `.prompt` field for `Continue`/`Repeat` actions; a `NextStep` outcome's
+prompt is silently discarded. **The trap-door reroll dialog was never actually surfaced to the
+agent at all**, independent of the source-stash bug. Fixed both: stashed `re_roll_source` from the
+offered `AgentPrompt::ReRollOffer`, added `handle_command`'s `Action::UseReRoll` handling, and
+switched the offer branch to build from `StepOutcome::cont()`. 2 new regression tests.
+
+**Stage 2 — remaining ~67 `SkillUsageType`-special skill files** (4 parallel worktree batches by
+subdirectory): **47 of 67 had the identical drift** — every one called the base 2-arg `Skill::new()`
+constructor (defaults to `SkillUsageType::Regular`), silently dropping the special usage type
+(`OncePerGame`/`OncePerHalf`/`OncePerTurn`/`OncePerTurnByTeamMate`) their Java constructor actually
+passed. `bb2020/special` (16/16) and 2 `mixed/special` batches (16/16, 15/15) were **100% affected**
+— a systematic gap, not per-file variance; `bb2025`+`bb2025/special` (20 files) came back fully
+clean. Fixed via `Skill::with_usage_type(name, category, usage_type)`, 1 regression test per file.
+**This closes the full `SkillUsageType`-special audit started in Phase AF** (73 files total, 19
+fixed then + 47 now = 66 of 73 had real drift).
+
+**Stage 3 — fresh 6-batch re-verification audit** (same technique as Phase AF, on newly-scoped
+areas: report roll-message renderers by ruleset, skill_behaviour reachability, and a targeted sweep
+for the NextStep-swallows-prompt anti-pattern found in Stage 1). **5 of 6 batches found and fixed
+genuine bugs**:
+1. **NextStep-swallows-prompt sweep** (all ~96 files using `.with_prompt(` in `step/`): found exactly
+   1 more live instance beyond `step_trap_door.rs` — `step_all_you_can_eat.rs` had the identical
+   `outcome_base.with_prompt(...)`-on-`NextStep` bug, fixed the same way. Everything else (93 files)
+   confirmed already `cont()`/`repeat()`-based and correct. One adjacent-but-different possible bug
+   flagged, not fixed: `step_play_card.rs` may discard locally-accumulated published params before
+   attaching its prompt — different bug shape, needs its own look.
+2. **bb2016 report renderers**: 1 fix — `hypnotic_gaze_roll_message.rs` was missing a space before
+   "+ Roll" in the needed-roll text (the pre-existing test had encoded the buggy output as expected).
+3. **bb2025 report renderers**: 2 fixes — `pass_roll_message.rs` silently dropped the "Nerves of
+   Steel" sub-report Java always dispatches when that modifier applies; `Prayer` had no `description`
+   field at all, so `prayer_roll_message.rs` printed only the duration, never the actual rules text,
+   for any of the 16 possible prayer rolls.
+4. **mixed/root report renderers**: 6 fixes — `confusion_roll_message.rs` was missing 3 of 6 real
+   Java skill-subclass message overrides (TakeRoot/AnimalSavagery/UnchannelledFury); 5 files
+   (`interception`/`jump`/`jump_up`/`right_stuff`/`safe_throw`) hardcoded the BB2020/2025 "needed
+   roll" text formula for every edition, silently rendering wrong text in BB2016 games (Java's
+   `AgilityMechanic` genuinely differs by edition here).
+5. **bb2020/bb2025 skill_behaviour reachability**: 5 fixes — `BoneHead`/`ReallyStupid` (both
+   editions) never checked Java's `UtilCards.hasUnusedSkill` gate, so the negative-trait roll could
+   silently re-fire on every dispatch within the same compound action instead of once; bb2025
+   `StandFirmStepModifier` had no `handle_command` at all, so the player's actual accept/decline
+   reply was never recorded and it always fell back to headless auto-decline. 2 more *dispatch*-layer
+   gaps flagged, not fixed (need work outside `skill_behaviour/`, not just within it): `Saboteur`'s
+   step never calls `execute_step_hooks` for it at all, and `SneakyGit`'s eject-player override is
+   correct but unreachable for the same reason in `step_eject_player.rs`.
+6. **bb2016 skill_behaviour reachability**: fully clean — all 9 files either live-and-correct or
+   correctly-dead-by-established-convention (with independently-verified-complete logic living
+   directly in the real step file instead).
+
+Tests: 17,210 (post Stage 1) → **17,261** (+51 across Stages 2-3). 0 failures across
+`cargo test --workspace`. `cargo build --workspace` and `cargo clippy --workspace --all-targets`
+both clean — 0 errors, no new warning categories.
+
+**Honest completion estimate: unchanged from Phase AF, ~99.8-99.9%+ on the "every file/method has a
+Rust match" axis** (still bug-fixing within already-`✓` files, not new translation). But **this is
+now the *second* consecutive phase where fresh re-verification found real bugs in most of what it
+checked (5/6 this phase, 6/7 last phase)** — stronger evidence this residual-bug-hunting approach
+has real remaining yield, not diminishing returns. **What's left, in priority order**: (1)
+`step_play_card.rs`'s possible published-params-loss bug (flagged, not confirmed); (2) `Saboteur`/
+`SneakyGit` dispatch-layer gaps in `step_drop_falling_players.rs`/`step_eject_player.rs`; (3) the
+non-special bb2016/bb2020/common skill files, never audited for the same constructor-arg-drift class
+as the (now fully closed) `SkillUsageType`-special files; (4) card/inducement activation-effect
+wiring beyond the single `deactivate_card` fix (Phase AF) — a much larger, unaudited cluster
+(~107 files); (5) the `Report*` data-struct layer (72 files) paired with this phase's renderer
+audit, not yet swept as its own cluster. Parity/integration testing remains the only large
+remaining workstream, still gated on the user explicitly lifting the standing "no parity yet"
+instruction.
+
+---
+
+## Prior Status (2026-07-18, Phase AF done — fresh re-verification audit, 7 parallel batches)
 
 **Context: Phase AE's own closing note named zero new concrete gaps** — the "every Java
 class/method has a Rust match" axis had no outstanding named work, only (1) parity/integration
