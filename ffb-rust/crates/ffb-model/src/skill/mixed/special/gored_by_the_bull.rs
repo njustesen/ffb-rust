@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed.special::GoredByTheBull.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct GoredByTheBull {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct GoredByTheBull {
 
 impl GoredByTheBull {
     pub fn new() -> Self {
-        let base = Skill::new("Gored By The Bull", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Gored By The Bull", SkillCategory::Trait, SkillUsageType::OncePerGame);
         Self { base }
     }
 }
@@ -29,4 +29,6 @@ mod tests {
     fn name_is_correct() { assert_eq!(GoredByTheBull::new().get_name(), "Gored By The Bull"); }
     #[test]
     fn category_is_correct() { assert_eq!(GoredByTheBull::new().get_category(), SkillCategory::Trait); }
+    #[test]
+    fn usage_type_is_once_per_game() { assert_eq!(GoredByTheBull::new().skill_usage_type, SkillUsageType::OncePerGame); }
 }

@@ -8,7 +8,7 @@ pub struct MightyBlow {
 
 impl MightyBlow {
     pub fn new() -> Self {
-        let base = Skill::new("Mighty Blow", SkillCategory::Strength);
+        let base = Skill::with_default_value("Mighty Blow", SkillCategory::Strength, 1);
         Self { base }
     }
 }
@@ -34,5 +34,10 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(MightyBlow::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn default_value_is_one() {
+        assert_eq!(MightyBlow::new().get_default_skill_value(), 1);
     }
 }

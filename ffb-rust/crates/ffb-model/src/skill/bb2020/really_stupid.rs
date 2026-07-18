@@ -8,7 +8,7 @@ pub struct ReallyStupid {
 
 impl ReallyStupid {
     pub fn new() -> Self {
-        let base = Skill::new("Really Stupid", SkillCategory::Trait);
+        let base = Skill::as_negative_trait("Really Stupid", SkillCategory::Trait);
         Self { base }
     }
 }
@@ -34,5 +34,10 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(ReallyStupid::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn is_negative_trait() {
+        assert!(ReallyStupid::new().is_negative_trait());
     }
 }
