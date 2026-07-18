@@ -12,7 +12,11 @@ impl DodgeModifierCollection {
         let mut inner = BaseDodgeModifierCollection::new();
         for i in 1i32..=8 {
             let name = if i == 1 { "1 Prehensile Tail".to_string() } else { format!("{} Prehensile Tails", i) };
-            inner.add(DodgeModifier::new_full(name, "1 for being marked with Prehensile Tail".to_string(), 1, i, ModifierType::PREHENSILE_TAIL, false));
+            // Java: modifiers/bb2016/DodgeModifierCollection.java uses the 3-arg
+            // DodgeModifier(name, modifier, type) ctor, which sets both `modifier` AND
+            // `multiplier` to the same value — i.e. under BB2016 the dodge penalty scales
+            // with the marker count (unlike BB2020/2025's flat -1-per-tail reporting text).
+            inner.add(DodgeModifier::new_full(name.clone(), name, i, i, ModifierType::PREHENSILE_TAIL, false));
         }
         Self { inner }
     }
@@ -56,5 +60,21 @@ mod tests {
     fn all_modifiers_have_nonempty_names() {
         let col = DodgeModifierCollection::new();
         assert!(col.get_modifiers().iter().all(|m| !m.get_name().is_empty()));
+    }
+
+    /// Regression test: Java's `modifiers/bb2016/DodgeModifierCollection.java` uses the 3-arg
+    /// `DodgeModifier(name, modifier, type)` constructor, which sets `modifier == multiplier`.
+    /// Previously the Rust translation hardcoded `modifier: 1` for every count, so a BB2016
+    /// dodge against 3 Prehensile Tail markers only applied a -1 penalty instead of the correct
+    /// -3 (scaling with marker count, unlike BB2020/2025 which stay flat at 1 per instance).
+    #[test]
+    fn prehensile_tail_modifier_scales_with_marker_count() {
+        let col = DodgeModifierCollection::new();
+        let three = col.get_modifiers().iter().find(|m| m.get_name() == "3 Prehensile Tails").unwrap();
+        assert_eq!(three.get_modifier(), 3, "BB2016 Prehensile Tail penalty must scale with marker count");
+        assert_eq!(three.get_multiplier(), 3);
+
+        let one = col.get_modifiers().iter().find(|m| m.get_name() == "1 Prehensile Tail").unwrap();
+        assert_eq!(one.get_modifier(), 1);
     }
 }
