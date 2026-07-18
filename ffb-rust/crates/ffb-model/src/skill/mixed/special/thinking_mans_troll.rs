@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed.special::ThinkingMansTroll.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct ThinkingMansTroll {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct ThinkingMansTroll {
 
 impl ThinkingMansTroll {
     pub fn new() -> Self {
-        let base = Skill::new("Thinking Man's Troll", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Thinking Man's Troll", SkillCategory::Trait, SkillUsageType::OncePerHalf);
         Self { base }
     }
 }
@@ -29,4 +29,6 @@ mod tests {
     fn name_is_correct() { assert_eq!(ThinkingMansTroll::new().get_name(), "Thinking Man's Troll"); }
     #[test]
     fn category_is_correct() { assert_eq!(ThinkingMansTroll::new().get_category(), SkillCategory::Trait); }
+    #[test]
+    fn usage_type_is_once_per_half() { assert_eq!(ThinkingMansTroll::new().skill_usage_type, SkillUsageType::OncePerHalf); }
 }

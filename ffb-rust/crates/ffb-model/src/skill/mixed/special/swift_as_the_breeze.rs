@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed.special::SwiftAsTheBreeze.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct SwiftAsTheBreeze {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct SwiftAsTheBreeze {
 
 impl SwiftAsTheBreeze {
     pub fn new() -> Self {
-        let base = Skill::new("Swift As The Breeze", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Swift As The Breeze", SkillCategory::Trait, SkillUsageType::OncePerGame);
         Self { base }
     }
 }
@@ -29,4 +29,6 @@ mod tests {
     fn name_is_correct() { assert_eq!(SwiftAsTheBreeze::new().get_name(), "Swift As The Breeze"); }
     #[test]
     fn category_is_correct() { assert_eq!(SwiftAsTheBreeze::new().get_category(), SkillCategory::Trait); }
+    #[test]
+    fn usage_type_is_once_per_game() { assert_eq!(SwiftAsTheBreeze::new().skill_usage_type, SkillUsageType::OncePerGame); }
 }
