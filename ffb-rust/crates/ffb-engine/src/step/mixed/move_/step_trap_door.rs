@@ -103,7 +103,21 @@ impl StepTrapDoor {
             game, RE_ROLLED_ACTION, 2, false,
         ) {
             self.re_roll_state.re_rolled_action = Some(ReRolledAction::new(RE_ROLLED_ACTION));
-            return outcome_base.with_prompt(prompt);
+            // Stash the *offered* source here (mirroring `AgentPrompt::ReRollOffer.source`) so
+            // `handle_command` has something to commit-or-discard based on the reply — matching
+            // the fix applied to `step_move_ball_and_chain.rs`'s identical bug shape.
+            if let ffb_model::prompts::AgentPrompt::ReRollOffer { ref source, .. } = prompt {
+                self.re_roll_state.re_roll_source = Some(source.clone());
+            }
+            // A second, more fundamental bug fixed alongside the source-stash one:
+            // `outcome_base`'s action is `NextStep`, but the driver's `dispatch_after_start`
+            // only honors `outcome.prompt` for `Continue`/`Repeat` actions — a `NextStep`
+            // outcome's prompt is silently discarded (see `driver.rs`). Returning
+            // `outcome_base.with_prompt(...)` meant this dialog was never actually surfaced to
+            // the agent at all; must build a `cont()`-based outcome carrying the same events.
+            return StepOutcome::cont()
+                .with_events(outcome_base.events)
+                .with_prompt(prompt);
         }
 
         // No re-roll available — fall through
@@ -206,7 +220,16 @@ impl Step for StepTrapDoor {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: `AbstractStepWithReRoll.handleCommand`'s CLIENT_USE_RE_ROLL branch commits
+        // `reRollSource` from the reply; the Rust `Action::UseReRoll` reply is a simplified
+        // bool, so `use_reroll == false` clears the stashed source instead (same convention as
+        // `step_move_ball_and_chain.rs`'s fix for this identical bug shape).
+        if let Action::UseReRoll { use_reroll } = action {
+            if !use_reroll {
+                self.re_roll_state.re_roll_source = None;
+            }
+        }
         self.execute_step(game, rng)
     }
 
@@ -357,5 +380,58 @@ mod tests {
         let out = step.start(&mut game, &mut rng);
         // Should not panic
         assert!(matches!(out.action, StepAction::NextStep | StepAction::Continue));
+    }
+
+    /// Regression test for the bug where `re_roll_source` was never stashed when the
+    /// re-roll offer was made, and `handle_command` ignored the incoming `Action`
+    /// entirely — identical bug shape to `step_move_ball_and_chain.rs`'s fixed
+    /// BallAndChain re-roll. Before the fix, accepting the trap-door re-roll offer had
+    /// no effect: `re_roll_source` stayed `None`, so the second roll's reroll-source
+    /// check was always `None` and no re-roll (nor TRR consumption) ever happened.
+    #[test]
+    fn accepting_reroll_offer_stashes_source_and_consumes_trr() {
+        let mut step = StepTrapDoor::new();
+        step.player_id = Some("p1".into());
+        let coord = FieldCoordinate::new(5, 5);
+        let mut game = make_game();
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.trap_doors.push(coord);
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        game.turn_data_home.reroll_used = false;
+
+        // Seed 7 produces d6 == 1 on the first roll → fall triggers the re-roll offer.
+        let mut rng = GameRng::new(7);
+        let out = step.start(&mut game, &mut rng);
+
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(step.re_roll_state.re_roll_source.is_some(), "re_roll_source must be stashed when the offer is issued");
+
+        let _ = step.handle_command(&Action::UseReRoll { use_reroll: true }, &mut game, &mut rng);
+
+        assert_eq!(game.turn_data_home.rerolls, 0, "accepting the offer must consume the TRR");
+    }
+
+    #[test]
+    fn declining_reroll_offer_clears_source_and_does_not_consume_trr() {
+        let mut step = StepTrapDoor::new();
+        step.player_id = Some("p1".into());
+        let coord = FieldCoordinate::new(5, 5);
+        let mut game = make_game();
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.trap_doors.push(coord);
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        game.turn_data_home.reroll_used = false;
+
+        let mut rng = GameRng::new(7);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(step.re_roll_state.re_roll_source.is_some());
+
+        let _ = step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut rng);
+
+        assert!(step.re_roll_state.re_roll_source.is_none(), "declining must clear the stashed source");
+        assert_eq!(game.turn_data_home.rerolls, 1, "declining must not consume the TRR");
     }
 }
