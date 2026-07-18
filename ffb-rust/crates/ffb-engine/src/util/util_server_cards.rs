@@ -128,7 +128,11 @@ impl UtilServerCards {
 
         let card = card_clone?;
 
-        player_id = if card.handler_key_name().map_or(false, |_| true) {
+        // Java: `if (pCard.getTarget().isPlayedOnPlayer())` — the player lookup is gated on
+        // the card's target, not on whether it happens to have a handler registered. Cards
+        // like "Beguiling Bracers" (target OWN_PLAYER, no handler_key) still need their
+        // field_model card entry cleaned up on deactivation.
+        player_id = if card.get_target().is_played_on_player() {
             game.field_model.find_player_with_card(card_name).map(|s| s.to_string())
         } else {
             None
@@ -369,6 +373,30 @@ mod tests {
     fn deactivate_card_unknown_returns_none() {
         let mut game = make_game();
         assert!(UtilServerCards::deactivate_card(&mut game, "No Such Card").is_none());
+    }
+
+    #[test]
+    fn deactivate_card_removes_field_model_entry_for_handlerless_player_targeted_card() {
+        // Regression test: "Beguiling Bracers" (target OWN_PLAYER, no handler_key in the real
+        // catalog) must still have its field_model card entry cleaned up on deactivation.
+        // Java gates the player lookup on `card.getTarget().isPlayedOnPlayer()`, not on
+        // whether the card happens to have a registered handler.
+        use ffb_model::inducement::card_target::CardTarget;
+        let mut game = make_game();
+        let card = Card::new("Beguiling Bracers", None::<&str>)
+            .with_target(CardTarget::OWN_PLAYER)
+            .with_duration(InducementDuration::UntilEndOfGame);
+        game.turn_data_home.inducement_set.add_available_card("Beguiling Bracers");
+        game.turn_data_home.inducement_set.activate_card_full(card.clone());
+        game.field_model.add_card("p1", card);
+
+        assert!(game.field_model.find_player_with_card("Beguiling Bracers").is_some());
+        let ev = UtilServerCards::deactivate_card(&mut game, "Beguiling Bracers");
+        assert!(ev.is_some());
+        assert!(
+            game.field_model.find_player_with_card("Beguiling Bracers").is_none(),
+            "handler-less player-targeted card should be removed from field_model on deactivation"
+        );
     }
 
     #[test]
