@@ -142,7 +142,7 @@ impl StepRightStuff {
                 });
                 let ctx = RightStuffContext::new_full(game, player, mechanic_pass_result, None);
                 let mods = factory.find_applicable(&ctx);
-                RightStuffModifierFactory::minimum_roll(player.agility as i32, &mods)
+                RightStuffModifierFactory::minimum_roll(player.agility_with_modifiers(), &mods)
             } else {
                 4
             };
@@ -429,5 +429,39 @@ mod tests {
         let _out = step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::RIGHT_STUFF_ROLL),
             "BB2020 failure roll path must also add ReportRightStuffRoll");
+    }
+
+    #[test]
+    fn minimum_roll_uses_agility_with_modifiers_not_raw_agility() {
+        // Java: AgilityMechanic.minimumRollRightStuff(Player, modifiers) uses
+        // player.getAgilityWithModifiers(), not the raw AG stat. A temporary AG
+        // penalty (e.g. from a spell/skill effect) must lower the effective
+        // agility used for the Right Stuff minimum-roll calculation.
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerGender, PlayerType};
+        use ffb_model::model::player::{Player, STAT_AG};
+        use crate::step::framework::StepAction;
+        let mut game = make_game();
+        let mut p = Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 6, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        // Raw agility 6 → minimum roll 6 (fails on a roll of 5).
+        // Effective agility (with -2 penalty) is 4 → minimum roll 4 (succeeds on a roll of 5).
+        p.add_temporary_stat_mod("test", STAT_AG, -2);
+        game.team_home.players.push(p);
+        let mut step = StepRightStuff::new();
+        step.thrown_player_id = Some("p1".into());
+        step.roll = 5;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel,
+            "roll of 5 must succeed against the agility-with-modifiers threshold of 4, \
+             not fail against the raw-agility threshold of 6");
     }
 }
