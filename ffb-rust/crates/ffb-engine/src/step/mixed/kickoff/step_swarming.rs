@@ -1,6 +1,7 @@
 use ffb_model::enums::{PS_PRONE, PS_RESERVE, SkillId, TurnMode};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
+use ffb_model::prompts::AgentPrompt;
 use ffb_model::report::mixed::report_swarming_roll::ReportSwarmingRoll;
 use ffb_model::types::FieldCoordinateBounds;
 use ffb_model::util::rng::GameRng;
@@ -128,6 +129,7 @@ impl StepSwarming {
         let mut swarmers_on_pitch = 0i32;
         let mut players_on_pitch: Vec<String> = Vec::new();
         let mut reserve_no_swarming: Vec<String> = Vec::new();
+        let mut reserve_swarmers: Vec<String> = Vec::new();
         let mut has_swarming_reserves = false;
 
         for pid in &player_ids {
@@ -151,6 +153,7 @@ impl StepSwarming {
             } else if base == PS_RESERVE {
                 if has_swarming {
                     has_swarming_reserves = true;
+                    reserve_swarmers.push(pid.clone());
                 } else {
                     reserve_no_swarming.push(pid.clone());
                 }
@@ -210,8 +213,17 @@ impl StepSwarming {
             return StepOutcome::next().with_event(event);
         }
 
-        // client-only: DialogSwarmingPlayersParameter(allowedAmount)
-        StepOutcome::cont().with_event(event)
+        // Java: UtilServerDialog.showDialog(getGameState(), new
+        //   DialogSwarmingPlayersParameter(state.allowedAmount), false) — waits for the coach to
+        //   place `allowedAmount` swarmers, then CLIENT_END_TURN. Previously this was a bare
+        //   `StepOutcome::cont()` with no `AgentPrompt`, so an autonomous agent driving the
+        //   headless engine had no signal a placement decision was needed here and would stall.
+        StepOutcome::cont()
+            .with_event(event)
+            .with_prompt(AgentPrompt::SwarmingPlayers {
+                team_id: team_id.clone(),
+                eligible_players: reserve_swarmers,
+            })
     }
 
     /// Java BB2020 SwarmingBehaviour.leave() — restores PRONE→RESERVE, resets turn mode.
@@ -587,5 +599,34 @@ mod tests {
         let mut step = StepSwarming::new();
         step.start(&mut game, &mut GameRng::new(1));
         assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::SWARMING_PLAYERS_ROLL));
+    }
+
+    /// Regression test: Java shows `DialogSwarmingPlayersParameter` (waiting for the coach to
+    /// place `allowedAmount` swarmers) whenever `allowedAmount > 0`. A prior translation
+    /// returned a bare `StepOutcome::cont()` with no `AgentPrompt`, so an autonomous agent had
+    /// no signal that a placement decision was needed and the step would stall indefinitely.
+    #[test]
+    fn swarming_placement_emits_agent_prompt_when_allowed_amount_positive() {
+        let mut game = make_game();
+        game.home_playing = true;
+        let sw = make_swarmer("h_s", 1);
+        game.team_home.players.push(sw);
+        game.field_model.set_player_coordinate("h_s", FieldCoordinate::new(10, 7));
+        game.field_model.set_player_state("h_s", PlayerState::new(PS_STANDING));
+        let sw2 = make_swarmer("h_s2", 2);
+        game.team_home.players.push(sw2);
+        game.field_model.set_player_state("h_s2", PlayerState::new(PS_RESERVE));
+
+        let mut step = StepSwarming::new();
+        // Seed chosen so d3 rolls >= 1, guaranteeing allowed_amount > 0 (limiting_amount=1).
+        let out = step.start(&mut game, &mut GameRng::new(1));
+
+        assert!(step.allowed_amount > 0, "test setup must produce a positive allowed_amount");
+        match out.prompt {
+            Some(ffb_model::prompts::AgentPrompt::SwarmingPlayers { ref team_id, .. }) => {
+                assert_eq!(team_id, "home");
+            }
+            other => panic!("expected AgentPrompt::SwarmingPlayers, got {other:?}"),
+        }
     }
 }

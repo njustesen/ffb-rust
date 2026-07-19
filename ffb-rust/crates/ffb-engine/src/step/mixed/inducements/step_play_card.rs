@@ -183,12 +183,24 @@ impl Step for StepPlayCard {
                 self.opponent_id = Some(defender_id.clone());
             }
             // Java: case CLIENT_END_TURN with illegal substitution:
-            //   fEndCardPlaying = true; process setup player if available
+            //   fEndCardPlaying = true; process setup player if available; game.setTurnMode(REGULAR)
+            //
+            // NOTE: Java's full branch also does `game.getFieldModel().addCardEffect(setupPlayer,
+            // CardEffect.ILLEGALLY_SUBSTITUTED); UtilServerSetup.setupPlayer(gameState,
+            // fSetupPlayerId, fSetupPlayerCoordinate)` before clearing `fSetupPlayerId`/
+            // `fSetupPlayerCoordinate` — the coordinate is populated by a `CLIENT_SETUP_PLAYER`
+            // command, which has no `Action` variant in this engine yet (no player-placement
+            // step in this flow reaches that far), so the substituted player is not actually
+            // placed on the field here. That remains a known, documented gap. This fix only
+            // restores the `turn_mode` reset, whose absence left the engine permanently stuck
+            // in `TurnMode::IllegalSubstitution` after any Illegal Substitution card — every
+            // subsequent turn's mode checks would see the wrong mode forever.
             Action::EndTurn => {
                 if self.illegal_substitution {
                     self.end_card_playing = true;
                     self.setup_player_id = None;
                     self.illegal_substitution = false;
+                    game.turn_mode = ffb_model::enums::TurnMode::Regular;
                 }
             }
             _ => {}
@@ -311,6 +323,34 @@ mod tests {
         step.handle_command(&Action::EndTurn, &mut game, &mut rng);
         assert!(step.end_card_playing);
         assert!(!step.illegal_substitution);
+    }
+
+    /// Regression test: Java's `CLIENT_END_TURN` illegal-substitution branch calls
+    /// `game.setTurnMode(TurnMode.REGULAR)` — the only place in `StepPlayCard` that reverts
+    /// the `TurnMode::IllegalSubstitution` mode set when the Illegal Substitution card was
+    /// played. A prior translation never reset it, so the engine's turn mode got stuck at
+    /// `IllegalSubstitution` for the rest of the game after playing this card.
+    #[test]
+    fn handle_end_turn_with_illegal_substitution_resets_turn_mode_to_regular() {
+        let mut step = StepPlayCard::new();
+        step.illegal_substitution = true;
+        let mut game = make_game();
+        game.turn_mode = ffb_model::enums::TurnMode::IllegalSubstitution;
+        let mut rng = GameRng::new(0);
+        step.handle_command(&Action::EndTurn, &mut game, &mut rng);
+        assert_eq!(game.turn_mode, ffb_model::enums::TurnMode::Regular);
+    }
+
+    /// Without an active illegal substitution, CLIENT_END_TURN must not touch turn_mode.
+    #[test]
+    fn handle_end_turn_without_illegal_substitution_leaves_turn_mode_untouched() {
+        let mut step = StepPlayCard::new();
+        step.illegal_substitution = false;
+        let mut game = make_game();
+        game.turn_mode = ffb_model::enums::TurnMode::Setup;
+        let mut rng = GameRng::new(0);
+        step.handle_command(&Action::EndTurn, &mut game, &mut rng);
+        assert_eq!(game.turn_mode, ffb_model::enums::TurnMode::Setup);
     }
 
     // ── Card activation / target routing (Phase AAU) ────────────────────────────

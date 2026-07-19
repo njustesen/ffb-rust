@@ -58,11 +58,13 @@ impl Step for StepDoubleStrength {
         // Java: playerIds.size() > 1 → DialogPlayerChoiceParameter(INDOMITABLE) →
         // CLIENT_PLAYER_CHOICE, the coach picks which Dauntless-successful target to double.
         // Java: `command.getSkill().hasSkillProperty(canDoubleStrengthAfterDauntless)` — property
-        // based, not tied to the specific `Indomitable` skill id.
+        // based, not tied to the specific `Indomitable` skill id. Note Java's `handleCommand`
+        // never reads `ClientCommandUseSkill.isSkillUsed()` here — any CLIENT_USE_SKILL for a
+        // skill with this property unconditionally applies the double-strength effect,
+        // regardless of the command's `use_skill` flag.
         let chosen: Option<String> = match action {
-            Action::UseSkill { skill_id, use_skill }
-                if *use_skill
-                    && skill_id.properties().contains(&NamedProperties::CAN_DOUBLE_STRENGTH_AFTER_DAUNTLESS) =>
+            Action::UseSkill { skill_id, .. }
+                if skill_id.properties().contains(&NamedProperties::CAN_DOUBLE_STRENGTH_AFTER_DAUNTLESS) =>
             {
                 self.player_ids.first().cloned()
             }
@@ -248,18 +250,30 @@ mod tests {
         assert!(!outcome.published.iter().any(|p| matches!(p, StepParameter::DoubleTargetStrengthForPlayer(_))));
     }
 
+    /// Regression test: Java's `handleCommand` CLIENT_USE_SKILL branch for
+    /// `StepDoubleStrength` never checks `ClientCommandUseSkill.isSkillUsed()` — it applies
+    /// the double-strength effect unconditionally whenever the client sends this command for
+    /// a skill with `canDoubleStrengthAfterDauntless` (`StepDoubleStrength.java:71-79`). A
+    /// prior Rust translation added an `if use_skill` guard not present in Java, so declining
+    /// silently dropped the effect instead of applying it like Java does.
     #[test]
-    fn no_indomitable_report_when_skill_declined() {
+    fn use_skill_false_still_applies_double_strength_matching_java() {
         let mut step = StepDoubleStrength::new();
         step.set_parameter(&StepParameter::PlayerIdDauntlessSuccess("tgt".into()));
         let mut game = make_game();
         add_player_with_skill(&mut game, "att", SkillId::Indomitable);
         let mut rng = GameRng::new(0);
         step.start(&mut game, &mut rng);
-        step.handle_command(
+        let outcome = step.handle_command(
             &Action::UseSkill { skill_id: SkillId::Indomitable, use_skill: false },
             &mut game, &mut rng,
         );
-        assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::INDOMITABLE));
+        assert!(
+            game.report_list.has_report(ffb_model::report::report_id::ReportId::INDOMITABLE),
+            "Java applies the effect regardless of the isSkillUsed() flag"
+        );
+        assert!(outcome.published.iter().any(|p| {
+            matches!(p, StepParameter::DoubleTargetStrengthForPlayer(id) if id == "tgt")
+        }));
     }
 }

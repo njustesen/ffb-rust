@@ -46,8 +46,8 @@ impl StepDropDivingTackler {
                     for p in params {
                         outcome = outcome.publish(p);
                     }
-                    // Java: UtilServerPlayerMove.updateMoveSquares(getGameState(), false)
-                    UtilServerPlayerMove::update_move_squares(game, false);
+                    // Java: UtilServerPlayerMove.updateMoveSquares(getGameState(), game.getActingPlayer().isJumping())
+                    UtilServerPlayerMove::update_move_squares(game, game.acting_player.jumping);
                 }
             }
         }
@@ -164,6 +164,50 @@ mod tests {
         assert_eq!(coord, new_pos);
         let has_entering = outcome.published.iter().any(|p| matches!(p, StepParameter::PlayerEnteringSquare(_)));
         assert!(has_entering);
+    }
+
+    /// Regression test: Java passes `game.getActingPlayer().isJumping()` into
+    /// `UtilServerPlayerMove.updateMoveSquares`, which scans a 2-step (jump) range instead
+    /// of a 1-step (normal) range. A prior translation hardcoded `false`, so a jumping
+    /// acting player would get the wrong (too-small) set of legal move-continuation
+    /// squares after a Diving Tackle drop resets the coordinate.
+    #[test]
+    fn jumping_acting_player_gets_two_step_move_squares() {
+        let mut step = StepDropDivingTackler::new();
+        step.set_parameter(&StepParameter::UsingDivingTackle(true));
+        let new_pos = FieldCoordinate::new(10, 7);
+        step.set_parameter(&StepParameter::CoordinateFrom(new_pos));
+        let mut game = make_game();
+        add_player(&mut game, "def", PS_STANDING);
+        game.defender_id = Some("def".into());
+
+        // Make the *acting* player (not the defender) jumping and in the middle of a Move
+        // action, standing at the reset coordinate, so `update_move_squares` actually scans.
+        game.team_home.players.push(Player {
+            id: "mover".into(), name: "mover".into(), nr: 2, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("mover", new_pos);
+        game.field_model.set_player_state("mover", ffb_model::enums::PlayerState::new(PS_STANDING));
+        game.acting_player.set_player("mover".into(), ffb_model::enums::PlayerAction::Move);
+        game.acting_player.jumping = true;
+
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+
+        // A 2-step-away square is only reachable when `jumping == true` was actually threaded
+        // through to `update_move_squares` (1-step scan would never include it).
+        let two_step_away = new_pos.add(2, 0);
+        assert!(
+            game.field_model.move_squares.iter().any(|(c, _)| *c == two_step_away),
+            "jumping acting player must get 2-step move squares, not the 1-step default"
+        );
     }
 
     #[test]

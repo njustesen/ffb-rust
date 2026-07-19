@@ -11,13 +11,14 @@ use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
 use ffb_model::model::re_rolled_action::ReRolledAction;
 use ffb_model::model::skill_use::SkillUse;
+use ffb_model::option::game_option_id;
 use ffb_model::report::report_scatter_player::ReportScatterPlayer;
 use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
-use crate::step::abstract_step_with_re_roll::ReRollState;
+use crate::step::abstract_step_with_re_roll::{ReRollState, find_skill_reroll_source};
 
 /// Java `ReRolledActions.DIRECTION` equivalent name.
 const RE_ROLLED_ACTION: &str = "DIRECTION";
@@ -103,22 +104,40 @@ impl StepMoveBallAndChain {
             // Java: if (getReRollSource() == null) { ... askForReRoll? ... }
             if self.re_roll_state.re_roll_source.is_none() {
                 if should_ask_for_reroll(self.re_roll_setting.as_deref(), game, new_coord) {
-                    if let Some(prompt) = crate::step::util_server_re_roll::ask_for_reroll_if_available(
-                        game,
-                        RE_ROLLED_ACTION,
-                        0,
-                        false,
-                    ) {
-                        self.re_roll_state.re_rolled_action = Some(ReRolledAction::new(RE_ROLLED_ACTION));
-                        // Java: `rerollSource` is only committed via `setReRollSource(rerollSource)`
-                        // in `handleCommand` once the player accepts (isSkillUsed()==true). We stash
-                        // the *offered* source here (mirroring `AgentPrompt::ReRollOffer.source`) so
-                        // `handle_command` has something to commit-or-discard based on the reply,
-                        // matching the pattern used by e.g. `StepGoForIt::execute_step`.
-                        if let ffb_model::prompts::AgentPrompt::ReRollOffer { ref source, .. } = prompt {
-                            self.re_roll_state.re_roll_source = Some(source.clone());
+                    // Java: `ReRollSource reRollSource = UtilCards.getUnusedRerollSource(actingPlayer,
+                    //   RE_ROLLED_ACTION); if (reRollSource != null) { showDialog(...); return; }
+                    //   askForReRoll = ALLOW_BALL_AND_CHAIN_RE_ROLL.isEnabled(); if (askForReRoll && ...)`
+                    // — a skill-granted reroll source (e.g. WhirlingDervish) is offered
+                    // *independent* of the ALLOW_BALL_AND_CHAIN_RE_ROLL option, which only gates
+                    // the TRR-backed reroll. `ask_for_reroll_if_available` (below) already checks
+                    // the skill source first, so pre-checking here just decides whether we're
+                    // allowed to fall through to it for the TRR-only case; a present skill source
+                    // always takes this call regardless of the option.
+                    let has_skill_source = find_skill_reroll_source(game, RE_ROLLED_ACTION).is_some();
+                    // Java: `askForReRoll = ((GameOptionBoolean) game.getOptions()
+                    //   .getOptionWithDefault(GameOptionId.ALLOW_BALL_AND_CHAIN_RE_ROLL)).isEnabled();`
+                    // — defaults to `false`, so without this gate a TRR-backed reroll was
+                    // (incorrectly) always offered even with no skill reroll source present.
+                    let option_allows_trr = game.options.is_enabled(game_option_id::ALLOW_BALL_AND_CHAIN_RE_ROLL);
+
+                    if has_skill_source || option_allows_trr {
+                        if let Some(prompt) = crate::step::util_server_re_roll::ask_for_reroll_if_available(
+                            game,
+                            RE_ROLLED_ACTION,
+                            0,
+                            false,
+                        ) {
+                            self.re_roll_state.re_rolled_action = Some(ReRolledAction::new(RE_ROLLED_ACTION));
+                            // Java: `rerollSource` is only committed via `setReRollSource(rerollSource)`
+                            // in `handleCommand` once the player accepts (isSkillUsed()==true). We stash
+                            // the *offered* source here (mirroring `AgentPrompt::ReRollOffer.source`) so
+                            // `handle_command` has something to commit-or-discard based on the reply,
+                            // matching the pattern used by e.g. `StepGoForIt::execute_step`.
+                            if let ffb_model::prompts::AgentPrompt::ReRollOffer { ref source, .. } = prompt {
+                                self.re_roll_state.re_roll_source = Some(source.clone());
+                            }
+                            return StepOutcome::cont().with_prompt(prompt);
                         }
-                        return StepOutcome::cont().with_prompt(prompt);
                     }
                 }
             }
@@ -436,6 +455,9 @@ mod tests {
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         game.turn_data_home.reroll_used = false;
+        // Java defaults ALLOW_BALL_AND_CHAIN_RE_ROLL to false — the TRR offer only fires
+        // once the house rule is turned on.
+        game.options.set(game_option_id::ALLOW_BALL_AND_CHAIN_RE_ROLL, "true");
 
         let mut rng = GameRng::new(2);
         let out = step.start(&mut game, &mut rng);
@@ -468,6 +490,7 @@ mod tests {
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         game.turn_data_home.reroll_used = false;
+        game.options.set(game_option_id::ALLOW_BALL_AND_CHAIN_RE_ROLL, "true");
 
         let mut rng = GameRng::new(2);
         let out = step.start(&mut game, &mut rng);
@@ -478,5 +501,79 @@ mod tests {
 
         assert!(step.re_roll_state.re_roll_source.is_none(), "declining must clear the stashed source");
         assert_eq!(game.turn_data_home.rerolls, 1, "declining must not consume the TRR");
+    }
+
+    /// Regression test: Java only offers a TRR-backed Ball & Chain reroll when
+    /// `ALLOW_BALL_AND_CHAIN_RE_ROLL` is enabled (defaults to `false`). A prior Rust
+    /// translation ignored this option entirely and always offered the TRR reroll
+    /// whenever one was available.
+    #[test]
+    fn trr_reroll_not_offered_when_option_disabled() {
+        let mut step = StepMoveBallAndChain::new();
+        step.coordinate_from = Some(FieldCoordinate::new(10, 8));
+        step.coordinate_to = Some(FieldCoordinate::new(11, 8));
+        step.original_coordinate_to = Some(FieldCoordinate::new(11, 8));
+        step.goto_label_on_end = "end".into();
+        step.goto_label_on_fall_down = "fall".into();
+
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        game.turn_data_home.reroll_used = false;
+        // ALLOW_BALL_AND_CHAIN_RE_ROLL left unset — Java's default is `false`.
+
+        let mut rng = GameRng::new(2);
+        let out = step.start(&mut game, &mut rng);
+
+        assert_ne!(out.action, StepAction::Continue, "no reroll offer should be made with the option disabled");
+        assert!(step.re_roll_state.re_roll_source.is_none());
+        assert_eq!(game.turn_data_home.rerolls, 1, "TRR must be untouched when no offer was made");
+    }
+
+    /// Regression test: Java checks `UtilCards.getUnusedRerollSource(actingPlayer,
+    /// RE_ROLLED_ACTION)` (e.g. WhirlingDervish's registered DIRECTION reroll)
+    /// *independent* of the `ALLOW_BALL_AND_CHAIN_RE_ROLL` option — a skill-granted
+    /// reroll is still offered even when the house rule is off. A prior translation's
+    /// `find_skill_reroll_source` didn't map "DIRECTION" to any skill at all, so
+    /// WhirlingDervish could never reroll Ball & Chain scatter.
+    #[test]
+    fn whirling_dervish_reroll_offered_even_with_option_disabled() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::{SkillId, PlayerType, PlayerGender, PS_STANDING};
+        use ffb_model::model::player::Player;
+
+        let mut step = StepMoveBallAndChain::new();
+        step.coordinate_from = Some(FieldCoordinate::new(10, 8));
+        step.coordinate_to = Some(FieldCoordinate::new(11, 8));
+        step.original_coordinate_to = Some(FieldCoordinate::new(11, 8));
+        step.goto_label_on_end = "end".into();
+        step.goto_label_on_fall_down = "fall".into();
+
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "mover".into(), name: "mover".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue::new(SkillId::WhirlingDervish)],
+            extra_skills: vec![], temporary_skills: vec![], used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("mover", FieldCoordinate::new(10, 8));
+        game.field_model.set_player_state("mover", ffb_model::enums::PlayerState::new(PS_STANDING));
+        game.acting_player.set_player("mover".into(), ffb_model::enums::PlayerAction::Move);
+        game.home_playing = true;
+        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        // ALLOW_BALL_AND_CHAIN_RE_ROLL left unset/false — must not matter for a skill reroll.
+
+        let mut rng = GameRng::new(2);
+        let out = step.start(&mut game, &mut rng);
+
+        assert_eq!(out.action, StepAction::Continue, "a WhirlingDervish skill reroll must be offered regardless of the option");
+        assert_eq!(
+            step.re_roll_state.re_roll_source.as_ref().map(|s| s.name.as_str()),
+            Some("WhirlingDervish"),
+        );
     }
 }

@@ -1,5 +1,6 @@
 use ffb_mechanics::mechanics::minimum_roll_chainsaw;
 use ffb_model::enums::{ApothecaryMode, ReRollSource};
+use ffb_model::option::{game_option_id, game_option_string};
 use ffb_model::report::report_chainsaw_roll::ReportChainsawRoll;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
@@ -152,14 +153,28 @@ impl StepFoulChainsaw {
                 attacker_coord, None, None, ApothecaryMode::Attacker,
             );
 
-            // Java: causesTurnOver = hasBall(attacker) || (armor broken && option != NEVER)
-            // Stub: default to ALL_AV_BREAKS (armor broken → turnover)
+            // Java: String chainsawOption = game.getOptions().getOptionWithDefault(CHAINSAW_TURNOVER).getValueAsString();
+            let chainsaw_option = game.options.get(game_option_id::CHAINSAW_TURNOVER)
+                .unwrap_or(game_option_string::CHAINSAW_TURNOVER_KICKBACK)
+                .to_owned();
+
+            // Java: boolean causesTurnOver = UtilPlayer.hasBall(game, actingPlayer.getPlayer());
             let has_ball = game.field_model.player_coordinate(&attacker_id)
                 .zip(game.field_model.ball_coordinate)
                 .map(|(pc, bc)| pc == bc)
                 .unwrap_or(false);
             let armor_broken = injury_result.injury_context().is_armor_broken();
-            let causes_turn_over = has_ball || armor_broken;
+            let mut causes_turn_over = has_ball;
+            let mut extra_end_turn = false;
+            if armor_broken {
+                // Java: if (!CHAINSAW_TURNOVER_NEVER.equalsIgnoreCase(chainsawOption)) causesTurnOver = true;
+                if !chainsaw_option.eq_ignore_ascii_case(game_option_string::CHAINSAW_TURNOVER_NEVER) {
+                    causes_turn_over = true;
+                }
+            } else if chainsaw_option == game_option_string::CHAINSAW_TURNOVER_KICKBACK {
+                // Java: else if (CHAINSAW_TURNOVER_KICKBACK.equals(chainsawOption)) publishParameter(END_TURN, true);
+                extra_end_turn = true;
+            }
 
             let label = self.goto_label_on_failure.clone();
             let dpc = DropPlayerContext {
@@ -172,8 +187,11 @@ impl StepFoulChainsaw {
                 modified_injury_ends_turn: true,
                 ..DropPlayerContext::new()
             };
-            return StepOutcome::next()
-                .publish(StepParameter::DropPlayerContext(Box::new(dpc)));
+            let mut out = StepOutcome::next();
+            if extra_end_turn {
+                out = out.publish(StepParameter::EndTurn(true));
+            }
+            return out.publish(StepParameter::DropPlayerContext(Box::new(dpc)));
         }
 
         StepOutcome::next()
@@ -344,5 +362,72 @@ mod tests {
         let mut step = StepFoulChainsaw::new(String::new());
         assert!(step.set_parameter(&StepParameter::GotoLabelOnFailure("mylabel".into())));
         assert_eq!(step.goto_label_on_failure, "mylabel");
+    }
+
+    /// Regression test: with a forced roll-1 failure (no TRR available, so it always drops),
+    /// Java only sets `causesTurnOver = true` on an armor break when the `CHAINSAW_TURNOVER`
+    /// option is NOT `never`. Previously Rust hardcoded ALL_AV_BREAKS behavior and ignored the
+    /// option, so `CHAINSAW_TURNOVER_NEVER` had no effect on the attacker's own backfire.
+    #[test]
+    fn chainsaw_turnover_never_suppresses_turnover_on_attacker_armor_break() {
+        let mut game = make_game();
+        add_player(&mut game, "home", "atk", Some(SkillId::Chainsaw));
+        game.acting_player.player_id = Some("atk".into());
+        // armour 2 guarantees the backfire injury breaks armor
+        game.team_home.players[0].armour = 2;
+        game.options.set(
+            ffb_model::option::game_option_id::CHAINSAW_TURNOVER,
+            ffb_model::option::game_option_string::CHAINSAW_TURNOVER_NEVER,
+        );
+        let mut step = StepFoulChainsaw::new("fail".into());
+        step.using_chainsaw = true;
+        let seed = failing_chainsaw_roll_seed();
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        let dpc = out.published.iter().find_map(|p| {
+            if let StepParameter::DropPlayerContext(ctx) = p { Some(ctx.clone()) } else { None }
+        }).expect("DROP_PLAYER_CONTEXT must be published on backfire");
+        assert!(dpc.injury_result.as_ref().unwrap().injury_context().is_armor_broken());
+        assert!(!dpc.end_turn, "CHAINSAW_TURNOVER_NEVER must suppress turnover even on armor break");
+    }
+
+    /// Find a seed whose first `d6()` roll is below `minimum_roll_chainsaw()`, guaranteeing
+    /// the chainsaw roll fails (and, with no TRR configured on the test team, backfires).
+    fn failing_chainsaw_roll_seed() -> u64 {
+        let minimum_roll = minimum_roll_chainsaw();
+        for seed in 0..1000u64 {
+            let mut probe = GameRng::new(seed);
+            if probe.d6() < minimum_roll {
+                return seed;
+            }
+        }
+        panic!("no failing seed found");
+    }
+
+    /// Regression test: Java independently publishes END_TURN=true (in addition to whatever
+    /// `DropPlayerContext.endTurn` ends up as) when the roll does NOT break armor and the
+    /// option is `kickback`. This extra publish did not exist at all in the prior translation.
+    #[test]
+    fn chainsaw_turnover_kickback_publishes_end_turn_without_armor_break() {
+        let mut game = make_game();
+        add_player(&mut game, "home", "atk", Some(SkillId::Chainsaw));
+        game.acting_player.player_id = Some("atk".into());
+        // high armour so the backfire injury never breaks armor
+        game.team_home.players[0].armour = 13;
+        game.options.set(
+            ffb_model::option::game_option_id::CHAINSAW_TURNOVER,
+            ffb_model::option::game_option_string::CHAINSAW_TURNOVER_KICKBACK,
+        );
+        let mut step = StepFoulChainsaw::new("fail".into());
+        step.using_chainsaw = true;
+        let seed = failing_chainsaw_roll_seed();
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        let dpc = out.published.iter().find_map(|p| {
+            if let StepParameter::DropPlayerContext(ctx) = p { Some(ctx.clone()) } else { None }
+        }).expect("DROP_PLAYER_CONTEXT must be published on backfire");
+        assert!(!dpc.injury_result.as_ref().unwrap().injury_context().is_armor_broken());
+        assert!(
+            out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "CHAINSAW_TURNOVER_KICKBACK must publish an extra END_TURN=true even without an armor break"
+        );
     }
 }

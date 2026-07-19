@@ -132,6 +132,26 @@ impl StepTentacles {
                             let min_roll = (6 - st_difference).max(2);
                             let successful = roll >= min_roll;
 
+                            // Java: `boolean reRolled = ((getReRolledAction() == TENTACLES) &&
+                            //   (getReRollSource() != null))` — recomputed here (distinct from
+                            //   the `re_rolled` gate above, which only checked the action name
+                            //   before the reroll was consumed).
+                            let re_rolled_for_report = self.re_roll_state.re_rolled_action.as_ref()
+                                .map(|a| a.name.as_str()) == Some("TENTACLES")
+                                && self.re_roll_state.re_roll_source.is_some();
+
+                            // Java: `step.getResult().addReport(new ReportTentaclesShadowingRoll(
+                            //   skill, game.getDefenderId(), roll, successful, minimumRoll, reRolled))`
+                            // — unconditional, right after the roll (previously missing entirely).
+                            game.report_list.add(ffb_model::report::mixed::report_tentacles_shadowing_roll::ReportTentaclesShadowingRoll::new(
+                                Some(SkillId::Tentacles),
+                                Some(defender_id.clone()),
+                                roll,
+                                successful,
+                                min_roll,
+                                re_rolled_for_report,
+                            ));
+
                             if !successful {
                                 if self.re_roll_state.re_rolled_action.as_ref().map(|a| a.name.as_str()) != Some("TENTACLES") {
                                     if let Some(prompt) = ask_for_reroll_if_available(game, "TENTACLES", min_roll, false) {
@@ -491,6 +511,57 @@ mod tests {
             }
             other => panic!("unexpected step action: {other:?}"),
         }
+    }
+
+    /// Regression test: Java's `TentaclesBehaviour.handleExecuteStepHook` unconditionally
+    /// calls `step.getResult().addReport(new ReportTentaclesShadowingRoll(...))` right after
+    /// the strength-contest roll (win or lose). A prior translation computed
+    /// `roll`/`min_roll`/`successful` but never added the report at all, so the client was
+    /// never told a Tentacles roll happened.
+    #[test]
+    fn tentacles_roll_adds_shadowing_report() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_STANDING};
+        let mut game = make_game();
+        game.acting_player.player_id = Some("actor".into());
+        game.acting_player.dodging = true;
+        game.acting_player.strength = 3;
+        game.team_home.players.push(Player {
+            id: "actor".into(), name: "actor".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("actor", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("actor", PlayerState::new(PS_STANDING).change_active(true));
+        game.team_away.players.push(Player {
+            id: "tentacler".into(), name: "tentacler".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 6, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("tentacler", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("tentacler", PlayerState::new(PS_STANDING).change_active(true));
+
+        let mut step = StepTentacles::new();
+        step.state.coordinate_from = Some(FieldCoordinate::new(5, 5));
+        step.state.using_tentacles = Some(true);
+        game.defender_id = Some("tentacler".into());
+        let mut rng = GameRng::new(1);
+        step.start(&mut game, &mut rng);
+
+        assert!(
+            game.report_list.has_report(ffb_model::report::report_id::ReportId::TENTACLES_SHADOWING_ROLL),
+            "a Tentacles roll must add a ReportTentaclesShadowingRoll"
+        );
     }
 
     #[test]

@@ -63,6 +63,18 @@ pub fn find_skill_reroll_source(game: &Game, rerolled_action: &str) -> Option<Re
     let acting_id = game.acting_player.player_id.as_deref()?;
     let player = game.player(acting_id)?;
 
+    // Java: `ReRolledActions.DIRECTION` — only `WhirlingDervish` (BB2020/BB2025) registers
+    // this reroll source (`registerRerollSource(ReRolledActions.DIRECTION,
+    // ReRollSources.WHIRLING_DERVISH)`), via the generic `Skill.registerRerollSource` API
+    // rather than a `NamedProperties` string, so it's special-cased here instead of going
+    // through the property-name table below.
+    if rerolled_action == "DIRECTION" {
+        if player.has_skill(SkillId::WhirlingDervish) && !player.used_skills.contains(&SkillId::WhirlingDervish) {
+            return Some(ReRollSource::new("WhirlingDervish"));
+        }
+        return None;
+    }
+
     // Map rerolled_action name to NamedProperty that provides the re-roll for it.
     // This mirrors Java Skill.getRerollSource(ReRolledAction) which checks
     // skill.hasReRollSourceForAction(action).
