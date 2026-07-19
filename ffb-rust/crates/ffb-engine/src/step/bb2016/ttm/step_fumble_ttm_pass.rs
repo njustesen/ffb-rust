@@ -34,8 +34,8 @@ impl StepFumbleTtmPass {
             self.thrown_player_coordinate,
             self.thrown_player_state,
         ) {
-            // Java: fThrownPlayerState.getId() > 0 — base > 0 means not PS_UNKNOWN
-            if state.base() > 0 && game.player(player_id).is_some() {
+            // Java: fThrownPlayerState.getId() > 0 (raw id, not just the base component)
+            if state.id() > 0 && game.player(player_id).is_some() {
                 game.field_model.set_player_coordinate(player_id, coord);
                 // Java: sets game.getDefender()'s state — defender == thrown player in TTM
                 if let Some(defender_id) = game.defender_id.clone() {
@@ -149,6 +149,31 @@ mod tests {
         step.start(&mut game, &mut rng);
         // state.base() == 0 → skip, defender_id still set
         assert!(game.defender_id.is_some());
+    }
+
+    #[test]
+    fn nonzero_raw_id_with_zero_base_still_places() {
+        // Java guard is `fThrownPlayerState.getId() > 0`, which checks the FULL raw
+        // encoded int (base state + flag bits), not just the low-byte base state.
+        // A PlayerState with base == PS_UNKNOWN (0) but a nonzero flag bit set still
+        // has getId() > 0, so the placement/defender-clear logic must still run.
+        let mut step = StepFumbleTtmPass::new();
+        let target_coord = FieldCoordinate::new(10, 7);
+        // base = PS_UNKNOWN (0), but raw id is nonzero due to a set flag bit.
+        let state_with_zero_base_nonzero_id = PlayerState::new(0x100);
+        assert_eq!(state_with_zero_base_nonzero_id.base(), 0);
+        assert!(state_with_zero_base_nonzero_id.id() > 0);
+        step.set_parameter(&StepParameter::ThrownPlayerId(Some("p1".into())));
+        step.set_parameter(&StepParameter::ThrownPlayerCoordinate(Some(target_coord)));
+        step.set_parameter(&StepParameter::ThrownPlayerState(state_with_zero_base_nonzero_id));
+        let mut game = make_game();
+        add_player(&mut game, "p1", PS_STANDING);
+        game.defender_id = Some("p1".into());
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        let coord = game.field_model.player_coordinate("p1").unwrap();
+        assert_eq!(coord, target_coord);
+        assert!(game.defender_id.is_none());
     }
 
     #[test]

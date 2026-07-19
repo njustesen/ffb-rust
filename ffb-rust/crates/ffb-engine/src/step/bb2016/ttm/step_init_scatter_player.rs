@@ -50,22 +50,18 @@ impl StepInitScatterPlayer {
 
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Guard: no player or coordinate → skip.
+        // Java: `if ((thrownPlayer == null) || (fThrownPlayerCoordinate == null)) { setNextAction(NEXT_STEP); return; }`
+        // Note: Java does NOT publish any parameters on this early-return path.
         let thrown_player_id = match &self.thrown_player_id {
             Some(id) if game.player(id).is_some() => id.clone(),
             _ => {
-                return StepOutcome::next()
-                    .publish(StepParameter::ThrownPlayerId(self.thrown_player_id.clone()))
-                    .publish(StepParameter::ThrownPlayerState(self.thrown_player_state.unwrap_or_default()))
-                    .publish(StepParameter::ThrownPlayerHasBall(self.thrown_player_has_ball));
+                return StepOutcome::next();
             }
         };
         let thrown_player_coord = match self.thrown_player_coordinate {
             Some(c) => c,
             None => {
-                return StepOutcome::next()
-                    .publish(StepParameter::ThrownPlayerId(self.thrown_player_id.clone()))
-                    .publish(StepParameter::ThrownPlayerState(self.thrown_player_state.unwrap_or_default()))
-                    .publish(StepParameter::ThrownPlayerHasBall(self.thrown_player_has_ball));
+                return StepOutcome::next();
             }
         };
 
@@ -258,6 +254,20 @@ mod tests {
     }
 
     #[test]
+    fn early_exit_publishes_nothing() {
+        // Java: `if ((thrownPlayer == null) || (fThrownPlayerCoordinate == null)) {
+        //   getResult().setNextAction(StepAction.NEXT_STEP); return; }`
+        // No StepParameter is published on this guard-clause path.
+        let mut game = make_game();
+        let mut step = StepInitScatterPlayer::new();
+        step.thrown_player_id = Some("nobody".into());
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.action, StepAction::NextStep));
+        assert!(out.published.is_empty(), "Java does not publish any parameters on the early-return path");
+    }
+
+    #[test]
     fn set_parameter_throw_scatter() {
         let mut step = StepInitScatterPlayer::new();
         assert!(step.set_parameter(&StepParameter::ThrowScatter(true)));
@@ -332,14 +342,16 @@ mod tests {
     }
 
     #[test]
-    fn always_publishes_thrown_player_id_on_early_exit() {
+    fn early_exit_does_not_publish_thrown_player_id() {
+        // Java's guard-clause early return sets NEXT_STEP and returns immediately,
+        // without publishing THROWN_PLAYER_ID (or any other parameter).
         let mut game = make_game();
         let mut step = StepInitScatterPlayer::new();
         // No player in game → early exit path
         step.thrown_player_id = Some("nobody".into());
         step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
         let out = step.start(&mut game, &mut GameRng::new(0));
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::ThrownPlayerId(_))),
-            "early exit must publish ThrownPlayerId");
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::ThrownPlayerId(_))),
+            "Java's early-return guard clause does not publish ThrownPlayerId");
     }
 }

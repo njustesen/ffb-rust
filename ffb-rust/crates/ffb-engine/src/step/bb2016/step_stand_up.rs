@@ -182,9 +182,12 @@ impl StepStandUp {
     }
 
     fn fail_stand_up(&self, game: &mut Game) -> StepOutcome {
-        // Java: setPlayerState(PRONE, !active); publish END_PLAYER_ACTION; GOTO failure
+        // Java: playerState.changeBase(PlayerState.PRONE).changeActive(false) — preserves
+        // other flags (rooted, confused, etc.) on the existing state rather than replacing it.
         if let Some(pid) = game.acting_player.player_id.clone() {
-            game.field_model.set_player_state(&pid, PlayerState::new(PS_PRONE));
+            let existing = game.field_model.player_state(&pid)
+                .unwrap_or_else(|| PlayerState::new(PS_PRONE));
+            game.field_model.set_player_state(&pid, existing.change_base(PS_PRONE).change_active(false));
         }
         self.handle_failed_stand_up(game);
         let label = self.goto_label_on_failure.clone();
@@ -385,6 +388,31 @@ mod tests {
         step.roll = 6;
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::STAND_UP_ROLL), "success should add ReportStandUpRoll");
+    }
+
+    #[test]
+    fn failed_stand_up_preserves_other_player_state_flags() {
+        // Java: playerState.changeBase(PRONE).changeActive(false) preserves flags like
+        // rooted rather than replacing the whole PlayerState.
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        game.acting_player.standing_up = true;
+        game.acting_player.player_id = Some("p1".into());
+        let pid = game.acting_player.player_id.clone();
+        if let Some(ref id) = pid {
+            let existing = game.field_model.player_state(id)
+                .unwrap_or_else(|| PlayerState::new(0))
+                .change_rooted(true);
+            game.field_model.set_player_state(id, existing);
+        }
+        let mut step = StepStandUp::new("fail".into());
+        step.roll = 1; // guaranteed fail
+        step.start(&mut game, &mut GameRng::new(0));
+        let state = game.field_model.player_state(pid.as_deref().unwrap()).unwrap();
+        assert!(state.is_rooted(), "rooted flag should be preserved through failed stand-up");
+        assert_eq!(state.base(), PS_PRONE);
+        assert!(!state.is_active());
     }
 
     #[test]

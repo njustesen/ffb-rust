@@ -202,6 +202,32 @@ impl StepApothecary {
             // Java: fInjuryResult.applyTo(this) — apply injury outcome to field model
             let side_events = if let Some(ref ir) = self.injury_result {
                 ir.apply_to(game);
+
+                // Java (default case of the ApothecaryStatus switch): if the resulting state is
+                // a casualty and the defender has the Regeneration skill (canRollToSaveFromInjury)
+                // and the injury type allows apothecary use, give them a roll to save themselves
+                // (UtilServerInjury.handleRegeneration) — independent of whether an Igor
+                // inducement exists. The Igor/DialogUseIgorParameter branch that follows in Java
+                // is intentionally excluded (BB2016 has no Igor inducement), but the player's own
+                // Regeneration skill roll is not Igor-specific and must still run.
+                if let Some(defender_id) = ir.injury_context.defender_id.clone() {
+                    let is_casualty = game.field_model.player_state(&defender_id)
+                        .map(|s| s.is_casualty())
+                        .unwrap_or(false);
+                    let can_regen = game.player(&defender_id)
+                        .map(|p| p.has_skill_property(ffb_model::model::property::named_properties::NamedProperties::CAN_ROLL_TO_SAVE_FROM_INJURY))
+                        .unwrap_or(false);
+                    let can_use_apo = ir.injury_context.injury_type_name.as_deref()
+                        .map(|name| crate::injury::make_injury_type(name).can_use_apo())
+                        .unwrap_or(true);
+                    if is_casualty && can_regen && can_use_apo {
+                        let regenerated = crate::step::util_server_injury::handle_regeneration(game, rng, &defender_id);
+                        if regenerated {
+                            self.cure_poison(game);
+                        }
+                    }
+                }
+
                 // Java: UtilServerInjury.handleInjurySideEffects(this, fInjuryResult)
                 crate::step::util_server_injury::handle_injury_side_effects(game, ir)
             } else {
@@ -477,6 +503,49 @@ mod tests {
             game.report_list.has_report(ReportId::APOTHECARY_ROLL),
             "DoNotUseApothecary should emit ReportApothecaryRoll"
         );
+    }
+
+    /// Java (StepApothecary.executeStep, default case): a casualty result on a player with
+    /// the Regeneration skill (canRollToSaveFromInjury) gets a save roll via
+    /// UtilServerInjury.handleRegeneration — independent of any Igor inducement. A successful
+    /// roll (d6 >= 4) must change the player's field-model state from CASUALTY to RESERVE.
+    #[test]
+    fn regeneration_skill_gives_casualty_a_save_roll() {
+        use ffb_model::enums::{ApothecaryStatus, PlayerState, PlayerType, PlayerGender, SkillId, PS_RESERVE};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+        use std::collections::HashSet;
+
+        let mut game = make_game();
+        let player = Player {
+            id: "def1".into(), name: "def1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Regeneration, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(player);
+        game.field_model.set_player_coordinate("def1", FieldCoordinate::new(5, 5));
+
+        let mut step = StepApothecary::new();
+        step.apothecary_mode = Some(ApothecaryMode::Defender);
+        let mut ir = make_injury_result(ApothecaryMode::Defender, ffb_model::enums::PS_SERIOUS_INJURY);
+        ir.injury_context.apothecary_status = ApothecaryStatus::NoApothecary;
+        step.injury_result = Some(ir);
+        // Player starts out CASUALTY on the field model (as ApplyTo would set it).
+        game.field_model.set_player_state("def1", PlayerState::new(ffb_model::enums::PS_SERIOUS_INJURY));
+
+        // Seed chosen so the d6 regeneration roll succeeds (>=4).
+        let mut rng = GameRng::new(2);
+        step.start(&mut game, &mut rng);
+
+        let state = game.field_model.player_state("def1").expect("state must exist");
+        assert_eq!(state.base(), PS_RESERVE, "successful Regeneration roll must cure the casualty to RESERVE");
     }
 
     #[test]

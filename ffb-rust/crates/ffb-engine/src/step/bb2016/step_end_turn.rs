@@ -137,7 +137,7 @@ impl StepEndTurn {
         if self.touchdown.is_none() {
             self.touchdown = Some(Self::check_touchdown(game));
         }
-        let touchdown = self.touchdown.unwrap_or(false);
+        let mut touchdown = self.touchdown.unwrap_or(false);
 
         UtilServerGame::mark_played_and_secret_weapons(game);
 
@@ -170,6 +170,20 @@ impl StepEndTurn {
                 game.setup_offense = false;
             } else {
                 match game.turn_mode {
+                    // Java: `case NO_PLAYERS_TO_FIELD:` — both teams skip 2 turns, the
+                    // half-end check re-runs, turn mode goes to SETUP, and (importantly)
+                    // `fTouchdown` is forced to `true` so the downstream KO-recovery /
+                    // heat-exhaustion / kickoff-vs-endgame branching below treats this
+                    // exactly like a touchdown/drive-end.
+                    TurnMode::NoPlayersToField => {
+                        game.turn_data_home.turn_nr += 2;
+                        game.turn_data_away.turn_nr += 2;
+                        self.new_half = Self::check_end_of_half(game);
+                        game.turn_mode = TurnMode::Setup;
+                        game.setup_offense = false;
+                        self.touchdown = Some(true);
+                        touchdown = true;
+                    }
                     TurnMode::Kickoff => {
                         game.home_playing = !game.home_playing;
                         game.turn_data_mut().turn_nr += 1;
@@ -503,6 +517,25 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.turn_data_home.blitz_used);
         assert!(!game.turn_data_away.foul_used);
+    }
+
+    /// Regression test: Java's `case NO_PLAYERS_TO_FIELD:` was entirely missing from the
+    /// Rust `match` (falling into the no-op `_ => {}` wildcard arm). Java advances both
+    /// teams' turn number by 2, forces `fTouchdown = true` (so the drive-end / KO-recovery
+    /// bookkeeping below runs), and transitions to SETUP.
+    #[test]
+    fn no_players_to_field_skips_two_turns_and_forces_touchdown_path() {
+        let mut game = make_game();
+        game.turn_mode = TurnMode::NoPlayersToField;
+        game.turn_data_home.turn_nr = 2;
+        game.turn_data_away.turn_nr = 2;
+        let mut step = StepEndTurn::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(game.turn_data_home.turn_nr, 4, "home turn_nr should advance by 2");
+        assert_eq!(game.turn_data_away.turn_nr, 4, "away turn_nr should advance by 2");
+        assert_eq!(game.turn_mode, TurnMode::Setup);
+        assert_eq!(step.touchdown, Some(true), "fTouchdown must be forced true");
     }
 
     #[test]

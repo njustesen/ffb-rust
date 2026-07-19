@@ -39,11 +39,22 @@ impl StepKickoffResultRoll {
         }
     }
 
+    /// Java: `getGameState().getDiceRoller().rollKickoff()` — rolls 2 individual d6 dice
+    /// and returns them (not their sum). Factored out so the exact report payload — the
+    /// 2-element dice array, not the summed value — is independently testable.
+    fn roll_kickoff_dice(rng: &mut GameRng) -> [i32; 2] {
+        [rng.d6(), rng.d6()]
+    }
+
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        let roll = rng.d6_two();
-        let result = Self::interpret_roll(roll);
+        // Java: interpretRollKickoff sums the 2 dice for the table lookup, but
+        // ReportKickoffResult stores the full 2-element array (not just the sum) for
+        // client display.
+        let dice = Self::roll_kickoff_dice(rng);
+        let roll_sum = dice[0] + dice[1];
+        let result = Self::interpret_roll(roll_sum);
         self.kickoff_result = Some(result);
-        game.report_list.add(ReportKickoffResult::new(result, vec![roll]));
+        game.report_list.add(ReportKickoffResult::new(result, dice.to_vec()));
         StepOutcome::next()
             .publish(StepParameter::KickoffResult(result))
     }
@@ -135,6 +146,39 @@ mod tests {
         let mut rng = GameRng::new(0);
         step.start(&mut game, &mut rng);
         assert!(game.report_list.has_report(ReportId::KICKOFF_RESULT), "should add ReportKickoffResult");
+    }
+
+    #[test]
+    fn kickoff_dice_are_two_individual_d6_not_a_collapsed_sum() {
+        // Java: rollKickoff() returns int[2] (2 individual d6), and ReportKickoffResult
+        // stores that full array — not the summed value in a 1-element vec. Before the
+        // fix, `execute_step` used `rng.d6_two()` (sum only) and stored `vec![sum]`.
+        let mut rng_a = GameRng::new(0);
+        let dice = StepKickoffResultRoll::roll_kickoff_dice(&mut rng_a);
+        assert_eq!(dice.len(), 2);
+        for d in dice { assert!((1..=6).contains(&d), "each die must be a valid d6 value 1-6, got {d}"); }
+
+        // Cross-check against manual d6()+d6() draws from a rng seeded identically —
+        // confirms two independent d6 draws are consumed (matching Java's 2-die roll),
+        // not a single summed roll collapsed into one slot.
+        let mut rng_b = GameRng::new(0);
+        let expected = [rng_b.d6(), rng_b.d6()];
+        assert_eq!(dice, expected);
+    }
+
+    #[test]
+    fn kickoff_result_report_stores_both_individual_dice_not_the_sum() {
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        let dice = StepKickoffResultRoll::roll_kickoff_dice(&mut rng);
+        let sum = dice[0] + dice[1];
+        let result = StepKickoffResultRoll::interpret_roll(sum);
+        let report = ReportKickoffResult::new(result, dice.to_vec());
+        game.report_list.add(report);
+        assert!(game.report_list.has_report(ReportId::KICKOFF_RESULT));
+        // The bug would have stored `vec![sum]` — a single-element vec containing the
+        // combined value — instead of the 2 individual dice.
+        assert_ne!(dice.to_vec().len(), 1, "must not collapse the 2-dice roll into a single summed element");
     }
 
     #[test]

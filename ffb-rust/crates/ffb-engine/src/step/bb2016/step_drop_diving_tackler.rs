@@ -49,9 +49,11 @@ impl StepDropDivingTackler {
             }
         }
 
-        // Reset DivingTackle & Shadowing attributes: publish defender id, then clear
-        let defender_id = game.defender_id.clone();
-        outcome = outcome.publish(StepParameter::PlayerId(defender_id.unwrap_or_default()));
+        // Reset DivingTackle & Shadowing attributes.
+        // Java: `game.setDefenderId(null);` — a plain in-memory reset with no accompanying
+        // publishParameter call. (A previous version of this file incorrectly published a
+        // `StepParameter::PlayerId` here, which has no counterpart in the Java source and
+        // could leak a stray PlayerId parameter to unrelated steps later on the stack.)
         game.defender_id = None;
 
         outcome
@@ -161,8 +163,13 @@ mod tests {
         assert!(has_entering);
     }
 
+    /// Regression test: Java's `executeStep()` resets `game.setDefenderId(null)` as a plain
+    /// in-memory field reset — it never calls `publishParameter`/`publishParameters` for this.
+    /// A previous version of this file incorrectly published a stray `StepParameter::PlayerId`
+    /// here, which has no counterpart in the Java source (this would incorrectly forward the
+    /// used-up defender id on as a step-parameter to whatever step runs next on the stack).
     #[test]
-    fn always_publishes_player_id() {
+    fn does_not_publish_a_stray_player_id() {
         let mut step = StepDropDivingTackler::new();
         let mut game = make_game();
         add_player(&mut game, "def", PS_STANDING);
@@ -170,7 +177,7 @@ mod tests {
         let mut rng = GameRng::new(0);
         let outcome = step.start(&mut game, &mut rng);
         let has_player_id = outcome.published.iter().any(|p| matches!(p, StepParameter::PlayerId(_)));
-        assert!(has_player_id);
+        assert!(!has_player_id, "Java never publishes a PlayerId parameter from this step");
     }
 
     #[test]

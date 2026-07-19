@@ -104,6 +104,9 @@ impl StepSetup {
             // client-only: show setup error dialog when !setup_valid
             if setup_valid {
                 game.home_playing = !game.home_playing;
+                // Java: game.getTurnData().setTurnStarted(false); game.getTurnData().setFirstTurnAfterKickoff(false);
+                game.turn_data_mut().turn_started = false;
+                game.turn_data_mut().first_turn_after_kickoff = false;
                 UtilBox::refresh_boxes(game);
 
                 if game.setup_offense {
@@ -284,6 +287,23 @@ mod tests {
         game.setup_offense = true;
         step.handle_command(&Action::ConfirmSetup, &mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::Kickoff);
+    }
+
+    #[test]
+    fn confirm_setup_resets_turn_started_and_first_turn_after_kickoff() {
+        // Java: game.getTurnData().setTurnStarted(false); game.getTurnData().setFirstTurnAfterKickoff(false);
+        // executed on the newly-playing team's turn data right after the home_playing toggle.
+        let mut step = StepSetup::new();
+        step.goto_label_on_end = Some("end".to_string());
+        let mut game = make_game_with_reserves();
+        game.home_playing = true;
+        // Away team will become the playing team after toggle — pre-seed dirty flags on it.
+        game.turn_data_away.turn_started = true;
+        game.turn_data_away.first_turn_after_kickoff = true;
+        step.handle_command(&Action::ConfirmSetup, &mut game, &mut GameRng::new(0));
+        assert!(!game.home_playing);
+        assert!(!game.turn_data_away.turn_started, "turn_started should be reset to false");
+        assert!(!game.turn_data_away.first_turn_after_kickoff, "first_turn_after_kickoff should be reset to false");
     }
 
     #[test]

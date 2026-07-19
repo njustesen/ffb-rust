@@ -149,15 +149,26 @@ impl StepWizard {
                     coord: Some(self.transform_coord(coord, game)),
                 };
                 // Collect affected player IDs: ZAP/LIGHTNING → player at coord; FIREBALL → 3×3 area.
+                // Java: addToAffectedPlayers() filters out PRONE and STUNNED players for
+                // LIGHTNING/FIREBALL (ZAP adds directly without this filter, but ZAP is
+                // not reachable through WizardSpellChoice in this translation).
                 let spell_key = format!("{:?}", spell);
-                let affected: Vec<String> = if spell == SpecialEffect::FIREBALL {
-                    let mut coords = vec![coord];
-                    coords.extend(game.field_model.adjacent_on_pitch(coord));
+                let affected: Vec<String> = {
+                    let coords: Vec<FieldCoordinate> = if spell == SpecialEffect::FIREBALL {
+                        let mut coords = vec![coord];
+                        coords.extend(game.field_model.adjacent_on_pitch(coord));
+                        coords
+                    } else {
+                        vec![coord]
+                    };
                     coords.iter()
                         .filter_map(|c| game.field_model.player_at(*c).cloned())
+                        .filter(|id| {
+                            game.field_model.player_state(id)
+                                .map(|s| !s.is_prone() && !s.is_stunned())
+                                .unwrap_or(false)
+                        })
                         .collect()
-                } else {
-                    game.field_model.player_at(coord).cloned().into_iter().collect()
                 };
                 let mut out = StepOutcome::next().with_event(wizard_event);
                 for player_id in affected {
@@ -187,7 +198,8 @@ mod tests {
     use super::*;
     use crate::step::framework::test_team;
     use crate::step::framework::StepAction;
-    use ffb_model::enums::Rules;
+    use ffb_model::enums::{PlayerState, Rules, PS_PRONE, PS_STANDING, PS_STUNNED};
+    use ffb_model::model::player::Player;
     use ffb_model::report::report_id::ReportId;
 
     fn make_game() -> Game {
@@ -313,5 +325,72 @@ mod tests {
             &mut GameRng::new(0),
         );
         assert!(game.report_list.has_report(ReportId::WIZARD_USE), "ReportWizardUse must be emitted on fireball cast");
+    }
+
+    #[test]
+    fn lightning_on_prone_player_does_not_push_sequence() {
+        // Java: addToAffectedPlayers() excludes PRONE players from the affected list,
+        // so no SpecialEffect sequence should be pushed for a prone target.
+        let mut team = test_team("home", 0);
+        team.players.push(Player { id: "p1".into(), name: "P1".into(), nr: 1, ..Default::default() });
+        let away = test_team("away", 0);
+        let mut game = Game::new(team, away, Rules::Bb2016);
+        game.turn_mode = TurnMode::Wizard;
+        game.home_playing = true;
+        let coord = FieldCoordinate::new(5, 5);
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE));
+
+        let mut step = StepWizard::new();
+        let out = step.handle_command(
+            &Action::WizardSpell { spell: WizardSpellChoice::Lightning, coord },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(out.pushes.is_empty(), "prone player should not be affected by Lightning");
+    }
+
+    #[test]
+    fn fireball_on_stunned_player_does_not_push_sequence() {
+        // Java: addToAffectedPlayers() excludes STUNNED players from the affected list.
+        let mut team = test_team("home", 0);
+        team.players.push(Player { id: "p1".into(), name: "P1".into(), nr: 1, ..Default::default() });
+        let away = test_team("away", 0);
+        let mut game = Game::new(team, away, Rules::Bb2016);
+        game.turn_mode = TurnMode::Wizard;
+        game.home_playing = true;
+        let coord = FieldCoordinate::new(5, 5);
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STUNNED));
+
+        let mut step = StepWizard::new();
+        let out = step.handle_command(
+            &Action::WizardSpell { spell: WizardSpellChoice::Fireball, coord },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(out.pushes.is_empty(), "stunned player should not be affected by Fireball");
+    }
+
+    #[test]
+    fn lightning_on_standing_player_pushes_sequence() {
+        // Sanity check: a standing player at the target coordinate IS affected.
+        let mut team = test_team("home", 0);
+        team.players.push(Player { id: "p1".into(), name: "P1".into(), nr: 1, ..Default::default() });
+        let away = test_team("away", 0);
+        let mut game = Game::new(team, away, Rules::Bb2016);
+        game.turn_mode = TurnMode::Wizard;
+        game.home_playing = true;
+        let coord = FieldCoordinate::new(5, 5);
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+
+        let mut step = StepWizard::new();
+        let out = step.handle_command(
+            &Action::WizardSpell { spell: WizardSpellChoice::Lightning, coord },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(!out.pushes.is_empty(), "standing player should be affected by Lightning");
     }
 }

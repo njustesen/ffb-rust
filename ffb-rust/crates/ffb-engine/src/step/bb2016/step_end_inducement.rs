@@ -66,9 +66,12 @@ impl Step for StepEndInducement {
 impl StepEndInducement {
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: UtilServerDialog.hideDialog(getGameState()) — no-op in headless Rust
+        // Java: `if (fInducementPhase == null) { return; }` — note this returns WITHOUT
+        // calling `getResult().setNextAction(...)`, so the step keeps StepResult's default
+        // action (StepAction.CONTINUE — set in the StepResult constructor), not NEXT_STEP.
         let phase = match self.inducement_phase {
             Some(p) => p,
-            None => return StepOutcome::next(),
+            None => return StepOutcome::cont(),
         };
 
         // Java: fEndTurn |= UtilServerSteps.checkTouchdown(getGameState())
@@ -127,12 +130,15 @@ mod tests {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2016)
     }
 
+    /// Regression test: Java's `if (fInducementPhase == null) { return; }` returns without
+    /// calling `setNextAction`, so the step keeps `StepResult`'s default action (CONTINUE),
+    /// not NEXT_STEP. A previous version of this file incorrectly returned `NextStep` here.
     #[test]
-    fn no_phase_returns_next_immediately() {
+    fn no_phase_waits_continue_not_next_step() {
         let mut game = make_game();
         let mut step = StepEndInducement::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(out.action, StepAction::Continue);
         assert!(out.pushes.is_empty());
     }
 

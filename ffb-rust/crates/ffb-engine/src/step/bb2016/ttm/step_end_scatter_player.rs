@@ -38,8 +38,13 @@ impl StepEndScatterPlayer {
         }
     }
 
-    fn execute_step(&self, _game: &mut Game) -> StepOutcome {
-        let all_present = self.thrown_player_id.is_some()
+    fn execute_step(&self, game: &mut Game) -> StepOutcome {
+        // Java: Player<?> thrownPlayer = game.getPlayerById(fThrownPlayerId);
+        //       if ((thrownPlayer != null) && ...)
+        let thrown_player_exists = self.thrown_player_id.as_deref()
+            .map(|id| game.player(id).is_some())
+            .unwrap_or(false);
+        let all_present = thrown_player_exists
             && self.thrown_player_state.is_some()
             && self.thrown_player_coordinate.is_some();
         let mut out = StepOutcome::next();
@@ -107,6 +112,21 @@ mod tests {
     #[test]
     fn id_is_end_scatter_player() {
         assert_eq!(StepEndScatterPlayer::new().id(), StepId::EndScatterPlayer);
+    }
+
+    #[test]
+    fn nonexistent_thrown_player_returns_next_without_push() {
+        // Java: `Player<?> thrownPlayer = game.getPlayerById(fThrownPlayerId); if (thrownPlayer != null) ...`
+        // A dangling THROWN_PLAYER_ID that doesn't resolve to a real player must
+        // suppress the ScatterPlayer sequence push, even when state/coordinate are set.
+        let mut game = make_game();
+        let mut step = StepEndScatterPlayer::new();
+        step.thrown_player_id = Some("ghost".into());
+        step.thrown_player_state = Some(PlayerState::new(0));
+        step.thrown_player_coordinate = Some(FieldCoordinate { x: 5, y: 5 });
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.pushes.is_empty());
+        assert!(matches!(out.action, StepAction::NextStep));
     }
 
     #[test]

@@ -144,14 +144,16 @@ impl StepAlwaysHungry {
                 p.used_skills.insert(SkillId::AlwaysHungry);
             }
 
-            // Java: if (reRolledAction == ESCAPE) { if (source == null || !useReRoll) doEscape = false }
+            // Java: if (reRolledAction == ESCAPE) { if (source == null || !useReRoll(..., thrownPlayer)) {
+            //           setNextAction(GOTO_LABEL, fGotoLabelOnFailure); return; } }
             let already_rerolled_escape = self.re_roll_state.re_rolled_action
                 .as_ref().map(|a| a.name == "ESCAPE").unwrap_or(false);
             if already_rerolled_escape {
                 let source_opt = self.re_roll_state.re_roll_source.clone();
-                let consumed = source_opt.as_ref().map(|s| use_reroll(game, s, &acting_id)).unwrap_or(false);
+                let consumed = source_opt.as_ref().map(|s| use_reroll(game, s, &thrown_player_id)).unwrap_or(false);
                 if !consumed {
-                    do_escape = false;
+                    let label = self.goto_label_on_failure.clone();
+                    return StepOutcome::goto(&label);
                 }
             }
 
@@ -409,6 +411,29 @@ mod tests {
             }
         }
         panic!("No seed produced escape success in first 20 seeds");
+    }
+
+    #[test]
+    fn declined_escape_reroll_goes_to_failure_label() {
+        // Java: if (ReRolledActions.ESCAPE == getReRolledAction()) {
+        //         if ((getReRollSource() == null) || !useReRoll(..., thrownPlayer)) {
+        //           setNextAction(GOTO_LABEL, fGotoLabelOnFailure); return; } }
+        // A declined re-roll (source == null on retry) must GOTO the failure label,
+        // not silently fall through to NEXT_STEP.
+        use ffb_model::model::re_rolled_action::ReRolledAction;
+        let mut game = make_game();
+        add_always_hungry_player(&mut game, "ogre");
+        game.team_home.player_mut("ogre").unwrap().used_skills.insert(SkillId::AlwaysHungry);
+        add_thrown_player(&mut game, "gob");
+        let mut step = StepAlwaysHungry::new();
+        step.goto_label_on_failure = "fail".into();
+        step.goto_label_on_success = "success".into();
+        step.thrown_player_id = Some("gob".into());
+        step.re_roll_state.re_rolled_action = Some(ReRolledAction::new("ESCAPE"));
+        step.re_roll_state.re_roll_source = None; // simulates the player declining the re-roll offer
+        let out = step.execute_step(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.action, StepAction::GotoLabel));
+        assert_eq!(out.goto_label.as_deref(), Some("fail"));
     }
 
     #[test]

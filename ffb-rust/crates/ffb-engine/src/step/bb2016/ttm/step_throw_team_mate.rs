@@ -5,16 +5,15 @@
 ///
 /// Init param: GOTO_LABEL_ON_FAILURE (mandatory).
 /// Consumed params: THROWN_PLAYER_ID, THROWN_PLAYER_STATE, THROWN_PLAYER_HAS_BALL.
-use std::collections::HashSet;
 use ffb_model::enums::{PassingDistance, PlayerState, ReRollSource};
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::report::bb2016::report_throw_team_mate_roll::ReportThrowTeamMateRoll;
 use ffb_mechanics::bb2016::pass_mechanic::PassMechanic as Bb2016PassMechanic;
-use ffb_mechanics::bb2016::ttm_mechanic::TtmMechanic as Bb2016TtmMechanic;
-use ffb_mechanics::modifiers::pass_modifier::PassModifier;
+use ffb_mechanics::modifiers::pass_context::PassContext;
+use ffb_mechanics::modifiers::pass_modifier_factory::PassModifierFactory;
 use ffb_mechanics::pass_mechanic::PassMechanic as PassMechanicTrait;
-use ffb_mechanics::ttm_mechanic::TtmMechanic as TtmMechanicTrait;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::generator::bb2016::scatter_player::{ScatterPlayer, ScatterPlayerParams};
@@ -94,16 +93,49 @@ impl StepThrowTeamMate {
             };
 
             // Java: passModifierFactory.findModifiers(new PassContext(game, thrower, passingDistance, true))
-            // No modifiers for TTM in bb2016 (passing distance modifier is applied via minimumRoll).
-            let modifiers: HashSet<PassModifier> = HashSet::new();
+            // — REGULAR (weather, e.g. Blizzard/Very Sunny) + TACKLEZONE (isAffectedByTackleZones is
+            // always true when context.isTtm()) + DISTURBING_PRESENCE + skill modifiers (notably
+            // bb2016.ThrowTeamMate itself registers a "+1 Throw Team-Mate" penalty whenever isTtm(),
+            // plus Accurate/StrongArm/Stunty) + card modifiers.
+            let thrower_player = match game.player(&thrower_id) {
+                Some(p) => p,
+                None => return StepOutcome::next(),
+            };
+            let factory = PassModifierFactory::for_rules(game.rules);
+            let ctx = PassContext::new(game, thrower_player, passing_distance, true);
+            let collection_mods = factory.find_modifiers(&ctx);
+            let skill_mods = factory.find_skill_modifiers(&ctx);
+            let card_mods = factory.find_card_modifiers(&ctx);
+            let modifier_total: i32 = collection_mods.iter().map(|m| m.get_modifier()).sum::<i32>()
+                + skill_mods.iter().map(|m| m.get_modifier()).sum::<i32>()
+                + card_mods.iter().map(|m| m.get_modifier()).sum::<i32>();
+            let modifier_names: Vec<String> = collection_mods.iter().map(|m| m.get_report_string().to_string())
+                .chain(skill_mods.iter().map(|m| m.get_report_string().to_string()))
+                .chain(card_mods.iter().map(|m| m.get_report_string().to_string()))
+                .collect();
 
-            let ttm_mechanic = Bb2016TtmMechanic::new();
-            self.minimum_roll = ttm_mechanic.minimum_roll(passing_distance, &modifiers);
+            // Java: TtmMechanic.minimumRoll(distance, modifiers) = max(2, 2 + modifierSum)
+            //       modifierSum = sum(modifiers) - distance.getModifier2016()
+            self.minimum_roll = (2 + (modifier_total - passing_distance.modifier_2016())).max(2);
 
             let roll = rng.d6();
 
             // Java: successful = !DiceInterpreter.isPassFumble(roll, passingDistance, passModifiers)
-            let successful = !is_ttm_fumble(roll, passing_distance);
+            let successful = !is_ttm_fumble(roll, passing_distance, modifier_total);
+
+            // Java: boolean reRolled = (getReRolledAction() == THROW_TEAM_MATE && getReRollSource() != null);
+            //       getResult().addReport(new ReportThrowTeamMateRoll(...))
+            let re_rolled = self.re_rolled_action.as_deref() == Some("THROW_TEAM_MATE") && self.re_roll_source.is_some();
+            game.report_list.add(ReportThrowTeamMateRoll::new(
+                Some(thrower_id.clone()),
+                successful,
+                roll,
+                self.minimum_roll,
+                re_rolled,
+                modifier_names,
+                Some(format!("{:?}", passing_distance)),
+                self.thrown_player_id.clone().unwrap_or_default(),
+            ));
 
             if successful {
                 // Java: scattersSingleDirection = thrownPlayer.hasSkillProperty(ttmScattersInSingleDirection)
@@ -144,11 +176,12 @@ impl StepThrowTeamMate {
 }
 
 /// Java: `DiceInterpreter.isPassFumble(roll, passingDistance, passModifiers)` for TTM.
-/// Roll 1 → fumble. Roll 6 → not fumble. Otherwise: (roll + distance_modifier2016) <= 1.
-fn is_ttm_fumble(roll: i32, distance: PassingDistance) -> bool {
+/// Roll 1 → fumble. Roll 6 → not fumble.
+/// Otherwise: (roll + distance_modifier2016 - modifierTotal) <= 1.
+fn is_ttm_fumble(roll: i32, distance: PassingDistance, modifier_total: i32) -> bool {
     if roll == 1 { return true; }
     if roll == 6 { return false; }
-    (roll + distance.modifier_2016()) <= 1
+    (roll + distance.modifier_2016() - modifier_total) <= 1
 }
 
 impl Default for StepThrowTeamMate {
@@ -305,20 +338,31 @@ mod tests {
 
     #[test]
     fn is_ttm_fumble_roll_1() {
-        assert!(is_ttm_fumble(1, PassingDistance::QuickPass));
+        assert!(is_ttm_fumble(1, PassingDistance::QuickPass, 0));
     }
 
     #[test]
     fn is_ttm_fumble_roll_6() {
-        assert!(!is_ttm_fumble(6, PassingDistance::QuickPass));
+        assert!(!is_ttm_fumble(6, PassingDistance::QuickPass, 0));
     }
 
     #[test]
     fn is_ttm_fumble_borderline() {
-        // roll=2, QuickPass.modifier_2016 = 1 → 2+1=3 > 1 → not fumble
-        assert!(!is_ttm_fumble(2, PassingDistance::QuickPass));
-        // roll=2, LongBomb.modifier_2016 = -2 → 2+(-2)=0 <= 1 → fumble
-        assert!(is_ttm_fumble(2, PassingDistance::LongBomb));
+        // roll=2, QuickPass.modifier_2016 = 1, no modifiers → 2+1-0=3 > 1 → not fumble
+        assert!(!is_ttm_fumble(2, PassingDistance::QuickPass, 0));
+        // roll=2, LongBomb.modifier_2016 = -2, no modifiers → 2+(-2)-0=0 <= 1 → fumble
+        assert!(is_ttm_fumble(2, PassingDistance::LongBomb, 0));
+    }
+
+    #[test]
+    fn is_ttm_fumble_modifier_total_reduces_fumble_chance() {
+        // Java: DiceInterpreter.isPassFumble subtracts the modifier total from the
+        // roll-check: (roll + distance.modifier2016 - modifierTotal) <= 1.
+        // roll=2, QuickPass (+1), modifierTotal=-1 (e.g. "Throw Team-Mate" penalty) →
+        // 2 + 1 - (-1) = 4 > 1 → not fumble even though it would fumble with total=2:
+        // 2 + 1 - 2 = 1 <= 1 → fumble.
+        assert!(!is_ttm_fumble(2, PassingDistance::QuickPass, -1));
+        assert!(is_ttm_fumble(2, PassingDistance::QuickPass, 2));
     }
 
     #[test]
@@ -335,6 +379,88 @@ mod tests {
 
         assert!(game.turn_data_home.pass_used);
         assert!(game.acting_player.has_passed);
+    }
+
+    #[test]
+    fn throw_team_mate_skill_adds_plus_one_penalty_to_minimum_roll() {
+        // Java: ThrowTeamMateBehaviour.handleExecuteStepHook computes
+        // `passModifierFactory.findModifiers(new PassContext(game, thrower, distance, true))`
+        // which — via GenerifiedModifierFactory's per-skill iteration — always includes the
+        // thrower's own `skill.bb2016.ThrowTeamMate` modifier ("Throw Team-Mate", +1, REGULAR,
+        // applies when isTtm()). That +1 must raise `minimumRoll` by 1 relative to a thrower
+        // without the skill; previously the step hardcoded an empty modifier set so this
+        // penalty (and tacklezone/disturbing-presence/other skill modifiers) never applied.
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::SkillId as ModelSkillId;
+
+        fn add_player_with_skills(game: &mut Game, home: bool, id: &str, coord: FieldCoordinate, skills: Vec<ModelSkillId>) {
+            let player = Player {
+                id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+                player_type: PlayerType::Regular, gender: PlayerGender::Male,
+                movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+                starting_skills: skills.into_iter().map(|s| SkillWithValue { skill_id: s, value: None }).collect(),
+                extra_skills: vec![], temporary_skills: vec![],
+                used_skills: Default::default(),
+                niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+                is_big_guy: false,
+                ..Default::default()
+            };
+            if home { game.team_home.players.push(player); }
+            else { game.team_away.players.push(player); }
+            game.field_model.set_player_coordinate(id, coord);
+            game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+        }
+
+        // delta_x=4, delta_y=0 → bb2016 throwing_range_table row0 col4 = 'S' (ShortPass,
+        // modifier_2016 = 0), so the minimum-roll difference below is purely the skill's +1
+        // penalty and isn't obscured by the distance modifier or the `max(2, ..)` floor.
+        let coord = FieldCoordinate::new(10, 7);
+        let pass_coord = FieldCoordinate::new(14, 7);
+
+        let mut game_without_skill = make_game();
+        game_without_skill.home_playing = true;
+        add_player(&mut game_without_skill, true, "thrower", coord);
+        game_without_skill.acting_player.player_id = Some("thrower".into());
+        game_without_skill.pass_coordinate = Some(pass_coord);
+        let mut step_without_skill = StepThrowTeamMate::new();
+        step_without_skill.goto_label_on_failure = "fail".into();
+        step_without_skill.start(&mut game_without_skill, &mut GameRng::new(0));
+
+        let mut game_with_skill = make_game();
+        game_with_skill.home_playing = true;
+        add_player_with_skills(&mut game_with_skill, true, "thrower", coord, vec![ModelSkillId::ThrowTeamMate]);
+        game_with_skill.acting_player.player_id = Some("thrower".into());
+        game_with_skill.pass_coordinate = Some(pass_coord);
+        let mut step_with_skill = StepThrowTeamMate::new();
+        step_with_skill.goto_label_on_failure = "fail".into();
+        step_with_skill.start(&mut game_with_skill, &mut GameRng::new(0));
+
+        assert_eq!(
+            step_with_skill.minimum_roll,
+            step_without_skill.minimum_roll + 1,
+            "the thrower's own ThrowTeamMate skill must add a +1 minimum-roll penalty"
+        );
+    }
+
+    #[test]
+    fn report_throw_team_mate_roll_added() {
+        // Java: ThrowTeamMateBehaviour always calls
+        // `step.getResult().addReport(new ReportThrowTeamMateRoll(...))` right after the roll,
+        // regardless of success/failure. The Rust translation previously never added this report.
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.home_playing = true;
+        add_player(&mut game, true, "thrower", FieldCoordinate::new(10, 7));
+        game.acting_player.player_id = Some("thrower".into());
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+
+        let mut step = StepThrowTeamMate::new();
+        step.goto_label_on_failure = "fail".into();
+        step.thrown_player_id = Some("tp1".into());
+        step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(game.report_list.has_report(ReportId::THROW_TEAM_MATE_ROLL),
+            "THROW_TEAM_MATE_ROLL report must be added after rolling");
     }
 
     #[test]

@@ -156,6 +156,20 @@ impl StepSpecialEffect {
                     );
                     game.add_zapped_player(ffb_model::model::zapped_player::ZappedPlayer::new(player, position));
                 }
+                // Java: if (FieldCoordinate.equals(game.getFieldModel().getBallCoordinate(), playerCoordinate)) {
+                //   getGameState().getStepStack().push(new StepCatchScatterThrowIn(...));
+                //   publishParameter(CATCH_SCATTER_THROW_IN_MODE, SCATTER_BALL)
+                // }
+                let ball_at_player = game.field_model.ball_coordinate
+                    .map(|bc| bc == coord)
+                    .unwrap_or(false);
+                if ball_at_player {
+                    outcome = outcome
+                        .push_seq(vec![crate::step::framework::SequenceStep::new(StepId::CatchScatterThrowIn)])
+                        .publish(StepParameter::CatchScatterThrowInMode(
+                            crate::step::CatchScatterThrowInMode::ScatterBall,
+                        ));
+                }
             }
             SpecialEffect::Fireball => {
                 let injury_result = handle_injury_by_name(
@@ -407,6 +421,41 @@ mod tests {
     fn none_effect_always_fails() {
         let game = make_game();
         assert!(!is_special_effect_successful(None, &game, "x", 6));
+    }
+
+    #[test]
+    fn zap_on_ball_carrier_pushes_catch_scatter_throw_in_and_publishes_scatter_ball() {
+        // Java: if the zapped player was standing on the ball's square, a
+        // StepCatchScatterThrowIn is pushed and CATCH_SCATTER_THROW_IN_MODE=SCATTER_BALL is
+        // published. This was previously dropped entirely by the Rust Zap branch.
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        add_home_player(&mut game, "p1");
+        let coord = FieldCoordinate::new(5, 5);
+        game.field_model.ball_coordinate = Some(coord);
+        let mut step = StepSpecialEffect::new("fail".into(), "p1".into(), Some(SpecialEffect::Zap));
+        step.roll_for_effect = false;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            out.published.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(
+                crate::step::CatchScatterThrowInMode::ScatterBall
+            ))),
+            "expected CATCH_SCATTER_THROW_IN_MODE=SCATTER_BALL to be published when zapping the ball carrier"
+        );
+        assert!(!out.pushes.is_empty(), "expected a pushed StepCatchScatterThrowIn sequence");
+    }
+
+    #[test]
+    fn zap_away_from_ball_does_not_push_catch_scatter_throw_in() {
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        add_home_player(&mut game, "p1");
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(1, 1));
+        let mut step = StepSpecialEffect::new("fail".into(), "p1".into(), Some(SpecialEffect::Zap));
+        step.roll_for_effect = false;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.pushes.is_empty());
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(_))));
     }
 
     #[test]

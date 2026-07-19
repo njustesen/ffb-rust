@@ -64,13 +64,19 @@ impl StepInitBlocking {
             return StepOutcome::goto(&self.goto_label_on_end);
         }
 
+        // Java: `Player<?> defender = game.getPlayerById(fBlockDefenderId); if (defender != null)
+        // { ...; getResult().setNextAction(NEXT_STEP); }` — when there's no defender yet (the
+        // player has chosen "Block" but not yet clicked a target), Java's `executeStep()` falls
+        // through this whole `else` branch WITHOUT calling `setNextAction`, so the step keeps
+        // `StepResult`'s default action (CONTINUE) and waits for a `CLIENT_BLOCK` command. The
+        // sibling BB2020/BB2025 translations of this same step already return `cont()` here.
         let defender_id = match &self.block_defender_id {
             Some(id) => id.clone(),
-            None => return StepOutcome::next(),
+            None => return StepOutcome::cont(),
         };
 
         if game.player(&defender_id).is_none() {
-            return StepOutcome::next();
+            return StepOutcome::cont();
         }
 
         game.defender_id = Some(defender_id.clone());
@@ -279,13 +285,30 @@ mod tests {
         assert_eq!(game.defender_id.as_deref(), Some("def"));
     }
 
+    /// Regression test: Java's `executeStep()` never calls `setNextAction` when there's no
+    /// defender yet (player picked "Block" but hasn't clicked a target) — the step keeps
+    /// `StepResult`'s default CONTINUE action and waits for `CLIENT_BLOCK`. A previous version
+    /// of this file incorrectly returned `NextStep`, which would have skipped the whole block
+    /// sequence (BoneHead/ReallyStupid/TakeRoot/etc.) without ever letting the player choose a
+    /// target. The sibling BB2020/BB2025 translations already get this right.
     #[test]
-    fn no_defender_returns_next() {
+    fn no_defender_waits_continue_not_next_step() {
         let mut step = StepInitBlocking::new();
         step.set_parameter(&StepParameter::GotoLabelOnEnd("end".into()));
         let mut game = make_game();
         let mut rng = GameRng::new(0);
         let outcome = step.start(&mut game, &mut rng);
-        assert!(matches!(outcome.action, StepAction::NextStep));
+        assert_eq!(outcome.action, StepAction::Continue);
+    }
+
+    #[test]
+    fn unknown_defender_id_waits_continue_not_next_step() {
+        let mut step = StepInitBlocking::new();
+        step.set_parameter(&StepParameter::GotoLabelOnEnd("end".into()));
+        step.set_parameter(&StepParameter::BlockDefenderId("nonexistent".into()));
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        let outcome = step.start(&mut game, &mut rng);
+        assert_eq!(outcome.action, StepAction::Continue);
     }
 }

@@ -7,7 +7,7 @@ use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::util_server_injury::{
-    drop_player, handle_injury_by_name, injury_type_causes_turnover,
+    drop_player_no_sph, handle_injury_by_name, injury_type_causes_turnover,
 };
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2016.StepFallDown.
@@ -78,7 +78,10 @@ impl StepFallDown {
         );
 
         // Java: publishParameters(UtilServerInjury.dropPlayer(this, actingPlayer, ATTACKER))
-        let drop_params = drop_player(game, &player_id, true);
+        // — the 3-arg overload, which defaults `eligibleForSafePairOfHands = false`. A
+        // falling player (failed dodge/GFI/jump) never gets a Safe Pair of Hands reroll
+        // offer for the ball they drop.
+        let drop_params = drop_player_no_sph(game, &player_id);
 
         // Java: if (actingPlayer.isSufferingBloodLust())
         if game.acting_player.suffering_blood_lust {
@@ -214,6 +217,27 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         let state = game.field_model.player_state("p1").unwrap();
         assert_ne!(state.base(), PS_RESERVE);
+    }
+
+    /// Regression test: Java's `dropPlayer(this, actingPlayer, ATTACKER)` call is the 3-arg
+    /// overload, which defaults `eligibleForSafePairOfHands = false` — so a player who drops
+    /// the ball by falling down (failed dodge/GFI/jump) never gets a `DROPPED_BALL_CARRIER`
+    /// (Safe Pair of Hands reroll offer) parameter published. A previous version of this file
+    /// called the lower-level `drop_player(..., true)`, incorrectly enabling that reroll offer.
+    #[test]
+    fn falling_with_ball_does_not_offer_safe_pair_of_hands() {
+        let mut game = make_game();
+        add_acting_player(&mut game, "p1");
+        let coord = FieldCoordinate::new(5, 5);
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_in_play = true;
+        let mut step = StepFallDown::new();
+        step.injury_type_name = Some("InjuryTypeDropGFI".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            !out.published.iter().any(|p| matches!(p, StepParameter::DroppedBallCarrier(_))),
+            "falling down must never offer Safe Pair of Hands"
+        );
     }
 
     #[test]

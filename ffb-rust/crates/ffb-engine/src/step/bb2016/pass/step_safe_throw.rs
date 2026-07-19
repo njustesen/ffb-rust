@@ -136,9 +136,21 @@ impl StepSafeThrow {
     }
 
     fn fail_safe_throw(&self, game: &mut Game, interceptor_id: &str) -> StepOutcome {
-        // Java: fieldModel.setBallCoordinate(interceptorCoordinate) / setBombCoordinate if THROW_BOMB
+        // Java: fieldModel.setRangeRuler(null)
+        game.field_model.range_ruler = None;
+        // Java: if (PlayerAction.THROW_BOMB == game.getThrowerAction()) {
+        //   fieldModel.setBombCoordinate(interceptorCoordinate); fieldModel.setBombMoving(false);
+        // } else {
+        //   fieldModel.setBallCoordinate(interceptorCoordinate); fieldModel.setBallMoving(false);
+        // }
         if let Some(coord) = game.field_model.player_coordinate(interceptor_id) {
-            game.field_model.ball_coordinate = Some(coord);
+            if game.thrower_action == Some(ffb_model::enums::PlayerAction::ThrowBomb) {
+                game.field_model.bomb_coordinate = Some(coord);
+                game.field_model.bomb_moving = false;
+            } else {
+                game.field_model.ball_coordinate = Some(coord);
+                game.field_model.ball_moving = false;
+            }
         }
         StepOutcome::goto(&self.goto_label_on_failure)
     }
@@ -318,6 +330,34 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::SAFE_THROW_ROLL),
             "SAFE_THROW_ROLL must be added after rolling");
+    }
+
+    /// Java: on safe-throw failure while THROW_BOMB, the fail path must move the *bomb*
+    /// coordinate (fieldModel.setBombCoordinate / setBombMoving(false)), not the ball.
+    #[test]
+    fn safe_throw_failure_during_bomb_throw_sets_bomb_coordinate_not_ball() {
+        let mut game = make_game();
+        game.thrower_id = Some("thrower".into());
+        game.thrower_action = Some(ffb_model::enums::PlayerAction::ThrowBomb);
+        add_player_with_skill(&mut game, true, "thrower", SkillId::SafeThrow);
+        add_player_with_skill(&mut game, false, "interceptor", SkillId::Block);
+        let interceptor_coord = FieldCoordinate::new(5, 5);
+        game.field_model.set_player_coordinate("interceptor", interceptor_coord);
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(1, 1));
+        game.field_model.bomb_moving = true;
+        let mut step = StepSafeThrow::new();
+        step.goto_label_on_failure = "fail".into();
+        step.interceptor_id = Some("interceptor".into());
+        // Force the immediate-fail path (no reroll available).
+        step.re_rolled_action = Some(SAFE_THROW_ACTION.to_string());
+        step.re_roll_source = None;
+        let out = step.start(&mut game, &mut GameRng::new(1));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(game.field_model.bomb_coordinate, Some(interceptor_coord),
+            "bomb coordinate should move to interceptor on THROW_BOMB safe-throw failure");
+        assert!(!game.field_model.bomb_moving);
+        // Ball coordinate must be untouched since this was a bomb throw, not a pass.
+        assert_eq!(game.field_model.ball_coordinate, Some(FieldCoordinate::new(1, 1)));
     }
 
     /// Declining a reroll clears the reroll source so the next execute goes to fail path.

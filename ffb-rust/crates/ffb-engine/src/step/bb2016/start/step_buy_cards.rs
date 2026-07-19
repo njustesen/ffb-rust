@@ -13,11 +13,12 @@
 /// CardDeck / CardTypeFactory not ported; headless always skips card purchasing.
 /// client-only: DialogBuyCardsParameter — headless skips card purchasing dialog
 use ffb_model::model::game::Game;
-use ffb_model::option::game_option_id::{MAX_NR_OF_CARDS, USE_PREDEFINED_INDUCEMENTS};
+use ffb_model::option::game_option_id::{FREE_CARD_CASH, FREE_INDUCEMENT_CASH, MAX_NR_OF_CARDS, USE_PREDEFINED_INDUCEMENTS};
 use ffb_model::option::util_game_option::{get_int_option, is_option_enabled};
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::step::game::start::util_inducement_sequence::UtilInducementSequence;
 
 /// Java: `StepBuyCards` (bb2016/start).
 pub struct StepBuyCards {
@@ -50,13 +51,34 @@ impl StepBuyCards {
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: if (MAX_NR_OF_CARDS == 0 || USE_PREDEFINED_INDUCEMENTS) → skip card buying
         if get_int_option(game, MAX_NR_OF_CARDS) == 0 || is_option_enabled(game, USE_PREDEFINED_INDUCEMENTS) {
+            // Java: freeCash = FREE_INDUCEMENT_CASH; fInducementGoldHome/Away =
+            // calculateInducementGold(...) + freeCash — must actually compute the gold here,
+            // not just republish the (always-zero-at-this-point) field.
+            let free_cash = get_int_option(game, FREE_INDUCEMENT_CASH);
+            self.inducement_gold_home = UtilInducementSequence::calculate_inducement_gold(Some(game), true) + free_cash;
+            self.inducement_gold_away = UtilInducementSequence::calculate_inducement_gold(Some(game), false) + free_cash;
             return StepOutcome::next()
                 .publish(StepParameter::InducementGoldHome(self.inducement_gold_home))
                 .publish(StepParameter::InducementGoldAway(self.inducement_gold_away));
         }
-        // no-op: CardDeck / CardTypeFactory not ported — headless treats both teams as done (no cards bought)
+        // no-op: CardDeck / CardTypeFactory not ported — headless treats both teams as done
+        // (no cards bought), but must still compute inducement gold as Java does
+        // (lines 146-151 of StepBuyCards.executeStep) so downstream steps (StepBuyInducements)
+        // receive the correct available gold, not 0.
         self.cards_selected_home = true;
         self.cards_selected_away = true;
+        let free_cash = get_int_option(game, FREE_INDUCEMENT_CASH) + get_int_option(game, FREE_CARD_CASH);
+        self.inducement_gold_home = UtilInducementSequence::calculate_inducement_gold(Some(game), true) + free_cash;
+        self.inducement_gold_away = UtilInducementSequence::calculate_inducement_gold(Some(game), false) + free_cash;
+
+        // Java: cap at max inducement gold (freeInducementCash only, no card cash) once both
+        // teams are done selecting.
+        let free_cash_only = get_int_option(game, FREE_INDUCEMENT_CASH);
+        let max_gold_home = UtilInducementSequence::calculate_inducement_gold(Some(game), true) + free_cash_only;
+        let max_gold_away = UtilInducementSequence::calculate_inducement_gold(Some(game), false) + free_cash_only;
+        self.inducement_gold_home = self.inducement_gold_home.min(max_gold_home);
+        self.inducement_gold_away = self.inducement_gold_away.min(max_gold_away);
+
         StepOutcome::next()
             .publish(StepParameter::InducementGoldHome(self.inducement_gold_home))
             .publish(StepParameter::InducementGoldAway(self.inducement_gold_away))
@@ -108,9 +130,13 @@ mod tests {
 
     #[test]
     fn publishes_inducement_gold_home() {
+        // Java always recomputes fInducementGoldHome from calculateInducementGold(...) +
+        // freeCash before publishing, so the published value must reflect actual game state
+        // (TV difference), not a manually pre-set field.
         let mut game = make_game();
+        game.game_result.away.team_value = 1_100_000;
+        game.game_result.home.team_value = 1_000_000;
         let mut step = StepBuyCards::new();
-        step.inducement_gold_home = 100_000;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::InducementGoldHome(100_000))));
     }
@@ -118,8 +144,9 @@ mod tests {
     #[test]
     fn publishes_inducement_gold_away() {
         let mut game = make_game();
+        game.game_result.home.team_value = 1_050_000;
+        game.game_result.away.team_value = 1_000_000;
         let mut step = StepBuyCards::new();
-        step.inducement_gold_away = 50_000;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::InducementGoldAway(50_000))));
     }
@@ -127,5 +154,26 @@ mod tests {
     fn new_and_default_create_equivalent_instances() {
         let _a = StepBuyCards::new();
         let _b = StepBuyCards::default();
+    }
+
+    /// Java: even in the (untranslated CardDeck) no-op branch, StepBuyCards must still
+    /// compute and publish real inducement gold from team-value differences
+    /// (StepBuyCards.executeStep lines 146-151), not leave it at 0 — since
+    /// StepBuyInducements relies entirely on the published INDUCEMENT_GOLD_HOME/AWAY
+    /// parameter for how much gold a team has to spend.
+    #[test]
+    fn computes_inducement_gold_from_team_value_difference_when_card_buying_skipped() {
+        let mut game = make_game();
+        // Away has a much higher team value than home → home gets inducement gold
+        // equal to the TV difference (UtilInducementSequence.calculateInducementGold).
+        game.game_result.home.team_value = 1_000_000;
+        game.game_result.away.team_value = 1_200_000;
+        let mut step = StepBuyCards::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        let gold_home = out.published.iter().find_map(|p| match p {
+            StepParameter::InducementGoldHome(v) => Some(*v),
+            _ => None,
+        }).expect("InducementGoldHome must be published");
+        assert!(gold_home > 0, "home team should receive nonzero inducement gold from TV difference, got {gold_home}");
     }
 }

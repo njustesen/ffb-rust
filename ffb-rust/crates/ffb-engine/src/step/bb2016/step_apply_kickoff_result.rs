@@ -232,23 +232,30 @@ impl StepApplyKickoffResult {
     }
 
     fn handle_extra_reroll(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // Java: roll d6 for each team, add fame/cheerleaders/coaches, winner gets +1 reroll.
+        // Java: roll d6 for each team, add fame + fan_favourites always; cheerleaders only
+        // for CHEERING_FANS (isFanReRoll) and assistant coaches (minus a ban penalty) only
+        // for BRILLIANT_COACHING (isCoachReRoll) — these two bonuses are mutually exclusive,
+        // gated by which specific kickoff result triggered this handler.
         let roll_home = rng.d6();
         let roll_away = rng.d6();
 
-        // Java: total = roll + fame + cheerleaders + assistantCoaches + inducementSet values
-        let home_bonus = game.game_result.home.fame
-            + game.team_home.cheerleaders
-            + game.team_home.assistant_coaches
-            + game.turn_data_home.inducement_set.value(Usage::ADD_CHEERLEADER)
-            + game.turn_data_home.inducement_set.value(Usage::ADD_COACH);
-        let away_bonus = game.game_result.away.fame
-            + game.team_away.cheerleaders
-            + game.team_away.assistant_coaches
-            + game.turn_data_away.inducement_set.value(Usage::ADD_CHEERLEADER)
-            + game.turn_data_away.inducement_set.value(Usage::ADD_COACH);
-        let total_home = roll_home + home_bonus;
-        let total_away = roll_away + away_bonus;
+        let fan_favs_home = players_on_field_with_property(game, true, NamedProperties::INCREASES_TEAMS_FAME);
+        let fan_favs_away = players_on_field_with_property(game, false, NamedProperties::INCREASES_TEAMS_FAME);
+
+        let mut total_home = roll_home + game.game_result.home.fame + fan_favs_home;
+        let mut total_away = roll_away + game.game_result.away.fame + fan_favs_away;
+
+        let result = self.kickoff_result.unwrap_or(KickoffResult::BrilliantCoaching);
+        if result.is_fan_reroll() {
+            total_home += game.team_home.cheerleaders;
+            total_away += game.team_away.cheerleaders;
+        }
+        if result.is_coach_reroll() {
+            total_home += game.team_home.assistant_coaches;
+            total_away += game.team_away.assistant_coaches;
+            if game.turn_data_home.coach_banned { total_home -= 1; }
+            if game.turn_data_away.coach_banned { total_away -= 1; }
+        }
 
         let home_gains = total_home >= total_away;
         let away_gains = total_away >= total_home;
@@ -259,7 +266,7 @@ impl StepApplyKickoffResult {
             game.turn_data_away.rerolls += 1;
         }
 
-        let kickoff_result = self.kickoff_result.unwrap_or(KickoffResult::BrilliantCoaching);
+        let kickoff_result = result;
         // Java: getResult().addReport(new ReportKickoffExtraReRoll(kickoffResult, rollHome, homeGainsReRoll, rollAway, awayGainsReRoll))
         game.report_list.add(ReportKickoffExtraReRoll::new(
             kickoff_result,
@@ -701,6 +708,45 @@ mod tests {
         // No players on field — should silently skip injury logic
         let out = step.start(&mut game, &mut GameRng::new(1));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    /// Java: BRILLIANT_COACHING (isCoachReRoll) adds assistant coaches to the total but must
+    /// NOT add cheerleaders — the two bonuses are mutually exclusive per kickoff-result type.
+    /// Proven by an invariant: changing team_home.cheerleaders must not change the outcome
+    /// when the kickoff result is BrilliantCoaching (same seed both runs).
+    #[test]
+    fn brilliant_coaching_does_not_add_cheerleaders_to_total() {
+        let run = |cheerleaders: i32| {
+            let mut game = make_game();
+            game.team_home.assistant_coaches = 5;
+            game.team_home.cheerleaders = cheerleaders;
+            game.team_away.assistant_coaches = 5;
+            let mut step = StepApplyKickoffResult::new("end".into(), "blitz".into());
+            step.kickoff_result = Some(KickoffResult::BrilliantCoaching);
+            step.start(&mut game, &mut GameRng::new(7));
+            (game.turn_data_home.rerolls, game.turn_data_away.rerolls)
+        };
+        assert_eq!(run(0), run(100), "cheerleaders must not affect BrilliantCoaching's reroll outcome");
+    }
+
+    /// Java: the coach-banned penalty (-1) applies to a team's BRILLIANT_COACHING total only
+    /// when that team's coach is banned.
+    #[test]
+    fn brilliant_coaching_applies_coach_ban_penalty() {
+        let run = |away_banned: bool| {
+            let mut game = make_game();
+            game.team_home.assistant_coaches = 0;
+            game.team_away.assistant_coaches = 0;
+            game.turn_data_away.coach_banned = away_banned;
+            let mut step = StepApplyKickoffResult::new("end".into(), "blitz".into());
+            step.kickoff_result = Some(KickoffResult::BrilliantCoaching);
+            step.start(&mut game, &mut GameRng::new(0)); // seed 0: both teams roll the same d6 (tie)
+            (game.turn_data_home.rerolls, game.turn_data_away.rerolls)
+        };
+        // With equal rolls and equal (0) assistant coaches, both teams tie and both gain a
+        // reroll — unless away's coach is banned, in which case only home should gain one.
+        assert_eq!(run(false), (1, 1), "equal rolls with no ban should tie (both gain a reroll)");
+        assert_eq!(run(true), (1, 0), "away's ban penalty should break the tie in home's favor");
     }
 
     #[test]
