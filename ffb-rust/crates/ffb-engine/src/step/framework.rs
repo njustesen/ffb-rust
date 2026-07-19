@@ -206,8 +206,8 @@ pub enum StepParameter {
     KickedPlayerId(Option<String>),
     /// PlayerState of the kicked player at kick time.
     KickedPlayerState(ffb_model::enums::PlayerState),
-    /// Field coordinate of the kicked player (KTM sequence).
-    KickedPlayerCoordinate(ffb_model::types::FieldCoordinate),
+    /// Field coordinate of the kicked player (None = clear it) (KTM sequence).
+    KickedPlayerCoordinate(Option<ffb_model::types::FieldCoordinate>),
     /// Whether the kicked player is carrying the ball (KTM sequence).
     KickedPlayerHasBall(bool),
     // ── foul parameters ──────────────────────────────────────────────────────

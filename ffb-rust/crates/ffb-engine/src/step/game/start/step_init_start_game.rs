@@ -1,11 +1,16 @@
 /// 1:1 translation of `com.fumbbl.ffb.server.step.game.start.StepInitStartGame`.
 ///
-/// Java: gates the start-game sequence on both coaches signalling ready and (in FUMBBL
-/// server mode) a FUMBBL game-state record being created. In standalone mode the step
-/// transitions immediately once both teams are present (which is always true in our engine).
+/// Java: gates the start-game sequence on both coaches signalling ready
+/// (`game.getStarted() != null`, set only once both `fStartedHome` and `fStartedAway`
+/// are true) and (in FUMBBL server mode) a FUMBBL game-state record being created. In
+/// standalone mode, once both coaches are ready, the step transitions once both teams
+/// are present (which is always true in our engine).
 ///
-/// Rust: only standalone mode is supported. `start()` → `execute_step()` → `leave_step()`
-/// immediately, setting `GameStatus::Active` and returning `NextStep`.
+/// Rust: only standalone mode is supported. `start()` → `execute_step()` checks whether
+/// both `started_home` and `started_away` are already true (mirrors `game.getStarted()
+/// != null`); if not, the step returns `Continue` and waits for `Action::StartGame`
+/// commands from both coaches via `handle_command()`. Once both have signalled,
+/// `leave_step()` sets `GameStatus::Active` and returns `NextStep`.
 use ffb_model::enums::GameStatus;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
@@ -64,12 +69,16 @@ impl Step for StepInitStartGame {
 }
 
 impl StepInitStartGame {
-    /// Java: `executeStep()` — proceeds to `leave_step()` in standalone mode.
-    ///
-    /// Java standalone: calls `leaveStep()` directly once `game.getStarted() != null`.
-    /// In our engine, teams are always loaded at game start, so we proceed immediately.
+    /// Java: `executeStep()` — proceeds to `leave_step()` only once
+    /// `game.getStarted() != null`, i.e. once both coaches have sent
+    /// `CLIENT_START_GAME` (`fStartedHome && fStartedAway`). Otherwise the step
+    /// keeps waiting (`Continue`).
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
-        self.leave_step(game)
+        if self.started_home && self.started_away {
+            self.leave_step(game)
+        } else {
+            StepOutcome::cont()
+        }
     }
 
     /// Java: `leaveStep()` — sets the game active and advances to the next step.
@@ -109,8 +118,23 @@ mod tests {
     }
 
     #[test]
-    fn start_sets_game_active_and_returns_next_step() {
+    fn start_without_both_coaches_ready_returns_continue_and_leaves_game_starting() {
+        // Java: executeStep() only calls leaveStep() once `game.getStarted() != null`,
+        // which requires BOTH fStartedHome and fStartedAway to be true. On the initial
+        // start() call neither coach has signalled yet, so the step must wait.
         let mut step = StepInitStartGame::new();
+        let mut game = make_game();
+        let mut rng = make_rng();
+        let outcome = step.start(&mut game, &mut rng);
+        assert_eq!(outcome.action, StepAction::Continue);
+        assert_eq!(game.status, GameStatus::Starting);
+    }
+
+    #[test]
+    fn start_after_both_coaches_already_ready_sets_game_active_and_returns_next_step() {
+        let mut step = StepInitStartGame::new();
+        step.started_home = true;
+        step.started_away = true;
         let mut game = make_game();
         let mut rng = make_rng();
         let outcome = step.start(&mut game, &mut rng);
@@ -145,11 +169,25 @@ mod tests {
     }
 
     #[test]
-    fn handle_command_start_game_also_activates_game() {
+    fn handle_command_start_game_from_only_one_coach_does_not_activate_game() {
+        // Java: game.setStarted() (and thus leaveStep()) only fires once BOTH
+        // fStartedHome and fStartedAway are true. A single coach's ready command
+        // must leave the game waiting.
         let mut step = StepInitStartGame::new();
         let mut game = make_game();
         let mut rng = make_rng();
         let outcome = step.handle_command(&Action::StartGame { home: true }, &mut game, &mut rng);
+        assert_eq!(outcome.action, StepAction::Continue);
+        assert_eq!(game.status, GameStatus::Starting);
+    }
+
+    #[test]
+    fn handle_command_start_game_from_both_coaches_activates_game() {
+        let mut step = StepInitStartGame::new();
+        let mut game = make_game();
+        let mut rng = make_rng();
+        step.handle_command(&Action::StartGame { home: true }, &mut game, &mut rng);
+        let outcome = step.handle_command(&Action::StartGame { home: false }, &mut game, &mut rng);
         assert_eq!(outcome.action, StepAction::NextStep);
         assert_eq!(game.status, GameStatus::Active);
     }

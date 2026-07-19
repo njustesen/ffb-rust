@@ -66,17 +66,22 @@ impl StepRiotousRookies {
             } else {
                 (game.team_away.id.clone(), game.team_away.roster_id.clone())
             };
-            // Java: mechanic.riotousRookiesPosition(team.getRoster())
             let mechanic = game_mechanic_for(game.rules);
-            let position = loader::find_roster(&roster_id, game.rules)
-                .and_then(|r| mechanic.riotous_rookies_position(&r));
+            let roster = loader::find_roster(&roster_id, game.rules);
             let mut rookie_counter = 0;
             for _ in 0..value {
                 let (roll, rookies) = Self::roll_rookies_count(rng);
-                for i in 0..rookies {
-                    self.riotous_player(game, home, rookie_counter + i, position.as_ref());
+                // Java: RosterPosition position = mechanic.riotousRookiesPosition(team.getRoster());
+                let position = roster.as_ref().and_then(|r| mechanic.riotous_rookies_position(r));
+                // Java: `if (position != null) { ...create players + addReport... }` —
+                // when the roster has no eligible position, no players are created and
+                // no report is added, but rookieCounter still advances.
+                if let Some(pos) = position.as_ref() {
+                    for i in 0..rookies {
+                        self.riotous_player(game, home, rookie_counter + i, Some(pos));
+                    }
+                    game.report_list.add(ReportRiotousRookies::new(roll.to_vec(), rookies, team_id.clone()));
                 }
-                game.report_list.add(ReportRiotousRookies::new(roll.to_vec(), rookies, team_id.clone()));
                 rookie_counter += rookies;
             }
         }
@@ -96,8 +101,8 @@ impl StepRiotousRookies {
         let max_nr = team.players.iter().map(|p| p.nr).max().unwrap_or(0);
         let nr = max_nr + 1;
 
-        // Java: new RosterPlayer(id = teamId + index)
-        let id = format!("{}{}", team_id, index);
+        // Java: riotousPlayer.setId(team.getId() + "Riotous" + index);
+        let id = format!("{}Riotous{}", team_id, index);
         let player_id = id.clone();
         // Java: rookieName(generator, fallback) — HTTP deferred, fallback used
         let name = self.rookie_name("", &format!("Riotous Rookie #{}", index));
@@ -111,7 +116,8 @@ impl StepRiotousRookies {
         // Java: SkillFactory adds Loner to the rookie's skill set
         player.add_skill(SkillId::Loner);
 
-        // Java: riotousPlayer sets position_id and stats from riotousRookiesPosition
+        // Java: riotousPlayer.updatePosition(position, ...) sets position_id, stats,
+        // and adds the position's starting skills, in addition to the explicit Loner add above.
         if let Some(pos) = position {
             player.position_id = pos.id.clone();
             player.movement = pos.movement;
@@ -119,6 +125,9 @@ impl StepRiotousRookies {
             player.agility = pos.agility;
             player.passing = pos.passing;
             player.armour = pos.armour;
+            for skill in &pos.skills {
+                player.add_skill(skill.skill_id);
+            }
         }
 
         let team_mut = if home { &mut game.team_home } else { &mut game.team_away };
@@ -277,6 +286,17 @@ mod tests {
         );
     }
 
+    /// Java: `riotousPlayer.setId(team.getId() + "Riotous" + index);` — the id must
+    /// contain the literal "Riotous" segment, not just teamId+index concatenated.
+    #[test]
+    fn riotous_player_id_matches_java_format() {
+        let step = StepRiotousRookies::new();
+        let mut game = make_game();
+        step.riotous_player(&mut game, true, 5, None);
+        let player = game.team_home.players.last().unwrap();
+        assert_eq!(player.id, "homeRiotous5");
+    }
+
     #[test]
     fn riotous_player_nr_is_max_plus_one() {
         let step = StepRiotousRookies::new();
@@ -352,6 +372,64 @@ mod tests {
         assert_eq!(player.agility, 3);
         assert_eq!(player.passing, 4);
         assert_eq!(player.armour, 8);
+    }
+
+    /// Java: `updatePosition` adds `fPosition.getSkills()` to the rookie in addition
+    /// to the explicit `addSkill(factory.forName("Loner"))` call.
+    #[test]
+    fn riotous_player_with_position_copies_position_skills() {
+        use ffb_model::model::RosterPosition;
+        use ffb_model::enums::PlayerType;
+        use ffb_model::model::skill_def::SkillWithValue;
+        let step = StepRiotousRookies::new();
+        let mut game = make_game();
+        let pos = RosterPosition {
+            id: "lineman".into(),
+            name: "Lineman".into(),
+            player_type: PlayerType::Regular,
+            quantity: 16,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            skills: vec![SkillWithValue::new(SkillId::ThickSkull)],
+            ..Default::default()
+        };
+        step.riotous_player(&mut game, true, 0, Some(&pos));
+        let player = game.team_home.players.last().unwrap();
+        assert!(player.has_skill(SkillId::ThickSkull), "position skill should be copied to the rookie");
+        assert!(player.has_skill(SkillId::Loner), "rookie should still have the explicit Loner skill");
+    }
+
+    /// Java: `hireRiotousRookies` only creates players and adds a report
+    /// `if (position != null)`; when the roster has no eligible position
+    /// (`riotousRookiesPosition` returns null), no players are created and
+    /// no report is added — but `rookieCounter` still advances.
+    #[test]
+    fn hire_riotous_rookies_skips_creation_when_no_eligible_position() {
+        use ffb_model::inducement::inducement::Inducement;
+        use ffb_model::inducement::usage::Usage;
+
+        let step = StepRiotousRookies::new();
+        let mut game = make_game();
+        // Roster id that does not resolve to any real roster data, forcing
+        // `riotous_rookies_position` to always return None.
+        game.team_home.roster_id = "nonexistent_test_roster_xyz".into();
+        game.turn_data_home.inducement_set.add_inducement(Inducement::new(
+            "ADD_LINEMEN_TEST",
+            2,
+            vec![Usage::ADD_LINEMEN],
+        ));
+        let home_count_before = game.team_home.players.len();
+        let mut rng = GameRng::new(7);
+
+        step.hire_riotous_rookies_for_team(&mut game, &mut rng, true);
+
+        assert_eq!(
+            game.team_home.players.len(), home_count_before,
+            "no rookies should be created when no eligible roster position exists"
+        );
+        assert!(
+            game.report_list.is_empty(),
+            "no report should be added when no eligible roster position exists"
+        );
     }
 
     #[test]

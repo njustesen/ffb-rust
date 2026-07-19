@@ -112,7 +112,7 @@ impl StepInitKickTeamMate {
                     outcome = outcome.publish(StepParameter::KickedPlayerState(state));
                 }
                 if let Some(coord) = kicked_coord {
-                    outcome = outcome.publish(StepParameter::KickedPlayerCoordinate(coord));
+                    outcome = outcome.publish(StepParameter::KickedPlayerCoordinate(Some(coord)));
                 }
 
                 return outcome;
@@ -194,7 +194,7 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::KickedPlayerId(Some(id)) if id == kicked_id)));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::NrOfDice(2))));
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::KickedPlayerCoordinate(c) if *c == FieldCoordinate::new(7, 5))));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::KickedPlayerCoordinate(Some(c)) if *c == FieldCoordinate::new(7, 5))));
         assert_eq!(game.acting_player.player_action, Some(PlayerAction::KickTeamMate));
         assert_eq!(game.defender_id.as_deref(), Some(kicked_id));
     }

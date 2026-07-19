@@ -51,7 +51,7 @@ impl Step for StepKickTeamMateDoubleRolled {
         match param {
             StepParameter::KickedPlayerId(v) => { self.kicked_player_id = v.clone(); true }
             StepParameter::KickedPlayerState(v) => { self.kicked_player_state = Some(*v); true }
-            StepParameter::KickedPlayerCoordinate(v) => { self.kicked_player_coordinate = Some(*v); true }
+            StepParameter::KickedPlayerCoordinate(v) => { self.kicked_player_coordinate = *v; true }
             _ => false,
         }
     }
@@ -94,7 +94,7 @@ impl StepKickTeamMateDoubleRolled {
         }
 
         // Java: publish KICKED_PLAYER_COORDINATE(null) — avoids reset in end step
-        outcome.publish(StepParameter::KickedPlayerCoordinate(FieldCoordinate::new(0, 0)))
+        outcome.publish(StepParameter::KickedPlayerCoordinate(None))
     }
 }
 
@@ -166,6 +166,49 @@ mod tests {
         assert!(!out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))));
         // KICKED_PLAYER_COORDINATE(null) sentinel is always published
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::KickedPlayerCoordinate(_))));
+    }
+
+    /// Java: `publishParameter(new StepParameter(KICKED_PLAYER_COORDINATE, null))` — the
+    /// published value must be the `null` sentinel (Rust: `None`), not a placeholder
+    /// coordinate. A concrete placeholder would look like a "valid" coordinate to
+    /// StepEndKickTeamMate's reset guard (`fKickedPlayerCoordinate != null`), causing
+    /// it to wrongly restore the crowd-injured player's pre-injury position/state.
+    #[test]
+    fn kicked_player_coordinate_none_sentinel_is_published() {
+        let mut game = make_game();
+        let coord = FieldCoordinate::new(3, 3);
+
+        let mut step = StepKickTeamMateDoubleRolled::new();
+        step.kicked_player_id = Some("k4".into());
+        step.kicked_player_state = Some(PlayerState::new(PS_STANDING));
+        step.kicked_player_coordinate = Some(coord);
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            out.published.iter().any(|p| matches!(p, StepParameter::KickedPlayerCoordinate(None))),
+            "expected KickedPlayerCoordinate(None) sentinel, got: {:?}",
+            out.published.iter().find(|p| matches!(p, StepParameter::KickedPlayerCoordinate(_)))
+        );
+    }
+
+    /// Regression test: the None sentinel published by StepKickTeamMateDoubleRolled must
+    /// actually clear a downstream StepEndKickTeamMate's coordinate field (simulating the
+    /// stack-broadcast `publish` mechanism), otherwise the end step's reset-position guard
+    /// would incorrectly fire and overwrite the crowd-injured player's KNOCKED_OUT state.
+    #[test]
+    fn none_sentinel_clears_downstream_end_step_coordinate() {
+        use crate::step::action::ktm::step_end_kick_team_mate::StepEndKickTeamMate;
+
+        let mut end_step = StepEndKickTeamMate::new();
+        // Simulate StepInitKickTeamMate having already set a concrete coordinate on the
+        // end step earlier in the sequence.
+        end_step.set_parameter(&StepParameter::KickedPlayerCoordinate(Some(FieldCoordinate::new(9, 9))));
+        assert_eq!(end_step.kicked_player_coordinate, Some(FieldCoordinate::new(9, 9)));
+
+        // StepKickTeamMateDoubleRolled now publishes the null sentinel.
+        let consumed = end_step.set_parameter(&StepParameter::KickedPlayerCoordinate(None));
+        assert!(consumed);
+        assert_eq!(end_step.kicked_player_coordinate, None);
     }
 
     #[test]

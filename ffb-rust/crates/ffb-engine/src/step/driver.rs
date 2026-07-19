@@ -401,6 +401,18 @@ pub struct DriverGameState {
     current: Option<DriverStepEntry>,
     forwarded: Option<Action>,
     pending_prompt: Option<AgentPrompt>,
+    /// True exactly when the most recently dispatched outcome was
+    /// `StepAction::Continue` — i.e. the step is waiting for an external
+    /// command (whether or not that wait is surfaced as an `AgentPrompt`).
+    /// `StepAction::Repeat` intentionally leaves this false: unlike
+    /// `Continue`, `Repeat` means "call `start()` again immediately" (see
+    /// CLAUDE.md's "Loop pattern"). Without this flag, a step that legitimately
+    /// returns `Continue` with no prompt (e.g. `StepInitStartGame` waiting on
+    /// two separate `CLIENT_START_GAME` network commands, which has no
+    /// client-side dialog) would be busy-looped on `start()` forever by
+    /// `drive()`, since the loop used to treat "no prompt" as "not actually
+    /// waiting".
+    waiting_for_command: bool,
     pub events: Vec<GameEvent>,
     initial_hash: String,
 }
@@ -409,7 +421,8 @@ impl DriverGameState {
     pub fn from_game(game: Game, seed: u64) -> Self {
         DriverGameState {
             game, rng: GameRng::new(seed), stack: DriverStepStack::new(),
-            current: None, forwarded: None, pending_prompt: None, events: Vec::new(),
+            current: None, forwarded: None, pending_prompt: None,
+            waiting_for_command: false, events: Vec::new(),
             initial_hash: String::new(),
         }
     }
@@ -421,6 +434,19 @@ impl DriverGameState {
         gs.initial_hash = state_hash(&gs.game);
         gs.stack.push_sequence(start_game_sequence());
         gs.run_until_prompt();
+        // `start_game_sequence()` begins with `StepInitStartGame`, which (matching Java's
+        // `StepInitStartGame`) only proceeds once BOTH coaches have sent `CLIENT_START_GAME`
+        // (`fStartedHome && fStartedAway`), and waits (`Continue`, no dialog/prompt — this isn't
+        // a UI choice, just two independent network commands) until then. This constructor is a
+        // synchronous, single-process entry point that is only ever called once both `home` and
+        // `away` teams are already fully formed (its own doc: "Initialize the engine once both
+        // teams are present" — see `ffb-server::game_state::GameState::start_game`), so both
+        // coaches being "ready" is already an established precondition here — there is no
+        // earlier async join/team-load handshake modeled at this layer for a real per-client
+        // signal to arrive later. Synthesize both `CLIENT_START_GAME` commands immediately so
+        // construction doesn't stall waiting for network events this driver never delivers.
+        gs.apply_action(Action::StartGame { home: true });
+        gs.apply_action(Action::StartGame { home: false });
         gs
     }
 
@@ -478,11 +504,11 @@ impl DriverGameState {
 
     fn drive(&mut self) {
         loop {
-            if self.current.is_some() && self.pending_prompt.is_some() { return; }
+            if self.current.is_some() && (self.pending_prompt.is_some() || self.waiting_for_command) { return; }
             if self.current.is_none() {
                 match self.stack.pop() {
                     Some(s) => self.current = Some(s),
-                    None => { self.pending_prompt = None; return; }
+                    None => { self.pending_prompt = None; self.waiting_for_command = false; return; }
                 }
             }
             let mut entry = self.current.take().unwrap();
@@ -490,18 +516,19 @@ impl DriverGameState {
                 Some(cmd) => {
                     let o = entry.step.handle_command(&cmd, &mut self.game, &mut self.rng);
                     self.dispatch(entry, cmd, o);
-                    if self.pending_prompt.is_some() { return; }
+                    if self.pending_prompt.is_some() || self.waiting_for_command { return; }
                     continue;
                 }
                 None => entry.step.start(&mut self.game, &mut self.rng),
             };
             self.apply_effects(&mut outcome);
             self.dispatch_after_start(entry, outcome);
-            if self.pending_prompt.is_some() { return; }
+            if self.pending_prompt.is_some() || self.waiting_for_command { return; }
         }
     }
 
     fn dispatch(&mut self, entry: DriverStepEntry, action: Action, outcome: StepOutcome) {
+        self.waiting_for_command = matches!(outcome.action, StepAction::Continue);
         match outcome.action {
             StepAction::NextStep => {}
             StepAction::Continue | StepAction::Repeat => {
@@ -522,6 +549,7 @@ impl DriverGameState {
     }
 
     fn dispatch_after_start(&mut self, entry: DriverStepEntry, outcome: StepOutcome) {
+        self.waiting_for_command = matches!(outcome.action, StepAction::Continue);
         match outcome.action {
             StepAction::NextStep => {}
             StepAction::Continue | StepAction::Repeat => {

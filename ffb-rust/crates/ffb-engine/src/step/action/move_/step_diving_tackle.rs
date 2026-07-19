@@ -285,9 +285,17 @@ impl StepDivingTackle {
                                     }
                                 }
                             } else {
+                                // Java bug-for-bug: `dodgeModifiersWithBT` is a fresh set from
+                                // `modifierFactory.findModifiers(...)` and the subsequent
+                                // `dodgeModifiers.addAll(modifierFactory.forType(DIVING_TACKLE))` adds
+                                // the +2 Diving Tackle modifier to the wrong set (`dodgeModifiers`, the
+                                // ORIGINAL non-BT-forced set) rather than to `dodgeModifiersWithBT`.
+                                // `requiredRoll`/`wouldSucceed` below are therefore always computed
+                                // WITHOUT the Diving Tackle modifier — include_dt_modifier=false here
+                                // faithfully reproduces that (not the "obviously intended" `true`).
                                 let (required, _dodge_modifiers_with_bt_has_strength) = Self::dodge_minimum_roll(
                                     game, rules, &acting, from, to, true,
-                                    used_stat_based_roll_modifier.as_ref(), false, true,
+                                    used_stat_based_roll_modifier.as_ref(), false, false,
                                 );
                                 // Java bug-for-bug: `strengthModifierCanBeAdded` re-checks the
                                 // ORIGINAL (non-BT-forced) modifier set rather than the just-computed
@@ -305,7 +313,7 @@ impl StepDivingTackle {
                                 } else if used_stat_based_roll_modifier.is_none() {
                                     if let Some(ref avail) = available_stat_based_modifier {
                                         let (required2, _) = Self::dodge_minimum_roll(
-                                            game, rules, &acting, from, to, true, Some(avail), false, true,
+                                            game, rules, &acting, from, to, true, Some(avail), false, false,
                                         );
                                         if DiceInterpreter::is_skill_roll_successful(self.dodge_roll, required2) {
                                             descriptions.push(if strength_modifier_can_be_added {
@@ -733,6 +741,40 @@ mod tests {
         assert!(step.using_break_tackle);
         assert!(outcome.published.iter().any(|p| matches!(p, StepParameter::UsingBreakTackle(true))));
         assert!(game.player("home1").unwrap().used_skills.contains(&SkillId::BreakTackle));
+    }
+
+    #[test]
+    fn bb2020_stat_modifier_description_excludes_diving_tackle_bonus() {
+        // Java bug-for-bug: in the "no current strength modifier" branch, `dodgeModifiersWithBT`
+        // never receives the +2 Diving Tackle modifier (the Java `addAll` call targets the wrong
+        // set), so `wouldSucceed`'s minimum-roll computation must NOT include it either.
+        // agility=4, ST(Incorporeal)=1: correct (bug-faithful) minimum = 4 + 0 - 1 = 3 (roll 4 passes,
+        // description IS pushed). If the Diving Tackle +2 were wrongly included, minimum = 5 (roll 4
+        // fails, description would NOT be pushed) — this is exactly the pre-fix behaviour.
+        let mut game = make_game(Rules::Bb2020);
+        game.acting_player.player_id = Some("home1".into());
+        add_player(&mut game, true, "home1", FieldCoordinate::new(6, 6), 4, 1, &[SkillId::Incorporeal]);
+        add_player(&mut game, false, "away1", FieldCoordinate::new(6, 5), 3, 3, &[SkillId::DivingTackle]);
+        let mut step = StepDivingTackle::new();
+        step.goto_label_on_success = "DT".into();
+        step.coordinate_from = Some(FieldCoordinate::new(5, 5));
+        step.coordinate_to = Some(FieldCoordinate::new(6, 6));
+        step.using_modifying_skill = Some(false);
+        // minimum_roll_with_current = agility(4) + DT(2) - stat(0, unused) = 6 → roll 4 fails, enters
+        // the should_prompt branch; no strength modifier present (no Break Tackle skill) → else arm.
+        step.dodge_roll = 4;
+        let outcome = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(outcome.action, StepAction::Continue);
+        let prompt = outcome.prompt.expect("expected a player-choice prompt");
+        match prompt {
+            ffb_model::prompts::AgentPrompt::PlayerChoice { descriptions, .. } => {
+                assert!(
+                    descriptions.iter().any(|d| d.contains("Incorporeal")),
+                    "expected an Incorporeal-related description, got {descriptions:?}"
+                );
+            }
+            _ => panic!("expected PlayerChoice prompt"),
+        }
     }
 
     #[test]
