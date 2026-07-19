@@ -152,6 +152,10 @@ impl Step for StepPushback {
 impl StepPushback {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let mut do_push = false;
+        // Java: crowd-push params (INJURY_RESULT, THROW_IN mode/coord, END_TURN) that must be
+        // published alongside DEFENDER_PUSHED once execution reaches the unified `if (state.doPush)`
+        // block at the bottom of the method — Java does NOT return early from the crowd-push branch.
+        let mut extra_params: Vec<StepParameter> = Vec::new();
 
         // Java: if (!state.pushbackStack.isEmpty())
         // Player chose a coordinate — select that pushback square from the field model.
@@ -225,19 +229,33 @@ impl StepPushback {
 
                 // Java: if (!ArrayTool.isProvided(state.pushbackSquares)) → Crowd push
                 if !pushback_squares_found && !stop_processing {
-                    // Java: determine injuryType and attacker based on prayerState
-                    // Stub: prayerState.hasFanInteraction → false → always InjuryTypeCrowdPush, no attacker
+                    // Java: boolean sameTeam = state.defender != null && state.defender.getTeam() == game.getActingTeam();
+                    let same_team = game.defender_id.as_deref()
+                        .map(|id| game.is_active_team_player(id))
+                        .unwrap_or(false);
+
+                    // Java: if (hasFanInteraction(actingTeam) && !sameTeam) → CrowdPushForSpp w/ attacker = actingPlayer
+                    //       else → CrowdPush, no attacker
+                    let acting_team_id = game.active_team().id.clone();
+                    let (injury_type_name, attacker_id) =
+                        if game.prayer_state.has_fan_interaction(&acting_team_id) && !same_team {
+                            ("InjuryTypeCrowdPushForSpp", game.acting_player.player_id.clone())
+                        } else {
+                            ("InjuryTypeCrowdPush", None)
+                        };
+
                     let crowd_push_coord = self.starting_pushback_square
                         .as_ref()
                         .map(|sq| sq.coordinate)
                         .unwrap_or(defender_coord);
                     let injury_result = handle_injury_by_name(
-                        game, rng, "InjuryTypeCrowdPush",
-                        None,
+                        game, rng, injury_type_name,
+                        attacker_id.as_deref(),
                         game.defender_id.as_deref().unwrap_or(""),
                         crowd_push_coord,
                         None, None, ApothecaryMode::CrowdPush,
                     );
+                    extra_params.push(StepParameter::InjuryResult(Box::new(injury_result)));
 
                     // Java: game.getFieldModel().remove(state.defender)
                     if let Some(defender_id) = game.defender_id.clone() {
@@ -252,34 +270,29 @@ impl StepPushback {
                     let ball_at_defender = game.field_model.ball_coordinate
                         .map(|bc| bc == defender_coord)
                         .unwrap_or(false);
-                    let mut outcome = StepOutcome::next()
-                        .publish(StepParameter::InjuryResult(Box::new(injury_result)))
-                        .publish(StepParameter::DefenderPushed(true))
-                        // Java: publishParameter(STARTING_PUSHBACK_SQUARE, null)
-                        .publish(StepParameter::StartingPushbackSquare(None));
-
                     if ball_at_defender {
                         game.field_model.ball_coordinate = None;
-                        outcome = outcome
-                            .publish(StepParameter::CatchScatterThrowInMode(
-                                crate::step::CatchScatterThrowInMode::ThrowIn,
-                            ))
-                            .publish(StepParameter::ThrowInCoordinate(defender_coord));
+                        extra_params.push(StepParameter::CatchScatterThrowInMode(
+                            crate::step::CatchScatterThrowInMode::ThrowIn,
+                        ));
+                        extra_params.push(StepParameter::ThrowInCoordinate(defender_coord));
                         // Java: if sameTeam → publish END_TURN(true)
-                        let same_team = game.defender_id.as_deref()
-                            .map(|id| game.is_active_team_player(id))
-                            .unwrap_or(false);
                         if same_team {
-                            outcome = outcome.publish(StepParameter::EndTurn(true));
+                            extra_params.push(StepParameter::EndTurn(true));
                         }
                     }
 
+                    // Java: publishParameter(STARTING_PUSHBACK_SQUARE, null) — this also updates
+                    // state.startingPushbackSquare synchronously (AbstractStep.publishParameter calls
+                    // setParameter on self), so the addReport check below sees it as null.
                     self.starting_pushback_square = None;
-                    return outcome;
+                    // Java: state.doPush = true;
+                    do_push = true;
                 }
 
                 // Java: if (state.startingPushbackSquare == null) addReport(ReportPushback(...))
-                // SideStep/Grab hook may have cleared starting_pushback_square → add report now.
+                // Reached unconditionally — including the crowd-push branch above, since it just
+                // cleared starting_pushback_square. SideStep/Grab hooks may also have cleared it.
                 if self.starting_pushback_square.is_none() {
                     game.report_list.add(ReportPushback::new(
                         defender_id.clone(),
@@ -287,10 +300,13 @@ impl StepPushback {
                     ));
                 }
 
-                // Java: fieldModel.add(state.pushbackSquares)
-                game.field_model.pushback_squares.clear();
-                game.field_model.pushback_squares.extend(final_pushback_squares);
-                return StepOutcome::cont();
+                if !do_push {
+                    // Java: fieldModel.add(state.pushbackSquares)
+                    game.field_model.pushback_squares.clear();
+                    game.field_model.pushback_squares.extend(final_pushback_squares);
+                    return StepOutcome::cont();
+                }
+                // Java: falls through to the `if (state.doPush)` block below (crowd push sets doPush=true).
             }
         }
 
@@ -310,7 +326,11 @@ impl StepPushback {
             // Java: game.setWaitingForOpponent(false)
             // Java: getResult().setNextAction(StepAction.NEXT_STEP)
 
-            let mut outcome = StepOutcome::next()
+            let mut outcome = StepOutcome::next();
+            // Java: crowd-push params (INJURY_RESULT, THROW_IN mode/coord, END_TURN) were published
+            // earlier in the method, before DEFENDER_PUSHED — publish them here in the same order.
+            for p in extra_params { outcome = outcome.publish(p); }
+            outcome = outcome
                 .publish(StepParameter::DefenderPushed(true))
                 .publish(StepParameter::StartingPushbackSquare(None));
             for p in extra { outcome = outcome.publish(p); }
@@ -603,6 +623,51 @@ mod tests {
         game.field_model.set_player_coordinate("p1", coord);
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.report_list.has_report(ReportId::PUSHBACK), "ReportPushback should NOT appear when starting square is not cleared");
+    }
+
+    /// Regression test for two bugs found while auditing against StepPushback.java:
+    /// (1) Java's crowd-push branch does NOT return early — it falls through into the
+    ///     unified `if (state.doPush)` block, so a ReportPushback is always added once
+    ///     `startingPushbackSquare` becomes null (crowd push sets it null via publishParameter,
+    ///     which synchronously calls setParameter on self — see AbstractStep.publishParameter).
+    /// (2) That same fall-through means any pending chain/domino pushback entries left on
+    ///     pushbackStack get drained and applied via pushPlayer, even when the *current*
+    ///     defender is crowd-pushed. The old Rust code returned early from the crowd-push
+    ///     branch, silently dropping both the report and any queued chain pushes.
+    #[test]
+    fn crowd_push_drains_chain_pushback_stack_and_adds_report() {
+        let mut step = StepPushback::new();
+        let coord = FieldCoordinate::new(0, 0);
+        step.starting_pushback_square = Some(PushbackSquare::new(coord, Direction::North, true));
+
+        let mut game = make_game();
+        game.defender_id = Some("p1".into());
+        game.field_model.set_player_coordinate("p1", coord);
+
+        // Simulate a still-pending chain push for another player, targeting an occupied square
+        // so the top-of-method stack check leaves do_push = false and execution still reaches
+        // the crowd-push branch for the current defender at (0,0)/North (pushback squares off-pitch).
+        let chain_target = FieldCoordinate::new(5, 5);
+        game.field_model.set_player_coordinate("blocker", chain_target);
+        step.pushback_stack.push(("chain1".to_string(), chain_target));
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(
+            game.report_list.has_report(ReportId::PUSHBACK),
+            "ReportPushback should be added when crowd push clears starting_pushback_square"
+        );
+        assert!(
+            step.pushback_stack.is_empty(),
+            "pending chain pushback must be drained even when the current defender is crowd-pushed"
+        );
+        assert_eq!(
+            game.field_model.player_coordinate("chain1"),
+            Some(chain_target),
+            "chain-pushed player must be moved via pushPlayer"
+        );
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DefenderPushed(true))));
     }
 
     // ── StepPushbackHookState ────────────────────────────────────────────────

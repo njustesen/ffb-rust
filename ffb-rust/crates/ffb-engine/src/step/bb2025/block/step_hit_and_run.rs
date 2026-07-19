@@ -164,8 +164,10 @@ impl StepHitAndRun {
             .into_iter()
             .filter(|&c| game.field_model.player_at(c).is_none())
             // Java: !ArrayTool.isProvided(UtilPlayer.findAdjacentPlayers(game, otherTeam, coord))
+            // Note: uses the plain findAdjacentPlayers (no tacklezone filter) — any adjacent
+            // opponent (even prone/stunned) disqualifies the square, unlike findAdjacentPlayersWithTacklezones.
             .filter(|&c| {
-                UtilPlayer::find_adjacent_players_with_tacklezones(game, other_team, c, false).is_empty()
+                UtilPlayer::find_adjacent_players(game, other_team, c).is_empty()
             })
             .collect()
     }
@@ -348,6 +350,57 @@ mod tests {
         assert!(game.field_model.get_move_square(FieldCoordinate::new(0, 0)).is_none());
         // At least one eligible adjacent square should have been added
         assert!(!game.field_model.move_squares.is_empty());
+    }
+
+    /// Java: StepHitAndRun.findSquares uses the plain UtilPlayer.findAdjacentPlayers (no
+    /// tacklezone filter), so a square adjacent to a PRONE opponent must still be excluded —
+    /// unlike findAdjacentPlayersWithTacklezones, which would ignore prone/stunned opponents.
+    #[test]
+    fn find_squares_excludes_square_adjacent_to_prone_opponent() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, PS_STANDING, PS_PRONE, PlayerState, PlayerAction, SkillId};
+
+        let mut game = make_game();
+
+        let attacker = Player {
+            id: "attacker".into(), name: "a".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::HitAndRun, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(attacker);
+        game.field_model.set_player_coordinate("attacker", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("attacker", PlayerState::new(PS_STANDING));
+        game.acting_player.set_player("attacker".into(), PlayerAction::Block);
+
+        // Opponent lying prone (no tacklezones) adjacent to (6,5), which is itself adjacent
+        // to the attacker at (5,5). (6,5) is empty, so under a tacklezone-only filter it
+        // would wrongly be treated as eligible.
+        let opponent = Player {
+            id: "opponent".into(), name: "o".into(), nr: 2, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_away.players.push(opponent);
+        game.field_model.set_player_coordinate("opponent", FieldCoordinate::new(7, 5));
+        game.field_model.set_player_state("opponent", PlayerState::new(PS_PRONE));
+
+        let step = StepHitAndRun::new();
+        let squares = step.find_squares(&game);
+        assert!(
+            !squares.contains(&FieldCoordinate::new(6, 5)),
+            "square adjacent to a prone opponent must be excluded, matching Java's plain findAdjacentPlayers (no tacklezone filter)"
+        );
     }
 
     /// Selecting a coordinate causes the player to move to that square (move_squares cleared via reset_state).

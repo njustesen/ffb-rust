@@ -106,7 +106,10 @@ impl StepKickoffScatterRoll {
         };
 
         // ── Determine the kicking player coordinate ──────────────────────────
-        // Java: search the kicking team's players for one in CENTER_FIELD or LOS bounds.
+        // Java `findKickingPlayer`: first collect players in CENTER_FIELD bounds; if that set is
+        // empty, fall back to LOS bounds (NOT a combined OR of both). Among the resulting
+        // candidates, prefer one with canReduceKickDistance (Kick skill); otherwise take the
+        // first candidate in team order.
         if self.kicking_player_coordinate.is_none() {
             let (center_bounds, los_bounds) = if game.home_playing {
                 (FieldCoordinateBounds::CENTER_FIELD_HOME, FieldCoordinateBounds::LOS_HOME)
@@ -114,14 +117,30 @@ impl StepKickoffScatterRoll {
                 (FieldCoordinateBounds::CENTER_FIELD_AWAY, FieldCoordinateBounds::LOS_AWAY)
             };
             let kicking_team = game.active_team();
-            let found = kicking_team.players.iter().find_map(|p| {
-                let coord = game.field_model.player_coordinate(&p.id)?;
-                if center_bounds.is_in_bounds(coord) || los_bounds.is_in_bounds(coord) {
-                    Some((p.id.clone(), coord))
-                } else {
-                    None
-                }
-            });
+            let with_coords: Vec<(String, FieldCoordinate)> = kicking_team.players.iter()
+                .filter_map(|p| game.field_model.player_coordinate(&p.id).map(|c| (p.id.clone(), c)))
+                .collect();
+            let center_players: Vec<(String, FieldCoordinate)> = with_coords.iter()
+                .filter(|(_, c)| center_bounds.is_in_bounds(*c))
+                .cloned()
+                .collect();
+            let players_on_field: Vec<(String, FieldCoordinate)> = if center_players.is_empty() {
+                with_coords.into_iter()
+                    .filter(|(_, c)| los_bounds.is_in_bounds(*c))
+                    .collect()
+            } else {
+                center_players
+            };
+            let found = if players_on_field.is_empty() {
+                None
+            } else {
+                players_on_field.iter()
+                    .find(|(id, _)| game.player(id)
+                        .map(|p| p.has_skill_property(NamedProperties::CAN_REDUCE_KICK_DISTANCE))
+                        .unwrap_or(false))
+                    .cloned()
+                    .or_else(|| players_on_field.first().cloned())
+            };
             let default_kicker = if game.home_playing {
                 FieldCoordinate::new(0, 7)
             } else {
@@ -333,6 +352,62 @@ mod tests {
         if step.touchback {
             assert!(game.report_list.has_report(ReportId::EVENT));
         }
+    }
+
+    /// Java's `findKickingPlayer` prefers, among the players eligible in the same bounds group,
+    /// the one with `canReduceKickDistance` (Kick skill) — it does NOT simply take whichever
+    /// eligible player appears first in team order. This test places a non-Kick player before
+    /// a Kick-skill player (both in CENTER_FIELD_HOME bounds); before the fix, the Rust
+    /// implementation picked the first-in-order (non-Kick) player and never waited for a
+    /// kick-choice dialog.
+    #[test]
+    fn kick_skill_player_preferred_over_earlier_non_kick_player_in_same_bounds() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, SkillId, PlayerState, PS_STANDING};
+        use ffb_model::model::skill_def::SkillWithValue;
+
+        let mut game = make_game();
+
+        let non_kicker = Player {
+            id: "p1".into(), name: "p1".into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        let kicker = Player {
+            id: "p2".into(), name: "p2".into(), nr: 2,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Kick, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        // p1 (no Kick) appears before p2 (Kick) in team order.
+        game.team_home.players.push(non_kicker);
+        game.team_home.players.push(kicker);
+        game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 7));
+        game.field_model.set_player_coordinate("p2", FieldCoordinate::new(6, 7));
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+        game.field_model.set_player_state("p2", PlayerState::new(PS_STANDING));
+        game.home_playing = true;
+
+        let mut step = StepKickoffScatterRoll::new();
+        step.kickoff_start_coordinate = Some(FieldCoordinate::new(13, 7));
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert_eq!(step.kicking_player_id, Some("p2".to_string()),
+            "kick-skill player must be preferred over an earlier non-kick player in the same bounds group");
+        assert_eq!(out.action, StepAction::Continue,
+            "should wait for the kick-choice dialog since the selected kicker has the Kick skill");
     }
 
     #[test]

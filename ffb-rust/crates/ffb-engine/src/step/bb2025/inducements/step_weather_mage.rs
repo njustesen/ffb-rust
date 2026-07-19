@@ -42,6 +42,15 @@ impl Step for StepWeatherMage {
     fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         match action {
             Action::SelectWeather { weather } => {
+                // Java: CLIENT_SELECT_WEATHER — always reports Effect.CHANGED before
+                // applying the new weather (StepWeatherMage.handleCommand, case CLIENT_SELECT_WEATHER).
+                let old_weather = game.field_model.weather;
+                game.report_list.add(ReportWeatherMageResult::new(
+                    0,
+                    Some(weather.name().to_string()),
+                    Some(WeatherMageEffect::CHANGED),
+                    Some(old_weather.name().to_string()),
+                ));
                 game.field_model.weather = *weather;
                 StepOutcome::next()
             }
@@ -174,6 +183,23 @@ mod tests {
         );
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(game.field_model.weather, Weather::Blizzard);
+    }
+
+    /// Java StepWeatherMage.handleCommand (case CLIENT_SELECT_WEATHER) always adds a
+    /// ReportWeatherMageResult with Effect.CHANGED before applying the new weather.
+    /// This report was previously missing entirely from the Rust handle_command path.
+    #[test]
+    fn handle_select_weather_adds_changed_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.field_model.weather = Weather::Nice;
+        let mut step = StepWeatherMage::new();
+        step.handle_command(
+            &Action::SelectWeather { weather: Weather::Blizzard },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(game.report_list.has_report(ReportId::WEATHER_MAGE_RESULT));
     }
 
     /// Acknowledge command always returns NEXT_STEP.

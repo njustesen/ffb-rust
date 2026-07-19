@@ -31,8 +31,25 @@ impl DeferredCommand for DropPlayerFromBombCommand {
 
     fn execute(&self, game: &mut Game) -> Vec<StepParameter> {
         // Java: UtilServerInjury.dropPlayer(step, player, apothecaryMode, eligibleForSafePairOfHands)
-        // apothecary_mode and was_active (original_bombardier comparison) deferred — dialog infra needed.
+        // apothecary_mode deferred — dialog infra needed.
         let mut params = drop_player(game, &self.player_id, self.eligible_for_safe_pair_of_hands);
+
+        // Java:
+        //   PlayerState newState = game.getFieldModel().getPlayerState(player);
+        //   if (!player.getId().equalsIgnoreCase(originalBombardier) && newState.isProneOrStunned())
+        //       game.getFieldModel().setPlayerState(player, newState.changeActive(wasActive));
+        if let Some(new_state) = game.field_model.player_state(&self.player_id) {
+            let is_original_bombardier = game
+                .original_bombardier
+                .as_deref()
+                .map(|id| id.eq_ignore_ascii_case(&self.player_id))
+                .unwrap_or(false);
+            if !is_original_bombardier && new_state.is_prone_or_stunned() {
+                game.field_model
+                    .set_player_state(&self.player_id, new_state.change_active(self.was_active));
+            }
+        }
+
         // Java: if (suppressEndTurn) → remove END_TURN from published params
         if self.suppress_end_turn {
             params.retain(|p| !matches!(p, StepParameter::EndTurn(_)));
@@ -87,5 +104,63 @@ mod tests {
     #[test]
     fn is_zero_sized_unit_struct() {
         assert!(std::mem::size_of::<DropPlayerFromBombCommand>() > 0);
+    }
+
+    fn add_stunned_player(game: &mut Game, id: &str, active: bool) {
+        use ffb_model::enums::{PlayerGender, PlayerState, PlayerType, PS_STUNNED};
+        use ffb_model::model::player::Player;
+        use ffb_model::types::FieldCoordinate;
+        game.team_home.players.push(Player {
+            id: id.into(),
+            name: id.into(),
+            nr: 1,
+            position_id: "lineman".into(),
+            player_type: PlayerType::Regular,
+            gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![],
+            extra_skills: vec![],
+            temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0,
+            stat_injuries: vec![],
+            current_spps: 0,
+            career_spps: 0,
+            race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        let pos = FieldCoordinate::new(5, 5);
+        game.field_model.set_player_coordinate(id, pos);
+        let state = PlayerState::new(PS_STUNNED).change_active(active);
+        game.field_model.set_player_state(id, state);
+    }
+
+    #[test]
+    fn restores_active_flag_for_non_bombardier_prone_or_stunned_player() {
+        // Java: DropPlayerFromBombCommand.execute — for a player who is NOT the original
+        // bombardier and ends up prone/stunned after the drop, the active flag is restored to
+        // `wasActive` rather than left as whatever dropPlayer's own deactivation logic set it to.
+        let mut game = make_game();
+        add_stunned_player(&mut game, "p1", false);
+        game.original_bombardier = Some("someone_else".into());
+        let cmd = DropPlayerFromBombCommand::new("p1".into(), ApothecaryMode::Defender, false, true, false);
+        cmd.execute(&mut game);
+        let state = game.field_model.player_state("p1").unwrap();
+        assert!(state.is_active(), "active flag should be restored to was_active=true");
+    }
+
+    #[test]
+    fn does_not_restore_active_flag_for_original_bombardier() {
+        // Java: the changeActive restoration is skipped when the dropped player IS the
+        // original bombardier (equalsIgnoreCase match), leaving dropPlayer's own deactivation
+        // in place.
+        let mut game = make_game();
+        add_stunned_player(&mut game, "p1", false);
+        game.original_bombardier = Some("p1".into());
+        let cmd = DropPlayerFromBombCommand::new("p1".into(), ApothecaryMode::Defender, false, true, false);
+        cmd.execute(&mut game);
+        let state = game.field_model.player_state("p1").unwrap();
+        assert!(!state.is_active(), "bombardier's active flag should not be restored");
     }
 }

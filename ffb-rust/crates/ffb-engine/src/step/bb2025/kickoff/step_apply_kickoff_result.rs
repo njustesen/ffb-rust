@@ -361,10 +361,11 @@ impl StepApplyKickoffResult {
                     })
                     .count() as i32;
 
-                if moved_players <= self.nr_of_players_allowed {
-                    // Java: mechanic.checkSetup(gameState, game.isHomePlaying(), getKickingSwarmers())
-                    let _valid = SetupMechanic::new().check_setup_with_swarmers(game, game.home_playing, game.kicking_swarmers);
-                    // client-only: show setup error dialog when !valid
+                // Java: validSolidDefence(movedPlayers) && mechanic.checkSetup(gameState, game.isHomePlaying(), getKickingSwarmers())
+                // Both conditions must hold to leave Solid Defence; checkSetup is a real (non-client-only)
+                // validity check and must gate the transition, not just the moved-player count.
+                let valid = SetupMechanic::new().check_setup_with_swarmers(game, game.home_playing, game.kicking_swarmers);
+                if moved_players <= self.nr_of_players_allowed && valid {
                     // Java: leaveSolidDefence → setKickingSwarmers(0)
                     game.kicking_swarmers = 0;
                     game.turn_mode = TurnMode::Kickoff;
@@ -435,7 +436,19 @@ impl StepApplyKickoffResult {
                 };
                 SetupMechanic::new().pin_players_in_tacklezones(game, &pin_team_id);
                 // Animation is client-side only.
-                StepOutcome::cont()
+                // Java: `skip = ...noneMatch(player -> playerState.isActive())` — if the receiving team
+                // has no active (unpinned) players left, immediately undo the toggle and finish.
+                let any_active = game.active_team().players.iter()
+                    .any(|p| game.field_model.player_state(&p.id)
+                        .map(|s| s.is_active())
+                        .unwrap_or(false));
+                if !any_active {
+                    game.home_playing = !game.home_playing;
+                    game.turn_mode = TurnMode::Kickoff;
+                    StepOutcome::next()
+                } else {
+                    StepOutcome::cont()
+                }
             }
         }
     }
@@ -511,7 +524,13 @@ impl StepApplyKickoffResult {
                         self.nr_of_moved_players,
                         self.nr_of_players_allowed,
                     ));
+                    // Java: `if (nrOfMovedPlayers == nrOfPlayersAllowed) { fEndKickoff = true; ... }
+                    //        else if (activePlayersOnField == 0) { fEndKickoff = true; ... }`
+                    // The active-players-exhausted case must also end Quick Snap, otherwise headless
+                    // play stalls waiting for moves from a team with no active players left.
                     if self.nr_of_moved_players == self.nr_of_players_allowed {
+                        self.end_kickoff = true;
+                    } else if active_on_field == 0 {
                         self.end_kickoff = true;
                     }
                 }
@@ -520,9 +539,12 @@ impl StepApplyKickoffResult {
             }
 
             if self.end_kickoff {
+                // Java reports `limit_reached=true` when the move cap was hit, and
+                // `limit_reached=false` when the team ran out of active players instead.
+                let limit_reached = self.nr_of_moved_players == self.nr_of_players_allowed;
                 game.home_playing = !game.home_playing;
                 game.turn_mode = TurnMode::Kickoff;
-                StepOutcome::next().with_event(GameEvent::KickoffSequenceActivationsExhausted { limit_reached: true })
+                StepOutcome::next().with_event(GameEvent::KickoffSequenceActivationsExhausted { limit_reached })
             } else {
                 StepOutcome::cont()
             }
@@ -825,7 +847,14 @@ mod tests {
 
     #[test]
     fn high_kick_waits_for_receiving_team() {
+        use ffb_model::enums::{PS_STANDING, PlayerState};
         let mut game = make_game();
+        // Receiving team (away, since home_playing toggles true->false) needs at least
+        // one active player, otherwise (matching Java's `noneMatch` skip check) the step
+        // would immediately skip back to Kickoff instead of waiting.
+        game.team_away.players.push(make_min_player("away1"));
+        game.field_model.set_player_coordinate("away1", FieldCoordinate::new(3, 3));
+        game.field_model.set_player_state("away1", PlayerState::new(PS_STANDING).change_active(true));
         game.field_model.ball_coordinate = Some(FieldCoordinate::new(7, 7));
         let mut step = make_step();
         step.kickoff_result = Some(KickoffResult::HighKick);
@@ -937,5 +966,121 @@ mod tests {
                 "player should be sent to reserve or have -1 MA/-1 AV"
             );
         }
+    }
+
+    // ── HighKick: skip when receiving team has no active players ─────────────
+
+    fn make_min_player(id: &str) -> ffb_model::model::player::Player {
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+        Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None, ..Default::default()
+        }
+    }
+
+    #[test]
+    fn high_kick_skips_when_receiving_team_fully_pinned() {
+        use ffb_model::enums::{PS_STANDING, PlayerState};
+
+        let mut game = make_game();
+        // Home player will end up pinning the away player's tacklezone.
+        game.team_home.players.push(make_min_player("hp1"));
+        game.field_model.set_player_coordinate("hp1", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("hp1", PlayerState::new(PS_STANDING).change_active(true));
+
+        // Away is the only player on the receiving team; it will be pinned
+        // (adjacent to hp1's tacklezone) and has no teammates to fall back on.
+        game.team_away.players.push(make_min_player("ap1"));
+        game.field_model.set_player_coordinate("ap1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("ap1", PlayerState::new(PS_STANDING).change_active(true));
+
+        // No catcher on the ball square, so the high-kick reposition sub-phase is entered.
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(1, 1));
+        game.home_playing = true;
+
+        let mut step = make_step();
+        step.kickoff_result = Some(KickoffResult::HighKick);
+        step.touchback = false;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        // Before the fix: the pinned-out receiving team would leave turn_mode stuck at
+        // HighKick with action Continue forever, since the "no active players" guard was
+        // dropped. After the fix, it must immediately bounce back to Kickoff/NextStep.
+        assert_eq!(out.action, StepAction::NextStep, "should skip HighKick when no active players remain");
+        assert_eq!(game.turn_mode, TurnMode::Kickoff);
+        assert!(game.home_playing, "home_playing toggle must be undone when skipping");
+    }
+
+    // ── SolidDefence: invalid setup must not end the sub-phase ────────────────
+
+    #[test]
+    fn solid_defence_stays_active_when_setup_invalid() {
+        use ffb_model::enums::PlayerState;
+        let mut game = make_game();
+        game.options.set(ffb_model::option::game_option_id::MAX_PLAYERS_ON_FIELD, "11");
+        game.options.set(ffb_model::option::game_option_id::MIN_PLAYERS_ON_LOS, "3");
+
+        // 11 reservable (but unplaced) players make `checkSetup` fail: available_players (11)
+        // >= max_players_on_field (11) while all_players_on_field is 0.
+        for i in 0..11 {
+            let id = format!("hp{i}");
+            game.team_home.players.push(make_min_player(&id));
+            game.field_model.set_player_state(&id, PlayerState::new(ffb_model::enums::PS_RESERVE));
+        }
+        game.home_playing = true;
+
+        let mut step = make_step();
+        step.kickoff_result = Some(KickoffResult::SolidDefence);
+        // First call: enters Solid Defence mode.
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.turn_mode, TurnMode::SolidDefence);
+
+        // Simulate the receiving player's EndTurn (no players actually moved).
+        step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
+
+        // Before the fix: an invalid setup (checkSetup == false) was ignored, and the step
+        // always left Solid Defence once the moved-player count was within the allowed cap.
+        // After the fix: an invalid setup must keep the game in Solid Defence.
+        assert_eq!(game.turn_mode, TurnMode::SolidDefence, "invalid setup must not leave Solid Defence");
+    }
+
+    // ── QuickSnap: end sub-phase when active players run out mid-move ────────
+
+    #[test]
+    fn quick_snap_ends_when_active_players_exhausted_before_cap() {
+        use ffb_model::enums::{PS_STANDING, PlayerState};
+
+        let mut game = make_game();
+        // Only one player total on the acting (post-toggle) team, so after the
+        // single allowed move it has no more active players — but nrOfPlayersAllowed
+        // (roll+3 >= 4) will never be reached by moving just one player.
+        game.team_home.players.push(make_min_player("hp1"));
+        game.field_model.set_player_coordinate("hp1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("hp1", PlayerState::new(PS_STANDING).change_active(true));
+        game.home_playing = false; // toggled to true (home) when QuickSnap starts
+
+        let mut step = make_step();
+        step.kickoff_result = Some(KickoffResult::QuickSnap);
+        let out1 = step.start(&mut game, &mut GameRng::new(1));
+        assert_eq!(game.turn_mode, TurnMode::QuickSnap);
+        assert_eq!(out1.action, StepAction::Continue);
+        assert!(step.nr_of_players_allowed >= 4, "roll (1..3) + 3 should be >= 4");
+
+        // Move the only active player once — this consumes it (it becomes the "moved"
+        // player, but importantly there are no other active players left to move).
+        step.moved_player = Some("hp1".into());
+        step.to_coordinate = Some(FieldCoordinate::new(5, 6));
+        let out2 = step.execute_step(&mut game, &mut GameRng::new(1));
+
+        // Before the fix: with active_players_on_field == 0 but nr_of_moved_players (1) <
+        // nr_of_players_allowed (>=4), the step would never end and StepOutcome::cont()
+        // would be returned forever. After the fix, the exhausted-players branch ends it.
+        assert_eq!(out2.action, StepAction::NextStep, "quick snap must end when no active players remain");
+        assert_eq!(game.turn_mode, TurnMode::Kickoff);
     }
 }

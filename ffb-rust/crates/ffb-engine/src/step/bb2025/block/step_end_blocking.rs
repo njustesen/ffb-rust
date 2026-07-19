@@ -106,26 +106,57 @@ impl Step for StepEndBlocking {
                 self.use_pile_driver = Some(!player_id.is_empty());
             }
             Action::UseSkill { skill_id, use_skill } => {
-                match skill_id {
-                    SkillId::HitAndRun => {
-                        // Java: canMoveAfterBlock property
-                        self.use_hit_and_run = Some(*use_skill);
-                    }
-                    SkillId::PutridRegurgitation => {
-                        // Java: canUseVomitAfterBlock property
-                        self.use_putrid_regurgitation = Some(*use_skill);
-                    }
-                    _ => {
-                        // Java: canAddBlockDie — update dice decorations
-                        // Java: getResult().addReport(new ReportSkillUse(commandUseSkill.getSkill(), true, SkillUse.ADD_BLOCK_DIE))
-                        {
-                            use ffb_model::model::skill_use::SkillUse;
-                            use ffb_model::report::report_skill_use::ReportSkillUse;
+                // Java: dispatch by the skill's property, not by identity.
+                if (*skill_id).properties().contains(&NamedProperties::CAN_MOVE_AFTER_BLOCK) {
+                    self.use_hit_and_run = Some(*use_skill);
+                } else if (*skill_id).properties().contains(&NamedProperties::CAN_USE_VOMIT_AFTER_BLOCK) {
+                    self.use_putrid_regurgitation = Some(*use_skill);
+                } else if (*skill_id).properties().contains(&NamedProperties::CAN_ADD_BLOCK_DIE) {
+                    // Java: canAddBlockDie branch — only applies the block-die skill use if the
+                    // target selection state exists, the skill is unused, the current dice
+                    // decoration for the selected target is 1/2 (or 3 with an opponent that can
+                    // move before being blocked), and the target is adjacent to the acting player.
+                    use ffb_model::model::skill_use::SkillUse;
+                    use ffb_model::report::report_skill_use::ReportSkillUse;
+
+                    let acting_player_id = game.acting_player.player_id.clone();
+                    let has_unused_skill = acting_player_id.as_deref()
+                        .and_then(|id| game.player(id))
+                        .map(|p| p.all_skill_ids().any(|id| id == *skill_id) && !p.used_skills.contains(skill_id))
+                        .unwrap_or(false);
+                    let selected_player_id = game.field_model.target_selection_state.as_ref()
+                        .and_then(|ts| ts.selected_player_id.clone());
+
+                    if game.field_model.target_selection_state.is_some() && has_unused_skill {
+                        let target_coordinate = selected_player_id.as_deref()
+                            .and_then(|id| game.field_model.player_coordinate(id));
+                        let player_coordinate = acting_player_id.as_deref()
+                            .and_then(|id| game.field_model.player_coordinate(id));
+                        let dice_decoration = target_coordinate
+                            .and_then(|c| game.field_model.get_dice_decoration_at(c))
+                            .cloned();
+                        let opponent_can_move = selected_player_id.as_deref()
+                            .and_then(|id| game.player(id))
+                            .map(|defender| UtilCards::has_unused_skill_with_property(
+                                defender, NamedProperties::CAN_MOVE_BEFORE_BEING_BLOCKED))
+                            .unwrap_or(false);
+                        let dice_ok = dice_decoration.as_ref().map(|d| {
+                            d.nr_of_dice == 1 || d.nr_of_dice == 2 || (d.nr_of_dice == 3 && opponent_can_move)
+                        }).unwrap_or(false);
+                        let adjacent = target_coordinate.zip(player_coordinate)
+                            .map(|(t, p)| t.is_adjacent(p))
+                            .unwrap_or(false);
+
+                        if dice_ok && adjacent {
+                            if let Some(ts) = game.field_model.target_selection_state.as_mut() {
+                                ts.add_used_skill(*skill_id);
+                            }
                             game.report_list.add(ReportSkillUse::new(
                                 None, *skill_id, true, SkillUse::ADD_BLOCK_DIE,
                             ));
+                            // Java: ServerUtilBlock.updateDiceDecorations(getGameState()) — no frenzy flag.
+                            ServerUtilBlock::update_dice_decorations(game);
                         }
-                        ServerUtilBlock::update_dice_decorations_with_frenzy(game, true);
                     }
                 }
             }
@@ -983,9 +1014,18 @@ mod tests {
     }
 
     // ── report_list: ADD_BLOCK_DIE skill use ─────────────────────────────────
+    //
+    // Java only takes the `canAddBlockDie` branch (StepEndBlocking#handleCommand,
+    // CLIENT_USE_SKILL case) when the used skill actually carries the
+    // `canAddBlockDie` property (and several further guards: a live
+    // TargetSelectionState, an unused matching skill, a 1/2/3-with-mobile-opponent
+    // dice decoration, and target/attacker adjacency all hold). A skill like Block,
+    // which has none of the three relevant properties (canMoveAfterBlock,
+    // canUseVomitAfterBlock, canAddBlockDie), must never add a SKILL_USE report or
+    // touch dice decorations.
 
     #[test]
-    fn use_skill_block_adds_report_skill_use_add_block_die() {
+    fn use_skill_without_matching_property_adds_no_report() {
         use ffb_model::report::report_id::ReportId;
         let mut step = StepEndBlocking::new();
         let mut game = make_game();
@@ -994,12 +1034,12 @@ mod tests {
             &mut game,
             &mut GameRng::new(0),
         );
-        assert!(game.report_list.has_report(ReportId::SKILL_USE),
-            "expected SKILL_USE report for ADD_BLOCK_DIE");
+        assert!(!game.report_list.has_report(ReportId::SKILL_USE),
+            "Block has none of canMoveAfterBlock/canUseVomitAfterBlock/canAddBlockDie — no SKILL_USE report should be added");
     }
 
     #[test]
-    fn use_skill_add_block_die_report_count_is_one() {
+    fn use_skill_without_matching_property_report_count_is_zero() {
         use ffb_model::report::report_id::ReportId;
         let mut step = StepEndBlocking::new();
         let mut game = make_game();
@@ -1011,7 +1051,24 @@ mod tests {
         let count = game.report_list.get_reports().iter()
             .filter(|r| r.get_id() == ReportId::SKILL_USE)
             .count();
-        assert_eq!(count, 1, "exactly one SKILL_USE report should be added");
+        assert_eq!(count, 0, "no SKILL_USE report should be added for a skill without the relevant properties");
+    }
+
+    #[test]
+    fn use_skill_add_block_die_without_target_selection_state_adds_no_report() {
+        // Even for a skill_id that would take the canAddBlockDie branch, without a
+        // live TargetSelectionState (game.field_model.target_selection_state == None)
+        // Java never adds the report or rebuilds dice decorations.
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepEndBlocking::new();
+        let mut game = make_game();
+        assert!(game.field_model.target_selection_state.is_none());
+        step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Block, use_skill: true },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(!game.report_list.has_report(ReportId::SKILL_USE));
     }
 
     // ── auto-decline for skills not present on player ─────────────────────────

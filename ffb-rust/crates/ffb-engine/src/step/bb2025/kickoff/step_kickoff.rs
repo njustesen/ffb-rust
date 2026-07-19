@@ -8,6 +8,7 @@ use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::common::Inducement;
 use crate::step::generator::common::inducement::InducementParams;
+use crate::util::util_server_game::UtilServerGame;
 
 /// Accepts the kicker's placement choice; publishes `KickoffStartCoordinate`
 /// and pushes two `BeforeKickoffScatter` Inducement sequences (home + away).
@@ -54,6 +55,8 @@ impl StepKickoff {
     fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         match self.kickoff_start_coordinate {
             Some(coord) => {
+                // Java: UtilServerGame.updatePlayerStateDependentProperties(this)
+                UtilServerGame::update_player_state_dependent_properties(game);
                 // Java: pushSequence(InducementPhase.BEFORE_KICKOFF_SCATTER, home_playing)
                 // Java: pushSequence(InducementPhase.BEFORE_KICKOFF_SCATTER, !home_playing)
                 let seq_home = Inducement::build_sequence(&InducementParams {
@@ -143,6 +146,23 @@ mod tests {
         step.kickoff_start_coordinate = Some(FieldCoordinate::new(13, 7));
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    /// Java StepKickoff.executeStep calls UtilServerGame.updatePlayerStateDependentProperties(this)
+    /// before publishing KICKOFF_START_COORDINATE. This recomputes single_use_rerolls (among other
+    /// things), so a stale sentinel value must be overwritten with the recomputed value (0 for a
+    /// team with no matching skills), proving the call happens.
+    #[test]
+    fn kickoff_with_coordinate_updates_player_state_dependent_properties() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.single_use_rerolls = 99;
+        game.turn_data_away.single_use_rerolls = 99;
+        let mut step = StepKickoff::new();
+        step.kickoff_start_coordinate = Some(FieldCoordinate::new(13, 7));
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.turn_data_home.single_use_rerolls, 0);
+        assert_eq!(game.turn_data_away.single_use_rerolls, 0);
     }
 
     #[test]
