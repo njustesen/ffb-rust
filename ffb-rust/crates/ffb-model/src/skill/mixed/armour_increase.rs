@@ -1,4 +1,9 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed::ArmourIncrease.
+/// Deferred: Java's `getCost(Player<?> player)` override (returns 10000, overriding the base
+/// `com.fumbbl.ffb.skill.ArmourIncrease`'s own cost logic) is not translated — `Skill` has no
+/// `get_cost` method in Rust, and the base class's cost logic depends on
+/// `Position::hasSkill`/`isDoubleCategory`, which don't exist on the Rust `Position` model.
+/// Adding this would require new cross-cutting infra beyond this file's scope.
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 

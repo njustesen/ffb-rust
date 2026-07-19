@@ -1,5 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed::Bloodlust.
 use crate::model::skill::skill::Skill;
+use crate::model::skill::skill_value_evaluator::SkillValueEvaluator;
 use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct Bloodlust {
@@ -16,6 +17,16 @@ impl Bloodlust {
             SkillUsageType::Regular,
         );
         Self { base }
+    }
+
+    /// Java `getConfusionMessage()` override.
+    pub fn get_confusion_message(&self) -> &'static str {
+        "needs to bite a thrall"
+    }
+
+    /// Java `evaluator()` override.
+    pub fn evaluator(&self) -> SkillValueEvaluator {
+        SkillValueEvaluator::Roll
     }
 }
 
@@ -39,4 +50,12 @@ mod tests {
     fn default_value_is_two() { assert_eq!(Bloodlust::new().get_default_skill_value(), 2); }
     #[test]
     fn is_negative_trait() { assert!(Bloodlust::new().is_negative_trait()); }
+    #[test]
+    fn confusion_message_overridden() {
+        assert_eq!(Bloodlust::new().get_confusion_message(), "needs to bite a thrall");
+    }
+    #[test]
+    fn evaluator_is_roll() {
+        assert_eq!(Bloodlust::new().evaluator(), SkillValueEvaluator::Roll);
+    }
 }

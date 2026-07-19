@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use crate::enums::{SkillCategory, SkillUsageType, DeclareCondition, ReRollSource};
 use crate::model::re_rolled_action::ReRolledAction;
 use crate::model::property::i_skill_property::ISkillProperty;
+use crate::model::skill::skill_value_evaluator::SkillValueEvaluator;
 
 // TODO: replace with proper types when modifier crates are ported
 pub type PassModifier = String;
@@ -292,6 +293,11 @@ impl Skill {
     pub fn enhancement_source_name(&self) -> &str {
         &self.name
     }
+
+    /// Java `evaluator()` — returns `SkillValueEvaluator.DEFAULT` in the base class.
+    pub fn evaluator(&self) -> SkillValueEvaluator {
+        SkillValueEvaluator::Default
+    }
 }
 
 impl Default for Skill {
@@ -469,6 +475,12 @@ mod tests {
     fn get_skill_use_description_returns_none_by_default() {
         let s = Skill::new("Block", SkillCategory::General);
         assert!(s.get_skill_use_description().is_none());
+    }
+
+    #[test]
+    fn evaluator_defaults_to_default_variant() {
+        let s = Skill::new("Block", SkillCategory::General);
+        assert_eq!(s.evaluator(), SkillValueEvaluator::Default);
     }
 
     #[test]
