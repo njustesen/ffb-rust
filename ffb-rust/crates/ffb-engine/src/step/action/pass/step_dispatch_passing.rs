@@ -61,10 +61,11 @@ impl Step for StepDispatchPassing {
 
 impl StepDispatchPassing {
     fn execute_step(&self, game: &Game) -> StepOutcome {
-        // Java: if thrower == null || throwerAction == null → return (no action)
-        // In Rust: check thrower_id + thrower_action; if not set → goto end
+        // Java: if (thrower == null || throwerAction == null) { return; } — a bare return with no
+        // `setNextAction` call at all, i.e. the step stays waiting (StepAction.CONTINUE), NOT a
+        // GOTO to the end label.
         if game.thrower_id.is_none() || game.thrower_action.is_none() {
-            return StepOutcome::goto(&self.goto_label_on_end);
+            return StepOutcome::cont();
         }
 
         match game.thrower_action {
@@ -167,12 +168,21 @@ mod tests {
     }
 
     #[test]
-    fn no_thrower_gotos_end_label() {
+    fn no_thrower_continues_waiting() {
+        // Java: `if (thrower == null || throwerAction == null) { return; }` — a bare return with no
+        // setNextAction call, so the step just stays waiting rather than jumping anywhere.
         let mut game = make_game();
         game.thrower_id = None;
         let out = make_step().start(&mut game, &mut GameRng::new(0));
-        assert_eq!(out.action, StepAction::GotoLabel);
-        assert_eq!(out.goto_label.as_deref(), Some("end"));
+        assert_eq!(out.action, StepAction::Continue);
+    }
+
+    #[test]
+    fn no_thrower_action_continues_waiting() {
+        let mut game = make_game();
+        game.thrower_action = None;
+        let out = make_step().start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue);
     }
 
     #[test]

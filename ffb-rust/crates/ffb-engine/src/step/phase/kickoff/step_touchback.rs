@@ -95,6 +95,10 @@ impl StepTouchback {
                 // Java: game.getFieldModel().setBallCoordinate(fTouchbackCoordinate)
                 game.field_model.ball_coordinate = Some(coord);
                 // Java: Player<?> player = game.getFieldModel().getPlayer(fTouchbackCoordinate)
+                // Java always falls through to `game.setTurnMode(TurnMode.REGULAR)` after this
+                // block, regardless of which sub-branch ran — publishParameter() is a plain
+                // statement in Java, not an early return, so it must not skip the turn-mode set.
+                let mut publish_catch_scatter = false;
                 if let Some(player_id) = game.field_model.player_at(coord).cloned() {
                     // Java: PlayerState playerState = game.getFieldModel().getPlayerState(player)
                     let player_state = game.field_model.player_state(&player_id);
@@ -111,13 +115,16 @@ impl StepTouchback {
                         // client-only: getResult().setSound(SoundId.CATCH)
                     } else {
                         // Java: publishParameter(CATCH_SCATTER_THROW_IN_MODE, CATCH_KICKOFF)
-                        return StepOutcome::next().publish(StepParameter::CatchScatterThrowInMode(
-                            CatchScatterThrowInMode::CatchKickoff,
-                        ));
+                        publish_catch_scatter = true;
                     }
                 }
                 // Java: game.setTurnMode(TurnMode.REGULAR)
                 game.turn_mode = TurnMode::Regular;
+                if publish_catch_scatter {
+                    return StepOutcome::next().publish(StepParameter::CatchScatterThrowInMode(
+                        CatchScatterThrowInMode::CatchKickoff,
+                    ));
+                }
             }
         }
 
@@ -198,6 +205,40 @@ mod tests {
         assert!(!game.field_model.out_of_bounds);
         // Java: game.getFieldModel().setBallCoordinate(fTouchbackCoordinate)
         assert_eq!(game.field_model.ball_coordinate, Some(coord));
+    }
+
+    /// Java: `publishParameter(CATCH_SCATTER_THROW_IN_MODE, ...)` is a plain statement,
+    /// followed unconditionally by `game.setTurnMode(TurnMode.REGULAR)` — the turn mode
+    /// must still be set to REGULAR even when the ball lands on a player without
+    /// tacklezones (triggering the catch-scatter-throw-in branch instead of a catch).
+    #[test]
+    fn touchback_catch_scatter_branch_still_sets_turn_mode_regular() {
+        use ffb_model::enums::{PS_PRONE, PlayerState};
+
+        let mut game = make_game();
+        let mut step = StepTouchback::new();
+        step.set_parameter(&StepParameter::Touchback(true));
+
+        let coord = FieldCoordinate::new(5, 8);
+        step.touchback_coordinate = Some(coord);
+
+        // Place a prone player (no tacklezones) at the touchback coordinate so the
+        // "else" branch (publish CatchScatterThrowInMode) is taken instead of the catch.
+        let mut player = ffb_model::model::player::Player::default();
+        player.id = "p1".into();
+        game.team_home.players.push(player);
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE));
+
+        let out = step.execute_step(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        // The catch-scatter-throw-in mode should be published...
+        let published_catch_scatter = out.published.iter().any(|p| {
+            matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::CatchKickoff))
+        });
+        assert!(published_catch_scatter, "should publish CatchScatterThrowInMode::CatchKickoff");
+        // ...but turn mode must still become REGULAR (Java always runs this afterward).
+        assert_eq!(game.turn_mode, TurnMode::Regular, "turn mode must be REGULAR even on the catch-scatter branch");
     }
 
     #[test]

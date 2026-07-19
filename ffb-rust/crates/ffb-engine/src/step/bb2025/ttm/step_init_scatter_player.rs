@@ -383,7 +383,7 @@ impl Step for StepInitScatterPlayer {
             StepParameter::ThrownPlayerHasBall(v)    => { self.thrown_player_has_ball = *v; true }
             StepParameter::KickedPlayerHasBall(v)    => { self.thrown_player_has_ball = *v; true }
             StepParameter::ThrownPlayerCoordinate(v) => { self.thrown_player_coordinate = *v; true }
-            StepParameter::KickedPlayerCoordinate(v) => { self.thrown_player_coordinate = Some(*v); true }
+            StepParameter::KickedPlayerCoordinate(v) => { self.thrown_player_coordinate = *v; true }
             StepParameter::ThrownPlayerState(v)      => { self.thrown_player_state = Some(*v); true }
             StepParameter::KickedPlayerState(v)      => { self.thrown_player_state = Some(*v); true }
             StepParameter::ThrowScatter(v)           => { self.throw_scatter = *v; true }

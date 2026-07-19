@@ -85,7 +85,7 @@ impl Step for StepEndScatterPlayer {
             StepParameter::KickedPlayerId(v)            => { self.thrown_player_id = v.clone(); true }
             StepParameter::KickedPlayerHasBall(v)       => { self.thrown_player_has_ball = *v; true }
             StepParameter::KickedPlayerState(v)         => { self.thrown_player_state = Some(*v); true }
-            StepParameter::KickedPlayerCoordinate(v)   => { self.thrown_player_coordinate = Some(*v); true }
+            StepParameter::KickedPlayerCoordinate(v)   => { self.thrown_player_coordinate = *v; true }
             StepParameter::IsKickedPlayer(v)            => { self.is_kicked_player = *v; true }
             _ => false,
         }

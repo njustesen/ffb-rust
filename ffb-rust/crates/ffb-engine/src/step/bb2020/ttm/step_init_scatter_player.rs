@@ -331,7 +331,7 @@ impl Step for StepInitScatterPlayer {
             StepParameter::KickedPlayerId(v)          => { self.thrown_player_id = v.clone(); true }
             StepParameter::KickedPlayerState(v)       => { self.thrown_player_state = Some(*v); true }
             StepParameter::KickedPlayerHasBall(v)     => { self.thrown_player_has_ball = *v; true }
-            StepParameter::KickedPlayerCoordinate(v)  => { self.thrown_player_coordinate = Some(*v); true }
+            StepParameter::KickedPlayerCoordinate(v)  => { self.thrown_player_coordinate = *v; true }
             _ => false,
         }
     }
@@ -473,7 +473,7 @@ mod tests {
         assert_eq!(step.thrown_player_state, Some(state));
         assert!(step.set_parameter(&StepParameter::KickedPlayerHasBall(true)));
         assert!(step.thrown_player_has_ball);
-        assert!(step.set_parameter(&StepParameter::KickedPlayerCoordinate(FieldCoordinate::new(1, 1))));
+        assert!(step.set_parameter(&StepParameter::KickedPlayerCoordinate(Some(FieldCoordinate::new(1, 1)))));
         assert_eq!(step.thrown_player_coordinate, Some(FieldCoordinate::new(1, 1)));
     }
 

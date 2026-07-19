@@ -106,19 +106,20 @@ impl StepJumpUp {
             if let Some(ref source_name) = self.re_roll_source.clone() {
                 let source = ReRollSource::new(source_name.as_str());
                 if !use_reroll(game, &source, &player_id) {
-                    // Token exhausted — fail immediately
+                    // Token exhausted — fail immediately.
+                    // Java: this early `return false` happens before `actingPlayer.markSkillUsed(skill)`
+                    // at the bottom of handleExecuteStepHook, so the skill is NOT marked used here.
                     let ps = game.field_model.player_state(&player_id).unwrap_or_else(|| PlayerState::new(PS_PRONE));
                     game.field_model.set_player_state(&player_id, ps.change_base(PS_PRONE).change_active(false));
-                    mark_used(game, &player_id);
                     return StepOutcome::goto(&self.goto_label_on_failure)
                         .publish(StepParameter::EndPlayerAction(true));
                 }
                 // Re-roll consumed — fall through to re-roll dice
             } else {
-                // Player declined (handle_command cleared source) — fail immediately
+                // Player declined (handle_command cleared source) — fail immediately.
+                // Java: same early-return path as the exhausted-token case above — no markSkillUsed call.
                 let ps = game.field_model.player_state(&player_id).unwrap_or_else(|| PlayerState::new(PS_PRONE));
                 game.field_model.set_player_state(&player_id, ps.change_base(PS_PRONE).change_active(false));
-                mark_used(game, &player_id);
                 return StepOutcome::goto(&self.goto_label_on_failure)
                     .publish(StepParameter::EndPlayerAction(true));
             }
@@ -445,5 +446,32 @@ mod tests {
         assert_eq!(out.goto_label.as_deref(), Some("FAIL"));
         let state = game.field_model.player_state(&pid).unwrap();
         assert_eq!(state.base(), PS_PRONE);
+        // Java: this early `return false` in JumpUpBehaviour happens before the
+        // `actingPlayer.markSkillUsed(skill)` call at the end of the method, so the
+        // JumpUp skill must NOT be marked used when the re-roll is declined.
+        assert!(
+            !game.team_home.player(&pid).unwrap().used_skills.contains(&SkillId::JumpUp),
+            "declined re-roll must not mark JumpUp used (Java has no markSkillUsed on this path)"
+        );
+    }
+
+    #[test]
+    fn exhausted_reroll_token_fails_without_marking_skill_used() {
+        // Java: if reRollSource is set but UtilServerReRoll.useReRoll(...) fails (token exhausted),
+        // the method returns before reaching actingPlayer.markSkillUsed(skill) at the bottom.
+        let (mut game, pid) = make_game_block_standing_up(vec![SkillId::JumpUp], 3);
+        let mut step = StepJumpUp::new();
+        step.goto_label_on_failure = "FAIL".into();
+        step.re_rolled_action = Some("JUMP_UP".into());
+        step.re_roll_source = Some("TRR".into());
+        // No re-rolls available on the team → use_reroll() will fail (token exhausted).
+        game.turn_data_home.rerolls = 0;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.goto_label.as_deref(), Some("FAIL"));
+        assert!(
+            !game.team_home.player(&pid).unwrap().used_skills.contains(&SkillId::JumpUp),
+            "exhausted re-roll token must not mark JumpUp used (Java has no markSkillUsed on this path)"
+        );
     }
 }

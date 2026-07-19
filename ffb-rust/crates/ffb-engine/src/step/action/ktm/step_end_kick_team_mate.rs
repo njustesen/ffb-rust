@@ -75,7 +75,7 @@ impl Step for StepEndKickTeamMate {
             StepParameter::KickedPlayerHasBall(v) => { self.kicked_player_has_ball = *v; true }
             StepParameter::ThrownPlayerHasBall(v) => { self.kicked_player_has_ball = *v; true }
             // Java: both KICKED_PLAYER_COORDINATE and THROWN_PLAYER_COORDINATE
-            StepParameter::KickedPlayerCoordinate(v) => { self.kicked_player_coordinate = Some(*v); true }
+            StepParameter::KickedPlayerCoordinate(v) => { self.kicked_player_coordinate = *v; true }
             StepParameter::ThrownPlayerCoordinate(v) => { self.kicked_player_coordinate = v.clone(); true }
             _ => false,
         }
