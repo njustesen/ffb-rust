@@ -11,6 +11,11 @@ impl AnimalSavagery {
         let base = Skill::as_negative_trait("Animal Savagery", SkillCategory::Trait);
         Self { base }
     }
+
+    /// Java `getConfusionMessage()` override.
+    pub fn get_confusion_message(&self) -> &'static str {
+        "tries to lash out against a team mate"
+    }
 }
 
 impl Default for AnimalSavagery {
@@ -31,4 +36,8 @@ mod tests {
     fn category_is_correct() { assert_eq!(AnimalSavagery::new().get_category(), SkillCategory::Trait); }
     #[test]
     fn is_negative_trait() { assert!(AnimalSavagery::new().is_negative_trait()); }
+    #[test]
+    fn confusion_message_overridden() {
+        assert_eq!(AnimalSavagery::new().get_confusion_message(), "tries to lash out against a team mate");
+    }
 }

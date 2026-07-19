@@ -1,4 +1,9 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed::Dodge.
+/// Deferred: Java's `postConstruct()` also calls `registerProperty`/`registerRerollSource`
+/// (canRerollDodge, ignoreDefenderStumblesResult, DODGE reroll source) — left untranslated
+/// because `Skill::register_reroll_source`/`register_property` are wired up nowhere else in
+/// the ~300-file skill tree (0 callers in ffb-engine/ffb-mechanics), so this is part of a
+/// systemic, cross-cutting postConstruct-registration gap rather than a Dodge-specific bug.
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 

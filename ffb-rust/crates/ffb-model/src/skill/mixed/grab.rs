@@ -11,6 +11,11 @@ impl Grab {
         let base = Skill::new("Grab", SkillCategory::Strength);
         Self { base }
     }
+
+    /// Java `getSkillUseDescription()` override.
+    pub fn get_skill_use_description(&self) -> Option<Vec<String>> {
+        Some(vec!["Using Grab will allow to push the opponent into any open square, Side Step will be cancelled in any case".to_string()])
+    }
 }
 
 impl Default for Grab {
@@ -29,4 +34,11 @@ mod tests {
     fn name_is_correct() { assert_eq!(Grab::new().get_name(), "Grab"); }
     #[test]
     fn category_is_correct() { assert_eq!(Grab::new().get_category(), SkillCategory::Strength); }
+    #[test]
+    fn skill_use_description_overridden() {
+        assert_eq!(
+            Grab::new().get_skill_use_description(),
+            Some(vec!["Using Grab will allow to push the opponent into any open square, Side Step will be cancelled in any case".to_string()])
+        );
+    }
 }

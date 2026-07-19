@@ -11,6 +11,11 @@ impl Juggernaut {
         let base = Skill::new("Juggernaut", SkillCategory::Strength);
         Self { base }
     }
+
+    /// Java `getSkillUseDescription()` override.
+    pub fn get_skill_use_description(&self) -> Option<Vec<String>> {
+        Some(vec!["Using Juggernaut will convert the BOTH DOWN Block Result into a PUSHBACK.".to_string()])
+    }
 }
 
 impl Default for Juggernaut {
@@ -29,4 +34,11 @@ mod tests {
     fn name_is_correct() { assert_eq!(Juggernaut::new().get_name(), "Juggernaut"); }
     #[test]
     fn category_is_correct() { assert_eq!(Juggernaut::new().get_category(), SkillCategory::Strength); }
+    #[test]
+    fn skill_use_description_overridden() {
+        assert_eq!(
+            Juggernaut::new().get_skill_use_description(),
+            Some(vec!["Using Juggernaut will convert the BOTH DOWN Block Result into a PUSHBACK.".to_string()])
+        );
+    }
 }
