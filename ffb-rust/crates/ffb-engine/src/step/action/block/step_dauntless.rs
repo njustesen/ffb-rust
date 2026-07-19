@@ -130,10 +130,13 @@ impl StepDauntless {
             }
         }
 
+        // Java: actingPlayer.getStrength() — raw strength, no modifiers.
         let attacker_st = game.player(&player_id).map(|p| p.strength).unwrap_or(3);
+        // Java: game.getDefender().getStrengthWithModifiers() — defender strength INCLUDES modifiers
+        // (e.g. temporary stat changes). Using raw `.strength` here would drop Guard/other modifiers.
         let defender_st = game.defender_id.as_ref()
             .and_then(|id| game.player(id))
-            .map(|p| p.strength)
+            .map(|p| p.strength_with_modifiers())
             .unwrap_or(3);
 
         let in_range = attacker_st < defender_st && attacker_st + 6 > defender_st;
@@ -433,6 +436,26 @@ mod tests {
         assert_eq!(outcome.action, StepAction::NextStep);
         assert!(!outcome.published.iter().any(|p| matches!(p, StepParameter::SuccessfulDauntless(_))));
         assert!(outcome.events.iter().any(|e| matches!(e, GameEvent::DauntlessRoll { success: false, .. })));
+    }
+
+    #[test]
+    fn defender_strength_with_modifiers_used_for_range_check() {
+        // attacker=2, defender base=3 → not in range without modifiers (2 < 3, 2+6=8>3, actually
+        // in range already). Use a case that only becomes in-range once defender's temporary
+        // strength modifier is applied: attacker=2, defender base=2 (equal, skip), +1 modifier
+        // brings defender to 3 (in range: 2<3 && 2+6>3).
+        let mut game = make_game(2, vec![SkillId::Dauntless], 2);
+        game.team_away.player_mut("def").unwrap().add_temporary_stat_mod(
+            "TEST_MOD", ffb_model::model::player::STAT_ST, 1,
+        );
+        let seed = seed_for_d6(6);
+        let outcome = StepDauntless::new().start(&mut game, &mut GameRng::new(seed));
+        // Without the fix (raw strength), defender_st stays 2, attacker==defender → not in range →
+        // NextStep with no events. With the fix, defender_st is 3 → in range → roll happens.
+        assert!(
+            outcome.events.iter().any(|e| matches!(e, GameEvent::DauntlessRoll { .. })),
+            "defender's temporary strength modifier must be applied to the in-range check"
+        );
     }
 
     #[test]

@@ -102,7 +102,11 @@ impl StepDumpOff {
             if let Some(ref did) = defender_id {
                 game.thrower_id = Some(did.clone());
             }
-            game.acting_player.player_action = Some(PlayerAction::DumpOff);
+            // Java: game.setThrowerAction(PlayerAction.DUMP_OFF) — NOT actingPlayer's action.
+            // StepDispatchPassing routes on game.thrower_action, so leaving this unset would
+            // make the pushed Pass sequence immediately goto its "end" label instead of
+            // resolving the dump-off pass.
+            game.thrower_action = Some(PlayerAction::DumpOff);
             game.defender_action = Some(PlayerAction::DumpOff);
             let event = GameEvent::SkillUse {
                 player_id: defender_id.unwrap_or_default(),
@@ -260,6 +264,20 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::DumpOff);
         assert_eq!(game.thrower_id.as_deref(), Some("def"));
+    }
+
+    #[test]
+    fn using_dump_off_true_sets_thrower_action_not_acting_player_action() {
+        // Java: game.setThrowerAction(PlayerAction.DUMP_OFF) — game.thrower_action, not
+        // actingPlayer's own player_action. StepDispatchPassing (the step that follows in the
+        // pushed Pass sequence) routes purely on game.thrower_action; leaving it unset would
+        // make the Pass sequence immediately bail out via its "end" goto label.
+        let mut game = make_game(vec![SkillId::DumpOff]);
+        let mut step = StepDumpOff::new();
+        step.using_dump_off = Some(true);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.thrower_action, Some(PlayerAction::DumpOff));
+        assert_eq!(game.defender_action, Some(PlayerAction::DumpOff));
     }
 
     #[test]

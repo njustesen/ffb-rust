@@ -231,6 +231,9 @@ mod tests {
         let state = game.field_model.player_state(&player_id).unwrap();
         assert_eq!(state.base(), PS_PRONE);
         assert!(!state.is_active());
+        // Real bug regression guard: bb2025's cancelPlayerAction ALSO sets confused(true) in the
+        // standing-up branch (unlike bb2016/bb2020, which leave confused untouched there).
+        assert!(state.is_confused(), "bb2025 standing-up negatrait failure must also be confused");
     }
 
     #[test]
