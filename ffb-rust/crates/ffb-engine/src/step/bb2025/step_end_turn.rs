@@ -314,9 +314,10 @@ impl StepEndTurn {
                 UtilBox::put_all_players_into_box(game);
             }
 
-            // Java: game.startTurn() — reset per-turn flags for both teams
-            game.turn_data_home.reset_for_turn();
-            game.turn_data_away.reset_for_turn();
+            // Java: game.startTurn() — resets pass_coordinate, acting_player, thrower/defender
+            // ids+actions, waiting_for_opponent, timeout flags, concession_possible,
+            // last_defender_id, AND per-turn flags for both teams' TurnData.
+            game.start_turn();
 
             // Java: endGenerator.pushSequence / kickoffGenerator
             use ffb_model::enums::InducementPhase;
@@ -509,6 +510,32 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.turn_data_home.blitz_used);
         assert!(!game.turn_data_away.foul_used);
+    }
+
+    /// Java `Game.startTurn()` clears far more than the two TurnData objects: it also
+    /// resets pass_coordinate, acting_player, thrower/defender ids+actions,
+    /// waiting_for_opponent, timeout flags, concession_possible and last_defender_id.
+    /// A prior translation only called `turn_data_{home,away}.reset_for_turn()`, leaving
+    /// stale acting-player/defender/thrower state from the ended turn.
+    #[test]
+    fn start_turn_clears_acting_player_defender_and_thrower_state() {
+        let mut game = make_game();
+        game.acting_player.player_id = Some("stale_actor".into());
+        game.defender_id = Some("stale_defender".into());
+        game.thrower_id = Some("stale_thrower".into());
+        game.pass_coordinate = Some(FieldCoordinate::new(3, 3));
+        game.waiting_for_opponent = true;
+        game.timeout_possible = true;
+
+        let mut step = StepEndTurn::new();
+        step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(game.acting_player.player_id.is_none(), "acting_player must be cleared by startTurn()");
+        assert!(game.defender_id.is_none(), "defender_id must be cleared by startTurn()");
+        assert!(game.thrower_id.is_none(), "thrower_id must be cleared by startTurn()");
+        assert!(game.pass_coordinate.is_none(), "pass_coordinate must be cleared by startTurn()");
+        assert!(!game.waiting_for_opponent, "waiting_for_opponent must be cleared by startTurn()");
+        assert!(!game.timeout_possible, "timeout_possible must be cleared by startTurn()");
     }
 
     #[test]

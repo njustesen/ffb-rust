@@ -286,6 +286,10 @@ pub enum StepParameter {
     PassFumble(bool),
     PassingDistance(ffb_model::enums::PassingDistance),
     CatcherId(Option<String>),
+    /// Java: `StepParameterKey.SKIP` — carries a boolean (e.g. `StepInitBomb` publishes
+    /// `SKIP=false` when a bomb is caught mid-bounce, so `StepRecheckExplodeSkill` re-offers
+    /// the explode choice instead of skipping straight through).
+    Skip(bool),
     InterceptorId(Option<String>),
     HailMaryPassFlag(bool),
     FailedCatch(bool),

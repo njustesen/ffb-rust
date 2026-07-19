@@ -1,5 +1,6 @@
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use crate::enums::PlayerAction;
+use crate::enums::{PlayerAction, SkillId};
 use crate::model::player::PlayerId;
 
 /// Tracks the currently-acting player during a turn.
@@ -58,6 +59,10 @@ pub struct ActingPlayer {
     /// (player action allows it and the player has the ball); cleared once the ball stops
     /// moving again. Consumed by `StepResetFumblerooskie`.
     pub fumblerooskie_pending: bool,
+    /// Java: skillsGrantedBy — for each skill granted this turn (e.g. Wisdom of the White
+    /// Dwarf), the list of player IDs that received it (keyed by skill instead of Java's
+    /// `skill.getName()` since Rust identifies skills by `SkillId`).
+    pub skills_granted_by: HashMap<SkillId, Vec<PlayerId>>,
 }
 
 impl ActingPlayer {
@@ -106,6 +111,15 @@ impl ActingPlayer {
     /// Java: `setFumblerooskiePending(boolean)`.
     pub fn set_fumblerooskie_pending(&mut self, fumblerooskie_pending: bool) {
         self.fumblerooskie_pending = fumblerooskie_pending;
+    }
+
+    /// Java: `addGrantedSkill(Skill skill, Player<?> player)` — records that `player_id`
+    /// (if any) was granted `skill_id` this turn.
+    pub fn add_granted_skill(&mut self, skill_id: SkillId, player_id: Option<PlayerId>) {
+        let players = self.skills_granted_by.entry(skill_id).or_default();
+        if let Some(id) = player_id {
+            players.push(id);
+        }
     }
 }
 
@@ -181,5 +195,26 @@ mod tests {
         assert!(!ap.temporary_frenzy);
         assert!(!ap.ignore_tackle_zones);
         assert_eq!(ap.fury_of_blood_god_blocks, 0);
+    }
+
+    #[test]
+    fn add_granted_skill_tracks_players() {
+        use crate::enums::SkillId;
+        let mut ap = ActingPlayer::new();
+        ap.add_granted_skill(SkillId::WisdomOfTheWhiteDwarf, Some("p1".into()));
+        ap.add_granted_skill(SkillId::WisdomOfTheWhiteDwarf, Some("p2".into()));
+        assert_eq!(
+            ap.skills_granted_by.get(&SkillId::WisdomOfTheWhiteDwarf).map(|v| v.as_slice()),
+            Some(["p1".to_string(), "p2".to_string()].as_slice())
+        );
+    }
+
+    #[test]
+    fn add_granted_skill_with_no_player_creates_empty_entry() {
+        use crate::enums::SkillId;
+        let mut ap = ActingPlayer::new();
+        ap.add_granted_skill(SkillId::WisdomOfTheWhiteDwarf, None);
+        assert!(ap.skills_granted_by.contains_key(&SkillId::WisdomOfTheWhiteDwarf));
+        assert!(ap.skills_granted_by.get(&SkillId::WisdomOfTheWhiteDwarf).unwrap().is_empty());
     }
 }

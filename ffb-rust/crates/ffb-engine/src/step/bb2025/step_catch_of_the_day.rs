@@ -4,7 +4,7 @@
 ///
 /// Init params: GOTO_LABEL_ON_FAILURE.
 /// Runtime params: END_TURN, END_PLAYER_ACTION.
-use ffb_model::enums::{SkillId, PlayerAction};
+use ffb_model::enums::{ReRollSource, SkillId, PlayerAction};
 use ffb_model::model::game::Game;
 use ffb_model::model::skill_use::SkillUse;
 use ffb_model::report::mixed::report_catch_of_the_day_roll::ReportCatchOfTheDayRoll;
@@ -14,6 +14,7 @@ use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
 pub struct StepCatchOfTheDay {
     /// Java: endPlayerAction — set by END_PLAYER_ACTION parameter.
@@ -22,6 +23,10 @@ pub struct StepCatchOfTheDay {
     pub end_turn: bool,
     /// Java: goToLabelOnFailure — GOTO_LABEL_ON_FAILURE init parameter.
     pub goto_label_on_failure: String,
+    /// Java: AbstractStepWithReRoll.reRolledAction
+    pub re_rolled_action: Option<String>,
+    /// Java: AbstractStepWithReRoll.reRollSource
+    pub re_roll_source: Option<String>,
 }
 
 impl StepCatchOfTheDay {
@@ -30,6 +35,8 @@ impl StepCatchOfTheDay {
             end_player_action: false,
             end_turn: false,
             goto_label_on_failure: String::new(),
+            re_rolled_action: None,
+            re_roll_source: None,
         }
     }
 }
@@ -45,9 +52,12 @@ impl Step for StepCatchOfTheDay {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // Java: super.handleCommand → re-roll path (AbstractStepWithReRoll)
-        // Random agent always declines → just execute again
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: super.handleCommand → AbstractStepWithReRoll: CLIENT_USE_RE_ROLL(false) clears
+        // the re-roll source (player declined).
+        if let Action::UseReRoll { use_reroll: false } = action {
+            self.re_roll_source = None;
+        }
         self.execute_step(game, rng)
     }
 
@@ -62,30 +72,54 @@ impl Step for StepCatchOfTheDay {
 }
 
 impl StepCatchOfTheDay {
-    fn execute_step(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let player_id = match game.acting_player.player_id.clone() {
             Some(id) => id,
             None => return StepOutcome::next(),
         };
 
+        let is_rerolled = self.re_rolled_action.as_deref() == Some("CATCH_OF_THE_DAY");
+
         // Java: skill = UtilCards.getUnusedSkillWithProperty(actingPlayer, canGetBallOnGround)
+        //       if (skill != null || getReRolledAction() == CATCH_OF_THE_DAY)
         let has_skill = game.player(&player_id)
             .map(|p| p.has_skill(SkillId::CatchOfTheDay) && !p.used_skills.contains(&SkillId::CatchOfTheDay))
             .unwrap_or(false);
 
-        if !has_skill {
+        if !has_skill && !is_rerolled {
             return StepOutcome::next();
         }
 
-        // Java: markActionUsed + markSkillUsed
-        Self::mark_action_used(game, &player_id);
-        Self::mark_skill_used(game, &player_id);
-
-        // Java: if (endTurn || endPlayerAction) → ReportSkillWasted + GOTO_LABEL
+        // Java: if (endTurn || endPlayerAction) → ReportSkillWasted + GOTO_LABEL + markUsages
         if self.end_turn || self.end_player_action {
             game.report_list.add(ReportSkillWasted::new(Some(player_id.clone()), Some(SkillId::CatchOfTheDay)));
+            Self::mark_action_used(game, &player_id);
+            Self::mark_skill_used(game, &player_id);
             return StepOutcome::goto(&self.goto_label_on_failure);
         }
+
+        if is_rerolled {
+            // Java: if (getReRollSource() == null || !UtilServerReRoll.useReRoll(...)) {
+            //         getResult().setSound(SoundId.BOUNCE); return; }
+            let declined_or_failed = match self.re_roll_source.clone() {
+                Some(ref source_name) => {
+                    let source = ReRollSource::new(source_name.as_str());
+                    !use_reroll(game, &source, &player_id)
+                }
+                None => true,
+            };
+            if declined_or_failed {
+                // client-only: SoundId.BOUNCE — sound playback is client-side only (dropped).
+                return StepOutcome::next();
+            }
+        } else {
+            // Java: markUsages(game, actingPlayer, skill) — only on the non-re-rolled pass.
+            Self::mark_action_used(game, &player_id);
+            Self::mark_skill_used(game, &player_id);
+        }
+
+        // Java: addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, GET_BALL_ON_GROUND))
+        game.report_list.add(ReportSkillUse::new(Some(player_id.clone()), SkillId::CatchOfTheDay, true, SkillUse::GET_BALL_ON_GROUND));
 
         let player_coord = match game.field_model.player_coordinate(&player_id) {
             Some(c) => c,
@@ -101,9 +135,6 @@ impl StepCatchOfTheDay {
         let in_range = player_coord.distance_in_steps(ball_coord) <= 3;
 
         if ball_moving && in_range {
-            // Java: addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, GET_BALL_ON_GROUND))
-            game.report_list.add(ReportSkillUse::new(Some(player_id.clone()), SkillId::CatchOfTheDay, true, SkillUse::GET_BALL_ON_GROUND));
-
             // Java: roll = getDiceRoller().rollDice(6); success = roll >= 3
             let roll = rng.d6();
             let success = roll >= 3;
@@ -112,10 +143,24 @@ impl StepCatchOfTheDay {
                 game.field_model.ball_coordinate = Some(player_coord);
                 game.field_model.ball_moving = false;
             }
-            // On failure with random agent: no re-roll → NEXT_STEP
 
             // Java: addReport(new ReportCatchOfTheDayRoll(actingPlayer.getPlayerId(), success, roll, 3, reRolled))
-            game.report_list.add(ReportCatchOfTheDayRoll::new(Some(player_id.clone()), success, roll, 3, false));
+            game.report_list.add(ReportCatchOfTheDayRoll::new(Some(player_id.clone()), success, roll, 3, is_rerolled));
+
+            if !success {
+                // Java: else if (getReRolledAction() != CATCH_OF_THE_DAY &&
+                //         UtilServerReRoll.askForReRollIfAvailable(..., CATCH_OF_THE_DAY, 3, false)) {
+                //         setReRolledAction(CATCH_OF_THE_DAY); getResult().setNextAction(CONTINUE); }
+                //       else { getResult().setSound(SoundId.BOUNCE); }
+                if !is_rerolled {
+                    if let Some(prompt) = ask_for_reroll_if_available(game, "CATCH_OF_THE_DAY", 3, false) {
+                        self.re_rolled_action = Some("CATCH_OF_THE_DAY".into());
+                        self.re_roll_source = Some("TRR".into());
+                        return StepOutcome::cont().with_prompt(prompt);
+                    }
+                }
+                // client-only: SoundId.BOUNCE — sound playback is client-side only (dropped).
+            }
         } else {
             // Java: not in range → addReport(new ReportSkillWasted(actingPlayer.getPlayerId(), skill))
             game.report_list.add(ReportSkillWasted::new(Some(player_id.clone()), Some(SkillId::CatchOfTheDay)));
@@ -298,5 +343,73 @@ mod tests {
         let mut step = StepCatchOfTheDay::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::SKILL_WASTED));
+    }
+
+    // ── Bug fix regression tests ──────────────────────────────────────────
+    // Previously a failed roll never offered a team re-roll (Java:
+    // `askForReRollIfAvailable(..., CATCH_OF_THE_DAY, 3, false)` → StepAction.CONTINUE),
+    // and the skill/action-used bookkeeping was unconditional on every call instead of
+    // being gated on `reRolledAction` as in Java's `markUsages` branch.
+
+    #[test]
+    fn failed_roll_with_team_reroll_available_offers_reroll() {
+        let seed = seed_for_d6_lt3();
+        let (mut game, pid) = make_game_cotd();
+        game.turn_data_home.rerolls = 1;
+        let ball_coord = FieldCoordinate::new(11, 7);
+        game.field_model.ball_coordinate = Some(ball_coord);
+        game.field_model.ball_moving = true;
+
+        let mut step = StepCatchOfTheDay::new();
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+
+        assert_eq!(out.action, StepAction::Continue, "expected CONTINUE to offer a re-roll");
+        assert!(out.prompt.is_some());
+        assert_eq!(step.re_rolled_action.as_deref(), Some("CATCH_OF_THE_DAY"));
+        // Ball must not have moved yet — the roll is being re-attempted.
+        assert_eq!(game.field_model.ball_coordinate, Some(ball_coord));
+        assert!(game.field_model.ball_moving);
+        let _ = &pid;
+    }
+
+    #[test]
+    fn declining_reroll_leaves_ball_unmoved_and_returns_next_step() {
+        let seed = seed_for_d6_lt3();
+        let (mut game, _) = make_game_cotd();
+        game.turn_data_home.rerolls = 1;
+        let ball_coord = FieldCoordinate::new(11, 7);
+        game.field_model.ball_coordinate = Some(ball_coord);
+        game.field_model.ball_moving = true;
+
+        let mut step = StepCatchOfTheDay::new();
+        step.start(&mut game, &mut GameRng::new(seed));
+        let out = step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut GameRng::new(0));
+
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(game.field_model.ball_coordinate, Some(ball_coord));
+        assert!(game.field_model.ball_moving);
+    }
+
+    #[test]
+    fn skill_used_is_marked_exactly_once_across_reroll_round_trip() {
+        let seed_fail = seed_for_d6_lt3();
+        let (mut game, pid) = make_game_cotd();
+        game.turn_data_home.rerolls = 1;
+        let ball_coord = FieldCoordinate::new(11, 7);
+        game.field_model.ball_coordinate = Some(ball_coord);
+        game.field_model.ball_moving = true;
+
+        let mut step = StepCatchOfTheDay::new();
+        step.start(&mut game, &mut GameRng::new(seed_fail));
+        assert!(
+            game.team_home.player(&pid).unwrap().used_skills.contains(&SkillId::CatchOfTheDay),
+            "skill must be marked used on the first (non-re-rolled) pass"
+        );
+
+        // Re-roll accepted (re_roll_source stays Some("TRR")); second roll may succeed or fail,
+        // but the skill must not be double-marked or cause a panic.
+        let seed_second = seed_for_d6_gte3(3);
+        let out = step.handle_command(&Action::UseReRoll { use_reroll: true }, &mut game, &mut GameRng::new(seed_second));
+        assert_eq!(out.action, StepAction::NextStep);
     }
 }

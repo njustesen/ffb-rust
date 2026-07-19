@@ -146,7 +146,8 @@ impl StepInitThrowTeamMate {
         if self.end_turn {
             // Java: publishParameter(END_TURN, true); publishParameter(CHECK_FORGO, true)
             return StepOutcome::goto(&self.goto_label_on_end)
-                .publish(StepParameter::EndTurn(true));
+                .publish(StepParameter::EndTurn(true))
+                .publish(StepParameter::CheckForgo(true));
         }
         if self.end_player_action {
             return StepOutcome::goto(&self.goto_label_on_end)
@@ -227,6 +228,18 @@ mod tests {
         let out = step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("end_label"));
+    }
+
+    // Java: executeStep() when endTurn publishes both END_TURN=true and CHECK_FORGO=true.
+    #[test]
+    fn end_turn_command_publishes_check_forgo() {
+        let mut game = make_game();
+        let mut step = StepInitThrowTeamMate::new("end_label".into());
+        let out = step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "expected EndTurn(true) to be published");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::CheckForgo(true))),
+            "expected CheckForgo(true) to be published alongside EndTurn");
     }
 
     #[test]

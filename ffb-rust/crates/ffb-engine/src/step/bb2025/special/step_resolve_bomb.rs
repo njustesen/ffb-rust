@@ -1,4 +1,4 @@
-use ffb_model::types::FieldCoordinate;
+use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -64,9 +64,22 @@ impl StepResolveBomb {
         // client-only: syncGameModel, fieldModel.add(BloodSpot) — client-side display
 
         // Java: targetCoordinates = fieldModel.findAdjacentCoordinates(fBombCoordinate, FIELD, 1, true)
-        // This includes the bomb square itself (true = include center).
-        let mut target_coords: Vec<FieldCoordinate> = game.field_model.adjacent_on_pitch(bomb_coordinate);
-        target_coords.push(bomb_coordinate); // include center square
+        // `findAdjacentCoordinates` iterates `y` in -1..=1 (outer), `x` in -1..=1 (inner), and
+        // includes the center square in-place (since `pWithStartCoordinate=true` bypasses the
+        // `x != 0 || y != 0` guard) — so the center lands in the *middle* of the list, not at
+        // the end. Bug fix: this previously used `adjacent_on_pitch` (a different 8-neighbour
+        // order, no center) plus an appended center at the *end*, which produced a different
+        // ordering than Java once the list is reversed below — changing which affected
+        // player's SpecialEffect sequence gets pushed (and therefore resolved) first.
+        let mut target_coords: Vec<FieldCoordinate> = Vec::new();
+        for dy in -1..=1 {
+            for dx in -1..=1 {
+                let candidate = FieldCoordinate::new(bomb_coordinate.x + dx, bomb_coordinate.y + dy);
+                if FieldCoordinateBounds::FIELD.is_in_bounds(candidate) {
+                    target_coords.push(candidate);
+                }
+            }
+        }
 
         // Java: affectedPlayers = players at those coordinates (in reverse order)
         // Collect player ids at each coordinate
@@ -165,6 +178,43 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(!out.pushes.is_empty(), "should push SpecialEffect sequence");
         assert_eq!(out.pushes[0][0].step_id, StepId::SpecialEffect);
+    }
+
+    #[test]
+    fn affected_players_are_pushed_in_java_coordinate_order() {
+        // Regression: Java's `findAdjacentCoordinates(bombCoord, FIELD, 1, true)` visits
+        // squares in row-major order (y=-1..=1 outer, x=-1..=1 inner) WITH the center square
+        // included in place (5th of 9), then `executeStep` walks that array *backwards* to
+        // build `affectedPlayers`. For players at NW, N, and E of the bomb (none at center),
+        // Java's forward order is [NW, N, E] so the reversed affectedPlayers order is
+        // [E, N, NW]. The old Rust port used `adjacent_on_pitch` (N, NE, E, SE, S, SW, W, NW)
+        // with the center appended at the very *end* instead of the middle, which reverses to
+        // a different player order — changing which player's SpecialEffect resolves first.
+        let mut game = make_game();
+        let bomb_coord = FieldCoordinate::new(10, 7);
+
+        let mut mk = |id: &str| { let mut p = Player::default(); p.id = id.into(); p };
+        game.team_home.players.push(mk("nw_player"));
+        game.team_home.players.push(mk("n_player"));
+        game.team_home.players.push(mk("e_player"));
+        game.field_model.bomb_coordinate = Some(bomb_coord);
+        game.field_model.set_player_coordinate("nw_player", FieldCoordinate::new(9, 6));  // NW
+        game.field_model.set_player_coordinate("n_player", FieldCoordinate::new(10, 6));  // N
+        game.field_model.set_player_coordinate("e_player", FieldCoordinate::new(11, 7));  // E
+
+        let mut step = StepResolveBomb::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        let pushed_ids: Vec<String> = out.pushes.iter()
+            .filter_map(|seq| seq.iter().find(|s| s.step_id == StepId::SpecialEffect))
+            .filter_map(|s| s.params.iter().find_map(|p| match p {
+                StepParameter::PlayerId(id) => Some(id.clone()),
+                _ => None,
+            }))
+            .collect();
+
+        assert_eq!(pushed_ids, vec!["e_player", "n_player", "nw_player"],
+            "affected players must be pushed in Java's reversed row-major coordinate order");
     }
 
     #[test]

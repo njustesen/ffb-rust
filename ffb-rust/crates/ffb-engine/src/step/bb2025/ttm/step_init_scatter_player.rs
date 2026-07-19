@@ -261,11 +261,16 @@ impl StepInitScatterPlayer {
             };
 
             // Java: commands = [HitPlayerTurnOverCommand (conditional), DropPlayerCommand(...)]
+            // Note: EndTurn is NOT published here directly — Java only sets it via the
+            // deferred HitPlayerTurnOverCommand, which StepSteadyFooting executes only on
+            // its fail() path (i.e. only if the hit player doesn't save themselves with the
+            // Steady Footing skill). Publishing EndTurn(true) immediately here would end the
+            // turn even when Steady Footing later succeeds for a hit player who is not on the
+            // acting team (StepSteadyFooting.succeed() only resets EndTurn to false for the
+            // acting team's own player), diverging from Java behavior.
             let mut commands: Vec<Arc<dyn DeferredCommand>> = Vec::new();
             if always_turn_over || hit_own_team {
                 commands.push(Arc::new(HitPlayerTurnOverCommand));
-                // EndTurn is also published directly so it propagates immediately
-                outcome = outcome.publish(StepParameter::EndTurn(true));
             }
             commands.push(Arc::new(DropPlayerCommand::new(
                 hit_player_id.clone(),
@@ -641,9 +646,14 @@ mod tests {
             "expected DropThrownPlayer(true)");
     }
 
-    /// Hitting own team player triggers EndTurn and includes HitPlayerTurnOverCommand in SFC.
+    /// Hitting own team player defers EndTurn via HitPlayerTurnOverCommand inside the
+    /// SteadyFootingContext — it must NOT be published directly by this step, since Java
+    /// only ever sets END_TURN through StepSteadyFooting's fail() path (executing the
+    /// deferred commands), which is skipped entirely when the hit player successfully
+    /// avoids falling down (Steady Footing skill). Publishing EndTurn(true) immediately
+    /// here would incorrectly end the turn even when Steady Footing later saves the player.
     #[test]
-    fn landing_on_own_team_triggers_end_turn() {
+    fn landing_on_own_team_defers_end_turn_via_command_not_direct_publish() {
         let mut game = make_game();
         game.home_playing = true;
         // Both players in home team
@@ -659,8 +669,16 @@ mod tests {
         game.pass_coordinate = Some(land);
 
         let out = step.start(&mut game, &mut GameRng::new(0));
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
-            "expected EndTurn(true) when hitting own team");
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "EndTurn(true) must not be published directly by StepInitScatterPlayer — \
+             it should only be produced later by HitPlayerTurnOverCommand via SteadyFootingContext");
+        // The deferred command carrying EndTurn(true) must still be present in the context.
+        let sfc_param = out.published.iter().find_map(|p| {
+            if let StepParameter::SteadyFootingContext(ctx) = p { Some(ctx) } else { None }
+        });
+        assert!(sfc_param.is_some(), "SteadyFootingContext must be published");
+        assert_eq!(sfc_param.unwrap().deferred_commands.len(), 2,
+            "expected HitPlayerTurnOverCommand + DropPlayerCommand (2 total)");
     }
 
     /// Hitting an opponent without SPP skills uses InjuryTypeTTMHitPlayer (no SPP).
