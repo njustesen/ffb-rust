@@ -1,4 +1,7 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::GhostlyFlames.
+// NOTE: Java postConstruct registers a StaticArmourModifier(+4) whose appliesToContext() unconditionally
+// returns false, i.e. it is currently a no-op in Java too. No per-skill dynamic modifier registration
+// mechanism exists in Rust regardless.
 use crate::model::skill::skill::Skill;
 use crate::enums::{SkillCategory, SkillUsageType};
 

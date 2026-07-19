@@ -11,6 +11,11 @@ impl SideStep {
         let base = Skill::new("Side Step", SkillCategory::Agility);
         Self { base }
     }
+
+    /// Java `getSkillUseDescription()`.
+    pub fn get_skill_use_description(&self) -> Option<Vec<String>> {
+        Some(vec!["Using SideStep will allow you to chose the square you are pushed to.".to_string()])
+    }
 }
 
 impl Default for SideStep {

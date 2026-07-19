@@ -11,6 +11,10 @@ impl Shadowing {
         let base = Skill::new("Shadowing", SkillCategory::General);
         Self { base }
     }
+    // NOTE: Java postConstruct also calls registerConflictingProperty(NamedProperties.movesRandomly);
+    // canFollowPlayerLeavingTacklezones is already wired via SkillId::Shadowing in skill_id.rs, but
+    // there is no live conflicting-property table to mirror the movesRandomly conflict in yet
+    // (register_conflicting_property is dead code with zero callers).
 }
 
 impl Default for Shadowing {

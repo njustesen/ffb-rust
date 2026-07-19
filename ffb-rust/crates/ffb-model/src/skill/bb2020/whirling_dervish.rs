@@ -1,4 +1,7 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::WhirlingDervish.
+// NOTE: Java postConstruct calls registerRerollSource(ReRolledActions.DIRECTION, ReRollSources.
+// WHIRLING_DERVISH). There is no live reroll-source lookup table in the Rust codebase to mirror this into
+// (Skill::register_reroll_source is dead code), so this is left as a gap pending that infrastructure.
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 
