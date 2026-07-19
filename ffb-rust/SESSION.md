@@ -1,6 +1,71 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-19, Phase AJ done — deleted dead bb2020/special/ duplicate + full sweep of ffb-engine/src/step/, 464 files)
+## Current Status (2026-07-19, Phase AK done — full sweep of crates/ffb-model/src/skill/, 305 files)
+
+**Context: Phase AJ's closing note named the ~305 skill files' full method-body logic as the top
+priority next pool** — only constructor arguments/property registrations had been spot-checked in
+an earlier phase, method bodies never systematically compared. Full details in
+`docs/PHASE_AK_PLAN.md`; summary here.
+
+**This is the sixth consecutive phase (AF, AG, AH, AI, AJ, AK) where fresh re-verification found
+real bugs in nearly everything it checked.** Split into 8 parallel isolated-worktree batches
+(bb2016, bb2020, bb2025, bb2025/special+common, mixed ×2, mixed/special ×2), all 305 files covered
+exactly once. Tests: 17,736 → **17,902** (+166). 0 failures across `cargo test --workspace`;
+`cargo build --workspace` and `cargo clippy --workspace --all-targets` both clean.
+
+**Headline finding: 36 of 56 bb2020 skill files were compiled dead code.** `bb2020/mod.rs` only
+declared 20 `pub mod` entries; the other 36 files were complete, correct translations of real Java
+classes (Animosity, BallAndChain, Bombardier, BoneHead, Brawler, BreakTackle, and 30 more) that were
+never compiled, tested, or part of the crate — bb2020 games silently ran without any of these
+skills' effects. Fixed by declaring all 56 modules.
+
+**Dominant bug shape (all batches): missing/wrong `SkillId::properties()` entries.** This codebase's
+live property-registration mechanism is the centralized `SkillId::properties()` table in
+`skill_id.rs`, not the per-skill-struct `Skill::register_property`/etc. methods (confirmed dead
+code, zero callers workspace-wide). ~70 property-table entries were added/corrected across all 8
+batches. Two confirmed live gameplay breaks: `GoredByTheBull`'s `canAddBlockDie` and `HalflingLuck`'s
+`canRerollSingleDieOncePerPeriod`, both silently inert because their properties were never in the
+table despite being checked by real step files (`step_init_moving.rs`/`step_end_moving.rs`,
+`step_block_roll.rs`).
+
+**Other bugs found:** missing `getConfusionMessage()`/`getSkillUseDescription()`/`evaluator()`/
+`getCost()`/`canBeAssignedTo()` overrides across a dozen+ files; wrong `SkillCategory`/
+`SkillUsageType`/`DeclareCondition` constructor args (LethalFlight tagged `Trait` instead of
+`Devious`; Leap invented a nonexistent `OncePerTurn` usage type); a real `ffb-mechanics` gap where
+`dodge_modifier_factory.rs` only had a BB2016 arm for BreakTackle's strength-tiered dodge bonus
+(BB2020/BB2025 players got zero benefit); and, during merge-time reconciliation, a pre-existing
+invented property `"blocksLikeChainsaw"` on `BallAndChain` that doesn't exist in any of the three
+editions' Java sources (confirmed by reading all three `postConstruct()` methods directly) —
+removed and replaced with the verified full cross-edition property union.
+
+**Systemic gap flagged (not fixed — needs an engine-level design decision, not a per-file fix):** no
+skill file anywhere in the codebase calls `register_reroll_source`, despite the `ReRollSource`/
+`ReRolledAction` infrastructure being fully implemented and tested. Several skills (SavageBlow,
+ThinkingMansTroll, UnstoppableMomentum, Dodge, and others) register reroll sources in Java with no
+live Rust effect.
+
+**Two of 8 batches stalled on first launch** with empty/placeholder responses (confused by
+unrelated concurrent worktree context) and were relaunched from scratch with explicit "you are
+solo, ignore other batch numbers" framing; both retries succeeded cleanly. One additional batch's
+final report was itself a stalled status-monitoring loop — its actual committed work was verified
+directly (build/test/clippy run by hand) rather than waiting for a coherent summary.
+
+**Honest completion estimate: still not behaviorally done.** File/method coverage remains
+~99.8–99.9%+ by the tracker's file-existence metric, but six straight phases of fresh
+re-verification finding real bugs on already-"✓" files — including, this phase, an entire 36-file
+dead-code discovery in a previously "100%-tracked" pool — is a strong, repeated signal that more
+remain. **What's left, in priority order:**
+1. The ~137 client/server handler files (sampled clean twice across two phases, never fully swept).
+2. The systemic `register_reroll_source` gap identified this phase.
+3. A small set of documented-not-fixed gaps carried from Phase AJ: `sequences.rs`'s
+   `Rules`-ignoring kickoff sequences; BB2025 `step_apothecary.rs`'s missing "Getting Even"/"Raise
+   Dead" subsystems; `step_select_blitz_target_end.rs`'s self-documented stub; Tentacles' reroll
+   resolving against the wrong team.
+4. Parity/integration testing remains the only large, entirely out-of-scope workstream.
+
+---
+
+## Prior Status (2026-07-19, Phase AJ done — deleted dead bb2020/special/ duplicate + full sweep of ffb-engine/src/step/, 464 files)
 
 **Context: Phase AI closed with two open items — a dead-code decision on `skill/bb2020/special/`,
 and the need to scope a fresh area since the 3 largest previously-flagged pools were now fully
