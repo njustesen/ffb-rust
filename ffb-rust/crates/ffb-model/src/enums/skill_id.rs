@@ -907,8 +907,8 @@ impl SkillId {
             // Java: CloudBurster (BB2020) registers canForceInterceptionRerollOfLongPasses;
             // bb2025's CloudBurster registers the differently-named passesAreNotIntercepted instead — union of both.
             SkillId::CloudBurster => &["canForceInterceptionRerollOfLongPasses", "passesAreNotIntercepted"],
-            // Java: FuriousOutburst.postConstruct registers canTeleportBeforeAndAfterAvRollAttack
-            SkillId::FuriousOutburst => &["canTeleportBeforeAndAfterAvRollAttack"],
+            // Java: FuriousOutburst.postConstruct registers canTeleportBeforeAndAfterAvRollAttack + canPerformArmourRollInsteadOfBlock
+            SkillId::FuriousOutburst => &["canTeleportBeforeAndAfterAvRollAttack", "canPerformArmourRollInsteadOfBlock"],
             // Java: SafePass.postConstruct registers NamedProperties.dontDropFumbles
             SkillId::SafePass => &["dontDropFumbles"],
             // Java: Trickster.postConstruct registers NamedProperties.canMoveBeforeBeingBlocked
@@ -965,8 +965,35 @@ impl SkillId {
             // Java: bb2020/PileDriver.postConstruct + bb2025/PileDriver.postConstruct register canFoulAfterBlock
             SkillId::PileDriver => &["canFoulAfterBlock"],
             // Java: bb2016/SecretWeapon.postConstruct registers preventStuntyDodgeModifier, getsSentOffAtEndOfDrive,
-            //   and CancelSkillProperty(ignoreTacklezonesWhenDodging).
+            //   and CancelSkillProperty(ignoreTacklezonesWhenDodging); mixed/SecretWeapon.postConstruct
+            //   (base class) registers getsSentOffAtEndOfDrive — union of both.
             SkillId::SecretWeapon => &["preventStuntyDodgeModifier", "getsSentOffAtEndOfDrive", "cancelsIgnoreTacklezonesWhenDodging"],
+            // Java: mixed/special/KeenPlayer.postConstruct registers canJoinTeamIfLessThanEleven + getsSentOffAtEndOfDrive
+            SkillId::KeenPlayer => &["canJoinTeamIfLessThanEleven", "getsSentOffAtEndOfDrive"],
+            // Java: mixed/special/AllYouCanEat.postConstruct registers canUseThrowBombActionTwice
+            SkillId::AllYouCanEat => &["canUseThrowBombActionTwice"],
+            // Java: mixed/special/BalefulHex.postConstruct registers canMakeOpponentMissTurn
+            SkillId::BalefulHex => &["canMakeOpponentMissTurn"],
+            // Java: mixed/special/BlackInk.postConstruct registers canGazeAutomatically
+            SkillId::BlackInk => &["canGazeAutomatically"],
+            // Java: mixed/special/BugmansXXXXXX.postConstruct registers canReRollOnesOnKORecovery
+            SkillId::BugmansXXXXXX => &["canReRollOnesOnKORecovery"],
+            // Java: mixed/special/CatchOfTheDay.postConstruct registers canGetBallOnGround
+            SkillId::CatchOfTheDay => &["canGetBallOnGround"],
+            // Java: mixed/special/FuryOfTheBloodGod.postConstruct registers canPerformTwoBlocksAfterFailedFury
+            SkillId::FuryOfTheBloodGod => &["canPerformTwoBlocksAfterFailedFury"],
+            // Java: mixed/special/GoredByTheBull.postConstruct registers canAddBlockDie + providesBlockAlternativeDuringBlitz
+            SkillId::GoredByTheBull => &["canAddBlockDie", "providesBlockAlternativeDuringBlitz"],
+            // Java: mixed/special/HalflingLuck.postConstruct registers canRerollSingleDieOncePerPeriod
+            SkillId::HalflingLuck => &["canRerollSingleDieOncePerPeriod"],
+            // Java: mixed/special/IllBeBack.postConstruct registers ignoreFirstSecretWeaponSentOff
+            SkillId::IllBeBack => &["ignoreFirstSecretWeaponSentOff"],
+            // Java: mixed/special/KickEmWhileTheyReDown.postConstruct registers canUseChainsawOnDownedOpponents
+            SkillId::KickEmWhileTheyReDown => &["canUseChainsawOnDownedOpponents"],
+            // Java: mixed/special/LookIntoMyEyes.postConstruct registers canStealBallFromOpponent
+            SkillId::LookIntoMyEyes => &["canStealBallFromOpponent"],
+            // Java: mixed/special/BoundingLeap.postConstruct registers canIgnoreJumpModifiers
+            SkillId::BoundingLeap => &["canIgnoreJumpModifiers"],
             // Java: mixed/IronHardSkin.postConstruct registers cancelsReducesArmourToFixedValue + ignores properties
             SkillId::IronHardSkin => &[
                 "cancelsReducesArmourToFixedValue",
@@ -1398,5 +1425,87 @@ mod tests {
         let props = SkillId::DivingCatch.properties();
         assert!(props.contains(&"canAttemptCatchInAdjacentSquares"));
         assert!(props.contains(&"addBonusForAccuratePass"));
+    }
+
+    // ── mixed/special properties() gaps (bug fixes) ────────────────────────
+    // Java postConstruct() registrations for these skills were never mirrored into this
+    // table, silently breaking every live call site that checks `id.properties().contains(...)`
+    // (e.g. GoredByTheBull's canAddBlockDie in step_init_moving.rs/step_end_moving.rs,
+    // HalflingLuck's canRerollSingleDieOncePerPeriod in step_block_roll.rs).
+
+    #[test]
+    fn properties_all_you_can_eat() {
+        assert!(SkillId::AllYouCanEat.properties().contains(&"canUseThrowBombActionTwice"));
+    }
+
+    #[test]
+    fn properties_baleful_hex() {
+        assert!(SkillId::BalefulHex.properties().contains(&"canMakeOpponentMissTurn"));
+    }
+
+    #[test]
+    fn properties_black_ink() {
+        assert!(SkillId::BlackInk.properties().contains(&"canGazeAutomatically"));
+    }
+
+    #[test]
+    fn properties_bugmans_xxxxxx() {
+        assert!(SkillId::BugmansXXXXXX.properties().contains(&"canReRollOnesOnKORecovery"));
+    }
+
+    #[test]
+    fn properties_catch_of_the_day() {
+        assert!(SkillId::CatchOfTheDay.properties().contains(&"canGetBallOnGround"));
+    }
+
+    #[test]
+    fn properties_furious_outburst_has_both() {
+        let props = SkillId::FuriousOutburst.properties();
+        assert!(props.contains(&"canTeleportBeforeAndAfterAvRollAttack"));
+        assert!(props.contains(&"canPerformArmourRollInsteadOfBlock"));
+    }
+
+    #[test]
+    fn properties_fury_of_the_blood_god() {
+        assert!(SkillId::FuryOfTheBloodGod.properties().contains(&"canPerformTwoBlocksAfterFailedFury"));
+    }
+
+    #[test]
+    fn properties_gored_by_the_bull_has_both() {
+        let props = SkillId::GoredByTheBull.properties();
+        assert!(props.contains(&"canAddBlockDie"));
+        assert!(props.contains(&"providesBlockAlternativeDuringBlitz"));
+    }
+
+    #[test]
+    fn properties_halfling_luck() {
+        assert!(SkillId::HalflingLuck.properties().contains(&"canRerollSingleDieOncePerPeriod"));
+    }
+
+    #[test]
+    fn properties_ill_be_back() {
+        assert!(SkillId::IllBeBack.properties().contains(&"ignoreFirstSecretWeaponSentOff"));
+    }
+
+    #[test]
+    fn properties_keen_player_has_both() {
+        let props = SkillId::KeenPlayer.properties();
+        assert!(props.contains(&"canJoinTeamIfLessThanEleven"));
+        assert!(props.contains(&"getsSentOffAtEndOfDrive"));
+    }
+
+    #[test]
+    fn properties_kick_em_while_they_re_down() {
+        assert!(SkillId::KickEmWhileTheyReDown.properties().contains(&"canUseChainsawOnDownedOpponents"));
+    }
+
+    #[test]
+    fn properties_look_into_my_eyes() {
+        assert!(SkillId::LookIntoMyEyes.properties().contains(&"canStealBallFromOpponent"));
+    }
+
+    #[test]
+    fn properties_bounding_leap() {
+        assert!(SkillId::BoundingLeap.properties().contains(&"canIgnoreJumpModifiers"));
     }
 }
