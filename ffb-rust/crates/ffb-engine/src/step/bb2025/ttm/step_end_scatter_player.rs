@@ -85,7 +85,7 @@ impl Step for StepEndScatterPlayer {
             StepParameter::KickedPlayerState(v) => { self.thrown_player_state = Some(*v); true }
             StepParameter::OldDefenderState(v) => { self.old_player_state = Some(*v); true }
             StepParameter::ThrownPlayerCoordinate(v) => { self.thrown_player_coordinate = *v; true }
-            StepParameter::KickedPlayerCoordinate(v) => { self.thrown_player_coordinate = Some(*v); true }
+            StepParameter::KickedPlayerCoordinate(v) => { self.thrown_player_coordinate = *v; true }
             StepParameter::IsKickedPlayer(v) => { self.is_kicked_player = *v; true }
             _ => false,
         }
@@ -222,7 +222,7 @@ mod tests {
     fn set_kicked_player_coordinate_accepted_same_as_thrown() {
         let mut step = StepEndScatterPlayer::default();
         let coord = FieldCoordinate { x: 6, y: 2 };
-        assert!(step.set_parameter(&StepParameter::KickedPlayerCoordinate(coord)));
+        assert!(step.set_parameter(&StepParameter::KickedPlayerCoordinate(Some(coord))));
         assert_eq!(step.thrown_player_coordinate, Some(coord));
     }
 
@@ -239,7 +239,7 @@ mod tests {
         let mut step = StepEndScatterPlayer::new();
         assert!(step.set_parameter(&StepParameter::KickedPlayerId(Some("k1".into()))));
         assert!(step.set_parameter(&StepParameter::KickedPlayerState(PlayerState::new(PS_STANDING))));
-        assert!(step.set_parameter(&StepParameter::KickedPlayerCoordinate(FieldCoordinate { x: 1, y: 1 })));
+        assert!(step.set_parameter(&StepParameter::KickedPlayerCoordinate(Some(FieldCoordinate { x: 1, y: 1 }))));
 
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);

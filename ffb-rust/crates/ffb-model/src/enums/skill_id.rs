@@ -384,7 +384,6 @@ impl SkillId {
             SkillId::ViolentInnovator => "ViolentInnovator",
             SkillId::WoodlandFury => "WoodlandFury",
             SkillId::WorkingInTandem => "WorkingInTandem",
-            SkillId::Wrestle => "Wrestle",
             SkillId::AllYouCanEat => "AllYouCanEat",
             SkillId::BeerBarrelBash => "BeerBarrelBash",
             SkillId::BlackInk => "BlackInk",
