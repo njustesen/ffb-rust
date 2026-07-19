@@ -11,6 +11,14 @@ impl Juggernaut {
         let base = Skill::new("Juggernaut", SkillCategory::Strength);
         Self { base }
     }
+
+    /// Java `getSkillUseDescription()` override — shadows `Skill::get_skill_use_description`
+    /// (which returns `None`) via inherent method resolution taking priority over `Deref`.
+    pub fn get_skill_use_description(&self) -> Option<Vec<String>> {
+        Some(vec![
+            "Using Juggernaut will convert the BOTH DOWN Block Result into a PUSHBACK.".to_string(),
+        ])
+    }
 }
 
 impl Default for Juggernaut {
@@ -34,5 +42,16 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(Juggernaut::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn skill_use_description_matches_java_override() {
+        // Java overrides getSkillUseDescription(); base Skill::get_skill_use_description
+        // returns None, which is what a prior translation left in place (missing override).
+        let desc = Juggernaut::new().get_skill_use_description();
+        assert_eq!(
+            desc,
+            Some(vec!["Using Juggernaut will convert the BOTH DOWN Block Result into a PUSHBACK.".to_string()])
+        );
     }
 }

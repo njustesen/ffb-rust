@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2025::ProjectileVomit.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{DeclareCondition, SkillCategory};
 
 pub struct ProjectileVomit {
     pub base: Skill,
@@ -8,7 +8,8 @@ pub struct ProjectileVomit {
 
 impl ProjectileVomit {
     pub fn new() -> Self {
-        let base = Skill::new("Projectile Vomit", SkillCategory::Trait);
+        let mut base = Skill::new("Projectile Vomit", SkillCategory::Trait);
+        base.declare_condition = DeclareCondition::Standing;
         Self { base }
     }
 }
@@ -34,5 +35,11 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(ProjectileVomit::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn declare_condition_is_standing() {
+        // Java constructor calls setDeclareCondition(DeclareCondition.STANDING).
+        assert_eq!(ProjectileVomit::new().get_declare_condition(), DeclareCondition::Standing);
     }
 }

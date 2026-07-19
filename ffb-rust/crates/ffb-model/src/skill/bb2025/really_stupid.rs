@@ -11,6 +11,12 @@ impl ReallyStupid {
         let base = Skill::as_negative_trait("Really Stupid", SkillCategory::Trait);
         Self { base }
     }
+
+    /// Java `getConfusionMessage()` override — Rust inherent method takes
+    /// priority over the Deref'd `Skill::get_confusion_message` ("is confused").
+    pub fn get_confusion_message(&self) -> &'static str {
+        "is distracted"
+    }
 }
 
 impl Default for ReallyStupid {
@@ -34,5 +40,12 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(ReallyStupid::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn confusion_message_overrides_default() {
+        // Java ReallyStupid.getConfusionMessage() returns "is distracted",
+        // not the Skill base class default of "is confused".
+        assert_eq!(ReallyStupid::new().get_confusion_message(), "is distracted");
     }
 }

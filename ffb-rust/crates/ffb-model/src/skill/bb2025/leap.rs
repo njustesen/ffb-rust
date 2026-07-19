@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2025::Leap.
 use crate::model::skill::skill::Skill;
-use crate::enums::{SkillCategory, SkillUsageType};
+use crate::enums::SkillCategory;
 
 pub struct Leap {
     pub base: Skill,
@@ -8,7 +8,10 @@ pub struct Leap {
 
 impl Leap {
     pub fn new() -> Self {
-        let base = Skill::with_usage_type("Leap", SkillCategory::Agility, SkillUsageType::OncePerTurn);
+        // Java: `super("Leap", SkillCategory.AGILITY)` — the two-arg constructor
+        // defaults to `SkillUsageType.REGULAR`. A prior translation incorrectly
+        // used `SkillUsageType::OncePerTurn`.
+        let base = Skill::new("Leap", SkillCategory::Agility);
         Self { base }
     }
 }
@@ -34,5 +37,13 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(Leap::new().get_category(), SkillCategory::Agility);
+    }
+
+    #[test]
+    fn usage_type_is_regular() {
+        // Java `super("Leap", SkillCategory.AGILITY)` uses the two-arg constructor,
+        // which defaults to SkillUsageType.REGULAR (not ONCE_PER_TURN).
+        use crate::enums::SkillUsageType;
+        assert_eq!(Leap::new().get_skill_usage_type(), SkillUsageType::Regular);
     }
 }
