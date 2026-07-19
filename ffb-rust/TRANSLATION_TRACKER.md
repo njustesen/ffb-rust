@@ -29,6 +29,71 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AI (2026-07-19): closed all 3 named quick-win follow-ups from Phase AH, then fanned out
+10 parallel worktree audits across the largest unswept pools (`ffb-mechanics/modifiers/`,
+`ffb-model/dialog/` parameters, `ffb-engine/step/generator/`) — fourth consecutive phase where
+fresh re-verification found real bugs in most of what it checked.** Tests: 17,396 → **17,423**
+(+27). No tracker status cells changed except the 20 `bb2020/special/*.java` rows below (all other
+touched files were already `✓`). Highlights:
+1. **Fixed the 20 `bb2020/special/*.java` tracker rows** flagged last phase — re-pointed from the
+   dead, uncompiled `src/skill/bb2020/special/*.rs` duplicates to the real, compiled sibling files
+   at `src/skill/bb2020/*.rs` (confirmed `bb2020/mod.rs` never declares a `special` submodule). The
+   dead directory itself was left in place, not deleted — flagged for the user to decide
+   repurpose-vs-delete.
+2. Verified the other 2 named Phase AH gaps (`casualty_modifier_factory.rs`'s Decay-roll question,
+   `armor_modifier_factory.rs`'s 2 missing branches) are still genuinely deferred/inert given the
+   current skill set — and found `go_for_it_modifier_factory.rs` was **not** actually inert as
+   claimed: it's fully wired with card modifiers in all 3 editions and already tested.
+3. Added the missing `HasReRollProperties` trait/impl to `DialogBlockRollPropertiesParameter` and
+   `DialogReRollPropertiesParameter` (both implement the Java interface but were missing it in
+   Rust) — 7 new regression tests.
+4. **`ffb-mechanics/src/modifiers/` (all 78 files swept in 3 batches):** 5 real bugs —
+   `catch_modifier_factory.rs` fell through to the bare base collection for BB2016/BB2020 instead
+   of dispatching to their edition-specific catch-modifier collections (silently dropping
+   Accurate-Pass/-1, Hand-Off/-1, Inaccurate-Pass/+1, Deflected-Pass/+1, Blast-It!/-1 depending on
+   edition); BB2016 Prehensile Tail hardcoded a flat -1 dodge penalty instead of scaling with
+   marker count; `InterceptionModifier`/`JumpModifier`'s 3-arg constructors hardcoded
+   `multiplier: 1` instead of defaulting it to the modifier value (Java delegates
+   `this(name, name, pModifier, pModifier, type)`); Right Stuff's minimum-roll calls in both
+   `bb2020`/`bb2025` `step_right_stuff.rs` used raw `agility` instead of
+   `agility_with_modifiers()`, silently dropping any temporary AG modifier from the landing-roll
+   threshold.
+5. **`ffb-model/src/dialog/` parameter files (all 67 swept in 3 batches):** 4 real bugs, all in
+   `transform()`/field-completeness: `DialogSelectKeywordParameter`/`DialogSelectPositionParameter`
+   did a naive `self.clone()` where Java's `transform()` hardcodes min/max-select to `1, 1`;
+   `DialogKickSkillParameter`'s `transform()` needs to mirror both ball-coordinate fields via
+   `FieldCoordinate::transform()`, not clone them; `DialogReRollRegenerationMultipleParameter` was
+   missing the `re_roll_options` field entirely.
+6. **`ffb-engine/src/step/generator/` (all 120 files swept in 4 batches):** 11 real bugs, the
+   largest a systemic one — 12 BB2025 generators (`auto_gaze_zoat`, `baleful_hex`, `black_ink`,
+   `catch_of_the_day`, `look_into_my_eyes`, `then_i_started_blastin`, `throw_keg`, `treacherous`,
+   `punt`, `raiding_party`, `select_blitz_target`, `throw_team_mate`) were all missing the same
+   `ActivationSequenceBuilder` negatrait/activation sub-sequence Phase AH found missing from
+   `multi_block.rs` — silently skipping Bone Head/Really Stupid/Take Root/Animal Savagery/
+   Unchannelled Fury/Blood Lust checks for those 12 player actions. Also: BB2020's `block.rs`
+   conditionally dropped the `SetDefender` step (and its clear-on-entry side effect) whenever no
+   defender had yet been chosen, letting a stale `defender_id` persist where Java always resets
+   it; `select.rs` was missing a `block_targets` field Java always threads to `END_SELECTING`.
+7. Two areas (all 34 top-level `step/generator/` files, all 16 `bb2016/` generator files, and all
+   22 dialog-parameter files in batch 1) came back **fully clean** — the first phase in 4 to find a
+   full-clean batch, though most other batches this phase still found real bugs.
+
+**Honest completion estimate: still not behaviorally done.** File/method coverage remains
+~99.8–99.9%+ (0 `○`/`~` rows). Four consecutive phases (AF, AG, AH, AI) have found real bugs on
+fresh re-verification — this phase's hit rate (7 of 10 batches found real bugs) is consistent with
+prior phases, with **no sign of drying up yet**. **What's left, in priority order:**
+1. Decide whether to delete or repurpose the now-correctly-mapped-but-still-dead
+   `src/skill/bb2020/special/` directory (20 files).
+2. This phase swept the 3 largest previously-named unswept pools to completion
+   (`ffb-mechanics/modifiers/`, dialog parameters, `step/generator/`) — the next phase needs to
+   scope a fresh area not yet covered by any phase's audit technique (candidates: skill files not
+   covered by the constructor-arg-drift sweep, `ffb-client` dialog-side handlers, `ffb-server`
+   handler bodies).
+3. Continue the fresh re-verification technique — it has not run dry after 4 consecutive phases.
+   Parity/integration testing remains the only large out-of-scope workstream.
+
+---
+
 **Phase AH (2026-07-18): closed all 5 follow-ups named by Phase AG, plus one more fresh-audit
 round on 4 newly-scoped areas — third consecutive phase where re-verification found real bugs in
 most of what it checked.** Tests: 17,261 → **17,396** (+135). No tracker status cells changed
