@@ -779,7 +779,8 @@ impl SkillId {
             SkillId::Swoop => &["ttmScattersInSingleDirection"],
             SkillId::KickTeamMate => &["canKickTeamMates"],
             SkillId::ThrowTeamMate => &["canThrowTeamMates"],
-            SkillId::RightStuff => &["canBeThrown", "canBeKicked"],
+            // Java: RightStuff.postConstruct registers canBeThrown, canBeKicked, ignoreTackleWhenBlocked
+            SkillId::RightStuff => &["canBeThrown", "canBeKicked", "ignoreTackleWhenBlocked"],
             // Java: BB2020 BallAndChain registers CancelSkillProperty(inflictsConfusion) and CancelSkillProperty(canMoveBeforeBeingBlocked)
             SkillId::BallAndChain => &["movesRandomly", "blocksLikeChainsaw", "cancelsInflictsConfusion", "cancelsCanMoveBeforeBeingBlocked"],
             // Java: BreatheFire.postConstruct registers canPerformArmourRollInsteadOfBlockThatMightFailWithTurnover

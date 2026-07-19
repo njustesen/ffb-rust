@@ -89,20 +89,20 @@ impl StepPass {
         };
 
         // Java: if (ReRolledActions.PASS == getReRolledAction()) → useReRoll or handleFailedPass
+        // Note: Java does NOT republish DONT_DROP_FUMBLE here — that publish only happens
+        // once, immediately after a fresh evaluatePass() roll (see below).
         if self.re_rolled_action.as_deref() == Some("PASS") {
             if let Some(ref source_name) = self.re_roll_source.clone() {
                 let source = ReRollSource::new(source_name.as_str());
                 if !use_reroll(game, &source, &thrower_id) {
                     let thrower_coord = game.field_model.player_coordinate(&thrower_id);
                     let pass_coord = game.pass_coordinate;
-                    return self.handle_failed_pass(game, is_bomb, thrower_coord, pass_coord, false)
-                        .publish(StepParameter::DontDropFumble(false));
+                    return self.handle_failed_pass(game, is_bomb, thrower_coord, pass_coord, false);
                 }
             } else {
                 let thrower_coord = game.field_model.player_coordinate(&thrower_id);
                 let pass_coord = game.pass_coordinate;
-                return self.handle_failed_pass(game, is_bomb, thrower_coord, pass_coord, false)
-                    .publish(StepParameter::DontDropFumble(false));
+                return self.handle_failed_pass(game, is_bomb, thrower_coord, pass_coord, false);
             }
         }
 
@@ -189,18 +189,36 @@ impl StepPass {
             }
         } else {
             let dont_drop = result == PassResult::SAVED_FUMBLE;
+            let is_fumble = result == PassResult::FUMBLE;
+            // Java: publishParameter(DONT_DROP_FUMBLE, ...) happens immediately after
+            // evaluatePass() — only for FUMBLE (false) / SAVED_FUMBLE (true) — and
+            // unconditionally, i.e. even if a re-roll dialog is about to be shown below.
+            // It must NOT be published for INACCURATE/WILDLY_INACCURATE.
+            let dont_drop_fumble_param = if is_fumble {
+                Some(StepParameter::DontDropFumble(false))
+            } else if dont_drop {
+                Some(StepParameter::DontDropFumble(true))
+            } else {
+                None
+            };
             if !dont_drop && self.re_rolled_action.is_none() {
                 // Java: mechanic.eligibleToReRoll → askForReRollIfAvailable
                 // client-only: DialogSkillUseParameter for pass skill re-roll — headless uses auto re-roll logic
-                let is_fumble = result == PassResult::FUMBLE;
                 if let Some(prompt) = ask_for_reroll_if_available(game, "PASS", self.minimum_roll, is_fumble) {
                     self.re_rolled_action = Some("PASS".into());
                     self.re_roll_source = Some("TRR".into());
-                    return StepOutcome::cont().with_prompt(prompt);
+                    let mut out = StepOutcome::cont().with_prompt(prompt);
+                    if let Some(p) = dont_drop_fumble_param {
+                        out = out.publish(p);
+                    }
+                    return out;
                 }
             }
-            self.handle_failed_pass(game, is_bomb, thrower_coord, pass_coord, dont_drop)
-                .publish(StepParameter::DontDropFumble(dont_drop))
+            let mut out = self.handle_failed_pass(game, is_bomb, thrower_coord, pass_coord, dont_drop);
+            if let Some(p) = dont_drop_fumble_param {
+                out = out.publish(p);
+            }
+            out
         }
     }
 
@@ -432,6 +450,36 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::PASS_ROLL),
             "should have PASS_ROLL report for bomb throw");
+    }
+
+    #[test]
+    fn dont_drop_fumble_not_published_on_inaccurate_result() {
+        // Java `StepPass.executeStep()` only publishes DONT_DROP_FUMBLE when
+        // state.result is FUMBLE (false) or SAVED_FUMBLE (true) — never for
+        // INACCURATE/WILDLY_INACCURATE. Find a seed whose first pass roll (with
+        // this thrower's AG 3, adjacent QuickPass, minimum_roll 3) lands on
+        // INACCURATE (roll 2, since roll 1 is always FUMBLE, roll 3 meets the
+        // minimum_roll of 3 and is ACCURATE, and roll 6 is always ACCURATE).
+        let (mut game, _) = make_thrower_game();
+        let mut seed = None;
+        for s in 0..200u64 {
+            let mut probe = GameRng::new(s);
+            let roll = probe.d6();
+            if roll == 2 {
+                seed = Some(s);
+                break;
+            }
+        }
+        let seed = seed.expect("should find a seed producing an inaccurate first roll");
+        let mut step = StepPass::new();
+        step.goto_label_on_end = "end".into();
+        step.goto_label_on_missed_pass = "miss".into();
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        assert_eq!(step.mech_result, Some(PassResult::INACCURATE));
+        assert!(
+            !out.published.iter().any(|p| matches!(p, StepParameter::DontDropFumble(_))),
+            "DONT_DROP_FUMBLE must not be published for an INACCURATE pass result"
+        );
     }
 
     #[test]

@@ -87,6 +87,8 @@ impl StepBlockChainsaw {
             let successful = roll >= minimum_roll;
 
             // Java: getResult().addReport(new ReportChainsawRoll(actingPlayer.getPlayerId(), successful, roll, minimumRoll, reRolled, null))
+            // Note: the 6-arg Java constructor delegates to the 7-arg one with defenderId=null
+            // (the trailing `null` here is the RollModifier[] array, not the defender id).
             {
                 use ffb_model::report::report_chainsaw_roll::ReportChainsawRoll;
                 game.report_list.add(ReportChainsawRoll::new(
@@ -96,7 +98,7 @@ impl StepBlockChainsaw {
                     minimum_roll,
                     re_rolled,
                     vec![],
-                    game.defender_id.clone(),
+                    None,
                 ));
             }
             let chainsaw_event = GameEvent::ChainsawRoll {
@@ -328,6 +330,31 @@ mod tests {
         game.defender_id = Some("def".into());
         step.start(&mut game, &mut GameRng::new(42));
         assert!(game.report_list.has_report(ReportId::CHAINSAW_ROLL), "ReportChainsawRoll must be emitted");
+    }
+
+    #[test]
+    fn chainsaw_report_has_no_defender_id() {
+        // Java: new ReportChainsawRoll(playerId, successful, roll, minimumRoll, reRolled, null)
+        // uses the 6-arg constructor, which delegates to the 7-arg ctor with defenderId=null.
+        // The report must NOT carry the defender's id even though one is set on the game.
+        use ffb_model::report::report_id::ReportId;
+        use ffb_model::report::report_chainsaw_roll::ReportChainsawRoll;
+        let mut step = StepBlockChainsaw::new();
+        step.set_parameter(&StepParameter::GotoLabelOnSuccess("ok".into()));
+        step.set_parameter(&StepParameter::GotoLabelOnFailure("fail".into()));
+        let mut game = make_game();
+        add_player_with_skill(&mut game, "saw", SkillId::Chainsaw);
+        add_player(&mut game, "def");
+        game.acting_player.player_id = Some("saw".into());
+        game.defender_id = Some("def".into());
+        step.start(&mut game, &mut GameRng::new(42));
+        let report = game.report_list.get_reports().iter()
+            .find(|r| r.get_id() == ReportId::CHAINSAW_ROLL)
+            .expect("ReportChainsawRoll must be emitted");
+        let chainsaw_report: &ReportChainsawRoll = (&**report as &dyn std::any::Any)
+            .downcast_ref()
+            .expect("report must be a ReportChainsawRoll");
+        assert_eq!(chainsaw_report.get_defender_id(), None, "defenderId must be null, matching Java's 6-arg constructor");
     }
 
     #[test]

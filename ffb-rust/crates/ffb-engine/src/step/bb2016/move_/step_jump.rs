@@ -105,7 +105,11 @@ impl StepJump {
                 .map(|s| use_reroll(game, s, &pid))
                 .unwrap_or(false);
             if !consumed {
-                return self.handle_failure(game);
+                // Java (LeapBehaviour.handleExecuteStepHook): reRollSource == null || !useReRoll(...)
+                // → publish INJURY_TYPE + GOTO_LABEL, doLeap = false. Crucially, this branch does
+                // NOT call actingPlayer.setJumping(false) — only the leap() SUCCESS/FAILURE branch
+                // does. So `jumping` remains true here, unlike the dice-roll-failure path below.
+                return self.fail_without_clearing_jumping(game);
             }
         }
 
@@ -160,6 +164,13 @@ impl StepJump {
 
     fn handle_failure(&mut self, game: &mut Game) -> StepOutcome {
         game.acting_player.jumping = false;
+        self.fail_without_clearing_jumping(game)
+    }
+
+    /// Java (LeapBehaviour.handleExecuteStepHook): the `reRollSource == null || !useReRoll(...)`
+    /// branch publishes INJURY_TYPE and GOTOs the failure label but does NOT reset
+    /// `actingPlayer.setJumping(false)` — unlike the leap() FAILURE branch.
+    fn fail_without_clearing_jumping(&mut self, _game: &mut Game) -> StepOutcome {
         let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeDropJump".into());
         let label = self.goto_label_on_failure.clone();
         StepOutcome::goto(&label)
@@ -302,6 +313,26 @@ mod tests {
         let _offer = step.start(&mut game, &mut GameRng::new(0));
         let out = step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
+    }
+
+    #[test]
+    fn decline_reroll_does_not_clear_jumping_flag() {
+        // Java (LeapBehaviour.handleExecuteStepHook): the reRollSource==null||!useReRoll(...)
+        // branch (declined re-roll) publishes INJURY_TYPE + GOTO_LABEL but does NOT call
+        // actingPlayer.setJumping(false) — only the leap() FAILURE branch (no more re-rolls
+        // available) does that. `jumping` must remain true after a declined re-roll.
+        let mut game = make_game();
+        add_player_ag3(&mut game, "p1");
+        game.acting_player.jumping = true;
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        let mut step = StepJump::new("fail".into());
+        step.roll = 1;
+        let _offer = step.start(&mut game, &mut GameRng::new(0));
+        step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut GameRng::new(0));
+        assert!(game.acting_player.jumping,
+            "declined re-roll must not clear the jumping flag (Java LeapBehaviour does not call setJumping(false) here)");
     }
 
     #[test]

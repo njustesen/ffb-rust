@@ -9,10 +9,11 @@
 /// - interceptor (dump-off) → set ball coordinate, EndPlayerAction
 /// - otherwise continue (move-after-pass handling)
 ///
+use ffb_model::enums::PlayerAction;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
-use crate::mechanic::spp_calc::SppCalc;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::generator::bb2016::bomb::{Bomb, BombParams};
 use crate::step::generator::bb2016::end_player_action::{EndPlayerAction, EndPlayerActionParams};
@@ -57,15 +58,33 @@ impl StepEndPassing {
         game.field_model.range_ruler = None;
         game.field_model.out_of_bounds = false;
 
-        let is_bomb = game.turn_mode.is_bomb_turn();
+        // Java: failed confusion roll on throw bomb -> end player action
+        if self.end_player_action
+            && matches!(
+                game.acting_player.player_action,
+                Some(PlayerAction::ThrowBomb) | Some(PlayerAction::HailMaryBomb)
+            )
+        {
+            let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
+                feeding_allowed: true,
+                end_player_action: true,
+                end_turn: self.end_turn,
+            });
+            return StepOutcome::next().push_seq(seq);
+        }
 
-        // Java path 1: bomb turn → Bomb sequence
-        if is_bomb {
+        // Java: throw bomb mode -> start bomb sequence
+        if game.turn_mode.is_bomb_turn() {
+            let catcher_for_bomb = if self.interceptor_id.is_some() {
+                self.interceptor_id.clone()
+            } else {
+                self.catcher_id.clone()
+            };
             let seq = Bomb::build_sequence(&BombParams {
-                catcher_id: self.catcher_id.clone(),
+                catcher_id: catcher_for_bomb,
                 pass_fumble: self.pass_fumble,
                 allow_move_after_pass: false,
-                dont_drop_fumble: self.dont_drop_fumble,
+                dont_drop_fumble: false,
             });
             let mut outcome = StepOutcome::next().push_seq(seq);
             if self.bomb_out_of_bounds {
@@ -74,7 +93,7 @@ impl StepEndPassing {
             return outcome;
         }
 
-        // Java path 2: animosity re-try → Pass generator
+        // Java: failed animosity may try to choose a new target
         if game.acting_player.suffering_animosity
             && !self.end_player_action
             && game.pass_coordinate.is_none()
@@ -83,62 +102,124 @@ impl StepEndPassing {
             return StepOutcome::next().push_seq(seq);
         }
 
-        // Java: completions SPP and passing yards — accurate, non-intercepted pass.
-        // BB2016 has no prayer system, so no additional_spp check.
-        if self.pass_accurate && !self.pass_fumble && self.interceptor_id.is_none() {
-            if let Some(ref thrower_id) = game.thrower_id.clone() {
+        let mut catcher_id = self.catcher_id.clone();
+
+        // Java: completions and passing statistic
+        if let Some(ref thrower_id) = game.thrower_id.clone() {
+            let has_ball = catcher_id
+                .as_deref()
+                .map(|id| UtilPlayer::has_ball(game, id))
+                .unwrap_or(false);
+            let on_thrower_team = catcher_id
+                .as_deref()
+                .map(|id| {
+                    if game.team_home.has_player(thrower_id) {
+                        game.team_home.has_player(id)
+                    } else {
+                        game.team_away.has_player(id)
+                    }
+                })
+                .unwrap_or(false);
+            let coord_matches = catcher_id
+                .as_deref()
+                .and_then(|id| game.field_model.player_coordinate(id))
+                .zip(game.pass_coordinate)
+                .map(|(catcher_coord, pass_coord)| catcher_coord == pass_coord)
+                .unwrap_or(false);
+
+            if has_ball && on_thrower_team && coord_matches {
+                let start_coord = game.field_model.player_coordinate(thrower_id);
+                let end_coord = catcher_id
+                    .as_deref()
+                    .and_then(|id| game.field_model.player_coordinate(id));
                 let is_home = game.team_home.has_player(thrower_id);
                 let team_result = if is_home { &mut game.game_result.home } else { &mut game.game_result.away };
                 let pr = team_result.player_results.entry(thrower_id.clone()).or_default();
-                pr.completions += 1;
-                pr.spp_gained += SppCalc::completion_spp();
-                // Java: deltaX = endCoord.x - startCoord.x (home) or reversed (away)
-                if let (Some(thrower_coord), Some(end_coord)) = (
-                    game.field_model.player_coordinate(thrower_id),
-                    game.pass_coordinate,
-                ) {
+                if self.pass_accurate {
+                    pr.completions += 1;
+                }
+                if let (Some(start), Some(end)) = (start_coord, end_coord) {
                     let delta_x = if game.home_playing {
-                        end_coord.x - thrower_coord.x
+                        end.x - start.x
                     } else {
-                        thrower_coord.x - end_coord.x
+                        start.x - end.x
                     };
                     pr.passing += delta_x;
                 }
             }
         }
 
-        // Java path 3: determine end_turn
-        let thrower_is_acting = game.thrower_id.is_some()
-            && game.acting_player.player_id.is_some()
+        // Java: fEndTurn || fEndPlayerAction || (thrower==actingPlayer && sufferingBloodLust && !hasFed)
+        let thrower_is_acting_player = game.thrower_id.is_some()
             && game.thrower_id == game.acting_player.player_id;
+        let blood_lust_forced_end = thrower_is_acting_player
+            && game.acting_player.suffering_blood_lust
+            && !game.acting_player.has_fed;
 
-        if self.end_turn || self.end_player_action {
-            let no_suffering = !game.acting_player.suffering_animosity
-                && !game.acting_player.suffering_blood_lust;
+        if self.end_turn || self.end_player_action || blood_lust_forced_end {
+            let other_team_has_catcher = catcher_id
+                .as_deref()
+                .map(|id| {
+                    game.thrower_id
+                        .as_deref()
+                        .map(|thrower_id| UtilPlayer::find_other_team(game, thrower_id).has_player(id))
+                        .unwrap_or(false)
+                })
+                .unwrap_or(false);
             self.end_turn |= check_touchdown(game)
-                || (self.catcher_id.is_none() && no_suffering && game.acting_player.has_passed)
+                || (catcher_id.is_none() && !game.acting_player.suffering_animosity)
+                || other_team_has_catcher
                 || self.pass_fumble;
             let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
-                feeding_allowed: false,
+                feeding_allowed: true,
                 end_player_action: self.end_player_action,
                 end_turn: self.end_turn,
             });
             return StepOutcome::next().push_seq(seq);
         }
 
-        // Java path 4: interceptor / dump-off path (thrower is NOT the acting player)
-        if !thrower_is_acting {
-            if let Some(ref interceptor_id) = self.interceptor_id.clone() {
-                if let Some(coord) = game.field_model.player_coordinate(interceptor_id) {
-                    game.field_model.ball_coordinate = Some(coord);
-                    game.field_model.ball_moving = false;
-                }
+        // Java else branch
+        if let Some(ref interceptor_id) = self.interceptor_id.clone() {
+            catcher_id = Some(interceptor_id.clone());
+            let is_home = game.team_home.has_player(interceptor_id);
+            let team_result = if is_home { &mut game.game_result.home } else { &mut game.game_result.away };
+            let cr = team_result.player_results.entry(interceptor_id.clone()).or_default();
+            cr.interceptions += 1;
+            if let Some(coord) = game.field_model.player_coordinate(interceptor_id) {
+                game.field_model.ball_coordinate = Some(coord);
             }
-            game.defender_action = None;
-            return StepOutcome::next();
+            game.field_model.ball_moving = false;
+        } else {
+            catcher_id = game
+                .field_model
+                .ball_coordinate
+                .and_then(|coord| game.field_model.player_at(coord))
+                .cloned();
         }
 
-        // Java path 5: continue (move-after-pass)
+        if thrower_is_acting_player {
+            let other_team_has_catcher = catcher_id
+                .as_deref()
+                .map(|id| {
+                    game.thrower_id
+                        .as_deref()
+                        .map(|thrower_id| UtilPlayer::find_other_team(game, thrower_id).has_player(id))
+                        .unwrap_or(false)
+                })
+                .unwrap_or(false);
+            self.end_turn |= check_touchdown(game)
+                || catcher_id.is_none()
+                || other_team_has_catcher
+                || (self.pass_fumble && !self.dont_drop_fumble);
+            let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
+                feeding_allowed: true,
+                end_player_action: true,
+                end_turn: self.end_turn,
+            });
+            return StepOutcome::next().push_seq(seq);
+        }
+
+        game.defender_action = None;
         StepOutcome::next()
     }
 }
@@ -275,10 +356,9 @@ mod tests {
         assert!(!out.pushes.is_empty());
     }
 
-    fn make_game_with_thrower(thrower_id: &str) -> Game {
-        let mut game = make_game();
+    fn push_home_player(game: &mut Game, id: &str) {
         game.team_home.players.push(ffb_model::model::player::Player {
-            id: thrower_id.into(), nr: 1, name: thrower_id.into(),
+            id: id.into(), nr: 1, name: id.into(),
             position_id: "pos".into(),
             player_type: ffb_model::enums::PlayerType::Regular,
             gender: ffb_model::enums::PlayerGender::Male,
@@ -289,64 +369,178 @@ mod tests {
             is_big_guy: false,
                     ..Default::default()
 });
+    }
+
+    fn make_game_with_thrower(thrower_id: &str) -> Game {
+        let mut game = make_game();
+        push_home_player(&mut game, thrower_id);
         game.thrower_id = Some(thrower_id.into());
         game.acting_player.player_id = Some(thrower_id.into());
         game
     }
 
+    /// Sets up thrower + catcher (both on home team), with the ball on the catcher
+    /// at `catch_coord`, which is also the pass coordinate — matching Java's
+    /// `UtilPlayer.hasBall(...) && thrower.getTeam().hasPlayer(catcher) &&
+    /// catcherCoordinate.equals(passCoordinate)` gate for the completions/passing block.
+    fn make_game_with_thrower_and_catcher(
+        thrower_id: &str,
+        catcher_id: &str,
+        thrower_coord: FieldCoordinate,
+        catch_coord: FieldCoordinate,
+    ) -> Game {
+        let mut game = make_game_with_thrower(thrower_id);
+        push_home_player(&mut game, catcher_id);
+        game.field_model.set_player_coordinate(thrower_id, thrower_coord);
+        game.field_model.set_player_coordinate(catcher_id, catch_coord);
+        game.field_model.ball_coordinate = Some(catch_coord);
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = false;
+        game.pass_coordinate = Some(catch_coord);
+        game
+    }
+
     #[test]
-    fn accurate_pass_awards_completion_spp() {
-        let mut game = make_game_with_thrower("thrower1");
+    fn accurate_pass_awards_completion_when_catcher_has_ball_at_pass_coordinate() {
+        let mut game = make_game_with_thrower_and_catcher(
+            "thrower1", "catcher1", FieldCoordinate::new(3, 7), FieldCoordinate::new(10, 7),
+        );
         let mut step = StepEndPassing::new();
+        step.catcher_id = Some("catcher1".into());
         step.pass_accurate = true;
-        step.interceptor_id = None;
-        step.pass_fumble = false;
         step.start(&mut game, &mut GameRng::new(0));
         let pr = game.game_result.home.player_results.get("thrower1").unwrap();
         assert_eq!(pr.completions, 1);
-        assert_eq!(pr.spp_gained, 1);
     }
 
     #[test]
-    fn fumble_does_not_award_completion_spp() {
-        let mut game = make_game_with_thrower("thrower1");
+    fn inaccurate_pass_does_not_award_completion() {
+        let mut game = make_game_with_thrower_and_catcher(
+            "thrower1", "catcher1", FieldCoordinate::new(3, 7), FieldCoordinate::new(10, 7),
+        );
         let mut step = StepEndPassing::new();
-        step.pass_accurate = true;
-        step.pass_fumble = true;
-        step.start(&mut game, &mut GameRng::new(0));
-        assert!(game.game_result.home.player_results.get("thrower1").map(|pr| pr.completions).unwrap_or(0) == 0);
-    }
-
-    #[test]
-    fn intercepted_pass_does_not_award_completion_spp() {
-        let mut game = make_game_with_thrower("thrower1");
-        game.field_model.set_player_coordinate("int1", FieldCoordinate::new(10, 7));
-        let mut step = StepEndPassing::new();
-        step.pass_accurate = true;
-        step.interceptor_id = Some("int1".into());
-        step.start(&mut game, &mut GameRng::new(0));
-        assert!(game.game_result.home.player_results.get("thrower1").map(|pr| pr.completions).unwrap_or(0) == 0);
-    }
-
-    #[test]
-    fn inaccurate_pass_does_not_award_spp() {
-        let mut game = make_game_with_thrower("thrower1");
-        let mut step = StepEndPassing::new();
+        step.catcher_id = Some("catcher1".into());
         step.pass_accurate = false;
         step.start(&mut game, &mut GameRng::new(0));
-        assert!(game.game_result.home.player_results.get("thrower1").map(|pr| pr.spp_gained).unwrap_or(0) == 0);
+        assert_eq!(
+            game.game_result.home.player_results.get("thrower1").map(|pr| pr.completions).unwrap_or(0),
+            0
+        );
+    }
+
+    #[test]
+    fn no_completion_when_catcher_not_at_pass_coordinate() {
+        let mut game = make_game_with_thrower("thrower1");
+        push_home_player(&mut game, "catcher1");
+        game.field_model.set_player_coordinate("catcher1", FieldCoordinate::new(5, 5));
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 7)); // does not match catcher's coord
+        let mut step = StepEndPassing::new();
+        step.catcher_id = Some("catcher1".into());
+        step.pass_accurate = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(
+            game.game_result.home.player_results.get("thrower1").map(|pr| pr.completions).unwrap_or(0),
+            0
+        );
+    }
+
+    /// Java's completions/passing-yards block only gates `completions` on
+    /// `fPassAccurate` — passing yards are added whenever the catcher has the ball
+    /// at the pass coordinate, regardless of accuracy. A prior Rust translation
+    /// gated passing yards on `pass_accurate` too; this pins the Java behavior.
+    #[test]
+    fn passing_yards_awarded_even_when_pass_not_accurate() {
+        let mut game = make_game_with_thrower_and_catcher(
+            "thrower1", "catcher1", FieldCoordinate::new(3, 7), FieldCoordinate::new(10, 7),
+        );
+        game.home_playing = true;
+        let mut step = StepEndPassing::new();
+        step.catcher_id = Some("catcher1".into());
+        step.pass_accurate = false;
+        step.start(&mut game, &mut GameRng::new(0));
+        let pr = game.game_result.home.player_results.get("thrower1").unwrap();
+        assert_eq!(pr.passing, 7); // 10 - 3 = 7 yards
+        assert_eq!(pr.completions, 0);
     }
 
     #[test]
     fn passing_yards_calculated_on_accurate_pass() {
-        let mut game = make_game_with_thrower("thrower1");
-        game.field_model.set_player_coordinate("thrower1", FieldCoordinate::new(3, 7));
-        game.pass_coordinate = Some(FieldCoordinate::new(10, 7));
+        let mut game = make_game_with_thrower_and_catcher(
+            "thrower1", "catcher1", FieldCoordinate::new(3, 7), FieldCoordinate::new(10, 7),
+        );
         game.home_playing = true;
         let mut step = StepEndPassing::new();
+        step.catcher_id = Some("catcher1".into());
         step.pass_accurate = true;
         step.start(&mut game, &mut GameRng::new(0));
         let pr = game.game_result.home.player_results.get("thrower1").unwrap();
         assert_eq!(pr.passing, 7); // 10 - 3 = 7 yards
+    }
+
+    /// Java: `catcherResult.setInterceptions(catcherResult.getInterceptions() + 1)`
+    /// in the interceptor branch — the prior Rust translation set the ball
+    /// coordinate but never recorded the interception statistic.
+    #[test]
+    fn interceptor_increments_interception_count() {
+        let mut game = make_game();
+        game.field_model.set_player_coordinate("int1", FieldCoordinate::new(10, 7));
+        let mut step = StepEndPassing::new();
+        step.interceptor_id = Some("int1".into());
+        step.start(&mut game, &mut GameRng::new(0));
+        let pr = game.game_result.away.player_results.get("int1").unwrap();
+        assert_eq!(pr.interceptions, 1);
+    }
+
+    /// Java's bomb-turn branch prefers `fInterceptorId` over `fCatcherId` when
+    /// building the Bomb sequence (`StringTool.isProvided(fInterceptorId) ? ... :
+    /// ...`). The prior Rust translation always used `catcher_id`, ignoring any
+    /// interceptor.
+    #[test]
+    fn bomb_turn_prefers_interceptor_id_over_catcher_id() {
+        let mut game = make_game();
+        game.turn_mode = TurnMode::BombHome;
+        let mut step = StepEndPassing::new();
+        step.catcher_id = Some("catcher1".into());
+        step.interceptor_id = Some("interceptor1".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        let seq = &out.pushes[0];
+        let init_bomb = seq.iter().find(|s| s.step_id == StepId::InitBomb).unwrap();
+        assert!(init_bomb.params.iter().any(
+            |p| matches!(p, StepParameter::CatcherId(Some(id)) if id == "interceptor1")
+        ));
+        assert!(!init_bomb.params.iter().any(
+            |p| matches!(p, StepParameter::CatcherId(Some(id)) if id == "catcher1")
+        ));
+    }
+
+    /// Java hardcodes `dontDropFumble=false` in both `Bomb.SequenceParams` calls
+    /// in this step; the prior Rust translation passed through `self.dont_drop_fumble`.
+    #[test]
+    fn bomb_turn_dont_drop_fumble_is_always_false() {
+        let mut game = make_game();
+        game.turn_mode = TurnMode::BombHome;
+        let mut step = StepEndPassing::new();
+        step.dont_drop_fumble = true;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        let seq = &out.pushes[0];
+        let init_bomb = seq.iter().find(|s| s.step_id == StepId::InitBomb).unwrap();
+        assert!(init_bomb.params.iter().any(|p| matches!(p, StepParameter::DontDropFumble(false))));
+    }
+
+    /// Java: `if (fEndPlayerAction && (actingPlayer.getPlayerAction() == THROW_BOMB
+    /// || actingPlayer.getPlayerAction() == HAIL_MARY_BOMB))` pushes an
+    /// EndPlayerAction sequence directly (feedingAllowed=true) before any other
+    /// check. This whole branch was missing from the prior Rust translation.
+    #[test]
+    fn end_player_action_for_bomb_thrower_pushes_end_player_action_directly() {
+        let mut game = make_game();
+        game.acting_player.player_action = Some(ffb_model::enums::PlayerAction::ThrowBomb);
+        let mut step = StepEndPassing::new();
+        step.end_player_action = true;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        let seq = &out.pushes[0];
+        assert_eq!(seq[0].step_id, StepId::InitFeeding);
+        assert!(seq[0].params.iter().any(|p| matches!(p, StepParameter::FeedingAllowed(true))));
     }
 }

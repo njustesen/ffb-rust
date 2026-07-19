@@ -147,12 +147,15 @@ impl StepHailMaryPass {
                 // Java: if (reRolledAction != PASS) → offer re-roll
                 self.re_rolled_action = Some("PASS".into());
 
-                // Try Pass skill dialog first
-                let has_pass_unused = game.player(&thrower_id)
-                    .map(|p| p.has_skill(SkillId::Pass) && !p.used_skills.contains(&SkillId::Pass))
+                // Try Pass skill dialog first.
+                // Java: `UtilCards.hasSkill(game.getThrower(), skill) && !state.passSkillUsed` —
+                // gated only by the per-step `passSkillUsed` flag, not by the player's
+                // turn-level `used_skills` set (that would block a legitimate re-offer here).
+                let has_pass = game.player(&thrower_id)
+                    .map(|p| p.has_skill(SkillId::Pass))
                     .unwrap_or(false);
 
-                if has_pass_unused && !self.pass_skill_used {
+                if has_pass && !self.pass_skill_used {
                     self.pass_skill_used = true;
                     self.re_roll_source = Some("Pass".into()); // pre-set, cleared on decline
                     let prompt = AgentPrompt::SkillUse {
@@ -458,6 +461,25 @@ mod tests {
         assert_eq!(out.action, StepAction::GotoLabel);
         // For bomb, no ScatterBall published
         assert!(!out.published.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall))));
+    }
+
+    /// Java: `UtilCards.hasSkill(game.getThrower(), skill) && !state.passSkillUsed` only
+    /// checks the local `passSkillUsed` step flag, not the player's turn-level
+    /// `used_skills` set. A prior Rust translation also required the skill to be
+    /// absent from `used_skills`, which would wrongly skip the Pass-skill dialog
+    /// if the skill had already been marked used elsewhere this turn.
+    #[test]
+    fn pass_skill_offered_even_if_already_in_used_skills_set() {
+        let seed = seed_for_d6(1);
+        let (mut game, tid) = make_thrower_game(PlayerAction::HailMaryPass, vec![SkillId::Pass]);
+        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == tid) {
+            p.used_skills.insert(SkillId::Pass);
+        }
+        let mut step = StepHailMaryPass::new();
+        step.goto_label_on_failure = "fail".into();
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(matches!(out.prompt, Some(AgentPrompt::SkillUse { .. })));
     }
 
     #[test]

@@ -107,7 +107,7 @@ impl StepGoForIt {
             // Java: actingPlayer.setGoingForIt(UtilPlayer.isNextMoveGoingForIt(game))
             let ma = player_id.as_deref()
                 .and_then(|id| game.player(id))
-                .map(|p| p.movement as i32)
+                .map(|p| p.movement_with_modifiers())
                 .unwrap_or(4);
             use crate::util::movement_calc::MovementCalc;
             game.acting_player.goes_for_it =
@@ -118,7 +118,7 @@ impl StepGoForIt {
         let current_move = game.acting_player.current_move;
         let ma = player_id.as_deref()
             .and_then(|id| game.player(id))
-            .map(|p| p.movement as i32)
+            .map(|p| p.movement_with_modifiers())
             .unwrap_or(4);
 
         if !going_for_it || current_move <= ma {
@@ -186,7 +186,7 @@ impl StepGoForIt {
             let current_move = game.acting_player.current_move;
             let ma = player_id.as_deref()
                 .and_then(|id| game.player(id))
-                .map(|p| p.movement as i32)
+                .map(|p| p.movement_with_modifiers())
                 .unwrap_or(4);
             if jumping && current_move > ma + 1 && !self.second_go_for_it {
                 self.second_go_for_it = true;
@@ -225,10 +225,12 @@ impl StepGoForIt {
         self.fail_gfi(game)
     }
 
-    fn fail_gfi(&self, game: &mut Game) -> StepOutcome {
-        if self.ball_and_chain_gfi {
-            game.acting_player.fell_from_rush = true;
-        }
+    fn fail_gfi(&self, _game: &mut Game) -> StepOutcome {
+        // Java (bb2016 StepGoForIt.failGfi()) does NOT set fellFromRush — that only
+        // happens in the bb2020/bb2025 StepGoForIt.failGfi(). bb2016's failGfi() is:
+        //   publishParameter(END_TURN, true);
+        //   publishParameter(INJURY_TYPE, new InjuryTypeDropGFI());
+        //   getResult().setNextAction(GOTO_LABEL, fGotoLabelOnFailure);
         // Java: publishParameter(INJURY_TYPE, new InjuryTypeDropGFI())
         let label = self.goto_label_on_failure.clone();
         StepOutcome::goto(&label)
@@ -393,6 +395,30 @@ mod tests {
     }
 
     #[test]
+    fn uses_movement_with_modifiers_not_raw_movement() {
+        // Java: actingPlayer.getCurrentMove() > actingPlayer.getPlayer().getMovementWithModifiers()
+        // (UtilPlayer.isNextMoveGoingForIt also uses getMovementWithModifiers()). A player with a
+        // temporary MA penalty (e.g. Greasy Cleats: -1) must be evaluated against the *modified*
+        // movement, not the raw base movement stat.
+        use ffb_model::model::player::STAT_MA;
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        // base MA is 4 (see add_player); apply a -1 temporary modifier → effective MA = 3
+        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "p1") {
+            p.add_temporary_stat_mod("GREASY_CLEATS", STAT_MA, -1);
+        }
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.goes_for_it = true;
+        // current_move = 4 (equal to raw MA, but 1 above effective MA of 3) → must be GFI
+        game.acting_player.current_move = 4;
+        let mut step = StepGoForIt::new("fail".into());
+        step.roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel,
+            "with movement_with_modifiers()==3, current_move=4 must trigger a GFI roll (and fail on roll=1)");
+    }
+
+    #[test]
     fn current_move_at_ma_returns_next_step() {
         // current_move <= ma → not actually going for it
         let mut game = make_game();
@@ -484,6 +510,25 @@ mod tests {
             game.report_list.has_report(ReportId::GO_FOR_IT_ROLL),
             "GO_FOR_IT_ROLL report should be added on a successful roll"
         );
+    }
+
+    #[test]
+    fn ball_and_chain_gfi_failure_does_not_set_fell_from_rush() {
+        // Java bb2016 StepGoForIt.failGfi() never touches fellFromRush — that behavior
+        // is bb2020/bb2025-only (see StepGoForIt.failGfi() in those packages). The
+        // bb2016 translation must not invent that assignment.
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.goes_for_it = true;
+        game.acting_player.current_move = 10;
+        let mut step = StepGoForIt::new("fail".into());
+        // ball_and_chain_gfi left false to match goForItAfterBlock==false (default
+        // player has no GO_FOR_IT_AFTER_BLOCK skill) so runGfi remains true.
+        step.roll = 1; // failure, no rerolls available → fail_gfi
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.acting_player.fell_from_rush,
+            "bb2016 StepGoForIt must not set fell_from_rush on GFI failure");
     }
 
     #[test]

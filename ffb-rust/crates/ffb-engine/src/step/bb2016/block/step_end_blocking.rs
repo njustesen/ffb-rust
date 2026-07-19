@@ -129,10 +129,16 @@ impl StepEndBlocking {
             .map(|p| p.has_skill_property(NamedProperties::BLOCKS_LIKE_CHAINSAW))
             .unwrap_or(false);
 
+        let has_skill_to_cancel_multi_block = attacker_id.as_deref()
+            .and_then(|id| game.player(id))
+            .map(|p| UtilCards::has_skill_to_cancel_property(p, NamedProperties::CAN_BLOCK_MORE_THAN_ONCE))
+            .unwrap_or(false);
+
         if is_multiple_block
             && can_block_multiple_times.is_some()
-            && !has_chainsaw
+            && !has_skill_to_cancel_multi_block
             && attacker_state.has_tacklezones()
+            && !has_chainsaw
             && !attacker_state.is_confused()
             && game.acting_player.has_blocked
         {
@@ -180,7 +186,9 @@ impl StepEndBlocking {
             game.acting_player.goes_for_it = true;
         }
 
-        let has_move_left = UtilPlayer::has_move_left(game, false);
+        // Java: UtilPlayer.isNextMovePossible(game, false) — not hasMoveLeft; this also
+        // checks actingPlayer.isHeldInPlace() (e.g. Tentacles), which hasMoveLeft alone omits.
+        let next_move_possible_for_second_block = UtilPlayer::is_next_move_possible(game, false);
         let defender_can_be_blocked = defender_state.map(|s| s.can_be_blocked()).unwrap_or(false);
         let is_adjacent = attacker_position.zip(defender_position)
             .map(|(a, d)| a.is_adjacent(d))
@@ -197,7 +205,7 @@ impl StepEndBlocking {
             && attacker_state.has_tacklezones()
             && self.defender_pushed
             && !is_multiple_block
-            && has_move_left;
+            && next_move_possible_for_second_block;
 
         if force_second_block {
             game.acting_player.goes_for_it = true;
@@ -421,5 +429,65 @@ mod tests {
         );
         assert!(!game.report_list.has_report(ReportId::SKILL_USE),
             "no SKILL_USE report should be added when use_skill=false");
+    }
+
+    // ── force-second-block: must use isNextMovePossible, not hasMoveLeft ─────
+
+    #[test]
+    fn force_second_block_skipped_when_held_in_place() {
+        // Java: the FORCE_SECOND_BLOCK branch requires UtilPlayer.isNextMovePossible(game, false),
+        // which returns false whenever actingPlayer.isHeldInPlace() (e.g. Tentacles) — regardless
+        // of whether the player still has movement left. A prior Rust translation used
+        // UtilPlayer::has_move_left directly, which ignores held_in_place and would incorrectly
+        // enter the FORCE_SECOND_BLOCK branch (pushing a frenzy Block sequence) instead of
+        // falling through to the default EndPlayerAction sequence.
+        use ffb_model::enums::{PlayerType, PlayerGender, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+
+        let mut step = StepEndBlocking::new();
+        step.defender_pushed = true;
+        let mut game = make_game();
+
+        game.team_home.players.push(Player {
+            id: "att".into(), name: "att".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Frenzy, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        game.acting_player.player_id = Some("att".into());
+        game.acting_player.player_action = Some(PlayerAction::Block);
+        game.acting_player.current_move = 0;
+        game.acting_player.held_in_place = true; // e.g. Tentacles
+
+        game.team_away.players.push(Player {
+            id: "def".into(), name: "def".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.defender_id = Some("def".into());
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // Falls through to the default branch (endGenerator.pushSequence), whose sequence
+        // starts with InitFeeding — not a frenzy Block sequence.
+        assert_eq!(out.pushes.len(), 1);
+        assert_eq!(out.pushes[0][0].step_id, StepId::InitFeeding,
+            "held_in_place must block the FORCE_SECOND_BLOCK branch even though hasMoveLeft is true");
     }
 }

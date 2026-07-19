@@ -75,8 +75,12 @@ impl StepMvp {
         // Java: int mvpNominations = UtilGameOption.getIntOption(game, GameOptionId.MVP_NOMINATIONS)
         let mvp_nominations: i32 = game.options.get_int("mvpNominations").unwrap_or(0);
         let _ = mvp_nominations; // client-only: nominations dialog — headless always auto-picks randomly
-        // Auto-roll: pick one random player per side using rng.
-        // Java: DiceRoller.randomPlayerId(findPlayerIdsForMvp(team)) — filter killed players.
+        // Auto-roll: pick a random player per MVP slot for each side using rng.
+        // Java (else branch, mvpNominations<=0 || adminMode):
+        //   fHomePlayersNominated = findPlayerIdsForMvp(team);
+        //   for (i = 0; i < fNrOfHomeMvps; i++) { fNrOfHomeChoices++; fHomePlayersMvp.add(randomPlayerId(...)) }
+        // Note: the same candidate list is reused for every pick within the loop, so a player
+        // can legitimately be chosen as MVP more than once (matches Java's DiceRoller.randomPlayerId call).
         if self.nr_of_home_choices < self.nr_of_home_mvps {
             let players: Vec<String> = game.team_home.players.iter()
                 .filter(|p| !game.field_model.player_state(&p.id).map(|s| s.is_killed()).unwrap_or(false))
@@ -86,17 +90,19 @@ impl StepMvp {
                     .unwrap_or(true))
                 .map(|p| p.id.clone())
                 .collect();
-            if !players.is_empty() {
-                let idx = rng.range(players.len());
-                let mvp_id = players[idx].clone();
-                let mvp_spp = SppCalc::mvp_spp(game.rules);
-                let pr = game.game_result.home.player_results.entry(mvp_id.clone()).or_default();
-                pr.mvp = true;
-                pr.player_awards += 1;
-                pr.spp_gained += mvp_spp;
-                self.home_players_mvp.push(mvp_id);
+            while self.nr_of_home_choices < self.nr_of_home_mvps {
+                self.nr_of_home_choices += 1;
+                if !players.is_empty() {
+                    let idx = rng.range(players.len());
+                    let mvp_id = players[idx].clone();
+                    let mvp_spp = SppCalc::mvp_spp(game.rules);
+                    let pr = game.game_result.home.player_results.entry(mvp_id.clone()).or_default();
+                    pr.mvp = true;
+                    pr.player_awards += 1;
+                    pr.spp_gained += mvp_spp;
+                    self.home_players_mvp.push(mvp_id);
+                }
             }
-            self.nr_of_home_choices += 1;
         }
         if self.nr_of_away_choices < self.nr_of_away_mvps {
             let players: Vec<String> = game.team_away.players.iter()
@@ -107,17 +113,19 @@ impl StepMvp {
                     .unwrap_or(true))
                 .map(|p| p.id.clone())
                 .collect();
-            if !players.is_empty() {
-                let idx = rng.range(players.len());
-                let mvp_id = players[idx].clone();
-                let mvp_spp = SppCalc::mvp_spp(game.rules);
-                let pr = game.game_result.away.player_results.entry(mvp_id.clone()).or_default();
-                pr.mvp = true;
-                pr.player_awards += 1;
-                pr.spp_gained += mvp_spp;
-                self.away_players_mvp.push(mvp_id);
+            while self.nr_of_away_choices < self.nr_of_away_mvps {
+                self.nr_of_away_choices += 1;
+                if !players.is_empty() {
+                    let idx = rng.range(players.len());
+                    let mvp_id = players[idx].clone();
+                    let mvp_spp = SppCalc::mvp_spp(game.rules);
+                    let pr = game.game_result.away.player_results.entry(mvp_id.clone()).or_default();
+                    pr.mvp = true;
+                    pr.player_awards += 1;
+                    pr.spp_gained += mvp_spp;
+                    self.away_players_mvp.push(mvp_id);
+                }
             }
-            self.nr_of_away_choices += 1;
         }
         // Java: if (fHomePlayersMvp.size() >= fNrOfHomeMvps || fAwayPlayersMvp.size() >= fNrOfAwayMvps)
         //         addReport(new ReportMostValuablePlayers(...))
@@ -291,6 +299,40 @@ mod tests {
         // The step should have picked one home MVP and one away MVP.
         assert_eq!(step.home_players_mvp.len(), 1);
         assert_eq!(step.away_players_mvp.len(), 1);
+    }
+
+    #[test]
+    fn extra_mvp_option_awards_two_mvps_per_side_in_single_call() {
+        // Before the fix: with extraMvp enabled (nr_of_*_mvps=2), a single execute_step call
+        // only picked 1 MVP per side (incrementing choices by only 1), so the step would
+        // return NextStep with the second MVP never picked and the report often not added.
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+        use std::collections::HashSet;
+        let mut game = make_game();
+        game.options.set("extraMvp", "true");
+        for (id, is_home) in [("h1", true), ("h2", true), ("a1", false), ("a2", false)] {
+            let player = Player {
+                id: id.into(), name: id.into(), nr: 1, position_id: "pos".into(),
+                player_type: PlayerType::Regular, gender: PlayerGender::Male,
+                movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+                starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+                used_skills: HashSet::new(),
+                niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+                is_big_guy: false,
+                ..Default::default()
+            };
+            if is_home { game.team_home.players.push(player); } else { game.team_away.players.push(player); }
+        }
+        let mut step = StepMvp::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(step.nr_of_home_choices, 2, "both home MVP slots should be filled in one call");
+        assert_eq!(step.nr_of_away_choices, 2, "both away MVP slots should be filled in one call");
+        assert_eq!(step.home_players_mvp.len(), 2);
+        assert_eq!(step.away_players_mvp.len(), 2);
+        use ffb_model::report::report_id::ReportId;
+        assert!(game.report_list.has_report(ReportId::MOST_VALUABLE_PLAYERS),
+            "report should be added once both sides' MVP quotas are fulfilled in a single call");
     }
 
     #[test]

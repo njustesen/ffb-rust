@@ -103,8 +103,10 @@ impl StepFollowup {
                 let mut cancel_skill_used = false;
                 if self.using_skill_preventing_follow_up.is_none() && attacker_cancels_fend {
                     let action = game.acting_player.player_action.unwrap_or(PlayerAction::Block);
+                    // Java: PlayerAction.BLITZ == actingPlayer.getPlayerAction()
+                    //   || (PlayerAction.MOVE == actingPlayer.getPlayerAction() && hasSkillProperty(blocksDuringMove))
+                    // Note: BLITZ_MOVE is NOT included in the Java condition.
                     let is_blitz_or_blocks_during_move = action == PlayerAction::Blitz
-                        || action == PlayerAction::BlitzMove
                         || (action == PlayerAction::Move && acting_player_id.as_deref()
                             .and_then(|id| game.player(id))
                             .map(|p| p.has_skill_property(NamedProperties::BLOCKS_DURING_MOVE))
@@ -447,5 +449,52 @@ mod tests {
         // Juggernaut should auto-cancel Fend → using_skill_preventing_follow_up = Some(false)
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(step.using_skill_preventing_follow_up, Some(false));
+    }
+
+    #[test]
+    fn juggernaut_does_not_cancel_fend_on_blitz_move() {
+        use ffb_model::enums::{PlayerType, PlayerGender, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        // Java: the auto-cancel condition only checks BLITZ or (MOVE && blocksDuringMove) —
+        // BLITZ_MOVE is deliberately excluded. On a BLITZ_MOVE action, Juggernaut must NOT
+        // auto-cancel Fend; the step should instead fall through to showing the Fend dialog
+        // (using_skill_preventing_follow_up stays None, action = Continue).
+        let mut step = StepFollowup::new();
+        step.old_defender_state = Some(PlayerState::new(PS_STANDING)); // has tacklezones
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "att".into(), name: "att".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Juggernaut, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        game.acting_player.player_id = Some("att".into());
+        game.acting_player.player_action = Some(PlayerAction::BlitzMove);
+        game.team_away.players.push(Player {
+            id: "def".into(), name: "def".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Fend, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.defender_id = Some("def".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(step.using_skill_preventing_follow_up, None,
+            "BLITZ_MOVE must not trigger Juggernaut auto-cancel of Fend (Java only checks BLITZ / MOVE+blocksDuringMove)");
+        assert_eq!(out.action, StepAction::Continue);
     }
 }

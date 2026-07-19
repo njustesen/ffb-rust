@@ -1,10 +1,10 @@
 use ffb_model::enums::Direction;
 use ffb_model::model::property::named_properties::NamedProperties;
-use ffb_model::report::report_id::ReportId;
 use ffb_model::report::report_scatter_player::ReportScatterPlayer;
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::drop_player_context::SteadyFootingContext;
 use crate::step::framework::{Step, StepOutcome};
@@ -12,27 +12,33 @@ use crate::step::framework::{StepId, StepParameter};
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2016.move.StepMoveBallAndChain.
 ///
-/// Handles movement of a Ball-and-Chain player. The player moves randomly in a
-/// direction determined by a scatter roll (ThrowInMechanic). If the destination
-/// is out of bounds, the player is crowd-pushed. If there is a player in the
-/// destination square, a block resolves. Otherwise, the player moves there.
+/// Handles movement of a Ball-and-Chain player. The player *always* scatters one
+/// square in a randomly-rolled direction (biased toward the direction of the
+/// pre-supplied COORDINATE_TO, i.e. the square the player was attempting to move
+/// to). If the scatter destination is out of bounds, the player is crowd-pushed.
+/// If there is a player in the destination square, a block resolves. Otherwise,
+/// the player moves there.
 ///
 /// Init params: GOTO_LABEL_ON_END (mandatory), GOTO_LABEL_ON_FALL_DOWN (mandatory),
 ///              COORDINATE_FROM (mandatory), COORDINATE_TO (mandatory).
 ///
 /// Logic (executeStep):
 /// 1. Check movesRandomly property (Ball-and-Chain carrier). If !movesRandomly → NEXT_STEP.
-/// 2. Scatter via ThrowInMechanic.scatter(coordinateFrom, roll) → coordinateTo.
-/// 3. If coordinateTo is out of bounds:
+/// 2. Roll a D8. Determine a base compass direction by comparing coordinateFrom to the
+///    (pre-scatter) coordinateTo, then interpret the roll relative to that base direction
+///    via ThrowInMechanic (this is *not* conditional on whether coordinateTo was preset —
+///    Ball-and-Chain always scatters).
+/// 3. Overwrite coordinateTo with the scatter result (1 square from coordinateFrom).
+/// 4. addReport(ReportScatterPlayer).
+/// 5. If out of bounds:
 ///    - Publish INJURY_TYPE(InjuryTypeCrowdPush)
 ///    - GOTO_LABEL(fGotoLabelOnFallDown)
-/// 4. If there is a player at coordinateTo (blockDefenderId):
+/// 6. Publish COORDINATE_TO(fCoordinateTo) unconditionally.
+/// 7. If there is a player at coordinateTo (blockDefenderId):
+///    - currentMove += 1; setGoingForIt(isNextMoveGoingForIt)
 ///    - Publish BLOCK_DEFENDER_ID
 ///    - GOTO_LABEL(fGotoLabelOnEnd)
-/// 5. Else:
-///    - NEXT_STEP
-///
-/// ThrowInMechanic.scatter → D8 roll mapped via Direction::for_roll + FieldCoordinate::step → wired.
+/// 8. Else: NEXT_STEP
 pub struct StepMoveBallAndChain {
     /// Java: fGotoLabelOnEnd
     pub goto_label_on_end: String,
@@ -40,7 +46,7 @@ pub struct StepMoveBallAndChain {
     pub goto_label_on_fall_down: String,
     /// Java: fCoordinateFrom
     pub coordinate_from: Option<FieldCoordinate>,
-    /// Java: fCoordinateTo (intended destination after scatter)
+    /// Java: fCoordinateTo (pre-scatter: the intended target; post-scatter: the actual landing square)
     pub coordinate_to: Option<FieldCoordinate>,
 }
 
@@ -97,51 +103,132 @@ impl StepMoveBallAndChain {
             Some(c) => c,
             None => return StepOutcome::next(),
         };
-
-        // Java: ThrowInMechanic.scatter(coordinateFrom, directionRoll) → coordinateTo
-        // Roll D8, map to scatter direction, step one square.
-        let (coordinate_to, scatter_direction, scatter_roll) = if let Some(pre_set) = self.coordinate_to {
-            (pre_set, None, None)
-        } else {
-            let roll = rng.d8();
-            let direction = Direction::for_roll(roll).unwrap_or(Direction::North);
-            (coordinate_from.step(direction, 1), Some(direction), Some(roll))
+        // Java uses fCoordinateTo directly (no null-guard in the source — a Ball-and-Chain
+        // player is always dispatched with a pending target square). We guard defensively.
+        let bias_coordinate_to = match self.coordinate_to {
+            Some(c) => c,
+            None => return StepOutcome::next(),
         };
 
-        // Java: getResult().addReport(new ReportScatterPlayer(coordinateFrom, coordinateTo, directions, false))
-        {
-            let dirs = scatter_direction.map(|d| vec![d]).unwrap_or_default();
-            let rolls = scatter_roll.map(|r| vec![r]).unwrap_or_default();
-            game.report_list.add(ReportScatterPlayer::new(
-                coordinate_from,
-                coordinate_to,
-                dirs,
-                rolls,
-                Some(false),
-            ));
-        }
+        // Java: int scatterRoll = getGameState().getDiceRoller().rollThrowInDirection();
+        // Always rolled — the scatter is unconditional, never skipped because coordinateTo
+        // was pre-supplied by the caller (that value only biases the direction below).
+        let scatter_roll = rng.d8();
 
-        // Check if out of bounds
+        // Java: compare fCoordinateFrom to fCoordinateTo (pre-scatter) to pick a base direction
+        let base_dir = if coordinate_from.x < bias_coordinate_to.x {
+            Direction::East
+        } else if coordinate_from.x > bias_coordinate_to.x {
+            Direction::West
+        } else if coordinate_from.y < bias_coordinate_to.y {
+            Direction::South
+        } else {
+            Direction::North
+        };
+
+        let player_scatter = interpret_throw_in_direction(base_dir, scatter_roll);
+
+        // Java: fCoordinateTo = UtilServerCatchScatterThrowIn.findScatterCoordinate(fCoordinateFrom, playerScatter, 1)
+        let coordinate_to = scatter_one_square(coordinate_from, player_scatter);
+        self.coordinate_to = Some(coordinate_to);
+
+        // Java: getResult().addReport(new ReportScatterPlayer(coordinateFrom, coordinateTo, [playerScatter], [scatterRoll]))
+        game.report_list.add(ReportScatterPlayer::new(
+            coordinate_from,
+            coordinate_to,
+            vec![player_scatter],
+            vec![scatter_roll],
+            None,
+        ));
+
+        // Java: if (!FieldCoordinateBounds.FIELD.isInBounds(fCoordinateTo))
         if !FieldCoordinateBounds::FIELD.is_in_bounds(coordinate_to) {
-            // Java: publishParameter(INJURY_TYPE, InjuryTypeCrowdPush) + GOTO_LABEL_ON_FALL_DOWN
+            // Java: publishParameter(INJURY_TYPE, new InjuryTypeCrowdPush()) + GOTO_LABEL_ON_FALL_DOWN
             let label = self.goto_label_on_fall_down.clone();
             let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeCrowdPush".into());
             return StepOutcome::goto(&label)
                 .publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
         }
 
-        // Check if there is a blocking defender at coordinateTo
+        // Java: publishParameter(COORDINATE_TO, fCoordinateTo) — unconditional
+        let mut outcome = StepOutcome::next()
+            .publish(StepParameter::CoordinateTo(coordinate_to));
+
+        // Java: Player<?> blockDefender = game.getFieldModel().getPlayer(fCoordinateTo)
         let block_defender_id = game.field_model.player_at(coordinate_to).cloned();
 
         if let Some(defender_id) = block_defender_id {
-            // Java: BLOCK_DEFENDER_ID + GOTO_LABEL_ON_END
+            // Java: actingPlayer.setCurrentMove(actingPlayer.getCurrentMove() + 1)
+            game.acting_player.current_move += 1;
+            // Java: actingPlayer.setGoingForIt(UtilPlayer.isNextMoveGoingForIt(game))
+            game.acting_player.goes_for_it = UtilPlayer::is_next_move_going_for_it(game);
             let label = self.goto_label_on_end.clone();
-            return StepOutcome::goto(&label)
-                .publish(StepParameter::BlockDefenderId(defender_id));
+            outcome = outcome.publish(StepParameter::BlockDefenderId(defender_id));
+            return StepOutcome::goto(&label).publish_all(outcome.published);
         }
 
-        // Empty square — move there
-        StepOutcome::next()
+        outcome
+    }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Java: ThrowInMechanic.interpretThrowInDirectionRoll(baseDir, roll).
+/// Maps a d8 roll (1-8) to a scatter direction based on the base (facing) direction.
+fn interpret_throw_in_direction(base: Direction, roll: i32) -> Direction {
+    let dirs_east: [Direction; 8] = [
+        Direction::Northeast, Direction::North, Direction::Northwest,
+        Direction::East, Direction::East,
+        Direction::Southeast, Direction::South, Direction::Southwest,
+    ];
+    let dirs_west: [Direction; 8] = [
+        Direction::Southwest, Direction::South, Direction::Southeast,
+        Direction::West, Direction::West,
+        Direction::Northwest, Direction::North, Direction::Northeast,
+    ];
+    let dirs_south: [Direction; 8] = [
+        Direction::Southeast, Direction::East, Direction::Northeast,
+        Direction::South, Direction::South,
+        Direction::Southwest, Direction::West, Direction::Northwest,
+    ];
+    let dirs_north: [Direction; 8] = [
+        Direction::Northwest, Direction::West, Direction::Southwest,
+        Direction::North, Direction::North,
+        Direction::Northeast, Direction::East, Direction::Southeast,
+    ];
+    let idx = ((roll - 1).max(0).min(7)) as usize;
+    match base {
+        Direction::East | Direction::Northeast | Direction::Southeast => dirs_east[idx],
+        Direction::West | Direction::Northwest | Direction::Southwest => dirs_west[idx],
+        Direction::South => dirs_south[idx],
+        Direction::North => dirs_north[idx],
+    }
+}
+
+/// Move one square in `dir` from `from` (Java: UtilServerCatchScatterThrowIn.findScatterCoordinate(from, dir, 1)).
+fn scatter_one_square(from: FieldCoordinate, dir: Direction) -> FieldCoordinate {
+    let (dx, dy): (i32, i32) = match dir {
+        Direction::North     => (0, -1),
+        Direction::Northeast => (1, -1),
+        Direction::East      => (1,  0),
+        Direction::Southeast => (1,  1),
+        Direction::South     => (0,  1),
+        Direction::Southwest => (-1, 1),
+        Direction::West      => (-1, 0),
+        Direction::Northwest => (-1,-1),
+    };
+    FieldCoordinate::new(from.x + dx, from.y + dy)
+}
+
+// Extension to add convenience helpers to StepOutcome
+trait StepOutcomeBuilder {
+    fn publish_all(self, params: Vec<StepParameter>) -> Self;
+}
+
+impl StepOutcomeBuilder for StepOutcome {
+    fn publish_all(mut self, params: Vec<StepParameter>) -> Self {
+        self.published.extend(params);
+        self
     }
 }
 
@@ -197,10 +284,12 @@ mod tests {
     }
 
     #[test]
-    fn empty_target_square_returns_next_step() {
+    fn non_ball_and_chain_player_returns_next_step() {
         let mut game = make_game();
         let from = FieldCoordinate::new(5, 5);
         let to = FieldCoordinate::new(6, 5);
+        add_player(&mut game, "p1", from);
+        game.acting_player.player_id = Some("p1".into());
         let mut step = StepMoveBallAndChain::new("end".into(), "fall".into());
         step.coordinate_from = Some(from);
         step.coordinate_to = Some(to);
@@ -210,46 +299,76 @@ mod tests {
 
     #[test]
     fn out_of_bounds_target_gotos_fall_down_label() {
+        // Center-field carrier scattering toward the near edge with a seed that rolls
+        // a direction driving it off the board.
         let mut game = make_game();
         let from = FieldCoordinate::new(0, 5);
-        let oob = FieldCoordinate::new(26, 5);
+        let bias_to = FieldCoordinate::new(1, 5); // east bias
         add_ball_and_chain_player(&mut game, "carrier", from);
         let mut step = StepMoveBallAndChain::new("end".into(), "fall".into());
         step.coordinate_from = Some(from);
-        step.coordinate_to = Some(oob);
-        let out = step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(out.action, StepAction::GotoLabel);
-        assert_eq!(out.goto_label.as_deref(), Some("fall"));
+        step.coordinate_to = Some(bias_to);
+        // Try a handful of seeds to find one that scatters west/off the left edge.
+        let mut found_oob = false;
+        for seed in 0..64u64 {
+            let mut s = StepMoveBallAndChain::new("end".into(), "fall".into());
+            s.coordinate_from = Some(from);
+            s.coordinate_to = Some(bias_to);
+            let out = s.start(&mut game, &mut GameRng::new(seed));
+            if out.action == StepAction::GotoLabel && out.goto_label.as_deref() == Some("fall") {
+                found_oob = true;
+                break;
+            }
+        }
+        assert!(found_oob, "expected at least one seed to scatter the carrier out of bounds from x=0");
+    }
+
+    #[test]
+    fn scatter_always_rolls_even_with_preset_coordinate_to() {
+        // Regression test: previously, when COORDINATE_TO was already set (the normal
+        // case — it holds the player's intended destination before the mandatory
+        // scatter), the step short-circuited and used it directly as the final
+        // landing square with no scatter roll and no ReportScatterPlayer data.
+        // Ball-and-Chain must *always* scatter one square from coordinateFrom.
+        let mut game = make_game();
+        let from = FieldCoordinate::new(10, 8);
+        let intended_to = FieldCoordinate::new(11, 8); // preset — east bias
+        add_ball_and_chain_player(&mut game, "carrier", from);
+        let mut step = StepMoveBallAndChain::new("end".into(), "fall".into());
+        step.coordinate_from = Some(from);
+        step.coordinate_to = Some(intended_to);
+        step.start(&mut game, &mut GameRng::new(2));
+        assert!(game.report_list.has_report(ReportId::SCATTER_PLAYER),
+            "SCATTER_PLAYER report must always be added, even with a preset COORDINATE_TO");
+        // The final coordinate_to must be exactly one square from coordinate_from
+        // (a scatter result), not the untouched preset value further away.
+        let final_to = step.coordinate_to.expect("coordinate_to must be set after scatter");
+        let dist = (final_to.x - from.x).abs().max((final_to.y - from.y).abs());
+        assert_eq!(dist, 1, "scatter must land exactly one square from coordinateFrom");
     }
 
     #[test]
     fn occupied_target_square_gotos_end_label() {
+        // Place a defender directly east of the carrier's scatter origin so that
+        // whichever direction the scatter mechanic resolves to when biased east,
+        // it is likely to land on the defender for at least one seed.
         let mut game = make_game();
         let from = FieldCoordinate::new(5, 5);
-        let to = FieldCoordinate::new(6, 5);
+        let bias_to = FieldCoordinate::new(6, 5);
         add_ball_and_chain_player(&mut game, "carrier", from);
-        add_player(&mut game, "defender", to);
-        let mut step = StepMoveBallAndChain::new("end".into(), "fall".into());
-        step.coordinate_from = Some(from);
-        step.coordinate_to = Some(to);
-        let out = step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(out.action, StepAction::GotoLabel);
-        assert_eq!(out.goto_label.as_deref(), Some("end"));
-    }
-
-    #[test]
-    fn occupied_square_publishes_block_defender_id() {
-        let mut game = make_game();
-        let from = FieldCoordinate::new(5, 5);
-        let to = FieldCoordinate::new(6, 5);
-        add_ball_and_chain_player(&mut game, "carrier", from);
-        add_player(&mut game, "defender", to);
-        let mut step = StepMoveBallAndChain::new("end".into(), "fall".into());
-        step.coordinate_from = Some(from);
-        step.coordinate_to = Some(to);
-        let out = step.start(&mut game, &mut GameRng::new(0));
-        let has_defender = out.published.iter().any(|p| matches!(p, StepParameter::BlockDefenderId(_)));
-        assert!(has_defender, "should publish BlockDefenderId when square is occupied");
+        add_player(&mut game, "defender", FieldCoordinate::new(6, 5));
+        let mut found_block = false;
+        for seed in 0..64u64 {
+            let mut s = StepMoveBallAndChain::new("end".into(), "fall".into());
+            s.coordinate_from = Some(from);
+            s.coordinate_to = Some(bias_to);
+            let out = s.start(&mut game, &mut GameRng::new(seed));
+            if out.action == StepAction::GotoLabel && out.goto_label.as_deref() == Some("end") {
+                found_block = true;
+                break;
+            }
+        }
+        assert!(found_block, "expected at least one seed to scatter the carrier onto the defender's square");
     }
 
     #[test]
@@ -309,32 +428,5 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::SCATTER_PLAYER),
             "should have SCATTER_PLAYER report when ball-and-chain player moves");
-    }
-
-    #[test]
-    fn scatter_player_report_added_without_preset_coordinate() {
-        let mut game = make_game();
-        let from = FieldCoordinate::new(12, 6);
-        add_ball_and_chain_player(&mut game, "carrier", from);
-        let mut step = StepMoveBallAndChain::new("end".into(), "fall".into());
-        step.coordinate_from = Some(from);
-        step.coordinate_to = None;
-        step.start(&mut game, &mut GameRng::new(0));
-        assert!(game.report_list.has_report(ReportId::SCATTER_PLAYER),
-            "SCATTER_PLAYER report should be added when D8 scatter is rolled");
-    }
-
-    #[test]
-    fn scatter_without_preset_coordinate_to_moves_player() {
-        // Without a preset coordinate_to, the step rolls D8 to scatter.
-        // Any D8 roll from center (12, 6) stays in bounds → NextStep.
-        let mut game = make_game();
-        let from = FieldCoordinate::new(12, 6);
-        let mut step = StepMoveBallAndChain::new("end".into(), "fall".into());
-        step.coordinate_from = Some(from);
-        step.coordinate_to = None;
-        let out = step.start(&mut game, &mut GameRng::new(0));
-        // D8 roll of 1 (seed 0) → North → (12,5) — in bounds → NextStep.
-        assert_eq!(out.action, StepAction::NextStep);
     }
 }
