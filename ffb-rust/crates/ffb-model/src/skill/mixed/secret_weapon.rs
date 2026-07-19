@@ -1,5 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed::SecretWeapon.
 use crate::model::skill::skill::Skill;
+use crate::model::skill::skill_value_evaluator::SkillValueEvaluator;
 use crate::enums::SkillCategory;
 
 pub struct SecretWeapon {
@@ -10,6 +11,11 @@ impl SecretWeapon {
     pub fn new() -> Self {
         let base = Skill::new("Secret Weapon", SkillCategory::Trait);
         Self { base }
+    }
+
+    /// Java `evaluator()` override.
+    pub fn evaluator(&self) -> SkillValueEvaluator {
+        SkillValueEvaluator::Roll
     }
 }
 
@@ -29,4 +35,8 @@ mod tests {
     fn name_is_correct() { assert_eq!(SecretWeapon::new().get_name(), "Secret Weapon"); }
     #[test]
     fn category_is_correct() { assert_eq!(SecretWeapon::new().get_category(), SkillCategory::Trait); }
+    #[test]
+    fn evaluator_is_roll() {
+        assert_eq!(SecretWeapon::new().evaluator(), SkillValueEvaluator::Roll);
+    }
 }
