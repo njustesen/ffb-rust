@@ -894,6 +894,8 @@ impl SkillId {
             SkillId::SafePairOfHands => &["canPlaceBallWhenKnockedDownOrPlacedProne"],
             // Java: SaboteurBehaviour registers canSabotageBlockerOnKnockdown
             SkillId::Saboteur => &["canSabotageBlockerOnKnockdown"],
+            // Java: mixed/special/QuickBite.postConstruct registers canAttackOpponentForBallAfterCatch
+            SkillId::QuickBite => &["canAttackOpponentForBallAfterCatch"],
             _ => &[],
         }
     }

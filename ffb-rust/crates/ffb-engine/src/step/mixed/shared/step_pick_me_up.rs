@@ -24,6 +24,7 @@ use ffb_model::enums::{PS_STANDING, PS_PRONE};
 use ffb_model::report::mixed::report_pick_me_up::ReportPickMeUp;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::step::util_server_steps::check_touchdown;
 
 /// Java: `StepPickMeUp` (mixed/shared, BB2020 + BB2025).
 pub struct StepPickMeUp {
@@ -53,7 +54,7 @@ impl StepPickMeUp {
         if self.first_run {
             // Java: if (checkTouchdown || (turnHome==8 && turnAway==8)) → NEXT_STEP
             let last_turn = game.turn_data_home.turn_nr == 8 && game.turn_data_away.turn_nr == 8;
-            if last_turn {
+            if check_touchdown(game) || last_turn {
                 return StepOutcome::next();
             }
 
@@ -185,6 +186,28 @@ mod tests {
         let out = step.start(&mut game, &mut rng);
         // No players on field → no eligible → next step
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn touchdown_condition_skips_pick_me_up() {
+        // Java: checkTouchdown(gameState) is ORed with the last-turn check; a standing ball
+        // carrier in the opposing end zone must short-circuit to NEXT_STEP even on turn 1.
+        use ffb_model::types::FieldCoordinate;
+        let mut step = StepPickMeUp::new();
+        let mut game = make_game();
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "carrier".into(),
+            ..Default::default()
+        });
+        let ball_pos = FieldCoordinate::new(25, 7); // ENDZONE_AWAY
+        game.field_model.set_player_coordinate("carrier", ball_pos);
+        game.field_model.set_player_state("carrier", ffb_model::enums::PlayerState::new(PS_STANDING));
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = false;
+        game.field_model.ball_coordinate = Some(ball_pos);
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep, "touchdown condition must short-circuit to NEXT_STEP");
     }
 
     #[test]

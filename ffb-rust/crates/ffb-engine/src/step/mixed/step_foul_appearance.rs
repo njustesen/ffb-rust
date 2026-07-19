@@ -154,9 +154,12 @@ impl StepFoulAppearance {
             }
         }
 
-        // Java: if (GAZE || blockAction) → publishParameter(END_PLAYER_ACTION, true)
+        // Java (bb2025 FoulAppearanceBehaviour.handleFailure): if (GAZE || blockAction || blitzing)
+        //   → publishParameter(END_PLAYER_ACTION, true)
+        // Note: the bb2020 variant of this behaviour omits `isBlitzing()` here, but this crate
+        // targets the bb2025 ruleset (see FoulAppearanceBehaviour.java bb2025 vs bb2020 diff).
         let end_action = player_action.map(|pa|
-            pa.is_gaze() || pa.is_block_action()
+            pa.is_gaze() || pa.is_block_action() || pa.is_blitzing()
         ).unwrap_or(false);
 
         // Java: game.setDefenderId(null)
@@ -369,6 +372,30 @@ mod tests {
             Some(TargetSelectionStatus::FAILED)
         );
         assert!(game.defender_id.is_none());
+    }
+
+    #[test]
+    fn failed_with_blitz_action_publishes_end_player_action() {
+        // bb2025 FoulAppearanceBehaviour.handleFailure adds `isBlitzing()` to the
+        // END_PLAYER_ACTION condition (bb2020 does not) — this crate targets bb2025.
+        use ffb_model::enums::PlayerAction;
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        add_player(&mut game, "atk", vec![]);
+        add_player(&mut game, "def", vec![SkillId::FoulAppearance]);
+        game.acting_player.player_id = Some("atk".into());
+        game.acting_player.player_action = Some(PlayerAction::Blitz);
+        game.defender_id = Some("def".into());
+        let mut step = StepFoulAppearance::new("fa_fail");
+        step.roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(
+            out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))),
+            "blitzing action should publish EndPlayerAction(true) on failure (bb2025)"
+        );
     }
 
     #[test]

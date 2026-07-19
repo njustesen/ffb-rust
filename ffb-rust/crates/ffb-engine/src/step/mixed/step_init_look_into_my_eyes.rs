@@ -35,7 +35,13 @@ impl StepInitLookIntoMyEyes {
         let ball_coord = game.field_model.ball_coordinate;
         for adj in game.field_model.adjacent_on_pitch(coord) {
             if let Some(player_id) = game.field_model.player_at(adj) {
-                if opposing_team_ids.contains(player_id.as_str()) && ball_coord == Some(adj) {
+                // Java: UtilPlayer.findAdjacentBlockablePlayers → findBlockablePlayers filters
+                // on `playerState.canBeBlocked()` (STANDING or MOVING) in addition to team
+                // membership — a prone/stunned/downed opponent must not be targetable.
+                let can_be_blocked = game.field_model.player_state(player_id.as_str())
+                    .map(|s| s.can_be_blocked())
+                    .unwrap_or(false);
+                if opposing_team_ids.contains(player_id.as_str()) && can_be_blocked && ball_coord == Some(adj) {
                     game.defender_id = Some(player_id.clone());
                     break;
                 }
@@ -141,6 +147,29 @@ mod tests {
         let mut rng = GameRng::new(0);
         step.start(&mut game, &mut rng);
         assert_eq!(game.defender_id, Some("def_with_ball".into()));
+    }
+
+    #[test]
+    fn prone_adjacent_ball_carrier_not_chosen() {
+        // Java: findAdjacentBlockablePlayers filters on `playerState.canBeBlocked()`
+        // (STANDING or MOVING only) — a prone opponent must not become the defender
+        // even if adjacent and carrying the ball.
+        let mut step = StepInitLookIntoMyEyes::new();
+        let mut game = make_game();
+        game.home_playing = true;
+        let att_pos = FieldCoordinate::new(5, 5);
+        let def_pos = FieldCoordinate::new(5, 6);
+        add_home_player(&mut game, "att", att_pos);
+        add_away_player(&mut game, "def_with_ball", def_pos);
+        game.field_model.set_player_state(
+            "def_with_ball",
+            ffb_model::enums::PlayerState::new(ffb_model::enums::PS_PRONE),
+        );
+        game.acting_player.set_player("att".into(), PlayerAction::Block);
+        game.field_model.ball_coordinate = Some(def_pos);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(game.defender_id.is_none(), "prone opponent cannot be blocked, so must not be targeted");
     }
 
     #[test]

@@ -90,9 +90,11 @@ impl StepFirstMoveFuriousOutburst {
             if let Some(ref tid) = target_id {
                 game.defender_id = Some(tid.clone());
                 // Java: fieldModel.setPlayerState(target, state.changeSelectedStabTarget(true))
+                // (first pass only sets the stab-target bit; removeSelectedBlitzTarget() is
+                // only applied on the second pass, see below)
                 let old_state = game.field_model.player_state(tid)
                     .unwrap_or_default();
-                game.field_model.set_player_state(tid, old_state.change_selected_stab_target(true).remove_selected_blitz_target());
+                game.field_model.set_player_state(tid, old_state.change_selected_stab_target(true));
                 // Java: find empty adjacent squares to target, add as MoveSquares
                 let target_coord = game.field_model.player_coordinate(tid);
                 if let Some(tc) = target_coord {
@@ -121,6 +123,20 @@ impl StepFirstMoveFuriousOutburst {
             if self.with_ball {
                 game.field_model.ball_coordinate = Some(coord);
             }
+        }
+        // Java: fieldModel.setPlayerState(target, fieldModel.getPlayerState(target)
+        //         .changeSelectedStabTarget(true).removeSelectedBlitzTarget());
+        // `target` is recomputed from the target-selection state (same as Java re-derives it
+        // unconditionally at the top of executeStep), since this struct doesn't retain the id
+        // across the first/second pass.
+        let target_id = game.field_model.target_selection_state.as_ref()
+            .and_then(|ts| ts.get_selected_player_id().cloned());
+        if let Some(ref tid) = target_id {
+            let old_state = game.field_model.player_state(tid).unwrap_or_default();
+            game.field_model.set_player_state(
+                tid,
+                old_state.change_selected_stab_target(true).remove_selected_blitz_target(),
+            );
         }
         // Java: fieldModel.getTargetSelectionState().commit(game)
         if let Some(ref mut ts) = game.field_model.target_selection_state {
@@ -303,6 +319,49 @@ mod tests {
         let mut rng = GameRng::new(0);
         step.start(&mut game, &mut rng);
         assert!(game.field_model.target_selection_state.as_ref().map(|ts| ts.is_canceled()).unwrap_or(false));
+    }
+
+    #[test]
+    fn first_pass_marks_stab_target_without_clearing_blitz_target() {
+        // Java: first pass calls only `changeSelectedStabTarget(true)` on the target's state —
+        // `removeSelectedBlitzTarget()` must NOT run until the second pass.
+        use ffb_model::model::target_selection_state::TargetSelectionState;
+        let mut step = StepFirstMoveFuriousOutburst::new("end");
+        let mut game = make_game();
+        add_player(&mut game, "att", PS_STANDING);
+        add_player(&mut game, "target", PS_STANDING);
+        game.field_model.set_player_state(
+            "target",
+            ffb_model::enums::PlayerState::new(PS_STANDING).add_selected_blitz_target(),
+        );
+        game.field_model.target_selection_state = Some(TargetSelectionState::new("target"));
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        let target_state = game.field_model.player_state("target").unwrap();
+        assert!(target_state.is_selected_stab_target(), "first pass should mark stab target");
+        assert!(target_state.is_selected_blitz_target(), "first pass must not clear the blitz-target bit");
+    }
+
+    #[test]
+    fn second_pass_marks_stab_target_and_clears_blitz_target() {
+        // Java: second pass calls `changeSelectedStabTarget(true).removeSelectedBlitzTarget()`
+        // on the target — this was previously missing entirely from the Rust translation.
+        use ffb_model::model::target_selection_state::TargetSelectionState;
+        let mut step = StepFirstMoveFuriousOutburst::new("end");
+        step.coordinate = Some(FieldCoordinate::new(6, 6));
+        let mut game = make_game();
+        add_player(&mut game, "att", PS_STANDING);
+        add_player(&mut game, "target", PS_STANDING);
+        game.field_model.set_player_state(
+            "target",
+            ffb_model::enums::PlayerState::new(PS_STANDING).add_selected_blitz_target(),
+        );
+        game.field_model.target_selection_state = Some(TargetSelectionState::new("target"));
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        let target_state = game.field_model.player_state("target").unwrap();
+        assert!(target_state.is_selected_stab_target(), "second pass should mark stab target");
+        assert!(!target_state.is_selected_blitz_target(), "second pass should clear the blitz-target bit");
     }
 
     #[test]

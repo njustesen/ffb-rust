@@ -1,9 +1,13 @@
 /// 1:1 translation of `com.fumbbl.ffb.server.step.mixed.start.StepPettyCash`.
 ///
 /// Calculates petty cash available to the underdog team from the TV difference.
-/// Java: the `INDUCEMENTS_ALWAYS_USE_TREASURY` option check is omitted (not in Rust model).
+/// Java: the `ReportFreePettyCash` report is suppressed when the
+/// `INDUCEMENTS_ALWAYS_USE_TREASURY` game option is enabled (the `pettyCashFromTvDiff` value is
+/// still always recorded, since it also determines inducement-step turn order).
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::option::game_option_id::INDUCEMENTS_ALWAYS_USE_TREASURY;
+use ffb_model::option::util_game_option::is_option_enabled;
 use ffb_model::report::mixed::report_free_petty_cash::ReportFreePettyCash;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -25,20 +29,26 @@ impl StepPettyCash {
         let available_petty_cash = home_tv - away_tv;
         if available_petty_cash != 0 {
             // Negative means home is underdog; positive means away is underdog
+            let treasury_always_used = is_option_enabled(game, INDUCEMENTS_ALWAYS_USE_TREASURY);
             if available_petty_cash < 0 {
                 let amount = available_petty_cash.unsigned_abs() as i32;
                 game.game_result.home.petty_cash_from_tv_diff = amount;
                 // Java: getResult().addReport(new ReportFreePettyCash(underdogResult.getTeam().getId(), underdogResult.getPettyCashFromTvDiff()))
-                game.report_list.add(ReportFreePettyCash::new(
-                    Some(game.team_home.id.clone()),
-                    amount,
-                ));
+                // only when INDUCEMENTS_ALWAYS_USE_TREASURY is disabled.
+                if !treasury_always_used {
+                    game.report_list.add(ReportFreePettyCash::new(
+                        Some(game.team_home.id.clone()),
+                        amount,
+                    ));
+                }
             } else {
                 game.game_result.away.petty_cash_from_tv_diff = available_petty_cash;
-                game.report_list.add(ReportFreePettyCash::new(
-                    Some(game.team_away.id.clone()),
-                    available_petty_cash,
-                ));
+                if !treasury_always_used {
+                    game.report_list.add(ReportFreePettyCash::new(
+                        Some(game.team_away.id.clone()),
+                        available_petty_cash,
+                    ));
+                }
             }
         }
 
@@ -139,6 +149,23 @@ mod tests {
         step.start(&mut game, &mut rng);
         assert_eq!(game.game_result.home.petty_cash_from_tv_diff, 200_000);
         assert_eq!(game.game_result.away.petty_cash_from_tv_diff, 0);
+    }
+
+    #[test]
+    fn report_suppressed_when_treasury_always_used_option_enabled() {
+        // Java: `if (!UtilGameOption.isOptionEnabled(game, INDUCEMENTS_ALWAYS_USE_TREASURY))` gates
+        // the ReportFreePettyCash — the pettyCashFromTvDiff value must still be recorded (it
+        // decides inducement-step turn order) even though the report itself is skipped.
+        let mut step = StepPettyCash::new();
+        let mut game = make_game(1_200_000, 1_000_000);
+        game.options.set(INDUCEMENTS_ALWAYS_USE_TREASURY, "true");
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(
+            !game.report_list.has_report(ReportId::FREE_PETTY_CASH),
+            "report must be suppressed when INDUCEMENTS_ALWAYS_USE_TREASURY is enabled"
+        );
+        assert_eq!(game.game_result.away.petty_cash_from_tv_diff, 200_000);
     }
 
     #[test]
