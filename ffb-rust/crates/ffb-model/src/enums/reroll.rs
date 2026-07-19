@@ -102,7 +102,7 @@ impl LeaderState {
 
 /// Wrapper holding available re-roll properties for a given action offer.
 /// Mirrors Java `ReRollOptions` — determines if an actual team re-roll is available.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ReRollOptions {
     pub properties: Vec<ReRollProperty>,
 }

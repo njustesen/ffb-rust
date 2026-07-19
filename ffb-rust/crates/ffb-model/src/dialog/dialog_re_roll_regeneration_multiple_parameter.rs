@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::enums::ReRollOptions;
 use super::dialog_id::DialogId;
 use super::i_dialog_parameter::IDialogParameter;
 
@@ -9,11 +10,13 @@ pub struct DialogReRollRegenerationMultipleParameter {
     pub player_ids: Vec<String>,
     /// InducementType serialized by name.
     pub inducement_type: Option<String>,
+    pub re_roll_options: Vec<ReRollOptions>,
 }
 
 impl DialogReRollRegenerationMultipleParameter {
     pub fn get_player_ids(&self) -> &[String] { &self.player_ids }
     pub fn get_inducement_type(&self) -> Option<&str> { self.inducement_type.as_deref() }
+    pub fn get_re_roll_options(&self) -> &[ReRollOptions] { &self.re_roll_options }
 }
 
 impl IDialogParameter for DialogReRollRegenerationMultipleParameter {
@@ -52,8 +55,30 @@ mod tests {
 
     #[test]
     fn empty_player_ids_edge_case() {
-        let p = DialogReRollRegenerationMultipleParameter { player_ids: vec![], inducement_type: None };
+        let p = DialogReRollRegenerationMultipleParameter { player_ids: vec![], inducement_type: None, re_roll_options: vec![] };
         assert!(p.get_player_ids().is_empty());
         assert_eq!(p.get_inducement_type(), None);
+    }
+
+    /// Java's DialogReRollRegenerationMultipleParameter carries a `reRollOptions` field
+    /// (constructor, getter, transform pass-through, JSON round-trip). The Rust struct had
+    /// dropped this field entirely — this test fails on that pre-fix behavior (field absent)
+    /// and passes once the field is restored.
+    #[test]
+    fn re_roll_options_field_is_preserved() {
+        use crate::enums::{ReRollOptions, ReRollProperty};
+        let opts = ReRollOptions::new(vec![ReRollProperty::Trr]);
+        let p = DialogReRollRegenerationMultipleParameter {
+            player_ids: vec!["p1".into()],
+            inducement_type: None,
+            re_roll_options: vec![opts],
+        };
+        assert_eq!(p.get_re_roll_options().len(), 1);
+        assert!(p.get_re_roll_options()[0].can_actually_reroll());
+
+        // Serde round-trip must preserve the field too.
+        let json = serde_json::to_string(&p).unwrap();
+        let back: DialogReRollRegenerationMultipleParameter = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.get_re_roll_options().len(), 1);
     }
 }
