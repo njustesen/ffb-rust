@@ -1,13 +1,16 @@
 use ffb_mechanics::bb2025::throw_in_mechanic::ThrowInMechanic;
 use ffb_mechanics::throw_in_mechanic::ThrowInMechanic as ThrowInMechanicTrait;
-use ffb_model::enums::Direction;
+use ffb_model::enums::{Direction, ReRollSource};
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::report::bb2025::report_punt_direction::ReportPuntDirection;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_cards::UtilCards;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
 /// Rolls the scatter direction for a punt using the BB2025 ThrowInMechanic (1d6 from kicker's
 /// direction), then publishes either Direction or throws-in out of bounds.
@@ -45,7 +48,11 @@ impl Step for StepPuntDirection {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: CLIENT_USE_SKILL — if (command.isSkillUsed()) setReRollSource(...); else leave source unset (declined).
+        if let Action::UseReRoll { use_reroll: false } = action {
+            self.re_roll_source = None;
+        }
         self.execute_step(game, rng)
     }
 
@@ -61,16 +68,40 @@ impl Step for StepPuntDirection {
 
 impl StepPuntDirection {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        let label = self.goto_label_on_end.clone();
+        // Java: fieldModel.setBallMoving(true); game.getTurnData().setPuntUsed(true);
+        //       actingPlayer.markSkillUsed(NamedProperties.canPunt);
+        game.field_model.ball_moving = true;
+        game.turn_data_mut().punt_used = true;
+        let player_id = game.acting_player.player_id.clone().unwrap_or_default();
+        if let Some(skill_id) = game.player(&player_id)
+            .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_PUNT))
+        {
+            game.mark_skill_used(&player_id, skill_id);
+        }
 
         if self.out_of_bounds {
             let ball_coord = game.field_model.ball_coordinate;
-            let player_id = game.acting_player.player_id.clone().unwrap_or_default();
             game.report_list.add(ReportPuntDirection::new(None, 0, player_id, true));
-            return StepOutcome::goto(&label)
+            return StepOutcome::goto(&self.goto_label_on_end.clone())
                 .publish(StepParameter::EndTurn(true))
                 .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ThrowIn))
                 .publish(StepParameter::ThrowInCoordinate(ball_coord.unwrap_or(FieldCoordinate::new(0, 0))));
+        }
+
+        // Java: if (ReRolledActions.PUNT_DIRECTION == getReRolledAction()) {
+        //           if (getReRollSource() == null || !UtilServerReRoll.useReRoll(...)) { leave(); return; }
+        //       }
+        if self.re_rolled_action.as_deref() == Some("PUNT_DIRECTION") {
+            match self.re_roll_source.clone() {
+                Some(ref source_name) => {
+                    let source = ReRollSource::new(source_name.as_str());
+                    if !use_reroll(game, &source, &player_id) {
+                        return self.leave(game);
+                    }
+                    // Re-roll consumed — fall through to roll again.
+                }
+                None => return self.leave(game),
+            }
         }
 
         let coord_from = match self.coordinate_from {
@@ -82,8 +113,6 @@ impl StepPuntDirection {
             None => return StepOutcome::next(),
         };
 
-        game.field_model.ball_moving = true;
-
         // Java: Direction baseDirection = coordinateFrom.getDirection(coordinateTo);
         //       int roll = rollThrowInDirection(); // 1d6
         //       direction = mechanic.interpretThrowInDirectionRoll(baseDirection, roll);
@@ -94,19 +123,36 @@ impl StepPuntDirection {
         let indicator = coord_from.step(direction, 1);
         if indicator.is_on_pitch() {
             game.field_model.ball_coordinate = Some(indicator);
-            let player_id = game.acting_player.player_id.clone().unwrap_or_default();
-            game.report_list.add(ReportPuntDirection::new(Some(direction), roll, player_id, false));
-            StepOutcome::next()
-                .publish(StepParameter::Direction(direction))
+            game.field_model.out_of_bounds = false;
         } else {
-            // Out of bounds — throw in.
+            game.field_model.out_of_bounds = true;
+        }
+        game.report_list.add(ReportPuntDirection::new(
+            Some(direction), roll, player_id.clone(), game.field_model.out_of_bounds,
+        ));
+
+        // Java: if (getReRolledAction() == null) { setReRolledAction(PUNT_DIRECTION); ... offer re-roll ... }
+        if self.re_rolled_action.is_none() {
+            self.re_rolled_action = Some("PUNT_DIRECTION".into());
+            if let Some(prompt) = ask_for_reroll_if_available(game, "PUNT_DIRECTION", 0, false) {
+                self.re_roll_source = Some("TRR".into());
+                return StepOutcome::cont().with_prompt(prompt);
+            }
+        }
+        self.leave(game)
+    }
+
+    /// Java: `StepPuntDirection.leave()`.
+    fn leave(&mut self, game: &mut Game) -> StepOutcome {
+        if game.field_model.out_of_bounds {
             let ball_coord = game.field_model.ball_coordinate;
-            let player_id = game.acting_player.player_id.clone().unwrap_or_default();
-            game.report_list.add(ReportPuntDirection::new(Some(direction), roll, player_id, true));
-            StepOutcome::goto(&label)
+            StepOutcome::goto(&self.goto_label_on_end.clone())
                 .publish(StepParameter::EndTurn(true))
                 .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ThrowIn))
                 .publish(StepParameter::ThrowInCoordinate(ball_coord.unwrap_or(FieldCoordinate::new(0, 0))))
+        } else {
+            StepOutcome::next()
+                .publish(StepParameter::Direction(self.direction.unwrap_or(Direction::North)))
         }
     }
 }
@@ -210,5 +256,53 @@ mod tests {
         step.coordinate_to = Some(to);
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::PUNT_DIRECTION_ROLL), "expected PUNT_DIRECTION_ROLL report after rolling direction");
+    }
+
+    // Java: `game.getTurnData().setPuntUsed(true)` — must run on every execute_step entry,
+    // including the out-of-bounds branch, not just the successful roll path.
+    #[test]
+    fn execute_step_marks_punt_used_on_turn_data() {
+        let mut game = make_game();
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(0, 7));
+        assert!(!game.turn_data().punt_used);
+        let mut step = StepPuntDirection::new("end".into());
+        step.out_of_bounds = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.turn_data().punt_used, "expected TurnData.puntUsed to be set true");
+    }
+
+    // Java: `actingPlayer.markSkillUsed(NamedProperties.canPunt)` — the Punt skill must be
+    // marked used on the acting player after the punt direction step executes.
+    #[test]
+    fn execute_step_marks_punt_skill_used() {
+        use ffb_model::enums::{PlayerType, PlayerGender, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+
+        let mut game = make_game();
+        let player = Player {
+            id: "punter".into(), name: "p".into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 3, armour: 8,
+            starting_skills: vec![SkillWithValue::new(SkillId::Punt)],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(player);
+        game.acting_player.player_id = Some("punter".into());
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(0, 7));
+
+        let mut step = StepPuntDirection::new("end".into());
+        step.out_of_bounds = true;
+        step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(
+            game.team_home.player("punter").unwrap().used_skills.contains(&SkillId::Punt),
+            "expected Punt skill to be marked used on the acting player"
+        );
     }
 }

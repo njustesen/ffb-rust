@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use ffb_model::enums::{ApothecaryStatus, ApothecaryMode, PS_BADLY_HURT, PS_KNOCKED_OUT, PS_STUNNED, PS_RESERVE, PS_RIP, PS_SERIOUS_INJURY, PlayerState};
+use ffb_model::enums::{ApothecaryStatus, ApothecaryMode, PS_BADLY_HURT, PS_KNOCKED_OUT, PS_STUNNED, PS_PRONE, PS_RESERVE, PS_RIP, PS_SERIOUS_INJURY, PlayerState};
 use ffb_model::model::game::Game;
 use ffb_model::model::player_state::PlayerState as PlayerStateModel;
 use ffb_model::util::rng::GameRng;
@@ -245,9 +245,11 @@ impl StepApothecaryMultiple {
                 && !self.regeneration_failed_results.is_empty();
 
             if double_attacker {
+                // Java (bb2025): playerState.changeBase(PlayerState.PRONE) — note this differs
+                // from the bb2020 sibling which uses PlayerState.RESERVE here.
                 let player_id = self.injury_results[0].injury_context().defender_id.clone().unwrap_or_default();
                 if let Some(ps) = game.field_model.player_state(&player_id) {
-                    game.field_model.set_player_state(&player_id, ps.change_base(PS_RESERVE));
+                    game.field_model.set_player_state(&player_id, ps.change_base(PS_PRONE));
                 }
                 {
                     let is_home = game.team_home.players.iter().any(|p| p.id == player_id);
@@ -535,5 +537,49 @@ mod tests {
     fn set_parameter_unknown_returns_false() {
         let mut step = StepApothecaryMultiple::default();
         assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
+    }
+
+    #[test]
+    fn double_attacker_down_resets_state_to_prone_not_reserve() {
+        // Java StepApothecaryMultiple (bb2025), doubleAttackerDown branch:
+        //   game.getFieldModel().setPlayerState(player, playerState.changeBase(PlayerState.PRONE));
+        // (the bb2020 sibling uses PlayerState.RESERVE here instead — bb2025 differs).
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use std::collections::HashSet;
+
+        let mut game = make_game();
+        let player = Player {
+            id: "home_1".into(), nr: 1, name: "p1".into(),
+            position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![],
+            temporary_skills: vec![], used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(player);
+        game.field_model.set_player_coordinate("home_1", FieldCoordinate::new(5, 7));
+        game.field_model.set_player_state("home_1", PlayerState::new(PS_STUNNED));
+
+        let mut step = StepApothecaryMultiple::default();
+        step.team_id = Some("home".to_string());
+        // Two injury results for the same defender, with a status untouched by the
+        // DoRequest/UseApothecary phases so both survive the apply/retain step.
+        step.injury_results.push(make_injury("home_1", ApothecaryMode::HitPlayer, ApothecaryStatus::ResultChoice));
+        step.injury_results.push(make_injury("home_1", ApothecaryMode::HitPlayer, ApothecaryStatus::ResultChoice));
+        // Non-empty regeneration_failed_results to enable the doubleAttackerDown branch
+        // and skip the phase-1 regeneration filtering.
+        step.regeneration_failed_results.push(
+            make_injury("home_1", ApothecaryMode::HitPlayer, ApothecaryStatus::ResultChoice)
+        );
+
+        step.start(&mut game, &mut GameRng::new(0));
+
+        let final_state = game.field_model.player_state("home_1").expect("player state set");
+        assert_eq!(final_state.base(), PS_PRONE, "bb2025 double-attacker-down must reset to PRONE, not RESERVE");
     }
 }

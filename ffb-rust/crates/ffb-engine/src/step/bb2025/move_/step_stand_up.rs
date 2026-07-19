@@ -154,21 +154,22 @@ impl StepStandUp {
             ));
         }
 
-        // Java: if playerState.isPinned() → GOTO failure label (even on success)
-        let is_pinned = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.field_model.player_state(id))
-            .map(|s| s.is_pinned())
-            .unwrap_or(false);
-        if is_pinned {
-            let label = self.goto_label_on_failure.clone();
-            return StepOutcome::goto(&label)
-                .publish(StepParameter::EndPlayerAction(true));
-        }
-
         if successful {
             game.acting_player.has_moved = true;
             game.acting_player.standing_up = false;
-            StepOutcome::next()
+            // Java: only checked in the `successful` branch, and — unlike the failure
+            // path — does NOT publish END_PLAYER_ACTION when redirecting to the failure
+            // label (`getResult().setNextAction(GOTO_LABEL, ...)` with no publishParameter call).
+            let is_pinned = game.acting_player.player_id.as_deref()
+                .and_then(|id| game.field_model.player_state(id))
+                .map(|s| s.is_pinned())
+                .unwrap_or(false);
+            if is_pinned {
+                let label = self.goto_label_on_failure.clone();
+                StepOutcome::goto(&label)
+            } else {
+                StepOutcome::next()
+            }
         } else {
             // Java: if (reRolledAction == STAND_UP || !askForReRollIfAvailable(...)) → handleFailedStandUp
             if already_rerolled {
@@ -187,9 +188,13 @@ impl StepStandUp {
     }
 
     fn fail_stand_up(&self, game: &mut Game) -> StepOutcome {
-        // Java: setPlayerState(PRONE, !active), publish END_PLAYER_ACTION, GOTO failure label
+        // Java: setPlayerState(playerState.changeBase(PRONE).changeActive(false)) — this
+        // mutates the player's *existing* PlayerState (preserving flags such as confused,
+        // rooted, hypnotized, usedPro, …), not a freshly constructed PRONE state.
         if let Some(pid) = game.acting_player.player_id.clone() {
-            game.field_model.set_player_state(&pid, PlayerState::new(PS_PRONE));
+            let current = game.field_model.player_state(&pid).unwrap_or_else(|| PlayerState::new(PS_PRONE));
+            let new_state = current.change_base(PS_PRONE).change_active(false);
+            game.field_model.set_player_state(&pid, new_state);
         }
         self.handle_failed_stand_up(game);
         let label = self.goto_label_on_failure.clone();
@@ -423,6 +428,70 @@ mod tests {
         step.roll = 4;
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::STAND_UP_ROLL));
+    }
+
+    #[test]
+    fn pinned_and_successful_goes_to_label_without_end_player_action() {
+        // Java: `if (playerState.isPinned()) { setNextAction(GOTO_LABEL, ...); }` — no
+        // publishParameter(END_PLAYER_ACTION) call in this branch (unlike the failure path).
+        use ffb_model::enums::PlayerState;
+        let mut game = make_game();
+        game.acting_player.standing_up = true;
+        game.acting_player.player_id = Some("p1".into());
+        game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE).change_rooted(true));
+        let mut step = StepStandUp::new("fail".into());
+        step.roll = 6; // guaranteed success
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.goto_label.as_deref(), Some("fail"));
+        assert!(
+            !out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))),
+            "Java's pinned-and-successful branch never publishes END_PLAYER_ACTION"
+        );
+    }
+
+    #[test]
+    fn pinned_and_failed_roll_still_offers_reroll() {
+        // Java only checks isPinned() in the `successful` branch; a failed roll for a
+        // pinned player must still go through the normal reroll-offer path, not short-
+        // circuit straight to the failure label.
+        use ffb_model::enums::PlayerState;
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        game.acting_player.standing_up = true;
+        game.acting_player.player_id = Some("p1".into());
+        game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE).change_rooted(true));
+        let mut step = StepStandUp::new("fail".into());
+        step.roll = 1; // guaranteed fail
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue, "pinned player should still be offered a re-roll on failure");
+        assert!(out.prompt.is_some());
+    }
+
+    #[test]
+    fn failure_preserves_other_player_state_flags() {
+        // Java: setPlayerState(playerState.changeBase(PRONE).changeActive(false)) mutates
+        // the *existing* PlayerState (base mask for PRONE is 0xfff00, preserving upper
+        // flag bits like rooted/confused/usedPro), not a fresh PRONE-only state.
+        use ffb_model::enums::PlayerState;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        game.acting_player.standing_up = true;
+        game.acting_player.player_id = Some("p1".into());
+        game.field_model.set_player_state(
+            "p1",
+            PlayerState::new(PS_PRONE).change_rooted(true),
+        );
+        let mut step = StepStandUp::new("fail".into());
+        step.roll = 1; // guaranteed fail
+        step.start(&mut game, &mut GameRng::new(0));
+        let state = game.field_model.player_state("p1").unwrap();
+        assert!(state.is_rooted(), "rooted flag must survive a failed stand-up");
+        assert!(!state.is_active(), "active flag must be cleared on failed stand-up");
+        assert_eq!(state.base(), PS_PRONE);
     }
 
     #[test]

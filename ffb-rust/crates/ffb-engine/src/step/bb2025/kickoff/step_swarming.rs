@@ -147,22 +147,40 @@ impl StepSwarming {
         if !has_swarming_rule {
             return StepOutcome::next();
         }
-        let has_swarming_reserves = team.players.iter().any(|p| {
-            // Java: Keyword::LINEMAN and PlayerState::RESERVE.
-            game.field_model.player_state(&p.id)
-                .map(|s| s.base() == PS_RESERVE)
-                .unwrap_or(false)
-        });
+        // Java: partitions the team's players into playersOnPitch (FIELD bounds) and,
+        // for players in the RESERVE box, playersReserveNoSwarming (non-LINEMAN
+        // reserves) vs. hasSwarmingReserves (any LINEMAN reserve).
+        let mut has_swarming_reserves = false;
+        let mut players_on_pitch: Vec<String> = Vec::new();
+        let mut players_reserve_no_swarming: Vec<String> = Vec::new();
+        for p in &team.players {
+            let coord = game.field_model.player_coordinate(&p.id);
+            if coord.map(|c| FieldCoordinateBounds::FIELD.is_in_bounds(c)).unwrap_or(false) {
+                players_on_pitch.push(p.id.clone());
+            } else if game.field_model.player_state(&p.id).map(|s| s.base() == PS_RESERVE).unwrap_or(false) {
+                if p.is_lineman {
+                    has_swarming_reserves = true;
+                } else {
+                    players_reserve_no_swarming.push(p.id.clone());
+                }
+            }
+        }
 
         if !has_swarming_reserves {
             return StepOutcome::next();
         }
 
-        // Roll for the number of swarming players (Java: DiceRoller.rollSwarmingPlayers() = d6).
-        self.rolled_amount = rng.d6();
-
-        // Java: addReport(new ReportSwarmingRoll(state.teamId, state.rolledAmount))
-        game.report_list.add(ReportSwarmingRoll::new(team_id.clone(), self.rolled_amount));
+        // Java: deactivate all on-pitch players, and set non-lineman reserves to PRONE.
+        for pid in &players_on_pitch {
+            if let Some(state) = game.field_model.player_state(pid) {
+                game.field_model.set_player_state(pid, state.change_active(false));
+            }
+        }
+        for pid in &players_reserve_no_swarming {
+            if let Some(state) = game.field_model.player_state(pid) {
+                game.field_model.set_player_state(pid, state.change_base(PS_PRONE));
+            }
+        }
 
         // Flip home_playing if we are handling the receiving team.
         if self.handle_receiving_team {
@@ -170,6 +188,12 @@ impl StepSwarming {
         }
 
         game.turn_mode = TurnMode::Swarming;
+
+        // Roll for the number of swarming players (Java: DiceRoller.rollSwarmingPlayers() = d6).
+        self.rolled_amount = rng.d6();
+
+        // Java: addReport(new ReportSwarmingRoll(state.teamId, state.rolledAmount))
+        game.report_list.add(ReportSwarmingRoll::new(team_id.clone(), self.rolled_amount));
 
         // Java: pushes self back onto stack to re-enter when setup is submitted.
         // StepOutcome::cont() keeps this step active — equivalent behavior; no stack push needed.
@@ -246,6 +270,7 @@ mod tests {
             id: "p1".into(), name: "p1".into(), nr: 1, position_id: "lineman".into(),
             player_type: PlayerType::Regular, gender: PlayerGender::Male,
             movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            is_lineman: true,
             ..Default::default()
         };
         home.players.push(p);
@@ -254,6 +279,62 @@ mod tests {
         game.home_playing = true;
         game.field_model.set_player_state("p1", PlayerState::new(PS_RESERVE));
         game
+    }
+
+    /// Java `executeStep()`: hasSwarmingReserves is only set when a RESERVE player has
+    /// the LINEMAN keyword; non-lineman reserves go into playersReserveNoSwarming and do
+    /// NOT trigger swarming. Before the fix, the Rust check ignored `is_lineman` entirely
+    /// and treated any RESERVE player as a swarming reserve, so this non-lineman-only
+    /// team would have wrongly rolled swarming (NextStep would fail; roll would happen).
+    #[test]
+    fn non_lineman_reserve_does_not_trigger_swarming() {
+        let mut home = test_team("home", 0);
+        home.special_rules = vec!["Swarming".to_string()];
+        let p = Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "catcher".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            is_lineman: false,
+            ..Default::default()
+        };
+        home.players.push(p);
+        let away = test_team("away", 0);
+        let mut game = Game::new(home, away, Rules::Bb2025);
+        game.home_playing = true;
+        game.field_model.set_player_state("p1", PlayerState::new(PS_RESERVE));
+
+        let mut step = StepSwarming::new();
+        step.handle_receiving_team = false;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep, "non-lineman reserve must not trigger swarming");
+        assert!(!game.report_list.has_report(ReportId::SWARMING_PLAYERS_ROLL));
+    }
+
+    /// Java: on-pitch players are deactivated (changeActive(false)) and non-lineman
+    /// reserves are set PRONE when swarming triggers. Before the fix neither mutation
+    /// happened at all.
+    #[test]
+    fn swarming_trigger_deactivates_on_pitch_players() {
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_swarming_game();
+        // Add a second, on-pitch player for the home team.
+        let on_pitch = Player {
+            id: "p2".into(), name: "p2".into(), nr: 2, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            is_lineman: true,
+            ..Default::default()
+        };
+        game.team_home.players.push(on_pitch);
+        game.field_model.set_player_coordinate("p2", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("p2", PlayerState::new(ffb_model::enums::PS_STANDING));
+
+        let mut step = StepSwarming::new();
+        step.handle_receiving_team = false;
+        step.start(&mut game, &mut GameRng::new(0));
+
+        let state = game.field_model.player_state("p2").unwrap();
+        assert!(!state.is_active(), "on-pitch player should be deactivated when swarming triggers");
     }
 
     #[test]

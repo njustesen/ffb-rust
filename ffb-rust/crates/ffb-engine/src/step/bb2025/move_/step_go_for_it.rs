@@ -240,22 +240,16 @@ impl StepGoForIt {
     }
 
     fn fail_gfi(&mut self, game: &mut Game) -> StepOutcome {
-        // Java: if (jumping && !secondGfi && currentMove > ma+1 && !failedRushForJumpAlwaysLandsInTargetSquare)
+        // Java (bb2025 StepGoForIt.failGfi): if (actingPlayer.isJumping())
         //           publish COORDINATE_FROM(null), move player back to moveStart
+        // Note: unlike the bb2020 sibling, bb2025 does NOT gate this on
+        // !secondGoForIt / currentMove / failedRushForJumpAlwaysLandsInTargetSquare —
+        // jumping alone is the only guard.
         let jumping = game.acting_player.jumping;
-        let current_move = game.acting_player.current_move;
         let pid = game.acting_player.player_id.clone();
-        let ma = pid.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.movement as i32)
-            .unwrap_or(4);
-        let always_lands = pid.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill_property(NamedProperties::FAILED_RUSH_FOR_JUMP_ALWAYS_LANDS_IN_TARGET_SQUARE))
-            .unwrap_or(false);
         let mut outcome = StepOutcome::goto(&self.goto_label_on_failure.clone())
             .publish(StepParameter::EndTurn(true));
-        if jumping && !self.second_go_for_it && current_move > ma + 1 && !always_lands {
+        if jumping {
             if let Some(start) = self.move_start {
                 if let Some(id) = pid.as_deref() {
                     game.field_model.set_player_coordinate(id, start);
@@ -501,6 +495,30 @@ mod tests {
         step.roll = 1;
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.field_model.player_coordinate("p1"), Some(start));
+    }
+
+    /// Java bb2025 `StepGoForIt.failGfi()` gates the move-back solely on
+    /// `actingPlayer.isJumping()` — unlike the BB2020 sibling, it does NOT also
+    /// require `currentMove > ma + 1`. Before the fix, the Rust code copied the
+    /// BB2020 guard (`current_move > ma + 1`), so a jumping player exactly at
+    /// `ma + 1` (the minimum move that reaches the GFI check at all) was wrongly
+    /// left in place instead of being moved back to `move_start`.
+    #[test]
+    fn jumping_fail_at_ma_plus_one_still_moves_player_back() {
+        let start = FieldCoordinate::new(3, 3);
+        let mut game = make_game();
+        add_player(&mut game, "p1"); // movement = 4
+        game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 5));
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.goes_for_it = true;
+        game.acting_player.current_move = 5; // ma(4) + 1 — fails the old ">ma+1" guard
+        game.acting_player.jumping = true;
+        let mut step = StepGoForIt::new("fail".into());
+        step.move_start = Some(start);
+        step.roll = 1; // guaranteed fail
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.field_model.player_coordinate("p1"), Some(start),
+            "bb2025 failGfi moves jumping player back regardless of currentMove vs ma+1");
     }
 
     #[test]

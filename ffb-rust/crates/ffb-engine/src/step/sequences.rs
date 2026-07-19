@@ -127,8 +127,16 @@ pub fn standup_blitz_sequence() -> Vec<SequenceStep> {
     ]
 }
 
-/// Mirrors Java `com.fumbbl.ffb.server.step.generator.common.Inducement.pushSequence`.
+/// Mirrors Java `com.fumbbl.ffb.server.step.generator.common.Inducement.pushSequence`
+/// with the 3-arg `SequenceParams` constructor (`checkForgo` defaults to `false`).
 pub fn inducement_sequence(phase: InducementPhase, home_team: bool) -> Vec<SequenceStep> {
+    inducement_sequence_with_check_forgo(phase, home_team, false)
+}
+
+/// Mirrors Java `com.fumbbl.ffb.server.step.generator.common.Inducement.pushSequence`
+/// with the 4-arg `SequenceParams` constructor, forwarding an explicit `checkForgo` value
+/// to the `END_INDUCEMENT` step (used by `StepEndFeeding`'s end-of-opponent-turn call).
+pub fn inducement_sequence_with_check_forgo(phase: InducementPhase, home_team: bool, check_forgo: bool) -> Vec<SequenceStep> {
     vec![
         SequenceStep::with_params(StepId::InitInducement, vec![
             StepParameter::InducementPhase(phase),
@@ -142,7 +150,7 @@ pub fn inducement_sequence(phase: InducementPhase, home_team: bool) -> Vec<Seque
         ]),
         SequenceStep::new(StepId::CatchScatterThrowIn),
         SequenceStep::with_params(StepId::EndInducement, vec![
-            StepParameter::CheckForgo(false),
+            StepParameter::CheckForgo(check_forgo),
         ]),
     ]
 }

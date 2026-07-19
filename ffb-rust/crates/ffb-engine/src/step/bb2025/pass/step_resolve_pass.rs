@@ -154,10 +154,26 @@ impl StepResolvePass {
         // Java: else (missed / inaccurate) branch
         // Java: if (fieldModel.isOutOfBounds())
         if game.field_model.out_of_bounds {
-            // Ball landed out of bounds — throw-in sequence handled by earlier scatter step.
+            if is_bomb {
+                // Java: fieldModel.setBombCoordinate(null); publish BOMB_OUT_OF_BOUNDS=true
+                game.field_model.bomb_coordinate = None;
+                return StepOutcome::next().publish(StepParameter::BombOutOfBounds(true));
+            } else {
+                // Java: publish CATCH_SCATTER_THROW_IN_MODE=THROW_IN; publish
+                // THROW_IN_COORDINATE=passCoordinate; setBallMoving(true)
+                // Note: ball_coordinate is deliberately left as set by the earlier scatter step.
+                game.field_model.ball_moving = true;
+                let mut outcome = StepOutcome::next().publish(StepParameter::CatchScatterThrowInMode(
+                    CatchScatterThrowInMode::ThrowIn,
+                ));
+                if let Some(pc) = game.pass_coordinate {
+                    outcome = outcome.publish(StepParameter::ThrowInCoordinate(pc));
+                }
+                return outcome;
+            }
         }
 
-        // Default: inaccurate pass, ball at pass coordinate, catch as missed pass
+        // Default (not out of bounds): inaccurate pass, ball at pass coordinate, catch as missed pass
         if let Some(pass_coord) = game.pass_coordinate {
             if is_bomb {
                 game.field_model.bomb_coordinate = Some(pass_coord);
@@ -269,6 +285,50 @@ mod tests {
             matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::CatchMissedPass))
         });
         assert!(mode.is_some());
+    }
+
+    #[test]
+    fn missed_pass_out_of_bounds_publishes_throw_in_not_catch_missed_pass() {
+        // Bug fix regression: Java's else-branch checks fieldModel.isOutOfBounds() first;
+        // out-of-bounds routes to THROW_IN (not CATCH_MISSED_PASS), and must NOT
+        // overwrite ball_coordinate to pass_coordinate (it stays wherever the earlier
+        // scatter step left it).
+        let mut game = make_game();
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+        game.field_model.out_of_bounds = true;
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(0, 0));
+        let mut step = StepResolvePass::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        let throw_in_mode = out.published.iter().find(|p| {
+            matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ThrowIn))
+        });
+        assert!(throw_in_mode.is_some(), "out-of-bounds missed pass should publish ThrowIn mode");
+        let missed_mode = out.published.iter().find(|p| {
+            matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::CatchMissedPass))
+        });
+        assert!(missed_mode.is_none(), "should not publish CatchMissedPass when out of bounds");
+        let throw_in_coord = out.published.iter().find(|p| matches!(p, StepParameter::ThrowInCoordinate(_)));
+        assert!(throw_in_coord.is_some(), "expected ThrowInCoordinate published");
+        // ball_coordinate must be left untouched (not overwritten to pass_coordinate)
+        assert_eq!(game.field_model.ball_coordinate, Some(FieldCoordinate::new(0, 0)));
+        assert!(game.field_model.ball_moving);
+    }
+
+    #[test]
+    fn missed_bomb_out_of_bounds_clears_bomb_coordinate_and_publishes_bomb_out_of_bounds() {
+        let mut game = make_game();
+        game.thrower_action = Some(PlayerAction::ThrowBomb);
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+        game.field_model.out_of_bounds = true;
+        game.field_model.bomb_coordinate = Some(FieldCoordinate::new(3, 3));
+        let mut step = StepResolvePass::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.field_model.bomb_coordinate.is_none(), "bomb_coordinate should be cleared to null");
+        let oob = out.published.iter().find(|p| matches!(p, StepParameter::BombOutOfBounds(true)));
+        assert!(oob.is_some(), "expected BombOutOfBounds(true) published");
     }
 
     #[test]

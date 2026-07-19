@@ -697,6 +697,8 @@ impl SkillId {
     /// 1:1 translation of Skill.getSkillProperties() → SkillId lookup table.
     pub fn properties(self) -> &'static [&'static str] {
         match self {
+            // Java bb2025/Punt.postConstruct: registerProperty(canPunt)
+            SkillId::Punt => &["canPunt"],
             SkillId::SteadyFooting => &["canAvoidFallingDown"],
             SkillId::TakeRoot => &["becomesImmovable"],
             SkillId::Sprint => &["canMakeAnExtraGfi"],

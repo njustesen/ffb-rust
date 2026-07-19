@@ -124,21 +124,6 @@ impl StepPickUp {
             return StepOutcome::next();
         }
 
-        let prevent = player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| {
-                p.has_skill_property(NamedProperties::PREVENT_HOLD_BALL)
-                    || p.has_skill_property(NamedProperties::PREVENT_PICKUP)
-            })
-            .unwrap_or(false);
-        if prevent {
-            let label = self.goto_label_on_failure.clone();
-            return StepOutcome::goto(&label)
-                .publish(StepParameter::FeedingAllowed(false))
-                .publish(StepParameter::EndTurn(true))
-                .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::FailedPickUp));
-        }
-
         let has_tacklezones = player_id.as_deref()
             .and_then(|id| game.field_model.player_state(id))
             .map(|s| s.has_tacklezones())
@@ -171,7 +156,9 @@ impl StepPickUp {
                 .map(|s| use_reroll(game, s, &pid))
                 .unwrap_or(false);
             if !consumed {
-                return self.fail_pick_up(game, &player_id);
+                // Java: this doPickUp=false branch only gates on optionalPickUp,
+                // unlike the pickUp() FAILURE case which also checks preventPickup.
+                return self.fail_pick_up(game, &player_id, false);
             }
             // Roll was reset to 0 when the re-roll offer was issued; a fresh d6 is rolled below
         }
@@ -180,6 +167,19 @@ impl StepPickUp {
     }
 
     fn pick_up(&mut self, game: &mut Game, rng: &mut GameRng, player_id: Option<String>) -> StepOutcome {
+        // Java: pickUp(player) checks prevent skills first, before rolling, and treats
+        // it as an ordinary FAILURE (same optionalPickUp/preventPickup gated outcome).
+        let prevent = player_id.as_deref()
+            .and_then(|id| game.player(id))
+            .map(|p| {
+                p.has_skill_property(NamedProperties::PREVENT_HOLD_BALL)
+                    || p.has_skill_property(NamedProperties::PREVENT_PICKUP)
+            })
+            .unwrap_or(false);
+        if prevent {
+            return self.fail_pick_up(game, &player_id, true);
+        }
+
         if self.roll == 0 {
             self.roll = rng.d6();
         }
@@ -258,21 +258,35 @@ impl StepPickUp {
             }
         }
 
-        self.fail_pick_up(game, &player_id)
+        self.fail_pick_up(game, &player_id, true)
     }
 
-    fn fail_pick_up(&self, game: &Game, player_id: &Option<String>) -> StepOutcome {
-        let prevent_pickup = player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| p.has_skill_property(NamedProperties::PREVENT_PICKUP))
-            .unwrap_or(false);
+    /// Java: shared logic behind the `case FAILURE:` branch in `executeStep()` (reached via
+    /// `pickUp()`'s return value) and the `doPickUp = false` branch (reached when a re-roll
+    /// was already used up and a further re-roll attempt fails/declines).
+    ///
+    /// Both branches gate GOTO_LABEL-vs-NEXT_STEP (and whether END_TURN is published) on
+    /// `!optionalPickUp`; only the `case FAILURE` branch additionally requires
+    /// `!player.hasSkillProperty(preventPickup)` — the `doPickUp = false` branch does not
+    /// check preventPickup at all. `consider_prevent_pickup` selects which behavior applies.
+    fn fail_pick_up(&self, game: &Game, player_id: &Option<String>, consider_prevent_pickup: bool) -> StepOutcome {
+        let prevent_pickup = consider_prevent_pickup
+            && player_id.as_deref()
+                .and_then(|id| game.player(id))
+                .map(|p| p.has_skill_property(NamedProperties::PREVENT_PICKUP))
+                .unwrap_or(false);
+        let go_to_failure_label = !self.optional_pick_up && !prevent_pickup;
         let label = self.goto_label_on_failure.clone();
-        let mut out = StepOutcome::goto(&label)
-            .publish(StepParameter::FeedingAllowed(false))
-            .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::FailedPickUp));
-        if !self.optional_pick_up && !prevent_pickup {
+        let mut out = if go_to_failure_label {
+            StepOutcome::goto(&label)
+        } else {
+            StepOutcome::next()
+        };
+        out = out.publish(StepParameter::FeedingAllowed(false));
+        if go_to_failure_label {
             out = out.publish(StepParameter::EndTurn(true));
         }
+        out = out.publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::FailedPickUp));
         out
     }
 }
@@ -386,6 +400,30 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::FailedPickUp))));
+    }
+
+    #[test]
+    fn optional_pick_up_failure_returns_next_step_not_goto_label() {
+        // Java StepPickUp.executeStep() case FAILURE:
+        //   if (!optionalPickUp && !player.hasSkillProperty(preventPickup)) {
+        //       publish END_TURN(true); setNextAction(GOTO_LABEL, ...);
+        //   } else {
+        //       setNextAction(NEXT_STEP);
+        //   }
+        // When optionalPickUp is true, a failed roll (with no re-roll available) must
+        // resolve to NEXT_STEP without ending the turn, not jump to the failure label.
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        add_player_at_ball(&mut game, "p1");
+        let mut step = StepPickUp::new("fail".into());
+        step.optional_pick_up = true;
+        step.attempt_pick_up = true;
+        step.roll = 1; // guaranteed fail
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
     }
 
     #[test]
