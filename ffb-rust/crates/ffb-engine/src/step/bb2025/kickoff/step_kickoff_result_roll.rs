@@ -78,7 +78,10 @@ impl StepKickoffResultRoll {
                 self.kickoff_roll = vec![pair[0], pair[1]];
                 self.kickoff_result = Some(kickoff_result_for_roll(pair[0] + pair[1]));
             } else if overtime_option == "blitz" {
-                self.kickoff_result = Some(KickoffResult::Blitz);
+                // Java: com.fumbbl.ffb.kickoff.bb2025.KickoffResult.CHARGE — BB2025 renamed the
+                // "Blitz" kickoff result to "Charge"; the OVERTIME_KICK_OFF_BLITZ option name is
+                // legacy but still maps to the BB2025 CHARGE result, NOT the (non-BB2025) Blitz variant.
+                self.kickoff_result = Some(KickoffResult::Charge);
             } else if overtime_option == "solidDefence" {
                 self.kickoff_result = Some(KickoffResult::SolidDefence);
             } else {
@@ -166,6 +169,19 @@ mod tests {
         // Should reuse the pre-set result, not overwrite it.
         assert_eq!(step.kickoff_result, Some(KickoffResult::HighKick));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::KickoffResult(KickoffResult::HighKick))));
+    }
+
+    /// Java: OVERTIME_KICK_OFF_BLITZ maps to `com.fumbbl.ffb.kickoff.bb2025.KickoffResult.CHARGE`,
+    /// not a "Blitz" result (BB2025 renamed the "Blitz" kickoff result to "Charge").
+    #[test]
+    fn overtime_blitz_option_maps_to_charge_result() {
+        use ffb_model::option::game_option_id;
+        let mut game = make_game();
+        game.half = 3; // half >= 3 so the "all" branch is skipped
+        game.options.set(game_option_id::OVERTIME_KICK_OFF_RESULTS, "blitz");
+        let mut step = StepKickoffResultRoll::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(step.kickoff_result, Some(KickoffResult::Charge));
     }
 
     #[test]

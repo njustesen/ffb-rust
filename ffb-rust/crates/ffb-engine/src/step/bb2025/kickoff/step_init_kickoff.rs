@@ -60,7 +60,9 @@ impl StepInitKickoff {
             events.push(GameEvent::StartHalf { half: game.half });
             game.turn_mode = TurnMode::Setup;
             game.start_turn();
-            UtilServerGame::update_player_state_dependent_properties(game);
+            // Java: com.fumbbl.ffb.server.step.bb2025.kickoff.StepInitKickoff.executeStep does NOT call
+            // UtilServerGame.updatePlayerStateDependentProperties (unlike the mixed BB2016/BB2020
+            // StepInitKickoff, which does). Only prepareForSetup is called here.
             UtilServerGame::prepare_for_setup(game);
         }
 
@@ -150,6 +152,22 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::START_HALF),
             "START_HALF report must be added when StartGame mode");
+    }
+
+    /// Java's bb2025 StepInitKickoff.executeStep does NOT call
+    /// UtilServerGame.updatePlayerStateDependentProperties (only the mixed BB2016/BB2020
+    /// StepInitKickoff does). Regression test: single_use_rerolls must not be recomputed
+    /// (and thus overwritten) by the StartGame transition.
+    #[test]
+    fn start_game_mode_does_not_recompute_single_use_rerolls() {
+        let mut game = make_game();
+        game.turn_mode = TurnMode::StartGame;
+        game.turn_data_home.single_use_rerolls = 99;
+        game.turn_data_away.single_use_rerolls = 99;
+        let mut step = StepInitKickoff::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.turn_data_home.single_use_rerolls, 99);
+        assert_eq!(game.turn_data_away.single_use_rerolls, 99);
     }
 
     #[test]

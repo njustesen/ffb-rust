@@ -1,5 +1,6 @@
 use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
@@ -86,7 +87,14 @@ impl StepInitFouling {
             .chain(game.team_away.players.iter())
             .any(|p| p.id == foul_defender_id);
 
-        if game.acting_player.has_fouled || !defender_exists {
+        // Java: !foulDefender.hasSkillProperty(NamedProperties.preventBeingFouled)
+        let defender_prevents_fouling = game.team_home.players.iter()
+            .chain(game.team_away.players.iter())
+            .find(|p| p.id == foul_defender_id)
+            .map(|p| p.has_skill_property(NamedProperties::PREVENT_BEING_FOULED))
+            .unwrap_or(false);
+
+        if game.acting_player.has_fouled || !defender_exists || defender_prevents_fouling {
             return StepOutcome::next();
         }
 

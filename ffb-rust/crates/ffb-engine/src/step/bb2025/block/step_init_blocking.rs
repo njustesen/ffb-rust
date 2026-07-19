@@ -136,19 +136,35 @@ impl StepInitBlocking {
             return StepOutcome::cont();
         }
 
-        // Java: actingPlayer.markSkillUsed(NamedProperties.canUseChainsawOnDownedOpponents/canUseVomitAfterBlock)
+        // Java: if (actingPlayer.getPlayerAction() != null) {
+        //          if (actingPlayer.getPlayerAction().isKickingDowned()) markSkillUsed(canUseChainsawOnDownedOpponents);
+        //          if (actingPlayer.getPlayerAction().isPutrid()) markSkillUsed(canUseVomitAfterBlock);
+        //       }
         if let Some(player_id) = game.acting_player.player_id.as_deref() {
             let player_id = player_id.to_owned();
-            let chainsaw_sid = game.player(&player_id)
-                .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_USE_CHAINSAW_ON_DOWNED_OPPONENTS));
-            let vomit_sid = game.player(&player_id)
-                .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_USE_VOMIT_AFTER_BLOCK));
-            let is_home = game.team_home.player(&player_id).is_some();
-            let player_mut = if is_home { game.team_home.player_mut(&player_id) }
-                             else { game.team_away.player_mut(&player_id) };
-            if let Some(p) = player_mut {
-                if let Some(sid) = chainsaw_sid { p.used_skills.insert(sid); }
-                if let Some(sid) = vomit_sid { p.used_skills.insert(sid); }
+            let player_action = game.acting_player.player_action;
+            let is_kicking_downed = player_action.map(|a| a.is_kicking_downed()).unwrap_or(false);
+            let is_putrid = player_action.map(|a| a.is_putrid()).unwrap_or(false);
+            let chainsaw_sid = if is_kicking_downed {
+                game.player(&player_id)
+                    .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_USE_CHAINSAW_ON_DOWNED_OPPONENTS))
+            } else {
+                None
+            };
+            let vomit_sid = if is_putrid {
+                game.player(&player_id)
+                    .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_USE_VOMIT_AFTER_BLOCK))
+            } else {
+                None
+            };
+            if chainsaw_sid.is_some() || vomit_sid.is_some() {
+                let is_home = game.team_home.player(&player_id).is_some();
+                let player_mut = if is_home { game.team_home.player_mut(&player_id) }
+                                 else { game.team_away.player_mut(&player_id) };
+                if let Some(p) = player_mut {
+                    if let Some(sid) = chainsaw_sid { p.used_skills.insert(sid); }
+                    if let Some(sid) = vomit_sid { p.used_skills.insert(sid); }
+                }
             }
         }
 
@@ -375,6 +391,76 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         // TurnMode should have been restored from SelectBlockKind before execution
         assert_eq!(game.turn_mode, ffb_model::enums::TurnMode::Regular);
+    }
+
+    /// Java: StepInitBlocking only calls actingPlayer.markSkillUsed(canUseVomitAfterBlock) when
+    /// actingPlayer.getPlayerAction().isPutrid() is true (and canUseChainsawOnDownedOpponents only
+    /// when isKickingDowned()). A plain Block action must not consume the PutridRegurgitation skill.
+    #[test]
+    fn vomit_skill_not_marked_used_for_plain_block_action() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerAction, SkillId};
+
+        let mut step = StepInitBlocking::new("end".into());
+        step.block_defender_id = Some("def9".into());
+        let mut game = make_game();
+
+        let attacker = Player {
+            id: "attacker".into(), name: "a".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::PutridRegurgitation, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(attacker);
+        game.acting_player.set_player("attacker".into(), PlayerAction::Block);
+        game.field_model.set_player_state("def9", ffb_model::enums::PlayerState::new(PS_STANDING));
+
+        step.start(&mut game, &mut GameRng::new(0));
+
+        let player = game.player("attacker").expect("attacker should exist");
+        assert!(
+            !player.used_skills.contains(&SkillId::PutridRegurgitation),
+            "plain Block action must not mark canUseVomitAfterBlock skill used (only isPutrid() actions should)"
+        );
+    }
+
+    /// Same skill IS marked used when the acting player's action is a Putrid Regurgitation block variant.
+    #[test]
+    fn vomit_skill_marked_used_for_putrid_block_action() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerAction, SkillId};
+
+        let mut step = StepInitBlocking::new("end".into());
+        step.block_defender_id = Some("def10".into());
+        let mut game = make_game();
+
+        let attacker = Player {
+            id: "attacker".into(), name: "a".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::PutridRegurgitation, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(attacker);
+        game.acting_player.set_player("attacker".into(), PlayerAction::PutridRegurgitationBlock);
+        game.field_model.set_player_state("def10", ffb_model::enums::PlayerState::new(PS_STANDING));
+
+        step.start(&mut game, &mut GameRng::new(0));
+
+        let player = game.player("attacker").expect("attacker should exist");
+        assert!(
+            player.used_skills.contains(&SkillId::PutridRegurgitation),
+            "PutridRegurgitationBlock action should mark canUseVomitAfterBlock skill used"
+        );
     }
 
     #[test]

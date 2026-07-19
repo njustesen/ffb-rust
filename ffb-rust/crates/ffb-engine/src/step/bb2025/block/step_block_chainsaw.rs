@@ -179,7 +179,10 @@ impl StepBlockChainsaw {
             let defender_state = game.field_model.player_state(&defender_id);
             let already_dropped = defender_state.map(|s| s.is_prone_or_stunned()).unwrap_or(false);
 
-            let grants_spp = false; // Stub: SPP from special actions not yet ported
+            // Java: UtilCards.hasSkillWithProperty(actingPlayer.getPlayer(), NamedProperties.grantsSppFromSpecialActionsCas)
+            let grants_spp = game.player(&attacker_id)
+                .map(|p| UtilCards::has_skill_with_property(p, NamedProperties::GRANTS_SPP_FROM_SPECIAL_ACTIONS_CAS))
+                .unwrap_or(false);
             let injury_type_name = if grants_spp { "InjuryTypeChainsawForSpp" } else { "InjuryTypeChainsaw" };
 
             let injury_result_defender = handle_injury_by_name(
@@ -203,6 +206,13 @@ impl StepBlockChainsaw {
                 already_dropped,
                 ..DropPlayerContext::new()
             };
+
+            // Java: game.getFieldModel().setPlayerState(game.getDefender(), defenderState.removeSelectedBlitzTarget());
+            // we usually do not need that but in case the player can continue after a chainsaw blitz we remove the
+            // state as this can be confusing on the UI side, e.g. with Maximum Carnage
+            if let Some(state) = defender_state {
+                game.field_model.set_player_state(&defender_id, state.remove_selected_blitz_target());
+            }
 
             StepOutcome::next().publish(StepParameter::DropPlayerContext(Box::new(dpc)))
         } else {
@@ -386,5 +396,75 @@ mod tests {
             }
         }
         panic!("no seed produces d6<2 (only 1 fails)");
+    }
+
+    /// Java: `boolean grantsSpp = UtilCards.hasSkillWithProperty(actingPlayer.getPlayer(),
+    /// NamedProperties.grantsSppFromSpecialActionsCas);` selects `InjuryTypeChainsawForSpp`
+    /// (is_worth_spps() == true) instead of the plain `InjuryTypeChainsaw` (false). Regression
+    /// test for a previous stub that always used the non-SPP injury type.
+    #[test]
+    fn successful_hit_with_grants_spp_skill_uses_spp_injury_type() {
+        for seed in 0..200u64 {
+            let mut rng = GameRng::new(seed);
+            if rng.d6() >= 2 {
+                let mut g = make_game();
+                add_player_with_skill(&mut g, "home", "atk1", Some(SkillId::Chainsaw));
+                // Attacker also has ViolentInnovator, which grants
+                // `grantsSppFromSpecialActionsCas` per NamedProperties.java.
+                if let Some(p) = g.team_home.player_mut("atk1") {
+                    p.starting_skills.push(SkillWithValue { skill_id: SkillId::ViolentInnovator, value: None });
+                }
+                add_player_with_skill(&mut g, "away", "def1", None);
+                g.acting_player.player_id = Some("atk1".into());
+                g.defender_id = Some("def1".into());
+
+                let mut step = StepBlockChainsaw::new("success".into(), "failure".into());
+                step.using_chainsaw = true;
+                let out = step.start(&mut g, &mut GameRng::new(seed));
+                assert_eq!(out.action, StepAction::NextStep, "seed={seed}");
+                let dpc = out.published.iter().find_map(|p| match p {
+                    StepParameter::DropPlayerContext(dpc) => Some(dpc),
+                    _ => None,
+                }).unwrap_or_else(|| panic!("seed={seed}: expected DropPlayerContext"));
+                let injury_result = dpc.injury_result.as_ref().expect("injury_result present");
+                assert!(
+                    injury_result.injury_context().is_worth_spps,
+                    "seed={seed}: expected is_worth_spps to be true for ViolentInnovator attacker"
+                );
+                return;
+            }
+        }
+        panic!("no seed produces d6>=2");
+    }
+
+    /// Java: after a successful chainsaw hit, `game.getFieldModel().setPlayerState(game.getDefender(),
+    /// defenderState.removeSelectedBlitzTarget())` clears the defender's "selected blitz target" bit
+    /// so the UI is not left showing a stale blitz-target highlight (e.g. with Maximum Carnage).
+    #[test]
+    fn successful_hit_clears_defender_selected_blitz_target() {
+        for seed in 0..200u64 {
+            let mut rng = GameRng::new(seed);
+            if rng.d6() >= 2 {
+                let mut g = make_game();
+                add_player_with_skill(&mut g, "home", "atk1", Some(SkillId::Chainsaw));
+                add_player_with_skill(&mut g, "away", "def1", None);
+                g.acting_player.player_id = Some("atk1".into());
+                g.defender_id = Some("def1".into());
+                let flagged = ffb_model::enums::PlayerState::new(PS_STANDING).add_selected_blitz_target();
+                g.field_model.set_player_state("def1", flagged);
+                assert!(g.field_model.player_state("def1").unwrap().is_selected_blitz_target());
+
+                let mut step = StepBlockChainsaw::new("success".into(), "failure".into());
+                step.using_chainsaw = true;
+                let out = step.start(&mut g, &mut GameRng::new(seed));
+                assert_eq!(out.action, StepAction::NextStep, "seed={seed}");
+                assert!(
+                    !g.field_model.player_state("def1").unwrap().is_selected_blitz_target(),
+                    "seed={seed}: expected selected-blitz-target flag to be cleared"
+                );
+                return;
+            }
+        }
+        panic!("no seed produces d6>=2");
     }
 }

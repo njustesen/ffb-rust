@@ -4,6 +4,7 @@ use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_cards::UtilCards;
+use ffb_model::prompts::agent_prompt::AgentPrompt;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -146,8 +147,16 @@ impl StepTrickster {
                     return StepOutcome::next();
                 }
 
-                // Would show DialogSkillUse for Trickster to passive player — stub: cont
-                return StepOutcome::cont();
+                // Java: UtilServerDialog.showDialog(gameState, new DialogSkillUseParameter(
+                //   defender.getId(), defender.getSkillWithProperty(canMoveBeforeBeingBlocked), 0), true)
+                let skill_id = defender_id.as_deref()
+                    .and_then(|id| game.player(id))
+                    .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_MOVE_BEFORE_BEING_BLOCKED));
+                return StepOutcome::cont().with_prompt(AgentPrompt::SkillUse {
+                    player_id: defender_id.clone().unwrap_or_default(),
+                    skill_id: skill_id.map(|s| s as u16).unwrap_or_default(),
+                    skill_name: skill_id.map(|s| format!("{:?}", s)).unwrap_or_default(),
+                });
             } else {
                 return StepOutcome::next();
             }
@@ -164,7 +173,12 @@ impl StepTrickster {
                 for &c in &self.eligible_squares {
                     game.field_model.add_move_square(MoveSquare::new(c, 0, 0));
                 }
-                return StepOutcome::cont();
+                // Java: client shows eligibleSquares as move squares and waits for
+                // CLIENT_FIELD_COORDINATE from the defender's (now-active) coach.
+                return StepOutcome::cont().with_prompt(AgentPrompt::TricksterMove {
+                    player_id: defender_id.clone().unwrap_or_default(),
+                    squares: self.eligible_squares.clone(),
+                });
             } else if self.action_status == TricksterPhase::WaitingForSkillUse {
                 // Java: move defender and update state — then push current step for pick-up
                 let def_id = defender_id.clone().unwrap_or_default();
@@ -383,6 +397,87 @@ mod tests {
 
         // No eligible square should be (6,6)
         assert!(!step.eligible_squares.contains(&FieldCoordinate::new(6, 6)));
+    }
+
+    /// Sets up an attacker at (5,5) and a defender at (6,5) with the Trickster skill
+    /// (canMoveBeforeBeingBlocked), mirroring `blocked_for_trickster_squares_excluded_from_eligibles`.
+    fn make_game_with_trickster_defender() -> Game {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, PS_STANDING, PlayerState, PlayerAction, SkillId};
+
+        let mut game = make_game();
+
+        let attacker = Player {
+            id: "att".into(), name: "a".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        let defender = Player {
+            id: "def".into(), name: "d".into(), nr: 2, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::Trickster, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(attacker);
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        game.acting_player.set_player("att".into(), PlayerAction::Block);
+
+        game.team_away.players.push(defender);
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.defender_id = Some("def".into());
+
+        game
+    }
+
+    /// Regression test: Java's `UtilServerDialog.showDialog(gameState, new
+    /// DialogSkillUseParameter(defender.getId(), ...), true)` must translate to
+    /// `StepOutcome::cont().with_prompt(AgentPrompt::SkillUse{..})` per CLAUDE.md's dialog
+    /// convention. The old Rust code returned a bare `StepOutcome::cont()`, so a headless
+    /// agent driving the engine would never be asked whether to use Trickster.
+    #[test]
+    fn skill_use_dialog_emits_skill_use_prompt() {
+        let mut game = make_game_with_trickster_defender();
+        let mut step = StepTrickster::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert_eq!(out.action, StepAction::Continue);
+        match out.prompt {
+            Some(AgentPrompt::SkillUse { player_id, .. }) => assert_eq!(player_id, "def"),
+            other => panic!("expected AgentPrompt::SkillUse, got {:?}", other),
+        }
+    }
+
+    /// Regression test: after usingTrickster=true and no toCoordinate chosen yet, Java sets up
+    /// eligibleSquares as MoveSquares for the (now-active) defender's coach to pick from —
+    /// the headless equivalent is `AgentPrompt::TricksterMove`. The old Rust code returned a
+    /// bare `StepOutcome::cont()` here too, so no agent decision point ever fired.
+    #[test]
+    fn trickster_move_choice_emits_trickster_move_prompt() {
+        let mut game = make_game_with_trickster_defender();
+        let mut step = StepTrickster::new();
+        step.using_trickster = Some(true);
+        step.eligible_squares = vec![FieldCoordinate::new(4, 4), FieldCoordinate::new(4, 5)];
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert_eq!(out.action, StepAction::Continue);
+        match out.prompt {
+            Some(AgentPrompt::TricksterMove { player_id, squares }) => {
+                assert_eq!(player_id, "def");
+                assert_eq!(squares, step.eligible_squares);
+            }
+            other => panic!("expected AgentPrompt::TricksterMove, got {:?}", other),
+        }
     }
 
     /// After leave(), move_squares are cleared.
