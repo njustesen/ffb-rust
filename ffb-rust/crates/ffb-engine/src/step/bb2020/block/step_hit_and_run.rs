@@ -72,7 +72,8 @@ impl StepHitAndRun {
             .map(|p| p.has_skill_property(NamedProperties::CAN_MOVE_AFTER_BLOCK))
             .unwrap_or(false);
 
-        if has_hit_and_run_skill && !attacker_state.is_pinned() {
+        // Java (bb2020): !playerState.isRooted() — NOT isPinned() (that's bb2025's condition)
+        if has_hit_and_run_skill && !attacker_state.is_rooted() {
             if self.end_turn || self.end_player_action {
                 self.reset_state(game);
                 return StepOutcome::next();
@@ -167,8 +168,10 @@ impl StepHitAndRun {
             .into_iter()
             .filter(|&c| game.field_model.player_at(c).is_none())
             // Java: !ArrayTool.isProvided(UtilPlayer.findAdjacentPlayers(game, otherTeam, coord))
+            // (plain findAdjacentPlayers — does NOT filter by tacklezone, unlike
+            // findAdjacentPlayersWithTacklezones)
             .filter(|&c| {
-                UtilPlayer::find_adjacent_players_with_tacklezones(game, other_team, c, false).is_empty()
+                UtilPlayer::find_adjacent_players(game, other_team, c).is_empty()
             })
             .collect()
     }
@@ -294,5 +297,61 @@ mod tests {
         step.coordinate = Some(dest);
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::HIT_AND_RUN), "ReportHitAndRun should appear after player moves");
+    }
+
+    /// Java (bb2020 StepHitAndRun.executeStep): `!playerState.isRooted()` — NOT `isPinned()`
+    /// (bb2025's StepHitAndRun uses isPinned, which is isChomped() || isRooted()). A prior Rust
+    /// bug copied the bb2025 isPinned() gate into bb2020, so a merely-Chomped (not Rooted)
+    /// attacker was incorrectly denied Hit and Run entirely (auto NEXT_STEP).
+    #[test]
+    fn chomped_but_not_rooted_still_allows_hit_and_run() {
+        use ffb_model::enums::PS_STANDING;
+        let mut step = StepHitAndRun::new();
+        let coord = FieldCoordinate::new(10, 7);
+        let mut game = make_game();
+        add_hit_and_run_player(&mut game, "p1", coord);
+        game.acting_player.player_id = Some("p1".into());
+        let chomped_not_rooted = ffb_model::enums::PlayerState::new(PS_STANDING).change_chomped(true);
+        game.field_model.set_player_state("p1", chomped_not_rooted);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // Not rooted → Hit and Run must still proceed (dialog / report), not auto NEXT_STEP.
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(game.report_list.has_report(ReportId::SKILL_USE), "ReportSkillUse should still appear for a Chomped-but-not-Rooted attacker");
+    }
+
+    /// Java (bb2020 StepHitAndRun.findSquares): `UtilPlayer.findAdjacentPlayers` — the plain
+    /// variant that does NOT filter by tacklezone, unlike `findAdjacentPlayersWithTacklezones`.
+    /// A prior Rust bug used the tacklezone-filtered variant, so a square adjacent to a
+    /// prone/stunned (no-tacklezone) opponent was incorrectly treated as eligible.
+    #[test]
+    fn find_squares_excludes_square_adjacent_to_prone_opponent() {
+        use ffb_model::enums::PS_PRONE;
+        let mut game = make_game();
+        let attacker_coord = FieldCoordinate::new(5, 5);
+        add_hit_and_run_player(&mut game, "p1", attacker_coord);
+        game.acting_player.player_id = Some("p1".into());
+
+        // Opponent at (6,6), PRONE (no tacklezones). Square (6,5) is empty, adjacent to both
+        // the attacker and this prone opponent.
+        game.team_away.players.push(Player {
+            id: "opp".into(), name: "opp".into(), nr: 2, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("opp", FieldCoordinate::new(6, 6));
+        game.field_model.set_player_state("opp", ffb_model::enums::PlayerState::new(PS_PRONE));
+
+        let step = StepHitAndRun::new();
+        let squares = step.find_squares(&game);
+        let excluded = FieldCoordinate::new(6, 5);
+        assert!(
+            !squares.contains(&excluded),
+            "square adjacent to ANY opponent (even prone) must be excluded per Java's plain findAdjacentPlayers"
+        );
     }
 }

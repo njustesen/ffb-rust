@@ -4,6 +4,7 @@ use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_cards::UtilCards;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -172,10 +173,8 @@ impl StepTrickster {
                     game.field_model.replace_multi_block_target_coordinate(old_coord, to);
                 }
 
-                // Check if defender has ball
-                self.with_ball = game.field_model.ball_coordinate
-                    .map(|bc| bc == game.field_model.player_coordinate(&def_id).unwrap_or(FieldCoordinate::new(-1, -1)))
-                    .unwrap_or(false);
+                // Java: withBall = UtilPlayer.hasBall(game, defender)
+                self.with_ball = UtilPlayer::has_ball(game, &def_id);
 
                 self.action_status = TricksterPhase::SkillChoiceYes;
                 // Java: getResult().setNextAction(NEXT_STEP_AND_REPEAT); getGameState().pushCurrentStepOnStack()
@@ -331,5 +330,30 @@ mod tests {
             &mut GameRng::new(0),
         );
         assert_eq!(step.to_coordinate, Some(coord));
+    }
+
+    /// Java: `withBall = UtilPlayer.hasBall(game, defender)` — which requires `ballInPlay &&
+    /// !ballMoving && ballCoordinate == defenderCoordinate`. A prior Rust bug reimplemented this
+    /// inline checking only coordinate equality, ignoring `ball_moving`/`ball_in_play` — so a
+    /// defender merely standing where a scattering (moving) ball happened to be would be
+    /// incorrectly treated as carrying it.
+    #[test]
+    fn with_ball_false_when_ball_is_moving_even_at_same_coordinate() {
+        let mut step = StepTrickster::new();
+        let def_coord = FieldCoordinate::new(8, 8);
+        step.using_trickster = Some(true);
+        step.to_coordinate = Some(FieldCoordinate::new(9, 8));
+        let mut game = make_game();
+        game.defender_id = Some("def1".into());
+        game.field_model.set_player_coordinate("def1", def_coord);
+        game.field_model.set_player_state("def1", ffb_model::enums::PlayerState::new(PS_STANDING));
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_coordinate = Some(def_coord);
+        game.field_model.ball_moving = true; // ball is scattering, not carried
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            !step.with_ball,
+            "defender must not be considered to have the ball while it is moving/scattering"
+        );
     }
 }

@@ -199,6 +199,12 @@ impl StepMoveDodge {
                 }
             }
 
+            // Java: if (UtilGameOption.isOptionEnabled(game, GameOptionId.STAND_FIRM_NO_DROP_ON_FAILED_DODGE))
+            if game.options.is_enabled("standFirmNoDropOnFailedDodge") {
+                return StepOutcome::next()
+                    .publish(StepParameter::EndPlayerAction(true));
+            }
+
             self.fail_dodge()
         }
     }
@@ -327,6 +333,37 @@ mod tests {
         step.dodge_roll = 6;
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::DODGE_ROLL));
+    }
+
+    #[test]
+    fn stand_firm_no_drop_option_returns_next_step_on_failure() {
+        // Java StepMoveDodge.executeStep: FAILURE case checks
+        // UtilGameOption.isOptionEnabled(game, GameOptionId.STAND_FIRM_NO_DROP_ON_FAILED_DODGE)
+        // and publishes END_PLAYER_ACTION + NEXT_STEP instead of failing the dodge.
+        // This game-option check was previously missing from the bb2020 translation.
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        game.options.set("standFirmNoDropOnFailedDodge", "true");
+        add_player(&mut game, "p1");
+        game.acting_player.dodging = true;
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn stand_firm_no_drop_option_disabled_still_goes_to_failure_label() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        add_player(&mut game, "p1");
+        game.acting_player.dodging = true;
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
     }
 
     #[test]

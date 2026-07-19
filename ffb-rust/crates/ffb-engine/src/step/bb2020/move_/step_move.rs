@@ -8,10 +8,13 @@ use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::util::UtilServerPlayerMove;
+use crate::util::server_util_block::ServerUtilBlock;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2020.move.StepMove.
 ///
-/// BB2020 logic is identical to BB2025.
+/// NOTE: bb2020's guard checks `playerState.isRooted()` (NOT the broader isPinned() used by the
+/// bb2025 sibling) -- this is a genuine bb2020/bb2025 rules divergence, not a translation error.
 /// Physically moves the acting player one square: updates the field model,
 /// increments currentMove (×2 for jumping), optionally moves the ball if carried,
 /// publishes PLAYER_ENTERING_SQUARE.
@@ -63,10 +66,12 @@ impl StepMove {
             return StepOutcome::next();
         };
 
-        let is_pinned = game.field_model.player_state(attacker_id)
-            .map(|s| s.is_pinned())
+        // Java: `if (!playerState.isRooted()) { ... }` -- note this checks isRooted() specifically,
+        // NOT the broader isPinned() (which is isChomped() || isRooted()).
+        let is_rooted = game.field_model.player_state(attacker_id)
+            .map(|s| s.is_rooted())
             .unwrap_or(false);
-        if is_pinned {
+        if is_rooted {
             return StepOutcome::next();
         }
 
@@ -132,6 +137,13 @@ impl StepMove {
         }
 
         game.acting_player.goes_for_it = UtilPlayer::is_next_move_going_for_it(game);
+
+        // Java: `if (fMoveStackSize == 0) { UtilServerPlayerMove.updateMoveSquares(getGameState(), false); }`
+        if self.move_stack_size == 0 {
+            UtilServerPlayerMove::update_move_squares(game, false);
+        }
+        // Java: `ServerUtilBlock.updateDiceDecorations(getGameState());` -- always, regardless of move stack size.
+        ServerUtilBlock::update_dice_decorations(game);
 
         StepOutcome::next()
             .publish(StepParameter::PlayerEnteringSquare(attacker_id.clone()))
@@ -227,6 +239,27 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         // Pinned player should not have moved.
         assert_eq!(game.field_model.player_coordinate("p1"), Some(from));
+    }
+
+    // Java StepMove.executeStep(): `if (!playerState.isRooted())` guards the move logic -- it checks
+    // isRooted() specifically, not the broader isPinned() (isChomped() || isRooted()). Before the fix,
+    // this file used is_pinned(), which would incorrectly block movement for a chomped-but-not-rooted
+    // player. This test would have failed before the fix (player stayed at `from`).
+    #[test]
+    fn chomped_but_not_rooted_player_still_moves() {
+        use ffb_model::enums::{PlayerState, PS_STANDING};
+        let mut game = make_game();
+        let from = FieldCoordinate::new(5, 5);
+        let to = FieldCoordinate::new(6, 5);
+        game.acting_player.player_id = Some("p1".into());
+        game.field_model.set_player_coordinate("p1", from);
+        // Chomped but NOT rooted: Java's isRooted() guard must not treat this as blocked.
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING).change_chomped(true));
+        let mut step = StepMove::new();
+        step.coordinate_to = Some(to);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.field_model.player_coordinate("p1"), Some(to),
+            "chomped-but-not-rooted player must still move (Java only checks isRooted())");
     }
 
     #[test]
@@ -329,6 +362,28 @@ mod tests {
         assert!(
             !game.report_list.has_report(ReportId::SKILL_USE),
             "no SKILL_USE report when within free rushes"
+        );
+    }
+
+    // Java: `if (fMoveStackSize == 0) { UtilServerPlayerMove.updateMoveSquares(getGameState(), false); }`
+    // -- this call was entirely missing from the Rust translation. Before the fix, move_squares would
+    // stay empty after finishing a move, so this test would have failed.
+    #[test]
+    fn last_step_of_move_recomputes_move_squares() {
+        use ffb_model::enums::PlayerAction;
+        let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        let from = FieldCoordinate::new(5, 5);
+        let to = FieldCoordinate::new(6, 5);
+        game.field_model.set_player_coordinate("p1", from);
+        let mut step = StepMove::new();
+        step.coordinate_to = Some(to);
+        step.move_stack_size = 0; // last step of the move
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            !game.field_model.move_squares.is_empty(),
+            "move_squares must be recomputed at the last step of a move"
         );
     }
 

@@ -129,6 +129,20 @@ impl StepShadowing {
                                     let min_roll = (6 - move_diff).max(2);
                                     let successful = roll >= min_roll;
 
+                                    // Java: getResult().addReport(new ReportTentaclesShadowingRoll(skill, ...))
+                                    {
+                                        use ffb_model::report::mixed::report_tentacles_shadowing_roll::ReportTentaclesShadowingRoll;
+                                        let report_re_rolled = re_rolled && self.re_roll_source.is_some();
+                                        game.report_list.add(ReportTentaclesShadowingRoll::new(
+                                            Some(SkillId::Shadowing),
+                                            Some(defender_id.clone()),
+                                            roll,
+                                            successful,
+                                            min_roll,
+                                            report_re_rolled,
+                                        ));
+                                    }
+
                                     if !successful {
                                         if !re_rolled {
                                             // BB2020: re-roll offered to defender
@@ -415,6 +429,48 @@ mod tests {
         step.coordinate_from = Some(FieldCoordinate::new(5, 5));
         step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut GameRng::new(0));
         assert!(step.re_roll_source.is_none());
+    }
+
+    #[test]
+    fn shadow_roll_emits_tentacles_shadowing_roll_report() {
+        // Java ShadowingBehaviour.handleExecuteStepHook: getResult().addReport(new
+        // ReportTentaclesShadowingRoll(...)) is added unconditionally right after the
+        // shadow roll is made (regardless of success/failure). This was entirely missing
+        // from the bb2020 Rust translation.
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("actor".into());
+        game.team_home.players.push(Player {
+            id: "actor".into(), name: "actor".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.team_away.players.push(Player {
+            id: "shadower".into(), name: "shadower".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.defender_id = Some("shadower".into());
+
+        let mut step = StepShadowing::new();
+        step.coordinate_from = Some(FieldCoordinate::new(5, 5));
+        step.using_shadowing = Some(true);
+        step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(game.report_list.has_report(ReportId::TENTACLES_SHADOWING_ROLL));
     }
 
     #[test]

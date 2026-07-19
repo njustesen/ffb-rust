@@ -95,27 +95,48 @@ impl StepBlockChoice {
                 StepOutcome::goto(&juggernaut_label)
             }
             BlockResult::PowPushback => {
-                // Java: check if defender has Dodge (ignoreDefenderStumblesResult).
-                // If Tackle on attacker cancels it, fall + pushback. Otherwise goto dodge.
+                // Java: check if defender has Dodge (ignoreDefenderStumblesResult); if not, and the
+                // block was thrown by an opponent, fall back to an unused Watch Out! skill
+                // (ignoresDefenderStumblesResultForFirstBlock).
+                // If Tackle on attacker cancels the found skill, fall + pushback. Otherwise goto dodge.
                 let defender_id = game.defender_id.clone();
                 let acting_player_id = game.acting_player.player_id.clone();
-                let defender_has_dodge = defender_id.as_deref()
+                let same_team = acting_player_id.as_deref().zip(defender_id.as_deref())
+                    .map(|(a, d)| game.player_team_id(a) == game.player_team_id(d))
+                    .unwrap_or(false);
+                // Java: blockedByOpponent = actingPlayer.getPlayer().getTeam() != game.getDefender().getTeam()
+                let blocked_by_opponent = !same_team;
+                let mut defender_has_dodge = defender_id.as_deref()
                     .and_then(|id| game.player(id))
                     .map(|p| p.has_skill_property(NamedProperties::IGNORE_DEFENDER_STUMBLES_RESULT))
                     .unwrap_or(false);
+                // Java: if (defenderDodgeSkill == null && blockedByOpponent) { try unused Watch Out! }
+                let mut uses_watch_out = false;
+                if !defender_has_dodge && blocked_by_opponent {
+                    let has_unused_watch_out = defender_id.as_deref()
+                        .and_then(|id| game.player(id))
+                        .map(|p| p.has_unused_skill_with_property(NamedProperties::IGNORES_DEFENDER_STUMBLES_RESULT_FOR_FIRST_BLOCK))
+                        .unwrap_or(false);
+                    if has_unused_watch_out {
+                        defender_has_dodge = true;
+                        uses_watch_out = true;
+                    }
+                }
                 if defender_has_dodge {
+                    let cancel_property = if uses_watch_out {
+                        NamedProperties::CANCELS_IGNORES_DEFENDER_STUMBLES_RESULT_FOR_FIRST_BLOCK
+                    } else {
+                        NamedProperties::CANCELS_IGNORE_DEFENDER_STUMBLES_RESULT
+                    };
                     let attacker_has_tackle = acting_player_id.as_deref()
                         .and_then(|id| game.player(id))
-                        .map(|p| p.has_skill_property(NamedProperties::CANCELS_IGNORE_DEFENDER_STUMBLES_RESULT))
+                        .map(|p| p.has_skill_property(cancel_property))
                         .unwrap_or(false);
                     let attacker_can_block_same_team = acting_player_id.as_deref()
                         .and_then(|id| game.player(id))
                         .map(|p| p.has_skill_property(NamedProperties::CAN_BLOCK_SAME_TEAM_PLAYER))
                         .unwrap_or(false);
-                    let same_team = acting_player_id.as_deref().zip(defender_id.as_deref())
-                        .map(|(a, d)| game.player_team_id(a) == game.player_team_id(d))
-                        .unwrap_or(false);
-                    let tackle_applies = attacker_has_tackle && (!attacker_can_block_same_team || !same_team);
+                    let tackle_applies = attacker_has_tackle && (!attacker_can_block_same_team || blocked_by_opponent);
                     if tackle_applies {
                         let right_stuff_cancels_tackle = game.options.get("rightStuffCancelsTackle") == Some("true");
                         let defender_has_right_stuff = defender_id.as_deref()
@@ -140,13 +161,15 @@ impl StepBlockChoice {
                             }
                             out
                         } else {
-                            // Tackle cancels Dodge → defender falls + pushback
-                            // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), attackerCanCancelDodgeSkill, true, SkillUse.CANCEL_DODGE))
+                            // Tackle cancels Dodge (or Watch Out!) → defender falls + pushback
+                            // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), attackerCanCancelDodgeSkill, true,
+                            //         usesWatchOut ? SkillUse.CANCEL_WATCH_OUT : SkillUse.CANCEL_DODGE))
                             if let Some(ref aid) = acting_player_id {
                                 use ffb_model::model::skill_use::SkillUse;
                                 use ffb_model::report::report_skill_use::ReportSkillUse;
+                                let skill_use = if uses_watch_out { SkillUse::CANCEL_WATCH_OUT } else { SkillUse::CANCEL_DODGE };
                                 game.report_list.add(ReportSkillUse::new(
-                                    Some(aid.clone()), SkillId::Tackle, true, SkillUse::CANCEL_DODGE,
+                                    Some(aid.clone()), SkillId::Tackle, true, skill_use,
                                 ));
                             }
                             if let Some(ref did) = defender_id {
@@ -391,6 +414,46 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::SKILL_USE), "Tackle cancel dodge must emit ReportSkillUse");
         assert!(game.report_list.has_report(ReportId::BLOCK_CHOICE));
+    }
+
+    /// Java: StepBlockChoice.executeStep POW_PUSHBACK — if the defender has no real Dodge
+    /// (ignoreDefenderStumblesResult) but was blocked by an opponent and has an unused Watch
+    /// Out! skill (ignoresDefenderStumblesResultForFirstBlock), it is treated like Dodge for
+    /// this block. A prior Rust bug omitted this fallback entirely, so a Watch-Out-only
+    /// defender always fell and was pushed back, even against an attacker with no Tackle.
+    #[test]
+    fn watch_out_without_tackle_gotos_dodge_and_does_not_fall() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut step = StepBlockChoice::new("dodge".into(), "jugger".into(), "push".into());
+        step.block_result = Some(BlockResult::PowPushback);
+        let mut game = make_game();
+        // Attacker has no Tackle.
+        game.team_home.players.push(make_bare_player("att", 1));
+        game.field_model.set_player_coordinate("att", ffb_model::types::FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        // Defender (opposing team) has Watch Out!, unused.
+        game.team_away.players.push(Player {
+            id: "def".into(), name: "def".into(), nr: 2, position_id: "l".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue::new(SkillId::WatchOut)],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("def", ffb_model::types::FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.goto_label.as_deref(), Some("dodge"), "Watch Out! should be treated like Dodge and goto the dodge label");
+        let def_state = game.field_model.player_state("def").unwrap();
+        assert_eq!(def_state, PlayerState::new(PS_STANDING), "defender must not fall when Watch Out! saves them");
     }
 
     fn make_bare_player(id: &str, nr: i32) -> Player {

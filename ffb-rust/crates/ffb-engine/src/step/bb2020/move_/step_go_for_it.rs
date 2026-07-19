@@ -1,8 +1,9 @@
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
-use ffb_model::enums::ReRollSource;
+use ffb_model::enums::{ReRollSource, PlayerAction};
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::drop_player_context::SteadyFootingContext;
 use crate::step::framework::{Step, StepOutcome};
@@ -90,6 +91,18 @@ impl StepGoForIt {
 
         if !run_gfi {
             return StepOutcome::next();
+        }
+
+        // Java: if (BLITZ == actingPlayer.getPlayerAction()) && (getReRolledAction() == null)
+        //         game.getTurnData().setBlitzUsed(true);
+        //         actingPlayer.setCurrentMove(actingPlayer.getCurrentMove() + 1);
+        //         actingPlayer.setGoingForIt(UtilPlayer.isNextMoveGoingForIt(game));
+        let is_blitz = game.acting_player.player_action == Some(PlayerAction::Blitz);
+        let not_rerolled = self.re_roll_state.re_rolled_action.is_none();
+        if is_blitz && not_rerolled {
+            game.turn_data_mut().blitz_used = true;
+            game.acting_player.current_move += 1;
+            game.acting_player.goes_for_it = UtilPlayer::is_next_move_going_for_it(game);
         }
 
         let going_for_it = game.acting_player.goes_for_it;
@@ -394,6 +407,34 @@ mod tests {
         step.roll = 1; // fail
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.field_model.player_coordinate("p1"), Some(start));
+    }
+
+    #[test]
+    fn blitz_action_sets_blitz_used_and_increments_current_move() {
+        // Java: if (BLITZ == actingPlayer.getPlayerAction()) && (getReRolledAction() == null) {
+        //         game.getTurnData().setBlitzUsed(true);
+        //         actingPlayer.setCurrentMove(actingPlayer.getCurrentMove() + 1);
+        //         actingPlayer.setGoingForIt(UtilPlayer.isNextMoveGoingForIt(game));
+        //       }
+        // This block was entirely missing from the bb2020 Rust translation: blitz_used stayed
+        // false and current_move was never bumped before the GFI threshold check.
+        use ffb_model::enums::PlayerAction;
+        let mut game = make_game();
+        add_player(&mut game, "p1"); // movement = 4
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Blitz);
+        game.acting_player.current_move = 4; // pre-increment: == ma, would not trigger GFI without the fix
+        game.acting_player.goes_for_it = false;
+        let mut step = StepGoForIt::new("fail".into());
+        step.roll = 4; // success, if the GFI roll actually happens
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(game.turn_data().blitz_used, "blitz_used should be set true for a BLITZ go-for-it");
+        assert_eq!(game.acting_player.current_move, 5, "current_move should be incremented by 1 for BLITZ");
+        // current_move (5) > ma (4) and going_for_it recomputed to true → the GFI roll actually runs.
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::GO_FOR_IT_ROLL),
+            "the GFI roll should have executed (proves current_move/goes_for_it were updated before the threshold check)");
     }
 
     #[test]

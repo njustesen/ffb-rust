@@ -137,20 +137,22 @@ impl StepStandUp {
             ));
         }
 
-        let is_pinned = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.field_model.player_state(id))
-            .map(|s| s.is_pinned())
-            .unwrap_or(false);
-        if is_pinned {
-            let label = self.goto_label_on_failure.clone();
-            return StepOutcome::goto(&label)
-                .publish(StepParameter::EndPlayerAction(true));
-        }
-
         if successful {
             game.acting_player.has_moved = true;
             game.acting_player.standing_up = false;
-            StepOutcome::next()
+            // Java (bb2020): if (playerState.isRooted()) → GOTO_LABEL(fGotoLabelOnFailure)
+            // else NEXT_STEP. (bb2025 sibling uses isPinned() instead — BB2020 checks
+            // rooted, not pinned; this branch was previously missing entirely here.)
+            let is_rooted = game.acting_player.player_id.as_deref()
+                .and_then(|id| game.field_model.player_state(id))
+                .map(|s| s.is_rooted())
+                .unwrap_or(false);
+            if is_rooted {
+                let label = self.goto_label_on_failure.clone();
+                StepOutcome::goto(&label)
+            } else {
+                StepOutcome::next()
+            }
         } else {
             if already_rerolled {
                 return self.fail_stand_up(game);
@@ -316,6 +318,41 @@ mod tests {
         step.roll = 4;
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::STAND_UP_ROLL));
+    }
+
+    #[test]
+    fn successful_stand_up_while_rooted_goes_to_failure_label() {
+        // Java StepStandUp (bb2020) executeStep(): on a *successful* stand-up roll,
+        // if playerState.isRooted() the step still routes to GOTO_LABEL(fGotoLabelOnFailure)
+        // instead of NEXT_STEP (a rooted player cannot actually act after standing up).
+        // This branch was entirely missing from the Rust translation (which unconditionally
+        // returned NextStep on success, and instead had an unrelated, non-Java `is_pinned`
+        // early-return that doesn't exist anywhere in the Java source).
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        game.acting_player.standing_up = true;
+        game.acting_player.player_id = Some("p1".into());
+        game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 5));
+        let rooted_state = ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING).change_rooted(true);
+        game.field_model.set_player_state("p1", rooted_state);
+        let mut step = StepStandUp::new("fail".into());
+        step.roll = 6; // guaranteed success
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.goto_label.as_deref(), Some("fail"));
+        // has_moved/standing_up are still updated as on any success
+        assert!(game.acting_player.has_moved);
+        assert!(!game.acting_player.standing_up);
+    }
+
+    #[test]
+    fn successful_stand_up_while_not_rooted_returns_next_step() {
+        let mut game = make_game();
+        game.acting_player.standing_up = true;
+        let mut step = StepStandUp::new("fail".into());
+        step.roll = 6;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
     }
 
     #[test]

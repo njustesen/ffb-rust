@@ -258,7 +258,7 @@ impl StepEndMoving {
             || (player_action == Some(PlayerAction::FoulMove) && UtilPlayer::can_foul(game, pid))
             || (player_action == Some(PlayerAction::GazeMove)
                 && UtilPlayer::has_adjacent_gaze_target(game, pid))
-            || (player_action == Some(PlayerAction::KickTeamMateMove) && can_kick_team_mate(game, pid, true))
+            || (player_action == Some(PlayerAction::KickTeamMateMove) && can_kick_team_mate(game, pid, false))
             || (player_action == Some(PlayerAction::ThrowTeamMateMove) && can_throw_team_mate(game, pid, false))
             || (is_blitz_move && adjacent_target)
             || (player_action == Some(PlayerAction::PuntMove) && has_ball);

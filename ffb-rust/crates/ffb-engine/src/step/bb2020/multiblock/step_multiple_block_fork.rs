@@ -154,7 +154,15 @@ impl StepMultipleBlockFork {
                     vec![StepParameter::GotoLabelOnSuccess("NEXT".into())],
                 ));
                 seq.push(SequenceStep::new(StepId::HandleDropPlayerContext));
-                seq.push(SequenceStep::labelled(StepId::ReportStabInjury, "NEXT", vec![]));
+                // Java: sequence.add(StepId.REPORT_STAB_INJURY, IStepLabel.NEXT,
+                //   StepParameter.from(StepParameterKey.PLAYER_ID, target.getPlayerId()));
+                // StepReportStabInjury.init() throws if PLAYER_ID is not set — this parameter
+                // was previously dropped, leaving `target` unset.
+                seq.push(SequenceStep::labelled(
+                    StepId::ReportStabInjury,
+                    "NEXT",
+                    vec![StepParameter::PlayerId(pid.clone())],
+                ));
                 seq.push(SequenceStep::with_params(
                     StepId::ConsumeParameter,
                     vec![StepParameter::ParametersToConsume(params_to_consume())],
@@ -274,6 +282,25 @@ mod tests {
         let mut step = StepMultipleBlockFork::new();
         assert!(step.set_parameter(&StepParameter::BlockTargets(vec!["a".into(), "b".into()])));
         assert_eq!(step.targets.len(), 2);
+    }
+
+    #[test]
+    fn stab_sequence_sets_report_stab_injury_player_id() {
+        // Java: sequence.add(StepId.REPORT_STAB_INJURY, IStepLabel.NEXT,
+        //   StepParameter.from(StepParameterKey.PLAYER_ID, target.getPlayerId()));
+        // Without this, StepReportStabInjury.init() would throw (PLAYER_ID not initialized).
+        let mut game = make_game();
+        let mut step = StepMultipleBlockFork::new();
+        step.targets.push(BlockTarget::new("stab1", BlockKind::STAB, None));
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.pushes.len(), 1);
+        let seq = &out.pushes[0];
+        let report_step = seq.iter().find(|s| s.step_id == StepId::ReportStabInjury)
+            .expect("ReportStabInjury not found in stab sequence");
+        assert!(
+            report_step.params.iter().any(|p| matches!(p, StepParameter::PlayerId(id) if id == "stab1")),
+            "ReportStabInjury step must receive PlayerId(\"stab1\")"
+        );
     }
 
     #[test]

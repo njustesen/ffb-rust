@@ -1,6 +1,7 @@
 use ffb_model::enums::PlayerAction;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::option::game_option_id::SNEAKY_GIT_CAN_MOVE_AFTER_FOUL;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
@@ -82,15 +83,16 @@ impl StepEndFouling {
             }
         }
 
-        // Java: else if (!fEndTurn && isOnPitch
+        // Java: else if (!fEndTurn && isOnPitch && sneakyMove.isEnabled()
         //           && player.hasSkillProperty(NamedProperties.canMoveAfterFoul)
         //           && UtilPlayer.isNextMovePossible(game, false))
+        let sneaky_move_enabled = game.options.is_enabled(SNEAKY_GIT_CAN_MOVE_AFTER_FOUL);
         let can_move_after_foul = player_id.as_deref()
             .and_then(|id| game.player(id))
             .map(|p| p.has_skill_property(NamedProperties::CAN_MOVE_AFTER_FOUL))
             .unwrap_or(false);
 
-        if !self.end_turn && is_on_pitch && can_move_after_foul && UtilPlayer::is_next_move_possible(game, false) {
+        if !self.end_turn && is_on_pitch && sneaky_move_enabled && can_move_after_foul && UtilPlayer::is_next_move_possible(game, false) {
             // Java: Select.pushSequence(new Select.SequenceParams(getGameState(), true))
             let seq = Select::build_sequence(&SelectParams { update_persistence: true, is_blitz_move: false, block_targets: vec![] });
             // Java: UtilServerSteps.changePlayerAction(this, player.getId(), PlayerAction.MOVE, false)
@@ -201,6 +203,8 @@ mod tests {
         use ffb_model::types::FieldCoordinate;
 
         let mut game = make_game();
+        // Java: GameOptionId.SNEAKY_GIT_CAN_MOVE_AFTER_FOUL must be enabled (defaults to false).
+        game.options.set("sneakyGitCanMoveAfterFoul", "true");
         // Put a SneakyGit player on the pitch with moves remaining
         let mut p = Player::default();
         p.id = "p1".into();
@@ -219,5 +223,38 @@ mod tests {
         // should push Select sequence (update_persistence=true)
         assert_eq!(out.pushes.len(), 1);
         assert_eq!(out.pushes[0][0].step_id, StepId::InitSelecting);
+    }
+
+    #[test]
+    fn sneaky_git_move_after_foul_disabled_by_default_falls_back_to_end_player_action() {
+        // Java: GameOptionFactory sets SNEAKY_GIT_CAN_MOVE_AFTER_FOUL default = false
+        // ("Sneaky Git has to end action after fouling"). Without explicitly enabling the
+        // option, even a SneakyGit player with moves remaining must NOT get the Select
+        // sequence — it must fall through to the EndPlayerAction branch instead.
+        use ffb_model::enums::PlayerState;
+        use ffb_model::model::player::Player;
+        const ACTIVE_STANDING: PlayerState = PlayerState(0x101);
+        use ffb_model::types::FieldCoordinate;
+
+        let mut game = make_game();
+        // Option NOT set — defaults to disabled.
+        let mut p = Player::default();
+        p.id = "p1".into();
+        p.movement = 6;
+        p.starting_skills.push(SkillWithValue::new(SkillId::QuickFoul));
+        game.team_home.players.push(p);
+        game.field_model.set_player_state("p1", ACTIVE_STANDING);
+        game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 5));
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.current_move = 0;
+
+        let mut step = StepEndFouling::new();
+        step.end_turn = false;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(out.pushes.len(), 1);
+        // Must push EndPlayerAction sequence (RemoveTargetSelectionState first step),
+        // not the Select sequence (InitSelecting), since the option is disabled.
+        assert_eq!(out.pushes[0][0].step_id, StepId::RemoveTargetSelectionState);
     }
 }

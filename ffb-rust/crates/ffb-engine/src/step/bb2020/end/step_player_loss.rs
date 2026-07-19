@@ -35,8 +35,20 @@ impl StepPlayerLoss {
 
         let player_ids: Vec<String> = {
             let team = if conceding_home { &game.team_home } else { &game.team_away };
+            let player_results = if conceding_home {
+                &game.game_result.home.player_results
+            } else {
+                &game.game_result.away.player_results
+            };
+            // Java: playerResult.getSeriousInjury() == null || !playerResult.getSeriousInjury().isDead()
             team.players.iter()
                 .filter(|p| p.extra_skills.len() as i32 >= 3)
+                .filter(|p| {
+                    player_results.get(&p.id)
+                        .and_then(|pr| pr.serious_injury)
+                        .map(|si| !si.is_dead())
+                        .unwrap_or(true)
+                })
                 .map(|p| p.id.clone())
                 .collect()
         };
@@ -173,6 +185,27 @@ mod tests {
         let mut step = StepPlayerLoss;
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::DEFECTING_PLAYERS), "should add ReportDefectingPlayers");
+    }
+
+    #[test]
+    fn dead_player_excluded_from_defection_roll() {
+        // Java: playerResult.getSeriousInjury() == null || !playerResult.getSeriousInjury().isDead()
+        // A player who died from a serious injury this game must not be rolled for defection,
+        // even if they otherwise have >= 3 extra skills.
+        use ffb_model::enums::SeriousInjuryKind;
+        let mut game = make_game();
+        game.game_result.home.conceded = true;
+        game.conceded_legally = false;
+        game.team_home.players.push(make_player_with_extra_skills("h1", 4));
+        let mut pr = PlayerResult::default();
+        pr.serious_injury = Some(SeriousInjuryKind::Dead);
+        game.game_result.home.player_results.insert("h1".into(), pr);
+        let mut step = StepPlayerLoss;
+        step.start(&mut game, &mut GameRng::new(0));
+        // Dead player should not be marked as defecting (never rolled) and no report emitted.
+        assert!(!game.game_result.home.player_results["h1"].defecting);
+        assert!(!game.report_list.has_report(ReportId::DEFECTING_PLAYERS),
+            "dead player should be excluded from defection roll and report");
     }
 
     #[test]

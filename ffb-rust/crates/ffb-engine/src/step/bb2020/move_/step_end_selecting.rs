@@ -167,6 +167,8 @@ impl StepEndSelecting {
 
         // ── Branch 1: end turn or end player action ─────────────────────────────
         if self.end_turn || self.end_player_action {
+            // Java: game.getFieldModel().clearMultiBlockTargets()
+            game.field_model.clear_multi_block_targets();
             let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
                 feeding_allowed: true,
                 end_player_action: self.end_player_action,
@@ -237,6 +239,8 @@ impl StepEndSelecting {
                 .unwrap_or(false);
 
         if player_action.is_none() || rooted_and_can_gaze {
+            // Java: game.getFieldModel().clearMultiBlockTargets()
+            game.field_model.clear_multi_block_targets();
             let seq = Select::build_sequence(&SelectParams {
                 update_persistence: false,
                 ..Default::default()
@@ -400,19 +404,29 @@ impl StepEndSelecting {
                 StepOutcome::next().push_seq(seq)
             }
             PlayerAction::Treacherous => {
-                let select_seq = Select::build_sequence(&SelectParams { update_persistence: true, ..Default::default() });
+                // Java: new Select.SequenceParams(getGameState(), true, blockTargets)
+                let select_seq = Select::build_sequence(&SelectParams { update_persistence: true, block_targets: self.block_targets.clone(), ..Default::default() });
                 let treacherous_seq = Treacherous::build_sequence(&TreacherousParams {
                     failure_label: "END_SELECTING".into(),
                 });
                 StepOutcome::next().push_seq(select_seq).push_seq(treacherous_seq)
             }
             PlayerAction::RaidingParty => {
-                let select_seq = Select::build_sequence(&SelectParams { update_persistence: true, ..Default::default() });
+                // Java: new Select.SequenceParams(getGameState(), true, blockTargets)
+                let select_seq = Select::build_sequence(&SelectParams { update_persistence: true, block_targets: self.block_targets.clone(), ..Default::default() });
                 let raiding_seq = RaidingParty::build_sequence(&RaidingPartyParams {
                     failure_label: "END_SELECTING".into(),
                     success_label: String::new(),
                 });
                 StepOutcome::next().push_seq(select_seq).push_seq(raiding_seq)
+            }
+            PlayerAction::WisdomOfTheWhiteDwarf => {
+                // Java: selectGenerator.pushSequence(selectParams);
+                //       Sequence sequence = new Sequence(getGameState()); sequence.add(StepId.WISDOM_OF_THE_WHITE_DWARF);
+                //       getGameState().getStepStack().push(sequence.getSequence());
+                let select_seq = Select::build_sequence(&SelectParams { update_persistence: true, block_targets: self.block_targets.clone(), ..Default::default() });
+                let wisdom_seq = vec![crate::step::framework::SequenceStep::new(StepId::WisdomOfTheWhiteDwarf)];
+                StepOutcome::next().push_seq(select_seq).push_seq(wisdom_seq)
             }
             PlayerAction::ThrowKeg => {
                 let seq = ThrowKeg::build_sequence(&ThrowKegParams {
@@ -428,14 +442,16 @@ impl StepEndSelecting {
                 StepOutcome::next().push_seq(seq)
             }
             PlayerAction::BalefulHex => {
-                let select_seq = Select::build_sequence(&SelectParams { update_persistence: true, ..Default::default() });
+                // Java: new Select.SequenceParams(getGameState(), true, blockTargets)
+                let select_seq = Select::build_sequence(&SelectParams { update_persistence: true, block_targets: self.block_targets.clone(), ..Default::default() });
                 let bh_seq = BalefulHex::build_sequence(&BalefulHexParams {
                     failure_label: "END_SELECTING".into(),
                 });
                 StepOutcome::next().push_seq(select_seq).push_seq(bh_seq)
             }
             PlayerAction::BlackInk => {
-                let select_seq = Select::build_sequence(&SelectParams { update_persistence: true, ..Default::default() });
+                // Java: new Select.SequenceParams(getGameState(), true, blockTargets)
+                let select_seq = Select::build_sequence(&SelectParams { update_persistence: true, block_targets: self.block_targets.clone(), ..Default::default() });
                 let bi_seq = BlackInk::build_sequence(&BlackInkParams {
                     failure_label: "END_SELECTING".into(),
                     old_player_state: None,
@@ -443,14 +459,16 @@ impl StepEndSelecting {
                 StepOutcome::next().push_seq(select_seq).push_seq(bi_seq)
             }
             PlayerAction::CatchOfTheDay => {
-                let select_seq = Select::build_sequence(&SelectParams { update_persistence: true, ..Default::default() });
+                // Java: new Select.SequenceParams(getGameState(), true, blockTargets)
+                let select_seq = Select::build_sequence(&SelectParams { update_persistence: true, block_targets: self.block_targets.clone(), ..Default::default() });
                 let cotd_seq = CatchOfTheDay::build_sequence(&CatchOfTheDayParams {
                     failure_label: "END_SELECTING".into(),
                 });
                 StepOutcome::next().push_seq(select_seq).push_seq(cotd_seq)
             }
             PlayerAction::ThenIStartedBlastin => {
-                let select_seq = Select::build_sequence(&SelectParams { update_persistence: true, ..Default::default() });
+                // Java: new Select.SequenceParams(getGameState(), true, blockTargets)
+                let select_seq = Select::build_sequence(&SelectParams { update_persistence: true, block_targets: self.block_targets.clone(), ..Default::default() });
                 let tisb_seq = ThenIStartedBlastin::build_sequence();
                 StepOutcome::next().push_seq(select_seq).push_seq(tisb_seq)
             }
@@ -575,6 +593,54 @@ mod tests {
         let stack = vec![FieldCoordinate::new(5, 5)];
         assert!(step.set_parameter(&StepParameter::MoveStack(stack.clone())));
         assert_eq!(step.move_stack, stack);
+    }
+
+    #[test]
+    fn end_turn_clears_multi_block_targets() {
+        // Java: fEndTurn || fEndPlayerAction branch calls game.getFieldModel().clearMultiBlockTargets()
+        // before pushing EndPlayerAction. This must reset field-model multi-block target state.
+        let mut game = make_game();
+        game.field_model.multi_block_targets.push("target1".to_string());
+        assert!(game.field_model.is_multi_block_target("target1"));
+        let mut step = StepEndSelecting::new();
+        step.end_turn = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.field_model.is_multi_block_target("target1"), "clear_multi_block_targets should have been called");
+    }
+
+    #[test]
+    fn dispatch_wisdom_of_the_white_dwarf_pushes_select_and_wisdom_sequences() {
+        // Java: case WISDOM_OF_THE_WHITE_DWARF: selectGenerator.pushSequence(selectParams);
+        //       Sequence sequence = new Sequence(...); sequence.add(StepId.WISDOM_OF_THE_WHITE_DWARF); push it.
+        // Previously this action fell into the `_ =>` fallback (wrong EndPlayerAction params);
+        // it must now push a Select sequence plus a WisdomOfTheWhiteDwarf step.
+        let mut game = make_game();
+        let mut step = StepEndSelecting::new();
+        step.dispatch_player_action = Some(PlayerAction::WisdomOfTheWhiteDwarf);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(out.pushes.len(), 2, "should push both Select and WisdomOfTheWhiteDwarf sequences");
+        assert!(out.pushes.iter().any(|seq| seq.iter().any(|s| s.step_id == StepId::WisdomOfTheWhiteDwarf)));
+    }
+
+    #[test]
+    fn dispatch_treacherous_propagates_block_targets_into_select_sequence() {
+        // Java: new Select.SequenceParams(getGameState(), true, blockTargets) — the accumulated
+        // blockTargets must be forwarded to the Select sequence's END_SELECTING step, not dropped.
+        use crate::step::framework::StepParameter;
+        let mut game = make_game();
+        let mut step = StepEndSelecting::new();
+        step.dispatch_player_action = Some(PlayerAction::Treacherous);
+        step.block_targets = vec!["defA".into(), "defB".into()];
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        let select_seq = out.pushes.iter().find(|seq| seq.iter().any(|s| s.step_id == StepId::EndSelecting))
+            .expect("should push a Select sequence containing EndSelecting");
+        let end_selecting = select_seq.iter().find(|s| s.step_id == StepId::EndSelecting).unwrap();
+        assert!(
+            end_selecting.params.iter().any(|p| matches!(p, StepParameter::BlockTargets(v) if v == &vec!["defA".to_string(), "defB".to_string()])),
+            "block_targets should be forwarded to the Select sequence's EndSelecting step"
+        );
     }
 
     #[test]

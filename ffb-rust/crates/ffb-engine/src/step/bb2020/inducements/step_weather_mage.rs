@@ -42,7 +42,18 @@ impl Step for StepWeatherMage {
     fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         match action {
             Action::SelectWeather { weather } => {
+                // Java: replaceWeather(weather, modifier, Effect.CHANGED) — client-selected
+                // weather always reports as CHANGED, regardless of whether it equals the
+                // old weather. (Modifier is not plumbed through Action::SelectWeather, so
+                // it is reported as 0 here.)
+                let old_weather = game.field_model.weather;
                 game.field_model.weather = *weather;
+                game.report_list.add(ReportWeatherMageResult::new(
+                    0,
+                    Some(weather.name().to_string()),
+                    Some(WeatherMageEffect::CHANGED),
+                    Some(old_weather.name().to_string()),
+                ));
                 StepOutcome::next()
             }
             Action::Acknowledge => StepOutcome::next(),
@@ -170,6 +181,22 @@ mod tests {
         );
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(game.field_model.weather, Weather::Blizzard);
+    }
+
+    /// When SelectWeather is handled, a ReportWeatherMageResult (CHANGED) report is
+    /// added — Java's `replaceWeather` always adds this report on client selection.
+    #[test]
+    fn handle_select_weather_adds_changed_result_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.field_model.weather = Weather::Nice;
+        let mut step = StepWeatherMage::new();
+        step.handle_command(
+            &Action::SelectWeather { weather: Weather::Blizzard },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(game.report_list.has_report(ReportId::WEATHER_MAGE_RESULT));
     }
 
     /// Acknowledge command always returns NEXT_STEP.

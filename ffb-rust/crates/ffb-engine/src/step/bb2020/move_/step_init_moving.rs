@@ -193,10 +193,11 @@ impl StepInitMoving {
 
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         if self.end_turn {
+            // Java bb2020 StepInitMoving does NOT publish CHECK_FORGO here (unlike the bb2025
+            // sibling, which does at StepInitMoving.java:329) — only END_TURN is published.
             let label = self.goto_label_on_end.clone();
             return StepOutcome::goto(&label)
-                .publish(StepParameter::EndTurn(true))
-                .publish(StepParameter::CheckForgo(true));
+                .publish(StepParameter::EndTurn(true));
         }
         if self.end_player_action {
             let label = self.goto_label_on_end.clone();
@@ -251,11 +252,11 @@ impl StepInitMoving {
                 Some(PlayerAction::HandOverMove) => {
                     game.turn_data_mut().hand_over_used = true;
                 }
-                Some(PlayerAction::PassMove) => {
+                // Java bb2020: `case PASS_MOVE: case THROW_TEAM_MATE_MOVE: game.getTurnData().setPassUsed(true); break;`
+                // Unlike bb2025 (which gives THROW_TEAM_MATE_MOVE its own ttmUsed case), bb2020 merges the two
+                // into setPassUsed only — there is no ttmUsed handling in bb2020 at all.
+                Some(PlayerAction::PassMove) | Some(PlayerAction::ThrowTeamMateMove) => {
                     game.turn_data_mut().pass_used = true;
-                }
-                Some(PlayerAction::ThrowTeamMateMove) => {
-                    game.turn_data_mut().ttm_used = true;
                 }
                 Some(PlayerAction::KickTeamMateMove) => {
                     game.turn_data_mut().ktm_used = true;
@@ -263,9 +264,7 @@ impl StepInitMoving {
                 Some(PlayerAction::SecureTheBall) => {
                     game.turn_data_mut().secure_the_ball_used = true;
                 }
-                Some(PlayerAction::PuntMove) | Some(PlayerAction::Punt) => {
-                    game.turn_data_mut().punt_used = true;
-                }
+                // Java bb2020 has no PUNT/PUNT_MOVE case in this switch (that's bb2025-only); falls to default.
                 _ => {}
             }
             game.concession_possible = false;
@@ -303,8 +302,12 @@ mod tests {
         Game::new(home, away, Rules::Bb2020)
     }
 
+    // Java (bb2020) StepInitMoving.executeStep(): `if (fEndTurn) { publishParameter(END_TURN, true);
+    // getResult().setNextAction(GOTO_LABEL, fGotoLabelOnEnd); }` -- no CHECK_FORGO publish. Unlike the
+    // bb2025 sibling (which does publish CHECK_FORGO), bb2020 must NOT. Before the fix, this file wrongly
+    // also published CheckForgo(true), which this test would have caught.
     #[test]
-    fn end_turn_goes_to_label_with_end_turn_and_check_forgo() {
+    fn end_turn_goes_to_label_with_end_turn_only() {
         let mut game = make_game();
         let mut step = StepInitMoving::new("end".into());
         step.end_turn = true;
@@ -312,7 +315,10 @@ mod tests {
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("end"));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::CheckForgo(true))));
+        assert!(
+            !out.published.iter().any(|p| matches!(p, StepParameter::CheckForgo(true))),
+            "bb2020 StepInitMoving must not publish CHECK_FORGO (that's bb2025-only behavior)"
+        );
     }
 
     #[test]
@@ -397,6 +403,22 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.acting_player.dodging);
         assert!(game.acting_player.goes_for_it, "setGoingForIt should be true");
+    }
+
+    // Java bb2020 StepInitMoving.executeStep(): `case PASS_MOVE: case THROW_TEAM_MATE_MOVE:
+    // game.getTurnData().setPassUsed(true); break;` -- bb2020 merges THROW_TEAM_MATE_MOVE into the
+    // PASS_MOVE case (unlike bb2025, which gives it its own ttmUsed case). Before the fix, this file
+    // wrongly set ttm_used instead of pass_used for ThrowTeamMateMove, so this test would have failed.
+    #[test]
+    fn throw_team_mate_move_sets_pass_used_not_ttm_used_in_bb2020() {
+        let mut game = make_game();
+        game.acting_player.player_action = Some(PlayerAction::ThrowTeamMateMove);
+        let mut step = StepInitMoving::new("end".into());
+        let target = FieldCoordinate::new(5, 5);
+        step.move_stack = vec![target];
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.turn_data().pass_used, "bb2020 THROW_TEAM_MATE_MOVE must set pass_used");
+        assert!(!game.turn_data().ttm_used, "bb2020 THROW_TEAM_MATE_MOVE must NOT set ttm_used (bb2025-only)");
     }
 
     #[test]
