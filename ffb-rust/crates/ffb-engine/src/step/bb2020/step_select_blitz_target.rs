@@ -188,12 +188,14 @@ impl StepSelectBlitzTarget {
     }
 
     /// Java: hasStandingOpponents — true if any opponent is on the field and can be blocked.
+    /// Java: `FieldCoordinateBounds.FIELD.isInBounds(...)` — the full playable field is
+    /// x: 0..=25, y: 0..=14 (inclusive, 0-indexed), matching `FieldCoordinateBounds::FIELD`.
     fn has_standing_opponents(&self, game: &Game) -> bool {
+        use ffb_model::types::FieldCoordinateBounds;
         let inactive = game.inactive_team();
         inactive.players.iter().any(|player| {
-            // Check if player is on the field (x: 1..=26, y: 1..=15)
             if let Some(coord) = game.field_model.player_coordinate(&player.id) {
-                if coord.x >= 1 && coord.x <= 26 && coord.y >= 1 && coord.y <= 15 {
+                if FieldCoordinateBounds::FIELD.is_in_bounds(coord) {
                     // Check if player state can be blocked
                     if let Some(state) = game.field_model.player_state(&player.id) {
                         return state.can_be_blocked();
@@ -257,6 +259,38 @@ mod tests {
         // Has standing opponent -> Continue (waiting for selection)
         assert_eq!(out.action, StepAction::Continue);
         assert_eq!(game.turn_mode, TurnMode::SelectBlitzTarget);
+    }
+
+    #[test]
+    fn opponent_in_home_endzone_counts_as_standing_opponent() {
+        // Java: FieldCoordinateBounds.FIELD spans x:0..=25, y:0..=14 (0-indexed), which
+        // includes the endzone column x=0. Before the fix, the Rust bounds check required
+        // x>=1, incorrectly excluding a standing opponent parked in the endzone.
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+
+        let mut game = make_game();
+        game.home_playing = true;
+
+        let pid = "away_p1".to_string();
+        game.team_away.players.push(Player {
+            id: pid.clone(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        // x=0 is the home endzone column — in bounds per FieldCoordinateBounds::FIELD.
+        game.field_model.set_player_coordinate(&pid, FieldCoordinate::new(0, 7));
+        game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
+
+        let mut step = StepSelectBlitzTarget::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue,
+            "opponent standing in the endzone (x=0) must count as a valid blitz target");
     }
 
     #[test]

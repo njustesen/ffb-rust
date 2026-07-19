@@ -30,7 +30,6 @@ use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::skill_use::SkillUse;
 use ffb_model::report::report_right_stuff_roll::ReportRightStuffRoll;
 use ffb_model::report::report_skill_use::ReportSkillUse;
-use ffb_model::util::util_cards::UtilCards;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter, CatchScatterThrowInMode};
 use ffb_mechanics::modifiers::right_stuff_modifier_factory::RightStuffModifierFactory;
@@ -155,10 +154,14 @@ impl StepRightStuff {
             // Java: if (PassOutcome.FUMBLE == passResult && thrower.hasSkillProperty(fumbledPlayerLandsSafely))
             //         { successful = true; addReport(ReportSkillUse(..., FUMBLED_PLAYER_LANDS_SAFELY)); }
             //       else { addReport(new ReportRightStuffRoll(...)); }
+            // NOTE: Java's `hasSkillProperty`/`getSkillWithProperty` ignore the skill's used
+            // state entirely (unlike ActingPlayer's getUnusedSkillWithProperty). Using the
+            // "unused" variant here would incorrectly skip the safe-landing effect if the
+            // thrower's skill happened to be marked used elsewhere this turn.
             let fumble_lands_safely_skill = if self.pass_result == Some(ModelPassResult::Fumble) {
                 game.thrower_id.as_deref()
                     .and_then(|id| game.player(id))
-                    .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::FUMBLED_PLAYER_LANDS_SAFELY))
+                    .and_then(|p| p.skill_id_with_property(NamedProperties::FUMBLED_PLAYER_LANDS_SAFELY))
             } else {
                 None
             };
@@ -237,28 +240,47 @@ impl StepRightStuff {
         }
 
         // Drop path (drop_thrown_player == true OR fumbled_ktm OR failed roll).
-        // Java: UtilServerInjury.handleInjury(fumbledKtm → FumbledKtm else TTMLanding).
+        // Java: UtilServerInjury.handleInjury(fumbledKtm ? FumbledKtm : TTMLanding,
+        //         game.getActingPlayer().getPlayer(), thrownPlayer, playerCoordinate, null, null,
+        //         ApothecaryMode.THROWN_PLAYER);
+        // NOTE: the ApothecaryMode is always THROWN_PLAYER regardless of fumbledKtm — only the
+        // injury type varies. The attacker is the acting player (thrower), not null.
         let coord = game.field_model.player_coordinate(&player_id)
             .unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
+        let attacker_id = game.acting_player.player_id.clone();
         let ir = if fumbled_ktm {
             let mut injury_type = InjuryTypeFumbledKtm::new();
             util_server_injury::handle_injury(
                 game, rng, &mut injury_type,
-                None, &player_id, coord, None, None,
-                ApothecaryMode::Defender,
+                attacker_id.as_deref(), &player_id, coord, None, None,
+                ApothecaryMode::ThrownPlayer,
             )
         } else {
             let mut injury_type = InjuryTypeTTMLanding::new();
             util_server_injury::handle_injury(
                 game, rng, &mut injury_type,
-                None, &player_id, coord, None, None,
+                attacker_id.as_deref(), &player_id, coord, None, None,
                 ApothecaryMode::ThrownPlayer,
             )
         };
         ir.apply_to(game);
+        // Java: publishParameter(INJURY_RESULT, injuryResultThrownPlayer)
         let mut out = StepOutcome::next()
             .publish(StepParameter::ThrownPlayerState(out_state))
+            .publish(StepParameter::InjuryResult(Box::new(ir)))
             .publish(StepParameter::ThrownPlayerCoordinate(None));
+
+        // Java: StepParameterSet params = UtilServerInjury.dropPlayer(this, thrownPlayer, ApothecaryMode.THROWN_PLAYER);
+        //       if (!fThrownPlayerHasBall) params.remove(END_TURN);
+        //       publishParameters(params);
+        //       if (fThrownPlayerHasBall) publishParameter(END_TURN, true);
+        let mut drop_params = util_server_injury::drop_player_no_sph(game, &player_id);
+        if !has_ball {
+            drop_params.retain(|p| !matches!(p, StepParameter::EndTurn(_)));
+        }
+        for p in drop_params {
+            out = out.publish(p);
+        }
         if has_ball {
             out = out.publish(StepParameter::EndTurn(true));
         }
@@ -377,6 +399,64 @@ mod tests {
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::ThrownPlayerCoordinate(None))));
     }
 
+    // Java: `!doRoll` branch always calls
+    //   `publishParameter(INJURY_RESULT, ...)` and
+    //   `UtilServerInjury.dropPlayer(this, thrownPlayer, ApothecaryMode.THROWN_PLAYER)`,
+    // always with `ApothecaryMode.THROWN_PLAYER` (fumbledKtm only changes the injury *type*,
+    // not the apothecary mode) and the acting player as attacker (never null). The Rust code
+    // previously omitted the INJURY_RESULT publish and the dropPlayer() call entirely, and
+    // used `ApothecaryMode::Defender` + no attacker for the fumbled-KTM branch.
+    #[test]
+    fn drop_path_publishes_injury_result_with_thrown_player_apothecary_mode_and_attacker() {
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerGender, PlayerType};
+        use ffb_model::model::player::Player;
+
+        let mut game = make_game();
+        let thrower = Player {
+            id: "thrower".into(), name: "thrower".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(thrower);
+        game.acting_player.player_id = Some("thrower".into());
+
+        let p1 = Player {
+            id: "p1".into(), name: "p1".into(), nr: 2, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(p1);
+        game.field_model.set_player_coordinate("p1", ffb_model::types::FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("p1", ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING));
+
+        let mut step = StepRightStuff::new();
+        step.thrown_player_id = Some("p1".into());
+        step.pass_result = Some(ModelPassResult::Fumble);
+        step.kicked_player = true; // fumbled_ktm branch
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        let injury_result = out.published.iter().find_map(|p| match p {
+            StepParameter::InjuryResult(ir) => Some(ir.clone()),
+            _ => None,
+        });
+        let ir = injury_result.expect("Java always publishes INJURY_RESULT in the !doRoll branch");
+        assert_eq!(ir.injury_context().apothecary_mode, ApothecaryMode::ThrownPlayer,
+            "ApothecaryMode is always THROWN_PLAYER regardless of fumbledKtm");
+        assert_eq!(ir.injury_context().attacker_id.as_deref(), Some("thrower"),
+            "attacker is the acting player, not null");
+    }
+
     #[test]
     fn report_right_stuff_roll_added_on_normal_roll() {
         // Java: StepRightStuff (BB2020) adds ReportRightStuffRoll in the normal (non-fumble) path.
@@ -464,4 +544,5 @@ mod tests {
             "roll of 5 must succeed against the agility-with-modifiers threshold of 4, \
              not fail against the raw-agility threshold of 6");
     }
+
 }

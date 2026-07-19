@@ -140,8 +140,13 @@ impl StepResolvePass {
             let pass_coord = game.pass_coordinate;
             if let Some(ref catcher_id) = self.catcher_id {
                 // Java: check catcher state — if no tackle zones → empty square path
+                // Java: `Player<?> catcher = ...; PlayerState catcherState = ...;
+                //        if (catcher == null || catcherState == null || !catcherState.hasTacklezones())`
+                // hasTacklezones() (not canBeBlocked()) is the correct predicate here: it also
+                // excludes confused/hypnotized/eye-gouged players and includes the BLOCKED base
+                // state, both of which canBeBlocked() gets wrong.
                 let catcher_has_tackle_zones = game.field_model.player_state(catcher_id)
-                    .map(|s| s.can_be_blocked())
+                    .map(|s| s.has_tacklezones())
                     .unwrap_or(false);
                 if !catcher_has_tackle_zones {
                     // Java: CATCH_ACCURATE_PASS_EMPTY_SQUARE / CATCH_ACCURATE_BOMB_EMPTY_SQUARE
@@ -404,5 +409,32 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         let oob = out.published.iter().any(|p| matches!(p, StepParameter::BombOutOfBounds(true)));
         assert!(oob, "expected BombOutOfBounds(true) for bomb OOB");
+    }
+
+    #[test]
+    fn hypnotized_standing_catcher_is_treated_as_having_no_tacklezones() {
+        // Regression: Java's condition is `!catcherState.hasTacklezones()`, not
+        // `!catcherState.canBeBlocked()`. hasTacklezones() additionally excludes
+        // confused/hypnotized/eye-gouged players, which canBeBlocked() does not check.
+        // A STANDING-but-hypnotized catcher must be routed through the "no tacklezones"
+        // (empty-square-equivalent) accurate-pass branch, not the normal catch branch.
+        let mut game = make_game();
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+        game.field_model.set_player_coordinate("c1", FieldCoordinate::new(10, 5));
+        let hypnotized = PlayerState::new(PS_STANDING).change_hypnotized(true);
+        game.field_model.set_player_state("c1", hypnotized);
+        let mut step = StepResolvePass::new();
+        step.pass_accurate = true;
+        step.catcher_id = Some("c1".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        let empty_square_mode = out.published.iter().any(|p| {
+            matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::CatchMissedPass))
+        });
+        assert!(
+            empty_square_mode,
+            "expected a hypnotized (no-tacklezones) standing catcher to route through the \
+             CatchMissedPass branch, not the normal CatchAccuratePass branch"
+        );
     }
 }

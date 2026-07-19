@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2020.StepBlackInk (BB2020).
 ///
-/// Applies the Black Ink skill: gaze at an adjacent opponent to confuse them.
+/// Applies the Black Ink skill: gaze at an adjacent opponent to hypnotize them.
 ///
 /// Differs from BB2025: `find_adjacent_opponents` does NOT filter on `!is_distracted()`
 /// (BB2020 uses SkillUse REMOVE_TACKLEZONE which targets any adjacent standing/prone opponent).
@@ -106,16 +106,15 @@ impl StepBlackInk {
                 true,
                 SkillUse::REMOVE_TACKLEZONE,
             ));
-            if eligibles.len() == 1 {
-                self.player_id = Some(eligibles[0].clone());
-            } else {
-                return StepOutcome::cont();
-            }
+            // Java: unlike StepBalefulHex, StepBlackInk has NO `eligiblePlayers.size() == 1`
+            // auto-select branch — it always shows the dialog and returns CONTINUE.
+            return StepOutcome::cont();
         }
 
         if let Some(ref target_id) = self.player_id.clone() {
+            // Java: fieldModel.setPlayerState(player, fieldModel.getPlayerState(player).changeHypnotized(true));
             if let Some(state) = game.field_model.player_state(target_id) {
-                game.field_model.set_player_state(target_id, state.change_confused(true));
+                game.field_model.set_player_state(target_id, state.change_hypnotized(true));
             }
             let is_home = game.team_home.player(&player_id).is_some();
             if is_home {
@@ -218,8 +217,11 @@ mod tests {
     }
 
     #[test]
-    fn confuses_auto_selected_target() {
-        let (mut game, actor_id) = make_game_bi();
+    fn single_eligible_target_still_waits_for_dialog() {
+        // Java: StepBlackInk (unlike StepBalefulHex) has NO `eligiblePlayers.size() == 1`
+        // auto-select branch — it always shows DialogPlayerChoiceParameter and returns CONTINUE,
+        // even when there is exactly one eligible opponent.
+        let (mut game, _actor_id) = make_game_bi();
         let target_id = "opp1".to_string();
         game.team_away.players.push(make_player(&target_id, None));
         let adj = FieldCoordinate::new(11, 7);
@@ -228,11 +230,19 @@ mod tests {
 
         let mut step = StepBlackInk::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(out.action, StepAction::Continue, "must wait for dialog even with one eligible target");
+        assert!(step.player_id.is_none(), "must not auto-select the sole eligible target");
 
+        // Once the client responds with the chosen player, the effect applies.
+        let out2 = step.handle_command(
+            &Action::SelectPlayer { player_id: target_id.clone() },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert_eq!(out2.action, StepAction::NextStep);
         let state = game.field_model.player_state(&target_id).unwrap();
-        assert!(state.is_confused(), "target should be confused");
-        assert!(game.team_home.player(&actor_id).unwrap().used_skills.contains(&SkillId::BlackInk));
+        assert!(state.is_hypnotized(), "target should be hypnotized, not merely confused");
+        assert!(!state.is_confused(), "Black Ink (BB2020) must not set the confused bit");
     }
 
     #[test]
@@ -248,9 +258,8 @@ mod tests {
 
         let mut step = StepBlackInk::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
-        // Should still find the target (no distracted filter in BB2020)
-        assert_eq!(out.action, StepAction::NextStep);
-        assert!(step.player_id.is_some(), "should have auto-selected the distracted opponent");
+        // Should still find the target (no distracted filter in BB2020) and wait for the dialog.
+        assert_eq!(out.action, StepAction::Continue);
     }
 
     #[test]

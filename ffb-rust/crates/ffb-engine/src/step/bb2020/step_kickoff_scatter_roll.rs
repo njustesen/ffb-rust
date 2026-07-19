@@ -188,10 +188,11 @@ impl StepKickoffScatterRoll {
                 })
             } else { None };
 
-            // Java: UtilServerGame.handleChefRolls — BB2020 runs chef rolls at first kickoff
-            let first_turn = game.turn_data_home.first_turn_after_kickoff
-                || game.turn_data_away.first_turn_after_kickoff;
-            if game.half < 3 && first_turn {
+            // Java: if (game.getHalf() < 3 && turnDataHome.getTurnNr() == 0 && turnDataAway.getTurnNr() == 0)
+            //   → UtilServerGame.handleChefRolls — fires exactly once, at the very first kickoff of the half
+            //   (turnNr is reset to 0 for both teams at the start of each half and only increments on EndTurn).
+            let first_kickoff_of_half = game.turn_data_home.turn_nr == 0 && game.turn_data_away.turn_nr == 0;
+            if game.half < 3 && first_kickoff_of_half {
                 let _chef_events = StateMechanic::new().handle_chef_rolls(game, rng);
                 // Chef GameEvents are handled downstream; no report needed here.
             }
@@ -328,6 +329,45 @@ mod tests {
             assert!(FieldCoordinateBounds::FIELD.is_in_bounds(coord),
                 "Ball placed off-field at {:?}", coord);
         }
+    }
+
+    #[test]
+    fn chef_rolls_fire_on_the_very_first_kickoff_of_the_game() {
+        // Java: gate is `game.getHalf() < 3 && turnDataHome.getTurnNr() == 0 && turnDataAway.getTurnNr() == 0`.
+        // On a freshly-started game (half 1, turn_nr 0 for both teams — the actual game state at the
+        // very first kickoff), this must fire. The old Rust code gated on `first_turn_after_kickoff`,
+        // which defaults to `false` on a fresh game and is only set `true` by StepEndTurn's KICKOFF
+        // case *after* the first drive's EndTurn — so it would incorrectly skip chef rolls on the
+        // game's actual first kickoff.
+        use ffb_model::inducement::inducement::Inducement;
+        use ffb_model::inducement::usage::Usage;
+
+        fn run(seed: u64) -> i32 {
+            let mut game = make_game();
+            game.turn_data_home.inducement_set.add_inducement(
+                Inducement::new("masterChef", 2, vec![Usage::STEAL_REROLL]),
+            );
+            game.turn_data_away.rerolls = 3;
+            let mut step = StepKickoffScatterRoll::new();
+            step.kickoff_start_coordinate = Some(FieldCoordinate::new(13, 7));
+            step.start(&mut game, &mut GameRng::new(seed));
+            game.turn_data_away.rerolls
+        }
+
+        {
+            let game = make_game();
+            assert_eq!(game.half, 1);
+            assert_eq!(game.turn_data_home.turn_nr, 0);
+            assert_eq!(game.turn_data_away.turn_nr, 0);
+            assert!(!game.turn_data_home.first_turn_after_kickoff, "fresh game has this flag false");
+        }
+
+        // Find a seed where the 2 home chefs steal at least one away re-roll.
+        let stolen_seed = (0u64..2000).find(|&s| run(s) < 3);
+        let remaining = stolen_seed.map(run)
+            .expect("expected at least one seed where master chefs steal a re-roll");
+        assert!(remaining < 3,
+            "master chef rolls must fire on the game's first kickoff and steal an away re-roll");
     }
 
     #[test]

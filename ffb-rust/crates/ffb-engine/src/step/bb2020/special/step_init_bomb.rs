@@ -107,6 +107,12 @@ impl Step for StepInitBomb {
                 *use_skill,
                 SkillUse::FORCE_BOMB_EXPLOSION,
             ));
+            // Java: if (explodeSkillUsed) actingPlayer.markSkillUsed(clientCommandUseSkill.getSkill())
+            if *use_skill {
+                if let Some(pid) = game.acting_player.player_id.clone() {
+                    game.mark_skill_used(&pid, *skill_id);
+                }
+            }
         }
         self.execute_step(game, rng)
     }
@@ -272,6 +278,26 @@ mod tests {
 
         // Java: addReport(new ReportSkillUse(..., SkillUse.FORCE_BOMB_EXPLOSION))
         assert!(game.report_list.has_report(ReportId::SKILL_USE));
+    }
+
+    #[test]
+    fn skill_marked_used_when_explode_skill_used_true() {
+        use ffb_mechanics::skills::SkillId;
+        use ffb_model::model::player::Player;
+        let mut step = StepInitBomb::new();
+        assert!(step.set_parameter(&StepParameter::CatcherId(Some("player-6".to_string()))));
+
+        let mut game = make_game();
+        let pid = "player-6".to_string();
+        game.team_home.players.push(Player { id: pid.clone(), ..Default::default() });
+        game.acting_player.player_id = Some(pid.clone());
+        let mut rng = GameRng::new(0);
+        let action = Action::UseSkill { skill_id: SkillId::Bombardier, use_skill: true };
+        step.handle_command(&action, &mut game, &mut rng);
+
+        // Java: if (explodeSkillUsed) actingPlayer.markSkillUsed(clientCommandUseSkill.getSkill())
+        let player = game.player(&pid).expect("player exists");
+        assert!(player.used_skills.contains(&SkillId::Bombardier));
     }
 
     #[test]

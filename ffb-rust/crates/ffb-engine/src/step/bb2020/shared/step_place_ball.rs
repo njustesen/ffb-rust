@@ -82,11 +82,18 @@ impl Step for StepPlaceBall {
 
 impl StepPlaceBall {
     /// Java: executeStep() with Phase::ASK fast-path.
+    ///
+    /// Java only publishes DROPPED_BALL_CARRIER (always `null`) from `leave()`, which is
+    /// reached at the end of the SELECT/PLACE/DONE phases — NOT from the two early-return
+    /// guards (`playerId == null || mode != SCATTER_BALL` in executeStep(), or
+    /// `skill == null || cannotUseSkill` in setup()), which just set NEXT_STEP and return
+    /// without touching the parameter at all.
     fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: if (playerId == null || catchScatterThrowInMode != SCATTER_BALL) → NEXT_STEP
+        // (no DROPPED_BALL_CARRIER publish)
         let player_id = match self.player_id.as_deref() {
             Some(id) if self.catch_scatter_throw_in_mode == Some(CatchScatterThrowInMode::ScatterBall) => id,
-            _ => return StepOutcome::next().publish(StepParameter::DroppedBallCarrier(None)),
+            _ => return StepOutcome::next(),
         };
 
         // Java Phase::ASK → setup(): check canPlaceBallWhenKnockedDownOrPlacedProne skill.
@@ -102,12 +109,13 @@ impl StepPlaceBall {
         };
 
         if !can_use {
-            // No skill or state prevents use → skip directly.
-            return StepOutcome::next().publish(StepParameter::DroppedBallCarrier(None));
+            // Java: setup() returns early (skill == null || cannotUseSkill) — no publish.
+            return StepOutcome::next();
         }
 
         // Skill available but dialog infra not yet ported: auto-decline (conservative).
-        // Java would show DialogSkillUseParameter and wait for CLIENT_USE_SKILL response.
+        // Java would show DialogSkillUseParameter and wait for CLIENT_USE_SKILL response;
+        // a decline reaches Phase::DONE → leave(), which DOES publish DROPPED_BALL_CARRIER=null.
         StepOutcome::next().publish(StepParameter::DroppedBallCarrier(None))
     }
 }
@@ -134,9 +142,52 @@ mod tests {
     }
 
     #[test]
-    fn publishes_dropped_ball_carrier() {
+    fn no_player_id_does_not_publish_dropped_ball_carrier() {
+        // Regression: Java's executeStep() early-return guard (playerId == null ||
+        // mode != SCATTER_BALL) just sets NEXT_STEP and returns — it never touches
+        // DROPPED_BALL_CARRIER. The old Rust code incorrectly published
+        // DroppedBallCarrier(None) unconditionally, even when playerId was never set.
         let mut game = make_game();
         let mut step = StepPlaceBall::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            !out.published.iter().any(|p| matches!(p, StepParameter::DroppedBallCarrier(_))),
+            "must not publish DroppedBallCarrier when playerId was never set"
+        );
+    }
+
+    #[test]
+    fn no_skill_available_does_not_publish_dropped_ball_carrier() {
+        // Regression: Java's setup() early-return guard (skill == null || cannotUseSkill)
+        // also just sets NEXT_STEP without touching DROPPED_BALL_CARRIER.
+        let mut game = make_game();
+        let mut step = StepPlaceBall::new();
+        step.player_id = Some("p1".into());
+        step.catch_scatter_throw_in_mode = Some(CatchScatterThrowInMode::ScatterBall);
+        // "p1" has no skills at all, so canPlaceBallWhenKnockedDownOrPlacedProne is absent.
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            !out.published.iter().any(|p| matches!(p, StepParameter::DroppedBallCarrier(_))),
+            "must not publish DroppedBallCarrier when the placement skill is unavailable"
+        );
+    }
+
+    #[test]
+    fn skill_available_auto_decline_publishes_dropped_ball_carrier_none() {
+        // When the skill IS available (and the dialog auto-declines, since Select/Place
+        // phases aren't ported), Java's decline path reaches Phase::DONE -> leave(), which
+        // DOES publish DROPPED_BALL_CARRIER = null.
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = make_game();
+        let mut player = ffb_model::model::player::Player::default();
+        player.id = "p1".into();
+        player.starting_skills.push(SkillWithValue::new(SkillId::SafePairOfHands));
+        game.team_home.players.push(player);
+        game.field_model.set_player_state("p1", ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING));
+        let mut step = StepPlaceBall::new();
+        step.player_id = Some("p1".into());
+        step.catch_scatter_throw_in_mode = Some(CatchScatterThrowInMode::ScatterBall);
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::DroppedBallCarrier(None))));
     }

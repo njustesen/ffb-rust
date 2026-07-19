@@ -484,6 +484,27 @@ impl StepApplyKickoffResult {
         if game.turn_mode == TurnMode::QuickSnap {
             if let (Some(ref player_id), Some(coord)) = (self.moved_player.clone(), self.to_coordinate) {
                 if self.nr_of_moved_players < self.nr_of_players_allowed {
+                    // Java: normalizedToCoordinate = home team ? toCoordinate : toCoordinate.transform()
+                    let is_home = game.team_home.player(player_id).is_some();
+                    let normalized = if is_home { coord } else { coord.transform() };
+
+                    // Java: if (playerCoordinate.equals(normalizedToCoordinate)) → CONTINUE, no-op.
+                    let already_there = game.field_model.player_coordinate(player_id) == Some(normalized);
+                    // Java: Player otherPlayer = fieldModel.getPlayer(normalizedToCoordinate);
+                    //   if present → reset both players' positions (client resync) and CONTINUE.
+                    let occupied = !already_there && game.field_model.player_at(normalized)
+                        .map(|other| other != player_id)
+                        .unwrap_or(false);
+
+                    self.moved_player = None;
+                    self.to_coordinate = None;
+
+                    if already_there || occupied {
+                        // no-op: FieldModel.sendPosition(...) client-resync calls — headless has no
+                        // client to resync; the authoritative state is simply left unchanged.
+                        return StepOutcome::cont();
+                    }
+
                     self.nr_of_moved_players += 1;
                     UtilServerSetup::setup_player(game, player_id, coord);
                     let active_on_field = count_active_players_on_field(game);
@@ -492,9 +513,40 @@ impl StepApplyKickoffResult {
                         self.nr_of_moved_players,
                         self.nr_of_players_allowed,
                     ));
+
+                    let mut exhausted_event = None;
                     if self.nr_of_moved_players == self.nr_of_players_allowed {
                         self.end_kickoff = true;
+                        exhausted_event = Some(GameEvent::KickoffSequenceActivationsExhausted { limit_reached: true });
+                    } else if active_on_field == 0 {
+                        // Java: else if (activePlayersOnField == 0) { fEndKickoff = true; addReport(Exhausted(false)); }
+                        self.end_kickoff = true;
+                        exhausted_event = Some(GameEvent::KickoffSequenceActivationsExhausted { limit_reached: false });
                     }
+
+                    // Java: pushCurrentStepOnStack(); push Sequence(TRAP_DOOR, APOTHECARY(TRAP_DOOR));
+                    //   publishParameter(PLAYER_ENTERING_SQUARE, movedPlayer); setNextAction(NEXT_STEP)
+                    let trap_door_seq = vec![
+                        SequenceStep::new(StepId::TrapDoor),
+                        SequenceStep::with_params(
+                            StepId::Apothecary,
+                            vec![StepParameter::ApothecaryMode(ffb_model::enums::ApothecaryMode::TrapDoor)],
+                        ),
+                    ];
+                    let mut out = StepOutcome::repeat()
+                        .push_seq(trap_door_seq)
+                        .publish(StepParameter::PlayerEnteringSquare(player_id.clone()));
+                    if let Some(ev) = exhausted_event {
+                        out = out.with_event(ev);
+                    }
+                    // Java: if (fEndKickoff) { endQuickSnap(game); } — called synchronously right after
+                    // pushing the TRAP_DOOR/APOTHECARY sequence, so the side/mode flip happens immediately
+                    // even though that sub-sequence runs before this step is popped again.
+                    if self.end_kickoff {
+                        game.home_playing = !game.home_playing;
+                        game.turn_mode = TurnMode::Kickoff;
+                    }
+                    return out;
                 }
                 self.moved_player = None;
                 self.to_coordinate = None;
@@ -575,8 +627,12 @@ impl StepApplyKickoffResult {
         let mut targeted_ids: Vec<String> = Vec::new();
         // Collect eject sequences to push (one per ejected player).
         let mut eject_seqs: Vec<Vec<SequenceStep>> = Vec::new();
+        // Params published from a successful stunPlayer() call (Java: publishParameters(...)).
+        let mut stun_params: Vec<StepParameter> = Vec::new();
         // ParametersToConsume discriminants for EjectPlayer's ConsumeParameter step.
+        // Java: {{ add(END_TURN); add(CATCH_SCATTER_THROW_IN_MODE); add(FOULER_HAS_BALL); }}
         let params_to_consume = vec![
+            std::mem::discriminant(&StepParameter::EndTurn(false)),
             std::mem::discriminant(&StepParameter::CatchScatterThrowInMode(
                 ffb_model::model::catch_scatter_throw_in_mode::CatchScatterThrowInMode::CatchBomb)),
             std::mem::discriminant(&StepParameter::FoulerHasBall(false)),
@@ -587,10 +643,12 @@ impl StepApplyKickoffResult {
             if let Some(home_player) = Self::random_player_on_field(game, rng, true) {
                 targeted_ids.push(home_player.clone());
                 let ref_roll = rng.d6();
+                // Java: getResult().addReport(new ReportOfficiousRefRoll(roll, playerId))
+                game.report_list.add(ffb_model::report::bb2020::report_officious_ref_roll::ReportOfficiousRefRoll::new(ref_roll, home_player.clone()));
                 if ref_roll == 1 {
                     eject_seqs.push(Self::build_eject_seq(&home_player, params_to_consume.clone()));
                 } else {
-                    util_server_injury::stun_player(game, &home_player);
+                    stun_params.extend(util_server_injury::stun_player(game, &home_player));
                 }
             }
         }
@@ -599,10 +657,11 @@ impl StepApplyKickoffResult {
             if let Some(away_player) = Self::random_player_on_field(game, rng, false) {
                 targeted_ids.push(away_player.clone());
                 let ref_roll = rng.d6();
+                game.report_list.add(ffb_model::report::bb2020::report_officious_ref_roll::ReportOfficiousRefRoll::new(ref_roll, away_player.clone()));
                 if ref_roll == 1 {
                     eject_seqs.push(Self::build_eject_seq(&away_player, params_to_consume.clone()));
                 } else {
-                    util_server_injury::stun_player(game, &away_player);
+                    stun_params.extend(util_server_injury::stun_player(game, &away_player));
                 }
             }
         }
@@ -626,6 +685,10 @@ impl StepApplyKickoffResult {
             });
         for seq in eject_seqs {
             outcome = outcome.push_seq(seq);
+        }
+        // Java: publishParameters(UtilServerInjury.stunPlayer(this, player, apothecaryMode))
+        for p in stun_params {
+            outcome = outcome.publish(p);
         }
         outcome
     }
@@ -874,6 +937,62 @@ mod tests {
         assert!(has_team_id, "SET_ACTING_TEAM should carry home team id when home_playing=true");
     }
 
+    #[test]
+    fn officious_ref_adds_roll_report_and_propagates_stun_params() {
+        // Java: insertSteps() always addReport(new ReportOfficiousRefRoll(roll, playerId)) for a
+        // targeted player, and on a non-eject roll, publishParameters(UtilServerInjury.stunPlayer(...)).
+        use ffb_model::enums::{PS_STANDING, PlayerState, PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+        use ffb_model::report::report_id::ReportId;
+
+        let mut step = make_step();
+        let mut game = make_game();
+        game.home_playing = true;
+        // fan_factor 0 for both teams → both totals equal on any roll → both teams targeted.
+        let home_player = Player {
+            id: "hp1".into(), name: "hp1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None, is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(home_player);
+        let coord = FieldCoordinate::new(5, 7);
+        game.field_model.set_player_coordinate("hp1", coord);
+        game.field_model.set_player_state("hp1", PlayerState::new(PS_STANDING));
+        // hp1 is the acting-team ball carrier, so stunning it triggers a ball scatter + end turn —
+        // observable evidence that stunPlayer's returned StepParameters are now published, not discarded.
+        game.field_model.ball_coordinate = Some(coord);
+        game.acting_player.player_id = Some("hp1".into());
+
+        step.kickoff_result = Some(KickoffResult::OficiousRef);
+
+        // Find a seed where the per-player eject roll is NOT 1 (so stunPlayer runs instead of
+        // the eject-sequence branch).
+        let seed = (0u64..2000).find(|&s| {
+            let mut rng = GameRng::new(s);
+            let _roll_home = rng.d6();
+            let _roll_away = rng.d6();
+            let ref_roll = rng.d6();
+            ref_roll != 1
+        }).expect("seed not found");
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+
+        assert!(game.report_list.has_report(ReportId::OFFICIOUS_REF_ROLL),
+            "ReportOfficiousRefRoll must be added for a targeted player");
+        let state = game.field_model.player_state("hp1").unwrap();
+        assert_eq!(state.base(), ffb_model::enums::PS_STUNNED,
+            "targeted player must be stunned when the eject roll is not 1");
+        // Java: publishParameters(UtilServerInjury.stunPlayer(...)) — the ball-scatter parameter
+        // must appear on the step outcome, proving the returned params are no longer discarded.
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(_))),
+            "stunPlayer's returned CATCH_SCATTER_THROW_IN_MODE parameter must be published");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "stunPlayer's returned END_TURN parameter must be published when the ball carrier is stunned");
+    }
+
     // ── GetTheRef tests ───────────────────────────────────────────────────────
 
     #[test]
@@ -953,5 +1072,94 @@ mod tests {
         // away1 is adjacent to home1 (kicking team with TZ), so should be deactivated
         let away1_state = game.field_model.player_state("away1").expect("state");
         assert!(!away1_state.is_active(), "away player in tackle zone should be deactivated by QuickSnap");
+    }
+
+    fn add_active_player(game: &mut Game, home: bool, id: &str, coord: FieldCoordinate) {
+        use ffb_model::enums::{PS_STANDING, PlayerState, PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+        let player = Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None, ..Default::default()
+        };
+        if home { game.team_home.players.push(player); } else { game.team_away.players.push(player); }
+        game.field_model.set_player_coordinate(id, coord);
+        game.field_model.set_player_state(id, PlayerState::new(PS_STANDING).change_active(true));
+    }
+
+    #[test]
+    fn quick_snap_move_pushes_trap_door_and_apothecary_sequence() {
+        // Java: handleQuickSnap, after a successful move, always does
+        //   pushCurrentStepOnStack(); push Sequence(TRAP_DOOR, APOTHECARY(APOTHECARY_MODE=TRAP_DOOR));
+        //   publishParameter(PLAYER_ENTERING_SQUARE, movedPlayer); setNextAction(NEXT_STEP)
+        use ffb_model::enums::ApothecaryMode;
+        let mut step = make_step();
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_mode = TurnMode::QuickSnap;
+        add_active_player(&mut game, true, "home1", FieldCoordinate::new(3, 3));
+
+        step.nr_of_players_allowed = 5;
+        step.nr_of_moved_players = 0;
+        step.moved_player = Some("home1".into());
+        step.to_coordinate = Some(FieldCoordinate::new(10, 10));
+
+        let out = step.handle_quick_snap(&mut game, &mut GameRng::new(0));
+
+        assert_eq!(out.action, StepAction::Repeat,
+            "successful move must push-self-and-sequence (Repeat), not silently drop the trapdoor check");
+        assert_eq!(out.pushes.len(), 1);
+        let seq = &out.pushes[0];
+        assert_eq!(seq.len(), 2);
+        assert_eq!(seq[0].step_id, StepId::TrapDoor);
+        assert_eq!(seq[1].step_id, StepId::Apothecary);
+        assert!(seq[1].params.iter().any(|p| matches!(p, StepParameter::ApothecaryMode(ApothecaryMode::TrapDoor))));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::PlayerEnteringSquare(id) if id == "home1")));
+    }
+
+    #[test]
+    fn quick_snap_ends_when_no_active_players_remain_after_move() {
+        // Java: else if (activePlayersOnField == 0) { fEndKickoff = true; addReport(Exhausted(false)); }
+        let mut step = make_step();
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_mode = TurnMode::QuickSnap;
+        add_active_player(&mut game, true, "home1", FieldCoordinate::new(3, 3));
+
+        // Only one active player and moving it off the FIELD bounds (into the dugout region)
+        // makes active_on_field 0 without having reached nr_of_players_allowed.
+        step.nr_of_players_allowed = 10;
+        step.nr_of_moved_players = 0;
+        step.moved_player = Some("home1".into());
+        step.to_coordinate = Some(FieldCoordinate::new(0, 0));
+
+        step.handle_quick_snap(&mut game, &mut GameRng::new(0));
+
+        assert!(step.end_kickoff, "end_kickoff must be set once no active players remain on the field");
+        // The synchronous endQuickSnap() flip must have happened immediately.
+        assert_eq!(game.turn_mode, TurnMode::Kickoff);
+    }
+
+    #[test]
+    fn quick_snap_move_already_at_target_is_a_no_op() {
+        // Java: if (playerCoordinate.equals(normalizedToCoordinate)) → CONTINUE, no state change.
+        let mut step = make_step();
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_mode = TurnMode::QuickSnap;
+        let coord = FieldCoordinate::new(3, 3);
+        add_active_player(&mut game, true, "home1", coord);
+
+        step.nr_of_players_allowed = 5;
+        step.nr_of_moved_players = 0;
+        step.moved_player = Some("home1".into());
+        step.to_coordinate = Some(coord);
+
+        let out = step.handle_quick_snap(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue);
+        assert_eq!(step.nr_of_moved_players, 0, "no move should be counted when already at target");
     }
 }

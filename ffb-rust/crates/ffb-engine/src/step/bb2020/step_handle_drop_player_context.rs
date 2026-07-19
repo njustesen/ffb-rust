@@ -10,6 +10,17 @@ use crate::step::util_server_injury::drop_player;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2020.StepHandleDropPlayerContext.
 /// Identical in logic to the BB2025 version — see bb2025/shared/step_handle_drop_player_context.rs.
+///
+/// Known gap (matches the BB2025 sibling, which documents this explicitly as "Stubbed"):
+/// Java's `executeStep()` first checks
+/// `injuryResult.injuryContext().getModifiedInjuryContext() != null && !injuryResult.isAlreadyReported()`
+/// — when a conditional-reroll skill (e.g. Old Pro) has produced a `ModifiedInjuryContext`, it reports
+/// the original injury, shows `DialogSkillUseParameter`, and waits (`CONTINUE`) for the coach's
+/// use/decline response before resolving via `swapToAlternateContext` / pushing a `PRO` re-roll
+/// sub-sequence (`handleCommand`'s `CLIENT_USE_SKILL` branch). That whole conditional-reroll cycle
+/// requires `Sequence`/`StepId::Pro` wiring and a skill→modification lookup that don't exist in this
+/// crate yet; wiring it correctly spans more than this file and is left for a follow-up rather than
+/// invented here. `execute_step` below always falls through to the unconditional drop path.
 pub struct StepHandleDropPlayerContext {
     pub drop_player_context: Option<Box<DropPlayerContext>>,
     pub re_rolled_action: Option<String>,

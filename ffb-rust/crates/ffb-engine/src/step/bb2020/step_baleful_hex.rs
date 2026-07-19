@@ -190,6 +190,12 @@ impl StepBalefulHex {
     /// ThrowTeamMate → pass_used; includes KickEmBlitz and KickTeamMate; no PUNT case.
     fn mark_action_used(game: &mut Game, player_id: &str) {
         let action = game.acting_player.player_action;
+        // Java: case FOUL/FOUL_MOVE: if (!actingPlayer.getPlayer().hasSkillProperty(allowsAdditionalFoul))
+        //   setFoulUsed(true) — guard is evaluated before mutably borrowing turn_data.
+        let allows_additional_foul = matches!(action, Some(PlayerAction::Foul | PlayerAction::FoulMove))
+            && game.player(player_id)
+                .map(|p| p.has_skill_property(ffb_model::model::property::NamedProperties::ALLOWS_ADDITIONAL_FOUL))
+                .unwrap_or(false);
         let turn = game.turn_data_mut();
         match action {
             Some(PlayerAction::Blitz | PlayerAction::BlitzMove | PlayerAction::KickEmBlitz) => turn.blitz_used = true,
@@ -199,10 +205,13 @@ impl StepBalefulHex {
                 PlayerAction::ThrowTeamMate | PlayerAction::ThrowTeamMateMove
             ) => turn.pass_used = true,
             Some(PlayerAction::HandOver | PlayerAction::HandOverMove) => turn.hand_over_used = true,
-            Some(PlayerAction::Foul | PlayerAction::FoulMove) => turn.foul_used = true,
+            Some(PlayerAction::Foul | PlayerAction::FoulMove) => {
+                if !allows_additional_foul {
+                    turn.foul_used = true;
+                }
+            }
             _ => {}
         }
-        let _ = player_id;
     }
 
     fn mark_skill_used(game: &mut Game, player_id: &str) {
@@ -362,6 +371,19 @@ mod tests {
             "expected BALEFUL_HEX roll report on successful roll");
         assert!(game.report_list.has_report(ReportId::SKILL_USE),
             "expected SKILL_USE report when eligible target found");
+    }
+
+    #[test]
+    fn mark_action_used_foul_sets_foul_used_without_allows_additional_foul_skill() {
+        // Java: markActionUsed FOUL case only sets foulUsed when the acting player
+        // lacks a skill with property allowsAdditionalFoul. No roster skill currently
+        // grants that property, so this exercises the "false" arm (matches the
+        // precedent baseline test in step_animal_savagery.rs's cancel_player_action_bb2020).
+        let (mut game, _) = make_game_bh();
+        game.acting_player.player_action = Some(PlayerAction::Foul);
+        StepBalefulHex::mark_action_used(&mut game, "actor");
+        assert!(game.turn_data_mut().foul_used,
+            "foul_used must be set for a Foul action when the player has no allowsAdditionalFoul skill");
     }
 
     #[test]

@@ -75,12 +75,19 @@ impl Step for StepThenIStartedBlastin {
             Action::SelectPlayer { player_id } => {
                 game.defender_id = Some(player_id.clone());
 
-                let player_is_on_active_team = if game.home_playing {
-                    game.team_home.player(player_id).is_some()
-                } else {
-                    game.team_away.player(player_id).is_some()
-                };
-                if player_is_on_active_team {
+                // Java: game.playingTeamHasActingPLayer() — actingTeam.hasPlayer(actingPlayer.getPlayer()).
+                // This checks whether the currently-playing team (per home_playing) contains the
+                // ORIGINAL SKILL USER (acting player), not the just-selected target — home_playing
+                // gets flipped on a failed roll so the opponent picks the auto-hit target next.
+                let acting_player_id = game.acting_player.player_id.clone();
+                let playing_team_has_acting_player = acting_player_id.as_deref().map(|id| {
+                    if game.home_playing {
+                        game.team_home.player(id).is_some()
+                    } else {
+                        game.team_away.player(id).is_some()
+                    }
+                }).unwrap_or(false);
+                if playing_team_has_acting_player {
                     // Java: playingTeamHasActingPlayer → executeStep
                     return self.execute_step(game, rng);
                 } else {
@@ -422,8 +429,13 @@ mod tests {
     }
 
     #[test]
-    fn select_opponent_in_tisb_mode_publishes_drop_player_context() {
-        let (mut game, _) = make_game();
+    fn select_opponent_after_flip_takes_auto_hit_path() {
+        // Java: playingTeamHasActingPLayer() == actingTeam.hasPlayer(actingPlayer.getPlayer()) —
+        // depends on the ORIGINAL SKILL USER's team membership, not the selected target's.
+        // Simulates the post-failed-roll state (fail() flipped home_playing) where the acting
+        // player (home) no longer belongs to the currently-"playing" (away) team, so target
+        // selection takes the auto-hit branch (no roll).
+        let (mut game, _) = make_game(); // actor is home player
         let def_id = "defender".to_string();
         game.team_away.players.push(make_plain_player(&def_id));
         game.field_model.set_player_state(&def_id, PlayerState::new(PS_STANDING).change_active(true));
@@ -431,10 +443,9 @@ mod tests {
 
         game.turn_mode = TurnMode::ThenIStartedBlastin;
         game.last_turn_mode = Some(TurnMode::Regular);
+        game.home_playing = false; // flipped by a prior failed roll; actor (home) no longer "playing"
 
         let mut step = StepThenIStartedBlastin::new();
-        // Simulate selecting an opponent on the away team (not acting team)
-        // This triggers the auto-hit path (else branch in Java)
         let out = step.handle_command(
             &Action::SelectPlayer { player_id: def_id.clone() },
             &mut game,
@@ -442,7 +453,50 @@ mod tests {
         );
 
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::DropPlayerContext(_))),
-            "selecting opponent should publish DropPlayerContext via hitPlayer");
+            "selecting opponent while acting player's team isn't 'playing' should auto-hit via hitPlayer");
+    }
+
+    #[test]
+    fn select_opponent_on_first_selection_goes_through_roll_not_auto_hit() {
+        // Regression test: before the fix, the branch condition checked whether the
+        // *selected defender* belonged to the active team instead of the *original skill
+        // user* (Java: game.playingTeamHasActingPLayer()). On the very first target
+        // selection (no prior failed-roll flip), the acting player's own team IS the
+        // playing team, so this must go through the roll-based executeStep path, NOT the
+        // instant auto-hit path — meaning a failing roll must NOT publish DropPlayerContext
+        // immediately, it must instead ask for a re-roll or flip+continue.
+        let (mut game, _actor_id) = make_game(); // home_playing=true, actor is home player
+        let def_id = "defender".to_string();
+        game.team_away.players.push(make_plain_player(&def_id));
+        game.field_model.set_player_state(&def_id, PlayerState::new(PS_STANDING).change_active(true));
+        game.field_model.set_player_coordinate(&def_id, FieldCoordinate::new(15, 7));
+
+        game.turn_mode = TurnMode::ThenIStartedBlastin;
+        game.last_turn_mode = Some(TurnMode::Regular);
+        // home_playing stays true (default from make_game): acting player's own team IS playing.
+
+        // Find a seed whose roll fails (< 3) and isn't a fumble (roll != 1), so the correct
+        // (fixed) behavior is "flip + Continue", never touching DropPlayerContext.
+        for seed in 0u64..1000 {
+            let mut probe = GameRng::new(seed);
+            let roll = probe.d6();
+            if (2..3).contains(&roll) {
+                let mut step = StepThenIStartedBlastin::new();
+                let out = step.handle_command(
+                    &Action::SelectPlayer { player_id: def_id.clone() },
+                    &mut game,
+                    &mut GameRng::new(seed),
+                );
+                assert!(
+                    !out.published.iter().any(|p| matches!(p, StepParameter::DropPlayerContext(_))),
+                    "seed={seed} roll={roll}: first selection with a failing (non-fumble) roll must \
+                     go through the roll-based path (flip+Continue), not auto-hit"
+                );
+                assert_eq!(out.action, StepAction::Continue);
+                return;
+            }
+        }
+        panic!("no seed found with roll == 2");
     }
 
     #[test]

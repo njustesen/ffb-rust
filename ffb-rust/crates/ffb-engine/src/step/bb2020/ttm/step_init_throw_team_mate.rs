@@ -21,6 +21,8 @@ use ffb_model::enums::{PlayerAction, PS_PICKED_UP};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_mechanics::bb2020::pass_mechanic::PassMechanic as Bb2020PassMechanic;
+use ffb_mechanics::pass_mechanic::PassMechanic as PassMechanicTrait;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 
@@ -66,8 +68,20 @@ impl StepInitThrowTeamMate {
             if let Some(target) = self.target_coordinate {
                 // Phase 2: target chosen → set pass coordinate.
                 game.pass_coordinate = Some(target);
-                // client-only: UtilRangeRuler.createRangeRuler — client display only; always proceeds
-                return StepOutcome::next();
+                // Java: game.getFieldModel().setRangeRuler(UtilRangeRuler.createRangeRuler(...));
+                //       if (rangeRuler != null) NEXT_STEP;  (else: falls through, no next action set → waits)
+                // The ruler object itself is client-side display only, but its null-vs-not-null gate
+                // (legal TTM throw distance) is real: an out-of-range target must NOT advance.
+                let thrower_coord = game.acting_player.player_id.as_deref()
+                    .and_then(|id| game.field_model.player_coordinate(id));
+                let pass_mechanic = Bb2020PassMechanic::new();
+                let in_range = pass_mechanic
+                    .find_passing_distance(game, thrower_coord, Some(target), true)
+                    .is_some();
+                if in_range {
+                    return StepOutcome::next();
+                }
+                return StepOutcome::cont();
             } else {
                 // Phase 1: player chosen — set up defender, publish parameters.
                 let thrown_id = thrown_id.clone();
@@ -238,5 +252,42 @@ mod tests {
         let mut game = make_game();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(matches!(out.action, StepAction::NextStep));
+    }
+
+    // Java: `if (targetCoordinate != null) { ... if (rangeRuler != null) NEXT_STEP; }` — an
+    // out-of-range target (findPassingDistance returns null) must NOT advance to NEXT_STEP.
+    // Previously the Rust code always returned NEXT_STEP regardless of distance, which is a
+    // real behavioral divergence: it would let a player select a target beyond any legal
+    // TTM throw distance and still proceed.
+    #[test]
+    fn out_of_range_target_does_not_advance() {
+        let mut step = StepInitThrowTeamMate::new();
+        step.set_parameter(&StepParameter::ThrownPlayerId(Some("p1".into())));
+        step.set_parameter(&StepParameter::TargetCoordinate(FieldCoordinate::new(20, 0)));
+        let mut game = make_game();
+        add_player(&mut game, "thrower");
+        game.field_model.set_player_coordinate("thrower", FieldCoordinate::new(0, 0));
+        game.acting_player.player_id = Some("thrower".into());
+        add_player(&mut game, "p1");
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.action, StepAction::Continue),
+            "out-of-range target must not advance to NEXT_STEP, got {:?}", out.action);
+        // Java: game.setPassCoordinate(targetCoordinate) still happens unconditionally.
+        assert_eq!(game.pass_coordinate, Some(FieldCoordinate::new(20, 0)));
+    }
+
+    #[test]
+    fn in_range_target_advances_to_next_step() {
+        let mut step = StepInitThrowTeamMate::new();
+        step.set_parameter(&StepParameter::ThrownPlayerId(Some("p1".into())));
+        step.set_parameter(&StepParameter::TargetCoordinate(FieldCoordinate::new(6, 5)));
+        let mut game = make_game();
+        add_player(&mut game, "thrower");
+        game.field_model.set_player_coordinate("thrower", FieldCoordinate::new(5, 5));
+        game.acting_player.player_id = Some("thrower".into());
+        add_player(&mut game, "p1");
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.action, StepAction::NextStep),
+            "in-range target should advance to NEXT_STEP, got {:?}", out.action);
     }
 }

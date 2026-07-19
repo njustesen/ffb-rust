@@ -5,6 +5,8 @@
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2020.StepPrayers`.
 use ffb_model::events::GameEvent;
+use ffb_model::factory::bb2020::prayer_factory::PrayerFactory;
+use ffb_model::factory::prayer_factory::PrayerFactory as PrayerFactoryTrait;
 use ffb_model::model::game::Game;
 use ffb_model::option::game_option_id;
 use ffb_model::report::mixed::report_prayer_amount::ReportPrayerAmount;
@@ -65,10 +67,20 @@ impl StepPrayers {
         if prayer_amount > 0 {
             let home_team_receives = self.tv_home < self.tv_away;
 
+            // Java: PrayerFactory prayerFactory = game.getFactory(FactoryType.Factory.PRAYER);
             // Exhibition: rolls 1–8; league (INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE): rolls 1–16.
             let use_league = game.options.is_enabled(game_option_id::INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE);
-            let max_roll = if use_league { 16 } else { 8 };
-            let mut available_rolls: Vec<i32> = (1..=max_roll).collect();
+            let mut factory = PrayerFactory::new();
+            factory.initialize(use_league);
+
+            // Java: availablePrayerRolls = prayerFactory.availablePrayerRolls(receivingTeam.getInducementSet(), otherTeam.getInducementSet())
+            // — excludes prayers the receiving team already holds, and "affects both teams"
+            // prayers the opponent already holds.
+            let mut available_rolls: Vec<i32> = if home_team_receives {
+                factory.available_prayer_rolls(&game.turn_data_home.inducement_set, &game.turn_data_away.inducement_set)
+            } else {
+                factory.available_prayer_rolls(&game.turn_data_away.inducement_set, &game.turn_data_home.inducement_set)
+            };
 
             prayer_amount = prayer_amount.min(available_rolls.len() as i32);
 
@@ -261,6 +273,28 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(7));
         let seq = &out.pushes[0];
         assert_eq!(seq.len(), 16, "league mode should allow up to 16 unique prayers");
+    }
+
+    #[test]
+    fn already_held_prayer_is_excluded_from_reroll() {
+        // Home team already holds "Iron Man" (roll 4 in the exhibition table). If we force
+        // exactly 1 prayer to be drawn, the roll must never be 4 since it's already held —
+        // before the fix, StepPrayers picked from a raw 1..=8 range ignoring InducementSet
+        // state entirely, so roll 4 could be (re-)selected.
+        let mut game = make_game();
+        game.options.set("inducementPrayersCost", "50000");
+        game.turn_data_home.inducement_set.add_prayer("Iron Man");
+        let mut step = StepPrayers::new();
+        step.tv_home = 1_000_000;
+        step.tv_away = 1_050_000; // 1 prayer, home is underdog and receives it
+        // Try many seeds; roll 4 must never appear since Iron Man is already held by home.
+        for seed in 0..50u64 {
+            let mut g = game.clone();
+            let out = step.start(&mut g, &mut GameRng::new(seed));
+            let seq = &out.pushes[0];
+            let roll = seq[0].params.iter().find_map(|p| if let StepParameter::PrayerRoll(r) = p { Some(*r) } else { None }).unwrap();
+            assert_ne!(roll, 4, "already-held prayer (Iron Man, roll 4) must not be re-drawn");
+        }
     }
 
     #[test]
