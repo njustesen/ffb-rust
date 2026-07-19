@@ -1,6 +1,7 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed.special::ThinkingMansTroll.
 use crate::model::skill::skill::Skill;
-use crate::enums::{SkillCategory, SkillUsageType};
+use crate::model::re_rolled_action::ReRolledAction;
+use crate::enums::{SkillCategory, SkillUsageType, ReRollSource};
 
 pub struct ThinkingMansTroll {
     pub base: Skill,
@@ -8,7 +9,9 @@ pub struct ThinkingMansTroll {
 
 impl ThinkingMansTroll {
     pub fn new() -> Self {
-        let base = Skill::with_usage_type("Thinking Man's Troll", SkillCategory::Trait, SkillUsageType::OncePerHalf);
+        let mut base = Skill::with_usage_type("Thinking Man's Troll", SkillCategory::Trait, SkillUsageType::OncePerHalf);
+        // Java postConstruct: registerRerollSource(ReRolledActions.SINGLE_DIE, ReRollSources.THINKING_MANS_TROLL);
+        base.register_reroll_source(ReRolledAction::new("Single Die"), ReRollSource::new("Thinking Man's Troll"));
         Self { base }
     }
 }
@@ -31,4 +34,10 @@ mod tests {
     fn category_is_correct() { assert_eq!(ThinkingMansTroll::new().get_category(), SkillCategory::Trait); }
     #[test]
     fn usage_type_is_once_per_half() { assert_eq!(ThinkingMansTroll::new().skill_usage_type, SkillUsageType::OncePerHalf); }
+    #[test]
+    fn registers_single_die_reroll_source() {
+        let skill = ThinkingMansTroll::new();
+        let source = skill.base.reroll_sources.get(&ReRolledAction::new("Single Die"));
+        assert_eq!(source, Some(&ReRollSource::new("Thinking Man's Troll")));
+    }
 }

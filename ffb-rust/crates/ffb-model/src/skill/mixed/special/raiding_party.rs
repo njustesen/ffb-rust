@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed.special::RaidingParty.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, SkillUsageType};
 
 pub struct RaidingParty {
     pub base: Skill,
@@ -8,7 +8,7 @@ pub struct RaidingParty {
 
 impl RaidingParty {
     pub fn new() -> Self {
-        let base = Skill::new("Raiding Party", SkillCategory::Trait);
+        let base = Skill::with_usage_type("Raiding Party", SkillCategory::Trait, SkillUsageType::OncePerDrive);
         Self { base }
     }
 }
@@ -29,4 +29,6 @@ mod tests {
     fn name_is_correct() { assert_eq!(RaidingParty::new().get_name(), "Raiding Party"); }
     #[test]
     fn category_is_correct() { assert_eq!(RaidingParty::new().get_category(), SkillCategory::Trait); }
+    #[test]
+    fn usage_type_is_once_per_drive() { assert_eq!(RaidingParty::new().skill_usage_type, SkillUsageType::OncePerDrive); }
 }
