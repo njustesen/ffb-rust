@@ -706,8 +706,11 @@ impl SkillId {
             SkillId::Dodge => &["ignoreDefenderStumblesResult", "canRerollDodge"],
             SkillId::Fend => &["preventOpponentFollowingUp"],
             SkillId::StandFirm => &["canRefuseToBePushed"],
-            SkillId::SideStep => &["canChooseOwnPushedBackSquare"],
-            SkillId::Sidestep => &["canChooseOwnPushedBackSquare"],
+            // Java: bb2016/SideStep.postConstruct registers CancelSkillProperty(canPushBackToAnySquare) + canChooseOwnPushedBackSquare
+            SkillId::SideStep => &["cancelsCanPushBackToAnySquare", "canChooseOwnPushedBackSquare"],
+            SkillId::Sidestep => &["cancelsCanPushBackToAnySquare", "canChooseOwnPushedBackSquare"],
+            // Java: bb2016/Grab.postConstruct registers canPushBackToAnySquare + CancelSkillProperty(canChooseOwnPushedBackSquare)
+            SkillId::Grab => &["canPushBackToAnySquare", "cancelsCanChooseOwnPushedBackSquare"],
             SkillId::Shadowing => &["canFollowPlayerLeavingTacklezones"],
             // Java bb2025/EyeGouge.postConstruct: registerProperty(canRemoveOpponentAssists)
             SkillId::EyeGouge => &["canRemoveOpponentAssists"],
@@ -777,15 +780,49 @@ impl SkillId {
             SkillId::Tackle => &["cancelsCanRerollDodge", "cancelsIgnoreDefenderStumblesResult", "cancelsIgnoresDefenderStumblesResultForFirstBlock"],
             // Java: Wrestle.postConstruct registers canTakeDownPlayersWithHimOnBothDown
             SkillId::Wrestle => &["canTakeDownPlayersWithHimOnBothDown"],
-            SkillId::Swoop => &["ttmScattersInSingleDirection"],
+            // Java: bb2016/Swoop.postConstruct registers preventStuntyDodgeModifier, ttmScattersInSingleDirection,
+            //   and CancelSkillProperty(ignoreTacklezonesWhenDodging).
+            SkillId::Swoop => &["preventStuntyDodgeModifier", "ttmScattersInSingleDirection", "cancelsIgnoreTacklezonesWhenDodging"],
             // Java: bb2025/special/WisdomOfTheWhiteDwarf.postConstruct registers canGrantSkillsToTeamMates
             SkillId::WisdomOfTheWhiteDwarf => &["canGrantSkillsToTeamMates"],
             SkillId::KickTeamMate => &["canKickTeamMates"],
             SkillId::ThrowTeamMate => &["canThrowTeamMates"],
             // Java: RightStuff.postConstruct registers canBeThrown, canBeKicked, ignoreTackleWhenBlocked
             SkillId::RightStuff => &["canBeThrown", "canBeKicked", "ignoreTackleWhenBlocked"],
-            // Java: BB2020 BallAndChain registers CancelSkillProperty(inflictsConfusion) and CancelSkillProperty(canMoveBeforeBeingBlocked)
-            SkillId::BallAndChain => &["movesRandomly", "blocksLikeChainsaw", "cancelsInflictsConfusion", "cancelsCanMoveBeforeBeingBlocked"],
+            // Java: BB2020 BallAndChain registers CancelSkillProperty(inflictsConfusion) and CancelSkillProperty(canMoveBeforeBeingBlocked).
+            //   bb2016/BallAndChain.postConstruct registers a much larger set (union below): 23 direct
+            //   properties + 4 CancelSkillProperty registrations.
+            SkillId::BallAndChain => &[
+                "forceFullMovement",
+                "grabOutsideBlock",
+                "placedProneCausesInjuryRoll",
+                "flipSameTeamOpponentToOtherTeam",
+                "preventAutoMove",
+                "preventRegularBlitzAction",
+                "preventRegularBlockAction",
+                "preventRegularFoulAction",
+                "preventRegularHandOverAction",
+                "preventRegularPassAction",
+                "preventRecoverFromConcusionAction",
+                "preventRecoverFromGazeAction",
+                "preventStandUpAction",
+                "canBlockMoreThanOnce",
+                "forceFollowup",
+                "canBlockSameTeamPlayer",
+                "preventThrowTeamMateAction",
+                "preventKickTeamMateAction",
+                "goForItAfterBlock",
+                "movesRandomly",
+                "blocksDuringMove",
+                "ignoreTacklezonesWhenMoving",
+                "convertStunToKO",
+                "cancelsCanBlockMoreThanOnce",
+                "cancelsCanPileOnOpponent",
+                "cancelsForceRollBeforeBeingBlocked",
+                "cancelsInflictsConfusion",
+                "blocksLikeChainsaw",
+                "cancelsCanMoveBeforeBeingBlocked",
+            ],
             // Java: BreatheFire.postConstruct registers canPerformArmourRollInsteadOfBlockThatMightFailWithTurnover
             SkillId::BreatheFire => &["canPerformArmourRollInsteadOfBlockThatMightFailWithTurnover"],
             // Java: WildAnimal.postConstruct registers enableStandUpAndEndBlitzAction + needsToRollForActionButKeepsTacklezone
@@ -801,7 +838,21 @@ impl SkillId {
             SkillId::GiveAndGo => &["canMoveAfterQuickPass", "canMoveAfterHandOff"],
             SkillId::RunningPass => &["canMoveAfterQuickPass"],
             SkillId::DivingCatch => &["canAttemptCatchInAdjacentSquares"],
-            SkillId::NoHands => &["preventCatch"],
+            // Java: bb2016/NoHands.postConstruct registers preventCatch, preventHoldBall,
+            //   preventRegularPassAction, preventRegularHandOverAction
+            SkillId::NoHands => &["preventCatch", "preventHoldBall", "preventRegularPassAction", "preventRegularHandOverAction"],
+            // Java: bb2016/Titchy.postConstruct registers hasNoTacklezoneForDodging
+            SkillId::Titchy => &["hasNoTacklezoneForDodging"],
+            // Java: bb2016/Stakes.postConstruct registers providesStabBlockAlternative, canPerformArmourRollInsteadOfBlock, providesBlockAlternative
+            SkillId::Stakes => &["providesStabBlockAlternative", "canPerformArmourRollInsteadOfBlock", "providesBlockAlternative"],
+            // Java: bb2016/KickOffReturn.postConstruct registers canMoveDuringKickOffScatter
+            SkillId::KickOffReturn => &["canMoveDuringKickOffScatter"],
+            // Java: bb2016/Swarming.postConstruct registers canSneakExtraPlayersOntoPitch
+            SkillId::Swarming => &["canSneakExtraPlayersOntoPitch"],
+            // Java: bb2016/NervesOfSteel.postConstruct registers ignoreTacklezonesWhenPassing + ignoreTacklezonesWhenCatching
+            SkillId::NervesOfSteel => &["ignoreTacklezonesWhenPassing", "ignoreTacklezonesWhenCatching"],
+            // Java: bb2016/MonstrousMouth.postConstruct registers CancelSkillProperty(forceOpponentToDropBallOnPushback)
+            SkillId::MonstrousMouth => &["cancelsForceOpponentToDropBallOnPushback"],
             // Java: SafeThrow.postConstruct registers NamedProperties.canCancelInterceptions
             SkillId::SafeThrow => &["canCancelInterceptions"],
             // Java: VeryLongLegs.postConstruct registers CancelSkillProperty(canCancelInterceptions) (BB2016)
@@ -846,8 +897,9 @@ impl SkillId {
             SkillId::Defensive => &["cancelsCanAlwaysAssistFouls"],
             // Java: bb2020/PileDriver.postConstruct + bb2025/PileDriver.postConstruct register canFoulAfterBlock
             SkillId::PileDriver => &["canFoulAfterBlock"],
-            // Java: mixed/SecretWeapon.postConstruct registers getsSentOffAtEndOfDrive
-            SkillId::SecretWeapon => &["getsSentOffAtEndOfDrive"],
+            // Java: bb2016/SecretWeapon.postConstruct registers preventStuntyDodgeModifier, getsSentOffAtEndOfDrive,
+            //   and CancelSkillProperty(ignoreTacklezonesWhenDodging).
+            SkillId::SecretWeapon => &["preventStuntyDodgeModifier", "getsSentOffAtEndOfDrive", "cancelsIgnoreTacklezonesWhenDodging"],
             // Java: mixed/IronHardSkin.postConstruct registers cancelsReducesArmourToFixedValue + ignores properties
             SkillId::IronHardSkin => &[
                 "cancelsReducesArmourToFixedValue",
@@ -1019,5 +1071,112 @@ mod tests {
     #[test]
     fn properties_maximum_carnage_second_chainsaw() {
         assert!(SkillId::MaximumCarnage.properties().contains(&"canPerformSecondChainsawAttack"));
+    }
+
+    // ── Phase AJ bb2016 audit: previously-missing property-table entries ──────
+
+    #[test]
+    fn properties_nerves_of_steel_ignores_tacklezones() {
+        let props = SkillId::NervesOfSteel.properties();
+        assert!(props.contains(&"ignoreTacklezonesWhenPassing"));
+        assert!(props.contains(&"ignoreTacklezonesWhenCatching"));
+    }
+
+    #[test]
+    fn properties_grab_can_push_back_to_any_square() {
+        let props = SkillId::Grab.properties();
+        assert!(props.contains(&"canPushBackToAnySquare"));
+        assert!(props.contains(&"cancelsCanChooseOwnPushedBackSquare"));
+    }
+
+    #[test]
+    fn properties_side_step_cancels_grab() {
+        assert!(SkillId::SideStep.properties().contains(&"cancelsCanPushBackToAnySquare"));
+    }
+
+    #[test]
+    fn properties_swarming_can_sneak_extra_players() {
+        assert!(SkillId::Swarming.properties().contains(&"canSneakExtraPlayersOntoPitch"));
+    }
+
+    #[test]
+    fn properties_no_hands_has_four() {
+        let props = SkillId::NoHands.properties();
+        assert!(props.contains(&"preventCatch"));
+        assert!(props.contains(&"preventHoldBall"));
+        assert!(props.contains(&"preventRegularPassAction"));
+        assert!(props.contains(&"preventRegularHandOverAction"));
+    }
+
+    #[test]
+    fn properties_secret_weapon_prevents_stunty_dodge_modifier() {
+        let props = SkillId::SecretWeapon.properties();
+        assert!(props.contains(&"preventStuntyDodgeModifier"));
+        assert!(props.contains(&"cancelsIgnoreTacklezonesWhenDodging"));
+    }
+
+    #[test]
+    fn properties_swoop_prevents_stunty_dodge_modifier() {
+        let props = SkillId::Swoop.properties();
+        assert!(props.contains(&"preventStuntyDodgeModifier"));
+        assert!(props.contains(&"cancelsIgnoreTacklezonesWhenDodging"));
+    }
+
+    #[test]
+    fn properties_titchy_has_no_tacklezone_for_dodging() {
+        assert!(SkillId::Titchy.properties().contains(&"hasNoTacklezoneForDodging"));
+    }
+
+    #[test]
+    fn properties_stakes_provides_stab_block_alternative() {
+        let props = SkillId::Stakes.properties();
+        assert!(props.contains(&"providesStabBlockAlternative"));
+        assert!(props.contains(&"canPerformArmourRollInsteadOfBlock"));
+        assert!(props.contains(&"providesBlockAlternative"));
+    }
+
+    #[test]
+    fn properties_kick_off_return_can_move_during_scatter() {
+        assert!(SkillId::KickOffReturn.properties().contains(&"canMoveDuringKickOffScatter"));
+    }
+
+    #[test]
+    fn properties_monstrous_mouth_cancels_drop_ball_on_pushback() {
+        assert!(SkillId::MonstrousMouth.properties().contains(&"cancelsForceOpponentToDropBallOnPushback"));
+    }
+
+    #[test]
+    fn properties_ball_and_chain_bb2016_union_is_complete() {
+        let props = SkillId::BallAndChain.properties();
+        for expected in [
+            "forceFullMovement",
+            "grabOutsideBlock",
+            "placedProneCausesInjuryRoll",
+            "flipSameTeamOpponentToOtherTeam",
+            "preventAutoMove",
+            "preventRegularBlitzAction",
+            "preventRegularBlockAction",
+            "preventRegularFoulAction",
+            "preventRegularHandOverAction",
+            "preventRegularPassAction",
+            "preventRecoverFromConcusionAction",
+            "preventRecoverFromGazeAction",
+            "preventStandUpAction",
+            "canBlockMoreThanOnce",
+            "forceFollowup",
+            "canBlockSameTeamPlayer",
+            "preventThrowTeamMateAction",
+            "preventKickTeamMateAction",
+            "goForItAfterBlock",
+            "movesRandomly",
+            "blocksDuringMove",
+            "ignoreTacklezonesWhenMoving",
+            "convertStunToKO",
+            "cancelsCanBlockMoreThanOnce",
+            "cancelsCanPileOnOpponent",
+            "cancelsForceRollBeforeBeingBlocked",
+        ] {
+            assert!(props.contains(&expected), "BallAndChain missing property {expected}");
+        }
     }
 }

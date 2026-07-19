@@ -1,4 +1,8 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2016::SureFeet.
+// DEFERRED: Java registers `registerRerollSource(ReRolledActions.GO_FOR_IT, ReRollSources.SURE_FEET)`.
+// There is no `ReRollSource::SureFeet` variant and no SkillId-keyed reroll-source lookup table
+// anywhere in the workspace (same gap affects bb2016 Monstrous Mouth), so this is deferred
+// pending that infrastructure.
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 

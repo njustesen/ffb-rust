@@ -1,4 +1,9 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2016::MonstrousMouth.
+// DEFERRED: Java registers `registerRerollSource(ReRolledActions.CATCH, ReRollSources.MONSTROUS_MOUTH)`.
+// The `cancelsForceOpponentToDropBallOnPushback` property is now in `SkillId::properties()`
+// (Phase AJ fix), but there is no `ReRollSource::MonstrousMouth` variant and no SkillId-keyed
+// reroll-source lookup table anywhere in the workspace (same gap affects bb2016 Sure Feet), so
+// the reroll-on-failed-catch grant is deferred pending that infrastructure.
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 

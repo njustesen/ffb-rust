@@ -1,4 +1,7 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2016::SideStep.
+// DEFERRED: Java overrides `getSkillUseDescription()` with a one-line UI hint string. Rust
+// `Skill::get_skill_use_description()` exists but has no consumer anywhere in the workspace yet,
+// so an override here would be dead code. Deferred pending that UI-hint infrastructure.
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 

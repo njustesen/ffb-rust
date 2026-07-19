@@ -1,4 +1,8 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2016::SecretWeapon.
+// DEFERRED: Java overrides `evaluator()` to return `SkillValueEvaluator.ROLL`. The Rust
+// `SkillValueEvaluator` enum exists but has no consumer anywhere in the workspace yet (no
+// SkillId-keyed evaluator lookup table, unlike `properties()`), so wiring an override here would
+// be dead code. Deferred pending that infrastructure.
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 
