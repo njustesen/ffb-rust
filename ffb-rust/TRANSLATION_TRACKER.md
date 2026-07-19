@@ -29,6 +29,26 @@ This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logi
 
 ## Progress Summary
 
+**Phase AJ (2026-07-19): deleted the dead `src/skill/bb2020/special/` duplicate flagged last
+phase, then fanned out 12 parallel worktree audits (11 + 1 gap-fill) across the largest unswept
+pool, `ffb-engine/src/step/` (464 non-generator files) — fifth consecutive phase where fresh
+re-verification found real bugs in nearly everything it checked, this time including a live
+production-breaking hang in core engine infrastructure.** Tests: 17,423 → **17,736** (+313). No
+tracker status cells changed (all touched files were already `✓`; this phase is bug fixes to
+already-translated files, not new translation work). Full detail in `SESSION.md` and
+`docs/PHASE_AJ_PLAN.md`; highlights: a busy-loop hang in `driver.rs`'s core dispatch (any
+`Continue` outcome with no prompt spun forever — real engine infrastructure, not a per-skill gap);
+5 confirmed total stubs fully ported (`step_wisdom_of_the_white_dwarf.rs`,
+`step_auto_gaze_zoat.rs`, `step_then_i_started_blastin.rs`, `step_look_into_my_eyes.rs`,
+`ttm/step_swoop.rs` — Swoop's entire movement mechanic was a no-op); `step_quick_bite.rs`'s two
+scoping-flagged suspicions both confirmed real; `StepParameter::KickedPlayerCoordinate` couldn't
+carry Java's `null` sentinel across 8 files/3 editions; two whole BB2016 files
+(`step_catch_scatter_throw_in.rs`, `step_pushback.rs`) were bare BB2025 re-exports leaking the
+wrong edition's rules in; a worktree-creation failure led to one batch running twice and another
+never running at all, both caught during pre-merge coverage verification (diffing every
+worktree's changed files against the original 11 assignments) and reconciled/gap-filled before
+finalizing rather than merged blindly.
+
 **Phase AI (2026-07-19): closed all 3 named quick-win follow-ups from Phase AH, then fanned out
 10 parallel worktree audits across the largest unswept pools (`ffb-mechanics/modifiers/`,
 `ffb-model/dialog/` parameters, `ffb-engine/step/generator/`) — fourth consecutive phase where

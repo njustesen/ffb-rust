@@ -1,6 +1,117 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-19, Phase AI done — closed AH's 3 quick-win follow-ups + full sweep of the 3 largest unswept pools)
+## Current Status (2026-07-19, Phase AJ done — deleted dead bb2020/special/ duplicate + full sweep of ffb-engine/src/step/, 464 files)
+
+**Context: Phase AI closed with two open items — a dead-code decision on `skill/bb2020/special/`,
+and the need to scope a fresh area since the 3 largest previously-flagged pools were now fully
+swept.** Investigation confirmed the dead directory was a true duplicate (git history showed the
+20 Java `bb2020.special` classes translated twice in one commit, then orphaned by a same-day
+merge) — deleted outright, 0 test impact. The largest never-audited pool was identified as
+`ffb-engine/src/step/` (464 non-generator step files, the actual step-execution logic) — two
+samples during scoping already found a confirmed total stub and a likely second bug. User approved
+a full sweep in this phase, matching Phase AI's "close the whole named pool" precedent.
+
+**This is the fifth consecutive phase (AF, AG, AH, AI, AJ) where fresh re-verification found real
+bugs in nearly everything it checked** — this time the largest pool yet (464 files across 12 agent
+runs, since one worktree-creation failure had to be retried and one batch was found to have never
+run at all and needed a fresh gap-fill agent), with no sign of drying up. Tests: 17,423 →
+**17,736** (+313). 0 failures across `cargo test --workspace`; `cargo build --workspace` and
+`cargo clippy --workspace --all-targets` both clean.
+
+**Stage 1 — dead directory (foreground, quick):** confirmed via git history (`c1d74eee`,
+`7279e83f`) that `crates/ffb-model/src/skill/bb2020/special/` (20 files + `mod.rs`) was a
+byte-for-byte duplicate of the live, compiled `bb2020/*.rs` flat files, orphaned by a same-day
+merge that dropped `pub mod special;`. Deleted; `TRANSLATION_TRACKER.md`'s 20 rows (already
+re-pointed in Phase AI) were unaffected; 17,423 tests still passed.
+
+**Stage 2 — 11 parallel isolated-worktree audits, full sweep of `step/`:** split by subdirectory
+(bb2016 ×2, bb2020 ×2, bb2025 ×3, mixed ×2, core-framework+action/game/phase ×2). **Every single
+batch found real bugs.** Two coordination issues surfaced and were caught before finalizing: one
+worktree-creation attempt failed (git lock contention, same class of issue Phase AI hit) and was
+retried under the assumption it was batch 8 (mixed/) — but the *original* batch 8 attempt had
+actually succeeded under a different agent ID, so the retry became an independent duplicate audit
+of the same 34 files, while the *real* missing batch (mixed pass/shared/special/start/ttm, 35
+files including `step_quick_bite.rs`) had silently never run at all. Both were caught during
+pre-merge coverage verification (diffing every worktree's changed-file list against the original
+11 batch assignments) rather than discovered later: the duplicate was reconciled file-by-file
+against Java source rather than merged wholesale, and the truly-missing batch was launched fresh
+and completed cleanly.
+
+**Selected findings (full list in `docs/PHASE_AJ_PLAN.md`):**
+1. **A live production-breaking hang in `driver.rs`**: the core dispatch loop busy-looped forever
+   on any `Continue` outcome with no `AgentPrompt` attached, surfaced while fixing
+   `step_init_start_game.rs`'s missing both-coaches-ready gate. This is real engine infrastructure,
+   not a per-skill gap — `ffb-server::GameState::start_game()` calls the same constructor. Fixed
+   with a `waiting_for_command` flag on `DriverGameState`.
+2. **5 confirmed total stubs**, fully ported: `step_wisdom_of_the_white_dwarf.rs` (the one already
+   flagged during scoping), `step_auto_gaze_zoat.rs`, `step_then_i_started_blastin.rs`,
+   `step_look_into_my_eyes.rs`, and `ttm/step_swoop.rs` (its entire throw-scatter movement block
+   was missing — Swoop's core mechanic was a complete no-op).
+3. **`step_quick_bite.rs`** — both suspicions flagged during scoping confirmed real: a silent
+   no-op on its single-opponent path (`CLIENT_USE_SKILL` never set `player_id`, no skill-property
+   guard), and a nonsensical `home_playing == has_player` acting-team comparison instead of
+   `player.getTeam() == getActingTeam()`.
+4. **Cross-cutting infrastructure gaps**: `StepParameter::KickedPlayerCoordinate` couldn't carry
+   Java's `null` sentinel (changed to `Option<FieldCoordinate>`, rippling through 8 files across
+   3 editions); `CHAINSAW_TURNOVER`/`ALLOW_BALL_AND_CHAIN_RE_ROLL` game options were silently
+   ignored in favor of hardcoded defaults in several foul/movement files; the already-defined
+   `AgentPrompt::SwarmingPlayers` dialog was never wired, stalling any autonomous agent at that
+   decision point. Two `SkillId::properties()` table gaps (`WisdomOfTheWhiteDwarf`,
+   `ExcuseMeAreYouAZoat`) silently broke their own skills regardless of the step logic.
+5. **Systemic per-edition drift**: BB2016's `step_catch_scatter_throw_in.rs` and
+   `step_pushback.rs` were bare re-exports of the BB2025 versions, leaking edition-specific rules
+   into BB2016 play. `step_wrestle.rs` hardcoded BB2016 gating logic across all three editions
+   despite BB2020/BB2025 having genuinely different Java conditions (`oldDefenderState.
+   hasTacklezones()`, a Juggernaut-cancels-Wrestle check, a bb2025-only `REVERT_END_TURN`).
+6. Dozens of smaller but concrete divergences across every batch: wrong dice (`step_kickoff_
+   result_roll.rs` summed two dice instead of reading them individually; `step_kickoff_scatter_
+   roll.rs` rolled d8 instead of d6), dropped guard clauses, wrong constants, invented logic with
+   no Java counterpart, missing reports, and the by-now-familiar "re_roll_source never stashed"
+   bug shape recurring in 3 more files (`step_projectile_vomit.rs`, `step_move_ball_and_chain.rs`,
+   and confirmed already-fixed in `step_trap_door.rs`).
+
+**Stage 3 — reconciling the duplicate batch-8 run:** rather than merge either independent run of
+the same 34 files wholesale, diffed both against `main` file-by-file. 4 files were genuinely new
+in the duplicate (`step_play_card.rs`'s stuck-forever turn_mode, `step_drop_diving_tackler.rs`'s
+wrong jumping flag, `step_move_ball_and_chain.rs` + `abstract_step_with_re_roll.rs`'s missing
+WhirlingDervish reroll mapping, `step_tentacles.rs`'s missing report) — brought in whole. 4 files
+needed a careful blend where both runs found real, non-contradictory bugs (verified against Java
+source before combining): `step_foul.rs`/`step_foul_chainsaw.rs` kept the first run's
+`hasUnusedSkillWithProperty`/property-based-skill-match fixes *and* added the second run's
+`CHAINSAW_TURNOVER` option gating; `step_swarming.rs` kept the first run's report-class fix and
+added the second run's `AgentPrompt` wiring; `step_double_strength.rs` kept the first run's
+property-based skill lookup (confirmed more faithful to Java than the duplicate's hardcoded
+`SkillId::Indomitable` check) while adopting the second run's correct finding that Java's
+`handleCommand` never reads `isSkillUsed()` at all. The rest were already fully covered by the
+first run — no action needed.
+
+**Merge-time fixes (2 small, unrelated to any single batch's own bugs):** a type mismatch in
+`bb2025/ttm/step_end_scatter_player.rs` where one batch's textual merge of the `KickedPlayerCoordinate`
+arm predated another batch's structural type change (double-`Option` wrap, caught by `cargo build`
+immediately); a duplicate `SkillId::Wrestle` match arm from two batches independently appending
+entries near each other in `skill_id.rs` (caught by a clippy warning, not a compile error).
+
+**Honest completion estimate: still not behaviorally done.** File/method coverage remains
+~99.8–99.9%+ (0 `○`/`~` rows). Five consecutive phases (AF, AG, AH, AI, AJ) have found real bugs on
+fresh re-verification — this phase swept the single largest remaining pool and every batch found
+something, including a live hang in core engine infrastructure, not just narrow per-skill issues.
+**What's left, in priority order:**
+1. The ~305 skill files' full method-body logic (only constructor arguments were checked in a
+   prior phase) — a pool comparable in size to the largest already-swept pools.
+2. The ~137 client/server handler files (sampled clean twice across two phases, never fully swept).
+3. A small set of documented-not-fixed gaps from this phase: `sequences.rs`'s `Rules`-ignoring
+   kickoff sequences (fixing it exposed a latent `step_touchback.rs` infinite loop, reverted rather
+   than ship a regression); BB2025 `step_apothecary.rs`'s missing "Getting Even"/"Raise Dead"
+   subsystems; `step_select_blitz_target_end.rs`'s self-documented stub; Tentacles' reroll
+   resolving against the wrong team.
+4. Parity/integration testing remains the only large, entirely out-of-scope workstream — the
+   project is **not** close to fully "done" on the behavioral-correctness axis, and five straight
+   phases of fresh re-verification finding real bugs (including production-breaking ones) is now a
+   strong, repeated signal rather than a one-off.
+
+---
+
+## Prior Status (2026-07-19, Phase AI done — closed AH's 3 quick-win follow-ups + full sweep of the 3 largest unswept pools)
 
 **Context: Phase AH's closing note named 3 quick-win follow-ups plus 3 large unsampled pools
 (`ffb-mechanics/modifiers/`, dialog parameters, `step/generator/`) it had only partially swept.**
