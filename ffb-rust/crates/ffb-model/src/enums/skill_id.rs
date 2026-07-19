@@ -717,11 +717,19 @@ impl SkillId {
             // Java Animosity.postConstruct (all editions): registerProperty(hasToRollToPassBallOn)
             SkillId::Animosity => &["hasToRollToPassBallOn"],
             SkillId::HypnoticGaze => &["inflictsConfusion", "canGazeDuringMove"],
-            SkillId::Leap => &["canLeap"],
+            // Java: bb2020/Leap.postConstruct registers canLeap + failedRushForJumpAlwaysLandsInTargetSquare
+            // (the latter was missing entirely from this entry).
+            SkillId::Leap => &["canLeap", "failedRushForJumpAlwaysLandsInTargetSquare"],
+            // Java: bb2020/PogoStick.postConstruct registers canLeap, ignoreTacklezonesWhenJumping,
+            //   failedRushForJumpAlwaysLandsInTargetSquare, CancelSkillProperty(makesJumpingHarder),
+            //   and CancelSkillProperty(canAttemptToTackleJumpingPlayer) — the last two cancel
+            //   properties were missing from the union.
             SkillId::PogoStick => &[
                 "canLeap",
                 "ignoreTacklezonesWhenJumping",
                 "failedRushForJumpAlwaysLandsInTargetSquare",
+                "cancelsMakesJumpingHarder",
+                "cancelsCanAttemptToTackleJumpingPlayer",
             ],
             SkillId::Pogo => &[
                 "canLeap",
@@ -744,18 +752,31 @@ impl SkillId {
             SkillId::BoneHead => &["appliesConfusion"],
             SkillId::ReallyStupid => &["appliesConfusion", "needsToRollHighToAvoidConfusion"],
             SkillId::MightyBlow => &["affectsEitherArmourOrInjuryOnBlock"],
+            // Java: bb2020/Brawler.postConstruct registers canRerollSingleBothDown. Was previously
+            // entirely absent from this table, falling through to the empty default.
+            SkillId::Brawler => &["canRerollSingleBothDown"],
             SkillId::DirtyPlayer => &["affectsEitherArmourOrInjuryOnFoul"],
+            // Java: bb2020/Stab.postConstruct registers 4 properties, including providesMultipleBlockAlternative
             SkillId::Stab => &[
                 "canPerformArmourRollInsteadOfBlock",
                 "providesBlockAlternative",
+                "providesMultipleBlockAlternative",
                 "providesStabBlockAlternative",
             ],
+            // Java: Chainsaw.postConstruct (union across bb2016/bb2020/bb2025). bb2016-only:
+            // makesStrengthTestObsolete, needsNoDiceDecorations. bb2020+bb2025 additionally register
+            // providesBlockAlternative + providesFoulingAlternative; bb2020-only additionally adds
+            // preventStuntyDodgeModifier + cancelsIgnoreTacklezonesWhenDodging.
             SkillId::Chainsaw => &[
                 "makesStrengthTestObsolete",
                 "blocksLikeChainsaw",
                 "needsNoDiceDecorations",
+                "providesBlockAlternative",
                 "providesChainsawBlockAlternative",
                 "providesChainsawFoulingAlternative",
+                "providesFoulingAlternative",
+                "preventStuntyDodgeModifier",
+                "cancelsIgnoreTacklezonesWhenDodging",
             ],
             SkillId::Claw => &["reducesArmourToFixedValue"],
             SkillId::ThickSkull => &["convertKOToStunOn8"],
@@ -765,6 +786,9 @@ impl SkillId {
             ],
             // Java: HitAndRun.postConstruct registers only canMoveAfterBlock
             SkillId::HitAndRun => &["canMoveAfterBlock"],
+            // Java: bb2020/Fumblerooskie.postConstruct registers canDropBall. Was previously
+            // entirely absent from this table, falling through to the empty default.
+            SkillId::Fumblerooskie => &["canDropBall"],
             SkillId::QuickFoul => &["canMoveAfterFoul"],
             // Java: Pro.postConstruct registers only canRerollOncePerTurn (all editions)
             SkillId::Pro => &["canRerollOncePerTurn"],
@@ -780,24 +804,34 @@ impl SkillId {
             SkillId::Tackle => &["cancelsCanRerollDodge", "cancelsIgnoreDefenderStumblesResult", "cancelsIgnoresDefenderStumblesResultForFirstBlock"],
             // Java: Wrestle.postConstruct registers canTakeDownPlayersWithHimOnBothDown
             SkillId::Wrestle => &["canTakeDownPlayersWithHimOnBothDown"],
-            // Java: bb2016/Swoop.postConstruct registers preventStuntyDodgeModifier, ttmScattersInSingleDirection,
-            //   and CancelSkillProperty(ignoreTacklezonesWhenDodging).
+            // Java: bb2016/bb2020 Swoop.postConstruct registers preventStuntyDodgeModifier, ttmScattersInSingleDirection,
+            //   and CancelSkillProperty(ignoreTacklezonesWhenDodging) (union of both editions).
             SkillId::Swoop => &["preventStuntyDodgeModifier", "ttmScattersInSingleDirection", "cancelsIgnoreTacklezonesWhenDodging"],
             // Java: bb2025/special/WisdomOfTheWhiteDwarf.postConstruct registers canGrantSkillsToTeamMates
             SkillId::WisdomOfTheWhiteDwarf => &["canGrantSkillsToTeamMates"],
             SkillId::KickTeamMate => &["canKickTeamMates"],
             SkillId::ThrowTeamMate => &["canThrowTeamMates"],
-            // Java: RightStuff.postConstruct registers canBeThrown, canBeKicked, ignoreTackleWhenBlocked
-            SkillId::RightStuff => &["canBeThrown", "canBeKicked", "ignoreTackleWhenBlocked"],
-            // Java: BB2020 BallAndChain registers CancelSkillProperty(inflictsConfusion) and CancelSkillProperty(canMoveBeforeBeingBlocked).
-            //   bb2016/BallAndChain.postConstruct registers a much larger set (union below): 23 direct
-            //   properties + 4 CancelSkillProperty registrations.
+            // Java: bb2016/RightStuff.postConstruct registers canBeThrown, canBeKicked, ignoreTackleWhenBlocked;
+            //   bb2025/RightStuff.postConstruct registers canBeThrown, ignoreTackleWhenBlocked (no canBeKicked);
+            //   bb2020/RightStuff.postConstruct registers canBeThrownIfStrengthIs3orLess (NOT canBeThrown) +
+            //   ignoreTackleWhenBlocked — union of all three editions.
+            SkillId::RightStuff => &["canBeThrown", "canBeKicked", "ignoreTackleWhenBlocked", "canBeThrownIfStrengthIs3orLess"],
+            // Java: BallAndChain.postConstruct (union across bb2016/bb2020/bb2025, confirmed directly
+            // against all three Java sources). All editions register the core "can only move, blocks
+            // anyone in its path, dies to prone/stun" property set; bb2016-only adds
+            // forceFullMovement/grabOutsideBlock/flipSameTeamOpponentToOtherTeam, bb2020+bb2025-only add
+            // ignoreBlockAssists/preventPickup (+cancelsPreventOpponentFollowingUp/cancelsCanMoveBeforeBeingBlocked),
+            // bb2025-only additionally adds preventSecureTheBallAction. "blocksLikeChainsaw" does NOT
+            // exist in any edition's Java source — it was invented/stale and has been removed.
             SkillId::BallAndChain => &[
                 "forceFullMovement",
                 "grabOutsideBlock",
                 "placedProneCausesInjuryRoll",
                 "flipSameTeamOpponentToOtherTeam",
                 "preventAutoMove",
+                "ignoreBlockAssists",
+                "preventPickup",
+                "preventSecureTheBallAction",
                 "preventRegularBlitzAction",
                 "preventRegularBlockAction",
                 "preventRegularFoulAction",
@@ -820,7 +854,7 @@ impl SkillId {
                 "cancelsCanPileOnOpponent",
                 "cancelsForceRollBeforeBeingBlocked",
                 "cancelsInflictsConfusion",
-                "blocksLikeChainsaw",
+                "cancelsPreventOpponentFollowingUp",
                 "cancelsCanMoveBeforeBeingBlocked",
             ],
             // Java: BreatheFire.postConstruct registers canPerformArmourRollInsteadOfBlockThatMightFailWithTurnover
@@ -838,8 +872,8 @@ impl SkillId {
             SkillId::GiveAndGo => &["canMoveAfterQuickPass", "canMoveAfterHandOff"],
             SkillId::RunningPass => &["canMoveAfterQuickPass"],
             SkillId::DivingCatch => &["canAttemptCatchInAdjacentSquares"],
-            // Java: bb2016/NoHands.postConstruct registers preventCatch, preventHoldBall,
-            //   preventRegularPassAction, preventRegularHandOverAction
+            // Java: bb2016/bb2020 NoHands.postConstruct registers preventCatch, preventHoldBall,
+            //   preventRegularPassAction, preventRegularHandOverAction (union of both editions)
             SkillId::NoHands => &["preventCatch", "preventHoldBall", "preventRegularPassAction", "preventRegularHandOverAction"],
             // Java: bb2016/Titchy.postConstruct registers hasNoTacklezoneForDodging
             SkillId::Titchy => &["hasNoTacklezoneForDodging"],
@@ -851,23 +885,44 @@ impl SkillId {
             SkillId::Swarming => &["canSneakExtraPlayersOntoPitch"],
             // Java: bb2016/NervesOfSteel.postConstruct registers ignoreTacklezonesWhenPassing + ignoreTacklezonesWhenCatching
             SkillId::NervesOfSteel => &["ignoreTacklezonesWhenPassing", "ignoreTacklezonesWhenCatching"],
-            // Java: bb2016/MonstrousMouth.postConstruct registers CancelSkillProperty(forceOpponentToDropBallOnPushback)
+            // Java: bb2016/bb2020 MonstrousMouth.postConstruct registers
+            // CancelSkillProperty(forceOpponentToDropBallOnPushback) (the CATCH reroll source is
+            // handled live by ffb-engine::skill_behaviour::bb2020::monstrous_mouth_behaviour, not
+            // through this property table).
+            // NOTE: the Strip Ball / forceOpponentToDropBallOnPushback check in
+            // ffb-engine::step::action::block::util_block_sequence::init_pushback is itself stubbed
+            // out ("NamedProperties not yet implemented"), so this cancel currently has no live effect
+            // regardless — pre-existing infra gap outside this audit's scope.
             SkillId::MonstrousMouth => &["cancelsForceOpponentToDropBallOnPushback"],
             // Java: SafeThrow.postConstruct registers NamedProperties.canCancelInterceptions
             SkillId::SafeThrow => &["canCancelInterceptions"],
             // Java: VeryLongLegs.postConstruct registers CancelSkillProperty(canCancelInterceptions) (BB2016)
             //   and CancelSkillProperty(canForceInterceptionRerollOfLongPasses) (BB2020) — union of both.
             SkillId::VeryLongLegs => &["cancelsCancelInterceptions", "cancelsCanForceInterceptionRerollOfLongPasses"],
-            // Java: CloudBurster (BB2020) registers NamedProperties.canForceInterceptionRerollOfLongPasses
-            SkillId::CloudBurster => &["canForceInterceptionRerollOfLongPasses"],
+            // Java: CloudBurster (BB2020) registers canForceInterceptionRerollOfLongPasses;
+            // bb2025's CloudBurster registers the differently-named passesAreNotIntercepted instead — union of both.
+            SkillId::CloudBurster => &["canForceInterceptionRerollOfLongPasses", "passesAreNotIntercepted"],
             // Java: FuriousOutburst.postConstruct registers canTeleportBeforeAndAfterAvRollAttack
             SkillId::FuriousOutburst => &["canTeleportBeforeAndAfterAvRollAttack"],
             // Java: SafePass.postConstruct registers NamedProperties.dontDropFumbles
             SkillId::SafePass => &["dontDropFumbles"],
             // Java: Trickster.postConstruct registers NamedProperties.canMoveBeforeBeingBlocked
             SkillId::Trickster => &["canMoveBeforeBeingBlocked"],
-            // Java: BlastIt.postConstruct registers NamedProperties.canReRollHmpScatter
-            SkillId::BlastIt => &["canReRollHmpScatter"],
+            // Java: BlastIt.postConstruct registers NamedProperties.canReRollHmpScatter + grantsCatchBonusToReceiver
+            SkillId::BlastIt => &["canReRollHmpScatter", "grantsCatchBonusToReceiver"],
+            // Java: BurstOfSpeed.postConstruct registers canMakeAnExtraGfiOnce
+            SkillId::BurstOfSpeed => &["canMakeAnExtraGfiOnce"],
+            // Java: ConsummateProfessional.postConstruct registers canRerollSingleDieOncePerPeriod
+            //   (also registers a reroll source, ReRolledActions.SINGLE_DIE/ReRollSources.CONSUMMATE_PROFESSIONAL,
+            //   but there is no live reroll-source table to mirror that in — see NOTE in consummate_professional.rs)
+            SkillId::ConsummateProfessional => &["canRerollSingleDieOncePerPeriod"],
+            // Java: bb2020/ExcuseMeAreYouAZoat.postConstruct registers canGainGaze (bb2025 registers
+            //   canGazeAutomaticallyThreeSquaresAway instead) — union of both editions
+            SkillId::ExcuseMeAreYouAZoat => &["canGainGaze", "canGazeAutomaticallyThreeSquaresAway"],
+            // Java: ThenIStartedBlastin.postConstruct registers canBlastRemotePlayer
+            SkillId::ThenIStartedBlastin => &["canBlastRemotePlayer"],
+            // Java: TwoForOne.postConstruct registers reducesLonerRollIfPartnerIsHurt
+            SkillId::TwoForOne => &["reducesLonerRollIfPartnerIsHurt"],
             // Java: PutridRegurgitation.postConstruct registers canUseVomitAfterBlock, providesBlockAlternative, canPerformArmourRollInsteadOfBlockThatMightFail
             SkillId::PutridRegurgitation => &[
                 "canUseVomitAfterBlock",
@@ -891,10 +946,17 @@ impl SkillId {
             // Java: bb2025/PumpUpTheCrowd.postConstruct registers grantsTeamReRollWhenCausingBlockCas
             // Java: bb2020/PumpUpTheCrowd.postConstruct registers grantsTeamReRollWhenCausingCas
             SkillId::PumpUpTheCrowd => &["grantsTeamReRollWhenCausingBlockCas", "grantsTeamReRollWhenCausingCas"],
-            // Java: bb2016+bb2020/SneakyGit.postConstruct + bb2025/PutTheBootIn.postConstruct register canAlwaysAssistFouls
-            SkillId::SneakyGit | SkillId::PutTheBootIn => &["canAlwaysAssistFouls"],
-            // Java: bb2025/Defensive.postConstruct registers CancelSkillProperty(canAlwaysAssistFouls)
-            SkillId::Defensive => &["cancelsCanAlwaysAssistFouls"],
+            // Java: bb2016+bb2025/PutTheBootIn.postConstruct register only canAlwaysAssistFouls;
+            //   bb2020/SneakyGit.postConstruct additionally registers canMoveAfterFoul — union of both.
+            SkillId::SneakyGit | SkillId::PutTheBootIn => &["canAlwaysAssistFouls", "canMoveAfterFoul"],
+            // Java: bb2020+bb2025/Defensive.postConstruct both register
+            // CancelSkillProperty(assistsBlocksInTacklezones) + CancelSkillProperty(assistsFoulsInTacklezones);
+            // bb2025 additionally registers CancelSkillProperty(canAlwaysAssistFouls) — union of both.
+            SkillId::Defensive => &[
+                "cancelsAssistsBlocksInTacklezones",
+                "cancelsAssistsFoulsInTacklezones",
+                "cancelsCanAlwaysAssistFouls",
+            ],
             // Java: bb2020/PileDriver.postConstruct + bb2025/PileDriver.postConstruct register canFoulAfterBlock
             SkillId::PileDriver => &["canFoulAfterBlock"],
             // Java: bb2016/SecretWeapon.postConstruct registers preventStuntyDodgeModifier, getsSentOffAtEndOfDrive,
@@ -933,8 +995,6 @@ impl SkillId {
             SkillId::Kick => &["canReduceKickDistance"],
             // Java: Kaboom.postConstruct registers canForceBombExplosion
             SkillId::Kaboom => &["canForceBombExplosion"],
-            // Java: bb2025/ExcuseMeAreYouAZoat.postConstruct registers canGazeAutomaticallyThreeSquaresAway
-            SkillId::ExcuseMeAreYouAZoat => &["canGazeAutomaticallyThreeSquaresAway"],
             // Java: Bombardier.postConstruct registers enableThrowBombAction (all editions)
             //   BB2020 additionally: preventStuntyDodgeModifier, cancelsIgnoreTacklezonesWhenDodging
             SkillId::Bombardier => &[
@@ -946,8 +1006,9 @@ impl SkillId {
             SkillId::FrenziedRush => &["canGainFrenzyForBlitz"],
             // Java: SlashingNails.postConstruct registers canGainClawsForBlitz
             SkillId::SlashingNails => &["canGainClawsForBlitz"],
-            // Java: Incorporeal.postConstruct registers canAvoidDodging
-            SkillId::Incorporeal => &["canAvoidDodging"],
+            // Java: bb2025/Incorporeal.postConstruct registers canAvoidDodging; bb2020/Incorporeal.postConstruct
+            //   registers canAddStrengthToDodge instead — union of both editions
+            SkillId::Incorporeal => &["canAvoidDodging", "canAddStrengthToDodge"],
             // Java: HailMaryPass.postConstruct registers canGainHailMary
             SkillId::HailMaryPass => &["canGainHailMary"],
             // Java: SafePairOfHands.postConstruct registers canPlaceBallWhenKnockedDownOrPlacedProne
@@ -958,6 +1019,11 @@ impl SkillId {
             SkillId::WatchOut => &["ignoresDefenderStumblesResultForFirstBlock"],
             // Java: mixed/special/QuickBite.postConstruct registers canAttackOpponentForBallAfterCatch
             SkillId::QuickBite => &["canAttackOpponentForBallAfterCatch"],
+            // Java: bb2020/ProjectileVomit.postConstruct registers providesBlockAlternative +
+            //   canPerformArmourRollInsteadOfBlockThatMightFail
+            SkillId::ProjectileVomit => &["providesBlockAlternative", "canPerformArmourRollInsteadOfBlockThatMightFail"],
+            // Java: bb2020/Swarming.postConstruct registers canSneakExtraPlayersOntoPitch
+            SkillId::Swarming => &["canSneakExtraPlayersOntoPitch"],
             _ => &[],
         }
     }
@@ -1015,7 +1081,15 @@ mod tests {
 
     #[test]
     fn properties_chainsaw_has_five() {
-        assert_eq!(SkillId::Chainsaw.properties().len(), 5);
+        // Bug: bb2020/bb2025 Chainsaw.postConstruct also registers providesBlockAlternative,
+        // providesFoulingAlternative, and (bb2020-only) preventStuntyDodgeModifier +
+        // cancelsIgnoreTacklezonesWhenDodging, none of which were present before the fix.
+        let props = SkillId::Chainsaw.properties();
+        assert_eq!(props.len(), 9);
+        assert!(props.contains(&"providesBlockAlternative"));
+        assert!(props.contains(&"providesFoulingAlternative"));
+        assert!(props.contains(&"preventStuntyDodgeModifier"));
+        assert!(props.contains(&"cancelsIgnoreTacklezonesWhenDodging"));
     }
 
     #[test]
@@ -1029,8 +1103,74 @@ mod tests {
     }
 
     #[test]
+    fn properties_leap_has_failed_rush_lands_in_target_square() {
+        // Bug: bb2020/Leap.postConstruct also registers failedRushForJumpAlwaysLandsInTargetSquare,
+        // which was missing (only canLeap was present).
+        assert!(SkillId::Leap.properties().contains(&"failedRushForJumpAlwaysLandsInTargetSquare"));
+    }
+
+    #[test]
+    fn properties_no_hands_has_full_property_set() {
+        // Bug: bb2020/NoHands.postConstruct registers 4 properties; only preventCatch was present.
+        let props = SkillId::NoHands.properties();
+        assert!(props.contains(&"preventHoldBall"));
+        assert!(props.contains(&"preventRegularPassAction"));
+        assert!(props.contains(&"preventRegularHandOverAction"));
+    }
+
+    #[test]
+    fn properties_monstrous_mouth_cancels_strip_ball() {
+        // Bug: SkillId::MonstrousMouth had no match arm at all, falling through to `_ => &[]`.
+        assert!(SkillId::MonstrousMouth.properties().contains(&"cancelsForceOpponentToDropBallOnPushback"));
+    }
+
+    #[test]
+    fn properties_fumblerooskie_has_can_drop_ball() {
+        // Bug: SkillId::Fumblerooskie had no match arm at all, falling through to `_ => &[]`.
+        assert!(SkillId::Fumblerooskie.properties().contains(&"canDropBall"));
+    }
+
+    #[test]
+    fn properties_brawler_has_can_reroll_single_both_down() {
+        // Bug: SkillId::Brawler had no match arm at all, falling through to `_ => &[]`.
+        assert!(SkillId::Brawler.properties().contains(&"canRerollSingleBothDown"));
+    }
+
+    #[test]
+    fn properties_cloud_burster_has_bb2025_property() {
+        // Bug: only the bb2020 property was present; bb2025's differently-named
+        // passesAreNotIntercepted was missing entirely.
+        assert!(SkillId::CloudBurster.properties().contains(&"passesAreNotIntercepted"));
+    }
+
+    #[test]
+    fn properties_defensive_cancels_tacklezone_assists() {
+        // Bug: bb2020/bb2025 Defensive.postConstruct cancels assistsBlocksInTacklezones and
+        // assistsFoulsInTacklezones, but the table only had cancelsCanAlwaysAssistFouls (bb2025-only).
+        let props = SkillId::Defensive.properties();
+        assert!(props.contains(&"cancelsAssistsBlocksInTacklezones"));
+        assert!(props.contains(&"cancelsAssistsFoulsInTacklezones"));
+    }
+
+    #[test]
     fn properties_ball_and_chain_cancels_trickster() {
         assert!(SkillId::BallAndChain.properties().contains(&"cancelsCanMoveBeforeBeingBlocked"));
+    }
+
+    #[test]
+    fn properties_ball_and_chain_has_full_bb2020_property_set() {
+        // Bug: entry previously listed a nonexistent "blocksLikeChainsaw" property and was missing
+        // most of the properties registered by Java bb2020/BallAndChain.postConstruct.
+        let props = SkillId::BallAndChain.properties();
+        assert!(!props.contains(&"blocksLikeChainsaw"));
+        assert!(props.contains(&"ignoreBlockAssists"));
+        assert!(props.contains(&"preventPickup"));
+        assert!(props.contains(&"blocksDuringMove"));
+        assert!(props.contains(&"ignoreTacklezonesWhenMoving"));
+        assert!(props.contains(&"convertStunToKO"));
+        assert!(props.contains(&"preventRegularBlockAction"));
+        assert!(props.contains(&"preventRegularBlitzAction"));
+        assert!(props.contains(&"cancelsPreventOpponentFollowingUp"));
     }
 
     #[test]
@@ -1123,6 +1263,23 @@ mod tests {
     }
 
     #[test]
+    fn properties_stab_has_multiple_block_alternative() {
+        // Bug: bb2020/Stab.postConstruct registers 4 properties but the union was missing
+        // providesMultipleBlockAlternative.
+        assert!(SkillId::Stab.properties().contains(&"providesMultipleBlockAlternative"));
+    }
+
+    #[test]
+    fn properties_swoop_has_full_bb2020_property_set() {
+        // Bug: bb2020/Swoop.postConstruct registers 3 properties but only ttmScattersInSingleDirection
+        // was present in the union.
+        let props = SkillId::Swoop.properties();
+        assert!(props.contains(&"preventStuntyDodgeModifier"));
+        assert!(props.contains(&"ttmScattersInSingleDirection"));
+        assert!(props.contains(&"cancelsIgnoreTacklezonesWhenDodging"));
+    }
+
+    #[test]
     fn properties_titchy_has_no_tacklezone_for_dodging() {
         assert!(SkillId::Titchy.properties().contains(&"hasNoTacklezoneForDodging"));
     }
@@ -1178,5 +1335,39 @@ mod tests {
         ] {
             assert!(props.contains(&expected), "BallAndChain missing property {expected}");
         }
+    }
+
+    #[test]
+    fn properties_sneaky_git_has_can_move_after_foul() {
+        // Bug: bb2020/SneakyGit.postConstruct additionally registers canMoveAfterFoul (unlike
+        // bb2016/SneakyGit and bb2025/PutTheBootIn, which only register canAlwaysAssistFouls).
+        let props = SkillId::SneakyGit.properties();
+        assert!(props.contains(&"canAlwaysAssistFouls"));
+        assert!(props.contains(&"canMoveAfterFoul"));
+    }
+
+    #[test]
+    fn properties_right_stuff_has_bb2020_conditional_throw_property() {
+        // Bug: bb2020/RightStuff.postConstruct registers canBeThrownIfStrengthIs3orLess instead of
+        // canBeThrown, but the union only had the bb2016/bb2025 property names.
+        let props = SkillId::RightStuff.properties();
+        assert!(props.contains(&"canBeThrownIfStrengthIs3orLess"));
+        assert!(props.contains(&"ignoreTackleWhenBlocked"));
+    }
+
+    #[test]
+    fn properties_projectile_vomit_registered() {
+        // Bug: SkillId::ProjectileVomit had no entry at all in properties(), so it fell through
+        // to the `_ => &[]` default despite Java registering 2 properties in postConstruct.
+        let props = SkillId::ProjectileVomit.properties();
+        assert!(props.contains(&"providesBlockAlternative"));
+        assert!(props.contains(&"canPerformArmourRollInsteadOfBlockThatMightFail"));
+    }
+
+    #[test]
+    fn properties_swarming_registered() {
+        // Bug: SkillId::Swarming had no entry at all in properties(), so it fell through to
+        // the `_ => &[]` default despite Java registering canSneakExtraPlayersOntoPitch.
+        assert!(SkillId::Swarming.properties().contains(&"canSneakExtraPlayersOntoPitch"));
     }
 }

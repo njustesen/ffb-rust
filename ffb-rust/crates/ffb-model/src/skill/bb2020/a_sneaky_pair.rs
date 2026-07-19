@@ -1,4 +1,8 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::ASneakyPair.
+// NOTE: Java postConstruct registers a StaticInjuryModifierAttacker(+1, foul/stab when a partner marks the
+// defender) via registerModifier(). There is no per-skill dynamic injury-modifier registration mechanism in the
+// Rust codebase (the mechanics-crate modifier factories only cover a fixed global pool: Bomb/Fireball/Lightning),
+// so this behavior is not yet wired up. Left as a gap pending that infrastructure.
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 

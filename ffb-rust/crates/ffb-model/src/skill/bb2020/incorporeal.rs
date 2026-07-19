@@ -1,4 +1,7 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::Incorporeal.
+// NOTE: Java (bb2020) postConstruct also calls setStatBasedRollModifierFactory(new StatBasedRollModifierFactory(
+// getName(), PlayerStatKey.ST)) to let the player add their Strength to a failed dodge roll. There is no
+// per-skill stat-based-roll-modifier registration mechanism in the Rust codebase, so this is not yet wired up.
 use crate::model::skill::skill::Skill;
 use crate::enums::{SkillCategory, SkillUsageType};
 
@@ -39,5 +42,12 @@ mod tests {
     #[test]
     fn usage_type_is_correct() {
         assert_eq!(Incorporeal::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
+    }
+
+    #[test]
+    fn registers_bb2020_named_property() {
+        use crate::enums::SkillId;
+        // bb2020's Incorporeal registers canAddStrengthToDodge (bb2025's registers canAvoidDodging instead).
+        assert!(SkillId::Incorporeal.properties().contains(&"canAddStrengthToDodge"));
     }
 }

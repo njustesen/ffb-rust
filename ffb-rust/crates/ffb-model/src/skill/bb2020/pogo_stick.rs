@@ -35,4 +35,15 @@ mod tests {
     fn category_is_correct() {
         assert_eq!(PogoStick::new().get_category(), SkillCategory::Trait);
     }
+
+    #[test]
+    fn properties_include_cancel_properties() {
+        // Bug: bb2020/PogoStick.postConstruct also registers CancelSkillProperty(makesJumpingHarder)
+        // and CancelSkillProperty(canAttemptToTackleJumpingPlayer), but SkillId::PogoStick.properties()
+        // was missing both.
+        use crate::enums::SkillId;
+        let props = SkillId::PogoStick.properties();
+        assert!(props.contains(&"cancelsMakesJumpingHarder"));
+        assert!(props.contains(&"cancelsCanAttemptToTackleJumpingPlayer"));
+    }
 }

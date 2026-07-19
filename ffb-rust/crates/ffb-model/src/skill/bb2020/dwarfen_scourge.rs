@@ -1,4 +1,7 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::DwarfenScourge.
+// NOTE: Java postConstruct registers a VariableArmourModifier and a VariableInjuryModifierAttacker (both
+// +1, or +2 vs dwarf defenders), but both override appliesToContext() to unconditionally return false — a
+// no-op in Java too. No per-skill dynamic modifier registration mechanism exists in Rust regardless.
 use crate::model::skill::skill::Skill;
 use crate::enums::{SkillCategory, SkillUsageType};
 

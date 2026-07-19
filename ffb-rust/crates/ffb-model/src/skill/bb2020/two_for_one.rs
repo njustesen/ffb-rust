@@ -1,4 +1,7 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::TwoForOne.
+// NOTE: Java postConstruct also calls setEnhancements(new TemporaryEnhancements().withSkills(singleton(
+// SkillClassWithValue(Loner.class, "2")))) so the surviving partner replaces Loner (4+) with Loner (2+).
+// Skill::set_enhancements is dead code in this codebase (no live consumer), so this is not yet wired up.
 use crate::model::skill::skill::Skill;
 use crate::enums::{SkillCategory, SkillUsageType};
 
@@ -39,5 +42,11 @@ mod tests {
     #[test]
     fn usage_type_is_correct() {
         assert_eq!(TwoForOne::new().get_skill_usage_type(), SkillUsageType::Special);
+    }
+
+    #[test]
+    fn registers_named_property() {
+        use crate::enums::SkillId;
+        assert!(SkillId::TwoForOne.properties().contains(&"reducesLonerRollIfPartnerIsHurt"));
     }
 }

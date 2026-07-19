@@ -1,4 +1,7 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::Animosity.
+// NOTE: Java overrides evaluator() with an AnimosityValueEvaluator that formats display strings
+// from the player's roster/position data. `AnimosityValueEvaluator`/`Skill::evaluator()` have no
+// live caller anywhere in this workspace (dead UI-display infra), so it is not implemented here.
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 

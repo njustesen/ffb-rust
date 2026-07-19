@@ -11,6 +11,14 @@ impl PassingIncrease {
         let base = Skill::new("+PA", SkillCategory::StatIncrease);
         Self { base }
     }
+
+    /// Java `getCost(Player<?> player)` — bb2020 PassingIncrease always costs a flat 30000,
+    /// overriding the base Skill.getCost() position/category-based calculation.
+    /// NOTE: base Skill.getCost() (position/double-category dependent default) is not yet
+    /// wired up in Rust; this returns the fixed override value only.
+    pub fn get_cost(&self) -> i32 {
+        30000
+    }
 }
 
 impl Default for PassingIncrease {
@@ -34,5 +42,12 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(PassingIncrease::new().get_category(), SkillCategory::StatIncrease);
+    }
+
+    #[test]
+    fn cost_is_flat_30000() {
+        // Bug: Java PassingIncrease.getCost() always returns 30000, but there was no
+        // get_cost() override on the Rust struct at all.
+        assert_eq!(PassingIncrease::new().get_cost(), 30000);
     }
 }

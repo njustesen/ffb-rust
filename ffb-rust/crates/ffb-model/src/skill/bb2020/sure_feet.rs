@@ -11,6 +11,9 @@ impl SureFeet {
         let base = Skill::new("Sure Feet", SkillCategory::Agility);
         Self { base }
     }
+    // NOTE: Java postConstruct calls registerRerollSource(ReRolledActions.RUSH, ReRollSources.SURE_FEET);
+    // there is no live reroll-source table to mirror that in yet (register_reroll_source is dead code
+    // with zero callers, and skill_id.rs has no equivalent static lookup for reroll sources).
 }
 
 impl Default for SureFeet {

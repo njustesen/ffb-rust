@@ -40,4 +40,12 @@ mod tests {
     fn usage_type_is_correct() {
         assert_eq!(BlastIt::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
     }
+
+    #[test]
+    fn registers_both_named_properties() {
+        use crate::enums::SkillId;
+        let props = SkillId::BlastIt.properties();
+        assert!(props.contains(&"canReRollHmpScatter"));
+        assert!(props.contains(&"grantsCatchBonusToReceiver"));
+    }
 }

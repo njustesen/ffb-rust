@@ -171,6 +171,48 @@ impl DodgeModifierFactory {
                         ));
                     }
                 }
+                SkillId::BreakTackle if rules == Rules::Bb2020 => {
+                    // Java: bb2020.BreakTackle registers two DodgeModifiers gated on
+                    // player.getStrengthWithModifiers(): ST 5+ => -2, ST 4- => -1, both further
+                    // gated on (isUseBreakTackle() || hasUnusedSkill).
+                    let use_break_tackle = context.use_break_tackle
+                        || (player.has_skill(SkillId::BreakTackle) && !player.used_skills.contains(&SkillId::BreakTackle));
+                    if use_break_tackle {
+                        let strength = player.strength_with_modifiers();
+                        if strength >= 5 {
+                            result.push(DodgeModifier::new_with_use_strength(
+                                "Break Tackle ST 5+", -2, ModifierType::REGULAR, true,
+                            ));
+                        } else {
+                            result.push(DodgeModifier::new_with_use_strength(
+                                "Break Tackle ST 4-", -1, ModifierType::REGULAR, true,
+                            ));
+                        }
+                    }
+                }
+                SkillId::BreakTackle if rules == Rules::Bb2025 => {
+                    // Java: bb2025.BreakTackle registers three DodgeModifiers gated on
+                    // player.getStrengthWithModifiers(): ST 5+ => -3, ST 4 => -2, ST 3- => -1, all
+                    // further gated on (isUseBreakTackle() || hasUnusedSkill).
+                    let use_break_tackle = context.use_break_tackle
+                        || (player.has_skill(SkillId::BreakTackle) && !player.used_skills.contains(&SkillId::BreakTackle));
+                    if use_break_tackle {
+                        let strength = player.strength_with_modifiers();
+                        if strength >= 5 {
+                            result.push(DodgeModifier::new_with_use_strength(
+                                "Break Tackle ST 5+", -3, ModifierType::REGULAR, true,
+                            ));
+                        } else if strength == 4 {
+                            result.push(DodgeModifier::new_with_use_strength(
+                                "Break Tackle ST 4", -2, ModifierType::REGULAR, true,
+                            ));
+                        } else {
+                            result.push(DodgeModifier::new_with_use_strength(
+                                "Break Tackle ST 3-", -1, ModifierType::REGULAR, true,
+                            ));
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -464,6 +506,31 @@ mod tests {
         let bt = mods.iter().find(|m| m.get_name() == "Break Tackle");
         assert!(bt.is_some(), "Break Tackle modifier should appear when use_break_tackle=true");
         assert!(bt.unwrap().is_use_strength(), "Break Tackle modifier should have use_strength=true");
+    }
+
+    #[test]
+    fn find_skill_modifiers_break_tackle_bb2020_strength_tiers() {
+        // Bug: BB2020's BreakTackle registers a ST-tiered DodgeModifier pair (ST5+ => -2,
+        // ST4- => -1) distinct from BB2016's flat 0 modifier, but the factory only had a
+        // Bb2016 match arm — BB2020/BB2025 players got no dodge bonus from Break Tackle at all.
+        use ffb_model::model::{ActingPlayer, SkillWithValue};
+        let (mut game, pid) = make_game_with_player(Rules::Bb2020);
+        game.team_home.players[0].starting_skills.push(SkillWithValue::new(SkillId::BreakTackle));
+        let factory = DodgeModifierFactory::for_rules(Rules::Bb2020);
+        let mut acting = ActingPlayer::default();
+        acting.player_id = Some(pid.clone());
+        let ctx = DodgeContext::new_with_break_tackle(&game, &acting, ffb_model::types::FieldCoordinate::new(5, 5), ffb_model::types::FieldCoordinate::new(6, 5), true);
+        let mods = factory.find_skill_modifiers(&ctx);
+        let bt = mods.iter().find(|m| m.get_name() == "Break Tackle ST 4-");
+        assert!(bt.is_some(), "ST 3 player should get the ST 4- tier (-1)");
+        assert_eq!(bt.unwrap().get_modifier(), -1);
+
+        game.team_home.players[0].strength = 5;
+        let ctx = DodgeContext::new_with_break_tackle(&game, &acting, ffb_model::types::FieldCoordinate::new(5, 5), ffb_model::types::FieldCoordinate::new(6, 5), true);
+        let mods = factory.find_skill_modifiers(&ctx);
+        let bt = mods.iter().find(|m| m.get_name() == "Break Tackle ST 5+");
+        assert!(bt.is_some(), "ST 5 player should get the ST 5+ tier (-2)");
+        assert_eq!(bt.unwrap().get_modifier(), -2);
     }
 
     #[test]

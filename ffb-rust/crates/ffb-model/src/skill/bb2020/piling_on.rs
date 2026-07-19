@@ -11,6 +11,13 @@ impl PilingOn {
         let base = Skill::new("Piling On", SkillCategory::Strength);
         Self { base }
     }
+
+    /// Java `eligible()` — overridden to return false. Java comment: this should be removed
+    /// but at the moment PilingOnBehavior is used to handle block knockdowns (e.g. for
+    /// BothDown results), so this needs to be untangled first.
+    pub fn eligible(&self) -> bool {
+        false
+    }
 }
 
 impl Default for PilingOn {
@@ -34,5 +41,12 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(PilingOn::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn eligible_is_false() {
+        // Bug: Java PilingOn.eligible() overrides to return false, but the Rust struct had no
+        // eligible() override at all, so it would fall back to the base Skill's `true` default.
+        assert!(!PilingOn::new().eligible());
     }
 }

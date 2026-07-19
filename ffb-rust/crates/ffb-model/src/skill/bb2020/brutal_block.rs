@@ -1,4 +1,7 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::BrutalBlock.
+// NOTE: Java postConstruct registers a StaticInjuryModifierAttacker whose appliesToContext() unconditionally
+// returns false, i.e. it is currently a no-op in Java too. No behavior is lost by omitting it here, but there is
+// still no per-skill dynamic injury-modifier registration mechanism in Rust if this is ever activated upstream.
 use crate::model::skill::skill::Skill;
 use crate::enums::{SkillCategory, SkillUsageType};
 

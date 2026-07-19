@@ -40,4 +40,10 @@ mod tests {
     fn usage_type_is_correct() {
         assert_eq!(ThenIStartedBlastin::new().get_skill_usage_type(), SkillUsageType::OncePerHalf);
     }
+
+    #[test]
+    fn registers_named_property() {
+        use crate::enums::SkillId;
+        assert!(SkillId::ThenIStartedBlastin.properties().contains(&"canBlastRemotePlayer"));
+    }
 }
