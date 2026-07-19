@@ -3,6 +3,7 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::enums::PlayerAction;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -175,6 +176,23 @@ impl StepEndSelecting {
     }
 
     fn dispatch_to_sequence(&self, game: &mut Game, player_action: PlayerAction, with_parameter: bool) -> StepOutcome {
+        // Java: if (pPlayerAction == null || (pPlayerAction == MOVE && playerState.isRooted()
+        //           && UtilPlayer.canGaze(game, actingPlayer.getPlayer()))) → Select sequence
+        // (the null case is handled by the caller before dispatch_to_sequence is invoked)
+        if player_action == PlayerAction::Move {
+            let player_id = game.acting_player.player_id.clone();
+            let is_rooted = player_id.as_deref()
+                .and_then(|id| game.field_model.player_state(id))
+                .map(|s| s.is_rooted())
+                .unwrap_or(false);
+            let can_gaze = player_id.as_deref()
+                .map(|id| UtilPlayer::can_gaze(game, id))
+                .unwrap_or(false);
+            if is_rooted && can_gaze {
+                let seq = Select::build_sequence(&SelectParams { update_persistence: false });
+                return StepOutcome::next().push_seq(seq);
+            }
+        }
         match player_action {
             PlayerAction::Pass
             | PlayerAction::HailMaryPass
@@ -441,6 +459,56 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!out.pushes.is_empty(), "rooted Move player should push EndPlayerAction, not Move");
+    }
+
+    #[test]
+    fn move_action_when_rooted_and_can_gaze_pushes_select_sequence() {
+        // Java: dispatchPlayerAction() guard —
+        //   if (pPlayerAction == MOVE && playerState.isRooted() && UtilPlayer.canGaze(...))
+        //       → Select.pushSequence(...); return;
+        // A rooted player who still has a gaze option available must be routed back to
+        // Select (not straight to EndPlayerAction) so they can choose to gaze instead.
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::SkillId;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use std::collections::HashSet;
+
+        let mut game = make_game();
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "gazer".into(), name: "gazer".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue::new(SkillId::HypnoticGaze)],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("gazer", FieldCoordinate::new(5, 5));
+        let rooted_state = PlayerState::new(PS_STANDING).change_active(true).change_rooted(true);
+        game.field_model.set_player_state("gazer", rooted_state);
+        // adjacent target with a tackle zone, required for canGaze() to be true
+        game.team_away.players.push(ffb_model::model::player::Player {
+            id: "target".into(), name: "target".into(), nr: 2, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 4, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("target", FieldCoordinate::new(5, 6));
+        game.field_model.set_player_state("target", PlayerState::new(PS_STANDING));
+
+        game.acting_player.player_id = Some("gazer".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        let mut step = StepEndSelecting::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(out.pushes.first().and_then(|seq| seq.first()).map(|s| s.step_id), Some(StepId::InitSelecting),
+            "rooted player who canGaze must be routed back to Select, not EndPlayerAction");
     }
 
     #[test]

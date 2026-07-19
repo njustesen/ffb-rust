@@ -134,22 +134,7 @@ impl StepMoveDodge {
             self.dodge_roll = rng.d6();
         }
 
-        let minimum_roll = {
-            let factory = DodgeModifierFactory::for_rules(game.rules);
-            if let Some(pid) = player_id.as_deref() {
-                let acting = game.acting_player.clone();
-                let src = self.coordinate_from.unwrap_or(FieldCoordinate::new(0, 0));
-                let tgt = self.coordinate_to.unwrap_or(FieldCoordinate::new(0, 0));
-                let ctx = DodgeContext::new(game, &acting, src, tgt);
-                let mods = factory.find_applicable(&ctx);
-                let skill_mods = factory.find_skill_modifiers(&ctx);
-                let all: Vec<&ffb_mechanics::modifiers::dodge_modifier::DodgeModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
-                let agility = game.player(pid).map(|p| p.agility as i32).unwrap_or(3);
-                DodgeModifierFactory::minimum_roll(agility, &all)
-            } else {
-                2
-            }
-        };
+        let (minimum_roll, mod_names) = self.dodge_modifiers_and_minimum_roll(game, player_id.as_deref());
         let successful = DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll);
 
         // Java: getResult().addReport(new ReportDodgeRoll(actingPlayer.getPlayerId(), successful,
@@ -163,7 +148,7 @@ impl StepMoveDodge {
             self.dodge_roll,
             minimum_roll,
             re_rolled,
-            vec![],
+            mod_names,
         ));
 
         if successful {
@@ -204,6 +189,29 @@ impl StepMoveDodge {
                 .publish(StepParameter::EndPlayerAction(true));
         }
         self.fail_dodge()
+    }
+
+    /// Computes the minimum dodge roll and the reporting-string names of the applicable
+    /// modifiers (regular + skill-based). Java: DodgeModifierFactory.findModifiers(...) combined
+    /// with the acting player's skill-registered modifiers, fed into
+    /// `dodgeModifiers.toArray(new DodgeModifier[0])` for the ReportDodgeRoll constructor.
+    fn dodge_modifiers_and_minimum_roll(&self, game: &Game, player_id: Option<&str>) -> (i32, Vec<String>) {
+        let factory = DodgeModifierFactory::for_rules(game.rules);
+        if let Some(pid) = player_id {
+            let acting = game.acting_player.clone();
+            let src = self.coordinate_from.unwrap_or(FieldCoordinate::new(0, 0));
+            let tgt = self.coordinate_to.unwrap_or(FieldCoordinate::new(0, 0));
+            let ctx = DodgeContext::new(game, &acting, src, tgt);
+            let mods = factory.find_applicable(&ctx);
+            let skill_mods = factory.find_skill_modifiers(&ctx);
+            let all: Vec<&ffb_mechanics::modifiers::dodge_modifier::DodgeModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
+            let agility = game.player(pid).map(|p| p.agility as i32).unwrap_or(3);
+            let min = DodgeModifierFactory::minimum_roll(agility, &all);
+            let names: Vec<String> = all.iter().map(|m| m.get_report_string().to_string()).collect();
+            (min, names)
+        } else {
+            (2, vec![])
+        }
     }
 
     fn fail_dodge(&self) -> StepOutcome {
@@ -433,6 +441,25 @@ mod tests {
         assert!(
             game.report_list.has_report(ReportId::DODGE_ROLL),
             "DODGE_ROLL report should be added on a failed dodge"
+        );
+    }
+
+    #[test]
+    fn dodge_modifier_names_include_actual_skill_modifiers() {
+        // Java: dodge() passes dodgeModifiers.toArray(...) into ReportDodgeRoll — the report must
+        // carry the real modifier names (e.g. skill-based ones like "Two Heads"), not an empty
+        // list. Previously the Rust translation hardcoded `vec![]` in the ReportDodgeRoll call
+        // regardless of the modifiers actually found by dodge_modifiers_and_minimum_roll.
+        use ffb_model::model::SkillWithValue;
+        use ffb_model::enums::SkillId;
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        game.team_home.players[0].starting_skills.push(SkillWithValue::new(SkillId::TwoHeads));
+        let step = StepMoveDodge::new("fail".into());
+        let (_min, names) = step.dodge_modifiers_and_minimum_roll(&game, Some("p1"));
+        assert!(
+            names.iter().any(|n| n == "Two Heads"),
+            "expected 'Two Heads' in roll modifiers, got: {:?}", names
         );
     }
 }

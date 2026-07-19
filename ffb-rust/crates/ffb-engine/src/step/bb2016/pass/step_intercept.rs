@@ -16,11 +16,13 @@
 /// client-only(Intercept-rangeRuler): UtilRangeRuler.createRangeRuler — range ruler is client-side display.
 use ffb_model::enums::{PlayerAction, ReRollSource};
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::prompts::AgentPrompt;
 use ffb_model::report::report_id::ReportId;
 use ffb_model::report::report_interception_roll::ReportInterceptionRoll;
 use ffb_model::util::passing::can_intercept;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_cards::UtilCards;
 use ffb_mechanics::modifiers::interception_modifier_factory::InterceptionModifierFactory;
 use ffb_mechanics::pass_result::PassResult;
 use crate::action::Action;
@@ -69,9 +71,23 @@ impl StepIntercept {
             Some(c) => c,
             None => return Vec::new(),
         };
+        // Java: boolean passesNotIntercepted = pThrower.hasSkillProperty(passesAreNotIntercepted);
+        let passes_not_intercepted = game.player(&thrower_id)
+            .map(|p| p.has_skill_property(NamedProperties::PASSES_ARE_NOT_INTERCEPTED))
+            .unwrap_or(false);
         let opponent_team = game.inactive_team();
         opponent_team.players.iter()
             .filter(|player| {
+                // Java: if (passesNotIntercepted && !UtilCards.hasSkillToCancelProperty(otherPlayer, passesAreNotIntercepted)) continue;
+                if passes_not_intercepted
+                    && !UtilCards::has_skill_to_cancel_property(player, NamedProperties::PASSES_ARE_NOT_INTERCEPTED)
+                {
+                    return false;
+                }
+                // Java: !otherPlayer.hasSkillProperty(NamedProperties.preventCatch)
+                if player.has_skill_property(NamedProperties::PREVENT_CATCH) {
+                    return false;
+                }
                 let coord = match game.field_model.player_coordinate(&player.id) {
                     Some(c) => c,
                     None => return false,
@@ -472,6 +488,20 @@ mod tests {
         let game = make_game();
         let interceptors = StepIntercept::find_interceptors(&game);
         assert!(interceptors.is_empty());
+    }
+
+    #[test]
+    fn find_interceptors_excludes_no_hands_player() {
+        // Java: UtilPassing.findInterceptors excludes otherPlayer.hasSkillProperty(preventCatch).
+        // NoHands (bb2016 skill) registers preventCatch, so a player with No Hands standing in
+        // the intercept corridor must never be returned as a possible interceptor.
+        let (mut game, interceptor_id) = make_game_with_interceptor();
+        if let Some(p) = game.team_away.player_mut(&interceptor_id) {
+            p.starting_skills.push(SkillWithValue::new(ffb_model::enums::SkillId::NoHands));
+        }
+        let interceptors = StepIntercept::find_interceptors(&game);
+        assert!(!interceptors.contains(&interceptor_id),
+            "player with No Hands must be excluded from possible interceptors");
     }
 
     #[test]

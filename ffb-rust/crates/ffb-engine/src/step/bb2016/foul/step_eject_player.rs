@@ -15,7 +15,7 @@
 /// Publishes: END_TURN, CATCH_SCATTER_THROW_IN_MODE.
 ///
 /// Publishes ReportSkillWasted for any unused single-use-reroll skills on the ejected player.
-use ffb_model::enums::{PS_RESERVE, PS_BANNED, PS_KNOCKED_OUT, SkillId};
+use ffb_model::enums::{PS_RESERVE, PS_BANNED, PS_KNOCKED_OUT, SkillId, SendToBoxReason};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_box::UtilBox;
@@ -54,7 +54,8 @@ impl StepEjectPlayer {
             let sneaky_git_ban_to_ko = game.options.is_enabled("sneakyGitBanToKo");
 
             // Java: state.argueTheCallSuccessful != null && state.argueTheCallSuccessful
-            let state_new_base = if self.argue_the_call_successful == Some(true) {
+            let argue_success = self.argue_the_call_successful == Some(true);
+            let state_new_base = if argue_success {
                 PS_RESERVE // argue succeeded → not ejected
             } else if has_sneaky_git && sneaky_git_ban_to_ko {
                 PS_KNOCKED_OUT
@@ -64,6 +65,17 @@ impl StepEjectPlayer {
 
             if let Some(current_state) = game.field_model.player_state(&player_id) {
                 game.field_model.set_player_state(&player_id, current_state.change_base(state_new_base));
+            }
+
+            // Java: attackerResult.setSendToBoxReason/Turn/Half(...) for the KNOCKED_OUT and BANNED branches.
+            if !argue_success {
+                let turn_nr = game.turn_data().turn_nr;
+                let half = game.half;
+                let is_home = game.team_home.player(&player_id).is_some();
+                let pr = game.game_result.team_result_mut(is_home).player_result_mut(&player_id);
+                pr.send_to_box_reason = Some(SendToBoxReason::FoulBan);
+                pr.send_to_box_turn = turn_nr;
+                pr.send_to_box_half = half;
             }
 
             UtilBox::put_player_into_box(game, &player_id);
@@ -210,6 +222,47 @@ mod tests {
 
         let state = game.field_model.player_state("fouler").expect("state");
         assert_eq!(state.base(), PS_BANNED, "fouler should be BANNED");
+    }
+
+    #[test]
+    fn fouler_banned_records_send_to_box_reason_turn_half() {
+        use ffb_model::enums::{PS_STANDING, SendToBoxReason};
+        let mut game = make_game();
+        add_player_with_state(&mut game, "fouler", PS_STANDING, vec![]);
+        game.acting_player.player_id = Some("fouler".into());
+        game.turn_data_home.turn_nr = 5;
+        game.half = 2;
+
+        let mut step = StepEjectPlayer::new();
+        step.goto_label_on_end = "end".into();
+        step.fouler_has_ball = Some(false);
+        step.start(&mut game, &mut GameRng::new(0));
+
+        let pr = game.game_result.home.player_result("fouler").expect("player result must exist");
+        assert_eq!(pr.send_to_box_reason, Some(SendToBoxReason::FoulBan),
+            "banned fouler should record FOUL_BAN send-to-box reason");
+        assert_eq!(pr.send_to_box_turn, 5);
+        assert_eq!(pr.send_to_box_half, 2);
+    }
+
+    #[test]
+    fn argue_the_call_success_does_not_record_send_to_box() {
+        use ffb_model::enums::PS_STANDING;
+        let mut game = make_game();
+        add_player_with_state(&mut game, "fouler", PS_STANDING, vec![]);
+        game.acting_player.player_id = Some("fouler".into());
+
+        let mut step = StepEjectPlayer::new();
+        step.goto_label_on_end = "end".into();
+        step.fouler_has_ball = Some(false);
+        step.argue_the_call_successful = Some(true);
+        step.start(&mut game, &mut GameRng::new(0));
+
+        let pr = game.game_result.home.player_result("fouler");
+        assert!(
+            pr.map(|p| p.send_to_box_reason.is_none()).unwrap_or(true),
+            "argue-the-call success should not record a send-to-box reason"
+        );
     }
 
     #[test]

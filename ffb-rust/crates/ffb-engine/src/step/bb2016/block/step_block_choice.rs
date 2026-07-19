@@ -121,16 +121,13 @@ impl StepBlockChoice {
                         if right_stuff_cancels_tackle && defender_has_right_stuff {
                             // Right Stuff cancels Tackle → Dodge still works → goto dodge
                             // Java: getResult().addReport(new ReportSkillUse(game.getDefenderId(), ignoreTackleSkill, true, SkillUse.CANCEL_TACKLE))
+                            // (Java adds only this single report here — no AVOID_FALLING report is added.)
                             if let Some(ref did) = defender_id {
                                 use ffb_model::model::skill_use::SkillUse;
                                 use ffb_model::report::report_skill_use::ReportSkillUse;
                                 game.report_list.add(ReportSkillUse::new(
                                     Some(did.clone()), SkillId::RightStuff, true, SkillUse::CANCEL_TACKLE,
                                 ));
-                                game.report_list.add(ReportSkillUse::new(
-                                    Some(did.clone()), SkillId::Dodge, true, SkillUse::AVOID_FALLING,
-                                ));
-                                let _ = did;
                             }
                             let mut outcome = StepOutcome::goto(&self.goto_label_on_dodge);
                             if let Some(ref did) = defender_id {
@@ -444,6 +441,58 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::SKILL_USE), "Tackle cancel dodge must emit ReportSkillUse");
         assert!(game.report_list.has_report(ReportId::BLOCK_CHOICE));
+    }
+
+    #[test]
+    fn right_stuff_cancels_tackle_emits_only_cancel_tackle_report_no_avoid_falling() {
+        // Java executeStep() POW_PUSHBACK branch: when RIGHT_STUFF_CANCELS_TACKLE is enabled
+        // and the defender has a skill with ignoreTackleWhenBlocked, only ONE ReportSkillUse
+        // (CANCEL_TACKLE) is added before goto-ing to the dodge label. There is no second
+        // AVOID_FALLING report in the Java source.
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::SkillId;
+        let mut step = StepBlockChoice::new();
+        step.set_parameter(&StepParameter::GotoLabelOnPushback("push".into()));
+        step.set_parameter(&StepParameter::GotoLabelOnDodge("dodge".into()));
+        step.set_parameter(&StepParameter::BlockResult(BlockResult::PowPushback));
+        let mut game = make_game();
+        game.options.set("rightStuffCancelsTackle", "true");
+        // attacker: has Tackle
+        game.team_home.players.push(Player {
+            id: "att".into(), name: "att".into(), nr: 1, position_id: "l".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue::new(SkillId::Tackle)],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        // defender: has Dodge and Right Stuff (ignoreTackleWhenBlocked)
+        game.team_away.players.push(Player {
+            id: "def".into(), name: "def".into(), nr: 2, position_id: "l".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 4, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue::new(SkillId::Dodge), SkillWithValue::new(SkillId::RightStuff)],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+        let mut rng = GameRng::new(0);
+        let outcome = step.start(&mut game, &mut rng);
+        assert_eq!(outcome.goto_label.as_deref(), Some("dodge"));
+        // Exactly two reports should be added: ReportSkillUse(CANCEL_TACKLE) + ReportBlockChoice.
+        // Before the fix, an extra spurious ReportSkillUse(AVOID_FALLING) was also added (3 total).
+        assert_eq!(game.report_list.size(), 2, "Java only adds a single CANCEL_TACKLE report here, no AVOID_FALLING report");
     }
 
     fn add_away_player(game: &mut Game, id: &str, state_base: u32) {

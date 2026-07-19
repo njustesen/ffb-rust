@@ -1,6 +1,7 @@
 use ffb_model::enums::ReRollSource;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::report::bb2016::report_tentacles_shadowing_roll::ReportTentaclesShadowingRoll;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
@@ -113,6 +114,17 @@ impl StepTentacles {
                             let actor_st = game.acting_player.strength;
                             let min_roll = DiceInterpreter::minimum_roll_tentacles_escape(defender_st, actor_st);
                             let successful = DiceInterpreter::is_tentacles_escape_successful(&dice, defender_st, actor_st);
+
+                            // Java: getResult().addReport(new ReportTentaclesShadowingRoll(skill,
+                            //         game.getDefenderId(), rollEscape, successful, minimumRoll, reRolled))
+                            game.report_list.add(ReportTentaclesShadowingRoll::new(
+                                "Tentacles".into(),
+                                defender_id.clone(),
+                                dice.to_vec(),
+                                successful,
+                                min_roll,
+                                re_rolled,
+                            ));
 
                             if successful {
                                 self.using_tentacles = Some(false);
@@ -307,6 +319,42 @@ mod tests {
     fn unrecognised_parameter_returns_false() {
         let mut step = StepTentacles::new("label");
         assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
+    }
+
+    #[test]
+    fn using_tentacles_with_defender_adds_shadowing_roll_report() {
+        // Java: TentaclesBehaviour.handleExecuteStepHook always calls
+        // getResult().addReport(new ReportTentaclesShadowingRoll(...)) whenever rollTentacles is
+        // true (i.e. whenever a dice roll actually happens), regardless of success/failure.
+        // Previously the Rust translation never added this report at all.
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::report::report_id::ReportId;
+        use std::collections::HashSet;
+
+        let mut game = make_game();
+        game.team_away.players.push(Player {
+            id: "defender1".into(), name: "Defender".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 4, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("defender1", FieldCoordinate::new(6, 5));
+        game.defender_id = Some("defender1".into());
+
+        let mut step = StepTentacles::new("label");
+        step.coordinate_from = Some(FieldCoordinate::new(5, 5));
+        step.using_tentacles = Some(true);
+        step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(
+            game.report_list.has_report(ReportId::TENTACLES_SHADOWING_ROLL),
+            "TENTACLES_SHADOWING_ROLL report should be added whenever the escape dice are rolled"
+        );
     }
 
     #[test]

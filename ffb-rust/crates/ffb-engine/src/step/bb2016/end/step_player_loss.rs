@@ -1,6 +1,7 @@
 /// 1:1 translation of `com.fumbbl.ffb.server.step.bb2016.end.StepPlayerLoss`.
 ///
-/// For illegal concession: any player with ≥51 current SPPs risks defecting.
+/// For illegal concession: any player with ≥51 current SPPs (`fCurrentSpps`/`current_spps`,
+/// the player's SPP total, not SPP gained this game) risks defecting.
 /// Java: `DiceInterpreter.isPlayerDefecting(roll)` = roll > 0 && roll < 4 (i.e., 1–3 on D6).
 use ffb_model::model::game::Game;
 use ffb_model::report::report_defecting_players::ReportDefectingPlayers;
@@ -39,7 +40,7 @@ impl StepPlayerLoss {
             team.players.iter()
                 .filter(|p| {
                     results.get(&p.id)
-                        .map(|r| r.spp_gained >= SPP_DEFECTION_THRESHOLD)
+                        .map(|r| r.current_spps >= SPP_DEFECTION_THRESHOLD)
                         .unwrap_or(false)
                 })
                 .map(|p| p.id.clone())
@@ -151,7 +152,7 @@ mod tests {
         game.conceded_legally = true;
         game.team_home.players.push(make_player("p1"));
         let mut pr = PlayerResult::default();
-        pr.spp_gained = 60;
+        pr.current_spps = 60;
         game.game_result.home.player_results.insert("p1".into(), pr);
         let mut rng = GameRng::new(0);
         step.start(&mut game, &mut rng);
@@ -166,7 +167,7 @@ mod tests {
         game.conceded_legally = false;
         game.team_home.players.push(make_player("p1"));
         let mut pr = PlayerResult::default();
-        pr.spp_gained = 50; // below threshold of 51
+        pr.current_spps = 50; // below threshold of 51
         game.game_result.home.player_results.insert("p1".into(), pr);
         let mut rng = GameRng::new(0);
         step.start(&mut game, &mut rng);
@@ -181,7 +182,7 @@ mod tests {
         game.conceded_legally = false;
         game.team_away.players.push(make_player("a1"));
         let mut pr = PlayerResult::default();
-        pr.spp_gained = 51;
+        pr.current_spps = 51;
         game.game_result.away.player_results.insert("a1".into(), pr);
         let mut rng = GameRng::new(0);
         let outcome = step.start(&mut game, &mut rng);
@@ -199,11 +200,33 @@ mod tests {
         game.conceded_legally = false;
         game.team_home.players.push(make_player("p1"));
         let mut pr = PlayerResult::default();
-        pr.spp_gained = 55; // above threshold
+        pr.current_spps = 55; // above threshold
         game.game_result.home.player_results.insert("p1".into(), pr);
         let mut rng = GameRng::new(0);
         step.start(&mut game, &mut rng);
         assert!(game.report_list.has_report(ReportId::DEFECTING_PLAYERS));
+    }
+
+    #[test]
+    fn uses_current_spps_not_spp_gained_this_game() {
+        // Java checks `playerResult.getCurrentSpps()` (the player's SPP total), not SPP gained
+        // during this game. A player with a huge spp_gained this game but low current_spps must
+        // NOT be flagged for the defection roll; this would have incorrectly triggered a roll
+        // before the fix (which mistakenly read `spp_gained` instead of `current_spps`).
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepPlayerLoss::new();
+        let mut game = make_game();
+        game.game_result.home.conceded = true;
+        game.conceded_legally = false;
+        game.team_home.players.push(make_player("p1"));
+        let mut pr = PlayerResult::default();
+        pr.spp_gained = 999; // huge SPP gained this game — irrelevant to the check
+        pr.current_spps = 10; // well below the 51 threshold
+        game.game_result.home.player_results.insert("p1".into(), pr);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(!game.game_result.home.player_results["p1"].defecting);
+        assert!(!game.report_list.has_report(ReportId::DEFECTING_PLAYERS));
     }
 
     #[test]
@@ -216,7 +239,7 @@ mod tests {
         // Player below threshold — no defection roll, no report
         game.team_home.players.push(make_player("p1"));
         let mut pr = PlayerResult::default();
-        pr.spp_gained = 40;
+        pr.current_spps = 40;
         game.game_result.home.player_results.insert("p1".into(), pr);
         let mut rng = GameRng::new(0);
         step.start(&mut game, &mut rng);

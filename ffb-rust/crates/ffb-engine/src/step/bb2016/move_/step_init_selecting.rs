@@ -111,7 +111,8 @@ impl Step for StepInitSelecting {
                 if game.turn_data().pass_used && !is_bomb_action {
                     return StepOutcome::cont();
                 }
-                let target = *coord;
+                // Java: if (game.isHomePlaying()) { publish(coord) } else { publish(coord.transform()) }
+                let target = if game.home_playing { *coord } else { coord.transform() };
                 let dispatch_action = if player_action == Some(PlayerAction::HailMaryPass) {
                     PlayerAction::HailMaryPass
                 } else {
@@ -141,8 +142,10 @@ impl Step for StepInitSelecting {
                 }
                 change_player_action(game, &acting_pid, PlayerAction::ThrowTeamMate, false);
                 self.dispatch_player_action = Some(PlayerAction::ThrowTeamMate);
+                // Java: if (game.isHomePlaying()) { publish(coord) } else { publish(coord.transform()) }
+                let target = if game.home_playing { *coord } else { coord.transform() };
                 return self.execute_step(game, rng)
-                    .publish(StepParameter::TargetCoordinate(*coord))
+                    .publish(StepParameter::TargetCoordinate(target))
                     .publish(StepParameter::ThrownPlayerId(Some(thrown_id.clone())));
             }
             Action::KickTeamMate { player_id: kicked_id, coord: _ } => {
@@ -215,6 +218,10 @@ impl StepInitSelecting {
                 return StepOutcome::goto(&label)
                     .publish(StepParameter::DispatchPlayerAction(Some(dispatch_action)));
             }
+            // Java: fDispatchPlayerAction != null is an else-if branch — when the inner guard
+            // (playerId provided && playerAction != null) fails, Java takes NO action at all
+            // (does not fall through to the final else's prepareStandingUp()/NEXT_STEP logic).
+            return StepOutcome::cont();
         }
 
         // Java: prepareStandingUp(); then NEXT_STEP if REMOVE_CONFUSION/STAND_UP/STAND_UP_BLITZ
@@ -580,5 +587,77 @@ mod tests {
         let out = step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
+    }
+
+    #[test]
+    fn dispatch_set_with_failed_guard_does_not_fall_through_to_standing_up_branch() {
+        // Java: `else if (fDispatchPlayerAction != null) { if (playerId provided && playerAction
+        // != null) {...} }` — when fDispatchPlayerAction is set but the inner guard fails, Java
+        // takes NO action (falls out of the else-if chain entirely). It must NOT fall through to
+        // the final `else { prepareStandingUp(); NEXT_STEP if REMOVE_CONFUSION/STAND_UP/... }`
+        // branch, even if game.acting_player.player_action happens to be STAND_UP.
+        let mut game = make_game();
+        game.acting_player.player_id = None; // guard fails: playerId not provided
+        game.acting_player.player_action = Some(PlayerAction::StandUp);
+        let mut step = StepInitSelecting::new("end".into());
+        step.dispatch_player_action = Some(PlayerAction::Move);
+        let out = step.execute_step(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue,
+            "dispatch_player_action set with failed guard must not fall through to the standing-up NEXT_STEP branch");
+    }
+
+    #[test]
+    fn pass_target_coordinate_transformed_for_away_team() {
+        // Java: CLIENT_PASS → if (game.isHomePlaying()) publish(coord) else publish(coord.transform())
+        let mut game = make_game();
+        game.home_playing = false;
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Pass);
+        let mut step = StepInitSelecting::new("end".into());
+        let coord = ffb_model::types::FieldCoordinate::new(10, 7);
+        let out = step.handle_command(&Action::Pass { coord }, &mut game, &mut GameRng::new(0));
+        let published = out.published.iter().find(|p| matches!(p, StepParameter::TargetCoordinate(_)));
+        if let Some(StepParameter::TargetCoordinate(c)) = published {
+            assert_eq!(*c, coord.transform(), "away-team pass target coordinate must be mirrored");
+        } else {
+            panic!("TargetCoordinate not published");
+        }
+    }
+
+    #[test]
+    fn pass_target_coordinate_not_transformed_for_home_team() {
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Pass);
+        let mut step = StepInitSelecting::new("end".into());
+        let coord = ffb_model::types::FieldCoordinate::new(10, 7);
+        let out = step.handle_command(&Action::Pass { coord }, &mut game, &mut GameRng::new(0));
+        let published = out.published.iter().find(|p| matches!(p, StepParameter::TargetCoordinate(_)));
+        if let Some(StepParameter::TargetCoordinate(c)) = published {
+            assert_eq!(*c, coord, "home-team pass target coordinate must not be mirrored");
+        } else {
+            panic!("TargetCoordinate not published");
+        }
+    }
+
+    #[test]
+    fn throw_team_mate_target_coordinate_transformed_for_away_team() {
+        // Java: CLIENT_THROW_TEAM_MATE → if (game.isHomePlaying()) publish(coord) else publish(coord.transform())
+        let mut game = make_game();
+        game.home_playing = false;
+        game.acting_player.player_id = Some("p1".into());
+        let mut step = StepInitSelecting::new("end".into());
+        let coord = ffb_model::types::FieldCoordinate::new(4, 9);
+        let out = step.handle_command(
+            &Action::ThrowTeamMate { player_id: "tm1".into(), coord },
+            &mut game, &mut GameRng::new(0),
+        );
+        let published = out.published.iter().find(|p| matches!(p, StepParameter::TargetCoordinate(_)));
+        if let Some(StepParameter::TargetCoordinate(c)) = published {
+            assert_eq!(*c, coord.transform(), "away-team throw-team-mate target coordinate must be mirrored");
+        } else {
+            panic!("TargetCoordinate not published");
+        }
     }
 }

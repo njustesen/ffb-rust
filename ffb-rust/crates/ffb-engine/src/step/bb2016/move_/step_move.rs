@@ -1,8 +1,5 @@
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
-use ffb_model::model::property::named_properties::NamedProperties;
-use ffb_model::model::skill_use::SkillUse;
-use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
 use crate::action::Action;
@@ -20,16 +17,20 @@ use crate::util::UtilServerPlayerMove;
 ///              MOVE_STACK (optional — remaining stack after this move; empty = last step).
 ///
 /// Logic (executeStep):
+/// - Java: PlayerState playerState = getPlayerState(actingPlayer.getPlayer()); if (!playerState.isRooted()) { ... }
+///   — the entire body below is skipped when the player is rooted.
 /// - Determine jumpingMove = actingPlayer.isJumping()
 /// - currentMove += jumpingMove ? 2 : 1
 /// - addTrackNumber(actingPlayer, coordinateTo)
 /// - updatePlayerAndBallPosition(actingPlayer, coordinateTo)
 /// - If rushing (goesForIt): update deltaX stat
-/// - If goingForIt: set goesForIt = false (now resolved)
-/// - If remaining move stack empty: updateMoveSquares + updateDiceDecorations
-/// - NEXT_STEP
+/// - setGoingForIt(isNextMoveGoingForIt) — auto go-for-it
+/// - If remaining move stack empty: updateMoveSquares(gameState, false)
+/// - updateDiceDecorations(gameState) — always, regardless of move stack size
+/// - NEXT_STEP (always, rooted or not)
 ///
 /// client-only: TrackNumber animation — field_model.track_numbers is client-side display only.
+/// client-only: SoundId DODGE/STEP assignment — sound playback is client-only.
 pub struct StepMove {
     /// Java: fCoordinateFrom
     pub coordinate_from: Option<FieldCoordinate>,
@@ -82,85 +83,66 @@ impl StepMove {
             None => return StepOutcome::next(),
         };
 
-        let jumping = game.acting_player.jumping;
+        // Java: PlayerState playerState = getFieldModel().getPlayerState(actingPlayer.getPlayer());
+        //       if (!playerState.isRooted()) { ... whole body ... }
+        let is_rooted = game.acting_player.player_id.as_deref()
+            .and_then(|id| game.field_model.player_state(id))
+            .map(|s| s.is_rooted())
+            .unwrap_or(false);
 
-        // Java: actingPlayer.getCurrentMove() + (jumping ? 2 : 1)
-        let move_increment = if jumping { 2 } else { 1 };
-        game.acting_player.current_move += move_increment;
+        if !is_rooted {
+            let jumping = game.acting_player.jumping;
 
-        // Java: if currentMove > movementWithModifiers + possibleFreeRushes && extraGfiOnceSkill.isPresent()
-        //   actingPlayer.markSkillUsed(extraGfiOnceSkill); addReport(ReportSkillUse(actingPlayer.getPlayerId(), skill, true, RUSH_ADDITIONALLY))
-        let extra_gfi_once_skill = game.acting_player.player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_MAKE_AN_EXTRA_GFI_ONCE));
-        if let Some(skill_id) = extra_gfi_once_skill {
-            let possible_free_rushes = 2 + if game.acting_player.player_id.as_deref()
-                .and_then(|id| game.player(id))
-                .map(|p| p.has_skill_property(NamedProperties::CAN_MAKE_AN_EXTRA_GFI))
-                .unwrap_or(false) { 1 } else { 0 };
-            let movement = game.acting_player.player_id.as_deref()
-                .and_then(|id| game.player(id))
-                .map(|p| p.movement_with_modifiers())
-                .unwrap_or(0);
-            if game.acting_player.current_move > movement + possible_free_rushes {
-                if let Some(pid) = game.acting_player.player_id.clone() {
-                    if let Some(p) = game.team_home.player_mut(&pid).or_else(|| game.team_away.player_mut(&pid)) {
-                        p.used_skills.insert(skill_id);
+            // Java: actingPlayer.getCurrentMove() + (jumping ? 2 : 1)
+            let move_increment = if jumping { 2 } else { 1 };
+            game.acting_player.current_move += move_increment;
+
+            // Java: game.getFieldModel().add(trackNumber)
+            // client-only: TrackNumber animation — field_model.track_numbers is client-side display only
+
+            // Java: updatePlayerAndBallPosition(actingPlayer, coordinateTo)
+            if let Some(ref player_id) = game.acting_player.player_id.clone() {
+                let old_pos = game.field_model.player_coordinate(player_id);
+                let ball_position_updated = if let (Some(ball_pos), Some(old)) = (game.field_model.ball_coordinate, old_pos) {
+                    if ball_pos == old && !game.field_model.ball_moving {
+                        game.field_model.ball_coordinate = Some(coordinate_to);
+                        true
+                    } else {
+                        false
                     }
-                }
-                game.report_list.add(ReportSkillUse::new(
-                    game.acting_player.player_id.clone(),
-                    skill_id,
-                    true,
-                    SkillUse::RUSH_ADDITIONAL_SQUARE_ONCE,
-                ));
-            }
-        }
-
-        // Java: game.getFieldModel().add(trackNumber)
-        // client-only: TrackNumber animation — field_model.track_numbers is client-side display only
-
-        // Java: updatePlayerAndBallPosition(actingPlayer, coordinateTo)
-        if let Some(ref player_id) = game.acting_player.player_id.clone() {
-            let old_pos = game.field_model.player_coordinate(player_id);
-            let ball_position_updated = if let (Some(ball_pos), Some(old)) = (game.field_model.ball_coordinate, old_pos) {
-                if ball_pos == old && !game.field_model.ball_moving {
-                    game.field_model.ball_coordinate = Some(coordinate_to);
-                    true
                 } else {
                     false
-                }
-            } else {
-                false
-            };
-            game.field_model.set_player_coordinate(player_id, coordinate_to);
+                };
+                game.field_model.set_player_coordinate(player_id, coordinate_to);
 
-            // Java: if (ballPositionUpdated) { playerResult.setRushing(rushing + deltaX) }
-            if ball_position_updated {
-                let from_x = self.coordinate_from.map(|c| c.x).unwrap_or(coordinate_to.x);
-                let delta_x = if game.home_playing {
-                    coordinate_to.x - from_x
-                } else {
-                    from_x - coordinate_to.x
-                };
-                let is_home = game.team_home.player(player_id).is_some();
-                let pr = if is_home {
-                    game.game_result.home.player_results.entry(player_id.clone()).or_default()
-                } else {
-                    game.game_result.away.player_results.entry(player_id.clone()).or_default()
-                };
-                pr.rushing += delta_x;
+                // Java: if (ballPositionUpdated) { playerResult.setRushing(rushing + deltaX) }
+                if ball_position_updated {
+                    let from_x = self.coordinate_from.map(|c| c.x).unwrap_or(coordinate_to.x);
+                    let delta_x = if game.home_playing {
+                        coordinate_to.x - from_x
+                    } else {
+                        from_x - coordinate_to.x
+                    };
+                    let is_home = game.team_home.player(player_id).is_some();
+                    let pr = if is_home {
+                        game.game_result.home.player_results.entry(player_id.clone()).or_default()
+                    } else {
+                        game.game_result.away.player_results.entry(player_id.clone()).or_default()
+                    };
+                    pr.rushing += delta_x;
+                }
+
+                // Java: actingPlayer.setGoingForIt(UtilPlayer.isNextMoveGoingForIt(game))
+                game.acting_player.goes_for_it = UtilPlayer::is_next_move_going_for_it(game);
             }
 
-            // Java: actingPlayer.setGoingForIt(UtilPlayer.isNextMoveGoingForIt(game))
-            game.acting_player.goes_for_it = UtilPlayer::is_next_move_going_for_it(game);
-        }
-
-        // Java: if (fMoveStackSize == 0) updateMoveSquares + updateDiceDecorations
-        if self.move_stack_size == 0 {
-            let jumping = game.acting_player.jumping;
-            UtilServerPlayerMove::update_move_squares(game, jumping);
+            // Java: if (fMoveStackSize == 0) updateMoveSquares(getGameState(), false)
+            if self.move_stack_size == 0 {
+                UtilServerPlayerMove::update_move_squares(game, false);
+            }
+            // Java: updateDiceDecorations(getGameState()) — unconditional, not gated by move stack size
             ServerUtilBlock::update_dice_decorations(game);
+            // client-only: setSound(actingPlayer.isDodging() ? SoundId.DODGE : SoundId.STEP)
         }
 
         StepOutcome::next()
@@ -410,51 +392,66 @@ mod tests {
         assert!(!game.acting_player.goes_for_it);
     }
 
-    // ── report_list: extra GFI once skill (RUSH_ADDITIONAL_SQUARE_ONCE) ──────
+    // ── rooted guard (Java: `if (!playerState.isRooted())`) ──────────────────
 
     #[test]
-    fn extra_gfi_once_skill_adds_skill_use_report() {
-        use ffb_model::report::report_id::ReportId;
-        use ffb_model::model::skill_def::SkillWithValue;
-        use ffb_model::enums::SkillId;
-        // Player with SureFeet (CAN_MAKE_AN_EXTRA_GFI_ONCE), MA=4
-        // current_move starts at 5 (will become 6 after +1), > MA(4) + possibleFreeRushes(2) = 6 → exact threshold met
+    fn rooted_player_does_not_move_or_increment_current_move() {
+        use ffb_model::enums::{PlayerState, PS_STANDING};
         let mut game = make_game();
         let from = FieldCoordinate::new(5, 5);
         let to = FieldCoordinate::new(6, 5);
         add_player(&mut game, "p1", from);
-        game.team_home.player_mut("p1").unwrap()
-            .starting_skills.push(SkillWithValue::new(SkillId::SureFeet));
-        // Set current_move so that after increment (current_move=6) > MA(4)+2=6 → false
-        // Need current_move after increment > MA + 2, so start at 6 (becomes 7)
-        game.acting_player.current_move = 6;
+        game.acting_player.current_move = 2;
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING).change_rooted(true));
         let mut step = StepMove::new();
         step.coordinate_from = Some(from);
         step.coordinate_to = Some(to);
-        step.start(&mut game, &mut GameRng::new(0));
-        assert!(game.report_list.has_report(ReportId::SKILL_USE),
-            "expected SKILL_USE report for RUSH_ADDITIONAL_SQUARE_ONCE");
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // Rooted: body skipped entirely — no position change, no currentMove increment —
+        // but NEXT_STEP is still set unconditionally.
+        assert_eq!(game.field_model.player_coordinate("p1"), Some(from));
+        assert_eq!(game.acting_player.current_move, 2);
+        assert_eq!(out.action, StepAction::NextStep);
     }
 
     #[test]
-    fn extra_gfi_once_not_triggered_within_free_rushes() {
-        use ffb_model::report::report_id::ReportId;
-        use ffb_model::model::skill_def::SkillWithValue;
-        use ffb_model::enums::SkillId;
-        // Player with SureFeet (CAN_MAKE_AN_EXTRA_GFI_ONCE), MA=4
-        // current_move starts at 0 (becomes 1 after increment), < MA(4)+2=6 → no extra GFI once
+    fn not_rooted_player_moves_normally() {
+        use ffb_model::enums::{PlayerState, PS_STANDING};
         let mut game = make_game();
         let from = FieldCoordinate::new(5, 5);
         let to = FieldCoordinate::new(6, 5);
         add_player(&mut game, "p1", from);
-        game.team_home.player_mut("p1").unwrap()
-            .starting_skills.push(SkillWithValue::new(SkillId::SureFeet));
-        game.acting_player.current_move = 0;
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
         let mut step = StepMove::new();
         step.coordinate_from = Some(from);
         step.coordinate_to = Some(to);
         step.start(&mut game, &mut GameRng::new(0));
-        assert!(!game.report_list.has_report(ReportId::SKILL_USE),
-            "no SKILL_USE report when current_move within free rushes");
+        assert_eq!(game.field_model.player_coordinate("p1"), Some(to));
+    }
+
+    // ── updateMoveSquares(gameState, false) — Java always passes a literal `false`,
+    // not the player's jumping flag — regression test for the miswired `jumping` arg. ──
+
+    #[test]
+    fn update_move_squares_uses_false_not_jumping_flag_when_stack_empty() {
+        use ffb_model::enums::PlayerAction;
+        let mut game = make_game();
+        let from = FieldCoordinate::new(5, 5);
+        let to = FieldCoordinate::new(6, 5);
+        add_player(&mut game, "p1", from);
+        game.acting_player.jumping = true;
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        let mut step = StepMove::new();
+        step.coordinate_from = Some(from);
+        step.coordinate_to = Some(to);
+        step.move_stack_size = 0;
+        step.start(&mut game, &mut GameRng::new(0));
+        // Java always passes `false` for the `jumping` arg of updateMoveSquares regardless
+        // of actingPlayer.isJumping(); a 2-step Chebyshev scan (jump range) would populate
+        // squares at distance 2, which must NOT happen here.
+        let has_distance_2_square = game.field_model.move_squares.iter()
+            .any(|(coord, _)| (coord.x - to.x).abs() == 2 || (coord.y - to.y).abs() == 2);
+        assert!(!has_distance_2_square,
+            "updateMoveSquares must be called with literal false, not the jumping flag");
     }
 }

@@ -82,14 +82,21 @@ impl StepBlockRoll {
 
                 // Java: fNrOfDice = ServerUtilBlock.findNrOfBlockDice(gameState, actingPlayer,
                 //         game.getDefender(), (playerAction == MULTIPLE_BLOCK), successfulDauntless)
+                // Java: `attacker.getTeam() == defender.getTeam()` (same-team block, e.g. Ball & Chain)
+                // is resolved internally by findNrOfBlockDice; the Rust helper takes it as an
+                // explicit parameter instead, so it must be computed here.
                 let is_multiple_block = player_action == Some(PlayerAction::MultipleBlock);
                 let attacker_str = game.acting_player.strength;
                 let defender_str = game.defender_id.as_deref()
                     .and_then(|id| game.player(id))
                     .map(|p| p.strength_with_modifiers())
                     .unwrap_or(3);
+                let attacker_on_home = game.team_home.has_player(&acting_id);
+                let same_team = game.defender_id.as_deref()
+                    .map(|id| game.team_home.has_player(id) == attacker_on_home)
+                    .unwrap_or(false);
                 self.nr_of_dice = ServerUtilBlock::find_nr_of_block_dice(
-                    attacker_str, defender_str, is_multiple_block, self.successful_dauntless, false);
+                    attacker_str, defender_str, same_team, is_multiple_block, false);
 
                 // Java: fBlockRoll = getGameState().getDiceRoller().rollBlockDice(fNrOfDice)
                 let n = self.nr_of_dice.unsigned_abs() as usize;
@@ -107,13 +114,13 @@ impl StepBlockRoll {
 
                 // Java: showBlockRollDialog(doRoll)
                 // → show dialog (CONTINUE) waiting for block choice
-                self.show_block_roll_dialog(game);
+                self.show_block_roll_dialog(game, true);
                 let mut outcome = StepOutcome::cont();
                 if let Some(ev) = block_event { outcome = outcome.with_event(ev); }
                 return outcome;
             } else {
                 // Java: showBlockRollDialog(doRoll) — re-roll path, show dialog
-                self.show_block_roll_dialog(game);
+                self.show_block_roll_dialog(game, false);
                 return StepOutcome::cont();
             }
         } else {
@@ -133,36 +140,19 @@ impl StepBlockRoll {
 
     /// Java: showBlockRollDialog(boolean pDoRoll)
     /// Determines which team gets the re-roll option and shows the dialog.
-    fn show_block_roll_dialog(&self, game: &mut Game) {
-        let team_id = if game.home_playing {
-            game.team_home.id.clone()
-        } else {
-            game.team_away.id.clone()
-        };
-
-        // Java: getResult().addReport(new ReportBlockRoll(teamId, fBlockRoll))
-        {
-            use ffb_model::report::report_block_roll::ReportBlockRoll;
-            game.report_list.add(ReportBlockRoll::new(
-                team_id.clone(),
-                self.block_roll.clone(),
-                game.defender_id.clone(),
-            ));
-        }
-
-        let _team_id = team_id;
-        let acting_id = game.acting_player.player_id.as_deref().unwrap_or("");
+    fn show_block_roll_dialog(&self, game: &mut Game, do_roll: bool) {
+        let acting_id = game.acting_player.player_id.as_deref().unwrap_or("").to_string();
 
         // Java: boolean teamReRollOption = (getReRollSource() == null) && !reRollUsed && (reRolls > 0)
         let td = game.turn_data();
-        let _team_reroll_option = self.re_roll.re_roll_source.is_none()
+        let mut team_reroll_option = self.re_roll.re_roll_source.is_none()
             && !td.reroll_used
             && td.rerolls > 0;
 
         // Java: boolean proReRollOption = (getReRollSource() == null)
         //   && UtilCards.hasUnusedSkillWithProperty(actingPlayer, canRerollOncePerTurn)
-        let _pro_reroll_option = self.re_roll.re_roll_source.is_none()
-            && game.player(acting_id)
+        let mut pro_reroll_option = self.re_roll.re_roll_source.is_none()
+            && game.player(&acting_id)
                 .map(|p| {
                     p.all_skill_ids()
                         .any(|id| id.properties().contains(&NamedProperties::CAN_REROLL_ONCE_PER_TURN)
@@ -170,9 +160,47 @@ impl StepBlockRoll {
                 })
                 .unwrap_or(false);
 
+        // Java: String teamId = homePlaying ? teamHome.getId() : teamAway.getId()
+        let mut team_id = if game.home_playing {
+            game.team_home.id.clone()
+        } else {
+            game.team_away.id.clone()
+        };
+
+        // Java: if ((fNrOfDice < 0) && (!pDoRoll || (getReRollSource() != null)
+        //         || (!teamReRollOption && !proReRollOption))) {
+        //         teamId = homePlaying ? teamAway.getId() : teamHome.getId();
+        //         teamReRollOption = false; proReRollOption = false; }
+        if self.nr_of_dice < 0
+            && (!do_roll
+                || self.re_roll.re_roll_source.is_some()
+                || (!team_reroll_option && !pro_reroll_option))
+        {
+            team_id = if game.home_playing {
+                game.team_away.id.clone()
+            } else {
+                game.team_home.id.clone()
+            };
+            team_reroll_option = false;
+            pro_reroll_option = false;
+        }
+        // team_reroll_option / pro_reroll_option are not modeled further: the simplified
+        // dialog system here does not carry DialogBlockRollParameter's reroll-option flags.
+        let _ = (team_reroll_option, pro_reroll_option);
+
+        // Java: getResult().addReport(new ReportBlockRoll(teamId, fBlockRoll))
+        {
+            use ffb_model::report::report_block_roll::ReportBlockRoll;
+            game.report_list.add(ReportBlockRoll::new(
+                team_id,
+                self.block_roll.clone(),
+                game.defender_id.clone(),
+            ));
+        }
+
         // Java: UtilServerDialog.showDialog(gameState, new DialogBlockRollParameter(teamId, fNrOfDice, fBlockRoll,
-        //     teamReRollOption, proReRollOption), true)
-        UtilServerDialog::show_dialog(game, DialogId::BLOCK_ROLL, true);
+        //     teamReRollOption, proReRollOption), (fNrOfDice < 0))
+        UtilServerDialog::show_dialog(game, DialogId::BLOCK_ROLL, self.nr_of_dice < 0);
     }
 }
 
@@ -319,5 +347,80 @@ mod tests {
         game.defender_id = Some("def".into());
         step.start(&mut game, &mut GameRng::new(1));
         assert!(game.report_list.has_report(ReportId::BLOCK_ROLL), "ReportBlockRoll must be emitted via showBlockRollDialog");
+    }
+
+    fn add_player(game: &mut Game, home: bool, id: &str, strength: i32) {
+        use ffb_model::enums::{PlayerGender, PlayerType};
+        use ffb_model::model::player::Player;
+        let player = Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        if home {
+            game.team_home.players.push(player);
+        } else {
+            game.team_away.players.push(player);
+        }
+    }
+
+    #[test]
+    fn multi_block_applies_defender_strength_modifier_not_same_team_abs() {
+        // Java: findNrOfBlockDice adds +1 to defender strength when usingMultiBlock, and only
+        // forces nrOfDice positive (abs) when attacker.getTeam() == defender.getTeam().
+        // Bug: the Rust call previously passed `is_multiple_block` into the `same_team` slot
+        // and `successful_dauntless` into the `using_multi_block` slot, so a cross-team
+        // multiple-block declaration was wrongly treated as same-team (forcing nrOfDice
+        // positive via abs()) instead of applying the +1 defender strength modifier.
+        let mut step = StepBlockRoll::new();
+        let mut game = make_game();
+        add_player(&mut game, true, "att", 4);
+        add_player(&mut game, false, "def", 4);
+        game.acting_player.player_id = Some("att".into());
+        game.acting_player.strength = 4;
+        game.acting_player.player_action = Some(PlayerAction::MultipleBlock);
+        game.defender_id = Some("def".into());
+        step.start(&mut game, &mut GameRng::new(1));
+        assert_eq!(
+            step.nr_of_dice, -2,
+            "equal strength + multi-block should give defender the +1 modifier (nrOfDice = -2), \
+             not force abs() as if same-team"
+        );
+    }
+
+    #[test]
+    fn negative_nr_of_dice_swaps_report_team_to_defender_when_no_reroll_available() {
+        // Java: showBlockRollDialog swaps teamId (and the ReportBlockRoll it reports) to the
+        // defending team when fNrOfDice < 0 and the attacking team has no team/skill re-roll
+        // available. This swap was entirely missing from the Rust translation.
+        use ffb_model::report::report_block_roll::ReportBlockRoll;
+        use ffb_model::report::report_id::ReportId;
+        let mut step = StepBlockRoll::new();
+        let mut game = make_game();
+        add_player(&mut game, true, "att", 3);
+        add_player(&mut game, false, "def", 4);
+        game.acting_player.player_id = Some("att".into());
+        game.acting_player.strength = 3;
+        game.defender_id = Some("def".into());
+        // test_team() has 0 rerolls and the attacker has no canRerollOncePerTurn skill,
+        // so both teamReRollOption and proReRollOption are false → swap condition applies.
+        step.start(&mut game, &mut GameRng::new(1));
+        assert_eq!(step.nr_of_dice, -2, "attacker weaker than defender → defender chooses");
+        let report = game.report_list.get_reports().iter()
+            .find(|r| r.get_id() == ReportId::BLOCK_ROLL)
+            .expect("ReportBlockRoll must be emitted");
+        let block_roll_report: &ReportBlockRoll = (&**report as &dyn std::any::Any)
+            .downcast_ref()
+            .expect("report must be a ReportBlockRoll");
+        assert_eq!(
+            block_roll_report.get_choosing_team_id(),
+            game.team_away.id.as_str(),
+            "with fNrOfDice < 0 and no reroll available, teamId must swap to the defending team"
+        );
     }
 }

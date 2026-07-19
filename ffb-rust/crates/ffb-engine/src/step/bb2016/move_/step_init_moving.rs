@@ -1,10 +1,6 @@
 use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
-use ffb_model::enums::{PlayerAction, SkillId};
+use ffb_model::enums::PlayerAction;
 use ffb_model::model::game::Game;
-use ffb_model::model::property::named_properties::NamedProperties;
-use ffb_model::model::skill_use::SkillUse;
-use ffb_model::report::mixed::report_fumblerooskie::ReportFumblerooskie;
-use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepAction};
@@ -132,23 +128,8 @@ impl Step for StepInitMoving {
                 self.gaze_victim_id = Some(target_id.clone());
                 return self.execute_step(game, rng);
             }
-            // Java: CLIENT_USE_FUMBLEROOSKIE → ReportFumblerooskie(player.getId(), true)
-            Action::UseSkill { skill_id: SkillId::Fumblerooskie, use_skill: true } => {
-                let player_id = game.acting_player.player_id.clone();
-                game.report_list.add(ReportFumblerooskie::new(player_id, true));
-            }
-            // Java: CLIENT_USE_SKILL → canAddBlockDie → ReportSkillUse(skill, true, ADD_BLOCK_DIE)
-            Action::UseSkill { skill_id, use_skill: true } => {
-                if skill_id.properties().contains(&NamedProperties::CAN_ADD_BLOCK_DIE) {
-                    let player_id = game.acting_player.player_id.clone();
-                    game.report_list.add(ReportSkillUse::new(
-                        player_id,
-                        *skill_id,
-                        true,
-                        SkillUse::ADD_BLOCK_DIE,
-                    ));
-                }
-            }
+            // Java bb2016 StepInitMoving.handleCommand() has no CLIENT_USE_FUMBLEROOSKIE or
+            // CLIENT_USE_SKILL cases (those only exist in the bb2025 StepInitMoving) — unhandled here.
             Action::EndTurn => {
                 self.end_turn = true;
                 return self.execute_step(game, rng);
@@ -191,7 +172,11 @@ impl StepInitMoving {
         }
 
         if let Some(ref kicked_id) = self.kicked_player_id.clone() {
-            let seq = KickTeamMate::build_sequence(&KickTeamMateParams::default());
+            // Java: new KickTeamMate.SequenceParams(getGameState(), fNumDice, fKickedPlayerId)
+            let seq = KickTeamMate::build_sequence(&KickTeamMateParams {
+                kicked_player_id: Some(kicked_id.clone()),
+                num_dice: self.num_dice,
+            });
             return StepOutcome::next()
                 .push_seq(seq)
                 .publish(StepParameter::KickedPlayerId(Some(kicked_id.clone())))
@@ -495,39 +480,23 @@ mod tests {
         assert!(game.acting_player.goes_for_it, "setGoingForIt should be true for GFI square");
     }
 
-    // ── report_list: Fumblerooskie and ADD_BLOCK_DIE ─────────────────────────
-
     #[test]
-    fn use_fumblerooskie_skill_adds_fumblerooskie_report() {
-        use ffb_model::report::report_id::ReportId;
-        use ffb_model::enums::SkillId;
+    fn kicked_player_id_pushes_sequence_with_actual_params() {
+        // Java: pushSequence(new KickTeamMate.SequenceParams(getGameState(), fNumDice, fKickedPlayerId))
+        // The sub-sequence's InitKickTeamMate step must carry the real kicked_player_id/num_dice,
+        // not defaults.
         let mut game = make_game();
-        game.acting_player.player_id = Some("p1".into());
         let mut step = StepInitMoving::new("end".into());
-        step.handle_command(
-            &Action::UseSkill { skill_id: SkillId::Fumblerooskie, use_skill: true },
-            &mut game,
-            &mut GameRng::new(0),
-        );
-        assert!(game.report_list.has_report(ReportId::FUMBLEROOSKIE),
-            "expected FUMBLEROOSKIE report when Fumblerooskie skill is used");
-    }
-
-    #[test]
-    fn use_skill_without_can_add_block_die_does_not_add_skill_use_report() {
-        use ffb_model::report::report_id::ReportId;
-        use ffb_model::enums::SkillId;
-        // Dodge does NOT have CAN_ADD_BLOCK_DIE — no SKILL_USE report should be added
-        let mut game = make_game();
-        game.acting_player.player_id = Some("p1".into());
-        let mut step = StepInitMoving::new("end".into());
-        step.handle_command(
-            &Action::UseSkill { skill_id: SkillId::Dodge, use_skill: true },
-            &mut game,
-            &mut GameRng::new(0),
-        );
-        assert!(!game.report_list.has_report(ReportId::SKILL_USE),
-            "Dodge does not have CAN_ADD_BLOCK_DIE — no SKILL_USE report should be added");
+        step.kicked_player_id = Some("victim1".into());
+        step.num_dice = 2;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "expected KickTeamMate sub-sequence to be pushed");
+        let init_step = &out.pushes[0][0];
+        assert!(init_step.params.iter().any(|p| matches!(p, StepParameter::KickedPlayerId(Some(id)) if id == "victim1")),
+            "InitKickTeamMate step should receive the actual kicked_player_id");
+        assert!(init_step.params.iter().any(|p| matches!(p, StepParameter::NrOfDice(2))),
+            "InitKickTeamMate step should receive the actual num_dice");
     }
 
     #[test]

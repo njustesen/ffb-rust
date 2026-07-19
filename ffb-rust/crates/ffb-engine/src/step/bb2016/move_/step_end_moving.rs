@@ -1,8 +1,6 @@
 use ffb_model::types::FieldCoordinate;
 use ffb_model::enums::PlayerAction;
 use ffb_model::model::game::Game;
-use ffb_model::report::mixed::report_player_event::ReportPlayerEvent;
-use ffb_model::report::report_id::ReportId;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
 use ffb_mechanics::bb2016::ttm_mechanic::TtmMechanic as Bb2016TtmMechanic;
@@ -118,24 +116,10 @@ impl StepEndMoving {
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // client-only: UtilServerDialog.hideDialog
 
-        // Java: triesToSecureBall = playerAction == SECURE_THE_BALL
-        // Java: secureTheBallFailed = endPlayerAction && triesToSecureBall && !UtilPlayer.hasBall(...)
-        let player_action = game.acting_player.player_action;
-        let tries_to_secure_ball = player_action == Some(PlayerAction::SecureTheBall);
-        let has_ball = game.acting_player.player_id.as_deref()
-            .map(|id| UtilPlayer::has_ball(game, id))
-            .unwrap_or(false);
-        let secure_the_ball_failed = self.end_player_action && tries_to_secure_ball && !has_ball;
-
-        // Java: if (secureTheBallFailed) getResult().addReport(new ReportPlayerEvent(...))
-        if secure_the_ball_failed {
-            game.report_list.add(ReportPlayerEvent::new(
-                game.acting_player.player_id.clone(),
-                Some("could not secure the ball, causing a turnover".into()),
-            ));
-        }
-
-        self.end_turn |= check_touchdown(game) || secure_the_ball_failed;
+        // Java (bb2016 StepEndMoving): no SECURE_THE_BALL handling — that logic only
+        // exists in the bb2025 StepEndMoving.executeStep(). bb2016 simply does:
+        //   fEndTurn |= UtilServerSteps.checkTouchdown(getGameState());
+        self.end_turn |= check_touchdown(game);
 
         // Java: if (fFeedingAllowed == null) fFeedingAllowed = true
         let feeding_allowed = self.feeding_allowed.unwrap_or(true);
@@ -529,36 +513,25 @@ mod tests {
     }
 
     #[test]
-    fn secure_the_ball_failed_adds_player_event_report() {
+    fn bb2016_end_moving_never_adds_secure_the_ball_report() {
+        // bb2016 StepEndMoving.executeStep() has no SECURE_THE_BALL handling at all —
+        // that logic only exists in the bb2025 StepEndMoving. Previously the Rust
+        // translation had invented this logic (copied from bb2025), which would have
+        // wrongly added a ReportPlayerEvent and forced fEndTurn=true here. Verify no
+        // such report is ever added and end_turn isn't forced by this scenario.
+        use ffb_model::report::report_id::ReportId;
         let mut game = make_game();
         add_player_at(&mut game, true, "p1", FieldCoordinate::new(5, 5));
         game.acting_player.player_id = Some("p1".into());
         game.acting_player.player_action = Some(PlayerAction::SecureTheBall);
-        // Ball is NOT at player's square → secure_the_ball_failed
+        // Ball NOT at player's square (would have been "secure the ball failed" under
+        // the bb2025-only logic).
         game.field_model.ball_coordinate = Some(FieldCoordinate::new(10, 5));
         let mut step = StepEndMoving::new();
         step.end_player_action = true;
         step.start(&mut game, &mut GameRng::new(0));
-        assert!(game.report_list.has_report(ReportId::PLAYER_EVENT),
-            "ReportPlayerEvent must be added when secure_the_ball fails");
-    }
-
-    #[test]
-    fn no_player_event_when_secure_the_ball_succeeds() {
-        let mut game = make_game();
-        let coord = FieldCoordinate::new(5, 5);
-        add_player_at(&mut game, true, "p1", coord);
-        game.acting_player.player_id = Some("p1".into());
-        game.acting_player.player_action = Some(PlayerAction::SecureTheBall);
-        // Ball IS at player's square and in play → has_ball = true → no failure
-        game.field_model.ball_coordinate = Some(coord);
-        game.field_model.ball_in_play = true;
-        game.field_model.ball_moving = false;
-        let mut step = StepEndMoving::new();
-        step.end_player_action = true;
-        step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.report_list.has_report(ReportId::PLAYER_EVENT),
-            "no ReportPlayerEvent when player secured the ball");
+            "bb2016 StepEndMoving must never add a secure-the-ball ReportPlayerEvent");
     }
 
     #[test]

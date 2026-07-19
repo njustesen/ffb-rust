@@ -81,7 +81,10 @@ impl StepInitFouling {
 
             StepOutcome::next()
         } else {
-            StepOutcome::next()
+            // Java: no nextAction is set when the foul validation fails (already fouled,
+            // invalid defender, or protected by preventBeingFouled) — the step stays
+            // pending, waiting for a valid CLIENT_FOUL/CLIENT_END_TURN command.
+            StepOutcome::cont()
         }
     }
 }
@@ -210,8 +213,26 @@ mod tests {
         game.acting_player.player_id = Some("att".into());
         game.acting_player.has_fouled = true;
         let mut rng = GameRng::new(0);
-        step.start(&mut game, &mut rng);
+        let outcome = step.start(&mut game, &mut rng);
         assert!(game.defender_id.is_none());
+        // Java: executeStep() sets no nextAction at all when validation fails
+        // (already fouled) — the step must stay pending (Continue), not advance.
+        assert!(matches!(outcome.action, StepAction::Continue),
+            "invalid foul attempt (already fouled) must not advance to NEXT_STEP");
+    }
+
+    #[test]
+    fn invalid_defender_leaves_step_pending() {
+        let mut step = StepInitFouling::new();
+        step.set_parameter(&StepParameter::FoulDefenderId("nonexistent".into()));
+        let mut game = make_game();
+        add_player(&mut game, "att");
+        game.acting_player.player_id = Some("att".into());
+        let mut rng = GameRng::new(0);
+        let outcome = step.start(&mut game, &mut rng);
+        assert!(game.defender_id.is_none());
+        assert!(matches!(outcome.action, StepAction::Continue),
+            "foul attempt with an invalid defender id must not advance to NEXT_STEP");
     }
 
     #[test]
