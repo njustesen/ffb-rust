@@ -827,6 +827,8 @@ impl SkillId {
             SkillId::MaximumCarnage => &["canPerformSecondChainsawAttack"],
             // Java: BeerBarrelBash.postConstruct registers canThrowKeg
             SkillId::BeerBarrelBash => &["canThrowKeg"],
+            // Java: Indomitable.postConstruct registers canDoubleStrengthAfterDauntless
+            SkillId::Indomitable => &["canDoubleStrengthAfterDauntless"],
             // Java: PilingOnBehaviour registers canPileOnOpponent
             SkillId::PilingOn => &["canPileOnOpponent"],
             // Java: bb2016/WeepingDagger.postConstruct registers appliesPoisonOnBadlyHurt

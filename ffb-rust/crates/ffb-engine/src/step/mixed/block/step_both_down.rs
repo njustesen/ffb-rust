@@ -5,9 +5,10 @@
 /// it has the Block skill.
 ///
 /// Expects `OLD_DEFENDER_STATE` parameter from a preceding step (e.g. StepInitBlocking).
-use ffb_model::enums::{PlayerState, SkillId};
+use ffb_model::enums::PlayerState;
 use ffb_model::enums::PS_FALLING;
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -26,14 +27,15 @@ impl StepBothDown {
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
         // ── Defender ──────────────────────────────────────────────────────────
         if let Some(defender_id) = game.defender_id.clone() {
-            let defender_has_block = game.player(&defender_id)
-                .map(|p| p.has_skill(SkillId::Block))
+            // Java: game.getDefender().hasSkillProperty(NamedProperties.preventFallOnBothDown)
+            let defender_prevents_fall = game.player(&defender_id)
+                .map(|p| p.has_skill_property(NamedProperties::PREVENT_FALL_ON_BOTH_DOWN))
                 .unwrap_or(false);
             let defender_has_tacklezones = game.field_model.player_state(&defender_id)
                 .map(|s| s.has_tacklezones())
                 .unwrap_or(false);
 
-            if !(defender_has_block && defender_has_tacklezones) {
+            if !(defender_prevents_fall && defender_has_tacklezones) {
                 // Java: defenderState.changeBase(PlayerState.FALLING)
                 if let Some(state) = game.field_model.player_state(&defender_id) {
                     game.field_model.set_player_state(&defender_id, state.change_base(PS_FALLING));
@@ -45,11 +47,12 @@ impl StepBothDown {
 
         // ── Attacker ──────────────────────────────────────────────────────────
         if let Some(attacker_id) = game.acting_player.player_id.clone() {
-            let attacker_has_block = game.player(&attacker_id)
-                .map(|p| p.has_skill(SkillId::Block))
+            // Java: !actingPlayer.getPlayer().hasSkillProperty(NamedProperties.preventFallOnBothDown)
+            let attacker_prevents_fall = game.player(&attacker_id)
+                .map(|p| p.has_skill_property(NamedProperties::PREVENT_FALL_ON_BOTH_DOWN))
                 .unwrap_or(false);
 
-            if !attacker_has_block {
+            if !attacker_prevents_fall {
                 if let Some(state) = game.field_model.player_state(&attacker_id) {
                     game.field_model.set_player_state(&attacker_id, state.change_base(PS_FALLING));
                 }
@@ -89,7 +92,7 @@ impl Step for StepBothDown {
 mod tests {
     use super::*;
     use crate::step::framework::test_team;
-    use ffb_model::enums::{Rules, PS_STANDING, PS_FALLING};
+    use ffb_model::enums::{Rules, PS_STANDING, PS_FALLING, SkillId};
     use ffb_model::model::player::Player;
     use ffb_model::model::skill_def::SkillWithValue;
     use ffb_model::enums::{PlayerType, PlayerGender};

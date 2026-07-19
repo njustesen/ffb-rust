@@ -62,13 +62,15 @@ impl StepFoul {
         let defender_coord = game.field_model.player_coordinate(&defender_id)
             .unwrap_or(ffb_model::types::FieldCoordinate::new(0, 0));
 
-        // Java: prayerState.hasFoulingFrenzy(actingTeam) → InjuryTypeFoulForSpp else InjuryTypeFoul
-        // Prayer state not yet ported — always use InjuryTypeFoul.
-        // When using chainsaw: InjuryTypeFoulChainsaw (adds chainsaw armor modifiers — stubbed same as InjuryTypeFoul).
-        let injury_type_name = if self.using_chainsaw {
-            "InjuryTypeFoulChainsaw"
-        } else {
-            "InjuryTypeFoul"
+        // Java: prayerState.hasFoulingFrenzy(actingTeam) ? InjuryTypeFoulForSpp : InjuryTypeFoul
+        // (both variants further wrap chainsaw handling via the `usingChainsaw` ctor arg).
+        let acting_team_id = game.active_team().id.clone();
+        let fouling_frenzy = game.prayer_state.has_fouling_frenzy(&acting_team_id);
+        let injury_type_name = match (fouling_frenzy, self.using_chainsaw) {
+            (true, true) => "InjuryTypeFoulChainsawForSpp",
+            (true, false) => "InjuryTypeFoulForSpp",
+            (false, true) => "InjuryTypeFoulChainsaw",
+            (false, false) => "InjuryTypeFoul",
         };
 
         let injury_result = handle_injury_by_name(
@@ -209,6 +211,47 @@ mod tests {
             if let StepParameter::DropPlayerContext(ctx) = p { Some(ctx.clone()) } else { None }
         }).expect("DROP_PLAYER_CONTEXT not published");
         assert_eq!(dpc.player_id.as_deref(), Some("def"));
+    }
+
+    /// Regression test: Java picks `InjuryTypeFoulForSpp` over `InjuryTypeFoul` when
+    /// `getGameState().getPrayerState().hasFoulingFrenzy(actingTeam)` is true. Before this
+    /// fix, the Rust translation always used the non-SPP variant (comment: "Prayer state
+    /// not yet ported"), even though `PrayerState::has_fouling_frenzy` was already fully
+    /// implemented in `ffb-model` — fouls made under an active Fouling Frenzy prayer never
+    /// scored SPPs for the attacker.
+    #[test]
+    fn fouling_frenzy_uses_spp_injury_type() {
+        let mut game = make_game();
+        add_player(&mut game, "home", "att");
+        add_player(&mut game, "away", "def");
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+        game.home_playing = true;
+        game.prayer_state.add_fouling_frenzy("home");
+        let mut step = StepFoul::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        let dpc = out.published.iter().find_map(|p| {
+            if let StepParameter::DropPlayerContext(ctx) = p { Some(ctx.clone()) } else { None }
+        }).expect("DROP_PLAYER_CONTEXT not published");
+        let ir = dpc.injury_result.expect("injury result must be present");
+        assert!(ir.injury_context().is_worth_spps, "fouling frenzy foul must be worth SPPs");
+    }
+
+    #[test]
+    fn without_fouling_frenzy_is_not_worth_spps() {
+        let mut game = make_game();
+        add_player(&mut game, "home", "att");
+        add_player(&mut game, "away", "def");
+        game.acting_player.player_id = Some("att".into());
+        game.defender_id = Some("def".into());
+        game.home_playing = true;
+        let mut step = StepFoul::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        let dpc = out.published.iter().find_map(|p| {
+            if let StepParameter::DropPlayerContext(ctx) = p { Some(ctx.clone()) } else { None }
+        }).expect("DROP_PLAYER_CONTEXT not published");
+        let ir = dpc.injury_result.expect("injury result must be present");
+        assert!(!ir.injury_context().is_worth_spps, "regular foul must not be worth SPPs");
     }
 
     #[test]

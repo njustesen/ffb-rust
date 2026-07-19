@@ -214,6 +214,11 @@ pub enum StepParameter {
     FoulerHasBall(bool),
     ArgueTheCallSuccessful(bool),
     CheckForgo(bool),
+    /// Java: `StepParameterKey.OFFICIOUS_REF` — set by the Officious Ref kickoff event
+    /// when it pushes `StepEjectPlayer` directly (bypassing the normal foul sequence),
+    /// so the SneakyGit step-modifier hook knows to use the "was banned by the officious
+    /// ref" send-to-box reason instead of the foul-ban one.
+    OfficiousRef(bool),
     // ── inducement parameters ────────────────────────────────────────────────
     InducementPhase(ffb_model::enums::InducementPhase),
     EndInducementPhase(bool),

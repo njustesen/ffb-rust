@@ -133,6 +133,15 @@ impl StepProjectileVomit {
                     drop_self = true;
                 } else if let Some(prompt) = ask_for_reroll_if_available(game, "PROJECTILE_VOMIT", minimum_roll, false) {
                     self.re_roll.set_re_rolled_action(ReRolledAction::new("PROJECTILE_VOMIT"));
+                    // Stash the *offered* source here (mirroring `AgentPrompt::ReRollOffer.source`)
+                    // so `handle_command` has something to commit-or-discard based on the reply —
+                    // same bug shape/fix as `step_trap_door.rs` / `step_move_ball_and_chain.rs`.
+                    // Without this, `re_roll.re_roll_source` stays `None`, so the next
+                    // `execute_step` call always forces `drop_self = true` regardless of the
+                    // player's choice, meaning accepting the re-roll offer never re-rolled.
+                    if let ffb_model::prompts::AgentPrompt::ReRollOffer { ref source, .. } = prompt {
+                        self.re_roll.re_roll_source = Some(source.clone());
+                    }
                     let out = StepOutcome::cont().with_prompt(prompt);
                     return if let Some(ev) = vomit_event { out.with_event(ev) } else { out };
                 } else {
@@ -357,5 +366,92 @@ mod tests {
         step.set_parameter(&StepParameter::GotoLabelOnFailure("f".into()));
         assert_eq!(step.goto_label_on_success, "s");
         assert_eq!(step.goto_label_on_failure, "f");
+    }
+
+    /// Regression test: the offered re-roll's `re_roll_source` must be stashed when the
+    /// dialog is issued (same bug shape/fix as `step_trap_door.rs`). Before the fix,
+    /// `execute_step`'s re-roll-offer branch called `set_re_rolled_action` but never
+    /// touched `re_roll.re_roll_source`, so the *next* `execute_step` call (triggered by
+    /// `handle_command`) always found `re_roll_source == None` and forced `drop_self = true`
+    /// — accepting the re-roll offer never actually re-rolled, nor consumed the team re-roll.
+    #[test]
+    fn accepting_reroll_offer_stashes_source_and_consumes_trr() {
+        let mut step = StepProjectileVomit {
+            goto_label_on_success: "success".into(),
+            goto_label_on_failure: "failure".into(),
+            using_vomit: true,
+            ..Default::default()
+        };
+        let mut game = make_game();
+        // PutridRegurgitation registers canPerformArmourRollInsteadOfBlockThatMightFail.
+        add_player(&mut game, "att", PS_STANDING, &[SkillId::PutridRegurgitation]);
+        game.acting_player.set_player("att".into(), ffb_model::enums::PlayerAction::ProjectileVomit);
+        game.team_home.players.push(Player {
+            id: "def".into(), name: "def".into(), nr: 2, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("def", ffb_model::enums::PlayerState::new(PS_STANDING));
+        game.defender_id = Some("def".into());
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        game.turn_data_home.reroll_used = false;
+
+        // Seed 7 produces d6 == 1 on the first roll → failure triggers the re-roll offer
+        // (same seed used by the analogous step_trap_door.rs regression test).
+        let mut rng = GameRng::new(7);
+        let out = step.start(&mut game, &mut rng);
+
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(step.re_roll.re_roll_source.is_some(), "re_roll_source must be stashed when the offer is issued");
+
+        let _ = step.handle_command(&Action::UseReRoll { use_reroll: true }, &mut game, &mut rng);
+
+        assert_eq!(game.turn_data_home.rerolls, 0, "accepting the offer must consume the TRR");
+    }
+
+    #[test]
+    fn declining_reroll_offer_clears_source_and_does_not_consume_trr() {
+        let mut step = StepProjectileVomit {
+            goto_label_on_success: "success".into(),
+            goto_label_on_failure: "failure".into(),
+            using_vomit: true,
+            ..Default::default()
+        };
+        let mut game = make_game();
+        add_player(&mut game, "att", PS_STANDING, &[SkillId::PutridRegurgitation]);
+        game.acting_player.set_player("att".into(), ffb_model::enums::PlayerAction::ProjectileVomit);
+        game.team_home.players.push(Player {
+            id: "def".into(), name: "def".into(), nr: 2, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("def", ffb_model::enums::PlayerState::new(PS_STANDING));
+        game.defender_id = Some("def".into());
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        game.turn_data_home.reroll_used = false;
+
+        let mut rng = GameRng::new(7);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(step.re_roll.re_roll_source.is_some());
+
+        let _ = step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut rng);
+
+        assert!(step.re_roll.re_roll_source.is_none(), "declining must clear the stashed source");
+        assert_eq!(game.turn_data_home.rerolls, 1, "declining must not consume the TRR");
     }
 }

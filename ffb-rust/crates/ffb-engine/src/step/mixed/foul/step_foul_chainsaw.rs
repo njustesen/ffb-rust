@@ -77,9 +77,9 @@ impl StepFoulChainsaw {
             None => return StepOutcome::next(),
         };
 
-        // Java: if (!hasUnusedSkillWithProperty(blocksLikeChainsaw) || !usingChainsaw) → NEXT_STEP
+        // Java: if (!UtilCards.hasUnusedSkillWithProperty(actingPlayer, blocksLikeChainsaw) || !usingChainsaw) → NEXT_STEP
         let has_chainsaw = game.player(&attacker_id)
-            .map(|p| p.has_skill_property(NamedProperties::BLOCKS_LIKE_CHAINSAW))
+            .map(|p| p.has_unused_skill_with_property(NamedProperties::BLOCKS_LIKE_CHAINSAW))
             .unwrap_or(false);
         if !has_chainsaw || !self.using_chainsaw {
             return StepOutcome::next();
@@ -309,6 +309,27 @@ mod tests {
             }
         }
         panic!("no seed producing roll >= 2");
+    }
+
+    /// Regression test: Java gates on `UtilCards.hasUnusedSkillWithProperty`, not just
+    /// `hasSkillProperty` — a chainsaw that has already been used this action must not
+    /// trigger a second roll. Before this fix, `has_chainsaw` used `has_skill_property`,
+    /// which ignores `used_skills` entirely, so an already-used Chainsaw would still let
+    /// the step proceed to roll again.
+    #[test]
+    fn already_used_chainsaw_skill_returns_next_step() {
+        let mut game = make_game();
+        add_player(&mut game, "home", "atk", Some(SkillId::Chainsaw));
+        if let Some(p) = game.team_home.player_mut("atk") {
+            p.used_skills.insert(SkillId::Chainsaw);
+        }
+        game.acting_player.player_id = Some("atk".into());
+        let mut step = StepFoulChainsaw::new("fail".into());
+        step.using_chainsaw = true;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.published.is_empty(), "an already-used chainsaw skill must not trigger a roll");
+        assert!(!game.report_list.has_report(ReportId::CHAINSAW_ROLL));
     }
 
     #[test]
