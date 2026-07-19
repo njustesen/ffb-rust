@@ -138,10 +138,14 @@ impl StepUnchannelledFury {
         };
 
         if skip_roll {
-            // Re-roll declined or token exhausted — check for FuryOfTheBloodGod dialog
+            // Re-roll declined or token exhausted — check for FuryOfTheBloodGod dialog.
+            // Java (UnchannelledFuryBehaviour, this exact branch): `playerAction == PlayerAction.BLOCK`
+            // — an *exact* BLOCK check, unlike the broader `isBlockAction()` used in the
+            // failed-roll branch further below (which also covers VICIOUS_VINES, BREATHE_FIRE,
+            // CHAINSAW, STAB, PROJECTILE_VOMIT, CHOMP).
             let player_action = game.acting_player.player_action;
             if self.has_unused_fury_of_blood_god(game, &player_id)
-                && player_action.map(|a| a.is_block_action()).unwrap_or(false)
+                && player_action == Some(PlayerAction::Block)
             {
                 // client-only: DialogSkillUseParameter for FuryOfTheBloodGod
                 return StepOutcome::cont(); // wait for UseSkill response
@@ -558,6 +562,34 @@ mod tests {
         game.acting_player.player_id = Some("p1".into());
         step.handle_command(&Action::UseSkill { skill_id: SkillId::FuryOfTheBloodGod, use_skill: false }, &mut game, &mut rng);
         assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
+    }
+
+    #[test]
+    fn declined_reroll_offers_fury_dialog_only_for_exact_block_action() {
+        // Java: UnchannelledFuryBehaviour's "re-roll declined/exhausted" branch checks
+        // `playerAction == PlayerAction.BLOCK` exactly, unlike the broader
+        // `isBlockAction()` used after a failed *roll* (which also covers STAB,
+        // VICIOUS_VINES, BREATHE_FIRE, CHAINSAW, PROJECTILE_VOMIT, CHOMP).
+        // With action == STAB (isBlockAction() == true, but != BLOCK), a declined
+        // re-roll must go straight to cancel+failure, not offer the dialog.
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = make_game();
+        add_player_with_skill(&mut game, "p1", SkillId::UnchannelledFury);
+        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "p1") {
+            p.starting_skills.push(SkillWithValue { skill_id: SkillId::FuryOfTheBloodGod, value: None });
+        }
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+        game.acting_player.player_action = Some(PlayerAction::Stab);
+        // Mark UnchannelledFury as already used (roll happened), simulating the
+        // second invocation after the coach declined the re-roll offer.
+        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "p1") {
+            p.used_skills.insert(SkillId::UnchannelledFury);
+        }
+        let mut step = StepUnchannelledFury::new("FAIL");
+        step.re_rolled_action = Some("UNCHANNELLED_FURY".into());
+        step.re_roll_source = None; // declined
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel, "STAB is not exact BLOCK, so no dialog should be offered");
     }
 
     #[test]

@@ -104,16 +104,17 @@ impl StepPassBlock {
             }
 
         } else {
-            // Java: first time through — check for available pass blockers
-            // Simplified: emit PassBlockEligible event and emit PassBlock(false) if none,
-            // then advance.  Full mechanic lookup deferred.
-            // Java: if (availablePassBlockers.size() == 0) { report PassBlock(false); }
-            let opposing_team_id = if game.home_playing {
-                game.team_away.id.clone()
+            // Java: Set<Player<?>> availablePassBlockers = mechanic.findPassBlockers(game, opposingTeam, true);
+            //       if (availablePassBlockers.size() == 0) { report PassBlock(false); } else { ... }
+            // headless(PassBlock-turnMode): full TurnMode::PassBlock switch + homePlaying flip +
+            // player-state save/select-sequence push not yet ported (mirrors bb2016 sibling).
+            let (opposing_team_id, opposing_team_clone) = if game.home_playing {
+                (game.team_away.id.clone(), game.team_away.clone())
             } else {
-                game.team_home.id.clone()
+                (game.team_home.id.clone(), game.team_home.clone())
             };
-            game.report_list.add(ReportPassBlock::new(opposing_team_id, false));
+            let has_blockers = Self::has_available_pass_blockers(game, &opposing_team_clone);
+            game.report_list.add(ReportPassBlock::new(opposing_team_id, has_blockers));
             let outcome = StepOutcome::next()
                 .with_event(ffb_model::events::GameEvent::PassBlock {
                     player_id: None,
@@ -122,6 +123,16 @@ impl StepPassBlock {
         }
 
         StepOutcome::next()
+    }
+
+    /// Java: `mechanic.findPassBlockers(game, opposingTeam, true).size() != 0`.
+    /// Extracted so tests can assert on the exact predicate used to decide
+    /// `ReportPassBlock`'s availability flag, without needing to downcast the
+    /// boxed `IReport` trait object stored in `game.report_list`.
+    fn has_available_pass_blockers(game: &Game, opposing_team: &ffb_model::model::Team) -> bool {
+        use ffb_mechanics::on_the_ball_mechanic::OnTheBallMechanic as OnTheBallMechanicTrait;
+        let mechanic = ffb_mechanics::mixed::on_the_ball_mechanic::OnTheBallMechanic::new();
+        !mechanic.find_pass_blockers(game, opposing_team, true).is_empty()
     }
 }
 
@@ -251,5 +262,73 @@ mod tests {
         let mut step = StepPassBlock::new();
         step.set_parameter(&StepParameter::GotoLabelOnEnd("lbl".into()));
         assert_eq!(step.goto_label_on_end, "lbl");
+    }
+
+    /// Regression: the mixed StepPassBlock previously never called
+    /// `OnTheBallMechanic::find_pass_blockers` and always reported
+    /// `ReportPassBlock(available=false)`, even when the opposing team had an
+    /// eligible Pass-Block player standing with tacklezones. Java:
+    /// `Set<Player<?>> availablePassBlockers = mechanic.findPassBlockers(game, opposingTeam, true);
+    ///  if (availablePassBlockers.size() == 0) { report(false) } else { report ... }`
+    #[test]
+    fn eligible_pass_blocker_is_detected_as_available() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerGender, PlayerType, SkillId, PlayerState};
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+
+        let mut game = make_game();
+        game.thrower_id = Some("p1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        // Thrower is on the home team; opposing team (away) has a Pass Block player.
+        game.home_playing = true;
+
+        let blocker = Player {
+            id: "blocker1".into(),
+            name: "blocker1".into(),
+            nr: 1,
+            position_id: "lineman".into(),
+            player_type: PlayerType::Regular,
+            gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue::new(SkillId::PassBlock)],
+            extra_skills: vec![],
+            temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0,
+            stat_injuries: vec![],
+            current_spps: 0,
+            career_spps: 0,
+            race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_away.players.push(blocker);
+        game.field_model.set_player_coordinate("blocker1", FieldCoordinate::new(3, 3));
+        game.field_model.set_player_state("blocker1", PlayerState::new(0x1)); // PS_STANDING → has_tacklezones
+
+        // This is the exact predicate the (fixed) step now uses to decide the
+        // ReportPassBlock availability flag; before the fix, the step never
+        // invoked find_pass_blockers at all and hard-coded `false`.
+        let available = StepPassBlock::has_available_pass_blockers(&game, &game.team_away);
+        assert!(available, "expected an eligible Pass-Block player standing with tacklezones to be detected as an available pass blocker");
+
+        // End-to-end: running the step with this setup must produce a
+        // ReportPassBlock (existence already covered by other tests); here we
+        // additionally confirm the step doesn't panic and completes normally.
+        let mut step = StepPassBlock::new();
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.report_list.has_report(ReportId::PASS_BLOCK));
+    }
+
+    #[test]
+    fn no_eligible_pass_blockers_when_opposing_team_has_no_pass_block_players() {
+        let mut game = make_game();
+        game.thrower_id = Some("p1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.home_playing = true;
+        assert!(!StepPassBlock::has_available_pass_blockers(&game, &game.team_away));
     }
 }

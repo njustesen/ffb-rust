@@ -76,6 +76,10 @@ impl Step for StepWizard {
                     self.wizard_spell = Some(SpecialEffect::FIREBALL);
                     self.target_coordinate = Some(self.transform_coord(*coord, game));
                 }
+                WizardSpellChoice::Zap => {
+                    self.wizard_spell = Some(SpecialEffect::ZAP);
+                    self.target_coordinate = Some(self.transform_coord(*coord, game));
+                }
             }
         }
         // Java: if (wizardSpellCommand.getWizardSpell() == null) → cancel

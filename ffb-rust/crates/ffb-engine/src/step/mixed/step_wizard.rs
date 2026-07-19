@@ -102,8 +102,11 @@ impl StepWizard {
                     }
                 }
 
-                // Java: collect affected players
-                // addToAffectedPlayers: skip prone or stunned
+                // Java: collect affected players.
+                // ZAP adds the player at the target coordinate directly (no
+                // prone/stunned filter — see `affectedPlayers.add(...)` in
+                // StepWizard.executeStep). LIGHTNING and FIREBALL route through
+                // `addToAffectedPlayers`, which skips prone or stunned players.
                 let affected: Vec<String> = {
                     let coords: Vec<FieldCoordinate> = if spell == SpecialEffect::FIREBALL {
                         let mut v = vec![coord];
@@ -112,15 +115,22 @@ impl StepWizard {
                     } else {
                         vec![coord]
                     };
-                    coords.iter()
-                        .filter_map(|c| game.field_model.player_at(*c))
-                        .filter(|id| {
-                            game.field_model.player_state(id)
-                                .map(|s| !s.is_prone() && !s.is_stunned())
-                                .unwrap_or(false)
-                        })
-                        .map(|id| id.to_string())
-                        .collect()
+                    if spell == SpecialEffect::ZAP {
+                        coords.iter()
+                            .filter_map(|c| game.field_model.player_at(*c))
+                            .map(|id| id.to_string())
+                            .collect()
+                    } else {
+                        coords.iter()
+                            .filter_map(|c| game.field_model.player_at(*c))
+                            .filter(|id| {
+                                game.field_model.player_state(id)
+                                    .map(|s| !s.is_prone() && !s.is_stunned())
+                                    .unwrap_or(false)
+                            })
+                            .map(|id| id.to_string())
+                            .collect()
+                    }
                 };
 
                 // Restore old turn mode
@@ -181,6 +191,7 @@ impl Step for StepWizard {
                 self.wizard_spell = Some(match spell {
                     WizardSpellChoice::Lightning => SpecialEffect::LIGHTNING,
                     WizardSpellChoice::Fireball => SpecialEffect::FIREBALL,
+                    WizardSpellChoice::Zap => SpecialEffect::ZAP,
                 });
                 self.target_coordinate = Some(if self.home_team { *coord } else { coord.transform() });
             }
@@ -347,6 +358,45 @@ mod tests {
     fn unrecognised_parameter_returns_false() {
         let mut step = StepWizard::new();
         assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
+    }
+
+    #[test]
+    fn zap_on_prone_player_still_pushes_sequence() {
+        // Java: StepWizard.executeStep adds the ZAP target directly
+        // (`affectedPlayers.add(...)`), unlike LIGHTNING/FIREBALL which route
+        // through `addToAffectedPlayers` and skip prone/stunned players.
+        let mut step = StepWizard::new();
+        step.home_team = true;
+        step.old_turn_mode = Some(TurnMode::Regular);
+        step.wizard_spell = Some(SpecialEffect::ZAP);
+        let coord = FieldCoordinate::new(5, 5);
+        step.target_coordinate = Some(coord);
+
+        let mut team = test_team("home", 0);
+        team.players.push(Player { id: "p1".into(), name: "P1".into(), nr: 1, ..Default::default() });
+        let mut game = Game::new(team, test_team("away", 0), Rules::Bb2025);
+        game.turn_mode = TurnMode::Wizard;
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE));
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "ZAP must hit a prone player unlike lightning/fireball");
+    }
+
+    #[test]
+    fn wizard_spell_action_zap_sets_zap_effect() {
+        let mut step = StepWizard::new();
+        step.home_team = true;
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Wizard;
+        let coord = FieldCoordinate::new(5, 5);
+        step.handle_command(
+            &Action::WizardSpell { spell: WizardSpellChoice::Zap, coord },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert_eq!(step.wizard_spell, Some(SpecialEffect::ZAP));
     }
 
     #[test]

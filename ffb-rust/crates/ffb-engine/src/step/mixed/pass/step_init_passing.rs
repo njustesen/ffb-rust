@@ -56,22 +56,58 @@ impl StepInitPassing {
                 .with_published(outcome.published);
         }
 
-        // Java: if suffering blood lust and not fed → goto end
-        if game.acting_player.suffering_blood_lust {
-            // Java: !actingPlayer.hasFed() — use has_acted proxy (TODO: add has_fed)
-            let has_fed = false; // stub
-            if !has_fed {
-                return StepOutcome::goto(&self.goto_label_on_end.clone())
-                    .with_events(outcome.events)
-                    .with_published(outcome.published);
-            }
+        // Java: (game.getThrower() == actingPlayer.getPlayer()) && actingPlayer.isSufferingBloodLust() && !actingPlayer.hasFed()
+        let thrower_is_acting = game.thrower_id.is_some() && game.thrower_id == game.acting_player.player_id;
+        if thrower_is_acting
+            && game.acting_player.suffering_blood_lust
+            && !game.acting_player.has_fed
+        {
+            return StepOutcome::goto(&self.goto_label_on_end.clone())
+                .with_events(outcome.events)
+                .with_published(outcome.published);
         }
 
         // Java: pass/hand-over setup (range ruler, hasPassed, concessionPossible, etc.)
         // These mutations are on game state — perform them then advance.
-        // Simplified: just mark hasPassed on actingPlayer via has_moved proxy.
         // client-only: full range ruler logic — RangeRuler is client-side display
-        game.acting_player.has_moved = true; // proxy for hasPassed
+        use ffb_model::enums::PlayerAction;
+        let thrower_action = game.thrower_action;
+        match thrower_action {
+            Some(PlayerAction::HandOver) => {
+                if thrower_is_acting {
+                    game.acting_player.has_passed = true;
+                    game.concession_possible = false;
+                    game.turn_data_mut().hand_over_used = true;
+                    game.turn_data_mut().turn_started = true;
+                }
+            }
+            Some(PlayerAction::Pass) => {
+                if thrower_is_acting {
+                    game.acting_player.has_passed = true;
+                    game.turn_data_mut().turn_started = true;
+                    game.concession_possible = false;
+                    game.turn_data_mut().pass_used = true;
+                }
+            }
+            Some(PlayerAction::ThrowBomb) | Some(PlayerAction::DumpOff) => {
+                if thrower_is_acting {
+                    game.acting_player.has_passed = true;
+                    game.turn_data_mut().turn_started = true;
+                    game.concession_possible = false;
+                }
+            }
+            Some(PlayerAction::HailMaryBomb) | Some(PlayerAction::HailMaryPass) => {
+                if thrower_is_acting {
+                    game.acting_player.has_passed = true;
+                }
+                game.turn_data_mut().turn_started = true;
+                game.concession_possible = false;
+                if thrower_action == Some(PlayerAction::HailMaryPass) {
+                    game.turn_data_mut().pass_used = true;
+                }
+            }
+            _ => {}
+        }
 
         outcome
     }
@@ -207,6 +243,97 @@ mod tests {
         let mut game = make_game();
         game.thrower_id = Some("p1".into());
         game.thrower_action = Some(PlayerAction::Pass);
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    /// Regression: the mixed StepInitPassing previously set `has_moved` (a proxy,
+    /// wrong field) instead of `has_passed` (Java: `actingPlayer.setHasPassed(true)`),
+    /// and never set `turn_data.pass_used` / `concession_possible`. Mirrors the
+    /// already-correct bb2016 sibling translation.
+    #[test]
+    fn pass_action_sets_has_passed_and_pass_used_and_clears_concession() {
+        let mut step = StepInitPassing::new();
+        step.goto_label_on_end = "end".into();
+        let mut game = make_game();
+        game.thrower_id = Some("p1".into());
+        game.acting_player.player_id = Some("p1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.concession_possible = true;
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.acting_player.has_passed, "has_passed must be set (Java: actingPlayer.setHasPassed(true))");
+        assert!(!game.acting_player.has_moved, "has_moved must NOT be touched by this step");
+        assert!(game.turn_data().pass_used, "turn_data.pass_used must be set for PASS action");
+        assert!(game.turn_data().turn_started);
+        assert!(!game.concession_possible);
+    }
+
+    #[test]
+    fn hand_over_action_sets_hand_over_used() {
+        let mut step = StepInitPassing::new();
+        step.goto_label_on_end = "end".into();
+        let mut game = make_game();
+        game.thrower_id = Some("p1".into());
+        game.acting_player.player_id = Some("p1".into());
+        game.thrower_action = Some(PlayerAction::HandOver);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert!(game.acting_player.has_passed);
+        assert!(game.turn_data().hand_over_used);
+    }
+
+    /// Regression: Java guards the blood-lust check with
+    /// `game.getThrower() == actingPlayer.getPlayer()`. The mixed translation
+    /// previously dropped this guard and applied the check unconditionally
+    /// whenever `acting_player.suffering_blood_lust` was set, even if the acting
+    /// player was not the thrower (e.g. during a Dump-Off where the defender is
+    /// the thrower). It also hard-coded `has_fed = false` instead of reading the
+    /// real `acting_player.has_fed` field.
+    #[test]
+    fn blood_lust_check_ignored_when_thrower_is_not_acting_player() {
+        let mut step = StepInitPassing::new();
+        step.goto_label_on_end = "end".into();
+        let mut game = make_game();
+        // Thrower is the defender (dump-off scenario); acting player is someone else.
+        game.thrower_id = Some("defender".into());
+        game.thrower_action = Some(PlayerAction::DumpOff);
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.suffering_blood_lust = true;
+        game.acting_player.has_fed = false;
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        // Must NOT goto label, since thrower != acting player.
+        assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    #[test]
+    fn blood_lust_thrower_is_acting_and_not_fed_goes_to_label() {
+        let mut step = StepInitPassing::new();
+        step.goto_label_on_end = "end".into();
+        let mut game = make_game();
+        game.thrower_id = Some("p1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.suffering_blood_lust = true;
+        game.acting_player.has_fed = false;
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::GotoLabel);
+    }
+
+    #[test]
+    fn blood_lust_thrower_is_acting_and_fed_continues() {
+        let mut step = StepInitPassing::new();
+        step.goto_label_on_end = "end".into();
+        let mut game = make_game();
+        game.thrower_id = Some("p1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.suffering_blood_lust = true;
+        game.acting_player.has_fed = true;
         let mut rng = GameRng::new(0);
         let out = step.start(&mut game, &mut rng);
         assert_eq!(out.action, StepAction::NextStep);

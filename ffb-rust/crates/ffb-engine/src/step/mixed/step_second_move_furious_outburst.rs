@@ -19,11 +19,12 @@
 /// Java fields: `eligibleSquares`, `endPlayerAction`, `endTurn`, `withBall`,
 ///              `goToLabelOnEnd`, `coordinate`.
 use std::collections::HashSet;
-use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds, MoveSquare, FIELD_WIDTH};
+use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds, MoveSquare};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter, CatchScatterThrowInMode};
+use crate::step::util_server_steps::check_touchdown;
 
 /// Java: `StepSecondMoveFuriousOutburst` (mixed, BB2020 + BB2025).
 pub struct StepSecondMoveFuriousOutburst {
@@ -76,7 +77,7 @@ impl StepSecondMoveFuriousOutburst {
                 game.field_model.set_player_state(sid, old.change_selected_stab_target(false));
             }
             // Java: stayInEndzone = UtilServerSteps.checkTouchdown — if scoring, restrict to opponent endzone
-            let stay_in_endzone = Self::check_touchdown(game);
+            let stay_in_endzone = check_touchdown(game);
             let opponent_endzone = if game.home_playing {
                 FieldCoordinateBounds::ENDZONE_AWAY
             } else {
@@ -128,33 +129,6 @@ impl StepSecondMoveFuriousOutburst {
         outcome
     }
 
-    /// Java: UtilServerSteps.checkTouchdown — true if ball carrier is in opponent's endzone.
-    fn check_touchdown(game: &Game) -> bool {
-        if !game.field_model.ball_in_play || game.field_model.ball_moving {
-            return false;
-        }
-        let ball_coord = match game.field_model.ball_coordinate {
-            Some(c) => c,
-            None => return false,
-        };
-        let carrier_id = match game.field_model.player_at(ball_coord) {
-            Some(id) => id.clone(),
-            None => return false,
-        };
-        let state = match game.field_model.player_state(&carrier_id) {
-            Some(s) => s,
-            None => return false,
-        };
-        if state.is_prone_or_stunned() {
-            return false;
-        }
-        let home_has_carrier = game.team_home.player(&carrier_id).is_some();
-        if home_has_carrier {
-            ball_coord.x == FIELD_WIDTH - 1
-        } else {
-            ball_coord.x == 0
-        }
-    }
 }
 
 impl Default for StepSecondMoveFuriousOutburst {

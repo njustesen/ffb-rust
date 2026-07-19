@@ -16,7 +16,10 @@ use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::abstract_step_with_re_roll::ReRollState;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
-const MINIMUM_PRO_ROLL: i32 = 4; // Java: RollMechanic.minimumProRoll() = 4 across all editions
+// Java: RollMechanic.minimumProRoll() = 3 for BB2020/BB2025 (this step's editions).
+// Only the bb2016 RollMechanic returns 4; StepPro is annotated
+// @RulesCollection(BB2020) @RulesCollection(BB2025), so 3 is correct here.
+const MINIMUM_PRO_ROLL: i32 = 3;
 const OLD_PRO: &str = "OLD_PRO";
 
 /// Java: `StepPro` (mixed, BB2020 + BB2025).
@@ -60,12 +63,14 @@ impl StepPro {
         // Java: if (doRoll) { successful = useReRoll(this, ReRollSources.PRO, player) }
         // ReRollSources.PRO internally rolls D6 >= minimumProRoll()
         if do_roll {
+            // Java: RollMechanic.useReRoll marks `changeUsedPro(true)` unconditionally
+            // (before rolling) once Pro is eligible to be used this turn, regardless of
+            // whether the subsequent skill roll succeeds or fails.
+            if let Some(state) = game.field_model.player_state(&player_id) {
+                game.field_model.set_player_state(&player_id, state.change_used_pro(true));
+            }
             let roll = rng.d6();
             successful = roll >= MINIMUM_PRO_ROLL;
-            // Mark Pro as used (Java: mechanic.useReRoll rolls it and marks skill used)
-            if let Some(state) = game.field_model.player_state(&player_id) {
-                game.field_model.set_player_state(&player_id, state.change_used_pro(!successful));
-            }
         }
 
         // Java: if (!successful && getReRolledAction() != OLD_PRO) → ask for reroll
@@ -178,6 +183,30 @@ mod tests {
         } else {
             // Still publishes SuccessfulPro(false) when no reroll available
             assert!(out.published.iter().any(|p| matches!(p, StepParameter::SuccessfulPro(false))));
+        }
+    }
+
+    #[test]
+    fn minimum_pro_roll_is_three_not_four() {
+        // Java: RollMechanic.minimumProRoll() returns 3 for BB2020 and BB2025;
+        // only BB2016 returns 4, and StepPro is BB2020/BB2025-only.
+        assert_eq!(MINIMUM_PRO_ROLL, 3);
+    }
+
+    #[test]
+    fn used_pro_is_marked_true_regardless_of_roll_outcome() {
+        // Java: RollMechanic.useReRoll sets `changeUsedPro(true)` unconditionally
+        // before rolling the Pro skill die, whether the roll subsequently
+        // succeeds or fails.
+        for seed in 0..20u64 {
+            let mut step = StepPro::new();
+            step.player_id = Some("p1".into());
+            let mut game = make_game();
+            add_player(&mut game, "p1");
+            let mut rng = GameRng::new(seed);
+            step.start(&mut game, &mut rng);
+            let state = game.field_model.player_state("p1").expect("player state");
+            assert!(state.has_used_pro(), "seed {seed}: used_pro must be true after a Pro roll attempt");
         }
     }
 

@@ -118,10 +118,12 @@ impl StepQuickBite {
                     if let Some(player_coord) = game.field_model.player_coordinate(player_id) {
                         game.field_model.ball_coordinate = Some(player_coord);
                     }
-                    let attacker_on_acting_team = game.home_playing == game.team_home.has_player(player_id);
-                    outcome = outcome
-                        .publish(StepParameter::PlayerId(player_id.clone()))
-                        .publish(StepParameter::RevertEndTurn(attacker_on_acting_team));
+                    // Java: if (player.getTeam() == game.getActingTeam()) publish REVERT_END_TURN(true)
+                    // — only published when the attacker is on the acting team; otherwise omitted.
+                    outcome = outcome.publish(StepParameter::PlayerId(player_id.clone()));
+                    if game.is_active_team_player(player_id) {
+                        outcome = outcome.publish(StepParameter::RevertEndTurn(true));
+                    }
                 }
                 return outcome;
             }
@@ -157,9 +159,18 @@ impl Step for StepQuickBite {
                     self.use_skill = Some(false);
                 }
             }
-            // Java: CLIENT_USE_SKILL(canAttackOpponentForBallAfterCatch)
-            Action::UseSkill { use_skill, .. } => {
-                self.use_skill = Some(*use_skill);
+            // Java: CLIENT_USE_SKILL — playerIds.contains(commandUseSkill.getPlayerId())
+            //   && commandUseSkill.getSkill().hasSkillProperty(canAttackOpponentForBallAfterCatch)
+            // The only candidate offered via the single-opponent skill-use dialog is playerIds[0],
+            // so a property-matching command implicitly refers to that player (Action::UseSkill
+            // carries no explicit player id field).
+            Action::UseSkill { skill_id, use_skill } => {
+                if skill_id.properties().contains(&NamedProperties::CAN_ATTACK_OPPONENT_FOR_BALL_AFTER_CATCH) {
+                    if let Some(pid) = self.player_ids.first() {
+                        self.player_id = Some(pid.clone());
+                    }
+                    self.use_skill = Some(*use_skill);
+                }
             }
             _ => {}
         }
@@ -214,22 +225,42 @@ mod tests {
 
     #[test]
     fn handle_use_skill_true_sets_use_skill() {
+        // Java: CLIENT_USE_SKILL only matches when playerIds.contains(getPlayerId())
+        // && getSkill().hasSkillProperty(canAttackOpponentForBallAfterCatch); the lone
+        // dialog candidate is playerIds[0], so player_id must be populated from it too.
         let mut step = StepQuickBite::new();
+        step.player_ids.push("opp".into());
         let mut game = make_game();
         let mut rng = GameRng::new(0);
-        let action = Action::UseSkill { skill_id: SkillId::Block, use_skill: true };
+        let action = Action::UseSkill { skill_id: SkillId::QuickBite, use_skill: true };
         step.handle_command(&action, &mut game, &mut rng);
         assert_eq!(step.use_skill, Some(true));
+        assert_eq!(step.player_id, Some("opp".into()));
     }
 
     #[test]
     fn handle_use_skill_false_sets_use_skill() {
         let mut step = StepQuickBite::new();
+        step.player_ids.push("opp".into());
         let mut game = make_game();
         let mut rng = GameRng::new(0);
-        let action = Action::UseSkill { skill_id: SkillId::Block, use_skill: false };
+        let action = Action::UseSkill { skill_id: SkillId::QuickBite, use_skill: false };
         step.handle_command(&action, &mut game, &mut rng);
         assert_eq!(step.use_skill, Some(false));
+    }
+
+    #[test]
+    fn handle_use_skill_ignores_wrong_skill_property() {
+        // Java: commandUseSkill.getSkill().hasSkillProperty(canAttackOpponentForBallAfterCatch)
+        // guards the branch — a command carrying an unrelated skill must fall through unhandled.
+        let mut step = StepQuickBite::new();
+        step.player_ids.push("opp".into());
+        let mut game = make_game();
+        let mut rng = GameRng::new(0);
+        let action = Action::UseSkill { skill_id: SkillId::Block, use_skill: true };
+        step.handle_command(&action, &mut game, &mut rng);
+        assert_eq!(step.use_skill, None);
+        assert_eq!(step.player_id, None);
     }
 
     #[test]
@@ -252,5 +283,50 @@ mod tests {
         let mut rng = GameRng::new(0);
         step.start(&mut game, &mut rng);
         assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
+    }
+
+    fn add_low_armour_player(game: &mut Game, on_home_team: bool, id: &str) {
+        let player = ffb_model::model::player::Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
+            player_type: ffb_model::enums::PlayerType::Regular,
+            gender: ffb_model::enums::PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 2,
+            ..Default::default()
+        };
+        if on_home_team { game.team_home.players.push(player); } else { game.team_away.players.push(player); }
+    }
+
+    #[test]
+    fn revert_end_turn_published_when_attacker_on_acting_team() {
+        // Java: `if (player.getTeam() == game.getActingTeam())` publish REVERT_END_TURN(true)
+        // only when the Quick Bite attacker (`playerId`) belongs to the acting team.
+        let mut step = StepQuickBite::new();
+        step.catcher_id = Some("catcher".into());
+        step.player_id = Some("attacker".into());
+        step.use_skill = Some(true);
+        let mut game = make_game();
+        // game.home_playing defaults to true, so the home team is the acting team.
+        assert!(game.home_playing);
+        add_low_armour_player(&mut game, true, "attacker");
+        let mut rng = GameRng::new(1); // seed known to break armour(2) per InjuryTypeQuickBite tests
+        let out = step.start(&mut game, &mut rng);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::RevertEndTurn(true))),
+            "expected REVERT_END_TURN(true) when attacker is on the acting team");
+    }
+
+    #[test]
+    fn revert_end_turn_not_published_when_attacker_off_acting_team() {
+        let mut step = StepQuickBite::new();
+        step.catcher_id = Some("catcher".into());
+        step.player_id = Some("attacker".into());
+        step.use_skill = Some(true);
+        let mut game = make_game();
+        assert!(game.home_playing);
+        // attacker on the away (non-acting) team this time.
+        add_low_armour_player(&mut game, false, "attacker");
+        let mut rng = GameRng::new(1);
+        let out = step.start(&mut game, &mut rng);
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::RevertEndTurn(_))),
+            "REVERT_END_TURN must not be published when the attacker is off the acting team");
     }
 }

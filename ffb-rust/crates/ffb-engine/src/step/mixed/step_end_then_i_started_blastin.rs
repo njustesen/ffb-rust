@@ -41,7 +41,9 @@ impl StepEndThenIStartedBlastin {
 
         if self.end_turn || self.end_player_action || prone_or_worse {
             // Java: restore last_turn_mode if it's a basic mode, otherwise set REGULAR
-            if game.turn_mode != TurnMode::Regular {
+            // Java: `!game.getTurnMode().isBasicMode()` — isBasicMode() is true for both
+            // REGULAR and BLITZ, so this must check is_basic_mode(), not `!= Regular`.
+            if !game.turn_mode.is_basic_mode() {
                 match game.last_turn_mode {
                     Some(ltm) => game.turn_mode = ltm,
                     None => game.turn_mode = TurnMode::Regular,
@@ -158,6 +160,26 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         let has_epa = out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(_)));
         assert!(has_epa, "prone player should trigger end sequence parameters");
+    }
+
+    #[test]
+    fn blitz_turn_mode_is_basic_mode_and_is_not_reset() {
+        // Java: `isBasicMode()` is true for both REGULAR and BLITZ, so
+        // `!game.getTurnMode().isBasicMode()` must be false (and the turn-mode
+        // restore block skipped) when turn_mode is BLITZ, even though BLITZ != REGULAR.
+        let mut step = StepEndThenIStartedBlastin::new();
+        step.end_turn = true;
+        let mut game = make_game();
+        add_player(&mut game, "att", PS_STANDING);
+        game.turn_mode = TurnMode::Blitz;
+        game.last_turn_mode = None;
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        assert_eq!(
+            game.turn_mode,
+            TurnMode::Blitz,
+            "BLITZ is a basic mode; turn mode must not be reset to Regular"
+        );
     }
 
     #[test]

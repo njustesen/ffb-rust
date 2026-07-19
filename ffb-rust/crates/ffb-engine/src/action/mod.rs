@@ -216,6 +216,9 @@ pub enum PlayerActionChoice {
 pub enum WizardSpellChoice {
     Lightning,
     Fireball,
+    // Java: SpecialEffect.ZAP is also `isWizardSpell() == true` and is handled
+    // identically to StepWizard's other two client-selectable spells.
+    Zap,
 }
 
 /// A single inducement purchase (id + quantity).

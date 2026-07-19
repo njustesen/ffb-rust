@@ -904,6 +904,8 @@ impl SkillId {
             SkillId::Saboteur => &["canSabotageBlockerOnKnockdown"],
             // Java: WatchOut.postConstruct registers ignoresDefenderStumblesResultForFirstBlock
             SkillId::WatchOut => &["ignoresDefenderStumblesResultForFirstBlock"],
+            // Java: mixed/special/QuickBite.postConstruct registers canAttackOpponentForBallAfterCatch
+            SkillId::QuickBite => &["canAttackOpponentForBallAfterCatch"],
             _ => &[],
         }
     }
