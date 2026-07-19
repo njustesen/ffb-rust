@@ -230,10 +230,14 @@ impl StepSelectGazeTarget {
                 game.field_model.set_player_state(&selected_id, new_state);
             }
 
-            // Java: setTargetSelectionState(new TargetSelectionState(selectedPlayerId).select().commit())
+            // Java: TargetSelectionState targetSelectionState = new TargetSelectionState(selectedPlayerId);
+            //   if (game.getActingPlayer().hasActed()) { targetSelectionState.commit(game); }
+            //   setTargetSelectionState(targetSelectionState.select())
             let mut ts = TargetSelectionState::new(selected_id.clone());
+            if game.acting_player.has_acted {
+                ts.commit();
+            }
             ts.select();
-            ts.commit();
             game.field_model.target_selection_state = Some(ts);
 
             // Java: getResult().addReport(new ReportSelectGazeTarget(actingPlayer.getId(), selectedId))
@@ -354,6 +358,74 @@ mod tests {
         // The target should have the selected gaze target bit set
         let state = game.field_model.player_state(&pid).unwrap();
         assert!(state.is_selected_gaze_target());
+    }
+
+    #[test]
+    fn selecting_opponent_without_having_acted_does_not_commit() {
+        // Java: TargetSelectionState.commit(game) is only called when
+        // game.getActingPlayer().hasActed() is true. If the acting player has not
+        // yet acted this turn (gaze is their first/only action so far), the
+        // resulting TargetSelectionState must remain uncommitted.
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("home_p1".into());
+        game.acting_player.has_acted = false;
+
+        let pid = "away_p1".to_string();
+        game.team_away.players.push(Player {
+            id: pid.clone(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate(&pid, FieldCoordinate::new(10, 7));
+        game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
+
+        let mut step = StepSelectGazeTarget::new();
+        step.selected_player_id = Some(pid.clone());
+        step.start(&mut game, &mut GameRng::new(0));
+        let tss = game.field_model.target_selection_state.as_ref().unwrap();
+        assert!(!tss.is_committed(), "must not commit when acting player has not acted yet");
+        assert!(tss.get_status() == ffb_model::model::target_selection_state::TargetSelectionStatus::SELECTED);
+    }
+
+    #[test]
+    fn selecting_opponent_after_having_acted_commits() {
+        // Java: hasActed() true → targetSelectionState.commit(game) is called.
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+
+        let mut game = make_game();
+        game.home_playing = true;
+        game.acting_player.player_id = Some("home_p1".into());
+        game.acting_player.has_acted = true;
+
+        let pid = "away_p2".to_string();
+        game.team_away.players.push(Player {
+            id: pid.clone(), name: "p2".into(), nr: 2, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate(&pid, FieldCoordinate::new(11, 7));
+        game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING));
+
+        let mut step = StepSelectGazeTarget::new();
+        step.selected_player_id = Some(pid.clone());
+        step.start(&mut game, &mut GameRng::new(0));
+        let tss = game.field_model.target_selection_state.as_ref().unwrap();
+        assert!(tss.is_committed(), "must commit when acting player has already acted");
     }
 
     #[test]

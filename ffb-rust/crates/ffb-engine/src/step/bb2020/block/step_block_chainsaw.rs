@@ -186,9 +186,11 @@ impl StepBlockChainsaw {
                 defender_coord, None, None, ApothecaryMode::Defender,
             );
 
-            let armor_broken = injury_result_defender.injury_context().is_armor_broken();
             let chainsaw_option = game.options.get(game_option_id::CHAINSAW_TURNOVER).unwrap_or(CHAINSAW_TURNOVER_ALL_AV_BREAKS);
-            let causes_turn_over = chainsaw_option.eq_ignore_ascii_case(CHAINSAW_TURNOVER_ALL_AV_BREAKS) && armor_broken;
+            // Java: GameOptionString.CHAINSAW_TURNOVER_ALL_AV_BREAKS.equalsIgnoreCase(chainsawOption)
+            // (no armor-broken check here — a successful chainsaw hit always ends the turn unless
+            // the option is set to something other than the default "allAvBreaks").
+            let causes_turn_over = chainsaw_option.eq_ignore_ascii_case(CHAINSAW_TURNOVER_ALL_AV_BREAKS);
 
             let dpc = DropPlayerContext {
                 injury_result: Some(Box::new(injury_result_defender)),
@@ -201,6 +203,11 @@ impl StepBlockChainsaw {
                 already_dropped,
                 ..DropPlayerContext::new()
             };
+
+            // Java: game.getFieldModel().setPlayerState(game.getDefender(), defenderState.removeSelectedBlitzTarget());
+            if let Some(state) = defender_state {
+                game.field_model.set_player_state(&defender_id, state.remove_selected_blitz_target());
+            }
 
             StepOutcome::next().publish(StepParameter::DropPlayerContext(Box::new(dpc)))
         } else {
@@ -358,6 +365,47 @@ mod tests {
             }
         }
         panic!("no seed produces d6>=2");
+    }
+
+    /// Java: on a successful chainsaw hit, `endTurn` is
+    /// `GameOptionString.CHAINSAW_TURNOVER_ALL_AV_BREAKS.equalsIgnoreCase(chainsawOption)` with no
+    /// armor-broken check — a successful chainsaw always ends the turn under the default option,
+    /// regardless of whether the defender's armor actually breaks. A prior Rust bug added an
+    /// extra `&& armor_broken` guard that isn't in the Java source.
+    #[test]
+    fn successful_hit_ends_turn_even_without_armor_break() {
+        for seed in 0..500u64 {
+            let mut rng = GameRng::new(seed);
+            if rng.d6() < 2 {
+                continue;
+            }
+            let mut g = make_game();
+            add_player_with_skill(&mut g, "home", "atk1", Some(SkillId::Chainsaw));
+            add_player_with_skill(&mut g, "away", "def1", None);
+            g.acting_player.player_id = Some("atk1".into());
+            g.defender_id = Some("def1".into());
+
+            let mut step = StepBlockChainsaw::new("success".into(), "failure".into());
+            step.using_chainsaw = true;
+            let out = step.start(&mut g, &mut GameRng::new(seed));
+
+            let dpc = out.published.iter().find_map(|p| match p {
+                StepParameter::DropPlayerContext(ctx) => Some(ctx.as_ref()),
+                _ => None,
+            });
+            let Some(dpc) = dpc else { continue };
+            let armor_broken = dpc.injury_result.as_ref()
+                .map(|ir| ir.injury_context().is_armor_broken())
+                .unwrap_or(false);
+            if armor_broken {
+                continue;
+            }
+            // Found a seed with a successful hit but no armor break: end_turn must still be true
+            // under the default "allAvBreaks" chainsaw option.
+            assert!(dpc.end_turn, "seed={seed}: expected end_turn=true even without armor break");
+            return;
+        }
+        panic!("no seed produced a successful chainsaw hit without an armor break");
     }
 
     /// Failed chainsaw hit (roll = 1) → publish STEADY_FOOTING_CONTEXT (backfire).

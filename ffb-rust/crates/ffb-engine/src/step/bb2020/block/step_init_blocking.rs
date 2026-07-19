@@ -131,13 +131,27 @@ impl StepInitBlocking {
             return StepOutcome::cont();
         }
 
-        // Java: actingPlayer.markSkillUsed(NamedProperties.canUseChainsawOnDownedOpponents/canUseVomitAfterBlock)
-        if let Some(player_id) = game.acting_player.player_id.as_deref() {
+        // Java: if (actingPlayer.getPlayerAction() != null) {
+        //         if (isKickingDowned()) markSkillUsed(canUseChainsawOnDownedOpponents);
+        //         if (isPutrid()) markSkillUsed(canUseVomitAfterBlock);
+        //       }
+        if let (Some(player_id), Some(action)) = (
+            game.acting_player.player_id.as_deref(),
+            game.acting_player.player_action,
+        ) {
             let player_id = player_id.to_owned();
-            let chainsaw_sid = game.player(&player_id)
-                .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_USE_CHAINSAW_ON_DOWNED_OPPONENTS));
-            let vomit_sid = game.player(&player_id)
-                .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_USE_VOMIT_AFTER_BLOCK));
+            let chainsaw_sid = if action.is_kicking_downed() {
+                game.player(&player_id)
+                    .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_USE_CHAINSAW_ON_DOWNED_OPPONENTS))
+            } else {
+                None
+            };
+            let vomit_sid = if action.is_putrid() {
+                game.player(&player_id)
+                    .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_USE_VOMIT_AFTER_BLOCK))
+            } else {
+                None
+            };
             let is_home = game.team_home.player(&player_id).is_some();
             let player_mut = if is_home { game.team_home.player_mut(&player_id) }
                              else { game.team_away.player_mut(&player_id) };
@@ -384,5 +398,48 @@ mod tests {
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::UsingChainsaw(true))));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::UsingVomit(true))));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::UsingBreatheFire(true))));
+    }
+
+    /// Java (bb2020 StepInitBlocking.executeStep):
+    /// `if (actingPlayer.getPlayerAction() != null) { if (isKickingDowned()) markSkillUsed(canUseChainsawOnDownedOpponents);
+    ///   if (isPutrid()) markSkillUsed(canUseVomitAfterBlock); }`
+    /// A prior Rust bug dropped these action-type guards entirely, unconditionally marking the
+    /// Putrid Regurgitation (and Chainsaw-on-downed-opponents) skill "used" on every block,
+    /// regardless of which action the attacker was actually performing.
+    #[test]
+    fn putrid_regurgitation_skill_not_marked_used_on_non_putrid_block() {
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerGender, PlayerType, SkillId, PlayerAction};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+
+        let mut step = StepInitBlocking::new("end".into());
+        step.block_defender_id = Some("def9".into());
+        let mut game = make_game();
+        game.field_model.set_player_state("def9", ffb_model::enums::PlayerState::new(PS_STANDING));
+
+        let atk_id = "atk9".to_string();
+        game.team_home.players.push(Player {
+            id: atk_id.clone(), name: atk_id.clone(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::PutridRegurgitation, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.acting_player.player_id = Some(atk_id.clone());
+        // A regular Blitz is not a "putrid" action — the skill must not be marked used.
+        game.acting_player.player_action = Some(PlayerAction::Blitz);
+
+        step.start(&mut game, &mut GameRng::new(0));
+
+        let attacker = game.team_home.player(&atk_id).unwrap();
+        assert!(
+            !attacker.used_skills.contains(&SkillId::PutridRegurgitation),
+            "Putrid Regurgitation must only be marked used on a Putrid action, not every block"
+        );
     }
 }

@@ -397,7 +397,15 @@ impl StepEndBlocking {
             }
         };
 
+        // Java: (game.getTurnData().isFoulUsed() && !activePlayer.hasSkillProperty(allowsAdditionalFoul))
+        let foul_already_used_this_turn = game.turn_data().foul_used
+            && !attacker_id.as_deref()
+                .and_then(|id| game.player(id))
+                .map(|p| p.has_skill_property(NamedProperties::ALLOWS_ADDITIONAL_FOUL))
+                .unwrap_or(false);
+
         if !can_foul_after_block || self.knocked_down_players.is_empty()
+            || foul_already_used_this_turn
             || game.turn_mode == TurnMode::Blitz
         {
             self.use_pile_driver = Some(false);
@@ -459,8 +467,10 @@ impl StepEndBlocking {
         }
 
         // ── Hit and Run ──────────────────────────────────────────────────────
-        // Java: canMoveAfterBlock = state.MOVING && hasSkill(canMoveAfterBlock)
-        //   && (regularBlock || usingStab) && !isPinned() && availableSquares non-empty
+        // Java (bb2020): canMoveAfterBlock = state.MOVING && hasSkill(canMoveAfterBlock)
+        //   && regularBlock && !isRooted() && availableSquares non-empty
+        // (Note: bb2025's StepEndBlocking instead uses `(regularBlock || usingStab) && !isPinned()`
+        //   — bb2020 does not have the usingStab exception and checks isRooted, not isPinned.)
         // Java availableSquares: adjacent coords, no player, no adjacent opponent TZ player
         let available_squares: Vec<_> = attacker_position.map(|coord| {
             let inactive = game.inactive_team();
@@ -476,8 +486,8 @@ impl StepEndBlocking {
                 .and_then(|id| game.player(id))
                 .map(|p| p.has_skill_property(NamedProperties::CAN_MOVE_AFTER_BLOCK))
                 .unwrap_or(false)
-            && (regular_block || self.using_stab)
-            && !attacker_state.is_pinned()
+            && regular_block
+            && !attacker_state.is_rooted()
             && !available_squares.is_empty();
 
         if !can_move_after_block {
@@ -532,6 +542,13 @@ impl StepEndBlocking {
                 let is_home = game.team_home.has_player(pid);
                 let result = if is_home { &mut game.game_result.home } else { &mut game.game_result.away };
                 result.player_results.entry(pid.to_string()).or_default().fouls += 1;
+                // Java: if (!activePlayer.hasSkillProperty(allowsAdditionalFoul)) game.getTurnData().setFoulUsed(true)
+                let allows_additional_foul = game.player(pid)
+                    .map(|p| p.has_skill_property(NamedProperties::ALLOWS_ADDITIONAL_FOUL))
+                    .unwrap_or(false);
+                if !allows_additional_foul {
+                    game.turn_data_mut().foul_used = true;
+                }
             }
             // Java: pileDriver.pushSequence(new PileDriver.SequenceParams(getGameState(), targetPlayerId))
             let seq = PileDriver::build_sequence(&PileDriverParams {
@@ -961,6 +978,53 @@ mod tests {
         assert_eq!(new_state.base(), PS_STANDING);
     }
 
+    /// Java (bb2020 StepEndBlocking): `canMoveAfterBlock = ... && regularBlock && !isRooted()`.
+    /// Unlike bb2025's StepEndBlocking (`(regularBlock || usingStab) && !isPinned()`), bb2020 has
+    /// no Stab exception. A prior Rust bug copied the bb2025 condition into the bb2020 file, so a
+    /// Stab-using Hit-and-Run-capable attacker incorrectly stayed eligible to move after the block.
+    #[test]
+    fn hit_and_run_disabled_when_using_stab_even_with_squares_available() {
+        use ffb_model::model::skill_def::{SkillId, SkillWithValue};
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::types::FieldCoordinate;
+        use std::collections::HashSet;
+
+        let mut game = make_game();
+        game.home_playing = true;
+
+        let atk_id = "home_atk".to_string();
+        let atk = Player {
+            id: atk_id.clone(), name: "Attacker".into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::HitAndRun, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(atk);
+        game.field_model.set_player_state(&atk_id, PlayerState::new(PS_MOVING));
+        game.field_model.set_player_coordinate(&atk_id, FieldCoordinate::new(10, 5));
+        game.acting_player.player_id = Some(atk_id.clone());
+
+        let mut step = StepEndBlocking::new();
+        // usingStab -> not a regular block; bb2020 must therefore disable Hit and Run
+        // regardless of available squares or rooted state.
+        step.using_stab = true;
+        step.use_putrid_regurgitation = Some(false);
+
+        step.start(&mut game, &mut GameRng::new(0));
+
+        assert_eq!(
+            step.use_hit_and_run, Some(false),
+            "bb2020 Hit and Run must require a regular block (no Stab exception)"
+        );
+    }
+
     // ── auto-decline for skills not present on player ─────────────────────────
 
     #[test]
@@ -1054,6 +1118,56 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!out.pushes.is_empty(), "expected PileDriver sequence to be pushed");
         assert_eq!(out.pushes[0][0].step_id, StepId::PileDriver);
+        // Java: if (!activePlayer.hasSkillProperty(allowsAdditionalFoul)) game.getTurnData().setFoulUsed(true)
+        assert!(game.turn_data().foul_used, "triggering Pile Driver's foul must mark foul_used on turn data");
+    }
+
+    /// Java: StepEndBlocking.executeStep — the Pile Driver gate also checks
+    /// `game.getTurnData().isFoulUsed() && !activePlayer.hasSkillProperty(allowsAdditionalFoul)`.
+    /// A prior Rust bug dropped this guard entirely, so Pile Driver stayed available even
+    /// after a foul had already been used this turn.
+    #[test]
+    fn pile_driver_disabled_when_foul_already_used_without_allows_additional_foul() {
+        use ffb_model::model::skill_def::{SkillId, SkillWithValue};
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use std::collections::HashSet;
+
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_mut().foul_used = true;
+
+        let atk_id = "home_atk".to_string();
+        let atk = Player {
+            id: atk_id.clone(), name: "Attacker".into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::PileDriver, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(atk);
+        game.field_model.set_player_state(&atk_id, PlayerState::new(PS_MOVING));
+        game.acting_player.player_id = Some(atk_id.clone());
+
+        let mut step = StepEndBlocking::new();
+        step.old_defender_state = None;
+        step.knocked_down_players = vec!["someone".into()];
+        // Bypass the earlier putrid regurgitation / hit-and-run dialogs so execution reaches
+        // the pile-driver gate directly.
+        step.use_putrid_regurgitation = Some(false);
+        step.use_hit_and_run = Some(false);
+
+        step.start(&mut game, &mut GameRng::new(0));
+
+        assert_eq!(
+            step.use_pile_driver, Some(false),
+            "pile driver must be disabled when a foul was already used this turn and the attacker lacks allowsAdditionalFoul"
+        );
     }
 
     #[test]

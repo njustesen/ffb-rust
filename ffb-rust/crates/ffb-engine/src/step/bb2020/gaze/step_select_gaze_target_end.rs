@@ -1,8 +1,9 @@
 /// 1:1 translation of `com.fumbbl.ffb.server.step.bb2020.gaze.StepSelectGazeTargetEnd` (BB2020).
 ///
-/// Ends the gaze-target selection phase: if the turn is ending push EndPlayerAction; if the
-/// selection was cancelled push Select; if a target was selected push Move (bloodlust) or
-/// Select + change action to GAZE_MOVE; otherwise push EndMoving.
+/// Ends the gaze-target selection phase: if the turn is ending push EndPlayerAction; if there is
+/// no TargetSelectionState, nothing is pushed; if the selection was cancelled push Select; if a
+/// target was selected push Move (bloodlust) or Select + change action to GAZE_MOVE; otherwise
+/// (TargetSelectionState present but neither canceled nor selected) push EndMoving.
 ///
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2020.gaze.StepSelectGazeTargetEnd`.
 use ffb_model::model::game::Game;
@@ -11,7 +12,7 @@ use ffb_model::enums::PlayerAction;
 use ffb_model::enums::PlayerState;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
-use crate::step::framework::{StepId, StepParameter};
+use crate::step::framework::{SequenceStep, StepId, StepParameter};
 use crate::step::generator::bb2020::EndPlayerAction;
 use crate::step::generator::bb2020::end_player_action::EndPlayerActionParams;
 use crate::step::generator::bb2020::Select;
@@ -77,6 +78,13 @@ impl StepSelectGazeTargetEnd {
         }
 
         // Java: TargetSelectionState targetSelectionState = game.getFieldModel().getTargetSelectionState();
+        //   ... } else if (targetSelectionState != null) { ... }
+        // When there is no target selection state at all, Java's else-if chain is skipped
+        // entirely — no sequence is pushed, only NEXT_STEP.
+        if game.field_model.target_selection_state.is_none() {
+            return StepOutcome::next();
+        }
+
         let is_canceled = game.field_model.target_selection_state.as_ref()
             .map(|ts| ts.is_canceled())
             .unwrap_or(false);
@@ -106,9 +114,11 @@ impl StepSelectGazeTargetEnd {
         let suffering_blood_lust = game.acting_player.suffering_blood_lust;
 
         // Java isSelected() + bloodlust path:
-        //   setPlayerState(target, changeSelectedGazeTarget(false)); setDefenderId(null);
-        //   changePlayerAction(actingPlayer, bloodlustAction, false); Move.pushSequence()
-        if is_selected && suffering_blood_lust {
+        //   if (actingPlayer.isSufferingBloodLust() && bloodlustAction != null) {
+        //     setPlayerState(target, changeSelectedGazeTarget(false)); setDefenderId(null);
+        //     changePlayerAction(actingPlayer, bloodlustAction, false); Move.pushSequence()
+        //   }
+        if is_selected && suffering_blood_lust && self.bloodlust_action.is_some() {
             if let Some(ref tid) = target_player_id {
                 if let Some(state) = game.field_model.player_state(tid) {
                     let new_state: PlayerState = state.change_selected_gaze_target(false);
@@ -139,15 +149,15 @@ impl StepSelectGazeTargetEnd {
             return StepOutcome::next().push_seq(seq);
         }
 
-        // Java else / no target state — fallback to GAZE_MOVE + Select
-        if let Some(ref pid) = player_id {
-            util_server_steps::change_player_action(game, pid, PlayerAction::GazeMove, false);
-        }
-        let seq = Select::build_sequence(&SelectParams {
-            update_persistence: false,
-            is_blitz_move: false,
-            block_targets: vec![],
-        });
+        // Java else (targetSelectionState present but neither canceled nor selected —
+        //   e.g. STARTED/SKIPPED/FAILED status):
+        //   Sequence sequence = new Sequence(getGameState());
+        //   sequence.add(StepId.END_MOVING, StepParameter.from(StepParameterKey.END_PLAYER_ACTION, true));
+        //   getGameState().getStepStack().push(sequence.getSequence());
+        let seq = vec![SequenceStep::with_params(
+            StepId::EndMoving,
+            vec![StepParameter::EndPlayerAction(true)],
+        )];
         StepOutcome::next().push_seq(seq)
     }
 }
@@ -188,25 +198,48 @@ mod tests {
     }
 
     #[test]
-    fn default_path_pushes_select_sequence() {
+    fn no_target_selection_state_pushes_nothing() {
+        // Java: `else if (targetSelectionState != null)` is skipped entirely when
+        // there is no TargetSelectionState — no sequence is pushed, just NEXT_STEP.
         let mut game = make_game();
         game.acting_player.player_id = Some("actor".into());
+        assert!(game.field_model.target_selection_state.is_none());
         let mut step = StepSelectGazeTargetEnd::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
-        assert_eq!(out.pushes.len(), 1);
-        // Select sequence starts with InitSelecting
-        assert_eq!(out.pushes[0][0].step_id, StepId::InitSelecting);
+        assert!(out.pushes.is_empty(), "no target selection state means no sequence is pushed");
     }
 
     #[test]
-    fn default_path_changes_action_to_gaze_move() {
+    fn no_target_selection_state_does_not_change_action() {
+        // Java: without a TargetSelectionState, changePlayerAction is never called.
         let mut game = make_game();
         game.acting_player.player_id = Some("actor".into());
         game.acting_player.player_action = Some(PlayerAction::Move);
         let mut step = StepSelectGazeTargetEnd::new();
         step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(game.acting_player.player_action, Some(PlayerAction::GazeMove));
+        assert_eq!(game.acting_player.player_action, Some(PlayerAction::Move));
+    }
+
+    #[test]
+    fn target_selection_state_not_canceled_or_selected_pushes_end_moving() {
+        // Java else branch: TargetSelectionState present but neither canceled() nor
+        // selected() (e.g. still STARTED) → push a bare Sequence with
+        // StepId.END_MOVING and END_PLAYER_ACTION=true — NOT the GAZE_MOVE/Select fallback.
+        use ffb_model::model::target_selection_state::TargetSelectionState;
+        let mut game = make_game();
+        game.acting_player.player_id = Some("actor".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+        game.field_model.target_selection_state = Some(TargetSelectionState::default());
+        let mut step = StepSelectGazeTargetEnd::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(out.pushes.len(), 1);
+        assert_eq!(out.pushes[0].len(), 1);
+        assert_eq!(out.pushes[0][0].step_id, StepId::EndMoving);
+        assert!(out.pushes[0][0].params.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))));
+        // Player action must NOT have been changed to GazeMove in this branch.
+        assert_eq!(game.acting_player.player_action, Some(PlayerAction::Move));
     }
 
     #[test]
@@ -230,9 +263,13 @@ mod tests {
 
     #[test]
     fn bloodlust_without_action_pushes_select_sequence() {
+        use ffb_model::model::target_selection_state::TargetSelectionState;
         let mut game = make_game();
         game.acting_player.player_id = Some("actor".into());
         game.acting_player.suffering_blood_lust = true;
+        let mut ts = TargetSelectionState::new("opponent3");
+        ts.select();
+        game.field_model.target_selection_state = Some(ts);
         let mut step = StepSelectGazeTargetEnd::new();
         step.bloodlust_action = None;
         let out = step.start(&mut game, &mut GameRng::new(0));
@@ -265,11 +302,15 @@ mod tests {
 
     #[test]
     fn handle_command_delegates_to_execute_step() {
+        use ffb_model::model::target_selection_state::TargetSelectionState;
         let mut game = make_game();
         game.acting_player.player_id = Some("actor".into());
+        let mut ts = TargetSelectionState::new("opp");
+        ts.select();
+        game.field_model.target_selection_state = Some(ts);
         let mut step = StepSelectGazeTargetEnd::new();
         let out = step.handle_command(&Action::Acknowledge, &mut game, &mut GameRng::new(0));
-        // Default path → Select
+        // isSelected(), no bloodlust → Select
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(out.pushes[0][0].step_id, StepId::InitSelecting);
     }

@@ -90,7 +90,12 @@ impl StepHypnoticGaze {
                 .and_then(|id| game.player(id))
                 .map(|p| p.has_skill_property(NamedProperties::INFLICTS_CONFUSION))
                 .unwrap_or(false);
-            do_gaze = has_gaze_skill;
+            // Java: gazeSkill.isPresent() && !UtilCards.hasSkillToCancelProperty(actingPlayer.getPlayer(), NamedProperties.inflictsConfusion)
+            let has_cancelling_skill = acting_player_id.as_deref()
+                .and_then(|id| game.player(id))
+                .map(|p| ffb_model::util::util_cards::UtilCards::has_skill_to_cancel_property(p, NamedProperties::INFLICTS_CONFUSION))
+                .unwrap_or(false);
+            do_gaze = has_gaze_skill && !has_cancelling_skill;
         }
 
         let mut goto_end_label = true;
@@ -259,6 +264,40 @@ mod tests {
         assert!(
             !game.report_list.has_report(ReportId::HYPNOTIC_GAZE_ROLL),
             "no HYPNOTIC_GAZE_ROLL when gaze skill is absent"
+        );
+    }
+
+    // Java: `doGaze = gazeSkill.isPresent() && !UtilCards.hasSkillToCancelProperty(actingPlayer.getPlayer(),
+    // NamedProperties.inflictsConfusion);` -- BallAndChain has the "cancelsInflictsConfusion" property, so a
+    // player with both HypnoticGaze and BallAndChain must NOT roll for gaze. Before the fix, the Rust code
+    // only checked `has_gaze_skill` and ignored the cancelling skill, so this test would have failed.
+    #[test]
+    fn no_gaze_roll_report_when_acting_player_has_cancelling_skill() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        let mut attacker = Player::default();
+        attacker.id = "a1".into();
+        attacker.starting_skills.push(SkillWithValue::new(SkillId::HypnoticGaze));
+        attacker.starting_skills.push(SkillWithValue::new(SkillId::BallAndChain));
+        game.team_home.players.push(attacker);
+        game.field_model.set_player_coordinate("a1", FieldCoordinate::new(5, 5));
+
+        let mut defender = Player::default();
+        defender.id = "d1".into();
+        game.team_away.players.push(defender);
+        game.field_model.set_player_coordinate("d1", FieldCoordinate::new(6, 5));
+
+        game.home_playing = true;
+        game.acting_player.player_id = Some("a1".into());
+        game.acting_player.player_action = Some(PlayerAction::Gaze);
+        game.defender_id = Some("d1".into());
+
+        let mut step = StepHypnoticGaze::new("end".into());
+        step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(
+            !game.report_list.has_report(ReportId::HYPNOTIC_GAZE_ROLL),
+            "no HYPNOTIC_GAZE_ROLL when BallAndChain cancels inflictsConfusion"
         );
     }
 }

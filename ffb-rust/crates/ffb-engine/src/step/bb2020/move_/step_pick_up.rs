@@ -1,4 +1,3 @@
-use ffb_model::enums::PlayerAction;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::enums::ReRollSource;
@@ -14,12 +13,12 @@ use ffb_mechanics::modifiers::pickup_context::PickupContext;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2020.move.StepPickUp.
 ///
-/// BB2020 logic is identical to BB2025; PickupModifierFactory::for_rules selects BB2020 modifiers.
+/// Note: unlike the BB2025 sibling, BB2020 has no SECURE_THE_BALL / Trickster
+/// (PICK_UP_OPTIONAL / ATTEMPT_PICK_UP / PLAYER_ON_BALL_ID) support — those
+/// parameters/fields do not exist on the Java BB2020 class.
 ///
 /// Init params: GOTO_LABEL_ON_FAILURE (mandatory), THROWN_PLAYER_ID (optional).
-/// Sets: CATCH_SCATTER_THROW_IN_MODE, FEEDING_ALLOWED, END_TURN, END_PLAYER_ACTION.
-///
-/// client-only: CLIENT_PICK_UP_CHOICE (Trickster optional path) — dialog is client-side; headless skips.
+/// Sets: CATCH_SCATTER_THROW_IN_MODE, FEEDING_ALLOWED, END_TURN.
 pub struct StepPickUp {
     /// Java: fGotoLabelOnFailure
     pub goto_label_on_failure: String,
@@ -27,14 +26,6 @@ pub struct StepPickUp {
     pub thrown_player_id: Option<String>,
     /// Java: ignore — set via FollowupChoice(false), skip pick-up
     pub ignore: bool,
-    /// Java: secureTheBall — action is PlayerAction::SECURE_THE_BALL
-    pub secure_the_ball: bool,
-    /// Java: optionalPickUp — Trickster path
-    pub optional_pick_up: bool,
-    /// Java: attemptPickUp — coach answer to optional pick-up dialog
-    pub attempt_pick_up: bool,
-    /// Java: overridePlayerId — alternative picker (e.g. Raiding Party)
-    pub override_player_id: Option<String>,
     /// Java: AbstractStepWithReRoll fields
     pub re_roll_state: ReRollState,
     /// Persisted roll for re-roll (Java rolls inside pickUp() on first call)
@@ -47,10 +38,6 @@ impl StepPickUp {
             goto_label_on_failure,
             thrown_player_id: None,
             ignore: false,
-            secure_the_ball: false,
-            optional_pick_up: false,
-            attempt_pick_up: false,
-            override_player_id: None,
             re_roll_state: ReRollState::new(),
             roll: 0,
         }
@@ -78,9 +65,6 @@ impl Step for StepPickUp {
         match param {
             StepParameter::GotoLabelOnFailure(v) => { self.goto_label_on_failure = v.clone(); true }
             StepParameter::FollowupChoice(v) => { self.ignore = !v; true }
-            StepParameter::PickUpOptional(v) => { self.optional_pick_up = *v; self.ignore = false; true }
-            StepParameter::PlayerOnBallId(v) => { self.override_player_id = Some(v.clone()); true }
-            StepParameter::AttemptPickUp(v) => { self.attempt_pick_up = *v; self.ignore = false; true }
             StepParameter::ThrownPlayerId(v) => { self.thrown_player_id = v.clone(); true }
             _ => false,
         }
@@ -89,44 +73,20 @@ impl Step for StepPickUp {
 
 impl StepPickUp {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        self.secure_the_ball = game.acting_player.player_action == Some(PlayerAction::SecureTheBall);
-
-        if self.optional_pick_up && !self.attempt_pick_up {
-            return StepOutcome::next();
-        }
-        if self.ignore {
-            return StepOutcome::next();
-        }
-
-        let player_id = self.override_player_id.clone()
-            .or_else(|| self.thrown_player_id.clone())
+        let player_id = self.thrown_player_id.clone()
             .or_else(|| game.acting_player.player_id.clone());
 
         let is_pick_up = {
             let coord = player_id.as_deref()
                 .and_then(|id| game.field_model.player_coordinate(id));
-            game.field_model.ball_in_play
+            !self.ignore
+                && game.field_model.ball_in_play
                 && game.field_model.ball_moving
                 && coord.is_some()
                 && coord == game.field_model.ball_coordinate
         };
-        if !is_pick_up {
+        if player_id.is_none() || !is_pick_up {
             return StepOutcome::next();
-        }
-
-        let prevent = player_id.as_deref()
-            .and_then(|id| game.player(id))
-            .map(|p| {
-                p.has_skill_property(NamedProperties::PREVENT_HOLD_BALL)
-                    || p.has_skill_property(NamedProperties::PREVENT_PICKUP)
-            })
-            .unwrap_or(false);
-        if prevent {
-            let label = self.goto_label_on_failure.clone();
-            return StepOutcome::goto(&label)
-                .publish(StepParameter::FeedingAllowed(false))
-                .publish(StepParameter::EndTurn(true))
-                .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::FailedPickUp));
         }
 
         let has_tacklezones = player_id.as_deref()
@@ -134,6 +94,9 @@ impl StepPickUp {
             .map(|s| s.has_tacklezones())
             .unwrap_or(true);
         if !has_tacklezones {
+            // Java: a player of the own team without tackle zone was moved onto the ball
+            // with e.g. Raiding Party or some other voluntary movement (no chain pushes).
+            // This should be considered a pickup fail, unless the player has e.g. Ball And Chain.
             let label = self.goto_label_on_failure.clone();
             let acting_team_has_player = player_id.as_deref()
                 .map(|id| game.active_team().has_player(id))
@@ -160,7 +123,13 @@ impl StepPickUp {
                 .map(|s| use_reroll(game, s, &pid))
                 .unwrap_or(false);
             if !consumed {
-                return self.fail_pick_up(game, &player_id);
+                // Java: getReRollSource() == null || !useReRoll(...) → unconditional END_TURN,
+                // regardless of preventPickup (unlike the pickUp()-FAILURE path below).
+                let label = self.goto_label_on_failure.clone();
+                return StepOutcome::goto(&label)
+                    .publish(StepParameter::FeedingAllowed(false))
+                    .publish(StepParameter::EndTurn(true))
+                    .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::FailedPickUp));
             }
         }
 
@@ -168,6 +137,17 @@ impl StepPickUp {
     }
 
     fn pick_up(&mut self, game: &mut Game, rng: &mut GameRng, player_id: Option<String>) -> StepOutcome {
+        let prevent = player_id.as_deref()
+            .and_then(|id| game.player(id))
+            .map(|p| {
+                p.has_skill_property(NamedProperties::PREVENT_HOLD_BALL)
+                    || p.has_skill_property(NamedProperties::PREVENT_PICKUP)
+            })
+            .unwrap_or(false);
+        if prevent {
+            return self.fail_pick_up(game, &player_id);
+        }
+
         if self.roll == 0 {
             self.roll = rng.d6();
         }
@@ -179,8 +159,7 @@ impl StepPickUp {
                 let mods = factory.find_applicable(&ctx);
                 let skill_mods = factory.find_skill_modifiers(&ctx);
                 let all: Vec<&ffb_mechanics::modifiers::pickup_modifier::PickupModifier> = mods.iter().copied().chain(skill_mods.iter()).collect();
-                let effective_agility = if self.secure_the_ball { 2 } else { player.agility as i32 };
-                let min = PickupModifierFactory::minimum_roll(effective_agility, &all);
+                let min = PickupModifierFactory::minimum_roll(player.agility as i32, &all);
                 let names: Vec<String> = all.iter().map(|m| m.get_report_string().to_string()).collect();
                 (min, names)
             } else {
@@ -210,11 +189,7 @@ impl StepPickUp {
 
         if successful {
             game.field_model.ball_moving = false;
-            let mut out = StepOutcome::next();
-            if self.secure_the_ball {
-                out = out.publish(StepParameter::EndPlayerAction(true));
-            }
-            return out;
+            return StepOutcome::next();
         }
 
         let already_rerolled = self.re_roll_state.re_rolled_action
@@ -224,15 +199,13 @@ impl StepPickUp {
             use ffb_model::model::re_rolled_action::ReRolledAction;
             self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("PICKUP"));
 
-            if !self.secure_the_ball {
-                let skill_source = find_skill_reroll_source(game, "PICKUP");
-                if let Some(source) = skill_source {
-                    let pid = player_id.as_deref().unwrap_or("").to_owned();
-                    use_reroll(game, &source, &pid);
-                    self.re_roll_state.re_roll_source = Some(source);
-                    self.roll = 0;
-                    return self.pick_up(game, rng, player_id);
-                }
+            let skill_source = find_skill_reroll_source(game, "PICKUP");
+            if let Some(source) = skill_source {
+                let pid = player_id.as_deref().unwrap_or("").to_owned();
+                use_reroll(game, &source, &pid);
+                self.re_roll_state.re_roll_source = Some(source);
+                self.roll = 0;
+                return self.pick_up(game, rng, player_id);
             }
 
             if let Some(prompt) = ask_for_reroll_if_available(game, "PICKUP", minimum_roll, false) {
@@ -252,12 +225,11 @@ impl StepPickUp {
             .unwrap_or(false);
         let label = self.goto_label_on_failure.clone();
         let mut out = StepOutcome::goto(&label)
-            .publish(StepParameter::FeedingAllowed(false))
-            .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::FailedPickUp));
-        if !self.optional_pick_up && !prevent_pickup {
+            .publish(StepParameter::FeedingAllowed(false));
+        if !prevent_pickup {
             out = out.publish(StepParameter::EndTurn(true));
         }
-        out
+        out.publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::FailedPickUp))
     }
 }
 
@@ -303,16 +275,6 @@ mod tests {
         let mut game = make_game();
         let mut step = StepPickUp::new("fail".into());
         step.ignore = true;
-        let out = step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(out.action, StepAction::NextStep);
-    }
-
-    #[test]
-    fn optional_pick_up_declined_returns_next_step() {
-        let mut game = make_game();
-        let mut step = StepPickUp::new("fail".into());
-        step.optional_pick_up = true;
-        step.attempt_pick_up = false;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
     }
@@ -388,6 +350,27 @@ mod tests {
         let _offer = step.start(&mut game, &mut GameRng::new(0));
         let out = step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
+    }
+
+    #[test]
+    fn decline_reroll_publishes_unconditional_end_turn() {
+        // Java StepPickUp (bb2020) executeStep(): when the re-roll-consumption path fails
+        // (getReRollSource() == null after declining), END_TURN is published unconditionally
+        // — it is not gated on preventPickup like the pickUp()-FAILURE path is. This test
+        // pins that behavior (previously this file had been overwritten with BB2025's
+        // Trickster/Secure-The-Ball logic, which doesn't apply to BB2020 at all).
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        add_player_at_ball(&mut game, "p1");
+        let mut step = StepPickUp::new("fail".into());
+        step.roll = 1;
+        let _offer = step.start(&mut game, &mut GameRng::new(0));
+        let out = step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::FeedingAllowed(false))));
     }
 
     #[test]

@@ -235,8 +235,9 @@ impl StepEndPassing {
             && game.acting_player.player_id.is_some()
             && game.thrower_id == game.acting_player.player_id;
 
+        // Java: fEndTurn || fEndPlayerAction || ((thrower == actingPlayer) && isSufferingBloodLust() && !hasFed())
         if self.end_turn || self.end_player_action
-            || (thrower_is_acting && game.acting_player.suffering_blood_lust)
+            || (thrower_is_acting && game.acting_player.suffering_blood_lust && !game.acting_player.has_fed)
         {
             // Java: fEndTurn |= checkTouchdown || (catcher==null && !animosity && !bloodlust && hasPassed)
             //   || otherTeam.hasPlayer(catcher) && !bloodlust || fPassFumble
@@ -517,6 +518,28 @@ mod tests {
         assert!(game.pass_coordinate.is_none());
         assert_eq!(game.acting_player.player_action, Some(PlayerAction::Move));
         assert_eq!(out.pushes.len(), 1);
+    }
+
+    /// Java: `fEndTurn || fEndPlayerAction || ((thrower == actingPlayer) && isSufferingBloodLust()
+    /// && !hasFed())` — the early-exit branch only fires when the acting player has NOT fed yet.
+    /// A blood-lusting thrower who HAS fed must fall through to the normal end-of-turn
+    /// computation (which, with no catcher, derives end_turn=true from `catcher == null`),
+    /// not bypass it with end_turn/end_player_action left false.
+    #[test]
+    fn blood_lust_thrower_who_has_fed_does_not_take_early_exit_branch() {
+        let mut game = make_game_with_home_thrower("t1");
+        game.acting_player.suffering_blood_lust = true;
+        game.acting_player.has_fed = true;
+        let mut step = StepEndPassing::new();
+        // catcher_id left None → Java's normal-path `catcher == null` forces end_turn = true.
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.pushes.len(), 1);
+        let init_feeding = out.pushes[0].iter().find(|s| s.step_id == StepId::InitFeeding)
+            .expect("InitFeeding not found in EndPlayerAction sequence");
+        assert!(
+            init_feeding.params.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
+            "expected EndTurn(true) once has_fed bypasses the blood-lust early-exit"
+        );
     }
 
     #[test]

@@ -11,9 +11,13 @@ use crate::step::framework::{StepId, StepParameter};
 use crate::util::UtilServerPlayerMove;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2020.block.StepFollowup.
-/// Handles optional attacker follow-up after a block. Fend (preventOpponentFollowingUp) and
-/// Taunt (forceOpponentToFollowUp) skill dialogs require TODO stubs; movement and
-/// updatePlayerAndBallPosition + PlayerEnteringSquare are wired.
+/// Handles optional attacker follow-up after a block. Fend (preventOpponentFollowingUp)
+/// skill dialogs require a TODO stub; movement and updatePlayerAndBallPosition +
+/// PlayerEnteringSquare are wired.
+///
+/// Note: unlike bb2025's StepFollowup, the bb2020 Java source has no Taunt
+/// (forceOpponentToFollowUp) handling and gates on `attackerState.isRooted()`, not
+/// `isPinned()` — a prior Rust bug had copied the bb2025 behaviour into this bb2020 file.
 pub struct StepFollowup {
     pub coordinate_from: Option<FieldCoordinate>,
     pub defender_position: Option<FieldCoordinate>,
@@ -21,8 +25,6 @@ pub struct StepFollowup {
     pub using_skill_preventing_follow_up: Option<bool>,
     pub followup_choice: Option<bool>,
     pub old_defender_state: Option<PlayerState>,
-    /// Java: usingSkillForcingFollowUp (Boolean — tristate: null/true/false)
-    pub using_skill_forcing_follow_up: Option<bool>,
 }
 
 impl StepFollowup {
@@ -33,7 +35,6 @@ impl StepFollowup {
             using_skill_preventing_follow_up: None,
             followup_choice: None,
             old_defender_state: None,
-            using_skill_forcing_follow_up: None,
         }
     }
 }
@@ -53,12 +54,9 @@ impl Step for StepFollowup {
         match action {
             Action::UseSkill { skill_id, use_skill } => {
                 // Fend skill: defender uses it to prevent follow-up
+                // (bb2020 has no Taunt/forceOpponentToFollowUp handling — that's bb2025-only)
                 if *skill_id == SkillId::Fend {
                     self.using_skill_preventing_follow_up = Some(*use_skill);
-                }
-                // Taunt skill: defender uses it to force follow-up
-                if *skill_id == SkillId::Taunt {
-                    self.using_skill_forcing_follow_up = Some(*use_skill);
                 }
             }
             Action::FollowUp { follow_up } => {
@@ -102,8 +100,8 @@ impl StepFollowup {
         let mut effective_choice = self.followup_choice;
         let mut out_params: Vec<StepParameter> = Vec::new();
 
-        // Pinned or Vicious Vines: cannot follow up
-        if attacker_state.is_pinned() || player_action == Some(PlayerAction::ViciousVines) {
+        // Java (bb2020): attackerState.isRooted() — NOT isPinned() (that's bb2025's condition)
+        if attacker_state.is_rooted() || player_action == Some(PlayerAction::ViciousVines) {
             effective_choice = Some(false);
             out_params.push(StepParameter::FollowupChoice(false));
         }
@@ -202,38 +200,9 @@ impl StepFollowup {
                 }
             }
 
-            // Taunt skill (forceOpponentToFollowUp): defender may force attacker to follow up
-            let cannot_follow = attacker_state.is_pinned()
-                || player_action == Some(PlayerAction::ViciousVines)
-                || player_action == Some(PlayerAction::MultipleBlock);
-            let defender_has_taunt = game.defender_id.as_deref()
-                .and_then(|id| game.player(id))
-                .map(|p| p.has_skill_property(NamedProperties::FORCE_OPPONENT_TO_FOLLOW_UP))
-                .unwrap_or(false);
-
-            if defender_has_taunt
-                && effective_choice.is_none()
-                && self.using_skill_preventing_follow_up == Some(false)
-                && !cannot_follow
-            {
-                if self.using_skill_forcing_follow_up.is_none() {
-                    // Would show DialogSkillUse for Taunt — stub: wait for response
-                    return build_outcome(out_params, StepOutcome::cont());
-                }
-                if let Some(true) = self.using_skill_forcing_follow_up {
-                    effective_choice = Some(true);
-                    out_params.push(StepParameter::FollowupChoice(true));
-                }
-                // Report skill use (TODO: add ReportSkillUse event)
-            } else if self.using_skill_forcing_follow_up.is_none() {
-                self.using_skill_forcing_follow_up = Some(false);
-            }
-
-            // No automated choice — show followup choice dialog
-            if effective_choice.is_none()
-                && self.using_skill_preventing_follow_up.is_some()
-                && self.using_skill_forcing_follow_up != Some(true)
-            {
+            // Java: if ((followupChoice == null) && (usingSkillPreventingFollowUp != null)) { showDialog(FollowupChoice) }
+            // (bb2020 has no Taunt/forceOpponentToFollowUp counter-mechanic — that's bb2025-only)
+            if effective_choice.is_none() && self.using_skill_preventing_follow_up.is_some() {
                 // Would show DialogFollowupChoice — stub: wait for agent FollowUp action
                 return build_outcome(out_params, StepOutcome::cont());
             }
@@ -311,7 +280,6 @@ mod tests {
         // and the step shows a dialog → CONTINUE
         let mut step = StepFollowup::new();
         step.using_skill_preventing_follow_up = Some(false);
-        step.using_skill_forcing_follow_up = Some(false);
         let mut game = make_game();
         let out = step.start(&mut game, &mut GameRng::new(0));
         // followup_choice is None, no conditions override → wait for choice dialog → CONTINUE
@@ -324,7 +292,6 @@ mod tests {
         step.followup_choice = Some(true);
         step.defender_position = Some(FieldCoordinate::new(5, 5));
         step.using_skill_preventing_follow_up = Some(false);
-        step.using_skill_forcing_follow_up = Some(false);
         let mut game = make_game();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
@@ -335,7 +302,6 @@ mod tests {
         let mut step = StepFollowup::new();
         step.followup_choice = Some(false);
         step.using_skill_preventing_follow_up = Some(false);
-        step.using_skill_forcing_follow_up = Some(false);
         let mut game = make_game();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
@@ -347,7 +313,6 @@ mod tests {
     fn vicious_vines_forces_no_followup() {
         let mut step = StepFollowup::new();
         step.using_skill_preventing_follow_up = Some(false);
-        step.using_skill_forcing_follow_up = Some(false);
         let mut game = make_game();
         game.acting_player.player_action = Some(PlayerAction::ViciousVines);
         // Should automatically set followup to false, then proceed
@@ -360,11 +325,44 @@ mod tests {
     fn multiple_block_forces_no_followup() {
         let mut step = StepFollowup::new();
         step.using_skill_preventing_follow_up = Some(false);
-        step.using_skill_forcing_follow_up = Some(false);
         let mut game = make_game();
         game.acting_player.player_action = Some(PlayerAction::MultipleBlock);
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    /// Java (bb2020 StepFollowup.executeStep): `attackerState.isRooted()` — NOT `isPinned()`
+    /// (bb2025's StepFollowup uses isPinned, which is `isChomped() || isRooted()`). A prior Rust
+    /// bug copied the bb2025 `isPinned()` gate into bb2020, so a merely-Chomped (not Rooted)
+    /// attacker was incorrectly forced to skip follow-up entirely (auto NEXT_STEP with
+    /// FollowupChoice=false) instead of proceeding to the normal follow-up choice flow.
+    #[test]
+    fn chomped_but_not_rooted_does_not_force_no_followup() {
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerGender, PlayerType};
+        use ffb_model::model::player::Player;
+        let mut step = StepFollowup::new();
+        step.using_skill_preventing_follow_up = Some(false);
+        let mut game = make_game();
+        let attacker_id = "attacker".to_string();
+        game.team_home.players.push(Player {
+            id: attacker_id.clone(), name: attacker_id.clone(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 4, strength: 4, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.acting_player.player_id = Some(attacker_id.clone());
+        // Chomped but NOT rooted: is_pinned() would be true, is_rooted() is false.
+        let chomped_not_rooted = PlayerState::new(PS_STANDING).change_chomped(true);
+        game.field_model.set_player_state(&attacker_id, chomped_not_rooted);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // bb2020 must NOT force no-followup here; it should fall through to the normal
+        // follow-up-choice dialog (CONTINUE), not auto-resolve to NEXT_STEP.
+        assert_eq!(out.action, StepAction::Continue);
     }
 
     #[test]
@@ -410,7 +408,6 @@ mod tests {
         let mut step = StepFollowup::new();
         // FALLING state → no tacklezones but not prone/stunned → triggers NO_TACKLEZONE path
         step.old_defender_state = Some(PlayerState::new(PS_FALLING));
-        step.using_skill_forcing_follow_up = Some(false);
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::SKILL_USE), "Fend no-tacklezone path must emit ReportSkillUse");
     }
@@ -451,7 +448,6 @@ mod tests {
         game.defender_id = Some("defender".into());
         let mut step = StepFollowup::new();
         step.old_defender_state = Some(standing);
-        step.using_skill_forcing_follow_up = Some(false);
         // Juggernaut on Blitz should auto-cancel Fend → no dialog wait → reaches followup choice dialog.
         let out = step.start(&mut game, &mut GameRng::new(0));
         // Fend is cancelled, step proceeds to followup choice (None → Continue).
