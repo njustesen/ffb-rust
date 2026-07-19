@@ -1,7 +1,8 @@
-use ffb_model::enums::PlayerAction;
+use ffb_model::enums::{PlayerAction, ReRollSource};
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::skill_use::SkillUse;
+use ffb_model::prompts::AgentPrompt;
 use ffb_model::report::report_interception_roll::ReportInterceptionRoll;
 use ffb_model::report::report_skill_use::ReportSkillUse;
 use ffb_model::util::passing::can_intercept;
@@ -11,6 +12,18 @@ use ffb_mechanics::pass_result::PassResult;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+
+/// Result of a single `intercept()` roll attempt.
+enum InterceptStatus {
+    /// Java: `ActionStatus.SUCCESS` — `(easy_intercept)`.
+    Success(bool),
+    /// Java: `ActionStatus.FAILURE` — no re-roll was available/offered.
+    Failure,
+    /// Java: `ActionStatus.WAITING_FOR_RE_ROLL` — a re-roll dialog was shown; step
+    /// must `cont()` and wait for the agent's `Action::UseReRoll` response.
+    WaitingForReRoll(AgentPrompt),
+}
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2020.pass.StepIntercept.
 ///
@@ -96,22 +109,28 @@ impl StepIntercept {
 
     /// Java: intercept(pInterceptor, passState) — rolls agility, checks modifiers.
     ///
-    /// Returns `(successful, easy_intercept)`. Java only sets
-    /// `passState.setInterceptionSuccessful(true)` when `successful && easyIntercept`
-    /// (see `StepIntercept.intercept()`); a normal (non-easy) successful interception
-    /// only flows into `state.setDeflectionSuccessful(true)` in `executeStep()` and
-    /// still requires a catch roll via `StepResolvePass`'s DEFLECTED path.
-    fn intercept(&self, interceptor_id: &str, game: &mut Game, rng: &mut GameRng) -> (bool, bool) {
+    /// Java only sets `passState.setInterceptionSuccessful(true)` when
+    /// `successful && easyIntercept` (see `StepIntercept.intercept()`); a normal
+    /// (non-easy) successful interception only flows into
+    /// `state.setDeflectionSuccessful(true)` in `executeStep()` and still requires a
+    /// catch roll via `StepResolvePass`'s DEFLECTED path.
+    ///
+    /// On failure, mirrors Java's re-roll offer: if this attempt hasn't already been
+    /// re-rolled (`getReRolledAction() != INTERCEPTION`), offers a re-roll dialog via
+    /// `UtilServerReRoll.askForReRollIfAvailable`.
+    fn intercept(&mut self, interceptor_id: &str, game: &mut Game, rng: &mut GameRng) -> InterceptStatus {
         let (easy_intercept, minimum_roll, roll) = {
             let interceptor = match game.player(interceptor_id) {
                 Some(p) => p,
-                None => return (false, false),
+                None => return InterceptStatus::Failure,
             };
 
             // Java: easyIntercept = interceptionSkill != null && pInterceptor.hasUnused(interceptionSkill)
+            // hasUnused() checks BOTH that the skill is present AND not already used this
+            // drive/turn — has_skill_property alone does not check usage state.
             let easy_intercept = self.interception_skill_name
                 .as_deref()
-                .map(|_| interceptor.has_skill_property(NamedProperties::CAN_INTERCEPT_EASILY))
+                .map(|_| interceptor.has_unused_skill_with_property(NamedProperties::CAN_INTERCEPT_EASILY))
                 .unwrap_or(false);
 
             let roll = rng.d6();
@@ -167,7 +186,19 @@ impl StepIntercept {
             easy_intercept,
         ));
 
-        (successful, easy_intercept)
+        if successful {
+            InterceptStatus::Success(easy_intercept)
+        } else {
+            // Java: if (getReRolledAction() != ReRolledActions.INTERCEPTION) { ... offer re-roll ... }
+            if self.re_rolled_action.as_deref() != Some("INTERCEPTION") {
+                if let Some(prompt) = ask_for_reroll_if_available(game, "INTERCEPTION", minimum_roll, false) {
+                    self.re_rolled_action = Some("INTERCEPTION".into());
+                    self.re_roll_source = Some("TRR".into());
+                    return InterceptStatus::WaitingForReRoll(prompt);
+                }
+            }
+            InterceptStatus::Failure
+        }
     }
 }
 
@@ -235,6 +266,21 @@ impl StepIntercept {
             return StepOutcome::goto(&label);
         }
 
+        // Java: if (ReRolledActions.INTERCEPTION == getReRolledAction()) — consume the re-roll
+        // the agent just accepted/declined (re-entry after a WAITING_FOR_RE_ROLL prompt).
+        // Only reachable once an interceptor has already been chosen (re_rolled_action can
+        // only be set from within `intercept()`, which is only called once chosen).
+        if self.re_rolled_action.as_deref() == Some("INTERCEPTION") {
+            let consumed = match (self.re_roll_source.clone(), self.interceptor_id.clone()) {
+                (Some(src), Some(id)) => use_reroll(game, &ReRollSource::new(src.as_str()), &id),
+                _ => false,
+            };
+            if !consumed {
+                // Java: doIntercept = false — declined or exhausted re-roll source.
+                return self.finish(game, false, false, &label);
+            }
+        }
+
         // Java: if (!state.isInterceptorChosen()) → showDialog, TurnMode=INTERCEPTION, doNextStep=false
         if !self.interceptor_chosen {
             // client-only: DialogInterceptionParameter — headless waits for CLIENT_INTERCEPTOR_CHOICE command
@@ -243,22 +289,48 @@ impl StepIntercept {
 
         // Java: else if (interceptor != null) → intercept(interceptor, state)
         let (do_intercept, easy_intercept) = if let Some(ref interceptor_id) = self.interceptor_id.clone() {
-            let (success, easy) = self.intercept(interceptor_id, game, rng);
-            if success {
-                let is_bomb = matches!(
-                    game.thrower_action,
-                    Some(PlayerAction::ThrowBomb) | Some(PlayerAction::HailMaryBomb)
-                );
-                if is_bomb {
-                    game.field_model.bomb_moving = false;
-                } else {
-                    game.field_model.ball_moving = false;
+            match self.intercept(interceptor_id, game, rng) {
+                InterceptStatus::Success(easy) => {
+                    let is_bomb = matches!(
+                        game.thrower_action,
+                        Some(PlayerAction::ThrowBomb) | Some(PlayerAction::HailMaryBomb)
+                    );
+                    if is_bomb {
+                        game.field_model.bomb_moving = false;
+                    } else {
+                        game.field_model.ball_moving = false;
+                    }
+                    (true, easy)
+                }
+                InterceptStatus::Failure => (false, false),
+                InterceptStatus::WaitingForReRoll(prompt) => {
+                    return StepOutcome::cont().with_prompt(prompt);
                 }
             }
-            (success, easy)
         } else {
             (false, false)
         };
+
+        self.finish(game, do_intercept, easy_intercept, &label)
+    }
+
+    /// Java: the `doNextStep` tail of `executeStep()` — marks the chosen easy-intercept
+    /// skill used (unconditionally, on both success and failure), and routes to
+    /// NEXT_STEP/GOTO_LABEL.
+    fn finish(&mut self, game: &mut Game, do_intercept: bool, easy_intercept: bool, label: &str) -> StepOutcome {
+        // Java: if (interceptionSkill != null && interceptor != null) interceptor.markUsed(interceptionSkill, game)
+        if self.interception_skill_name.is_some() {
+            if let Some(ref interceptor_id) = self.interceptor_id.clone() {
+                let skill_id = game.player(interceptor_id)
+                    .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_INTERCEPT_EASILY));
+                if let Some(sid) = skill_id {
+                    if let Some(player) = game.team_home.player_mut(interceptor_id)
+                        .or_else(|| game.team_away.player_mut(interceptor_id)) {
+                        player.used_skills.insert(sid);
+                    }
+                }
+            }
+        }
 
         if do_intercept {
             let interceptor_id = self.interceptor_id.clone();
@@ -273,7 +345,7 @@ impl StepIntercept {
             }
             outcome
         } else {
-            StepOutcome::goto(&label)
+            StepOutcome::goto(label)
         }
     }
 }
@@ -565,6 +637,113 @@ mod tests {
         assert!(
             game.report_list.has_report(ReportId::INTERCEPTION_ROLL),
             "expected ReportInterceptionRoll even on failed intercept"
+        );
+    }
+
+    #[test]
+    fn already_used_easy_intercept_skill_does_not_grant_minimum_roll_of_two() {
+        // Regression: Java's easyIntercept check is `pInterceptor.hasUnused(interceptionSkill)`
+        // — it requires the skill be BOTH present AND unused. The old Rust code used
+        // `has_skill_property`, which ignores usage state, so an already-used Yoink would
+        // still grant the easy-intercept minimum roll of 2 forever. With a low agility (1)
+        // interceptor and the skill marked used, the normal (non-easy) minimum roll applies,
+        // which is much harder to hit than 2 — across many seeds we should see far fewer
+        // than an ~83% (5/6) success rate if the fix is in place.
+        use ffb_model::enums::{PlayerState as PS, PS_STANDING, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut home = test_team("home", 0);
+        let mut away = test_team("away", 0);
+
+        let mut thrower = ffb_model::model::player::Player::default();
+        thrower.id = "t1".into();
+        home.players.push(thrower);
+
+        let mut interceptor = ffb_model::model::player::Player::default();
+        interceptor.id = "opp1".into();
+        interceptor.agility = 1;
+        interceptor.starting_skills.push(SkillWithValue::new(SkillId::Yoink));
+        interceptor.used_skills.insert(SkillId::Yoink); // already used this drive/turn
+        away.players.push(interceptor);
+
+        let mut game = Game::new(home, away, Rules::Bb2020);
+        game.thrower_id = Some("t1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.pass_coordinate = Some(FieldCoordinate::new(14, 7));
+        game.field_model.set_player_coordinate("t1", FieldCoordinate::new(1, 7));
+        game.field_model.set_player_coordinate("opp1", FieldCoordinate::new(7, 7));
+        game.field_model.set_player_state("opp1", PS::new(PS_STANDING));
+
+        let mut successes = 0;
+        for seed in 0u64..30 {
+            let mut game2 = game.clone();
+            let mut step = StepIntercept::new("fail".into());
+            step.interceptor_chosen = true;
+            step.interceptor_id = Some("opp1".into());
+            step.interception_skill_name = Some("Yoink".into());
+            let out = step.start(&mut game2, &mut GameRng::new(seed));
+            if out.action == StepAction::NextStep {
+                successes += 1;
+            }
+        }
+        assert!(
+            successes < 25,
+            "expected far fewer than 25/30 successes once the used Yoink no longer grants \
+             the easy-intercept minimum roll of 2 (got {successes}/30)"
+        );
+    }
+
+    #[test]
+    fn failed_interception_offers_re_roll_when_team_re_roll_available() {
+        // Regression: Java's `intercept()` offers a re-roll (via
+        // UtilServerReRoll.askForReRollIfAvailable) on a failed interception roll when one
+        // hasn't already been used this attempt. The old Rust code never offered any re-roll
+        // at all on failure — it went straight to GOTO_LABEL. With a team re-roll available,
+        // a failing roll must now return StepAction::Continue with a re-roll prompt instead.
+        use ffb_model::enums::{PlayerState as PS, PS_STANDING};
+        let mut home = test_team("home", 0);
+        let mut away = test_team("away", 0);
+
+        let mut thrower = ffb_model::model::player::Player::default();
+        thrower.id = "t1".into();
+        home.players.push(thrower);
+
+        let mut interceptor = ffb_model::model::player::Player::default();
+        interceptor.id = "opp1".into();
+        interceptor.agility = 1; // low agility → likely to fail the interception roll
+        away.players.push(interceptor);
+
+        let mut game = Game::new(home, away, Rules::Bb2020);
+        game.thrower_id = Some("t1".into());
+        game.thrower_action = Some(PlayerAction::Pass);
+        game.pass_coordinate = Some(FieldCoordinate::new(14, 7));
+        game.field_model.set_player_coordinate("t1", FieldCoordinate::new(1, 7));
+        game.field_model.set_player_coordinate("opp1", FieldCoordinate::new(7, 7));
+        game.field_model.set_player_state("opp1", PS::new(PS_STANDING));
+        // NOTE: `ask_for_reroll_if_available` resolves its team-reroll pool purely from
+        // `game.turn_data()` (keyed off `game.home_playing`), independent of which team the
+        // rolling player (the interceptor) actually belongs to — it's a generic helper shared
+        // by many steps for the currently-acting side's re-roll pool. Game::new defaults
+        // home_playing to true, so populate turn_data_home to make a re-roll available.
+        game.turn_data_home.rerolls = 1;
+        game.turn_data_home.reroll_used = false;
+
+        let mut found_reroll_offer = false;
+        for seed in 0u64..30 {
+            let mut game2 = game.clone();
+            let mut step = StepIntercept::new("fail".into());
+            step.interceptor_chosen = true;
+            step.interceptor_id = Some("opp1".into());
+            let out = step.start(&mut game2, &mut GameRng::new(seed));
+            if out.action == StepAction::Continue && out.prompt.is_some() {
+                found_reroll_offer = true;
+                assert_eq!(step.re_rolled_action.as_deref(), Some("INTERCEPTION"));
+                break;
+            }
+        }
+        assert!(
+            found_reroll_offer,
+            "expected at least one seed in 0..30 to fail the interception roll and be \
+             offered a re-roll (StepAction::Continue with a prompt)"
         );
     }
 }

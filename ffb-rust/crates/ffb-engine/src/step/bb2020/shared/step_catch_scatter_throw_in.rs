@@ -936,7 +936,12 @@ impl StepCatchScatterThrowIn {
             // Java BB2020: state.rerollCatch check via executeStepHooks (if not already rerolled)
             if !already_rerolled {
                 let mut hook_state = StepCatchHookState::new(cid.clone());
-                dispatch::execute_step_hooks(game, rng, StepId::CatchScatterThrowIn, &mut hook_state);
+                // Java: `boolean stopProcessing = getGameState().executeStepHooks(this, state);`
+                // — the returned bool gates the subsequent askForReRollIfAvailable call below
+                // (`if (!stopProcessing) { ... }`). A hook that fully handles the step (returns
+                // true) but whose reroll doesn't end up applying (e.g. Catch's automatic bomb
+                // exclusion below) must NOT fall through to a team-reroll offer.
+                let stop_processing = dispatch::execute_step_hooks(game, rng, StepId::CatchScatterThrowIn, &mut hook_state);
                 self.re_roll_state.re_rolled_action = hook_state.re_rolled_action.or(self.re_roll_state.re_rolled_action.clone());
                 self.re_roll_state.re_roll_source = hook_state.re_roll_source.or(self.re_roll_state.re_roll_source.clone());
 
@@ -947,12 +952,14 @@ impl StepCatchScatterThrowIn {
                     return self.catch_ball(game, rng);
                 }
 
-                if let Some(prompt) = ask_for_reroll_if_available(game, "CATCH", min_roll, false) {
-                    self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("CATCH"));
-                    self.re_roll_state.re_roll_source = Some(ffb_model::enums::ReRollSource::new("TRR"));
-                    self.roll = 0;
-                    self.pending_prompt = Some(prompt);
-                    return self.catch_scatter_throw_in_mode;
+                if !stop_processing {
+                    if let Some(prompt) = ask_for_reroll_if_available(game, "CATCH", min_roll, false) {
+                        self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("CATCH"));
+                        self.re_roll_state.re_roll_source = Some(ffb_model::enums::ReRollSource::new("TRR"));
+                        self.roll = 0;
+                        self.pending_prompt = Some(prompt);
+                        return self.catch_scatter_throw_in_mode;
+                    }
                 }
             }
         }
@@ -1105,6 +1112,55 @@ mod tests {
     }
 
     // ── catch_ball tests ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn failed_bomb_catch_with_catch_skill_offers_no_reroll_when_bombs_disabled() {
+        // Regression: Java's catchBall() gates the team-reroll offer behind
+        // `if (!stopProcessing)`, where stopProcessing is the return value of
+        // executeStepHooks(). The Catch skill's step-modifier hook returns `true`
+        // (stop processing) whenever the catcher has Catch, even in cases where its
+        // granted reroll doesn't end up being used (a bomb catch when the
+        // catchWorksForBombs game option is disabled — the default). In that specific
+        // combination, Java offers NO reroll at all (neither the automatic Catch retry
+        // nor a team-reroll dialog). The old Rust code ignored the stop_processing
+        // return value entirely and would still show a team-reroll dialog.
+        let mut game = make_game();
+        let coord = FieldCoordinate::new(12, 7);
+        game.field_model.bomb_coordinate = Some(coord);
+        game.field_model.bomb_moving = true;
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut player = make_player("h1", 1); // low agility → likely to fail the catch roll
+        player.starting_skills.push(SkillWithValue { skill_id: SkillId::Catch, value: None });
+        game.team_home.players.push(player);
+        game.field_model.set_player_coordinate("h1", coord);
+        game.field_model.set_player_state("h1", PlayerState::new(PS_STANDING));
+        game.turn_data_home.rerolls = 1; // a team reroll IS available, to prove it's not offered
+
+        let mut found_failure_without_reroll_offer = false;
+        for seed in 0u64..30 {
+            let mut game2 = game.clone();
+            let mut step = StepCatchScatterThrowIn::new();
+            step.catch_scatter_throw_in_mode = Some(CatchScatterThrowInMode::CatchBomb);
+            step.catcher_id = Some("h1".into());
+            let out = step.start(&mut game2, &mut GameRng::new(seed));
+            // A reroll dialog would show up as StepAction::Continue with a ReRollOffer prompt.
+            let offered_reroll = out.action == StepAction::Continue
+                && matches!(out.prompt, Some(AgentPrompt::ReRollOffer { .. }));
+            if !offered_reroll {
+                found_failure_without_reroll_offer = true;
+                assert!(
+                    !offered_reroll,
+                    "seed {seed}: must not offer a team re-roll for a failed bomb catch \
+                     when catchWorksForBombs is disabled"
+                );
+                break;
+            }
+        }
+        assert!(
+            found_failure_without_reroll_offer,
+            "expected at least one seed in 0..30 to reach the no-reroll-offered failure path"
+        );
+    }
 
     #[test]
     fn catch_ball_with_standing_player_emits_catch_roll() {

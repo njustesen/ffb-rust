@@ -15,7 +15,7 @@ use ffb_model::util::rng::GameRng;
 use ffb_model::report::mixed::report_apothecary_roll::ReportApothecaryRoll;
 use ffb_model::report::report_apothecary_choice::ReportApothecaryChoice;
 use crate::action::Action;
-use crate::injury::InjuryResult;
+use crate::injury::{InjuryResult, InjuryTypeServer};
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 
@@ -222,15 +222,39 @@ impl StepApothecary {
                     // Java: break — fall through to applyTo
                 }
                 Some(ApothecaryStatus::UseIgor) => {
-                    // Java: find REGENERATION inducement with uses left, useInducement, handleRegeneration
+                    // Java: find REGENERATION inducement (min priority) with uses left, useInducement,
+                    //   addReport(ReportInducement(team, type, 0)), handleRegeneration; if success → curePoison();
+                    //   if type has usage APOTHECARY_JOURNEYMEN && plagueDoctors > 0 → decrement.
                     if let Some(ref id) = defender_id {
                         let is_home = game.team_home.has_player(id);
-                        if is_home {
-                            game.turn_data_home.inducement_set.use_one_for_usage(Usage::REGENERATION);
+                        let team_id = if is_home { game.team_home.id.clone() } else { game.team_away.id.clone() };
+                        let used_type = if is_home {
+                            game.turn_data_home.inducement_set.use_one_for_usage(Usage::REGENERATION)
                         } else {
-                            game.turn_data_away.inducement_set.use_one_for_usage(Usage::REGENERATION);
+                            game.turn_data_away.inducement_set.use_one_for_usage(Usage::REGENERATION)
+                        };
+                        if let Some(type_id) = used_type {
+                            // Java: getResult().addReport(new ReportInducement(team.getId(), type, 0))
+                            game.report_list.add(ffb_model::report::report_inducement::ReportInducement::new(
+                                team_id, type_id.clone(), 0,
+                            ));
+                            let success = crate::step::util_server_injury::handle_regeneration(game, rng, id);
+                            if success {
+                                self.cure_poison(game);
+                            }
+                            // Java: if (type.hasUsage(APOTHECARY_JOURNEYMEN) && turnData.getPlagueDoctors() > 0)
+                            let has_journeymen_usage = if is_home {
+                                game.turn_data_home.inducement_set.get(&type_id)
+                            } else {
+                                game.turn_data_away.inducement_set.get(&type_id)
+                            }.map(|i| i.has_usage(Usage::APOTHECARY_JOURNEYMEN)).unwrap_or(false);
+                            if has_journeymen_usage {
+                                let turn = if is_home { &mut game.turn_data_home } else { &mut game.turn_data_away };
+                                if turn.plague_doctors > 0 {
+                                    turn.plague_doctors -= 1;
+                                }
+                            }
                         }
-                        crate::step::util_server_injury::handle_regeneration(game, rng, id);
                     }
                 }
                 _ => {
@@ -240,9 +264,19 @@ impl StepApothecary {
                     }
 
                     // Java: if (player.hasSkillProperty(canRollToSaveFromInjury) && injuryType.canUseApo())
-                    // → handleRegeneration; if fails + has REGENERATION inducement → WAIT_FOR_IGOR_USE
+                    // → handleRegeneration; if success → curePoison(); if fails + has REGENERATION inducement → WAIT_FOR_IGOR_USE
                     if let Some(ref id) = defender_id {
-                        crate::step::util_server_injury::handle_regeneration(game, rng, id);
+                        let injury_type_name = self.injury_result.as_ref()
+                            .and_then(|ir| ir.injury_context.injury_type_name.clone());
+                        let can_use_apo = crate::injury::make_injury_type(
+                            injury_type_name.as_deref().unwrap_or("InjuryTypeBlock")
+                        ).can_use_apo();
+                        if can_use_apo {
+                            let success = crate::step::util_server_injury::handle_regeneration(game, rng, id);
+                            if success {
+                                self.cure_poison(game);
+                            }
+                        }
                     }
                     // client-only: if regen failed and REGENERATION inducement available → WAIT_FOR_IGOR_USE dialog
                     // Headless auto-declines Igor dialog; game continues with the injury.
@@ -513,6 +547,84 @@ mod tests {
             step.injury_result.as_ref().unwrap().injury_context.apothecary_status,
             ApothecaryStatus::DoNotUseIgor,
         );
+    }
+
+    fn add_regen_player(game: &mut Game, id: &str, state: ffb_model::enums::PlayerState) {
+        use ffb_model::enums::{PlayerType, PlayerGender, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        game.team_home.players.push(Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Regeneration, value: None }],
+            extra_skills: vec![], temporary_skills: vec![], used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_state(id, state);
+    }
+
+    #[test]
+    fn use_igor_adds_inducement_report_and_decrements_plague_doctors_on_success() {
+        // Java: USE_IGOR case → useInducement + addReport(ReportInducement) + handleRegeneration;
+        // on success → curePoison(); if type has APOTHECARY_JOURNEYMEN usage and plagueDoctors > 0 → decrement.
+        use ffb_model::enums::PS_BADLY_HURT;
+        use ffb_model::inducement::inducement::Inducement;
+        use ffb_model::report::report_id::ReportId;
+
+        let mut game = make_game();
+        add_regen_player(&mut game, "p1", ffb_model::enums::PlayerState::new(PS_BADLY_HURT));
+        game.turn_data_home.inducement_set.add_inducement(
+            Inducement::new("plagueDoctor", 1, vec![Usage::REGENERATION, Usage::APOTHECARY_JOURNEYMEN]),
+        );
+        game.turn_data_home.plague_doctors = 2;
+
+        let mut step = StepApothecary::new();
+        step.apothecary_mode = Some(ApothecaryMode::Defender);
+        let mut ir = make_ir(ApothecaryMode::Defender, ApothecaryStatus::UseIgor);
+        ir.injury_context.defender_id = Some("p1".into());
+        step.injury_result = Some(ir);
+        step.defender_poisoned = true;
+
+        // GameRng::new(4) rolls 4 on first d6 → regeneration succeeds (threshold >= 4).
+        let mut rng = GameRng::new(4);
+        step.start(&mut game, &mut rng);
+
+        assert!(game.report_list.has_report(ReportId::INDUCEMENT),
+            "ReportInducement must be added when the Igor inducement is used");
+        assert_eq!(game.turn_data_home.plague_doctors, 1,
+            "plagueDoctors must decrement when the used inducement has APOTHECARY_JOURNEYMEN usage");
+        let state = game.field_model.player_state("p1").unwrap();
+        assert_eq!(state.base(), ffb_model::enums::PS_RESERVE, "successful regeneration cures the casualty");
+    }
+
+    #[test]
+    fn regeneration_gated_by_injury_type_can_use_apo() {
+        // Java: default branch requires injuryType.canUseApo() in addition to hasSkillProperty +
+        // isCasualty before calling handleRegeneration. InjuryTypeEatPlayer overrides canUseApo() to
+        // false, so regeneration must NOT be attempted even though the player has Regeneration and is a casualty.
+        use ffb_model::enums::PS_BADLY_HURT;
+        let mut game = make_game();
+        add_regen_player(&mut game, "p1", ffb_model::enums::PlayerState::new(PS_BADLY_HURT));
+
+        let mut step = StepApothecary::new();
+        step.apothecary_mode = Some(ApothecaryMode::Defender);
+        let mut ir = make_ir(ApothecaryMode::Defender, ApothecaryStatus::NoApothecary);
+        ir.injury_context.defender_id = Some("p1".into());
+        ir.injury_context.injury = Some(ffb_model::enums::PlayerState::new(PS_BADLY_HURT));
+        ir.injury_context.injury_type_name = Some("InjuryTypeEatPlayer".into());
+        step.injury_result = Some(ir);
+        step.show_report = false;
+
+        // GameRng::new(4) would succeed regeneration if attempted — proves the gate blocks it.
+        let mut rng = GameRng::new(4);
+        step.start(&mut game, &mut rng);
+
+        let state = game.field_model.player_state("p1").unwrap();
+        assert_eq!(state.base(), PS_BADLY_HURT,
+            "regeneration must not apply when injuryType.canUseApo() is false (InjuryTypeEatPlayer)");
     }
 
     #[test]

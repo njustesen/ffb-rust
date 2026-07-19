@@ -11,7 +11,9 @@ use crate::step::util_server_steps;
 /// commands, then dispatches to the appropriate action sequence via GOTO_LABEL or NEXT_STEP.
 ///
 /// Java executeStep routing:
-///   end_turn → GotoLabel(end) + publish EndTurn + CheckForgo
+///   end_turn → GotoLabel(end) + publish EndTurn
+///     (BB2020, unlike BB2025, never publishes CHECK_FORGO from this step — BB2025's
+///     sibling only does so from CLIENT_END_TURN handling or when isTimeoutEnforced())
 ///   end_player_action → GotoLabel(end) + publish EndPlayerAction
 ///   dispatch_player_action set + acting player present:
 ///     publish DispatchPlayerAction
@@ -98,9 +100,10 @@ impl StepInitSelecting {
         let label = &self.goto_label_on_end;
 
         if self.end_turn {
+            // Java (BB2020): executeStep()'s `if (game.isTimeoutEnforced() || fEndTurn)` branch
+            // publishes only END_TURN here — no CHECK_FORGO (that's a BB2025-only addition).
             return StepOutcome::goto(label)
-                .publish(StepParameter::EndTurn(true))
-                .publish(StepParameter::CheckForgo(true));
+                .publish(StepParameter::EndTurn(true));
         }
         if self.end_player_action {
             return StepOutcome::goto(label)
@@ -206,7 +209,22 @@ mod tests {
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("end_label"));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::CheckForgo(true))));
+    }
+
+    #[test]
+    fn end_turn_does_not_publish_check_forgo() {
+        // Regression: Java's BB2020 StepInitSelecting.executeStep() never publishes
+        // CHECK_FORGO from the `fEndTurn` branch — that behavior only exists in the
+        // BB2025 sibling step (either from CLIENT_END_TURN handling or when
+        // isTimeoutEnforced()). The old Rust code invented an unconditional CheckForgo(true)
+        // publish here that has no basis in the BB2020 Java source.
+        let mut game = make_game();
+        let mut step = StepInitSelecting::new("end_label".into());
+        let out = step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
+        assert!(
+            !out.published.iter().any(|p| matches!(p, StepParameter::CheckForgo(_))),
+            "BB2020 StepInitSelecting must not publish CheckForgo on end_turn"
+        );
     }
 
     #[test]
@@ -260,14 +278,13 @@ mod tests {
     }
 
     #[test]
-    fn end_turn_command_publishes_end_turn_and_check_forgo() {
+    fn end_turn_command_publishes_end_turn() {
         let mut game = make_game();
         let mut step = StepInitSelecting::new("lbl".into());
         let out = step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("lbl"));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::CheckForgo(true))));
     }
 
     #[test]

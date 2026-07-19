@@ -82,21 +82,15 @@ impl StepInitScatterPlayer {
         }
 
         // Guard: no player or coordinate → NEXT_STEP.
+        // Java: if ((thrownPlayer == null) || (thrownPlayerCoordinate == null)) { setNextAction(NEXT_STEP); return; }
+        // No parameters are published on this early-return path.
         let thrown_player_id = match &self.thrown_player_id {
             Some(id) if game.player(id).is_some() => id.clone(),
-            _ => return StepOutcome::next()
-                .publish(StepParameter::ThrownPlayerId(self.thrown_player_id.clone()))
-                .publish(StepParameter::ThrownPlayerState(self.thrown_player_state.unwrap_or_default()))
-                .publish(StepParameter::ThrownPlayerHasBall(self.thrown_player_has_ball))
-                .publish(StepParameter::IsKickedPlayer(self.is_kicked_player)),
+            _ => return StepOutcome::next(),
         };
         let thrown_player_coord = match self.thrown_player_coordinate {
             Some(c) => c,
-            None => return StepOutcome::next()
-                .publish(StepParameter::ThrownPlayerId(self.thrown_player_id.clone()))
-                .publish(StepParameter::ThrownPlayerState(self.thrown_player_state.unwrap_or_default()))
-                .publish(StepParameter::ThrownPlayerHasBall(self.thrown_player_has_ball))
-                .publish(StepParameter::IsKickedPlayer(self.is_kicked_player)),
+            None => return StepOutcome::next(),
         };
 
         // Java: startCoordinate = thrownPlayerCoordinate (then may change based on scatter/deviate)
@@ -378,6 +372,31 @@ mod tests {
         let mut game = make_game();
         let out = StepInitScatterPlayer::new().start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    // Java: `if ((thrownPlayer == null) || (thrownPlayerCoordinate == null)) { setNextAction(NEXT_STEP); return; }`
+    // publishes nothing on this early-return path.
+    #[test]
+    fn no_player_returns_next_without_publishing_anything() {
+        let mut game = make_game();
+        let mut step = StepInitScatterPlayer::new();
+        step.thrown_player_id = Some("missing".into()); // not in game → guard triggers
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.published.is_empty(), "Java's early return publishes no parameters");
+    }
+
+    #[test]
+    fn missing_coordinate_returns_next_without_publishing_anything() {
+        let mut game = make_game();
+        add_player(&mut game, "p1", FieldCoordinate::new(13, 7));
+        let mut step = StepInitScatterPlayer::new();
+        step.thrown_player_id = Some("p1".into());
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        step.thrown_player_coordinate = None; // guard triggers
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.published.is_empty(), "Java's early return publishes no parameters");
     }
 
     #[test]

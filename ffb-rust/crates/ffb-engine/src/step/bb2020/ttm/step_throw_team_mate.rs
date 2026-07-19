@@ -12,7 +12,6 @@
 /// Consumed params: THROWN_PLAYER_ID, THROWN_PLAYER_STATE, THROWN_PLAYER_HAS_BALL.
 use std::collections::HashSet;
 use ffb_model::enums::{PassingDistance, PassOutcome, PlayerState, ReRollSource, SkillId};
-use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::mixed::report_throw_team_mate_roll::ReportThrowTeamMateRoll;
@@ -25,7 +24,6 @@ use crate::action::Action;
 use crate::model::step_modifier::RerollHookState;
 use crate::skill_behaviour::dispatch;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
-use crate::step::generator::bb2020::scatter_player::{ScatterPlayer, ScatterPlayerParams};
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
 /// Java `StepThrowTeamMate.StepState` — fields promoted to struct level.
@@ -125,7 +123,7 @@ impl StepThrowTeamMate {
                 .map(|p| p.passing != 0)
                 .unwrap_or(false);
             let passing_value = game.player(&thrower_id)
-                .map(|p| p.passing as i32)
+                .map(|p| p.passing_with_modifiers())
                 .unwrap_or(0);
 
             self.pass_result = Some(evaluate_ttm_pass(player_can_pass, passing_value, roll, modifier_sum));
@@ -151,24 +149,12 @@ impl StepThrowTeamMate {
             ));
 
             if successful {
-                // Push ScatterPlayer sequence
-                let scatters_single = self.thrown_player_id.as_deref()
-                    .and_then(|id| game.player(id))
-                    .map(|p| p.has_skill_property(NamedProperties::TTM_SCATTERS_IN_SINGLE_DIRECTION))
-                    .unwrap_or(false);
-
-                let scatter_params = ScatterPlayerParams {
-                    thrown_player_id: self.thrown_player_id.clone(),
-                    thrown_player_state: self.thrown_player_state,
-                    thrown_player_has_ball: self.thrown_player_has_ball,
-                    thrown_player_coordinate: thrower_coord,
-                    throw_scatter: pass_result == PassOutcome::Complete,
-                    has_swoop: scatters_single,
-                    deviates: pass_result == PassOutcome::Inaccurate,
-                    ..Default::default()
-                };
-                let seq = ScatterPlayer::build_sequence(&scatter_params);
-                return self.handle_pass_result(game).push_seq(seq);
+                // Java: handlePassResult(state.passResult, step) — publish PASS_RESULT, NEXT_STEP.
+                // The generator sequence places StepDispatchScatterPlayer immediately after this
+                // step; it is StepDispatchScatterPlayer (not this step) that reads PASS_RESULT and
+                // decides whether/what ScatterPlayer sequence to push. Pushing one here as well
+                // would double-push the scatter sequence.
+                return self.handle_pass_result(game);
             } else {
                 // Java: if (getReRolledAction() != rerolledAction && playerCanPass) → try reroll
                 if self.re_rolled_action.is_none() && player_can_pass {
@@ -358,11 +344,11 @@ mod tests {
         step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
 
         let out = step.start(&mut game, &mut GameRng::new(42));
-        // Should always publish PassResultParam
+        // Java's handlePassResult always publishes PASS_RESULT and never pushes a sequence —
+        // StepDispatchScatterPlayer (the next step in the generator sequence) does the pushing.
         let has_result = out.published.iter().any(|p| matches!(p, StepParameter::PassResultParam(_)));
-        let has_sequence = !out.pushes.is_empty();
-        // Either a scatter sequence was pushed (success) or pass_result published (failure)
-        assert!(has_result || has_sequence, "throw should produce outcome");
+        assert!(has_result, "throw should always publish PassResultParam");
+        assert!(out.pushes.is_empty(), "StepThrowTeamMate must never push a sequence itself");
     }
 
     #[test]
@@ -480,6 +466,40 @@ mod tests {
         step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
         step.start(&mut game, &mut GameRng::new(42));
         assert!(game.report_list.has_report(ReportId::THROW_TEAM_MATE_ROLL));
+    }
+
+    // Java: `ThrowTeamMateBehaviour.handleExecuteStepHook` calls
+    // `evaluatePass(playerCanPass, thrower.getPassingWithModifiers(), roll, modifierSum)` —
+    // the pass VALUE fed into the roll evaluation uses passing-with-modifiers, not the raw
+    // PA stat. A temporary PA penalty must make the throw harder to complete.
+    #[test]
+    fn evaluate_pass_uses_passing_with_modifiers_not_raw_passing() {
+        use ffb_model::model::player::STAT_PA;
+        let mut game = make_game();
+        game.home_playing = true;
+        add_player(&mut game, true, "thrower", FieldCoordinate::new(10, 7), 6);
+        // -3 PA modifier: effective passing_with_modifiers() = 3, raw passing = 6.
+        if let Some(p) = game.team_home.player_mut("thrower") {
+            p.add_temporary_stat_mod("test", STAT_PA, -3);
+        }
+        game.acting_player.player_id = Some("thrower".into());
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+
+        let mut step = StepThrowTeamMate::new();
+        step.thrown_player_id = Some("tp1".into());
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        // roll=4, modifier_sum=0: raw PA=6 → 4<6 → INACCURATE; with-modifiers PA=3 → 4>=3 → ACCURATE(Complete).
+        let seed = (0u64..2000).find(|&s| GameRng::new(s).d6() == 4).expect("seed with d6=4");
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+
+        assert_eq!(step.pass_result, Some(PassOutcome::Complete),
+            "must use passing_with_modifiers() (3, effective) not raw passing (6), \
+             got {:?}", step.pass_result);
+        // Java's handlePassResult only publishes PASS_RESULT + NEXT_STEP; it never pushes a
+        // sequence — StepDispatchScatterPlayer (the next step) is responsible for that.
+        assert!(out.pushes.is_empty(),
+            "StepThrowTeamMate must not push a ScatterPlayer sequence itself");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassResultParam(PassOutcome::Complete))));
     }
 
     #[test]

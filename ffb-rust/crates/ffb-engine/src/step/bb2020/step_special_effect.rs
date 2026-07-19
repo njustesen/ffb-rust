@@ -182,6 +182,22 @@ impl StepSpecialEffect {
                 outcome = outcome.publish(StepParameter::InjuryResult(Box::new(injury_result)));
                 for p in drop_player(game, &player_id, true) { outcome = outcome.publish(p); }
 
+                // Java: PlayerState newState = getPlayerState(player);
+                // if (!player.getId().equalsIgnoreCase(originalBombardier) && newState.isProneOrStunned())
+                //     setPlayerState(player, newState.changeActive(isActive));
+                // Restores the pre-injury "active" bit for non-bombardier players knocked
+                // prone/stunned by the bomb (dropPlayer's injury resolution otherwise clears it).
+                let is_original_bombardier = self.original_bombardier.as_deref()
+                    .map(|orig| orig.eq_ignore_ascii_case(&player_id))
+                    .unwrap_or(false);
+                if !is_original_bombardier {
+                    if let Some(new_state) = game.field_model.player_state(&player_id) {
+                        if new_state.is_prone() || new_state.is_stunned() {
+                            game.field_model.set_player_state(&player_id, new_state.change_active(is_active));
+                        }
+                    }
+                }
+
                 if !suppress_end_turn && is_standing {
                     let acting_team_has_player =
                         if bomb_from_home { player_is_home }
@@ -191,7 +207,6 @@ impl StepSpecialEffect {
                         outcome = outcome.publish(StepParameter::EndTurn(true));
                     }
                 }
-                let _ = is_active;
             }
             Some(SpecialEffect::LIGHTNING) | None => {
                 // Lightning has no injury in the base game; or unknown key
@@ -438,6 +453,34 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
             "original bombardier hits themselves → suppressEndTurn=false → EndTurn published");
+    }
+
+    #[test]
+    fn bomb_restores_active_bit_for_non_bombardier_player_knocked_prone() {
+        // Java: PlayerState newState = getPlayerState(player);
+        // if (!player.getId().equalsIgnoreCase(originalBombardier) && newState.isProneOrStunned())
+        //     setPlayerState(player, newState.changeActive(isActive));
+        //
+        // drop_player_with_base deactivates the hit player only when they are the
+        // acting player (is_acting) — here the hit player *is* the acting player but is
+        // NOT the original bombardier, so before the fix their active bit was left
+        // cleared by drop_player; the fix must restore it back to true.
+        let pid = "victim";
+        let mut step = StepSpecialEffect::new("FAIL".into());
+        step.player_id = Some(pid.into());
+        step.roll_for_effect = false;
+        step.special_effect_key = Some("bomb".into());
+        step.original_bombardier = Some("other_bomber".into());
+
+        let mut game = make_game_with_player(pid, true);
+        game.acting_player.player_id = Some(pid.into()); // hit player is the current actor
+        game.turn_mode = TurnMode::BombHome;
+
+        step.start(&mut game, &mut GameRng::new(0));
+
+        let state = game.field_model.player_state(pid).unwrap();
+        assert!(state.is_prone() || state.is_stunned(), "bomb should drop the player prone");
+        assert!(state.is_active(), "non-bombardier player's active bit must be restored after being dropped");
     }
 
     #[test]

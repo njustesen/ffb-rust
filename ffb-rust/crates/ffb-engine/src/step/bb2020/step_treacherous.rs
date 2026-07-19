@@ -132,7 +132,9 @@ impl StepTreacherous {
         outcome
     }
 
-    /// Java: `treacherousTarget` — find adjacent active-team player who carries the ball.
+    /// Java: `treacherousTarget` — `UtilPlayer.findAdjacentBlockablePlayers(game, actingTeam, coord)`
+    /// filtered by `hasBall`. `findAdjacentBlockablePlayers` requires `playerState.canBeBlocked()`
+    /// (i.e. the candidate must be standing/blockable) in addition to team membership and adjacency.
     fn find_treacherous_target(
         game: &Game,
         actor_id: &str,
@@ -142,7 +144,12 @@ impl StepTreacherous {
             .filter(|p| p.id != actor_id)
             .find(|p| {
                 if let Some(pc) = game.field_model.player_coordinate(&p.id) {
-                    game.field_model.ball_coordinate == Some(pc) && pc.is_adjacent(actor_coord)
+                    let is_blockable = game.field_model.player_state(&p.id)
+                        .map(|s| s.can_be_blocked())
+                        .unwrap_or(false);
+                    is_blockable
+                        && game.field_model.ball_coordinate == Some(pc)
+                        && pc.is_adjacent(actor_coord)
                 } else {
                     false
                 }
@@ -262,6 +269,29 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::DropPlayerContext(_))));
         assert_eq!(game.field_model.ball_coordinate, Some(FieldCoordinate::new(10, 7)));
+    }
+
+    #[test]
+    fn prone_teammate_with_ball_is_not_a_valid_stab_target() {
+        // Java: findAdjacentBlockablePlayers requires playerState.canBeBlocked() (STANDING or
+        // MOVING). A prone teammate carrying the ball must NOT be selected as a stab target,
+        // even though they're adjacent and hold the ball.
+        use ffb_model::enums::PS_PRONE;
+        let (mut game, _) = make_game_with_treacherous();
+        let mate_id = "mate".to_string();
+        game.team_home.players.push(make_player(&mate_id, None));
+        let adj = FieldCoordinate::new(11, 7);
+        game.field_model.set_player_coordinate(&mate_id, adj);
+        game.field_model.set_player_state(&mate_id, PlayerState::new(PS_PRONE));
+        game.field_model.ball_coordinate = Some(adj);
+
+        let mut step = StepTreacherous::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::DropPlayerContext(_))),
+            "prone (non-blockable) teammate must not be selected as a treacherous stab target");
+        // Ball must remain where it was — no stab occurred.
+        assert_eq!(game.field_model.ball_coordinate, Some(adj));
     }
 
     #[test]

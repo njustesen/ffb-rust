@@ -167,13 +167,31 @@ impl StepBloodLust {
     }
 
     /// Decide whether to show the action-change dialog or go directly to failure.
+    ///
+    /// Java (`BloodLustBehaviour.handleExecuteStepHook`, BB2020): the dialog is shown only
+    /// when `actingPlayer.getPlayerAction()` is exactly one of a fixed whitelist —
+    /// `{VICIOUS_VINES, BLOCK, PASS, HAND_OVER, THROW_BOMB, THROW_TEAM_MATE, KICK_TEAM_MATE,
+    /// FOUL, STAND_UP, STAND_UP_BLITZ, BLITZ_MOVE, GAZE_MOVE, MULTIPLE_BLOCK}` — NOT a general
+    /// "not already a move action" heuristic. Any other action (e.g. a plain BLITZ, BLITZ_SELECT,
+    /// DUMP_OFF, HAIL_MARY_PASS, ...) must fall straight through to failure without a dialog.
     fn fail_blood_lust_for_action(&mut self, game: &mut Game, acting_id: &str) -> StepOutcome {
-        // BB2020: if current action is non-MOVE type, show dialog asking if player wants to
-        // change to the alternate (move-phase) action so the vampire can go feed.
         let current_action = game.acting_player.player_action;
-        let needs_dialog = current_action
-            .map(|a| a != PlayerAction::Move && Self::get_alternate_action(a) != a)
-            .unwrap_or(false);
+        let needs_dialog = matches!(
+            current_action,
+            Some(PlayerAction::ViciousVines)
+                | Some(PlayerAction::Block)
+                | Some(PlayerAction::Pass)
+                | Some(PlayerAction::HandOver)
+                | Some(PlayerAction::ThrowBomb)
+                | Some(PlayerAction::ThrowTeamMate)
+                | Some(PlayerAction::KickTeamMate)
+                | Some(PlayerAction::Foul)
+                | Some(PlayerAction::StandUp)
+                | Some(PlayerAction::StandUpBlitz)
+                | Some(PlayerAction::BlitzMove)
+                | Some(PlayerAction::GazeMove)
+                | Some(PlayerAction::MultipleBlock)
+        );
 
         if needs_dialog {
             self.status = BloodLustStatus::WaitForActionChange;
@@ -323,6 +341,22 @@ mod tests {
         assert_eq!(out.action, StepAction::Continue);
         assert!(matches!(out.prompt, Some(AgentPrompt::BloodlustAction { .. })));
         assert!(!game.acting_player.suffering_blood_lust);
+    }
+
+    #[test]
+    fn failed_roll_blitz_action_direct_failure_no_dialog() {
+        // Regression: Java's BloodLustBehaviour only shows the action-change dialog for a
+        // fixed whitelist of player actions (VICIOUS_VINES, BLOCK, PASS, HAND_OVER,
+        // THROW_BOMB, THROW_TEAM_MATE, KICK_TEAM_MATE, FOUL, STAND_UP, STAND_UP_BLITZ,
+        // BLITZ_MOVE, GAZE_MOVE, MULTIPLE_BLOCK). A plain BLITZ action is NOT in that list,
+        // so it must fail directly without a dialog. The old Rust heuristic
+        // ("not already MOVE") incorrectly showed a dialog for BLITZ (and any other action
+        // outside the whitelist).
+        let seed = seed_for_d6(1);
+        let mut game = make_game(vec![SkillId::BloodLust], Some(PlayerAction::Blitz));
+        let out = StepBloodLust::new("fail").start(&mut game, &mut GameRng::new(seed));
+        assert_ne!(out.action, StepAction::Continue, "BLITZ is not in Java's dialog whitelist");
+        assert!(game.acting_player.suffering_blood_lust);
     }
 
     #[test]

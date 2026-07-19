@@ -309,10 +309,13 @@ impl StepPass {
                     .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Complete))
             }
             PassResult::SAVED_FUMBLE => {
-                // Java: handleFailedPass → SAVED_FUMBLE branch
+                // Java: handleFailedPass → SAVED_FUMBLE branch. The bomb sub-branch also
+                // publishes CATCHER_ID=null (the ball sub-branch does not — see Java source).
+                let mut outcome_needs_catcher_reset = false;
                 if is_bomb {
                     game.field_model.bomb_coordinate = None;
                     game.field_model.bomb_moving = false;
+                    outcome_needs_catcher_reset = true;
                 } else {
                     if let Some(tc) = thrower_coord {
                         game.field_model.ball_coordinate = Some(tc);
@@ -320,10 +323,14 @@ impl StepPass {
                     game.field_model.ball_moving = false;
                 }
                 let label = self.goto_label_on_saved_fumble.clone();
-                StepOutcome::goto(&label)
+                let mut outcome = StepOutcome::goto(&label)
                     .publish(StepParameter::PassFumble(false))
                     .publish(StepParameter::DontDropFumble(true))
-                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Fumble))
+                    .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Fumble));
+                if outcome_needs_catcher_reset {
+                    outcome = outcome.publish(StepParameter::CatcherId(None));
+                }
+                outcome
             }
             PassResult::FUMBLE => {
                 // Java: mechanic.eligibleToReRoll → askForReRollIfAvailable
@@ -412,6 +419,10 @@ impl StepPass {
         // Java: if THROW_BOMB → setBombCoordinate(passCoordinate)
         // Java: else → setBallCoordinate(passCoordinate)
         // Java: publishParameter(CATCHER_ID, null); setNextAction(GOTO_LABEL, goToLabelOnMissedPass)
+        // Java: handleFailedPass() unconditionally publishes PASS_FUMBLE = (result == FUMBLE)
+        // at the very top of the method, before the SAVED_FUMBLE/FUMBLE/else dispatch — so
+        // this (else/missed) branch must also publish PassFumble(false), matching the other
+        // two branches which already do so.
         if let Some(pass_coord) = game.pass_coordinate {
             if is_bomb {
                 game.field_model.bomb_coordinate = Some(pass_coord);
@@ -421,6 +432,7 @@ impl StepPass {
         }
         let label = self.goto_label_on_missed_pass.clone();
         StepOutcome::goto(&label)
+            .publish(StepParameter::PassFumble(false))
             .publish(StepParameter::CatcherId(None))
             .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Inaccurate))
     }
@@ -587,5 +599,40 @@ mod tests {
             game.report_list.has_report(ReportId::PASS_ROLL),
             "expected ReportPassRoll in report_list after a fumble"
         );
+    }
+
+    #[test]
+    fn missed_pass_publishes_pass_fumble_false() {
+        // Regression: Java's handleFailedPass() unconditionally publishes
+        // PASS_FUMBLE = (result == FUMBLE) at the top of the method, for ALL three
+        // branches (SAVED_FUMBLE, FUMBLE, and the else/missed branch). The Rust
+        // translation's missed/inaccurate handler was missing this publish entirely,
+        // which could leave a stale PassFumble(true) on the stack from an earlier
+        // failed re-roll attempt within the same StepPass invocation.
+        let mut game = make_game_with_thrower(4);
+        let mut step = make_step();
+        step.pass_result = Some(PassResult::INACCURATE);
+        step.minimum_roll = 3;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.goto_label.as_deref(), Some("missed"));
+        let has_pass_fumble_false = out.published.iter().any(|p| matches!(p, StepParameter::PassFumble(false)));
+        assert!(has_pass_fumble_false, "expected PassFumble(false) published for a missed (inaccurate) pass");
+    }
+
+    #[test]
+    fn saved_fumble_bomb_publishes_catcher_id_none() {
+        // Regression: Java's handleFailedPass() SAVED_FUMBLE branch publishes
+        // CATCHER_ID=null only in the bomb sub-branch (not the ball sub-branch) —
+        // the Rust translation was missing this publish for bombs entirely.
+        let mut game = make_game_with_thrower(3);
+        game.thrower_action = Some(PlayerAction::ThrowBomb);
+        let mut step = make_step();
+        step.pass_result = Some(PassResult::SAVED_FUMBLE);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.goto_label.as_deref(), Some("saved_fumble"));
+        let has_catcher_none = out.published.iter().any(|p| matches!(p, StepParameter::CatcherId(None)));
+        assert!(has_catcher_none, "expected CatcherId(None) published for a saved-fumble bomb");
     }
 }

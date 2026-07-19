@@ -1,4 +1,4 @@
-use ffb_model::enums::{PlayerAction, PlayerState, PS_STANDING, ReRollSource};
+use ffb_model::enums::{PlayerAction, PlayerState, ReRollSource};
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_mechanics::mechanics::{is_skill_roll_successful, minimum_roll_confusion};
@@ -12,7 +12,11 @@ use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 ///
 /// The Java step body is entirely delegated to `executeStepHooks(this, state)`.
 /// The BB2020 TakeRootBehaviour hook (inlined here) does:
-///   1. If player started STANDING and is not yet rooted → roll d6 vs. minimumRollConfusion(true)=2.
+///   1. If player is not yet rooted → roll d6 vs. minimumRollConfusion(true)=2.
+///      NOTE: unlike the BB2025 sibling (`if (startedStanding && !playerState.isRooted())`),
+///      BB2020's hook has NO `startedStanding` gate at all — it is
+///      `if (!playerState.isRooted())` only. A player who did not start the activation
+///      standing still rolls in BB2020.
 ///   2. On success → NEXT_STEP (player may move freely).
 ///   3. On failure → set player rooted, cancel player action.
 ///   4. TODO: re-roll dialog path (WAITING_FOR_RE_ROLL). For now random agent never re-rolls.
@@ -98,17 +102,14 @@ impl StepTakeRoot {
             None => return StepOutcome::next(),
         };
 
-        // Java: actingPlayer.getOldPlayerState().getBase() == PlayerState.STANDING
-        // If old_player_state is unknown (not yet set), conservatively assume STANDING.
-        let started_standing = self.old_player_state
-            .map(|s| s.base() == PS_STANDING)
-            .unwrap_or(true);
-
+        // Java (BB2020): `if (!playerState.isRooted())` — no startedStanding gate (that check
+        // is BB2025-only). old_player_state is retained on the struct for parameter
+        // compatibility but must NOT gate the roll here.
         let is_rooted = game.field_model.player_state(&player_id)
             .map(|s| s.is_rooted())
             .unwrap_or(false);
 
-        if !started_standing || is_rooted {
+        if is_rooted {
             // Java: hook returns false → executeStep falls through to NEXT_STEP
             return StepOutcome::next();
         }
@@ -131,8 +132,13 @@ impl StepTakeRoot {
                 return cancel_take_root_player_action(game, &player_id);
             }
         } else {
+            // Java: UtilCards.hasUnusedSkill(actingPlayer, skill) — present AND not already
+            // used this drive/turn, not merely present (has_skill alone ignores usage state).
             do_roll = game.player(&player_id)
-                .map(|p| p.has_skill(ffb_model::enums::SkillId::TakeRoot))
+                .map(|p| {
+                    let id = ffb_model::enums::SkillId::TakeRoot;
+                    p.has_skill(id) && !p.used_skills.contains(&id)
+                })
                 .unwrap_or(false);
         }
 
@@ -144,6 +150,27 @@ impl StepTakeRoot {
         let roll = rng.d6();
         let minimum_roll = minimum_roll_confusion(true);
         let successful = is_skill_roll_successful(roll, minimum_roll);
+
+        // Java: actingPlayer.markSkillUsed(skill) — unconditional, regardless of success/failure.
+        if let Some(player) = game.player_mut(&player_id) {
+            player.used_skills.insert(ffb_model::enums::SkillId::TakeRoot);
+        }
+
+        // Java: boolean reRolled = (reRolledAction != null && reRolledAction == step.getReRolledAction()
+        //         && step.getReRollSource() != null);
+        //       getResult().addReport(new ReportConfusionRoll(playerId, successful, roll, minimumRoll,
+        //         reRolled, skill));
+        // Added unconditionally (both success and failure), matching Java's placement outside
+        // the `if (!successful)` branch.
+        let re_rolled = self.re_rolled_action.as_deref() == Some("TAKE_ROOT") && self.re_roll_source.is_some();
+        game.report_list.add(ffb_model::report::report_confusion_roll::ReportConfusionRoll::new(
+            Some(player_id.clone()),
+            successful,
+            roll,
+            minimum_roll,
+            re_rolled,
+            Some("TakeRoot".to_string()),
+        ));
 
         if successful {
             self.status = TakeRootStatus::Success;
@@ -340,20 +367,67 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
     }
 
-    /// Player did NOT start standing → no roll (same as already-rooted guard).
+    /// Regression: BB2020's TakeRootBehaviour hook has NO `startedStanding` gate — unlike
+    /// the BB2025 sibling (`if (startedStanding && !playerState.isRooted())`), BB2020 is
+    /// `if (!playerState.isRooted())` only. A player who did not start standing (e.g. old
+    /// state PRONE) must still roll (and have TakeRoot marked used), not be silently skipped.
+    /// The old Rust code incorrectly imported BB2025's startedStanding gate into this file.
     #[test]
-    fn did_not_start_standing_skips_roll() {
+    fn did_not_start_standing_still_rolls_and_marks_skill_used() {
         let mut game = make_game();
         add_player_with_take_root(&mut game, "p1");
         game.acting_player.player_id = Some("p1".into());
         game.acting_player.player_action = Some(PlayerAction::Move);
 
         let mut step = StepTakeRoot::new();
-        // Player started PRONE
+        // Player started PRONE — must NOT prevent the roll in BB2020.
         step.old_player_state = Some(PlayerState::new(PS_PRONE));
 
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(
+            game.player("p1").unwrap().used_skills.contains(&SkillId::TakeRoot),
+            "TakeRoot must be marked used after rolling, even when the player did not start standing"
+        );
+    }
+
+    /// Regression: Java always adds a ReportConfusionRoll after rolling for TakeRoot,
+    /// regardless of success/failure. The old Rust code never added this report at all.
+    #[test]
+    fn rolling_adds_confusion_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        add_player_with_take_root(&mut game, "p1");
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+
+        let mut step = StepTakeRoot::new();
+        step.old_player_state = Some(PlayerState::new(PS_STANDING));
+        step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(
+            game.report_list.has_report(ReportId::CONFUSION_ROLL),
+            "expected ReportConfusionRoll after a TakeRoot roll"
+        );
+    }
+
+    /// Regression: `has_unused_skill` semantics — a player whose TakeRoot skill is already
+    /// marked used this drive/turn must not roll again (Java: `UtilCards.hasUnusedSkill`).
+    #[test]
+    fn already_used_take_root_skill_does_not_roll_again() {
+        let mut game = make_game();
+        add_player_with_take_root(&mut game, "p1");
+        game.team_home.player_mut("p1").unwrap().used_skills.insert(SkillId::TakeRoot);
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+
+        let mut step = StepTakeRoot::new();
+        step.old_player_state = Some(PlayerState::new(PS_STANDING));
         let out = step.start(&mut game, &mut GameRng::new(0));
+
         assert_eq!(out.action, StepAction::NextStep);
+        // No roll happened, so no report should have been added.
+        use ffb_model::report::report_id::ReportId;
+        assert!(!game.report_list.has_report(ReportId::CONFUSION_ROLL));
     }
 
     /// cancel_take_root_player_action roots the player in the field model.
