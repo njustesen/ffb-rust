@@ -248,7 +248,14 @@ impl StepEndPassing {
             && game.acting_player.player_id.is_some()
             && game.thrower_id == game.acting_player.player_id;
 
-        if self.end_turn || self.end_player_action {
+        // Java: fEndTurn || fEndPlayerAction || ((thrower == actingPlayer.getPlayer())
+        //   && actingPlayer.isSufferingBloodLust() && !actingPlayer.hasFed())
+        if self.end_turn
+            || self.end_player_action
+            || (thrower_is_acting
+                && game.acting_player.suffering_blood_lust
+                && !game.acting_player.has_fed)
+        {
             // Java: fEndTurn |= (UtilServerSteps.checkTouchdown(getGameState())
             //   || (catcher == null && !actingPlayer.isSufferingAnimosity() && !actingPlayer.isSufferingBloodLust() && actingPlayer.hasPassed())
             //   || UtilPlayer.findOtherTeam(game, game.getThrower()).hasPlayer(catcher) && !actingPlayer.isSufferingBloodLust()
@@ -672,6 +679,25 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         let pr = game.game_result.home.player_results.get("t1").unwrap();
         assert_eq!(pr.passing, 7);
+    }
+
+    #[test]
+    fn bloodlust_suffering_without_feeding_forces_end_player_action_path() {
+        // Bug fix regression: Java's outer condition is
+        //   fEndTurn || fEndPlayerAction || (thrower==actingPlayer && sufferingBloodLust && !hasFed())
+        // Previously the third disjunct was dropped entirely, so a player suffering
+        // BloodLust who hadn't fed (and has no bloodlust_action set, so the earlier
+        // bloodlust-retarget branch doesn't fire) would fall through to the move-continuation
+        // path instead of ending the player's action via EndPlayerAction.
+        let mut game = make_game_with_home_thrower("t1");
+        game.acting_player.suffering_blood_lust = true;
+        game.acting_player.has_fed = false;
+        let mut step = StepEndPassing::new();
+        // No bloodlust_action set, so the early bloodlust-retarget branch doesn't trigger.
+        step.catcher_id = Some("c1".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.pushes.len(), 1);
+        assert_eq!(out.pushes[0][0].step_id, StepId::RemoveTargetSelectionState);
     }
 
     #[test]

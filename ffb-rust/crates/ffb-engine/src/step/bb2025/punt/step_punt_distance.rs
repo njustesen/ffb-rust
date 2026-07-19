@@ -1,4 +1,4 @@
-use ffb_model::enums::Direction;
+use ffb_model::enums::{Direction, ReRollSource};
 use ffb_model::report::bb2025::report_punt_distance::ReportPuntDistance;
 use ffb_model::report::report_id::ReportId;
 use ffb_model::types::FieldCoordinate;
@@ -7,10 +7,11 @@ use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
 /// Rolls d6 distance for a punt and advances the ball that many squares.
 /// Publishes CatchScatterThrowInMode::CatchPunt or throws into crowd with ThrowIn.
-/// Re-roll (skill/team) is supported via UseSkill/UseReRoll actions (TODO).
+/// Re-roll (skill/team) is supported via UseSkill/UseReRoll actions.
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.punt.StepPuntDistance`.
 pub struct StepPuntDistance {
     pub direction: Option<Direction>,
@@ -38,7 +39,11 @@ impl Step for StepPuntDistance {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: CLIENT_USE_SKILL — if (command.isSkillUsed()) setReRollSource(...); else leave unset (declined).
+        if let Action::UseReRoll { use_reroll: false } = action {
+            self.re_roll_source = None;
+        }
         self.execute_step(game, rng)
     }
 
@@ -53,6 +58,26 @@ impl Step for StepPuntDistance {
 
 impl StepPuntDistance {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: fieldModel.setBallMoving(true);
+        game.field_model.ball_moving = true;
+        let player_id = game.acting_player.player_id.clone().unwrap_or_default();
+
+        // Java: if (ReRolledActions.PUNT_DISTANCE == getReRolledAction()) {
+        //           if (getReRollSource() == null || !UtilServerReRoll.useReRoll(...)) { leave(); return; }
+        //       }
+        if self.re_rolled_action.as_deref() == Some("PUNT_DISTANCE") {
+            match self.re_roll_source.clone() {
+                Some(ref source_name) => {
+                    let source = ReRollSource::new(source_name.as_str());
+                    if !use_reroll(game, &source, &player_id) {
+                        return self.leave(game);
+                    }
+                    // Re-roll consumed — fall through to roll again.
+                }
+                None => return self.leave(game),
+            }
+        }
+
         let direction = match self.direction {
             Some(d) => d,
             None => return StepOutcome::next(),
@@ -62,28 +87,44 @@ impl StepPuntDistance {
             None => return StepOutcome::next(),
         };
 
-        game.field_model.ball_moving = true;
-
         self.distance = rng.d6() as i32;
         let landing = coord_from.step(direction, self.distance);
 
-        let out_of_bounds = !landing.is_on_pitch();
-        // Java: getResult().addReport(new ReportPuntDistance(distance, fieldModel.isOutOfBounds()))
-        game.report_list.add(ReportPuntDistance::new(self.distance, out_of_bounds));
-
         if landing.is_on_pitch() {
+            game.field_model.out_of_bounds = false;
             game.field_model.ball_coordinate = Some(landing);
-            StepOutcome::next()
-                .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::CatchPunt))
         } else {
             // Find last valid square on path.
             let last = find_last_on_pitch(coord_from, direction, self.distance - 1);
-            if let Some(c) = last { game.field_model.ball_coordinate = Some(c); }
+            game.field_model.out_of_bounds = true;
+            game.field_model.ball_coordinate = last;
+        }
+
+        // Java: getResult().addReport(new ReportPuntDistance(distance, fieldModel.isOutOfBounds()))
+        game.report_list.add(ReportPuntDistance::new(self.distance, game.field_model.out_of_bounds));
+
+        // Java: if (getReRolledAction() == null) { setReRolledAction(PUNT_DISTANCE); ... offer re-roll ... }
+        if self.re_rolled_action.is_none() {
+            self.re_rolled_action = Some("PUNT_DISTANCE".into());
+            if let Some(prompt) = ask_for_reroll_if_available(game, "PUNT_DISTANCE", 0, false) {
+                self.re_roll_source = Some("TRR".into());
+                return StepOutcome::cont().with_prompt(prompt);
+            }
+        }
+        self.leave(game)
+    }
+
+    /// Java: `StepPuntDistance.leave()` (Animation set-up is client-visual only, not ported).
+    fn leave(&mut self, game: &mut Game) -> StepOutcome {
+        if game.field_model.out_of_bounds {
             let ball_coord = game.field_model.ball_coordinate;
             StepOutcome::next()
                 .publish(StepParameter::EndTurn(true))
                 .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ThrowIn))
                 .publish(StepParameter::ThrowInCoordinate(ball_coord.unwrap_or(FieldCoordinate::new(0, 0))))
+        } else {
+            StepOutcome::next()
+                .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::CatchPunt))
         }
     }
 }
@@ -182,5 +223,23 @@ mod tests {
         step.coordinate_from = Some(FieldCoordinate::new(5, 7));
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.report_list.has_report(ReportId::PUNT_DISTANCE_ROLL));
+    }
+
+    // Java: `fieldModel.setOutOfBounds(false)` runs unconditionally on the in-bounds path
+    // (isInBounds(ballIndicatorCoordinate)). If a prior step (e.g. StepPuntDirection) had
+    // left `out_of_bounds = true`, an in-bounds distance roll must clear it — otherwise
+    // downstream CatchScatterThrowIn logic (which reads this flag) would wrongly treat an
+    // on-pitch landing as a throw-in.
+    #[test]
+    fn on_pitch_landing_clears_stale_out_of_bounds_flag() {
+        let mut game = make_game();
+        game.field_model.out_of_bounds = true; // stale from a prior step
+        let from = FieldCoordinate::new(5, 7); // East: any d6 distance stays on pitch
+        let mut step = StepPuntDistance::new();
+        step.direction = Some(Direction::East);
+        step.coordinate_from = Some(from);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(!game.field_model.out_of_bounds, "expected out_of_bounds to be cleared on in-bounds landing");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::CatchPunt))));
     }
 }

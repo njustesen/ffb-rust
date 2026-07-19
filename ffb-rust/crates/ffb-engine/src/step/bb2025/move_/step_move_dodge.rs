@@ -32,6 +32,8 @@ use ffb_mechanics::modifiers::dodge_context::DodgeContext;
 /// client-only: DivingTackle pre-roll check / dtRerollAsked — headless skips
 /// STAND_FIRM_NO_DROP_ON_FAILED_DODGE game option → wired in execute_step (final fail path only).
 /// isDodging guard, SteadyFootingContext publish on failDodge, re-roll infra, and DodgeModifierFactory are wired.
+/// failDodge: SteadyFootingContext(InjuryTypeDropDodge) published — corrected from InjuryTypeFallDown
+/// (matches the fix already applied in the BB2020 sibling step).
 pub struct StepMoveDodge {
     /// Java: fGotoLabelOnFailure
     pub goto_label_on_failure: String,
@@ -234,9 +236,10 @@ impl StepMoveDodge {
     fn fail_dodge(&self) -> StepOutcome {
         // Java: failDodge → findAdjacentOpposingPlayersWithProperty(armBar), show dialog if multiple
         // client-only: Arm-Bar dialog — client-side
-        // Java: injuryType = options → InjuryTypeFallDown (Arm-Bar dialog can override to InjuryTypeArmBar)
-        // Stub: always InjuryTypeFallDown (InjuryTypeName variant — no injury roll at this step)
-        let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeFallDown".into());
+        // Java: injuryType = (armBarPlayer != null) ? new InjuryTypeDropDodgeForSpp(armBarPlayer)
+        //                                            : new InjuryTypeDropDodge(false)
+        // Stub: always InjuryTypeDropDodge (arm-bar path not wired in headless)
+        let ctx = SteadyFootingContext::from_injury_type_name("InjuryTypeDropDodge".into());
         let label = self.goto_label_on_failure.clone();
         StepOutcome::goto(&label)
             .publish(StepParameter::SteadyFootingContext(Box::new(ctx)))
@@ -428,5 +431,28 @@ mod tests {
         step.dodge_roll = 1;
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::DODGE_ROLL));
+    }
+
+    #[test]
+    fn failure_publishes_drop_dodge_injury_type_not_fall_down() {
+        // Java: failDodge() publishes SteadyFootingContext(new InjuryTypeDropDodge(false))
+        // when no arm-bar player is involved — never InjuryTypeFallDown (that's StepFallDown's
+        // injury type, used for e.g. Really Stupid/Bonehead knockdowns, not failed dodges).
+        use crate::drop_player_context::SteadyFootingContext as SFC;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 0;
+        add_player(&mut game, "p1");
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        let injury_type_name = out.published.iter().find_map(|p| match p {
+            StepParameter::SteadyFootingContext(ctx) => {
+                let ctx: &SFC = ctx;
+                ctx.injury_type_name().map(|s| s.to_string())
+            }
+            _ => None,
+        });
+        assert_eq!(injury_type_name.as_deref(), Some("InjuryTypeDropDodge"));
     }
 }

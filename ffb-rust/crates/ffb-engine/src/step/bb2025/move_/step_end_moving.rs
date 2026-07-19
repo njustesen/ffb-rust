@@ -286,7 +286,7 @@ impl StepEndMoving {
             || (player_action == Some(PlayerAction::FoulMove) && UtilPlayer::can_foul(game, pid))
             || (player_action == Some(PlayerAction::GazeMove)
                 && UtilPlayer::has_adjacent_gaze_target(game, pid))
-            || (player_action == Some(PlayerAction::KickTeamMateMove) && can_kick_team_mate(game, pid, true))
+            || (player_action == Some(PlayerAction::KickTeamMateMove) && can_kick_team_mate(game, pid, false))
             || (player_action == Some(PlayerAction::ThrowTeamMateMove) && can_throw_team_mate(game, pid, false))
             || (is_blitz_move && adjacent_target)
             || (player_action == Some(PlayerAction::PuntMove) && has_ball);
@@ -838,5 +838,59 @@ mod tests {
         step.end_player_action = true;
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.report_list.has_report(ReportId::PLAYER_EVENT), "no ReportPlayerEvent when player has the ball");
+    }
+
+    /// Java Branch 5: `(PlayerAction.KICK_TEAM_MATE_MOVE == playerAction) &&
+    /// UtilPlayer.canKickTeamMate(game, actingPlayer.getPlayer(), false)` — the third
+    /// argument (checkBlitzUsed) is hardcoded `false`, so `turnData.blitzUsed` must NOT
+    /// gate whether the next move (kicking a team-mate) is offered. Before the fix, the
+    /// Rust call site passed `true`, so a prior blitz in the turn would incorrectly
+    /// suppress the KickTeamMateMove continuation and fall through to EndPlayerAction.
+    #[test]
+    fn kick_team_mate_move_ignores_blitz_used_flag() {
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+
+        let mut game = make_game();
+        let kicker = Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::KickTeamMate, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None, is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(kicker);
+        game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+
+        // A kickable team-mate adjacent to the kicker: needs the RightStuff skill
+        // (canBeThrown / canBeKicked) to be a valid kick target (Player::can_be_thrown).
+        let mate = Player {
+            id: "mate".into(), name: "mate".into(), nr: 2, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::RightStuff, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None, is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(mate);
+        game.field_model.set_player_coordinate("mate", FieldCoordinate::new(5, 6));
+        game.field_model.set_player_state("mate", PlayerState::new(PS_STANDING));
+
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::KickTeamMateMove);
+        // Simulate a blitz already used this turn — must not block KickTeamMateMove.
+        game.turn_data_mut().blitz_used = true;
+
+        let mut step = StepEndMoving::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "KickTeamMateMove should still push Move sequence despite blitz_used");
     }
 }

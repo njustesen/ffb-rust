@@ -1,7 +1,9 @@
 use ffb_model::enums::PlayerAction;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
+use ffb_model::util::util_cards::UtilCards;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
@@ -61,14 +63,24 @@ impl StepInitPunt {
         }
 
         let player_action = game.acting_player.player_action;
-        if player_action != Some(PlayerAction::Punt) {
-            return StepOutcome::goto(&label);
-        }
 
         let player_id = match game.acting_player.player_id.clone() {
             Some(id) => id,
             None => return StepOutcome::goto(&label),
         };
+
+        // Java: UtilCards.getUnusedSkillWithProperty(actingPlayer, NamedProperties.canPunt)
+        let has_punt_skill = game
+            .team_home
+            .player(&player_id)
+            .or_else(|| game.team_away.player(&player_id))
+            .map(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_PUNT).is_some())
+            .unwrap_or(false);
+
+        // Java: actingPlayer.getPlayerAction() == PlayerAction.PUNT && skill != null
+        if player_action != Some(PlayerAction::Punt) || !has_punt_skill {
+            return StepOutcome::goto(&label);
+        }
 
         let player_coord = match game.field_model.player_coordinate(&player_id) {
             Some(c) => c,
@@ -153,7 +165,8 @@ mod tests {
             position_id: "lineman".into(), player_type: PlayerType::Regular,
             gender: PlayerGender::Male,
             movement: 6, strength: 3, agility: 3, passing: 3, armour: 8,
-            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            starting_skills: vec![ffb_model::model::skill_def::SkillWithValue::new(ffb_model::enums::SkillId::Punt)],
+            extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
             is_big_guy: false,
@@ -183,7 +196,8 @@ mod tests {
             position_id: "lineman".into(), player_type: PlayerType::Regular,
             gender: PlayerGender::Male,
             movement: 6, strength: 3, agility: 3, passing: 3, armour: 8,
-            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            starting_skills: vec![ffb_model::model::skill_def::SkillWithValue::new(ffb_model::enums::SkillId::Punt)],
+            extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
             is_big_guy: false,
@@ -213,7 +227,8 @@ mod tests {
             position_id: "lineman".into(), player_type: PlayerType::Regular,
             gender: PlayerGender::Male,
             movement: 6, strength: 3, agility: 3, passing: 3, armour: 8,
-            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            starting_skills: vec![ffb_model::model::skill_def::SkillWithValue::new(ffb_model::enums::SkillId::Punt)],
+            extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
             current_spps: 0, career_spps: 0, race: None,
             is_big_guy: false,
@@ -233,5 +248,36 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::CoordinateTo(_))));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::CoordinateFrom(_))));
+    }
+
+    // 6. Java: `actingPlayer.getPlayerAction() == PlayerAction.PUNT && skill != null` — a player
+    // with PlayerAction::Punt but WITHOUT the Punt skill (canPunt property) must fall through
+    // to the goto-label branch, not be allowed to proceed with the punt.
+    #[test]
+    fn punt_action_without_punt_skill_goes_to_label() {
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+
+        let mut game = make_game();
+        let player = Player {
+            id: "punter_noskill".into(), name: "p".into(), nr: 4,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 3, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(player);
+        game.field_model.set_player_coordinate("punter_noskill", FieldCoordinate::new(5, 5));
+        game.acting_player.player_id = Some("punter_noskill".into());
+        game.acting_player.player_action = Some(PlayerAction::Punt);
+
+        let mut step = StepInitPunt::new("endLabel".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert_eq!(out.goto_label.as_deref(), Some("endLabel"));
     }
 }

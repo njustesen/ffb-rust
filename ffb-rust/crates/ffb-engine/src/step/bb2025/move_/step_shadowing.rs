@@ -130,11 +130,33 @@ impl StepShadowing {
                                     let min_roll = 4; // fixed in BB2025
                                     let successful = roll >= min_roll;
 
+                                    // Java: boolean reRolled = ((step.getReRolledAction() == ReRolledActions.SHADOWING)
+                                    //   && (step.getReRollSource() != null));
+                                    // step.getResult().addReport(new ReportTentaclesShadowingRoll(skill, defenderId,
+                                    //   roll, successful, minimumRoll, reRolled));
+                                    let reported_re_rolled = re_rolled && self.re_roll_source.is_some();
+                                    {
+                                        use ffb_model::report::mixed::report_tentacles_shadowing_roll::ReportTentaclesShadowingRoll;
+                                        game.report_list.add(ReportTentaclesShadowingRoll::new(
+                                            Some(SkillId::Shadowing),
+                                            Some(defender_id.clone()),
+                                            roll,
+                                            successful,
+                                            min_roll,
+                                            reported_re_rolled,
+                                        ));
+                                    }
+
                                     if !successful {
                                         if !re_rolled {
                                             if let Some(prompt) = ask_for_reroll_if_available(game, "SHADOWING", min_roll, false) {
                                                 self.re_rolled_action = Some("SHADOWING".into());
-                                                self.re_roll_source = Some("TRR".into());
+                                                // Java sets reRollSource from the client's reply to the offered
+                                                // dialog; the offer itself already carries the actual source
+                                                // (skill re-roll or TRR) — don't assume TRR unconditionally.
+                                                if let ffb_model::prompts::AgentPrompt::ReRollOffer { ref source, .. } = prompt {
+                                                    self.re_roll_source = Some(source.name.clone());
+                                                }
                                                 do_next_step = false;
                                                 return StepOutcome::cont().with_prompt(prompt);
                                             } else {
@@ -492,5 +514,36 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(seed));
         // After a successful roll, "def" should have been added as a shadower
         assert!(game.active_shadowers.contains(&"def".to_string()));
+    }
+
+    #[test]
+    fn shadowing_roll_emits_tentacles_shadowing_roll_report() {
+        // Java ShadowingBehaviour.handleExecuteStepHook always adds a
+        // ReportTentaclesShadowingRoll after rolling, whether the roll succeeds or fails.
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, PS_STANDING, PlayerState};
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.acting_player.player_id = Some("actor".into());
+        game.home_playing = true;
+        game.field_model.set_player_coordinate("actor", FieldCoordinate::new(10, 5));
+        game.team_away.players.push(Player {
+            id: "def".into(), name: "def".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 5, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(10, 4));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.defender_id = Some("def".into());
+        let mut step = StepShadowing::new();
+        step.coordinate_from = Some(FieldCoordinate::new(10, 5));
+        step.using_shadowing = Some(true);
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::TENTACLES_SHADOWING_ROLL));
     }
 }

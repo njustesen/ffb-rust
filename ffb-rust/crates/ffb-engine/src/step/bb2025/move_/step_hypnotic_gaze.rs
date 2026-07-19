@@ -121,11 +121,12 @@ impl StepHypnoticGaze {
             ));
 
             if successful {
-                // Java: if !confused && !hypnotized → changeHypnotized(true)
+                // Java: PlayerState oldVictimState = ...; if (!oldVictimState.isConfused())
+                //         setPlayerState(defender, oldVictimState.changeConfused(true));
                 if let Some(ref did) = defender_id {
                     if let Some(old_state) = game.field_model.player_state(did) {
-                        if !old_state.is_confused() && !old_state.is_hypnotized() {
-                            game.field_model.set_player_state(did, old_state.change_hypnotized(true));
+                        if !old_state.is_confused() {
+                            game.field_model.set_player_state(did, old_state.change_confused(true));
                         }
                     }
                 }
@@ -228,6 +229,10 @@ mod tests {
         assert!(game.defender_id.is_none());
     }
 
+    /// Java: `if (!oldVictimState.isConfused()) setPlayerState(defender, oldVictimState.changeConfused(true))`.
+    /// Before the fix, the Rust code called `change_hypnotized(true)` (a different bit) with an
+    /// extra `!is_hypnotized()` guard not present in Java — so `is_confused()` would have stayed
+    /// false and this test would have failed.
     #[test]
     fn successful_gaze_sets_defender_confused() {
         let mut game = make_game();
@@ -270,7 +275,7 @@ mod tests {
                 let mut s = StepHypnoticGaze::new("end".into());
                 s.start(&mut g, &mut GameRng::new(seed));
                 let state = g.field_model.player_state("d1").unwrap();
-                assert!(state.is_hypnotized(), "seed={seed}: roll passed but defender not hypnotized");
+                assert!(state.is_confused(), "seed={seed}: roll passed but defender not confused");
                 return;
             }
         }

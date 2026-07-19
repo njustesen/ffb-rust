@@ -1,5 +1,6 @@
 use ffb_model::enums::Direction;
 use ffb_model::enums::SkillId;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::skill_use::SkillUse;
 use ffb_model::report::mixed::report_event::ReportEvent;
 use ffb_model::report::report_id::ReportId;
@@ -34,6 +35,9 @@ pub struct StepKickoffScatterRollAskAfter {
     pub scatter_distance: i32,
     /// Java: fKickingPlayerCoordinate — published downstream.
     pub kicking_player_coordinate: Option<FieldCoordinate>,
+    /// Kicking player id, derived from findKickingPlayer(); used to check for the Kick
+    /// skill (canReduceKickDistance) and to report skill use.
+    pub kicking_player_id: Option<String>,
     /// Java: fKickoffBounds — receiving half or None → touchback.
     pub kickoff_bounds: Option<FieldCoordinateBounds>,
     /// Java: fTouchback.
@@ -48,6 +52,7 @@ impl StepKickoffScatterRollAskAfter {
             scatter_direction: None,
             scatter_distance: 0,
             kicking_player_coordinate: None,
+            kicking_player_id: None,
             kickoff_bounds: None,
             touchback: false,
         }
@@ -96,33 +101,57 @@ impl StepKickoffScatterRollAskAfter {
             self.scatter_direction = Direction::for_roll(dir_roll);
             self.scatter_distance = rng.d6();
 
-            // Determine kicking player coordinate.
-            // Java: search kicking team's CENTER_FIELD / LOS players for canReduceKickDistance.
+            // Determine kicking player: Java findKickingPlayer() — first filter the
+            // kicking team's players in CENTER_FIELD bounds; if none are there, fall
+            // back to LOS bounds. Among the resulting candidates, prefer one with the
+            // canReduceKickDistance (Kick) skill, else the first candidate.
             let (center_bounds, los_bounds) = if game.home_playing {
                 (FieldCoordinateBounds::CENTER_FIELD_HOME, FieldCoordinateBounds::LOS_HOME)
             } else {
                 (FieldCoordinateBounds::CENTER_FIELD_AWAY, FieldCoordinateBounds::LOS_AWAY)
             };
             let kicking_team = game.active_team();
-            let found = kicking_team.players.iter().find_map(|p| {
-                let coord = game.field_model.player_coordinate(&p.id)?;
-                if center_bounds.is_in_bounds(coord) || los_bounds.is_in_bounds(coord) {
-                    Some(coord)
-                } else {
-                    None
-                }
-            });
+            let center_players: Vec<(String, FieldCoordinate)> = kicking_team.players.iter()
+                .filter_map(|p| {
+                    let coord = game.field_model.player_coordinate(&p.id)?;
+                    center_bounds.is_in_bounds(coord).then_some((p.id.clone(), coord))
+                })
+                .collect();
+            let players_on_field = if center_players.is_empty() {
+                kicking_team.players.iter()
+                    .filter_map(|p| {
+                        let coord = game.field_model.player_coordinate(&p.id)?;
+                        los_bounds.is_in_bounds(coord).then_some((p.id.clone(), coord))
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                center_players
+            };
+            let found = players_on_field.iter()
+                .find(|(id, _)| {
+                    game.player(id)
+                        .map(|p| p.has_skill_property(NamedProperties::CAN_REDUCE_KICK_DISTANCE))
+                        .unwrap_or(false)
+                })
+                .or_else(|| players_on_field.first())
+                .cloned();
+
             let default_kicker = if game.home_playing {
                 FieldCoordinate::new(0, 7)
             } else {
                 FieldCoordinate::new(25, 7)
             };
-            self.kicking_player_coordinate = Some(found.unwrap_or(default_kicker));
+            match found {
+                Some((id, coord)) => {
+                    self.kicking_player_id = Some(id);
+                    self.kicking_player_coordinate = Some(coord);
+                }
+                None => {
+                    self.kicking_player_id = None;
+                    self.kicking_player_coordinate = Some(default_kicker);
+                }
+            }
 
-            // client-only: if kicking player has canReduceKickDistance, show DialogKickSkillParameter
-            // (with the two possible landing squares) and return Continue.
-            // For the random-agent path there is no Kick player, so fall through.
-            self.use_kick_choice = Some(false);
             // Java: getResult().addReport(new ReportKickoffScatter(ballCoordinateEnd, fScatterDirection, rollScatterDirection, fScatterDistance))
             let ball_end_report = start.step(self.scatter_direction.unwrap_or(Direction::North), self.scatter_distance);
             game.report_list.add(ReportKickoffScatter::new(
@@ -131,6 +160,17 @@ impl StepKickoffScatterRollAskAfter {
                 dir_roll,
                 self.scatter_distance,
             ));
+
+            // Java: if kicking player has canReduceKickDistance, show DialogKickSkillParameter
+            // and wait for the coach's choice; otherwise fUseKickChoice = false immediately.
+            let has_kick = self.kicking_player_id.as_deref()
+                .and_then(|pid| game.player(pid))
+                .map(|p| p.has_skill_property(NamedProperties::CAN_REDUCE_KICK_DISTANCE))
+                .unwrap_or(false);
+            if has_kick {
+                return StepOutcome::cont();
+            }
+            self.use_kick_choice = Some(false);
         }
 
         // ── Phase 2: resolve final distance and place ball ───────────────────
@@ -147,6 +187,23 @@ impl StepKickoffScatterRollAskAfter {
         };
 
         let ball_end = start.step(direction, distance);
+
+        // Java: if (fUseKickChoice && skillReduceKickDistance != null) { addReport(ReportSkillUse(...)) }
+        if use_kick {
+            if let Some(pid) = self.kicking_player_id.clone() {
+                let has_kick = game.player(&pid)
+                    .map(|p| p.has_skill_property(NamedProperties::CAN_REDUCE_KICK_DISTANCE))
+                    .unwrap_or(false);
+                if has_kick {
+                    game.report_list.add(ReportSkillUse::new(
+                        Some(pid),
+                        SkillId::Kick,
+                        true,
+                        SkillUse::HALVE_KICKOFF_SCATTER,
+                    ));
+                }
+            }
+        }
 
         // Walk back until the ball is on the field.
         let mut dist_walk = distance;
@@ -247,6 +304,44 @@ mod tests {
         if let Some(c) = game.field_model.ball_coordinate {
             assert!(FieldCoordinateBounds::FIELD.is_in_bounds(c), "Ball off-field at {c:?}");
         }
+    }
+
+    /// Java `executeStep()`: when the kicking player has `canReduceKickDistance` (the
+    /// Kick skill) and `fUseKickChoice` is still null, a `DialogKickSkillParameter` is
+    /// shown and the step waits for the coach's answer instead of proceeding straight
+    /// through with `fUseKickChoice = false`. Before the fix, this Rust step always
+    /// hardcoded `use_kick_choice = Some(false)` on the first pass and never waited,
+    /// so this test would have failed (asserting NextStep instead of Continue).
+    #[test]
+    fn kick_skill_player_waits_for_choice() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, SkillId, PlayerState, PS_STANDING};
+        use ffb_model::model::skill_def::SkillWithValue;
+
+        let mut game = make_game();
+        let p = Player {
+            id: "kicker".into(), name: "kicker".into(), nr: 1,
+            position_id: "lineman".into(), player_type: PlayerType::Regular,
+            gender: PlayerGender::Male, movement: 6, strength: 3, agility: 3,
+            passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Kick, value: None }],
+            extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(), niggling_injuries: 0, stat_injuries: vec![],
+            current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(p);
+        // LOS_HOME is x=12, y=4..=10 — within bounds for the home kicking team's search.
+        game.field_model.set_player_coordinate("kicker", FieldCoordinate::new(12, 7));
+        game.field_model.set_player_state("kicker", PlayerState::new(PS_STANDING));
+        game.home_playing = true;
+
+        let mut step = StepKickoffScatterRollAskAfter::new();
+        step.kickoff_start_coordinate = Some(FieldCoordinate::new(13, 7));
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue, "player with Kick skill should wait for choice");
+        assert_eq!(step.kicking_player_id.as_deref(), Some("kicker"));
     }
 
     #[test]

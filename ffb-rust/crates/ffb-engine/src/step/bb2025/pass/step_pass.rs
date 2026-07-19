@@ -124,9 +124,11 @@ impl Step for StepPass {
 
 impl StepPass {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // Java guard: if thrower or throwerAction is null → return (no-op)
+        // Java guard: if thrower or throwerAction is null → return (no-op).
+        // Java's `return;` here leaves StepResult's default nextAction (CONTINUE) untouched —
+        // it does NOT jump to goToLabelOnEnd. Match that exactly: stay put / wait.
         if game.thrower_id.is_none() || game.thrower_action.is_none() {
-            return StepOutcome::goto(&self.goto_label_on_end);
+            return StepOutcome::cont();
         }
 
         // Java: if (PASS == reRolledAction) { if (source == null || !useReRoll) proceed with stored result }
@@ -355,13 +357,15 @@ mod tests {
     }
 
     #[test]
-    fn no_thrower_goes_to_end_label() {
+    fn no_thrower_stays_put_matching_java_implicit_continue_default() {
+        // Bug fix regression: Java's `if (thrower == null || throwerAction == null) return;`
+        // leaves StepResult's default nextAction (CONTINUE) untouched — it does NOT jump to
+        // goToLabelOnEnd. The step must wait, not skip ahead.
         let mut game = make_game();
         let mut step = make_step();
         // thrower_id is None by default
         let out = step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(out.action, StepAction::GotoLabel);
-        assert_eq!(out.goto_label.as_deref(), Some("end"));
+        assert_eq!(out.action, StepAction::Continue);
     }
 
     #[test]

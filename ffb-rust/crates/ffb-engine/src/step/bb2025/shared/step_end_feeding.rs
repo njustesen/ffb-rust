@@ -9,7 +9,7 @@ use crate::step::generator::bb2025::{EndTurn, Pass, Select};
 use crate::step::generator::bb2025::end_turn::EndTurnParams;
 use crate::step::generator::bb2025::pass::PassParams;
 use crate::step::generator::bb2025::select::SelectParams;
-use crate::step::sequences::inducement_sequence;
+use crate::step::sequences::{inducement_sequence, inducement_sequence_with_check_forgo};
 use ffb_model::enums::InducementPhase;
 
 /// Final step of the feed sequence. Consumes EndPlayerAction/EndTurn/CheckForgo.
@@ -75,7 +75,7 @@ impl StepEndFeeding {
                     // Java: Inducement(EndOfOwnTurn, home)
                     // Java: push PickMeUp step
                     let home = game.home_playing;
-                    let seq_opponent = inducement_sequence(InducementPhase::EndOfOpponentTurn, !home);
+                    let seq_opponent = inducement_sequence_with_check_forgo(InducementPhase::EndOfOpponentTurn, !home, self.check_forgo);
                     let seq_own = inducement_sequence(InducementPhase::EndOfOwnTurn, home);
                     let pick_me_up = vec![
                         crate::step::framework::SequenceStep::new(StepId::PickMeUp),
@@ -156,6 +156,29 @@ mod tests {
         // Pushes: pick_me_up + inducement_own + inducement_opponent = 3 sequences
         assert_eq!(out.pushes.len(), 3);
         assert_eq!(out.pushes[0][0].step_id, StepId::PickMeUp);
+    }
+
+    // Java: `new Inducement.SequenceParams(getGameState(), InducementPhase.END_OF_OPPONENT_TURN,
+    //       !game.isHomePlaying(), checkForgo)` — the step's own `checkForgo` field (set via the
+    // CHECK_FORGO init/step parameter) must reach the opponent-turn inducement sequence's
+    // END_INDUCEMENT step, not be silently dropped as `false`.
+    #[test]
+    fn end_turn_regular_forwards_check_forgo_to_opponent_inducement_sequence() {
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        let mut step = StepEndFeeding::new();
+        step.end_turn = true;
+        step.check_forgo = true;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        // pushes: [pick_me_up, seq_own, seq_opponent]
+        let seq_opponent = &out.pushes[2];
+        let end_inducement = seq_opponent.iter().find(|s| s.step_id == StepId::EndInducement)
+            .expect("expected EndInducement step in opponent-turn inducement sequence");
+        assert!(
+            end_inducement.params.iter().any(|p| matches!(p, StepParameter::CheckForgo(true))),
+            "expected CheckForgo(true) to be forwarded to opponent-turn EndInducement, got {:?}",
+            end_inducement.params
+        );
     }
 
     #[test]
