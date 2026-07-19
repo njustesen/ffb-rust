@@ -8,7 +8,7 @@ pub struct LethalFlight {
 
 impl LethalFlight {
     pub fn new() -> Self {
-        let base = Skill::new("Lethal Flight", SkillCategory::Trait);
+        let base = Skill::new("Lethal Flight", SkillCategory::Devious);
         Self { base }
     }
 }
@@ -33,6 +33,8 @@ mod tests {
 
     #[test]
     fn category_is_correct() {
-        assert_eq!(LethalFlight::new().get_category(), SkillCategory::Trait);
+        // Java: `super("Lethal Flight", SkillCategory.DEVIOUS)`. A prior translation
+        // incorrectly used SkillCategory::Trait here.
+        assert_eq!(LethalFlight::new().get_category(), SkillCategory::Devious);
     }
 }

@@ -1,6 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2025::Stab.
 use crate::model::skill::skill::Skill;
-use crate::enums::SkillCategory;
+use crate::enums::{SkillCategory, DeclareCondition};
 
 pub struct Stab {
     pub base: Skill,
@@ -8,7 +8,8 @@ pub struct Stab {
 
 impl Stab {
     pub fn new() -> Self {
-        let base = Skill::new("Stab", SkillCategory::Trait);
+        let mut base = Skill::new("Stab", SkillCategory::Trait);
+        base.set_declare_condition(DeclareCondition::Standing);
         Self { base }
     }
 }
@@ -34,5 +35,11 @@ mod tests {
     #[test]
     fn category_is_correct() {
         assert_eq!(Stab::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn declare_condition_is_standing() {
+        // Java Stab() constructor calls setDeclareCondition(DeclareCondition.STANDING).
+        assert_eq!(Stab::new().get_declare_condition(), DeclareCondition::Standing);
     }
 }
