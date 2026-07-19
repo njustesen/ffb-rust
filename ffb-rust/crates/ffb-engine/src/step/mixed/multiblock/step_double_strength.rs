@@ -5,6 +5,7 @@
 /// `DoubleTargetStrengthForPlayer` for the chosen target.
 use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::report::mixed::report_indomitable::ReportIndomitable;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -19,13 +20,14 @@ pub struct StepDoubleStrength {
 impl StepDoubleStrength {
     pub fn new() -> Self { Self { player_ids: Vec::new() } }
 
+    /// Java: `UtilCards.getUnusedSkillWithProperty(actingPlayer, canDoubleStrengthAfterDauntless)`
     fn has_unused_indomitable(game: &Game) -> bool {
         let acting_id = match game.acting_player.player_id.as_deref() {
             Some(id) => id,
             None => return false,
         };
         game.player(acting_id)
-            .map(|p| p.has_skill(SkillId::Indomitable) && !p.used_skills.contains(&SkillId::Indomitable))
+            .map(|p| p.has_unused_skill_with_property(NamedProperties::CAN_DOUBLE_STRENGTH_AFTER_DAUNTLESS))
             .unwrap_or(false)
     }
 
@@ -55,8 +57,13 @@ impl Step for StepDoubleStrength {
         // always targets the sole entry in playerIds.
         // Java: playerIds.size() > 1 → DialogPlayerChoiceParameter(INDOMITABLE) →
         // CLIENT_PLAYER_CHOICE, the coach picks which Dauntless-successful target to double.
+        // Java: `command.getSkill().hasSkillProperty(canDoubleStrengthAfterDauntless)` — property
+        // based, not tied to the specific `Indomitable` skill id.
         let chosen: Option<String> = match action {
-            Action::UseSkill { skill_id, use_skill } if *skill_id == SkillId::Indomitable && *use_skill => {
+            Action::UseSkill { skill_id, use_skill }
+                if *use_skill
+                    && skill_id.properties().contains(&NamedProperties::CAN_DOUBLE_STRENGTH_AFTER_DAUNTLESS) =>
+            {
                 self.player_ids.first().cloned()
             }
             Action::IndomitableChoice { player_id } if self.player_ids.contains(player_id) => {
@@ -66,12 +73,16 @@ impl Step for StepDoubleStrength {
         };
         if let Some(target_id) = chosen {
             let actor_id = game.acting_player.player_id.clone();
-            // Mark skill used
+            // Java: actingPlayer.markSkillUsed(NamedProperties.canDoubleStrengthAfterDauntless)
+            // — marks whichever skill instance actually grants the property, not literally
+            // the `Indomitable` skill id by name.
             if let Some(ref aid) = actor_id {
                 if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == *aid)
                     .or_else(|| game.team_away.players.iter_mut().find(|p| p.id == *aid))
                 {
-                    p.used_skills.insert(SkillId::Indomitable);
+                    if let Some(skill) = p.skill_id_with_property(NamedProperties::CAN_DOUBLE_STRENGTH_AFTER_DAUNTLESS) {
+                        p.used_skills.insert(skill);
+                    }
                 }
             }
             // Java: getResult().addReport(new ReportIndomitable(actingPlayer.getPlayerId(), playerIds.get(0)))

@@ -36,18 +36,22 @@ impl StepDedicatedFans {
         let home_id = game.team_home.id.clone();
         let away_id = game.team_away.id.clone();
 
-        let conceded_id: Option<String>;
-        // winning_home: None = draw, Some(true) = home wins, Some(false) = away wins
-        let winning_home: Option<bool>;
+        // Java runs these as two *independent* `if` statements (not else-if): if both teams
+        // concede, the away-conceded assignment runs second and overwrites `concededTeam` /
+        // `winningTeam` from the home-conceded assignment.
+        let mut conceded_id: Option<String> = None;
+        let mut winning_home: Option<bool> = None;
 
         if home_conceded {
             conceded_id = Some(home_id.clone());
             winning_home = Some(false); // away wins
-        } else if away_conceded {
+        }
+        if away_conceded {
             conceded_id = Some(away_id.clone());
             winning_home = Some(true); // home wins
-        } else {
-            conceded_id = None;
+        }
+
+        if conceded_id.is_none() {
             // Java: score + penaltyScore
             let home_total = game.game_result.home.score + game.game_result.home.penalty_score;
             let away_total = game.game_result.away.score + game.game_result.away.penalty_score;
@@ -204,6 +208,29 @@ mod tests {
         // modifier(5, 3, _, conceded=true) → -min(min(5,2),0) → -2
         let m = StepDedicatedFans::modifier(5, 3, false, true);
         assert_eq!(m, -2);
+    }
+
+    /// Regression test: when BOTH teams concede, Java runs two independent `if`
+    /// statements, so the away-conceded assignment (which runs second) wins —
+    /// `concededTeam` ends up `teamAway.getId()` and `winningTeam` ends up `teamHome`.
+    /// A naive `if home_conceded { .. } else if away_conceded { .. }` translation would
+    /// stop at the home branch and get exactly the opposite (concededTeam=home,
+    /// winningTeam=away).
+    #[test]
+    fn both_teams_conceding_away_assignment_wins() {
+        let mut step = StepDedicatedFans::new();
+        let mut game = make_game();
+        game.game_result.home.conceded = true;
+        game.game_result.away.conceded = true;
+        game.team_home.dedicated_fans = 3;
+        game.team_away.dedicated_fans = 3;
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        // The away team is the "conceded" team in Java's final state, so the home team is
+        // recorded as winning: home's modifier must be the "winning" branch (>= 0), and
+        // away's must be the "conceded" branch (<= 0).
+        assert!(game.game_result.home.dedicated_fans_modifier >= 0, "home must be treated as winner");
+        assert!(game.game_result.away.dedicated_fans_modifier <= 0, "away must be treated as the conceding team");
     }
 
     #[test]

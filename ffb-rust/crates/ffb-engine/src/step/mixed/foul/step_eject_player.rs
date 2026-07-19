@@ -86,6 +86,8 @@ impl Step for StepEjectPlayer {
             StepParameter::GotoLabelOnEnd(v)         => { self.goto_label_on_end = v.clone(); false }
             StepParameter::FoulerHasBall(v)           => { self.fouler_has_ball = Some(*v); true }
             StepParameter::ArgueTheCallSuccessful(v)  => { self.argue_the_call_successful = Some(*v); true }
+            // Java: `init()` sets `state.officiousRef` and calls `consume(parameter)`.
+            StepParameter::OfficiousRef(v)            => { self.officious_ref = *v; true }
             _ => false,
         }
     }
@@ -197,6 +199,33 @@ mod tests {
         assert_eq!(state.base(), PS_BANNED);
         let pr = game.game_result.home.player_result("fouler1").expect("player result must exist");
         assert_eq!(pr.send_to_box_reason, Some(ffb_model::enums::SendToBoxReason::FoulBan));
+    }
+
+    /// Regression test for the missing `StepParameter::OfficiousRef` wiring. Java's
+    /// `StepApplyKickoffResult` (bb2020) pushes this `EjectPlayer` step with
+    /// `from(StepParameterKey.OFFICIOUS_REF, true)` when the Officious Ref kickoff event
+    /// ejects a player. Before this fix, no `StepParameter::OfficiousRef` variant even
+    /// existed, so `state.officious_ref` was always `false` and
+    /// `SneakyGitEjectPlayerModifier` could never record `SendToBoxReason::OficiousRef` —
+    /// every ejection was misreported as a foul ban, even ones caused by the ref event.
+    #[test]
+    fn officious_ref_param_sets_send_to_box_reason() {
+        use ffb_model::enums::PS_STANDING;
+        let mut step = StepEjectPlayer::new();
+        step.set_parameter(&StepParameter::GotoLabelOnEnd("end".into()));
+        step.set_parameter(&StepParameter::OfficiousRef(true));
+        let mut game = make_game_with_fouler("fouler1", PS_STANDING);
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        let pr = game.game_result.home.player_result("fouler1").expect("player result must exist");
+        assert_eq!(pr.send_to_box_reason, Some(ffb_model::enums::SendToBoxReason::OficiousRef));
+    }
+
+    #[test]
+    fn officious_ref_param_is_consumed() {
+        let mut step = StepEjectPlayer::new();
+        let consumed = step.set_parameter(&StepParameter::OfficiousRef(true));
+        assert!(consumed);
     }
 
     #[test]

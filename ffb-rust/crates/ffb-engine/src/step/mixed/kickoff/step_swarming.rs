@@ -1,7 +1,7 @@
 use ffb_model::enums::{PS_PRONE, PS_RESERVE, SkillId, TurnMode};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
-use ffb_model::report::bb2025::report_swarming_roll::ReportSwarmingRoll;
+use ffb_model::report::mixed::report_swarming_roll::ReportSwarmingRoll;
 use ffb_model::types::FieldCoordinateBounds;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_player::UtilPlayer;
@@ -189,8 +189,15 @@ impl StepSwarming {
         self.rolled_amount = rng.d3();
         self.allowed_amount = self.limiting_amount.min(self.rolled_amount);
 
-        // Java: getResult().addReport(new ReportSwarmingRoll(state.teamId, state.rolledAmount))
-        game.report_list.add(ReportSwarmingRoll::new(team_id.clone(), self.rolled_amount));
+        // Java: getResult().addReport(new ReportSwarmingRoll(state.teamId, state.allowedAmount,
+        //   state.rolledAmount, state.limitingAmount)) — note the ctor's 2nd arg is
+        // `allowedAmount`, not `rolledAmount` (matches `SwarmingBehaviour` in both bb2016/bb2020).
+        game.report_list.add(ReportSwarmingRoll::new(
+            Some(team_id.clone()),
+            self.allowed_amount,
+            self.rolled_amount,
+            self.limiting_amount,
+        ));
 
         let event = GameEvent::SwarmingPlayersRoll {
             team_id: team_id.clone(),
@@ -528,6 +535,41 @@ mod tests {
 
         let mut step = StepSwarming::new();
         step.start(&mut game, &mut GameRng::new(1));
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SWARMING_PLAYERS_ROLL));
+    }
+
+    /// Regression test: Java's `SwarmingBehaviour` (bb2016 and bb2020) both construct the
+    /// *mixed* `ReportSwarmingRoll(teamId, allowedAmount, rolledAmount, limitingAmount)` —
+    /// a 4-field report — not the bb2025 2-field `ReportSwarmingRoll(teamId, roll)`. Before
+    /// this fix, `step_swarming.rs` imported the bb2025 variant and only ever recorded the
+    /// raw d3 roll, silently dropping `allowed_amount`/`limiting_amount` from the report.
+    #[test]
+    fn swarming_report_carries_amount_and_limit() {
+        let mut game = make_game();
+        game.home_playing = true;
+        // Two swarmers on pitch (limiting_amount = 2) + one reserve swarmer.
+        let sw1 = make_swarmer("h_s1", 1);
+        game.team_home.players.push(sw1);
+        game.field_model.set_player_coordinate("h_s1", FieldCoordinate::new(10, 7));
+        game.field_model.set_player_state("h_s1", PlayerState::new(PS_STANDING));
+        let sw2 = make_swarmer("h_s2", 2);
+        game.team_home.players.push(sw2);
+        game.field_model.set_player_coordinate("h_s2", FieldCoordinate::new(11, 7));
+        game.field_model.set_player_state("h_s2", PlayerState::new(PS_STANDING));
+        let reserve = make_swarmer("h_s3", 3);
+        game.team_home.players.push(reserve);
+        game.field_model.set_player_state("h_s3", PlayerState::new(PS_RESERVE));
+
+        let mut step = StepSwarming::new();
+        step.start(&mut game, &mut GameRng::new(1));
+
+        assert_eq!(step.limiting_amount, 2, "two swarmers already on pitch");
+        assert_eq!(step.allowed_amount, step.limiting_amount.min(step.rolled_amount));
+        // The mixed (bb2016/bb2020) ReportSwarmingRoll report must be present — the bb2025
+        // variant (which the step previously imported by mistake) shares the same
+        // `ReportId::SWARMING_PLAYERS_ROLL`, so this alone wouldn't have caught the bug; the
+        // real regression coverage is that this file now compiles against the 4-field mixed
+        // constructor `ReportSwarmingRoll::new(team_id, amount, roll, limit)` at all.
         assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SWARMING_PLAYERS_ROLL));
     }
 

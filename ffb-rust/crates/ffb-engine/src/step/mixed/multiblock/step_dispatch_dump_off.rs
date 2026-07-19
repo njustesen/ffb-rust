@@ -17,6 +17,12 @@ impl StepDispatchDumpOff {
     pub fn new() -> Self { Self { targets: Vec::new() } }
 
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
+        // Java: targets.stream().filter(target -> UtilPlayer.hasBall(game, player)).findFirst()
+        // UtilPlayer.hasBall requires ballInPlay && !ballMoving && coordinates match — not just
+        // "some player happens to occupy the ball's square".
+        if !game.field_model.ball_in_play || game.field_model.ball_moving {
+            return StepOutcome::next();
+        }
         let ball_carrier = game.field_model.ball_coordinate.and_then(|bc| {
             game.field_model.player_at(bc).map(|id| id.clone())
         });
@@ -126,6 +132,7 @@ mod tests {
         let mut game = make_game();
         let pos = add_player(&mut game, "carrier");
         game.field_model.ball_coordinate = Some(pos);
+        game.field_model.ball_in_play = true;
         let mut rng = GameRng::new(0);
         let outcome = step.start(&mut game, &mut rng);
         assert_eq!(game.defender_id, Some("carrier".into()));
@@ -133,6 +140,39 @@ mod tests {
         assert_eq!(outcome.pushes[0][0].step_id, StepId::DumpOff);
         let has_pos = outcome.published.iter().any(|p| matches!(p, StepParameter::DefenderPosition(_)));
         assert!(has_pos);
+    }
+
+    /// Regression test: Java's `UtilPlayer.hasBall` requires `ballInPlay && !ballMoving`, not
+    /// just coordinate equality. Before this fix, a player merely standing on the ball's
+    /// square (e.g. while the ball is still mid-scatter, `ballInPlay == false`) was wrongly
+    /// treated as the ball carrier and dispatched into a DumpOff sequence.
+    #[test]
+    fn ball_not_in_play_is_noop_even_if_coordinates_match() {
+        let mut step = StepDispatchDumpOff::new();
+        step.set_parameter(&StepParameter::BlockTargets(vec!["carrier".into()]));
+        let mut game = make_game();
+        let pos = add_player(&mut game, "carrier");
+        game.field_model.ball_coordinate = Some(pos);
+        game.field_model.ball_in_play = false; // ball not actually in play
+        let mut rng = GameRng::new(0);
+        let outcome = step.start(&mut game, &mut rng);
+        assert!(outcome.pushes.is_empty());
+        assert!(game.defender_id.is_none());
+    }
+
+    #[test]
+    fn ball_moving_is_noop_even_if_coordinates_match() {
+        let mut step = StepDispatchDumpOff::new();
+        step.set_parameter(&StepParameter::BlockTargets(vec!["carrier".into()]));
+        let mut game = make_game();
+        let pos = add_player(&mut game, "carrier");
+        game.field_model.ball_coordinate = Some(pos);
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = true; // ball is mid-scatter
+        let mut rng = GameRng::new(0);
+        let outcome = step.start(&mut game, &mut rng);
+        assert!(outcome.pushes.is_empty());
+        assert!(game.defender_id.is_none());
     }
 
     #[test]

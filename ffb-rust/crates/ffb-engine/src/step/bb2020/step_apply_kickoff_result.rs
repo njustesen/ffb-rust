@@ -723,7 +723,14 @@ impl StepApplyKickoffResult {
             ),
             SequenceStep::with_params(
                 StepId::EjectPlayer,
-                vec![StepParameter::GotoLabelOnEnd(labels::END_FOULING.to_owned())],
+                // Java: `sequence.add(StepId.EJECT_PLAYER, from(GOTO_LABEL_ON_END, END_FOULING),
+                //   from(StepParameterKey.OFFICIOUS_REF, true))` — without OfficiousRef(true),
+                // SneakyGitEjectPlayerModifier can never distinguish an officious-ref ejection
+                // from a normal foul-ban ejection.
+                vec![
+                    StepParameter::GotoLabelOnEnd(labels::END_FOULING.to_owned()),
+                    StepParameter::OfficiousRef(true),
+                ],
             ),
             SequenceStep::labelled(
                 StepId::ConsumeParameter,

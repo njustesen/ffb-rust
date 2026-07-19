@@ -4,6 +4,7 @@
 /// Sets `game.defender_id` and publishes `UsingChainsaw` on exit.
 use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -46,11 +47,12 @@ impl StepPileDriver {
                 if self.target_player_id.is_none() {
                     return StepOutcome::goto(&self.goto_label_end);
                 }
+                // Java: UtilCards.hasUnusedSkillWithProperty(actingPlayer, blocksLikeChainsaw)
                 let acting_id = game.acting_player.player_id.clone();
                 let has_unused_chainsaw = acting_id
                     .as_deref()
                     .and_then(|id| game.player(id))
-                    .map(|p| p.has_skill(SkillId::Chainsaw) && !p.used_skills.contains(&SkillId::Chainsaw))
+                    .map(|p| p.has_unused_skill_with_property(NamedProperties::BLOCKS_LIKE_CHAINSAW))
                     .unwrap_or(false);
                 if has_unused_chainsaw {
                     // Java: UtilServerDialog.showDialog → CONTINUE waiting for CLIENT_USE_CHAINSAW
@@ -189,6 +191,28 @@ mod tests {
         let mut rng = GameRng::new(0);
         let outcome = step.start(&mut game, &mut rng);
         assert!(matches!(outcome.action, crate::step::framework::StepAction::Continue), "should wait for dialog");
+    }
+
+    /// Regression test: Java gates on `hasUnusedSkillWithProperty`, so an already-used
+    /// Chainsaw must not trigger the dialog prompt — it should leave the step immediately
+    /// (as if the player had no chainsaw at all). Before this fix, the Rust check only
+    /// tested `has_skill(Chainsaw)` and ignored `used_skills`.
+    #[test]
+    fn already_used_chainsaw_skips_dialog() {
+        let mut step = StepPileDriver::new();
+        step.set_parameter(&StepParameter::TargetPlayerId(Some("def".into())));
+        step.set_parameter(&StepParameter::GotoLabelOnEnd("end".into()));
+        let mut game = make_game();
+        add_player_with_chainsaw(&mut game, "att");
+        if let Some(p) = game.team_home.player_mut("att") {
+            p.used_skills.insert(MSkillId::Chainsaw);
+        }
+        let mut rng = GameRng::new(0);
+        let outcome = step.start(&mut game, &mut rng);
+        assert!(matches!(outcome.action, StepAction::NextStep), "an already-used chainsaw must not prompt a dialog");
+        assert_eq!(game.defender_id, Some("def".into()));
+        let has_using = outcome.published.iter().any(|p| matches!(p, StepParameter::UsingChainsaw(false)));
+        assert!(has_using);
     }
 
     #[test]
