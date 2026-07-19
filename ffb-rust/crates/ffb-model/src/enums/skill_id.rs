@@ -705,6 +705,8 @@ impl SkillId {
             SkillId::Block => &["preventFallOnBothDown"],
             SkillId::Dodge => &["ignoreDefenderStumblesResult", "canRerollDodge"],
             SkillId::Fend => &["preventOpponentFollowingUp"],
+            // Java: Horns.postConstruct registers addStrengthOnBlitz
+            SkillId::Horns => &["addStrengthOnBlitz"],
             SkillId::StandFirm => &["canRefuseToBePushed"],
             SkillId::SideStep => &["canChooseOwnPushedBackSquare"],
             SkillId::Sidestep => &["canChooseOwnPushedBackSquare"],
@@ -800,7 +802,10 @@ impl SkillId {
             SkillId::Regeneration => &["preventRaiseFromDead", "canRollToSaveFromInjury", "cancelsAllowsRaisingLineman"],
             SkillId::GiveAndGo => &["canMoveAfterQuickPass", "canMoveAfterHandOff"],
             SkillId::RunningPass => &["canMoveAfterQuickPass"],
-            SkillId::DivingCatch => &["canAttemptCatchInAdjacentSquares"],
+            // Java: DivingCatch.postConstruct registers canAttemptCatchInAdjacentSquares + addBonusForAccuratePass
+            //   (the CatchModifier("Diving Catch", -1, REGULAR) it also registers is deferred — modifier
+            //   system is stubbed as String types, see model::skill::skill modifier fields)
+            SkillId::DivingCatch => &["canAttemptCatchInAdjacentSquares", "addBonusForAccuratePass"],
             SkillId::NoHands => &["preventCatch"],
             // Java: SafeThrow.postConstruct registers NamedProperties.canCancelInterceptions
             SkillId::SafeThrow => &["canCancelInterceptions"],
@@ -896,8 +901,11 @@ impl SkillId {
             SkillId::SlashingNails => &["canGainClawsForBlitz"],
             // Java: Incorporeal.postConstruct registers canAvoidDodging
             SkillId::Incorporeal => &["canAvoidDodging"],
-            // Java: HailMaryPass.postConstruct registers canGainHailMary
-            SkillId::HailMaryPass => &["canGainHailMary"],
+            // Java: HailMaryPass.postConstruct registers canPassToAnySquare (canGainHailMary belongs to
+            //   the unrelated mixed/special/ShotToNothing skill, not HailMaryPass)
+            SkillId::HailMaryPass => &["canPassToAnySquare"],
+            // Java: ShotToNothing.postConstruct registers canGainHailMary
+            SkillId::ShotToNothing => &["canGainHailMary"],
             // Java: SafePairOfHands.postConstruct registers canPlaceBallWhenKnockedDownOrPlacedProne
             SkillId::SafePairOfHands => &["canPlaceBallWhenKnockedDownOrPlacedProne"],
             // Java: SaboteurBehaviour registers canSabotageBlockerOnKnockdown
@@ -1019,5 +1027,26 @@ mod tests {
     #[test]
     fn properties_maximum_carnage_second_chainsaw() {
         assert!(SkillId::MaximumCarnage.properties().contains(&"canPerformSecondChainsawAttack"));
+    }
+
+    #[test]
+    fn properties_hail_mary_pass_can_pass_to_any_square() {
+        // Java HailMaryPass.postConstruct registers canPassToAnySquare, not canGainHailMary
+        // (canGainHailMary belongs to the unrelated ShotToNothing skill).
+        let props = SkillId::HailMaryPass.properties();
+        assert!(props.contains(&"canPassToAnySquare"));
+        assert!(!props.contains(&"canGainHailMary"));
+    }
+
+    #[test]
+    fn properties_horns_add_strength_on_blitz() {
+        assert!(SkillId::Horns.properties().contains(&"addStrengthOnBlitz"));
+    }
+
+    #[test]
+    fn properties_diving_catch_has_both_properties() {
+        let props = SkillId::DivingCatch.properties();
+        assert!(props.contains(&"canAttemptCatchInAdjacentSquares"));
+        assert!(props.contains(&"addBonusForAccuratePass"));
     }
 }

@@ -1,4 +1,12 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.common::Tackle.
+// NOTE: Java's postConstruct() registers three `CancelSkillProperty` wrappers
+// (around canRerollDodge, ignoreDefenderStumblesResult, and
+// ignoresDefenderStumblesResultForFirstBlock). The Rust `CancelSkillProperty`
+// (model/property/cancel_skill_property.rs) was translated with a different
+// shape (wraps a `SkillId`) instead of Java's (wraps an arbitrary
+// `ISkillProperty`), so there is no way to construct these registrations with
+// the current infra. Deferred until CancelSkillProperty is re-ported to wrap a
+// boxed ISkillProperty.
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 

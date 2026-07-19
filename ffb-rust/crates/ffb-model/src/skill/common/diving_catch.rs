@@ -1,4 +1,11 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.common::DivingCatch.
+///
+/// DEFERRED: Java's postConstruct() also registers a CatchModifier("Diving Catch", -1, REGULAR)
+/// with an overridden appliesToContext(...) that checks CatchScatterThrowInMode. This is not
+/// translated here because the modifier system in this crate is currently stubbed
+/// (see model::skill::skill — CatchModifier etc. are `String` type aliases, no behavior hook
+/// exists yet). The `canAttemptCatchInAdjacentSquares` / `addBonusForAccuratePass` properties
+/// this skill also registers are tracked in enums::skill_id::SkillId::properties().
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 
