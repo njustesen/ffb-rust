@@ -161,16 +161,29 @@ impl StepTreacherous {
 
     fn mark_action_used(game: &mut Game, player_id: &str) {
         let action = game.acting_player.player_action;
+        // Java: FOUL/FOUL_MOVE only sets foulUsed when the acting player's skill does NOT
+        // grant `allowsAdditionalFoul`. Bug fix: this guard was previously missing entirely
+        // (foul_used was set unconditionally), and the KICK_EM_BLITZ, KICK_TEAM_MATE(_MOVE),
+        // and PUNT(_MOVE) cases were missing outright (fell through to the default no-op).
+        let skips_foul_used = matches!(action, Some(PlayerAction::Foul | PlayerAction::FoulMove))
+            && game.player(player_id)
+                .map(|p| p.has_skill_property(ffb_model::model::property::NamedProperties::ALLOWS_ADDITIONAL_FOUL))
+                .unwrap_or(false);
         let turn = game.turn_data_mut();
         match action {
-            Some(PlayerAction::Blitz | PlayerAction::BlitzMove) => turn.blitz_used = true,
+            Some(PlayerAction::Blitz | PlayerAction::BlitzMove | PlayerAction::KickEmBlitz) => turn.blitz_used = true,
+            Some(PlayerAction::KickTeamMate | PlayerAction::KickTeamMateMove) => turn.ktm_used = true,
             Some(PlayerAction::Pass | PlayerAction::PassMove) => turn.pass_used = true,
             Some(PlayerAction::HandOver | PlayerAction::HandOverMove) => turn.hand_over_used = true,
-            Some(PlayerAction::Foul | PlayerAction::FoulMove) => turn.foul_used = true,
+            Some(PlayerAction::Foul | PlayerAction::FoulMove) => {
+                if !skips_foul_used {
+                    turn.foul_used = true;
+                }
+            }
+            Some(PlayerAction::Punt | PlayerAction::PuntMove) => turn.punt_used = true,
             Some(PlayerAction::ThrowTeamMate | PlayerAction::ThrowTeamMateMove) => turn.ttm_used = true,
             _ => {}
         }
-        let _ = player_id; // used by the Java to check allowsAdditionalFoul; not yet translated
     }
 
     fn mark_skill_used(game: &mut Game, player_id: &str) {
@@ -291,6 +304,41 @@ mod tests {
             "should publish DropPlayerContext, matching the real ported InjuryTypeStab dispatch");
         // Ball should have moved to actor
         assert_eq!(game.field_model.ball_coordinate, Some(FieldCoordinate::new(10, 7)));
+    }
+
+    #[test]
+    fn kick_em_blitz_marks_blitz_used() {
+        // Regression: PlayerAction::KickEmBlitz previously fell through to the `_ => {}` no-op
+        // arm instead of setting blitz_used, unlike Java's markActionUsed which groups
+        // KICK_EM_BLITZ with BLITZ/BLITZ_MOVE.
+        let (mut game, _actor_id) = make_game_with_treacherous();
+        game.acting_player.player_action = Some(PlayerAction::KickEmBlitz);
+        let mut step = StepTreacherous::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.turn_data().blitz_used, "KickEmBlitz should mark blitz_used");
+    }
+
+    #[test]
+    fn kick_team_mate_marks_ktm_used() {
+        // Regression: PlayerAction::KickTeamMate / KickTeamMateMove were entirely missing
+        // from the match, so ktm_used was never set (Java: KICK_TEAM_MATE, KICK_TEAM_MATE_MOVE
+        // -> turnData.setKtmUsed(true)).
+        let (mut game, _actor_id) = make_game_with_treacherous();
+        game.acting_player.player_action = Some(PlayerAction::KickTeamMate);
+        let mut step = StepTreacherous::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.turn_data().ktm_used, "KickTeamMate should mark ktm_used");
+    }
+
+    #[test]
+    fn punt_marks_punt_used() {
+        // Regression: PlayerAction::Punt / PuntMove were entirely missing from the match, so
+        // punt_used was never set (Java: PUNT, PUNT_MOVE -> turnData.setPuntUsed(true)).
+        let (mut game, _actor_id) = make_game_with_treacherous();
+        game.acting_player.player_action = Some(PlayerAction::Punt);
+        let mut step = StepTreacherous::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.turn_data().punt_used, "Punt should mark punt_used");
     }
 
     #[test]

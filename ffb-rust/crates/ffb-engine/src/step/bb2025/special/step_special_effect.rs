@@ -1,12 +1,17 @@
 /// 1:1 translation of `com.fumbbl.ffb.server.step.bb2025.special.StepSpecialEffect`.
 ///
-/// Applies a special inducement effect (Lightning, ZAP, Fireball, Bomb) to a player.
+/// Applies a special inducement effect (ZAP, Fireball, Bomb) to a player.
 /// Optionally rolls a d6 to check if the effect succeeds.
 ///
 /// BB2025 differences vs BB2016:
-///   - FIREBALL: publishes SteadyFootingContext(InjuryResult) instead of InjuryResult directly.
-///   - BOMB: complex suppressEndTurn logic + SteadyFootingContext; SPP tracking via
-///     InjuryTypeBombWithModifierForSpp when bombardier != player's team and has ViolentInnovator.
+///   - LIGHTNING: bb2025's Java source has NO handling for this effect at all (only bb2016
+///     applies an injury for it) — the `SpecialEffect::LIGHTNING` match arm here is
+///     deliberately a no-op, matching bb2025 Java exactly.
+///   - FIREBALL: publishes SteadyFootingContext(InjuryResult, [DropPlayerCommand]) instead of
+///     InjuryResult directly.
+///   - BOMB: complex suppressEndTurn logic + SteadyFootingContext with a deferred
+///     DropPlayerFromBombCommand; SPP tracking via InjuryTypeBombWithModifierForSpp when
+///     bombardier != player's team and has ViolentInnovator.
 ///   - END_TURN guard: only published if `isStanding` (not prone/stunned).
 ///   - ZAP: creates ZappedPlayer with BB2020 stats (MA=5, ST=1, AG=2, PA=0, AV=5).
 use ffb_model::enums::{ApothecaryMode, TurnMode};
@@ -21,9 +26,10 @@ use ffb_model::report::report_id::ReportId;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::drop_player_context::SteadyFootingContext;
+use crate::step::bb2025::command::{DropPlayerCommand, DropPlayerFromBombCommand};
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
-use crate::step::util_server_injury::{drop_player, handle_injury_by_name};
+use crate::step::util_server_injury::handle_injury_by_name;
 
 /// Java: `StepSpecialEffect` (bb2025/special).
 pub struct StepSpecialEffect {
@@ -97,6 +103,9 @@ impl StepSpecialEffect {
         let is_standing = game.field_model.player_state(&player_id)
             .map(|s| !s.is_prone_or_stunned() && !s.is_stunned())
             .unwrap_or(true);
+        let is_active = game.field_model.player_state(&player_id)
+            .map(|s| s.is_active())
+            .unwrap_or(false);
 
         // Java: if fRollForEffect → roll; DiceInterpreter.isSpecialEffectSuccessful
         let mut spell_roll_event: Option<GameEvent> = None;
@@ -139,14 +148,13 @@ impl StepSpecialEffect {
         let mut suppress_end_turn = false;
 
         match effect {
-            SpecialEffect::LIGHTNING => {
-                let ir = handle_injury_by_name(
-                    game, rng, "InjuryTypeLightning",
-                    None, &player_id, coord, None, None, ApothecaryMode::SpecialEffect,
-                );
-                outcome = outcome.publish(StepParameter::InjuryResult(Box::new(ir)));
-                for p in drop_player(game, &player_id, true) { outcome = outcome.publish(p); }
-            }
+            // Bug fix: the bb2025 Java `StepSpecialEffect.executeStep()` has NO `if
+            // (fSpecialEffect == SpecialEffect.LIGHTNING)` branch at all — only bb2016's
+            // version handles LIGHTNING (bb2020 and bb2025 do not). This arm previously
+            // applied an injury + dropped the player for LIGHTNING, which doesn't happen in
+            // the real bb2025 Java source; falling through to the end-turn check (matching
+            // Java exactly) is the correct behavior here.
+            SpecialEffect::LIGHTNING => {}
             SpecialEffect::ZAP => {
                 // Java: ZappedPlayer.init(rosterPlayer, game) + team.addPlayer(zappedPlayer)
                 // BB2025 zap stats same as BB2020: MA=5, ST=1, AG=2, PA=0, AV=5
@@ -169,7 +177,16 @@ impl StepSpecialEffect {
                     game, rng, "InjuryTypeFireball",
                     None, &player_id, coord, None, None, ApothecaryMode::SpecialEffect,
                 );
-                let ctx = SteadyFootingContext::from_injury_result(ir);
+                // Java: `new SteadyFootingContext(injuryResult, Collections.singletonList(dropPlayerCommand))`
+                // — bug fix: the deferred `DropPlayerCommand` was previously dropped entirely,
+                // so nothing would run the actual player-drop/injury-application logic when
+                // Steady Footing resolves.
+                let commands: Vec<std::sync::Arc<dyn crate::step::framework::DeferredCommand>> = vec![
+                    std::sync::Arc::new(DropPlayerCommand::new(
+                        player_id.clone(), ApothecaryMode::SpecialEffect, true,
+                    )),
+                ];
+                let ctx = SteadyFootingContext::from_injury_result_with_commands(ir, commands);
                 outcome = outcome.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
             }
             SpecialEffect::BOMB => {
@@ -214,7 +231,16 @@ impl StepSpecialEffect {
                     game, rng, injury_type_name,
                     attacker_id, &player_id, coord, None, None, ApothecaryMode::SpecialEffect,
                 );
-                let ctx = SteadyFootingContext::from_injury_result(ir);
+                // Java: `new SteadyFootingContext(injuryResult, Collections.singletonList(command))`
+                // where `command = new DropPlayerFromBombCommand(player.getId(), SPECIAL_EFFECT,
+                // true, isActive, suppressEndTurn)`. Bug fix: this deferred command was
+                // previously dropped entirely.
+                let commands: Vec<std::sync::Arc<dyn crate::step::framework::DeferredCommand>> = vec![
+                    std::sync::Arc::new(DropPlayerFromBombCommand::new(
+                        player_id.clone(), ApothecaryMode::SpecialEffect, true, is_active, suppress_end_turn,
+                    )),
+                ];
+                let ctx = SteadyFootingContext::from_injury_result_with_commands(ir, commands);
                 outcome = outcome.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
             }
         }
@@ -327,7 +353,12 @@ mod tests {
     }
 
     #[test]
-    fn no_roll_lightning_publishes_injury_result() {
+    fn no_roll_lightning_does_not_publish_injury_result() {
+        // Regression: bb2025's Java `StepSpecialEffect.executeStep()` has NO `if
+        // (fSpecialEffect == SpecialEffect.LIGHTNING)` branch — only bb2016's version applies
+        // an injury for LIGHTNING. The Rust port previously (incorrectly) copied that
+        // bb2016-only behavior into the bb2025 file, publishing an InjuryResult + dropping the
+        // player for an effect the real bb2025 source never touches.
         let mut game = make_game();
         game.home_playing = true;
         add_home_player(&mut game, "p1");
@@ -337,7 +368,52 @@ mod tests {
         step.roll_for_effect = false;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
-        assert!(out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))));
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))),
+            "bb2025 StepSpecialEffect must not apply an injury for LIGHTNING (bb2025 Java has no such branch)");
+    }
+
+    #[test]
+    fn fireball_steady_footing_context_carries_drop_player_command() {
+        // Regression: Java's `new SteadyFootingContext(injuryResult,
+        // Collections.singletonList(dropPlayerCommand))` was previously translated as
+        // `SteadyFootingContext::from_injury_result(ir)` with NO deferred commands at all —
+        // silently dropping the `DropPlayerCommand` that applies the actual player-drop /
+        // injury resolution when Steady Footing is checked downstream.
+        let mut game = make_game();
+        game.home_playing = true;
+        add_home_player(&mut game, "p1");
+        let mut step = StepSpecialEffect::new("fail".into());
+        step.player_id = Some("p1".into());
+        step.special_effect = Some(SpecialEffect::FIREBALL);
+        step.roll_for_effect = false;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        let ctx = out.published.iter().find_map(|p| match p {
+            StepParameter::SteadyFootingContext(ctx) => Some(ctx.as_ref()),
+            _ => None,
+        }).expect("SteadyFootingContext must be published");
+        assert_eq!(ctx.deferred_commands.len(), 1,
+            "FIREBALL must attach exactly one deferred DropPlayerCommand");
+    }
+
+    #[test]
+    fn bomb_steady_footing_context_carries_drop_player_from_bomb_command() {
+        // Regression: same gap as FIREBALL — BOMB's `DropPlayerFromBombCommand` (carrying
+        // is_active/suppress_end_turn) was entirely missing from the published context.
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_mode = TurnMode::BombHome;
+        add_home_player(&mut game, "p1");
+        let mut step = StepSpecialEffect::new("fail".into());
+        step.player_id = Some("p1".into());
+        step.special_effect = Some(SpecialEffect::BOMB);
+        step.roll_for_effect = false;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        let ctx = out.published.iter().find_map(|p| match p {
+            StepParameter::SteadyFootingContext(ctx) => Some(ctx.as_ref()),
+            _ => None,
+        }).expect("SteadyFootingContext must be published");
+        assert_eq!(ctx.deferred_commands.len(), 1,
+            "BOMB must attach exactly one deferred DropPlayerFromBombCommand");
     }
 
     #[test]

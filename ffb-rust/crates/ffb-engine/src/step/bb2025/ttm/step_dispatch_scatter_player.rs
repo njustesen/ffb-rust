@@ -116,12 +116,13 @@ impl StepDispatchScatterPlayer {
         // Java: scattersSingleDirection = thrownPlayer != null
         //   && thrownPlayer.hasUsableSkillProperty(ttmScattersInSingleDirection, oldPlayerState)
         // hasUsableSkillProperty = hasSkillProperty && state.isStanding() && !state.isDistracted()
+        // isDistracted() = isConfused() || isHypnotized() — NOT confused alone.
         let scatters_single_direction = self.thrown_player_id.as_deref()
             .and_then(|id| game.player(id))
             .map(|p| p.has_skill_property(NamedProperties::TTM_SCATTERS_IN_SINGLE_DIRECTION))
             .unwrap_or(false)
             && self.old_player_state
-                .map(|s| s.is_standing() && !s.is_confused())
+                .map(|s| s.is_standing() && !s.is_distracted())
                 .unwrap_or(false);
 
         // Java: throwScatter / scattersSingleDirection reset based on passResult
@@ -186,6 +187,54 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(out.pushes.len(), 1);
         assert_eq!(out.pushes[0][0].step_id, StepId::InitScatterPlayer);
+    }
+
+    /// Regression test: Java `hasUsableSkillProperty` requires `!state.isDistracted()`,
+    /// where `isDistracted() = isConfused() || isHypnotized()`. A hypnotized-but-not-confused
+    /// thrown player must still be treated as "not usable" (no single-direction scatter /
+    /// no Swoop step), matching Java exactly.
+    #[test]
+    fn hypnotized_not_confused_thrown_player_is_still_distracted() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{SkillId, PlayerState as PS};
+        let mut game = make_game();
+        let mut p = Player::default();
+        p.id = "swooper".into();
+        p.starting_skills.push(ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::Swoop, value: None });
+        game.team_home.players.push(p);
+
+        let mut step = StepDispatchScatterPlayer::new();
+        step.pass_result = PassOutcome::Complete;
+        step.thrown_player_id = Some("swooper".into());
+        // Hypnotized but NOT confused: Java still treats this as "distracted" -> not usable.
+        step.old_player_state = Some(PS::new(ffb_model::enums::PS_STANDING).change_hypnotized(true));
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.pushes.len(), 1);
+        // No Swoop step should be pushed: scatters_single_direction must be false.
+        assert_eq!(out.pushes[0][0].step_id, StepId::InitScatterPlayer,
+            "hypnotized thrown player must not trigger single-direction Swoop scatter");
+    }
+
+    #[test]
+    fn standing_undistracted_swoop_player_scatters_single_direction() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{SkillId, PlayerState as PS};
+        let mut game = make_game();
+        let mut p = Player::default();
+        p.id = "swooper".into();
+        p.starting_skills.push(ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::Swoop, value: None });
+        game.team_home.players.push(p);
+
+        let mut step = StepDispatchScatterPlayer::new();
+        step.pass_result = PassOutcome::Complete;
+        step.thrown_player_id = Some("swooper".into());
+        step.old_player_state = Some(PS::new(ffb_model::enums::PS_STANDING));
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.pushes.len(), 1);
+        // Standing, not distracted -> scatters_single_direction is true -> Swoop step leads the sequence.
+        assert_eq!(out.pushes[0][0].step_id, StepId::Swoop);
     }
 
     #[test]

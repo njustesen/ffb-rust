@@ -111,9 +111,11 @@ impl StepHandleDropPlayerContext {
             }
 
             // Java: if (victimStateKey != null) publishParameter(victimStateKey, defenderState)
+            // Java: game.getFieldModel().getPlayerState(game.getDefender()) — uses the game's
+            // defenderId (the victim of the block), not the acting player.
             if let Some(vsk) = ctx.victim_state_key {
                 let defender_state = game.field_model.player_state(
-                    game.acting_player.player_id.as_deref().unwrap_or("")
+                    game.defender_id.as_deref().unwrap_or("")
                 );
                 if let Some(state) = defender_state {
                     let param = match vsk {
@@ -129,7 +131,7 @@ impl StepHandleDropPlayerContext {
             // Java: additionalVictimStateKeys loop (same pattern)
             for &vsk in &ctx.additional_victim_state_keys {
                 let defender_state = game.field_model.player_state(
-                    game.acting_player.player_id.as_deref().unwrap_or("")
+                    game.defender_id.as_deref().unwrap_or("")
                 );
                 if let Some(state) = defender_state {
                     let param = match vsk {
@@ -330,6 +332,32 @@ mod tests {
         step.handle_command(&action, &mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::SKILL_USE),
             "SKILL_USE report must be added even when skill is not used");
+    }
+
+    /// Java: victimStateKey publishes `game.getFieldModel().getPlayerState(game.getDefender())`
+    /// — the defender's state, not the acting player's. p1 (acting player) is dropped and becomes
+    /// prone; the victim state key must carry p2 (defender)'s still-standing state, not p1's.
+    #[test]
+    fn victim_state_key_uses_defender_not_acting_player() {
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        add_player(&mut game, "p2");
+        game.acting_player.player_id = Some("p1".into());
+        game.defender_id = Some("p2".into());
+
+        let mut step = StepHandleDropPlayerContext::new();
+        let mut dpc = make_dpc("p1");
+        dpc.victim_state_key = Some(VictimStateKey::OldDefenderState);
+        step.drop_player_context = Some(dpc);
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        let published_state = out.published.iter().find_map(|p| {
+            if let StepParameter::OldDefenderState(s) = p { Some(*s) } else { None }
+        }).expect("OldDefenderState should be published");
+        let p2_state = game.field_model.player_state("p2").unwrap();
+        assert_eq!(published_state, p2_state);
+        assert_eq!(published_state.base(), PS_STANDING);
     }
 
     #[test]

@@ -13,6 +13,7 @@ use ffb_model::report::report_skill_use::ReportSkillUse;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::util::{ServerUtilBlock, UtilServerPlayerMove};
 
 pub struct StepBlackInk {
     /// Java: endPlayerAction — set by END_PLAYER_ACTION parameter.
@@ -139,6 +140,11 @@ impl StepBlackInk {
             } else if let Some(p) = game.team_away.player_mut(&player_id) {
                 p.used_skills.insert(SkillId::BlackInk);
             }
+            // Java: UtilServerPlayerMove.updateMoveSquares(getGameState(), game.getActingPlayer().isJumping());
+            //       ServerUtilBlock.updateDiceDecorations(getGameState());
+            let jumping = game.acting_player.jumping;
+            UtilServerPlayerMove::update_move_squares(game, jumping);
+            ServerUtilBlock::update_dice_decorations(game);
         }
 
         StepOutcome::next()
@@ -311,5 +317,30 @@ mod tests {
         );
         assert!(game.report_list.has_report(ReportId::SKILL_USE),
             "SKILL_USE(used=false) report must be added when player declines");
+    }
+
+    // ── Bug fix regression test ────────────────────────────────────────────
+    // Previously the confuse-and-mark-used branch never called
+    // UtilServerPlayerMove::update_move_squares / ServerUtilBlock::update_dice_decorations,
+    // unlike the Java `StepBlackInk.executeStep()`, which calls both after confusing the
+    // target. This left FieldModel.move_squares stale after using Black Ink.
+    #[test]
+    fn confusing_target_recomputes_move_squares() {
+        let (mut game, _actor_id) = make_game_with_black_ink();
+        let target_id = "opp1".to_string();
+        game.team_away.players.push(make_player(&target_id, None));
+        let adj = FieldCoordinate::new(11, 7);
+        game.field_model.set_player_coordinate(&target_id, adj);
+        game.field_model.set_player_state(&target_id, PlayerState::new(PS_STANDING).change_active(true));
+
+        assert!(game.field_model.move_squares.is_empty());
+
+        let mut step = StepBlackInk::new();
+        step.start(&mut game, &mut GameRng::new(0));
+
+        assert!(
+            !game.field_model.move_squares.is_empty(),
+            "update_move_squares should populate FieldModel.move_squares after confusing the target"
+        );
     }
 }

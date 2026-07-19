@@ -192,8 +192,12 @@ impl StepRightStuff {
 
         // Java: fumbledKtm = (passResult==FUMBLE && kickedPlayer)
         let fumbled_ktm = self.pass_result == Some(ModelPassResult::Fumble) && self.kicked_player;
-        // Java: doRoll = !dropThrownPlayer && !fumbledKtm
-        let mut do_roll = !self.drop_thrown_player && !fumbled_ktm;
+        // Java: autoFailLanding = oldPlayerState != null && (oldPlayerState.isProneOrStunned() || oldPlayerState.isDistracted())
+        let auto_fail_landing = self.old_player_state
+            .map(|s| s.is_prone_or_stunned() || s.is_distracted())
+            .unwrap_or(false);
+        // Java: doRoll = !dropThrownPlayer && !fumbledKtm && !autoFailLanding
+        let mut do_roll = !self.drop_thrown_player && !fumbled_ktm && !auto_fail_landing;
 
         // Java: if (doRoll && reRolledAction == RIGHT_STUFF) {
         //         if (source == null || !useReRoll) doRoll = false; }
@@ -521,6 +525,40 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(seed));
         assert!(game.report_list.has_report(ReportId::RIGHT_STUFF_ROLL),
             "RIGHT_STUFF_ROLL report must be added on a normal d6 roll (no FumbledPlayerLandsSafely)");
+    }
+
+    // Java: autoFailLanding = oldPlayerState != null && (oldPlayerState.isProneOrStunned() || oldPlayerState.isDistracted())
+    // doRoll = !fDropThrownPlayer && !fumbledKtm && !autoFailLanding
+    // A player who was already Stunned before being thrown must auto-fail the Right Stuff
+    // roll (no dice roll, straight to injury handling) rather than getting a landing check.
+    #[test]
+    fn stunned_old_state_auto_fails_landing_without_rolling() {
+        use ffb_model::report::report_id::ReportId;
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PS_STANDING, PS_STUNNED, PlayerState};
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        let mut p = Player::default();
+        p.id = "p1".into();
+        p.agility = 3;
+        game.team_home.players.push(p);
+        let coord = FieldCoordinate::new(5, 5);
+        game.field_model.set_player_coordinate("p1", coord);
+        game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+
+        let mut step = StepRightStuff::new("success".into());
+        step.thrown_player_id = Some("p1".into());
+        step.thrown_player_has_ball = Some(false);
+        // oldPlayerState was Stunned before the throw -> auto-fail, no roll.
+        step.old_player_state = Some(PlayerState::new(PS_STUNNED));
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        assert_eq!(out.action, StepAction::NextStep,
+            "auto-failed landing must go straight to NEXT_STEP (injury handling), not GOTO success label");
+        assert!(!game.report_list.has_report(ReportId::RIGHT_STUFF_ROLL),
+            "no dice roll / RIGHT_STUFF_ROLL report should be added when auto-failing due to prior Stunned state");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))),
+            "auto-fail path must still publish SteadyFootingContext for injury resolution");
     }
 
     #[test]

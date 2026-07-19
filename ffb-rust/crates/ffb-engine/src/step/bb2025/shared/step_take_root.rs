@@ -159,6 +159,20 @@ impl StepTakeRoot {
         let minimum_roll = minimum_roll_confusion(true);
         let successful = is_skill_roll_successful(roll, minimum_roll);
 
+        // Java: boolean reRolled = (reRolledAction != null) && (reRolledAction == step.getReRolledAction())
+        //         && (step.getReRollSource() != null);
+        //       getResult().addReport(new ReportConfusionRoll(playerId, successful, roll, minimumRoll, reRolled, skill));
+        let report_rerolled = self.re_rolled_action.as_deref() == Some("TAKE_ROOT")
+            && self.re_roll_source.is_some();
+        game.report_list.add(ffb_model::report::report_confusion_roll::ReportConfusionRoll::new(
+            Some(player_id.clone()),
+            successful,
+            roll,
+            minimum_roll,
+            report_rerolled,
+            Some(ffb_model::enums::SkillId::TakeRoot.class_name().to_string()),
+        ));
+
         if successful {
             self.status = TakeRootStatus::Success;
             StepOutcome::next()
@@ -410,6 +424,24 @@ mod tests {
         assert_eq!(game.acting_player.player_action, Some(PlayerAction::Pass));
         assert_eq!(game.thrower_id.as_deref(), Some("p1"));
         assert_eq!(game.thrower_action, Some(PlayerAction::Pass));
+    }
+
+    /// Java: TakeRootBehaviour.handleExecuteStepHook always adds a ReportConfusionRoll when
+    /// a roll is made (doRoll branch), regardless of success/failure.
+    #[test]
+    fn rolling_adds_confusion_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        add_player_with_take_root(&mut game, "p1");
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.player_action = Some(PlayerAction::Move);
+
+        let mut step = StepTakeRoot::new();
+        step.old_player_state = Some(PlayerState::new(PS_STANDING));
+
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.report_list.has_report(ReportId::CONFUSION_ROLL),
+            "expected CONFUSION_ROLL report after TakeRoot skill roll");
     }
 
     /// Multiple seeds — always returns NEXT_STEP (re-roll dialog stubbed).

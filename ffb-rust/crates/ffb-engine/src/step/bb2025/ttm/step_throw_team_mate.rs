@@ -120,11 +120,14 @@ impl StepThrowTeamMate {
 
             let roll = rng.d6();
 
+            // Java: playerCanPass = thrower.getPassing() != 0 (raw PA stat)
             let player_can_pass = game.player(&thrower_id)
                 .map(|p| p.passing != 0)
                 .unwrap_or(false);
+            // Java: evaluatePass(..., thrower.getPassingWithModifiers(), ...) — must use the
+            // modified passing value (e.g. temporary PA penalties/bonuses), not the raw stat.
             let passing_value = game.player(&thrower_id)
-                .map(|p| p.passing as i32)
+                .map(|p| p.passing_with_modifiers())
                 .unwrap_or(0);
 
             self.pass_result = Some(evaluate_ttm_pass_bb2025(player_can_pass, passing_value, roll, modifier_sum));
@@ -510,6 +513,44 @@ mod tests {
     #[test]
     fn evaluate_ttm_pass_bb2025_no_passing_stat_fumble() {
         assert_eq!(evaluate_ttm_pass_bb2025(false, 0, 5, 0), PassOutcome::Fumble);
+    }
+
+    // Java: ThrowTeamMateBehaviour.handleExecuteStepHook uses
+    // `thrower.getPassingWithModifiers()` (not the raw PA stat) as the passValue
+    // fed into evaluatePass. A temporary PA modifier must change the pass outcome:
+    // with raw PA=6 a roll of 4 is INACCURATE (4 < 6), but with a -3 temporary PA
+    // modifier (effective PA=3) the same roll of 4 becomes COMPLETE (4 >= 3).
+    #[test]
+    fn passing_with_modifiers_used_for_pass_evaluation_not_raw_passing() {
+        use ffb_model::model::player::STAT_PA;
+
+        // Find a seed whose first d6() roll is 4.
+        let mut seed = 0u64;
+        loop {
+            if GameRng::new(seed).d6() == 4 { break; }
+            seed += 1;
+        }
+
+        let mut game = make_game();
+        game.home_playing = true;
+        add_thrower(&mut game, "thrower", FieldCoordinate::new(10, 7), 6);
+        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "thrower") {
+            p.add_temporary_stat_mod("test", STAT_PA, -3);
+        }
+        assert_eq!(game.player("thrower").unwrap().passing_with_modifiers(), 3,
+            "temporary PA modifier must lower the effective passing value");
+
+        game.acting_player.player_id = Some("thrower".into());
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+
+        let mut step = StepThrowTeamMate::new();
+        step.thrown_player_id = Some("tp1".into());
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        step.start(&mut game, &mut GameRng::new(seed));
+
+        assert_eq!(step.pass_result, Some(PassOutcome::Complete),
+            "roll of 4 against effective PA 3 (passing_with_modifiers) must be COMPLETE, \
+             not INACCURATE as it would be against the raw PA stat of 6");
     }
 
     #[test]

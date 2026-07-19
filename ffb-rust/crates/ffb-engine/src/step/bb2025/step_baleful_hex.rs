@@ -5,7 +5,7 @@
 /// Init params: GOTO_LABEL_ON_FAILURE.
 /// Runtime params: END_TURN, END_PLAYER_ACTION.
 /// Commands: CLIENT_PLAYER_CHOICE (target selection or decline).
-use ffb_model::enums::{SkillId, PlayerAction};
+use ffb_model::enums::{ReRollSource, SkillId, PlayerAction};
 use ffb_model::model::game::Game;
 use ffb_model::model::skill_use::SkillUse;
 use ffb_model::report::mixed::report_baleful_hex_roll::ReportBalefulHexRoll;
@@ -15,6 +15,7 @@ use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
 pub struct StepBalefulHex {
     /// Java: endPlayerAction — set by END_PLAYER_ACTION parameter.
@@ -27,6 +28,10 @@ pub struct StepBalefulHex {
     pub player_id: Option<String>,
     /// Java: roll — the skill die result.
     pub roll: i32,
+    /// Java: AbstractStepWithReRoll.reRolledAction
+    pub re_rolled_action: Option<String>,
+    /// Java: AbstractStepWithReRoll.reRollSource
+    pub re_roll_source: Option<String>,
 }
 
 impl StepBalefulHex {
@@ -37,6 +42,8 @@ impl StepBalefulHex {
             goto_label_on_failure: String::new(),
             player_id: None,
             roll: 0,
+            re_rolled_action: None,
+            re_roll_source: None,
         }
     }
 }
@@ -68,6 +75,11 @@ impl Step for StepBalefulHex {
                     return StepOutcome::next();
                 }
                 self.player_id = Some(player_id.clone());
+            }
+            // Java: AbstractStepWithReRoll.handleCommand — CLIENT_USE_RE_ROLL(false) clears
+            // the re-roll source (player declined).
+            Action::UseReRoll { use_reroll: false } => {
+                self.re_roll_source = None;
             }
             _ => {}
         }
@@ -135,10 +147,29 @@ impl StepBalefulHex {
             }
         }
 
-        // Java: roll = rollSkill(); successful = roll > 1
+        // Java: if (StringTool.isProvided(playerId)) { ... }
         if self.player_id.is_some() {
+            // Java: if (getReRolledAction() == RE_ROLLED_ACTION) {
+            //         if (getReRollSource() == null || !UtilServerReRoll.useReRoll(...)) {
+            //           actingPlayer.markSkillUsed(skill); return; } }
+            if self.re_rolled_action.as_deref() == Some("BALEFUL_HEX") {
+                let declined_or_failed = match self.re_roll_source.clone() {
+                    Some(ref source_name) => {
+                        let source = ReRollSource::new(source_name.as_str());
+                        !use_reroll(game, &source, &player_id)
+                    }
+                    None => true,
+                };
+                if declined_or_failed {
+                    Self::mark_skill_used(game, &player_id);
+                    return StepOutcome::next();
+                }
+            }
+
+            // Java: roll = rollSkill(); successful = roll > 1
             self.roll = rng.d6();
             let successful = self.roll > 1;
+            let re_rolled = self.re_rolled_action.as_deref() == Some("BALEFUL_HEX");
 
             // Java: getResult().addReport(new ReportBalefulHexRoll(actingPlayer.getPlayerId(), playerId, successful, roll, reRolled))
             game.report_list.add(ReportBalefulHexRoll::new(
@@ -146,7 +177,7 @@ impl StepBalefulHex {
                 successful,
                 self.roll,
                 2, // minimum roll: roll > 1 means 2+
-                false, // re_rolled: simplified — re-roll handling deferred
+                re_rolled,
                 self.player_id.clone(),
             ));
 
@@ -161,8 +192,18 @@ impl StepBalefulHex {
                     }
                 }
                 Self::mark_skill_used(game, &player_id);
+            } else if self.re_rolled_action.is_none() {
+                // Java: else if (getReRolledAction() == null && UtilServerReRoll.askForReRollIfAvailable(
+                //         getGameState(), actingPlayer, RE_ROLLED_ACTION, 2, false)) {
+                //         getResult().setNextAction(StepAction.CONTINUE); }
+                //       else { actingPlayer.markSkillUsed(skill); }
+                if let Some(prompt) = ask_for_reroll_if_available(game, "BALEFUL_HEX", 2, false) {
+                    self.re_rolled_action = Some("BALEFUL_HEX".into());
+                    self.re_roll_source = Some("TRR".into());
+                    return StepOutcome::cont().with_prompt(prompt);
+                }
+                Self::mark_skill_used(game, &player_id);
             } else {
-                // Failure: random agent declines re-roll → mark used
                 Self::mark_skill_used(game, &player_id);
             }
         }
@@ -357,5 +398,52 @@ mod tests {
             "expected SKILL_USE report when eligible target found");
         assert!(game.report_list.has_report(ReportId::BALEFUL_HEX),
             "expected BALEFUL_HEX roll report");
+    }
+
+    // ── Bug fix regression tests ──────────────────────────────────────────
+    // Previously a failed roll always immediately marked the skill used and returned
+    // NEXT_STEP, never offering a team re-roll even when one was available (Java:
+    // `askForReRollIfAvailable(..., RE_ROLLED_ACTION, 2, false)` → StepAction.CONTINUE).
+    // The skill was also always marked used on failure, when Java only marks it used
+    // once no re-roll is offered/accepted.
+
+    #[test]
+    fn failed_roll_with_team_reroll_available_offers_reroll_and_does_not_mark_skill_used() {
+        let seed = seed_for_d6(1); // == 1, not > 1: failure
+        let (mut game, actor_id) = make_game_bh();
+        game.turn_data_home.rerolls = 1;
+        let target_id = "opp1".to_string();
+        game.team_away.players.push(make_player(&target_id, None));
+        game.field_model.set_player_coordinate(&target_id, FieldCoordinate::new(12, 7));
+        game.field_model.set_player_state(&target_id, PlayerState::new(PS_STANDING).change_active(true));
+
+        let mut step = StepBalefulHex::new();
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+
+        assert_eq!(out.action, StepAction::Continue, "expected CONTINUE to offer a re-roll");
+        assert!(out.prompt.is_some());
+        assert_eq!(step.re_rolled_action.as_deref(), Some("BALEFUL_HEX"));
+        assert!(
+            !game.team_home.player(&actor_id).unwrap().used_skills.contains(&SkillId::BalefulHex),
+            "skill should not be marked used while a re-roll is pending"
+        );
+    }
+
+    #[test]
+    fn declining_reroll_marks_skill_used_and_returns_next_step() {
+        let seed = seed_for_d6(1); // failure
+        let (mut game, actor_id) = make_game_bh();
+        game.turn_data_home.rerolls = 1;
+        let target_id = "opp1".to_string();
+        game.team_away.players.push(make_player(&target_id, None));
+        game.field_model.set_player_coordinate(&target_id, FieldCoordinate::new(12, 7));
+        game.field_model.set_player_state(&target_id, PlayerState::new(PS_STANDING).change_active(true));
+
+        let mut step = StepBalefulHex::new();
+        step.start(&mut game, &mut GameRng::new(seed));
+        let out = step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut GameRng::new(0));
+
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.team_home.player(&actor_id).unwrap().used_skills.contains(&SkillId::BalefulHex));
     }
 }

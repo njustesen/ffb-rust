@@ -779,6 +779,8 @@ impl SkillId {
             // Java: Wrestle.postConstruct registers canTakeDownPlayersWithHimOnBothDown
             SkillId::Wrestle => &["canTakeDownPlayersWithHimOnBothDown"],
             SkillId::Swoop => &["ttmScattersInSingleDirection"],
+            // Java: bb2025/special/WisdomOfTheWhiteDwarf.postConstruct registers canGrantSkillsToTeamMates
+            SkillId::WisdomOfTheWhiteDwarf => &["canGrantSkillsToTeamMates"],
             SkillId::KickTeamMate => &["canKickTeamMates"],
             SkillId::ThrowTeamMate => &["canThrowTeamMates"],
             // Java: RightStuff.postConstruct registers canBeThrown, canBeKicked, ignoreTackleWhenBlocked
@@ -878,6 +880,8 @@ impl SkillId {
             SkillId::Kick => &["canReduceKickDistance"],
             // Java: Kaboom.postConstruct registers canForceBombExplosion
             SkillId::Kaboom => &["canForceBombExplosion"],
+            // Java: bb2025/ExcuseMeAreYouAZoat.postConstruct registers canGazeAutomaticallyThreeSquaresAway
+            SkillId::ExcuseMeAreYouAZoat => &["canGazeAutomaticallyThreeSquaresAway"],
             // Java: Bombardier.postConstruct registers enableThrowBombAction (all editions)
             //   BB2020 additionally: preventStuntyDodgeModifier, cancelsIgnoreTacklezonesWhenDodging
             SkillId::Bombardier => &[

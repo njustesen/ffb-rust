@@ -75,11 +75,17 @@ impl Step for StepEndScatterPlayer {
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
+            // Java: `case KICKED_PLAYER_ID: case THROWN_PLAYER_ID:` — both keys share the
+            // same field (and likewise for HAS_BALL / STATE / COORDINATE below).
             StepParameter::ThrownPlayerId(v) => { self.thrown_player_id = v.clone(); true }
+            StepParameter::KickedPlayerId(v) => { self.thrown_player_id = v.clone(); true }
             StepParameter::ThrownPlayerHasBall(v) => { self.thrown_player_has_ball = *v; true }
+            StepParameter::KickedPlayerHasBall(v) => { self.thrown_player_has_ball = *v; true }
             StepParameter::ThrownPlayerState(v) => { self.thrown_player_state = Some(*v); true }
+            StepParameter::KickedPlayerState(v) => { self.thrown_player_state = Some(*v); true }
             StepParameter::OldDefenderState(v) => { self.old_player_state = Some(*v); true }
             StepParameter::ThrownPlayerCoordinate(v) => { self.thrown_player_coordinate = *v; true }
+            StepParameter::KickedPlayerCoordinate(v) => { self.thrown_player_coordinate = Some(*v); true }
             StepParameter::IsKickedPlayer(v) => { self.is_kicked_player = *v; true }
             _ => false,
         }
@@ -185,5 +191,59 @@ mod tests {
         let mut step = StepEndScatterPlayer::default();
         assert!(step.set_parameter(&StepParameter::OldDefenderState(PlayerState::new(PS_STANDING))));
         assert_eq!(step.old_player_state, Some(PlayerState::new(PS_STANDING)));
+    }
+
+    // ── Regression: Java's setParameter has `case KICKED_PLAYER_ID: case THROWN_PLAYER_ID:`
+    // (and likewise for HAS_BALL / STATE / COORDINATE) — both keys must feed the same fields,
+    // since this step is shared between the throw-team-mate and kick-team-mate sequences.
+
+    #[test]
+    fn set_kicked_player_id_accepted_same_as_thrown() {
+        let mut step = StepEndScatterPlayer::default();
+        assert!(step.set_parameter(&StepParameter::KickedPlayerId(Some("k1".into()))));
+        assert_eq!(step.thrown_player_id.as_deref(), Some("k1"));
+    }
+
+    #[test]
+    fn set_kicked_player_has_ball_accepted_same_as_thrown() {
+        let mut step = StepEndScatterPlayer::default();
+        assert!(step.set_parameter(&StepParameter::KickedPlayerHasBall(true)));
+        assert!(step.thrown_player_has_ball);
+    }
+
+    #[test]
+    fn set_kicked_player_state_accepted_same_as_thrown() {
+        let mut step = StepEndScatterPlayer::default();
+        assert!(step.set_parameter(&StepParameter::KickedPlayerState(PlayerState::new(PS_STANDING))));
+        assert_eq!(step.thrown_player_state, Some(PlayerState::new(PS_STANDING)));
+    }
+
+    #[test]
+    fn set_kicked_player_coordinate_accepted_same_as_thrown() {
+        let mut step = StepEndScatterPlayer::default();
+        let coord = FieldCoordinate { x: 6, y: 2 };
+        assert!(step.set_parameter(&StepParameter::KickedPlayerCoordinate(coord)));
+        assert_eq!(step.thrown_player_coordinate, Some(coord));
+    }
+
+    #[test]
+    fn kicked_player_id_flow_pushes_scatter_player_sequence() {
+        // End-to-end: a step fed exclusively via the KICKED_PLAYER_* parameters (as a
+        // kick-team-mate caller would) must still push the ScatterPlayer sequence.
+        use ffb_model::model::player::Player;
+        let mut game = make_game();
+        let mut p = Player::default();
+        p.id = "k1".into();
+        game.team_home.players.push(p);
+
+        let mut step = StepEndScatterPlayer::new();
+        assert!(step.set_parameter(&StepParameter::KickedPlayerId(Some("k1".into()))));
+        assert!(step.set_parameter(&StepParameter::KickedPlayerState(PlayerState::new(PS_STANDING))));
+        assert!(step.set_parameter(&StepParameter::KickedPlayerCoordinate(FieldCoordinate { x: 1, y: 1 })));
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.pushes.is_empty(), "KICKED_PLAYER_* parameters must feed the same fields as THROWN_PLAYER_*");
+        assert_eq!(out.pushes[0][0].step_id, StepId::InitScatterPlayer);
     }
 }
