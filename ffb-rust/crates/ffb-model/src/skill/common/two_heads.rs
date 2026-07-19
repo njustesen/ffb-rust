@@ -1,4 +1,10 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.common::TwoHeads.
+// NOTE: Java's postConstruct() does:
+//   registerModifier(new DodgeModifier("Two Heads", -1, ModifierType.REGULAR));
+// `DodgeModifier` is stubbed as `String` in the Rust `Skill` struct (no
+// modifier subsystem ported yet, no numeric value/ModifierType fields exist),
+// so the actual -1 dodge modifier cannot be represented/registered with the
+// current infra. Deferred until the dodge modifier subsystem is ported.
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 

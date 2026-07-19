@@ -319,12 +319,13 @@ mod tests {
         use ffb_model::report::report_id::ReportId;
         use std::collections::HashSet;
         let mut game = make_game();
-        // Add a player with HailMaryPass (canGainHailMary property).
+        // Add a player with ShotToNothing (canGainHailMary property — NOT HailMaryPass,
+        // which registers canPassToAnySquare instead; see skill_id.rs properties()).
         game.team_home.players.push(Player {
             id: "hm1".into(), name: "HM".into(), nr: 1, position_id: "pos".into(),
             player_type: PlayerType::Regular, gender: PlayerGender::Male,
             movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
-            starting_skills: vec![SkillWithValue { skill_id: ffb_model::enums::SkillId::HailMaryPass, value: None }],
+            starting_skills: vec![SkillWithValue { skill_id: ffb_model::enums::SkillId::ShotToNothing, value: None }],
             extra_skills: vec![], temporary_skills: vec![], used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
             is_big_guy: false,
@@ -334,12 +335,12 @@ mod tests {
         game.acting_player.player_id = Some("hm1".into());
         let mut step = StepInitSelecting::new("end".into());
         step.handle_command(
-            &Action::UseSkill { skill_id: ffb_model::enums::SkillId::HailMaryPass, use_skill: true },
+            &Action::UseSkill { skill_id: ffb_model::enums::SkillId::ShotToNothing, use_skill: true },
             &mut game,
             &mut GameRng::new(0),
         );
         assert!(game.report_list.has_report(ReportId::SKILL_USE),
-            "expected SKILL_USE report for HailMaryPass");
+            "expected SKILL_USE report for ShotToNothing (GAIN_HAIL_MARY)");
     }
 
     #[test]

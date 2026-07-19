@@ -1,4 +1,9 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.common::ExtraArms.
+///
+/// DEFERRED: Java's postConstruct() registers a PickupModifier, InterceptionModifier, and
+/// CatchModifier (each "Extra Arms", -1, REGULAR). Not translated here because the modifier
+/// system in this crate is currently stubbed (see model::skill::skill — PickupModifier,
+/// InterceptionModifier, CatchModifier are `String` type aliases with no behavior hook yet).
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 

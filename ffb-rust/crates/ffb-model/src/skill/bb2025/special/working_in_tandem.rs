@@ -22,6 +22,17 @@ impl std::ops::Deref for WorkingInTandem {
     fn deref(&self) -> &Self::Target { &self.base }
 }
 
+// DEFERRED: Java WorkingInTandem overrides `evaluator()` with a custom, Player-aware
+// SkillValueEvaluator (nested `Evaluator` class reading `player.temporarySkillValues()` /
+// `player.getSkillValueExcludingTemporaryOnes()` to build display strings, plus the
+// `VARIANT_BLOCK`/`VARIANT_PASS` constants it formats). The Rust `SkillValueEvaluator`
+// (crate::model::skill::skill_value_evaluator) is a fixed Default/Modifier/Roll enum with
+// no support for arbitrary per-skill/per-player evaluator logic, and `Skill` has no
+// `evaluator()` hook at all — porting this needs a new player-aware evaluator trait/hook
+// on `Skill`, which is out of scope for this file-level audit. The rules-engine-relevant
+// behavior (reroll on marked partner / no pass modifiers to partner) is driven separately
+// via NamedProperties lookups in ffb-mechanics/ffb-engine, not through this evaluator.
+
 #[cfg(test)]
 mod tests {
     use super::*;

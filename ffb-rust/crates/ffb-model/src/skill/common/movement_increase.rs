@@ -1,4 +1,8 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.common::MovementIncrease.
+// NOTE: Java's `getCost(Player)` override (returns 30000) is not translated here.
+// The Rust `Skill` struct has no `get_cost`/cost concept anywhere in the skill
+// module yet (no infra exists for per-skill purchase cost), so this is deferred
+// until that infrastructure is ported.
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 
