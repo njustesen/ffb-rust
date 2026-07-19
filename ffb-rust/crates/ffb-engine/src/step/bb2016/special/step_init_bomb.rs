@@ -82,10 +82,14 @@ impl StepInitBomb {
                     .publish(StepParameter::BombExploded(true))
                     .publish(StepParameter::CatcherId(None));
                 for player_id in affected {
+                    // Java: rollForEffect = !fBombCoordinate.equals(getPlayerCoordinate(player))
+                    // — the player standing directly on the bomb square is always affected
+                    // (no roll); only players on adjacent squares roll for effect.
+                    let roll_for_effect = game.field_model.player_coordinate(&player_id) != Some(coord);
                     let seq = SpecialEffectGenerator::build_sequence(&SpecialEffectParams {
                         special_effect: Some("BOMB".to_string()),
                         player_id: Some(player_id),
-                        roll_for_effect: true,
+                        roll_for_effect,
                     });
                     out = out.push_seq(seq);
                 }
@@ -220,6 +224,59 @@ mod tests {
             !game.report_list.has_report(ReportId::BOMB_OUT_OF_BOUNDS),
             "bomb explosion with coordinate should NOT add ReportBombOutOfBounds"
         );
+    }
+
+    /// Java: `rollForEffect = !fBombCoordinate.equals(getPlayerCoordinate(player))`.
+    /// The player standing directly on the bomb square must NOT roll for effect
+    /// (guaranteed hit); a player on an adjacent square must roll for effect.
+    #[test]
+    fn player_on_bomb_square_does_not_roll_for_effect_but_adjacent_player_does() {
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+        use std::collections::HashSet;
+        use crate::step::framework::StepParameter;
+
+        let mut game = make_game();
+        let coord = FieldCoordinate::new(10, 7);
+        game.field_model.bomb_coordinate = Some(coord);
+
+        let make_player = |id: &str| Player {
+            id: id.into(), name: id.into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+
+        // Direct hit: standing exactly on the bomb square.
+        game.team_home.players.push(make_player("direct"));
+        game.field_model.set_player_coordinate("direct", coord);
+        // Adjacent: standing one square away.
+        game.team_home.players.push(make_player("adjacent"));
+        let adjacent_coord = FieldCoordinate::new(coord.x + 1, coord.y);
+        game.field_model.set_player_coordinate("adjacent", adjacent_coord);
+
+        let mut step = StepInitBomb::new();
+        step.goto_label_on_end = "catch".into();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+
+        // Find the RollForEffect param published inside each pushed sub-sequence for each player.
+        let find_roll_for_effect = |player_id: &str| -> bool {
+            out.pushes.iter().flatten().find_map(|entry| {
+                let has_player = entry.params.iter().any(|p| matches!(p, StepParameter::PlayerId(pid) if pid == player_id));
+                if !has_player { return None; }
+                entry.params.iter().find_map(|p| match p {
+                    StepParameter::RollForEffect(v) => Some(*v),
+                    _ => None,
+                })
+            }).expect("expected RollForEffect param for player")
+        };
+
+        assert!(!find_roll_for_effect("direct"), "player directly on bomb square must not roll for effect");
+        assert!(find_roll_for_effect("adjacent"), "player on adjacent square must roll for effect");
     }
 
     #[test]

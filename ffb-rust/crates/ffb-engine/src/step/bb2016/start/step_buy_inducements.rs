@@ -90,11 +90,48 @@ impl StepBuyInducements {
         if self.inducement_gold_away < MINIMUM_PETTY_CASH_FOR_INDUCEMENTS {
             self.inducements_selected_away = true;
         }
+
+        // Java: if (fInducementsSelectedHome && !fReportedHome) { fReportedHome = true; addReport(generateReport(home)); }
+        if self.inducements_selected_home && !self.reported_home {
+            self.reported_home = true;
+            let report = self.generate_report(game, true);
+            game.report_list.add(report);
+        }
+        if self.inducements_selected_away && !self.reported_away {
+            self.reported_away = true;
+            let report = self.generate_report(game, false);
+            game.report_list.add(report);
+        }
+
         // client-only: show inducement buying dialog — headless auto-skips
         if self.inducements_selected_home && self.inducements_selected_away {
             return self.leave_step(game);
         }
         StepOutcome::cont()
+    }
+
+    /// Java: `generateReport(Team)` — tallies inducement/star/mercenary counts bought by the
+    /// team and reports the gold spent.
+    fn generate_report(&self, game: &Game, home: bool) -> ffb_model::report::bb2016::report_inducements_bought::ReportInducementsBought {
+        use ffb_model::report::bb2016::report_inducements_bought::ReportInducementsBought;
+        let (team_id, inducement_set, gold_used) = if home {
+            (game.team_home.id.clone(), &game.turn_data_home.inducement_set, self.gold_used_home)
+        } else {
+            (game.team_away.id.clone(), &game.turn_data_away.inducement_set, self.gold_used_away)
+        };
+        let mut nr_of_inducements = 0;
+        let mut nr_of_stars = 0;
+        let mut nr_of_mercenaries = 0;
+        for inducement in inducement_set.get_inducements() {
+            if inducement.has_usage(Usage::STAR) {
+                nr_of_stars = inducement.get_value();
+            } else if inducement.has_usage(Usage::LONER) {
+                nr_of_mercenaries = inducement.get_value();
+            } else {
+                nr_of_inducements += inducement.get_value();
+            }
+        }
+        ReportInducementsBought::new(team_id, nr_of_inducements, nr_of_stars, nr_of_mercenaries, gold_used)
     }
 
     fn leave_step(&self, game: &mut Game) -> StepOutcome {
@@ -403,6 +440,24 @@ mod tests {
         // UtilInducementSequence: home gets 200k petty cash
         assert_eq!(game.game_result.home.petty_cash_used, 200_000);
         assert_eq!(game.game_result.away.petty_cash_used, 0);
+    }
+
+    /// Java: `StepBuyInducements.executeStep` adds a `ReportInducementsBought` for each team
+    /// as soon as it's marked selected (guarded by `fReportedHome`/`fReportedAway` so it's
+    /// added exactly once) — this was previously entirely missing from the translation.
+    #[test]
+    fn auto_skip_under_minimum_adds_inducements_bought_report_for_both_teams() {
+        use ffb_model::option::game_option_id::INDUCEMENTS;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        game.options.set(INDUCEMENTS, "true");
+        // Both teams start with 0 gold → both auto-selected on first execute_step call.
+        let mut step = StepBuyInducements::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        let count = game.report_list.get_reports().iter()
+            .filter(|r| r.get_id() == ReportId::INDUCEMENTS_BOUGHT)
+            .count();
+        assert_eq!(count, 2, "expected one ReportInducementsBought per team, got {count}");
     }
 
     #[test]

@@ -197,8 +197,12 @@ impl StepInitFeeding {
             }
         }
 
+        // Java: `actingPlayer.setHasFed(true);` — that's the only flag Java sets here. There is
+        // no `setHasActed(true)` call anywhere in the Java source; a previous version of this
+        // file fabricated one, which could incorrectly mark the vampire's action as spent
+        // (affecting has_acted-gated logic elsewhere, e.g. blitz/gaze target confirmation)
+        // even when Java leaves that flag untouched.
         game.acting_player.has_fed = true;
-        game.acting_player.has_acted = true;
         outcome
             .publish(StepParameter::EndPlayerAction(self.end_player_action))
             .publish(StepParameter::EndTurn(self.end_turn))
@@ -326,6 +330,26 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         let has_end_turn = out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true)));
         assert!(has_end_turn);
+    }
+
+    /// Regression test: Java's `executeStep()` only ever calls `actingPlayer.setHasFed(true)`
+    /// — there is no `setHasActed(true)` call anywhere in the BB2016/2020/2025 Java sources.
+    /// A previous version of this file fabricated one, which is invented logic with no
+    /// traceable Java line and could incorrectly suppress the vampire's main action.
+    #[test]
+    fn does_not_fabricate_has_acted() {
+        let mut step = StepInitFeeding::new();
+        step.goto_label_on_end = Some("end".to_string());
+        step.feeding_allowed = Some(false);
+        let mut game = make_game();
+        let actor_coord = FieldCoordinate::new(5, 5);
+        add_player(&mut game, "vampire", actor_coord);
+        game.acting_player.player_id = Some("vampire".to_string());
+        game.acting_player.suffering_blood_lust = true;
+        game.acting_player.has_acted = false;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.acting_player.has_fed, "Java does set hasFed");
+        assert!(!game.acting_player.has_acted, "Java never sets hasActed in this step");
     }
 
     #[test]

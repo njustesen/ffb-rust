@@ -112,7 +112,8 @@ impl StepKickoffScatterRoll {
         if self.scatter_direction.is_none() {
             let dir_roll = rng.d8();
             let direction = Direction::for_roll(dir_roll).unwrap_or(Direction::North);
-            let distance = rng.d8(); // Java: rollScatterDistance() → d8
+            // Java: rollScatterDistance() is rollDice(6) — a plain d6 (1-6), NOT a d8.
+            let distance = rng.d6();
 
             self.scatter_direction = Some(direction);
             self.scatter_distance = distance;
@@ -293,6 +294,25 @@ mod tests {
         step.kickoff_start_coordinate = Some(FieldCoordinate::new(13, 7));
         let _ = step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::KICKOFF_SCATTER));
+    }
+
+    #[test]
+    fn scatter_distance_is_a_d6_roll_not_d8() {
+        // Java: DiceRoller.rollScatterDistance() = rollDice(6) — a plain d6 (1-6).
+        // Before the fix, the Rust code used rng.d8() (1-8), which could produce an
+        // out-of-range distance of 7 or 8 that Java's scatter table can never produce.
+        for seed in 0u64..500 {
+            let mut game = make_game();
+            game.home_playing = true;
+            let mut step = StepKickoffScatterRoll::new();
+            step.kickoff_start_coordinate = Some(FieldCoordinate::new(13, 7));
+            step.start(&mut game, &mut GameRng::new(seed));
+            assert!(
+                (1..=6).contains(&step.scatter_distance),
+                "scatter_distance must be a d6 roll (1-6), got {} for seed {}",
+                step.scatter_distance, seed
+            );
+        }
     }
 
     #[test]

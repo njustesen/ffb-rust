@@ -15,7 +15,7 @@
 /// RightStuffModifierFactory tacklezone modifiers: UtilPlayer::find_tacklezones wired.
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
-use ffb_model::enums::{PS_FALLING, ApothecaryMode, ReRollSource};
+use ffb_model::enums::{PS_FALLING, ApothecaryMode, ReRollSource, SkillId};
 use ffb_model::report::report_right_stuff_roll::ReportRightStuffRoll;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
@@ -131,8 +131,15 @@ impl StepRightStuff {
                 // Java: GenerifiedModifierFactory.getTacklezoneModifier → count = findTacklezones
                 // BB2016 has "N Tacklezones" → +N per adjacent opponent tacklezone.
                 let tacklezone_modifier = UtilPlayer::find_tacklezones(game, &player_id) as i32;
+                // Java: GenerifiedModifierFactory.getSkillModifiers → skill.bb2016.Swoop.postConstruct()
+                // registers RightStuffModifier("Swoop", -1, REGULAR) on the player's own skill set.
+                let swoop_modifier = if game.player(&player_id).map(|p| p.has_skill(SkillId::Swoop)).unwrap_or(false) {
+                    -1
+                } else {
+                    0
+                };
                 let base = 7 - agility.min(6);
-                (base + regular_total + tacklezone_modifier).max(2)
+                (base + regular_total + tacklezone_modifier + swoop_modifier).max(2)
             } else { 2 }
         };
 
@@ -399,5 +406,44 @@ mod tests {
         let _out = step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::RIGHT_STUFF_ROLL),
             "RIGHT_STUFF_ROLL report should be added even on failure");
+    }
+
+    #[test]
+    fn swoop_skill_reduces_minimum_roll_by_one() {
+        // Java: skill.bb2016.Swoop.postConstruct() registers
+        // `RightStuffModifier("Swoop", -1, REGULAR)` on the player's own skill set. That
+        // modifier is picked up via GenerifiedModifierFactory.findModifiers ->
+        // getSkillModifiers(context), independent of the static RightStuffModifierCollection.
+        // Agility 3 -> base minimum roll = 7 - 3 = 4. With Swoop's -1, minimum roll = 3.
+        // Rolling a 3 must succeed with Swoop; without the fix it would still require 4+ and
+        // fail (offering a team re-roll instead of finishing the step immediately).
+        use std::collections::HashSet;
+        use ffb_model::enums::{PlayerGender, PlayerType, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use crate::step::framework::StepAction;
+        let mut game = make_game();
+        // Give the acting team an unused re-roll so a failed roll would take the
+        // re-roll-offer (Continue) branch instead of NextStep, making the two outcomes
+        // observably distinct.
+        game.turn_data_mut().rerolls = 1;
+        let p = Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Swoop, value: None }], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: HashSet::new(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        };
+        game.team_home.players.push(p);
+        let mut step = StepRightStuff::new();
+        step.thrown_player_id = Some("p1".into());
+        step.roll = 3;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep,
+            "Swoop's -1 modifier should let a roll of 3 succeed (minimum roll 3), \
+             not fall through to a re-roll offer as if the minimum were still 4");
     }
 }

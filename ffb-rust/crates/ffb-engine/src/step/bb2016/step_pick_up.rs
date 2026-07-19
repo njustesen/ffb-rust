@@ -119,7 +119,10 @@ impl StepPickUp {
                 .map(|s| use_reroll(game, s, &player_id))
                 .unwrap_or(false);
             if !consumed {
-                return self.fail_pick_up();
+                // Java: this pre-check failure branch only publishes END_TURN and
+                // CATCH_SCATTER_THROW_IN_MODE — unlike the pickUp() FAILURE case, it does NOT
+                // publish FEEDING_ALLOWED.
+                return self.fail_pick_up_no_feeding();
             }
         }
 
@@ -196,6 +199,15 @@ impl StepPickUp {
         let label = self.goto_label_on_failure.clone();
         StepOutcome::goto(&label)
             .publish(StepParameter::FeedingAllowed(false))
+            .publish(StepParameter::EndTurn(true))
+            .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::FailedPickUp))
+    }
+
+    /// Java: the outer re-roll-declined pre-check (ReRolledActions.PICK_UP == getReRolledAction())
+    /// only publishes END_TURN and CATCH_SCATTER_THROW_IN_MODE, not FEEDING_ALLOWED.
+    fn fail_pick_up_no_feeding(&self) -> StepOutcome {
+        let label = self.goto_label_on_failure.clone();
+        StepOutcome::goto(&label)
             .publish(StepParameter::EndTurn(true))
             .publish(StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::FailedPickUp))
     }
@@ -326,6 +338,27 @@ mod tests {
         let _offer = step.start(&mut game, &mut GameRng::new(0));
         let out = step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
+    }
+
+    #[test]
+    fn decline_reroll_does_not_publish_feeding_allowed() {
+        // Java: the outer re-roll-declined pre-check only publishes END_TURN and
+        // CATCH_SCATTER_THROW_IN_MODE, NOT FEEDING_ALLOWED (unlike the pickUp() FAILURE case).
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        add_player_at_ball(&mut game, "p1");
+        let mut step = StepPickUp::new("fail".into());
+        step.roll = 1;
+        let _offer = step.start(&mut game, &mut GameRng::new(0));
+        let out = step.handle_command(&Action::UseReRoll { use_reroll: false }, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(
+            !out.published.iter().any(|p| matches!(p, StepParameter::FeedingAllowed(_))),
+            "declined-reroll pre-check path must not publish FEEDING_ALLOWED"
+        );
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
     }
 
     #[test]

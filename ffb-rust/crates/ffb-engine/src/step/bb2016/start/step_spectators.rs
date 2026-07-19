@@ -4,12 +4,14 @@
 /// (0/1/2) based on the relative audience sizes (BB2016).
 /// Java: `rollSpectators()` → teams get `(d1 + d2 + fan_factor) * 1000` spectators.
 /// Fame rules: 2× or more → fame 2; more → fame 1; else → fame 0.
-/// Note: pushes Kickoff sequence in Java — deferred (SequenceGeneratorFactory not yet ported).
+/// Java also pushes the Kickoff sequence (`with_coin_choice = true`) onto the stack
+/// before finishing — the mixed Kickoff generator is now ported, so this is wired here.
 use ffb_model::model::game::Game;
 use ffb_model::report::bb2016::report_spectators::ReportSpectators;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
+use crate::step::generator::mixed::kickoff::{Kickoff, KickoffParams};
 
 /// Java: `StepSpectators` (bb2016/start).
 pub struct StepSpectators;
@@ -72,13 +74,16 @@ impl Step for StepSpectators {
         // Java: getResult().addReport(rollSpectators())
         let report = Self::roll_spectators(game, rng);
         game.report_list.add(report);
-        StepOutcome::next()
+        // Java: ((Kickoff) factory.forName(...)).pushSequence(new Kickoff.SequenceParams(gameState, true))
+        let seq = Kickoff::build_sequence(&KickoffParams { with_coin_choice: true });
+        StepOutcome::next().push_seq(seq)
     }
 
     fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let report = Self::roll_spectators(game, rng);
         game.report_list.add(report);
-        StepOutcome::next()
+        let seq = Kickoff::build_sequence(&KickoffParams { with_coin_choice: true });
+        StepOutcome::next().push_seq(seq)
     }
 
     fn set_parameter(&mut self, _param: &StepParameter) -> bool { false }
@@ -149,6 +154,20 @@ mod tests {
         // min home = (20+2)*1000 = 22000; max away = (1+12)*1000 = 13000 → home always 2×
         assert_eq!(game.game_result.home.fame, 2);
         assert_eq!(game.game_result.away.fame, 0);
+    }
+
+    /// Java: `StepSpectators.executeStep()` pushes the Kickoff sequence
+    /// (`new Kickoff.SequenceParams(gameState, true)`) before advancing — without this the
+    /// BB2016 game never reaches kickoff after spectators are rolled.
+    #[test]
+    fn pushes_kickoff_sequence_with_coin_choice() {
+        let mut step = StepSpectators::new();
+        let mut game = make_game(5, 5);
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.pushes.len(), 1, "should push exactly one Kickoff sequence");
+        let seq = &out.pushes[0];
+        assert_eq!(seq[0].step_id, StepId::CoinChoice, "with_coin_choice=true → sequence starts with CoinChoice");
     }
 
     #[test]

@@ -1,12 +1,9 @@
-use ffb_model::enums::{PlayerAction, ReRollSource, SkillId, PS_PRONE, PS_STANDING};
-use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
-use crate::dice_interpreter::DiceInterpreter;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
-use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use crate::skill_behaviour::dispatch;
 
 // ── Hook state ────────────────────────────────────────────────────────────────
 
@@ -25,7 +22,10 @@ pub struct StepWildAnimalHookState {
 /// 1:1 translation of `com.fumbbl.ffb.server.step.bb2016.StepWildAnimal`.
 ///
 /// Resolves the Wild Animal negatrait check.
-/// Core logic from Java's `WildAnimalBehaviour.handleExecuteStepHook`, inlined here.
+/// Java: `executeStep()` is a thin wrapper delegating to
+/// `getGameState().executeStepHooks(this, state)` — the actual logic lives in
+/// `WildAnimalBehaviour.handleExecuteStepHook`
+/// (see `skill_behaviour::bb2016::wild_animal_behaviour::WildAnimalStepModifier`).
 ///
 /// Init params: GOTO_LABEL_ON_FAILURE (mandatory).
 pub struct StepWildAnimal {
@@ -70,131 +70,25 @@ impl Step for StepWildAnimal {
 }
 
 impl StepWildAnimal {
-    /// Java: `WildAnimalBehaviour.handleExecuteStepHook(StepWildAnimal, StepState)`.
+    /// Java: `StepWildAnimal.executeStep()` → `getGameState().executeStepHooks(this, state)`.
+    /// Logic lives in `WildAnimalBehaviour.handleExecuteStepHook` (via dispatch).
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // Java: if (!game.getTurnMode().checkNegatraits()) → NEXT_STEP
-        if !game.turn_mode.check_negatraits() {
-            return StepOutcome::next();
-        }
-
-        let acting_id = match game.acting_player.player_id.clone() {
-            Some(id) => id,
-            None => return StepOutcome::next(),
+        let mut hook_state = StepWildAnimalHookState {
+            goto_label_on_failure: self.goto_label_on_failure.clone(),
+            re_rolled_action: self.re_rolled_action.clone(),
+            re_roll_source: self.re_roll_source.clone(),
+            outcome: None,
+            updated_re_rolled_action: None,
+            updated_re_roll_source: None,
         };
-
-        // Java: recover tacklezones at start of wild animal check
-        if let Some(state) = game.field_model.player_state(&acting_id) {
-            let recovered = state.recover_tacklezones();
-            game.field_model.set_player_state(&acting_id, recovered);
+        dispatch::execute_step_hooks(game, rng, StepId::WildAnimal, &mut hook_state);
+        if let Some(rra) = hook_state.updated_re_rolled_action {
+            self.re_rolled_action = Some(rra);
         }
-
-        let has_wild_animal = game.player(&acting_id)
-            .map(|p| p.has_skill(SkillId::WildAnimal))
-            .unwrap_or(false);
-        if !has_wild_animal {
-            return StepOutcome::next();
+        if let Some(rrs) = hook_state.updated_re_roll_source {
+            self.re_roll_source = Some(rrs);
         }
-
-        let re_rolled = self.re_rolled_action.as_deref() == Some("WILD_ANIMAL");
-        let do_roll;
-
-        if re_rolled {
-            if let Some(ref source_str) = self.re_roll_source.clone() {
-                let source = ReRollSource::new(source_str.as_str());
-                if use_reroll(game, &source, &acting_id) {
-                    do_roll = true;
-                } else {
-                    return self.cancel_action(game);
-                }
-            } else {
-                return self.cancel_action(game);
-            }
-        } else {
-            // Java: doRoll = UtilCards.hasUnusedSkill(actingPlayer, WildAnimal)
-            do_roll = game.player(&acting_id)
-                .map(|p| !p.used_skills.contains(&SkillId::WildAnimal))
-                .unwrap_or(false);
-        }
-
-        if !do_roll {
-            return StepOutcome::next();
-        }
-
-        // Java: goodConditions = BLITZ/BLOCK type action
-        let good_conditions = matches!(
-            game.acting_player.player_action,
-            Some(PlayerAction::BlitzMove)
-            | Some(PlayerAction::Blitz)
-            | Some(PlayerAction::Block)
-            | Some(PlayerAction::MultipleBlock)
-            | Some(PlayerAction::StandUpBlitz)
-        );
-
-        let roll = rng.d6();
-        let min_roll = DiceInterpreter::minimum_roll_confusion(good_conditions);
-        let successful = roll >= min_roll;
-
-        // Java: actingPlayer.markSkillUsed(WildAnimal)
-        if let Some(player) = game.player_mut(&acting_id) {
-            player.used_skills.insert(SkillId::WildAnimal);
-        }
-
-        let event = GameEvent::ConfusionRoll {
-            player_id: acting_id.clone(),
-            roll,
-            confused: !successful,
-        };
-
-        if !successful {
-            if !re_rolled {
-                if let Some(prompt) = ask_for_reroll_if_available(game, "WILD_ANIMAL", min_roll, false) {
-                    self.re_rolled_action = Some("WILD_ANIMAL".into());
-                    self.re_roll_source = Some("TRR".into());
-                    return StepOutcome::cont().with_event(event).with_prompt(prompt);
-                }
-            }
-            return self.cancel_action(game).with_event(event);
-        }
-
-        StepOutcome::next().with_event(event)
-    }
-
-    /// Java: `cancelPlayerAction(step)` — mark turn resources used, deactivate player.
-    fn cancel_action(&mut self, game: &mut Game) -> StepOutcome {
-        let player_action = game.acting_player.player_action;
-        let td = game.turn_data_mut();
-        match player_action {
-            Some(PlayerAction::Blitz) | Some(PlayerAction::BlitzMove)
-            | Some(PlayerAction::KickTeamMate) | Some(PlayerAction::KickTeamMateMove) => {
-                td.blitz_used = true;
-            }
-            Some(PlayerAction::Pass) | Some(PlayerAction::PassMove)
-            | Some(PlayerAction::ThrowTeamMate) | Some(PlayerAction::ThrowTeamMateMove) => {
-                td.pass_used = true;
-            }
-            Some(PlayerAction::HandOver) | Some(PlayerAction::HandOverMove) => {
-                td.hand_over_used = true;
-            }
-            Some(PlayerAction::Foul) | Some(PlayerAction::FoulMove) => {
-                td.foul_used = true;
-            }
-            _ => {}
-        }
-
-        // Java: playerState.changeBase(PRONE if standing_up else STANDING).changeActive(false)
-        if let Some(acting_id) = game.acting_player.player_id.clone() {
-            if let Some(state) = game.field_model.player_state(&acting_id) {
-                let new_base = if game.acting_player.standing_up { PS_PRONE } else { PS_STANDING };
-                let new_state = state.change_base(new_base).change_active(false);
-                game.field_model.set_player_state(&acting_id, new_state);
-            }
-        }
-
-        // Java: game.setPassCoordinate(null)
-        game.pass_coordinate = None;
-
-        StepOutcome::goto(&self.goto_label_on_failure)
-            .publish(StepParameter::EndPlayerAction(true))
+        hook_state.outcome.unwrap_or_else(StepOutcome::next)
     }
 }
 
@@ -202,7 +96,7 @@ impl StepWildAnimal {
 mod tests {
     use super::*;
     use crate::step::framework::{test_team, StepAction};
-    use ffb_model::enums::{Rules, TurnMode};
+    use ffb_model::enums::{PlayerAction, Rules, SkillId, TurnMode};
     use ffb_model::model::skill_def::SkillWithValue;
 
     fn add_player(
@@ -353,5 +247,33 @@ mod tests {
         let mut step = StepWildAnimal::new("old".into());
         assert!(step.set_parameter(&StepParameter::GotoLabelOnFailure("new".into())));
         assert_eq!(step.goto_label_on_failure, "new");
+    }
+
+    #[test]
+    fn successful_roll_adds_confusion_roll_report() {
+        // Java: WildAnimalBehaviour.handleExecuteStepHook always calls
+        // step.getResult().addReport(new ReportConfusionRoll(...)) whenever a roll happens.
+        // The step must dispatch through execute_step_hooks (not reimplement the logic
+        // inline) so that the canonical WildAnimalStepModifier records this report.
+        use ffb_model::report::report_id::ReportId;
+        let seed = seed_for_d6(5); // success in good or bad conditions
+        let mut game = make_game(vec![SkillId::WildAnimal], Some(PlayerAction::Block));
+        StepWildAnimal::new("fail".into()).start(&mut game, &mut GameRng::new(seed));
+        assert!(
+            game.report_list.has_report(ReportId::CONFUSION_ROLL),
+            "CONFUSION_ROLL report must be added after a Wild Animal roll"
+        );
+    }
+
+    #[test]
+    fn failed_roll_adds_confusion_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let seed = seed_for_d6(1); // fails good_conditions min 2
+        let mut game = make_game(vec![SkillId::WildAnimal], Some(PlayerAction::Block));
+        StepWildAnimal::new("fail".into()).start(&mut game, &mut GameRng::new(seed));
+        assert!(
+            game.report_list.has_report(ReportId::CONFUSION_ROLL),
+            "CONFUSION_ROLL report must be added after a failed Wild Animal roll"
+        );
     }
 }

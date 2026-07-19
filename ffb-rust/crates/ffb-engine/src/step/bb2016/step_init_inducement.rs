@@ -75,11 +75,18 @@ impl Step for StepInitInducement {
             }
         }
         // Java: CLIENT_USE_INDUCEMENT
-        if let Action::UseInducement { inducement_type, card_id: _, player_ids: _ } = action {
-            if let Some(itype) = inducement_type {
-                self.inducement_type = Some(itype.clone());
-                self.end_inducement_phase = false;
-            }
+        //   fInducementType = useInducementCommand.getInducementType()
+        //   fCard = useInducementCommand.getCard()
+        //   fEndInducementPhase = ((fInducementType == null) && (fCard == null))
+        // NOTE: card_id must be handled here too — Action::UseInducement is the direct
+        // mirror of ClientCommandUseInducement and can carry a card_id (see
+        // `use_inducement_with_card_round_trips`). Previously only `inducement_type` was
+        // read, silently dropping card plays routed through this action and never
+        // setting end_inducement_phase on cancellation (both fields None).
+        if let Action::UseInducement { inducement_type, card_id, player_ids: _ } = action {
+            self.inducement_type = inducement_type.clone();
+            self.card = card_id.clone();
+            self.end_inducement_phase = inducement_type.is_none() && card_id.is_none();
         }
         // Java: CLIENT_USE_INDUCEMENT with spell type (wizard)
         if let Action::WizardSpell { spell: _, coord: _ } = action {
@@ -233,5 +240,40 @@ mod tests {
         let action = Action::PlayCard { card_id: "".to_string(), target_player_id: None };
         step.handle_command(&action, &mut game, &mut GameRng::new(0));
         assert!(step.end_inducement_phase);
+    }
+
+    #[test]
+    fn use_inducement_action_with_card_id_records_the_card() {
+        // Java: ClientCommandUseInducement.getCard() sets fCard even when routed through
+        // the single CLIENT_USE_INDUCEMENT command. Before the fix, Action::UseInducement
+        // completely ignored card_id, silently dropping the card play.
+        let mut step = StepInitInducement::new();
+        step.inducement_phase = Some(InducementPhase::EndOfOwnTurn);
+        let mut game = make_game();
+        let action = Action::UseInducement {
+            inducement_type: None,
+            card_id: Some("distract".to_string()),
+            player_ids: vec![],
+        };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert_eq!(step.card.as_deref(), Some("distract"), "card_id must be recorded");
+        assert!(!step.end_inducement_phase, "playing a card must not end the inducement phase");
+    }
+
+    #[test]
+    fn use_inducement_action_with_both_fields_none_ends_inducement_phase() {
+        // Java: fEndInducementPhase = ((fInducementType == null) && (fCard == null)).
+        // Before the fix, Action::UseInducement with inducement_type=None left
+        // end_inducement_phase untouched instead of setting it to true.
+        let mut step = StepInitInducement::new();
+        step.inducement_phase = Some(InducementPhase::EndOfOwnTurn);
+        let mut game = make_game();
+        let action = Action::UseInducement {
+            inducement_type: None,
+            card_id: None,
+            player_ids: vec![],
+        };
+        step.handle_command(&action, &mut game, &mut GameRng::new(0));
+        assert!(step.end_inducement_phase, "both fields None must end the inducement phase");
     }
 }
