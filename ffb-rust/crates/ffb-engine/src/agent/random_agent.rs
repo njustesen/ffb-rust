@@ -1,15 +1,11 @@
-//! The step-engine agent boundary — a SEPARATE module from the driver, with a single clear
-//! interface: `Agent::act(&GameState) -> Action`.
+//! `RandomAgent` — the parity/coverage driver. Moved out of `agent.rs` into this submodule
+//! (agent module split) without behavior changes; see `agent/mod.rs` for the shared `Agent`
+//! trait and module-level docs.
 //!
-//! Dependency direction is one-way: the agent reads the engine (`GameState`), never the
-//! reverse. One `act` call per prompt — the agent inspects `gs.current_prompt()` (and `gs.game`
-//! for legal-action queries) and returns the `Action` the driver should `apply`. State-in /
-//! action-out: no separate response type.
-//!
-//! `RandomAgent` is the parity/coverage driver — it mirrors the Java `ParityRunner` decision/
-//! action RNG contract (see `AGENT_CONTRACT.md` and `docs/step_port/INVARIANTS.md`). A single
-//! shared instance drives BOTH sides (the runner plays both coaches); its two RNG streams are
-//! kept distinct from the game dice by the seed XORs below.
+//! `RandomAgent` mirrors the Java `ParityRunner` decision/action RNG contract (see
+//! `AGENT_CONTRACT.md` and `docs/step_port/INVARIANTS.md`). A single shared instance drives BOTH
+//! sides (the runner plays both coaches); its two RNG streams are kept distinct from the game
+//! dice by the seed XORs below.
 
 use std::collections::HashSet;
 use rand_xoshiro::Xoshiro256StarStar;
@@ -22,12 +18,7 @@ use crate::action::{Action, PlayerActionChoice};
 use crate::legal_actions::{legal_block_targets, legal_foul_targets, legal_handoff_receivers, legal_pass_receivers, TeamSide};
 use crate::step::GameState;
 
-/// The step engine's decision-maker. Reads the game state (including the pending prompt) and
-/// returns the action to apply. `&mut self` carries the agent's own RNG/turn state; `&GameState`
-/// is read-only — the agent never mutates the engine.
-pub trait Agent {
-    fn act(&mut self, gs: &GameState) -> Action;
-}
+use super::Agent;
 
 /// Parity/coverage random agent. Decision RNG (`seed ^ 0xDEAD_BEEF_CAFE_0001`) drives the
 /// Java-synced choices (coin guess, receive, player selection, kick target); action RNG
@@ -394,7 +385,7 @@ impl Agent for RandomAgent {
 
 /// Convert a model-level `PlayerAction` (from `AgentPrompt`) back to the engine's
 /// `PlayerActionChoice` (for `Action::ActivatePlayer`). Covers the lineman-reachable set.
-fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
+pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
     match pa {
         PlayerAction::Move | PlayerAction::BlitzMove | PlayerAction::PassMove
         | PlayerAction::HandOverMove | PlayerAction::FoulMove | PlayerAction::GazeMove

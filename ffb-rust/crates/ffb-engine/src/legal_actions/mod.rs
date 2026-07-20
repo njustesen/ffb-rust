@@ -4,7 +4,7 @@ use ffb_model::model::player::PlayerId;
 use ffb_model::types::FieldCoordinate;
 use ffb_mechanics::skills::SkillId;
 use ffb_mechanics::mechanics::STANDARD_GFI_SQUARES;
-use ffb_model::enums::{Rules, PS_PRONE};
+use ffb_model::enums::{Rules, PS_PRONE, SkillCategory};
 use crate::action::{Action, PlayerActionChoice};
 
 /// The side (home or away) in the current game.
@@ -511,6 +511,61 @@ pub fn legal_kickoff_targets(_game: &Game, side: TeamSide) -> Vec<FieldCoordinat
     targets
 }
 
+/// Enumerates every legal inducement purchase for the `BuyInducements`/`BuyPrayersAndInducements`
+/// prompts: every subset of `available` (each item bought 0 or 1 times — the prompt's `available`
+/// list does not carry per-item unit prices for larger quantities) whose total cost is within
+/// `budget`.
+///
+/// Design choice: full combinatorial power-set enumeration, not a single greedy/random-walk
+/// sample. "Uniformly among all truly legal actions" only holds if every affordable subset is a
+/// genuine candidate — a greedy-cheapest-first sampler would systematically bias toward small,
+/// cheap purchases and never surface e.g. "skip the cheap apothecary, buy the expensive star
+/// player instead." Realistic inducement catalogs are short (rulebook-bounded, well under 20
+/// entries), so 2^n stays tractable. As a defensive fallback for a pathologically large
+/// `available` list (currently never hit in practice), we cap full enumeration at 20 items and
+/// fall back to a single cheapest-first greedy-affordable subset beyond that, to avoid a 2^n
+/// blowup — documented here as an accepted approximation for that (currently theoretical) case.
+pub fn legal_inducement_purchases(available: &[(String, i32)], budget: i32) -> Vec<Vec<(String, i32)>> {
+    const MAX_FULL_ENUMERATION: usize = 20;
+    if available.len() > MAX_FULL_ENUMERATION {
+        let mut sorted: Vec<&(String, i32)> = available.iter().collect();
+        sorted.sort_by_key(|(_, cost)| *cost);
+        let mut remaining = budget;
+        let mut subset = Vec::new();
+        for (name, cost) in sorted {
+            if *cost >= 0 && *cost <= remaining {
+                subset.push((name.clone(), *cost));
+                remaining -= *cost;
+            }
+        }
+        return vec![subset];
+    }
+
+    let n = available.len();
+    let mut results = Vec::new();
+    for mask in 0u32..(1u32 << n) {
+        let mut total = 0i32;
+        let mut subset = Vec::new();
+        for (i, item) in available.iter().enumerate() {
+            if mask & (1 << i) != 0 {
+                total += item.1;
+                subset.push(item.clone());
+            }
+        }
+        if total <= budget {
+            results.push(subset);
+        }
+    }
+    results
+}
+
+/// Flattens the `SelectSkill` prompt's `available: Vec<(SkillCategory, Vec<u16>)>` into the
+/// concrete set of legal skill ids the coach may pick from (union across all offered
+/// categories) — so a real choice can be made instead of the informational-only fallback.
+pub fn legal_skill_choices(available: &[(SkillCategory, Vec<u16>)]) -> Vec<u16> {
+    available.iter().flat_map(|(_, ids)| ids.iter().copied()).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -929,6 +984,65 @@ mod tests {
         let targets = legal_kickoff_targets(&game, TeamSide::Away);
         assert!(targets.iter().all(|t| t.x >= 0 && t.x <= 12));
         assert!(!targets.is_empty());
+    }
+
+    // ── legal_inducement_purchases ─────────────────────────────────────────────
+
+    #[test]
+    fn legal_inducement_purchases_includes_empty_subset() {
+        let available = vec![("Wizard".to_string(), 150)];
+        let subsets = legal_inducement_purchases(&available, 100);
+        assert!(subsets.contains(&vec![]));
+    }
+
+    #[test]
+    fn legal_inducement_purchases_excludes_over_budget_subsets() {
+        let available = vec![("Wizard".to_string(), 150), ("Bribe".to_string(), 50)];
+        let subsets = legal_inducement_purchases(&available, 50);
+        for subset in &subsets {
+            let total: i32 = subset.iter().map(|(_, c)| c).sum();
+            assert!(total <= 50, "subset {:?} exceeds budget", subset);
+        }
+        assert!(subsets.contains(&vec![("Bribe".to_string(), 50)]));
+        assert!(!subsets.iter().any(|s| s.iter().any(|(n, _)| n == "Wizard")));
+    }
+
+    #[test]
+    fn legal_inducement_purchases_enumerates_all_affordable_subsets() {
+        let available = vec![("A".to_string(), 10), ("B".to_string(), 20)];
+        let subsets = legal_inducement_purchases(&available, 30);
+        // All 4 subsets (empty, {A}, {B}, {A,B}) are affordable within budget 30.
+        assert_eq!(subsets.len(), 4);
+    }
+
+    #[test]
+    fn legal_inducement_purchases_large_catalog_falls_back_to_greedy() {
+        let available: Vec<(String, i32)> = (0..25).map(|i| (format!("item{i}"), 10)).collect();
+        let subsets = legal_inducement_purchases(&available, 55);
+        // Fallback returns exactly one greedy-affordable subset (cheapest-first; all equal cost
+        // here, so up to floor(55/10) = 5 items fit).
+        assert_eq!(subsets.len(), 1);
+        let total: i32 = subsets[0].iter().map(|(_, c)| c).sum();
+        assert!(total <= 55);
+        assert_eq!(subsets[0].len(), 5);
+    }
+
+    // ── legal_skill_choices ─────────────────────────────────────────────────────
+
+    #[test]
+    fn legal_skill_choices_flattens_across_categories() {
+        let available = vec![
+            (SkillCategory::General, vec![1u16, 2, 3]),
+            (SkillCategory::Strength, vec![4, 5]),
+        ];
+        let ids = legal_skill_choices(&available);
+        assert_eq!(ids, vec![1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn legal_skill_choices_empty_when_no_categories() {
+        let available: Vec<(SkillCategory, Vec<u16>)> = vec![];
+        assert!(legal_skill_choices(&available).is_empty());
     }
 }
 
