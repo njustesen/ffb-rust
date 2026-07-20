@@ -30,11 +30,15 @@ use crate::util::util_server_setup::UtilServerSetup;
 pub struct StepSetup {
     /// Java: fEndSetup — set true when the coach sends CLIENT_END_TURN.
     pub end_setup: bool,
+    /// Java (bb2016/bb2020): fGotoLabelOnEnd — mandatory init param GOTO_LABEL_ON_END.
+    /// The bb2025 Java StepSetup does not accept it, but this struct serves all editions
+    /// (make_step maps one struct per StepId); stored, unused by the bb2025 logic.
+    pub goto_label_on_end: String,
 }
 
 impl StepSetup {
     pub fn new() -> Self {
-        Self { end_setup: false }
+        Self { end_setup: false, goto_label_on_end: String::new() }
     }
 }
 
@@ -56,14 +60,22 @@ impl Step for StepSetup {
             }
             Action::PlacePlayer { player_id, coord } => {
                 UtilServerSetup::setup_player(game, player_id, *coord);
-                return StepOutcome::cont();
+                // Fall through to execute_step (not an early return): the coach hasn't
+                // confirmed yet, so re-emit the TeamSetup prompt for the remaining
+                // players instead of leaving the driver with no pending prompt at all.
             }
             _ => {}
         }
         self.execute_step(game, rng)
     }
 
-    fn set_parameter(&mut self, _param: &StepParameter) -> bool { false }
+    fn set_parameter(&mut self, param: &StepParameter) -> bool {
+        // Java (bb2016/bb2020) init(): GOTO_LABEL_ON_END (mandatory)
+        match param {
+            StepParameter::GotoLabelOnEnd(v) => { self.goto_label_on_end = v.clone(); true }
+            _ => false,
+        }
+    }
 }
 
 impl StepSetup {
@@ -119,9 +131,11 @@ impl StepSetup {
             self.end_setup = false;
             StepOutcome::next()
         } else {
-            // Invalid setup: stay and let the coach try again.
+            // Invalid setup: stay and let the coach try again. Recurse (not a bare
+            // `StepOutcome::cont()`) so the `!self.end_setup` branch above re-emits a real
+            // TeamSetup prompt — otherwise the driver is left waiting with no prompt at all.
             self.end_setup = false;
-            StepOutcome::cont()
+            self.execute_step(game, rng)
         }
     }
 }

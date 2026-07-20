@@ -138,7 +138,16 @@ impl Step for StepInitThrowTeamMate {
         self.execute_step(game, rng)
     }
 
-    fn set_parameter(&mut self, _param: &StepParameter) -> bool { false }
+    fn set_parameter(&mut self, param: &StepParameter) -> bool {
+        // Java init(): GOTO_LABEL_ON_END (mandatory), TARGET_COORDINATE, THROWN_PLAYER_ID, IS_KICKED_PLAYER
+        match param {
+            StepParameter::GotoLabelOnEnd(v) => { self.goto_label_on_end = v.clone(); true }
+            StepParameter::TargetCoordinate(v) => { self.target_coordinate = Some(*v); true }
+            StepParameter::ThrownPlayerId(v) => { self.thrown_player_id = v.clone(); true }
+            StepParameter::IsKickedPlayer(v) => { self.kicked = *v; true }
+            _ => false,
+        }
+    }
 }
 
 impl StepInitThrowTeamMate {

@@ -30,6 +30,9 @@ use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
 /// Java `StepThrowTeamMate.StepState` — fields promoted to struct level.
 pub struct StepThrowTeamMate {
+    /// Java (bb2016): `state.goToLabelOnFailure` — mandatory init param GOTO_LABEL_ON_FAILURE
+    /// (stored; only used by the bb2016 edition — this struct serves all editions via make_step).
+    pub goto_label_on_failure: String,
     /// Java: `state.thrownPlayerId`
     pub thrown_player_id: Option<String>,
     /// Java: `state.thrownPlayerState`
@@ -53,6 +56,7 @@ pub struct StepThrowTeamMate {
 impl StepThrowTeamMate {
     pub fn new() -> Self {
         Self {
+            goto_label_on_failure: String::new(),
             thrown_player_id: None,
             thrown_player_state: None,
             thrown_player_has_ball: false,
@@ -277,6 +281,9 @@ impl Step for StepThrowTeamMate {
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
+            // Java (bb2016) init(): GOTO_LABEL_ON_FAILURE (mandatory; stored, only used by
+            // the bb2016 edition — this struct serves all editions via make_step)
+            StepParameter::GotoLabelOnFailure(v) => { self.goto_label_on_failure = v.clone(); true }
             StepParameter::ThrownPlayerId(v)     => { self.thrown_player_id = v.clone(); true }
             StepParameter::ThrownPlayerState(v)  => { self.thrown_player_state = Some(*v); true }
             StepParameter::ThrownPlayerHasBall(v)=> { self.thrown_player_has_ball = *v; true }

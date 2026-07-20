@@ -40,6 +40,16 @@ impl StepBribes {
 impl Step for StepBribes {
     fn id(&self) -> StepId { StepId::Bribes }
 
+    // Java: init(StepParameterSet) reads GOTO_LABEL_ON_END (mandatory init param). Without
+    // accepting it the label stayed empty and the success path did goto(""), silently
+    // draining the whole step stack and ending the game mid-foul.
+    fn set_parameter(&mut self, param: &StepParameter) -> bool {
+        match param {
+            StepParameter::GotoLabelOnEnd(v) => { self.goto_label_on_end = v.clone(); true }
+            _ => false,
+        }
+    }
+
     fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         self.execute_step(game, rng)
     }

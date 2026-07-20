@@ -63,6 +63,11 @@ impl Step for StepBlockChoice {
             StepParameter::DiceIndex(v) => { self.dice_index = *v; true }
             StepParameter::NrOfDice(v) => { self.nr_of_dice = *v; true }
             StepParameter::OldDefenderState(v) => { self.old_defender_state = Some(*v); true }
+            // Java: mandatory init params — see the bb2025 StepBlockChoice: dropping these made
+            // POW/PUSHBACK outcomes goto("") which silently drained the stack and ended the game.
+            StepParameter::GotoLabelOnDodge(s)      => { self.goto_label_on_dodge = s.clone(); true }
+            StepParameter::GotoLabelOnJuggernaut(s) => { self.goto_label_on_juggernaut = s.clone(); true }
+            StepParameter::GotoLabelOnPushback(s)   => { self.goto_label_on_pushback = s.clone(); true }
             _ => false,
         }
     }

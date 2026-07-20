@@ -46,6 +46,14 @@ impl Step for StepInitPunt {
         }
         self.execute_step(game, rng)
     }
+
+    fn set_parameter(&mut self, param: &StepParameter) -> bool {
+        // Java init(): GOTO_LABEL_ON_END
+        match param {
+            StepParameter::GotoLabelOnEnd(v) => { self.goto_label_on_end = v.clone(); true }
+            _ => false,
+        }
+    }
 }
 
 impl StepInitPunt {

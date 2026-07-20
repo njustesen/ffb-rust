@@ -149,6 +149,9 @@ impl Step for StepRightStuff {
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
+            // Java init(): GOTO_LABEL_ON_SUCCESS, IS_KICKED_PLAYER
+            StepParameter::GotoLabelOnSuccess(v) => { self.goto_on_success = v.clone(); true }
+            StepParameter::IsKickedPlayer(v) => { self.kicked_player = *v; true }
             StepParameter::ThrownPlayerHasBall(v) => { self.thrown_player_has_ball = Some(*v); true }
             StepParameter::ThrownPlayerId(v) => { self.thrown_player_id = v.clone(); true }
             StepParameter::DropThrownPlayer(v) => { self.drop_thrown_player = *v; true }

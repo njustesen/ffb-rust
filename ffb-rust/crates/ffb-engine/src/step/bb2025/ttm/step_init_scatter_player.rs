@@ -58,6 +58,12 @@ pub struct StepInitScatterPlayer {
     using_swoop: bool,
     /// Java: swoopDirection
     swoop_direction: Option<Direction>,
+    /// Java (bb2020): crashLanding — init param CRASH_LANDING (bb2020 edition only; stored,
+    /// bb2020-specific crash-landing logic not yet wired into the shared step).
+    pub crash_landing: bool,
+    /// Java (bb2020): deviate — init param PASS_DEVIATES (bb2020 edition only; stored,
+    /// bb2020-specific deviate logic not yet wired into the shared step).
+    pub deviate: bool,
     // AbstractStepWithReRoll stubs
     re_rolled_action: Option<String>,
 }
@@ -75,6 +81,8 @@ impl StepInitScatterPlayer {
             using_bullseye: false,
             using_swoop: false,
             swoop_direction: None,
+            crash_landing: false,
+            deviate: false,
             re_rolled_action: None,
         }
     }
@@ -398,6 +406,9 @@ impl Step for StepInitScatterPlayer {
             StepParameter::UsingBullseye(v)          => { self.using_bullseye = *v; true }
             StepParameter::UsingSwoop(v)             => { self.using_swoop = *v; true }
             StepParameter::OldDefenderState(v)       => { self.old_player_state = Some(*v); true }
+            // bb2020 Java init(): CRASH_LANDING, PASS_DEVIATES
+            StepParameter::CrashLanding(v)           => { self.crash_landing = *v; true }
+            StepParameter::PassDeviates(v)           => { self.deviate = *v; true }
             _ => false,
         }
     }

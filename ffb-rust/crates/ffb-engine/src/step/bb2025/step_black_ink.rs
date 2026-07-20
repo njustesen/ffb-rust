@@ -22,6 +22,9 @@ pub struct StepBlackInk {
     pub end_turn: bool,
     /// Java: goToLabelOnFailure — GOTO_LABEL_ON_FAILURE init parameter.
     pub goto_label_on_failure: String,
+    /// Java: oldPlayerState — OLD_PLAYER_STATE init parameter (stored; the Java decline path
+    /// restores it, which is not yet translated here).
+    pub old_player_state: Option<ffb_model::enums::PlayerState>,
     /// Java: playerId — set from CLIENT_PLAYER_CHOICE command.
     pub player_id: Option<String>,
 }
@@ -32,6 +35,7 @@ impl StepBlackInk {
             end_player_action: false,
             end_turn: false,
             goto_label_on_failure: String::new(),
+            old_player_state: None,
             player_id: None,
         }
     }
@@ -79,6 +83,8 @@ impl Step for StepBlackInk {
             StepParameter::EndTurn(v)               => { self.end_turn = *v; true }
             StepParameter::EndPlayerAction(v)       => { self.end_player_action = *v; true }
             StepParameter::GotoLabelOnFailure(v)    => { self.goto_label_on_failure = v.clone(); true }
+            // Java init(): OLD_PLAYER_STATE
+            StepParameter::OldPlayerState(v)        => { self.old_player_state = Some(*v); true }
             _ => false,
         }
     }

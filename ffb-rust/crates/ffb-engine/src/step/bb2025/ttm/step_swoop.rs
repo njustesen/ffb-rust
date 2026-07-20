@@ -157,6 +157,14 @@ impl Step for StepSwoop {
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
+            // Java init(): THROWN_PLAYER_ID, THROWN_PLAYER_HAS_BALL, THROWN_PLAYER_COORDINATE,
+            //              THROWN_PLAYER_STATE, THROW_SCATTER (mandatory), GOTO_LABEL_ON_FALL_DOWN
+            StepParameter::ThrownPlayerId(v) => { self.thrown_player_id = v.clone(); true }
+            StepParameter::ThrownPlayerHasBall(v) => { self.thrown_player_has_ball = *v; true }
+            StepParameter::ThrownPlayerCoordinate(v) => { self.thrown_player_coordinate = *v; true }
+            StepParameter::ThrownPlayerState(v) => { self.thrown_player_state = Some(*v); true }
+            StepParameter::ThrowScatter(v) => { self.throw_scatter = *v; true }
+            StepParameter::GotoLabelOnFallDown(v) => { self.goto_label_on_fall_down = v.clone(); true }
             StepParameter::CoordinateFrom(v) => { self.coordinate_from = Some(*v); true }
             StepParameter::CoordinateTo(v) => { self.coordinate_to = Some(*v); true }
             _ => false,

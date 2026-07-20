@@ -33,6 +33,10 @@ pub struct StepInitSelecting {
     pub end_player_action: bool,
     /// Java: forceGotoOnDispatch
     pub force_goto_on_dispatch: bool,
+    /// Java: fUpdatePersistence (mandatory init param UPDATE_PERSISTENCE) — Java stores it
+    /// purely to decide whether to persist the game state on start(); persistence is not
+    /// modeled in this crate, so the value is stored but unused.
+    pub update_persistence: bool,
 }
 
 impl StepInitSelecting {
@@ -43,6 +47,7 @@ impl StepInitSelecting {
             end_turn: false,
             end_player_action: false,
             force_goto_on_dispatch: false,
+            update_persistence: false,
         }
     }
 }
@@ -51,13 +56,27 @@ impl Step for StepInitSelecting {
     fn id(&self) -> StepId { StepId::InitSelecting }
 
     fn start(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        // Rust bridging for Java's UtilActingPlayer.changeActingPlayer — see the bb2025
+        // StepInitSelecting for the full rationale: record the finished activation into
+        // turn_data.acted_player_ids so the eligible list shrinks, then clear the context.
+        if game.acting_player.player_id.is_some() {
+            let acted = game.acting_player.has_moved
+                || game.acting_player.has_fouled
+                || game.acting_player.has_blocked
+                || game.acting_player.has_passed
+                || game.acting_player.has_triggered_effect
+                || game.acting_player.forgone;
+            if acted {
+                if let Some(pid) = game.acting_player.player_id.clone() {
+                    let td = if game.home_playing { &mut game.turn_data_home } else { &mut game.turn_data_away };
+                    if !td.acted_player_ids.contains(&pid) { td.acted_player_ids.push(pid); }
+                }
+            }
+            game.acting_player.clear();
+        }
         // Java start() only updates persistence — it does NOT call executeStep().
         // Emit the activation prompt so the agent knows which players are available.
-        let team = if game.home_playing { &game.team_home } else { &game.team_away };
-        let eligible: Vec<_> = team.players.iter()
-            .filter(|p| game.field_model.player_coordinate(&p.id).is_some())
-            .map(|p| (p.id.clone(), vec![PlayerAction::Move]))
-            .collect();
+        let eligible = crate::legal_actions::eligible_players_for_activation(game);
         StepOutcome::cont()
             .with_prompt(AgentPrompt::ActivatePlayer { eligible_players: eligible })
     }
@@ -88,6 +107,8 @@ impl Step for StepInitSelecting {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             StepParameter::GotoLabelOnEnd(v) => { self.goto_label_on_end = v.clone(); true }
+            // Java init(): UPDATE_PERSISTENCE (mandatory; stored for persistence only)
+            StepParameter::UpdatePersistence(v) => { self.update_persistence = *v; true }
             StepParameter::EndTurn(v) => { self.end_turn = *v; true }
             StepParameter::EndPlayerAction(v) => { self.end_player_action = *v; true }
             _ => false,
@@ -112,22 +133,38 @@ impl StepInitSelecting {
         if let Some(dispatch) = self.dispatch_player_action {
             if game.acting_player.player_id.is_some() {
                 let standing_up = game.acting_player.standing_up;
-                let outcome = StepOutcome::next()
-                    .publish(StepParameter::DispatchPlayerAction(Some(dispatch)));
-                if standing_up && !self.force_goto_on_dispatch {
-                    return outcome;
-                } else {
-                    return StepOutcome::goto(label)
-                        .publish(StepParameter::DispatchPlayerAction(Some(dispatch)));
+                // Rust bridging — see the bb2025 StepInitSelecting for the full rationale:
+                // thread the agent's activation-time target (game.defender_id) through to
+                // StepEndSelecting so the action sequence starts with the target set.
+                let mut target_params: Vec<StepParameter> = Vec::new();
+                if let Some(def) = game.defender_id.clone() {
+                    match dispatch {
+                        PlayerAction::Block | PlayerAction::Blitz => {
+                            target_params.push(StepParameter::BlockDefenderId(def));
+                        }
+                        PlayerAction::Foul => {
+                            target_params.push(StepParameter::FoulDefenderId(def));
+                        }
+                        PlayerAction::Pass | PlayerAction::HandOver => {
+                            if let Some(coord) = game.field_model.player_coordinate(&def) {
+                                target_params.push(StepParameter::TargetCoordinate(coord));
+                            }
+                        }
+                        _ => {}
+                    }
                 }
+                let mut outcome = if standing_up && !self.force_goto_on_dispatch {
+                    StepOutcome::next()
+                } else {
+                    StepOutcome::goto(label)
+                };
+                outcome = outcome.publish(StepParameter::DispatchPlayerAction(Some(dispatch)));
+                for p in target_params { outcome = outcome.publish(p); }
+                return outcome;
             }
         }
         // Waiting: build activation prompt
-        let team = if game.home_playing { &game.team_home } else { &game.team_away };
-        let eligible: Vec<_> = team.players.iter()
-            .filter(|p| game.field_model.player_coordinate(&p.id).is_some())
-            .map(|p| (p.id.clone(), vec![PlayerAction::Move]))
-            .collect();
+        let eligible = crate::legal_actions::eligible_players_for_activation(game);
         StepOutcome::cont()
             .with_prompt(AgentPrompt::ActivatePlayer { eligible_players: eligible })
     }

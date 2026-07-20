@@ -97,6 +97,8 @@ impl Step for StepPileDriver {
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
+            // Java init(): PLAYER_ID → targetPlayerId, GOTO_LABEL_ON_END (both mandatory)
+            StepParameter::PlayerId(v) => { self.target_player_id = Some(v.clone()); true }
             StepParameter::TargetPlayerId(v) => { self.target_player_id = v.clone(); true }
             StepParameter::GotoLabelOnEnd(v)  => { self.goto_label_end = v.clone(); true }
             _ => false,

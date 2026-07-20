@@ -103,9 +103,11 @@ impl StepSetup {
                     .push_seq(seq_opponent)
             }
         } else {
-            // Invalid setup: let the coach try again.
+            // Invalid setup: let the coach try again. Recurse (not a bare `StepOutcome::cont()`)
+            // so the `!self.end_setup` branch above re-emits a real TeamSetup prompt — otherwise
+            // the driver is left waiting with no prompt at all.
             self.end_setup = false;
-            StepOutcome::cont()
+            self.execute_step(game, rng)
         }
     }
 }
@@ -137,7 +139,9 @@ impl Step for StepSetup {
             }
             Action::PlacePlayer { player_id, coord } => {
                 UtilServerSetup::setup_player(game, player_id, *coord);
-                return StepOutcome::cont();
+                // Fall through to execute_step (not an early return): the coach hasn't
+                // confirmed yet, so re-emit the TeamSetup prompt for the remaining
+                // players instead of leaving the driver with no pending prompt at all.
             }
             _ => {}
         }

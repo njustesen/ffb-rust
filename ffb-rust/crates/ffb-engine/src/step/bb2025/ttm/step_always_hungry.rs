@@ -65,6 +65,9 @@ impl Step for StepAlwaysHungry {
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
+            // Java init(): GOTO_LABEL_ON_FAILURE / GOTO_LABEL_ON_SUCCESS (mandatory), IS_KICKED_PLAYER
+            StepParameter::GotoLabelOnFailure(v) => { self.goto_label_on_failure = v.clone(); true }
+            StepParameter::GotoLabelOnSuccess(v) => { self.goto_label_on_success = v.clone(); true }
             StepParameter::ThrownPlayerId(v) => { self.thrown_player_id = v.clone(); true }
             StepParameter::IsKickedPlayer(v) => { self.is_kicked = *v; true }
             _ => false,

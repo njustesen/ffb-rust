@@ -1,3 +1,4 @@
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::report::mixed::report_argue_the_call_roll::ReportArgueTheCallRoll;
 use ffb_model::report::report_id::ReportId;
@@ -39,6 +40,16 @@ impl StepBribes {
 
 impl Step for StepBribes {
     fn id(&self) -> StepId { StepId::Bribes }
+
+    // Java: init(StepParameterSet) reads GOTO_LABEL_ON_END (mandatory init param). Without
+    // accepting it the label stayed empty and the success path did goto(""), silently
+    // draining the whole step stack and ending the game mid-foul.
+    fn set_parameter(&mut self, param: &StepParameter) -> bool {
+        match param {
+            StepParameter::GotoLabelOnEnd(v) => { self.goto_label_on_end = v.clone(); true }
+            _ => false,
+        }
+    }
 
     fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         self.execute_step(game, rng)
@@ -97,14 +108,27 @@ impl StepBribes {
                     false,
                     0,
                 ));
+                // Coverage: one ArgueTheCall event per argue roll (success + failure).
+                let argue_event = GameEvent::ArgueTheCall {
+                    player_id: fouler_id.clone(),
+                    roll,
+                    success: successful,
+                };
                 if successful {
                     self.bribes_choice = Some(false);
                     let label = self.goto_label_on_end.clone();
                     return StepOutcome::goto(&label)
+                        .with_event(argue_event)
                         .publish(StepParameter::FoulerHasBall(fouler_has_ball))
                         .publish(StepParameter::ArgueTheCallSuccessful(true))
                         .publish(StepParameter::EndTurn(true));
                 }
+                // Argue failed → fouler ejected below; attach the roll event to that outcome.
+                return StepOutcome::next()
+                    .with_event(argue_event)
+                    .publish(StepParameter::FoulerHasBall(fouler_has_ball))
+                    .publish(StepParameter::ArgueTheCallSuccessful(false))
+                    .publish(StepParameter::EndTurn(true));
             } else {
                 // Coach already banned — argue is skipped, auto-eject.
                 self.argue_the_call_successful = Some(false);

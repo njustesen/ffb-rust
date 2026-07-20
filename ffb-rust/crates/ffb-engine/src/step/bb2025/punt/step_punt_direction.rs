@@ -58,6 +58,8 @@ impl Step for StepPuntDirection {
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
+            // Java init(): GOTO_LABEL_ON_END
+            StepParameter::GotoLabelOnEnd(v) => { self.goto_label_on_end = v.clone(); true }
             StepParameter::CoordinateTo(c) => { self.coordinate_to = Some(*c); true }
             StepParameter::CoordinateFrom(c) => { self.coordinate_from = Some(*c); true }
             StepParameter::Touchback(v) => { self.out_of_bounds = *v; true }

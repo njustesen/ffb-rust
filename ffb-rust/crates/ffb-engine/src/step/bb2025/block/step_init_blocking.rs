@@ -90,6 +90,10 @@ impl Step for StepInitBlocking {
             StepParameter::UsingVomit(v) => { self.using_vomit = *v; true }
             StepParameter::UsingBreatheFire(v) => { self.using_breathe_fire = *v; true }
             StepParameter::UsingChomp(v) => { self.using_chomp = *v; true }
+            // Java init(): MULTI_BLOCK_DEFENDER_ID, ASK_FOR_BLOCK_KIND, PUBLISH_DEFENDER
+            StepParameter::MultiBlockDefenderId(v) => { self.multi_block_defender_id = v.clone(); true }
+            StepParameter::AskForBlockKind(v) => { self.ask_for_block_kind = *v; true }
+            StepParameter::PublishDefender(v) => { self.publish_defender = *v; true }
             StepParameter::EndPlayerAction(v) => { self.end_player_action = *v; true }
             StepParameter::EndTurn(v) => { self.end_turn = *v; true }
             _ => false,

@@ -1,4 +1,5 @@
 use ffb_model::enums::PlayerAction;
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::skill_use::SkillUse;
@@ -35,6 +36,10 @@ pub struct StepInitSelecting {
     pub end_player_action: bool,
     /// Java: forceGotoOnDispatch
     pub force_goto_on_dispatch: bool,
+    /// Java: fUpdatePersistence (mandatory init param UPDATE_PERSISTENCE) — Java stores it
+    /// purely to decide whether to persist the game state on start(); persistence is not
+    /// modeled in this crate, so the value is stored but unused.
+    pub update_persistence: bool,
 }
 
 impl StepInitSelecting {
@@ -45,6 +50,7 @@ impl StepInitSelecting {
             end_turn: false,
             end_player_action: false,
             force_goto_on_dispatch: false,
+            update_persistence: false,
         }
     }
 }
@@ -53,13 +59,30 @@ impl Step for StepInitSelecting {
     fn id(&self) -> StepId { StepId::InitSelecting }
 
     fn start(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        // Rust bridging for Java's UtilActingPlayer.changeActingPlayer: Java deactivates the
+        // previous acting player when the NEXT one is selected and leaves "already activated
+        // this turn" tracking to the coach; here the engine records the finished activation
+        // (turn_data.acted_player_ids feeds legal_activate_player_actions) when selection
+        // resumes, so the eligible list shrinks for every agent. hasActed() is Java's
+        // computed getter (moved || fouled || blocked || passed || triggeredEffect || forgone).
+        if game.acting_player.player_id.is_some() {
+            let acted = game.acting_player.has_moved
+                || game.acting_player.has_fouled
+                || game.acting_player.has_blocked
+                || game.acting_player.has_passed
+                || game.acting_player.has_triggered_effect
+                || game.acting_player.forgone;
+            if acted {
+                if let Some(pid) = game.acting_player.player_id.clone() {
+                    let td = if game.home_playing { &mut game.turn_data_home } else { &mut game.turn_data_away };
+                    if !td.acted_player_ids.contains(&pid) { td.acted_player_ids.push(pid); }
+                }
+            }
+            game.acting_player.clear();
+        }
         // Java start() only updates persistence — it does NOT call executeStep().
         // Emit the activation prompt so the agent knows which players are available.
-        let team = if game.home_playing { &game.team_home } else { &game.team_away };
-        let eligible: Vec<_> = team.players.iter()
-            .filter(|p| game.field_model.player_coordinate(&p.id).is_some())
-            .map(|p| (p.id.clone(), vec![PlayerAction::Move]))
-            .collect();
+        let eligible = crate::legal_actions::eligible_players_for_activation(game);
         StepOutcome::cont()
             .with_prompt(AgentPrompt::ActivatePlayer { eligible_players: eligible })
     }
@@ -81,8 +104,20 @@ impl Step for StepInitSelecting {
                     PlayerActionChoice::Block | PlayerActionChoice::Blitz
                 );
                 self.dispatch_player_action = Some(pa);
+                // Java: if (playerAction.isMoving() || playerAction.isStandingUp())
+                //   UtilServerPlayerMove.updateMoveSquares(getGameState(), actingPlayer.isJumping())
+                // — computes per-square dodging/GFI flags for the fresh activation. Without this
+                // the MoveSquare table stays empty, StepInitMoving never sets
+                // acting_player.dodging, and no dodge is ever rolled.
+                if pa.is_moving() || game.acting_player.standing_up {
+                    crate::util::UtilServerPlayerMove::update_move_squares(game, game.acting_player.jumping);
+                }
                 // Java: checkForStaller() called after CLIENT_ACTIVATE_PLAYER
                 Self::check_for_staller(game);
+                // Java: UtilServerGame.changePlayerAction syncs the activation to clients;
+                // coverage counts activations per action type via GameEvent::PlayerAction.
+                return self.execute_step(game, rng)
+                    .with_event(GameEvent::PlayerAction { player_id: player_id.clone(), action: pa });
             }
             // Java: CLIENT_USE_SKILL — selected skills that are resolved immediately (SKIP_STEP).
             Action::UseSkill { skill_id, use_skill: true } => {
@@ -131,6 +166,8 @@ impl Step for StepInitSelecting {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             StepParameter::GotoLabelOnEnd(v) => { self.goto_label_on_end = v.clone(); true }
+            // Java init(): UPDATE_PERSISTENCE (mandatory; stored for persistence only)
+            StepParameter::UpdatePersistence(v) => { self.update_persistence = *v; true }
             StepParameter::EndTurn(v) => { self.end_turn = *v; true }
             StepParameter::EndPlayerAction(v) => { self.end_player_action = *v; true }
             _ => false,
@@ -169,22 +206,40 @@ impl StepInitSelecting {
         if let Some(dispatch) = self.dispatch_player_action {
             if game.acting_player.player_id.is_some() {
                 let standing_up = game.acting_player.standing_up;
-                let outcome = StepOutcome::next()
-                    .publish(StepParameter::DispatchPlayerAction(Some(dispatch)));
-                if standing_up && !self.force_goto_on_dispatch {
-                    return outcome;
-                } else {
-                    return StepOutcome::goto(label)
-                        .publish(StepParameter::DispatchPlayerAction(Some(dispatch)));
+                // Rust bridging: the agent chose its target at activation time
+                // (Action::ActivatePlayer.block_defender_id → game.defender_id), whereas Java's
+                // client sends it later via CLIENT_BLOCK/CLIENT_FOUL/CLIENT_PASS/CLIENT_HAND_OVER.
+                // Thread it through to StepEndSelecting so the pushed action sequence starts with
+                // the target already set instead of waiting forever for a command nothing sends.
+                let mut target_params: Vec<StepParameter> = Vec::new();
+                if let Some(def) = game.defender_id.clone() {
+                    match dispatch {
+                        PlayerAction::Block | PlayerAction::Blitz => {
+                            target_params.push(StepParameter::BlockDefenderId(def));
+                        }
+                        PlayerAction::Foul => {
+                            target_params.push(StepParameter::FoulDefenderId(def));
+                        }
+                        PlayerAction::Pass | PlayerAction::HandOver => {
+                            if let Some(coord) = game.field_model.player_coordinate(&def) {
+                                target_params.push(StepParameter::TargetCoordinate(coord));
+                            }
+                        }
+                        _ => {}
+                    }
                 }
+                let mut outcome = if standing_up && !self.force_goto_on_dispatch {
+                    StepOutcome::next()
+                } else {
+                    StepOutcome::goto(label)
+                };
+                outcome = outcome.publish(StepParameter::DispatchPlayerAction(Some(dispatch)));
+                for p in target_params { outcome = outcome.publish(p); }
+                return outcome;
             }
         }
         // Waiting: build activation prompt
-        let team = if game.home_playing { &game.team_home } else { &game.team_away };
-        let eligible: Vec<_> = team.players.iter()
-            .filter(|p| game.field_model.player_coordinate(&p.id).is_some())
-            .map(|p| (p.id.clone(), vec![PlayerAction::Move]))
-            .collect();
+        let eligible = crate::legal_actions::eligible_players_for_activation(game);
         StepOutcome::cont()
             .with_prompt(AgentPrompt::ActivatePlayer { eligible_players: eligible })
     }
