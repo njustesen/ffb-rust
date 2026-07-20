@@ -76,12 +76,24 @@ impl Step for StepInitInducement {
 }
 
 impl StepInitInducement {
-    fn execute_step(&self, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // no-op: InducementType routing, sequence generators (Wizard/ThrowARock/WeatherMage) — requires InducementTypeFactory; headless skips all inducement sequences
         let phase = match self.inducement_phase {
             Some(p) => p,
             None => return StepOutcome::next(),
         };
+        // Java findUseableInducements() side effects — see the bb2025 StepInitInducement for
+        // the full rationale: BETWEEN_TURNS + the END_OF_OPPONENT_TURN home_playing handover
+        // are load-bearing parts of the turn-handover flip chain.
+        self.touchdown_or_end_of_half = crate::step::util_server_steps::check_touchdown(game);
+        if matches!(phase, InducementPhase::EndOfOwnTurn | InducementPhase::EndOfOpponentTurn)
+            && !self.touchdown_or_end_of_half
+        {
+            game.turn_mode = ffb_model::enums::TurnMode::BetweenTurns;
+            if phase == InducementPhase::EndOfOpponentTurn && self.home_team != game.home_playing {
+                game.home_playing = !game.home_playing;
+            }
+        }
         StepOutcome::next()
             .publish(StepParameter::EndInducementPhase(true))
             .publish(StepParameter::HomeTeam(self.home_team))

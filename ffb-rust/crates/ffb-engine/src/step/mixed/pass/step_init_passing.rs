@@ -25,12 +25,34 @@ pub struct StepInitPassing {
     pub end_turn: bool,
     /// Java: `fEndPlayerAction`
     pub end_player_action: bool,
+    /// Rust bridging: the pass target the agent chose at activation time, threaded through the
+    /// Pass generator's TARGET_COORDINATE init param. Java instead receives a CLIENT_PASS command
+    /// carrying this coordinate; consuming the param here plays that command's role.
+    pub target_coordinate: Option<ffb_model::types::FieldCoordinate>,
 }
 
 impl StepInitPassing {
     pub fn new() -> Self { Self::default() }
 
     fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
+        // Rust bridging: a TARGET_COORDINATE init param stands in for Java's CLIENT_PASS
+        // command — apply the same state setup its handler performs. Java sets the thrower
+        // UNCONDITIONALLY (dump-off → defender, else acting player); only overwriting when
+        // unset left a stale thrower from an earlier pass in the same turn, which made
+        // StepEndPassing treat the current activation as a foreign dump-off and end the game.
+        if let Some(coord) = self.target_coordinate.take() {
+            game.pass_coordinate = Some(coord);
+            self.catcher_id = game.field_model.player_at(coord).cloned();
+            let is_dump_off = game.defender_id.is_some()
+                && game.defender_action == Some(ffb_model::enums::PlayerAction::DumpOff);
+            if is_dump_off {
+                game.thrower_id = game.defender_id.clone();
+                game.thrower_action = game.defender_action;
+            } else {
+                game.thrower_id = game.acting_player.player_id.clone();
+                game.thrower_action = game.acting_player.player_action;
+            }
+        }
         // Java: if (game.getThrower() == null || game.getThrowerAction() == null) { return; }
         if game.thrower_id.is_none() || game.thrower_action.is_none() {
             return StepOutcome::cont();
@@ -168,6 +190,7 @@ impl Step for StepInitPassing {
             StepParameter::CatcherId(v)          => { self.catcher_id = v.clone(); true }
             StepParameter::EndTurn(v)            => { self.end_turn = *v; true }
             StepParameter::EndPlayerAction(v)    => { self.end_player_action = *v; true }
+            StepParameter::TargetCoordinate(v)   => { self.target_coordinate = Some(*v); true }
             _ => false,
         }
     }

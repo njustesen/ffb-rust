@@ -17,8 +17,15 @@ pub fn start_game_sequence() -> Vec<SequenceStep> {
         SequenceStep::new(StepId::KickoffScatterRoll),
         SequenceStep::new(StepId::KickoffResultRoll),
         SequenceStep::new(StepId::ApplyKickoffResult),
+        // Java Kickoff generator: KICKOFF_ANIMATION between APPLY_KICKOFF_RESULT and
+        // CATCH_SCATTER_THROW_IN — it sets ballInPlay(true) and publishes the CATCH_KICKOFF
+        // mode. Omitting it left ball_in_play false for the entire drive, which silently
+        // disabled every pickup/catch roll (StepPickUp guards on ball_in_play).
+        SequenceStep::new(StepId::KickoffAnimation),
         SequenceStep::new(StepId::CatchScatterThrowIn),
         SequenceStep::new(StepId::Touchback),
+        // Java: a second CATCH_SCATTER_THROW_IN resolves the post-touchback ball placement.
+        SequenceStep::new(StepId::CatchScatterThrowIn),
         SequenceStep::new(StepId::EndKickoff),
     ]
 }
@@ -62,8 +69,12 @@ pub fn h2_kickoff_sequence() -> Vec<SequenceStep> {
         SequenceStep::new(StepId::KickoffScatterRoll),
         SequenceStep::new(StepId::KickoffResultRoll),
         SequenceStep::new(StepId::ApplyKickoffResult),
+        // See start_game_sequence: KICKOFF_ANIMATION sets ballInPlay(true) (pickups/catches
+        // are dead without it), and the touchback resolves via a second CST step.
+        SequenceStep::new(StepId::KickoffAnimation),
         SequenceStep::new(StepId::CatchScatterThrowIn),
         SequenceStep::new(StepId::Touchback),
+        SequenceStep::new(StepId::CatchScatterThrowIn),
         SequenceStep::new(StepId::EndKickoff),
     ]
 }
