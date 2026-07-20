@@ -428,8 +428,53 @@ impl DriverGameState {
     }
 
     pub fn new(home: Team, away: Team, rules: Rules, seed: u64) -> Self {
+        Self::new_with_options(home, away, rules, seed, &[])
+    }
+
+    /// As `new_with_options`, but pushes the **edition-aware** generator start-game
+    /// sequence (`generator::{bb2016,bb2020,bb2025}::start_game::StartGame::build_sequence()`
+    /// — `InitStartGame` → `Spectators`/`Weather` → `PettyCash` → `BuyInducements`/
+    /// `BuyCards`+`BuyInducements`/`BuyCardsAndInducements`, which then dynamically push
+    /// their own Kickoff/CoinChoice sequence) instead of `sequences::start_game_sequence()`'s
+    /// flattened, PettyCash/BuyInducements-skipping pregame (`InitStartGame` → `Spectators`
+    /// → `Weather` → `CoinChoice` → `ReceiveChoice` → `InitKickoff` → ... directly).
+    ///
+    /// `new`/`new_with_options` deliberately keep the flattened sequence — it's what the
+    /// Java-parity RNG contract (`AGENT_CONTRACT.md`) and `RandomAgent` were built and
+    /// verified against, and changing dice/prompt ordering there would desync byte-for-byte
+    /// parity tests. This constructor exists for callers that need the *real* pregame flow
+    /// (petty cash + inducement purchasing actually reachable) and don't need Java-parity
+    /// RNG-stream sync — e.g. `UniformAgent`-driven mechanic-coverage runs.
+    pub fn new_full_pregame(home: Team, away: Team, rules: Rules, seed: u64, options: &[(&str, &str)]) -> Self {
+        let mut game = Game::new(home, away, rules);
+        for (key, value) in options { game.options.set(*key, *value); }
+        let mut gs = DriverGameState::from_game(game, seed);
+        gs.initial_hash = state_hash(&gs.game);
+        let seq = match rules {
+            Rules::Bb2016 => crate::step::generator::bb2016::start_game::StartGame::build_sequence(),
+            Rules::Bb2020 => crate::step::generator::bb2020::start_game::StartGame::build_sequence(),
+            Rules::Bb2025 | Rules::Common => crate::step::generator::bb2025::start_game::StartGame::build_sequence(),
+        };
+        gs.stack.push_sequence(seq);
+        gs.run_until_prompt();
+        // Same rationale as `new_with_options`: synthesize both CLIENT_START_GAME sends so
+        // construction doesn't stall on the InitStartGame handshake.
+        gs.apply_action(Action::StartGame { home: true });
+        gs.apply_action(Action::StartGame { home: false });
+        gs
+    }
+
+    /// As `new`, but applies `options` (game-option id → value string, e.g.
+    /// `[("inducements", "true")]`) to the freshly-built `Game` before driving the
+    /// pregame — `Game::new` starts every option unset/disabled (mirrors Java's
+    /// per-ruleset option config, which this synchronous single-process constructor
+    /// has no ruleset-loader hook to apply), so callers that need a specific option
+    /// enabled from the very first step (e.g. `INDUCEMENTS`, so `StepBuyInducements`
+    /// actually fires) must set it before the pregame sequence runs, not after.
+    pub fn new_with_options(home: Team, away: Team, rules: Rules, seed: u64, options: &[(&str, &str)]) -> Self {
         use crate::step::sequences::start_game_sequence;
-        let game = Game::new(home, away, rules);
+        let mut game = Game::new(home, away, rules);
+        for (key, value) in options { game.options.set(*key, *value); }
         let mut gs = DriverGameState::from_game(game, seed);
         gs.initial_hash = state_hash(&gs.game);
         gs.stack.push_sequence(start_game_sequence());

@@ -20,6 +20,7 @@
 use std::collections::HashMap;
 use ffb_model::data::loader::{find_position, BB2016_INDUCEMENTS};
 use ffb_model::enums::{InducementPhase, PlayerType, PlayerState, PS_RESERVE};
+use ffb_model::events::GameEvent;
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
 use ffb_model::model::player::Player;
@@ -361,28 +362,35 @@ impl Step for StepBuyInducements {
         //   add_star_players and add_mercenaries are implemented but the call-site requires
         //   extended action fields not yet present in the Rust action model (star players / staff
         //   are out of scope for this pass — see module docs).
+        let mut events = Vec::new();
         if let Action::BuyInducements { home, purchases } = action {
-            if *home {
-                self.gold_used_home += apply_purchases(
+            let team_id = if *home { game.team_home.id.clone() } else { game.team_away.id.clone() };
+            let (spent, applied) = if *home {
+                apply_purchases(
                     &BB2016_INDUCEMENTS.inducements,
                     &mut game.team_home,
                     &mut game.turn_data_home.inducement_set,
                     purchases,
                     self.inducement_gold_home - self.gold_used_home,
-                );
-                self.inducements_selected_home = true;
+                )
             } else {
-                self.gold_used_away += apply_purchases(
+                apply_purchases(
                     &BB2016_INDUCEMENTS.inducements,
                     &mut game.team_away,
                     &mut game.turn_data_away.inducement_set,
                     purchases,
                     self.inducement_gold_away - self.gold_used_away,
-                );
-                self.inducements_selected_away = true;
+                )
+            };
+            if *home { self.gold_used_home += spent; self.inducements_selected_home = true; }
+            else { self.gold_used_away += spent; self.inducements_selected_away = true; }
+            for (id, count) in applied {
+                events.push(GameEvent::BuyInducement { team_id: team_id.clone(), inducement_id: id, count });
             }
         }
-        self.execute_step(game)
+        let mut out = self.execute_step(game);
+        for ev in events { out = out.with_event(ev); }
+        out
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {

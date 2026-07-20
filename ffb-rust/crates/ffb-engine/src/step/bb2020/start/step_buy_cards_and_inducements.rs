@@ -33,6 +33,7 @@
 use std::collections::HashMap;
 use ffb_model::data::loader::{find_position, BB2020_INDUCEMENTS};
 use ffb_model::enums::{InducementPhase, PlayerType, PlayerState, PS_RESERVE};
+use ffb_model::events::GameEvent;
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
 use ffb_model::model::player::Player;
@@ -181,18 +182,23 @@ impl StepBuyCardsAndInducements {
 
     /// Java: `handleBuyInducements(Game, ClientCommandBuyInducements)` — applies the purchase
     /// list against the catalog (star players / mercenaries / infamous staff / cards are
-    /// handled via separate action fields not modeled here — see module docs).
-    fn apply_purchase(&mut self, game: &mut Game, home: bool, purchases: &[crate::action::InducementPurchase]) {
+    /// handled via separate action fields not modeled here — see module docs). Returns a
+    /// `GameEvent::BuyInducement` per inducement id actually purchased.
+    fn apply_purchase(&mut self, game: &mut Game, home: bool, purchases: &[crate::action::InducementPurchase]) -> Vec<GameEvent> {
         let catalog = &BB2020_INDUCEMENTS.inducements;
-        if home {
+        let (team_id, spent, applied) = if home {
             let budget = self.available_inducement_gold_home.unwrap_or(0) - self.used_inducement_gold_home;
-            let spent = apply_purchases(catalog, &mut game.team_home, &mut game.turn_data_home.inducement_set, purchases, budget);
-            self.used_inducement_gold_home += spent;
+            let (spent, applied) = apply_purchases(catalog, &mut game.team_home, &mut game.turn_data_home.inducement_set, purchases, budget);
+            (game.team_home.id.clone(), spent, applied)
         } else {
             let budget = self.available_inducement_gold_away.unwrap_or(0) - self.used_inducement_gold_away;
-            let spent = apply_purchases(catalog, &mut game.team_away, &mut game.turn_data_away.inducement_set, purchases, budget);
-            self.used_inducement_gold_away += spent;
-        }
+            let (spent, applied) = apply_purchases(catalog, &mut game.team_away, &mut game.turn_data_away.inducement_set, purchases, budget);
+            (game.team_away.id.clone(), spent, applied)
+        };
+        if home { self.used_inducement_gold_home += spent; } else { self.used_inducement_gold_away += spent; }
+        applied.into_iter()
+            .map(|(id, count)| GameEvent::BuyInducement { team_id: team_id.clone(), inducement_id: id, count })
+            .collect()
     }
 
     /// Java: `init(Game game)` — determine who has petty cash and set initial phase.
@@ -702,10 +708,13 @@ impl Step for StepBuyCardsAndInducements {
         //     if parallel: buffer command
         //     else: handleBuyInducements + addReport
         //     EXECUTE_STEP
+        let mut events = Vec::new();
         if let Action::BuyInducements { home, purchases } = action {
-            self.apply_purchase(game, *home, purchases);
+            events = self.apply_purchase(game, *home, purchases);
         }
-        self.execute_step(game, rng)
+        let mut out = self.execute_step(game, rng);
+        for ev in events { out = out.with_event(ev); }
+        out
     }
 
     fn set_parameter(&mut self, _param: &StepParameter) -> bool { false }

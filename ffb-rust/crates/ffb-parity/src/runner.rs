@@ -13,6 +13,7 @@ use ffb_model::model::player::Player;
 use ffb_model::model::roster_position::RosterPosition;
 use ffb_model::model::team::Team;
 use ffb_model::prompts::AgentPrompt;
+use ffb_model::option::game_option_id::INDUCEMENTS;
 use crate::log_format::{GameLog, LogLine, java_log_path_for, rust_log_path_for, rust_events_path_for};
 use crate::state_hash::state_hash;
 use ffb_model::util::state_hash::state_string;
@@ -732,7 +733,15 @@ pub fn run_uniform_game(
     let rules = edition_to_rules(edition);
     let home = make_team(home_roster, "home", edition);
     let away = make_team(away_roster, "away", edition);
-    let mut engine = GameState::new(home, away, rules, seed);
+    // `GameState::new`/`new_with_options` drive the flattened pregame
+    // (`sequences::start_game_sequence()`) that the Java-parity RNG contract depends on —
+    // it skips PettyCash/BuyInducements entirely. `new_full_pregame` uses the real,
+    // edition-aware generator sequence so PettyCash/BuyInducements actually run; combined
+    // with enabling INDUCEMENTS (every option starts disabled — no ruleset-loader hook at
+    // this synchronous layer), `StepBuyInducements` now actually fires instead of
+    // auto-skipping to DONE. This is the whole point of a "uniform sampling including
+    // inducements" run.
+    let mut engine = GameState::new_full_pregame(home, away, rules, seed, &[(INDUCEMENTS, "true")]);
 
     let mut home_agent = UniformAgent::new(seed);
     let mut away_agent = UniformAgent::new(seed ^ 0xFFFF_FFFF);

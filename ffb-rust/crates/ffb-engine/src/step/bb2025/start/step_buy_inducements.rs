@@ -31,6 +31,7 @@
 /// prompt at a time. This is a known, narrower-path simplification.
 use ffb_model::data::loader::BB2025_INDUCEMENTS;
 use ffb_model::enums::InducementPhase;
+use ffb_model::events::GameEvent;
 use ffb_model::inducement::inducement::Inducement as InducementModel;
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
@@ -198,13 +199,16 @@ impl StepBuyInducements {
 
     /// Java: `handleTeamInducements(TurnData, Team, ClientCommandBuyInducements, int)` —
     /// extracts the Prayers of Nuffle purchase (tracked separately, see module docs) and
-    /// applies the remaining purchases via the shared catalog helper.
-    fn apply_purchase(&mut self, game: &mut Game, home: bool, purchases: &[InducementPurchase]) {
+    /// applies the remaining purchases via the shared catalog helper. Returns a
+    /// `GameEvent::BuyInducement` per inducement id actually purchased (including "prayers"),
+    /// so coverage tooling can see that a purchase happened.
+    fn apply_purchase(&mut self, game: &mut Game, home: bool, purchases: &[InducementPurchase]) -> Vec<GameEvent> {
         let (prayer_purchases, other_purchases): (Vec<_>, Vec<_>) =
             purchases.iter().cloned().partition(|p| p.id == "prayers");
         let catalog = &BB2025_INDUCEMENTS.inducements;
         let prayers_def = catalog.iter().find(|d| d.id == "prayers");
 
+        let team_id = if home { game.team_home.id.clone() } else { game.team_away.id.clone() };
         let (team, turn_inducement_set, gold_used, gold_available, prayers_bought) = if home {
             (&mut game.team_home, &mut game.turn_data_home.inducement_set,
              &mut self.used_inducement_gold_home, self.available_inducement_gold_home,
@@ -216,6 +220,7 @@ impl StepBuyInducements {
         };
 
         let mut budget = gold_available.unwrap_or(0) - *gold_used;
+        let mut events = Vec::new();
 
         if let (Some(def), Some(purchase)) = (prayers_def, prayer_purchases.first()) {
             let room = (def.max_count - *prayers_bought).max(0);
@@ -229,11 +234,18 @@ impl StepBuyInducements {
                 budget -= cost;
                 *gold_used += cost;
                 team.treasury = (team.treasury - cost).max(0);
+                events.push(GameEvent::BuyInducement {
+                    team_id: team_id.clone(), inducement_id: "prayers".to_string(), count: qty as u32,
+                });
             }
         }
 
-        let spent = apply_purchases(catalog, team, turn_inducement_set, &other_purchases, budget);
+        let (spent, applied) = apply_purchases(catalog, team, turn_inducement_set, &other_purchases, budget);
         *gold_used += spent;
+        for (id, count) in applied {
+            events.push(GameEvent::BuyInducement { team_id: team_id.clone(), inducement_id: id, count });
+        }
+        events
     }
 
     /// Java: `leaveStep()` — push sequences, record gold spent / prayers bought, NEXT_STEP.
@@ -330,10 +342,13 @@ impl Step for StepBuyInducements {
     fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: CLIENT_BUY_INDUCEMENTS → handleBuyInducements (or buffer, in parallel mode).
         // headless: parallel-mode buffering not implemented — see module docs.
+        let mut events = Vec::new();
         if let Action::BuyInducements { home, purchases } = action {
-            self.apply_purchase(game, *home, purchases);
+            events = self.apply_purchase(game, *home, purchases);
         }
-        self.execute_step(game)
+        let mut out = self.execute_step(game);
+        for ev in events { out = out.with_event(ev); }
+        out
     }
 
     fn set_parameter(&mut self, _param: &StepParameter) -> bool { false }

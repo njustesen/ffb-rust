@@ -66,7 +66,7 @@ fn existing_qty(def: &InducementJson, team: &Team, inducement_set: &InducementSe
     }
 }
 
-fn apply_one(def: &InducementJson, requested: i32, remaining_budget: i32, team: &mut Team, inducement_set: &mut InducementSet) -> i32 {
+fn apply_one(def: &InducementJson, requested: i32, remaining_budget: i32, team: &mut Team, inducement_set: &mut InducementSet) -> (i32, u32) {
     let existing = existing_qty(def, team, inducement_set);
     let room = (def.max_count - existing).max(0);
     let mut qty = requested.min(room);
@@ -74,7 +74,7 @@ fn apply_one(def: &InducementJson, requested: i32, remaining_budget: i32, team: 
         qty = qty.min(remaining_budget / def.cost);
     }
     if qty <= 0 {
-        return 0;
+        return (0, 0);
     }
     let cost = def.cost * qty;
     team.treasury = (team.treasury - cost).max(0);
@@ -90,32 +90,36 @@ fn apply_one(def: &InducementJson, requested: i32, remaining_budget: i32, team: 
             inducement_set.add_inducement(Inducement::new(def.id.clone(), existing + qty, usages));
         }
     }
-    cost
+    (cost, qty as u32)
 }
 
 /// Applies a full purchase list (as received via `Action::BuyInducements`) against `team` and
 /// its `inducement_set`, in order, each purchase's affordability checked against the remaining
 /// budget after prior purchases in the same list. Purchases for ids not in the buyable catalog
-/// (unknown id, or gated out for this team) are skipped. Returns the total gold spent.
+/// (unknown id, or gated out for this team) are skipped. Returns the total gold spent plus the
+/// `(inducement_id, quantity)` actually applied for each purchase that resulted in a nonzero
+/// quantity — callers use this to emit `GameEvent::BuyInducement` for coverage tracking.
 pub fn apply_purchases(
     catalog: &[InducementJson],
     team: &mut Team,
     inducement_set: &mut InducementSet,
     purchases: &[InducementPurchase],
     budget: i32,
-) -> i32 {
+) -> (i32, Vec<(String, u32)>) {
     let mut remaining = budget;
     let mut spent = 0;
+    let mut applied = Vec::new();
     for purchase in purchases {
         let def = match catalog.iter().find(|d| d.id == purchase.id) {
             Some(d) if is_available_for_team(d, team) => d,
             _ => continue,
         };
-        let cost = apply_one(def, purchase.count as i32, remaining, team, inducement_set);
+        let (cost, qty) = apply_one(def, purchase.count as i32, remaining, team, inducement_set);
         remaining -= cost;
         spent += cost;
+        if qty > 0 { applied.push((def.id.clone(), qty)); }
     }
-    spent
+    (spent, applied)
 }
 
 #[cfg(test)]
@@ -173,7 +177,7 @@ mod tests {
         let mut team = make_team();
         let mut set = InducementSet::new();
         let purchases = vec![InducementPurchase { id: "bribes".into(), count: 2 }];
-        let spent = apply_purchases(&BB2016_INDUCEMENTS.inducements, &mut team, &mut set, &purchases, 1_000_000);
+        let (spent, _applied) = apply_purchases(&BB2016_INDUCEMENTS.inducements, &mut team, &mut set, &purchases, 1_000_000);
         assert_eq!(spent, 200_000);
         assert_eq!(team.bribes, 2);
         assert_eq!(team.treasury, 800_000);
@@ -185,7 +189,7 @@ mod tests {
         let mut set = InducementSet::new();
         // bribes max_count is 3.
         let purchases = vec![InducementPurchase { id: "bribes".into(), count: 10 }];
-        let spent = apply_purchases(&BB2016_INDUCEMENTS.inducements, &mut team, &mut set, &purchases, 10_000_000);
+        let (spent, _applied) = apply_purchases(&BB2016_INDUCEMENTS.inducements, &mut team, &mut set, &purchases, 10_000_000);
         assert_eq!(team.bribes, 3);
         assert_eq!(spent, 300_000);
     }
@@ -196,7 +200,7 @@ mod tests {
         let mut set = InducementSet::new();
         // Only enough gold for 1 bribe (100,000).
         let purchases = vec![InducementPurchase { id: "bribes".into(), count: 3 }];
-        let spent = apply_purchases(&BB2016_INDUCEMENTS.inducements, &mut team, &mut set, &purchases, 150_000);
+        let (spent, _applied) = apply_purchases(&BB2016_INDUCEMENTS.inducements, &mut team, &mut set, &purchases, 150_000);
         assert_eq!(team.bribes, 1);
         assert_eq!(spent, 100_000);
     }
@@ -206,7 +210,7 @@ mod tests {
         let mut team = make_team();
         let mut set = InducementSet::new();
         let purchases = vec![InducementPurchase { id: "nonexistent".into(), count: 1 }];
-        let spent = apply_purchases(&BB2016_INDUCEMENTS.inducements, &mut team, &mut set, &purchases, 1_000_000);
+        let (spent, _applied) = apply_purchases(&BB2016_INDUCEMENTS.inducements, &mut team, &mut set, &purchases, 1_000_000);
         assert_eq!(spent, 0);
     }
 
@@ -215,7 +219,7 @@ mod tests {
         let mut team = make_team();
         let mut set = InducementSet::new();
         let purchases = vec![InducementPurchase { id: "igor".into(), count: 1 }];
-        let spent = apply_purchases(&BB2016_INDUCEMENTS.inducements, &mut team, &mut set, &purchases, 1_000_000);
+        let (spent, _applied) = apply_purchases(&BB2016_INDUCEMENTS.inducements, &mut team, &mut set, &purchases, 1_000_000);
         assert_eq!(spent, 0);
         assert!(set.get("igor").is_none());
     }
@@ -225,7 +229,7 @@ mod tests {
         let mut team = make_team();
         let mut set = InducementSet::new();
         let purchases = vec![InducementPurchase { id: "wizard".into(), count: 1 }];
-        let spent = apply_purchases(&BB2016_INDUCEMENTS.inducements, &mut team, &mut set, &purchases, 1_000_000);
+        let (spent, _applied) = apply_purchases(&BB2016_INDUCEMENTS.inducements, &mut team, &mut set, &purchases, 1_000_000);
         assert_eq!(spent, 150_000);
         assert_eq!(set.get("wizard").map(|i| i.get_value()), Some(1));
         assert!(set.get("wizard").unwrap().has_usage(Usage::SPELL));
@@ -249,7 +253,7 @@ mod tests {
             InducementPurchase { id: "bribes".into(), count: 1 }, // 100,000
             InducementPurchase { id: "halflingMasterChef".into(), count: 1 }, // 300,000
         ];
-        let spent = apply_purchases(&BB2016_INDUCEMENTS.inducements, &mut team, &mut set, &purchases, 350_000);
+        let (spent, _applied) = apply_purchases(&BB2016_INDUCEMENTS.inducements, &mut team, &mut set, &purchases, 350_000);
         // bribes fits (100,000 spent, 250,000 left); master chef (300,000) doesn't fit remaining 250,000.
         assert_eq!(spent, 100_000);
         assert_eq!(team.bribes, 1);
