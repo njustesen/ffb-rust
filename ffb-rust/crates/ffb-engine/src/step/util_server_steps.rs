@@ -22,11 +22,19 @@ pub fn check_command_with_acting_player(game: &Game, acting_player_id: &str) -> 
 }
 
 /// Java `changePlayerAction(IStep, String, PlayerAction, boolean)`.
-/// Updates the acting player in the game state.
+/// Updates the acting player in the game state, then recomputes move squares and
+/// dice decorations (Java: UtilServerPlayerMove.updateMoveSquares +
+/// ServerUtilBlock.updateDiceDecorations). Without the updateMoveSquares call the
+/// first square of every move had no MoveSquare data, so StepInitMoving never set
+/// actingPlayer.dodging and dodge rolls never fired.
 pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerAction, jumping: bool) {
     if !player_id.is_empty() {
         game.acting_player.set_player(player_id.to_owned(), action);
         game.acting_player.jumping = jumping;
+        // Java: UtilServerPlayerMove.updateMoveSquares(pStep.getGameState(), actingPlayer.isJumping());
+        crate::util::util_server_player_move::UtilServerPlayerMove::update_move_squares(game, jumping);
+        // Java: ServerUtilBlock.updateDiceDecorations(pStep.getGameState());
+        crate::util::server_util_block::ServerUtilBlock::update_dice_decorations(game);
     }
 }
 

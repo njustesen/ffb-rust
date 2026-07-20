@@ -66,9 +66,10 @@ impl StepApothecary {
         // Java: if (fInjuryResult.injuryContext().getApothecaryStatus() != null) { switch ... }
         match apo_status {
             ApothecaryStatus::DoRequest => {
+                let mut injury_event = None;
                 if self.show_report {
                     if let Some(ref mut ir) = self.injury_result {
-                        ir.report(game);
+                        injury_event = ir.report(game);
                     }
                 }
                 // Java: apothecaryTypes = ApothecaryType.forPlayer(game, defender, playerState)
@@ -80,10 +81,12 @@ impl StepApothecary {
                 self.injury_result.as_mut().unwrap().injury_context.apothecary_status =
                     ApothecaryStatus::WaitForApothecaryUse;
                 do_next_step = false;
-                return StepOutcome::cont().with_prompt(AgentPrompt::UseApothecary {
+                let mut out = StepOutcome::cont().with_prompt(AgentPrompt::UseApothecary {
                     player_id: defender_id,
                     apothecary_type: "team".to_string(),
                 });
+                if let Some(ev) = injury_event { out = out.with_event(ev); }
+                return out;
             }
             ApothecaryStatus::UseApothecary => {
                 // Java: if (rollApothecary()) { setStatus(WAIT_FOR_APOTHECARY_USE); doNextStep=false }
@@ -128,7 +131,9 @@ impl StepApothecary {
             ApothecaryStatus::NoApothecary => {
                 if self.show_report {
                     if let Some(ref mut ir) = self.injury_result {
-                        ir.report(game);
+                        if let Some(ev) = ir.report(game) {
+                            pending_events.push(ev);
+                        }
                     }
                 }
             }

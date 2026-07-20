@@ -215,6 +215,9 @@ impl StepPass {
         }
 
         // Java: state.setResult(mechanic.evaluatePass(thrower, roll, passingDistance, passModifiers, isBomb))
+        // A declined re-roll re-enters this step with the stored roll/result — only a
+        // freshly evaluated roll counts as a newly resolved roll for event emission.
+        let freshly_resolved = self.pass_result.is_none();
         if self.pass_result.is_none() {
             let result = if let Some(thrower) = game.thrower() {
                 if let Some(dist) = passing_dist {
@@ -255,8 +258,31 @@ impl StepPass {
             ));
         }
 
+        // Emit one GameEvent per resolved roll (monolith parity: initial roll and
+        // re-rolled resolution each produce their own PassRoll event; a declined
+        // re-roll reuses the stored result and emits nothing new).
+        let roll_event = if freshly_resolved {
+            use ffb_model::enums::PassOutcome;
+            let re_rolled = self.re_rolled_action.is_some() && self.re_roll_source.is_some();
+            Some(ffb_model::events::GameEvent::PassRoll {
+                player_id: thrower_id.clone(),
+                target: self.minimum_roll,
+                distance: passing_dist.unwrap_or(PassingDistance::LongBomb),
+                roll: self.roll,
+                result: match result {
+                    PassResult::ACCURATE => PassOutcome::Complete,
+                    PassResult::INACCURATE => PassOutcome::Inaccurate,
+                    PassResult::WILDLY_INACCURATE => PassOutcome::WildlyInaccurate,
+                    PassResult::FUMBLE | PassResult::SAVED_FUMBLE => PassOutcome::Fumble,
+                },
+                rerolled: re_rolled,
+            })
+        } else {
+            None
+        };
+
         // Java result routing:
-        match result {
+        let outcome = match result {
             PassResult::ACCURATE => {
                 // Java: fieldModel.setBallCoordinate(game.getPassCoordinate()) [or setBombCoordinate]
                 if let Some(pass_coord) = game.pass_coordinate {
@@ -294,7 +320,9 @@ impl StepPass {
                     if let Some(prompt) = ask_for_reroll_if_available(game, "PASS", self.minimum_roll, true) {
                         self.re_rolled_action = Some("PASS".into());
                         self.re_roll_source = Some("TRR".into());
-                        return StepOutcome::cont().with_prompt(prompt);
+                        let mut out = StepOutcome::cont().with_prompt(prompt);
+                        if let Some(ev) = roll_event { out = out.with_event(ev); }
+                        return out;
                     }
                 }
                 if let Some(tc) = thrower_coord {
@@ -318,7 +346,9 @@ impl StepPass {
                     if let Some(prompt) = ask_for_reroll_if_available(game, "PASS", self.minimum_roll, false) {
                         self.re_rolled_action = Some("PASS".into());
                         self.re_roll_source = Some("TRR".into());
-                        return StepOutcome::cont().with_prompt(prompt);
+                        let mut out = StepOutcome::cont().with_prompt(prompt);
+                        if let Some(ev) = roll_event { out = out.with_event(ev); }
+                        return out;
                     }
                 }
                 if let Some(pass_coord) = game.pass_coordinate {
@@ -333,6 +363,10 @@ impl StepPass {
                     .publish(StepParameter::CatcherId(None))
                     .publish(StepParameter::PassResultParam(ffb_model::enums::PassOutcome::Inaccurate))
             }
+        };
+        match roll_event {
+            Some(ev) => outcome.with_event(ev),
+            None => outcome,
         }
     }
 }

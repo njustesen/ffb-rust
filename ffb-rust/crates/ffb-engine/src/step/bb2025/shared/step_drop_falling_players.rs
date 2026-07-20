@@ -341,13 +341,14 @@ impl StepDropFallingPlayers {
                         .unwrap_or(false);
 
                 if piling_on_eligible {
-                    if let Some(ir) = self.injury_result_defender.as_deref_mut() {
-                        ir.report(game);
-                    }
-                    return StepOutcome::cont().with_prompt(AgentPrompt::PilingOn {
+                    let injury_event = self.injury_result_defender.as_deref_mut()
+                        .and_then(|ir| ir.report(game));
+                    let mut cont_out = StepOutcome::cont().with_prompt(AgentPrompt::PilingOn {
                         player_id: attacker_id.clone(),
                         target_id: defender_id.clone(),
                     });
+                    if let Some(ev) = injury_event { cont_out = cont_out.with_event(ev); }
+                    return cont_out;
                 }
             }
         }

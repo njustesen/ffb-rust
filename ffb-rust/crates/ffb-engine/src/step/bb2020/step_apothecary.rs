@@ -151,9 +151,10 @@ impl StepApothecary {
         if let Some(status) = status {
             match status {
                 ApothecaryStatus::DoRequest => {
+                    let mut injury_event = None;
                     if self.show_report {
                         if let Some(ref mut ir) = self.injury_result {
-                            ir.report(game);
+                            injury_event = ir.report(game);
                         }
                     }
                     // Java: showDialog(DialogUseApothecaryParameter)
@@ -163,6 +164,7 @@ impl StepApothecary {
                     // client-only: DialogUseApothecaryParameter — headless auto-accepts
                     do_next_step = false;
                     outcome = StepOutcome::cont();
+                    if let Some(ev) = injury_event { outcome = outcome.with_event(ev); }
                 }
                 ApothecaryStatus::UseApothecary => {
                     let (choice_shown, apo_event) = self.roll_apothecary(game, rng);
@@ -203,7 +205,9 @@ impl StepApothecary {
                 ApothecaryStatus::NoApothecary => {
                     if self.show_report {
                         if let Some(ref mut ir) = self.injury_result {
-                            ir.report(game);
+                            if let Some(ev) = ir.report(game) {
+                                outcome = outcome.with_event(ev);
+                            }
                         }
                     }
                 }
@@ -288,7 +292,11 @@ impl StepApothecary {
             } else {
                 vec![]
             };
+            // Preserve events already attached to the pre-apply outcome (Injury /
+            // ApothecaryRoll from the status switch above) — replacing the outcome
+            // wholesale would silently drop them.
             let mut out = StepOutcome::next();
+            for ev in outcome.events.drain(..) { out = out.with_event(ev); }
             for ev in side_events { out = out.with_event(ev); }
             outcome = out;
         }

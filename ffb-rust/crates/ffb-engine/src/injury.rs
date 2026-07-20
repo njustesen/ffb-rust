@@ -236,9 +236,11 @@ impl InjuryResult {
     pub fn passed_regeneration(&mut self) { self.pre_regeneration = false; }
 
     /// Java: `InjuryResult.report(IStep)` — delegates to `StateMechanic.reportInjury`.
-    pub fn report(&mut self, game: &mut ffb_model::model::game::Game) {
+    /// Returns the `GameEvent::Injury` for the report actually added (None when the
+    /// injury was already reported) so steps can attach it to their `StepOutcome`.
+    pub fn report(&mut self, game: &mut ffb_model::model::game::Game) -> Option<ffb_model::events::GameEvent> {
         let mechanic = crate::mechanic::state_mechanic_for(game.rules);
-        mechanic.report_injury(game, self);
+        mechanic.report_injury(game, self)
     }
 
     /// Java: InjuryResult.applyTo(IStep) — applies injury outcome to game state.

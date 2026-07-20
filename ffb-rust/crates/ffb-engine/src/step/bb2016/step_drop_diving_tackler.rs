@@ -29,14 +29,9 @@ impl StepDropDivingTackler {
         if self.using_diving_tackle {
             if let Some(defender_id) = game.defender_id.clone() {
                 if !defender_id.is_empty() {
+                    // Java: updatePlayerAndBallPosition
                     if let Some(coord) = self.coordinate_from {
-                        let old_coord = game.field_model.player_coordinate(&defender_id);
-                        game.field_model.set_player_coordinate(&defender_id, coord);
-                        if let Some(old) = old_coord {
-                            if game.field_model.ball_coordinate == Some(old) {
-                                game.field_model.ball_coordinate = Some(coord);
-                            }
-                        }
+                        game.field_model.update_player_and_ball_position(&defender_id, coord);
                         outcome = outcome.publish(StepParameter::PlayerEnteringSquare(defender_id.clone()));
                     }
 

@@ -240,7 +240,7 @@ impl StepPushback {
 /// PLAYER_ENTERING_SQUARE — unlike BB2025 it does NOT publish PLAYER_WAS_PUSHED.
 fn push_player(game: &mut Game, player_id: &str, coord: FieldCoordinate) -> Vec<StepParameter> {
     // Java: fieldModel.updatePlayerAndBallPosition(pPlayer, pCoordinate)
-    game.field_model.set_player_coordinate(player_id, coord);
+    game.field_model.update_player_and_ball_position(player_id, coord);
     UtilServerPlayerMove::update_move_squares(game, false);
 
     let mut params: Vec<StepParameter> = Vec::new();

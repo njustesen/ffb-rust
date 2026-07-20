@@ -231,15 +231,16 @@ impl InjuryResult {
     /// Java: `InjuryResult.report(IStep)` — delegates to `StateMechanic.reportInjury`.
     /// Note: step code uses `crate::injury::InjuryResult.report()` directly; this
     /// variant is kept for tests and legacy callers.
-    pub fn report(&mut self, game: &mut Game) {
+    pub fn report(&mut self, game: &mut Game) -> Option<ffb_model::events::GameEvent> {
         // Translate to the canonical InjuryResult used by the trait, emit, then sync back.
         let mut canonical = crate::injury::InjuryResult::new(self.injury_context.apothecary_mode);
         canonical.injury_context = self.injury_context.clone();
         canonical.already_reported = self.already_reported;
         canonical.pre_regeneration = self.pre_regeneration;
         let mechanic = crate::mechanic::state_mechanic_for(game.rules);
-        mechanic.report_injury(game, &mut canonical);
+        let event = mechanic.report_injury(game, &mut canonical);
         self.already_reported = canonical.already_reported;
+        event
     }
 
     /// Java: `InjuryResult.handleIgnoringArmourBreaks(IStep, Player, Game)`.

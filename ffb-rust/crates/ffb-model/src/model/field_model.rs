@@ -147,6 +147,24 @@ impl FieldModel {
         self.player_coordinates.insert(id.to_owned(), coord);
     }
 
+    /// Java: FieldModel.updatePlayerAndBallPosition(Player, FieldCoordinate).
+    ///
+    /// Moves the player AND — if the player was standing on the (non-moving) ball,
+    /// i.e. was carrying it — moves the ball with them. Returns true when the ball
+    /// position was updated. This is the carrier-movement primitive Java uses in
+    /// StepMove/StepGoForIt/StepJump/StepPushback/StepFollowup/StepHitAndRun/
+    /// StepRaidingParty/StepDropDivingTackler and the Shadowing/Tentacles behaviours.
+    pub fn update_player_and_ball_position(&mut self, id: &str, coord: FieldCoordinate) -> bool {
+        let mut ball_position_updated = false;
+        let old_position = self.player_coordinate(id);
+        if !self.ball_moving && old_position.is_some() && old_position == self.ball_coordinate {
+            self.ball_coordinate = Some(coord);
+            ball_position_updated = true;
+        }
+        self.set_player_coordinate(id, coord);
+        ball_position_updated
+    }
+
     pub fn remove_player(&mut self, id: &str) {
         self.player_coordinates.remove(id);
         self.player_states.remove(id);

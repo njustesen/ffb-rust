@@ -142,6 +142,12 @@ impl StepMove {
         // client-only: SoundId DODGE/STEP — sound playback is client-only
 
         StepOutcome::next()
+            // Monolith parity: PlayerMoved fired once per square entered, right where
+            // the field-model position was applied.
+            .with_event(ffb_model::events::GameEvent::PlayerMoved {
+                player_id: attacker_id.clone(),
+                coord: to,
+            })
             .publish(StepParameter::PlayerEnteringSquare(attacker_id.clone()))
     }
 }

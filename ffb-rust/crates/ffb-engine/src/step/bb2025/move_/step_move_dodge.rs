@@ -177,11 +177,11 @@ impl StepMoveDodge {
         let successful = DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll);
 
         // Java line 333-335: addReport(new ReportDodgeRoll(...))
+        let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
+            .map(|a| a.name == "DODGE").unwrap_or(false)
+            && self.re_roll_state.re_roll_source.is_some();
         {
             use ffb_model::report::mixed::report_dodge_roll::ReportDodgeRoll;
-            let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
-                .map(|a| a.name == "DODGE").unwrap_or(false)
-                && self.re_roll_state.re_roll_source.is_some();
             game.report_list.add(ReportDodgeRoll::new(
                 player_id.clone(),
                 successful,
@@ -192,12 +192,19 @@ impl StepMoveDodge {
                 None, // stat_based_roll_modifier: headless never applies modifier-ignoring skill
             ));
         }
+        // Emit one GameEvent per resolved roll (monolith parity: initial roll and
+        // re-rolled resolution each produce their own DodgeRoll event).
+        let roll_event = ffb_model::events::GameEvent::DodgeRoll {
+            player_id: player_id.clone().unwrap_or_default(),
+            target: minimum_roll,
+            roll: self.dodge_roll,
+            success: successful,
+            rerolled: re_rolled,
+        };
 
         if successful {
-            let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
-                .map(|a| a.name == "DODGE").unwrap_or(false)
-                && self.re_roll_state.re_roll_source.is_some();
             StepOutcome::next()
+                .with_event(roll_event)
                 .publish(StepParameter::ReRollUsed(self.re_roll_used || re_rolled))
                 .publish(StepParameter::UsingBreakTackle(self.using_break_tackle))
         } else {
@@ -213,23 +220,27 @@ impl StepMoveDodge {
                     use_reroll(game, &source, &pid);
                     self.re_roll_state.re_roll_source = Some(source);
                     self.dodge_roll = 0;
-                    return self.execute_step(game, rng);
+                    // Failed initial roll resolved — event goes first, re-roll events follow.
+                    let mut out = self.execute_step(game, rng);
+                    out.events.insert(0, roll_event);
+                    return out;
                 }
 
                 // TRR offer
                 if let Some(prompt) = ask_for_reroll_if_available(game, "DODGE", minimum_roll, false) {
                     self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
                     self.dodge_roll = 0; // reset so the re-roll gets a fresh d6
-                    return StepOutcome::cont().with_prompt(prompt);
+                    return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
                 }
             }
 
             // Java: if (UtilGameOption.isOptionEnabled(game, GameOptionId.STAND_FIRM_NO_DROP_ON_FAILED_DODGE))
             if game.options.is_enabled("standFirmNoDropOnFailedDodge") {
                 return StepOutcome::next()
+                    .with_event(roll_event)
                     .publish(StepParameter::EndPlayerAction(true));
             }
-            self.fail_dodge()
+            self.fail_dodge().with_event(roll_event)
         }
     }
 

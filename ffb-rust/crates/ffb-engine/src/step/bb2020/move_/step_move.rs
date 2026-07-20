@@ -370,13 +370,27 @@ mod tests {
     // stay empty after finishing a move, so this test would have failed.
     #[test]
     fn last_step_of_move_recomputes_move_squares() {
-        use ffb_model::enums::PlayerAction;
+        use ffb_model::enums::{PlayerAction, PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
         let mut game = make_game();
+        // A real, active standing player is required since update_move_squares now runs
+        // Java's UtilPlayer.isNextMovePossible guard.
+        game.team_home.players.push(Player {
+            id: "p1".into(), name: "p1".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
         game.acting_player.player_id = Some("p1".into());
         game.acting_player.player_action = Some(PlayerAction::Move);
         let from = FieldCoordinate::new(5, 5);
         let to = FieldCoordinate::new(6, 5);
         game.field_model.set_player_coordinate("p1", from);
+        game.field_model.set_player_state("p1", ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING).change_active(true));
         let mut step = StepMove::new();
         step.coordinate_to = Some(to);
         step.move_stack_size = 0; // last step of the move

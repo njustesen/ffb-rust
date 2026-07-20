@@ -239,7 +239,8 @@ impl StepGoForIt {
         if jumping && !self.second_go_for_it && current_move > ma + 1 && !always_lands {
             if let Some(start) = self.move_start {
                 if let Some(id) = pid.as_deref() {
-                    game.field_model.set_player_coordinate(id, start);
+                    // Java: game.getFieldModel().updatePlayerAndBallPosition(actingPlayer.getPlayer(), moveStart)
+                    game.field_model.update_player_and_ball_position(id, start);
                 }
             }
             outcome = outcome.publish(StepParameter::CoordinateFrom(FieldCoordinate::new(0, 0)));

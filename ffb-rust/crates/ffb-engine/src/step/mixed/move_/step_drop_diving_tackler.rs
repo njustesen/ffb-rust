@@ -31,14 +31,7 @@ impl StepDropDivingTackler {
                 if !defender_id.is_empty() {
                     // Java: if fCoordinateFrom != null → updatePlayerAndBallPosition
                     if let Some(coord) = self.coordinate_from {
-                        let old_coord = game.field_model.player_coordinate(&defender_id);
-                        game.field_model.set_player_coordinate(&defender_id, coord);
-                        // Move ball if it was at the old position
-                        if let Some(old) = old_coord {
-                            if game.field_model.ball_coordinate == Some(old) {
-                                game.field_model.ball_coordinate = Some(coord);
-                            }
-                        }
+                        game.field_model.update_player_and_ball_position(&defender_id, coord);
                         outcome = outcome.publish(StepParameter::PlayerEnteringSquare(defender_id.clone()));
                     }
 
@@ -183,18 +176,22 @@ mod tests {
 
         // Make the *acting* player (not the defender) jumping and in the middle of a Move
         // action, standing at the reset coordinate, so `update_move_squares` actually scans.
+        // Leap is required since update_move_squares now runs Java's addMoveSquare guard
+        // (JumpMechanic.isValidJump: distance 2 + canLeap/prone-on-path); the state must be
+        // active for UtilPlayer.isNextMovePossible.
         game.team_home.players.push(Player {
             id: "mover".into(), name: "mover".into(), nr: 2, position_id: "lineman".into(),
             player_type: PlayerType::Regular, gender: PlayerGender::Male,
             movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
-            starting_skills: vec![], extra_skills: vec![], temporary_skills: vec![],
+            starting_skills: vec![ffb_model::model::skill_def::SkillWithValue::new(ffb_model::enums::SkillId::Leap)],
+            extra_skills: vec![], temporary_skills: vec![],
             used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
             is_big_guy: false,
             ..Default::default()
         });
         game.field_model.set_player_coordinate("mover", new_pos);
-        game.field_model.set_player_state("mover", ffb_model::enums::PlayerState::new(PS_STANDING));
+        game.field_model.set_player_state("mover", ffb_model::enums::PlayerState::new(PS_STANDING).change_active(true));
         game.acting_player.set_player("mover".into(), ffb_model::enums::PlayerAction::Move);
         game.acting_player.jumping = true;
 

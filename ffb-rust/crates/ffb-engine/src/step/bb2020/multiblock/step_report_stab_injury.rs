@@ -46,10 +46,13 @@ impl Step for StepReportStabInjury {
     fn id(&self) -> StepId { StepId::ReportStabInjury }
 
     fn start(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        let mut out = StepOutcome::next();
         if let Some(ref mut ir) = self.injury_result {
-            ir.report(game);
+            if let Some(ev) = ir.report(game) {
+                out = out.with_event(ev);
+            }
         }
-        StepOutcome::next()
+        out
     }
 
     fn handle_command(&mut self, _action: &Action, _game: &mut Game, _rng: &mut GameRng) -> StepOutcome {

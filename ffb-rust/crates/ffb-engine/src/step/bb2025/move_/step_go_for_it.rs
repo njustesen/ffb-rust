@@ -191,6 +191,19 @@ impl StepGoForIt {
             ));
         }
 
+        // Emit one GameEvent per resolved roll (monolith parity: initial roll and
+        // re-rolled resolution each produce their own GoForItRoll event).
+        let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
+            .map(|a| a.name == "GFI").unwrap_or(false)
+            && self.re_roll_state.re_roll_source.is_some();
+        let roll_event = ffb_model::events::GameEvent::GoForItRoll {
+            player_id: player_id.clone().unwrap_or_default(),
+            target: minimum_roll,
+            roll: self.roll,
+            success: successful,
+            rerolled: re_rolled,
+        };
+
         if successful {
             // Java: succeedGfi — if jumping and !secondGfi and currentMove > ma+1 → repeat
             let jumping = game.acting_player.jumping;
@@ -204,9 +217,9 @@ impl StepGoForIt {
                 self.using_modifier_ignoring_skill = None;
                 self.re_roll_state.re_rolled_action = None;
                 self.roll = 0;
-                return StepOutcome::repeat();
+                return StepOutcome::repeat().with_event(roll_event);
             }
-            return StepOutcome::next();
+            return StepOutcome::next().with_event(roll_event);
         }
 
         // Failure path — attempt re-roll if this is the first failure
@@ -225,18 +238,21 @@ impl StepGoForIt {
                 self.re_roll_state.re_roll_source = Some(source);
                 self.using_modifier_ignoring_skill = None;
                 self.roll = 0; // fresh roll for the re-roll
-                return self.rush(game, rng);
+                // Failed initial roll resolved — event goes first, re-roll events follow.
+                let mut out = self.rush(game, rng);
+                out.events.insert(0, roll_event);
+                return out;
             }
 
             // No skill re-roll — offer TRR
             if let Some(prompt) = ask_for_reroll_if_available(game, "GFI", minimum_roll, false) {
                 self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
                 self.roll = 0; // reset so the re-roll gets a fresh d6
-                return StepOutcome::cont().with_prompt(prompt);
+                return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
             }
         }
 
-        self.fail_gfi(game)
+        self.fail_gfi(game).with_event(roll_event)
     }
 
     fn fail_gfi(&mut self, game: &mut Game) -> StepOutcome {
@@ -252,7 +268,8 @@ impl StepGoForIt {
         if jumping {
             if let Some(start) = self.move_start {
                 if let Some(id) = pid.as_deref() {
-                    game.field_model.set_player_coordinate(id, start);
+                    // Java: game.getFieldModel().updatePlayerAndBallPosition(actingPlayer.getPlayer(), moveStart)
+                    game.field_model.update_player_and_ball_position(id, start);
                 }
             }
             outcome = outcome.publish(StepParameter::CoordinateFrom(FieldCoordinate::new(0, 0)));

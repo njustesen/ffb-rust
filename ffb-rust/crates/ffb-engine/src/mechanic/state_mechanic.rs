@@ -42,7 +42,12 @@ pub trait StateMechanic: Send + Sync {
 
     /// Java: reportInjury(IStep, InjuryResult).
     /// 1:1 translation of bb2025/StateMechanic.reportInjury().
-    fn report_injury(&self, game: &mut Game, injury_result: &mut InjuryResult) {
+    ///
+    /// Returns the `GameEvent::Injury` corresponding to the ReportInjury that was
+    /// actually added (None when the injury was already reported) so the calling
+    /// step can attach it to its `StepOutcome` — fires exactly once per injury,
+    /// mirroring Java's `fAlreadyReported` guard.
+    fn report_injury(&self, game: &mut Game, injury_result: &mut InjuryResult) -> Option<GameEvent> {
         let ctx = injury_result.injury_context();
         let pre_regen = injury_result.is_pre_regeneration();
 
@@ -75,13 +80,26 @@ pub trait StateMechanic: Send + Sync {
         }
 
         if injury_result.is_already_reported() {
-            return;
+            return None;
         }
 
         let report = build_report_injury(injury_result.injury_context(), skip);
         game.report_list.add(report);
         // Java: step.getResult().setSound() — client-only, no-op in headless
         injury_result.set_already_reported(true);
+
+        // Coverage event mirroring the ReportInjury just added: armor-held injuries carry
+        // armor_roll only (injury_roll None); broken armor carries both rolls plus the
+        // KO/casualty outcome and serious-injury kind.
+        let ctx = injury_result.injury_context();
+        Some(GameEvent::Injury {
+            player_id: ctx.defender_id.clone().unwrap_or_default(),
+            armor_roll: ctx.armor_roll,
+            injury_roll: ctx.injury_roll,
+            serious_injury: ctx.serious_injury,
+            was_ko: ctx.is_knocked_out(),
+            was_cas: ctx.is_casualty(),
+        })
     }
 
     /// Java: handlePumpUp(IStep, InjuryResult).

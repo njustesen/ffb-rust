@@ -221,9 +221,22 @@ impl StepPickUp {
             ));
         }
 
+        // Emit one GameEvent per resolved roll (monolith parity: initial roll and
+        // re-rolled resolution each produce their own PickupRoll event).
+        let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
+            .map(|a| a.name == "PICKUP").unwrap_or(false)
+            && self.re_roll_state.re_roll_source.is_some();
+        let roll_event = ffb_model::events::GameEvent::PickupRoll {
+            player_id: player_id.clone().unwrap_or_default(),
+            target: minimum_roll,
+            roll: self.roll,
+            success: successful,
+            rerolled: re_rolled,
+        };
+
         if successful {
             game.field_model.ball_moving = false;
-            let mut out = StepOutcome::next();
+            let mut out = StepOutcome::next().with_event(roll_event);
             if self.secure_the_ball {
                 out = out.publish(StepParameter::EndPlayerAction(true));
             }
@@ -246,7 +259,10 @@ impl StepPickUp {
                     use_reroll(game, &source, &pid);
                     self.re_roll_state.re_roll_source = Some(source);
                     self.roll = 0;
-                    return self.pick_up(game, rng, player_id);
+                    // Failed initial roll resolved — event goes first, re-roll events follow.
+                    let mut out = self.pick_up(game, rng, player_id);
+                    out.events.insert(0, roll_event);
+                    return out;
                 }
             }
 
@@ -254,11 +270,11 @@ impl StepPickUp {
             if let Some(prompt) = ask_for_reroll_if_available(game, "PICKUP", minimum_roll, false) {
                 self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
                 self.roll = 0; // reset so the re-roll gets a fresh d6
-                return StepOutcome::cont().with_prompt(prompt);
+                return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
             }
         }
 
-        self.fail_pick_up(game, &player_id, true)
+        self.fail_pick_up(game, &player_id, true).with_event(roll_event)
     }
 
     /// Java: shared logic behind the `case FAILURE:` branch in `executeStep()` (reached via
