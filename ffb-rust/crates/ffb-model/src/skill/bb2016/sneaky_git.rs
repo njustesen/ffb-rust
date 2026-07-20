@@ -25,14 +25,20 @@ impl std::ops::Deref for SneakyGit {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_sneaky_git() {
         assert_eq!(SneakyGit::new().get_name(), "Sneaky Git");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_agility() {
         assert_eq!(SneakyGit::new().get_category(), SkillCategory::Agility);
+    }
+
+    #[test]
+    fn has_can_always_assist_fouls_property() {
+        assert!(SkillId::SneakyGit.properties().contains(&"canAlwaysAssistFouls"));
     }
 }

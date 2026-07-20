@@ -174,11 +174,6 @@ mod tests {
     }
 
     #[test]
-    fn default_creates_instance() {
-        let _obs = ChompRemovalObserver::default();
-    }
-
-    #[test]
     fn coordinate_change_to_box_emits_chomp_removed_report() {
         use ffb_model::report::bb2025::report_chomp_removed::ReportChompRemoved;
         let obs = ChompRemovalObserver::new();

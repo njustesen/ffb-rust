@@ -25,14 +25,20 @@ impl std::ops::Deref for PrehensileTail {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_prehensile_tail() {
         assert_eq!(PrehensileTail::new().get_name(), "Prehensile Tail");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_mutation() {
         assert_eq!(PrehensileTail::new().get_category(), SkillCategory::Mutation);
+    }
+
+    #[test]
+    fn has_makes_dodging_harder_property() {
+        assert!(SkillId::PrehensileTail.properties().contains(&"makesDodgingHarder"));
     }
 }

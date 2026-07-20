@@ -28,14 +28,26 @@ impl std::ops::Deref for StripBall {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(StripBall::new().get_name(), "Strip Ball"); }
+    fn name_is_strip_ball() {
+        assert_eq!(StripBall::new().get_name(), "Strip Ball");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(StripBall::new().get_category(), SkillCategory::General); }
+    fn category_is_general() {
+        assert_eq!(StripBall::new().get_category(), SkillCategory::General);
+    }
+
+    #[test]
+    fn has_force_opponent_to_drop_ball_on_pushback_property() {
+        assert!(crate::enums::SkillId::StripBall.properties().contains(&"forceOpponentToDropBallOnPushback"));
+    }
+
+    // The struct-level registration below is kept so the Java registration
+    // retains coverage as well.
     #[test]
     fn registers_force_opponent_to_drop_ball_on_pushback_property() {
-        // Java StripBall.postConstruct() registers forceOpponentToDropBallOnPushback;
-        // this would have failed before the fix since no property was registered.
         let s = StripBall::new();
         assert!(s.has_skill_property(NamedProperties::FORCE_OPPONENT_TO_DROP_BALL_ON_PUSHBACK));
     }

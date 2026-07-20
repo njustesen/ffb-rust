@@ -29,13 +29,17 @@ impl std::ops::Deref for SureFeet {
 mod tests {
     use super::*;
 
+    // The bb2016 test's has_sure_feet_reroll_source is not mirrored: bb2020/SureFeet.postConstruct
+    // only calls registerRerollSource(RUSH, SURE_FEET), and there is no live reroll-source
+    // table in Rust to assert against (see the ConsummateProfessional NOTE in skill_id.rs).
+
     #[test]
-    fn name_is_correct() {
+    fn name_is_sure_feet() {
         assert_eq!(SureFeet::new().get_name(), "Sure Feet");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_agility() {
         assert_eq!(SureFeet::new().get_category(), SkillCategory::Agility);
     }
 }

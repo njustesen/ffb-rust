@@ -132,6 +132,9 @@ impl Default for ThrowInCalc {
     }
 }
 
+// Test mirror of com.fumbbl.ffb.server.util.ThrowInCalcTest (1:1).
+// Java @ParameterizedTest CsvSource rows become one Rust test fn looping the same rows.
+// Note: Java signals invalid input with IllegalArgumentException; the Rust mirror returns None.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -139,130 +142,181 @@ mod tests {
     // ── throw_in_distance ────────────────────────────────────────────────────
 
     #[test]
-    fn throw_in_distance_bb2016_sums_dice() {
+    fn distance_bb2016_sums_two_dice() {
         assert_eq!(ThrowInCalc::throw_in_distance(3, 4, Rules::Bb2016), 7);
+        assert_eq!(ThrowInCalc::throw_in_distance(1, 1, Rules::Bb2016), 2);
+        assert_eq!(ThrowInCalc::throw_in_distance(6, 6, Rules::Bb2016), 12);
     }
 
     #[test]
-    fn throw_in_distance_bb2025_sums_dice() {
-        assert_eq!(ThrowInCalc::throw_in_distance(2, 5, Rules::Bb2025), 7);
-    }
-
-    #[test]
-    fn throw_in_distance_bb2020_adds_1() {
+    fn distance_bb2020_adds_bonus_one() {
         assert_eq!(ThrowInCalc::throw_in_distance(3, 4, Rules::Bb2020), 8);
+        assert_eq!(ThrowInCalc::throw_in_distance(1, 1, Rules::Bb2020), 3);
+        assert_eq!(ThrowInCalc::throw_in_distance(6, 6, Rules::Bb2020), 13);
+    }
+
+    #[test]
+    fn distance_bb2025_sums_two_dice_no_bonus_like_bb2016() {
+        assert_eq!(ThrowInCalc::throw_in_distance(3, 4, Rules::Bb2025), 7);
+        assert_eq!(ThrowInCalc::throw_in_distance(1, 1, Rules::Bb2025), 2);
     }
 
     // ── is_corner_square ─────────────────────────────────────────────────────
 
     #[test]
-    fn is_corner_square_home_upper() {
+    fn is_corner_square_all_four_corners() {
         assert!(ThrowInCalc::is_corner_square(0, 0));
-    }
-
-    #[test]
-    fn is_corner_square_away_lower() {
+        assert!(ThrowInCalc::is_corner_square(25, 0));
+        assert!(ThrowInCalc::is_corner_square(0, 14));
         assert!(ThrowInCalc::is_corner_square(25, 14));
     }
 
     #[test]
-    fn is_corner_square_midfield_is_not() {
-        assert!(!ThrowInCalc::is_corner_square(12, 7));
-    }
-
-    #[test]
-    fn is_corner_square_endzone_midline_is_not() {
-        // x<1 but y=7 is on endzone line, not corner
-        assert!(!ThrowInCalc::is_corner_square(0, 7));
+    fn is_corner_square_edge_not_corner() {
+        assert!(!ThrowInCalc::is_corner_square(5, 0)); // upper sideline, not corner
+        assert!(!ThrowInCalc::is_corner_square(0, 7)); // home endzone, not corner
+        assert!(!ThrowInCalc::is_corner_square(12, 7)); // field
     }
 
     // ── throw_in_direction_for_roll ──────────────────────────────────────────
 
     #[test]
-    fn throw_in_direction_home_endzone_roll_1_is_northeast() {
-        // x < 1, template=EAST, roll=1 → NE
-        assert_eq!(
-            ThrowInCalc::throw_in_direction_for_roll(0, 7, 1),
-            Some(Direction::Northeast)
-        );
+    fn home_endzone_directions_for_rolls() {
+        let rows = [
+            (1, Direction::Northeast),
+            (2, Direction::Northeast),
+            (3, Direction::East),
+            (4, Direction::East),
+            (5, Direction::Southeast),
+            (6, Direction::Southeast),
+        ];
+        for (roll, expected) in rows {
+            assert_eq!(
+                ThrowInCalc::throw_in_direction_for_roll(0, 7, roll),
+                Some(expected),
+                "home-endzone roll {roll}"
+            );
+        }
     }
 
     #[test]
-    fn throw_in_direction_home_endzone_roll_3_is_east() {
-        assert_eq!(
-            ThrowInCalc::throw_in_direction_for_roll(0, 7, 3),
-            Some(Direction::East)
-        );
+    fn away_endzone_directions_for_rolls() {
+        let rows = [
+            (1, Direction::Southwest),
+            (2, Direction::Southwest),
+            (3, Direction::West),
+            (4, Direction::West),
+            (5, Direction::Northwest),
+            (6, Direction::Northwest),
+        ];
+        for (roll, expected) in rows {
+            assert_eq!(
+                ThrowInCalc::throw_in_direction_for_roll(25, 7, roll),
+                Some(expected),
+                "away-endzone roll {roll}"
+            );
+        }
     }
 
     #[test]
-    fn throw_in_direction_home_endzone_roll_5_is_southeast() {
-        assert_eq!(
-            ThrowInCalc::throw_in_direction_for_roll(0, 7, 5),
-            Some(Direction::Southeast)
-        );
+    fn lower_sideline_directions_for_rolls() {
+        let rows = [
+            (1, Direction::Northwest),
+            (2, Direction::Northwest),
+            (3, Direction::North),
+            (4, Direction::North),
+            (5, Direction::Northeast),
+            (6, Direction::Northeast),
+        ];
+        for (roll, expected) in rows {
+            assert_eq!(
+                ThrowInCalc::throw_in_direction_for_roll(12, 14, roll),
+                Some(expected),
+                "lower-sideline roll {roll}"
+            );
+        }
     }
 
     #[test]
-    fn throw_in_direction_away_endzone_roll_3_is_west() {
-        // x > 24, template=WEST
-        assert_eq!(
-            ThrowInCalc::throw_in_direction_for_roll(25, 7, 3),
-            Some(Direction::West)
-        );
+    fn upper_sideline_directions_for_rolls() {
+        let rows = [
+            (1, Direction::Southeast),
+            (2, Direction::Southeast),
+            (3, Direction::South),
+            (4, Direction::South),
+            (5, Direction::Southwest),
+            (6, Direction::Southwest),
+        ];
+        for (roll, expected) in rows {
+            assert_eq!(
+                ThrowInCalc::throw_in_direction_for_roll(12, 0, roll),
+                Some(expected),
+                "upper-sideline roll {roll}"
+            );
+        }
     }
 
     #[test]
-    fn throw_in_direction_lower_sideline_roll_3_is_north() {
-        // y > 13, template=NORTH
-        assert_eq!(
-            ThrowInCalc::throw_in_direction_for_roll(12, 14, 3),
-            Some(Direction::North)
-        );
-    }
-
-    #[test]
-    fn throw_in_direction_upper_sideline_roll_3_is_south() {
-        // y < 1, template=SOUTH
-        assert_eq!(
-            ThrowInCalc::throw_in_direction_for_roll(12, 0, 3),
-            Some(Direction::South)
-        );
-    }
-
-    #[test]
-    fn throw_in_direction_interior_returns_none() {
+    fn throw_in_direction_interior_coordinate_is_invalid() {
+        // (12,7) is not on any board edge — the Rust mirror returns None
+        // (Java signals this with an IllegalArgumentException)
         assert_eq!(ThrowInCalc::throw_in_direction_for_roll(12, 7, 4), None);
     }
 
     // ── corner_throw_in_direction_for_roll ───────────────────────────────────
 
     #[test]
-    fn corner_northwest_roll_1_is_east() {
-        assert_eq!(
-            ThrowInCalc::corner_throw_in_direction_for_roll(Direction::Northwest, 1),
-            Some(Direction::East)
-        );
+    fn northwest_corner() {
+        let rows = [(1, Direction::East), (2, Direction::Southeast), (3, Direction::South)];
+        for (roll, expected) in rows {
+            assert_eq!(
+                ThrowInCalc::corner_throw_in_direction_for_roll(Direction::Northwest, roll),
+                Some(expected),
+                "NW-corner D3={roll}"
+            );
+        }
     }
 
     #[test]
-    fn corner_northwest_roll_3_is_south() {
-        assert_eq!(
-            ThrowInCalc::corner_throw_in_direction_for_roll(Direction::Northwest, 3),
-            Some(Direction::South)
-        );
+    fn northeast_corner() {
+        let rows = [(1, Direction::South), (2, Direction::Southwest), (3, Direction::West)];
+        for (roll, expected) in rows {
+            assert_eq!(
+                ThrowInCalc::corner_throw_in_direction_for_roll(Direction::Northeast, roll),
+                Some(expected),
+                "NE-corner D3={roll}"
+            );
+        }
     }
 
     #[test]
-    fn corner_southeast_roll_1_is_west() {
-        assert_eq!(
-            ThrowInCalc::corner_throw_in_direction_for_roll(Direction::Southeast, 1),
-            Some(Direction::West)
-        );
+    fn southwest_corner() {
+        let rows = [(1, Direction::North), (2, Direction::Northeast), (3, Direction::East)];
+        for (roll, expected) in rows {
+            assert_eq!(
+                ThrowInCalc::corner_throw_in_direction_for_roll(Direction::Southwest, roll),
+                Some(expected),
+                "SW-corner D3={roll}"
+            );
+        }
     }
 
     #[test]
-    fn corner_non_corner_direction_returns_none() {
+    fn southeast_corner() {
+        let rows = [(1, Direction::West), (2, Direction::Northwest), (3, Direction::North)];
+        for (roll, expected) in rows {
+            assert_eq!(
+                ThrowInCalc::corner_throw_in_direction_for_roll(Direction::Southeast, roll),
+                Some(expected),
+                "SE-corner D3={roll}"
+            );
+        }
+    }
+
+    #[test]
+    fn corner_throw_in_direction_non_corner_direction_is_invalid() {
+        // NORTH is not a corner direction — the Rust mirror returns None
+        // (Java signals this with an IllegalArgumentException)
         assert_eq!(
             ThrowInCalc::corner_throw_in_direction_for_roll(Direction::North, 2),
             None
@@ -272,22 +326,10 @@ mod tests {
     // ── corner_direction ─────────────────────────────────────────────────────
 
     #[test]
-    fn corner_direction_home_upper_is_northwest() {
+    fn corner_direction_all_four_corners() {
         assert_eq!(ThrowInCalc::corner_direction(0, 0), Direction::Northwest);
-    }
-
-    #[test]
-    fn corner_direction_away_upper_is_northeast() {
         assert_eq!(ThrowInCalc::corner_direction(25, 0), Direction::Northeast);
-    }
-
-    #[test]
-    fn corner_direction_home_lower_is_southwest() {
         assert_eq!(ThrowInCalc::corner_direction(0, 14), Direction::Southwest);
-    }
-
-    #[test]
-    fn corner_direction_away_lower_is_southeast() {
         assert_eq!(ThrowInCalc::corner_direction(25, 14), Direction::Southeast);
     }
 }

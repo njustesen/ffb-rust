@@ -122,6 +122,11 @@ pub fn minimum_roll_intercept_edition(agility: i32, modifier_total: i32, rules: 
     }
 }
 
+// Tests exercising the ffb-mechanics API directly; names aligned with the
+// Java-derived tests in AgilityCalcTest / CatchCalcTest (mirrored 1:1 in
+// ffb-engine::util::{agility_calc, catch_calc}). Kept here only where they
+// cover mechanics-specific API (free functions, Modifier slices, edition
+// dispatchers) that the engine mirrors do not touch.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -130,7 +135,7 @@ mod tests {
     // ── BB2016 base ───────────────────────────────────────────────────────────
 
     #[test]
-    fn bb2016_base_agility_table() {
+    fn bb2016_agility_base() {
         assert_eq!(agility_roll_base_bb2016(1), 6);
         assert_eq!(agility_roll_base_bb2016(2), 5);
         assert_eq!(agility_roll_base_bb2016(3), 4);
@@ -138,6 +143,7 @@ mod tests {
         assert_eq!(agility_roll_base_bb2016(5), 2);
         assert_eq!(agility_roll_base_bb2016(6), 1);
         assert_eq!(agility_roll_base_bb2016(7), 1); // capped
+        assert_eq!(agility_roll_base_bb2016(9), 1); // capped
     }
 
     #[test]
@@ -160,7 +166,7 @@ mod tests {
     }
 
     #[test]
-    fn bb2016_dodge_with_negative_modifier_floor_at_2() {
+    fn bb2016_dodge_with_negative_modifier_decreases_but_floor_at_2() {
         // AG3 base dodge = 3; Dodge skill -1 = 2
         assert_eq!(minimum_roll_dodge_bb2016(3, -1), 2);
         // AG2 base dodge = 4; -10 modifiers → 2
@@ -168,7 +174,7 @@ mod tests {
     }
 
     #[test]
-    fn bb2016_catch_harder_than_dodge() {
+    fn bb2016_catch_harder_than_dodge_for_same_ag() {
         for ag in 1..=4 {
             assert_eq!(
                 minimum_roll_catch_bb2016(ag, 0),
@@ -178,34 +184,25 @@ mod tests {
         }
     }
 
-    #[test]
-    fn bb2016_intercept_no_modifiers() {
-        assert_eq!(minimum_roll_intercept_bb2016(1, 0), 8); // base 6 + 2
-        assert_eq!(minimum_roll_intercept_bb2016(3, 0), 6); // base 4 + 2
-        assert_eq!(minimum_roll_intercept_bb2016(6, 0), 3); // base 1 + 2
-    }
-
-    // ── BB2020 ────────────────────────────────────────────────────────────────
+    // ── BB2020 (Modifier-slice API, not covered by the engine mirrors) ───────
 
     #[test]
-    fn bb2020_minimum_roll_no_modifiers() {
-        assert_eq!(minimum_roll(3, &[]), 3);
+    fn bb2020_direct_agility_no_modifiers() {
+        for ag in 2..=6 {
+            assert_eq!(minimum_roll(ag, &[]), ag, "ag={ag}");
+        }
     }
 
     #[test]
-    fn bb2020_minimum_roll_positive_modifier() {
-        let m = Modifier::new("test", 1, Rules::Common);
-        assert_eq!(minimum_roll(3, &[m]), 4);
+    fn bb2020_with_negative_modifier_floor_at_2() {
+        let m5 = Modifier::new("test", -5, Rules::Common);
+        assert_eq!(minimum_roll(3, &[m5]), 2); // floor
+        let m1 = Modifier::new("test", -1, Rules::Common);
+        assert_eq!(minimum_roll(2, &[m1]), 2); // 1 → 2
     }
 
     #[test]
-    fn bb2020_minimum_roll_capped_at_2() {
-        let m = Modifier::new("test", -5, Rules::Common);
-        assert_eq!(minimum_roll(5, &[m]), 2);
-    }
-
-    #[test]
-    fn bb2016_vs_bb2020_same_ag4_dodge() {
+    fn dispatched_bb2016_vs_bb2020_differ_for_same_ag4() {
         // BB2016 AG4: dodge target = 2
         // BB2020 AG4 (4+ player): target = 4
         assert_eq!(minimum_roll_dodge_bb2016(4, 0), 2);
@@ -217,14 +214,6 @@ mod tests {
         // AG3 + modifier 1 = 4
         let m = Modifier::new("test", 1, Rules::Common);
         assert_eq!(minimum_roll(3, &[m]), 4);
-    }
-
-    #[test]
-    fn bb2025_dodge_same_as_bb2020() {
-        // BB2020 and BB2025 both use the same agility formula
-        for ag in 2..=6 {
-            assert_eq!(minimum_roll(ag, &[]), minimum_roll(ag, &[]), "ag={ag}");
-        }
     }
 
     // ── Common ───────────────────────────────────────────────────────────────
@@ -239,24 +228,19 @@ mod tests {
     // ── Edition-dispatched catch ──────────────────────────────────────────────
 
     #[test]
-    fn catch_edition_bb2016_and_bb2020_differ_for_ag4() {
+    fn dispatched_catch_bb2016_and_bb2020_differ_for_ag4() {
         assert_eq!(minimum_roll_catch_edition(4, 0, Rules::Bb2016), 3);
         assert_eq!(minimum_roll_catch_edition(4, 0, Rules::Bb2020), 4);
         assert_eq!(minimum_roll_catch_edition(4, 0, Rules::Bb2025), 4);
     }
 
     #[test]
-    fn catch_edition_bb2016_with_modifier() {
-        assert_eq!(minimum_roll_catch_edition(3, 1, Rules::Bb2016), 5);
-    }
-
-    #[test]
-    fn catch_edition_bb2020_floored_at_2() {
+    fn bb2020_catch_floored_at_2() {
         assert_eq!(minimum_roll_catch_edition(1, -5, Rules::Bb2020), 2);
     }
 
     #[test]
-    fn catch_edition_bb2020_with_modifier() {
+    fn bb2020_catch_with_modifier() {
         // AG3 + rain (+1) = 4
         assert_eq!(minimum_roll_catch_edition(3, 1, Rules::Bb2020), 4);
     }
@@ -264,13 +248,14 @@ mod tests {
     // ── Edition-dispatched interception ──────────────────────────────────────
 
     #[test]
-    fn intercept_edition_bb2016_harder_than_bb2020() {
+    fn dispatched_interception_bb2016_harder_than_bb2020() {
         assert_eq!(minimum_roll_intercept_edition(4, 0, Rules::Bb2016), 5);
         assert_eq!(minimum_roll_intercept_edition(4, 0, Rules::Bb2020), 4);
+        assert_eq!(minimum_roll_intercept_edition(4, 0, Rules::Bb2025), 4);
     }
 
     #[test]
-    fn intercept_edition_bb2020_same_as_catch() {
+    fn bb2020_interception_same_as_catch() {
         for ag in 2..=6 {
             assert_eq!(
                 minimum_roll_catch_edition(ag, 0, Rules::Bb2020),
@@ -322,7 +307,7 @@ mod tests {
     }
 
     #[test]
-    fn bb2016_interception_always_harder_than_catch() {
+    fn bb2016_interception_harder_than_catch() {
         for ag in 1..=6 {
             let intercept = minimum_roll_intercept_bb2016(ag, 0);
             let catch_ = minimum_roll_catch_bb2016(ag, 0);

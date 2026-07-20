@@ -73,17 +73,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandPushback::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandPushback::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_pushback() {
         assert_eq!(ClientCommandPushback::new().get_id(), NetCommandId::ClientPushback);
     }

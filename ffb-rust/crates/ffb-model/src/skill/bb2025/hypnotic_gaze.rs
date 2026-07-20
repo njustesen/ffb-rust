@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_hypnotic_gaze() {
         assert_eq!(HypnoticGaze::new().get_name(), "Hypnotic Gaze");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(HypnoticGaze::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_inflicts_confusion_property() {
+        assert!(crate::enums::SkillId::HypnoticGaze.properties().contains(&"inflictsConfusion"));
     }
 }

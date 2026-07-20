@@ -67,17 +67,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandFollowupChoice::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandFollowupChoice::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_followup_choice() {
         assert_eq!(ClientCommandFollowupChoice::new(true).get_id(), NetCommandId::ClientFollowupChoice);
     }

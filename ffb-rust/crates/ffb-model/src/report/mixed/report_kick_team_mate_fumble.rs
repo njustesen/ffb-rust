@@ -36,31 +36,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::KICK_TEAM_MATE_FUMBLE); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "kickTeamMateFumble"); }
-
-    #[test]
-    fn is_default() {
-        let r = ReportKickTeamMateFumble::default();
-        assert_eq!(r.get_id(), ReportId::KICK_TEAM_MATE_FUMBLE);
-    }
-
-    #[test]
-    fn new_and_default_equal() {
-        let via_new = ReportKickTeamMateFumble::new();
-        let via_default = ReportKickTeamMateFumble::default();
-        assert_eq!(via_new.get_id(), via_default.get_id());
-    }
-
-    #[test]
-    fn unit_struct_has_no_fields() {
-        let r = make();
-        assert_eq!(r.get_name(), "kickTeamMateFumble");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

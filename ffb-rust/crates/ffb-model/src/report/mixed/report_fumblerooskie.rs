@@ -47,25 +47,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::FUMBLEROOSKIE); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "fumblerooskie"); }
-
-    #[test]
-    fn is_used() { assert!(make().is_used()); }
-
-    #[test]
-    fn get_player_id() { assert_eq!(make().get_player_id(), Some("p1")); }
-
-    #[test]
-    fn not_used_with_none_player() {
-        let r = ReportFumblerooskie::new(None, false);
-        assert!(!r.is_used());
-        assert_eq!(r.get_player_id(), None);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

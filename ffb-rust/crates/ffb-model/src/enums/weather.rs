@@ -99,6 +99,79 @@ mod tests {
         assert_eq!(w, back);
     }
 
+    // ── EnumRoundTripTest parity (Java ffb-server) ──────────────────────────
+
+    #[test]
+    fn weather_all_values_have_name() {
+        for w in Weather::all() {
+            assert!(!w.name().is_empty(), "All Weather values must have a non-empty name");
+        }
+    }
+
+    #[test]
+    fn weather_all_values_have_short_name() {
+        for w in Weather::all() {
+            assert!(
+                !w.short_name().is_empty(),
+                "All Weather values must have a non-empty short name"
+            );
+        }
+    }
+
+    #[test]
+    fn weather_names_are_unique() {
+        for w in Weather::all() {
+            let count = Weather::all().iter().filter(|other| other.name() == w.name()).count();
+            assert_eq!(count, 1, "Weather name '{}' must be unique", w.name());
+        }
+    }
+
+    #[test]
+    fn weather_short_names_are_unique() {
+        for w in Weather::all() {
+            let count = Weather::all()
+                .iter()
+                .filter(|other| other.short_name() == w.short_name())
+                .count();
+            assert_eq!(count, 1, "Weather shortName '{}' must be unique", w.short_name());
+        }
+    }
+
+    #[test]
+    fn weather_enum_lookup_by_name() {
+        assert_eq!(Weather::from_name("Sweltering Heat"), Some(Weather::SwelteringHeat));
+        assert_eq!(Weather::from_name("Very Sunny"), Some(Weather::VerySunny));
+        assert_eq!(Weather::from_name("Nice Weather"), Some(Weather::Nice));
+        assert_eq!(Weather::from_name("Pouring Rain"), Some(Weather::PouringRain));
+        assert_eq!(Weather::from_name("Blizzard"), Some(Weather::Blizzard));
+        assert_eq!(Weather::from_name("Intro"), Some(Weather::Intro));
+    }
+
+    #[test]
+    fn weather_sweltering_heat_name() {
+        assert_eq!(Weather::SwelteringHeat.name(), "Sweltering Heat");
+    }
+
+    #[test]
+    fn weather_nice_name() {
+        assert_eq!(Weather::Nice.name(), "Nice Weather");
+    }
+
+    #[test]
+    fn weather_blizzard_name() {
+        assert_eq!(Weather::Blizzard.name(), "Blizzard");
+    }
+
+    #[test]
+    fn weather_pouring_rain_short_name() {
+        assert_eq!(Weather::PouringRain.short_name(), "rain");
+    }
+
+    #[test]
+    fn weather_very_sunny_short_name() {
+        assert_eq!(Weather::VerySunny.short_name(), "sunny");
+    }
+
     // ── WeatherCalcTest parity — all 11 roll values 2..=12 ─────────────────────
 
     #[test]

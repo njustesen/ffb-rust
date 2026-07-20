@@ -145,19 +145,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ServerCommandModelSync::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandModelSync::default());
-        assert!(s.contains("ServerCommandModelSync"));
-    }
-
-    #[test]
     fn size_of_is_at_least_zero() {
         let _ = std::mem::size_of::<ServerCommandModelSync>();
     }

@@ -38,51 +38,72 @@ impl Default for KickoffEventCalc {
     }
 }
 
+// Tests mirror ffb-java/ffb-server/src/test/java/com/fumbbl/ffb/server/util/KickoffEventCalcTest.java 1:1
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // ── cheering_fans_total ───────────────────────────────────────────────────
+
     #[test]
-    fn cheering_fans_total_sums_all_three() {
-        // roll=3, fame=2, cheerleaders=1 → 6
-        assert_eq!(KickoffEventCalc::cheering_fans_total(3, 2, 1), 6);
+    fn cheering_fans_roll4_fame3_cheerleaders2_is9() {
+        assert_eq!(9, KickoffEventCalc::cheering_fans_total(4, 3, 2));
     }
 
     #[test]
-    fn cheering_fans_total_no_bonus() {
-        assert_eq!(KickoffEventCalc::cheering_fans_total(4, 0, 0), 4);
+    fn cheering_fans_no_cheerleaders() {
+        assert_eq!(7, KickoffEventCalc::cheering_fans_total(4, 3, 0));
+    }
+
+    // ── brilliant_coaching_total ──────────────────────────────────────────────
+
+    #[test]
+    fn brilliant_coaching_normal_coach() {
+        assert_eq!(9, KickoffEventCalc::brilliant_coaching_total(4, 3, 2, false));
     }
 
     #[test]
-    fn brilliant_coaching_total_no_ban() {
-        // roll=5, fame=1, assistants=2, no ban → 8
-        assert_eq!(KickoffEventCalc::brilliant_coaching_total(5, 1, 2, false), 8);
+    fn brilliant_coaching_banned_coach_minus1() {
+        assert_eq!(8, KickoffEventCalc::brilliant_coaching_total(4, 3, 2, true));
     }
 
     #[test]
-    fn brilliant_coaching_total_with_ban() {
-        // roll=5, fame=1, assistants=2, banned → 7
-        assert_eq!(KickoffEventCalc::brilliant_coaching_total(5, 1, 2, true), 7);
+    fn brilliant_coaching_no_assistants() {
+        assert_eq!(7, KickoffEventCalc::brilliant_coaching_total(4, 3, 0, false));
+    }
+
+    // ── gains_extra_reroll ────────────────────────────────────────────────────
+
+    #[test]
+    fn home_wins_higher_total() {
+        assert!(KickoffEventCalc::gains_extra_reroll(8, 5));
     }
 
     #[test]
-    fn gains_extra_reroll_when_ahead() {
-        assert!(KickoffEventCalc::gains_extra_reroll(7, 5));
+    fn away_wins_home_does_not() {
+        assert!(!KickoffEventCalc::gains_extra_reroll(5, 8));
     }
 
     #[test]
-    fn gains_extra_reroll_on_tie() {
-        // Both teams win on a tie
-        assert!(KickoffEventCalc::gains_extra_reroll(5, 5));
+    fn tie_both_gain_reroll() {
+        assert!(KickoffEventCalc::gains_extra_reroll(7, 7));
+    }
+
+    // ── combined scenario ─────────────────────────────────────────────────────
+
+    #[test]
+    fn scenario_cheering_fans_home_wins() {
+        let home_total = KickoffEventCalc::cheering_fans_total(4, 5, 2); // 11
+        let away_total = KickoffEventCalc::cheering_fans_total(3, 4, 1); // 8
+        assert!(KickoffEventCalc::gains_extra_reroll(home_total, away_total));
+        assert!(!KickoffEventCalc::gains_extra_reroll(away_total, home_total));
     }
 
     #[test]
-    fn no_extra_reroll_when_behind() {
-        assert!(!KickoffEventCalc::gains_extra_reroll(4, 6));
-    }
-
-    #[test]
-    fn brilliant_coaching_zero_values() {
-        assert_eq!(KickoffEventCalc::brilliant_coaching_total(1, 0, 0, false), 1);
+    fn scenario_brilliant_coaching_tie_both_win() {
+        let home_total = KickoffEventCalc::brilliant_coaching_total(3, 5, 2, false); // 10
+        let away_total = KickoffEventCalc::brilliant_coaching_total(4, 4, 2, false); // 10
+        assert!(KickoffEventCalc::gains_extra_reroll(home_total, away_total));
+        assert!(KickoffEventCalc::gains_extra_reroll(away_total, home_total));
     }
 }

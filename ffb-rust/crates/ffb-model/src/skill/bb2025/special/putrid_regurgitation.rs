@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_putrid_regurgitation() {
         assert_eq!(PutridRegurgitation::new().get_name(), "Putrid Regurgitation");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(PutridRegurgitation::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_use_vomit_after_block_property() {
+        assert!(crate::enums::SkillId::PutridRegurgitation.properties().contains(&"canUseVomitAfterBlock"));
     }
 }

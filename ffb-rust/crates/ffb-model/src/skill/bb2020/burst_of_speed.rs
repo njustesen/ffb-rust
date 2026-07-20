@@ -25,25 +25,25 @@ impl std::ops::Deref for BurstOfSpeed {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_burst_of_speed() {
         assert_eq!(BurstOfSpeed::new().get_name(), "Burst of Speed");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(BurstOfSpeed::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_make_an_extra_gfi_once_property() {
+        assert!(SkillId::BurstOfSpeed.properties().contains(&"canMakeAnExtraGfiOnce"));
     }
 
     #[test]
     fn usage_type_is_correct() {
         assert_eq!(BurstOfSpeed::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
-    }
-
-    #[test]
-    fn registers_named_property() {
-        use crate::enums::SkillId;
-        assert!(SkillId::BurstOfSpeed.properties().contains(&"canMakeAnExtraGfiOnce"));
     }
 }

@@ -30,13 +30,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_leap() {
         assert_eq!(Leap::new().get_name(), "Leap");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_agility() {
         assert_eq!(Leap::new().get_category(), SkillCategory::Agility);
+    }
+
+    #[test]
+    fn has_can_leap_property() {
+        assert!(crate::enums::SkillId::Leap.properties().contains(&"canLeap"));
     }
 
     #[test]

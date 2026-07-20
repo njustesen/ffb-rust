@@ -25,14 +25,20 @@ impl std::ops::Deref for DivingTackle {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_diving_tackle() {
         assert_eq!(DivingTackle::new().get_name(), "Diving Tackle");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_agility() {
         assert_eq!(DivingTackle::new().get_category(), SkillCategory::Agility);
+    }
+
+    #[test]
+    fn has_can_attempt_to_tackle_dodging_player_property() {
+        assert!(SkillId::DivingTackle.properties().contains(&"canAttemptToTackleDodgingPlayer"));
     }
 }

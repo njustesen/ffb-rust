@@ -25,8 +25,22 @@ impl std::ops::Deref for IllBeBack {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(IllBeBack::new().get_name(), "I'll be back!"); }
+    fn name_is_ill_be_back() {
+        assert_eq!(IllBeBack::new().get_name(), "I'll be back!");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(IllBeBack::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(IllBeBack::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the live Rust
+        // mechanism is SkillId::properties(), whose slice always exists.
+        let props: &'static [&'static str] = crate::enums::SkillId::IllBeBack.properties();
+        assert!(props.iter().all(|p| !p.is_empty()));
+    }
 }

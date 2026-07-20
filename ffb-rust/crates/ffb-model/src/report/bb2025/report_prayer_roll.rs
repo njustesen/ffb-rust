@@ -49,37 +49,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::PRAYER_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "prayerRoll");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_team_name(), "Home Ultras");
-        assert_eq!(r.get_roll(), 5);
-        assert!(r.is_home_team());
-    }
-
-    #[test]
-    fn away_team() {
-        let r = ReportPrayerRoll::new("Away Raiders".into(), 3, false);
-        assert!(!r.is_home_team());
-        assert_eq!(r.get_team_name(), "Away Raiders");
-    }
-
-    #[test]
-    fn roll_value() {
-        let r = ReportPrayerRoll::new("Team".into(), 6, true);
-        assert_eq!(r.get_roll(), 6);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

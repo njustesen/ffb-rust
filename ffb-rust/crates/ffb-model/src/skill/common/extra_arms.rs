@@ -30,8 +30,21 @@ impl std::ops::Deref for ExtraArms {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(ExtraArms::new().get_name(), "Extra Arms"); }
+    fn name_is_extra_arms() {
+        assert_eq!(ExtraArms::new().get_name(), "Extra Arms");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(ExtraArms::new().get_category(), SkillCategory::Mutation); }
+    fn category_is_mutation() {
+        assert_eq!(ExtraArms::new().get_category(), SkillCategory::Mutation);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java asserts getSkillProperties() is not null; the live Rust mechanism
+        // always returns a slice (empty here — ExtraArms registers only modifiers, no NamedProperties).
+        assert!(crate::enums::SkillId::ExtraArms.properties().is_empty());
+    }
 }

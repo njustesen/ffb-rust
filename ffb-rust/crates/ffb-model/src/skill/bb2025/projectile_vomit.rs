@@ -28,13 +28,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_projectile_vomit() {
         assert_eq!(ProjectileVomit::new().get_name(), "Projectile Vomit");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(ProjectileVomit::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_provides_block_alternative_property() {
+        assert!(crate::enums::SkillId::ProjectileVomit.properties().contains(&"providesBlockAlternative"));
     }
 
     #[test]

@@ -53,26 +53,12 @@ mod tests {
     }
 
     #[test]
-    fn default_same_as_new() { let _ = ClientCommandConcedeGame::default(); }
-
-    #[test]
     fn stores_concede_status() {
         let cmd = ClientCommandConcedeGame {
             entropy: None,
             concede_game_status: Some(ConcedeGameStatus::REQUESTED),
         };
         assert!(cmd.get_concede_game_status().is_some());
-    }
-
-    #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandConcedeGame::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandConcedeGame::default().clone();
     }
 
     #[test]

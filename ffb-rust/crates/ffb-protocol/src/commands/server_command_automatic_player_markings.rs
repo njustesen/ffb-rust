@@ -81,22 +81,6 @@ mod tests {
         assert!(cmd.markings.is_empty());
         assert_eq!(cmd.index, 0);
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandAutomaticPlayerMarkings::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandAutomaticPlayerMarkings::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandAutomaticPlayerMarkings::default());
-        assert!(s.contains("ServerCommandAutomaticPlayerMarkings"));
-    }
 
     #[test]
     fn get_id_is_server_automatic_player_markings() {

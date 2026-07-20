@@ -27,52 +27,52 @@ impl Default for BlockResultCalc {
     }
 }
 
+// Test mirror of com.fumbbl.ffb.server.util.BlockResultCalcTest
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn roll_1_is_skull() {
+    fn block_result_for_roll() {
+        for (roll, expected) in [
+            (1, BlockResult::Skull),
+            (2, BlockResult::BothDown),
+            (3, BlockResult::Pushback),
+            (4, BlockResult::Pushback),
+            (5, BlockResult::PowPushback),
+            (6, BlockResult::Pow),
+        ] {
+            assert_eq!(BlockResultCalc::block_result_for_roll(roll), expected, "roll={roll}");
+        }
+    }
+
+    #[test]
+    fn skull_on_1() {
         assert_eq!(BlockResultCalc::block_result_for_roll(1), BlockResult::Skull);
     }
 
     #[test]
-    fn roll_2_is_both_down() {
+    fn both_down_on_2() {
         assert_eq!(BlockResultCalc::block_result_for_roll(2), BlockResult::BothDown);
     }
 
     #[test]
-    fn roll_3_is_pushback() {
+    fn pushback_on_3() {
         assert_eq!(BlockResultCalc::block_result_for_roll(3), BlockResult::Pushback);
     }
 
     #[test]
-    fn roll_4_is_pushback() {
+    fn pushback_on_4() {
         assert_eq!(BlockResultCalc::block_result_for_roll(4), BlockResult::Pushback);
     }
 
     #[test]
-    fn roll_5_is_pow_pushback() {
+    fn pow_pushback_on_5() {
         assert_eq!(BlockResultCalc::block_result_for_roll(5), BlockResult::PowPushback);
     }
 
     #[test]
-    fn roll_6_is_pow() {
+    fn pow_on_6() {
         assert_eq!(BlockResultCalc::block_result_for_roll(6), BlockResult::Pow);
-    }
-
-    #[test]
-    fn all_six_faces_map_correctly() {
-        let expected = [
-            BlockResult::Skull,
-            BlockResult::BothDown,
-            BlockResult::Pushback,
-            BlockResult::Pushback,
-            BlockResult::PowPushback,
-            BlockResult::Pow,
-        ];
-        for (i, exp) in expected.iter().enumerate() {
-            assert_eq!(BlockResultCalc::block_result_for_roll(i as i32 + 1), *exp);
-        }
     }
 }

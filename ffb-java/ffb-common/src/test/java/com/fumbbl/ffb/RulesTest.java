@@ -7,6 +7,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.util.Arrays;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,6 +42,18 @@ public class RulesTest {
 	@Test
 	public void _2020IsNotEligibleForCommon() {
 		assertFalse(RulesCollection.Rules.COMMON.isOrExtends(RulesCollection.Rules.BB2020));
+	}
+
+	@Test
+	public void _2016IsNotEligibleFor2025() {
+		assertFalse(RulesCollection.Rules.BB2025.isOrExtends(RulesCollection.Rules.BB2016));
+	}
+
+	@Test
+	public void nameValues() {
+		assertEquals("BB2016", RulesCollection.Rules.BB2016.name());
+		assertEquals("BB2025", RulesCollection.Rules.BB2025.name());
+		assertEquals("COMMON", RulesCollection.Rules.COMMON.name());
 	}
 
 

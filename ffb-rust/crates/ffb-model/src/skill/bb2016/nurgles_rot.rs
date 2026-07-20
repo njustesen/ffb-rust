@@ -25,14 +25,20 @@ impl std::ops::Deref for NurglesRot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_nurgles_rot() {
         assert_eq!(NurglesRot::new().get_name(), "Nurgle's Rot");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(NurglesRot::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_allows_raising_lineman_property() {
+        assert!(SkillId::NurglesRot.properties().contains(&"allowsRaisingLineman"));
     }
 }

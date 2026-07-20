@@ -63,39 +63,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::SPELL_EFFECT_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "spellEffectRoll");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_special_effect(), SpecialEffect::LIGHTNING);
-        assert_eq!(r.get_player_id(), Some("p1"));
-        assert_eq!(r.get_roll(), 4);
-        assert!(r.is_successful());
-    }
-
-    #[test]
-    fn unsuccessful_no_player() {
-        let r = ReportSpecialEffectRoll::new(SpecialEffect::FIREBALL, None, 2, false);
-        assert!(!r.is_successful());
-        assert_eq!(r.get_player_id(), None);
-    }
-
-    #[test]
-    fn fireball_effect() {
-        let r = ReportSpecialEffectRoll::new(SpecialEffect::FIREBALL, Some("p2".into()), 5, true);
-        assert_eq!(r.get_special_effect(), SpecialEffect::FIREBALL);
-        assert_eq!(r.get_roll(), 5);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

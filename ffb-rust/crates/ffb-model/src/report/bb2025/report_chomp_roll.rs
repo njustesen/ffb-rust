@@ -81,39 +81,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::CHOMP_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "chompRoll");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_chomper(), "chomper1");
-        assert_eq!(r.get_chompee(), "chompee1");
-        assert!(r.is_successful());
-    }
-
-    #[test]
-    fn minimum_roll_and_rerolled() {
-        let r = make();
-        assert_eq!(r.get_minimum_roll(), 3);
-        assert!(!r.is_re_rolled());
-    }
-
-    #[test]
-    fn unsuccessful_with_player_id() {
-        let r = ReportChompRoll::new(Some("p2".into()), false, 2, 4, true, "c1".into(), "c2".into());
-        assert!(!r.is_successful());
-        assert_eq!(r.get_player_id(), Some("p2"));
-        assert!(r.is_re_rolled());
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

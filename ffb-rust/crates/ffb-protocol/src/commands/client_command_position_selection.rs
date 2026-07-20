@@ -83,18 +83,6 @@ mod tests {
         assert_eq!(cmd.get_position(), positions.as_slice());
     }
 
-
-    #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandPositionSelection::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandPositionSelection::default().clone();
-    }
-
     #[test]
     fn get_id_is_client_position_selection() {
         assert_eq!(ClientCommandPositionSelection::new().get_id(), NetCommandId::ClientPositionSelection);

@@ -76,163 +76,163 @@ pub const PLAYER_STATE_BADLY_HURT: i32 = 7;
 
 #[cfg(test)]
 mod tests {
+    // 1:1 mirror of com.fumbbl.ffb.server.mechanic.CasualtyCalcTest
+    // (Java @ParameterizedTest value sources become in-test loops).
     use super::*;
 
-    // ── casualty_tier_bb2016 ─────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════
+    // BB2016 — 2d6 casualty die (only first die matters for tier)
+    // ══════════════════════════════════════════════════════════════════════
 
     #[test]
-    fn bb2016_die_6_is_rip() {
+    fn bb2016_first_die1to3_is_badly_hurt() {
+        for die in [1, 2, 3] {
+            assert_eq!(CasualtyCalc::casualty_tier_bb2016(die), PLAYER_STATE_BADLY_HURT, "die={die}");
+        }
+    }
+
+    #[test]
+    fn bb2016_first_die4or5_is_serious_injury() {
+        for die in [4, 5] {
+            assert_eq!(CasualtyCalc::casualty_tier_bb2016(die), PLAYER_STATE_SERIOUS_INJURY, "die={die}");
+        }
+    }
+
+    #[test]
+    fn bb2016_first_die6_is_rip() {
         assert_eq!(CasualtyCalc::casualty_tier_bb2016(6), PLAYER_STATE_RIP);
     }
 
     #[test]
-    fn bb2016_die_4_is_serious_injury() {
-        assert_eq!(CasualtyCalc::casualty_tier_bb2016(4), PLAYER_STATE_SERIOUS_INJURY);
+    fn bb2016_requires_si_roll_only_for4and5() {
+        for die in [4, 5] {
+            assert!(CasualtyCalc::requires_si_roll_bb2016(die), "die={die}");
+        }
     }
 
     #[test]
-    fn bb2016_die_5_is_serious_injury() {
-        assert_eq!(CasualtyCalc::casualty_tier_bb2016(5), PLAYER_STATE_SERIOUS_INJURY);
+    fn bb2016_no_si_roll_for1to3and6() {
+        for die in [1, 2, 3, 6] {
+            assert!(!CasualtyCalc::requires_si_roll_bb2016(die), "die={die}");
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // BB2020 — d16 casualty roll
+    // ══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn bb2020_roll1to6_is_badly_hurt() {
+        for roll in [1, 2, 3, 4, 5, 6] {
+            assert_eq!(CasualtyCalc::casualty_tier_bb2020(roll), PLAYER_STATE_BADLY_HURT, "roll={roll}");
+        }
     }
 
     #[test]
-    fn bb2016_die_1_is_badly_hurt() {
-        assert_eq!(CasualtyCalc::casualty_tier_bb2016(1), PLAYER_STATE_BADLY_HURT);
+    fn bb2020_roll7to14_is_serious_injury() {
+        for roll in [7, 8, 9, 10, 11, 12, 13, 14] {
+            assert_eq!(CasualtyCalc::casualty_tier_bb2020(roll), PLAYER_STATE_SERIOUS_INJURY, "roll={roll}");
+        }
     }
 
     #[test]
-    fn bb2016_die_3_is_badly_hurt() {
-        assert_eq!(CasualtyCalc::casualty_tier_bb2016(3), PLAYER_STATE_BADLY_HURT);
-    }
-
-    // ── casualty_tier_bb2020 ─────────────────────────────────────────────
-
-    #[test]
-    fn bb2020_roll_15_is_rip() {
-        assert_eq!(CasualtyCalc::casualty_tier_bb2020(15), PLAYER_STATE_RIP);
+    fn bb2020_roll15plus_is_rip() {
+        for roll in [15, 16, 17] {
+            assert_eq!(CasualtyCalc::casualty_tier_bb2020(roll), PLAYER_STATE_RIP, "roll={roll}");
+        }
     }
 
     #[test]
-    fn bb2020_roll_16_is_rip() {
-        assert_eq!(CasualtyCalc::casualty_tier_bb2020(16), PLAYER_STATE_RIP);
-    }
-
-    #[test]
-    fn bb2020_roll_7_is_serious_injury() {
-        assert_eq!(CasualtyCalc::casualty_tier_bb2020(7), PLAYER_STATE_SERIOUS_INJURY);
-    }
-
-    #[test]
-    fn bb2020_roll_14_is_serious_injury() {
-        assert_eq!(CasualtyCalc::casualty_tier_bb2020(14), PLAYER_STATE_SERIOUS_INJURY);
-    }
-
-    #[test]
-    fn bb2020_roll_6_is_badly_hurt() {
-        assert_eq!(CasualtyCalc::casualty_tier_bb2020(6), PLAYER_STATE_BADLY_HURT);
-    }
-
-    #[test]
-    fn bb2020_roll_1_is_badly_hurt() {
-        assert_eq!(CasualtyCalc::casualty_tier_bb2020(1), PLAYER_STATE_BADLY_HURT);
-    }
-
-    // ── casualty_tier_bb2025 ─────────────────────────────────────────────
-
-    #[test]
-    fn bb2025_roll_15_is_rip() {
-        assert_eq!(CasualtyCalc::casualty_tier_bb2025(15), PLAYER_STATE_RIP);
-    }
-
-    #[test]
-    fn bb2025_roll_9_is_serious_injury() {
-        assert_eq!(CasualtyCalc::casualty_tier_bb2025(9), PLAYER_STATE_SERIOUS_INJURY);
-    }
-
-    #[test]
-    fn bb2025_roll_14_is_serious_injury() {
-        assert_eq!(CasualtyCalc::casualty_tier_bb2025(14), PLAYER_STATE_SERIOUS_INJURY);
-    }
-
-    #[test]
-    fn bb2025_roll_8_is_badly_hurt() {
-        assert_eq!(CasualtyCalc::casualty_tier_bb2025(8), PLAYER_STATE_BADLY_HURT);
-    }
-
-    #[test]
-    fn bb2025_roll_1_is_badly_hurt() {
-        assert_eq!(CasualtyCalc::casualty_tier_bb2025(1), PLAYER_STATE_BADLY_HURT);
-    }
-
-    // ── requires_si_roll ─────────────────────────────────────────────────
-
-    #[test]
-    fn bb2016_die_4_requires_si_roll() {
-        assert!(CasualtyCalc::requires_si_roll_bb2016(4));
-    }
-
-    #[test]
-    fn bb2016_die_5_requires_si_roll() {
-        assert!(CasualtyCalc::requires_si_roll_bb2016(5));
-    }
-
-    #[test]
-    fn bb2016_die_6_does_not_require_si_roll() {
-        assert!(!CasualtyCalc::requires_si_roll_bb2016(6));
-    }
-
-    #[test]
-    fn bb2020_roll_13_requires_si_roll() {
-        assert!(CasualtyCalc::requires_si_roll_bb2020(13));
-    }
-
-    #[test]
-    fn bb2020_roll_14_requires_si_roll() {
-        assert!(CasualtyCalc::requires_si_roll_bb2020(14));
-    }
-
-    #[test]
-    fn bb2020_roll_12_does_not_require_si_roll() {
+    fn bb2020_requires_si_roll_only_for13and14() {
         assert!(!CasualtyCalc::requires_si_roll_bb2020(12));
-    }
-
-    // ── serious_injury_sub_type ──────────────────────────────────────────
-
-    #[test]
-    fn bb2020_roll_10_12_is_serious_injury_subtype() {
-        for r in 10..=12 {
-            assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2020(r), Some("SERIOUS_INJURY"), "roll={r}");
-        }
+        assert!(CasualtyCalc::requires_si_roll_bb2020(13));
+        assert!(CasualtyCalc::requires_si_roll_bb2020(14));
+        assert!(!CasualtyCalc::requires_si_roll_bb2020(15));
     }
 
     #[test]
-    fn bb2020_roll_7_9_is_seriously_hurt() {
-        for r in 7..=9 {
-            assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2020(r), Some("SERIOUSLY_HURT"), "roll={r}");
-        }
+    fn bb2020_serious_injury_sub_type_seriously_hurt() {
+        assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2020(7), Some("SERIOUSLY_HURT"));
+        assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2020(9), Some("SERIOUSLY_HURT"));
     }
 
     #[test]
-    fn bb2020_roll_6_has_no_subtype() {
+    fn bb2020_serious_injury_sub_type_serious_injury() {
+        assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2020(10), Some("SERIOUS_INJURY"));
+        assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2020(12), Some("SERIOUS_INJURY"));
+    }
+
+    #[test]
+    fn bb2020_serious_injury_sub_type_null_for_si_table_rolls() {
+        assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2020(13), None);
+        assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2020(14), None);
+    }
+
+    #[test]
+    fn bb2020_serious_injury_sub_type_null_below_si_range() {
         assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2020(6), None);
     }
 
+    // ══════════════════════════════════════════════════════════════════════
+    // BB2025 — d16 casualty roll (same structure, different thresholds)
+    // ══════════════════════════════════════════════════════════════════════
+
     #[test]
-    fn bb2025_roll_11_12_is_serious_injury_subtype() {
-        for r in 11..=12 {
-            assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2025(r), Some("SERIOUS_INJURY"), "roll={r}");
+    fn bb2025_roll1to8_is_badly_hurt() {
+        for roll in [1, 2, 3, 4, 5, 6, 7, 8] {
+            assert_eq!(CasualtyCalc::casualty_tier_bb2025(roll), PLAYER_STATE_BADLY_HURT, "roll={roll}");
         }
     }
 
     #[test]
-    fn bb2025_roll_9_10_is_seriously_hurt() {
-        for r in 9..=10 {
-            assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2025(r), Some("SERIOUSLY_HURT"), "roll={r}");
+    fn bb2025_roll9to14_is_serious_injury() {
+        for roll in [9, 10, 11, 12, 13, 14] {
+            assert_eq!(CasualtyCalc::casualty_tier_bb2025(roll), PLAYER_STATE_SERIOUS_INJURY, "roll={roll}");
         }
     }
 
     #[test]
-    fn bb2025_roll_8_has_no_subtype() {
+    fn bb2025_roll15plus_is_rip() {
+        for roll in [15, 16] {
+            assert_eq!(CasualtyCalc::casualty_tier_bb2025(roll), PLAYER_STATE_RIP, "roll={roll}");
+        }
+    }
+
+    #[test]
+    fn bb2025_serious_injury_sub_type_seriously_hurt() {
+        assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2025(9), Some("SERIOUSLY_HURT"));
+        assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2025(10), Some("SERIOUSLY_HURT"));
+    }
+
+    #[test]
+    fn bb2025_serious_injury_sub_type_serious_injury() {
+        assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2025(11), Some("SERIOUS_INJURY"));
+        assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2025(12), Some("SERIOUS_INJURY"));
+    }
+
+    #[test]
+    fn bb2025_serious_injury_sub_type_null_for_si_table_rolls() {
+        assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2025(13), None);
+        assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2025(14), None);
+    }
+
+    #[test]
+    fn bb2025_serious_injury_sub_type_null_below_si_range() {
         assert_eq!(CasualtyCalc::serious_injury_sub_type_bb2025(8), None);
+    }
+
+    // ── Cross-edition comparison ──────────────────────────────────────────
+
+    #[test]
+    fn bb2025_has_higher_badly_hurt_threshold_than_bb2020() {
+        // BB2020: roll 7 → SI; BB2025: roll 7 → Badly Hurt
+        assert_eq!(CasualtyCalc::casualty_tier_bb2020(7), PLAYER_STATE_SERIOUS_INJURY);
+        assert_eq!(CasualtyCalc::casualty_tier_bb2025(7), PLAYER_STATE_BADLY_HURT);
+    }
+
+    #[test]
+    fn bb2025_roll8_is_badly_hurt_unlike_bb2020() {
+        assert_eq!(CasualtyCalc::casualty_tier_bb2020(8), PLAYER_STATE_SERIOUS_INJURY);
+        assert_eq!(CasualtyCalc::casualty_tier_bb2025(8), PLAYER_STATE_BADLY_HURT);
     }
 }

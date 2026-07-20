@@ -25,14 +25,20 @@ impl std::ops::Deref for Regeneration {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_regeneration() {
         assert_eq!(Regeneration::new().get_name(), "Regeneration");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(Regeneration::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_can_roll_to_save_from_injury_property() {
+        assert!(SkillId::Regeneration.properties().contains(&"canRollToSaveFromInjury"));
     }
 }

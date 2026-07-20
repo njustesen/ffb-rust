@@ -25,8 +25,26 @@ impl std::ops::Deref for OnTheBall {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors ffb-java OnTheBallSkillTest.
+
     #[test]
-    fn name_is_correct() { assert_eq!(OnTheBall::new().get_name(), "On The Ball"); }
+    fn name_is_on_the_ball() {
+        assert_eq!(OnTheBall::new().get_name(), "On The Ball");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(OnTheBall::new().get_category(), SkillCategory::Passing); }
+    fn category_is_passing() {
+        assert_eq!(OnTheBall::new().get_category(), SkillCategory::Passing);
+    }
+
+    #[test]
+    fn has_can_move_during_kickoff_scatter_property() {
+        assert!(crate::enums::SkillId::OnTheBall.properties().contains(&"canMoveDuringKickOffScatter"));
+    }
+
+    #[test]
+    fn class_name_is_on_the_ball() {
+        assert_eq!(crate::enums::SkillId::OnTheBall.class_name(), "OnTheBall");
+    }
 }

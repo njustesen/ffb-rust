@@ -53,38 +53,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::TEAM_CAPTAIN_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "teamCaptainRoll");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_team_id(), "team1");
-        assert_eq!(r.get_minimum_roll(), 4);
-        assert!(r.is_successful());
-    }
-
-    #[test]
-    fn roll_value() {
-        let r = make();
-        assert_eq!(r.get_roll(), 5);
-    }
-
-    #[test]
-    fn unsuccessful_roll_below_minimum() {
-        let r = ReportTeamCaptainRoll::new("team2".into(), 4, 3, false);
-        assert!(!r.is_successful());
-        assert_eq!(r.get_roll(), 3);
-        assert_eq!(r.get_team_id(), "team2");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

@@ -27,12 +27,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_monstrous_mouth() {
         assert_eq!(MonstrousMouth::new().get_name(), "Monstrous Mouth");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_mutation() {
         assert_eq!(MonstrousMouth::new().get_category(), SkillCategory::Mutation);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the bb2025 Java postConstruct
+        // registers NamedProperties, so the live SkillId table must be populated.
+        assert!(!crate::enums::SkillId::MonstrousMouth.properties().is_empty());
     }
 }

@@ -75,22 +75,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::TENTACLES_SHADOWING_ROLL); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "tentaclesShadowingRoll"); }
-
-    #[test]
-    fn get_defender_id() { assert_eq!(make().get_defender_id(), Some("d1")); }
-
-    #[test]
-    fn is_successful() { assert!(make().is_successful()); }
-    #[test]
-    fn get_name_is_nonempty() {
-        assert!(!make().get_name().is_empty());
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

@@ -65,10 +65,6 @@ mod tests {
         let m = RollModifier::new("x", 3);
         assert_eq!(m.get_multiplier(), 3);
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", RollModifier::default()).is_empty());
-    }
 
 
     #[test]

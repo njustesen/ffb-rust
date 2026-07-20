@@ -25,8 +25,21 @@ impl std::ops::Deref for KickTeamMate {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(KickTeamMate::new().get_name(), "Kick Team-Mate"); }
+    fn name_is_kick_team_mate() {
+        assert_eq!(KickTeamMate::new().get_name(), "Kick Team-Mate");
+    }
+
+    // Java test (bb2016 class) asserts EXTRAORDINARY; the mixed edition class mirrored
+    // here uses SkillCategory.TRAIT.
     #[test]
-    fn category_is_correct() { assert_eq!(KickTeamMate::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(KickTeamMate::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_kick_team_mates_property() {
+        assert!(crate::enums::SkillId::KickTeamMate.properties().contains(&"canKickTeamMates"));
+    }
 }

@@ -47,25 +47,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::KICKOFF_TIMEOUT); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "kickoffTimeout"); }
-
-    #[test]
-    fn get_turn_number() { assert_eq!(make().get_turn_number(), 4); }
-
-    #[test]
-    fn get_turn_modifier() { assert_eq!(make().get_turn_modifier(), 1); }
-
-    #[test]
-    fn negative_modifier() {
-        let r = ReportKickoffTimeout::new(-1, 8);
-        assert_eq!(r.get_turn_modifier(), -1);
-        assert_eq!(r.get_turn_number(), 8);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

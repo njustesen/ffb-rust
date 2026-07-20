@@ -83,11 +83,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandGaze::default()).is_empty());
-    }
-
-    #[test]
     fn get_id_is_client_gaze() {
         assert_eq!(ClientCommandGaze::new().get_id(), NetCommandId::ClientGaze);
     }

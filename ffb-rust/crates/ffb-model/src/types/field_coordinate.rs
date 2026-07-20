@@ -287,11 +287,19 @@ mod tests {
     }
 
     #[test]
-    fn adjacent() {
-        let a = FieldCoordinate::new(5, 5);
-        assert!(a.is_adjacent(FieldCoordinate::new(6, 5)));
-        assert!(a.is_adjacent(FieldCoordinate::new(6, 6)));
-        assert!(!a.is_adjacent(FieldCoordinate::new(7, 5)));
+    fn field_coordinate_adjacent_to_neighbor() {
+        assert!(FieldCoordinate::new(5, 5).is_adjacent(FieldCoordinate::new(6, 5)));
+        assert!(FieldCoordinate::new(5, 5).is_adjacent(FieldCoordinate::new(5, 6)));
+    }
+
+    #[test]
+    fn field_coordinate_adjacent_to_diagonal() {
+        assert!(FieldCoordinate::new(5, 5).is_adjacent(FieldCoordinate::new(6, 6)));
+    }
+
+    #[test]
+    fn field_coordinate_not_adjacent_to_far_square() {
+        assert!(!FieldCoordinate::new(1, 1).is_adjacent(FieldCoordinate::new(5, 5)));
     }
 
     #[test]
@@ -357,27 +365,74 @@ mod tests {
     }
 
     #[test]
-    fn coordinate_add_returns_correct_result() {
+    fn field_coordinate_get_x() {
+        assert_eq!(FieldCoordinate::new(5, 3).x, 5);
+    }
+
+    #[test]
+    fn field_coordinate_get_y() {
+        assert_eq!(FieldCoordinate::new(5, 3).y, 3);
+    }
+
+    #[test]
+    fn field_coordinate_add_returns_correct_result() {
         let c = FieldCoordinate::new(5, 5).add(2, -1);
         assert_eq!(c.x, 7);
         assert_eq!(c.y, 4);
     }
 
     #[test]
-    fn box_coordinate_is_true_for_home_rsv() {
+    fn field_coordinate_home_box_is_box_coordinate() {
         assert!(FieldCoordinate::new(RSV_HOME_X, 1).is_box_coordinate());
         assert!(FieldCoordinate::new(KO_HOME_X, 1).is_box_coordinate());
+    }
+
+    #[test]
+    fn field_coordinate_away_box_is_box_coordinate() {
         assert!(FieldCoordinate::new(RSV_AWAY_X, 1).is_box_coordinate());
     }
 
     #[test]
-    fn pitch_coordinate_is_not_box() {
+    fn field_coordinate_pitch_coordinate_is_not_box() {
         assert!(!FieldCoordinate::new(5, 5).is_box_coordinate());
     }
 
     #[test]
-    fn bounds_endzone_home_and_away_in_bounds() {
+    fn field_coordinate_bounds_field_contains_center() {
+        assert!(FieldCoordinateBounds::FIELD.is_in_bounds(FieldCoordinate::new(13, 8)));
+    }
+
+    // Java asserts getTopLeftCorner() is not null; Rust fields cannot be null,
+    // so assert the known corner value instead.
+    #[test]
+    fn field_coordinate_bounds_has_top_left_corner() {
+        assert_eq!(FieldCoordinateBounds::FIELD.top_left, FieldCoordinate::new(0, 0));
+    }
+
+    // Java asserts getBottomRightCorner() is not null; Rust fields cannot be null,
+    // so assert the known corner value instead.
+    #[test]
+    fn field_coordinate_bounds_has_bottom_right_corner() {
+        assert_eq!(FieldCoordinateBounds::FIELD.bottom_right, FieldCoordinate::new(25, 14));
+    }
+
+    #[test]
+    fn field_coordinate_bounds_field_width_is_26() {
+        assert_eq!(FieldCoordinateBounds::FIELD.width(), 26);
+    }
+
+    #[test]
+    fn field_coordinate_bounds_field_height_is_15() {
+        assert_eq!(FieldCoordinateBounds::FIELD.height(), 15);
+    }
+
+    #[test]
+    fn field_coordinate_bounds_endzone_home_in_bounds() {
         assert!(FieldCoordinateBounds::ENDZONE_HOME.is_in_bounds(FieldCoordinate::new(0, 5)));
+    }
+
+    #[test]
+    fn field_coordinate_bounds_endzone_away_in_bounds() {
         assert!(FieldCoordinateBounds::ENDZONE_AWAY.is_in_bounds(FieldCoordinate::new(25, 5)));
     }
 

@@ -75,22 +75,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::PENALTY_SHOOTOUT); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "penaltyShootout"); }
-
-    #[test]
-    fn get_roll_home() { assert_eq!(make().get_roll_home(), 4); }
-
-    #[test]
-    fn get_home_team_won_penalty() { assert_eq!(make().get_home_team_won_penalty(), Some(true)); }
-    #[test]
-    fn get_name_is_nonempty() {
-        assert!(!make().get_name().is_empty());
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

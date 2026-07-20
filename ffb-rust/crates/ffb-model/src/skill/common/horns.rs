@@ -25,8 +25,19 @@ impl std::ops::Deref for Horns {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(Horns::new().get_name(), "Horns"); }
+    fn name_is_horns() {
+        assert_eq!(Horns::new().get_name(), "Horns");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Horns::new().get_category(), SkillCategory::Mutation); }
+    fn category_is_mutation() {
+        assert_eq!(Horns::new().get_category(), SkillCategory::Mutation);
+    }
+
+    #[test]
+    fn has_add_strength_on_blitz_property() {
+        assert!(crate::enums::SkillId::Horns.properties().contains(&"addStrengthOnBlitz"));
+    }
 }

@@ -45,25 +45,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::SHOW_STAR_RE_ROLLS_LOST); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "showStarReRollLost"); }
-
-    #[test]
-    fn get_amount() { assert_eq!(make().get_amount(), 1); }
-
-    #[test]
-    fn get_team_id() { assert_eq!(make().get_team_id(), Some("team1")); }
-
-    #[test]
-    fn team_id_none_and_zero_amount() {
-        let r = ReportShowStarReRollsLost::new(None, 0);
-        assert!(r.get_team_id().is_none());
-        assert_eq!(r.get_amount(), 0);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

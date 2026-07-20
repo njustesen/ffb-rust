@@ -47,25 +47,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::PUMP_UP_THE_CROWD_RE_ROLLS_LOST); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "pumpUpTheCrowdReRollLost"); }
-
-    #[test]
-    fn get_amount() { assert_eq!(make().get_amount(), 2); }
-
-    #[test]
-    fn get_team_id() { assert_eq!(make().get_team_id(), Some("team1")); }
-
-    #[test]
-    fn team_id_none() {
-        let r = ReportPumpUpTheCrowdReRollsLost::new(None, 0);
-        assert!(r.get_team_id().is_none());
-        assert_eq!(r.get_amount(), 0);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

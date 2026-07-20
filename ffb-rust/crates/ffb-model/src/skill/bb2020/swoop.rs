@@ -25,14 +25,22 @@ impl std::ops::Deref for Swoop {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
+
+    // bb2020/Swoop is SkillCategory.TRAIT (the bb2016 test's EXTRAORDINARY is bb2016-only).
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_swoop() {
         assert_eq!(Swoop::new().get_name(), "Swoop");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(Swoop::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_prevent_stunty_dodge_modifier_property() {
+        assert!(SkillId::Swoop.properties().contains(&"preventStuntyDodgeModifier"));
     }
 }

@@ -25,14 +25,20 @@ impl std::ops::Deref for Swarming {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_swarming() {
         assert_eq!(Swarming::new().get_name(), "Swarming");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(Swarming::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_can_sneak_extra_players_onto_pitch_property() {
+        assert!(SkillId::Swarming.properties().contains(&"canSneakExtraPlayersOntoPitch"));
     }
 }

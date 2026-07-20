@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_right_stuff() {
         assert_eq!(RightStuff::new().get_name(), "Right Stuff");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(RightStuff::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_be_thrown_property() {
+        assert!(crate::enums::SkillId::RightStuff.properties().contains(&"canBeThrown"));
     }
 }

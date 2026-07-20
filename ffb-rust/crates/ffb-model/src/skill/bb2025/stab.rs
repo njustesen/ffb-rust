@@ -28,13 +28,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_stab() {
         assert_eq!(Stab::new().get_name(), "Stab");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(Stab::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_perform_armour_roll_instead_of_block_property() {
+        assert!(crate::enums::SkillId::Stab.properties().contains(&"canPerformArmourRollInsteadOfBlock"));
     }
 
     #[test]

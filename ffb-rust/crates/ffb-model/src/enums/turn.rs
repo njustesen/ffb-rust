@@ -76,42 +76,46 @@ impl TurnMode {
         }
     }
 
+    /// Java: `TurnMode.forName` matches names case-insensitively.
     pub fn from_name(name: &str) -> Option<TurnMode> {
-        match name {
-            "regular" => Some(TurnMode::Regular),
-            "setup" => Some(TurnMode::Setup),
-            "kickoff" => Some(TurnMode::Kickoff),
-            "perfectDefence" => Some(TurnMode::PerfectDefence),
-            "solidDefence" => Some(TurnMode::SolidDefence),
-            "quickSnap" => Some(TurnMode::QuickSnap),
-            "highKick" => Some(TurnMode::HighKick),
-            "startGame" => Some(TurnMode::StartGame),
-            "blitz" => Some(TurnMode::Blitz),
-            "touchback" => Some(TurnMode::Touchback),
-            "interception" => Some(TurnMode::Interception),
-            "endGame" => Some(TurnMode::EndGame),
-            "swarming" => Some(TurnMode::Swarming),
-            "kickoffReturn" => Some(TurnMode::KickoffReturn),
-            "wizard" => Some(TurnMode::Wizard),
-            "passBlock" => Some(TurnMode::PassBlock),
-            "dumpOff" => Some(TurnMode::DumpOff),
-            "noPlayersToField" => Some(TurnMode::NoPlayersToField),
-            "bombHome" => Some(TurnMode::BombHome),
-            "bombAway" => Some(TurnMode::BombAway),
-            "bombHomeBlitz" => Some(TurnMode::BombHomeBlitz),
-            "bombAwayBlitz" => Some(TurnMode::BombAwayBlitz),
-            "illegalSubstitution" => Some(TurnMode::IllegalSubstitution),
-            "selectBlitzTarget" => Some(TurnMode::SelectBlitzTarget),
-            "selectGazeTarget" => Some(TurnMode::SelectGazeTarget),
-            "safePairOfHands" => Some(TurnMode::SafePairOfHands),
-            "selectBlockKind" => Some(TurnMode::SelectBlockKind),
-            "betweenTurns" => Some(TurnMode::BetweenTurns),
-            "trickster" => Some(TurnMode::Trickster),
-            "raidingParty" => Some(TurnMode::RaidingParty),
-            "hitAndRun" => Some(TurnMode::HitAndRun),
-            "thenIStartedBlastin" => Some(TurnMode::ThenIStartedBlastin),
-            _ => None,
-        }
+        Self::all().iter().copied().find(|v| v.name().eq_ignore_ascii_case(name))
+    }
+
+    pub fn all() -> &'static [TurnMode] {
+        &[
+            TurnMode::Regular,
+            TurnMode::Setup,
+            TurnMode::Kickoff,
+            TurnMode::PerfectDefence,
+            TurnMode::SolidDefence,
+            TurnMode::QuickSnap,
+            TurnMode::HighKick,
+            TurnMode::StartGame,
+            TurnMode::Blitz,
+            TurnMode::Touchback,
+            TurnMode::Interception,
+            TurnMode::EndGame,
+            TurnMode::Swarming,
+            TurnMode::KickoffReturn,
+            TurnMode::Wizard,
+            TurnMode::PassBlock,
+            TurnMode::DumpOff,
+            TurnMode::NoPlayersToField,
+            TurnMode::BombHome,
+            TurnMode::BombAway,
+            TurnMode::BombHomeBlitz,
+            TurnMode::BombAwayBlitz,
+            TurnMode::IllegalSubstitution,
+            TurnMode::SelectBlitzTarget,
+            TurnMode::SelectGazeTarget,
+            TurnMode::SafePairOfHands,
+            TurnMode::SelectBlockKind,
+            TurnMode::BetweenTurns,
+            TurnMode::Trickster,
+            TurnMode::RaidingParty,
+            TurnMode::HitAndRun,
+            TurnMode::ThenIStartedBlastin,
+        ]
     }
 
     /// Whether to check for active negatrait (BoneHead/ReallyStupid/etc.) at turn start.
@@ -148,19 +152,115 @@ impl TurnMode {
 mod tests {
     use super::*;
 
+    const ALL: [TurnMode; 32] = [
+        TurnMode::Regular, TurnMode::Setup, TurnMode::Kickoff, TurnMode::PerfectDefence,
+        TurnMode::SolidDefence, TurnMode::QuickSnap, TurnMode::HighKick, TurnMode::StartGame,
+        TurnMode::Blitz, TurnMode::Touchback, TurnMode::Interception, TurnMode::EndGame,
+        TurnMode::Swarming, TurnMode::KickoffReturn, TurnMode::Wizard, TurnMode::PassBlock,
+        TurnMode::DumpOff, TurnMode::NoPlayersToField, TurnMode::BombHome, TurnMode::BombAway,
+        TurnMode::BombHomeBlitz, TurnMode::BombAwayBlitz, TurnMode::IllegalSubstitution,
+        TurnMode::SelectBlitzTarget, TurnMode::SelectGazeTarget, TurnMode::SafePairOfHands,
+        TurnMode::SelectBlockKind, TurnMode::BetweenTurns, TurnMode::Trickster,
+        TurnMode::RaidingParty, TurnMode::HitAndRun, TurnMode::ThenIStartedBlastin,
+    ];
+
+    // ── TurnModeTest mirrors (ffb-server/.../server/model/TurnModeTest.java) ──
+
     #[test]
-    fn round_trip_name() {
-        let modes = [TurnMode::Regular, TurnMode::Kickoff, TurnMode::BombHome, TurnMode::ThenIStartedBlastin];
-        for m in &modes {
-            assert_eq!(TurnMode::from_name(m.name()), Some(*m));
+    fn turn_mode_all_have_non_null_name() {
+        for m in ALL {
+            assert!(!m.name().is_empty());
         }
     }
 
     #[test]
-    fn bomb_turn_detection() {
+    fn turn_mode_regular_is_basic_mode() {
+        assert!(TurnMode::Regular.is_basic_mode());
+    }
+
+    #[test]
+    fn turn_mode_blitz_is_basic_mode() {
+        assert!(TurnMode::Blitz.is_basic_mode());
+    }
+
+    #[test]
+    fn turn_mode_setup_is_not_basic_mode() {
+        assert!(!TurnMode::Setup.is_basic_mode());
+    }
+
+    #[test]
+    fn turn_mode_regular_checks_for_active_players() {
+        assert!(TurnMode::Regular.check_for_active_players());
+    }
+
+    #[test]
+    fn turn_mode_setup_does_not_check_for_active_players() {
+        assert!(!TurnMode::Setup.check_for_active_players());
+    }
+
+    #[test]
+    fn turn_mode_bomb_home_is_bomb_turn() {
         assert!(TurnMode::BombHome.is_bomb_turn());
+        assert!(TurnMode::BombAway.is_bomb_turn());
+        assert!(TurnMode::BombHomeBlitz.is_bomb_turn());
+        assert!(TurnMode::BombAwayBlitz.is_bomb_turn());
+    }
+
+    #[test]
+    fn turn_mode_regular_is_not_bomb_turn() {
         assert!(!TurnMode::Regular.is_bomb_turn());
     }
+
+    #[test]
+    fn turn_mode_dump_off_does_not_allow_end_player_action() {
+        assert!(!TurnMode::DumpOff.allow_end_player_action());
+    }
+
+    #[test]
+    fn turn_mode_regular_allows_end_player_action() {
+        assert!(TurnMode::Regular.allow_end_player_action());
+    }
+
+    #[test]
+    fn turn_mode_trickster_forces_dice_decoration_update() {
+        assert!(TurnMode::Trickster.force_dice_decoration_update());
+    }
+
+    #[test]
+    fn turn_mode_regular_does_not_force_dice_decoration_update() {
+        assert!(!TurnMode::Regular.force_dice_decoration_update());
+    }
+
+    #[test]
+    fn turn_mode_for_name_regular() {
+        assert_eq!(TurnMode::from_name("regular"), Some(TurnMode::Regular));
+    }
+
+    #[test]
+    fn turn_mode_for_name_case_insensitive() {
+        assert_eq!(TurnMode::from_name("KICKOFF"), Some(TurnMode::Kickoff));
+    }
+
+    #[test]
+    fn turn_mode_kickoff_return_does_not_check_nega_traits() {
+        assert!(!TurnMode::KickoffReturn.check_negatraits());
+    }
+
+    #[test]
+    fn turn_mode_regular_checks_nega_traits() {
+        assert!(TurnMode::Regular.check_negatraits());
+    }
+
+    // ── shared with Java (ported Rust extra) ────────────────────────────────
+
+    #[test]
+    fn turn_mode_all_from_name_round_trip() {
+        for m in ALL {
+            assert_eq!(TurnMode::from_name(m.name()), Some(m));
+        }
+    }
+
+    // ── Rust-only: serde ────────────────────────────────────────────────────
 
     #[test]
     fn serde_round_trip() {
@@ -168,96 +268,5 @@ mod tests {
         let json = serde_json::to_string(&m).unwrap();
         let back: TurnMode = serde_json::from_str(&json).unwrap();
         assert_eq!(m, back);
-    }
-
-    #[test]
-    fn all_have_non_empty_names() {
-        let all = [
-            TurnMode::Regular, TurnMode::Setup, TurnMode::Kickoff, TurnMode::PerfectDefence,
-            TurnMode::SolidDefence, TurnMode::QuickSnap, TurnMode::HighKick, TurnMode::StartGame,
-            TurnMode::Blitz, TurnMode::Touchback, TurnMode::Interception, TurnMode::EndGame,
-            TurnMode::Swarming, TurnMode::KickoffReturn, TurnMode::Wizard, TurnMode::PassBlock,
-            TurnMode::DumpOff, TurnMode::NoPlayersToField, TurnMode::BombHome, TurnMode::BombAway,
-            TurnMode::BombHomeBlitz, TurnMode::BombAwayBlitz, TurnMode::IllegalSubstitution,
-            TurnMode::SelectBlitzTarget, TurnMode::SelectGazeTarget, TurnMode::SafePairOfHands,
-            TurnMode::SelectBlockKind, TurnMode::BetweenTurns, TurnMode::Trickster,
-            TurnMode::RaidingParty, TurnMode::HitAndRun, TurnMode::ThenIStartedBlastin,
-        ];
-        for m in all {
-            assert!(!m.name().is_empty());
-        }
-    }
-
-    #[test]
-    fn all_from_name_round_trip() {
-        let all = [
-            TurnMode::Regular, TurnMode::Setup, TurnMode::Kickoff, TurnMode::PerfectDefence,
-            TurnMode::SolidDefence, TurnMode::QuickSnap, TurnMode::HighKick, TurnMode::StartGame,
-            TurnMode::Blitz, TurnMode::Touchback, TurnMode::Interception, TurnMode::EndGame,
-            TurnMode::Swarming, TurnMode::KickoffReturn, TurnMode::Wizard, TurnMode::PassBlock,
-            TurnMode::DumpOff, TurnMode::NoPlayersToField, TurnMode::BombHome, TurnMode::BombAway,
-            TurnMode::BombHomeBlitz, TurnMode::BombAwayBlitz, TurnMode::IllegalSubstitution,
-            TurnMode::SelectBlitzTarget, TurnMode::SelectGazeTarget, TurnMode::SafePairOfHands,
-            TurnMode::SelectBlockKind, TurnMode::BetweenTurns, TurnMode::Trickster,
-            TurnMode::RaidingParty, TurnMode::HitAndRun, TurnMode::ThenIStartedBlastin,
-        ];
-        for m in all {
-            assert_eq!(TurnMode::from_name(m.name()), Some(m));
-        }
-    }
-
-    #[test]
-    fn regular_is_basic_mode() {
-        assert!(TurnMode::Regular.is_basic_mode());
-    }
-
-    #[test]
-    fn blitz_is_basic_mode() {
-        assert!(TurnMode::Blitz.is_basic_mode());
-    }
-
-    #[test]
-    fn setup_is_not_basic_mode() {
-        assert!(!TurnMode::Setup.is_basic_mode());
-    }
-
-    #[test]
-    fn regular_checks_for_active_players() {
-        assert!(TurnMode::Regular.check_for_active_players());
-    }
-
-    #[test]
-    fn setup_does_not_check_for_active_players() {
-        assert!(!TurnMode::Setup.check_for_active_players());
-    }
-
-    #[test]
-    fn dump_off_does_not_allow_end_player_action() {
-        assert!(!TurnMode::DumpOff.allow_end_player_action());
-    }
-
-    #[test]
-    fn regular_allows_end_player_action() {
-        assert!(TurnMode::Regular.allow_end_player_action());
-    }
-
-    #[test]
-    fn trickster_forces_dice_decoration_update() {
-        assert!(TurnMode::Trickster.force_dice_decoration_update());
-    }
-
-    #[test]
-    fn regular_does_not_force_dice_decoration_update() {
-        assert!(!TurnMode::Regular.force_dice_decoration_update());
-    }
-
-    #[test]
-    fn kickoff_return_does_not_check_negatraits() {
-        assert!(!TurnMode::KickoffReturn.check_negatraits());
-    }
-
-    #[test]
-    fn regular_checks_negatraits() {
-        assert!(TurnMode::Regular.check_negatraits());
     }
 }

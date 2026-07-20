@@ -38,12 +38,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_working_in_tandem() {
         assert_eq!(WorkingInTandem::new().get_name(), "Working in Tandem");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(WorkingInTandem::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_reroll_single_block_die_when_partner_is_marking_property() {
+        assert!(crate::enums::SkillId::WorkingInTandem.properties().contains(&"canRerollSingleBlockDieWhenPartnerIsMarking"));
     }
 }

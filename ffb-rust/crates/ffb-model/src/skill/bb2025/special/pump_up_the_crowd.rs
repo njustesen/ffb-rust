@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_pump_up_the_crowd() {
         assert_eq!(PumpUpTheCrowd::new().get_name(), "Pump Up The Crowd");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(PumpUpTheCrowd::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_grants_team_re_roll_when_causing_block_cas_property() {
+        assert!(crate::enums::SkillId::PumpUpTheCrowd.properties().contains(&"grantsTeamReRollWhenCausingBlockCas"));
     }
 }

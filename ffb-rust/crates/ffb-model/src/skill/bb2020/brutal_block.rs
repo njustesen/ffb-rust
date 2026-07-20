@@ -28,15 +28,23 @@ impl std::ops::Deref for BrutalBlock {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_brutal_block() {
         assert_eq!(BrutalBlock::new().get_name(), "Brutal Block");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(BrutalBlock::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the live Rust property table
+        // is SkillId::BrutalBlock.properties(), which always returns a valid slice.
+        assert!(SkillId::BrutalBlock.properties().iter().all(|p| !p.is_empty()));
     }
 
     #[test]

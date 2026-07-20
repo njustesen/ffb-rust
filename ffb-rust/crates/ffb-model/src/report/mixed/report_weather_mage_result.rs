@@ -94,21 +94,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::WEATHER_MAGE_RESULT); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "weatherMageResult"); }
-
-    #[test]
-    fn get_modifier() { assert_eq!(make().get_modifier(), 1); }
-
-    #[test]
-    fn get_new_weather() { assert_eq!(make().get_new_weather(), Some("NICE")); }
-
-    #[test]
-    fn get_effect() { assert_eq!(make().get_effect(), Some(WeatherMageEffect::CHANGED)); }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

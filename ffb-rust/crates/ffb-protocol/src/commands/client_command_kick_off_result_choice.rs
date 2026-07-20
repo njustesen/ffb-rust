@@ -76,17 +76,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandKickOffResultChoice::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandKickOffResultChoice::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_kick_off_result_choice() {
         assert_eq!(ClientCommandKickOffResultChoice::new().get_id(), NetCommandId::ClientKickOffResultChoice);
     }

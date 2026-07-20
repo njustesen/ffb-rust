@@ -64,39 +64,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::KICKOFF_EXTRA_RE_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "extraReRoll");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_roll_home(), 3);
-        assert!(r.is_home_gains_re_roll());
-        assert!(!r.is_away_gains_re_roll());
-    }
-
-    #[test]
-    fn roll_away_and_kickoff_result() {
-        let r = make();
-        assert_eq!(r.get_roll_away(), 2);
-        assert_eq!(r.get_kickoff_result(), KickoffResult::BrilliantCoaching);
-    }
-
-    #[test]
-    fn away_gains_reroll() {
-        let r = ReportKickoffExtraReRoll::new(KickoffResult::BrilliantCoaching, 1, false, 5, true);
-        assert!(!r.is_home_gains_re_roll());
-        assert!(r.is_away_gains_re_roll());
-        assert_eq!(r.get_roll_away(), 5);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

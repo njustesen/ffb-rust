@@ -122,5 +122,6 @@ class CatchCalcTest {
         // BB2016 AG4: interception = 5; BB2020 AG4: interception = 4
         assertEquals(5, CatchCalc.minimumRollInterception(4, 0, Rules.BB2016));
         assertEquals(4, CatchCalc.minimumRollInterception(4, 0, Rules.BB2020));
+        assertEquals(4, CatchCalc.minimumRollInterception(4, 0, Rules.BB2025));
     }
 }

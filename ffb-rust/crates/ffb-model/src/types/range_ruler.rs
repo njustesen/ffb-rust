@@ -28,12 +28,14 @@ impl RangeRuler {
         } else if self.minimum_roll < 0 {
             ""
         } else if self.minimum_roll < 6 {
+            // Java: fMinimumRoll + "+" for any positive roll below 6 (1-5).
             match self.minimum_roll {
+                1 => "1+",
                 2 => "2+",
                 3 => "3+",
                 4 => "4+",
                 5 => "5+",
-                _ => "?+",
+                _ => unreachable!("guards restrict minimum_roll to 1..=5"),
             }
         } else {
             "6"
@@ -54,6 +56,18 @@ mod tests {
     use crate::types::FieldCoordinate;
 
     #[test]
+    fn range_ruler_minimum_roll_dash_for_zero() {
+        let r = RangeRuler::new("p1".into(), Some(FieldCoordinate::new(5, 5)), 0, false);
+        assert_eq!(r.minimum_roll_display(), "--");
+    }
+
+    #[test]
+    fn range_ruler_minimum_roll_3plus_for_roll_3() {
+        let r = RangeRuler::new("p1".into(), Some(FieldCoordinate::new(5, 5)), 3, false);
+        assert_eq!(r.minimum_roll_display(), "3+");
+    }
+
+    #[test]
     fn display_strings() {
         let make = |roll| RangeRuler::new("p1".into(), None, roll, false);
         assert_eq!(make(0).minimum_roll_display(), "--");
@@ -72,7 +86,7 @@ mod tests {
         );
         let t = r.transform();
         assert_eq!(t.target_coordinate.unwrap().x, 25 - 10);
-        assert_eq!(t.minimum_roll, 3);
+        assert_eq!(t.minimum_roll_display(), "3+");
     }
 
     #[test]
@@ -95,8 +109,8 @@ mod tests {
         assert_eq!(make(2).minimum_roll_display(), "2+");
         assert_eq!(make(4).minimum_roll_display(), "4+");
         assert_eq!(make(5).minimum_roll_display(), "5+");
-        // An unlisted in-range value falls through to "?+"
-        assert_eq!(make(1).minimum_roll_display(), "?+");
+        // Java formats any positive roll below 6 as "<roll>+", including 1
+        assert_eq!(make(1).minimum_roll_display(), "1+");
     }
 
     #[test]
@@ -107,7 +121,7 @@ mod tests {
         assert!(t.target_coordinate.is_none());
         // other fields preserved
         assert_eq!(t.thrower_id, "p2");
-        assert_eq!(t.minimum_roll, 5);
+        assert_eq!(t.minimum_roll_display(), "5+");
         assert!(t.throw_team_mate);
     }
 }

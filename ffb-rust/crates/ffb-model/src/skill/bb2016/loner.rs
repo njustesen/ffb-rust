@@ -26,16 +26,30 @@ impl std::ops::Deref for Loner {
 }
 
 #[cfg(test)]
+// Mirrors ffb-java/ffb-server/src/test/java/com/fumbbl/ffb/server/skill tests.
+// Java test targets mixed/Loner (category TRAIT); bb2016/Loner.java is EXTRAORDINARY.
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_loner() {
         assert_eq!(Loner::new().get_name(), "Loner");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(Loner::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_has_to_roll_to_use_team_reroll_property() {
+        assert!(SkillId::Loner.properties().contains(&"hasToRollToUseTeamReroll"));
+    }
+
+    #[test]
+    fn class_name_is_loner() {
+        // Java: assertEquals("Loner", skill.getClass().getSimpleName())
+        assert!(std::any::type_name::<Loner>().ends_with("::Loner"));
     }
 }

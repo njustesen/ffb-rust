@@ -74,9 +74,5 @@ mod tests {
         assert_eq!(original, copied);
         assert_eq!(copied.get_name(), "PIT_TRAP");
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", CardHandlerKey::CHOP_BLOCK).is_empty());
-    }
 
 }

@@ -27,16 +27,19 @@ impl std::ops::Deref for SureFeet {
 }
 
 #[cfg(test)]
+// Mirrors ffb-java/ffb-server/src/test/java/com/fumbbl/ffb/server/skill tests.
+// Java test's has_sure_feet_reroll_source is omitted: there is no live SkillId-keyed
+// reroll-source table in Rust yet (see DEFERRED note at top of this file).
 mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_sure_feet() {
         assert_eq!(SureFeet::new().get_name(), "Sure Feet");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_agility() {
         assert_eq!(SureFeet::new().get_category(), SkillCategory::Agility);
     }
 }

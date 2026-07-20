@@ -32,8 +32,19 @@ impl std::ops::Deref for DivingCatch {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(DivingCatch::new().get_name(), "Diving Catch"); }
+    fn name_is_diving_catch() {
+        assert_eq!(DivingCatch::new().get_name(), "Diving Catch");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(DivingCatch::new().get_category(), SkillCategory::Agility); }
+    fn category_is_agility() {
+        assert_eq!(DivingCatch::new().get_category(), SkillCategory::Agility);
+    }
+
+    #[test]
+    fn has_can_attempt_catch_in_adjacent_squares_property() {
+        assert!(crate::enums::SkillId::DivingCatch.properties().contains(&"canAttemptCatchInAdjacentSquares"));
+    }
 }

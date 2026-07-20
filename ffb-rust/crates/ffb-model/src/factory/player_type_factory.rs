@@ -30,12 +30,6 @@ mod tests {
     }
 
     #[test]
-    fn initialize_does_not_panic() {
-        let mut f = PlayerTypeFactory::default();
-        f.initialize();
-    }
-
-    #[test]
     fn for_name_a_second_known_variant() {
         assert_eq!(PlayerTypeFactory::default().for_name("Star"), Some(PlayerType::Star));
     }

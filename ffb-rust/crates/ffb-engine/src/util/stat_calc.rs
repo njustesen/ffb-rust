@@ -99,40 +99,49 @@ impl Default for StatCalc {
     }
 }
 
+// Tests mirror ffb-server/src/test/java/com/fumbbl/ffb/server/util/StatCalcTest.java 1:1.
+// Java @ParameterizedTest over {BB2020, BB2025} ("modern") becomes a loop over both rulesets.
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    const MODERN: [Rules; 2] = [Rules::Bb2020, Rules::Bb2025];
+
     // ── stat_min ─────────────────────────────────────────────────────────────
 
     #[test]
-    fn stat_min_bb2016_all_1() {
+    fn stat_min_bb2016_all_stats_return_1() {
         for &key in PlayerStatKey::all() {
-            assert_eq!(StatCalc::stat_min(key, Rules::Bb2016), 1, "{:?}", key);
+            assert_eq!(
+                StatCalc::stat_min(key, Rules::Bb2016),
+                1,
+                "Expected min=1 for {:?}",
+                key
+            );
         }
     }
 
     #[test]
-    fn stat_min_bb2020_av_is_3() {
-        assert_eq!(StatCalc::stat_min(PlayerStatKey::Av, Rules::Bb2020), 3);
+    fn stat_min_modern_av_returns_3() {
+        for rules in MODERN {
+            assert_eq!(StatCalc::stat_min(PlayerStatKey::Av, rules), 3);
+        }
     }
 
     #[test]
-    fn stat_min_bb2025_av_is_3() {
-        assert_eq!(StatCalc::stat_min(PlayerStatKey::Av, Rules::Bb2025), 3);
-    }
-
-    #[test]
-    fn stat_min_bb2020_non_av_is_1() {
-        assert_eq!(StatCalc::stat_min(PlayerStatKey::Ma, Rules::Bb2020), 1);
-        assert_eq!(StatCalc::stat_min(PlayerStatKey::St, Rules::Bb2020), 1);
-        assert_eq!(StatCalc::stat_min(PlayerStatKey::Ag, Rules::Bb2020), 1);
+    fn stat_min_modern_non_av_returns_1() {
+        for rules in MODERN {
+            assert_eq!(StatCalc::stat_min(PlayerStatKey::Ma, rules), 1);
+            assert_eq!(StatCalc::stat_min(PlayerStatKey::St, rules), 1);
+            assert_eq!(StatCalc::stat_min(PlayerStatKey::Ag, rules), 1);
+            assert_eq!(StatCalc::stat_min(PlayerStatKey::Pa, rules), 1);
+        }
     }
 
     // ── stat_max ─────────────────────────────────────────────────────────────
 
     #[test]
-    fn stat_max_bb2016_common_stats_are_10() {
+    fn stat_max_bb2016_ma_st_ag_av_return_10() {
         assert_eq!(StatCalc::stat_max(PlayerStatKey::Ma, Rules::Bb2016), 10);
         assert_eq!(StatCalc::stat_max(PlayerStatKey::St, Rules::Bb2016), 10);
         assert_eq!(StatCalc::stat_max(PlayerStatKey::Ag, Rules::Bb2016), 10);
@@ -140,30 +149,44 @@ mod tests {
     }
 
     #[test]
-    fn stat_max_bb2020_specific_caps() {
-        assert_eq!(StatCalc::stat_max(PlayerStatKey::Ma, Rules::Bb2020), 9);
-        assert_eq!(StatCalc::stat_max(PlayerStatKey::St, Rules::Bb2020), 8);
-        assert_eq!(StatCalc::stat_max(PlayerStatKey::Ag, Rules::Bb2020), 6);
-        assert_eq!(StatCalc::stat_max(PlayerStatKey::Pa, Rules::Bb2020), 6);
-        assert_eq!(StatCalc::stat_max(PlayerStatKey::Av, Rules::Bb2020), 11);
+    fn stat_max_modern_ma_returns_9() {
+        for rules in MODERN {
+            assert_eq!(StatCalc::stat_max(PlayerStatKey::Ma, rules), 9);
+        }
     }
 
     #[test]
-    fn stat_max_bb2025_same_as_bb2020() {
-        for &key in PlayerStatKey::all() {
-            assert_eq!(
-                StatCalc::stat_max(key, Rules::Bb2025),
-                StatCalc::stat_max(key, Rules::Bb2020),
-                "{:?}",
-                key
-            );
+    fn stat_max_modern_st_returns_8() {
+        for rules in MODERN {
+            assert_eq!(StatCalc::stat_max(PlayerStatKey::St, rules), 8);
+        }
+    }
+
+    #[test]
+    fn stat_max_modern_ag_returns_6() {
+        for rules in MODERN {
+            assert_eq!(StatCalc::stat_max(PlayerStatKey::Ag, rules), 6);
+        }
+    }
+
+    #[test]
+    fn stat_max_modern_pa_returns_6() {
+        for rules in MODERN {
+            assert_eq!(StatCalc::stat_max(PlayerStatKey::Pa, rules), 6);
+        }
+    }
+
+    #[test]
+    fn stat_max_modern_av_returns_11() {
+        for rules in MODERN {
+            assert_eq!(StatCalc::stat_max(PlayerStatKey::Av, rules), 11);
         }
     }
 
     // ── apply_lasting_injury ─────────────────────────────────────────────────
 
     #[test]
-    fn apply_lasting_injury_bb2016_decreases_ma() {
+    fn apply_lasting_injury_bb2016_ma_decreases() {
         assert_eq!(
             StatCalc::apply_lasting_injury(6, PlayerStatKey::Ma, Rules::Bb2016),
             5
@@ -171,78 +194,111 @@ mod tests {
     }
 
     #[test]
-    fn apply_lasting_injury_bb2016_floored_at_1() {
+    fn apply_lasting_injury_bb2016_ag_decreases() {
         assert_eq!(
-            StatCalc::apply_lasting_injury(1, PlayerStatKey::St, Rules::Bb2016),
+            StatCalc::apply_lasting_injury(4, PlayerStatKey::Ag, Rules::Bb2016),
+            3
+        );
+    }
+
+    #[test]
+    fn apply_lasting_injury_bb2016_ma_floored_at_1() {
+        assert_eq!(
+            StatCalc::apply_lasting_injury(1, PlayerStatKey::Ma, Rules::Bb2016),
             1
         );
     }
 
     #[test]
-    fn apply_lasting_injury_bb2020_ag_increases() {
-        // BB2020 AG worsens (higher = worse target)
-        assert_eq!(
-            StatCalc::apply_lasting_injury(3, PlayerStatKey::Ag, Rules::Bb2020),
-            4
-        );
+    fn apply_lasting_injury_modern_ag_increases() {
+        for rules in MODERN {
+            assert_eq!(
+                StatCalc::apply_lasting_injury(3, PlayerStatKey::Ag, rules),
+                4
+            );
+        }
     }
 
     #[test]
-    fn apply_lasting_injury_bb2020_ag_capped_at_max() {
-        assert_eq!(
-            StatCalc::apply_lasting_injury(6, PlayerStatKey::Ag, Rules::Bb2020),
-            6
-        );
+    fn apply_lasting_injury_modern_pa_increases() {
+        for rules in MODERN {
+            assert_eq!(
+                StatCalc::apply_lasting_injury(4, PlayerStatKey::Pa, rules),
+                5
+            );
+        }
     }
 
     #[test]
-    fn apply_lasting_injury_bb2020_ma_decreases() {
-        assert_eq!(
-            StatCalc::apply_lasting_injury(7, PlayerStatKey::Ma, Rules::Bb2020),
-            6
-        );
+    fn apply_lasting_injury_modern_ag_capped_at_max() {
+        for rules in MODERN {
+            assert_eq!(
+                StatCalc::apply_lasting_injury(6, PlayerStatKey::Ag, rules),
+                6
+            );
+        }
     }
 
     #[test]
-    fn apply_lasting_injury_bb2020_av_floored_at_3() {
-        assert_eq!(
-            StatCalc::apply_lasting_injury(3, PlayerStatKey::Av, Rules::Bb2020),
-            3
-        );
+    fn apply_lasting_injury_modern_ma_decreases() {
+        for rules in MODERN {
+            assert_eq!(
+                StatCalc::apply_lasting_injury(6, PlayerStatKey::Ma, rules),
+                5
+            );
+        }
+    }
+
+    #[test]
+    fn apply_lasting_injury_modern_av_floored_at_3() {
+        for rules in MODERN {
+            assert_eq!(
+                StatCalc::apply_lasting_injury(3, PlayerStatKey::Av, rules),
+                3
+            );
+        }
     }
 
     // ── apply_in_game_agility_injury ─────────────────────────────────────────
 
     #[test]
-    fn in_game_agility_injury_bb2016_decreases() {
+    fn apply_in_game_agility_injury_bb2016_decreases() {
         assert_eq!(StatCalc::apply_in_game_agility_injury(4, 1, Rules::Bb2016), 3);
+        assert_eq!(StatCalc::apply_in_game_agility_injury(4, 2, Rules::Bb2016), 2);
     }
 
     #[test]
-    fn in_game_agility_injury_bb2020_increases() {
-        assert_eq!(StatCalc::apply_in_game_agility_injury(3, 1, Rules::Bb2020), 4);
+    fn apply_in_game_agility_injury_modern_increases() {
+        for rules in MODERN {
+            assert_eq!(StatCalc::apply_in_game_agility_injury(4, 1, rules), 5);
+            assert_eq!(StatCalc::apply_in_game_agility_injury(4, 2, rules), 6);
+        }
     }
 
     // ── stat_can_be_reduced_by_injury ────────────────────────────────────────
 
     #[test]
-    fn stat_reducible_bb2016_zero_injuries() {
+    fn stat_can_be_reduced_bb2016_no_prior_injuries_true() {
         assert!(StatCalc::stat_can_be_reduced_by_injury(4, 4, Rules::Bb2016));
     }
 
     #[test]
-    fn stat_reducible_bb2016_one_injury() {
+    fn stat_can_be_reduced_bb2016_one_prior_injury_true() {
         assert!(StatCalc::stat_can_be_reduced_by_injury(4, 3, Rules::Bb2016));
     }
 
     #[test]
-    fn stat_not_reducible_bb2016_two_injuries() {
+    fn stat_can_be_reduced_bb2016_two_prior_injuries_false() {
         assert!(!StatCalc::stat_can_be_reduced_by_injury(4, 2, Rules::Bb2016));
     }
 
     #[test]
-    fn stat_always_reducible_bb2020() {
-        assert!(StatCalc::stat_can_be_reduced_by_injury(4, 1, Rules::Bb2020));
-        assert!(StatCalc::stat_can_be_reduced_by_injury(4, 2, Rules::Bb2020));
+    fn stat_can_be_reduced_modern_always_true() {
+        for rules in MODERN {
+            assert!(StatCalc::stat_can_be_reduced_by_injury(4, 4, rules));
+            assert!(StatCalc::stat_can_be_reduced_by_injury(4, 3, rules));
+            assert!(StatCalc::stat_can_be_reduced_by_injury(4, 2, rules));
+            assert!(StatCalc::stat_can_be_reduced_by_injury(4, 1, rules));
+        }
     }
 }

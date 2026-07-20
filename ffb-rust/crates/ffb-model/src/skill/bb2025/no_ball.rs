@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_no_ball() {
         assert_eq!(NoBall::new().get_name(), "No Ball");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(NoBall::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_prevent_catch_property() {
+        assert!(crate::enums::SkillId::NoBall.properties().contains(&"preventCatch"));
     }
 }

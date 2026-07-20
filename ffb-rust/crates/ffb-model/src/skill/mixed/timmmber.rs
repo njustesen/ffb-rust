@@ -25,8 +25,24 @@ impl std::ops::Deref for Timmmber {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors ffb-java TimmmberSkillTest (written against the bb2016 class, where
+    // the category is EXTRAORDINARY); category adapted to the mixed edition's
+    // constructor (TRAIT). The Java `is_bb2016_edition` test is skipped (edition
+    // annotations are covered elsewhere).
+
     #[test]
-    fn name_is_correct() { assert_eq!(Timmmber::new().get_name(), "Timmm-ber!"); }
+    fn name_is_timmm_ber() {
+        assert_eq!(Timmmber::new().get_name(), "Timmm-ber!");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Timmmber::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(Timmmber::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_allow_stand_up_assists_property() {
+        assert!(crate::enums::SkillId::Timmmber.properties().contains(&"allowStandUpAssists"));
+    }
 }

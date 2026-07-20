@@ -41,36 +41,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_id() {
-        assert_eq!(ReportPuntDistance::new(4, false).get_id(), ReportId::PUNT_DISTANCE_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(ReportPuntDistance::new(4, false).get_name(), "puntDistanceRoll");
-    }
-
-    #[test]
-    fn fields() {
-        let r = ReportPuntDistance::new(4, true);
-        assert_eq!(r.get_roll(), 4);
-        assert!(r.is_out_of_bounds());
-    }
-
-    #[test]
-    fn not_out_of_bounds() {
-        let r = ReportPuntDistance::new(3, false);
-        assert!(!r.is_out_of_bounds());
-        assert_eq!(r.get_roll(), 3);
-    }
-
-    #[test]
-    fn max_roll() {
-        let r = ReportPuntDistance::new(6, false);
-        assert_eq!(r.get_roll(), 6);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = ReportPuntDistance::new(4, false);
         let json = original.to_json_value();

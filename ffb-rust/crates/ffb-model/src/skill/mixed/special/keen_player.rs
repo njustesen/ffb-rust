@@ -25,8 +25,22 @@ impl std::ops::Deref for KeenPlayer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(KeenPlayer::new().get_name(), "Keen Player"); }
+    fn name_is_keen_player() {
+        assert_eq!(KeenPlayer::new().get_name(), "Keen Player");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(KeenPlayer::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(KeenPlayer::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the live Rust
+        // mechanism is SkillId::properties(), whose slice always exists.
+        let props: &'static [&'static str] = crate::enums::SkillId::KeenPlayer.properties();
+        assert!(props.iter().all(|p| !p.is_empty()));
+    }
 }

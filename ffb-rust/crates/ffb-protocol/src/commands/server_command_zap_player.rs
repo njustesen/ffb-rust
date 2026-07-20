@@ -63,22 +63,6 @@ mod tests {
         let cmd = ServerCommandZapPlayer::default();
         assert!(cmd.player_id.is_empty());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandZapPlayer::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandZapPlayer::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandZapPlayer::default());
-        assert!(s.contains("ServerCommandZapPlayer"));
-    }
 
     #[test]
     fn get_id_is_server_zap_player() {

@@ -591,6 +591,43 @@ mod tests {
         }
     }
 
+    // ── PlayerModelTest.java mirrors (RosterPlayer setter/getter ↔ pub field) ──
+
+    #[test]
+    fn player_name_is_set_and_retrieved() {
+        let mut p = Player::default();
+        p.name = "Joe Bloggs".into();
+        assert_eq!(p.name, "Joe Bloggs");
+    }
+
+    #[test]
+    fn player_nr_is_set_and_retrieved() {
+        let mut p = Player::default();
+        p.nr = 7;
+        assert_eq!(p.nr, 7);
+    }
+
+    #[test]
+    fn player_movement_is_set_and_retrieved() {
+        let mut p = Player::default();
+        p.movement = 6;
+        assert_eq!(p.movement, 6);
+    }
+
+    #[test]
+    fn player_strength_is_set_and_retrieved() {
+        let mut p = Player::default();
+        p.strength = 3;
+        assert_eq!(p.strength, 3);
+    }
+
+    #[test]
+    fn player_agility_is_set_and_retrieved() {
+        let mut p = Player::default();
+        p.agility = 3;
+        assert_eq!(p.agility, 3);
+    }
+
     #[test]
     fn serde_round_trip() {
         let p = test_player();

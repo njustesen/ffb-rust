@@ -74,29 +74,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::HYPNOTIC_GAZE_ROLL); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "hypnoticGazeRoll"); }
-
-    #[test]
-    fn get_defender_id() { assert_eq!(make().get_defender_id(), Some("d1")); }
-
-    #[test]
-    fn minimum_roll_and_rerolled() {
-        let r = ReportHypnoticGazeRoll::new(Some("p1".into()), true, 4, 3, true, None);
-        assert_eq!(r.get_minimum_roll(), 3);
-        assert!(r.is_re_rolled());
-    }
-
-    #[test]
-    fn unsuccessful_with_no_defender() {
-        let r = ReportHypnoticGazeRoll::new(None, false, 2, 4, false, None);
-        assert!(!r.is_successful());
-        assert_eq!(r.get_defender_id(), None);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

@@ -175,10 +175,4 @@ mod tests {
         assert!(f.for_card(&card).is_some());
     }
 
-    #[test]
-    fn initialize_does_not_panic() {
-        let mut f = CardHandlerFactory::new();
-        f.initialize(Rules::Bb2025);
-        f.initialize(Rules::Bb2016);
-    }
 }

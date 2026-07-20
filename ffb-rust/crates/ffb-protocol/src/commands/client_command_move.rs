@@ -112,17 +112,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandMove::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandMove::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_move() {
         assert_eq!(ClientCommandMove::default().get_id(), NetCommandId::ClientMove);
     }

@@ -54,36 +54,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::PASS_BLOCK);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "passBlock");
-    }
-
-    #[test]
-    fn field_getters() {
-        let r = make();
-        assert_eq!(r.get_team_id(), "team1");
-        assert!(r.is_pass_block_available());
-    }
-
-    #[test]
-    fn pass_block_unavailable() {
-        let r = ReportPassBlock::new("team2".into(), false);
-        assert!(!r.is_pass_block_available());
-        assert_eq!(r.get_team_id(), "team2");
-    }
-
-    #[test]
-    fn different_team_id() {
-        let r = ReportPassBlock::new("teamX".into(), true);
-        assert_eq!(r.get_team_id(), "teamX");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

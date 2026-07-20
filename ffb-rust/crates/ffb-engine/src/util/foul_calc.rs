@@ -49,66 +49,110 @@ impl Default for FoulCalc {
     }
 }
 
+// Tests mirror ffb-java/ffb-server/src/test/java/com/fumbbl/ffb/server/util/FoulCalcTest.java 1:1
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // ── is_spotted_by_armor_roll ──────────────────────────────────────────────
+
     #[test]
-    fn doubles_without_sneaky_git_spotted() {
+    fn armor_roll_doubles_no_sneaky_git_spotted() {
         assert!(FoulCalc::is_spotted_by_armor_roll(3, 3, false));
     }
 
     #[test]
-    fn doubles_with_sneaky_git_not_spotted() {
+    fn armor_roll_doubles_with_sneaky_git_not_spotted() {
         assert!(!FoulCalc::is_spotted_by_armor_roll(3, 3, true));
     }
 
     #[test]
-    fn non_doubles_not_spotted() {
-        assert!(!FoulCalc::is_spotted_by_armor_roll(3, 4, false));
-        assert!(!FoulCalc::is_spotted_by_armor_roll(3, 4, true));
+    fn armor_roll_non_doubles_not_spotted() {
+        assert!(!FoulCalc::is_spotted_by_armor_roll(2, 4, false));
     }
 
     #[test]
-    fn injury_roll_doubles_with_armor_broken_spotted() {
+    fn armor_roll_all_doubles_no_sneaky_git_spotted() {
+        for d in 1..=6 {
+            assert!(FoulCalc::is_spotted_by_armor_roll(d, d, false), "d1={d} d2={d}");
+        }
+    }
+
+    #[test]
+    fn armor_roll_all_doubles_sneaky_git_not_spotted() {
+        for d in 1..=6 {
+            assert!(!FoulCalc::is_spotted_by_armor_roll(d, d, true), "d1={d} d2={d}");
+        }
+    }
+
+    // ── is_spotted_by_injury_roll ─────────────────────────────────────────────
+
+    #[test]
+    fn injury_roll_doubles_armor_broken_spotted() {
         assert!(FoulCalc::is_spotted_by_injury_roll(4, 4, true));
     }
 
     #[test]
-    fn injury_roll_doubles_without_armor_broken_not_spotted() {
+    fn injury_roll_doubles_armor_not_broken_not_spotted() {
         assert!(!FoulCalc::is_spotted_by_injury_roll(4, 4, false));
     }
 
     #[test]
-    fn injury_roll_non_doubles_not_spotted() {
-        assert!(!FoulCalc::is_spotted_by_injury_roll(3, 4, true));
+    fn injury_roll_non_doubles_armor_broken_not_spotted() {
+        assert!(!FoulCalc::is_spotted_by_injury_roll(3, 5, true));
     }
 
     #[test]
-    fn spotted_by_referee_armor_doubles() {
-        // sneaky git does not apply to injury roll
-        assert!(FoulCalc::is_spotted_by_referee(3, 3, 1, 2, false, false));
+    fn injury_roll_all_doubles_when_armor_broken_spotted() {
+        for d in 1..=6 {
+            assert!(FoulCalc::is_spotted_by_injury_roll(d, d, true), "d1={d} d2={d}");
+        }
+    }
+
+    // ── is_spotted_by_referee (combined) ──────────────────────────────────────
+
+    #[test]
+    fn referee_armor_doubles_spotted() {
+        // Armor doubles, armor not broken, no SneakyGit
+        assert!(FoulCalc::is_spotted_by_referee(2, 2, 1, 3, false, false));
     }
 
     #[test]
-    fn spotted_by_referee_injury_doubles_overrides_sneaky_git() {
-        // Sneaky git suppresses armor detection, but injury detection still fires
-        assert!(FoulCalc::is_spotted_by_referee(3, 4, 4, 4, true, true));
+    fn referee_injury_doubles_armor_broken_spotted() {
+        // Non-double armor, armor broken, injury doubles
+        assert!(FoulCalc::is_spotted_by_referee(3, 5, 4, 4, true, false));
     }
 
     #[test]
-    fn not_spotted_when_no_doubles_anywhere() {
-        assert!(!FoulCalc::is_spotted_by_referee(3, 4, 2, 5, false, false));
+    fn referee_no_doubles_not_spotted() {
+        // No doubles anywhere
+        assert!(!FoulCalc::is_spotted_by_referee(2, 4, 3, 5, true, false));
     }
 
     #[test]
-    fn minimum_roll_to_break_armour_8() {
-        assert_eq!(FoulCalc::minimum_roll_to_break_armour(8), 9);
+    fn referee_armor_doubles_sneaky_git_injury_not_doubles_not_spotted() {
+        // SneakyGit suppresses armor-roll detection, injury not doubles
+        assert!(!FoulCalc::is_spotted_by_referee(3, 3, 2, 5, false, true));
     }
 
     #[test]
-    fn minimum_roll_to_break_armour_boundary() {
-        assert_eq!(FoulCalc::minimum_roll_to_break_armour(7), 8);
-        assert_eq!(FoulCalc::minimum_roll_to_break_armour(9), 10);
+    fn referee_armor_doubles_sneaky_git_injury_doubles_armor_broken_spotted() {
+        // SneakyGit suppresses armor-roll detection, but injury doubles fires
+        assert!(FoulCalc::is_spotted_by_referee(3, 3, 4, 4, true, true));
+    }
+
+    #[test]
+    fn referee_no_armor_roll_injury_doubles_armor_not_broken_not_spotted() {
+        // Armor not broken (no injury roll made), doubles on injury ignored
+        assert!(!FoulCalc::is_spotted_by_referee(2, 4, 3, 3, false, false));
+    }
+
+    // ── minimum_roll_to_break_armour ──────────────────────────────────────────
+
+    #[test]
+    fn minimum_roll_to_break_armour_av_plus_one() {
+        for (av, expected) in [(7, 8), (8, 9), (9, 10), (10, 11), (11, 12)] {
+            assert_eq!(expected, FoulCalc::minimum_roll_to_break_armour(av), "av={av}");
+        }
     }
 }

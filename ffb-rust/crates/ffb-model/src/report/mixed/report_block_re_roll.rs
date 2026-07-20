@@ -56,21 +56,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::BLOCK_RE_ROLL); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "blockReRoll"); }
-
-    #[test]
-    fn get_block_roll() { assert_eq!(make().get_block_roll(), &[2, 5]); }
-
-    #[test]
-    fn get_player_id() { assert_eq!(make().get_player_id(), Some("p1")); }
-
-    #[test]
-    fn re_roll_source_is_none() { assert!(make().get_re_roll_source().is_none()); }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

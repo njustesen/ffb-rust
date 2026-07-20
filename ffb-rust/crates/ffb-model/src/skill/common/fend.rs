@@ -25,8 +25,19 @@ impl std::ops::Deref for Fend {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(Fend::new().get_name(), "Fend"); }
+    fn name_is_fend() {
+        assert_eq!(Fend::new().get_name(), "Fend");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Fend::new().get_category(), SkillCategory::General); }
+    fn category_is_general() {
+        assert_eq!(Fend::new().get_category(), SkillCategory::General);
+    }
+
+    #[test]
+    fn has_prevent_opponent_following_up_property() {
+        assert!(crate::enums::SkillId::Fend.properties().contains(&"preventOpponentFollowingUp"));
+    }
 }

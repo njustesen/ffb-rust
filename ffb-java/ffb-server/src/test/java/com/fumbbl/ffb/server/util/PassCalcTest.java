@@ -43,6 +43,12 @@ class PassCalcTest {
     }
 
     @Test
+    void bb2016_longBomb_ag3() {
+        // AG3, long bomb: ag_based = 7-3+2 = 6; fumble_boundary = 4; max = 6
+        assertEquals(6, PassCalc.minimumRollPassBB2016(3, PassingDistance.LONG_BOMB, 0));
+    }
+
+    @Test
     void bb2016_withPositiveModifier_harder() {
         // AG4, short pass, +1 modifier (e.g. rain): 7-4-0+1 = 4; fumble_boundary=2+1=3; max=4
         assertEquals(4, PassCalc.minimumRollPassBB2016(4, PassingDistance.SHORT_PASS, 1));
@@ -73,9 +79,20 @@ class PassCalcTest {
     }
 
     @Test
+    void bb2020_negativePa_returnsNull() {
+        assertNull(PassCalc.minimumRollPassBB2020(-1, PassingDistance.SHORT_PASS, 0));
+    }
+
+    @Test
     void bb2020_pa2_shortPass() {
         // PA2 + dist_mod 1 = 3
         assertEquals(3, PassCalc.minimumRollPassBB2020(2, PassingDistance.SHORT_PASS, 0));
+    }
+
+    @Test
+    void bb2020_pa3_shortPass() {
+        // PA3 + dist_mod 1 = 4
+        assertEquals(4, PassCalc.minimumRollPassBB2020(3, PassingDistance.SHORT_PASS, 0));
     }
 
     @Test
@@ -129,5 +146,11 @@ class PassCalcTest {
         // roll 1 + dist_mod(+1) - 0 = 2 > 1 → not a modified fumble
         // (natural 1 is handled separately as a direct fumble regardless)
         assertFalse(PassCalc.isModifiedFumbleBB2016(1, PassingDistance.QUICK_PASS, 0));
+    }
+
+    @Test
+    void bb2016_shortPass_roll1_isFumble() {
+        // roll 1 + dist_mod(0) - 0 = 1 <= 1 → fumble
+        assertTrue(PassCalc.isModifiedFumbleBB2016(1, PassingDistance.SHORT_PASS, 0));
     }
 }

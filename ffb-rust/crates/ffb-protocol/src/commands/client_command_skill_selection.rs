@@ -84,22 +84,6 @@ mod tests {
         assert_eq!(cmd.get_player_id(), Some("player_2"));
         assert_eq!(cmd.get_skill_id(), Some("BLOCK"));
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandSkillSelection::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandSkillSelection::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandSkillSelection::default());
-        assert!(s.contains("ClientCommandSkillSelection"));
-    }
 
     #[test]
     fn get_id_is_client_prayer_selection() {

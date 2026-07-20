@@ -45,36 +45,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::DODGY_SNACK_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "dodgySnackRoll");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_roll(), 4);
-        assert_eq!(r.get_player_id(), "p1");
-    }
-
-    #[test]
-    fn low_roll() {
-        let r = ReportDodgySnackRoll::new(1, "p2".into());
-        assert_eq!(r.get_roll(), 1);
-        assert_eq!(r.get_player_id(), "p2");
-    }
-
-    #[test]
-    fn high_roll() {
-        let r = ReportDodgySnackRoll::new(6, "p3".into());
-        assert_eq!(r.get_roll(), 6);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

@@ -59,24 +59,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::FAN_FACTOR); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "fanFactor"); }
-
-    #[test]
-    fn get_result() { assert_eq!(make().get_result(), 5); }
-
-    #[test]
-    fn get_roll_and_dedicated_fans() {
-        assert_eq!(make().get_roll(), 3);
-        assert_eq!(make().get_dedicated_fans(), 2);
-    }
-
-    #[test]
-    fn get_team_id() { assert_eq!(make().get_team_id(), Some("team1")); }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

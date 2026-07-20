@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_taunt() {
         assert_eq!(Taunt::new().get_name(), "Taunt");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_general() {
         assert_eq!(Taunt::new().get_category(), SkillCategory::General);
+    }
+
+    #[test]
+    fn has_force_opponent_to_follow_up_property() {
+        assert!(crate::enums::SkillId::Taunt.properties().contains(&"forceOpponentToFollowUp"));
     }
 }

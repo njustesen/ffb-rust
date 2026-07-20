@@ -41,6 +41,11 @@ class NetEnumTest {
     }
 
     @Test
+    void net_command_id_punt_to_crowd_name() {
+        assertEquals("clientPuntToCrowd", NetCommandId.CLIENT_PUNT_TO_CROWD.getName());
+    }
+
+    @Test
     void net_command_id_names_are_unique() {
         long unique = java.util.Arrays.stream(NetCommandId.values())
             .map(NetCommandId::getName)
@@ -77,6 +82,16 @@ class NetEnumTest {
     @Test
     void server_status_fumbbl_error_name() {
         assertEquals("Fumbbl Error", ServerStatus.FUMBBL_ERROR.getName());
+    }
+
+    @Test
+    void server_status_error_game_in_use_name() {
+        assertEquals("Game In Use", ServerStatus.ERROR_GAME_IN_USE.getName());
+    }
+
+    @Test
+    void server_status_unknown_coach_message() {
+        assertEquals("Unknown Coach!", ServerStatus.ERROR_UNKNOWN_COACH.getMessage());
     }
 
     // ── LeaderState ─────────────────────────────────────────────────────────

@@ -25,14 +25,20 @@ impl std::ops::Deref for Stunty {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_stunty() {
         assert_eq!(Stunty::new().get_name(), "Stunty");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(Stunty::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_ignore_tacklezones_when_dodging_property() {
+        assert!(SkillId::Stunty.properties().contains(&"ignoreTacklezonesWhenDodging"));
     }
 }

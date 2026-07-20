@@ -109,23 +109,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandApothecaryChoice::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_roundtrip() {
-        let cmd = ClientCommandApothecaryChoice::default();
-        let _ = cmd.clone();
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandApothecaryChoice::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_apothecary_choice() {
         assert_eq!(ClientCommandApothecaryChoice::new().get_id(), NetCommandId::ClientApothecaryChoice);
     }

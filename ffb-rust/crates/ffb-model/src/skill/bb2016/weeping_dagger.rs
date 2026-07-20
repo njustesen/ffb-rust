@@ -25,14 +25,20 @@ impl std::ops::Deref for WeepingDagger {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_weeping_dagger() {
         assert_eq!(WeepingDagger::new().get_name(), "Weeping Dagger");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(WeepingDagger::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_applies_poison_on_badly_hurt_property() {
+        assert!(SkillId::WeepingDagger.properties().contains(&"appliesPoisonOnBadlyHurt"));
     }
 }

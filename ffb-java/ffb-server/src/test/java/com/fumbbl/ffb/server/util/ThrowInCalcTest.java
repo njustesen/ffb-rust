@@ -75,6 +75,13 @@ class ThrowInCalcTest {
         assertEquals(expected, ThrowInCalc.throwInDirectionForRoll(12, 0, roll));
     }
 
+    @Test
+    void throwInDirection_interiorCoordinate_isInvalid() {
+        // (12,7) is not on any board edge — Java signals this with an exception
+        // (the Rust mirror returns None for the same input)
+        assertThrows(IllegalArgumentException.class, () -> ThrowInCalc.throwInDirectionForRoll(12, 7, 4));
+    }
+
     // ── cornerThrowInDirectionForRoll ─────────────────────────────────────────
 
     @ParameterizedTest(name = "NW-corner D3={0} → {1}")
@@ -99,6 +106,13 @@ class ThrowInCalcTest {
     @CsvSource({ "1,WEST", "2,NORTHWEST", "3,NORTH" })
     void southeastCorner(int roll, Direction expected) {
         assertEquals(expected, ThrowInCalc.cornerThrowInDirectionForRoll(Direction.SOUTHEAST, roll));
+    }
+
+    @Test
+    void cornerThrowInDirection_nonCornerDirection_isInvalid() {
+        // NORTH is not a corner direction — Java signals this with an exception
+        // (the Rust mirror returns None for the same input)
+        assertThrows(IllegalArgumentException.class, () -> ThrowInCalc.cornerThrowInDirectionForRoll(Direction.NORTH, 2));
     }
 
     // ── cornerDirection ───────────────────────────────────────────────────────

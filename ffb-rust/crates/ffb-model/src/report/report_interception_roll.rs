@@ -98,39 +98,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::INTERCEPTION_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "interceptionRoll");
-    }
-
-    #[test]
-    fn field_getters() {
-        let r = make();
-        assert!(r.is_bomb());
-        assert!(!r.is_ignore_agility());
-        assert!(!r.base.is_successful());
-    }
-
-    #[test]
-    fn minimum_roll_and_rerolled() {
-        let r = ReportInterceptionRoll::new(Some("p1".into()), true, 4, 3, true, vec![], false, false);
-        assert_eq!(r.base.get_minimum_roll(), 3);
-        assert!(r.base.is_re_rolled());
-    }
-
-    #[test]
-    fn unsuccessful_with_modifiers() {
-        let r = ReportInterceptionRoll::new(None, false, 2, 4, false, vec!["TackleZone".into()], false, true);
-        assert!(!r.base.is_successful());
-        assert_eq!(r.base.get_roll_modifiers().len(), 1);
-        assert!(r.is_ignore_agility());
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_pile_driver() {
         assert_eq!(PileDriver::new().get_name(), "Pile Driver");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_devious() {
         assert_eq!(PileDriver::new().get_category(), SkillCategory::Devious);
+    }
+
+    #[test]
+    fn has_can_foul_after_block_property() {
+        assert!(crate::enums::SkillId::PileDriver.properties().contains(&"canFoulAfterBlock"));
     }
 }

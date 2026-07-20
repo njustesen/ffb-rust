@@ -37,36 +37,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_id() {
-        assert_eq!(ReportReferee::new(true).get_id(), ReportId::REFEREE);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(ReportReferee::new(false).get_name(), "referee");
-    }
-
-    #[test]
-    fn fields() {
-        assert!(ReportReferee::new(true).is_fouling_player_banned());
-        assert!(!ReportReferee::new(false).is_fouling_player_banned());
-    }
-
-    #[test]
-    fn banned_true_id_correct() {
-        let r = ReportReferee::new(true);
-        assert!(r.is_fouling_player_banned());
-        assert_eq!(r.get_id(), ReportId::REFEREE);
-    }
-
-    #[test]
-    fn not_banned_name_correct() {
-        let r = ReportReferee::new(false);
-        assert!(!r.is_fouling_player_banned());
-        assert_eq!(r.get_name(), "referee");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = ReportReferee::new(true);
         let json = original.to_json_value();

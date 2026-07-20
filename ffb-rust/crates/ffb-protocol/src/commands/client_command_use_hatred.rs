@@ -57,22 +57,6 @@ mod tests {
     fn default_none() {
         assert!(ClientCommandUseHatred::new().target_id.is_none());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandUseHatred::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandUseHatred::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandUseHatred::default());
-        assert!(s.contains("ClientCommandUseHatred"));
-    }
 
     #[test]
     fn get_id_is_client_use_hatred() {

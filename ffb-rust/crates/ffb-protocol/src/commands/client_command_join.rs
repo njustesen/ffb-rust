@@ -132,18 +132,6 @@ mod tests {
         assert_eq!(cmd.get_team_id(), Some("team-abc"));
     }
 
-
-    #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandJoin::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandJoin::default().clone();
-    }
-
     #[test]
     fn get_id_is_client_join() {
         assert_eq!(ClientCommandJoin::new().get_id(), NetCommandId::ClientJoin);

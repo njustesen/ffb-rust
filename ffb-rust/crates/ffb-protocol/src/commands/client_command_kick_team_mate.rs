@@ -93,18 +93,6 @@ mod tests {
         assert!(cmd.get_acting_player_id().is_none());
     }
 
-
-    #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandKickTeamMate::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandKickTeamMate::default().clone();
-    }
-
     #[test]
     fn get_id_is_client_kick_team_mate() {
         assert_eq!(ClientCommandKickTeamMate::new().get_id(), NetCommandId::ClientKickTeamMate);

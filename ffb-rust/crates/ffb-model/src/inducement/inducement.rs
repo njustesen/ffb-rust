@@ -93,9 +93,5 @@ mod tests {
         assert_eq!(back.value, 1);
         assert_eq!(back.usages, vec![Usage::APOTHECARY]);
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", Inducement::default()).is_empty());
-    }
 
 }

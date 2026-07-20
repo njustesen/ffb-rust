@@ -25,14 +25,20 @@ impl std::ops::Deref for TakeRoot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_take_root() {
         assert_eq!(TakeRoot::new().get_name(), "Take Root");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(TakeRoot::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_becomes_immovable_property() {
+        assert!(SkillId::TakeRoot.properties().contains(&"becomesImmovable"));
     }
 }

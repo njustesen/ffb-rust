@@ -60,22 +60,6 @@ mod tests {
         assert_eq!(cmd.setup_names.len(), 1);
         assert_eq!(cmd.setup_names[0], "Press");
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandTeamSetupList::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandTeamSetupList::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandTeamSetupList::default());
-        assert!(s.contains("ServerCommandTeamSetupList"));
-    }
 
     #[test]
     fn get_id_is_server_team_setup_list() {

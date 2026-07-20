@@ -30,14 +30,22 @@ impl std::ops::Deref for MonstrousMouth {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_monstrous_mouth() {
         assert_eq!(MonstrousMouth::new().get_name(), "Monstrous Mouth");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(MonstrousMouth::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()) — the live Rust property
+        // table always yields a slice; assert every entry is a non-empty key.
+        assert!(SkillId::MonstrousMouth.properties().iter().all(|p| !p.is_empty()));
     }
 }

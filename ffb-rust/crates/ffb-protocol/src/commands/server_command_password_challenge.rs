@@ -68,22 +68,6 @@ mod tests {
         let cmd = ServerCommandPasswordChallenge::default();
         assert!(cmd.challenge.is_empty());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandPasswordChallenge::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandPasswordChallenge::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandPasswordChallenge::default());
-        assert!(s.contains("ServerCommandPasswordChallenge"));
-    }
 
     #[test]
     fn get_id_is_server_password_challenge() {

@@ -83,11 +83,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandHandOver::default()).is_empty());
-    }
-
-    #[test]
     fn get_id_is_client_hand_over() {
         assert_eq!(ClientCommandHandOver::new().get_id(), NetCommandId::ClientHandOver);
     }

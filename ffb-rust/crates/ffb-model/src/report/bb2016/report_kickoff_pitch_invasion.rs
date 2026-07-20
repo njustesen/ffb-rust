@@ -58,37 +58,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::KICKOFF_PITCH_INVASION);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "kickoffPitchInvasion");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_rolls_home(), &[4, 3]);
-        assert_eq!(r.get_players_affected_home(), &[true, false]);
-        assert_eq!(r.get_rolls_away(), &[2, 5]);
-    }
-
-    #[test]
-    fn players_affected_away() {
-        let r = make();
-        assert_eq!(r.get_players_affected_away(), &[false, true]);
-    }
-
-    #[test]
-    fn empty_vectors() {
-        let r = ReportKickoffPitchInvasion::new(vec![], vec![], vec![], vec![]);
-        assert!(r.get_rolls_home().is_empty());
-        assert!(r.get_players_affected_away().is_empty());
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

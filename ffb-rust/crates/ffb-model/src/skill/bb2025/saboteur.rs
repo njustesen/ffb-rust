@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_saboteur() {
         assert_eq!(Saboteur::new().get_name(), "Saboteur");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_devious() {
         assert_eq!(Saboteur::new().get_category(), SkillCategory::Devious);
+    }
+
+    #[test]
+    fn has_can_sabotage_blocker_on_knockdown_property() {
+        assert!(crate::enums::SkillId::Saboteur.properties().contains(&"canSabotageBlockerOnKnockdown"));
     }
 }

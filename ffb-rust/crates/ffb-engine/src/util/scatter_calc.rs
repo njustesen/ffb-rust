@@ -31,78 +31,102 @@ impl Default for ScatterCalc {
     }
 }
 
+// Tests mirror ffb-java/ffb-server/src/test/java/com/fumbbl/ffb/server/util/ScatterCalcTest.java 1:1
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn roll_1_is_north() {
-        assert_eq!(ScatterCalc::direction_for_roll(1), Some(Direction::North));
-    }
+    // ── direction_for_roll ────────────────────────────────────────────────────
 
     #[test]
-    fn roll_5_is_south() {
-        assert_eq!(ScatterCalc::direction_for_roll(5), Some(Direction::South));
-    }
-
-    #[test]
-    fn roll_8_is_northwest() {
-        assert_eq!(ScatterCalc::direction_for_roll(8), Some(Direction::Northwest));
-    }
-
-    #[test]
-    fn roll_out_of_range_is_none() {
-        assert_eq!(ScatterCalc::direction_for_roll(0), None);
-        assert_eq!(ScatterCalc::direction_for_roll(9), None);
-    }
-
-    #[test]
-    fn all_eight_rolls_produce_direction() {
-        for roll in 1..=8 {
-            assert!(ScatterCalc::direction_for_roll(roll).is_some(), "roll {} should give direction", roll);
+    fn direction_for_roll_all_faces() {
+        for (roll, expected) in [
+            (1, Direction::North),
+            (2, Direction::Northeast),
+            (3, Direction::East),
+            (4, Direction::Southeast),
+            (5, Direction::South),
+            (6, Direction::Southwest),
+            (7, Direction::West),
+            (8, Direction::Northwest),
+        ] {
+            assert_eq!(Some(expected), ScatterCalc::direction_for_roll(roll), "roll {roll}");
         }
     }
 
     #[test]
-    fn scatter_north_moves_up() {
-        let start = FieldCoordinate::new(10, 10);
-        let result = ScatterCalc::scatter_coordinate(start, Direction::North, 1);
-        assert_eq!(result, FieldCoordinate::new(10, 9));
+    fn direction_for_roll_out_of_range_returns_null() {
+        assert_eq!(None, ScatterCalc::direction_for_roll(0));
+        assert_eq!(None, ScatterCalc::direction_for_roll(9));
+    }
+
+    // ── scatter_coordinate ────────────────────────────────────────────────────
+
+    #[test]
+    fn scatter_north_decreases_y() {
+        let result = ScatterCalc::scatter_coordinate(FieldCoordinate::new(10, 10), Direction::North, 1);
+        assert_eq!(FieldCoordinate::new(10, 9), result);
     }
 
     #[test]
-    fn scatter_south_moves_down() {
-        let start = FieldCoordinate::new(10, 10);
-        let result = ScatterCalc::scatter_coordinate(start, Direction::South, 1);
-        assert_eq!(result, FieldCoordinate::new(10, 11));
+    fn scatter_south_increases_y() {
+        let result = ScatterCalc::scatter_coordinate(FieldCoordinate::new(10, 10), Direction::South, 1);
+        assert_eq!(FieldCoordinate::new(10, 11), result);
     }
 
     #[test]
-    fn scatter_east_moves_right() {
-        let start = FieldCoordinate::new(10, 10);
-        let result = ScatterCalc::scatter_coordinate(start, Direction::East, 1);
-        assert_eq!(result, FieldCoordinate::new(11, 10));
+    fn scatter_east_increases_x() {
+        let result = ScatterCalc::scatter_coordinate(FieldCoordinate::new(10, 10), Direction::East, 1);
+        assert_eq!(FieldCoordinate::new(11, 10), result);
     }
 
     #[test]
-    fn scatter_northeast_moves_diagonally() {
-        let start = FieldCoordinate::new(10, 10);
-        let result = ScatterCalc::scatter_coordinate(start, Direction::Northeast, 1);
-        assert_eq!(result, FieldCoordinate::new(11, 9));
+    fn scatter_west_decreases_x() {
+        let result = ScatterCalc::scatter_coordinate(FieldCoordinate::new(10, 10), Direction::West, 1);
+        assert_eq!(FieldCoordinate::new(9, 10), result);
     }
 
     #[test]
-    fn scatter_distance_two() {
-        let start = FieldCoordinate::new(5, 5);
-        let result = ScatterCalc::scatter_coordinate(start, Direction::South, 2);
-        assert_eq!(result, FieldCoordinate::new(5, 7));
+    fn scatter_northeast_increases_both() {
+        let result = ScatterCalc::scatter_coordinate(FieldCoordinate::new(10, 10), Direction::Northeast, 1);
+        assert_eq!(FieldCoordinate::new(11, 9), result);
+    }
+
+    #[test]
+    fn scatter_southeast_increases_x_increases_y() {
+        let result = ScatterCalc::scatter_coordinate(FieldCoordinate::new(10, 10), Direction::Southeast, 1);
+        assert_eq!(FieldCoordinate::new(11, 11), result);
+    }
+
+    #[test]
+    fn scatter_southwest_decreases_x_increases_y() {
+        let result = ScatterCalc::scatter_coordinate(FieldCoordinate::new(10, 10), Direction::Southwest, 1);
+        assert_eq!(FieldCoordinate::new(9, 11), result);
+    }
+
+    #[test]
+    fn scatter_northwest_decreases_both() {
+        let result = ScatterCalc::scatter_coordinate(FieldCoordinate::new(10, 10), Direction::Northwest, 1);
+        assert_eq!(FieldCoordinate::new(9, 9), result);
+    }
+
+    #[test]
+    fn scatter_distance_two_doubles_offset() {
+        let result = ScatterCalc::scatter_coordinate(FieldCoordinate::new(5, 5), Direction::Northeast, 2);
+        assert_eq!(FieldCoordinate::new(7, 3), result);
+    }
+
+    #[test]
+    fn scatter_distance_zero_returns_start() {
+        let start = FieldCoordinate::new(7, 7);
+        let result = ScatterCalc::scatter_coordinate(start, Direction::South, 0);
+        assert_eq!(start, result);
     }
 
     #[test]
     fn scatter_southwest_distance_three() {
-        let start = FieldCoordinate::new(10, 5);
-        let result = ScatterCalc::scatter_coordinate(start, Direction::Southwest, 3);
+        let result = ScatterCalc::scatter_coordinate(FieldCoordinate::new(10, 5), Direction::Southwest, 3);
         // dx=-3, dy=+3
-        assert_eq!(result, FieldCoordinate::new(7, 8));
+        assert_eq!(FieldCoordinate::new(7, 8), result);
     }
 }

@@ -101,18 +101,31 @@ impl ServerUrlProperty {
     }
 
     pub fn url(&self, properties: &HashMap<String, String>) -> String {
-        let get = |key: &str| properties.get(key).map(|s| s.as_str()).unwrap_or("").to_string();
-        let base = get(self.base_key());
-        let base = base.trim_end_matches('/').to_string();
-        let port = get(self.port_key());
-        let path = get(self.path_key());
+        Self::url_from_keys(self.base_key(), self.port_key(), self.path_key(), properties)
+    }
+
+    /// Java `ServerUrlProperty.url(Properties)` body, parameterized over the
+    /// three property keys (Java tests mock getBaseKey/getPortKey/getPathKey).
+    fn url_from_keys(
+        base_key: &str,
+        port_key: &str,
+        path_key: &str,
+        properties: &HashMap<String, String>,
+    ) -> String {
+        let get = |key: &str| properties.get(key).map(|s| s.as_str()).unwrap_or("");
+        let path = get(path_key);
+        // Java: if (path.startsWith("http")) return path;
+        if path.starts_with("http") {
+            return path.to_string();
+        }
         let path = path.trim_start_matches('/');
-        let mut url = base;
-        if !url.contains(':') || url.split(':').count() < 3 {
-            if !port.is_empty() {
-                url.push(':');
-                url.push_str(&port);
-            }
+        let base = get(base_key).trim_end_matches('/');
+        let mut url = base.to_string();
+        let port = get(port_key);
+        // Java: if (base.split(":").length < 3 && StringTool.isProvided(port))
+        if base.split(':').count() < 3 && !port.is_empty() {
+            url.push(':');
+            url.push_str(port);
         }
         if !path.is_empty() {
             url.push('/');
@@ -176,7 +189,84 @@ impl ServerUrlProperty {
 
 #[cfg(test)]
 mod tests {
+    // Mirrors ffb-java ffb-server ServerUrlPropertyTest (Java: ServerUrlPropertyTest.java).
+    // Java mocks getBaseKey/getPortKey/getPathKey; Rust exercises url_from_keys directly.
     use super::*;
+
+    const BASE: &str = "base";
+    const BASE_WITH_PORT: &str = "baseWithPort";
+    const BASE_WITH_SLASH: &str = "baseWithSlash";
+    const PORT: &str = "port";
+    const PATH: &str = "path";
+    const PATH_WITH_SLASH: &str = "pathWithSlash";
+    const PATH_HAS_URL: &str = "pathHasUrl";
+    const SLASHES_ONLY: &str = "slashesOnly";
+
+    fn setup_props() -> HashMap<String, String> {
+        let mut props = HashMap::new();
+        props.insert(BASE.to_string(), "https://host".to_string());
+        props.insert(BASE_WITH_PORT.to_string(), "https://host:8080".to_string());
+        props.insert(BASE_WITH_SLASH.to_string(), "https://host/".to_string());
+        props.insert(PORT.to_string(), "8000".to_string());
+        props.insert(PATH.to_string(), PATH.to_string());
+        props.insert(PATH_WITH_SLASH.to_string(), "//path".to_string());
+        props.insert(PATH_HAS_URL.to_string(), "https://otherhost/path".to_string());
+        props
+    }
+
+    fn url(base_key: &str, port_key: &str, path_key: &str) -> String {
+        ServerUrlProperty::url_from_keys(base_key, port_key, path_key, &setup_props())
+    }
+
+    /// Java: `urlReturnsAssembledValue`.
+    #[test]
+    fn url_returns_assembled_value() {
+        assert_eq!("https://host:8000/path", url(BASE, PORT, PATH));
+    }
+
+    /// Java: `urlHandlesUndefinedPort`.
+    #[test]
+    fn url_handles_undefined_port() {
+        assert_eq!("https://host/path", url(BASE, "unknownPort", PATH));
+    }
+
+    /// Java: `urlHandlesUndefinedPath`.
+    #[test]
+    fn url_handles_undefined_path() {
+        assert_eq!("https://host:8000", url(BASE, PORT, "unknownPath"));
+    }
+
+    /// Java: `urlHandlesSlashAsPathAndPrefix`.
+    #[test]
+    fn url_handles_slash_as_path_and_prefix() {
+        assert_eq!("https://host:8000", url(BASE, PORT, SLASHES_ONLY));
+    }
+
+    /// Java: `urlIgnoresDuplicateSlashes`.
+    #[test]
+    fn url_ignores_duplicate_slashes() {
+        assert_eq!("https://host/path", url(BASE_WITH_SLASH, "unknownPort", PATH_WITH_SLASH));
+    }
+
+    /// Java: `urlIgnoresPortIfPresentInBase`.
+    #[test]
+    fn url_ignores_port_if_present_in_base() {
+        assert_eq!("https://host:8080/path", url(BASE_WITH_PORT, PORT, PATH));
+    }
+
+    /// Java: `urlIgnoresOtherValuesIfPathIsFullUrl`.
+    #[test]
+    fn url_ignores_other_values_if_path_is_full_url() {
+        assert_eq!("https://otherhost/path", url(BASE, PORT, PATH_HAS_URL));
+    }
+
+    /// Java: `urlRemovesSlashFromBase`.
+    #[test]
+    fn url_removes_slash_from_base() {
+        assert_eq!("https://host:8000/path", url(BASE_WITH_SLASH, PORT, PATH));
+    }
+
+    // ── Rust-only: enum key wiring (no Java counterpart) ────────────────────
 
     #[test]
     fn test_path_key_admin_backup() {

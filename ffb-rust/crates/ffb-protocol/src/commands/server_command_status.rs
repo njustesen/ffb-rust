@@ -65,22 +65,6 @@ mod tests {
         let cmd = ServerCommandStatus::default();
         assert!(cmd.server_status.is_none());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandStatus::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandStatus::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandStatus::default());
-        assert!(s.contains("ServerCommandStatus"));
-    }
 
     #[test]
     fn get_id_is_server_status() {

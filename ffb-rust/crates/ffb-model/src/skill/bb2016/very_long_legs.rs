@@ -25,14 +25,22 @@ impl std::ops::Deref for VeryLongLegs {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_very_long_legs() {
         assert_eq!(VeryLongLegs::new().get_name(), "Very Long Legs");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_mutation() {
         assert_eq!(VeryLongLegs::new().get_category(), SkillCategory::Mutation);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()) — the live Rust property
+        // table always yields a slice; assert every entry is a non-empty key.
+        assert!(SkillId::VeryLongLegs.properties().iter().all(|p| !p.is_empty()));
     }
 }

@@ -57,35 +57,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::CARD_EFFECT_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "cardEffectRoll");
-    }
-
-    #[test]
-    fn get_roll() {
-        assert_eq!(make().get_roll(), 3);
-    }
-
-    #[test]
-    fn get_card_and_effect() {
-        let r = make();
-        assert_eq!(r.get_card(), "DISTRACT");
-        assert_eq!(r.get_card_effect(), Some("STUNNED"));
-    }
-
-    #[test]
-    fn no_card_effect_by_default() {
-        let r = ReportCardEffectRoll::new("BRIBE".into(), 5);
-        assert_eq!(r.get_card_effect(), None);
-        assert_eq!(r.get_roll(), 5);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

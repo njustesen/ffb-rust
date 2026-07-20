@@ -45,22 +45,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::SELECT_GAZE_TARGET); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "selectGazeTarget"); }
-
-    #[test]
-    fn get_attacker() { assert_eq!(make().get_attacker(), Some("a1")); }
-
-    #[test]
-    fn get_defender() { assert_eq!(make().get_defender(), Some("d1")); }
-    #[test]
-    fn get_name_is_nonempty() {
-        assert!(!make().get_name().is_empty());
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

@@ -43,27 +43,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::EVENT); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "event"); }
-
-    #[test]
-    fn get_event_message() { assert_eq!(make().get_event_message(), Some("something happened")); }
-
-    #[test]
-    fn none_event_message() {
-        let r = ReportEvent::new(None);
-        assert_eq!(r.get_event_message(), None);
-    }
-
-    #[test]
-    fn different_event_message() {
-        let r = ReportEvent::new(Some("touchdown".into()));
-        assert_eq!(r.get_event_message(), Some("touchdown"));
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

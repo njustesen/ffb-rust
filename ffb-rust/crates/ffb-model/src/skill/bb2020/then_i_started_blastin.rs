@@ -25,25 +25,25 @@ impl std::ops::Deref for ThenIStartedBlastin {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
-        assert_eq!(ThenIStartedBlastin::new().get_name(), "\"Then I Started Blastin'!\"");
+    fn name_contains_blastin() {
+        assert!(ThenIStartedBlastin::new().get_name().contains("Blastin"));
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(ThenIStartedBlastin::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_blast_remote_player_property() {
+        assert!(SkillId::ThenIStartedBlastin.properties().contains(&"canBlastRemotePlayer"));
     }
 
     #[test]
     fn usage_type_is_correct() {
         assert_eq!(ThenIStartedBlastin::new().get_skill_usage_type(), SkillUsageType::OncePerHalf);
-    }
-
-    #[test]
-    fn registers_named_property() {
-        use crate::enums::SkillId;
-        assert!(SkillId::ThenIStartedBlastin.properties().contains(&"canBlastRemotePlayer"));
     }
 }

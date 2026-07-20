@@ -25,14 +25,20 @@ impl std::ops::Deref for Brawler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_brawler() {
         assert_eq!(Brawler::new().get_name(), "Brawler");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_strength() {
         assert_eq!(Brawler::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn has_can_reroll_single_both_down_property() {
+        assert!(SkillId::Brawler.properties().contains(&"canRerollSingleBothDown"));
     }
 }

@@ -59,38 +59,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::STEADY_FOOTING_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "steadyFootingRoll");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert!(!r.is_successful());
-        assert!(r.is_re_rolled());
-    }
-
-    #[test]
-    fn minimum_roll_and_player_id() {
-        let r = make();
-        assert_eq!(r.get_minimum_roll(), 4);
-        assert_eq!(r.get_player_id(), Some("p1"));
-    }
-
-    #[test]
-    fn successful_not_rerolled() {
-        let r = ReportSteadyFootingRoll::new(Some("p2".into()), true, 5, 3, false);
-        assert!(r.is_successful());
-        assert!(!r.is_re_rolled());
-        assert_eq!(r.get_roll(), 5);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

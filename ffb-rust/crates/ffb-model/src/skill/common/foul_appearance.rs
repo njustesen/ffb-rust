@@ -25,8 +25,19 @@ impl std::ops::Deref for FoulAppearance {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(FoulAppearance::new().get_name(), "Foul Appearance"); }
+    fn name_is_foul_appearance() {
+        assert_eq!(FoulAppearance::new().get_name(), "Foul Appearance");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(FoulAppearance::new().get_category(), SkillCategory::Mutation); }
+    fn category_is_mutation() {
+        assert_eq!(FoulAppearance::new().get_category(), SkillCategory::Mutation);
+    }
+
+    #[test]
+    fn has_force_roll_before_being_blocked_property() {
+        assert!(crate::enums::SkillId::FoulAppearance.properties().contains(&"forceRollBeforeBeingBlocked"));
+    }
 }

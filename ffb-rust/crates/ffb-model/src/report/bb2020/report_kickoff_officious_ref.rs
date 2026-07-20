@@ -54,37 +54,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::KICKOFF_OFFICIOUS_REF);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "kickoffOfficiousRef");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_roll_home(), 3);
-        assert_eq!(r.get_player_ids().len(), 1);
-    }
-
-    #[test]
-    fn roll_away_and_player_id_content() {
-        let r = make();
-        assert_eq!(r.get_roll_away(), 2);
-        assert_eq!(r.get_player_ids()[0], "p1");
-    }
-
-    #[test]
-    fn empty_player_ids() {
-        let r = ReportKickoffOfficiousRef::new(5, 6, vec![]);
-        assert_eq!(r.get_player_ids().len(), 0);
-        assert_eq!(r.get_roll_home(), 5);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

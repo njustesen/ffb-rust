@@ -26,7 +26,18 @@ impl std::ops::Deref for Reliable {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(Reliable::new().get_name(), "Reliable"); }
+    fn name_is_reliable() {
+        assert_eq!(Reliable::new().get_name(), "Reliable");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Reliable::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(Reliable::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); properties() always returns a valid slice.
+        let _properties: &'static [&'static str] = crate::enums::SkillId::Reliable.properties();
+    }
 }

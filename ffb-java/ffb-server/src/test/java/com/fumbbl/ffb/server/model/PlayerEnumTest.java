@@ -60,7 +60,20 @@ class PlayerEnumTest {
 
     @Test
     void player_gender_from_ordinal_default_is_neutral() {
+        assertEquals(PlayerGender.NEUTRAL, PlayerGender.fromOrdinal(0));
         assertEquals(PlayerGender.NEUTRAL, PlayerGender.fromOrdinal(99));
+    }
+
+    @Test
+    void player_gender_nonbinary_genitive_is_their() {
+        assertEquals("their", PlayerGender.NONBINARY.getGenitive());
+    }
+
+    @ParameterizedTest
+    @EnumSource(PlayerGender.class)
+    void player_gender_all_genitives_non_empty(PlayerGender g) {
+        assertNotNull(g.getGenitive());
+        assertFalse(g.getGenitive().isEmpty());
     }
 
     // ── PlayerType ──────────────────────────────────────────────────────────

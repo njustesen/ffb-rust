@@ -72,22 +72,6 @@ mod tests {
         cmd.add_message("hi");
         assert_eq!(cmd.messages.len(), 1);
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandAdminMessage::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandAdminMessage::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandAdminMessage::default());
-        assert!(s.contains("ServerCommandAdminMessage"));
-    }
 
     #[test]
     fn get_id_is_server_admin_message() {

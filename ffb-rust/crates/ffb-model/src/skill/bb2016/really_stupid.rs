@@ -23,16 +23,24 @@ impl std::ops::Deref for ReallyStupid {
 }
 
 #[cfg(test)]
+// Mirrors ffb-java/ffb-server/src/test/java/com/fumbbl/ffb/server/skill tests.
+// Java test targets bb2025 (category TRAIT); bb2016/ReallyStupid.java is EXTRAORDINARY.
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_really_stupid() {
         assert_eq!(ReallyStupid::new().get_name(), "Really Stupid");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(ReallyStupid::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_applies_confusion_property() {
+        assert!(SkillId::ReallyStupid.properties().contains(&"appliesConfusion"));
     }
 }

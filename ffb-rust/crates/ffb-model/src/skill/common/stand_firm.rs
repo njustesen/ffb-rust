@@ -28,15 +28,19 @@ impl std::ops::Deref for StandFirm {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(StandFirm::new().get_name(), "Stand Firm"); }
+    fn name_is_stand_firm() {
+        assert_eq!(StandFirm::new().get_name(), "Stand Firm");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(StandFirm::new().get_category(), SkillCategory::Strength); }
+    fn category_is_strength() {
+        assert_eq!(StandFirm::new().get_category(), SkillCategory::Strength);
+    }
+
     #[test]
-    fn registers_can_refuse_to_be_pushed_property() {
-        // Java StandFirm.postConstruct() registers canRefuseToBePushed;
-        // this would have failed before the fix since no property was registered.
-        let s = StandFirm::new();
-        assert!(s.has_skill_property(NamedProperties::CAN_REFUSE_TO_BE_PUSHED));
+    fn has_can_refuse_to_be_pushed_property() {
+        assert!(crate::enums::SkillId::StandFirm.properties().contains(&"canRefuseToBePushed"));
     }
 }

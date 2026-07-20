@@ -101,10 +101,6 @@ mod tests {
         assert!(cmd.was_active);
         assert!(cmd.suppress_end_turn);
     }
-    #[test]
-    fn is_zero_sized_unit_struct() {
-        assert!(std::mem::size_of::<DropPlayerFromBombCommand>() > 0);
-    }
 
     fn add_stunned_player(game: &mut Game, id: &str, active: bool) {
         use ffb_model::enums::{PlayerGender, PlayerState, PlayerType, PS_STUNNED};

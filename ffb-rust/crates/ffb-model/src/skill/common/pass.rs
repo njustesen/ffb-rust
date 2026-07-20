@@ -32,9 +32,22 @@ impl std::ops::Deref for Pass {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(Pass::new().get_name(), "Pass"); }
+    fn name_is_pass() {
+        assert_eq!(Pass::new().get_name(), "Pass");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Pass::new().get_category(), SkillCategory::Passing); }
+    fn category_is_passing() {
+        assert_eq!(Pass::new().get_category(), SkillCategory::Passing);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java asserts getSkillProperties() is not null; the live Rust mechanism
+        // always returns a slice (empty here — Pass registers only a reroll source, no NamedProperties).
+        assert!(crate::enums::SkillId::Pass.properties().is_empty());
+    }
+
     #[test]
     fn registers_pass_reroll_source() {
         // Java Pass.postConstruct() registers a reroll source for the PASS action;

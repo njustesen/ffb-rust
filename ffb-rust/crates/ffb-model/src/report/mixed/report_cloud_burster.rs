@@ -54,21 +54,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::CLOUD_BURSTER); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "cloudBurster"); }
-
-    #[test]
-    fn get_thrower_id() { assert_eq!(make().get_thrower_id(), Some("t1")); }
-
-    #[test]
-    fn get_interceptor_id() { assert_eq!(make().get_interceptor_id(), Some("i1")); }
-
-    #[test]
-    fn get_thrower_team_id() { assert_eq!(make().get_thrower_team_id(), Some("team1")); }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_give_and_go() {
         assert_eq!(GiveAndGo::new().get_name(), "Give and Go");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_passing() {
         assert_eq!(GiveAndGo::new().get_category(), SkillCategory::Passing);
+    }
+
+    #[test]
+    fn has_can_move_after_quick_pass_property() {
+        assert!(crate::enums::SkillId::GiveAndGo.properties().contains(&"canMoveAfterQuickPass"));
     }
 }

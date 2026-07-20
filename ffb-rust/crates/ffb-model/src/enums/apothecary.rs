@@ -156,6 +156,18 @@ mod tests {
     }
 
     #[test]
+    fn apothecary_mode_count_is_fifteen() {
+        let all = [
+            ApothecaryMode::Attacker, ApothecaryMode::Away, ApothecaryMode::CrowdPush,
+            ApothecaryMode::Defender, ApothecaryMode::Feeding, ApothecaryMode::Home,
+            ApothecaryMode::SpecialEffect, ApothecaryMode::ThrownPlayer, ApothecaryMode::KickedPlayer,
+            ApothecaryMode::HitPlayer, ApothecaryMode::Catcher, ApothecaryMode::TrapDoor,
+            ApothecaryMode::AnimalSavagery, ApothecaryMode::DroppedByOwnPlayer, ApothecaryMode::QuickBite,
+        ];
+        assert_eq!(all.len(), 15);
+    }
+
+    #[test]
     fn apothecary_mode_home_name() {
         assert_eq!(ApothecaryMode::Home.name(), "home");
     }
@@ -176,7 +188,7 @@ mod tests {
     }
 
     #[test]
-    fn apothecary_mode_all_have_non_empty_names() {
+    fn apothecary_mode_all_have_non_null_name() {
         for m in [
             ApothecaryMode::Attacker, ApothecaryMode::Away, ApothecaryMode::CrowdPush,
             ApothecaryMode::Defender, ApothecaryMode::Feeding, ApothecaryMode::Home,
@@ -186,6 +198,19 @@ mod tests {
         ] {
             assert!(!m.name().is_empty());
         }
+    }
+
+    #[test]
+    fn apothecary_status_count_is_eleven() {
+        let all = [
+            ApothecaryStatus::NoApothecary, ApothecaryStatus::DoRequest,
+            ApothecaryStatus::WaitForApothecaryUse, ApothecaryStatus::WaitForApothecaryChoice,
+            ApothecaryStatus::UseApothecary, ApothecaryStatus::DoNotUseApothecary,
+            ApothecaryStatus::ResultChoice, ApothecaryStatus::WaitForIgorUse,
+            ApothecaryStatus::UseIgor, ApothecaryStatus::DoNotUseIgor,
+            ApothecaryStatus::WaitForGettingEven,
+        ];
+        assert_eq!(all.len(), 11);
     }
 
     #[test]
@@ -199,7 +224,7 @@ mod tests {
     }
 
     #[test]
-    fn apothecary_status_all_have_non_empty_names() {
+    fn apothecary_status_all_have_non_null_name() {
         for s in [
             ApothecaryStatus::NoApothecary, ApothecaryStatus::DoRequest,
             ApothecaryStatus::WaitForApothecaryUse, ApothecaryStatus::WaitForApothecaryChoice,
@@ -213,17 +238,17 @@ mod tests {
     }
 
     #[test]
-    fn apothecary_type_team_display_name() {
+    fn apothecary_type_team_name() {
         assert_eq!(ApothecaryType::Team.display_name(), "Team Apothecary");
     }
 
     #[test]
-    fn apothecary_type_plague_display_name() {
+    fn apothecary_type_plague_name() {
         assert_eq!(ApothecaryType::Plague.display_name(), "Plague Doctor");
     }
 
     #[test]
-    fn apothecary_type_wandering_display_name() {
+    fn apothecary_type_wandering_name() {
         assert_eq!(ApothecaryType::Wandering.display_name(), "Wandering Apothecary");
     }
 
@@ -234,7 +259,7 @@ mod tests {
     }
 
     #[test]
-    fn apothecary_type_all_have_non_empty_display_names() {
+    fn apothecary_type_all_have_non_null_name() {
         for t in [ApothecaryType::Team, ApothecaryType::Wandering, ApothecaryType::Plague] {
             assert!(!t.display_name().is_empty());
         }

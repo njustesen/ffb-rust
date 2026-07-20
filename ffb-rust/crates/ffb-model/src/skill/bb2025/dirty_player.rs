@@ -27,12 +27,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_dirty_player() {
         assert_eq!(DirtyPlayer::new().get_name(), "Dirty Player");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_devious() {
         assert_eq!(DirtyPlayer::new().get_category(), SkillCategory::Devious);
+    }
+
+    #[test]
+    fn has_affects_either_armour_or_injury_on_foul_property() {
+        assert!(crate::enums::SkillId::DirtyPlayer.properties().contains(&"affectsEitherArmourOrInjuryOnFoul"));
+    }
+
+    #[test]
+    fn does_not_have_force_followup_property() {
+        assert!(!crate::enums::SkillId::DirtyPlayer.properties().contains(&"forceFollowup"));
     }
 }

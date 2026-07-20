@@ -32,14 +32,24 @@ impl std::ops::Deref for BallAndChain {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
+
+    // bb2020/BallAndChain is SkillCategory.TRAIT (the bb2016 test's EXTRAORDINARY is bb2016-only).
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_ball_and_chain() {
         assert_eq!(BallAndChain::new().get_name(), "Ball and Chain");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(BallAndChain::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_moves_randomly_property() {
+        // Java bb2016 test asserts forceFullMovement, which only the bb2016 edition
+        // registers; bb2020/BallAndChain.postConstruct registers movesRandomly instead.
+        assert!(SkillId::BallAndChain.properties().contains(&"movesRandomly"));
     }
 }

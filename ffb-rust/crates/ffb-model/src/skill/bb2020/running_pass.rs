@@ -25,14 +25,20 @@ impl std::ops::Deref for RunningPass {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_running_pass() {
         assert_eq!(RunningPass::new().get_name(), "Running Pass");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_passing() {
         assert_eq!(RunningPass::new().get_category(), SkillCategory::Passing);
+    }
+
+    #[test]
+    fn has_can_move_after_quick_pass_property() {
+        assert!(SkillId::RunningPass.properties().contains(&"canMoveAfterQuickPass"));
     }
 }

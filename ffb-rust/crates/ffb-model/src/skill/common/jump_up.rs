@@ -25,8 +25,19 @@ impl std::ops::Deref for JumpUp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(JumpUp::new().get_name(), "Jump Up"); }
+    fn name_is_jump_up() {
+        assert_eq!(JumpUp::new().get_name(), "Jump Up");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(JumpUp::new().get_category(), SkillCategory::Agility); }
+    fn category_is_agility() {
+        assert_eq!(JumpUp::new().get_category(), SkillCategory::Agility);
+    }
+
+    #[test]
+    fn has_can_stand_up_for_free_property() {
+        assert!(crate::enums::SkillId::JumpUp.properties().contains(&"canStandUpForFree"));
+    }
 }

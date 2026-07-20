@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_team_captain() {
         assert_eq!(TeamCaptain::new().get_name(), "Team Captain");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(TeamCaptain::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_save_re_rolls_property() {
+        assert!(crate::enums::SkillId::TeamCaptain.properties().contains(&"canSaveReRolls"));
     }
 }

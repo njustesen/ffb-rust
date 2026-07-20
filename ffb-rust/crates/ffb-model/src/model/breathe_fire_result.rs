@@ -56,9 +56,5 @@ mod tests {
         assert!(!BreatheFireResult::NO_EFFECT.get_message().is_empty());
         assert!(!BreatheFireResult::PRONE.get_message().is_empty());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", BreatheFireResult::FAILURE).is_empty());
-    }
 
 }

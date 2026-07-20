@@ -37,15 +37,19 @@ impl std::ops::Deref for ThickSkull {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(ThickSkull::new().get_name(), "Thick Skull"); }
+    fn name_is_thick_skull() {
+        assert_eq!(ThickSkull::new().get_name(), "Thick Skull");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(ThickSkull::new().get_category(), SkillCategory::Strength); }
+    fn category_is_strength() {
+        assert_eq!(ThickSkull::new().get_category(), SkillCategory::Strength);
+    }
+
     #[test]
-    fn registers_convert_ko_to_stun_on_8_property() {
-        // Java ThickSkull.postConstruct() registers convertKOToStunOn8;
-        // this would have failed before the fix since no property was registered.
-        let t = ThickSkull::new();
-        assert!(t.has_skill_property(NamedProperties::CONVERT_KO_TO_STUN_ON_8));
+    fn has_convert_ko_to_stun_on_8_property() {
+        assert!(crate::enums::SkillId::ThickSkull.properties().contains(&"convertKOToStunOn8"));
     }
 }

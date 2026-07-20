@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_put_the_boot_in() {
         assert_eq!(PutTheBootIn::new().get_name(), "Put the Boot In");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_devious() {
         assert_eq!(PutTheBootIn::new().get_category(), SkillCategory::Devious);
+    }
+
+    #[test]
+    fn has_can_always_assist_fouls_property() {
+        assert!(crate::enums::SkillId::PutTheBootIn.properties().contains(&"canAlwaysAssistFouls"));
     }
 }

@@ -70,22 +70,6 @@ mod tests {
     fn default_none() {
         assert!(ClientCommandUseReRollForTarget::new().target_id.is_none());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandUseReRollForTarget::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandUseReRollForTarget::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandUseReRollForTarget::default());
-        assert!(s.contains("ClientCommandUseReRollForTarget"));
-    }
 
     #[test]
     fn get_id_is_client_use_re_roll_for_target() {

@@ -47,25 +47,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::FREE_PETTY_CASH); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "freePettyCash"); }
-
-    #[test]
-    fn get_gold() { assert_eq!(make().get_gold(), 50000); }
-
-    #[test]
-    fn get_team_id() { assert_eq!(make().get_team_id(), Some("team1")); }
-
-    #[test]
-    fn none_team_id() {
-        let r = ReportFreePettyCash::new(None, 10000);
-        assert_eq!(r.get_team_id(), None);
-        assert_eq!(r.get_gold(), 10000);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

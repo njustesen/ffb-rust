@@ -36,12 +36,18 @@ mod tests {
     use crate::types::FieldCoordinate;
 
     #[test]
-    fn transform_flips_side() {
+    fn pushback_square_home_choice_flips_on_transform() {
         let sq = PushbackSquare::new(FieldCoordinate::new(10, 7), Direction::East, true);
         let t = sq.transform();
-        assert_eq!(t.home_choice, false);
+        assert!(!t.home_choice);
+        assert_eq!(t.coordinate.x, crate::types::field_coordinate::FIELD_WIDTH - 1 - 10);
+    }
+
+    #[test]
+    fn pushback_square_transform_mirrors_direction() {
+        let sq = PushbackSquare::new(FieldCoordinate::new(10, 7), Direction::East, true);
+        let t = sq.transform();
         assert_eq!(t.direction, Direction::West);
-        assert_eq!(t.coordinate.x, 25 - 10);
     }
 
     #[test]

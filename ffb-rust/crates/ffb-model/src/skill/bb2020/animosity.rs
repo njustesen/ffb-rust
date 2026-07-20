@@ -28,14 +28,20 @@ impl std::ops::Deref for Animosity {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_animosity() {
         assert_eq!(Animosity::new().get_name(), "Animosity");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(Animosity::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_has_to_roll_to_pass_ball_on_property() {
+        assert!(SkillId::Animosity.properties().contains(&"hasToRollToPassBallOn"));
     }
 }

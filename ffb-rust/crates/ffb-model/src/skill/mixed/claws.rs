@@ -25,8 +25,28 @@ impl std::ops::Deref for Claws {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(Claws::new().get_name(), "Claws"); }
+    fn name_is_claws() {
+        assert_eq!(Claws::new().get_name(), "Claws");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Claws::new().get_category(), SkillCategory::Mutation); }
+    fn category_is_mutation() {
+        assert_eq!(Claws::new().get_category(), SkillCategory::Mutation);
+    }
+
+    // The mixed Claws class shares SkillId::Claw with bb2016's Claw.
+    #[test]
+    fn has_reduces_armour_to_fixed_value_property() {
+        assert!(crate::enums::SkillId::Claw.properties().contains(&"reducesArmourToFixedValue"));
+    }
+
+    #[test]
+    fn class_name_is_claws() {
+        assert_eq!(
+            crate::enums::SkillId::from_class_name("Claws"),
+            Some(crate::enums::SkillId::Claw)
+        );
+    }
 }

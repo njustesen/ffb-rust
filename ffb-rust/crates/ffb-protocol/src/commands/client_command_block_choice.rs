@@ -67,17 +67,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandBlockChoice::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandBlockChoice::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_block_choice() {
         assert_eq!(ClientCommandBlockChoice::new(0).get_id(), NetCommandId::ClientBlockChoice);
     }

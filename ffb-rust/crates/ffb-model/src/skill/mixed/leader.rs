@@ -25,8 +25,26 @@ impl std::ops::Deref for Leader {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors ffb-java LeaderSkillTest.
+
     #[test]
-    fn name_is_correct() { assert_eq!(Leader::new().get_name(), "Leader"); }
+    fn name_is_leader() {
+        assert_eq!(Leader::new().get_name(), "Leader");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Leader::new().get_category(), SkillCategory::Passing); }
+    fn category_is_passing() {
+        assert_eq!(Leader::new().get_category(), SkillCategory::Passing);
+    }
+
+    #[test]
+    fn has_grants_team_reroll_when_on_pitch_property() {
+        assert!(crate::enums::SkillId::Leader.properties().contains(&"grantsTeamReRollWhenOnPitch"));
+    }
+
+    #[test]
+    fn class_name_is_leader() {
+        assert_eq!(crate::enums::SkillId::Leader.class_name(), "Leader");
+    }
 }

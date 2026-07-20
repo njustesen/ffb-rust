@@ -48,32 +48,9 @@ mod tests {
     }
 
     #[test]
-    fn dummy_observer_next_does_not_panic() {
-        let obs = DummyObserver;
-        let mut game = make_game();
-        obs.next(Some("player-1"), ModelChangeId::FieldModelSetPlayerCoordinate, &mut game);
-    }
-
-    #[test]
-    fn dummy_observer_next_with_none_key_does_not_panic() {
-        let obs = DummyObserver;
-        let mut game = make_game();
-        obs.next(None, ModelChangeId::FieldModelSetPlayerCoordinate, &mut game);
-    }
-
-    #[test]
     fn counting_observer_name_matches() {
         let obs = CountingObserver { name: "MyCounter" };
         assert_eq!(obs.get_name(), "MyCounter");
-    }
-
-    #[test]
-    fn counting_observer_next_does_not_panic_multiple_calls() {
-        let obs = CountingObserver { name: "Counter" };
-        let mut game = make_game();
-        obs.next(Some("p1"), ModelChangeId::FieldModelSetPlayerCoordinate, &mut game);
-        obs.next(None, ModelChangeId::FieldModelSetPlayerCoordinate, &mut game);
-        obs.next(Some("p2"), ModelChangeId::FieldModelSetPlayerCoordinate, &mut game);
     }
 
     #[test]

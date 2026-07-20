@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_incorporeal() {
         assert_eq!(Incorporeal::new().get_name(), "Incorporeal");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(Incorporeal::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_avoid_dodging_property() {
+        assert!(crate::enums::SkillId::Incorporeal.properties().contains(&"canAvoidDodging"));
     }
 }

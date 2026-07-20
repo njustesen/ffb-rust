@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_mighty_blow() {
         assert_eq!(MightyBlow::new().get_name(), "Mighty Blow");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_strength() {
         assert_eq!(MightyBlow::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn has_affects_either_armour_or_injury_on_block_property() {
+        assert!(crate::enums::SkillId::MightyBlow.properties().contains(&"affectsEitherArmourOrInjuryOnBlock"));
     }
 }

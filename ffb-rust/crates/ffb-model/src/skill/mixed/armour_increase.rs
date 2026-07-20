@@ -30,8 +30,22 @@ impl std::ops::Deref for ArmourIncrease {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(ArmourIncrease::new().get_name(), "+AV"); }
+    fn name_is_plus_av() {
+        assert_eq!(ArmourIncrease::new().get_name(), "+AV");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(ArmourIncrease::new().get_category(), SkillCategory::StatIncrease); }
+    fn category_is_stat_increase() {
+        assert_eq!(ArmourIncrease::new().get_category(), SkillCategory::StatIncrease);
+    }
+
+    // Java: assertNotNull(skill.getSkillProperties()). The live Rust mechanism always
+    // returns a valid slice; ArmourIncrease registers no NamedProperties, so the live
+    // property table is empty.
+    #[test]
+    fn skill_properties_are_not_null() {
+        assert!(crate::enums::SkillId::ArmourIncrease.properties().is_empty());
+    }
 }

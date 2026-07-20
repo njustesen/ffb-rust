@@ -68,4 +68,12 @@ class InifileParamFilterTest {
         assertEquals(DEFAULT_INIFUILE_VALUE, result.getIniFileName(), "Inifile value must be set to the default value");
     }
 
+    @Test
+    void filterForInifileExtractsOverrideParam() {
+        String[] input = new String[]{OVERRIDE_PARAM, OVERRIDE_VALUE};
+        InifileParamFilterResult result = filter.filterForInifile(input);
+        assertEquals(OVERRIDE_VALUE, result.getOverrideFileName());
+        assertEquals(DEFAULT_INIFUILE_VALUE, result.getIniFileName());
+    }
+
 }

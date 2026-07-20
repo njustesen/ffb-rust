@@ -103,6 +103,8 @@ class PassingDistanceCalcTest {
     void outOfRangeCells_returnNull() {
         // dy=13, dx=3 → "B B B   " → index 3 is space → null
         assertNull(PassingDistanceCalc.forDeltas(3, 13));
+        // dy=13, dx=13 → bottom-right corner is off the table edge → null
+        assertNull(PassingDistanceCalc.forDeltas(13, 13));
     }
 
     // ── forCoordinates ────────────────────────────────────────────────────────

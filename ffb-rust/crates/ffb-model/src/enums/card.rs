@@ -150,6 +150,19 @@ impl CardEffect {
             _ => None,
         }
     }
+
+    /// Skills applied by this effect — 1:1 translation of Java
+    /// `CardEffect.skills()` (default: empty set; DISTRACTED → BoneHead,
+    /// MAD_CAP_MUSHROOM_POTION → JumpUp + NoHands, SEDATIVE → ReallyStupid).
+    pub fn skills(self) -> &'static [crate::enums::skill_id::SkillId] {
+        use crate::enums::skill_id::SkillId;
+        match self {
+            CardEffect::Distracted => &[SkillId::BoneHead],
+            CardEffect::MadCapMushroomPotion => &[SkillId::JumpUp, SkillId::NoHands],
+            CardEffect::Sedative => &[SkillId::ReallyStupid],
+            _ => &[],
+        }
+    }
 }
 
 /// Who a card is played on.
@@ -234,7 +247,7 @@ mod tests {
     }
 
     #[test]
-    fn card_effect_all_have_non_empty_names() {
+    fn card_effect_all_have_non_null_name() {
         for e in [
             CardEffect::Distracted, CardEffect::IllegallySubstituted,
             CardEffect::MadCapMushroomPotion, CardEffect::Sedative, CardEffect::Poisoned,
@@ -249,17 +262,48 @@ mod tests {
     }
 
     #[test]
+    fn card_effect_distracted_has_skills() {
+        // Java: assertFalse(CardEffect.DISTRACTED.skills().isEmpty())
+        assert!(!CardEffect::Distracted.skills().is_empty());
+        assert_eq!(
+            CardEffect::Distracted.skills(),
+            &[crate::enums::skill_id::SkillId::BoneHead]
+        );
+    }
+
+    #[test]
+    fn card_effect_poisoned_has_no_skills() {
+        // Java: assertTrue(CardEffect.POISONED.skills().isEmpty())
+        assert!(CardEffect::Poisoned.skills().is_empty());
+    }
+
+    #[test]
+    fn card_effect_mad_cap_mushroom_has_two_skills() {
+        // Java: assertEquals(2, CardEffect.MAD_CAP_MUSHROOM_POTION.skills().size())
+        assert_eq!(CardEffect::MadCapMushroomPotion.skills().len(), 2);
+    }
+
+    #[test]
     fn card_target_count_is_four() {
         let all = [CardTarget::Turn, CardTarget::OwnPlayer, CardTarget::OpposingPlayer, CardTarget::AnyPlayer];
         assert_eq!(all.len(), 4);
     }
 
     #[test]
-    fn card_target_full_round_trip_id() {
-        for id in 1u8..=4 {
-            let t = CardTarget::from_id(id).unwrap();
-            assert_eq!(t.id(), id);
+    fn card_target_all_have_non_null_name() {
+        for t in [CardTarget::Turn, CardTarget::OwnPlayer, CardTarget::OpposingPlayer, CardTarget::AnyPlayer] {
+            assert!(!t.name().is_empty());
         }
+    }
+
+    #[test]
+    fn card_target_turn_id_is_one() {
+        assert_eq!(CardTarget::Turn.id(), 1);
+    }
+
+    #[test]
+    fn card_target_own_player_id_is_two() {
+        assert_eq!(CardTarget::OwnPlayer.id(), 2);
     }
 
     #[test]
@@ -270,7 +314,22 @@ mod tests {
     #[test]
     fn card_target_own_player_is_played_on_player() {
         assert!(CardTarget::OwnPlayer.is_played_on_player());
+    }
+
+    #[test]
+    fn card_target_any_player_is_played_on_player() {
         assert!(CardTarget::AnyPlayer.is_played_on_player());
+    }
+
+    #[test]
+    fn card_target_from_id() {
+        assert_eq!(CardTarget::from_id(1), Some(CardTarget::Turn));
+        assert_eq!(CardTarget::from_id(4), Some(CardTarget::AnyPlayer));
+    }
+
+    #[test]
+    fn card_target_from_id_unknown_returns_null() {
+        assert_eq!(CardTarget::from_id(99), None);
     }
 
     #[test]

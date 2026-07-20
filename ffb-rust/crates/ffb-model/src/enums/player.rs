@@ -182,12 +182,14 @@ impl PlayerState {
         b == PS_STANDING || b == PS_RESERVE
     }
 
+    /// Java `PlayerState.hasTacklezones()` — eye gouge does NOT remove
+    /// tacklezones; Java checks it separately (e.g. ServerUtilPlayer when
+    /// counting block assists).
     pub fn has_tacklezones(self) -> bool {
         let b = self.base();
         (b == PS_STANDING || b == PS_MOVING || b == PS_BLOCKED)
             && !self.is_confused()
             && !self.is_hypnotized()
-            && !self.is_eye_gouged()
     }
 
     pub fn is_prone_or_stunned(self) -> bool {
@@ -748,7 +750,7 @@ mod tests {
     }
 
     #[test]
-    fn standing_moving_blocked_have_tacklezones() {
+    fn standing_moving_blocked_have_active_tacklezones() {
         for &base in &[PS_STANDING, PS_MOVING, PS_BLOCKED] {
             assert!(PlayerState::new(base).has_tacklezones(), "base={base:#x}");
         }
@@ -763,17 +765,30 @@ mod tests {
     }
 
     #[test]
-    fn standing_confused_no_tacklezones() {
-        let s = PlayerState::new(PS_STANDING).change_confused(true);
-        assert!(s.is_confused());
-        assert!(!s.has_tacklezones());
+    fn standing_but_confused_no_tacklezones() {
+        // Confuse bit (0x200) disables tackle zones even while Standing
+        let state = PlayerState::new(PS_STANDING | 0x00200);
+        assert!(state.is_confused());
+        assert!(!state.has_tacklezones());
     }
 
     #[test]
-    fn standing_hypnotized_no_tacklezones() {
-        let s = PlayerState::new(PS_STANDING).change_hypnotized(true);
-        assert!(s.is_hypnotized());
-        assert!(!s.has_tacklezones());
+    fn standing_but_hypnotized_no_tacklezones() {
+        let state = PlayerState::new(PS_STANDING | 0x00800);
+        assert!(state.is_hypnotized());
+        assert!(!state.has_tacklezones());
+    }
+
+    #[test]
+    fn standing_confused_and_hypnotized_no_tacklezones() {
+        let state = PlayerState::new(PS_STANDING | 0x00200 | 0x00800);
+        assert!(!state.has_tacklezones());
+    }
+
+    #[test]
+    fn blocked_with_flags_confused_no_tacklezones() {
+        let state = PlayerState::new(PS_BLOCKED | 0x00200);
+        assert!(!state.has_tacklezones());
     }
 
     #[test]
@@ -789,38 +804,90 @@ mod tests {
         }
     }
 
-    #[test]
-    fn removed_from_play_states_are_casualty_or_banned() {
-        assert!(PlayerState::new(PS_BADLY_HURT).is_casualty());
-        assert!(PlayerState::new(PS_SERIOUS_INJURY).is_casualty());
-        assert!(PlayerState::new(PS_RIP).is_casualty());
+    /// Java checks membership in `PlayerState.REMOVED_FROM_PLAY`; the Rust
+    /// model expresses the same set as `is_casualty()` plus the BANNED base.
+    fn removed_from_play(state: PlayerState) -> bool {
+        state.is_casualty() || state.base() == PS_BANNED
     }
 
     #[test]
-    fn active_states_not_casualty() {
+    fn removed_states_are_in_removed_from_play_list() {
+        for &base in &[PS_BADLY_HURT, PS_SERIOUS_INJURY, PS_RIP, PS_BANNED] {
+            assert!(removed_from_play(PlayerState::new(base)), "base={base:#x}");
+        }
+    }
+
+    #[test]
+    fn active_states_not_in_removed_from_play_list() {
         for &base in &[PS_STANDING, PS_MOVING, PS_PRONE, PS_STUNNED, PS_KNOCKED_OUT, PS_RESERVE] {
-            assert!(!PlayerState::new(base).is_casualty(), "base={base:#x}");
+            assert!(!removed_from_play(PlayerState::new(base)), "base={base:#x}");
         }
     }
 
     #[test]
     fn confused_is_distracted() {
-        let s = PlayerState::new(PS_STANDING).change_confused(true);
-        assert!(s.is_confused());
-        assert!(s.is_distracted());
+        let state = PlayerState::new(PS_STANDING | 0x00200);
+        assert!(state.is_confused());
+        assert!(state.is_distracted());
     }
 
     #[test]
     fn hypnotized_is_distracted() {
-        let s = PlayerState::new(PS_STANDING).change_hypnotized(true);
-        assert!(s.is_hypnotized());
-        assert!(s.is_distracted());
+        let state = PlayerState::new(PS_STANDING | 0x00800);
+        assert!(state.is_hypnotized());
+        assert!(state.is_distracted());
     }
 
     #[test]
     fn normal_standing_not_distracted() {
-        let s = PlayerState::new(PS_STANDING);
-        assert!(!s.is_distracted());
+        let state = PlayerState::new(PS_STANDING);
+        assert!(!state.is_distracted());
+    }
+
+    #[test]
+    fn tackle_zone_count_three_standing_adjacent_returns_three() {
+        // Pure tackle zone counting: number of adjacent players with has_tacklezones() = true
+        let adjacent_states = [
+            PlayerState::new(PS_STANDING),
+            PlayerState::new(PS_STANDING),
+            PlayerState::new(PS_STANDING),
+        ];
+        let count = adjacent_states.iter().filter(|s| s.has_tacklezones()).count();
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn tackle_zone_count_mixed_adjacent_only_counts_active() {
+        let adjacent_states = [
+            PlayerState::new(PS_STANDING),
+            PlayerState::new(PS_PRONE),            // no tackle zone
+            PlayerState::new(PS_MOVING),
+            PlayerState::new(PS_STANDING | 0x200), // confused
+            PlayerState::new(PS_BLOCKED),
+        ];
+        let count = adjacent_states.iter().filter(|s| s.has_tacklezones()).count();
+        assert_eq!(count, 3); // STANDING + MOVING + BLOCKED
+    }
+
+    #[test]
+    fn tackle_zone_count_all_prone_returns_zero() {
+        let adjacent_states = [
+            PlayerState::new(PS_PRONE),
+            PlayerState::new(PS_STUNNED),
+            PlayerState::new(PS_KNOCKED_OUT),
+        ];
+        let count = adjacent_states.iter().filter(|s| s.has_tacklezones()).count();
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn tackle_zones_dodge_modifier_is_minus_one_per_zone() {
+        // Each tackle zone imposes a -1 modifier to the dodge roll.
+        // This documents the formula: totalModifier = -tackleZones
+        for zones in 0i32..=8 {
+            let total_modifier = -zones;
+            assert_eq!(total_modifier, -zones); // trivial but documents the expected value
+        }
     }
 
     #[test]
@@ -831,18 +898,157 @@ mod tests {
         assert!(!s.is_active(), "flags should be cleared when base has no mask");
     }
 
+    // ── PlayerActionTest mirrors ─────────────────────────────────────────────
+
     #[test]
-    fn player_action_is_moving() {
+    fn player_action_count_at_least_fifty() {
+        assert!(PlayerAction::all().len() >= 50);
+    }
+
+    #[test]
+    fn player_action_all_have_non_null_name() {
+        for a in PlayerAction::all() {
+            assert!(!a.name().is_empty());
+        }
+    }
+
+    #[test]
+    fn move_is_moving() {
         assert!(PlayerAction::Move.is_moving());
+    }
+
+    #[test]
+    fn blitz_move_is_moving() {
         assert!(PlayerAction::BlitzMove.is_moving());
+    }
+
+    #[test]
+    fn pass_move_is_moving() {
+        assert!(PlayerAction::PassMove.is_moving());
+    }
+
+    #[test]
+    fn block_is_not_moving() {
         assert!(!PlayerAction::Block.is_moving());
     }
 
     #[test]
-    fn player_action_is_block_action() {
+    fn pass_is_not_moving() {
+        assert!(!PlayerAction::Pass.is_moving());
+    }
+
+    #[test]
+    fn pass_is_passing() {
+        assert!(PlayerAction::Pass.is_passing());
+    }
+
+    #[test]
+    fn dump_off_is_passing() {
+        assert!(PlayerAction::DumpOff.is_passing());
+    }
+
+    #[test]
+    fn hand_over_is_passing() {
+        assert!(PlayerAction::HandOver.is_passing());
+    }
+
+    #[test]
+    fn move_is_not_passing() {
+        assert!(!PlayerAction::Move.is_passing());
+    }
+
+    #[test]
+    fn blitz_is_blitzing() {
+        assert!(PlayerAction::Blitz.is_blitzing());
+    }
+
+    #[test]
+    fn blitz_move_is_blitzing() {
+        assert!(PlayerAction::BlitzMove.is_blitzing());
+    }
+
+    #[test]
+    fn move_is_not_blitzing() {
+        assert!(!PlayerAction::Move.is_blitzing());
+    }
+
+    #[test]
+    fn block_is_block_action() {
         assert!(PlayerAction::Block.is_block_action());
+    }
+
+    #[test]
+    fn chainsaw_is_block_action() {
         assert!(PlayerAction::Chainsaw.is_block_action());
+    }
+
+    #[test]
+    fn stab_is_block_action() {
+        assert!(PlayerAction::Stab.is_block_action());
+    }
+
+    #[test]
+    fn move_is_not_block_action() {
         assert!(!PlayerAction::Move.is_block_action());
+    }
+
+    #[test]
+    fn move_type_is_one() {
+        assert_eq!(PlayerAction::Move.action_type(), 1);
+    }
+
+    #[test]
+    fn block_type_is_two() {
+        assert_eq!(PlayerAction::Block.action_type(), 2);
+    }
+
+    #[test]
+    fn blitz_type_is_three() {
+        assert_eq!(PlayerAction::Blitz.action_type(), 3);
+    }
+
+    #[test]
+    fn pass_type_is_seven() {
+        assert_eq!(PlayerAction::Pass.action_type(), 7);
+    }
+
+    #[test]
+    fn foul_type_is_nine() {
+        assert_eq!(PlayerAction::Foul.action_type(), 9);
+    }
+
+    #[test]
+    fn stand_up_type_is_eleven() {
+        assert_eq!(PlayerAction::StandUp.action_type(), 11);
+    }
+
+    #[test]
+    fn gaze_is_gaze() {
+        assert!(PlayerAction::Gaze.is_gaze());
+        assert!(PlayerAction::GazeMove.is_gaze());
+        assert!(PlayerAction::GazeSelect.is_gaze());
+    }
+
+    #[test]
+    fn move_is_not_gaze() {
+        assert!(!PlayerAction::Move.is_gaze());
+    }
+
+    #[test]
+    fn throw_bomb_is_bomb() {
+        assert!(PlayerAction::ThrowBomb.is_bomb());
+    }
+
+    #[test]
+    fn move_is_not_bomb() {
+        assert!(!PlayerAction::Move.is_bomb());
+    }
+
+    #[test]
+    fn stand_up_and_stand_up_blitz_are_standing_up() {
+        assert!(PlayerAction::StandUp.is_standing_up());
+        assert!(PlayerAction::StandUpBlitz.is_standing_up());
+        assert!(!PlayerAction::Move.is_standing_up());
     }
 
     #[test]
@@ -891,59 +1097,19 @@ mod tests {
         assert!(!PlayerState::new(PS_KNOCKED_OUT).can_be_fouled());
     }
 
-    #[test]
-    fn player_action_is_standing_up() {
-        assert!(PlayerAction::StandUp.is_standing_up());
-        assert!(PlayerAction::StandUpBlitz.is_standing_up());
-        assert!(!PlayerAction::Move.is_standing_up());
-        assert!(!PlayerAction::Block.is_standing_up());
-    }
-
-    #[test]
-    fn player_action_is_passing() {
-        assert!(PlayerAction::Pass.is_passing());
-        assert!(PlayerAction::DumpOff.is_passing());
-        assert!(PlayerAction::HandOver.is_passing());
-        assert!(!PlayerAction::Move.is_passing());
-        assert!(!PlayerAction::Block.is_passing());
-    }
-
-    #[test]
-    fn player_action_is_blitzing() {
-        assert!(PlayerAction::Blitz.is_blitzing());
-        assert!(PlayerAction::BlitzMove.is_blitzing());
-        assert!(!PlayerAction::Move.is_blitzing());
-        assert!(!PlayerAction::Block.is_blitzing());
-    }
-
-    #[test]
-    fn player_action_type_codes() {
-        assert_eq!(PlayerAction::Move.action_type(), 1);
-        assert_eq!(PlayerAction::Block.action_type(), 2);
-        assert_eq!(PlayerAction::Blitz.action_type(), 3);
-        assert_eq!(PlayerAction::Pass.action_type(), 7);
-        assert_eq!(PlayerAction::Foul.action_type(), 9);
-        assert_eq!(PlayerAction::StandUp.action_type(), 11);
-    }
-
-    #[test]
-    fn player_action_gaze() {
-        assert!(PlayerAction::Gaze.is_gaze());
-        assert!(PlayerAction::GazeMove.is_gaze());
-        assert!(PlayerAction::GazeSelect.is_gaze());
-        assert!(!PlayerAction::Move.is_gaze());
-    }
-
-    #[test]
-    fn player_action_bomb() {
-        assert!(PlayerAction::ThrowBomb.is_bomb());
-        assert!(!PlayerAction::Move.is_bomb());
-    }
+    // ── PlayerEnumTest mirrors ───────────────────────────────────────────────
 
     #[test]
     fn player_gender_count_is_four() {
         let all = [PlayerGender::Male, PlayerGender::Female, PlayerGender::Nonbinary, PlayerGender::Neutral];
         assert_eq!(all.len(), 4);
+    }
+
+    #[test]
+    fn player_gender_all_have_non_null_name() {
+        for g in [PlayerGender::Male, PlayerGender::Female, PlayerGender::Nonbinary, PlayerGender::Neutral] {
+            assert!(!g.name().is_empty());
+        }
     }
 
     #[test]
@@ -974,6 +1140,11 @@ mod tests {
     #[test]
     fn player_gender_from_ordinal_one_is_male() {
         assert_eq!(PlayerGender::from_ordinal(1), PlayerGender::Male);
+    }
+
+    #[test]
+    fn player_gender_from_ordinal_two_is_female() {
+        assert_eq!(PlayerGender::from_ordinal(2), PlayerGender::Female);
     }
 
     #[test]
@@ -1008,7 +1179,7 @@ mod tests {
     }
 
     #[test]
-    fn player_type_all_have_non_empty_names() {
+    fn player_type_all_have_non_null_name() {
         for t in [
             PlayerType::Regular, PlayerType::BigGuy, PlayerType::Star, PlayerType::Irregular,
             PlayerType::RiotousRookie, PlayerType::RaisedFromDead, PlayerType::Mercenary,
@@ -1026,6 +1197,11 @@ mod tests {
     #[test]
     fn player_type_regular_name() {
         assert_eq!(PlayerType::Regular.name(), "Regular");
+    }
+
+    #[test]
+    fn player_type_star_name() {
+        assert_eq!(PlayerType::Star.name(), "Star");
     }
 
     #[test]

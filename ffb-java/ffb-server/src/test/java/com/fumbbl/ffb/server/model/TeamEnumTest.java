@@ -54,6 +54,18 @@ class TeamEnumTest {
         assertEquals(BoxType.OUT, BoxType.fromName("out"));
     }
 
+    @Test
+    void box_type_round_trip_id() {
+        for (int id = 1; id <= 2; id++) {
+            assertEquals(id, BoxType.fromId(id).getId());
+        }
+    }
+
+    @Test
+    void box_type_out_name() {
+        assertEquals("out", BoxType.OUT.getName());
+    }
+
     // ── SendToBoxReason ─────────────────────────────────────────────────────
 
     @ParameterizedTest
@@ -122,5 +134,17 @@ class TeamEnumTest {
     @Test
     void team_status_skill_rolls_pending_id_is_six() {
         assertEquals(6, TeamStatus.SKILL_ROLLS_PENDING.getId());
+    }
+
+    // ── ported from Rust ffb-model enums::team tests ────────────────────────
+
+    @Test
+    void team_status_retired_name() {
+        assertEquals("Retired", TeamStatus.RETIRED.getName());
+    }
+
+    @Test
+    void team_status_pending_approval_name() {
+        assertEquals("Pending Approval", TeamStatus.PENDING_APPROVAL.getName());
     }
 }

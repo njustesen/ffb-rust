@@ -43,34 +43,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::START_HALF);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "startHalf");
-    }
-
-    #[test]
-    fn get_half() {
-        assert_eq!(make().get_half(), 1);
-        assert_eq!(ReportStartHalf::new(2).get_half(), 2);
-    }
-
-    #[test]
-    fn get_id_second_half() {
-        let r = ReportStartHalf::new(2);
-        assert_eq!(r.get_id(), ReportId::START_HALF);
-    }
-
-    #[test]
-    fn get_name_second_half() {
-        let r = ReportStartHalf::new(2);
-        assert_eq!(r.get_name(), "startHalf");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

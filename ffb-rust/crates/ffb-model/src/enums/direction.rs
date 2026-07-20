@@ -123,7 +123,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn for_roll_all_eight_faces() {
+    fn direction_for_roll_all_eight_faces() {
         assert_eq!(Direction::for_roll(1), Some(Direction::North));
         assert_eq!(Direction::for_roll(2), Some(Direction::Northeast));
         assert_eq!(Direction::for_roll(3), Some(Direction::East));
@@ -135,25 +135,45 @@ mod tests {
     }
 
     #[test]
-    fn for_roll_out_of_range_returns_none() {
+    fn direction_for_roll_out_of_range_returns_null() {
         assert_eq!(Direction::for_roll(0), None);
         assert_eq!(Direction::for_roll(9), None);
     }
 
     #[test]
-    fn round_trip_name() {
+    fn direction_all_values_found_by_name() {
         for d in Direction::all() {
             assert_eq!(Direction::from_name(d.name()), Some(*d));
         }
     }
 
     #[test]
-    fn transform_is_mirror() {
-        assert_eq!(Direction::Northeast.transform(), Direction::Northwest);
-        assert_eq!(Direction::East.transform(), Direction::West);
-        assert_eq!(Direction::Southeast.transform(), Direction::Southwest);
+    fn direction_transform_north_to_north() {
         assert_eq!(Direction::North.transform(), Direction::North);
+    }
+
+    #[test]
+    fn direction_transform_east_to_west() {
+        assert_eq!(Direction::East.transform(), Direction::West);
+    }
+
+    #[test]
+    fn direction_transform_northeast_to_northwest() {
+        assert_eq!(Direction::Northeast.transform(), Direction::Northwest);
+    }
+
+    #[test]
+    fn direction_transform_southeast_to_southwest() {
+        assert_eq!(Direction::Southeast.transform(), Direction::Southwest);
+    }
+
+    #[test]
+    fn direction_transform_south_to_south() {
         assert_eq!(Direction::South.transform(), Direction::South);
+    }
+
+    #[test]
+    fn direction_transform_is_involution() {
         for d in Direction::all() {
             assert_eq!(d.transform().transform(), *d);
         }
@@ -178,40 +198,50 @@ mod tests {
     }
 
     #[test]
-    fn count_is_8() {
+    fn direction_count_is_eight() {
         assert_eq!(Direction::all().len(), 8);
     }
 
     #[test]
-    fn all_have_non_empty_names() {
+    fn direction_all_have_non_null_name() {
         for d in Direction::all() {
             assert!(!d.name().is_empty());
         }
     }
 
     #[test]
-    fn north_name_is_north() {
+    fn direction_north_name() {
         assert_eq!(Direction::North.name(), "North");
     }
 
     #[test]
-    fn south_name_is_south() {
+    fn direction_south_name() {
         assert_eq!(Direction::South.name(), "South");
     }
 
     #[test]
-    fn east_name_is_east() {
+    fn direction_east_name() {
         assert_eq!(Direction::East.name(), "East");
     }
 
     #[test]
-    fn from_name_case_insensitive() {
+    fn direction_west_name() {
+        assert_eq!(Direction::West.name(), "West");
+    }
+
+    #[test]
+    fn direction_northeast_name() {
+        assert_eq!(Direction::Northeast.name(), "Northeast");
+    }
+
+    #[test]
+    fn direction_for_name_case_insensitive() {
         assert_eq!(Direction::from_name("north"), Some(Direction::North));
         assert_eq!(Direction::from_name("SOUTH"), Some(Direction::South));
     }
 
     #[test]
-    fn from_name_unknown_is_none() {
+    fn direction_for_name_unknown_returns_null() {
         assert_eq!(Direction::from_name("unknown"), None);
     }
 }

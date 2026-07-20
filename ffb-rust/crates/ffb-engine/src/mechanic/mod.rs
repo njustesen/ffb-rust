@@ -4,9 +4,6 @@ pub mod roll_mechanic;
 pub mod setup_mechanic;
 pub mod state_mechanic;
 pub mod spp_calc;
-pub mod armor_modifier_values;
-pub mod injury_modifier_values;
-pub mod weather_modifier_values;
 
 pub mod bb2016;
 pub mod bb2020;

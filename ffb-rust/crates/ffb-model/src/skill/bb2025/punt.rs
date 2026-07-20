@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_punt() {
         assert_eq!(Punt::new().get_name(), "Punt");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_passing() {
         assert_eq!(Punt::new().get_category(), SkillCategory::Passing);
+    }
+
+    #[test]
+    fn has_can_punt_property() {
+        assert!(crate::enums::SkillId::Punt.properties().contains(&"canPunt"));
     }
 }

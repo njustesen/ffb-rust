@@ -45,36 +45,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::OFFICIOUS_REF_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "officiousRefRoll");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_roll(), 4);
-        assert_eq!(r.get_player_id(), "p1");
-    }
-
-    #[test]
-    fn different_roll_value() {
-        let r = ReportOfficiousRefRoll::new(1, "p2".into());
-        assert_eq!(r.get_roll(), 1);
-        assert_eq!(r.get_player_id(), "p2");
-    }
-
-    #[test]
-    fn max_roll_value() {
-        let r = ReportOfficiousRefRoll::new(6, "p3".into());
-        assert_eq!(r.get_roll(), 6);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

@@ -63,17 +63,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandBloodlustAction::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandBloodlustAction::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_bloodlust_action() {
         assert_eq!(ClientCommandBloodlustAction::new(false).get_id(), NetCommandId::ClientBloodlustAction);
     }

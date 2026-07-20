@@ -33,15 +33,23 @@ impl std::ops::Deref for StrengthIncrease {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_plus_st() {
         assert_eq!(StrengthIncrease::new().get_name(), "+ST");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_stat_increase() {
         assert_eq!(StrengthIncrease::new().get_category(), SkillCategory::StatIncrease);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the live Rust property table
+        // is SkillId::StrengthIncrease.properties(), which always returns a valid slice.
+        assert!(SkillId::StrengthIncrease.properties().iter().all(|p| !p.is_empty()));
     }
 
     #[test]

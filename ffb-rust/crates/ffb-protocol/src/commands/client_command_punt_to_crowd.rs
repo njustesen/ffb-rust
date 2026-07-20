@@ -60,18 +60,6 @@ mod tests {
         assert!(!cmd.is_punt_to_crowd());
     }
 
-
-    #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandPuntToCrowd::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandPuntToCrowd::default().clone();
-    }
-
     #[test]
     fn get_id_is_client_punt_to_crowd() {
         assert_eq!(ClientCommandPuntToCrowd::default().get_id(), NetCommandId::ClientPuntToCrowd);

@@ -25,8 +25,26 @@ impl std::ops::Deref for ThrowTeamMate {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors ffb-java ThrowTeamMateSkillTest (written against the bb2016 class,
+    // where the category is EXTRAORDINARY); category adapted to the mixed
+    // edition's constructor (TRAIT). Property assertion verified against the
+    // mixed edition's postConstruct, which registers canThrowTeamMates. The Java
+    // `is_bb2016_edition` test is skipped (edition annotations are covered
+    // elsewhere).
+
     #[test]
-    fn name_is_correct() { assert_eq!(ThrowTeamMate::new().get_name(), "Throw Team-Mate"); }
+    fn name_is_throw_team_mate() {
+        assert_eq!(ThrowTeamMate::new().get_name(), "Throw Team-Mate");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(ThrowTeamMate::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(ThrowTeamMate::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_throw_team_mates_property() {
+        assert!(crate::enums::SkillId::ThrowTeamMate.properties().contains(&"canThrowTeamMates"));
+    }
 }

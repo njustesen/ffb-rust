@@ -30,12 +30,30 @@ impl std::ops::Deref for AnimalSavagery {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(AnimalSavagery::new().get_name(), "Animal Savagery"); }
+    fn name_is_animal_savagery() {
+        assert_eq!(AnimalSavagery::new().get_name(), "Animal Savagery");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(AnimalSavagery::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(AnimalSavagery::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_enable_stand_up_and_end_blitz_action_property() {
+        assert!(crate::enums::SkillId::AnimalSavagery.properties().contains(&"enableStandUpAndEndBlitzAction"));
+    }
+
+    #[test]
+    fn class_name_is_animal_savagery() {
+        assert_eq!(crate::enums::SkillId::AnimalSavagery.class_name(), "AnimalSavagery");
+    }
+
     #[test]
     fn is_negative_trait() { assert!(AnimalSavagery::new().is_negative_trait()); }
+
     #[test]
     fn confusion_message_overridden() {
         assert_eq!(AnimalSavagery::new().get_confusion_message(), "tries to lash out against a team mate");

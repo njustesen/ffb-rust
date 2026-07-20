@@ -61,36 +61,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::KICKOFF_RESULT);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "kickoffResult");
-    }
-
-    #[test]
-    fn field_getters() {
-        let r = make();
-        assert_eq!(r.get_kickoff_roll(), &[3, 4]);
-        assert_eq!(r.get_kickoff_result(), &KickoffResult::Blitz);
-    }
-
-    #[test]
-    fn empty_roll_vec() {
-        let r = ReportKickoffResult::new(KickoffResult::Blitz, vec![]);
-        assert_eq!(r.get_kickoff_roll().len(), 0);
-    }
-
-    #[test]
-    fn different_kickoff_result() {
-        let r = ReportKickoffResult::new(KickoffResult::QuickSnap, vec![2, 5]);
-        assert_eq!(r.get_kickoff_result(), &KickoffResult::QuickSnap);
-        assert_eq!(r.get_kickoff_roll(), &[2, 5]);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

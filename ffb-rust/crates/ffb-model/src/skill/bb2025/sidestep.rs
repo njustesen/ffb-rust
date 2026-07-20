@@ -35,13 +35,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_sidestep() {
         assert_eq!(Sidestep::new().get_name(), "Sidestep");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_agility() {
         assert_eq!(Sidestep::new().get_category(), SkillCategory::Agility);
+    }
+
+    #[test]
+    fn has_can_choose_own_pushed_back_square_property() {
+        assert!(crate::enums::SkillId::Sidestep.properties().contains(&"canChooseOwnPushedBackSquare"));
+    }
+
+    #[test]
+    fn does_not_have_force_followup_property() {
+        assert!(!crate::enums::SkillId::Sidestep.properties().contains(&"forceFollowup"));
     }
 
     #[test]

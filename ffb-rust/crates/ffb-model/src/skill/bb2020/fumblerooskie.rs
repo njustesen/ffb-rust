@@ -25,14 +25,20 @@ impl std::ops::Deref for Fumblerooskie {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_fumblerooskie() {
         assert_eq!(Fumblerooskie::new().get_name(), "Fumblerooskie");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_passing() {
         assert_eq!(Fumblerooskie::new().get_category(), SkillCategory::Passing);
+    }
+
+    #[test]
+    fn has_can_drop_ball_property() {
+        assert!(SkillId::Fumblerooskie.properties().contains(&"canDropBall"));
     }
 }

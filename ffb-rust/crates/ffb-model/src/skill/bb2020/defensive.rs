@@ -25,14 +25,22 @@ impl std::ops::Deref for Defensive {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_defensive() {
         assert_eq!(Defensive::new().get_name(), "Defensive");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_agility() {
         assert_eq!(Defensive::new().get_category(), SkillCategory::Agility);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the live Rust property table
+        // is SkillId::Defensive.properties(), which always returns a valid slice.
+        assert!(SkillId::Defensive.properties().iter().all(|p| !p.is_empty()));
     }
 }

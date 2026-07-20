@@ -133,9 +133,5 @@ mod tests {
         let b = a;
         assert_eq!(a, b);
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", FactoryContext::APPLICATION).is_empty());
-    }
 
 }

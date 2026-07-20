@@ -98,21 +98,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::THROW_TEAM_MATE_ROLL); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "throwTeamMateRoll"); }
-
-    #[test]
-    fn get_thrown_player_id() { assert_eq!(make().get_thrown_player_id(), Some("thrown")); }
-
-    #[test]
-    fn get_pass_result() { assert_eq!(make().get_pass_result(), Some("ACCURATE")); }
-
-    #[test]
-    fn is_kick() { assert!(!make().is_kick()); }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

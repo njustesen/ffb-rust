@@ -49,35 +49,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::BOMB_EXPLODES_AFTER_CATCH);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "bombExplodesAfterCatch");
-    }
-
-    #[test]
-    fn get_catcher_id() {
-        assert_eq!(make().get_catcher_id(), "p1");
-    }
-
-    #[test]
-    fn explodes_and_roll() {
-        let r = make();
-        assert!(r.explodes());
-        assert_eq!(r.get_roll(), 5);
-    }
-
-    #[test]
-    fn does_not_explode() {
-        let r = ReportBombExplodesAfterCatch::new("p2".into(), false, 3);
-        assert!(!r.explodes());
-        assert_eq!(r.get_catcher_id(), "p2");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

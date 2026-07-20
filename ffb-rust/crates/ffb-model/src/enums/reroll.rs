@@ -122,11 +122,47 @@ impl ReRollOptions {
 mod tests {
     use super::*;
 
+    // ── ReRollEnumTest mirrors ───────────────────────────────────────────────
+
     #[test]
-    fn reroll_property_actual_reroll() {
+    fn reroll_property_trr_is_actual_reroll() {
         assert!(ReRollProperty::Trr.is_actual_reroll());
-        assert!(!ReRollProperty::Loner.is_actual_reroll());
+    }
+
+    #[test]
+    fn reroll_property_mascot_is_actual_reroll() {
+        assert!(ReRollProperty::Mascot.is_actual_reroll());
+    }
+
+    #[test]
+    fn reroll_property_pro_is_actual_reroll() {
+        assert!(ReRollProperty::Pro.is_actual_reroll());
+    }
+
+    #[test]
+    fn reroll_property_brilliant_coaching_is_not_actual_reroll() {
         assert!(!ReRollProperty::BrilliantCoaching.is_actual_reroll());
+    }
+
+    #[test]
+    fn reroll_property_loner_is_not_actual_reroll() {
+        assert!(!ReRollProperty::Loner.is_actual_reroll());
+    }
+
+    #[test]
+    fn reroll_property_name_matches_enum_name() {
+        // Java: p.name() == p.getName() for every ReRollProperty.
+        for (p, java_enum_name) in [
+            (ReRollProperty::Trr, "TRR"),
+            (ReRollProperty::BrilliantCoaching, "BRILLIANT_COACHING"),
+            (ReRollProperty::Mascot, "MASCOT"),
+            (ReRollProperty::Pro, "PRO"),
+            (ReRollProperty::Loner, "LONER"),
+            (ReRollProperty::PumpUpTheCrowd, "PUMP_UP_THE_CROWD"),
+            (ReRollProperty::ShowStar, "SHOW_STAR"),
+        ] {
+            assert_eq!(p.name(), java_enum_name);
+        }
     }
 
     #[test]
@@ -155,7 +191,7 @@ mod tests {
     }
 
     #[test]
-    fn reroll_property_all_have_non_empty_names() {
+    fn reroll_property_all_have_non_null_name() {
         for p in [
             ReRollProperty::Trr, ReRollProperty::BrilliantCoaching, ReRollProperty::Mascot,
             ReRollProperty::Pro, ReRollProperty::Loner, ReRollProperty::PumpUpTheCrowd,
@@ -186,21 +222,29 @@ mod tests {
         assert_eq!(LeaderState::Available.name(), "available");
     }
 
+    // ── ReRollOptionsTest mirrors ────────────────────────────────────────────
+
     #[test]
-    fn reroll_options_can_actually_reroll_when_trr() {
-        let opts = ReRollOptions::new(vec![ReRollProperty::Trr]);
-        assert!(opts.can_actually_reroll());
+    fn reroll_options_can_actually_reroll_when_trr_property() {
+        let options = ReRollOptions::new(vec![ReRollProperty::Trr]);
+        assert!(options.can_actually_reroll());
     }
 
     #[test]
     fn reroll_options_cannot_reroll_when_empty() {
-        let opts = ReRollOptions::new(vec![]);
-        assert!(!opts.can_actually_reroll());
+        let options = ReRollOptions::new(vec![]);
+        assert!(!options.can_actually_reroll());
     }
 
     #[test]
-    fn reroll_options_loner_alone_cannot_actually_reroll() {
-        let opts = ReRollOptions::new(vec![ReRollProperty::Loner]);
-        assert!(!opts.can_actually_reroll());
+    fn reroll_options_property_list_not_empty_when_set() {
+        let options = ReRollOptions::new(vec![ReRollProperty::Trr, ReRollProperty::Loner]);
+        assert!(!options.properties.is_empty());
+    }
+
+    #[test]
+    fn reroll_options_loner_cannot_actually_reroll_alone() {
+        let options = ReRollOptions::new(vec![ReRollProperty::Loner]);
+        assert!(!options.can_actually_reroll());
     }
 }

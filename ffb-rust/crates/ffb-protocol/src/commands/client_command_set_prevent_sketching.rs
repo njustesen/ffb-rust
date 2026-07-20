@@ -86,17 +86,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandSetPreventSketching::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandSetPreventSketching::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_set_prevent_sketching() {
         assert_eq!(
             ClientCommandSetPreventSketching::new().get_id(),

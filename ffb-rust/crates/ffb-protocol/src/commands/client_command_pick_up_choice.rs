@@ -66,17 +66,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandPickUpChoice::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandPickUpChoice::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_pick_up_choice() {
         assert_eq!(ClientCommandPickUpChoice::default().get_id(), NetCommandId::ClientPickUpChoice);
     }

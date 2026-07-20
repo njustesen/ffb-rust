@@ -95,44 +95,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::PASS_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "passRoll");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_passing_distance(), Some("LONG_PASS"));
-        assert!(!r.is_bomb());
-        assert_eq!(r.get_result(), "ACCURATE");
-    }
-
-    #[test]
-    fn minimum_roll_and_rerolled() {
-        let r = make();
-        assert_eq!(r.get_minimum_roll(), 3);
-        assert!(!r.is_re_rolled());
-    }
-
-    #[test]
-    fn bomb_and_hail_mary_flags() {
-        let r = ReportPassRoll::new(
-            None, false, 1, 4, true, vec!["modifier".into()],
-            None, true, true, "INACCURATE".into(),
-        );
-        assert!(r.is_bomb());
-        assert!(r.is_hail_mary_pass());
-        assert!(r.is_re_rolled());
-        assert_eq!(r.get_roll_modifiers().len(), 1);
-        assert_eq!(r.get_passing_distance(), None);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

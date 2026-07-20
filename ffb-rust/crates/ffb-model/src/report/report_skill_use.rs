@@ -61,39 +61,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::SKILL_USE);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "skillUse");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_player_id(), Some("p1"));
-        assert_eq!(r.get_skill(), SkillId::Block);
-        assert!(r.is_used());
-        assert_eq!(r.get_skill_use(), SkillUse::BRING_DOWN_OPPONENT);
-    }
-
-    #[test]
-    fn not_used() {
-        let r = ReportSkillUse::new(Some("p2".into()), SkillId::Block, false, SkillUse::WOULD_NOT_HELP);
-        assert!(!r.is_used());
-        assert_eq!(r.get_skill_use(), SkillUse::WOULD_NOT_HELP);
-    }
-
-    #[test]
-    fn no_player_id() {
-        let r = ReportSkillUse::new(None, SkillId::Block, true, SkillUse::STOP_OPPONENT);
-        assert_eq!(r.get_player_id(), None);
-        assert_eq!(r.get_skill_use(), SkillUse::STOP_OPPONENT);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

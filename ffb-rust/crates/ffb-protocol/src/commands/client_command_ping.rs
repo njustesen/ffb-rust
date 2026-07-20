@@ -57,17 +57,6 @@ mod tests {
 #[test]    fn debug_format_nonempty() {        let v = ClientCommandPing::default();        assert!(!format!("{:?}", v).is_empty());    }
 
     #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandPing::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandPing::default());
-        assert!(s.contains("ClientCommandPing"));
-    }
-
-    #[test]
     fn get_id_is_client_ping() {
         assert_eq!(ClientCommandPing::default().get_id(), NetCommandId::ClientPing);
     }

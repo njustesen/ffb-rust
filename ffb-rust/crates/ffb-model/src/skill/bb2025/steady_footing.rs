@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_steady_footing() {
         assert_eq!(SteadyFooting::new().get_name(), "Steady Footing");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(SteadyFooting::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_avoid_falling_down_property() {
+        assert!(crate::enums::SkillId::SteadyFooting.properties().contains(&"canAvoidFallingDown"));
     }
 }

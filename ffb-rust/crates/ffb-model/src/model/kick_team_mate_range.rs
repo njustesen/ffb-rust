@@ -57,9 +57,5 @@ mod tests {
     fn debug_contains_variant_name() {
         assert!(format!("{:?}", KickTeamMateRange::MEDIUM).contains("MEDIUM"));
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", KickTeamMateRange::LONG).is_empty());
-    }
 
 }

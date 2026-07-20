@@ -29,14 +29,22 @@ impl std::ops::Deref for ASneakyPair {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_a_sneaky_pair() {
         assert_eq!(ASneakyPair::new().get_name(), "A Sneaky Pair");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(ASneakyPair::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the live Rust property table
+        // is SkillId::ASneakyPair.properties(), which always returns a valid slice.
+        assert!(SkillId::ASneakyPair.properties().iter().all(|p| !p.is_empty()));
     }
 }

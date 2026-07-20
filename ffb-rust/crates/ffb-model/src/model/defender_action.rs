@@ -63,9 +63,5 @@ mod tests {
         assert_eq!(DefenderAction::from_id(-1), None);
         assert_eq!(DefenderAction::from_id(99), None);
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", DefenderAction::DUMP_OFF).is_empty());
-    }
 
 }

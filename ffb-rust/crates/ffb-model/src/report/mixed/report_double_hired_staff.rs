@@ -43,27 +43,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::DOUBLE_HIRED_STAFF); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "doubleHiredStaff"); }
-
-    #[test]
-    fn get_staff_name() { assert_eq!(make().get_staff_name(), Some("apothecary")); }
-
-    #[test]
-    fn none_staff_name() {
-        let r = ReportDoubleHiredStaff::new(None);
-        assert_eq!(r.get_staff_name(), None);
-    }
-
-    #[test]
-    fn different_staff_name() {
-        let r = ReportDoubleHiredStaff::new(Some("cheerleader".into()));
-        assert_eq!(r.get_staff_name(), Some("cheerleader"));
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

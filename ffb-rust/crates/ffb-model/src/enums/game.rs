@@ -66,16 +66,16 @@ impl GameStatus {
 mod tests {
     use super::*;
 
+    const ALL: [GameStatus; 9] = [
+        GameStatus::Scheduled, GameStatus::Starting, GameStatus::Active,
+        GameStatus::Paused, GameStatus::Finished, GameStatus::Uploaded,
+        GameStatus::Backuped, GameStatus::Loading, GameStatus::Replaying,
+    ];
+
     #[test]
-    fn round_trip_name() {
-        let statuses = [
-            GameStatus::Scheduled,
-            GameStatus::Active,
-            GameStatus::Finished,
-            GameStatus::Loading,
-        ];
-        for s in &statuses {
-            assert_eq!(GameStatus::from_name(s.name()), Some(*s));
+    fn game_status_all_values_found_by_name() {
+        for s in ALL {
+            assert_eq!(GameStatus::from_name(s.name()), Some(s));
         }
     }
 
@@ -88,54 +88,57 @@ mod tests {
     }
 
     #[test]
-    fn count_is_nine() {
-        let all = [
-            GameStatus::Scheduled, GameStatus::Starting, GameStatus::Active,
-            GameStatus::Paused, GameStatus::Finished, GameStatus::Uploaded,
-            GameStatus::Backuped, GameStatus::Loading, GameStatus::Replaying,
-        ];
-        assert_eq!(all.len(), 9);
+    fn game_status_count_is_nine() {
+        assert_eq!(ALL.len(), 9);
     }
 
     #[test]
-    fn all_have_non_empty_names() {
-        for s in [
-            GameStatus::Scheduled, GameStatus::Starting, GameStatus::Active,
-            GameStatus::Paused, GameStatus::Finished, GameStatus::Uploaded,
-            GameStatus::Backuped, GameStatus::Loading, GameStatus::Replaying,
-        ] {
+    fn game_status_all_have_non_null_name() {
+        for s in ALL {
             assert!(!s.name().is_empty());
         }
     }
 
     #[test]
-    fn active_type_string_is_a() {
+    fn game_status_all_have_non_null_type_string() {
+        for s in ALL {
+            assert!(!s.type_string().is_empty());
+        }
+    }
+
+    #[test]
+    fn game_status_active_name() {
+        assert_eq!(GameStatus::Active.name(), "active");
+    }
+
+    #[test]
+    fn game_status_active_type_string() {
         assert_eq!(GameStatus::Active.type_string(), "A");
     }
 
     #[test]
-    fn finished_type_string_is_f() {
+    fn game_status_finished_name() {
+        assert_eq!(GameStatus::Finished.name(), "finished");
+    }
+
+    #[test]
+    fn game_status_finished_type_string() {
         assert_eq!(GameStatus::Finished.type_string(), "F");
     }
 
     #[test]
-    fn scheduled_type_string_is_o() {
+    fn game_status_scheduled_type_string() {
         assert_eq!(GameStatus::Scheduled.type_string(), "O");
     }
 
     #[test]
-    fn loading_name_is_loading() {
+    fn game_status_loading_name() {
         assert_eq!(GameStatus::Loading.name(), "loading");
     }
 
     #[test]
-    fn type_strings_are_unique() {
-        let all = [
-            GameStatus::Scheduled, GameStatus::Starting, GameStatus::Active,
-            GameStatus::Paused, GameStatus::Finished, GameStatus::Uploaded,
-            GameStatus::Backuped, GameStatus::Loading, GameStatus::Replaying,
-        ];
-        let unique: std::collections::HashSet<_> = all.iter().map(|s| s.type_string()).collect();
-        assert_eq!(unique.len(), all.len());
+    fn game_status_type_strings_are_unique() {
+        let unique: std::collections::HashSet<_> = ALL.iter().map(|s| s.type_string()).collect();
+        assert_eq!(unique.len(), ALL.len());
     }
 }

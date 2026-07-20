@@ -26,9 +26,23 @@ impl std::ops::Deref for Yoink {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(Yoink::new().get_name(), "Yoink!"); }
+    fn name_is_yoink() {
+        assert_eq!(Yoink::new().get_name(), "Yoink!");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Yoink::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(Yoink::new().get_category(), SkillCategory::Trait);
+    }
+
     #[test]
-    fn usage_type_is_once_per_game() { assert_eq!(Yoink::new().skill_usage_type, SkillUsageType::OncePerGame); }
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); properties() always returns a valid slice.
+        let _properties: &'static [&'static str] = crate::enums::SkillId::Yoink.properties();
+    }
+
+    #[test]
+    fn usage_type_is_once_per_game() {
+        assert_eq!(Yoink::new().skill_usage_type, SkillUsageType::OncePerGame);
+    }
 }

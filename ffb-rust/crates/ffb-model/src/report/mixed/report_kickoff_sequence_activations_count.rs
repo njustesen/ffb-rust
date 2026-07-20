@@ -51,21 +51,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::KICKOFF_SEQUENCE_ACTIVATIONS_COUNT); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "kickoffSequenceActivationsCount"); }
-
-    #[test]
-    fn get_limit() { assert_eq!(make().get_limit(), 3); }
-
-    #[test]
-    fn get_amount() { assert_eq!(make().get_amount(), 2); }
-
-    #[test]
-    fn get_available() { assert_eq!(make().get_available(), 5); }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

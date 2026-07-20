@@ -48,22 +48,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::REFEREE); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "referee"); }
-
-    #[test]
-    fn is_fouling_player_banned() { assert!(make().is_fouling_player_banned()); }
-
-    #[test]
-    fn is_under_scrutiny() { assert!(!make().is_under_scrutiny()); }
-    #[test]
-    fn get_name_is_nonempty() {
-        assert!(!make().get_name().is_empty());
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

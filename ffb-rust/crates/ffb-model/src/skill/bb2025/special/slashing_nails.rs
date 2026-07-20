@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_slashing_nails() {
         assert_eq!(SlashingNails::new().get_name(), "Slashing Nails");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(SlashingNails::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_gain_claws_for_blitz_property() {
+        assert!(crate::enums::SkillId::SlashingNails.properties().contains(&"canGainClawsForBlitz"));
     }
 }

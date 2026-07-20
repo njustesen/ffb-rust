@@ -25,8 +25,24 @@ impl std::ops::Deref for IronHardSkin {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(IronHardSkin::new().get_name(), "Iron Hard Skin"); }
+    fn name_is_iron_hard_skin() {
+        assert_eq!(IronHardSkin::new().get_name(), "Iron Hard Skin");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(IronHardSkin::new().get_category(), SkillCategory::Mutation); }
+    fn category_is_mutation() {
+        assert_eq!(IronHardSkin::new().get_category(), SkillCategory::Mutation);
+    }
+
+    #[test]
+    fn has_ignores_armour_modifiers_from_fouls_property() {
+        assert!(crate::enums::SkillId::IronHardSkin.properties().contains(&"ignoresArmourModifiersFromFouls"));
+    }
+
+    #[test]
+    fn class_name_is_iron_hard_skin() {
+        assert_eq!(crate::enums::SkillId::IronHardSkin.class_name(), "IronHardSkin");
+    }
 }

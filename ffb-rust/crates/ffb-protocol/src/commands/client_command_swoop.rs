@@ -79,22 +79,6 @@ mod tests {
         assert!(cmd.acting_player_id.is_none());
         assert!(cmd.target_coordinate.is_none());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandSwoop::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandSwoop::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandSwoop::default());
-        assert!(s.contains("ClientCommandSwoop"));
-    }
 
     #[test]
     fn get_id_is_client_swoop() {

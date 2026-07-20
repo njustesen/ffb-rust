@@ -26,7 +26,18 @@ impl std::ops::Deref for SneakiestOfTheLot {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(SneakiestOfTheLot::new().get_name(), "Sneakiest of the Lot"); }
+    fn name_is_sneakiest_of_the_lot() {
+        assert_eq!(SneakiestOfTheLot::new().get_name(), "Sneakiest of the Lot");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(SneakiestOfTheLot::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(SneakiestOfTheLot::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); properties() always returns a valid slice.
+        let _properties: &'static [&'static str] = crate::enums::SkillId::SneakiestOfTheLot.properties();
+    }
 }

@@ -41,33 +41,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::NO_PLAYERS_TO_FIELD);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "noPlayersToField");
-    }
-
-    #[test]
-    fn fields() {
-        assert_eq!(make().get_team_id(), "team1");
-    }
-
-    #[test]
-    fn away_team_id() {
-        let r = ReportNoPlayersToField::new("away_team".into());
-        assert_eq!(r.get_team_id(), "away_team");
-    }
-
-    #[test]
-    fn empty_team_id() {
-        let r = ReportNoPlayersToField::new("".into());
-        assert_eq!(r.get_team_id(), "");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

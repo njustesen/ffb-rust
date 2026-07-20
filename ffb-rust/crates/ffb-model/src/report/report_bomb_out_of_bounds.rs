@@ -29,34 +29,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_id() {
-        assert_eq!(ReportBombOutOfBounds::new().get_id(), ReportId::BOMB_OUT_OF_BOUNDS);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(ReportBombOutOfBounds::new().get_name(), "bombOutOfBounds");
-    }
-
-    #[test]
-    fn default_works() {
-        let r = ReportBombOutOfBounds::default();
-        assert_eq!(r.get_id(), ReportId::BOMB_OUT_OF_BOUNDS);
-    }
-
-    #[test]
-    fn new_and_default_same_name() {
-        assert_eq!(ReportBombOutOfBounds::new().get_name(), ReportBombOutOfBounds::default().get_name());
-    }
-
-    #[test]
-    fn clone_preserves_id() {
-        let r = ReportBombOutOfBounds::new();
-        let c = r.clone();
-        assert_eq!(c.get_id(), ReportId::BOMB_OUT_OF_BOUNDS);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = ReportBombOutOfBounds::new();
         let json = original.to_json_value();

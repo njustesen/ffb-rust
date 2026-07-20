@@ -30,8 +30,24 @@ impl std::ops::Deref for Dodge {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(Dodge::new().get_name(), "Dodge"); }
+    fn name_is_dodge() {
+        assert_eq!(Dodge::new().get_name(), "Dodge");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Dodge::new().get_category(), SkillCategory::Agility); }
+    fn category_is_agility() {
+        assert_eq!(Dodge::new().get_category(), SkillCategory::Agility);
+    }
+
+    #[test]
+    fn has_ignore_defender_stumbles_result_property() {
+        assert!(crate::enums::SkillId::Dodge.properties().contains(&"ignoreDefenderStumblesResult"));
+    }
+
+    #[test]
+    fn does_not_have_force_followup_property() {
+        assert!(!crate::enums::SkillId::Dodge.properties().contains(&"forceFollowup"));
+    }
 }

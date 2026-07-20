@@ -76,22 +76,6 @@ mod tests {
         assert!(cmd.inducement_type_name.is_none());
         assert!(cmd.player_ids.is_empty());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandUseInducement::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandUseInducement::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandUseInducement::default());
-        assert!(s.contains("ClientCommandUseInducement"));
-    }
 
     #[test]
     fn get_id_is_client_use_inducement() {

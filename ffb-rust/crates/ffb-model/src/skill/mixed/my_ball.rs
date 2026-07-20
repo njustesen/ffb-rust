@@ -25,8 +25,26 @@ impl std::ops::Deref for MyBall {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors ffb-java MyBallSkillTest.
+
     #[test]
-    fn name_is_correct() { assert_eq!(MyBall::new().get_name(), "My Ball"); }
+    fn name_is_my_ball() {
+        assert_eq!(MyBall::new().get_name(), "My Ball");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(MyBall::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(MyBall::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_prevent_regular_hand_over_action_property() {
+        assert!(crate::enums::SkillId::MyBall.properties().contains(&"preventRegularHandOverAction"));
+    }
+
+    #[test]
+    fn class_name_is_my_ball() {
+        assert_eq!(crate::enums::SkillId::MyBall.class_name(), "MyBall");
+    }
 }

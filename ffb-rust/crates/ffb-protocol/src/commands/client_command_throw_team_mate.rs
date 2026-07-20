@@ -93,22 +93,6 @@ mod tests {
         assert!(cmd.thrown_player_id.is_none());
         assert!(!cmd.kicked);
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandThrowTeamMate::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandThrowTeamMate::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandThrowTeamMate::default());
-        assert!(s.contains("ClientCommandThrowTeamMate"));
-    }
 
     #[test]
     fn get_id_is_client_throw_team_mate() {

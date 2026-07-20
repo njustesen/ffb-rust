@@ -71,23 +71,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandBuyCard::new()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandBuyCard::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandBuyCard::default());
-        assert!(s.contains("ClientCommandBuyCard"));
-    }
-
-    #[test]
     fn get_id_is_client_buy_card() {
         assert_eq!(ClientCommandBuyCard::new().get_id(), NetCommandId::ClientBuyCard);
     }

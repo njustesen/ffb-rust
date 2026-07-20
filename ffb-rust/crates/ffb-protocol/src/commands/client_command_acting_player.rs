@@ -90,17 +90,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandActingPlayer::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandActingPlayer::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_acting_player() {
         assert_eq!(ClientCommandActingPlayer::default().get_id(), NetCommandId::ClientActingPlayer);
     }

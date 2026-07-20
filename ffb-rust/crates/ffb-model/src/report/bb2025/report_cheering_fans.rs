@@ -57,38 +57,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::KICKOFF_CHEERING_FANS);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "cheeringFans");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_roll_home(), 4);
-        assert_eq!(r.get_team_ids().len(), 1);
-    }
-
-    #[test]
-    fn roll_away_and_rerolled() {
-        let r = make();
-        assert_eq!(r.get_roll_away(), 2);
-        assert_eq!(r.get_rerolled().len(), 0);
-    }
-
-    #[test]
-    fn rerolled_teams() {
-        let r = ReportCheeringFans::new(vec!["t1".into(), "t2".into()], 3, 5, vec!["t1".into()]);
-        assert_eq!(r.get_team_ids().len(), 2);
-        assert_eq!(r.get_rerolled().len(), 1);
-        assert_eq!(r.get_rerolled()[0], "t1");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

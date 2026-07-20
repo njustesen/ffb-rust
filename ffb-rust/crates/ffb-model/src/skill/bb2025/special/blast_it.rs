@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_blast_it() {
         assert_eq!(BlastIt::new().get_name(), "Blast It!");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(BlastIt::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_re_roll_hmp_scatter_property() {
+        assert!(crate::enums::SkillId::BlastIt.properties().contains(&"canReRollHmpScatter"));
     }
 }

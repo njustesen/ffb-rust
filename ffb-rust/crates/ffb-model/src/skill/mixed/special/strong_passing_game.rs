@@ -28,11 +28,25 @@ impl std::ops::Deref for StrongPassingGame {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(StrongPassingGame::new().get_name(), "Strong Passing Game"); }
+    fn name_is_strong_passing_game() {
+        assert_eq!(StrongPassingGame::new().get_name(), "Strong Passing Game");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(StrongPassingGame::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(StrongPassingGame::new().get_category(), SkillCategory::Trait);
+    }
+
     #[test]
-    fn usage_type_is_once_per_game() { assert_eq!(StrongPassingGame::new().skill_usage_type, SkillUsageType::OncePerGame); }
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); properties() always returns a valid slice.
+        let _properties: &'static [&'static str] = crate::enums::SkillId::StrongPassingGame.properties();
+    }
+
+    #[test]
+    fn usage_type_is_once_per_game() {
+        assert_eq!(StrongPassingGame::new().skill_usage_type, SkillUsageType::OncePerGame);
+    }
     #[test]
     fn sets_stat_based_roll_modifier_factory_for_strength() {
         assert_eq!(

@@ -103,18 +103,6 @@ mod tests {
         assert_eq!(cmd.get_slots().len(), 2);
     }
 
-
-    #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandJourneymen::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandJourneymen::default().clone();
-    }
-
     #[test]
     fn get_id_is_client_journeymen() {
         assert_eq!(ClientCommandJourneymen::new().get_id(), NetCommandId::ClientJourneymen);

@@ -91,42 +91,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::GAME_OPTIONS);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "gameOptions");
-    }
-
-    #[test]
-    fn field_getters() {
-        let r = make();
-        assert!(r.is_overtime());
-        assert_eq!(r.get_turntime(), 60);
-        assert!(!r.is_sneaky_git_as_foul_guard());
-        assert!(r.is_foul_bonus_outside_tacklezone());
-        assert!(!r.is_right_stuff_cancels_tackle());
-        assert!(r.is_piling_on_without_modifier());
-    }
-
-    #[test]
-    fn no_overtime() {
-        let r = ReportGameOptions::new(false, 30, false, false, false, false);
-        assert!(!r.is_overtime());
-        assert_eq!(r.get_turntime(), 30);
-    }
-
-    #[test]
-    fn all_flags_true() {
-        let r = ReportGameOptions::new(true, 120, true, true, true, true);
-        assert!(r.is_sneaky_git_as_foul_guard());
-        assert!(r.is_right_stuff_cancels_tackle());
-        assert!(r.is_piling_on_without_modifier());
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

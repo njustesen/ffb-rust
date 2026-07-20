@@ -29,8 +29,21 @@ impl std::ops::Deref for MovementIncrease {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(MovementIncrease::new().get_name(), "+MA"); }
+    fn name_is_plus_ma() {
+        assert_eq!(MovementIncrease::new().get_name(), "+MA");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(MovementIncrease::new().get_category(), SkillCategory::StatIncrease); }
+    fn category_is_stat_increase() {
+        assert_eq!(MovementIncrease::new().get_category(), SkillCategory::StatIncrease);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java asserts getSkillProperties() is not null; the live Rust mechanism
+        // always returns a slice (empty here — MovementIncrease registers no NamedProperties).
+        assert!(crate::enums::SkillId::MovementIncrease.properties().is_empty());
+    }
 }

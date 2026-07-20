@@ -19,18 +19,24 @@ impl InifileParamFilter {
         let mut override_file_name: Option<String> = None;
         let mut filtered_args: Vec<String> = Vec::new();
 
+        // Java iterates with an Iterator: the flag itself is always consumed
+        // (and dropped), the value only if another arg follows.
         let mut i = 0;
         while i < args.len() {
-            if args[i] == Self::INIFILE_PARAM && i + 1 < args.len() {
-                ini_file_name = args[i + 1].clone();
-                i += 2;
-            } else if args[i] == Self::OVERRIDE_PARAM && i + 1 < args.len() {
-                override_file_name = Some(args[i + 1].clone());
-                i += 2;
+            if args[i] == Self::INIFILE_PARAM {
+                if i + 1 < args.len() {
+                    ini_file_name = args[i + 1].clone();
+                    i += 1;
+                }
+            } else if args[i] == Self::OVERRIDE_PARAM {
+                if i + 1 < args.len() {
+                    override_file_name = Some(args[i + 1].clone());
+                    i += 1;
+                }
             } else {
                 filtered_args.push(args[i].clone());
-                i += 1;
             }
+            i += 1;
         }
 
         InifileParamFilterResult::new(ini_file_name, override_file_name, filtered_args)
@@ -45,37 +51,85 @@ impl Default for InifileParamFilter {
 
 #[cfg(test)]
 mod tests {
+    // Mirrors ffb-java ffb-server InifileParamFilterTest (Java: InifileParamFilterTest.java).
+    // Java-only: `filterForInifileReturnsDefaultForNullArray` — Rust slices cannot be null.
     use super::*;
 
-    #[test]
-    fn construct() {
-        let _ = InifileParamFilter::new();
+    const OTHER_PARAM_1: &str = "otherParam1";
+    const OTHER_PARAM_2: &str = "otherParam2";
+    const INIFILE_PARAM: &str = "-inifile";
+    const INIFILE_VALUE: &str = "inifile_value";
+    const OVERRIDE_PARAM: &str = "-override";
+    const OVERRIDE_VALUE: &str = "override_value";
+    const DEFAULT_INIFUILE_VALUE: &str = "server.ini";
+
+    fn args(values: &[&str]) -> Vec<String> {
+        values.iter().map(|s| s.to_string()).collect()
     }
 
+    /// Java: `filterForInifileFiltersExistingParam`.
     #[test]
-    fn default_inifile() {
+    fn filter_for_inifile_filters_existing_param() {
+        let filter = InifileParamFilter::new();
+        let input = args(&[OTHER_PARAM_1, INIFILE_PARAM, INIFILE_VALUE, OTHER_PARAM_2]);
+        let expected = args(&[OTHER_PARAM_1, OTHER_PARAM_2]);
+        let result = filter.filter_for_inifile(&input);
+        assert_eq!(result.get_filtered_args(), expected.as_slice(), "Inifile param and value were not filtered correctly");
+        assert_eq!(result.get_ini_file_name(), INIFILE_VALUE, "Inifile value has not been extracted correctly");
+        assert!(result.get_override_file_name().is_none(), "No override was specified");
+    }
+
+    /// Java: `filterForInifileFiltersExistingParams`.
+    #[test]
+    fn filter_for_inifile_filters_existing_params() {
+        let filter = InifileParamFilter::new();
+        let input = args(&[OTHER_PARAM_1, INIFILE_PARAM, INIFILE_VALUE, OTHER_PARAM_2, OVERRIDE_PARAM, OVERRIDE_VALUE]);
+        let expected = args(&[OTHER_PARAM_1, OTHER_PARAM_2]);
+        let result = filter.filter_for_inifile(&input);
+        assert_eq!(result.get_filtered_args(), expected.as_slice(), "Inifile param and value were not filtered correctly");
+        assert_eq!(result.get_ini_file_name(), INIFILE_VALUE, "Inifile value has not been extracted correctly");
+        assert_eq!(result.get_override_file_name(), Some(OVERRIDE_VALUE), "Override value has not been extracted correctly");
+    }
+
+    /// Java: `filterForInifileReturnsDefaultForMissingParam`.
+    #[test]
+    fn filter_for_inifile_returns_default_for_missing_param() {
+        let filter = InifileParamFilter::new();
+        let input = args(&[OTHER_PARAM_1, OTHER_PARAM_2]);
+        let expected = args(&[OTHER_PARAM_1, OTHER_PARAM_2]);
+        let result = filter.filter_for_inifile(&input);
+        assert_eq!(result.get_filtered_args(), expected.as_slice(), "Other params must be retained as passed in.");
+        assert_eq!(result.get_ini_file_name(), DEFAULT_INIFUILE_VALUE, "Inifile value must be set to the default value");
+    }
+
+    /// Java: `filterForInifileReturnsDefaultForMissingValue`. A trailing
+    /// `-inifile` with no value is consumed and dropped, like Java's iterator.
+    #[test]
+    fn filter_for_inifile_returns_default_for_missing_value() {
+        let filter = InifileParamFilter::new();
+        let input = args(&[OTHER_PARAM_1, INIFILE_PARAM]);
+        let expected = args(&[OTHER_PARAM_1]);
+        let result = filter.filter_for_inifile(&input);
+        assert_eq!(result.get_filtered_args(), expected.as_slice(), "Inifile param was not filtered correctly");
+        assert_eq!(result.get_ini_file_name(), DEFAULT_INIFUILE_VALUE, "Inifile value must be set to the default value");
+    }
+
+    /// Java: `filterForInifileReturnsDefaultForEmptyArray`.
+    #[test]
+    fn filter_for_inifile_returns_default_for_empty_array() {
         let filter = InifileParamFilter::new();
         let result = filter.filter_for_inifile(&[]);
-        assert_eq!(result.get_ini_file_name(), "server.ini");
-        assert!(result.get_override_file_name().is_none());
-        assert_eq!(result.get_filtered_args().len(), 0);
+        assert_eq!(result.get_filtered_args().len(), 0, "Empty input must result in empty output");
+        assert_eq!(result.get_ini_file_name(), DEFAULT_INIFUILE_VALUE, "Inifile value must be set to the default value");
     }
 
+    /// Java: `filterForInifileExtractsOverrideParam` (ported Rust extra).
     #[test]
-    fn extracts_inifile_param() {
+    fn filter_for_inifile_extracts_override_param() {
         let filter = InifileParamFilter::new();
-        let args: Vec<String> = vec!["-inifile".to_string(), "custom.ini".to_string(), "other".to_string()];
-        let result = filter.filter_for_inifile(&args);
-        assert_eq!(result.get_ini_file_name(), "custom.ini");
-        assert_eq!(result.get_filtered_args(), &["other".to_string()]);
-    }
-
-    #[test]
-    fn extracts_override_param() {
-        let filter = InifileParamFilter::new();
-        let args: Vec<String> = vec!["-override".to_string(), "override.ini".to_string()];
-        let result = filter.filter_for_inifile(&args);
-        assert_eq!(result.get_override_file_name(), Some("override.ini"));
-        assert_eq!(result.get_ini_file_name(), "server.ini");
+        let input = args(&[OVERRIDE_PARAM, OVERRIDE_VALUE]);
+        let result = filter.filter_for_inifile(&input);
+        assert_eq!(result.get_override_file_name(), Some(OVERRIDE_VALUE));
+        assert_eq!(result.get_ini_file_name(), DEFAULT_INIFUILE_VALUE);
     }
 }

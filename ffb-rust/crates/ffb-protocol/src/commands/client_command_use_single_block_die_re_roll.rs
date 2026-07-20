@@ -60,22 +60,6 @@ mod tests {
     fn default_no_source() {
         assert!(ClientCommandUseSingleBlockDieReRoll::new(0).re_roll_source.is_none());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandUseSingleBlockDieReRoll::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandUseSingleBlockDieReRoll::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandUseSingleBlockDieReRoll::default());
-        assert!(s.contains("ClientCommandUseSingleBlockDieReRoll"));
-    }
 
     #[test]
     fn get_id_is_client_use_single_block_die_re_roll() {

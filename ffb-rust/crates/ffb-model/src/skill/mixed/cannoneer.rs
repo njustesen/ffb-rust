@@ -25,8 +25,27 @@ impl std::ops::Deref for Cannoneer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(Cannoneer::new().get_name(), "Cannoneer"); }
+    fn name_is_cannoneer() {
+        assert_eq!(Cannoneer::new().get_name(), "Cannoneer");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Cannoneer::new().get_category(), SkillCategory::Passing); }
+    fn category_is_passing() {
+        assert_eq!(Cannoneer::new().get_category(), SkillCategory::Passing);
+    }
+
+    // Java: assertNotNull(skill.getSkillProperties()). The live Rust mechanism always
+    // returns a valid slice; Cannoneer registers no NamedProperties (only a
+    // PassModifier), so the live property table is empty.
+    #[test]
+    fn skill_properties_are_not_null() {
+        assert!(crate::enums::SkillId::Cannoneer.properties().is_empty());
+    }
+
+    #[test]
+    fn class_name_is_cannoneer() {
+        assert_eq!(crate::enums::SkillId::Cannoneer.class_name(), "Cannoneer");
+    }
 }

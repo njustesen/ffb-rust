@@ -78,109 +78,194 @@ impl SppCalc {
 
 #[cfg(test)]
 mod tests {
+    // 1:1 mirror of com.fumbbl.ffb.server.mechanic.SppCalcTest
+    // (Java's single-arg touchdownSpp/casualtySpp overloads map to *_spp_basic).
     use super::*;
 
+    // ── Touchdown ─────────────────────────────────────────────────────────
+
     #[test]
-    fn touchdown_spp_normal_is_3() {
-        assert_eq!(SppCalc::touchdown_spp_basic(Rules::Bb2025), 3);
-        assert_eq!(SppCalc::touchdown_spp_basic(Rules::Bb2020), 3);
+    fn touchdown_bb2016_is3() {
         assert_eq!(SppCalc::touchdown_spp_basic(Rules::Bb2016), 3);
     }
 
     #[test]
-    fn touchdown_spp_brawlin_brutes_bb2025_is_2() {
+    fn touchdown_bb2020_is3() {
+        assert_eq!(SppCalc::touchdown_spp_basic(Rules::Bb2020), 3);
+    }
+
+    #[test]
+    fn touchdown_bb2025_normal_team_is3() {
+        assert_eq!(SppCalc::touchdown_spp(Rules::Bb2025, false), 3);
+    }
+
+    #[test]
+    fn touchdown_bb2025_brawlin_brutes_is2() {
         assert_eq!(SppCalc::touchdown_spp(Rules::Bb2025, true), 2);
     }
 
     #[test]
-    fn touchdown_spp_brawlin_brutes_non_bb2025_is_3() {
-        assert_eq!(SppCalc::touchdown_spp(Rules::Bb2020, true), 3);
+    fn touchdown_bb2016_brawlin_brutes_has_no_effect() {
+        // Brawlin' Brutes rule only exists in BB2025
         assert_eq!(SppCalc::touchdown_spp(Rules::Bb2016, true), 3);
     }
 
     #[test]
-    fn casualty_spp_normal_is_2() {
-        assert_eq!(SppCalc::casualty_spp_basic(Rules::Bb2025), 2);
+    fn touchdown_bb2020_brawlin_brutes_has_no_effect() {
+        // Brawlin' Brutes rule only exists in BB2025
+        assert_eq!(SppCalc::touchdown_spp(Rules::Bb2020, true), 3);
+    }
+
+    // ── Casualty ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn casualty_bb2016_is2() {
         assert_eq!(SppCalc::casualty_spp_basic(Rules::Bb2016), 2);
     }
 
     #[test]
-    fn casualty_spp_brawlin_brutes_bb2025_is_3() {
+    fn casualty_bb2020_is2() {
+        assert_eq!(SppCalc::casualty_spp_basic(Rules::Bb2020), 2);
+    }
+
+    #[test]
+    fn casualty_bb2025_normal_team_is2() {
+        assert_eq!(SppCalc::casualty_spp(Rules::Bb2025, false), 2);
+    }
+
+    #[test]
+    fn casualty_bb2025_brawlin_brutes_is3() {
         assert_eq!(SppCalc::casualty_spp(Rules::Bb2025, true), 3);
     }
 
+    // ── Constant events (same across all editions) ────────────────────────
+
     #[test]
-    fn fixed_spp_values_all_editions() {
+    fn completion_is1_all_editions() {
         assert_eq!(SppCalc::completion_spp(), 1);
+    }
+
+    #[test]
+    fn interception_is2_all_editions() {
         assert_eq!(SppCalc::interception_spp(), 2);
+    }
+
+    #[test]
+    fn deflection_is1_all_editions() {
         assert_eq!(SppCalc::deflection_spp(), 1);
+    }
+
+    #[test]
+    fn catch_is1_all_editions() {
         assert_eq!(SppCalc::catch_spp(), 1);
     }
 
+    // ── Landing ───────────────────────────────────────────────────────────
+
     #[test]
-    fn landing_spp_bb2025_is_1() {
-        assert_eq!(SppCalc::landing_spp(Rules::Bb2025), 1);
+    fn landing_bb2016_is0() {
+        assert_eq!(SppCalc::landing_spp(Rules::Bb2016), 0);
     }
 
     #[test]
-    fn landing_spp_bb2016_bb2020_is_0() {
-        assert_eq!(SppCalc::landing_spp(Rules::Bb2016), 0);
+    fn landing_bb2020_is0() {
         assert_eq!(SppCalc::landing_spp(Rules::Bb2020), 0);
     }
 
     #[test]
-    fn mvp_spp_bb2016_is_5() {
+    fn landing_bb2025_is1() {
+        assert_eq!(SppCalc::landing_spp(Rules::Bb2025), 1);
+    }
+
+    // ── MVP ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn mvp_bb2016_is5() {
         assert_eq!(SppCalc::mvp_spp(Rules::Bb2016), 5);
     }
 
     #[test]
-    fn mvp_spp_bb2020_bb2025_is_4() {
+    fn mvp_bb2020_is4() {
         assert_eq!(SppCalc::mvp_spp(Rules::Bb2020), 4);
-        assert_eq!(SppCalc::mvp_spp(Rules::Bb2025), 4);
     }
 
     #[test]
-    fn additional_spp_bb2016_is_0() {
+    fn mvp_bb2025_is4() {
+        assert_eq!(SppCalc::mvp_spp(Rules::Bb2025), 4);
+    }
+
+    // ── Additional SPP (league bonus) ─────────────────────────────────────
+
+    #[test]
+    fn additional_spp_bb2016_is0() {
         assert_eq!(SppCalc::additional_spp(Rules::Bb2016), 0);
     }
 
     #[test]
-    fn additional_spp_bb2020_bb2025_is_1() {
+    fn additional_spp_bb2020_is1() {
         assert_eq!(SppCalc::additional_spp(Rules::Bb2020), 1);
-        assert_eq!(SppCalc::additional_spp(Rules::Bb2025), 1);
     }
 
     #[test]
-    fn player_level_bb2016_rookie_at_zero() {
+    fn additional_spp_bb2025_is1() {
+        assert_eq!(SppCalc::additional_spp(Rules::Bb2025), 1);
+    }
+
+    // ── Level thresholds (BB2016 SPP-based) ───────────────────────────────
+
+    #[test]
+    fn bb2016_level_thresholds_values() {
+        assert_eq!(SppCalc::LEVEL_THRESHOLDS_BB2016, [6, 16, 31, 51, 76, 176]);
+    }
+
+    #[test]
+    fn bb2016_player_level_rookie() {
         assert_eq!(SppCalc::player_level_bb2016(0), 0);
         assert_eq!(SppCalc::player_level_bb2016(5), 0);
     }
 
     #[test]
-    fn player_level_bb2016_experienced_at_6() {
+    fn bb2016_player_level_experienced() {
         assert_eq!(SppCalc::player_level_bb2016(6), 1);
         assert_eq!(SppCalc::player_level_bb2016(15), 1);
     }
 
     #[test]
-    fn player_level_bb2016_legend_at_176() {
-        assert_eq!(SppCalc::player_level_bb2016(176), 6);
-        assert_eq!(SppCalc::player_level_bb2016(9999), 6);
-    }
-
-    #[test]
-    fn player_level_bb2016_all_thresholds() {
-        // Level 2 at 16, level 3 at 31, level 4 at 51, level 5 at 76
+    fn bb2016_player_level_veteran() {
         assert_eq!(SppCalc::player_level_bb2016(16), 2);
-        assert_eq!(SppCalc::player_level_bb2016(31), 3);
-        assert_eq!(SppCalc::player_level_bb2016(51), 4);
-        assert_eq!(SppCalc::player_level_bb2016(76), 5);
+        assert_eq!(SppCalc::player_level_bb2016(30), 2);
     }
 
     #[test]
-    fn just_levelled_up_bb2016_detects_transition() {
-        assert!(SppCalc::just_levelled_up_bb2016(5, 6));
-        assert!(!SppCalc::just_levelled_up_bb2016(6, 10));
-        assert!(SppCalc::just_levelled_up_bb2016(15, 16));
+    fn bb2016_player_level_emerging() {
+        assert_eq!(SppCalc::player_level_bb2016(31), 3);
+        assert_eq!(SppCalc::player_level_bb2016(50), 3);
+    }
+
+    #[test]
+    fn bb2016_player_level_star() {
+        assert_eq!(SppCalc::player_level_bb2016(51), 4);
+        assert_eq!(SppCalc::player_level_bb2016(75), 4);
+    }
+
+    #[test]
+    fn bb2016_player_level_super_star() {
+        assert_eq!(SppCalc::player_level_bb2016(76), 5);
+        assert_eq!(SppCalc::player_level_bb2016(175), 5);
+    }
+
+    #[test]
+    fn bb2016_player_level_legend() {
+        assert_eq!(SppCalc::player_level_bb2016(176), 6);
+        assert_eq!(SppCalc::player_level_bb2016(999), 6);
+    }
+
+    #[test]
+    fn bb2016_just_levelled_up_at_threshold() {
+        assert!(SppCalc::just_levelled_up_bb2016(5, 6)); // 0→1
+        assert!(SppCalc::just_levelled_up_bb2016(15, 16)); // 1→2
+        assert!(SppCalc::just_levelled_up_bb2016(30, 31)); // 2→3
+        assert!(!SppCalc::just_levelled_up_bb2016(6, 15)); // same level
+        assert!(!SppCalc::just_levelled_up_bb2016(16, 30)); // same level
     }
 }

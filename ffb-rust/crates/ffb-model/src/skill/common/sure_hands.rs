@@ -39,9 +39,28 @@ impl std::ops::Deref for SureHands {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(SureHands::new().get_name(), "Sure Hands"); }
+    fn name_is_sure_hands() {
+        assert_eq!(SureHands::new().get_name(), "Sure Hands");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(SureHands::new().get_category(), SkillCategory::General); }
+    fn category_is_general() {
+        assert_eq!(SureHands::new().get_category(), SkillCategory::General);
+    }
+
+    #[test]
+    fn has_cancel_strip_ball_property() {
+        // Java: assertTrue(skill.hasSkillProperty(new CancelSkillProperty(
+        // NamedProperties.forceOpponentToDropBallOnPushback)))
+        assert!(crate::enums::SkillId::SureHands.properties().contains(&"cancelsForceOpponentToDropBallOnPushback"));
+    }
+
+    #[test]
+    fn does_not_have_force_followup_property() {
+        // Sure Hands does not force follow-up
+        assert!(!crate::enums::SkillId::SureHands.properties().contains(&"forceFollowup"));
+    }
+
     #[test]
     fn registers_pick_up_reroll_source() {
         // Java SureHands.postConstruct() registers a reroll source for PICK_UP;

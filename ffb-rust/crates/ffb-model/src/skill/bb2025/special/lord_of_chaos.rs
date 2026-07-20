@@ -27,12 +27,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_lord_of_chaos() {
         assert_eq!(LordOfChaos::new().get_name(), "Lord of Chaos");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(LordOfChaos::new().get_category(), SkillCategory::Trait);
     }
 }

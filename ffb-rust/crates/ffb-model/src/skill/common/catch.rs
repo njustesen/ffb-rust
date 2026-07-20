@@ -25,8 +25,23 @@ impl std::ops::Deref for Catch {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(Catch::new().get_name(), "Catch"); }
+    fn name_is_catch() {
+        assert_eq!(Catch::new().get_name(), "Catch");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Catch::new().get_category(), SkillCategory::Agility); }
+    fn category_is_agility() {
+        assert_eq!(Catch::new().get_category(), SkillCategory::Agility);
+    }
+
+    #[test]
+    fn has_no_named_properties() {
+        // Catch uses a ReRollSource rather than NamedProperties
+        assert!(crate::enums::SkillId::Catch.properties().is_empty());
+    }
+
+    // Java `has_catch_reroll_source` is not mirrored: there is no live Rust
+    // reroll-source table, and Catch::new() does not register one.
 }

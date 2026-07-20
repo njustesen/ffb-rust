@@ -43,6 +43,7 @@ impl Default for PostMatchCalc {
     }
 }
 
+// Tests mirror ffb-server/src/test/java/com/fumbbl/ffb/server/util/PostMatchCalcTest.java 1:1.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -50,71 +51,77 @@ mod tests {
     // ── interpret_fan_factor_roll ────────────────────────────────────────────
 
     #[test]
-    fn fan_factor_winning_roll_beats_factor_gains_fan() {
-        // winning (score_diff > 0), roll > fan_factor → +1
+    fn winning_roll_higher_than_ff_returns1() {
+        // scoreDiff > 0 (winning), roll beats fan factor
         assert_eq!(PostMatchCalc::interpret_fan_factor_roll(10, 8, 1), 1);
     }
 
     #[test]
-    fn fan_factor_draw_roll_beats_factor_gains_fan() {
-        // draw (score_diff == 0), roll > fan_factor → +1
-        assert_eq!(PostMatchCalc::interpret_fan_factor_roll(9, 7, 0), 1);
-    }
-
-    #[test]
-    fn fan_factor_losing_roll_below_factor_loses_fan() {
-        // losing (score_diff < 0), roll < fan_factor → -1
-        assert_eq!(PostMatchCalc::interpret_fan_factor_roll(5, 8, -2), -1);
-    }
-
-    #[test]
-    fn fan_factor_draw_roll_below_factor_loses_fan() {
-        // draw (score_diff == 0), roll < fan_factor → -1
-        assert_eq!(PostMatchCalc::interpret_fan_factor_roll(6, 8, 0), -1);
-    }
-
-    #[test]
-    fn fan_factor_roll_equals_factor_no_change() {
+    fn winning_roll_equal_to_ff_returns0() {
         assert_eq!(PostMatchCalc::interpret_fan_factor_roll(8, 8, 1), 0);
     }
 
     #[test]
-    fn fan_factor_winning_roll_below_factor_no_change() {
-        // winning but roll ≤ fan_factor → 0
-        assert_eq!(PostMatchCalc::interpret_fan_factor_roll(7, 9, 2), 0);
+    fn winning_roll_lower_than_ff_returns0() {
+        // Not losing, so cannot get -1
+        assert_eq!(PostMatchCalc::interpret_fan_factor_roll(6, 8, 1), 0);
+    }
+
+    #[test]
+    fn losing_roll_lower_than_ff_returns_minus1() {
+        assert_eq!(PostMatchCalc::interpret_fan_factor_roll(6, 8, -1), -1);
+    }
+
+    #[test]
+    fn losing_roll_higher_than_ff_returns0() {
+        assert_eq!(PostMatchCalc::interpret_fan_factor_roll(10, 8, -1), 0);
+    }
+
+    #[test]
+    fn draw_roll_higher_than_ff_returns1() {
+        // scoreDiff == 0 satisfies both >= 0 conditions
+        assert_eq!(PostMatchCalc::interpret_fan_factor_roll(10, 8, 0), 1);
+    }
+
+    #[test]
+    fn draw_roll_lower_than_ff_returns_minus1() {
+        assert_eq!(PostMatchCalc::interpret_fan_factor_roll(6, 8, 0), -1);
+    }
+
+    #[test]
+    fn draw_roll_equal_to_ff_returns0() {
+        assert_eq!(PostMatchCalc::interpret_fan_factor_roll(8, 8, 0), 0);
     }
 
     // ── interpret_master_chef_roll ───────────────────────────────────────────
 
     #[test]
-    fn master_chef_all_high_steals_three() {
-        assert_eq!(PostMatchCalc::interpret_master_chef_roll(&[4, 5, 6]), 3);
-    }
-
-    #[test]
-    fn master_chef_all_low_steals_none() {
+    fn all_low_steals_nothing() {
         assert_eq!(PostMatchCalc::interpret_master_chef_roll(&[1, 2, 3]), 0);
     }
 
     #[test]
-    fn master_chef_mixed_steals_two() {
-        assert_eq!(PostMatchCalc::interpret_master_chef_roll(&[1, 4, 6]), 2);
+    fn all_high_steals_all() {
+        assert_eq!(PostMatchCalc::interpret_master_chef_roll(&[4, 5, 6]), 3);
     }
 
     #[test]
-    fn master_chef_empty_slice_steals_none() {
-        assert_eq!(PostMatchCalc::interpret_master_chef_roll(&[]), 0);
+    fn mixed_steals_partial() {
+        assert_eq!(PostMatchCalc::interpret_master_chef_roll(&[3, 4, 6]), 2);
     }
 
     #[test]
-    fn master_chef_exactly_four_is_stolen() {
-        // boundary: 4 is strictly > 3
+    fn single_die_high_steals1() {
         assert_eq!(PostMatchCalc::interpret_master_chef_roll(&[4]), 1);
     }
 
     #[test]
-    fn master_chef_exactly_three_not_stolen() {
-        // boundary: 3 is not > 3
+    fn single_die_low_steals0() {
         assert_eq!(PostMatchCalc::interpret_master_chef_roll(&[3]), 0);
+    }
+
+    #[test]
+    fn empty_dice_steals0() {
+        assert_eq!(PostMatchCalc::interpret_master_chef_roll(&[]), 0);
     }
 }

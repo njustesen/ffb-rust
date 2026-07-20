@@ -33,15 +33,23 @@ impl std::ops::Deref for PassingIncrease {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_plus_pa() {
         assert_eq!(PassingIncrease::new().get_name(), "+PA");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_stat_increase() {
         assert_eq!(PassingIncrease::new().get_category(), SkillCategory::StatIncrease);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the live Rust property table
+        // is SkillId::PassingIncrease.properties(), which always returns a valid slice.
+        assert!(SkillId::PassingIncrease.properties().iter().all(|p| !p.is_empty()));
     }
 
     #[test]

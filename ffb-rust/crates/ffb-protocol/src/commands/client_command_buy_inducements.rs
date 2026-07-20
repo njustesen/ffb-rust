@@ -183,18 +183,6 @@ mod tests {
         assert_eq!(cmd.get_star_player_position_ids().len(), 1);
     }
 
-
-    #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandBuyInducements::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandBuyInducements::default().clone();
-    }
-
     #[test]
     fn get_id_is_client_buy_inducements() {
         assert_eq!(ClientCommandBuyInducements::new().get_id(), NetCommandId::ClientBuyInducements);

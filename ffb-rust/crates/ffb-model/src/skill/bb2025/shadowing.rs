@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_shadowing() {
         assert_eq!(Shadowing::new().get_name(), "Shadowing");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_devious() {
         assert_eq!(Shadowing::new().get_category(), SkillCategory::Devious);
+    }
+
+    #[test]
+    fn has_can_follow_player_leaving_tacklezones_property() {
+        assert!(crate::enums::SkillId::Shadowing.properties().contains(&"canFollowPlayerLeavingTacklezones"));
     }
 }

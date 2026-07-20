@@ -27,12 +27,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_very_long_legs() {
         assert_eq!(VeryLongLegs::new().get_name(), "Very Long Legs");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_mutation() {
         assert_eq!(VeryLongLegs::new().get_category(), SkillCategory::Mutation);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the bb2025 Java postConstruct
+        // registers NamedProperties, so the live SkillId table must be populated.
+        assert!(!crate::enums::SkillId::VeryLongLegs.properties().is_empty());
     }
 }

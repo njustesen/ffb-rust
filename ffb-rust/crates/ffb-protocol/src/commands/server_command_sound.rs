@@ -54,28 +54,6 @@ mod tests {
         let cmd = ServerCommandSound::new(SoundId::TOUCHDOWN);
         assert_eq!(cmd.get_sound(), SoundId::TOUCHDOWN);
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandSound::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_roundtrip() {
-        let cmd = ServerCommandSound::default();
-        let _ = cmd.clone();
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandSound::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandSound::default());
-        assert!(s.contains("ServerCommandSound"));
-    }
 
     #[test]
     fn get_id_is_server_sound() {

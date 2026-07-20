@@ -191,8 +191,12 @@ mod tests {
     }
 
     #[test]
-    fn dead_is_dead() {
+    fn bb2020_dead_is_dead() {
         assert!(SeriousInjuryKind::Dead.is_dead());
+    }
+
+    #[test]
+    fn bb2020_seriously_hurt_is_not_dead() {
         assert!(!SeriousInjuryKind::SeriouslyHurt.is_dead());
     }
 
@@ -227,12 +231,41 @@ mod tests {
     }
 
     #[test]
-    fn bb2016_broken_ribs_has_no_attribute() {
+    fn bb2020_seriously_hurt_has_no_injury_attribute() {
+        assert_eq!(SeriousInjuryKind::SeriouslyHurt.injury_attribute(), None);
+    }
+
+    #[test]
+    fn bb2020_all_serious_injuries_have_name() {
+        // Java bb2020 SeriousInjury values, mapped to their consolidated Rust variants.
+        let bb2020 = [
+            SeriousInjuryKind::SeriouslyHurt,
+            SeriousInjuryKind::SeriousInjuryNi,
+            SeriousInjuryKind::HeadInjuryAv,
+            SeriousInjuryKind::SmashedKneeMa,
+            SeriousInjuryKind::BrokenArmPa,
+            SeriousInjuryKind::NeckInjuryAg,
+            SeriousInjuryKind::DislocatedShoulderSt,
+            SeriousInjuryKind::Dead,
+        ];
+        for si in bb2020 {
+            assert!(!si.name().is_empty(), "All BB2020 SeriousInjury values must have a name");
+        }
+    }
+
+    #[test]
+    fn bb2016_dead_is_dead() {
+        assert!(SeriousInjuryKind::Dead.is_dead());
+    }
+
+    #[test]
+    fn bb2016_broken_ribs_is_mng_not_dead() {
+        assert!(!SeriousInjuryKind::BrokenRibs.is_dead());
         assert_eq!(SeriousInjuryKind::BrokenRibs.injury_attribute(), None);
     }
 
     #[test]
-    fn bb2016_smashed_knee_is_niggling() {
+    fn bb2016_smashed_knee_is_niggling_injury() {
         assert_eq!(SeriousInjuryKind::SmashedKneeB2016.injury_attribute(), Some(InjuryAttribute::NI));
     }
 
@@ -242,7 +275,7 @@ mod tests {
     }
 
     #[test]
-    fn bb2016_broken_collar_bone_reduces_st() {
+    fn bb2016_smashed_collar_bone_reduces_st() {
         assert_eq!(SeriousInjuryKind::BrokenCollarBone.injury_attribute(), Some(InjuryAttribute::ST));
     }
 
@@ -252,7 +285,30 @@ mod tests {
     }
 
     #[test]
-    fn bb2016_seriously_hurt_has_no_attribute() {
-        assert_eq!(SeriousInjuryKind::SeriouslyHurt.injury_attribute(), None);
+    fn bb2016_all_serious_injuries_have_name() {
+        // Java bb2016 SeriousInjury values, mapped to their consolidated Rust variants.
+        let bb2016 = [
+            SeriousInjuryKind::BrokenRibs,
+            SeriousInjuryKind::Groin,
+            SeriousInjuryKind::GougedEye,
+            SeriousInjuryKind::BrokenJaw,
+            SeriousInjuryKind::FracturedArm,
+            SeriousInjuryKind::FracturedLeg,
+            SeriousInjuryKind::SmashedHand,
+            SeriousInjuryKind::PinchedNerve,
+            SeriousInjuryKind::DamagedBack,
+            SeriousInjuryKind::SmashedKneeB2016,
+            SeriousInjuryKind::SmashedHip,
+            SeriousInjuryKind::SmashedAnkle,
+            SeriousInjuryKind::SeriousConcussion,
+            SeriousInjuryKind::FracturedSkull,
+            SeriousInjuryKind::BrokenNeck,
+            SeriousInjuryKind::BrokenCollarBone,
+            SeriousInjuryKind::Dead,
+            SeriousInjuryKind::Poisoned,
+        ];
+        for si in bb2016 {
+            assert!(!si.name().is_empty(), "All BB2016 SeriousInjury values must have a name");
+        }
     }
 }

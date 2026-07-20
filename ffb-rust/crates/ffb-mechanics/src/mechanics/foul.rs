@@ -35,109 +35,14 @@ pub fn is_foul_armour_broken(armour_value: i32, roll_total: i32, _rules: Rules) 
     roll_total >= minimum_roll_to_break_armour(armour_value)
 }
 
+// Java-derived cases (FoulCalcTest) live in the 1:1 mirror module
+// ffb-engine/src/util/foul_calc.rs; only mechanics-specific API tests remain here.
 #[cfg(test)]
 mod tests {
     use super::*;
     use ffb_model::enums::Rules;
 
-    // ── is_spotted_by_armor_roll ──────────────────────────────────────────────
-
-    #[test]
-    fn armor_doubles_no_sneaky_git_spotted() {
-        assert!(is_spotted_by_armor_roll(3, 3, false));
-    }
-
-    #[test]
-    fn armor_doubles_with_sneaky_git_not_spotted() {
-        assert!(!is_spotted_by_armor_roll(3, 3, true));
-    }
-
-    #[test]
-    fn armor_non_doubles_not_spotted() {
-        assert!(!is_spotted_by_armor_roll(2, 4, false));
-    }
-
-    #[test]
-    fn armor_all_doubles_spotted() {
-        for d in 1..=6 {
-            assert!(is_spotted_by_armor_roll(d, d, false), "die={}", d);
-        }
-    }
-
-    #[test]
-    fn armor_all_doubles_sneaky_git_not_spotted() {
-        for d in 1..=6 {
-            assert!(!is_spotted_by_armor_roll(d, d, true), "die={}", d);
-        }
-    }
-
-    // ── is_spotted_by_injury_roll ─────────────────────────────────────────────
-
-    #[test]
-    fn injury_doubles_armor_broken_spotted() {
-        assert!(is_spotted_by_injury_roll(4, 4, true));
-    }
-
-    #[test]
-    fn injury_doubles_armor_not_broken_not_spotted() {
-        assert!(!is_spotted_by_injury_roll(4, 4, false));
-    }
-
-    #[test]
-    fn injury_non_doubles_armor_broken_not_spotted() {
-        assert!(!is_spotted_by_injury_roll(3, 5, true));
-    }
-
-    #[test]
-    fn injury_all_doubles_armor_broken_spotted() {
-        for d in 1..=6 {
-            assert!(is_spotted_by_injury_roll(d, d, true), "die={d}");
-        }
-    }
-
-    // ── is_spotted_by_referee ─────────────────────────────────────────────────
-
-    #[test]
-    fn referee_armor_doubles_spotted() {
-        assert!(is_spotted_by_referee(2, 2, 1, 3, false, false));
-    }
-
-    #[test]
-    fn referee_injury_doubles_armor_broken_spotted() {
-        assert!(is_spotted_by_referee(3, 5, 4, 4, true, false));
-    }
-
-    #[test]
-    fn referee_no_doubles_not_spotted() {
-        assert!(!is_spotted_by_referee(2, 4, 3, 5, true, false));
-    }
-
-    #[test]
-    fn referee_armor_doubles_sneaky_git_injury_not_doubles_not_spotted() {
-        assert!(!is_spotted_by_referee(3, 3, 2, 5, false, true));
-    }
-
-    #[test]
-    fn referee_armor_doubles_sneaky_git_injury_doubles_armor_broken_spotted() {
-        assert!(is_spotted_by_referee(3, 3, 4, 4, true, true));
-    }
-
-    #[test]
-    fn referee_no_armor_roll_injury_doubles_armor_not_broken_not_spotted() {
-        // Armor not broken (no injury roll made), doubles on injury ignored
-        assert!(!is_spotted_by_referee(2, 4, 3, 3, false, false));
-    }
-
-    // ── minimum_roll_to_break_armour ──────────────────────────────────────────
-
-    #[test]
-    fn minimum_roll_av_plus_one() {
-        for av in 7..=11 {
-            assert_eq!(av + 1, minimum_roll_to_break_armour(av));
-        }
-    }
-
-    // ── is_foul_armour_broken ─────────────────────────────────────────────────
+    // ── is_foul_armour_broken (ffb-mechanics-only API, no Java counterpart) ──
 
     #[test]
     fn foul_armour_broken_at_av_plus_one() {

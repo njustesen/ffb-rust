@@ -25,14 +25,20 @@ impl std::ops::Deref for Decay {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_decay() {
         assert_eq!(Decay::new().get_name(), "Decay");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(Decay::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_requires_second_casualty_roll_property() {
+        assert!(SkillId::Decay.properties().contains(&"requiresSecondCasualtyRoll"));
     }
 }

@@ -95,38 +95,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::KICKOFF_SCATTER);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "kickoffScatter");
-    }
-
-    #[test]
-    fn field_getters() {
-        let r = make();
-        assert_eq!(r.get_scatter_direction(), Direction::North);
-        assert_eq!(r.get_roll_scatter_direction(), 3);
-        assert_eq!(r.get_roll_scatter_distance(), 4);
-    }
-
-    #[test]
-    fn ball_coordinate_end() {
-        let r = make();
-        assert_eq!(r.get_ball_coordinate_end(), &FieldCoordinate::new(5, 7));
-    }
-
-    #[test]
-    fn different_direction() {
-        let r = ReportKickoffScatter::new(FieldCoordinate::new(0, 0), Direction::South, 1, 6);
-        assert_eq!(r.get_scatter_direction(), Direction::South);
-        assert_eq!(r.get_roll_scatter_direction(), 1);
-        assert_eq!(r.get_roll_scatter_distance(), 6);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

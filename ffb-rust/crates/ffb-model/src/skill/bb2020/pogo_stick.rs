@@ -25,15 +25,21 @@ impl std::ops::Deref for PogoStick {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_pogo_stick() {
         assert_eq!(PogoStick::new().get_name(), "Pogo Stick");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(PogoStick::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_leap_property() {
+        assert!(SkillId::PogoStick.properties().contains(&"canLeap"));
     }
 
     #[test]

@@ -139,23 +139,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandBlockOrReRollChoiceForTarget::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_roundtrip() {
-        let cmd = ClientCommandBlockOrReRollChoiceForTarget::default();
-        let _ = cmd.clone();
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandBlockOrReRollChoiceForTarget::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_block_or_re_roll_choice_for_target() {
         assert_eq!(
             ClientCommandBlockOrReRollChoiceForTarget::new().get_id(),

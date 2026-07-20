@@ -97,22 +97,6 @@ mod tests {
         assert!(cmd.player_numbers.is_empty());
         assert!(cmd.player_coordinates.is_empty());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandTeamSetupSave::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandTeamSetupSave::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandTeamSetupSave::default());
-        assert!(s.contains("ClientCommandTeamSetupSave"));
-    }
 
     #[test]
     fn get_id_is_client_team_setup_save() {

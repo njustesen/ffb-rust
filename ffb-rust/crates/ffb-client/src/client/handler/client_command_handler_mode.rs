@@ -27,11 +27,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandHandlerMode::QUEUING).is_empty());
-    }
-
-    #[test]
     fn all_four_variants_exist() {
         let all = [
             ClientCommandHandlerMode::PLAYING,

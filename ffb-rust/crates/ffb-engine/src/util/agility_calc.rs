@@ -61,97 +61,163 @@ impl Default for AgilityCalc {
     }
 }
 
+// Test mirror of com.fumbbl.ffb.server.util.AgilityCalcTest
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // ── agility_roll_base_bb2016 ─────────────────────────────────────────────
+
     #[test]
-    fn agility_roll_base_bb2016_ag3_is_4() {
-        assert_eq!(AgilityCalc::agility_roll_base_bb2016(3), 4);
+    fn bb2016_agility_base() {
+        for (ag, expected) in [(1, 6), (2, 5), (3, 4), (4, 3), (5, 2), (6, 1), (7, 1), (9, 1)] {
+            assert_eq!(AgilityCalc::agility_roll_base_bb2016(ag), expected, "ag={ag}");
+        }
+    }
+
+    // ── minimum_roll_dodge_bb2016 ────────────────────────────────────────────
+
+    #[test]
+    fn bb2016_dodge_no_modifiers() {
+        for (ag, expected) in [(1, 5), (2, 4), (3, 3), (4, 2), (5, 2), (6, 2)] {
+            assert_eq!(AgilityCalc::minimum_roll_dodge_bb2016(ag, 0), expected, "ag={ag}");
+        }
     }
 
     #[test]
-    fn agility_roll_base_bb2016_ag1_is_6() {
-        assert_eq!(AgilityCalc::agility_roll_base_bb2016(1), 6);
+    fn bb2016_dodge_with_positive_modifier_increases() {
+        // AG4 base dodge = 2; +1 tackle zone = 3
+        assert_eq!(AgilityCalc::minimum_roll_dodge_bb2016(4, 1), 3);
+        // AG4 base dodge = 2; +2 tackle zones = 4
+        assert_eq!(AgilityCalc::minimum_roll_dodge_bb2016(4, 2), 4);
     }
 
     #[test]
-    fn agility_roll_base_bb2016_ag6_is_1() {
-        assert_eq!(AgilityCalc::agility_roll_base_bb2016(6), 1);
+    fn bb2016_dodge_with_negative_modifier_decreases_but_floor_at_2() {
+        // AG3 base dodge = 3; Dodge skill -1 = 2
+        assert_eq!(AgilityCalc::minimum_roll_dodge_bb2016(3, -1), 2);
+        // AG2 base dodge = 4; -10 modifiers → 2
+        assert_eq!(AgilityCalc::minimum_roll_dodge_bb2016(2, -10), 2);
+    }
+
+    // ── minimum_roll_catch_bb2016 ────────────────────────────────────────────
+
+    #[test]
+    fn bb2016_catch_no_modifiers() {
+        for (ag, expected) in [(1, 6), (2, 5), (3, 4), (4, 3), (5, 2), (6, 2)] {
+            assert_eq!(AgilityCalc::minimum_roll_catch_bb2016(ag, 0), expected, "ag={ag}");
+        }
     }
 
     #[test]
-    fn agility_roll_base_bb2016_ag7_clamps_to_1() {
-        assert_eq!(AgilityCalc::agility_roll_base_bb2016(7), 1);
+    fn bb2016_catch_harder_than_dodge_for_same_ag() {
+        // Same AG, catch is always 1 harder than dodge (unless both at floor)
+        for ag in 1..=4 {
+            let dodge = AgilityCalc::minimum_roll_dodge_bb2016(ag, 0);
+            let catch_ = AgilityCalc::minimum_roll_catch_bb2016(ag, 0);
+            assert_eq!(catch_, dodge + 1, "ag={ag}");
+        }
     }
 
     #[test]
-    fn minimum_roll_dodge_bb2016_ag3_no_mods() {
-        // base=4, -1=3, floor 2 → 3
-        assert_eq!(AgilityCalc::minimum_roll_dodge_bb2016(3, 0), 3);
+    fn bb2016_catch_with_positive_modifier_harder() {
+        // AG4, catch base = 3; +1 tackle zone → 4
+        assert_eq!(AgilityCalc::minimum_roll_catch_bb2016(4, 1), 4);
+        assert_eq!(AgilityCalc::minimum_roll_catch_bb2016(4, 2), 5);
     }
 
     #[test]
-    fn minimum_roll_dodge_bb2016_floored_at_2() {
-        // ag=6, base=1, -1+0=0 → clamped to 2
-        assert_eq!(AgilityCalc::minimum_roll_dodge_bb2016(6, 0), 2);
+    fn bb2016_catch_with_negative_modifier_floor_at_2() {
+        // AG4, catch base = 3; -1 skill → 2; can't go below 2
+        assert_eq!(AgilityCalc::minimum_roll_catch_bb2016(4, -1), 2);
+        assert_eq!(AgilityCalc::minimum_roll_catch_bb2016(4, -10), 2);
     }
 
-    #[test]
-    fn minimum_roll_catch_bb2016_ag3_no_mods() {
-        // base=4, +0=4
-        assert_eq!(AgilityCalc::minimum_roll_catch_bb2016(3, 0), 4);
-    }
+    // ── minimum_roll_interception_bb2016 ─────────────────────────────────────
 
     #[test]
-    fn minimum_roll_interception_bb2016_ag3() {
-        // base=4, +2=6
-        assert_eq!(AgilityCalc::minimum_roll_interception_bb2016(3, 0), 6);
-    }
-
-    #[test]
-    fn minimum_roll_bb2020_ag3_no_mods() {
-        assert_eq!(AgilityCalc::minimum_roll_bb2020(3, 0), 3);
-    }
-
-    #[test]
-    fn minimum_roll_bb2020_floored_at_2() {
-        // ag=1, mod=-5 → max(2,-4)=2
-        assert_eq!(AgilityCalc::minimum_roll_bb2020(1, -5), 2);
-    }
-
-    #[test]
-    fn minimum_roll_dodge_dispatches_bb2016() {
-        let result = AgilityCalc::minimum_roll_dodge(3, 0, Rules::Bb2016);
-        assert_eq!(result, AgilityCalc::minimum_roll_dodge_bb2016(3, 0));
-    }
-
-    #[test]
-    fn minimum_roll_dodge_dispatches_bb2020() {
-        let result = AgilityCalc::minimum_roll_dodge(3, 0, Rules::Bb2020);
-        assert_eq!(result, AgilityCalc::minimum_roll_bb2020(3, 0));
-    }
-
-    #[test]
-    fn minimum_roll_dodge_dispatches_bb2025() {
-        let result = AgilityCalc::minimum_roll_dodge(4, 1, Rules::Bb2025);
-        assert_eq!(result, AgilityCalc::minimum_roll_bb2020(4, 1));
-    }
-
-    #[test]
-    fn minimum_roll_base_bb2016_same_as_catch() {
-        for ag in 1..=6 {
+    fn bb2016_interception_no_modifiers() {
+        for (ag, expected) in [(1, 8), (2, 7), (3, 6), (4, 5), (5, 4), (6, 3)] {
             assert_eq!(
-                AgilityCalc::minimum_roll_base_bb2016(ag, 0),
-                AgilityCalc::minimum_roll_catch_bb2016(ag, 0)
+                AgilityCalc::minimum_roll_interception_bb2016(ag, 0),
+                expected,
+                "ag={ag}"
             );
         }
     }
 
     #[test]
-    fn modifier_increases_target() {
-        let base = AgilityCalc::minimum_roll_bb2020(3, 0);
-        let harder = AgilityCalc::minimum_roll_bb2020(3, 2);
-        assert_eq!(harder, base + 2);
+    fn bb2016_interception_harder_than_catch_by_2_for_same_ag() {
+        // Interception is exactly 2 harder than catch for all AG (above floor)
+        for ag in 1..=4 {
+            let catch_ = AgilityCalc::minimum_roll_catch_bb2016(ag, 0);
+            let intercept = AgilityCalc::minimum_roll_interception_bb2016(ag, 0);
+            assert_eq!(intercept, catch_ + 2, "ag={ag}");
+        }
+    }
+
+    // ── minimum_roll_base_bb2016 ─────────────────────────────────────────────
+
+    #[test]
+    fn bb2016_base_same_as_catch() {
+        // Jump-up/leap/hypnotic gaze use the same formula as catch (base + mods)
+        for ag in 1..=6 {
+            assert_eq!(
+                AgilityCalc::minimum_roll_catch_bb2016(ag, 0),
+                AgilityCalc::minimum_roll_base_bb2016(ag, 0),
+                "ag={ag}"
+            );
+        }
+    }
+
+    // ── minimum_roll_bb2020 ──────────────────────────────────────────────────
+
+    #[test]
+    fn bb2020_direct_agility_no_modifiers() {
+        for (ag, expected) in [(2, 2), (3, 3), (4, 4), (5, 5), (6, 6)] {
+            assert_eq!(AgilityCalc::minimum_roll_bb2020(ag, 0), expected, "ag={ag}");
+        }
+    }
+
+    #[test]
+    fn bb2020_with_positive_modifier() {
+        assert_eq!(AgilityCalc::minimum_roll_bb2020(3, 1), 4); // 3 + 1 = 4
+    }
+
+    #[test]
+    fn bb2020_with_negative_modifier_floor_at_2() {
+        assert_eq!(AgilityCalc::minimum_roll_bb2020(3, -5), 2); // floor
+        assert_eq!(AgilityCalc::minimum_roll_bb2020(2, -1), 2); // 1 → 2
+    }
+
+    // ── minimum_roll_dodge (edition-dispatched) ──────────────────────────────
+
+    #[test]
+    fn dispatched_bb2016_vs_bb2020_differ_for_same_ag4() {
+        // BB2016 AG4: dodge target = 2
+        // BB2020 AG4 (meaning "4+" player): target = 4
+        assert_eq!(AgilityCalc::minimum_roll_dodge(4, 0, Rules::Bb2016), 2);
+        assert_eq!(AgilityCalc::minimum_roll_dodge(4, 0, Rules::Bb2020), 4);
+    }
+
+    #[test]
+    fn dispatched_bb2025_same_as_bb2020() {
+        assert_eq!(
+            AgilityCalc::minimum_roll_dodge(3, 0, Rules::Bb2020),
+            AgilityCalc::minimum_roll_dodge(3, 0, Rules::Bb2025)
+        );
+    }
+
+    #[test]
+    #[allow(clippy::eq_op)] // Java test asserts the same call against itself; mirrored verbatim
+    fn bb2020_catch_uses_same_formula_as_dodge() {
+        // In BB2020 all agility actions (dodge, catch, intercept) use the same formula: ag + mods
+        // So catch and dodge roll against the same target for a given AG and modifier sum
+        assert_eq!(
+            AgilityCalc::minimum_roll_bb2020(4, 0),
+            AgilityCalc::minimum_roll_bb2020(4, 0)
+        );
+        assert_eq!(AgilityCalc::minimum_roll_bb2020(4, 0), 4); // "4+" player needs to roll 4+
+        assert_eq!(AgilityCalc::minimum_roll_bb2020(4, -5), 2); // floored at 2
     }
 }

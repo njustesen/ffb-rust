@@ -27,8 +27,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() { assert_eq!(StrengthIncrease::new().get_name(), "+ST"); }
+    fn name_is_plus_st() {
+        assert_eq!(StrengthIncrease::new().get_name(), "+ST");
+    }
 
     #[test]
-    fn category_is_correct() { assert_eq!(StrengthIncrease::new().get_category(), SkillCategory::StatIncrease); }
+    fn category_is_stat_increase() {
+        assert_eq!(StrengthIncrease::new().get_category(), SkillCategory::StatIncrease);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java asserts getSkillProperties() is not null; the live Rust mechanism
+        // always returns a slice (empty here — StrengthIncrease registers no NamedProperties).
+        assert!(crate::enums::SkillId::StrengthIncrease.properties().is_empty());
+    }
 }

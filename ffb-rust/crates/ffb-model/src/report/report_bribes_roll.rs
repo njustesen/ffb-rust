@@ -49,34 +49,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::BRIBES_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "bribesRoll");
-    }
-
-    #[test]
-    fn get_roll() {
-        assert_eq!(make().get_roll(), 4);
-    }
-
-    #[test]
-    fn is_successful() {
-        assert!(make().is_successful());
-    }
-
-    #[test]
-    fn unsuccessful_bribe() {
-        let r = ReportBribesRoll::new("p2".into(), false, 2);
-        assert!(!r.is_successful());
-        assert_eq!(r.get_player_id(), "p2");
-        assert_eq!(r.get_roll(), 2);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

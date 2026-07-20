@@ -27,12 +27,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_break_tackle() {
         assert_eq!(BreakTackle::new().get_name(), "Break Tackle");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_strength() {
         assert_eq!(BreakTackle::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the bb2025 Java postConstruct
+        // registers no NamedProperties, so the live SkillId table must be empty here.
+        assert!(crate::enums::SkillId::BreakTackle.properties().is_empty());
     }
 }

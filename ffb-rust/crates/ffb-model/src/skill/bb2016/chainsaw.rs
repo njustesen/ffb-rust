@@ -25,14 +25,20 @@ impl std::ops::Deref for Chainsaw {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_chainsaw() {
         assert_eq!(Chainsaw::new().get_name(), "Chainsaw");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(Chainsaw::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_makes_strength_test_obsolete_property() {
+        assert!(SkillId::Chainsaw.properties().contains(&"makesStrengthTestObsolete"));
     }
 }

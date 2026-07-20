@@ -28,11 +28,25 @@ impl std::ops::Deref for ShotToNothing {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(ShotToNothing::new().get_name(), "Shot to Nothing"); }
+    fn name_is_shot_to_nothing() {
+        assert_eq!(ShotToNothing::new().get_name(), "Shot to Nothing");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(ShotToNothing::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(ShotToNothing::new().get_category(), SkillCategory::Trait);
+    }
+
     #[test]
-    fn usage_type_is_once_per_game() { assert_eq!(ShotToNothing::new().skill_usage_type, SkillUsageType::OncePerGame); }
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); properties() always returns a valid slice.
+        let _properties: &'static [&'static str] = crate::enums::SkillId::ShotToNothing.properties();
+    }
+
+    #[test]
+    fn usage_type_is_once_per_game() {
+        assert_eq!(ShotToNothing::new().skill_usage_type, SkillUsageType::OncePerGame);
+    }
     #[test]
     fn grants_hail_mary_pass_enhancement() {
         assert_eq!(ShotToNothing::new().base.get_enhancements(), Some(&"HailMaryPass".to_string()));

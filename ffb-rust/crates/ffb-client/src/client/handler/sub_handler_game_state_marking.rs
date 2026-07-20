@@ -76,12 +76,65 @@ impl Default for SubHandlerGameStateMarking {
 
 #[cfg(test)]
 mod tests {
+    // Mirrors ffb-java ffb-client-logic SubHandlerGameStateMarkingTest
+    // (Java: SubHandlerGameStateMarkingTest.java), one test fn per Java @Test.
+    //
+    // Java-only assertion (all tests): the transient-marker checks
+    // (`getTransientFieldMarkers()`/`getTransientPlayerMarkers()`) — the Rust
+    // FieldModel has no transient lists (see module doc), so those assertions
+    // have no Rust counterpart.
+    //
+    // Java's `assertSame(incomingGame, result)` / `verify(client).setGame(incomingGame)`
+    // are mirrored by asserting the returned game carries the incoming game's id
+    // (INCOMING_GAME_ID); the Rust translation has no client to set the game on.
     use super::*;
     use ffb_model::enums::Rules;
     use ffb_model::marking::field_marker::FieldMarker;
     use ffb_model::marking::player_marker::PlayerMarker;
     use ffb_model::model::team::Team;
     use ffb_model::types::FieldCoordinate;
+
+    const INCOMING_GAME_ID: u64 = 99;
+
+    fn incoming_player() -> PlayerMarker {
+        PlayerMarker::with_player_id("incomingPlayer")
+    }
+
+    fn existing_player() -> PlayerMarker {
+        PlayerMarker::with_player_id("existingPlayer")
+    }
+
+    fn incoming_field() -> FieldMarker {
+        FieldMarker::with_all(FieldCoordinate::new(0, 0), "incomingField", "")
+    }
+
+    fn existing_field() -> FieldMarker {
+        FieldMarker::with_all(FieldCoordinate::new(0, 0), "existingField", "")
+    }
+
+    /// Java: `setUp()` — existing game holds the existing markers, incoming game
+    /// the incoming ones. `existing.id` stays 0 (Java's unstubbed mock default);
+    /// "GameStateUpdate" tests overwrite it with 1 (Java: `given(existingGame.getId()).willReturn(1L)`).
+    fn setup() -> (Game, Game) {
+        let mut existing = make_game();
+        existing.id = 0;
+        existing.field_model.player_markers.push(existing_player());
+        existing.field_model.field_markers.push(existing_field());
+
+        let mut incoming = make_game();
+        incoming.id = INCOMING_GAME_ID;
+        incoming.field_model.player_markers.push(incoming_player());
+        incoming.field_model.field_markers.push(incoming_field());
+        (existing, incoming)
+    }
+
+    fn player_ids(game: &Game) -> Vec<String> {
+        game.field_model
+            .player_markers
+            .iter()
+            .map(|m| m.get_player_id().unwrap_or("").to_string())
+            .collect()
+    }
 
     fn make_team(id: &str) -> Team {
         Team {
@@ -114,71 +167,196 @@ mod tests {
         Game::new(make_team("home"), make_team("away"), Rules::Bb2020)
     }
 
+    /// Java: `testManualReplayInitialGameState`.
     #[test]
-    fn initial_state_keeps_existing_player_and_field_markers() {
-        let mut existing = make_game();
-        existing.id = 0;
-        existing.field_model.player_markers.push(PlayerMarker::with_player_id("p1"));
-        existing.field_model.field_markers.push(FieldMarker::with_coordinate(FieldCoordinate::new(1, 1)));
+    fn test_manual_replay_initial_game_state() {
+        let (existing, incoming) = setup();
+        let handler = SubHandlerGameStateMarking::new();
 
-        let incoming = make_game();
-        let sub_handler = SubHandlerGameStateMarking::new();
-        let result = sub_handler.handle_net_command(&existing, incoming, ClientMode::PLAYER, false);
+        let result = handler.handle_net_command(&existing, incoming, ClientMode::REPLAY, true);
 
-        assert_eq!(result.field_model.player_markers.len(), 1);
-        assert_eq!(result.field_model.field_markers.len(), 1);
+        assert_eq!(result.id, INCOMING_GAME_ID);
+        assert_eq!(result.field_model.field_markers, [existing_field()]);
+        assert_eq!(player_ids(&result), ["existingPlayer"]);
     }
 
+    /// Java: `testManualReplayGameStateUpdate`.
     #[test]
-    fn reconnecting_with_automatic_marking_drops_existing_player_markers() {
-        let mut existing = make_game();
-        existing.id = 42;
-        existing.field_model.player_markers.push(PlayerMarker::with_player_id("p1"));
+    fn test_manual_replay_game_state_update() {
+        let (mut existing, incoming) = setup();
+        existing.id = 1;
+        let handler = SubHandlerGameStateMarking::new();
 
-        let mut incoming = make_game();
-        incoming.id = 42;
-        let sub_handler = SubHandlerGameStateMarking::new();
-        // `client.getMode() != ClientMode.PLAYER` is false here (PLAYER), `isInitialState`
-        // is false (existing.id != 0), and `!reconnecting` is always true (see module doc),
-        // so `!isManualMarking` is what decides whether markers are kept.
-        let result = sub_handler.handle_net_command(&existing, incoming.clone(), ClientMode::PLAYER, true);
-        assert!(result.field_model.player_markers.is_empty());
+        let result = handler.handle_net_command(&existing, incoming, ClientMode::REPLAY, true);
 
-        incoming.field_model.player_markers.clear();
-        let result2 = sub_handler.handle_net_command(&existing, incoming, ClientMode::PLAYER, false);
-        assert_eq!(result2.field_model.player_markers.len(), 1);
+        assert_eq!(result.id, INCOMING_GAME_ID);
+        assert_eq!(result.field_model.field_markers, [existing_field()]);
+        assert_eq!(player_ids(&result), ["existingPlayer"]);
     }
 
+    /// Java: `testManualPlayerInitialGameState`.
     #[test]
-    fn spectator_mode_always_keeps_existing_player_markers() {
-        let mut existing = make_game();
-        existing.id = 42;
-        existing.field_model.player_markers.push(PlayerMarker::with_player_id("p1"));
-        let incoming = make_game();
-        let sub_handler = SubHandlerGameStateMarking::new();
-        let result = sub_handler.handle_net_command(&existing, incoming, ClientMode::SPECTATOR, true);
-        assert_eq!(result.field_model.player_markers.len(), 1);
+    fn test_manual_player_initial_game_state() {
+        let (existing, incoming) = setup();
+        let handler = SubHandlerGameStateMarking::new();
+
+        let result = handler.handle_net_command(&existing, incoming, ClientMode::PLAYER, true);
+
+        assert_eq!(result.id, INCOMING_GAME_ID);
+        assert_eq!(result.field_model.field_markers, [existing_field()]);
+        assert_eq!(player_ids(&result), ["existingPlayer"]);
     }
 
+    /// Java: `testManualPlayerGameStateUpdate`.
     #[test]
-    fn replay_mode_keeps_existing_field_markers_regardless_of_id() {
-        let mut existing = make_game();
-        existing.id = 42;
-        existing.field_model.field_markers.push(FieldMarker::with_coordinate(FieldCoordinate::new(2, 2)));
-        let incoming = make_game();
-        let sub_handler = SubHandlerGameStateMarking::new();
-        let result = sub_handler.handle_net_command(&existing, incoming, ClientMode::REPLAY, false);
-        assert_eq!(result.field_model.field_markers.len(), 1);
+    fn test_manual_player_game_state_update() {
+        let (mut existing, incoming) = setup();
+        existing.id = 1;
+        let handler = SubHandlerGameStateMarking::new();
+
+        let result = handler.handle_net_command(&existing, incoming, ClientMode::PLAYER, true);
+
+        assert_eq!(result.id, INCOMING_GAME_ID);
+        assert_eq!(result.field_model.field_markers, [incoming_field()]);
+        assert_eq!(player_ids(&result), ["incomingPlayer"]);
     }
 
+    /// Java: `testManualSpectatorGameStateUpdate`.
     #[test]
-    fn non_initial_non_replay_manual_marking_keeps_incoming_field_markers() {
-        let mut existing = make_game();
-        existing.id = 42;
-        existing.field_model.field_markers.push(FieldMarker::with_coordinate(FieldCoordinate::new(3, 3)));
-        let incoming = make_game();
-        let sub_handler = SubHandlerGameStateMarking::new();
-        let result = sub_handler.handle_net_command(&existing, incoming, ClientMode::PLAYER, true);
-        assert!(result.field_model.field_markers.is_empty());
+    fn test_manual_spectator_game_state_update() {
+        let (mut existing, incoming) = setup();
+        existing.id = 1;
+        let handler = SubHandlerGameStateMarking::new();
+
+        let result = handler.handle_net_command(&existing, incoming, ClientMode::SPECTATOR, true);
+
+        assert_eq!(result.id, INCOMING_GAME_ID);
+        assert_eq!(result.field_model.field_markers, [incoming_field()]);
+        assert_eq!(player_ids(&result), ["existingPlayer"]);
+    }
+
+    /// Java: `testAutomaticReplayInitialGameState`.
+    #[test]
+    fn test_automatic_replay_initial_game_state() {
+        let (existing, incoming) = setup();
+        let handler = SubHandlerGameStateMarking::new();
+
+        let result = handler.handle_net_command(&existing, incoming, ClientMode::REPLAY, false);
+
+        assert_eq!(result.id, INCOMING_GAME_ID);
+        assert_eq!(result.field_model.field_markers, [existing_field()]);
+        assert_eq!(player_ids(&result), ["existingPlayer"]);
+    }
+
+    /// Java: `testAutomaticPlayerInitialGameState`.
+    #[test]
+    fn test_automatic_player_initial_game_state() {
+        let (existing, incoming) = setup();
+        let handler = SubHandlerGameStateMarking::new();
+
+        let result = handler.handle_net_command(&existing, incoming, ClientMode::PLAYER, false);
+
+        assert_eq!(result.id, INCOMING_GAME_ID);
+        assert_eq!(result.field_model.field_markers, [existing_field()]);
+        assert_eq!(player_ids(&result), ["existingPlayer"]);
+    }
+
+    /// Java: `testAutomaticPlayerGameStateUpdate`.
+    #[test]
+    fn test_automatic_player_game_state_update() {
+        let (mut existing, incoming) = setup();
+        existing.id = 1;
+        let handler = SubHandlerGameStateMarking::new();
+
+        let result = handler.handle_net_command(&existing, incoming, ClientMode::PLAYER, false);
+
+        assert_eq!(result.id, INCOMING_GAME_ID);
+        assert_eq!(result.field_model.field_markers, [incoming_field()]);
+        assert_eq!(player_ids(&result), ["existingPlayer"]);
+    }
+
+    /// Java: `testAutomaticSpectatorGameStateUpdate`.
+    #[test]
+    fn test_automatic_spectator_game_state_update() {
+        let (mut existing, incoming) = setup();
+        existing.id = 1;
+        let handler = SubHandlerGameStateMarking::new();
+
+        let result = handler.handle_net_command(&existing, incoming, ClientMode::SPECTATOR, false);
+
+        assert_eq!(result.id, INCOMING_GAME_ID);
+        assert_eq!(result.field_model.field_markers, [incoming_field()]);
+        assert_eq!(player_ids(&result), ["existingPlayer"]);
+    }
+
+    /// Java: `testAutomaticReplayGameStateUpdate`.
+    #[test]
+    fn test_automatic_replay_game_state_update() {
+        let (mut existing, incoming) = setup();
+        existing.id = 1;
+        let handler = SubHandlerGameStateMarking::new();
+
+        let result = handler.handle_net_command(&existing, incoming, ClientMode::REPLAY, false);
+
+        assert_eq!(result.id, INCOMING_GAME_ID);
+        assert_eq!(result.field_model.field_markers, [existing_field()]);
+        assert_eq!(player_ids(&result), ["existingPlayer"]);
+    }
+
+    /// Java: `testManualPlayerReconnecting` (`given(incomingGame.getStarted()).willReturn(new Date())`).
+    #[test]
+    #[ignore = "PARITY: Rust Game has no `started` field; handle_net_command hardcodes reconnecting=false, so reconnect scenarios behave like the initial state"]
+    fn test_manual_player_reconnecting() {
+        let (existing, incoming) = setup();
+        // Java: incomingGame.getStarted() returns a Date → reconnecting == true.
+        let handler = SubHandlerGameStateMarking::new();
+
+        let result = handler.handle_net_command(&existing, incoming, ClientMode::PLAYER, true);
+
+        assert_eq!(result.id, INCOMING_GAME_ID);
+        assert_eq!(result.field_model.field_markers, [incoming_field()]);
+        assert_eq!(player_ids(&result), ["incomingPlayer"]);
+    }
+
+    /// Java: `testManualSpectatorReconnecting`.
+    #[test]
+    #[ignore = "PARITY: Rust Game has no `started` field; handle_net_command hardcodes reconnecting=false, so reconnect scenarios behave like the initial state"]
+    fn test_manual_spectator_reconnecting() {
+        let (existing, incoming) = setup();
+        let handler = SubHandlerGameStateMarking::new();
+
+        let result = handler.handle_net_command(&existing, incoming, ClientMode::SPECTATOR, true);
+
+        assert_eq!(result.id, INCOMING_GAME_ID);
+        assert_eq!(result.field_model.field_markers, [incoming_field()]);
+        assert_eq!(player_ids(&result), ["existingPlayer"]);
+    }
+
+    /// Java: `testAutomaticPlayerReconnecting`.
+    #[test]
+    #[ignore = "PARITY: Rust Game has no `started` field; handle_net_command hardcodes reconnecting=false, so reconnect scenarios behave like the initial state"]
+    fn test_automatic_player_reconnecting() {
+        let (existing, incoming) = setup();
+        let handler = SubHandlerGameStateMarking::new();
+
+        let result = handler.handle_net_command(&existing, incoming, ClientMode::PLAYER, false);
+
+        assert_eq!(result.id, INCOMING_GAME_ID);
+        assert_eq!(result.field_model.field_markers, [incoming_field()]);
+        assert_eq!(player_ids(&result), ["incomingPlayer"]);
+    }
+
+    /// Java: `testAutomaticSpectatorReconnecting`.
+    #[test]
+    #[ignore = "PARITY: Rust Game has no `started` field; handle_net_command hardcodes reconnecting=false, so reconnect scenarios behave like the initial state"]
+    fn test_automatic_spectator_reconnecting() {
+        let (existing, incoming) = setup();
+        let handler = SubHandlerGameStateMarking::new();
+
+        let result = handler.handle_net_command(&existing, incoming, ClientMode::SPECTATOR, false);
+
+        assert_eq!(result.id, INCOMING_GAME_ID);
+        assert_eq!(result.field_model.field_markers, [incoming_field()]);
+        assert_eq!(player_ids(&result), ["existingPlayer"]);
     }
 }

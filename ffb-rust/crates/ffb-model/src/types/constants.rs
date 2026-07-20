@@ -22,6 +22,30 @@ pub const MAX_TARGET_NUMBER: i32 = 6;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::field_coordinate::{FieldCoordinateBounds, FIELD_HEIGHT, FIELD_WIDTH};
+
+    #[test]
+    fn field_total_size_is_390() {
+        assert_eq!(FIELD_WIDTH * FIELD_HEIGHT, 390);
+    }
+
+    #[test]
+    fn field_bounds_field_size_is_390() {
+        assert_eq!(
+            FieldCoordinateBounds::FIELD.width() * FieldCoordinateBounds::FIELD.height(),
+            390
+        );
+    }
+
+    #[test]
+    fn endzone_home_width_is_one() {
+        assert_eq!(FieldCoordinateBounds::ENDZONE_HOME.width(), 1);
+    }
+
+    #[test]
+    fn endzone_away_width_is_one() {
+        assert_eq!(FieldCoordinateBounds::ENDZONE_AWAY.width(), 1);
+    }
 
     #[test]
     fn max_players_on_pitch_is_11() {

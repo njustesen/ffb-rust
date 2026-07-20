@@ -57,22 +57,6 @@ mod tests {
         let cmd = ServerCommandRemovePlayer::default();
         assert!(cmd.player_id.is_empty());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandRemovePlayer::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandRemovePlayer::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandRemovePlayer::default());
-        assert!(s.contains("ServerCommandRemovePlayer"));
-    }
 
     #[test]
     fn get_id_is_server_remove_player() {

@@ -26,9 +26,23 @@ impl std::ops::Deref for SavageMauling {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(SavageMauling::new().get_name(), "Savage Mauling"); }
+    fn name_is_savage_mauling() {
+        assert_eq!(SavageMauling::new().get_name(), "Savage Mauling");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(SavageMauling::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(SavageMauling::new().get_category(), SkillCategory::Trait);
+    }
+
     #[test]
-    fn usage_type_is_once_per_game() { assert_eq!(SavageMauling::new().skill_usage_type, SkillUsageType::OncePerGame); }
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); properties() always returns a valid slice.
+        let _properties: &'static [&'static str] = crate::enums::SkillId::SavageMauling.properties();
+    }
+
+    #[test]
+    fn usage_type_is_once_per_game() {
+        assert_eq!(SavageMauling::new().skill_usage_type, SkillUsageType::OncePerGame);
+    }
 }

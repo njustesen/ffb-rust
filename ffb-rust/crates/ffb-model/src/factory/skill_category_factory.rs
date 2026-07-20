@@ -37,11 +37,6 @@ mod tests {
     }
 
     #[test]
-    fn initialize_does_not_panic() {
-        let mut f = SkillCategoryFactory::default();
-        f.initialize();
-    }
-    #[test]
     fn for_name_empty_string_returns_none() {
         assert!(SkillCategoryFactory.for_name("").is_none());
     }

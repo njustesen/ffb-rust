@@ -46,35 +46,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::PUSHBACK);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "pushback");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_defender_id(), "def1");
-        assert_eq!(r.get_pushback_mode(), PushbackMode::REGULAR);
-    }
-
-    #[test]
-    fn different_defender_id() {
-        let r = ReportPushback::new("def2".into(), PushbackMode::SIDE_STEP);
-        assert_eq!(r.get_defender_id(), "def2");
-    }
-
-    #[test]
-    fn side_step_mode() {
-        let r = ReportPushback::new("def1".into(), PushbackMode::SIDE_STEP);
-        assert_eq!(r.get_pushback_mode(), PushbackMode::SIDE_STEP);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

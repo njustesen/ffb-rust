@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_eye_gouge() {
         assert_eq!(EyeGouge::new().get_name(), "Eye Gouge");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_devious() {
         assert_eq!(EyeGouge::new().get_category(), SkillCategory::Devious);
+    }
+
+    #[test]
+    fn has_can_remove_opponent_assists_property() {
+        assert!(crate::enums::SkillId::EyeGouge.properties().contains(&"canRemoveOpponentAssists"));
     }
 }

@@ -25,14 +25,22 @@ impl std::ops::Deref for NoHands {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
+
+    // bb2020/NoHands is SkillCategory.TRAIT (the bb2016 test's EXTRAORDINARY is bb2016-only).
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_no_hands() {
         assert_eq!(NoHands::new().get_name(), "No Hands");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(NoHands::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_prevent_catch_property() {
+        assert!(SkillId::NoHands.properties().contains(&"preventCatch"));
     }
 }

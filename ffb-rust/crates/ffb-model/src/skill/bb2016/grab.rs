@@ -25,14 +25,20 @@ impl std::ops::Deref for Grab {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_grab() {
         assert_eq!(Grab::new().get_name(), "Grab");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_strength() {
         assert_eq!(Grab::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn has_can_push_back_to_any_square_property() {
+        assert!(SkillId::Grab.properties().contains(&"canPushBackToAnySquare"));
     }
 }

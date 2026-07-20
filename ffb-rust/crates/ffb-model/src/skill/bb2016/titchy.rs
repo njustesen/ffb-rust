@@ -25,14 +25,20 @@ impl std::ops::Deref for Titchy {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_titchy() {
         assert_eq!(Titchy::new().get_name(), "Titchy");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(Titchy::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_no_tacklezone_for_dodging_property() {
+        assert!(SkillId::Titchy.properties().contains(&"hasNoTacklezoneForDodging"));
     }
 }

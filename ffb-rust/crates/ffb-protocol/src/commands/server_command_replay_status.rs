@@ -81,22 +81,6 @@ mod tests {
         assert!(!cmd.running);
         assert_eq!(cmd.command_nr, 0);
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandReplayStatus::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandReplayStatus::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandReplayStatus::default());
-        assert!(s.contains("ServerCommandReplayStatus"));
-    }
 
     #[test]
     fn get_id_is_server_replay_status() {

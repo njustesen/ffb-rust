@@ -28,26 +28,25 @@ impl std::ops::Deref for Incorporeal {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_incorporeal() {
         assert_eq!(Incorporeal::new().get_name(), "Incorporeal");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(Incorporeal::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_add_strength_to_dodge_property() {
+        assert!(SkillId::Incorporeal.properties().contains(&"canAddStrengthToDodge"));
     }
 
     #[test]
     fn usage_type_is_correct() {
         assert_eq!(Incorporeal::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
-    }
-
-    #[test]
-    fn registers_bb2020_named_property() {
-        use crate::enums::SkillId;
-        // bb2020's Incorporeal registers canAddStrengthToDodge (bb2025's registers canAvoidDodging instead).
-        assert!(SkillId::Incorporeal.properties().contains(&"canAddStrengthToDodge"));
     }
 }

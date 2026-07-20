@@ -27,14 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_lethal_flight() {
         assert_eq!(LethalFlight::new().get_name(), "Lethal Flight");
     }
 
     #[test]
-    fn category_is_correct() {
-        // Java: `super("Lethal Flight", SkillCategory.DEVIOUS)`. A prior translation
-        // incorrectly used SkillCategory::Trait here.
+    fn category_is_devious() {
         assert_eq!(LethalFlight::new().get_category(), SkillCategory::Devious);
+    }
+
+    #[test]
+    fn has_affects_either_armour_or_injury_on_ttm_property() {
+        assert!(crate::enums::SkillId::LethalFlight.properties().contains(&"affectsEitherArmourOrInjuryOnTtm"));
     }
 }

@@ -328,6 +328,52 @@ mod tests {
 
     fn coord() -> FieldCoordinate { FieldCoordinate::new(5, 5) }
 
+    // ── 1:1 mirrors of InjuryTypeBlockBB2025Test.java ───────────────────────────
+
+    #[test]
+    fn use_armour_modifiers_only_mode_should_exist() {
+        // Test that the new BB2025 mode exists in the enum.
+        // Java: assertEquals("USE_ARMOUR_MODIFIERS_ONLY_AGAINST_TEAM_MATES", mode.name());
+        // the Rust variant carries the same identity under this enum's CamelCase convention.
+        let mode = BlockMode::UseArmourModifiersOnlyAgainstTeamMates;
+        assert_eq!(format!("{:?}", mode), "UseArmourModifiersOnlyAgainstTeamMates");
+    }
+
+    #[test]
+    fn can_create_injury_type_block_with_use_armour_modifiers_only_mode() {
+        // Test that we can create an InjuryTypeBlock instance with the new mode.
+        let injury_type_block = InjuryTypeBlock::new(BlockMode::UseArmourModifiersOnlyAgainstTeamMates, true);
+        assert_eq!(injury_type_block.mode, BlockMode::UseArmourModifiersOnlyAgainstTeamMates);
+    }
+
+    #[test]
+    #[ignore = "PARITY: Java Mode.values().length == 4, but Rust BlockMode has 7 variants (3 extra engine-internal split-outs: UseMightyBlow/UseClaws/UseClawsAndMightyBlow)"]
+    fn all_modes_should_be_present() {
+        // Verify all expected (Java) modes exist.
+        let expected_modes = [
+            BlockMode::Regular,
+            BlockMode::UseModifiersAgainstTeamMates,
+            BlockMode::DoNotUseModifiers,
+            BlockMode::UseArmourModifiersOnlyAgainstTeamMates,
+        ];
+        assert_eq!(expected_modes.len(), 4);
+        // Java: assertEquals(4, InjuryTypeBlock.Mode.values().length) — Rust has no
+        // values(), so the full variant list is spelled out (7 in this port).
+        let all_modes = [
+            BlockMode::Regular,
+            BlockMode::UseModifiersAgainstTeamMates,
+            BlockMode::UseMightyBlow,
+            BlockMode::UseClaws,
+            BlockMode::UseClawsAndMightyBlow,
+            BlockMode::DoNotUseModifiers,
+            BlockMode::UseArmourModifiersOnlyAgainstTeamMates,
+        ];
+        assert_eq!(4, all_modes.len());
+    }
+
+    // ── Rust-side extras (behavioral; not expressible in the Java class's
+    //    mock-free structural style — see InjuryTypeBlockBB2025Test.java) ────────
+
     #[test]
     fn armor_save_results_in_prone() {
         let mut t = InjuryTypeBlock::new(BlockMode::Regular, true); let mut rng = GameRng::new(1);

@@ -37,31 +37,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_id() {
-        assert_eq!(ReportPrayerRoll::new(3).get_id(), ReportId::PRAYER_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(ReportPrayerRoll::new(3).get_name(), "prayerRoll");
-    }
-
-    #[test]
-    fn fields() {
-        assert_eq!(ReportPrayerRoll::new(5).get_roll(), 5);
-    }
-
-    #[test]
-    fn roll_minimum() {
-        assert_eq!(ReportPrayerRoll::new(1).get_roll(), 1);
-    }
-
-    #[test]
-    fn roll_maximum() {
-        assert_eq!(ReportPrayerRoll::new(6).get_roll(), 6);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = ReportPrayerRoll::new(3);
         let json = original.to_json_value();

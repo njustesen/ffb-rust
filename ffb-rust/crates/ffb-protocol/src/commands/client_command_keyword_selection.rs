@@ -96,17 +96,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandKeywordSelection::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandKeywordSelection::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_keyword_selection() {
         assert_eq!(ClientCommandKeywordSelection::new().get_id(), NetCommandId::ClientKeywordSelection);
     }

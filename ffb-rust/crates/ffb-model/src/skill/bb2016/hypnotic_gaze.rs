@@ -25,14 +25,25 @@ impl std::ops::Deref for HypnoticGaze {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_hypnotic_gaze() {
         assert_eq!(HypnoticGaze::new().get_name(), "Hypnotic Gaze");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(HypnoticGaze::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_inflicts_confusion_property() {
+        assert!(SkillId::HypnoticGaze.properties().contains(&"inflictsConfusion"));
+    }
+
+    #[test]
+    fn has_can_gaze_during_move_property() {
+        assert!(SkillId::HypnoticGaze.properties().contains(&"canGazeDuringMove"));
     }
 }

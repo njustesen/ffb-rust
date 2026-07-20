@@ -25,8 +25,26 @@ impl std::ops::Deref for Pro {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors ffb-java ProSkillTest.
+
     #[test]
-    fn name_is_correct() { assert_eq!(Pro::new().get_name(), "Pro"); }
+    fn name_is_pro() {
+        assert_eq!(Pro::new().get_name(), "Pro");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Pro::new().get_category(), SkillCategory::General); }
+    fn category_is_general() {
+        assert_eq!(Pro::new().get_category(), SkillCategory::General);
+    }
+
+    #[test]
+    fn has_can_reroll_once_per_turn_property() {
+        assert!(crate::enums::SkillId::Pro.properties().contains(&"canRerollOncePerTurn"));
+    }
+
+    #[test]
+    fn class_name_is_pro() {
+        assert_eq!(crate::enums::SkillId::Pro.class_name(), "Pro");
+    }
 }

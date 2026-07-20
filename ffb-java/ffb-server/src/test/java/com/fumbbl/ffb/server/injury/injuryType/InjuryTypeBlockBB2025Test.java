@@ -1,5 +1,7 @@
 package com.fumbbl.ffb.server.injury.injuryType;
 
+import com.fumbbl.ffb.SendToBoxReason;
+
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -36,6 +38,13 @@ class InjuryTypeBlockBB2025Test {
 		}
 
 		assertEquals(4, InjuryTypeBlock.Mode.values().length);
+	}
+
+	@Test
+	void sendToBoxReasonIsBlocked() {
+		// Block's InjuryType constructor passes SendToBoxReason.BLOCKED
+		InjuryTypeBlock injuryTypeBlock = new InjuryTypeBlock();
+		assertEquals(SendToBoxReason.BLOCKED, injuryTypeBlock.sendToBoxReason());
 	}
 }
 

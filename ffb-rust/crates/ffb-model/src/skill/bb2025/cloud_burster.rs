@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_cloud_burster() {
         assert_eq!(CloudBurster::new().get_name(), "Cloud Burster");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_passing() {
         assert_eq!(CloudBurster::new().get_category(), SkillCategory::Passing);
+    }
+
+    #[test]
+    fn has_passes_are_not_intercepted_property() {
+        assert!(crate::enums::SkillId::CloudBurster.properties().contains(&"passesAreNotIntercepted"));
     }
 }

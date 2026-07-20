@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_hatred() {
         assert_eq!(Hatred::new().get_name(), "Hatred");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(Hatred::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_reroll_single_skull_property() {
+        assert!(crate::enums::SkillId::Hatred.properties().contains(&"canRerollSingleSkull"));
     }
 }

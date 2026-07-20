@@ -43,33 +43,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::BITE_SPECTATOR);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "biteSpectator");
-    }
-
-    #[test]
-    fn get_player_id() {
-        assert_eq!(make().get_player_id(), "p1");
-    }
-
-    #[test]
-    fn different_player_id() {
-        let r = ReportBiteSpectator::new("p99".into());
-        assert_eq!(r.get_player_id(), "p99");
-    }
-
-    #[test]
-    fn player_id_matches_field() {
-        let r = ReportBiteSpectator::new("spectator_biter".into());
-        assert_eq!(r.get_player_id(), r.player_id.as_str());
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

@@ -85,76 +85,161 @@ impl Default for PassingDistanceCalc {
     }
 }
 
+// Test mirror of com.fumbbl.ffb.server.util.PassingDistanceCalcTest (1:1).
+// Java @ParameterizedTest CsvSource rows become one Rust test fn looping the same rows.
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // ── Own square ───────────────────────────────────────────────────────────
+
     #[test]
-    fn same_square_is_none() {
-        // [0][0] is T (None)
+    fn same_square_returns_null() {
         assert_eq!(PassingDistanceCalc::for_deltas(0, 0), None);
     }
 
+    // ── Quick Pass ───────────────────────────────────────────────────────────
+
     #[test]
-    fn dx1_dy0_is_quick_pass() {
-        // Row 0, col 1 = 'Q'
-        assert_eq!(PassingDistanceCalc::for_deltas(1, 0), Some(PassingDistance::QuickPass));
+    fn quick_pass() {
+        let rows = [
+            (1, 0), // adjacent horizontally
+            (0, 1), // adjacent vertically
+            (1, 1), // diagonal
+            (2, 0), // two squares horizontal
+            (2, 1), // row 1
+            (2, 2), // row 2
+            (1, 2), // row 2
+            (3, 0), // row 0
+            (3, 1), // row 1
+        ];
+        for (dx, dy) in rows {
+            assert_eq!(
+                PassingDistanceCalc::for_deltas(dx, dy),
+                Some(PassingDistance::QuickPass),
+                "dx={dx}, dy={dy}"
+            );
+        }
+    }
+
+    // ── Short Pass ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn short_pass() {
+        let rows = [
+            (4, 0), // row 0
+            (5, 0), // row 0
+            (6, 0), // row 0
+            (3, 2), // row 2
+            (4, 2), // row 2
+            (0, 4), // dy=4
+            (1, 4), // row 4
+        ];
+        for (dx, dy) in rows {
+            assert_eq!(
+                PassingDistanceCalc::for_deltas(dx, dy),
+                Some(PassingDistance::ShortPass),
+                "dx={dx}, dy={dy}"
+            );
+        }
+    }
+
+    // ── Long Pass ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn long_pass() {
+        let rows = [
+            (7, 0),  // row 0
+            (8, 0),  // row 0
+            (9, 0),  // row 0
+            (10, 0), // row 0
+            (0, 7),  // dy=7
+            (1, 7),  // row 7
+        ];
+        for (dx, dy) in rows {
+            assert_eq!(
+                PassingDistanceCalc::for_deltas(dx, dy),
+                Some(PassingDistance::LongPass),
+                "dx={dx}, dy={dy}"
+            );
+        }
+    }
+
+    // ── Long Bomb ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn long_bomb() {
+        let rows = [
+            (11, 0), // row 0
+            (12, 0), // row 0
+            (13, 0), // row 0
+            (0, 11), // dy=11
+            (1, 11), // row 11
+            (0, 12), // dy=12
+            (0, 13), // dy=13
+            (1, 12), // row 12
+            (2, 13), // row 13
+        ];
+        for (dx, dy) in rows {
+            assert_eq!(
+                PassingDistanceCalc::for_deltas(dx, dy),
+                Some(PassingDistance::LongBomb),
+                "dx={dx}, dy={dy}"
+            );
+        }
+    }
+
+    // ── Out of range ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn negative_delta_returns_null() {
+        assert_eq!(PassingDistanceCalc::for_deltas(-1, 0), None);
+        assert_eq!(PassingDistanceCalc::for_deltas(0, -1), None);
     }
 
     #[test]
-    fn dx6_dy0_is_short_pass() {
-        // Row 0: T Q Q Q S S S L ... → idx=6 is 'S'
-        assert_eq!(PassingDistanceCalc::for_deltas(6, 0), Some(PassingDistance::ShortPass));
-    }
-
-    #[test]
-    fn dx11_dy0_is_long_bomb() {
-        // Row 0: ... B B B → idx=11 is 'B'
-        assert_eq!(PassingDistanceCalc::for_deltas(11, 0), Some(PassingDistance::LongBomb));
-    }
-
-    #[test]
-    fn out_of_range_returns_none() {
+    fn delta_greater_than_13_returns_null() {
         assert_eq!(PassingDistanceCalc::for_deltas(14, 0), None);
         assert_eq!(PassingDistanceCalc::for_deltas(0, 14), None);
-        assert_eq!(PassingDistanceCalc::for_deltas(-1, 0), None);
     }
 
-    #[test]
-    fn for_coordinates_same_square_is_none() {
-        assert_eq!(PassingDistanceCalc::for_coordinates(5, 5, 5, 5), None);
-    }
+    // ── Null cells in table (spaces) ─────────────────────────────────────────
 
     #[test]
-    fn for_coordinates_adjacent_is_quick_pass() {
-        // dx=1, dy=0 → QuickPass
-        assert_eq!(PassingDistanceCalc::for_coordinates(5, 5, 6, 5), Some(PassingDistance::QuickPass));
+    fn out_of_range_cells_return_null() {
+        // dy=13, dx=3 → "B B B   " → index 3 is space → null
+        assert_eq!(PassingDistanceCalc::for_deltas(3, 13), None);
+        // dy=13, dx=13 → bottom-right corner is off the table edge → null
+        assert_eq!(PassingDistanceCalc::for_deltas(13, 13), None);
     }
 
+    // ── for_coordinates ──────────────────────────────────────────────────────
+
     #[test]
-    fn for_coordinates_symmetric() {
-        // from (0,0) to (3,3) should equal from (3,3) to (0,0)
+    fn for_coordinates_symmetrical() {
+        // Passing from (5,7) to (8,7) = dx=3, dy=0 → QuickPass
         assert_eq!(
-            PassingDistanceCalc::for_coordinates(0, 0, 3, 3),
-            PassingDistanceCalc::for_coordinates(3, 3, 0, 0)
+            PassingDistanceCalc::for_coordinates(5, 7, 8, 7),
+            Some(PassingDistance::QuickPass)
+        );
+        // Symmetric: (8,7) to (5,7)
+        assert_eq!(
+            PassingDistanceCalc::for_coordinates(8, 7, 5, 7),
+            Some(PassingDistance::QuickPass)
         );
     }
 
     #[test]
-    fn bottom_right_corner_is_none() {
-        // Row 13: "B B B" — dx >= 3 gives None
-        assert_eq!(PassingDistanceCalc::for_deltas(13, 13), None);
+    fn for_coordinates_same_square_returns_null() {
+        assert_eq!(PassingDistanceCalc::for_coordinates(5, 7, 5, 7), None);
     }
 
     #[test]
-    fn dy13_dx0_is_long_bomb() {
-        // Row 13: "B B B" → dx=0 is 'B'
-        assert_eq!(PassingDistanceCalc::for_deltas(0, 13), Some(PassingDistance::LongBomb));
-    }
-
-    #[test]
-    fn dx7_dy0_is_long_pass() {
-        // Row 0: T Q Q Q S S S L → idx=7 is 'L'
-        assert_eq!(PassingDistanceCalc::for_deltas(7, 0), Some(PassingDistance::LongPass));
+    fn for_coordinates_long_bomb_across_field() {
+        // From x=1 to x=14 = dx=13, dy=0 → LongBomb
+        assert_eq!(
+            PassingDistanceCalc::for_coordinates(1, 7, 14, 7),
+            Some(PassingDistance::LongBomb)
+        );
     }
 }

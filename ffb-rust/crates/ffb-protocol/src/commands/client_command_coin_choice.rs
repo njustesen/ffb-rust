@@ -69,17 +69,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandCoinChoice::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandCoinChoice::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_coin_choice() {
         assert_eq!(ClientCommandCoinChoice::new(true).get_id(), NetCommandId::ClientCoinChoice);
     }

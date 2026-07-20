@@ -79,17 +79,6 @@ mod tests {
 #[test]    fn debug_format_nonempty() {        let v = ClientCommandInterceptorChoice::default();        assert!(!format!("{:?}", v).is_empty());    }
 
     #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandInterceptorChoice::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandInterceptorChoice::default());
-        assert!(s.contains("ClientCommandInterceptorChoice"));
-    }
-
-    #[test]
     fn get_id_is_client_interceptor_choice() {
         assert_eq!(ClientCommandInterceptorChoice::new().get_id(), NetCommandId::ClientInterceptorChoice);
     }

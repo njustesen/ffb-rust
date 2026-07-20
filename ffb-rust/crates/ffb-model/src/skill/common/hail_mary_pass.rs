@@ -25,8 +25,19 @@ impl std::ops::Deref for HailMaryPass {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(HailMaryPass::new().get_name(), "Hail Mary Pass"); }
+    fn name_is_hail_mary_pass() {
+        assert_eq!(HailMaryPass::new().get_name(), "Hail Mary Pass");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(HailMaryPass::new().get_category(), SkillCategory::Passing); }
+    fn category_is_passing() {
+        assert_eq!(HailMaryPass::new().get_category(), SkillCategory::Passing);
+    }
+
+    #[test]
+    fn has_can_pass_to_any_square_property() {
+        assert!(crate::enums::SkillId::HailMaryPass.properties().contains(&"canPassToAnySquare"));
+    }
 }

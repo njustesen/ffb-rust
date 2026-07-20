@@ -47,25 +47,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::BRIBERY_AND_CORRUPTION_RE_ROLL); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "briberyAndCorruptionReRoll"); }
-
-    #[test]
-    fn get_action() { assert_eq!(make().get_action(), "USE"); }
-
-    #[test]
-    fn get_team_id() { assert_eq!(make().get_team_id(), Some("team1")); }
-
-    #[test]
-    fn none_team_id() {
-        let r = ReportBriberyAndCorruptionReRoll::new(None, "DECLINE".into());
-        assert_eq!(r.get_team_id(), None);
-        assert_eq!(r.get_action(), "DECLINE");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

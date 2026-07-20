@@ -52,101 +52,138 @@ impl InjuryCalc {
 
 #[cfg(test)]
 mod tests {
+    // 1:1 mirror of com.fumbbl.ffb.server.mechanic.InjuryCalcTest
+    // (Java @ParameterizedTest value sources become in-test loops).
     use super::*;
 
-    // ── BB2016 tests ──────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════
+    // BB2016
+    // ══════════════════════════════════════════════════════════════════════
 
     #[test]
-    fn bb2016_total_2_is_stunned() {
-        assert_eq!(InjuryCalc::interpret_injury_total_bb2016(2, false, false), Some(PLAYER_STATE_STUNNED));
+    fn bb2016_low_total_is_stunned() {
+        for total in [2, 3, 4, 5, 6, 7] {
+            assert_eq!(
+                InjuryCalc::interpret_injury_total_bb2016(total, false, false),
+                Some(PLAYER_STATE_STUNNED),
+                "total={total}"
+            );
+        }
     }
 
     #[test]
-    fn bb2016_total_7_is_stunned() {
-        assert_eq!(InjuryCalc::interpret_injury_total_bb2016(7, false, false), Some(PLAYER_STATE_STUNNED));
+    fn bb2016_mid_total_is_ko() {
+        for total in [8, 9] {
+            assert_eq!(
+                InjuryCalc::interpret_injury_total_bb2016(total, false, false),
+                Some(PLAYER_STATE_KNOCKED_OUT),
+                "total={total}"
+            );
+        }
     }
 
     #[test]
-    fn bb2016_total_8_is_ko() {
-        assert_eq!(InjuryCalc::interpret_injury_total_bb2016(8, false, false), Some(PLAYER_STATE_KNOCKED_OUT));
+    fn bb2016_high_total_is_casualty() {
+        for total in [10, 11, 12] {
+            assert_eq!(InjuryCalc::interpret_injury_total_bb2016(total, false, false), None, "total={total}");
+        }
     }
 
     #[test]
-    fn bb2016_total_9_is_ko() {
-        assert_eq!(InjuryCalc::interpret_injury_total_bb2016(9, false, false), Some(PLAYER_STATE_KNOCKED_OUT));
-    }
-
-    #[test]
-    fn bb2016_total_10_plus_is_casualty() {
-        assert_eq!(InjuryCalc::interpret_injury_total_bb2016(10, false, false), None);
-        assert_eq!(InjuryCalc::interpret_injury_total_bb2016(12, false, false), None);
-    }
-
-    #[test]
-    fn bb2016_total_8_thick_skull_is_stunned() {
+    fn bb2016_thick_skull_at8_becomes_stunned() {
         assert_eq!(InjuryCalc::interpret_injury_total_bb2016(8, false, true), Some(PLAYER_STATE_STUNNED));
     }
 
     #[test]
-    fn bb2016_total_7_stunty_is_ko() {
+    fn bb2016_thick_skull_at9_still_ko() {
+        assert_eq!(InjuryCalc::interpret_injury_total_bb2016(9, false, true), Some(PLAYER_STATE_KNOCKED_OUT));
+    }
+
+    #[test]
+    fn bb2016_stunty_at7_becomes_ko() {
         assert_eq!(InjuryCalc::interpret_injury_total_bb2016(7, true, false), Some(PLAYER_STATE_KNOCKED_OUT));
     }
 
     #[test]
-    fn bb2016_total_9_stunty_is_badly_hurt() {
+    fn bb2016_stunty_at9_becomes_badly_hurt() {
         assert_eq!(InjuryCalc::interpret_injury_total_bb2016(9, true, false), Some(PLAYER_STATE_BADLY_HURT));
     }
 
-    // ── BB2020 tests ──────────────────────────────────────────────────────
-
     #[test]
-    fn bb2020_total_2_is_stunned() {
-        assert_eq!(InjuryCalc::interpret_injury_total_bb2020(2, false, false), Some(PLAYER_STATE_STUNNED));
+    fn bb2016_thick_skull_at8_overrides_stunty_because_bb2016_checks_thick_skull_first() {
+        // In BB2016 Thick Skull at 8 is checked BEFORE Stunty — so even a Stunty player with
+        // ThickSkull is Stunned at total 8, not KO.
+        assert_eq!(InjuryCalc::interpret_injury_total_bb2016(8, true, true), Some(PLAYER_STATE_STUNNED));
     }
 
     #[test]
-    fn bb2020_total_7_is_stunned() {
-        assert_eq!(InjuryCalc::interpret_injury_total_bb2020(7, false, false), Some(PLAYER_STATE_STUNNED));
+    fn bb2016_stunty_thick_skull_at7_is_ko_because_thick_skull_only_activates_at8() {
+        // ThickSkull only saves at 8 in BB2016; at 7 with Stunty it's still KO
+        assert_eq!(InjuryCalc::interpret_injury_total_bb2016(7, true, true), Some(PLAYER_STATE_KNOCKED_OUT));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // BB2020 / BB2025 (share same logic)
+    // ══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn bb2020_low_total_is_stunned() {
+        for total in [2, 3, 4, 5, 6, 7] {
+            assert_eq!(
+                InjuryCalc::interpret_injury_total_bb2020(total, false, false),
+                Some(PLAYER_STATE_STUNNED),
+                "total={total}"
+            );
+        }
     }
 
     #[test]
-    fn bb2020_total_8_is_ko() {
-        assert_eq!(InjuryCalc::interpret_injury_total_bb2020(8, false, false), Some(PLAYER_STATE_KNOCKED_OUT));
+    fn bb2020_mid_total_is_ko() {
+        for total in [8, 9] {
+            assert_eq!(
+                InjuryCalc::interpret_injury_total_bb2020(total, false, false),
+                Some(PLAYER_STATE_KNOCKED_OUT),
+                "total={total}"
+            );
+        }
     }
 
     #[test]
-    fn bb2020_total_9_is_ko() {
-        assert_eq!(InjuryCalc::interpret_injury_total_bb2020(9, false, false), Some(PLAYER_STATE_KNOCKED_OUT));
+    fn bb2020_high_total_is_casualty() {
+        for total in [10, 11, 12] {
+            assert_eq!(InjuryCalc::interpret_injury_total_bb2020(total, false, false), None, "total={total}");
+        }
     }
 
     #[test]
-    fn bb2020_total_10_plus_is_casualty() {
-        assert_eq!(InjuryCalc::interpret_injury_total_bb2020(10, false, false), None);
-    }
-
-    #[test]
-    fn bb2020_total_7_stunty_thick_skull_is_stunned() {
-        assert_eq!(InjuryCalc::interpret_injury_total_bb2020(7, true, true), Some(PLAYER_STATE_STUNNED));
-    }
-
-    #[test]
-    fn bb2020_total_7_stunty_no_thick_skull_is_ko() {
-        assert_eq!(InjuryCalc::interpret_injury_total_bb2020(7, true, false), Some(PLAYER_STATE_KNOCKED_OUT));
-    }
-
-    #[test]
-    fn bb2020_total_8_thick_skull_non_stunty_is_stunned() {
+    fn bb2020_thick_skull_at8_non_stunty_becomes_stunned() {
         assert_eq!(InjuryCalc::interpret_injury_total_bb2020(8, false, true), Some(PLAYER_STATE_STUNNED));
     }
 
     #[test]
-    fn bb2020_total_8_thick_skull_stunty_is_ko() {
-        // Thick Skull only saves non-Stunty players at 8
+    fn bb2020_stunty_at7_becomes_ko() {
+        assert_eq!(InjuryCalc::interpret_injury_total_bb2020(7, true, false), Some(PLAYER_STATE_KNOCKED_OUT));
+    }
+
+    #[test]
+    fn bb2020_stunty_at9_becomes_badly_hurt() {
+        assert_eq!(InjuryCalc::interpret_injury_total_bb2020(9, true, false), Some(PLAYER_STATE_BADLY_HURT));
+    }
+
+    #[test]
+    fn bb2020_stunty_thick_skull_at7_thick_skull_saves() {
+        // BB2020: Thick Skull overrides Stunty at 7 — Stunned instead of KO
+        assert_eq!(InjuryCalc::interpret_injury_total_bb2020(7, true, true), Some(PLAYER_STATE_STUNNED));
+    }
+
+    #[test]
+    fn bb2020_stunty_thick_skull_at8_thick_skull_does_not_save() {
+        // BB2020: Thick Skull only saves non-Stunty at 8; Stunty+ThickSkull at 8 → KO
         assert_eq!(InjuryCalc::interpret_injury_total_bb2020(8, true, true), Some(PLAYER_STATE_KNOCKED_OUT));
     }
 
     #[test]
-    fn bb2020_total_9_stunty_is_badly_hurt() {
-        assert_eq!(InjuryCalc::interpret_injury_total_bb2020(9, true, false), Some(PLAYER_STATE_BADLY_HURT));
+    fn bb2020_stunty_at10_is_casualty() {
+        assert_eq!(InjuryCalc::interpret_injury_total_bb2020(10, true, false), None);
     }
 }

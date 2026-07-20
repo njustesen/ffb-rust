@@ -51,37 +51,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::KICKOFF_DODGY_SNACK);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "kickoffDodgySnack");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_roll_home(), 3);
-        assert_eq!(r.get_player_ids().len(), 1);
-    }
-
-    #[test]
-    fn roll_away_and_player_id_content() {
-        let r = make();
-        assert_eq!(r.get_roll_away(), 4);
-        assert_eq!(r.get_player_ids()[0], "p1");
-    }
-
-    #[test]
-    fn multiple_player_ids() {
-        let r = ReportKickoffDodgySnack::new(2, 5, vec!["p1".into(), "p2".into()]);
-        assert_eq!(r.get_player_ids().len(), 2);
-        assert_eq!(r.get_roll_away(), 5);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

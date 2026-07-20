@@ -75,22 +75,6 @@ mod tests {
         assert_eq!(cmd.game_time, 0);
         assert_eq!(cmd.turn_time, 0);
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandGameTime::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandGameTime::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandGameTime::default());
-        assert!(s.contains("ServerCommandGameTime"));
-    }
 
     #[test]
     fn get_id_is_server_game_time() {

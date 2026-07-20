@@ -25,14 +25,25 @@ impl std::ops::Deref for DirtyPlayer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_dirty_player() {
         assert_eq!(DirtyPlayer::new().get_name(), "Dirty Player");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_general() {
         assert_eq!(DirtyPlayer::new().get_category(), SkillCategory::General);
+    }
+
+    #[test]
+    fn has_affects_either_armour_or_injury_on_foul_property() {
+        assert!(SkillId::DirtyPlayer.properties().contains(&"affectsEitherArmourOrInjuryOnFoul"));
+    }
+
+    #[test]
+    fn does_not_have_force_followup_property() {
+        assert!(!SkillId::DirtyPlayer.properties().contains(&"forceFollowup"));
     }
 }

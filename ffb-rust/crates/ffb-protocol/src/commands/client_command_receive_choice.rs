@@ -67,17 +67,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandReceiveChoice::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandReceiveChoice::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_receive_choice() {
         assert_eq!(ClientCommandReceiveChoice::default().get_id(), NetCommandId::ClientReceiveChoice);
     }

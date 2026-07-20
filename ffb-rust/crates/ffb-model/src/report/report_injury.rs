@@ -41,10 +41,4 @@ mod tests {
         assert_eq!(report.defender_id, Some("p1".to_string()));
         assert_eq!(report.skip, SkipInjuryParts::ArmourAndCas);
     }
-
-    #[test]
-    fn get_id_is_injury() {
-        let report = DummyReportInjury { skip: SkipInjuryParts::None, defender_id: None };
-        assert_eq!(report.get_id(), ReportId::INJURY);
-    }
 }

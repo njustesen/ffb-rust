@@ -25,14 +25,20 @@ impl std::ops::Deref for NervesOfSteel {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_nerves_of_steel() {
         assert_eq!(NervesOfSteel::new().get_name(), "Nerves of Steel");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_passing() {
         assert_eq!(NervesOfSteel::new().get_category(), SkillCategory::Passing);
+    }
+
+    #[test]
+    fn has_ignore_tacklezones_when_passing_property() {
+        assert!(SkillId::NervesOfSteel.properties().contains(&"ignoreTacklezonesWhenPassing"));
     }
 }

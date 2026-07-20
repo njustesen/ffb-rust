@@ -61,27 +61,6 @@ mod tests {
     }
 
     #[test]
-    fn default_works() {
-        let _ = ServerCommandGameList::default();
-    }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandGameList::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandGameList::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandGameList::default());
-        assert!(s.contains("ServerCommandGameList"));
-    }
-
-    #[test]
     fn get_id_is_server_game_list() {
         assert_eq!(ServerCommandGameList::default().get_id(), NetCommandId::ServerGameList);
     }

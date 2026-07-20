@@ -28,12 +28,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_chainsaw() {
         assert_eq!(Chainsaw::new().get_name(), "Chainsaw");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(Chainsaw::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_blocks_like_chainsaw_property() {
+        assert!(crate::enums::SkillId::Chainsaw.properties().contains(&"blocksLikeChainsaw"));
     }
 }

@@ -50,79 +50,139 @@ impl Default for MovementCalc {
     }
 }
 
+// Tests mirror ffb-java/ffb-server/src/test/java/com/fumbbl/ffb/server/util/MovementCalcTest.java 1:1
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // ── max_movement ──────────────────────────────────────────────────────────
+
     #[test]
-    fn max_movement_is_ma_plus_gfi() {
-        assert_eq!(MovementCalc::max_movement(6, 2), 8);
-        assert_eq!(MovementCalc::max_movement(6, 0), 6);
+    fn max_movement_no_gfi_equals_ma() {
+        assert_eq!(6, MovementCalc::max_movement(6, 0));
+        assert_eq!(4, MovementCalc::max_movement(4, 0));
     }
 
     #[test]
-    fn is_next_move_going_for_it_exactly_at_ma() {
-        // When current_move == ma, the next square is GFI
-        assert!(MovementCalc::is_next_move_going_for_it(6, 6));
+    fn max_movement_standard_gfi_ma_plus2() {
+        assert_eq!(8, MovementCalc::max_movement(6, MovementCalc::STANDARD_GFI_SQUARES));
+        assert_eq!(6, MovementCalc::max_movement(4, MovementCalc::STANDARD_GFI_SQUARES));
     }
 
     #[test]
-    fn is_not_going_for_it_below_ma() {
-        assert!(!MovementCalc::is_next_move_going_for_it(5, 6));
+    fn max_movement_extra_gfi_ma_plus3() {
+        assert_eq!(9, MovementCalc::max_movement(6, 3));
     }
 
     #[test]
-    fn is_going_for_it_above_ma() {
-        assert!(MovementCalc::is_next_move_going_for_it(7, 6));
+    fn max_movement_with_temporary_modifier_applied_to_ma() {
+        // MA 6, temporary +1 from skill → MA is passed as 7
+        assert_eq!(9, MovementCalc::max_movement(7, MovementCalc::STANDARD_GFI_SQUARES));
+    }
+
+    // ── is_next_move_going_for_it ─────────────────────────────────────────────
+
+    #[test]
+    fn is_next_move_going_for_it_various_cases() {
+        for (current_move, ma, expected) in [
+            (0, 6, false),
+            (5, 6, false),
+            (6, 6, true), // exactly at MA → next is GFI
+            (7, 6, true), // beyond MA → still GFI
+            (0, 4, false),
+            (3, 4, false),
+            (4, 4, true),
+            (5, 4, true),
+        ] {
+            assert_eq!(
+                expected,
+                MovementCalc::is_next_move_going_for_it(current_move, ma),
+                "currentMove={current_move} ma={ma}"
+            );
+        }
     }
 
     #[test]
-    fn must_roll_to_stand_up_ma_3() {
+    fn is_next_move_going_for_it_ma1_gfi_immediately_after_first_move() {
+        // Snotling with MA 1: first GFI after move 1
+        assert!(!MovementCalc::is_next_move_going_for_it(0, 1));
+        assert!(MovementCalc::is_next_move_going_for_it(1, 1));
+    }
+
+    // ── must_roll_to_stand_up ─────────────────────────────────────────────────
+
+    #[test]
+    fn must_roll_to_stand_up_ma3_or_under_requires_roll() {
+        for (ma, expected) in [
+            (1, true),
+            (2, true),
+            (3, true),
+            (4, false),
+            (5, false),
+            (6, false),
+            (9, false),
+        ] {
+            assert_eq!(expected, MovementCalc::must_roll_to_stand_up(ma), "ma={ma}");
+        }
+    }
+
+    #[test]
+    fn must_roll_to_stand_up_boundary_exactly3_must_roll() {
         assert!(MovementCalc::must_roll_to_stand_up(3));
     }
 
     #[test]
-    fn must_roll_to_stand_up_ma_2() {
-        assert!(MovementCalc::must_roll_to_stand_up(2));
-    }
-
-    #[test]
-    fn must_not_roll_to_stand_up_ma_4() {
+    fn must_roll_to_stand_up_boundary_4_no_roll() {
         assert!(!MovementCalc::must_roll_to_stand_up(4));
     }
 
+    // ── has_move_left ─────────────────────────────────────────────────────────
+
     #[test]
-    fn has_move_left_when_not_exhausted() {
-        assert!(MovementCalc::has_move_left(3, 6, 2));
+    fn has_move_left_not_yet_moved_always_has_move() {
+        assert!(MovementCalc::has_move_left(0, 6, 0));
     }
 
     #[test]
-    fn no_move_left_when_exhausted() {
-        assert!(!MovementCalc::has_move_left(8, 6, 2));
+    fn has_move_left_reached_ma_exact_no_move_without_gfi() {
+        assert!(!MovementCalc::has_move_left(6, 6, 0));
     }
 
     #[test]
-    fn no_move_left_at_exact_limit() {
-        assert!(!MovementCalc::has_move_left(8, 6, 2));
+    fn has_move_left_reached_ma_has_gfi_squares_left() {
+        assert!(MovementCalc::has_move_left(6, 6, MovementCalc::STANDARD_GFI_SQUARES));
     }
 
     #[test]
-    fn gfi_squares_without_extra() {
-        assert_eq!(MovementCalc::gfi_squares(false), 2);
+    fn has_move_left_used_all_gfi_no_move_left() {
+        // MA 6 + 2 GFI = 8 total; after moving 8 → no move left
+        assert!(!MovementCalc::has_move_left(8, 6, MovementCalc::STANDARD_GFI_SQUARES));
+    }
+
+    // ── constants ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn constants_values_are_correct() {
+        assert_eq!(2, MovementCalc::STANDARD_GFI_SQUARES);
+        assert_eq!(3, MovementCalc::STAND_UP_COST);
+        assert_eq!(2, MovementCalc::GFI_MINIMUM_ROLL);
     }
 
     #[test]
-    fn gfi_squares_with_extra() {
-        assert_eq!(MovementCalc::gfi_squares(true), 3);
+    fn gfi_squares_no_skill_returns2() {
+        assert_eq!(2, MovementCalc::gfi_squares(false));
     }
 
     #[test]
-    fn stand_up_cost_constant_is_3() {
-        assert_eq!(MovementCalc::STAND_UP_COST, 3);
+    fn gfi_squares_with_extra_gfi_returns3() {
+        assert_eq!(3, MovementCalc::gfi_squares(true));
     }
 
+    // ── interaction: GFI minimum roll ─────────────────────────────────────────
+
     #[test]
-    fn gfi_minimum_roll_constant_is_2() {
-        assert_eq!(MovementCalc::GFI_MINIMUM_ROLL, 2);
+    fn gfi_minimum_roll_is_always2_regardless_of_stats() {
+        // GFI always requires 2+ (not agility-based), same across all editions
+        assert_eq!(2, MovementCalc::GFI_MINIMUM_ROLL);
     }
 }

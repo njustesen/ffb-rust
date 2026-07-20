@@ -1,6 +1,7 @@
 package com.fumbbl.ffb.server.model;
 
 import com.fumbbl.ffb.PlayerState;
+import com.fumbbl.ffb.ReRollSources;
 import com.fumbbl.ffb.model.BlockRoll;
 import org.junit.jupiter.api.Test;
 
@@ -39,5 +40,22 @@ class BlockRollTest {
     void block_roll_reroll_sources_empty_initially() {
         BlockRoll br = new BlockRoll("p1", STANDING, 1);
         assertTrue(br.getReRollSources().isEmpty());
+    }
+
+    @Test
+    void block_roll_reroll_tracking() {
+        BlockRoll br = new BlockRoll("p1", STANDING, 1);
+        br.setReRollDiceIndexes(new int[] { 0, 2 });
+        assertTrue(br.indexWasReRolled(0));
+        assertFalse(br.indexWasReRolled(1));
+        assertTrue(br.indexWasReRolled(2));
+    }
+
+    @Test
+    void block_roll_has_rerolls_left_when_source_added() {
+        BlockRoll br = new BlockRoll("p1", STANDING, 1);
+        assertFalse(br.hasReRollsLeft());
+        br.add(ReRollSources.TEAM_RE_ROLL);
+        assertTrue(br.hasReRollsLeft());
     }
 }

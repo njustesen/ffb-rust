@@ -28,25 +28,25 @@ impl std::ops::Deref for FrenziedRush {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_frenzied_rush() {
         assert_eq!(FrenziedRush::new().get_name(), "Frenzied Rush");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(FrenziedRush::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_gain_frenzy_for_blitz_property() {
+        assert!(SkillId::FrenziedRush.properties().contains(&"canGainFrenzyForBlitz"));
     }
 
     #[test]
     fn usage_type_is_correct() {
         assert_eq!(FrenziedRush::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
-    }
-
-    #[test]
-    fn registers_named_property() {
-        use crate::enums::SkillId;
-        assert!(SkillId::FrenziedRush.properties().contains(&"canGainFrenzyForBlitz"));
     }
 }

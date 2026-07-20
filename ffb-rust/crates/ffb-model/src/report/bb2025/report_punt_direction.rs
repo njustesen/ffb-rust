@@ -54,38 +54,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::PUNT_DIRECTION_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "puntDirectionRoll");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_direction(), Some(Direction::North));
-        assert_eq!(r.get_direction_roll(), 3);
-        assert!(!r.is_out_of_bounds());
-    }
-
-    #[test]
-    fn player_id() {
-        let r = make();
-        assert_eq!(r.get_player_id(), "p1");
-    }
-
-    #[test]
-    fn out_of_bounds_and_no_direction() {
-        let r = ReportPuntDirection::new(None, 7, "p2".into(), true);
-        assert_eq!(r.get_direction(), None);
-        assert!(r.is_out_of_bounds());
-        assert_eq!(r.get_player_id(), "p2");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

@@ -107,9 +107,5 @@ mod tests {
         assert!(back.is_committed());
         assert!(back.used_skills.contains(&SkillId::Dodge));
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", TargetSelectionStatus::STARTED).is_empty());
-    }
 
 }

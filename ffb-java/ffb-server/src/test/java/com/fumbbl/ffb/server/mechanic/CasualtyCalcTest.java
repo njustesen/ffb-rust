@@ -90,6 +90,11 @@ class CasualtyCalcTest {
         assertNull(CasualtyCalc.seriousInjurySubTypeBB2020(14));
     }
 
+    @Test
+    void bb2020_seriousInjurySubType_nullBelowSIRange() {
+        assertNull(CasualtyCalc.seriousInjurySubTypeBB2020(6));
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // BB2025 — d16 casualty roll (same structure, different thresholds)
     // ══════════════════════════════════════════════════════════════════════════
@@ -122,6 +127,17 @@ class CasualtyCalcTest {
     void bb2025_seriousInjurySubType_seriousInjury() {
         assertEquals("SERIOUS_INJURY", CasualtyCalc.seriousInjurySubTypeBB2025(11));
         assertEquals("SERIOUS_INJURY", CasualtyCalc.seriousInjurySubTypeBB2025(12));
+    }
+
+    @Test
+    void bb2025_seriousInjurySubType_nullForSITableRolls() {
+        assertNull(CasualtyCalc.seriousInjurySubTypeBB2025(13));
+        assertNull(CasualtyCalc.seriousInjurySubTypeBB2025(14));
+    }
+
+    @Test
+    void bb2025_seriousInjurySubType_nullBelowSIRange() {
+        assertNull(CasualtyCalc.seriousInjurySubTypeBB2025(8));
     }
 
     // ── Cross-edition comparison ──────────────────────────────────────────────

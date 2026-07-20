@@ -25,10 +25,27 @@ impl std::ops::Deref for Kaboom {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(Kaboom::new().get_name(), "Kaboom!"); }
+    fn name_is_kaboom() {
+        assert_eq!(Kaboom::new().get_name(), "Kaboom!");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Kaboom::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(Kaboom::new().get_category(), SkillCategory::Trait);
+    }
+
     #[test]
-    fn usage_type_is_once_per_game() { assert_eq!(Kaboom::new().get_skill_usage_type(), SkillUsageType::OncePerGame); }
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the live Rust
+        // mechanism is SkillId::properties(), whose slice always exists.
+        let props: &'static [&'static str] = crate::enums::SkillId::Kaboom.properties();
+        assert!(props.iter().all(|p| !p.is_empty()));
+    }
+
+    #[test]
+    fn usage_type_is_once_per_game() {
+        assert_eq!(Kaboom::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
+    }
 }

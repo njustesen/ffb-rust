@@ -112,22 +112,6 @@ mod tests {
         assert!(cmd.team_id.is_empty());
         assert!(cmd.send_to_box_reason.is_none());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandAddPlayer::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandAddPlayer::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandAddPlayer::default());
-        assert!(s.contains("ServerCommandAddPlayer"));
-    }
 
     #[test]
     fn get_id_is_server_add_player() {

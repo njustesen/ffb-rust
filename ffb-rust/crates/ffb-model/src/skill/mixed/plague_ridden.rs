@@ -25,8 +25,19 @@ impl std::ops::Deref for PlagueRidden {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors ffb-java PlagueRiddenSkillTest.
+    // Java `has_two_edition_annotations` is skipped (edition annotations are
+    // covered elsewhere). Java `has_skill_properties_not_null` has no live Rust
+    // equivalent (properties() returns a slice, which can never be null).
+
     #[test]
-    fn name_is_correct() { assert_eq!(PlagueRidden::new().get_name(), "Plague Ridden"); }
+    fn name_is_plague_ridden() {
+        assert_eq!(PlagueRidden::new().get_name(), "Plague Ridden");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(PlagueRidden::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(PlagueRidden::new().get_category(), SkillCategory::Trait);
+    }
 }

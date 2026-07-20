@@ -25,8 +25,22 @@ impl std::ops::Deref for BugmansXxxxxx {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(BugmansXxxxxx::new().get_name(), "Bugman's XXXXXX"); }
+    fn name_is_bugmans_xxxxxx() {
+        assert_eq!(BugmansXxxxxx::new().get_name(), "Bugman's XXXXXX");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(BugmansXxxxxx::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(BugmansXxxxxx::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the live Rust
+        // mechanism is SkillId::properties(), whose slice always exists.
+        let props: &'static [&'static str] = crate::enums::SkillId::BugmansXXXXXX.properties();
+        assert!(props.iter().all(|p| !p.is_empty()));
+    }
 }

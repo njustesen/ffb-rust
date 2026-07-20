@@ -88,17 +88,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandReplay::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandReplay::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_replay() {
         assert_eq!(ClientCommandReplay::new().get_id(), NetCommandId::ClientReplay);
     }

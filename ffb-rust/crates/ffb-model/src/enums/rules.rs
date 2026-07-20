@@ -54,44 +54,77 @@ impl Rules {
 
 #[cfg(test)]
 mod tests {
+    // Mirrors ffb-java ffb-common RulesTest (Java: RulesTest.java). Java test names
+    // starting with a digit (`_2016IsNotEligibleFor2020`) are mapped to `bb2016_...`.
     use super::*;
 
+    const ALL_RULES: [Rules; 4] = [Rules::Common, Rules::Bb2016, Rules::Bb2020, Rules::Bb2025];
+
+    /// Java: `commonIsEligibleFor2016`.
     #[test]
-    fn bb2020_extends_common() {
+    fn common_is_eligible_for_2016() {
+        assert!(Rules::Bb2016.is_or_extends(Rules::Common));
+    }
+
+    /// Java: `commonIsEligibleFor2020`.
+    #[test]
+    fn common_is_eligible_for_2020() {
         assert!(Rules::Bb2020.is_or_extends(Rules::Common));
-        assert!(Rules::Bb2020.is_or_extends(Rules::Bb2020));
+    }
+
+    /// Java: `identityIsEligible` (@ParameterizedTest over all Rules values).
+    #[test]
+    fn identity_is_eligible() {
+        for rule in ALL_RULES {
+            assert!(rule.is_or_extends(rule));
+        }
+    }
+
+    /// Java: `commonIsEligibleFor2025`.
+    #[test]
+    fn common_is_eligible_for_2025() {
+        assert!(Rules::Bb2025.is_or_extends(Rules::Common));
+    }
+
+    /// Java: `_2016IsNotEligibleFor2020` (leading digit is illegal in Rust idents).
+    #[test]
+    fn bb2016_is_not_eligible_for_2020() {
         assert!(!Rules::Bb2020.is_or_extends(Rules::Bb2016));
     }
 
+    /// Java: `_2020IsNotEligibleForCommon` (leading digit is illegal in Rust idents).
     #[test]
-    fn common_does_not_extend_edition() {
+    fn bb2020_is_not_eligible_for_common() {
         assert!(!Rules::Common.is_or_extends(Rules::Bb2020));
     }
 
+    /// Java: `_2016IsNotEligibleFor2025` (ported from a former Rust extra assertion).
+    #[test]
+    fn bb2016_is_not_eligible_for_2025() {
+        assert!(!Rules::Bb2025.is_or_extends(Rules::Bb2016));
+    }
+
+    /// Java: `nameValues` (mirrors Java enum `name()`).
+    #[test]
+    fn name_values() {
+        assert_eq!(Rules::Bb2016.name(), "BB2016");
+        assert_eq!(Rules::Bb2025.name(), "BB2025");
+        assert_eq!(Rules::Common.name(), "COMMON");
+    }
+
+    /// Rust-only: `hierarchy_level()` is a Rust helper with no Java counterpart.
     #[test]
     fn hierarchy_levels() {
         assert_eq!(Rules::Common.hierarchy_level(), 0);
         assert_eq!(Rules::Bb2016.hierarchy_level(), 1);
     }
 
+    /// Rust-only: serde surface has no Java counterpart.
     #[test]
     fn serde_round_trip() {
         let r = Rules::Bb2025;
         let json = serde_json::to_string(&r).unwrap();
         let back: Rules = serde_json::from_str(&json).unwrap();
         assert_eq!(r, back);
-    }
-
-    #[test]
-    fn bb2025_extends_common() {
-        assert!(Rules::Bb2025.is_or_extends(Rules::Common));
-        assert!(!Rules::Bb2025.is_or_extends(Rules::Bb2016));
-    }
-
-    #[test]
-    fn name_values() {
-        assert_eq!(Rules::Bb2016.name(), "BB2016");
-        assert_eq!(Rules::Bb2025.name(), "BB2025");
-        assert_eq!(Rules::Common.name(), "COMMON");
     }
 }

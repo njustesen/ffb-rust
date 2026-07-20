@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_swoop() {
         assert_eq!(Swoop::new().get_name(), "Swoop");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(Swoop::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_ttm_scatters_in_single_direction_property() {
+        assert!(crate::enums::SkillId::Swoop.properties().contains(&"ttmScattersInSingleDirection"));
     }
 }

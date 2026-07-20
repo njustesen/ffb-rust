@@ -25,14 +25,22 @@ impl std::ops::Deref for StrongArm {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_strong_arm() {
         assert_eq!(StrongArm::new().get_name(), "Strong Arm");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_strength() {
         assert_eq!(StrongArm::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()) — the live Rust property
+        // table always yields a slice; assert every entry is a non-empty key.
+        assert!(SkillId::StrongArm.properties().iter().all(|p| !p.is_empty()));
     }
 }

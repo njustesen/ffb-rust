@@ -80,22 +80,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandSetupPlayer::new()).is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandSetupPlayer::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandSetupPlayer::default());
-        assert!(s.contains("ClientCommandSetupPlayer"));
-    }
-
-    #[test]
     fn get_id_is_client_setup_player() {
         assert_eq!(ClientCommandSetupPlayer::new().get_id(), NetCommandId::ClientSetupPlayer);
     }

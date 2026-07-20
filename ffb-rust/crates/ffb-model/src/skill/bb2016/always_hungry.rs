@@ -25,14 +25,20 @@ impl std::ops::Deref for AlwaysHungry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_always_hungry() {
         assert_eq!(AlwaysHungry::new().get_name(), "Always Hungry");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(AlwaysHungry::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_might_eat_player_to_throw_property() {
+        assert!(SkillId::AlwaysHungry.properties().contains(&"mightEatPlayerToThrow"));
     }
 }

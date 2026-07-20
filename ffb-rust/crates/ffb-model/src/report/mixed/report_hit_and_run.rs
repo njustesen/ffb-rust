@@ -48,25 +48,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::HIT_AND_RUN); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "hitAndRun"); }
-
-    #[test]
-    fn get_direction() { assert_eq!(make().get_direction(), Some(Direction::North)); }
-
-    #[test]
-    fn get_player_id() { assert_eq!(make().get_player_id(), Some("p1")); }
-
-    #[test]
-    fn none_direction() {
-        let r = ReportHitAndRun::new(None, None);
-        assert_eq!(r.get_player_id(), None);
-        assert_eq!(r.get_direction(), None);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

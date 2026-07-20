@@ -35,6 +35,12 @@ class SppCalcTest {
         assertEquals(3, SppCalc.touchdownSpp(Rules.BB2016, true));
     }
 
+    @Test
+    void touchdown_bb2020_brawlinBrutesHasNoEffect() {
+        // Brawlin' Brutes rule only exists in BB2025
+        assertEquals(3, SppCalc.touchdownSpp(Rules.BB2020, true));
+    }
+
     // ── Casualty ─────────────────────────────────────────────────────────────
 
     @Test

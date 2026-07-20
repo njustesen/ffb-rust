@@ -77,19 +77,22 @@ mod tests {
     }
 
     #[test]
-    fn is_dodging_and_is_going_for_it_flags() {
-        let c = FieldCoordinate::new(5, 5);
-        let plain = MoveSquare::new(c, 0, 0);
-        assert!(!plain.is_dodging());
-        assert!(!plain.is_going_for_it());
+    fn move_square_is_dodging_when_dodge_roll_positive() {
+        let sq = MoveSquare::new(FieldCoordinate::new(5, 5), 3, 0);
+        assert!(sq.is_dodging());
+    }
 
-        let dodge = MoveSquare::new(c, 4, 0);
-        assert!(dodge.is_dodging());
-        assert!(!dodge.is_going_for_it());
+    #[test]
+    fn move_square_not_dodging_when_roll_zero() {
+        let sq = MoveSquare::new(FieldCoordinate::new(5, 5), 0, 0);
+        assert!(!sq.is_dodging());
+    }
 
-        let gfi = MoveSquare::new(c, 0, 2);
-        assert!(!gfi.is_dodging());
-        assert!(gfi.is_going_for_it());
+    #[test]
+    fn move_square_is_going_for_it_when_gfi_roll_positive() {
+        let sq = MoveSquare::new(FieldCoordinate::new(5, 5), 0, 2);
+        assert!(sq.is_going_for_it());
+        assert!(!sq.is_dodging());
     }
 
     #[test]
@@ -101,10 +104,6 @@ mod tests {
         assert_eq!(t.minimum_roll_gfi, 2);
         // y coordinate is untouched by transform
         assert_eq!(t.coordinate.y, 3);
-    }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", MoveSquareKind::Move).is_empty());
     }
 
 }

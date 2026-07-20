@@ -81,22 +81,6 @@ mod tests {
         assert!(!cmd.skill_used);
         assert!(!cmd.never_use);
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandUseSkill::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandUseSkill::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandUseSkill::default());
-        assert!(s.contains("ClientCommandUseSkill"));
-    }
 
     #[test]
     fn get_id_is_client_use_skill() {

@@ -25,14 +25,20 @@ impl std::ops::Deref for CloudBurster {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_cloud_burster() {
         assert_eq!(CloudBurster::new().get_name(), "Cloud Burster");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_passing() {
         assert_eq!(CloudBurster::new().get_category(), SkillCategory::Passing);
+    }
+
+    #[test]
+    fn has_can_force_interception_reroll_of_long_passes_property() {
+        assert!(SkillId::CloudBurster.properties().contains(&"canForceInterceptionRerollOfLongPasses"));
     }
 }

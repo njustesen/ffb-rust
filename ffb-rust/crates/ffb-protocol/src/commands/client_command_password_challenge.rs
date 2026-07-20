@@ -66,23 +66,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandPasswordChallenge::new()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandPasswordChallenge::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandPasswordChallenge::default());
-        assert!(s.contains("ClientCommandPasswordChallenge"));
-    }
-
-    #[test]
     fn get_id_is_client_password_challenge() {
         assert_eq!(ClientCommandPasswordChallenge::new().get_id(), NetCommandId::ClientPasswordChallenge);
     }

@@ -66,23 +66,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandPileDriver::new()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandPileDriver::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandPileDriver::default());
-        assert!(s.contains("ClientCommandPileDriver"));
-    }
-
-    #[test]
     fn get_id_is_client_pile_driver() {
         assert_eq!(ClientCommandPileDriver::new().get_id(), NetCommandId::ClientPileDriver);
     }

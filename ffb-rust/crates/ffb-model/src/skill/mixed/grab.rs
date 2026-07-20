@@ -30,10 +30,28 @@ impl std::ops::Deref for Grab {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(Grab::new().get_name(), "Grab"); }
+    fn name_is_grab() {
+        assert_eq!(Grab::new().get_name(), "Grab");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Grab::new().get_category(), SkillCategory::Strength); }
+    fn category_is_strength() {
+        assert_eq!(Grab::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn has_can_push_back_to_any_square_property() {
+        assert!(crate::enums::SkillId::Grab.properties().contains(&"canPushBackToAnySquare"));
+    }
+
+    // Mixed Grab also registers CancelSkillProperty(canChooseOwnPushedBackSquare).
+    #[test]
+    fn has_cancels_can_choose_own_pushed_back_square_property() {
+        assert!(crate::enums::SkillId::Grab.properties().contains(&"cancelsCanChooseOwnPushedBackSquare"));
+    }
+
     #[test]
     fn skill_use_description_overridden() {
         assert_eq!(

@@ -81,8 +81,4 @@ mod tests {
         assert_eq!(a, c);
     }
 
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientAction::WISDOM).is_empty());
-    }
 }

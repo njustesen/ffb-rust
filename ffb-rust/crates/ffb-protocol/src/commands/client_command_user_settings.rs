@@ -76,22 +76,6 @@ mod tests {
         cmd.set(CommonProperty::SETTING_SOUND_VOLUME, "80");
         assert_eq!(cmd.get(CommonProperty::SETTING_SOUND_VOLUME), Some("80"));
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandUserSettings::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandUserSettings::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandUserSettings::default());
-        assert!(s.contains("ClientCommandUserSettings"));
-    }
 
     #[test]
     fn get_id_is_client_user_settings() {

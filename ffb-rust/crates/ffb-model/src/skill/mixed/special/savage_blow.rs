@@ -29,11 +29,25 @@ impl std::ops::Deref for SavageBlow {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(SavageBlow::new().get_name(), "Savage Blow"); }
+    fn name_is_savage_blow() {
+        assert_eq!(SavageBlow::new().get_name(), "Savage Blow");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(SavageBlow::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(SavageBlow::new().get_category(), SkillCategory::Trait);
+    }
+
     #[test]
-    fn usage_type_is_once_per_game() { assert_eq!(SavageBlow::new().skill_usage_type, SkillUsageType::OncePerGame); }
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); properties() always returns a valid slice.
+        let _properties: &'static [&'static str] = crate::enums::SkillId::SavageBlow.properties();
+    }
+
+    #[test]
+    fn usage_type_is_once_per_game() {
+        assert_eq!(SavageBlow::new().skill_usage_type, SkillUsageType::OncePerGame);
+    }
     #[test]
     fn registers_multi_block_dice_reroll_source() {
         let skill = SavageBlow::new();

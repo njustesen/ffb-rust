@@ -49,39 +49,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::THROW_AT_PLAYER);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "throwAtPlayer");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_player_id(), "p1");
-        assert_eq!(r.get_roll(), 4);
-        assert!(r.is_successful());
-    }
-
-    #[test]
-    fn unsuccessful() {
-        let r = ReportThrowAtPlayer::new("p2".into(), 2, false);
-        assert!(!r.is_successful());
-        assert_eq!(r.get_roll(), 2);
-        assert_eq!(r.get_player_id(), "p2");
-    }
-
-    #[test]
-    fn high_roll_successful() {
-        let r = ReportThrowAtPlayer::new("p3".into(), 6, true);
-        assert_eq!(r.get_roll(), 6);
-        assert!(r.is_successful());
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

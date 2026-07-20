@@ -31,48 +31,29 @@ impl Default for WeatherCalc {
     }
 }
 
+// Test mirror of com.fumbbl.ffb.server.util.WeatherCalcTest (1:1).
+// The Java @ParameterizedTest CsvSource rows become one Rust test fn looping the same rows.
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn roll_2_is_sweltering_heat() {
-        assert_eq!(WeatherCalc::weather_for_roll(2), Weather::SwelteringHeat);
-    }
-
-    #[test]
-    fn roll_3_is_very_sunny() {
-        assert_eq!(WeatherCalc::weather_for_roll(3), Weather::VerySunny);
-    }
-
-    #[test]
-    fn rolls_4_through_10_are_nice() {
-        for total in 4..=10 {
-            assert_eq!(
-                WeatherCalc::weather_for_roll(total),
-                Weather::Nice,
-                "total={total}"
-            );
+    fn weather_for_roll() {
+        let rows = [
+            (2, Weather::SwelteringHeat),
+            (3, Weather::VerySunny),
+            (4, Weather::Nice),
+            (5, Weather::Nice),
+            (6, Weather::Nice),
+            (7, Weather::Nice),
+            (8, Weather::Nice),
+            (9, Weather::Nice),
+            (10, Weather::Nice),
+            (11, Weather::PouringRain),
+            (12, Weather::Blizzard),
+        ];
+        for (total, expected) in rows {
+            assert_eq!(WeatherCalc::weather_for_roll(total), expected, "roll {total}");
         }
-    }
-
-    #[test]
-    fn roll_11_is_pouring_rain() {
-        assert_eq!(WeatherCalc::weather_for_roll(11), Weather::PouringRain);
-    }
-
-    #[test]
-    fn roll_12_is_blizzard() {
-        assert_eq!(WeatherCalc::weather_for_roll(12), Weather::Blizzard);
-    }
-
-    #[test]
-    fn boundary_4_is_nice() {
-        assert_eq!(WeatherCalc::weather_for_roll(4), Weather::Nice);
-    }
-
-    #[test]
-    fn boundary_10_is_nice() {
-        assert_eq!(WeatherCalc::weather_for_roll(10), Weather::Nice);
     }
 }

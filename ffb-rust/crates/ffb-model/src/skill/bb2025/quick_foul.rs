@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_quick_foul() {
         assert_eq!(QuickFoul::new().get_name(), "Quick Foul");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_devious() {
         assert_eq!(QuickFoul::new().get_category(), SkillCategory::Devious);
+    }
+
+    #[test]
+    fn has_can_move_after_foul_property() {
+        assert!(crate::enums::SkillId::QuickFoul.properties().contains(&"canMoveAfterFoul"));
     }
 }

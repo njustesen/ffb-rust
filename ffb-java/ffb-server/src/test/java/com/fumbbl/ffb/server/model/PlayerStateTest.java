@@ -170,4 +170,61 @@ class PlayerStateTest {
             assertEquals(-zones, -zones); // trivial but documents the expected value
         }
     }
+
+    // ── ported from Rust ffb-model enums::player tests ────────────────────────
+
+    @Test
+    void player_state_base() {
+        PlayerState state = new PlayerState(PlayerState.STANDING);
+        assertEquals(PlayerState.STANDING, state.getBase());
+    }
+
+    @Test
+    void player_state_flag_round_trip() {
+        PlayerState state = new PlayerState(PlayerState.STANDING).changeActive(true).changeConfused(true);
+        assertTrue(state.isActive());
+        assertTrue(state.isConfused());
+        assertFalse(state.isRooted());
+    }
+
+    @Test
+    void player_state_has_tacklezones() {
+        PlayerState state = new PlayerState(PlayerState.STANDING).changeActive(true);
+        assertTrue(state.hasTacklezones());
+        PlayerState confused = state.changeConfused(true);
+        assertFalse(confused.hasTacklezones());
+    }
+
+    @Test
+    void player_state_change_base_clears_flags() {
+        PlayerState state = new PlayerState(PlayerState.STANDING)
+            .changeActive(true)
+            .changeBase(PlayerState.KNOCKED_OUT);
+        assertFalse(state.isActive(), "flags should be cleared when base has no mask");
+    }
+
+    @Test
+    void is_stunned_only_for_stunned_base() {
+        assertTrue(new PlayerState(PlayerState.STUNNED).isStunned());
+        assertFalse(new PlayerState(PlayerState.PRONE).isStunned());
+        assertFalse(new PlayerState(PlayerState.KNOCKED_OUT).isStunned());
+        assertFalse(new PlayerState(PlayerState.STANDING).isStunned());
+    }
+
+    @Test
+    void can_be_blocked_only_standing_or_moving() {
+        assertTrue(new PlayerState(PlayerState.STANDING).canBeBlocked());
+        assertTrue(new PlayerState(PlayerState.MOVING).canBeBlocked());
+        assertFalse(new PlayerState(PlayerState.PRONE).canBeBlocked());
+        assertFalse(new PlayerState(PlayerState.STUNNED).canBeBlocked());
+        assertFalse(new PlayerState(PlayerState.KNOCKED_OUT).canBeBlocked());
+    }
+
+    @Test
+    void can_be_fouled_only_prone_or_stunned() {
+        assertTrue(new PlayerState(PlayerState.PRONE).canBeFouled());
+        assertTrue(new PlayerState(PlayerState.STUNNED).canBeFouled());
+        assertFalse(new PlayerState(PlayerState.STANDING).canBeFouled());
+        assertFalse(new PlayerState(PlayerState.KNOCKED_OUT).canBeFouled());
+    }
 }

@@ -25,14 +25,20 @@ impl std::ops::Deref for Claw {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_claw() {
         assert_eq!(Claw::new().get_name(), "Claw");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_mutation() {
         assert_eq!(Claw::new().get_category(), SkillCategory::Mutation);
+    }
+
+    #[test]
+    fn has_reduces_armour_to_fixed_value_property() {
+        assert!(SkillId::Claw.properties().contains(&"reducesArmourToFixedValue"));
     }
 }

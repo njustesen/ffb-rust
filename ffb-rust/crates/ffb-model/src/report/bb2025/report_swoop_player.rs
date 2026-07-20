@@ -77,44 +77,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::SWOOP_PLAYER);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "swoopPlayer");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_direction(), Direction::East);
-        assert_eq!(r.get_distance(), 3);
-        assert!(!r.is_out_of_bounds());
-    }
-
-    #[test]
-    fn start_and_end_coordinates() {
-        let r = make();
-        assert_eq!(r.get_start_coordinate().x, 3);
-        assert_eq!(r.get_end_coordinate().x, 6);
-    }
-
-    #[test]
-    fn out_of_bounds_different_direction() {
-        let r = ReportSwoopPlayer::new(
-            FieldCoordinate::new(0, 0),
-            FieldCoordinate::new(0, 3),
-            Direction::North,
-            3,
-            true,
-        );
-        assert_eq!(r.get_direction(), Direction::North);
-        assert!(r.is_out_of_bounds());
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

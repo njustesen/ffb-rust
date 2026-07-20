@@ -1,6 +1,7 @@
 package com.fumbbl.ffb.server.model;
 
 import com.fumbbl.ffb.Direction;
+import com.fumbbl.ffb.factory.DirectionFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -80,9 +81,39 @@ class DirectionTest {
     }
 
     @Test
+    void direction_transform_southeast_to_southwest() {
+        assertEquals(Direction.SOUTHWEST, Direction.SOUTHEAST.transform());
+    }
+
+    @Test
+    void direction_transform_south_to_south() {
+        assertEquals(Direction.SOUTH, Direction.SOUTH.transform());
+    }
+
+    @Test
     void direction_transform_is_involution() {
         for (Direction d : Direction.values()) {
             assertEquals(d, d.transform().transform());
         }
+    }
+
+    @Test
+    void direction_for_roll_all_eight_faces() {
+        DirectionFactory factory = new DirectionFactory();
+        assertEquals(Direction.NORTH, factory.forRoll(1));
+        assertEquals(Direction.NORTHEAST, factory.forRoll(2));
+        assertEquals(Direction.EAST, factory.forRoll(3));
+        assertEquals(Direction.SOUTHEAST, factory.forRoll(4));
+        assertEquals(Direction.SOUTH, factory.forRoll(5));
+        assertEquals(Direction.SOUTHWEST, factory.forRoll(6));
+        assertEquals(Direction.WEST, factory.forRoll(7));
+        assertEquals(Direction.NORTHWEST, factory.forRoll(8));
+    }
+
+    @Test
+    void direction_for_roll_out_of_range_returns_null() {
+        DirectionFactory factory = new DirectionFactory();
+        assertNull(factory.forRoll(0));
+        assertNull(factory.forRoll(9));
     }
 }

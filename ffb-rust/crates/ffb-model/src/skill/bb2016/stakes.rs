@@ -25,14 +25,20 @@ impl std::ops::Deref for Stakes {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_stakes() {
         assert_eq!(Stakes::new().get_name(), "Stakes");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(Stakes::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_provides_stab_block_alternative_property() {
+        assert!(SkillId::Stakes.properties().contains(&"providesStabBlockAlternative"));
     }
 }

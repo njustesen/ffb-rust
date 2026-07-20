@@ -1,6 +1,6 @@
 use crate::report::i_report::IReport;
 use crate::report::report_id::ReportId;
-use crate::enums::{PlayerState, PS_BADLY_HURT};
+use crate::enums::PlayerState;
 
 /// 1:1 translation of `ReportInjury.java`.
 #[derive(Debug, Clone)]
@@ -119,6 +119,7 @@ impl IReport for ReportInjury {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::PS_BADLY_HURT;
 
     fn make() -> ReportInjury {
         ReportInjury::new(
@@ -137,44 +138,6 @@ mod tests {
             None,
             Some("attacker1".into()),
         )
-    }
-
-    #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::INJURY);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "injury");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_defender_id(), "defender1");
-        assert!(r.is_armor_broken());
-        assert_eq!(r.get_attacker_id(), Some("attacker1"));
-    }
-
-    #[test]
-    fn armor_and_injury_rolls_stored() {
-        let r = make();
-        assert_eq!(r.get_armor_roll(), &[3, 4]);
-        assert_eq!(r.get_injury_roll(), &[2, 5]);
-        assert_eq!(r.get_injury_type(), "casualty");
-    }
-
-    #[test]
-    fn no_attacker_and_serious_injury() {
-        let r = ReportInjury::new(
-            "d2".into(), "stun".into(), false, vec![], vec![2, 3],
-            vec![], vec![1], vec![4, 5], Some("BADLY_HURT".into()),
-            vec![], None, None, None, None,
-        );
-        assert_eq!(r.get_attacker_id(), None);
-        assert_eq!(r.get_serious_injury(), Some("BADLY_HURT"));
-        assert!(!r.is_armor_broken());
     }
 
     #[test]

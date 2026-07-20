@@ -117,8 +117,15 @@ mod tests {
     }
 
     #[test]
-    fn declare_condition_standing_requires_standing() {
+    fn declare_condition_standing_requires_standing_state() {
+        // Java: fulfilled(null) is false, fulfilled(new PlayerState(STANDING)) is true.
+        assert!(!DeclareCondition::Standing.fulfilled(false));
         assert!(DeclareCondition::Standing.fulfilled(true));
+    }
+
+    #[test]
+    fn declare_condition_standing_fails_for_prone() {
+        // Java: fulfilled(new PlayerState(PRONE)) is false (prone is not standing).
         assert!(!DeclareCondition::Standing.fulfilled(false));
     }
 
@@ -134,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    fn all_skill_categories_have_non_empty_names() {
+    fn skill_category_all_have_non_null_name() {
         for cat in [
             SkillCategory::General, SkillCategory::Agility, SkillCategory::Passing,
             SkillCategory::Strength, SkillCategory::Mutation, SkillCategory::Mutations,
@@ -146,22 +153,22 @@ mod tests {
     }
 
     #[test]
-    fn general_name_is_general() {
+    fn skill_category_general_name() {
         assert_eq!(SkillCategory::General.name(), "General");
     }
 
     #[test]
-    fn agility_name_is_agility() {
+    fn skill_category_agility_name() {
         assert_eq!(SkillCategory::Agility.name(), "Agility");
     }
 
     #[test]
-    fn strength_name_is_strength() {
+    fn skill_category_strength_name() {
         assert_eq!(SkillCategory::Strength.name(), "Strength");
     }
 
     #[test]
-    fn trait_name_is_trait() {
+    fn skill_category_trait_name() {
         assert_eq!(SkillCategory::Trait.name(), "Trait");
     }
 
@@ -191,7 +198,7 @@ mod tests {
     }
 
     #[test]
-    fn skill_usage_type_team_mate_does_not_remove_effects_at_end_of_turn() {
+    fn skill_usage_type_once_per_turn_by_team_mate_does_not_remove_effects() {
         assert!(!SkillUsageType::OncePerTurnByTeamMate.remove_effects_at_end_of_turn());
     }
 

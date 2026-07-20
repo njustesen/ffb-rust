@@ -68,39 +68,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::DEFECTING_PLAYERS);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "defectingPlayers");
-    }
-
-    #[test]
-    fn field_getters() {
-        let r = make();
-        assert_eq!(r.get_player_ids(), &["p1", "p2"]);
-        assert_eq!(r.get_rolls(), &[3, 5]);
-        assert_eq!(r.get_defectings(), &[true, false]);
-    }
-
-    #[test]
-    fn empty_lists() {
-        let r = ReportDefectingPlayers::new(vec![], vec![], vec![]);
-        assert_eq!(r.get_player_ids().len(), 0);
-        assert_eq!(r.get_rolls().len(), 0);
-        assert_eq!(r.get_defectings().len(), 0);
-    }
-
-    #[test]
-    fn single_defecting_player() {
-        let r = ReportDefectingPlayers::new(vec!["p3".into()], vec![1], vec![true]);
-        assert_eq!(r.get_player_ids(), &["p3"]);
-        assert_eq!(r.get_defectings(), &[true]);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

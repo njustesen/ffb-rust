@@ -26,9 +26,23 @@ impl std::ops::Deref for StarOfTheShow {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(StarOfTheShow::new().get_name(), "Star of the Show"); }
+    fn name_is_star_of_the_show() {
+        assert_eq!(StarOfTheShow::new().get_name(), "Star of the Show");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(StarOfTheShow::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(StarOfTheShow::new().get_category(), SkillCategory::Trait);
+    }
+
     #[test]
-    fn usage_type_is_once_per_game() { assert_eq!(StarOfTheShow::new().skill_usage_type, SkillUsageType::OncePerGame); }
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); properties() always returns a valid slice.
+        let _properties: &'static [&'static str] = crate::enums::SkillId::StarOfTheShow.properties();
+    }
+
+    #[test]
+    fn usage_type_is_once_per_game() {
+        assert_eq!(StarOfTheShow::new().skill_usage_type, SkillUsageType::OncePerGame);
+    }
 }

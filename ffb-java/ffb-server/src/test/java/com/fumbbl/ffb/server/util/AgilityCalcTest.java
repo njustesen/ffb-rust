@@ -121,6 +121,20 @@ class AgilityCalcTest {
         }
     }
 
+    // ── minimumRollBaseBB2016 ────────────────────────────────────────────────
+
+    @Test
+    void bb2016_base_same_as_catch() {
+        // Jump-up/leap/hypnotic gaze use the same formula as catch (base + mods)
+        for (int ag = 1; ag <= 6; ag++) {
+            assertEquals(
+                AgilityCalc.minimumRollCatchBB2016(ag, 0),
+                AgilityCalc.minimumRollBaseBB2016(ag, 0),
+                "ag=" + ag
+            );
+        }
+    }
+
     // ── minimumRollBB2020 ────────────────────────────────────────────────────
 
     @ParameterizedTest(name = "ag={0} → target={1}")

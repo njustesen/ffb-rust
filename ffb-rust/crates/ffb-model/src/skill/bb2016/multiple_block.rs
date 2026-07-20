@@ -25,14 +25,20 @@ impl std::ops::Deref for MultipleBlock {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_multiple_block() {
         assert_eq!(MultipleBlock::new().get_name(), "Multiple Block");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_strength() {
         assert_eq!(MultipleBlock::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn has_can_block_more_than_once_property() {
+        assert!(SkillId::MultipleBlock.properties().contains(&"canBlockMoreThanOnce"));
     }
 }

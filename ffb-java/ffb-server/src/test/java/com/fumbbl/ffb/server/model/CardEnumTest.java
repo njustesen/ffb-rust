@@ -2,6 +2,7 @@ package com.fumbbl.ffb.server.model;
 
 import com.fumbbl.ffb.CardEffect;
 import com.fumbbl.ffb.CardTarget;
+import com.fumbbl.ffb.factory.CardEffectFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -37,6 +38,24 @@ class CardEnumTest {
     @Test
     void card_effect_poisoned_name() {
         assertEquals("Poisoned", CardEffect.POISONED.getName());
+    }
+
+    @Test
+    void card_effect_illegally_substituted_name() {
+        assertEquals("IllegallySubstituted", CardEffect.ILLEGALLY_SUBSTITUTED.getName());
+    }
+
+    @Test
+    void card_effect_mad_cap_name() {
+        assertEquals("MadCapMushroomPotion", CardEffect.MAD_CAP_MUSHROOM_POTION.getName());
+    }
+
+    @Test
+    void card_effect_round_trip_name() {
+        CardEffectFactory factory = new CardEffectFactory();
+        for (CardEffect e : CardEffect.values()) {
+            assertEquals(e, factory.forName(e.getName()));
+        }
     }
 
     @Test
@@ -91,6 +110,33 @@ class CardEnumTest {
     @Test
     void card_target_any_player_is_played_on_player() {
         assertTrue(CardTarget.ANY_PLAYER.isPlayedOnPlayer());
+    }
+
+    @Test
+    void card_target_opposing_player_is_played_on_player() {
+        assertTrue(CardTarget.OPPOSING_PLAYER.isPlayedOnPlayer());
+    }
+
+    @Test
+    void card_target_own_player_name() {
+        assertEquals("ownPlayer", CardTarget.OWN_PLAYER.getName());
+    }
+
+    @Test
+    void card_target_opposing_player_name() {
+        assertEquals("opposingPlayer", CardTarget.OPPOSING_PLAYER.getName());
+    }
+
+    @Test
+    void card_target_any_player_name() {
+        assertEquals("anyPlayer", CardTarget.ANY_PLAYER.getName());
+    }
+
+    @Test
+    void card_target_round_trip_id() {
+        for (int id = 1; id <= 4; id++) {
+            assertEquals(id, CardTarget.fromId(id).getId());
+        }
     }
 
     @Test

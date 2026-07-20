@@ -37,16 +37,27 @@ impl std::ops::Deref for Wrestle {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(Wrestle::new().get_name(), "Wrestle"); }
-    #[test]
-    fn category_is_correct() { assert_eq!(Wrestle::new().get_category(), SkillCategory::General); }
-    #[test]
-    fn registers_can_take_down_players_with_him_on_both_down_property() {
-        // Java Wrestle.postConstruct() registers canTakeDownPlayersWithHimOnBothDown;
-        // this would have failed before the fix since no property was registered.
-        let w = Wrestle::new();
-        assert!(w.has_skill_property(NamedProperties::CAN_TAKE_DOWN_PLAYERS_WITH_HIM_ON_BOTH_DOWN));
+    fn name_is_wrestle() {
+        assert_eq!(Wrestle::new().get_name(), "Wrestle");
     }
+
+    #[test]
+    fn category_is_general() {
+        assert_eq!(Wrestle::new().get_category(), SkillCategory::General);
+    }
+
+    #[test]
+    fn has_can_take_down_players_with_him_on_both_down_property() {
+        // Wrestle must register canTakeDownPlayersWithHimOnBothDown to enable both-prone on Both Down result
+        assert!(crate::enums::SkillId::Wrestle.properties().contains(&"canTakeDownPlayersWithHimOnBothDown"));
+    }
+
+    #[test]
+    fn does_not_have_prevent_fall_on_both_down_property() {
+        // Wrestle does not prevent attacker from falling (that is Block)
+        assert!(!crate::enums::SkillId::Wrestle.properties().contains(&"preventFallOnBothDown"));
+    }
+
     #[test]
     fn get_skill_use_description_matches_java() {
         // Java Wrestle.getSkillUseDescription() overrides the base (null) and

@@ -93,4 +93,12 @@ class TurnModeTest {
     void turn_mode_regular_checks_negaTraits() {
         assertTrue(TurnMode.REGULAR.checkNegatraits());
     }
+
+    // ── ported from Rust ffb-model enums::turn tests ────────────────────────
+
+    @ParameterizedTest
+    @EnumSource(TurnMode.class)
+    void turn_mode_all_from_name_round_trip(TurnMode t) {
+        assertEquals(t, TurnMode.forName(t.getName()));
+    }
 }

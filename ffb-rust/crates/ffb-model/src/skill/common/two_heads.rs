@@ -31,8 +31,21 @@ impl std::ops::Deref for TwoHeads {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(TwoHeads::new().get_name(), "Two Heads"); }
+    fn name_is_two_heads() {
+        assert_eq!(TwoHeads::new().get_name(), "Two Heads");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(TwoHeads::new().get_category(), SkillCategory::Mutation); }
+    fn category_is_mutation() {
+        assert_eq!(TwoHeads::new().get_category(), SkillCategory::Mutation);
+    }
+
+    #[test]
+    fn has_skill_properties_not_null() {
+        // Java asserts getSkillProperties() is not null; the live Rust mechanism
+        // always returns a slice (empty here — TwoHeads registers only a dodge modifier, no NamedProperties).
+        assert!(crate::enums::SkillId::TwoHeads.properties().is_empty());
+    }
 }

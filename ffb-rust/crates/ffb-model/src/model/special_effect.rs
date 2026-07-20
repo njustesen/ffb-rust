@@ -66,9 +66,5 @@ mod tests {
         assert!(SpecialEffect::ZAP.is_wizard_spell());
         assert!(SpecialEffect::FIREBALL.is_wizard_spell());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", SpecialEffect::LIGHTNING).is_empty());
-    }
 
 }

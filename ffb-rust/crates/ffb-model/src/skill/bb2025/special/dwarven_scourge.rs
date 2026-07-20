@@ -27,12 +27,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_dwarven_scourge() {
         assert_eq!(DwarvenScourge::new().get_name(), "Dwarven Scourge");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(DwarvenScourge::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the bb2025 Java postConstruct
+        // registers no NamedProperties, so the live SkillId table must be empty here.
+        assert!(crate::enums::SkillId::DwarvenScourge.properties().is_empty());
     }
 }

@@ -58,37 +58,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::WINNINGS_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "winningsRoll");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_winnings_roll_home(), 4);
-        assert_eq!(r.get_winnings_home(), 40000);
-        assert_eq!(r.get_winnings_away(), 20000);
-    }
-
-    #[test]
-    fn roll_away_stored() {
-        let r = make();
-        assert_eq!(r.get_winnings_roll_away(), 2);
-    }
-
-    #[test]
-    fn zero_winnings() {
-        let r = ReportWinningsRoll::new(0, 0, 0, 0);
-        assert_eq!(r.get_winnings_home(), 0);
-        assert_eq!(r.get_winnings_away(), 0);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

@@ -102,8 +102,4 @@ mod tests {
         let params = cmd.execute(&mut game);
         assert!(params.is_empty());
     }
-    #[test]
-    fn is_zero_sized_unit_struct() {
-        assert_eq!(std::mem::size_of::<AnimalSavageryCancelActionCommand>(), 0);
-    }
 }

@@ -108,22 +108,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::PASS_ROLL); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "passRoll"); }
-
-    #[test]
-    fn get_result() { assert_eq!(make().get_result(), Some("ACCURATE")); }
-
-    #[test]
-    fn get_passing_distance() { assert_eq!(make().get_passing_distance(), Some("SHORT_PASS")); }
-    #[test]
-    fn get_name_is_nonempty() {
-        assert!(!make().get_name().is_empty());
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

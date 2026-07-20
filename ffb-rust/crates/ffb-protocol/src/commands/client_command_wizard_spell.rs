@@ -70,22 +70,6 @@ mod tests {
         assert!(cmd.get_wizard_spell().is_some());
         assert_eq!(cmd.get_target_coordinate(), Some(FieldCoordinate::new(3, 5)));
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandWizardSpell::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandWizardSpell::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandWizardSpell::default());
-        assert!(s.contains("ClientCommandWizardSpell"));
-    }
 
     #[test]
     fn get_id_is_client_wizard_spell() {

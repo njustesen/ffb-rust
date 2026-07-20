@@ -25,14 +25,22 @@ impl std::ops::Deref for BreakTackle {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_break_tackle() {
         assert_eq!(BreakTackle::new().get_name(), "Break Tackle");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_strength() {
         assert_eq!(BreakTackle::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()) — the live Rust property
+        // table always yields a slice; assert every entry is a non-empty key.
+        assert!(SkillId::BreakTackle.properties().iter().all(|p| !p.is_empty()));
     }
 }

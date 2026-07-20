@@ -78,28 +78,6 @@ mod tests {
         assert_eq!(cmd.get_sketch_id(), "sk1");
         assert_eq!(cmd.get_coordinate(), FieldCoordinate::new(5, 3));
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandSketchAddCoordinate::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_roundtrip() {
-        let cmd = ServerCommandSketchAddCoordinate::default();
-        let _ = cmd.clone();
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandSketchAddCoordinate::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandSketchAddCoordinate::default());
-        assert!(s.contains("ServerCommandSketchAddCoordinate"));
-    }
 
     #[test]
     fn get_id_is_server_sketch_add_coordinate() {

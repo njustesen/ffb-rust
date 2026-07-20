@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_frenzied_rush() {
         assert_eq!(FrenziedRush::new().get_name(), "Frenzied Rush");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(FrenziedRush::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_gain_frenzy_for_blitz_property() {
+        assert!(crate::enums::SkillId::FrenziedRush.properties().contains(&"canGainFrenzyForBlitz"));
     }
 }

@@ -25,14 +25,22 @@ impl std::ops::Deref for Swarming {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
+
+    // bb2020/Swarming is SkillCategory.TRAIT (the bb2016 test's EXTRAORDINARY is bb2016-only).
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_swarming() {
         assert_eq!(Swarming::new().get_name(), "Swarming");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(Swarming::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_sneak_extra_players_onto_pitch_property() {
+        assert!(SkillId::Swarming.properties().contains(&"canSneakExtraPlayersOntoPitch"));
     }
 }

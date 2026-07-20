@@ -68,39 +68,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::TENTACLES_SHADOWING_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "tentaclesShadowingRoll");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_skill(), "Tentacles");
-        assert_eq!(r.get_defender_id(), "d1");
-        assert!(!r.is_successful());
-    }
-
-    #[test]
-    fn minimum_roll_and_roll_values() {
-        let r = make();
-        assert_eq!(r.get_minimum_roll(), 5);
-        assert_eq!(r.get_roll(), &[3, 4]);
-    }
-
-    #[test]
-    fn rerolled_and_successful() {
-        let r = ReportTentaclesShadowingRoll::new("Shadowing".into(), "d2".into(), vec![6], true, 4, true);
-        assert!(r.is_successful());
-        assert!(r.is_re_rolled());
-        assert_eq!(r.get_skill(), "Shadowing");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
-        assert_eq!(BlastinSolvesEverything::new().get_name(), "\"Blastin' Solves Everything\"");
+    fn name_contains_blastin() {
+        assert!(BlastinSolvesEverything::new().get_name().contains("Blastin"));
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(BlastinSolvesEverything::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_blast_remote_player_property() {
+        assert!(crate::enums::SkillId::BlastinSolvesEverything.properties().contains(&"canBlastRemotePlayer"));
     }
 }

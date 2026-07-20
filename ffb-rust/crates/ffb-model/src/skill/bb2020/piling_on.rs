@@ -32,15 +32,27 @@ impl std::ops::Deref for PilingOn {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
+
+    // The bb2016 test's has_can_pile_on_opponent_property is not mirrored:
+    // bb2020/PilingOn.postConstruct registers no properties (Piling On is not a live
+    // BB2020 mechanic); mirror the registration surface with a not-null check instead.
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_piling_on() {
         assert_eq!(PilingOn::new().get_name(), "Piling On");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_strength() {
         assert_eq!(PilingOn::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the live Rust property table
+        // is SkillId::PilingOn.properties(), which always returns a valid slice.
+        assert!(SkillId::PilingOn.properties().iter().all(|p| !p.is_empty()));
     }
 
     #[test]

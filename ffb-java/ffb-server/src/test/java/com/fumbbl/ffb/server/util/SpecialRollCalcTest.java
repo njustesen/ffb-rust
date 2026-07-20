@@ -31,6 +31,18 @@ class SpecialRollCalcTest {
         assertEquals(6, SpecialRollCalc.minimumRollDauntless(1, 100));
     }
 
+    @Test
+    void dauntless_str3vs3_minimum1() {
+        // def=3, att=3 → min(6, 1) = 1
+        assertEquals(1, SpecialRollCalc.minimumRollDauntless(3, 3));
+    }
+
+    @Test
+    void dauntless_str5vs2_returnsMinus2() {
+        // def=2, att=5 → min(6, -2) = -2 (no floor in the source)
+        assertEquals(-2, SpecialRollCalc.minimumRollDauntless(5, 2));
+    }
+
     // ── minimumRollTentaclesEscape ────────────────────────────────────────────
 
     @Test
@@ -51,6 +63,12 @@ class SpecialRollCalcTest {
     @Test
     void tentacles_escape_failure() {
         assertFalse(SpecialRollCalc.isTentaclesEscapeSuccessful(2, 3, 5, 3));  // 5 < 8
+    }
+
+    @Test
+    void tentacles_escape_exactMinimum_succeeds() {
+        // min = 6+3-3=6; die1+die2=6 → exact boundary succeeds
+        assertTrue(SpecialRollCalc.isTentaclesEscapeSuccessful(3, 3, 3, 3));
     }
 
     // ── minimumRollShadowingEscape ────────────────────────────────────────────
@@ -144,6 +162,11 @@ class SpecialRollCalcTest {
     @Test
     void knockout_recovery_2_with_0babes_fails() {
         assertFalse(SpecialRollCalc.isRecoveringFromKnockout(2, 0));   // 2 not > 3
+    }
+
+    @Test
+    void knockout_recovery_2_with_1babe_fails() {
+        assertFalse(SpecialRollCalc.isRecoveringFromKnockout(2, 1));   // 2+1=3, not > 3 (exact boundary)
     }
 
     @Test

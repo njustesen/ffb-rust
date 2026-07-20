@@ -25,14 +25,20 @@ impl std::ops::Deref for Bombardier {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_bombardier() {
         assert_eq!(Bombardier::new().get_name(), "Bombardier");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(Bombardier::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_enable_throw_bomb_action_property() {
+        assert!(SkillId::Bombardier.properties().contains(&"enableThrowBombAction"));
     }
 }

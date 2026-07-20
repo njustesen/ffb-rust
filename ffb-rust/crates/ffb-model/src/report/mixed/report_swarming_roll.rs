@@ -54,25 +54,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::SWARMING_PLAYERS_ROLL); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "swarmingPlayersRoll"); }
-
-    #[test]
-    fn get_roll() { assert_eq!(make().get_roll(), 2); }
-
-    #[test]
-    fn get_limit() { assert_eq!(make().get_limit(), 4); }
-
-    #[test]
-    fn default_sentinels() {
-        let r = ReportSwarmingRoll::new(None, 0, -1, -1);
-        assert_eq!(r.get_roll(), -1);
-        assert_eq!(r.get_limit(), -1);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

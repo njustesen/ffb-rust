@@ -37,10 +37,30 @@ impl std::ops::Deref for Loner {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors ffb-java LonerSkillTest.
+
     #[test]
-    fn name_is_correct() { assert_eq!(Loner::new().get_name(), "Loner"); }
+    fn name_is_loner() {
+        assert_eq!(Loner::new().get_name(), "Loner");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Loner::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(Loner::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_has_to_roll_to_use_team_reroll_property() {
+        assert!(crate::enums::SkillId::Loner.properties().contains(&"hasToRollToUseTeamReroll"));
+    }
+
+    #[test]
+    fn class_name_is_loner() {
+        assert_eq!(crate::enums::SkillId::Loner.class_name(), "Loner");
+    }
+
+    // Additional Rust-side logic tests beyond the Java test class.
     #[test]
     fn default_value_is_four() { assert_eq!(Loner::new().get_default_skill_value(), 4); }
     #[test]

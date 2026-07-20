@@ -62,22 +62,6 @@ mod tests {
         let cmd = ClientCommandTransferReplayControl::with_coach("coach-abc");
         assert_eq!(cmd.get_coach(), Some("coach-abc"));
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandTransferReplayControl::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandTransferReplayControl::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandTransferReplayControl::default());
-        assert!(s.contains("ClientCommandTransferReplayControl"));
-    }
 
     #[test]
     fn get_id_is_client_transfer_replay_control() {

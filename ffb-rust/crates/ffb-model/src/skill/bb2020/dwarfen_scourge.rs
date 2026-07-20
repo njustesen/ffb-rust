@@ -28,15 +28,23 @@ impl std::ops::Deref for DwarfenScourge {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_dwarfen_scourge() {
         assert_eq!(DwarfenScourge::new().get_name(), "Dwarfen Scourge");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(DwarfenScourge::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the live Rust property table
+        // is SkillId::DwarfenScourge.properties(), which always returns a valid slice.
+        assert!(SkillId::DwarfenScourge.properties().iter().all(|p| !p.is_empty()));
     }
 
     #[test]

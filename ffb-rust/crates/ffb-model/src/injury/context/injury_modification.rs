@@ -46,9 +46,5 @@ mod tests {
     fn injury_variant_is_not_default() {
         assert_ne!(InjuryModification::INJURY, InjuryModification::default());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", InjuryModification::default()).is_empty());
-    }
 
 }

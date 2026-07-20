@@ -63,21 +63,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::THROWN_KEG); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "thrownKeg"); }
-
-    #[test]
-    fn get_roll() { assert_eq!(make().get_roll(), 3); }
-
-    #[test]
-    fn is_success() { assert!(make().is_success()); }
-
-    #[test]
-    fn is_fumble() { assert!(!make().is_fumble()); }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

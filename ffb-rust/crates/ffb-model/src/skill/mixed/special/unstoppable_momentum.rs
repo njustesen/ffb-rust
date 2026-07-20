@@ -29,9 +29,20 @@ impl std::ops::Deref for UnstoppableMomentum {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(UnstoppableMomentum::new().get_name(), "Unstoppable Momentum"); }
+    fn name_is_unstoppable_momentum() {
+        assert_eq!(UnstoppableMomentum::new().get_name(), "Unstoppable Momentum");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(UnstoppableMomentum::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(UnstoppableMomentum::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); properties() always returns a valid slice.
+        let _properties: &'static [&'static str] = crate::enums::SkillId::UnstoppableMomentum.properties();
+    }
     #[test]
     fn registers_single_block_die_reroll_source() {
         let skill = UnstoppableMomentum::new();

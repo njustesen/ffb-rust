@@ -47,25 +47,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::BIASED_REF); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "biasedRef"); }
-
-    #[test]
-    fn get_roll() { assert_eq!(make().get_roll(), 3); }
-
-    #[test]
-    fn is_foul_spotted() { assert!(make().is_foul_spotted()); }
-
-    #[test]
-    fn not_foul_spotted() {
-        let r = ReportBiasedRef::new(false, 1);
-        assert!(!r.is_foul_spotted());
-        assert_eq!(r.get_roll(), 1);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

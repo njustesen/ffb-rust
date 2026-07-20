@@ -25,14 +25,24 @@ impl std::ops::Deref for RightStuff {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
+
+    // bb2020/RightStuff is SkillCategory.TRAIT (the bb2016 test's EXTRAORDINARY is bb2016-only).
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_right_stuff() {
         assert_eq!(RightStuff::new().get_name(), "Right Stuff");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(RightStuff::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_be_thrown_if_strength_is_3_or_less_property() {
+        // Java bb2016 test asserts canBeThrown; bb2020/RightStuff.postConstruct registers
+        // canBeThrownIfStrengthIs3orLess instead.
+        assert!(SkillId::RightStuff.properties().contains(&"canBeThrownIfStrengthIs3orLess"));
     }
 }

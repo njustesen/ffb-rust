@@ -116,23 +116,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn modifier_2016_quick_is_positive() {
-        assert_eq!(PassingDistance::QuickPass.modifier_2016(), 1);
-        assert_eq!(PassingDistance::LongBomb.modifier_2016(), -2);
-    }
-
-    #[test]
     fn modifier_2016_all_distances() {
         assert_eq!(PassingDistance::QuickPass.modifier_2016(), 1);
         assert_eq!(PassingDistance::ShortPass.modifier_2016(), 0);
         assert_eq!(PassingDistance::LongPass.modifier_2016(), -1);
         assert_eq!(PassingDistance::LongBomb.modifier_2016(), -2);
-    }
-
-    #[test]
-    fn modifier_2020_is_penalty() {
-        assert_eq!(PassingDistance::QuickPass.modifier_2020(), 0);
-        assert_eq!(PassingDistance::LongBomb.modifier_2020(), 3);
     }
 
     #[test]
@@ -165,6 +153,84 @@ mod tests {
     #[test]
     fn pass_to_partner_bb2020_is_zero() {
         assert_eq!(PassingDistance::PassToPartner.modifier_2020(), 0);
+    }
+
+    // ── EnumRoundTripTest parity (Java ffb-server) ──────────────────────────
+
+    const ALL_DISTANCES: [PassingDistance; 5] = [
+        PassingDistance::QuickPass,
+        PassingDistance::ShortPass,
+        PassingDistance::LongPass,
+        PassingDistance::LongBomb,
+        PassingDistance::PassToPartner,
+    ];
+
+    #[test]
+    fn passing_distance_all_values_have_name() {
+        for pd in ALL_DISTANCES {
+            assert!(!pd.name().is_empty(), "All PassingDistance values must have a non-null name");
+        }
+    }
+
+    #[test]
+    fn passing_distance_bb2016_quick_pass_is_plus_1() {
+        assert_eq!(PassingDistance::QuickPass.modifier_2016(), 1);
+    }
+
+    #[test]
+    fn passing_distance_bb2016_short_pass_is_zero() {
+        assert_eq!(PassingDistance::ShortPass.modifier_2016(), 0);
+    }
+
+    #[test]
+    fn passing_distance_bb2016_long_pass_is_minus_1() {
+        assert_eq!(PassingDistance::LongPass.modifier_2016(), -1);
+    }
+
+    #[test]
+    fn passing_distance_bb2016_long_bomb_is_minus_2() {
+        assert_eq!(PassingDistance::LongBomb.modifier_2016(), -2);
+    }
+
+    #[test]
+    fn passing_distance_bb2020_quick_pass_is_zero() {
+        assert_eq!(PassingDistance::QuickPass.modifier_2020(), 0);
+    }
+
+    #[test]
+    fn passing_distance_bb2020_short_pass_is_1() {
+        assert_eq!(PassingDistance::ShortPass.modifier_2020(), 1);
+    }
+
+    #[test]
+    fn passing_distance_bb2020_long_pass_is_2() {
+        assert_eq!(PassingDistance::LongPass.modifier_2020(), 2);
+    }
+
+    #[test]
+    fn passing_distance_bb2020_long_bomb_is_3() {
+        assert_eq!(PassingDistance::LongBomb.modifier_2020(), 3);
+    }
+
+    #[test]
+    fn passing_distance_shortcuts_are_unique() {
+        let shortcuts: std::collections::HashSet<char> =
+            ALL_DISTANCES.iter().map(|pd| pd.shortcut()).collect();
+        assert_eq!(
+            shortcuts.len(),
+            ALL_DISTANCES.len(),
+            "All PassingDistance shortcuts must be unique"
+        );
+    }
+
+    #[test]
+    fn passing_distance_quick_pass_shortcut_is_q() {
+        assert_eq!(PassingDistance::QuickPass.shortcut(), 'Q');
+    }
+
+    #[test]
+    fn passing_distance_long_bomb_shortcut_is_b() {
+        assert_eq!(PassingDistance::LongBomb.shortcut(), 'B');
     }
 
     #[test]

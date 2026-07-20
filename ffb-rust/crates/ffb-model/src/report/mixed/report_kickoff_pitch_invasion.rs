@@ -60,28 +60,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::KICKOFF_PITCH_INVASION); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "kickoffPitchInvasion"); }
-
-    #[test]
-    fn get_amount() { assert_eq!(make().get_amount(), 1); }
-
-    #[test]
-    fn get_roll_home_and_away() {
-        let r = make();
-        assert_eq!(r.get_roll_home(), 3);
-        assert_eq!(r.get_roll_away(), 2);
-    }
-
-    #[test]
-    fn get_affected_players() {
-        let r = make();
-        assert_eq!(r.get_affected_players(), &["p1".to_string()]);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

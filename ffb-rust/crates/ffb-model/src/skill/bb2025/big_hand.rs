@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_big_hand() {
         assert_eq!(BigHand::new().get_name(), "Big Hand");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_mutation() {
         assert_eq!(BigHand::new().get_category(), SkillCategory::Mutation);
+    }
+
+    #[test]
+    fn class_name_is_big_hand() {
+        assert_eq!(crate::enums::SkillId::BigHand.class_name(), "BigHand");
     }
 }

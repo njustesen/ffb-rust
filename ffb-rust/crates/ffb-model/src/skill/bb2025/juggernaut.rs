@@ -35,13 +35,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_juggernaut() {
         assert_eq!(Juggernaut::new().get_name(), "Juggernaut");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_strength() {
         assert_eq!(Juggernaut::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn has_can_convert_both_down_to_push_property() {
+        assert!(crate::enums::SkillId::Juggernaut.properties().contains(&"canConvertBothDownToPush"));
     }
 
     #[test]

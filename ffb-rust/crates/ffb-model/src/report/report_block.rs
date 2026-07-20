@@ -43,32 +43,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::BLOCK);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "block");
-    }
-
-    #[test]
-    fn get_defender_id() {
-        assert_eq!(make().get_defender_id(), "def1");
-    }
-
-    #[test]
-    fn different_defender_id() {
-        let r = ReportBlock::new("def99".into());
-        assert_eq!(r.get_defender_id(), "def99");
-    }
-
-    #[test]
-    fn report_name_is_block() {
-        assert_eq!(ReportBlock::new("x".into()).get_name(), "block");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

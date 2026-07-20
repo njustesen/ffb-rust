@@ -83,22 +83,6 @@ mod tests {
         assert!(cmd.coach.is_empty());
         assert!(cmd.talks.is_empty());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandTalk::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandTalk::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandTalk::default());
-        assert!(s.contains("ServerCommandTalk"));
-    }
 
     #[test]
     fn get_id_is_server_talk() {

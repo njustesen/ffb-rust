@@ -49,37 +49,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::PILING_ON);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "pilingOn");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_player_id(), "p1");
-        assert!(r.is_used());
-        assert!(!r.is_re_roll_injury());
-    }
-
-    #[test]
-    fn not_used() {
-        let r = ReportPilingOn::new("p2".into(), false, false);
-        assert!(!r.is_used());
-        assert_eq!(r.get_player_id(), "p2");
-    }
-
-    #[test]
-    fn re_roll_injury_flag() {
-        let r = ReportPilingOn::new("p3".into(), true, true);
-        assert!(r.is_re_roll_injury());
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

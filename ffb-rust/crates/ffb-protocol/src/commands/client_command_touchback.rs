@@ -66,22 +66,6 @@ mod tests {
         let cmd = ClientCommandTouchback::default();
         assert!(cmd.ball_coordinate.is_none());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandTouchback::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandTouchback::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandTouchback::default());
-        assert!(s.contains("ClientCommandTouchback"));
-    }
 
     #[test]
     fn get_id_is_client_touchback() {

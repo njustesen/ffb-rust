@@ -92,6 +92,9 @@ fn current_time_millis() -> i64 {
 
 #[cfg(test)]
 mod tests {
+    // Mirrors ffb-java ffb-server SessionTimeoutTaskTest (Java: SessionTimeoutTaskTest.java).
+    // The expired_* tests below are Rust-only: they exercise the private pure helpers
+    // (extracted with an injected clock); Java tests the same behavior inline via run().
     use super::*;
     use ffb_model::model::ClientMode;
     use tokio::sync::mpsc;
@@ -116,7 +119,8 @@ mod tests {
         sm.add_session(1, 100, "Stale".into(), ClientMode::PLAYER, true, vec![], tx1);
         sm.add_session(2, 100, "Fresh".into(), ClientMode::PLAYER, false, vec![], tx2);
         sm.set_last_ping(1, 0);
-        sm.set_last_ping(2, 10_000);
+        // Exactly at the boundary (last_ping + timeout == now): Java's `<` keeps it alive.
+        sm.set_last_ping(2, 5_000);
 
         let expired = SessionTimeoutTask::expired_sessions(&sm, 5_000, 10_000);
         assert_eq!(expired, vec![1]);
@@ -141,6 +145,54 @@ mod tests {
         assert_eq!(expired, vec![1]);
     }
 
+    /// Java: `run` — one active + one timed-out session in each manager; only the
+    /// timed-out ones are closed (`verify(communication).close(timeoutSession)` /
+    /// `close(timeoutReplaySession)` / `verifyNoMoreInteractions(communication)`).
+    /// Closing is observed through the managers, since `ServerCommunication::close`
+    /// removes the session from the owning manager (the Rust stand-in for Jetty's
+    /// `Session.close()`). Java pins the active sessions exactly at the boundary
+    /// (`lastPing + timeout == now`) via Mockito Answers that recompute
+    /// `currentTimeMillis()` per call; with static pings a clock tick before
+    /// `run()` would flakily expire them, so they get 1s of headroom here — the
+    /// exact `<` boundary is covered in `expired_sessions_filters_by_timeout`.
+    #[tokio::test]
+    async fn run() {
+        const TIMEOUT: i64 = 10_000;
+        let (comm, _gc, sm) = make_communication();
+        let rsm = comm.replay_session_manager();
+        let now = current_time_millis();
+
+        let (tx1, _rx1) = mpsc::unbounded_channel();
+        let (tx2, _rx2) = mpsc::unbounded_channel();
+        {
+            let mut guard = sm.lock().unwrap();
+            guard.add_session(1, 100, "Active".into(), ClientMode::PLAYER, true, vec![], tx1);
+            guard.add_session(2, 100, "Timeout".into(), ClientMode::PLAYER, false, vec![], tx2);
+            guard.set_last_ping(1, now - TIMEOUT + 1_000);
+            guard.set_last_ping(2, now - TIMEOUT - 1);
+        }
+        {
+            let mut guard = rsm.lock().unwrap();
+            guard.add_session(3, "replay".into(), "ActiveCoach".into());
+            guard.add_session(4, "replay".into(), "TimeoutCoach".into());
+            guard.set_last_ping(3, now - TIMEOUT + 1_000);
+            guard.set_last_ping(4, now - TIMEOUT - 1);
+        }
+
+        let task = SessionTimeoutTask::new(Arc::clone(&sm), Arc::clone(&rsm), comm, TIMEOUT);
+
+        task.run();
+
+        // verify(communication).close(timeoutSession)
+        assert_eq!(sm.lock().unwrap().get_game_id_for_session(2), 0);
+        // verify(communication).close(timeoutReplaySession)
+        assert!(!rsm.lock().unwrap().has(4));
+        // verifyNoMoreInteractions(communication) — active sessions untouched
+        assert_eq!(sm.lock().unwrap().get_game_id_for_session(1), 100);
+        assert!(rsm.lock().unwrap().has(3));
+    }
+
+    /// Java: `runClosesExpiredRegularSession` (ported Rust extra).
     #[tokio::test]
     async fn run_closes_expired_regular_session() {
         let (comm, _gc, sm) = make_communication();
@@ -158,6 +210,7 @@ mod tests {
         assert_eq!(sm.lock().unwrap().get_game_id_for_session(1), 0);
     }
 
+    /// Java: `runLeavesFreshSessionUntouched` (ported Rust extra).
     #[tokio::test]
     async fn run_leaves_fresh_session_untouched() {
         let (comm, _gc, sm) = make_communication();

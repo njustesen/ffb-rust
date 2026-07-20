@@ -115,14 +115,37 @@ impl BlockTarget {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::enums::{BlockKind, PlayerState};
+    use crate::enums::{BlockKind, PlayerState, PS_STANDING};
 
     #[test]
-    fn block_roll_needs_selection() {
-        let mut br = BlockRoll::new("p1".into(), PlayerState(1), 1);
+    fn block_roll_needs_selection_when_index_negative() {
+        let br = BlockRoll::new("p1".into(), PlayerState(PS_STANDING), 1);
         assert!(br.needs_selection());
+    }
+
+    #[test]
+    fn block_roll_does_not_need_selection_when_index_zero() {
+        let mut br = BlockRoll::new("p1".into(), PlayerState(PS_STANDING), 1);
         br.selected_index = 0;
         assert!(!br.needs_selection());
+    }
+
+    #[test]
+    fn block_roll_target_id_set_on_construction() {
+        let br = BlockRoll::new("player42".into(), PlayerState(PS_STANDING), 1);
+        assert_eq!(br.target_id, "player42");
+    }
+
+    #[test]
+    fn block_roll_dauntless_false_by_default() {
+        let br = BlockRoll::new("p1".into(), PlayerState(PS_STANDING), 1);
+        assert!(!br.successful_dauntless);
+    }
+
+    #[test]
+    fn block_roll_reroll_sources_empty_initially() {
+        let br = BlockRoll::new("p1".into(), PlayerState(PS_STANDING), 1);
+        assert!(br.reroll_sources.is_empty());
     }
 
     #[test]

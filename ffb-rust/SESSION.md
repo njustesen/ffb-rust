@@ -1,6 +1,49 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-20, full-game playability + mechanic coverage — both engines)
+## Current Status (2026-07-20 later session, cross-engine TEST PARITY — see docs/TEST_PARITY.md)
+
+**Goal (user): remove non-sensible tests and mirror test coverage 1:1 across both engines —
+same tests, same function names (camelCase↔snake_case), same assertions — per the "mirrored
+core suite" model (Rust-only step/protocol/report tests kept as documented extras; behavioral
+step parity remains the ffb-parity harness's job).** Full details in `docs/TEST_PARITY.md`.
+
+Final state: Rust `cargo test --workspace` **16,256 passed, 0 failed, 5 documented
+`#[ignore = "PARITY..."]`** (was 17,984); Java `mvn -pl ffb-common,ffb-server,ffb-client-logic
+test` **2,522 passed, 0 failed** (was ~1,422); `cargo clippy --workspace --all-targets` clean.
+
+- **Pruned ~2,150 non-sensible Rust tests**: 426 debug/clone/construction tautologies; 796
+  self-restating `skills/mod.rs` table tests → 6 exhaustive data-driven tests (pinned table size
+  200, per-edition counts 27/58/135/157, category distribution, lookup round-trips); 921 trivial
+  report getters (wire ids stay pinned via `to_json_value_has_report_id` + round-trips). Java:
+  deleted the 3 orphan `*ModifierValues` classes + tests (verified absent upstream; Rust twins
+  in `ffb-engine/src/mechanic/` deleted too); renamed misnamed BlockDiceCalcTest methods.
+- **Mirrored suites** (same names/assertions both sides): all 297 skill definitions (Java
+  hasSkillProperty ↔ live `SkillId::properties()`; `CancelSkillProperty(x)` ↔ `"cancelsX"`),
+  22 calc/marking/injury classes, all model enum/type/property classes, client
+  game-state-marking handler, server commandline/net/url classes. 3 new Java skill-test files
+  authored (Trickster, SidestepBb2025, BloodlustMixed — latter two named around Windows
+  case-insensitive class-file collisions).
+- **Real parity bugs found by mirroring, all fixed**: 56 Java-registered skill properties
+  missing from `SkillId::properties()` (verified line-by-line vs postConstruct); Yoink had no
+  SKILL_TABLE row; duplicate unreachable Swarming arm; `SPP_TABLE_BB2020.additional_catch` 0→1;
+  StringTool::bind unmatched-placeholder semantics; RangeRuler roll-1 display;
+  TurnMode::from_name case-insensitivity; ServerUrlProperty::url full-URL early return;
+  InifileParamFilter trailing valueless flag; CommonProperty::is_stored_remote defaults;
+  ClientStateId Display; CardEffect::skills() implemented; PlayerState::has_tacklezones no
+  longer checks eye gouge (Java only consults it at assist time — already mirrored separately).
+- **Remaining known divergences** (pinned by 5 `#[ignore]` tests, documented in
+  docs/TEST_PARITY.md): BlockMode 7-vs-4 variants; 4 reconnect tests (Rust Game lacks
+  `started`). Known non-test gaps (design decisions needed): no live reroll-source table
+  (registerRerollSource unmirrored anywhere); SkillDef.usage_type vs SkillId::usage_type()
+  disagreements; Insignificant negative-trait constructor drift vs current bb2025 Java.
+- All changes (Rust + Java test edits + 3 new Java test files) are uncommitted working-tree
+  changes in this one repo (the whole tree, ffb-java included, is a single git repo —
+  njustesen/ffb-rust). Java src/main untouched except deleting the 3 orphan test-scaffolding
+  `*ModifierValues` classes.
+
+---
+
+## Prior Status (2026-07-20, full-game playability + mechanic coverage — both engines)
 
 **Goal (user, superseding the byte-for-byte-parity plan): both reference agents — Rust
 (`RandomAgent`/`UniformAgent`) and Java (`ParityRunner`) — play FULL games and reach ALL

@@ -28,12 +28,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_breathe_fire() {
         assert_eq!(BreatheFire::new().get_name(), "Breathe Fire");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(BreatheFire::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_perform_armour_roll_instead_of_block_that_might_fail_property() {
+        assert!(crate::enums::SkillId::BreatheFire.properties().contains(&"canPerformArmourRollInsteadOfBlockThatMightFailWithTurnover"));
     }
 }

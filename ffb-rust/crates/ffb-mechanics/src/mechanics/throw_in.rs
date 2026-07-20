@@ -56,6 +56,10 @@ fn throw_in_direction_from_template(template: Direction, roll: i32) -> Direction
     }
 }
 
+// Tests exercise the ffb-mechanics free-function API directly (separate from
+// ffb-engine's util::throw_in_calc mirror; this API panics on invalid input
+// where the mirror returns None). Names and case values are aligned 1:1 with
+// Java ThrowInCalcTest.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -63,21 +67,21 @@ mod tests {
     // ── throw_in_distance ─────────────────────────────────────────────────────
 
     #[test]
-    fn bb2016_sums_two_dice() {
+    fn distance_bb2016_sums_two_dice() {
         assert_eq!(throw_in_distance(3, 4, Rules::Bb2016), 7);
         assert_eq!(throw_in_distance(1, 1, Rules::Bb2016), 2);
         assert_eq!(throw_in_distance(6, 6, Rules::Bb2016), 12);
     }
 
     #[test]
-    fn bb2020_adds_bonus_one() {
+    fn distance_bb2020_adds_bonus_one() {
         assert_eq!(throw_in_distance(3, 4, Rules::Bb2020), 8);
         assert_eq!(throw_in_distance(1, 1, Rules::Bb2020), 3);
         assert_eq!(throw_in_distance(6, 6, Rules::Bb2020), 13);
     }
 
     #[test]
-    fn bb2025_sums_two_dice_no_bonus() {
+    fn distance_bb2025_sums_two_dice_no_bonus_like_bb2016() {
         assert_eq!(throw_in_distance(3, 4, Rules::Bb2025), 7);
         assert_eq!(throw_in_distance(1, 1, Rules::Bb2025), 2);
     }
@@ -85,7 +89,7 @@ mod tests {
     // ── is_corner_square ──────────────────────────────────────────────────────
 
     #[test]
-    fn corner_squares_all_four() {
+    fn is_corner_square_all_four_corners() {
         assert!(is_corner_square(0, 0));
         assert!(is_corner_square(25, 0));
         assert!(is_corner_square(0, 14));
@@ -93,16 +97,16 @@ mod tests {
     }
 
     #[test]
-    fn edge_not_corner() {
-        assert!(!is_corner_square(5, 0));
-        assert!(!is_corner_square(0, 7));
-        assert!(!is_corner_square(12, 7));
+    fn is_corner_square_edge_not_corner() {
+        assert!(!is_corner_square(5, 0)); // upper sideline, not corner
+        assert!(!is_corner_square(0, 7)); // home endzone, not corner
+        assert!(!is_corner_square(12, 7)); // field
     }
 
     // ── throw_in_direction_for_roll ───────────────────────────────────────────
 
     #[test]
-    fn home_endzone_rolls() {
+    fn home_endzone_directions_for_rolls() {
         assert_eq!(throw_in_direction_for_roll(0, 7, 1), Direction::Northeast);
         assert_eq!(throw_in_direction_for_roll(0, 7, 2), Direction::Northeast);
         assert_eq!(throw_in_direction_for_roll(0, 7, 3), Direction::East);
@@ -112,58 +116,69 @@ mod tests {
     }
 
     #[test]
-    fn away_endzone_rolls() {
+    fn away_endzone_directions_for_rolls() {
         assert_eq!(throw_in_direction_for_roll(25, 7, 1), Direction::Southwest);
+        assert_eq!(throw_in_direction_for_roll(25, 7, 2), Direction::Southwest);
         assert_eq!(throw_in_direction_for_roll(25, 7, 3), Direction::West);
+        assert_eq!(throw_in_direction_for_roll(25, 7, 4), Direction::West);
         assert_eq!(throw_in_direction_for_roll(25, 7, 5), Direction::Northwest);
+        assert_eq!(throw_in_direction_for_roll(25, 7, 6), Direction::Northwest);
     }
 
     #[test]
-    fn lower_sideline_rolls() {
+    fn lower_sideline_directions_for_rolls() {
         assert_eq!(throw_in_direction_for_roll(12, 14, 1), Direction::Northwest);
+        assert_eq!(throw_in_direction_for_roll(12, 14, 2), Direction::Northwest);
         assert_eq!(throw_in_direction_for_roll(12, 14, 3), Direction::North);
+        assert_eq!(throw_in_direction_for_roll(12, 14, 4), Direction::North);
         assert_eq!(throw_in_direction_for_roll(12, 14, 5), Direction::Northeast);
+        assert_eq!(throw_in_direction_for_roll(12, 14, 6), Direction::Northeast);
     }
 
     #[test]
-    fn upper_sideline_rolls() {
+    fn upper_sideline_directions_for_rolls() {
         assert_eq!(throw_in_direction_for_roll(12, 0, 1), Direction::Southeast);
+        assert_eq!(throw_in_direction_for_roll(12, 0, 2), Direction::Southeast);
         assert_eq!(throw_in_direction_for_roll(12, 0, 3), Direction::South);
+        assert_eq!(throw_in_direction_for_roll(12, 0, 4), Direction::South);
         assert_eq!(throw_in_direction_for_roll(12, 0, 5), Direction::Southwest);
+        assert_eq!(throw_in_direction_for_roll(12, 0, 6), Direction::Southwest);
     }
 
     // ── corner_throw_in_direction_for_roll ────────────────────────────────────
 
     #[test]
-    fn northwest_corner_d3_rolls() {
+    fn northwest_corner() {
         assert_eq!(corner_throw_in_direction_for_roll(Direction::Northwest, 1), Direction::East);
         assert_eq!(corner_throw_in_direction_for_roll(Direction::Northwest, 2), Direction::Southeast);
         assert_eq!(corner_throw_in_direction_for_roll(Direction::Northwest, 3), Direction::South);
     }
 
     #[test]
-    fn northeast_corner_d3_rolls() {
+    fn northeast_corner() {
         assert_eq!(corner_throw_in_direction_for_roll(Direction::Northeast, 1), Direction::South);
         assert_eq!(corner_throw_in_direction_for_roll(Direction::Northeast, 2), Direction::Southwest);
         assert_eq!(corner_throw_in_direction_for_roll(Direction::Northeast, 3), Direction::West);
     }
 
     #[test]
-    fn southwest_corner_d3_rolls() {
+    fn southwest_corner() {
         assert_eq!(corner_throw_in_direction_for_roll(Direction::Southwest, 1), Direction::North);
         assert_eq!(corner_throw_in_direction_for_roll(Direction::Southwest, 2), Direction::Northeast);
         assert_eq!(corner_throw_in_direction_for_roll(Direction::Southwest, 3), Direction::East);
     }
 
     #[test]
-    fn southeast_corner_d3_rolls() {
+    fn southeast_corner() {
         assert_eq!(corner_throw_in_direction_for_roll(Direction::Southeast, 1), Direction::West);
         assert_eq!(corner_throw_in_direction_for_roll(Direction::Southeast, 2), Direction::Northwest);
         assert_eq!(corner_throw_in_direction_for_roll(Direction::Southeast, 3), Direction::North);
     }
 
+    // ── corner_direction ──────────────────────────────────────────────────────
+
     #[test]
-    fn corner_direction_all_four() {
+    fn corner_direction_all_four_corners() {
         assert_eq!(corner_direction(0, 0),   Direction::Northwest);
         assert_eq!(corner_direction(25, 0),  Direction::Northeast);
         assert_eq!(corner_direction(0, 14),  Direction::Southwest);

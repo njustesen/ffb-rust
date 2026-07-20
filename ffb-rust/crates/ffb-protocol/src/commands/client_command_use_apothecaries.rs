@@ -81,22 +81,6 @@ mod tests {
         };
         assert_eq!(cmd.get_injury_description_json().len(), 1);
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandUseApothecaries::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandUseApothecaries::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandUseApothecaries::default());
-        assert!(s.contains("ClientCommandUseApothecaries"));
-    }
 
     #[test]
     fn get_id_is_client_use_apothecaries() {

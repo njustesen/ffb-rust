@@ -25,10 +25,30 @@ impl std::ops::Deref for UnchannelledFury {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors ffb-java UnchannelledFurySkillTest.
+
     #[test]
-    fn name_is_correct() { assert_eq!(UnchannelledFury::new().get_name(), "Unchannelled Fury"); }
+    fn name_is_unchannelled_fury() {
+        assert_eq!(UnchannelledFury::new().get_name(), "Unchannelled Fury");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(UnchannelledFury::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(UnchannelledFury::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_enable_stand_up_and_end_blitz_action_property() {
+        assert!(crate::enums::SkillId::UnchannelledFury.properties().contains(&"enableStandUpAndEndBlitzAction"));
+    }
+
+    #[test]
+    fn class_name_is_unchannelled_fury() {
+        assert_eq!(crate::enums::SkillId::UnchannelledFury.class_name(), "UnchannelledFury");
+    }
+
+    // Additional Rust-side logic test beyond the Java test class.
     #[test]
     fn is_negative_trait() { assert!(UnchannelledFury::new().is_negative_trait()); }
 }

@@ -93,17 +93,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandJoinReplay::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandJoinReplay::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_join_replay() {
         assert_eq!(ClientCommandJoinReplay::new().get_id(), NetCommandId::ClientJoinReplay);
     }

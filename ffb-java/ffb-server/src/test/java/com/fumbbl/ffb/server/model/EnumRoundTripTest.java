@@ -132,6 +132,15 @@ class EnumRoundTripTest {
         assertEquals("POW/PUSH", BlockResult.POW_PUSHBACK.getName());
     }
 
+    @Test
+    void block_result_names_are_unique() {
+        long uniqueNames = java.util.Arrays.stream(BlockResult.values())
+            .map(BlockResult::getName)
+            .distinct().count();
+        assertEquals(BlockResult.values().length, uniqueNames,
+            "All BlockResult names must be unique");
+    }
+
     // ── PassingDistance ──────────────────────────────────────────────────────
 
     @Test
@@ -198,6 +207,46 @@ class EnumRoundTripTest {
     @Test
     void passing_distance_long_bomb_shortcut_is_b() {
         assertEquals('B', PassingDistance.LONG_BOMB.getShortcut());
+    }
+
+    @Test
+    void modifier_2016_all_distances() {
+        assertEquals(1, PassingDistance.QUICK_PASS.getModifier2016());
+        assertEquals(0, PassingDistance.SHORT_PASS.getModifier2016());
+        assertEquals(-1, PassingDistance.LONG_PASS.getModifier2016());
+        assertEquals(-2, PassingDistance.LONG_BOMB.getModifier2016());
+    }
+
+    @Test
+    void modifier_2020_all_distances() {
+        assertEquals(0, PassingDistance.QUICK_PASS.getModifier2020());
+        assertEquals(1, PassingDistance.SHORT_PASS.getModifier2020());
+        assertEquals(2, PassingDistance.LONG_PASS.getModifier2020());
+        assertEquals(3, PassingDistance.LONG_BOMB.getModifier2020());
+    }
+
+    @Test
+    void bb2016_vs_bb2020_quick_pass_differs() {
+        // BB2016 quick pass gives +1 (bonus), BB2020 gives 0 (no modifier)
+        assertEquals(1, PassingDistance.QUICK_PASS.getModifier2016());
+        assertEquals(0, PassingDistance.QUICK_PASS.getModifier2020());
+    }
+
+    @Test
+    void bb2016_vs_bb2020_long_bomb_differs() {
+        // BB2016 long bomb is -2, BB2020 long bomb adds 3 (target number goes up)
+        assertEquals(-2, PassingDistance.LONG_BOMB.getModifier2016());
+        assertEquals(3, PassingDistance.LONG_BOMB.getModifier2020());
+    }
+
+    @Test
+    void pass_to_partner_bb2016_is_zero() {
+        assertEquals(0, PassingDistance.PASS_TO_PARTNER.getModifier2016());
+    }
+
+    @Test
+    void pass_to_partner_bb2020_is_zero() {
+        assertEquals(0, PassingDistance.PASS_TO_PARTNER.getModifier2020());
     }
 
     // ── BB2020 SeriousInjury ──────────────────────────────────────────────────
@@ -287,5 +336,20 @@ class EnumRoundTripTest {
         for (com.fumbbl.ffb.bb2016.SeriousInjury si : com.fumbbl.ffb.bb2016.SeriousInjury.values()) {
             assertNotNull(si.getName(), "All BB2016 SeriousInjury values must have a name");
         }
+    }
+
+    // ── InjuryAttribute ───────────────────────────────────────────────────────
+
+    @Test
+    void injury_attribute_round_trip() {
+        for (InjuryAttribute attribute : InjuryAttribute.values()) {
+            assertEquals(attribute, InjuryAttribute.forName(attribute.getName()));
+        }
+    }
+
+    @Test
+    void injury_attribute_strips_sign() {
+        assertEquals(InjuryAttribute.MA, InjuryAttribute.forName("-MA"));
+        assertEquals(InjuryAttribute.AV, InjuryAttribute.forName("+AV"));
     }
 }

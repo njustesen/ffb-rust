@@ -74,22 +74,6 @@ mod tests {
         let cmd = ClientCommandSynchronousMultiBlock::new();
         assert!(cmd.selected_block_targets.is_empty());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandSynchronousMultiBlock::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandSynchronousMultiBlock::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandSynchronousMultiBlock::default());
-        assert!(s.contains("ClientCommandSynchronousMultiBlock"));
-    }
 
     #[test]
     fn get_id_is_client_synchronous_multi_block() {

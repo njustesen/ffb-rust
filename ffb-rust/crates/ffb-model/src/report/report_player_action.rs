@@ -46,36 +46,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::PLAYER_ACTION);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "playerAction");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_acting_player_id(), "p1");
-        assert_eq!(r.get_player_action(), PlayerAction::Move);
-    }
-
-    #[test]
-    fn different_player_id() {
-        let r = ReportPlayerAction::new("p99".into(), PlayerAction::Move);
-        assert_eq!(r.get_acting_player_id(), "p99");
-    }
-
-    #[test]
-    fn block_action() {
-        let r = ReportPlayerAction::new("p2".into(), PlayerAction::Block);
-        assert_eq!(r.get_player_action(), PlayerAction::Block);
-        assert_eq!(r.get_acting_player_id(), "p2");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

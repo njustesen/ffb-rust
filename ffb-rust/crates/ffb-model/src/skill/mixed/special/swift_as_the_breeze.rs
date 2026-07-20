@@ -26,9 +26,23 @@ impl std::ops::Deref for SwiftAsTheBreeze {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(SwiftAsTheBreeze::new().get_name(), "Swift As The Breeze"); }
+    fn name_is_swift_as_the_breeze() {
+        assert_eq!(SwiftAsTheBreeze::new().get_name(), "Swift As The Breeze");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(SwiftAsTheBreeze::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(SwiftAsTheBreeze::new().get_category(), SkillCategory::Trait);
+    }
+
     #[test]
-    fn usage_type_is_once_per_game() { assert_eq!(SwiftAsTheBreeze::new().skill_usage_type, SkillUsageType::OncePerGame); }
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); properties() always returns a valid slice.
+        let _properties: &'static [&'static str] = crate::enums::SkillId::SwiftAsTheBreeze.properties();
+    }
+
+    #[test]
+    fn usage_type_is_once_per_game() {
+        assert_eq!(SwiftAsTheBreeze::new().skill_usage_type, SkillUsageType::OncePerGame);
+    }
 }

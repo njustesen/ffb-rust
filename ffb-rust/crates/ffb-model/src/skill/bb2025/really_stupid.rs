@@ -33,13 +33,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_really_stupid() {
         assert_eq!(ReallyStupid::new().get_name(), "Really Stupid");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(ReallyStupid::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_applies_confusion_property() {
+        assert!(crate::enums::SkillId::ReallyStupid.properties().contains(&"appliesConfusion"));
     }
 
     #[test]

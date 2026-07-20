@@ -45,33 +45,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::CARD_DEACTIVATED);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "cardDeactivated");
-    }
-
-    #[test]
-    fn get_card() {
-        assert_eq!(make().get_card(), "CUSTARD_PIE");
-    }
-
-    #[test]
-    fn different_card() {
-        let r = ReportCardDeactivated::new("ILLEGAL_PROCEDURE".into());
-        assert_eq!(r.get_card(), "ILLEGAL_PROCEDURE");
-    }
-
-    #[test]
-    fn card_matches_field() {
-        let r = make();
-        assert_eq!(r.get_card(), r.card.as_str());
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

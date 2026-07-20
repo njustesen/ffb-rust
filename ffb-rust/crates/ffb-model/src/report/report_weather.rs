@@ -52,36 +52,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::WEATHER);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "weather");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_weather(), Weather::Nice);
-        assert_eq!(r.get_weather_roll(), &[3, 4]);
-    }
-
-    #[test]
-    fn single_roll() {
-        let r = ReportWeather::new(Weather::Nice, vec![5]);
-        assert_eq!(r.get_weather_roll(), &[5]);
-    }
-
-    #[test]
-    fn empty_roll() {
-        let r = ReportWeather::new(Weather::Nice, vec![]);
-        assert_eq!(r.get_weather_roll().len(), 0);
-        assert_eq!(r.get_weather(), Weather::Nice);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

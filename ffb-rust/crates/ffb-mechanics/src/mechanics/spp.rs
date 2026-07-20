@@ -46,7 +46,8 @@ pub const SPP_TABLE_BB2020: SppTable = SppTable {
     landing: 0,
     additional_completion: 1,
     additional_casualty: 1,
-    additional_catch: 0,
+    // Java: SppCalc.additionalSpp returns 1 for every non-BB2016 edition (catch included).
+    additional_catch: 1,
 };
 
 /// BB2025 SPP table (base values; Brawlin' Brutes adjusts td/cas at call site).
@@ -98,212 +99,217 @@ pub fn just_levelled_up(old_spp: i32, new_spp: i32) -> bool {
 
 #[cfg(test)]
 mod tests {
+    // Test names mirror com.fumbbl.ffb.server.mechanic.SppCalcTest (Java camelCase →
+    // snake_case), exercised against the ffb-mechanics SppTable API.
     use super::*;
 
-    #[test]
-    fn bb2016_mvp_is_5() {
-        assert_eq!(spp_table(Rules::Bb2016).mvp, 5);
-    }
+    // ── Touchdown ─────────────────────────────────────────────────────────
 
     #[test]
-    fn bb2020_mvp_is_4() {
-        assert_eq!(spp_table(Rules::Bb2020).mvp, 4);
-    }
-
-    #[test]
-    fn bb2025_landing_is_1() {
-        assert_eq!(spp_table(Rules::Bb2025).landing, 1);
-    }
-
-    #[test]
-    fn bb2016_landing_is_0() {
-        assert_eq!(spp_table(Rules::Bb2016).landing, 0);
-    }
-
-    #[test]
-    fn brawlin_brutes_td_spp() {
-        assert_eq!(touchdown_spp(Rules::Bb2025, true), 2);
-        assert_eq!(touchdown_spp(Rules::Bb2025, false), 3);
-        assert_eq!(touchdown_spp(Rules::Bb2020, true), 3); // no effect in other editions
-    }
-
-    #[test]
-    fn brawlin_brutes_cas_spp() {
-        assert_eq!(casualty_spp(Rules::Bb2025, true), 3);
-        assert_eq!(casualty_spp(Rules::Bb2025, false), 2);
-    }
-
-    #[test]
-    fn level_thresholds() {
-        assert_eq!(player_level(0), 0);   // rookie
-        assert_eq!(player_level(5), 0);   // still rookie
-        assert_eq!(player_level(6), 1);   // experienced
-        assert_eq!(player_level(16), 2);  // veteran
-        assert_eq!(player_level(31), 3);  // emerging star
-        assert_eq!(player_level(51), 4);  // star
-        assert_eq!(player_level(76), 5);  // super star
-        assert_eq!(player_level(176), 6); // legend
-    }
-
-    #[test]
-    fn level_up_detection() {
-        assert!(just_levelled_up(5, 6));
-        assert!(!just_levelled_up(6, 8));
-        assert!(just_levelled_up(14, 16));
-    }
-
-    // ── Additional parity tests (SppCalcTest) ─────────────────────────────────
-
-    #[test]
-    fn touchdown_spp_by_edition() {
+    fn touchdown_bb2016_is3() {
         assert_eq!(touchdown_spp(Rules::Bb2016, false), 3);
+    }
+
+    #[test]
+    fn touchdown_bb2020_is3() {
         assert_eq!(touchdown_spp(Rules::Bb2020, false), 3);
+    }
+
+    #[test]
+    fn touchdown_bb2025_normal_team_is3() {
         assert_eq!(touchdown_spp(Rules::Bb2025, false), 3);
-        // BB2016: brawlin brutes has no effect
+    }
+
+    #[test]
+    fn touchdown_bb2025_brawlin_brutes_is2() {
+        assert_eq!(touchdown_spp(Rules::Bb2025, true), 2);
+    }
+
+    #[test]
+    fn touchdown_bb2016_brawlin_brutes_has_no_effect() {
+        // Brawlin' Brutes rule only exists in BB2025
         assert_eq!(touchdown_spp(Rules::Bb2016, true), 3);
     }
 
     #[test]
-    fn casualty_spp_by_edition() {
+    fn touchdown_bb2020_brawlin_brutes_has_no_effect() {
+        // Brawlin' Brutes rule only exists in BB2025
+        assert_eq!(touchdown_spp(Rules::Bb2020, true), 3);
+    }
+
+    // ── Casualty ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn casualty_bb2016_is2() {
         assert_eq!(casualty_spp(Rules::Bb2016, false), 2);
-        assert_eq!(casualty_spp(Rules::Bb2020, false), 2);
-        assert_eq!(casualty_spp(Rules::Bb2025, false), 2);
-        assert_eq!(casualty_spp(Rules::Bb2025, true), 3);
     }
 
     #[test]
-    fn fixed_spp_values_all_editions() {
+    fn casualty_bb2020_is2() {
+        assert_eq!(casualty_spp(Rules::Bb2020, false), 2);
+    }
+
+    #[test]
+    fn casualty_bb2025_normal_team_is2() {
+        assert_eq!(casualty_spp(Rules::Bb2025, false), 2);
+    }
+
+    #[test]
+    fn casualty_bb2025_brawlin_brutes_is3() {
+        assert_eq!(casualty_spp(Rules::Bb2025, true), 3);
+    }
+
+    // ── Constant events (same across all editions) ────────────────────────
+
+    #[test]
+    fn completion_is1_all_editions() {
         for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
-            let t = spp_table(rules);
-            assert_eq!(t.completion, 1, "completion edition={rules:?}");
-            assert_eq!(t.interception, 2, "interception edition={rules:?}");
-            assert_eq!(t.deflection, 1, "deflection edition={rules:?}");
-            assert_eq!(t.catch, 1, "catch edition={rules:?}");
+            assert_eq!(spp_table(rules).completion, 1, "edition={rules:?}");
         }
     }
 
     #[test]
-    fn landing_spp_by_edition() {
+    fn interception_is2_all_editions() {
+        for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            assert_eq!(spp_table(rules).interception, 2, "edition={rules:?}");
+        }
+    }
+
+    #[test]
+    fn deflection_is1_all_editions() {
+        for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            assert_eq!(spp_table(rules).deflection, 1, "edition={rules:?}");
+        }
+    }
+
+    #[test]
+    fn catch_is1_all_editions() {
+        for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            assert_eq!(spp_table(rules).catch, 1, "edition={rules:?}");
+        }
+    }
+
+    // ── Landing ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn landing_bb2016_is0() {
         assert_eq!(spp_table(Rules::Bb2016).landing, 0);
+    }
+
+    #[test]
+    fn landing_bb2020_is0() {
         assert_eq!(spp_table(Rules::Bb2020).landing, 0);
+    }
+
+    #[test]
+    fn landing_bb2025_is1() {
         assert_eq!(spp_table(Rules::Bb2025).landing, 1);
     }
 
+    // ── MVP ───────────────────────────────────────────────────────────────
+
     #[test]
-    fn mvp_spp_by_edition() {
+    fn mvp_bb2016_is5() {
         assert_eq!(spp_table(Rules::Bb2016).mvp, 5);
+    }
+
+    #[test]
+    fn mvp_bb2020_is4() {
         assert_eq!(spp_table(Rules::Bb2020).mvp, 4);
+    }
+
+    #[test]
+    fn mvp_bb2025_is4() {
         assert_eq!(spp_table(Rules::Bb2025).mvp, 4);
     }
 
+    // ── Additional SPP (league bonus; Java additionalSpp covers cas/comp) ──
+
     #[test]
-    fn additional_spp_by_edition() {
+    fn additional_spp_bb2016_is0() {
         assert_eq!(spp_table(Rules::Bb2016).additional_completion, 0);
-        assert_eq!(spp_table(Rules::Bb2020).additional_completion, 1);
-        assert_eq!(spp_table(Rules::Bb2025).additional_completion, 1);
+        assert_eq!(spp_table(Rules::Bb2016).additional_casualty, 0);
     }
 
     #[test]
-    fn level_thresholds_exact_values() {
+    fn additional_spp_bb2020_is1() {
+        assert_eq!(spp_table(Rules::Bb2020).additional_completion, 1);
+        assert_eq!(spp_table(Rules::Bb2020).additional_casualty, 1);
+    }
+
+    #[test]
+    fn additional_spp_bb2025_is1() {
+        assert_eq!(spp_table(Rules::Bb2025).additional_completion, 1);
+        assert_eq!(spp_table(Rules::Bb2025).additional_casualty, 1);
+    }
+
+    // ── Level thresholds ──────────────────────────────────────────────────
+
+    #[test]
+    fn bb2016_level_thresholds_values() {
         assert_eq!(LEVEL_THRESHOLDS, [6, 16, 31, 51, 76, 176]);
     }
 
     #[test]
-    fn just_levelled_up_at_each_threshold() {
-        assert!(just_levelled_up(5, 6));    // rookie → experienced
-        assert!(just_levelled_up(15, 16));  // experienced → veteran
-        assert!(just_levelled_up(30, 31));  // veteran → emerging star
-        assert!(!just_levelled_up(6, 15)); // same level, no level up
-    }
-
-    // ── Per-level range tests (matches SppCalcTest bb2016_playerLevel_* methods) ─
-
-    #[test]
-    fn player_level_rookie_range() {
+    fn bb2016_player_level_rookie() {
         assert_eq!(player_level(0), 0);
         assert_eq!(player_level(5), 0);
     }
 
     #[test]
-    fn player_level_experienced_range() {
+    fn bb2016_player_level_experienced() {
         assert_eq!(player_level(6), 1);
         assert_eq!(player_level(15), 1);
     }
 
     #[test]
-    fn player_level_veteran_range() {
+    fn bb2016_player_level_veteran() {
         assert_eq!(player_level(16), 2);
         assert_eq!(player_level(30), 2);
     }
 
     #[test]
-    fn player_level_emerging_star_range() {
+    fn bb2016_player_level_emerging() {
         assert_eq!(player_level(31), 3);
         assert_eq!(player_level(50), 3);
     }
 
     #[test]
-    fn player_level_star_range() {
+    fn bb2016_player_level_star() {
         assert_eq!(player_level(51), 4);
         assert_eq!(player_level(75), 4);
     }
 
     #[test]
-    fn player_level_super_star_range() {
+    fn bb2016_player_level_super_star() {
         assert_eq!(player_level(76), 5);
         assert_eq!(player_level(175), 5);
     }
 
     #[test]
-    fn player_level_legend_range() {
+    fn bb2016_player_level_legend() {
         assert_eq!(player_level(176), 6);
         assert_eq!(player_level(999), 6);
     }
 
     #[test]
-    fn just_levelled_up_false_within_same_level() {
-        assert!(!just_levelled_up(6, 15));   // both experienced
-        assert!(!just_levelled_up(16, 30));  // both veteran
+    fn bb2016_just_levelled_up_at_threshold() {
+        assert!(just_levelled_up(5, 6)); // 0→1
+        assert!(just_levelled_up(15, 16)); // 1→2
+        assert!(just_levelled_up(30, 31)); // 2→3
+        assert!(!just_levelled_up(6, 15)); // same level
+        assert!(!just_levelled_up(16, 30)); // same level
     }
 
-    // ── Additional SPP fields (additional_casualty / additional_catch) ─────────
-
-    #[test]
-    fn additional_casualty_spp_by_edition() {
-        assert_eq!(spp_table(Rules::Bb2016).additional_casualty, 0);
-        assert_eq!(spp_table(Rules::Bb2020).additional_casualty, 1);
-        assert_eq!(spp_table(Rules::Bb2025).additional_casualty, 1);
-    }
+    // ── ffb-mechanics-specific extra (no Java SppCalc counterpart) ─────────
+    // Java's additionalSpp() is a single value (1 for every non-BB2016
+    // edition); the Rust table splits it per event, so all three additional_*
+    // entries must match that value per edition.
 
     #[test]
     fn additional_catch_spp_by_edition() {
         assert_eq!(spp_table(Rules::Bb2016).additional_catch, 0);
-        assert_eq!(spp_table(Rules::Bb2020).additional_catch, 0);
+        assert_eq!(spp_table(Rules::Bb2020).additional_catch, 1);
         assert_eq!(spp_table(Rules::Bb2025).additional_catch, 1);
-    }
-
-    #[test]
-    fn touchdown_bb2016_without_brawlin_brutes() {
-        assert_eq!(touchdown_spp(Rules::Bb2016, false), 3);
-    }
-
-    #[test]
-    fn touchdown_bb2020_without_brawlin_brutes() {
-        assert_eq!(touchdown_spp(Rules::Bb2020, false), 3);
-    }
-
-    #[test]
-    fn casualty_bb2016_without_brawlin_brutes() {
-        assert_eq!(casualty_spp(Rules::Bb2016, false), 2);
-    }
-
-    #[test]
-    fn casualty_bb2020_without_brawlin_brutes() {
-        assert_eq!(casualty_spp(Rules::Bb2020, false), 2);
-    }
-
-    #[test]
-    fn bb2025_mvp_is_4() {
-        assert_eq!(spp_table(Rules::Bb2025).mvp, 4);
     }
 }

@@ -31,12 +31,6 @@ mod tests {
     }
 
     #[test]
-    fn initialize_does_not_panic() {
-        let mut f = PlayerGenderFactory::default();
-        f.initialize();
-    }
-
-    #[test]
     fn for_name_a_second_known_variant() {
         assert_eq!(PlayerGenderFactory::default().for_name("nonbinary"), Some(PlayerGender::Nonbinary));
     }

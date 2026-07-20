@@ -93,22 +93,6 @@ mod tests {
         let cmd = ServerCommandUserSettings::default();
         assert!(cmd.get_user_setting_value(CommonProperty::SETTING_SOUND_VOLUME).is_none());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandUserSettings::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandUserSettings::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandUserSettings::default());
-        assert!(s.contains("ServerCommandUserSettings"));
-    }
 
     #[test]
     fn get_id_is_server_user_settings() {

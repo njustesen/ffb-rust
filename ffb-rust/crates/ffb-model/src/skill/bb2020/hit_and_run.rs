@@ -25,14 +25,20 @@ impl std::ops::Deref for HitAndRun {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_hit_and_run() {
         assert_eq!(HitAndRun::new().get_name(), "Hit And Run");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(HitAndRun::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_move_after_block_property() {
+        assert!(SkillId::HitAndRun.properties().contains(&"canMoveAfterBlock"));
     }
 }

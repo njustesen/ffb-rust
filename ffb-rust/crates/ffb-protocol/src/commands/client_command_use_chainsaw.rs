@@ -66,17 +66,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandUseChainsaw::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandUseChainsaw::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_use_chainsaw() {
         assert_eq!(ClientCommandUseChainsaw::default().get_id(), NetCommandId::ClientUseChainsaw);
     }

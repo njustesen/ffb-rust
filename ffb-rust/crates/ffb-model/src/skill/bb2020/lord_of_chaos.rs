@@ -25,15 +25,21 @@ impl std::ops::Deref for LordOfChaos {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_lord_of_chaos() {
         assert_eq!(LordOfChaos::new().get_name(), "Lord of Chaos");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(LordOfChaos::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_grants_single_use_team_reroll_when_on_pitch_property() {
+        assert!(SkillId::LordOfChaos.properties().contains(&"grantsSingleUseTeamRerollWhenOnPitch"));
     }
 
     #[test]

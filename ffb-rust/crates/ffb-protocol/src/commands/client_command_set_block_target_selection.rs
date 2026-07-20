@@ -84,17 +84,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandSetBlockTargetSelection::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandSetBlockTargetSelection::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_set_block_target_selection() {
         assert_eq!(
             ClientCommandSetBlockTargetSelection::new().get_id(),

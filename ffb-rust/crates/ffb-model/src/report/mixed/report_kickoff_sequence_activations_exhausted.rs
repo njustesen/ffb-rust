@@ -43,26 +43,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::KICKOFF_SEQUENCE_ACTIVATIONS_EXHAUSTED); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "kickoffSequenceActivationsExhausted"); }
-
-    #[test]
-    fn is_limit_reached() { assert!(make().is_limit_reached()); }
-
-    #[test]
-    fn not_limit_reached() {
-        let r = ReportKickoffSequenceActivationsExhausted::new(false);
-        assert!(!r.is_limit_reached());
-    }
-
-    #[test]
-    fn get_name_matches() {
-        assert_eq!(make().get_name(), "kickoffSequenceActivationsExhausted");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

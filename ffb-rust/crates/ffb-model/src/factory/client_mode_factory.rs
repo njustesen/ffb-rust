@@ -38,12 +38,6 @@ mod tests {
     }
 
     #[test]
-    fn initialize_does_not_panic() {
-        let mut f = ClientModeFactory::default();
-        f.initialize();
-    }
-
-    #[test]
     fn for_name_a_second_known_variant() {
         assert_eq!(ClientModeFactory::default().for_name("replay"), Some(ClientMode::REPLAY));
     }

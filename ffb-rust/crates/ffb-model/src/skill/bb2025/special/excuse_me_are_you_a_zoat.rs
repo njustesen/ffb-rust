@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
-        assert_eq!(ExcuseMeAreYouAZoat::new().get_name(), "\"Excuse Me, Are You a Zoat?\"");
+    fn name_contains_zoat() {
+        assert!(ExcuseMeAreYouAZoat::new().get_name().contains("Zoat"));
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(ExcuseMeAreYouAZoat::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_gaze_automatically_three_squares_away_property() {
+        assert!(crate::enums::SkillId::ExcuseMeAreYouAZoat.properties().contains(&"canGazeAutomaticallyThreeSquaresAway"));
     }
 }

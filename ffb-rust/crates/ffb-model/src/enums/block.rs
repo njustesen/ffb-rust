@@ -80,35 +80,42 @@ mod tests {
     }
 
     #[test]
-    fn skull_name_is_skull() {
+    fn block_result_all_values_have_name() {
+        for r in BlockResult::all() {
+            assert!(!r.name().is_empty(), "All BlockResult values must have a non-null name");
+        }
+    }
+
+    #[test]
+    fn block_result_name_is_non_empty() {
+        for r in BlockResult::all() {
+            assert!(!r.name().is_empty(), "BlockResult name must not be empty");
+        }
+    }
+
+    #[test]
+    fn block_result_skull_name() {
         assert_eq!(BlockResult::Skull.name(), "SKULL");
     }
 
     #[test]
-    fn both_down_name_is_both_down() {
+    fn block_result_both_down_name() {
         assert_eq!(BlockResult::BothDown.name(), "BOTH DOWN");
     }
 
     #[test]
-    fn pushback_name_is_pushback() {
+    fn block_result_pushback_name() {
         assert_eq!(BlockResult::Pushback.name(), "PUSHBACK");
     }
 
     #[test]
-    fn pow_pushback_name_is_pow_push() {
+    fn block_result_pow_pushback_name() {
         assert_eq!(BlockResult::PowPushback.name(), "POW/PUSH");
     }
 
     #[test]
-    fn pow_name_is_pow() {
+    fn block_result_pow_name() {
         assert_eq!(BlockResult::Pow.name(), "POW");
-    }
-
-    #[test]
-    fn all_block_results_have_non_empty_names() {
-        for r in BlockResult::all() {
-            assert!(!r.name().is_empty());
-        }
     }
 
     #[test]

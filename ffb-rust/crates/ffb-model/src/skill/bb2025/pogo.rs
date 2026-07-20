@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_pogo() {
         assert_eq!(Pogo::new().get_name(), "Pogo");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(Pogo::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_leap_property() {
+        assert!(crate::enums::SkillId::Pogo.properties().contains(&"canLeap"));
     }
 }

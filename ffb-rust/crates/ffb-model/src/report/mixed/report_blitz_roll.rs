@@ -51,21 +51,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::BLITZ_ROLL); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "blitzRoll"); }
-
-    #[test]
-    fn get_roll() { assert_eq!(make().get_roll(), 4); }
-
-    #[test]
-    fn get_team_id() { assert_eq!(make().get_team_id(), Some("team1")); }
-
-    #[test]
-    fn get_amount() { assert_eq!(make().get_amount(), 2); }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

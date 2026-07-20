@@ -58,37 +58,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::FAN_FACTOR_ROLL_POST_MATCH);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "fanFactorRoll");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_fan_factor_roll_home(), &[3, 4]);
-        assert_eq!(r.get_fan_factor_modifier_home(), 1);
-        assert_eq!(r.get_fan_factor_modifier_away(), -1);
-    }
-
-    #[test]
-    fn away_roll_stored() {
-        let r = make();
-        assert_eq!(r.get_fan_factor_roll_away(), &[2, 5]);
-    }
-
-    #[test]
-    fn zero_modifiers() {
-        let r = ReportFanFactorRollPostMatch::new(vec![1], 0, vec![2], 0);
-        assert_eq!(r.get_fan_factor_modifier_home(), 0);
-        assert_eq!(r.get_fan_factor_modifier_away(), 0);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

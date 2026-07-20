@@ -1,6 +1,7 @@
 package com.fumbbl.ffb.server.model;
 
 import com.fumbbl.ffb.ClientStateId;
+import com.fumbbl.ffb.factory.ClientStateIdFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -39,6 +40,14 @@ class ClientStateIdTest {
     @Test
     void client_state_id_move_name() {
         assertEquals("move", ClientStateId.MOVE.getName());
+    }
+
+    @Test
+    void client_state_id_all_from_name_round_trip() {
+        ClientStateIdFactory factory = new ClientStateIdFactory();
+        for (ClientStateId id : ClientStateId.values()) {
+            assertEquals(id, factory.forName(id.getName()));
+        }
     }
 
     @Test

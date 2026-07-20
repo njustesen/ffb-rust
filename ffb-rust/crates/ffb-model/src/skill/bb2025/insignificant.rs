@@ -27,13 +27,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_insignificant() {
         assert_eq!(Insignificant::new().get_name(), "Insignificant");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(Insignificant::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the bb2025 Java postConstruct
+        // registers no NamedProperties, so the live SkillId table must be empty here.
+        assert!(crate::enums::SkillId::Insignificant.properties().is_empty());
     }
 
     #[test]

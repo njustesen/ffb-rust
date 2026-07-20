@@ -29,8 +29,27 @@ impl std::ops::Deref for AgilityIncrease {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(AgilityIncrease::new().get_name(), "+AG"); }
+    fn name_is_plus_ag() {
+        assert_eq!(AgilityIncrease::new().get_name(), "+AG");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(AgilityIncrease::new().get_category(), SkillCategory::StatIncrease); }
+    fn category_is_stat_increase() {
+        assert_eq!(AgilityIncrease::new().get_category(), SkillCategory::StatIncrease);
+    }
+
+    // Java: assertNotNull(skill.getSkillProperties()). The live Rust mechanism always
+    // returns a valid slice; AgilityIncrease registers no NamedProperties, so the live
+    // property table is empty.
+    #[test]
+    fn skill_properties_are_not_null() {
+        assert!(crate::enums::SkillId::AgilityIncrease.properties().is_empty());
+    }
+
+    #[test]
+    fn class_name_is_agility_increase() {
+        assert_eq!(crate::enums::SkillId::AgilityIncrease.class_name(), "AgilityIncrease");
+    }
 }

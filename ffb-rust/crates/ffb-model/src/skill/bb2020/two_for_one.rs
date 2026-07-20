@@ -28,25 +28,25 @@ impl std::ops::Deref for TwoForOne {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_two_for_one() {
         assert_eq!(TwoForOne::new().get_name(), "Two for One");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(TwoForOne::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_reduces_loner_roll_if_partner_is_hurt_property() {
+        assert!(SkillId::TwoForOne.properties().contains(&"reducesLonerRollIfPartnerIsHurt"));
     }
 
     #[test]
     fn usage_type_is_correct() {
         assert_eq!(TwoForOne::new().get_skill_usage_type(), SkillUsageType::Special);
-    }
-
-    #[test]
-    fn registers_named_property() {
-        use crate::enums::SkillId;
-        assert!(SkillId::TwoForOne.properties().contains(&"reducesLonerRollIfPartnerIsHurt"));
     }
 }

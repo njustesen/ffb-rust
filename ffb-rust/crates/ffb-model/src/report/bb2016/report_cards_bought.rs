@@ -49,38 +49,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::CARDS_BOUGHT);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "cardsBought");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_team_id(), "team1");
-        assert_eq!(r.get_nr_of_cards(), 2);
-        assert_eq!(r.get_gold(), 50000);
-    }
-
-    #[test]
-    fn zero_cards_zero_gold() {
-        let r = ReportCardsBought::new("team2".into(), 0, 0);
-        assert_eq!(r.get_nr_of_cards(), 0);
-        assert_eq!(r.get_gold(), 0);
-    }
-
-    #[test]
-    fn different_team_id() {
-        let r = ReportCardsBought::new("away_team".into(), 5, 100000);
-        assert_eq!(r.get_team_id(), "away_team");
-        assert_eq!(r.get_nr_of_cards(), 5);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

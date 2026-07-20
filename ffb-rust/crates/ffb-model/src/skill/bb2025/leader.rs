@@ -27,13 +27,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_leader() {
         assert_eq!(Leader::new().get_name(), "Leader");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_passing() {
         assert_eq!(Leader::new().get_category(), SkillCategory::Passing);
+    }
+
+    #[test]
+    fn class_name_is_leader() {
+        assert_eq!(crate::enums::SkillId::Leader.class_name(), "Leader");
     }
 
     #[test]

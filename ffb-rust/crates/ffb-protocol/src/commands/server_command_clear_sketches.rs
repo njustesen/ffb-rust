@@ -40,25 +40,6 @@ mod tests {
     }
 
     #[test]
-    fn default_same_as_new() { let _ = ServerCommandClearSketches::default(); }
-
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandClearSketches::new()).is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandClearSketches::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandClearSketches::default());
-        assert!(s.contains("ServerCommandClearSketches"));
-    }
-
-    #[test]
     fn get_id_is_server_clear_sketches() {
         assert_eq!(ServerCommandClearSketches::new().get_id(), NetCommandId::ServerClearSketches);
     }

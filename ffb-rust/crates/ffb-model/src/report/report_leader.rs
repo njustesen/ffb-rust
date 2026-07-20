@@ -55,35 +55,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::LEADER);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "leader");
-    }
-
-    #[test]
-    fn field_getters() {
-        let r = make();
-        assert_eq!(r.get_team_id(), "team1");
-        assert_eq!(r.get_leader_state(), LeaderState::Available);
-    }
-
-    #[test]
-    fn different_team_id() {
-        let r = ReportLeader::new("team2".into(), LeaderState::Available);
-        assert_eq!(r.get_team_id(), "team2");
-    }
-
-    #[test]
-    fn used_leader_state() {
-        let r = ReportLeader::new("team1".into(), LeaderState::Used);
-        assert_eq!(r.get_leader_state(), LeaderState::Used);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

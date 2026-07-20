@@ -95,4 +95,11 @@ class ScatterCalcTest {
         FieldCoordinate result = ScatterCalc.scatterCoordinate(start, Direction.SOUTH, 0);
         assertEquals(start, result);
     }
+
+    @Test
+    void scatter_southwest_distanceThree() {
+        FieldCoordinate result = ScatterCalc.scatterCoordinate(new FieldCoordinate(10, 5), Direction.SOUTHWEST, 3);
+        // dx=-3, dy=+3
+        assertEquals(new FieldCoordinate(7, 8), result);
+    }
 }

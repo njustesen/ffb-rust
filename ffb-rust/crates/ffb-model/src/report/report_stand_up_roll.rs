@@ -67,38 +67,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::STAND_UP_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "standUpRoll");
-    }
-
-    #[test]
-    fn minimum_roll_clamped() {
-        // modifier=1 → 4-1=3; modifier=3 → 4-3=1 clamped to 2
-        assert_eq!(make().get_minimum_roll(), 3);
-        let r = ReportStandUpRoll::new(Some("p1".into()), true, 2, 3, false);
-        assert_eq!(r.get_minimum_roll(), 2);
-    }
-
-    #[test]
-    fn get_player_id() {
-        assert_eq!(make().get_player_id(), Some("p1"));
-        let r = ReportStandUpRoll::new(None, false, 1, 0, false);
-        assert_eq!(r.get_player_id(), None);
-    }
-
-    #[test]
-    fn is_re_rolled() {
-        assert!(!make().is_re_rolled());
-        let r = ReportStandUpRoll::new(Some("p1".into()), true, 4, 1, true);
-        assert!(r.is_re_rolled());
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

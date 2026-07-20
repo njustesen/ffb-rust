@@ -112,22 +112,6 @@ mod tests {
         assert!(cmd.server_version.is_empty());
         assert!(cmd.client_properties.is_empty());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandVersion::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandVersion::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandVersion::default());
-        assert!(s.contains("ServerCommandVersion"));
-    }
 
     #[test]
     fn get_id_is_server_version() {

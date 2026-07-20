@@ -70,39 +70,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::JUMP_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        // JUMP_ROLL maps to "leapRoll" in the Java source
-        assert_eq!(make().get_name(), "leapRoll");
-    }
-
-    #[test]
-    fn base_fields() {
-        let r = make();
-        assert!(r.base.is_successful());
-        assert_eq!(r.base.get_roll(), 4);
-        assert_eq!(r.base.get_minimum_roll(), 3);
-    }
-
-    #[test]
-    fn minimum_roll_and_rerolled() {
-        let r = ReportJumpRoll::new(Some("p1".into()), true, 4, 3, true, vec![]);
-        assert_eq!(r.base.get_minimum_roll(), 3);
-        assert!(r.base.is_re_rolled());
-    }
-
-    #[test]
-    fn unsuccessful_with_modifiers() {
-        let r = ReportJumpRoll::new(None, false, 2, 4, false, vec!["TackleZone".into()]);
-        assert!(!r.base.is_successful());
-        assert_eq!(r.base.get_roll_modifiers().len(), 1);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

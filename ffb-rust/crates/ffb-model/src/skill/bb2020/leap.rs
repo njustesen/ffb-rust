@@ -25,14 +25,20 @@ impl std::ops::Deref for Leap {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_leap() {
         assert_eq!(Leap::new().get_name(), "Leap");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_agility() {
         assert_eq!(Leap::new().get_category(), SkillCategory::Agility);
+    }
+
+    #[test]
+    fn has_can_leap_property() {
+        assert!(SkillId::Leap.properties().contains(&"canLeap"));
     }
 }

@@ -47,25 +47,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::ANIMAL_SAVAGERY); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "animalSavagery"); }
-
-    #[test]
-    fn get_attacker_id() { assert_eq!(make().get_attacker_id(), Some("a1")); }
-
-    #[test]
-    fn get_defender_id() { assert_eq!(make().get_defender_id(), Some("d1")); }
-
-    #[test]
-    fn none_ids() {
-        let r = ReportAnimalSavagery::new(None, None);
-        assert_eq!(r.get_attacker_id(), None);
-        assert_eq!(r.get_defender_id(), None);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

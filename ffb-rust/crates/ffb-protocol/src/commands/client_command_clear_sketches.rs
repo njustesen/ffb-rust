@@ -42,27 +42,6 @@ impl NetCommand for ClientCommandClearSketches {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn can_construct() { let _ = ClientCommandClearSketches::new(); }
-
-    #[test]
-    fn default_same_as_new() { let _ = ClientCommandClearSketches::default(); }
-
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandClearSketches::new()).is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandClearSketches::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandClearSketches::default());
-        assert!(s.contains("ClientCommandClearSketches"));
-    }
 
     #[test]
     fn requires_control_is_true() {

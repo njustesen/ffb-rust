@@ -25,14 +25,22 @@ impl std::ops::Deref for Stab {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
+
+    // bb2020/Stab is SkillCategory.TRAIT (the bb2016 test's EXTRAORDINARY is bb2016-only).
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_stab() {
         assert_eq!(Stab::new().get_name(), "Stab");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(Stab::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_perform_armour_roll_instead_of_block_property() {
+        assert!(SkillId::Stab.properties().contains(&"canPerformArmourRollInsteadOfBlock"));
     }
 }

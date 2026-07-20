@@ -25,8 +25,24 @@ impl std::ops::Deref for ArmBar {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(ArmBar::new().get_name(), "Arm Bar"); }
+    fn name_is_arm_bar() {
+        assert_eq!(ArmBar::new().get_name(), "Arm Bar");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(ArmBar::new().get_category(), SkillCategory::Strength); }
+    fn category_is_strength() {
+        assert_eq!(ArmBar::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn has_affects_either_armour_or_injury_on_dodge_property() {
+        assert!(crate::enums::SkillId::ArmBar.properties().contains(&"affectsEitherArmourOrInjuryOnDodge"));
+    }
+
+    #[test]
+    fn class_name_is_arm_bar() {
+        assert_eq!(crate::enums::SkillId::ArmBar.class_name(), "ArmBar");
+    }
 }

@@ -35,13 +35,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_wisdom_of_the_white_dwarf() {
         assert_eq!(WisdomOfTheWhiteDwarf::new().get_name(), "Wisdom of the White Dwarf");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(WisdomOfTheWhiteDwarf::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_grant_skills_to_team_mates_property() {
+        assert!(crate::enums::SkillId::WisdomOfTheWhiteDwarf.properties().contains(&"canGrantSkillsToTeamMates"));
     }
 
     #[test]

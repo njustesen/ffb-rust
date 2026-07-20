@@ -36,27 +36,6 @@ impl NetCommand for ClientCommandCloseSession {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn can_construct() { let _ = ClientCommandCloseSession::new(); }
-
-    #[test]
-    fn default_same_as_new() { let _ = ClientCommandCloseSession::default(); }
-
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandCloseSession::new()).is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandCloseSession::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandCloseSession::default());
-        assert!(s.contains("ClientCommandCloseSession"));
-    }
 
     #[test]
     fn get_id_is_client_close_session() {

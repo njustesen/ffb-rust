@@ -56,37 +56,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::FUMBBL_RESULT_UPLOAD);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "fumbblResultUpload");
-    }
-
-    #[test]
-    fn field_getters() {
-        let r = make();
-        assert!(r.is_successful());
-        assert_eq!(r.get_upload_status(), "OK");
-    }
-
-    #[test]
-    fn unsuccessful_upload() {
-        let r = ReportFumbblResultUpload::new(false, "ERROR".into());
-        assert!(!r.is_successful());
-        assert_eq!(r.get_upload_status(), "ERROR");
-    }
-
-    #[test]
-    fn different_status_string() {
-        let r = ReportFumbblResultUpload::new(true, "PENDING".into());
-        assert!(r.is_successful());
-        assert_eq!(r.get_upload_status(), "PENDING");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

@@ -28,15 +28,19 @@ impl std::ops::Deref for Sprint {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(Sprint::new().get_name(), "Sprint"); }
+    fn name_is_sprint() {
+        assert_eq!(Sprint::new().get_name(), "Sprint");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Sprint::new().get_category(), SkillCategory::Agility); }
+    fn category_is_agility() {
+        assert_eq!(Sprint::new().get_category(), SkillCategory::Agility);
+    }
+
     #[test]
-    fn registers_can_make_an_extra_gfi_property() {
-        // Java Sprint.postConstruct() registers canMakeAnExtraGfi;
-        // this would have failed before the fix since no property was registered.
-        let s = Sprint::new();
-        assert!(s.has_skill_property(NamedProperties::CAN_MAKE_AN_EXTRA_GFI));
+    fn has_can_make_extra_gfi_property() {
+        assert!(crate::enums::SkillId::Sprint.properties().contains(&"canMakeAnExtraGfi"));
     }
 }

@@ -25,15 +25,21 @@ impl std::ops::Deref for BoneHead {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_bone_head() {
         assert_eq!(BoneHead::new().get_name(), "Bone Head");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(BoneHead::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_applies_confusion_property() {
+        assert!(SkillId::BoneHead.properties().contains(&"appliesConfusion"));
     }
 
     #[test]

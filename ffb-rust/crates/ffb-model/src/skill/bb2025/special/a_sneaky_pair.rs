@@ -27,12 +27,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_a_sneaky_pair() {
         assert_eq!(ASneakyPair::new().get_name(), "A Sneaky Pair");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(ASneakyPair::new().get_category(), SkillCategory::Trait);
     }
 }

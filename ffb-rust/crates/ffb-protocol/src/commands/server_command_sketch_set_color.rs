@@ -77,22 +77,6 @@ mod tests {
         assert!(cmd.sketch_ids.is_empty());
         assert_eq!(cmd.rbg, 0);
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandSketchSetColor::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandSketchSetColor::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandSketchSetColor::default());
-        assert!(s.contains("ServerCommandSketchSetColor"));
-    }
 
     #[test]
     fn get_id_is_server_sketch_set_color() {

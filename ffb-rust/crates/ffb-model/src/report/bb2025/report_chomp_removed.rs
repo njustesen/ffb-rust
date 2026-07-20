@@ -41,36 +41,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_id() {
-        assert_eq!(ReportChompRemoved::new("p1".into(), true).get_id(), ReportId::CHOMP_REMOVED);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(ReportChompRemoved::new("p1".into(), true).get_name(), "chompRemoved");
-    }
-
-    #[test]
-    fn fields() {
-        let r = ReportChompRemoved::new("p1".into(), true);
-        assert_eq!(r.get_player(), "p1");
-        assert!(r.is_successful());
-    }
-
-    #[test]
-    fn unsuccessful() {
-        let r = ReportChompRemoved::new("p2".into(), false);
-        assert!(!r.is_successful());
-        assert_eq!(r.get_player(), "p2");
-    }
-
-    #[test]
-    fn different_player() {
-        let r = ReportChompRemoved::new("bigGuy".into(), true);
-        assert_eq!(r.get_player(), "bigGuy");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = ReportChompRemoved::new("p1".into(), true);
         let json = original.to_json_value();

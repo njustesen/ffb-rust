@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_brawler() {
         assert_eq!(Brawler::new().get_name(), "Brawler");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_strength() {
         assert_eq!(Brawler::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn has_can_reroll_single_both_down_property() {
+        assert!(crate::enums::SkillId::Brawler.properties().contains(&"canRerollSingleBothDown"));
     }
 }

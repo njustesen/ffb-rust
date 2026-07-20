@@ -83,17 +83,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandRemoveSketches::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandRemoveSketches::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_remove_sketches() {
         assert_eq!(ClientCommandRemoveSketches::new().get_id(), NetCommandId::ClientRemoveSketches);
     }

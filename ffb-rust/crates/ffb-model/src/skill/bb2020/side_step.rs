@@ -30,14 +30,20 @@ impl std::ops::Deref for SideStep {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_side_step() {
         assert_eq!(SideStep::new().get_name(), "Side Step");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_agility() {
         assert_eq!(SideStep::new().get_category(), SkillCategory::Agility);
+    }
+
+    #[test]
+    fn has_can_choose_own_pushed_back_square_property() {
+        assert!(SkillId::SideStep.properties().contains(&"canChooseOwnPushedBackSquare"));
     }
 }

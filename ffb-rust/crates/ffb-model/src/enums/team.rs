@@ -259,17 +259,37 @@ mod tests {
 
     #[test]
     fn box_type_count_is_two() {
-        assert_eq!(BoxType::from_id(1).is_some() as u8 + BoxType::from_id(2).is_some() as u8, 2);
+        assert_eq!([BoxType::Reserves, BoxType::Out].len(), 2);
     }
 
     #[test]
-    fn box_type_from_name_reserves() {
+    fn box_type_reserves_id_is_one() {
+        assert_eq!(BoxType::Reserves.id(), 1);
+    }
+
+    #[test]
+    fn box_type_out_id_is_two() {
+        assert_eq!(BoxType::Out.id(), 2);
+    }
+
+    #[test]
+    fn box_type_from_id_one_is_reserves() {
+        assert_eq!(BoxType::from_id(1), Some(BoxType::Reserves));
+    }
+
+    #[test]
+    fn box_type_from_id_two_is_out() {
+        assert_eq!(BoxType::from_id(2), Some(BoxType::Out));
+    }
+
+    #[test]
+    fn box_type_from_name() {
         assert_eq!(BoxType::from_name("reserves"), Some(BoxType::Reserves));
         assert_eq!(BoxType::from_name("out"), Some(BoxType::Out));
     }
 
     #[test]
-    fn box_type_from_id_unknown_is_none() {
+    fn box_type_from_id_unknown_returns_null() {
         assert!(BoxType::from_id(99).is_none());
     }
 
@@ -313,7 +333,12 @@ mod tests {
     }
 
     #[test]
-    fn team_status_all_have_non_empty_names() {
+    fn team_status_skill_rolls_pending_id_is_six() {
+        assert_eq!(TeamStatus::SkillRollsPending.id(), 6);
+    }
+
+    #[test]
+    fn team_status_all_have_non_null_name() {
         for s in [
             TeamStatus::New, TeamStatus::Active, TeamStatus::PendingApproval, TeamStatus::Blocked,
             TeamStatus::Retired, TeamStatus::WaitingForOpponent, TeamStatus::SkillRollsPending,
@@ -323,27 +348,22 @@ mod tests {
     }
 
     #[test]
-    fn send_to_box_reason_all_have_non_empty_names() {
-        for r in [
-            SendToBoxReason::Mng, SendToBoxReason::FoulBan, SendToBoxReason::Fouled,
-            SendToBoxReason::Blocked, SendToBoxReason::CrowdPushed, SendToBoxReason::DodgeFail,
-            SendToBoxReason::GfiFail, SendToBoxReason::Kicked, SendToBoxReason::Stabbed,
-            SendToBoxReason::Lightning, SendToBoxReason::Fireball, SendToBoxReason::Bomb,
-        ] {
+    fn send_to_box_reason_all_have_non_null_name() {
+        for r in SendToBoxReason::all() {
             assert!(!r.name().is_empty());
         }
     }
 
     #[test]
-    fn send_to_box_reason_all_have_non_empty_reasons() {
-        for r in [
-            SendToBoxReason::Mng, SendToBoxReason::FoulBan, SendToBoxReason::Fouled,
-            SendToBoxReason::Blocked, SendToBoxReason::CrowdPushed, SendToBoxReason::DodgeFail,
-            SendToBoxReason::GfiFail, SendToBoxReason::Kicked, SendToBoxReason::Stabbed,
-            SendToBoxReason::Lightning, SendToBoxReason::Fireball, SendToBoxReason::Bomb,
-        ] {
+    fn send_to_box_reason_all_have_non_null_reason() {
+        for r in SendToBoxReason::all() {
             assert!(!r.reason().is_empty());
         }
+    }
+
+    #[test]
+    fn send_to_box_reason_at_least_thirty_seven_variants() {
+        assert!(SendToBoxReason::all().len() >= 37);
     }
 
     #[test]

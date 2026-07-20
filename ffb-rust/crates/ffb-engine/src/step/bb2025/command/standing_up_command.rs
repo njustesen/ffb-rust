@@ -56,8 +56,4 @@ mod tests {
         let params = StandingUpCommand.execute(&mut game);
         assert!(params.is_empty());
     }
-    #[test]
-    fn is_zero_sized_unit_struct() {
-        assert_eq!(std::mem::size_of::<StandingUpCommand>(), 0);
-    }
 }

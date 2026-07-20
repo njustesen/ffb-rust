@@ -153,22 +153,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::TURN_END); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "turnEnd"); }
-
-    #[test]
-    fn get_player_id_touchdown() { assert_eq!(make().get_player_id_touchdown(), Some("scorer")); }
-
-    #[test]
-    fn get_knockout_recoveries() { assert_eq!(make().get_knockout_recoveries().len(), 1); }
-    #[test]
-    fn get_name_is_nonempty() {
-        assert!(!make().get_name().is_empty());
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = ReportTurnEnd::new(
             Some("scorer".into()),

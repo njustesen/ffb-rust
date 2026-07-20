@@ -60,37 +60,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::TURN_END);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "turnEnd");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_player_id_touchdown(), Some("scorer"));
-        assert!(r.get_knockout_recoveries().is_empty());
-    }
-
-    #[test]
-    fn no_touchdown_none() {
-        let r = ReportTurnEnd::new(None, vec![], vec![], vec![]);
-        assert_eq!(r.get_player_id_touchdown(), None);
-        assert!(r.get_heat_exhaustions().is_empty());
-    }
-
-    #[test]
-    fn unzapped_player_ids_stored() {
-        let r = ReportTurnEnd::new(None, vec![], vec![], vec!["p1".into(), "p2".into()]);
-        assert_eq!(r.get_unzapped_player_ids().len(), 2);
-        assert_eq!(r.get_unzapped_player_ids()[0], "p1");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

@@ -25,10 +25,30 @@ impl std::ops::Deref for TakeRoot {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors ffb-java TakeRootSkillTest (written against the bb2016 class, where
+    // the category is EXTRAORDINARY); category adapted to the mixed edition's
+    // constructor (TRAIT). Property assertion verified against the mixed
+    // edition's postConstruct, which registers becomesImmovable. The Java
+    // `is_bb2016_edition` test is skipped (edition annotations are covered
+    // elsewhere).
+
     #[test]
-    fn name_is_correct() { assert_eq!(TakeRoot::new().get_name(), "Take Root"); }
+    fn name_is_take_root() {
+        assert_eq!(TakeRoot::new().get_name(), "Take Root");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(TakeRoot::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(TakeRoot::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_becomes_immovable_property() {
+        assert!(crate::enums::SkillId::TakeRoot.properties().contains(&"becomesImmovable"));
+    }
+
+    // Additional Rust-side logic test beyond the Java test class.
     #[test]
     fn is_negative_trait() { assert!(TakeRoot::new().is_negative_trait()); }
 }

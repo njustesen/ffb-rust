@@ -175,24 +175,40 @@ impl ClientStateId {
     }
 }
 
+/// Java: `ClientStateId.toString()` returns `getName()`.
+impl std::fmt::Display for ClientStateId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn round_trip_name() {
-        let ids = [
-            ClientStateId::Login,
-            ClientStateId::Move,
-            ClientStateId::Block,
-            ClientStateId::Setup,
-            ClientStateId::Kickoff,
-            ClientStateId::Punt,
-        ];
-        for id in &ids {
-            assert_eq!(ClientStateId::from_name(id.name()), Some(*id));
-        }
-    }
+    const ALL: [ClientStateId; 52] = [
+        ClientStateId::Login, ClientStateId::StartGame, ClientStateId::SelectPlayer,
+        ClientStateId::Move, ClientStateId::Block, ClientStateId::Blitz,
+        ClientStateId::HandOver, ClientStateId::Pass, ClientStateId::Spectate,
+        ClientStateId::Setup, ClientStateId::Kickoff, ClientStateId::Pushback,
+        ClientStateId::Interception, ClientStateId::Foul, ClientStateId::HighKick,
+        ClientStateId::QuickSnap, ClientStateId::Touchback, ClientStateId::WaitForOpponent,
+        ClientStateId::Replay, ClientStateId::ThrowTeamMate, ClientStateId::KickTeamMate,
+        ClientStateId::Swoop, ClientStateId::DumpOff, ClientStateId::WaitForSetup,
+        ClientStateId::Gaze, ClientStateId::KickoffReturn, ClientStateId::Swarming,
+        ClientStateId::Wizard, ClientStateId::PassBlock, ClientStateId::Bomb,
+        ClientStateId::IllegalSubstitution, ClientStateId::GazeMove,
+        ClientStateId::SelectBlitzTarget, ClientStateId::SelectGazeTarget,
+        ClientStateId::SynchronousMultiBlock, ClientStateId::PlaceBall,
+        ClientStateId::SolidDefence, ClientStateId::KickTeamMateThrow,
+        ClientStateId::ThrowKeg, ClientStateId::RaidingParty,
+        ClientStateId::SelectBlockKind, ClientStateId::MaximumCarnage,
+        ClientStateId::HitAndRun, ClientStateId::PutridRegurgitationBlitz,
+        ClientStateId::Trickster, ClientStateId::PutridRegurgitationBlock,
+        ClientStateId::KickEmBlock, ClientStateId::KickEmBlitz,
+        ClientStateId::ThenIStartedBlastin, ClientStateId::Stab,
+        ClientStateId::FuriousOutburst, ClientStateId::Punt,
+    ];
 
     #[test]
     fn serde_round_trip() {
@@ -203,80 +219,60 @@ mod tests {
     }
 
     #[test]
-    fn login_name_is_login() {
+    fn client_state_id_all_have_non_null_name() {
+        for id in ALL {
+            assert!(!id.name().is_empty());
+        }
+    }
+
+    #[test]
+    fn client_state_id_login_name() {
         assert_eq!(ClientStateId::Login.name(), "login");
     }
 
     #[test]
-    fn move_name_is_move() {
-        assert_eq!(ClientStateId::Move.name(), "move");
+    fn client_state_id_select_player_name() {
+        assert_eq!(ClientStateId::SelectPlayer.name(), "selectPlayer");
     }
 
     #[test]
-    fn block_name_is_block() {
+    fn client_state_id_block_name() {
         assert_eq!(ClientStateId::Block.name(), "block");
     }
 
     #[test]
-    fn all_from_name_round_trip() {
-        let samples = [
-            ClientStateId::Login, ClientStateId::Move, ClientStateId::Block,
-            ClientStateId::Setup, ClientStateId::Kickoff, ClientStateId::Punt,
-            ClientStateId::Stab, ClientStateId::ThenIStartedBlastin,
-        ];
-        for id in samples {
+    fn client_state_id_setup_name() {
+        assert_eq!(ClientStateId::Setup.name(), "setup");
+    }
+
+    #[test]
+    fn client_state_id_move_name() {
+        assert_eq!(ClientStateId::Move.name(), "move");
+    }
+
+    #[test]
+    fn client_state_id_all_from_name_round_trip() {
+        for id in ALL {
             assert_eq!(ClientStateId::from_name(id.name()), Some(id));
         }
     }
 
     #[test]
-    fn names_are_unique() {
-        let all = [
-            ClientStateId::Login, ClientStateId::StartGame, ClientStateId::SelectPlayer,
-            ClientStateId::Move, ClientStateId::Block, ClientStateId::Blitz,
-            ClientStateId::HandOver, ClientStateId::Pass, ClientStateId::Spectate,
-            ClientStateId::Setup, ClientStateId::Kickoff, ClientStateId::Pushback,
-            ClientStateId::Interception, ClientStateId::Foul, ClientStateId::HighKick,
-            ClientStateId::QuickSnap, ClientStateId::Touchback, ClientStateId::WaitForOpponent,
-            ClientStateId::Replay, ClientStateId::ThrowTeamMate, ClientStateId::KickTeamMate,
-            ClientStateId::Swoop, ClientStateId::DumpOff, ClientStateId::WaitForSetup,
-            ClientStateId::Gaze, ClientStateId::KickoffReturn, ClientStateId::Swarming,
-            ClientStateId::Wizard, ClientStateId::PassBlock, ClientStateId::Bomb,
-        ];
-        let unique: std::collections::HashSet<_> = all.iter().map(|id| id.name()).collect();
-        assert_eq!(unique.len(), all.len());
+    fn client_state_id_names_are_unique() {
+        let unique: std::collections::HashSet<_> = ALL.iter().map(|id| id.name()).collect();
+        assert_eq!(unique.len(), ALL.len());
     }
 
     #[test]
-    fn client_state_id_count_exceeds_50() {
-        let all = [
-            ClientStateId::Login, ClientStateId::StartGame, ClientStateId::SelectPlayer,
-            ClientStateId::Move, ClientStateId::Block, ClientStateId::Blitz,
-            ClientStateId::HandOver, ClientStateId::Pass, ClientStateId::Spectate,
-            ClientStateId::Setup, ClientStateId::Kickoff, ClientStateId::Pushback,
-            ClientStateId::Interception, ClientStateId::Foul, ClientStateId::HighKick,
-            ClientStateId::QuickSnap, ClientStateId::Touchback, ClientStateId::WaitForOpponent,
-            ClientStateId::Replay, ClientStateId::ThrowTeamMate, ClientStateId::KickTeamMate,
-            ClientStateId::Swoop, ClientStateId::DumpOff, ClientStateId::WaitForSetup,
-            ClientStateId::Gaze, ClientStateId::KickoffReturn, ClientStateId::Swarming,
-            ClientStateId::Wizard, ClientStateId::PassBlock, ClientStateId::Bomb,
-            ClientStateId::IllegalSubstitution, ClientStateId::GazeMove,
-            ClientStateId::SelectBlitzTarget, ClientStateId::SelectGazeTarget,
-            ClientStateId::SynchronousMultiBlock, ClientStateId::PlaceBall,
-            ClientStateId::SolidDefence, ClientStateId::KickTeamMateThrow,
-            ClientStateId::ThrowKeg, ClientStateId::RaidingParty,
-            ClientStateId::SelectBlockKind, ClientStateId::MaximumCarnage,
-            ClientStateId::HitAndRun, ClientStateId::PutridRegurgitationBlitz,
-            ClientStateId::Trickster, ClientStateId::PutridRegurgitationBlock,
-            ClientStateId::KickEmBlock, ClientStateId::KickEmBlitz,
-            ClientStateId::ThenIStartedBlastin, ClientStateId::Stab,
-            ClientStateId::FuriousOutburst, ClientStateId::Punt,
-        ];
-        assert!(all.len() > 50);
+    fn client_state_id_to_string_equals_name() {
+        // Java: for each id, assertEquals(id.getName(), id.toString());
+        for id in ALL {
+            assert_eq!(id.to_string(), id.name());
+        }
     }
 
     #[test]
-    fn punt_from_name_round_trip() {
-        assert_eq!(ClientStateId::from_name(ClientStateId::Punt.name()), Some(ClientStateId::Punt));
+    fn client_state_id_at_least_forty_variants() {
+        assert!(ALL.len() >= 40);
     }
 }

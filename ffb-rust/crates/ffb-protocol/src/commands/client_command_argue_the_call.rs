@@ -81,17 +81,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandArgueTheCall::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandArgueTheCall::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_argue_the_call() {
         assert_eq!(ClientCommandArgueTheCall::new().get_id(), NetCommandId::ClientArgueTheCall);
     }

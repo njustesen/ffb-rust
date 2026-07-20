@@ -62,22 +62,6 @@ mod tests {
         let cmd = ClientCommandUnsetBlockTargetSelection::with_player_id("p-99");
         assert_eq!(cmd.get_player_id(), Some("p-99"));
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandUnsetBlockTargetSelection::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandUnsetBlockTargetSelection::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandUnsetBlockTargetSelection::default());
-        assert!(s.contains("ClientCommandUnsetBlockTargetSelection"));
-    }
 
     #[test]
     fn get_id_is_client_unset_block_target_selection() {

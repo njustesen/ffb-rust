@@ -25,8 +25,31 @@ impl std::ops::Deref for NervesOfSteel {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors ffb-java NervesOfSteelSkillTest (written against the bb2016 class);
+    // property assertions verified against the mixed edition's postConstruct,
+    // which registers ignoreTacklezonesWhenPassing + ignoreTacklezonesWhenCatching.
+    // The Java `is_bb2016_edition` test is skipped (edition annotations are
+    // covered elsewhere). The Pass/Interception/Catch modifiers it registers have
+    // no live Rust equivalent to assert against.
+
     #[test]
-    fn name_is_correct() { assert_eq!(NervesOfSteel::new().get_name(), "Nerves of Steel"); }
+    fn name_is_nerves_of_steel() {
+        assert_eq!(NervesOfSteel::new().get_name(), "Nerves of Steel");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(NervesOfSteel::new().get_category(), SkillCategory::Passing); }
+    fn category_is_passing() {
+        assert_eq!(NervesOfSteel::new().get_category(), SkillCategory::Passing);
+    }
+
+    #[test]
+    fn has_ignore_tacklezones_when_passing_property() {
+        assert!(crate::enums::SkillId::NervesOfSteel.properties().contains(&"ignoreTacklezonesWhenPassing"));
+    }
+
+    #[test]
+    fn has_ignore_tacklezones_when_catching_property() {
+        assert!(crate::enums::SkillId::NervesOfSteel.properties().contains(&"ignoreTacklezonesWhenCatching"));
+    }
 }

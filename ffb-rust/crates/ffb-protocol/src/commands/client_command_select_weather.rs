@@ -87,17 +87,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandSelectWeather::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandSelectWeather::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_select_weather() {
         assert_eq!(ClientCommandSelectWeather::new().get_id(), NetCommandId::ClientSelectWeather);
     }

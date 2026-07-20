@@ -25,8 +25,19 @@ impl std::ops::Deref for Dauntless {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(Dauntless::new().get_name(), "Dauntless"); }
+    fn name_is_dauntless() {
+        assert_eq!(Dauntless::new().get_name(), "Dauntless");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Dauntless::new().get_category(), SkillCategory::General); }
+    fn category_is_general() {
+        assert_eq!(Dauntless::new().get_category(), SkillCategory::General);
+    }
+
+    #[test]
+    fn has_can_roll_to_match_opponents_strength_property() {
+        assert!(crate::enums::SkillId::Dauntless.properties().contains(&"canRollToMatchOpponentsStrength"));
+    }
 }

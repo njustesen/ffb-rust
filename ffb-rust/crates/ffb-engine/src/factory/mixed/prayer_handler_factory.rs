@@ -213,13 +213,6 @@ mod tests {
     }
 
     #[test]
-    fn initialize_does_not_panic() {
-        let mut f = PrayerHandlerFactory::new();
-        f.initialize(Rules::Bb2025);
-        f.initialize(Rules::Bb2020);
-    }
-
-    #[test]
     fn deactivate_prayers_removes_fan_interaction_effect() {
         use crate::step::framework::test_team;
         use ffb_model::model::game::Game;

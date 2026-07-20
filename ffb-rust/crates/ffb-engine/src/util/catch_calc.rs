@@ -57,81 +57,123 @@ impl Default for CatchCalc {
     }
 }
 
+// Test mirror of com.fumbbl.ffb.server.util.CatchCalcTest
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn minimum_roll_catch_bb2016_ag3_no_mods() {
-        // base = 7-3 = 4; +0 = 4
-        assert_eq!(CatchCalc::minimum_roll_catch_bb2016(3, 0), 4);
-    }
+    // ── minimum_roll_catch_bb2016 ────────────────────────────────────────────
 
     #[test]
-    fn minimum_roll_catch_bb2016_floored_at_2() {
-        // ag=6, base=1, +0 → 1 → clamped to 2
-        assert_eq!(CatchCalc::minimum_roll_catch_bb2016(6, 0), 2);
-    }
-
-    #[test]
-    fn minimum_roll_interception_bb2016_ag3() {
-        // base=4, +2=6
-        assert_eq!(CatchCalc::minimum_roll_interception_bb2016(3, 0), 6);
-    }
-
-    #[test]
-    fn minimum_roll_interception_bb2016_harder_than_catch() {
-        for ag in 1..=6 {
-            let catch = CatchCalc::minimum_roll_catch_bb2016(ag, 0);
-            let interception = CatchCalc::minimum_roll_interception_bb2016(ag, 0);
-            assert!(interception >= catch, "interception should be >= catch for ag={}", ag);
+    fn bb2016_catch_agility_table() {
+        for (ag, expected) in [(1, 6), (2, 5), (3, 4), (4, 3), (5, 2), (6, 2)] {
+            assert_eq!(CatchCalc::minimum_roll_catch_bb2016(ag, 0), expected, "ag={ag}");
         }
     }
 
     #[test]
-    fn minimum_roll_catch_bb2020_ag3_no_mods() {
-        assert_eq!(CatchCalc::minimum_roll_catch_bb2020(3, 0), 3);
+    fn bb2016_catch_harder_than_dodge_for_ag4() {
+        // Catch uses base; dodge uses base-1
+        let catch_target = CatchCalc::minimum_roll_catch_bb2016(4, 0);
+        let dodge_target = AgilityCalc::minimum_roll_dodge_bb2016(4, 0);
+        assert_eq!(
+            catch_target,
+            dodge_target + 1,
+            "catch should be 1 harder than dodge for AG4"
+        );
     }
 
     #[test]
-    fn minimum_roll_interception_bb2020_same_as_catch() {
-        // In BB2020, interception uses same formula as catch
-        for ag in 2..=6 {
+    fn bb2016_catch_with_positive_modifier_harder() {
+        // AG3, +1 rain: 4 + 1 = 5
+        assert_eq!(CatchCalc::minimum_roll_catch_bb2016(3, 1), 5);
+    }
+
+    #[test]
+    fn bb2016_catch_with_negative_modifier_easier() {
+        // AG4, -1 sure hands bonus: 3 - 1 = 2 (floor 2)
+        assert_eq!(CatchCalc::minimum_roll_catch_bb2016(4, -1), 2);
+    }
+
+    #[test]
+    fn bb2016_catch_floored_at_2() {
+        assert_eq!(CatchCalc::minimum_roll_catch_bb2016(6, -10), 2);
+    }
+
+    // ── minimum_roll_interception_bb2016 ─────────────────────────────────────
+
+    #[test]
+    fn bb2016_interception_agility_table() {
+        for (ag, expected) in [(1, 8), (2, 7), (3, 6), (4, 5), (5, 4), (6, 3)] {
             assert_eq!(
-                CatchCalc::minimum_roll_catch_bb2020(ag, 0),
-                CatchCalc::minimum_roll_interception_bb2020(ag, 0)
+                CatchCalc::minimum_roll_interception_bb2016(ag, 0),
+                expected,
+                "ag={ag}"
             );
         }
     }
 
     #[test]
-    fn minimum_roll_catch_dispatches_bb2016() {
-        let result = CatchCalc::minimum_roll_catch(3, 0, Rules::Bb2016);
-        assert_eq!(result, CatchCalc::minimum_roll_catch_bb2016(3, 0));
+    fn bb2016_interception_harder_than_catch() {
+        for ag in 1..=6 {
+            let intercept = CatchCalc::minimum_roll_interception_bb2016(ag, 0);
+            let catch_ = CatchCalc::minimum_roll_catch_bb2016(ag, 0);
+            assert!(
+                intercept >= catch_,
+                "interception should be >= catch for AG{ag}"
+            );
+        }
+    }
+
+    // ── minimum_roll_catch_bb2020 ────────────────────────────────────────────
+
+    #[test]
+    fn bb2020_catch_equals_ag() {
+        for (ag, expected) in [(2, 2), (3, 3), (4, 4), (5, 5), (6, 6)] {
+            assert_eq!(CatchCalc::minimum_roll_catch_bb2020(ag, 0), expected, "ag={ag}");
+        }
     }
 
     #[test]
-    fn minimum_roll_catch_dispatches_bb2020() {
-        let result = CatchCalc::minimum_roll_catch(3, 0, Rules::Bb2020);
-        assert_eq!(result, CatchCalc::minimum_roll_catch_bb2020(3, 0));
+    fn bb2020_catch_floored_at_2() {
+        assert_eq!(CatchCalc::minimum_roll_catch_bb2020(1, -5), 2);
     }
 
     #[test]
-    fn minimum_roll_interception_dispatches_bb2016() {
-        let result = CatchCalc::minimum_roll_interception(3, 0, Rules::Bb2016);
-        assert_eq!(result, CatchCalc::minimum_roll_interception_bb2016(3, 0));
+    fn bb2020_catch_with_modifier() {
+        // AG3 + rain (+1) = 4
+        assert_eq!(CatchCalc::minimum_roll_catch_bb2020(3, 1), 4);
+    }
+
+    // ── minimum_roll_interception_bb2020 ─────────────────────────────────────
+
+    #[test]
+    fn bb2020_interception_same_as_catch() {
+        // In BB2020 interception has no +2 penalty (unlike BB2016)
+        for ag in 2..=6 {
+            assert_eq!(
+                CatchCalc::minimum_roll_catch_bb2020(ag, 0),
+                CatchCalc::minimum_roll_interception_bb2020(ag, 0),
+                "BB2020 interception should equal catch for AG{ag}"
+            );
+        }
+    }
+
+    // ── Dispatched methods ───────────────────────────────────────────────────
+
+    #[test]
+    fn dispatched_catch_bb2016_and_bb2020_differ_for_ag4() {
+        // BB2016 AG4: catch = 3; BB2020 AG4: catch = 4
+        assert_eq!(CatchCalc::minimum_roll_catch(4, 0, Rules::Bb2016), 3);
+        assert_eq!(CatchCalc::minimum_roll_catch(4, 0, Rules::Bb2020), 4);
+        assert_eq!(CatchCalc::minimum_roll_catch(4, 0, Rules::Bb2025), 4);
     }
 
     #[test]
-    fn minimum_roll_interception_dispatches_bb2025() {
-        let result = CatchCalc::minimum_roll_interception(3, 0, Rules::Bb2025);
-        assert_eq!(result, CatchCalc::minimum_roll_interception_bb2020(3, 0));
-    }
-
-    #[test]
-    fn modifier_makes_catch_harder() {
-        let easy = CatchCalc::minimum_roll_catch_bb2020(3, 0);
-        let hard = CatchCalc::minimum_roll_catch_bb2020(3, 2);
-        assert_eq!(hard, easy + 2);
+    fn dispatched_interception_bb2016_harder_than_bb2020() {
+        // BB2016 AG4: interception = 5; BB2020 AG4: interception = 4
+        assert_eq!(CatchCalc::minimum_roll_interception(4, 0, Rules::Bb2016), 5);
+        assert_eq!(CatchCalc::minimum_roll_interception(4, 0, Rules::Bb2020), 4);
+        assert_eq!(CatchCalc::minimum_roll_interception(4, 0, Rules::Bb2025), 4);
     }
 }

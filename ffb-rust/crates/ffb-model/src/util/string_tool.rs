@@ -1,32 +1,36 @@
 
 /// Replace `$1`, `$2`, ... placeholders in `template` with the given parameters.
+///
+/// 1:1 translation of Java `StringTool.bind(String, Object[])`: returns an
+/// empty string when the template is empty or no parameters are given, and
+/// silently drops placeholders whose index exceeds the parameter count.
 pub fn bind(template: &str, params: &[&str]) -> String {
     let mut result = String::new();
-    let mut chars = template.char_indices().peekable();
-    while let Some((i, ch)) = chars.next() {
-        if ch == '$' {
-            // Collect consecutive digits
-            let mut digits = String::new();
-            while let Some(&(_, d)) = chars.peek() {
-                if d.is_ascii_digit() {
-                    digits.push(d);
-                    chars.next();
-                } else {
-                    break;
+    if is_provided(Some(template)) && !params.is_empty() {
+        let mut chars = template.chars().peekable();
+        while let Some(ch) = chars.next() {
+            if ch == '$' && chars.peek().is_some_and(|d| d.is_ascii_digit()) {
+                // Collect consecutive digits (Java pattern: [$]([0-9]+))
+                let mut digits = String::new();
+                while let Some(&d) = chars.peek() {
+                    if d.is_ascii_digit() {
+                        digits.push(d);
+                        chars.next();
+                    } else {
+                        break;
+                    }
                 }
-            }
-            if let Ok(idx) = digits.parse::<usize>() {
-                if idx >= 1 && idx <= params.len() {
-                    result.push_str(params[idx - 1]);
-                    continue;
+                if let Ok(idx) = digits.parse::<usize>() {
+                    if idx >= 1 && idx <= params.len() {
+                        result.push_str(params[idx - 1]);
+                    }
+                    // Java: index >= parameters.length appends nothing
+                    // (unmatched placeholders are dropped).
                 }
+            } else {
+                result.push(ch);
             }
-            result.push(ch);
-            result.push_str(&digits);
-        } else {
-            result.push(ch);
         }
-        let _ = i;
     }
     result
 }
@@ -88,8 +92,9 @@ mod tests {
     }
 
     #[test]
-    fn bind_missing_param_kept_as_is() {
-        assert_eq!(bind("$1 and $3", &["a"]), "a and $3");
+    fn bind_unmatched_placeholder_dropped() {
+        // Java StringTool.bind drops placeholders with no matching parameter.
+        assert_eq!(bind("$1 and $3", &["a"]), "a and ");
     }
 
     #[test]

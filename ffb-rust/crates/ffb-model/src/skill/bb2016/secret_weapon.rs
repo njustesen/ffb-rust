@@ -29,14 +29,20 @@ impl std::ops::Deref for SecretWeapon {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_secret_weapon() {
         assert_eq!(SecretWeapon::new().get_name(), "Secret Weapon");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(SecretWeapon::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_gets_sent_off_at_end_of_drive_property() {
+        assert!(SkillId::SecretWeapon.properties().contains(&"getsSentOffAtEndOfDrive"));
     }
 }

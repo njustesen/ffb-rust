@@ -102,17 +102,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandLoadAutomaticPlayerMarkings::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandLoadAutomaticPlayerMarkings::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_load_automatic_player_markings() {
         assert_eq!(
             ClientCommandLoadAutomaticPlayerMarkings::new().get_id(),

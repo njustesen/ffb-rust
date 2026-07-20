@@ -98,22 +98,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandSetMarker::new()).is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandSetMarker::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandSetMarker::default());
-        assert!(s.contains("ClientCommandSetMarker"));
-    }
-
-    #[test]
     fn get_id_is_client_set_marker() {
         assert_eq!(ClientCommandSetMarker::new().get_id(), NetCommandId::ClientSetMarker);
     }

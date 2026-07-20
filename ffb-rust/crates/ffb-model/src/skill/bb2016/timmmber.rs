@@ -23,16 +23,23 @@ impl std::ops::Deref for Timmmber {
 }
 
 #[cfg(test)]
+// Mirrors ffb-java/ffb-server/src/test/java/com/fumbbl/ffb/server/skill tests.
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_timmm_ber() {
         assert_eq!(Timmmber::new().get_name(), "Timmm-ber!");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(Timmmber::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_allow_stand_up_assists_property() {
+        assert!(SkillId::Timmmber.properties().contains(&"allowStandUpAssists"));
     }
 }

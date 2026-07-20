@@ -113,22 +113,6 @@ mod tests {
         assert_eq!(cmd.get_apothecary_type(), Some(ApothecaryType::Team));
         assert_eq!(cmd.get_serious_injury(), Some(SeriousInjuryKind::SeriouslyHurt));
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandUseApothecary::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandUseApothecary::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandUseApothecary::default());
-        assert!(s.contains("ClientCommandUseApothecary"));
-    }
 
     #[test]
     fn get_id_is_client_use_apothecary() {

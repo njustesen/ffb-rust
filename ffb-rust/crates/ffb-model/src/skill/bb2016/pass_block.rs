@@ -25,14 +25,20 @@ impl std::ops::Deref for PassBlock {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_pass_block() {
         assert_eq!(PassBlock::new().get_name(), "Pass Block");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_general() {
         assert_eq!(PassBlock::new().get_category(), SkillCategory::General);
+    }
+
+    #[test]
+    fn has_can_move_when_opponent_passes_property() {
+        assert!(SkillId::PassBlock.properties().contains(&"canMoveWhenOpponentPasses"));
     }
 }

@@ -82,73 +82,7 @@ mod tests {
         assert!(gains_extra_reroll(7, 7));
     }
 
-    #[test]
-    fn winning_roll_beats_ff_returns_plus1() {
-        assert_eq!(interpret_fan_factor_roll(10, 8, 1), 1);
-    }
-
-    #[test]
-    fn winning_roll_equals_ff_returns_0() {
-        assert_eq!(interpret_fan_factor_roll(8, 8, 1), 0);
-    }
-
-    #[test]
-    fn winning_roll_lower_than_ff_returns_0() {
-        assert_eq!(interpret_fan_factor_roll(6, 8, 1), 0);
-    }
-
-    #[test]
-    fn losing_roll_below_ff_returns_minus1() {
-        assert_eq!(interpret_fan_factor_roll(6, 8, -1), -1);
-    }
-
-    #[test]
-    fn losing_roll_higher_than_ff_returns_0() {
-        assert_eq!(interpret_fan_factor_roll(10, 8, -1), 0);
-    }
-
-    #[test]
-    fn draw_roll_beats_ff_returns_plus1() {
-        assert_eq!(interpret_fan_factor_roll(10, 8, 0), 1);
-    }
-
-    #[test]
-    fn draw_roll_below_ff_returns_minus1() {
-        assert_eq!(interpret_fan_factor_roll(6, 8, 0), -1);
-    }
-
-    #[test]
-    fn draw_roll_equals_ff_returns_0() {
-        assert_eq!(interpret_fan_factor_roll(8, 8, 0), 0);
-    }
-
-    #[test]
-    fn master_chef_all_low_steals_nothing() {
-        assert_eq!(interpret_master_chef_roll(&[1, 2, 3]), 0);
-    }
-
-    #[test]
-    fn master_chef_all_high_steals_all() {
-        assert_eq!(interpret_master_chef_roll(&[4, 5, 6]), 3);
-    }
-
-    #[test]
-    fn master_chef_mixed_steals_partial() {
-        assert_eq!(interpret_master_chef_roll(&[3, 4, 6]), 2);
-    }
-
-    #[test]
-    fn master_chef_empty_steals_0() {
-        assert_eq!(interpret_master_chef_roll(&[]), 0);
-    }
-
-    #[test]
-    fn master_chef_single_die_high_steals_1() {
-        assert_eq!(interpret_master_chef_roll(&[4]), 1);
-    }
-
-    #[test]
-    fn master_chef_single_die_low_steals_0() {
-        assert_eq!(interpret_master_chef_roll(&[3]), 0);
-    }
+    // NOTE: interpret_fan_factor_roll / interpret_master_chef_roll tests that duplicated
+    // PostMatchCalcTest.java live in the 1:1 mirror module
+    // (ffb-engine/src/util/post_match_calc.rs); redundant copies were removed here.
 }

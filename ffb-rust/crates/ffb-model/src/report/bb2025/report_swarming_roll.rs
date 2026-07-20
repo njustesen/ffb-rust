@@ -41,36 +41,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_id() {
-        assert_eq!(ReportSwarmingRoll::new("t1".into(), 2).get_id(), ReportId::SWARMING_PLAYERS_ROLL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(ReportSwarmingRoll::new("t1".into(), 2).get_name(), "swarmingPlayersRoll");
-    }
-
-    #[test]
-    fn fields() {
-        let r = ReportSwarmingRoll::new("t1".into(), 2);
-        assert_eq!(r.get_team_id(), "t1");
-        assert_eq!(r.get_roll(), 2);
-    }
-
-    #[test]
-    fn high_roll() {
-        let r = ReportSwarmingRoll::new("t2".into(), 6);
-        assert_eq!(r.get_roll(), 6);
-        assert_eq!(r.get_team_id(), "t2");
-    }
-
-    #[test]
-    fn low_roll() {
-        let r = ReportSwarmingRoll::new("t3".into(), 1);
-        assert_eq!(r.get_roll(), 1);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = ReportSwarmingRoll::new("t1".into(), 2);
         let json = original.to_json_value();

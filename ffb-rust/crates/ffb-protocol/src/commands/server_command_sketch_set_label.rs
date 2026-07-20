@@ -79,22 +79,6 @@ mod tests {
         assert!(cmd.coach.is_empty());
         assert!(cmd.label.is_empty());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandSketchSetLabel::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandSketchSetLabel::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandSketchSetLabel::default());
-        assert!(s.contains("ServerCommandSketchSetLabel"));
-    }
 
     #[test]
     fn get_id_is_server_sketch_set_label() {

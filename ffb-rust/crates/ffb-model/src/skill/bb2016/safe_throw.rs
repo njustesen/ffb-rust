@@ -25,14 +25,20 @@ impl std::ops::Deref for SafeThrow {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_safe_throw() {
         assert_eq!(SafeThrow::new().get_name(), "Safe Throw");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_passing() {
         assert_eq!(SafeThrow::new().get_category(), SkillCategory::Passing);
+    }
+
+    #[test]
+    fn has_can_cancel_interceptions_property() {
+        assert!(SkillId::SafeThrow.properties().contains(&"canCancelInterceptions"));
     }
 }

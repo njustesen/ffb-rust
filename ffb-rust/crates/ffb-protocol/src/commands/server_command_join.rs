@@ -145,23 +145,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ServerCommandJoin::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_roundtrip() {
-        let cmd = ServerCommandJoin::default();
-        let _ = cmd.clone();
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandJoin::default().clone();
-    }
-
-    #[test]
     fn get_id_is_server_join() {
         assert_eq!(ServerCommandJoin::default().get_id(), NetCommandId::ServerJoin);
     }

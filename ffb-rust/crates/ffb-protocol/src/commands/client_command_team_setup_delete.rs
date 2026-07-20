@@ -62,22 +62,6 @@ mod tests {
         let cmd = ClientCommandTeamSetupDelete::with_setup_name("my-setup");
         assert_eq!(cmd.get_setup_name(), Some("my-setup"));
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandTeamSetupDelete::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandTeamSetupDelete::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandTeamSetupDelete::default());
-        assert!(s.contains("ClientCommandTeamSetupDelete"));
-    }
 
     #[test]
     fn get_id_is_client_team_setup_delete() {

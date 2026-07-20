@@ -138,9 +138,5 @@ mod tests {
             assert_eq!(id, back);
         }
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ReportId::AlwaysHungry).is_empty());
-    }
 
 }

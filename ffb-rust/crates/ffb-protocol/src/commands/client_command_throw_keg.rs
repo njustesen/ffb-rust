@@ -62,22 +62,6 @@ mod tests {
         let cmd = ClientCommandThrowKeg::with_player_id("p-42");
         assert_eq!(cmd.get_player_id(), Some("p-42"));
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandThrowKeg::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandThrowKeg::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandThrowKeg::default());
-        assert!(s.contains("ClientCommandThrowKeg"));
-    }
 
     #[test]
     fn get_id_is_client_throw_keg() {

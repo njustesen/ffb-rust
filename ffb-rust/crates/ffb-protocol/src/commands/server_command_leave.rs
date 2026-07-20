@@ -112,23 +112,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ServerCommandLeave::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_roundtrip() {
-        let cmd = ServerCommandLeave::default();
-        let _ = cmd.clone();
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandLeave::default().clone();
-    }
-
-    #[test]
     fn get_id_is_server_leave() {
         assert_eq!(ServerCommandLeave::default().get_id(), NetCommandId::ServerLeave);
     }

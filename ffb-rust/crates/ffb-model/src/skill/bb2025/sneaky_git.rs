@@ -27,12 +27,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_sneaky_git() {
         assert_eq!(SneakyGit::new().get_name(), "Sneaky Git");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_devious() {
         assert_eq!(SneakyGit::new().get_category(), SkillCategory::Devious);
     }
 }

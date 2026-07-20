@@ -25,15 +25,21 @@ impl std::ops::Deref for BlastIt {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_blast_it() {
         assert_eq!(BlastIt::new().get_name(), "Blast It!");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(BlastIt::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_re_roll_hmp_scatter_property() {
+        assert!(SkillId::BlastIt.properties().contains(&"canReRollHmpScatter"));
     }
 
     #[test]

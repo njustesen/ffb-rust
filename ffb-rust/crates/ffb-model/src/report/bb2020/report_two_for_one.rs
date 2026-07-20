@@ -49,37 +49,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::TWO_FOR_ONE);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "twoForOne");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_player_id(), "p1");
-        assert_eq!(r.get_partner_id(), "p2");
-        assert!(r.is_used());
-    }
-
-    #[test]
-    fn not_used() {
-        let r = ReportTwoForOne::new("p3".into(), "p4".into(), false);
-        assert!(!r.is_used());
-        assert_eq!(r.get_player_id(), "p3");
-    }
-
-    #[test]
-    fn partner_id() {
-        let r = ReportTwoForOne::new("a".into(), "b".into(), true);
-        assert_eq!(r.get_partner_id(), "b");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

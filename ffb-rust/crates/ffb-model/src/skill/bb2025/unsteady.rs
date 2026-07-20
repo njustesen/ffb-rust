@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_unsteady() {
         assert_eq!(Unsteady::new().get_name(), "Unsteady");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(Unsteady::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_prevent_secure_the_ball_action_property() {
+        assert!(crate::enums::SkillId::Unsteady.properties().contains(&"preventSecureTheBallAction"));
     }
 }

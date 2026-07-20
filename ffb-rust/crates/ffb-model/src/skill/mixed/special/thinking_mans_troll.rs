@@ -29,11 +29,25 @@ impl std::ops::Deref for ThinkingMansTroll {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(ThinkingMansTroll::new().get_name(), "Thinking Man's Troll"); }
+    fn name_is_thinking_mans_troll() {
+        assert_eq!(ThinkingMansTroll::new().get_name(), "Thinking Man's Troll");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(ThinkingMansTroll::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(ThinkingMansTroll::new().get_category(), SkillCategory::Trait);
+    }
+
     #[test]
-    fn usage_type_is_once_per_half() { assert_eq!(ThinkingMansTroll::new().skill_usage_type, SkillUsageType::OncePerHalf); }
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); properties() always returns a valid slice.
+        let _properties: &'static [&'static str] = crate::enums::SkillId::ThinkingMansTroll.properties();
+    }
+
+    #[test]
+    fn usage_type_is_once_per_half() {
+        assert_eq!(ThinkingMansTroll::new().skill_usage_type, SkillUsageType::OncePerHalf);
+    }
     #[test]
     fn registers_single_die_reroll_source() {
         let skill = ThinkingMansTroll::new();

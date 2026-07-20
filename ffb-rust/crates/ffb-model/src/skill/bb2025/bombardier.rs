@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_bombardier() {
         assert_eq!(Bombardier::new().get_name(), "Bombardier");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(Bombardier::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_enable_throw_bomb_action_property() {
+        assert!(crate::enums::SkillId::Bombardier.properties().contains(&"enableThrowBombAction"));
     }
 }

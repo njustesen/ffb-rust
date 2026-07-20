@@ -25,8 +25,22 @@ impl std::ops::Deref for Drunkard {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(Drunkard::new().get_name(), "Drunkard"); }
+    fn name_is_drunkard() {
+        assert_eq!(Drunkard::new().get_name(), "Drunkard");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Drunkard::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(Drunkard::new().get_category(), SkillCategory::Trait);
+    }
+
+    // Java: assertNotNull(skill.getSkillProperties()). The live Rust mechanism always
+    // returns a valid slice; Drunkard registers no NamedProperties (only a
+    // GoForItModifier), so the live property table is empty.
+    #[test]
+    fn has_skill_properties_not_null() {
+        assert!(crate::enums::SkillId::Drunkard.properties().is_empty());
+    }
 }

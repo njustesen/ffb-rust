@@ -73,22 +73,6 @@ mod tests {
         assert!(cmd.re_rolled_action.is_none());
         assert!(cmd.re_roll_source.is_none());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandUseReRoll::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandUseReRoll::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandUseReRoll::default());
-        assert!(s.contains("ClientCommandUseReRoll"));
-    }
 
     #[test]
     fn get_id_is_client_use_re_roll() {

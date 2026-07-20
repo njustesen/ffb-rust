@@ -25,8 +25,19 @@ impl std::ops::Deref for DisturbingPresence {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(DisturbingPresence::new().get_name(), "Disturbing Presence"); }
+    fn name_is_disturbing_presence() {
+        assert_eq!(DisturbingPresence::new().get_name(), "Disturbing Presence");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(DisturbingPresence::new().get_category(), SkillCategory::Mutation); }
+    fn category_is_mutation() {
+        assert_eq!(DisturbingPresence::new().get_category(), SkillCategory::Mutation);
+    }
+
+    #[test]
+    fn has_inflicts_disturbing_presence_property() {
+        assert!(crate::enums::SkillId::DisturbingPresence.properties().contains(&"inflictsDisturbingPresence"));
+    }
 }

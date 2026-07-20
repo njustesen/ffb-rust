@@ -25,14 +25,20 @@ impl std::ops::Deref for WildAnimal {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_wild_animal() {
         assert_eq!(WildAnimal::new().get_name(), "Wild Animal");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(WildAnimal::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_needs_to_roll_for_action_property() {
+        assert!(SkillId::WildAnimal.properties().contains(&"needsToRollForActionButKeepsTacklezone"));
     }
 }

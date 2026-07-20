@@ -25,14 +25,25 @@ impl std::ops::Deref for Guard {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_guard() {
         assert_eq!(Guard::new().get_name(), "Guard");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_strength() {
         assert_eq!(Guard::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn has_assists_blocks_in_tacklezones_property() {
+        assert!(SkillId::Guard.properties().contains(&"assistsBlocksInTacklezones"));
+    }
+
+    #[test]
+    fn does_not_have_force_followup_property() {
+        assert!(!SkillId::Guard.properties().contains(&"forceFollowup"));
     }
 }

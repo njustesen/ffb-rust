@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_violent_innovator() {
         assert_eq!(ViolentInnovator::new().get_name(), "Violent Innovator");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_devious() {
         assert_eq!(ViolentInnovator::new().get_category(), SkillCategory::Devious);
+    }
+
+    #[test]
+    fn has_grants_spp_from_special_actions_cas_property() {
+        assert!(crate::enums::SkillId::ViolentInnovator.properties().contains(&"grantsSppFromSpecialActionsCas"));
     }
 }

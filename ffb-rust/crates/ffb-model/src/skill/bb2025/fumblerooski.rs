@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_fumblerooski() {
         assert_eq!(Fumblerooski::new().get_name(), "Fumblerooski");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_devious() {
         assert_eq!(Fumblerooski::new().get_category(), SkillCategory::Devious);
+    }
+
+    #[test]
+    fn has_can_drop_ball_property() {
+        assert!(crate::enums::SkillId::Fumblerooski.properties().contains(&"canDropBall"));
     }
 }

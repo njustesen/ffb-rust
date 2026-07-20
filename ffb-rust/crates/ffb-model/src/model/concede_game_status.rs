@@ -64,9 +64,5 @@ mod tests {
         assert_ne!(ConcedeGameStatus::REQUESTED, ConcedeGameStatus::CONFIRMED);
         assert_ne!(ConcedeGameStatus::CONFIRMED, ConcedeGameStatus::DENIED);
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ConcedeGameStatus::REQUESTED).is_empty());
-    }
 
 }

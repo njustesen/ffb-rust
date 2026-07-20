@@ -1,6 +1,7 @@
 package com.fumbbl.ffb.server.model;
 
 import com.fumbbl.ffb.GameStatus;
+import com.fumbbl.ffb.factory.GameStatusFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -41,6 +42,19 @@ class GameStatusTest {
     @Test
     void game_status_finished_name() {
         assertEquals("finished", GameStatus.FINISHED.getName());
+    }
+
+    @Test
+    void game_status_finished_type_string() {
+        assertEquals("F", GameStatus.FINISHED.getTypeString());
+    }
+
+    @Test
+    void game_status_all_values_found_by_name() {
+        GameStatusFactory factory = new GameStatusFactory();
+        for (GameStatus s : GameStatus.values()) {
+            assertEquals(s, factory.forName(s.getName()));
+        }
     }
 
     @Test

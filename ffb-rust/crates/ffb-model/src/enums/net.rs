@@ -507,6 +507,84 @@ impl ServerStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::leader_state::LeaderState;
+
+    const ALL_NET_COMMAND_IDS: &[NetCommandId] = &[
+        NetCommandId::InternalServerSocketClosed, NetCommandId::ClientJoin, NetCommandId::ClientTalk,
+        NetCommandId::ServerGameState, NetCommandId::ServerTeamList, NetCommandId::ServerStatus,
+        NetCommandId::ServerJoin, NetCommandId::ServerLeave, NetCommandId::ServerTalk,
+        NetCommandId::ClientSetupPlayer, NetCommandId::ClientStartGame, NetCommandId::ClientActingPlayer,
+        NetCommandId::ClientMove, NetCommandId::ClientBlitzMove, NetCommandId::ClientBlitzTargetSelected,
+        NetCommandId::ClientTargetSelected, NetCommandId::ClientUseReRoll, NetCommandId::ClientUseReRollForTarget,
+        NetCommandId::ServerSound, NetCommandId::ClientCoinChoice, NetCommandId::ClientReceiveChoice,
+        NetCommandId::ClientEndTurn, NetCommandId::ClientKickoff, NetCommandId::ClientTouchback,
+        NetCommandId::ClientHandOver, NetCommandId::ClientPass, NetCommandId::ClientBlock,
+        NetCommandId::ClientBlockChoice, NetCommandId::ClientPushback,
+        NetCommandId::ClientUseConsummateReRollForBlock, NetCommandId::ClientUseProReRollForBlock,
+        NetCommandId::ClientFollowupChoice, NetCommandId::ClientInterceptorChoice,
+        NetCommandId::ClientUseSkill, NetCommandId::ServerTeamSetupList, NetCommandId::ClientTeamSetupLoad,
+        NetCommandId::ClientTeamSetupSave, NetCommandId::ClientTeamSetupDelete, NetCommandId::ClientFoul,
+        NetCommandId::ClientUseApothecary, NetCommandId::ClientApothecaryChoice,
+        NetCommandId::ClientPasswordChallenge, NetCommandId::ServerPasswordChallenge,
+        NetCommandId::ServerModelSync, NetCommandId::ServerVersion, NetCommandId::ClientRequestVersion,
+        NetCommandId::ClientDebugClientState, NetCommandId::ServerGameList, NetCommandId::ClientUserSettings,
+        NetCommandId::ServerUserSettings, NetCommandId::ClientReplay, NetCommandId::ServerReplay,
+        NetCommandId::ClientThrowTeamMate, NetCommandId::ClientKickTeamMate, NetCommandId::ClientSwoop,
+        NetCommandId::ClientPlayerChoice, NetCommandId::ClientIllegalProcedure, NetCommandId::ClientConcedeGame,
+        NetCommandId::ServerAdminMessage, NetCommandId::ClientUseInducement, NetCommandId::ClientBuyInducements,
+        NetCommandId::ServerAddPlayer, NetCommandId::ServerZapPlayer, NetCommandId::ServerUnzapPlayer,
+        NetCommandId::ClientJourneymen, NetCommandId::ClientGaze, NetCommandId::ClientConfirm,
+        NetCommandId::ClientSetMarker, NetCommandId::InternalServerFumbblGameCreated,
+        NetCommandId::InternalServerFumbblTeamLoaded, NetCommandId::InternalServerFumbblGameChecked,
+        NetCommandId::InternalServerJoinApproved, NetCommandId::InternalServerReplayLoaded,
+        NetCommandId::ClientPettyCash, NetCommandId::ServerRemovePlayer, NetCommandId::ClientWizardSpell,
+        NetCommandId::ClientBuyCard, NetCommandId::ClientSelectCardToBuy, NetCommandId::InternalServerCloseGame,
+        NetCommandId::InternalServerDeleteGame, NetCommandId::InternalServerUploadGame,
+        NetCommandId::InternalServerScheduleGame, NetCommandId::InternalServerClearCache,
+        NetCommandId::ClientCloseSession, NetCommandId::ClientArgueTheCall,
+        NetCommandId::ClientUseApothecaries, NetCommandId::ClientUseIgors, NetCommandId::ServerGameTime,
+        NetCommandId::ClientPing, NetCommandId::ServerPong, NetCommandId::ClientSetBlockTargetSelection,
+        NetCommandId::ClientUnsetBlockTargetSelection, NetCommandId::ClientSynchronousMultiBlock,
+        NetCommandId::ClientBlockOrReRollChoiceForTarget, NetCommandId::ClientPileDriver,
+        NetCommandId::ClientUseChainsaw, NetCommandId::ClientUseBrawler, NetCommandId::ClientFieldCoordinate,
+        NetCommandId::ClientUseFumblerooskie, NetCommandId::ClientPrayerSelection,
+        NetCommandId::ClientUseTeamMatesWisdom, NetCommandId::ClientThrowKeg, NetCommandId::ClientSelectWeather,
+        NetCommandId::ClientUpdatePlayerMarkings, NetCommandId::ClientKickOffResultChoice,
+        NetCommandId::ClientBloodlustAction, NetCommandId::ServerUpdateLocalPlayerMarkers,
+        NetCommandId::InternalServerAddLoadedTeam, NetCommandId::InternalApplyAutomaticPlayerMarkings,
+        NetCommandId::ClientUseSingleBlockDieReRoll, NetCommandId::ClientUseMultiBlockDiceReRoll,
+        NetCommandId::InternalCalculateAutomaticPlayerMarkings, NetCommandId::ClientLoadAutomaticPlayerMarkings,
+        NetCommandId::ServerAutomaticPlayerMarkings, NetCommandId::ClientReplayStatus,
+        NetCommandId::ServerReplayStatus, NetCommandId::ClientJoinReplay, NetCommandId::ServerReplayControl,
+        NetCommandId::ClientTransferReplayControl, NetCommandId::ClientAddSketch,
+        NetCommandId::ClientRemoveSketches, NetCommandId::ClientSketchAddCoordinate,
+        NetCommandId::ClientSketchSetColor, NetCommandId::ClientSketchSetLabel, NetCommandId::ClientClearSketches,
+        NetCommandId::ServerAddSketches, NetCommandId::ServerRemoveSketches,
+        NetCommandId::ServerSketchAddCoordinate, NetCommandId::ServerSketchSetColor,
+        NetCommandId::ServerSketchSetLabel, NetCommandId::ServerClearSketches,
+        NetCommandId::ClientSetPreventSketching, NetCommandId::ServerSetPreventSketching,
+        NetCommandId::ClientPickUpChoice, NetCommandId::ClientKeywordSelection, NetCommandId::ClientUseHatred,
+        NetCommandId::ClientPositionSelection, NetCommandId::ClientPuntToCrowd,
+    ];
+
+    #[test]
+    fn net_command_id_all_have_non_null_name() {
+        for id in ALL_NET_COMMAND_IDS {
+            assert!(!id.name().is_empty());
+        }
+    }
+
+    #[test]
+    fn net_command_id_at_least_seventy_variants() {
+        assert!(ALL_NET_COMMAND_IDS.len() >= 70);
+    }
+
+    #[test]
+    fn net_command_id_names_are_unique() {
+        let unique: std::collections::HashSet<_> =
+            ALL_NET_COMMAND_IDS.iter().map(|id| id.name()).collect();
+        assert_eq!(unique.len(), ALL_NET_COMMAND_IDS.len());
+    }
 
     #[test]
     fn client_commands_are_client() {
@@ -543,17 +621,17 @@ mod tests {
     }
 
     #[test]
-    fn client_join_name_is_client_join() {
+    fn net_command_id_client_join_name() {
         assert_eq!(NetCommandId::ClientJoin.name(), "clientJoin");
     }
 
     #[test]
-    fn server_game_state_name() {
+    fn net_command_id_server_game_state_name() {
         assert_eq!(NetCommandId::ServerGameState.name(), "serverGameState");
     }
 
     #[test]
-    fn client_end_turn_name() {
+    fn net_command_id_client_end_turn_name() {
         assert_eq!(NetCommandId::ClientEndTurn.name(), "clientEndTurn");
     }
 
@@ -575,7 +653,7 @@ mod tests {
     }
 
     #[test]
-    fn server_status_all_have_non_empty_names() {
+    fn server_status_all_have_non_null_name() {
         for s in [
             ServerStatus::ErrorUnknownCoach, ServerStatus::ErrorWrongPassword,
             ServerStatus::ErrorGameInUse, ServerStatus::ErrorNotYourTeam,
@@ -583,12 +661,23 @@ mod tests {
             ServerStatus::FumbblError, ServerStatus::ReplayUnavailable,
         ] {
             assert!(!s.name().is_empty());
+        }
+    }
+
+    #[test]
+    fn server_status_all_have_non_null_message() {
+        for s in [
+            ServerStatus::ErrorUnknownCoach, ServerStatus::ErrorWrongPassword,
+            ServerStatus::ErrorGameInUse, ServerStatus::ErrorNotYourTeam,
+            ServerStatus::ErrorUnknownGameId, ServerStatus::ErrorSameTeam,
+            ServerStatus::FumbblError, ServerStatus::ReplayUnavailable,
+        ] {
             assert!(!s.message().is_empty());
         }
     }
 
     #[test]
-    fn server_status_wrong_password_name() {
+    fn server_status_error_wrong_password_name() {
         assert_eq!(ServerStatus::ErrorWrongPassword.name(), "Wrong Password");
     }
 
@@ -626,5 +715,33 @@ mod tests {
     fn internal_command_is_not_client_or_server() {
         assert!(!NetCommandId::InternalServerSocketClosed.is_client_command());
         assert!(!NetCommandId::InternalServerSocketClosed.is_server_command());
+    }
+
+    #[test]
+    fn leader_state_count_is_three() {
+        let all = [LeaderState::NONE, LeaderState::AVAILABLE, LeaderState::USED];
+        assert_eq!(all.len(), 3);
+    }
+
+    #[test]
+    fn leader_state_all_have_non_null_name() {
+        for s in [LeaderState::NONE, LeaderState::AVAILABLE, LeaderState::USED] {
+            assert!(!s.get_name().is_empty());
+        }
+    }
+
+    #[test]
+    fn leader_state_none_name() {
+        assert_eq!(LeaderState::NONE.get_name(), "none");
+    }
+
+    #[test]
+    fn leader_state_available_name() {
+        assert_eq!(LeaderState::AVAILABLE.get_name(), "available");
+    }
+
+    #[test]
+    fn leader_state_used_name() {
+        assert_eq!(LeaderState::USED.get_name(), "used");
     }
 }

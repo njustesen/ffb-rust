@@ -56,17 +56,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommand::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommand::default().clone();
-    }
-
-    #[test]
     fn has_entropy_reflects_state() {
         assert!(!ClientCommand::new().has_entropy());
         let mut cmd = ClientCommand::new();

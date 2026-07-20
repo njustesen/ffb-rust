@@ -25,8 +25,22 @@ impl std::ops::Deref for Accurate {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(Accurate::new().get_name(), "Accurate"); }
+    fn name_is_accurate() {
+        assert_eq!(Accurate::new().get_name(), "Accurate");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Accurate::new().get_category(), SkillCategory::Passing); }
+    fn category_is_passing() {
+        assert_eq!(Accurate::new().get_category(), SkillCategory::Passing);
+    }
+
+    // Java: assertNotNull(skill.getSkillProperties()). The live Rust mechanism always
+    // returns a valid slice; mixed Accurate registers no NamedProperties (only a
+    // PassModifier), so the live property table is empty.
+    #[test]
+    fn has_skill_properties_not_null() {
+        assert!(crate::enums::SkillId::Accurate.properties().is_empty());
+    }
 }

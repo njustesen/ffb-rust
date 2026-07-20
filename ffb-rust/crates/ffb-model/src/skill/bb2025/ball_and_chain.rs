@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_ball_and_chain() {
         assert_eq!(BallAndChain::new().get_name(), "Ball and Chain");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(BallAndChain::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_placed_prone_causes_injury_roll_property() {
+        assert!(crate::enums::SkillId::BallAndChain.properties().contains(&"placedProneCausesInjuryRoll"));
     }
 }

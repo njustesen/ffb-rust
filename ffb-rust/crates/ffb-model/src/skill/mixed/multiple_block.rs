@@ -25,8 +25,25 @@ impl std::ops::Deref for MultipleBlock {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors ffb-java MultipleBlockSkillTest (written against the bb2016 class);
+    // property assertions adapted to the mixed edition's postConstruct, which
+    // registers canBlockTwoAtOnce (canBlockMoreThanOnce is bb2016-only).
+    // The Java `is_bb2016_edition` test is skipped (edition annotations are
+    // covered elsewhere).
+
     #[test]
-    fn name_is_correct() { assert_eq!(MultipleBlock::new().get_name(), "Multiple Block"); }
+    fn name_is_multiple_block() {
+        assert_eq!(MultipleBlock::new().get_name(), "Multiple Block");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(MultipleBlock::new().get_category(), SkillCategory::Strength); }
+    fn category_is_strength() {
+        assert_eq!(MultipleBlock::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn has_can_block_two_at_once_property() {
+        assert!(crate::enums::SkillId::MultipleBlock.properties().contains(&"canBlockTwoAtOnce"));
+    }
 }

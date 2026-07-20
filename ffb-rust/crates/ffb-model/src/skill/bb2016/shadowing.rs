@@ -25,14 +25,20 @@ impl std::ops::Deref for Shadowing {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_shadowing() {
         assert_eq!(Shadowing::new().get_name(), "Shadowing");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_general() {
         assert_eq!(Shadowing::new().get_category(), SkillCategory::General);
+    }
+
+    #[test]
+    fn has_can_follow_player_leaving_tacklezones_property() {
+        assert!(SkillId::Shadowing.properties().contains(&"canFollowPlayerLeavingTacklezones"));
     }
 }

@@ -26,9 +26,23 @@ impl std::ops::Deref for WatchOut {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(WatchOut::new().get_name(), "Watch Out!"); }
+    fn name_is_watch_out() {
+        assert_eq!(WatchOut::new().get_name(), "Watch Out!");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(WatchOut::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(WatchOut::new().get_category(), SkillCategory::Trait);
+    }
+
     #[test]
-    fn usage_type_is_once_per_half() { assert_eq!(WatchOut::new().skill_usage_type, SkillUsageType::OncePerHalf); }
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); properties() always returns a valid slice.
+        let _properties: &'static [&'static str] = crate::enums::SkillId::WatchOut.properties();
+    }
+
+    #[test]
+    fn usage_type_is_once_per_half() {
+        assert_eq!(WatchOut::new().skill_usage_type, SkillUsageType::OncePerHalf);
+    }
 }

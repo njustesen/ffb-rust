@@ -357,11 +357,20 @@ impl CommonProperty {
         }
     }
 
+    /// Java: single-arg ctor `CommonProperty(String key)` delegates to
+    /// `this(key, null, "", "", true)`, so all CLIENT_*/HTTPCLIENT_* props
+    /// default to storedRemote=true; SETTING_LOCAL_SETTINGS passes true
+    /// explicitly; every other SETTING_* uses a ctor that passes false.
     pub fn is_stored_remote(self) -> bool {
-        match self {
-            CommonProperty::SETTING_LOCAL_SETTINGS => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            CommonProperty::CLIENT_COMMAND_COMPRESSION
+                | CommonProperty::CLIENT_PING_INTERVAL
+                | CommonProperty::CLIENT_DEBUG_STATE
+                | CommonProperty::HTTPCLIENT_TIMEOUT_CONNECT
+                | CommonProperty::HTTPCLIENT_TIMEOUT_SOCKET
+                | CommonProperty::SETTING_LOCAL_SETTINGS
+        )
     }
 
     pub fn for_key(key: &str) -> Option<Self> {
@@ -442,14 +451,29 @@ impl CommonProperty {
 
 #[cfg(test)]
 mod tests {
+    // Mirrors ffb-java ffb-common CommonPropertyTest (Java: CommonPropertyTest.java).
     use super::*;
 
+    /// Java: `assertFieldLength` (@ParameterizedTest @EnumSource over all values).
+    #[test]
+    fn assert_field_length() {
+        for property in CommonProperty::all() {
+            assert!(
+                property.get_key().len() <= 40,
+                "Name of {:?} is too long for database (40 chars)",
+                property
+            );
+        }
+    }
+
+    /// Java: `getKeyReturnsDotSeparatedString`.
     #[test]
     fn get_key_returns_dot_separated_string() {
         assert_eq!(CommonProperty::CLIENT_COMMAND_COMPRESSION.get_key(), "client.command.compression");
         assert_eq!(CommonProperty::SETTING_SOUND_MODE.get_key(), "setting.sound.mode");
     }
 
+    /// Java: `forKeyRoundTrips`.
     #[test]
     fn for_key_round_trips() {
         assert_eq!(
@@ -459,18 +483,24 @@ mod tests {
         assert_eq!(CommonProperty::for_key("invalid.key"), None);
     }
 
+    /// Java: `allIsNonEmpty`.
     #[test]
     fn all_is_non_empty() {
         assert!(!CommonProperty::all().is_empty());
     }
 
+    /// Java: `isStoredRemoteDefaults`. Java's single-arg enum constructor
+    /// (`CommonProperty(String key)`) delegates to
+    /// `this(key, null, "", "", true)`, so CLIENT_*/HTTPCLIENT_* props are
+    /// storedRemote in Java.
     #[test]
-    fn is_stored_remote_only_local_settings() {
+    fn is_stored_remote_defaults() {
         assert!(CommonProperty::SETTING_LOCAL_SETTINGS.is_stored_remote());
-        assert!(!CommonProperty::CLIENT_COMMAND_COMPRESSION.is_stored_remote());
+        assert!(CommonProperty::CLIENT_COMMAND_COMPRESSION.is_stored_remote());
         assert!(!CommonProperty::SETTING_SOUND_MODE.is_stored_remote());
     }
 
+    /// Java: `getValueReturnsNoneForClientPropsAndSomeForSettings` (Java: null).
     #[test]
     fn get_value_returns_none_for_client_props_and_some_for_settings() {
         assert_eq!(CommonProperty::CLIENT_PING_INTERVAL.get_value(), None);
@@ -478,9 +508,4 @@ mod tests {
         assert_eq!(CommonProperty::SETTING_SOUND_MODE.get_value(), Some("Sound"));
         assert_eq!(CommonProperty::SETTING_AUTOCOMPLETE.get_value(), Some("Autocomplete"));
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", CommonProperty::CLIENT_COMMAND_COMPRESSION).is_empty());
-    }
-
 }

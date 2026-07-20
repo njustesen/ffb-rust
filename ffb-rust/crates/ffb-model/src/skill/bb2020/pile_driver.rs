@@ -25,14 +25,20 @@ impl std::ops::Deref for PileDriver {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_pile_driver() {
         assert_eq!(PileDriver::new().get_name(), "Pile Driver");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_strength() {
         assert_eq!(PileDriver::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn has_can_foul_after_block_property() {
+        assert!(SkillId::PileDriver.properties().contains(&"canFoulAfterBlock"));
     }
 }

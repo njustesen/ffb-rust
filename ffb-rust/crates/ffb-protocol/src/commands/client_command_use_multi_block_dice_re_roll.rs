@@ -55,22 +55,6 @@ mod tests {
     fn default_empty() {
         assert!(ClientCommandUseMultiBlockDiceReRoll::new().dice_indexes.is_empty());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandUseMultiBlockDiceReRoll::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandUseMultiBlockDiceReRoll::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandUseMultiBlockDiceReRoll::default());
-        assert!(s.contains("ClientCommandUseMultiBlockDiceReRoll"));
-    }
 
     #[test]
     fn get_id_is_client_use_multi_block_dice_re_roll() {

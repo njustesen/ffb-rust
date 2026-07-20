@@ -25,8 +25,26 @@ impl std::ops::Deref for Trickster {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors ffb-java TricksterSkillTest.
+
     #[test]
-    fn name_is_correct() { assert_eq!(Trickster::new().get_name(), "Trickster"); }
+    fn name_is_trickster() {
+        assert_eq!(Trickster::new().get_name(), "Trickster");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Trickster::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(Trickster::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_move_before_being_blocked_property() {
+        assert!(crate::enums::SkillId::Trickster.properties().contains(&"canMoveBeforeBeingBlocked"));
+    }
+
+    #[test]
+    fn does_not_have_force_followup_property() {
+        assert!(!crate::enums::SkillId::Trickster.properties().contains(&"forceFollowup"));
+    }
 }

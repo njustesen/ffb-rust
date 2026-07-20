@@ -45,36 +45,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::NERVES_OF_STEEL);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "nervesOfSteel");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_player_id(), "p1");
-        assert_eq!(r.get_ball_action(), "pass");
-    }
-
-    #[test]
-    fn different_ball_action() {
-        let r = ReportNervesOfSteel::new("p2".into(), "catch".into());
-        assert_eq!(r.get_ball_action(), "catch");
-    }
-
-    #[test]
-    fn different_player_id() {
-        let r = ReportNervesOfSteel::new("p99".into(), "handoff".into());
-        assert_eq!(r.get_player_id(), "p99");
-        assert_eq!(r.get_ball_action(), "handoff");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

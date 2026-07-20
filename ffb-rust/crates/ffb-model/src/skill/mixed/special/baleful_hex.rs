@@ -25,10 +25,29 @@ impl std::ops::Deref for BalefulHex {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(BalefulHex::new().get_name(), "Baleful Hex"); }
+    fn name_is_baleful_hex() {
+        assert_eq!(BalefulHex::new().get_name(), "Baleful Hex");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(BalefulHex::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(BalefulHex::new().get_category(), SkillCategory::Trait);
+    }
+
     #[test]
-    fn usage_type_is_once_per_game() { assert_eq!(BalefulHex::new().get_skill_usage_type(), SkillUsageType::OncePerGame); }
+    fn has_can_make_opponent_miss_turn_property() {
+        assert!(crate::enums::SkillId::BalefulHex.properties().contains(&"canMakeOpponentMissTurn"));
+    }
+
+    #[test]
+    fn class_name_is_baleful_hex() {
+        assert_eq!(crate::enums::SkillId::BalefulHex.class_name(), "BalefulHex");
+    }
+
+    #[test]
+    fn usage_type_is_once_per_game() {
+        assert_eq!(BalefulHex::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
+    }
 }

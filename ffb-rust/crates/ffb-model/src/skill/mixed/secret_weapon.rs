@@ -31,10 +31,30 @@ impl std::ops::Deref for SecretWeapon {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors ffb-java SecretWeaponSkillTest (written against the bb2016 class,
+    // where the category is EXTRAORDINARY); category adapted to the mixed
+    // edition's constructor (TRAIT). Property assertion verified against the
+    // mixed edition's postConstruct, which registers only getsSentOffAtEndOfDrive.
+    // The Java `is_bb2016_edition` test is skipped (edition annotations are
+    // covered elsewhere).
+
     #[test]
-    fn name_is_correct() { assert_eq!(SecretWeapon::new().get_name(), "Secret Weapon"); }
+    fn name_is_secret_weapon() {
+        assert_eq!(SecretWeapon::new().get_name(), "Secret Weapon");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(SecretWeapon::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(SecretWeapon::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_gets_sent_off_at_end_of_drive_property() {
+        assert!(crate::enums::SkillId::SecretWeapon.properties().contains(&"getsSentOffAtEndOfDrive"));
+    }
+
+    // Additional Rust-side logic test beyond the Java test class.
     #[test]
     fn evaluator_is_roll() {
         assert_eq!(SecretWeapon::new().evaluator(), SkillValueEvaluator::Roll);

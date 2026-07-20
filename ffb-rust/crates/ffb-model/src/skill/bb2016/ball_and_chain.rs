@@ -25,14 +25,20 @@ impl std::ops::Deref for BallAndChain {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_ball_and_chain() {
         assert_eq!(BallAndChain::new().get_name(), "Ball and Chain");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(BallAndChain::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_force_full_movement_property() {
+        assert!(SkillId::BallAndChain.properties().contains(&"forceFullMovement"));
     }
 }

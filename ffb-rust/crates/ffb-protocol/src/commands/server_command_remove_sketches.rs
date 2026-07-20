@@ -69,22 +69,6 @@ mod tests {
         let cmd = ServerCommandRemoveSketches::default();
         assert!(cmd.ids.is_empty());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ServerCommandRemoveSketches::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandRemoveSketches::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ServerCommandRemoveSketches::default());
-        assert!(s.contains("ServerCommandRemoveSketches"));
-    }
 
     #[test]
     fn get_id_is_server_remove_sketches() {

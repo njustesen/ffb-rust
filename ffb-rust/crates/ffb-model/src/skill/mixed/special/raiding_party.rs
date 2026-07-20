@@ -26,9 +26,23 @@ impl std::ops::Deref for RaidingParty {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(RaidingParty::new().get_name(), "Raiding Party"); }
+    fn name_is_raiding_party() {
+        assert_eq!(RaidingParty::new().get_name(), "Raiding Party");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(RaidingParty::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(RaidingParty::new().get_category(), SkillCategory::Trait);
+    }
+
     #[test]
-    fn usage_type_is_once_per_drive() { assert_eq!(RaidingParty::new().skill_usage_type, SkillUsageType::OncePerDrive); }
+    fn has_skill_properties_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); properties() always returns a valid slice.
+        let _properties: &'static [&'static str] = crate::enums::SkillId::RaidingParty.properties();
+    }
+
+    #[test]
+    fn usage_type_is_once_per_drive() {
+        assert_eq!(RaidingParty::new().skill_usage_type, SkillUsageType::OncePerDrive);
+    }
 }

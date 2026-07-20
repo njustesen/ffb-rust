@@ -25,8 +25,26 @@ impl std::ops::Deref for PickMeUp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors ffb-java PickMeUpSkillTest.
+
     #[test]
-    fn name_is_correct() { assert_eq!(PickMeUp::new().get_name(), "Pick-me-up"); }
+    fn name_is_pick_me_up() {
+        assert_eq!(PickMeUp::new().get_name(), "Pick-me-up");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(PickMeUp::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(PickMeUp::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_stand_up_team_mates_property() {
+        assert!(crate::enums::SkillId::PickMeUp.properties().contains(&"canStandUpTeamMates"));
+    }
+
+    #[test]
+    fn class_name_is_pick_me_up() {
+        assert_eq!(crate::enums::SkillId::PickMeUp.class_name(), "PickMeUp");
+    }
 }

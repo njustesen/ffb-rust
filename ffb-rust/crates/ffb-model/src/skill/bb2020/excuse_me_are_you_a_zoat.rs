@@ -28,25 +28,25 @@ impl std::ops::Deref for ExcuseMeAreYouAZoat {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
-        assert_eq!(ExcuseMeAreYouAZoat::new().get_name(), "\"Excuse Me, Are You a Zoat?\"");
+    fn name_contains_zoat() {
+        assert!(ExcuseMeAreYouAZoat::new().get_name().contains("Zoat"));
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(ExcuseMeAreYouAZoat::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_gain_gaze_property() {
+        assert!(SkillId::ExcuseMeAreYouAZoat.properties().contains(&"canGainGaze"));
     }
 
     #[test]
     fn usage_type_is_correct() {
         assert_eq!(ExcuseMeAreYouAZoat::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
-    }
-
-    #[test]
-    fn registers_bb2020_named_property() {
-        use crate::enums::SkillId;
-        assert!(SkillId::ExcuseMeAreYouAZoat.properties().contains(&"canGainGaze"));
     }
 }

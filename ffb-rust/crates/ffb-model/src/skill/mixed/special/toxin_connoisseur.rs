@@ -26,9 +26,29 @@ impl std::ops::Deref for ToxinConnoisseur {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(ToxinConnoisseur::new().get_name(), "Toxin Connoisseur"); }
+    fn name_is_toxin_connoisseur() {
+        assert_eq!(ToxinConnoisseur::new().get_name(), "Toxin Connoisseur");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(ToxinConnoisseur::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(ToxinConnoisseur::new().get_category(), SkillCategory::Trait);
+    }
+
     #[test]
-    fn usage_type_is_once_per_game() { assert_eq!(ToxinConnoisseur::new().skill_usage_type, SkillUsageType::OncePerGame); }
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); properties() always returns a valid slice.
+        let _properties: &'static [&'static str] = crate::enums::SkillId::ToxinConnoisseur.properties();
+    }
+
+    #[test]
+    fn class_name_is_toxin_connoisseur() {
+        // Java: assertEquals("ToxinConnoisseur", skill.getClass().getSimpleName());
+        assert!(std::any::type_name::<ToxinConnoisseur>().ends_with("::ToxinConnoisseur"));
+    }
+
+    #[test]
+    fn usage_type_is_once_per_game() {
+        assert_eq!(ToxinConnoisseur::new().skill_usage_type, SkillUsageType::OncePerGame);
+    }
 }

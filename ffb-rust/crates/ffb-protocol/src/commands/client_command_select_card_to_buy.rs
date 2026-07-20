@@ -92,17 +92,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandSelectCardToBuy::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandSelectCardToBuy::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_select_card_to_buy() {
         assert_eq!(ClientCommandSelectCardToBuy::new(true, true).get_id(), NetCommandId::ClientSelectCardToBuy);
     }

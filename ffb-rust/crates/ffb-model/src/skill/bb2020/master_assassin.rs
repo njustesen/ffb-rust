@@ -25,15 +25,23 @@ impl std::ops::Deref for MasterAssassin {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_master_assassin() {
         assert_eq!(MasterAssassin::new().get_name(), "Master Assassin");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(MasterAssassin::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the live Rust property table
+        // is SkillId::MasterAssassin.properties(), which always returns a valid slice.
+        assert!(SkillId::MasterAssassin.properties().iter().all(|p| !p.is_empty()));
     }
 
     #[test]

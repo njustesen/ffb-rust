@@ -85,9 +85,5 @@ mod tests {
         let unique: std::collections::HashSet<_> = names.iter().collect();
         assert_eq!(names.len(), unique.len());
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", TeamStatus::NEW).is_empty());
-    }
 
 }

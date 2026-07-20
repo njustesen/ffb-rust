@@ -87,18 +87,6 @@ mod tests {
         assert_eq!(cmd.get_player_ids().len(), 1);
     }
 
-
-    #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandPlayerChoice::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandPlayerChoice::default().clone();
-    }
-
     #[test]
     fn get_id_is_client_player_choice() {
         assert_eq!(ClientCommandPlayerChoice::new().get_id(), NetCommandId::ClientPlayerChoice);

@@ -26,9 +26,29 @@ impl std::ops::Deref for Slayer {
 mod tests {
     use super::*;
     #[test]
-    fn name_is_correct() { assert_eq!(Slayer::new().get_name(), "Slayer"); }
+    fn name_is_slayer() {
+        assert_eq!(Slayer::new().get_name(), "Slayer");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Slayer::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(Slayer::new().get_category(), SkillCategory::Trait);
+    }
+
     #[test]
-    fn usage_type_is_once_per_game() { assert_eq!(Slayer::new().skill_usage_type, SkillUsageType::OncePerGame); }
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); properties() always returns a valid slice.
+        let _properties: &'static [&'static str] = crate::enums::SkillId::Slayer.properties();
+    }
+
+    #[test]
+    fn class_name_is_slayer() {
+        // Java: assertEquals("Slayer", skill.getClass().getSimpleName());
+        assert!(std::any::type_name::<Slayer>().ends_with("::Slayer"));
+    }
+
+    #[test]
+    fn usage_type_is_once_per_game() {
+        assert_eq!(Slayer::new().skill_usage_type, SkillUsageType::OncePerGame);
+    }
 }

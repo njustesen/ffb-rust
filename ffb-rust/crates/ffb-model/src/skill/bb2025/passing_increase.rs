@@ -27,12 +27,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_plus_pa() {
         assert_eq!(PassingIncrease::new().get_name(), "+PA");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_stat_increase() {
         assert_eq!(PassingIncrease::new().get_category(), SkillCategory::StatIncrease);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the bb2025 Java postConstruct
+        // registers no NamedProperties, so the live SkillId table must be empty here.
+        assert!(crate::enums::SkillId::PassingIncrease.properties().is_empty());
     }
 }

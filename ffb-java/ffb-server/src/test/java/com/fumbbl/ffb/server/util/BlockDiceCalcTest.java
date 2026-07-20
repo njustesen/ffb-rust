@@ -30,12 +30,12 @@ class BlockDiceCalcTest {
 
     @ParameterizedTest(name = "attacker={0} defender={1} → 3 dice")
     @CsvSource({"7,3", "6,2", "4,1", "10,4", "8,3"})
-    void attackerDoubleStrength_returnsThreeDice(int attacker, int defender) {
+    void attackerMoreThanDoubleStrength_returnsThreeDice(int attacker, int defender) {
         assertEquals(3, BlockDiceCalc.blockDiceCount(attacker, defender));
     }
 
     @Test
-    void attackerExactlyDoubleDefender_returnsThreeDice() {
+    void attackerExactlyDoubleDefender_returnsTwoDice() {
         // 6 > 2×3 → false (strictly greater), so 3 dice requires strictly more than double
         assertEquals(2, BlockDiceCalc.blockDiceCount(6, 3));
     }
@@ -54,7 +54,7 @@ class BlockDiceCalcTest {
     }
 
     @Test
-    void defenderDoubleAttacker_returnsMinusThreeDice() {
+    void defenderOneAboveDouble_returnsMinusThreeDice() {
         assertEquals(-3, BlockDiceCalc.blockDiceCount(3, 7));
     }
 

@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_regeneration() {
         assert_eq!(Regeneration::new().get_name(), "Regeneration");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(Regeneration::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_roll_to_save_from_injury_property() {
+        assert!(crate::enums::SkillId::Regeneration.properties().contains(&"canRollToSaveFromInjury"));
     }
 }

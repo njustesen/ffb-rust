@@ -25,8 +25,26 @@ impl std::ops::Deref for Kick {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(Kick::new().get_name(), "Kick"); }
+    fn name_is_kick() {
+        assert_eq!(Kick::new().get_name(), "Kick");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Kick::new().get_category(), SkillCategory::General); }
+    fn category_is_general() {
+        assert_eq!(Kick::new().get_category(), SkillCategory::General);
+    }
+
+    #[test]
+    fn has_can_reduce_kick_distance_property() {
+        assert!(crate::enums::SkillId::Kick.properties().contains(&"canReduceKickDistance"));
+    }
+
+    // Java: assertNotNull(skill.getSkillProperties()). The live Rust mechanism always
+    // returns a valid slice; Kick registers canReduceKickDistance, so the table is non-empty.
+    #[test]
+    fn has_skill_properties_not_null() {
+        assert!(!crate::enums::SkillId::Kick.properties().is_empty());
+    }
 }

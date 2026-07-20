@@ -28,14 +28,22 @@ impl std::ops::Deref for WhirlingDervish {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_whirling_dervish() {
         assert_eq!(WhirlingDervish::new().get_name(), "Whirling Dervish");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(WhirlingDervish::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the live Rust property table
+        // is SkillId::WhirlingDervish.properties(), which always returns a valid slice.
+        assert!(SkillId::WhirlingDervish.properties().iter().all(|p| !p.is_empty()));
     }
 }

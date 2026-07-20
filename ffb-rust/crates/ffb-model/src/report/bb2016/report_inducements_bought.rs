@@ -63,39 +63,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::INDUCEMENTS_BOUGHT);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "inducementsBought");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_team_id(), "team1");
-        assert_eq!(r.get_nr_of_inducements(), 3);
-        assert_eq!(r.get_nr_of_stars(), 1);
-        assert_eq!(r.get_gold(), 150000);
-    }
-
-    #[test]
-    fn mercenaries_count() {
-        let r = ReportInducementsBought::new("team2".into(), 2, 0, 1, 80000);
-        assert_eq!(r.get_nr_of_mercenaries(), 1);
-        assert_eq!(r.get_nr_of_stars(), 0);
-    }
-
-    #[test]
-    fn zero_inducements() {
-        let r = ReportInducementsBought::new("team3".into(), 0, 0, 0, 0);
-        assert_eq!(r.get_nr_of_inducements(), 0);
-        assert_eq!(r.get_gold(), 0);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

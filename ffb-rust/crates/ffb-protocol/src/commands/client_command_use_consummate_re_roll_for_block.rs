@@ -58,22 +58,6 @@ mod tests {
         let cmd = ClientCommandUseConsummateReRollForBlock::default();
         assert_eq!(cmd.get_pro_index(), 0);
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandUseConsummateReRollForBlock::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandUseConsummateReRollForBlock::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandUseConsummateReRollForBlock::default());
-        assert!(s.contains("ClientCommandUseConsummateReRollForBlock"));
-    }
 
     #[test]
     fn get_id_is_client_use_consummate_re_roll_for_block() {

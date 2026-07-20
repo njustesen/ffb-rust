@@ -36,26 +36,6 @@ impl NetCommand for ClientCommandUseTeamMatesWisdom {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn can_construct() { let _ = ClientCommandUseTeamMatesWisdom::new(); }
-    #[test]
-    fn default_works() { let _ = ClientCommandUseTeamMatesWisdom::default(); }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandUseTeamMatesWisdom::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandUseTeamMatesWisdom::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandUseTeamMatesWisdom::default());
-        assert!(s.contains("ClientCommandUseTeamMatesWisdom"));
-    }
 
     #[test]
     fn get_id_is_client_use_team_mates_wisdom() {

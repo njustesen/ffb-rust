@@ -25,14 +25,22 @@ impl std::ops::Deref for FanFavourite {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_fan_favourite() {
         assert_eq!(FanFavourite::new().get_name(), "Fan Favourite");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(FanFavourite::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()) — the live Rust property
+        // table always yields a slice; assert every entry is a non-empty key.
+        assert!(SkillId::FanFavourite.properties().iter().all(|p| !p.is_empty()));
     }
 }

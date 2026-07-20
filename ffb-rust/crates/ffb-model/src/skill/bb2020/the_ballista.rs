@@ -28,15 +28,23 @@ impl std::ops::Deref for TheBallista {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_the_ballista() {
         assert_eq!(TheBallista::new().get_name(), "The Ballista");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(TheBallista::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java: assertNotNull(skill.getSkillProperties()); the live Rust property table
+        // is SkillId::TheBallista.properties(), which always returns a valid slice.
+        assert!(SkillId::TheBallista.properties().iter().all(|p| !p.is_empty()));
     }
 
     #[test]

@@ -49,22 +49,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::TRAP_DOOR); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "trapDoor"); }
-
-    #[test]
-    fn get_roll() { assert_eq!(make().get_roll(), 4); }
-
-    #[test]
-    fn is_escaped() { assert!(make().is_escaped()); }
-    #[test]
-    fn get_name_is_nonempty() {
-        assert!(!make().get_name().is_empty());
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

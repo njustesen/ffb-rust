@@ -25,8 +25,23 @@ impl std::ops::Deref for Decay {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(Decay::new().get_name(), "Decay"); }
+    fn name_is_decay() {
+        assert_eq!(Decay::new().get_name(), "Decay");
+    }
+
+    // Java test (bb2016 class) asserts EXTRAORDINARY; the mixed edition class mirrored
+    // here uses SkillCategory.TRAIT.
     #[test]
-    fn category_is_correct() { assert_eq!(Decay::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(Decay::new().get_category(), SkillCategory::Trait);
+    }
+
+    // Java test (bb2016 class) checks requiresSecondCasualtyRoll, which only the bb2016
+    // edition registers. The mixed edition registers CancelSkillProperty(allowsRaisingLineman).
+    #[test]
+    fn has_cancels_allows_raising_lineman_property() {
+        assert!(crate::enums::SkillId::Decay.properties().contains(&"cancelsAllowsRaisingLineman"));
+    }
 }

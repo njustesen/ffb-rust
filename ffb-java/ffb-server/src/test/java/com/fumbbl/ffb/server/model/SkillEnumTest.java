@@ -42,6 +42,11 @@ class SkillEnumTest {
     }
 
     @Test
+    void skill_category_trait_name() {
+        assertEquals("Trait", SkillCategory.TRAIT.getName());
+    }
+
+    @Test
     void skill_category_mutation_alt_name_is_mutations() {
         assertEquals("Mutations", SkillCategory.MUTATION.getAltName());
     }

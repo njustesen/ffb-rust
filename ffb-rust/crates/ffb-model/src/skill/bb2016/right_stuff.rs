@@ -25,14 +25,20 @@ impl std::ops::Deref for RightStuff {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_right_stuff() {
         assert_eq!(RightStuff::new().get_name(), "Right Stuff");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(RightStuff::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_can_be_thrown_property() {
+        assert!(SkillId::RightStuff.properties().contains(&"canBeThrown"));
     }
 }

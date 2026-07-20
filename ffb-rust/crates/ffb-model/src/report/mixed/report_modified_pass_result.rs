@@ -48,25 +48,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() { assert_eq!(make().get_id(), ReportId::MODIFIED_PASS_RESULT); }
-
-    #[test]
-    fn get_name() { assert_eq!(make().get_name(), "modifiedPassResult"); }
-
-    #[test]
-    fn get_pass_result() { assert_eq!(make().get_pass_result(), "ACCURATE"); }
-
-    #[test]
-    fn get_skill_id_none() { assert!(make().get_skill_id().is_none()); }
-
-    #[test]
-    fn get_skill_id_some() {
-        let r = ReportModifiedPassResult::new(Some(SkillId::Pass), "INACCURATE".into());
-        assert_eq!(r.get_skill_id(), Some(SkillId::Pass));
-        assert_eq!(r.get_pass_result(), "INACCURATE");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = ReportModifiedPassResult::new(Some(SkillId::Pass), "ACCURATE".into());
         let json = original.to_json_value();

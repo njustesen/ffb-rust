@@ -33,8 +33,26 @@ impl std::ops::Deref for Tackle {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(Tackle::new().get_name(), "Tackle"); }
+    fn name_is_tackle() {
+        assert_eq!(Tackle::new().get_name(), "Tackle");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Tackle::new().get_category(), SkillCategory::General); }
+    fn category_is_general() {
+        assert_eq!(Tackle::new().get_category(), SkillCategory::General);
+    }
+
+    #[test]
+    fn has_can_reroll_dodge_cancel_property() {
+        // Tackle must cancel the opponent's Dodge re-roll
+        assert!(crate::enums::SkillId::Tackle.properties().contains(&"cancelsCanRerollDodge"));
+    }
+
+    #[test]
+    fn does_not_have_force_followup_property() {
+        // Tackle does not force the attacker to follow up
+        assert!(!crate::enums::SkillId::Tackle.properties().contains(&"forceFollowup"));
+    }
 }

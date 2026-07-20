@@ -748,7 +748,7 @@ impl SkillId {
             SkillId::Frenzy => &["forceFollowup", "forceSecondBlock"],
             // Java: Guard.postConstruct registers only assistsBlocksInTacklezones
             SkillId::Guard => &["assistsBlocksInTacklezones"],
-            SkillId::DivingTackle => &["canAttemptToTackleDodgingPlayer"],
+            SkillId::DivingTackle => &["canAttemptToTackleDodgingPlayer", "canAttemptToTackleJumpingPlayer"],
             SkillId::Tentacles => &["canHoldPlayersLeavingTacklezones"],
             SkillId::AlwaysHungry => &["mightEatPlayerToThrow"],
             SkillId::BoneHead => &["appliesConfusion"],
@@ -859,8 +859,9 @@ impl SkillId {
                 "cancelsPreventOpponentFollowingUp",
                 "cancelsCanMoveBeforeBeingBlocked",
             ],
-            // Java: BreatheFire.postConstruct registers canPerformArmourRollInsteadOfBlockThatMightFailWithTurnover
-            SkillId::BreatheFire => &["canPerformArmourRollInsteadOfBlockThatMightFailWithTurnover"],
+            // Java: BreatheFire.postConstruct (bb2020 and bb2025) registers
+            // canPerformArmourRollInsteadOfBlockThatMightFailWithTurnover + providesBlockAlternative
+            SkillId::BreatheFire => &["canPerformArmourRollInsteadOfBlockThatMightFailWithTurnover", "providesBlockAlternative"],
             // Java: WildAnimal.postConstruct registers enableStandUpAndEndBlitzAction + needsToRollForActionButKeepsTacklezone
             SkillId::WildAnimal => &["enableStandUpAndEndBlitzAction", "needsToRollForActionButKeepsTacklezone"],
             // Java: Loner.postConstruct registers hasToRollToUseTeamReroll + preventCardRabbitsFoot
@@ -898,12 +899,14 @@ impl SkillId {
             // ffb-engine::step::action::block::util_block_sequence::init_pushback is itself stubbed
             // out ("NamedProperties not yet implemented"), so this cancel currently has no live effect
             // regardless — pre-existing infra gap outside this audit's scope.
-            SkillId::MonstrousMouth => &["cancelsForceOpponentToDropBallOnPushback"],
-            // Java: SafeThrow.postConstruct registers NamedProperties.canCancelInterceptions
-            SkillId::SafeThrow => &["canCancelInterceptions"],
+            SkillId::MonstrousMouth => &["cancelsForceOpponentToDropBallOnPushback", "canPinPlayers", "providesBlockAlternative"],
+            // Java: bb2016/SafeThrow.postConstruct registers canCancelInterceptions + dontDropFumbles
+            SkillId::SafeThrow => &["canCancelInterceptions", "dontDropFumbles"],
+            // Java: Timmmber.postConstruct (bb2016 and mixed) registers allowStandUpAssists
+            SkillId::Timmmber => &["allowStandUpAssists"],
             // Java: VeryLongLegs.postConstruct registers CancelSkillProperty(canCancelInterceptions) (BB2016)
             //   and CancelSkillProperty(canForceInterceptionRerollOfLongPasses) (BB2020) — union of both.
-            SkillId::VeryLongLegs => &["cancelsCancelInterceptions", "cancelsCanForceInterceptionRerollOfLongPasses"],
+            SkillId::VeryLongLegs => &["cancelsCancelInterceptions", "cancelsCanForceInterceptionRerollOfLongPasses", "cancelsPassesAreNotIntercepted"],
             // Java: CloudBurster (BB2020) registers canForceInterceptionRerollOfLongPasses;
             // bb2025's CloudBurster registers the differently-named passesAreNotIntercepted instead — union of both.
             SkillId::CloudBurster => &["canForceInterceptionRerollOfLongPasses", "passesAreNotIntercepted"],
@@ -1002,7 +1005,7 @@ impl SkillId {
                 "ignoresArmourModifiersFromSpecialEffects",
             ],
             // Java: bb2020+bb2025/LordOfChaos.postConstruct registers grantsSingleUseTeamRerollWhenOnPitch
-            SkillId::LordOfChaos => &["grantsSingleUseTeamRerollWhenOnPitch"],
+            SkillId::LordOfChaos => &["grantsSingleUseTeamRerollWhenOnPitch", "canRerollSingleBlockDieOncePerPeriod"],
             // Java: NurglesRot.postConstruct registers allowsRaisingLineman
             SkillId::NurglesRot => &["allowsRaisingLineman"],
             // Java: Stunty.postConstruct registers smallIcon, preventRaiseFromDead, cancelsAllowsRaisingLineman,
@@ -1057,8 +1060,77 @@ impl SkillId {
             // Java: bb2020/ProjectileVomit.postConstruct registers providesBlockAlternative +
             //   canPerformArmourRollInsteadOfBlockThatMightFail
             SkillId::ProjectileVomit => &["providesBlockAlternative", "canPerformArmourRollInsteadOfBlockThatMightFail"],
-            // Java: bb2020/Swarming.postConstruct registers canSneakExtraPlayersOntoPitch
-            SkillId::Swarming => &["canSneakExtraPlayersOntoPitch"],
+            // Java: common/JumpUp.postConstruct registers canStandUpForFree
+            SkillId::JumpUp => &["canStandUpForFree"],
+            // Java: common/StripBall.postConstruct registers forceOpponentToDropBallOnPushback
+            SkillId::StripBall => &["forceOpponentToDropBallOnPushback"],
+            // Java: common/SureHands.postConstruct registers CancelSkillProperty(forceOpponentToDropBallOnPushback)
+            SkillId::SureHands => &["cancelsForceOpponentToDropBallOnPushback"],
+            // Java: mixed/ArmBar.postConstruct registers affectsEitherArmourOrInjuryOnDodge + ...OnJump
+            SkillId::ArmBar => &["affectsEitherArmourOrInjuryOnDodge", "affectsEitherArmourOrInjuryOnJump"],
+            // Java: mixed/BigHand and bb2025/BigHand register ignoreTacklezonesWhenPickingUp + ignoreWeatherWhenPickingUp
+            SkillId::BigHand => &["ignoreTacklezonesWhenPickingUp", "ignoreWeatherWhenPickingUp"],
+            // Java: mixed/Bloodlust.postConstruct registers enableStandUpAndEndBlitzAction + needsToRollForActionBlockingIsEasier
+            SkillId::BloodLust => &["enableStandUpAndEndBlitzAction", "needsToRollForActionBlockingIsEasier"],
+            // Java: mixed/Leader and bb2025/Leader register grantsTeamReRollWhenOnPitch
+            SkillId::Leader => &["grantsTeamReRollWhenOnPitch"],
+            // Java: mixed/MyBall.postConstruct registers preventRegularHandOverAction + preventRegularPassAction
+            //   + CancelSkillProperty(canDropBall)
+            SkillId::MyBall => &["preventRegularHandOverAction", "preventRegularPassAction", "cancelsCanDropBall"],
+            // Java: mixed/PickMeUp.postConstruct registers canStandUpTeamMates
+            SkillId::PickMeUp => &["canStandUpTeamMates"],
+            // Java: mixed/PlagueRidden.postConstruct registers allowsRaisingLineman
+            SkillId::PlagueRidden => &["allowsRaisingLineman"],
+            // Java: mixed/UnchannelledFury.postConstruct registers enableStandUpAndEndBlitzAction
+            //   + needsToRollForActionButKeepsTacklezone
+            SkillId::UnchannelledFury => &["enableStandUpAndEndBlitzAction", "needsToRollForActionButKeepsTacklezone"],
+            // Java: mixed/special/PrimalSavagery.postConstruct registers canLashOutAgainstOpponents
+            SkillId::PrimalSavagery => &["canLashOutAgainstOpponents"],
+            // Java: mixed/special/RaidingParty.postConstruct registers canMoveOpenTeamMate
+            SkillId::RaidingParty => &["canMoveOpenTeamMate"],
+            // Java: mixed/special/Reliable.postConstruct registers fumbledPlayerLandsSafely
+            SkillId::Reliable => &["fumbledPlayerLandsSafely"],
+            // Java: mixed/special/SavageBlow.postConstruct registers canReRollAnyNumberOfBlockDice
+            SkillId::SavageBlow => &["canReRollAnyNumberOfBlockDice"],
+            // Java: mixed/special/SneakiestOfTheLot.postConstruct registers allowsAdditionalFoul
+            SkillId::SneakiestOfTheLot => &["allowsAdditionalFoul"],
+            // Java: mixed/special/StarOfTheShow.postConstruct registers canGrantReRollAfterTouchdown
+            SkillId::StarOfTheShow => &["canGrantReRollAfterTouchdown"],
+            // Java: mixed/special/SwiftAsTheBreeze.postConstruct registers the three ignore-modifier-after-roll properties
+            SkillId::SwiftAsTheBreeze => &["canChooseToIgnoreDodgeModifierAfterRoll", "canChooseToIgnoreRushModifierAfterRoll", "canChooseToIgnoreJumpModifierAfterRoll"],
+            // Java: mixed/special/TastyMorsel.postConstruct registers canBiteOpponents
+            SkillId::TastyMorsel => &["canBiteOpponents"],
+            // Java: mixed/special/TheFlashingBlade.postConstruct registers canPerformArmourRollInsteadOfBlock + canStabAndMoveAfterwards
+            SkillId::TheFlashingBlade => &["canPerformArmourRollInsteadOfBlock", "canStabAndMoveAfterwards"],
+            // Java: mixed/special/ThinkingMansTroll.postConstruct registers canRerollSingleDieOncePerPeriod
+            SkillId::ThinkingMansTroll => &["canRerollSingleDieOncePerPeriod"],
+            // Java: mixed/special/UnstoppableMomentum.postConstruct registers canRerollSingleBlockDieDuringBlitz
+            SkillId::UnstoppableMomentum => &["canRerollSingleBlockDieDuringBlitz"],
+            // Java: mixed/special/ViciousVines.postConstruct registers canBlockOverDistance
+            SkillId::ViciousVines => &["canBlockOverDistance"],
+            // Java: bb2025/Bullseye.postConstruct registers canSkipTtmScatterOnSuperbThrow
+            SkillId::Bullseye => &["canSkipTtmScatterOnSuperbThrow"],
+            // Java: bb2025/Hatred.postConstruct registers canRerollSingleSkull + canBeGainedByGettingEven
+            SkillId::Hatred => &["canRerollSingleSkull", "canBeGainedByGettingEven"],
+            // Java: bb2025/NoBall.postConstruct registers the six prevent-* properties
+            SkillId::NoBall => &["preventCatch", "preventHoldBall", "preventRegularPassAction", "preventRegularHandOverAction", "preventSecureTheBallAction", "preventPuntAction"],
+            // Java: bb2025/Taunt.postConstruct registers forceOpponentToFollowUp
+            SkillId::Taunt => &["forceOpponentToFollowUp"],
+            // Java: bb2025/Unsteady.postConstruct registers preventSecureTheBallAction
+            SkillId::Unsteady => &["preventSecureTheBallAction"],
+            // Java: bb2025/Fumblerooski.postConstruct registers canDropBall (distinct from bb2020 Fumblerooskie)
+            SkillId::Fumblerooski => &["canDropBall"],
+            // Java: bb2025/special/ASneakyPair.postConstruct registers affectsEitherArmourOrInjuryWithPartner
+            SkillId::ASneakyPair => &["affectsEitherArmourOrInjuryWithPartner"],
+            // Java: bb2025/special/BlastinSolvesEverything.postConstruct registers canBlastRemotePlayer
+            SkillId::BlastinSolvesEverything => &["canBlastRemotePlayer"],
+            // Java: bb2025/special/TeamCaptain.postConstruct registers canSaveReRolls + needsToBeSetUp
+            SkillId::TeamCaptain => &["canSaveReRolls", "needsToBeSetUp"],
+            // Java: bb2025/special/WoodlandFury.postConstruct registers canRerollSingleBlockDieWhenWouldBeKnockedDown
+            SkillId::WoodlandFury => &["canRerollSingleBlockDieWhenWouldBeKnockedDown"],
+            // Java: bb2025/special/WorkingInTandem.postConstruct registers canRerollSingleBlockDieWhenPartnerIsMarking
+            //   + canPassToPartnerWithNoModifiers
+            SkillId::WorkingInTandem => &["canRerollSingleBlockDieWhenPartnerIsMarking", "canPassToPartnerWithNoModifiers"],
             _ => &[],
         }
     }

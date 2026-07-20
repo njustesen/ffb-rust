@@ -59,25 +59,9 @@ mod tests {
     }
 
     #[test]
-    fn default_same_as_new() {
-        let _ = ServerCommandUnzapPlayer::default();
-    }
-
-    #[test]
     fn debug_format_works() {
         let v = ServerCommandUnzapPlayer::new("t", "p");
         assert!(!format!("{:?}", v).is_empty());
-    }
-
-    #[test]
-    fn debug_format_nonempty() {
-        let cmd = ServerCommandUnzapPlayer::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ServerCommandUnzapPlayer::default().clone();
     }
 
     #[test]

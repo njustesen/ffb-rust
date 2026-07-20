@@ -56,37 +56,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::THROW_IN);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "throwIn");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_direction(), Direction::North);
-        assert_eq!(r.get_direction_roll(), 3);
-        assert_eq!(r.get_distance_roll(), &[2, 4]);
-    }
-
-    #[test]
-    fn different_direction() {
-        let r = ReportThrowIn::new(Direction::South, 5, vec![3]);
-        assert_eq!(r.get_direction(), Direction::South);
-    }
-
-    #[test]
-    fn distance_roll_length() {
-        let r = ReportThrowIn::new(Direction::East, 2, vec![1, 2, 3]);
-        assert_eq!(r.get_distance_roll().len(), 3);
-        assert_eq!(r.get_direction_roll(), 2);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

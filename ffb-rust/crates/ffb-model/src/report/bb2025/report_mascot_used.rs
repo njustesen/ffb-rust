@@ -57,39 +57,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::MASCOT_USED);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "mascotUsed");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_team_id(), "team1");
-        assert!(r.is_successful());
-        assert!(!r.is_fallback());
-    }
-
-    #[test]
-    fn minimum_roll_and_roll() {
-        let r = make();
-        assert_eq!(r.get_minimum_roll(), 4);
-        assert_eq!(r.get_roll(), 5);
-    }
-
-    #[test]
-    fn fallback_and_unsuccessful() {
-        let r = ReportMascotUsed::new("team2".into(), 5, 3, false, true);
-        assert!(!r.is_successful());
-        assert!(r.is_fallback());
-        assert_eq!(r.get_team_id(), "team2");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

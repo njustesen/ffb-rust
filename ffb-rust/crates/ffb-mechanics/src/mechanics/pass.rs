@@ -38,42 +38,49 @@ pub fn passing_distance_bb2025(from: FieldCoordinate, to: FieldCoordinate) -> Op
     }
 }
 
+// Tests exercise the BB2025 FieldCoordinate-based mechanics API directly (this
+// module owns its own table transcription, separate from ffb-engine's
+// util::passing_distance_calc mirror). Names and case values are aligned with
+// the Java-derived names in PassingDistanceCalcTest where cases coincide.
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn same_square_is_none() {
+    fn same_square_returns_null() {
         let c = FieldCoordinate::new(5, 5);
         assert_eq!(passing_distance_bb2025(c, c), None);
     }
 
     #[test]
-    fn adjacent_square_is_quick_pass() {
+    fn quick_pass() {
+        // dx=1, dy=0 — Java quickPass row "1,0"
         let from = FieldCoordinate::new(5, 5);
         let to = FieldCoordinate::new(6, 5);
         assert_eq!(passing_distance_bb2025(from, to), Some(PassingDistance::QuickPass));
     }
 
     #[test]
-    fn far_square_is_long_bomb() {
+    fn long_bomb() {
+        // dx=11, dy=0 — Java longBomb row "11,0"
         let from = FieldCoordinate::new(0, 0);
         let to = FieldCoordinate::new(11, 0);
         assert_eq!(passing_distance_bb2025(from, to), Some(PassingDistance::LongBomb));
     }
 
     #[test]
-    fn out_of_range_is_none() {
+    fn delta_greater_than_13_returns_null() {
         let from = FieldCoordinate::new(0, 0);
         let to = FieldCoordinate::new(14, 0);
         assert_eq!(passing_distance_bb2025(from, to), None);
     }
 
     #[test]
-    fn direction_independent() {
-        // Java's table is indexed by absolute delta, so swapping from/to shouldn't matter.
-        let from = FieldCoordinate::new(5, 5);
-        let to = FieldCoordinate::new(9, 5);
-        assert_eq!(passing_distance_bb2025(from, to), passing_distance_bb2025(to, from));
+    fn for_coordinates_symmetrical() {
+        // Passing from (5,7) to (8,7) = dx=3, dy=0 → QuickPass; symmetric both ways
+        let from = FieldCoordinate::new(5, 7);
+        let to = FieldCoordinate::new(8, 7);
+        assert_eq!(passing_distance_bb2025(from, to), Some(PassingDistance::QuickPass));
+        assert_eq!(passing_distance_bb2025(to, from), Some(PassingDistance::QuickPass));
     }
 }

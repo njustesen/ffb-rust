@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_bullseye() {
         assert_eq!(Bullseye::new().get_name(), "Bullseye");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_strength() {
         assert_eq!(Bullseye::new().get_category(), SkillCategory::Strength);
+    }
+
+    #[test]
+    fn has_can_skip_ttm_scatter_on_superb_throw_property() {
+        assert!(crate::enums::SkillId::Bullseye.properties().contains(&"canSkipTtmScatterOnSuperbThrow"));
     }
 }

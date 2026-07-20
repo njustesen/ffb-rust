@@ -25,8 +25,28 @@ impl std::ops::Deref for SafePairOfHands {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors ffb-java SafePairOfHandsSkillTest.
+
     #[test]
-    fn name_is_correct() { assert_eq!(SafePairOfHands::new().get_name(), "Safe Pair Of Hands"); }
+    fn name_is_safe_pair_of_hands() {
+        assert_eq!(SafePairOfHands::new().get_name(), "Safe Pair Of Hands");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(SafePairOfHands::new().get_category(), SkillCategory::Agility); }
+    fn category_is_agility() {
+        assert_eq!(SafePairOfHands::new().get_category(), SkillCategory::Agility);
+    }
+
+    #[test]
+    fn has_can_place_ball_when_knocked_down_property() {
+        assert!(crate::enums::SkillId::SafePairOfHands
+            .properties()
+            .contains(&"canPlaceBallWhenKnockedDownOrPlacedProne"));
+    }
+
+    #[test]
+    fn class_name_is_safe_pair_of_hands() {
+        assert_eq!(crate::enums::SkillId::SafePairOfHands.class_name(), "SafePairOfHands");
+    }
 }

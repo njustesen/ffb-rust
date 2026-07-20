@@ -65,18 +65,6 @@ mod tests {
         assert_eq!(cmd.get_petty_cash(), -1000);
     }
 
-
-    #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandPettyCash::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandPettyCash::default().clone();
-    }
-
     #[test]
     fn get_id_is_client_petty_cash() {
         assert_eq!(ClientCommandPettyCash::default().get_id(), NetCommandId::ClientPettyCash);

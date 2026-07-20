@@ -25,14 +25,20 @@ impl std::ops::Deref for KickTeamMate {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_kick_team_mate() {
         assert_eq!(KickTeamMate::new().get_name(), "Kick Team-Mate");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(KickTeamMate::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_can_kick_team_mates_property() {
+        assert!(SkillId::KickTeamMate.properties().contains(&"canKickTeamMates"));
     }
 }

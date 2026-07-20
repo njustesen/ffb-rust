@@ -25,15 +25,21 @@ impl std::ops::Deref for PutridRegurgitation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_putrid_regurgitation() {
         assert_eq!(PutridRegurgitation::new().get_name(), "Putrid Regurgitation");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(PutridRegurgitation::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_use_vomit_after_block_property() {
+        assert!(SkillId::PutridRegurgitation.properties().contains(&"canUseVomitAfterBlock"));
     }
 
     #[test]

@@ -27,12 +27,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_woodland_fury() {
         assert_eq!(WoodlandFury::new().get_name(), "Woodland Fury");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(WoodlandFury::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_reroll_single_block_die_when_would_be_knocked_down_property() {
+        assert!(crate::enums::SkillId::WoodlandFury.properties().contains(&"canRerollSingleBlockDieWhenWouldBeKnockedDown"));
     }
 }

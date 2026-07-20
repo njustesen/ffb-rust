@@ -30,12 +30,6 @@ mod tests {
     }
 
     #[test]
-    fn initialize_does_not_panic() {
-        let mut f = GameOptionIdFactory::default();
-        f.initialize();
-    }
-
-    #[test]
     fn for_name_a_second_known_variant() {
         // GameOptionId wraps any non-empty string, so a second non-empty name is valid
         assert!(GameOptionIdFactory::default().for_name("anotherOption").is_some());

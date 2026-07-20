@@ -25,8 +25,35 @@ impl std::ops::Deref for Stunty {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Mirrors ffb-java StuntySkillTest (written against the bb2016 class, where
+    // the category is EXTRAORDINARY); category adapted to the mixed edition's
+    // constructor (TRAIT). Property assertions verified against the mixed
+    // edition's postConstruct. The Java `is_bb2016_edition` test is skipped
+    // (edition annotations are covered elsewhere).
+
     #[test]
-    fn name_is_correct() { assert_eq!(Stunty::new().get_name(), "Stunty"); }
+    fn name_is_stunty() {
+        assert_eq!(Stunty::new().get_name(), "Stunty");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Stunty::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(Stunty::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_ignore_tacklezones_when_dodging_property() {
+        assert!(crate::enums::SkillId::Stunty.properties().contains(&"ignoreTacklezonesWhenDodging"));
+    }
+
+    #[test]
+    fn has_is_hurt_more_easily_property() {
+        assert!(crate::enums::SkillId::Stunty.properties().contains(&"isHurtMoreEasily"));
+    }
+
+    #[test]
+    fn has_passes_are_intercepted_easier_property() {
+        assert!(crate::enums::SkillId::Stunty.properties().contains(&"passesAreInterceptedEasier"));
+    }
 }

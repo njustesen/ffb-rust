@@ -46,50 +46,46 @@ pub fn multi_block_defender_modifier(rules: Rules) -> i32 {
     }
 }
 
+// Tests exercising the ffb-mechanics API directly; names aligned with the
+// Java-derived tests in BlockDiceCalcTest / BlockResultCalcTest (mirrored 1:1
+// in ffb-engine::util::{block_dice_calc, block_result_calc}). Kept because the
+// mechanics free functions and the Rules-dispatched multi-block modifiers are
+// separate production code not covered by the engine mirrors.
 #[cfg(test)]
 mod tests {
     use super::*;
     use ffb_model::enums::Rules;
 
-    // ── Equal strength ────────────────────────────────────────────────────────
-
     // ── block_result_for_roll ─────────────────────────────────────────────────
 
     #[test]
-    fn roll_1_is_skull() {
+    fn skull_on_1() {
         assert_eq!(block_result_for_roll(1), BlockResult::Skull);
     }
 
     #[test]
-    fn roll_2_is_both_down() {
+    fn both_down_on_2() {
         assert_eq!(block_result_for_roll(2), BlockResult::BothDown);
     }
 
     #[test]
-    fn roll_3_and_4_are_pushback() {
+    fn pushback_on_3() {
         assert_eq!(block_result_for_roll(3), BlockResult::Pushback);
+    }
+
+    #[test]
+    fn pushback_on_4() {
         assert_eq!(block_result_for_roll(4), BlockResult::Pushback);
     }
 
     #[test]
-    fn roll_5_is_pow_pushback() {
+    fn pow_pushback_on_5() {
         assert_eq!(block_result_for_roll(5), BlockResult::PowPushback);
     }
 
     #[test]
-    fn roll_6_is_pow() {
+    fn pow_on_6() {
         assert_eq!(block_result_for_roll(6), BlockResult::Pow);
-    }
-
-    #[test]
-    fn all_six_faces_covered() {
-        let results: Vec<BlockResult> = (1..=6).map(block_result_for_roll).collect();
-        assert_eq!(results[0], BlockResult::Skull);
-        assert_eq!(results[1], BlockResult::BothDown);
-        assert_eq!(results[2], BlockResult::Pushback);
-        assert_eq!(results[3], BlockResult::Pushback);
-        assert_eq!(results[4], BlockResult::PowPushback);
-        assert_eq!(results[5], BlockResult::Pow);
     }
 
     // ── block_dice_count ──────────────────────────────────────────────────────
@@ -97,85 +93,106 @@ mod tests {
     #[test]
     fn equal_strength_returns_one_die() {
         assert_eq!(block_dice_count(3, 3), 1);
+    }
+
+    #[test]
+    fn equal_strength_at_edge_1_vs_1_returns_one_die() {
         assert_eq!(block_dice_count(1, 1), 1);
-        assert_eq!(block_dice_count(5, 5), 1);
     }
 
     // ── Attacker advantage ────────────────────────────────────────────────────
 
     #[test]
-    fn attacker_one_above_defender_returns_two_dice() {
-        assert_eq!(block_dice_count(4, 3), 2);
-        assert_eq!(block_dice_count(5, 4), 2);
-        assert_eq!(block_dice_count(3, 2), 2);
+    fn attacker_stronger_returns_two_dice() {
+        for (attacker, defender) in [(4, 3), (5, 4), (5, 3), (3, 2), (6, 4)] {
+            assert_eq!(
+                block_dice_count(attacker, defender),
+                2,
+                "attacker={attacker} defender={defender}"
+            );
+        }
     }
 
     #[test]
     fn attacker_exactly_double_defender_returns_two_dice() {
         // strictly greater than double is required for 3 dice
         assert_eq!(block_dice_count(6, 3), 2);
-        assert_eq!(block_dice_count(4, 2), 2);
     }
 
     #[test]
-    fn attacker_more_than_double_returns_three_dice() {
-        assert_eq!(block_dice_count(7, 3), 3);
-        assert_eq!(block_dice_count(5, 2), 3);
-        assert_eq!(block_dice_count(4, 1), 3);
+    fn attacker_more_than_double_strength_returns_three_dice() {
+        for (attacker, defender) in [(7, 3), (6, 2), (4, 1), (10, 4), (8, 3)] {
+            assert_eq!(
+                block_dice_count(attacker, defender),
+                3,
+                "attacker={attacker} defender={defender}"
+            );
+        }
     }
 
     // ── Defender advantage ────────────────────────────────────────────────────
 
     #[test]
-    fn defender_one_above_attacker_returns_minus_two() {
-        assert_eq!(block_dice_count(3, 4), -2);
-        assert_eq!(block_dice_count(2, 3), -2);
-        assert_eq!(block_dice_count(3, 5), -2);
+    fn defender_stronger_returns_minus_two_dice() {
+        for (attacker, defender) in [(3, 4), (2, 3), (4, 5), (3, 5), (3, 6)] {
+            assert_eq!(
+                block_dice_count(attacker, defender),
+                -2,
+                "attacker={attacker} defender={defender}"
+            );
+        }
     }
 
     #[test]
-    fn defender_exactly_double_attacker_returns_minus_two() {
-        // strictly less than half required for -3
+    fn defender_exactly_double_attacker_returns_minus_two_dice() {
+        // strictly more than double required for -3
         assert_eq!(block_dice_count(3, 6), -2);
-        assert_eq!(block_dice_count(2, 4), -2);
     }
 
     #[test]
-    fn defender_more_than_double_attacker_returns_minus_three() {
-        assert_eq!(block_dice_count(3, 7), -3);
-        assert_eq!(block_dice_count(1, 3), -3);
-        assert_eq!(block_dice_count(2, 5), -3);
+    fn defender_more_than_double_attacker_returns_minus_three_dice() {
+        for (attacker, defender) in [(1, 3), (2, 5), (3, 7), (4, 9)] {
+            assert_eq!(
+                block_dice_count(attacker, defender),
+                -3,
+                "attacker={attacker} defender={defender}"
+            );
+        }
     }
 
     // ── add_block_die bonus ───────────────────────────────────────────────────
 
     #[test]
-    fn add_block_die_on_one_returns_two() {
+    fn add_block_die_on_one_die_returns_two() {
         assert_eq!(apply_add_block_die(1), 2);
     }
 
     #[test]
-    fn add_block_die_on_two_returns_three() {
+    fn add_block_die_on_two_dice_returns_three() {
         assert_eq!(apply_add_block_die(2), 3);
     }
 
     #[test]
-    fn add_block_die_no_effect_on_three_or_negative() {
+    fn add_block_die_on_three_dice_no_change() {
         assert_eq!(apply_add_block_die(3), 3);
+    }
+
+    #[test]
+    fn add_block_die_on_negative_dice_no_change() {
         assert_eq!(apply_add_block_die(-2), -2);
         assert_eq!(apply_add_block_die(-3), -3);
     }
 
-    // ── Multi-block modifiers ─────────────────────────────────────────────────
+    // ── Multi-block modifiers (Rules-dispatched mechanics API) ────────────────
 
     #[test]
-    fn multi_block_bb2016_defender_plus2_attacker_zero() {
+    fn bb2016_multi_block_defender_gets_plus_2() {
         assert_eq!(multi_block_defender_modifier(Rules::Bb2016), 2);
         assert_eq!(multi_block_attacker_modifier(Rules::Bb2016), 0);
     }
 
     #[test]
-    fn multi_block_bb2020_attacker_minus2_defender_zero() {
+    fn bb2020_multi_block_attacker_gets_minus_2() {
         assert_eq!(multi_block_attacker_modifier(Rules::Bb2020), -2);
         assert_eq!(multi_block_defender_modifier(Rules::Bb2020), 0);
         // BB2025 same as BB2020

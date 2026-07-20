@@ -28,25 +28,25 @@ impl std::ops::Deref for ConsummateProfessional {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_consummate_professional() {
         assert_eq!(ConsummateProfessional::new().get_name(), "Consummate Professional");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_trait() {
         assert_eq!(ConsummateProfessional::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_can_reroll_single_die_once_per_period_property() {
+        assert!(SkillId::ConsummateProfessional.properties().contains(&"canRerollSingleDieOncePerPeriod"));
     }
 
     #[test]
     fn usage_type_is_correct() {
         assert_eq!(ConsummateProfessional::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
-    }
-
-    #[test]
-    fn registers_named_property() {
-        use crate::enums::SkillId;
-        assert!(SkillId::ConsummateProfessional.properties().contains(&"canRerollSingleDieOncePerPeriod"));
     }
 }

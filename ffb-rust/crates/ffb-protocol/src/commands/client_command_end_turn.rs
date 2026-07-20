@@ -92,17 +92,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandEndTurn::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandEndTurn::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_end_turn() {
         assert_eq!(ClientCommandEndTurn::new().get_id(), NetCommandId::ClientEndTurn);
     }

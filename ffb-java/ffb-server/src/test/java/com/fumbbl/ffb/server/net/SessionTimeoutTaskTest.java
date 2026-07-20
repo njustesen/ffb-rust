@@ -69,4 +69,31 @@ class SessionTimeoutTaskTest {
     verify(communication).close(timeoutReplaySession);
     verifyNoMoreInteractions(communication);
   }
+
+  @Test
+  void runClosesExpiredRegularSession() {
+    when(sessionManager.getAllSessions()).thenReturn(new Session[]{timeoutSession});
+    when(sessionManager.getLastPing(timeoutSession)).then(
+      (Answer<Long>) invocationOnMock -> System.currentTimeMillis() - TIMEOUT - 1
+    );
+    when(replaySessionManager.getAllSessions()).thenReturn(new Session[0]);
+
+    timeoutTask.run();
+
+    verify(communication).close(timeoutSession);
+    verifyNoMoreInteractions(communication);
+  }
+
+  @Test
+  void runLeavesFreshSessionUntouched() {
+    when(sessionManager.getAllSessions()).thenReturn(new Session[]{activeSession});
+    when(sessionManager.getLastPing(activeSession)).then(
+      (Answer<Long>) invocationOnMock -> System.currentTimeMillis()
+    );
+    when(replaySessionManager.getAllSessions()).thenReturn(new Session[0]);
+
+    timeoutTask.run();
+
+    verifyNoInteractions(communication);
+  }
 }

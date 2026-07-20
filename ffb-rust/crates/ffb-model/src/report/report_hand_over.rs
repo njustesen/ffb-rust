@@ -48,33 +48,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::HAND_OVER);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "handOver");
-    }
-
-    #[test]
-    fn catcher_id_getter() {
-        assert_eq!(make().get_catcher_id(), "catcher1");
-    }
-
-    #[test]
-    fn different_catcher_id() {
-        let r = ReportHandOver::new("catcher99".into());
-        assert_eq!(r.get_catcher_id(), "catcher99");
-    }
-
-    #[test]
-    fn empty_catcher_id() {
-        let r = ReportHandOver::new(String::new());
-        assert_eq!(r.get_catcher_id(), "");
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

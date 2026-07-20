@@ -23,16 +23,24 @@ impl std::ops::Deref for Animosity {
 }
 
 #[cfg(test)]
+// Mirrors ffb-java/ffb-server/src/test/java/com/fumbbl/ffb/server/skill tests.
+// Java test targets bb2025 (category TRAIT); bb2016/Animosity.java is EXTRAORDINARY.
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_animosity() {
         assert_eq!(Animosity::new().get_name(), "Animosity");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(Animosity::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_has_to_roll_to_pass_ball_on_property() {
+        assert!(SkillId::Animosity.properties().contains(&"hasToRollToPassBallOn"));
     }
 }

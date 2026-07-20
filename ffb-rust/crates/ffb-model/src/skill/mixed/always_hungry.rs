@@ -25,8 +25,21 @@ impl std::ops::Deref for AlwaysHungry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(AlwaysHungry::new().get_name(), "Always Hungry"); }
+    fn name_is_always_hungry() {
+        assert_eq!(AlwaysHungry::new().get_name(), "Always Hungry");
+    }
+
+    // Java test (bb2016 class) asserts EXTRAORDINARY; the mixed edition class mirrored
+    // here uses SkillCategory.TRAIT.
     #[test]
-    fn category_is_correct() { assert_eq!(AlwaysHungry::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(AlwaysHungry::new().get_category(), SkillCategory::Trait);
+    }
+
+    #[test]
+    fn has_might_eat_player_to_throw_property() {
+        assert!(crate::enums::SkillId::AlwaysHungry.properties().contains(&"mightEatPlayerToThrow"));
+    }
 }

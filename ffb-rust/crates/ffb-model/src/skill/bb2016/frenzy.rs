@@ -25,14 +25,25 @@ impl std::ops::Deref for Frenzy {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_frenzy() {
         assert_eq!(Frenzy::new().get_name(), "Frenzy");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_general() {
         assert_eq!(Frenzy::new().get_category(), SkillCategory::General);
+    }
+
+    #[test]
+    fn has_force_followup_property() {
+        assert!(SkillId::Frenzy.properties().contains(&"forceFollowup"));
+    }
+
+    #[test]
+    fn has_force_second_block_property() {
+        assert!(SkillId::Frenzy.properties().contains(&"forceSecondBlock"));
     }
 }

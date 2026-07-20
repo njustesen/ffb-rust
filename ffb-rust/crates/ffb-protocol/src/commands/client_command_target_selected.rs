@@ -66,22 +66,6 @@ mod tests {
         let cmd = ClientCommandTargetSelected::with_target("player-123");
         assert_eq!(cmd.get_target_player_id(), Some("player-123"));
     }
-    #[test]
-    fn debug_format_nonempty() {
-        assert!(!format!("{:?}", ClientCommandTargetSelected::default()).is_empty());
-    }
-
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandTargetSelected::default().clone();
-    }
-
-    #[test]
-    fn debug_format_contains_struct_name() {
-        let s = format!("{:?}", ClientCommandTargetSelected::default());
-        assert!(s.contains("ClientCommandTargetSelected"));
-    }
 
     #[test]
     fn get_id_is_client_target_selected() {

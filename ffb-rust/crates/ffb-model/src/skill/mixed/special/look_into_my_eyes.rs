@@ -25,10 +25,29 @@ impl std::ops::Deref for LookIntoMyEyes {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(LookIntoMyEyes::new().get_name(), "Look Into My Eyes"); }
+    fn name_is_look_into_my_eyes() {
+        assert_eq!(LookIntoMyEyes::new().get_name(), "Look Into My Eyes");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(LookIntoMyEyes::new().get_category(), SkillCategory::Trait); }
+    fn category_is_trait() {
+        assert_eq!(LookIntoMyEyes::new().get_category(), SkillCategory::Trait);
+    }
+
     #[test]
-    fn usage_type_is_once_per_game() { assert_eq!(LookIntoMyEyes::new().get_skill_usage_type(), SkillUsageType::OncePerGame); }
+    fn has_can_steal_ball_from_opponent_property() {
+        assert!(crate::enums::SkillId::LookIntoMyEyes.properties().contains(&"canStealBallFromOpponent"));
+    }
+
+    #[test]
+    fn class_name_is_look_into_my_eyes() {
+        assert_eq!(crate::enums::SkillId::LookIntoMyEyes.class_name(), "LookIntoMyEyes");
+    }
+
+    #[test]
+    fn usage_type_is_once_per_game() {
+        assert_eq!(LookIntoMyEyes::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
+    }
 }

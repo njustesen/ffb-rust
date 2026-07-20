@@ -27,8 +27,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn name_is_correct() { assert_eq!(ArmourIncrease::new().get_name(), "+AV"); }
+    fn name_is_plus_av() {
+        assert_eq!(ArmourIncrease::new().get_name(), "+AV");
+    }
 
     #[test]
-    fn category_is_correct() { assert_eq!(ArmourIncrease::new().get_category(), SkillCategory::StatIncrease); }
+    fn category_is_stat_increase() {
+        assert_eq!(ArmourIncrease::new().get_category(), SkillCategory::StatIncrease);
+    }
+
+    #[test]
+    fn skill_properties_are_not_null() {
+        // Java asserts getSkillProperties() is not null; the live Rust mechanism
+        // always returns a slice (empty here — ArmourIncrease registers no NamedProperties).
+        assert!(crate::enums::SkillId::ArmourIncrease.properties().is_empty());
+    }
 }

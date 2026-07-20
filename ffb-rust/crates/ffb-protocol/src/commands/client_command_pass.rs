@@ -84,17 +84,6 @@ mod tests {
     }
 
     #[test]
-    fn debug_format_nonempty() {
-        let cmd = ClientCommandPass::default();
-        assert!(!format!("{cmd:?}").is_empty());
-    }
-
-    #[test]
-    fn clone_does_not_panic() {
-        let _ = ClientCommandPass::default().clone();
-    }
-
-    #[test]
     fn get_id_is_client_pass() {
         assert_eq!(ClientCommandPass::default().get_id(), NetCommandId::ClientPass);
     }

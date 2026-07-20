@@ -37,12 +37,6 @@ mod tests {
     }
 
     #[test]
-    fn initialize_does_not_panic() {
-        let mut f = ReRollSourceFactory::default();
-        f.initialize();
-    }
-
-    #[test]
     fn for_name_a_second_known_variant() {
         // "Team ReRoll" is stored lowercased; lookup is case-insensitive
         let f = ReRollSourceFactory::default();

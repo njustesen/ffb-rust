@@ -28,15 +28,19 @@ impl std::ops::Deref for Tentacles {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn name_is_correct() { assert_eq!(Tentacles::new().get_name(), "Tentacles"); }
+    fn name_is_tentacles() {
+        assert_eq!(Tentacles::new().get_name(), "Tentacles");
+    }
+
     #[test]
-    fn category_is_correct() { assert_eq!(Tentacles::new().get_category(), SkillCategory::Mutation); }
+    fn category_is_mutation() {
+        assert_eq!(Tentacles::new().get_category(), SkillCategory::Mutation);
+    }
+
     #[test]
-    fn registers_can_hold_players_leaving_tacklezones_property() {
-        // Java Tentacles.postConstruct() registers canHoldPlayersLeavingTacklezones;
-        // this would have failed before the fix since no property was registered.
-        let t = Tentacles::new();
-        assert!(t.has_skill_property(NamedProperties::CAN_HOLD_PLAYERS_LEAVING_TACKLEZONES));
+    fn has_can_hold_players_leaving_tacklezones_property() {
+        assert!(crate::enums::SkillId::Tentacles.properties().contains(&"canHoldPlayersLeavingTacklezones"));
     }
 }

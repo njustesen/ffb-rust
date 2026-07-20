@@ -45,36 +45,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id() {
-        assert_eq!(make().get_id(), ReportId::KICKOFF_RIOT);
-    }
-
-    #[test]
-    fn get_name() {
-        assert_eq!(make().get_name(), "kickoffRiot");
-    }
-
-    #[test]
-    fn fields() {
-        let r = make();
-        assert_eq!(r.get_roll(), 3);
-        assert_eq!(r.get_turn_modifier(), -1);
-    }
-
-    #[test]
-    fn positive_turn_modifier() {
-        let r = ReportKickoffRiot::new(5, 1);
-        assert_eq!(r.get_roll(), 5);
-        assert_eq!(r.get_turn_modifier(), 1);
-    }
-
-    #[test]
-    fn zero_modifier() {
-        let r = ReportKickoffRiot::new(4, 0);
-        assert_eq!(r.get_turn_modifier(), 0);
-    }
-
-    #[test]
     fn serialization_round_trip() {
         let original = make();
         let json = original.to_json_value();

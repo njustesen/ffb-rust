@@ -339,11 +339,11 @@ mod tests {
         assert!(!apo_usable_for_injury(Rules::Bb2020, InjuryOutcome::Stunned));
     }
 
-    // ── interpret_injury_total_bb2016 ─────────────────────────────────────────
+    // ── interpret_injury_total_bb2016 (names mirror InjuryCalcTest) ───────────
 
     #[test]
-    fn bb2016_low_totals_are_stunned() {
-        for total in 2..=7 {
+    fn bb2016_low_total_is_stunned() {
+        for total in [2, 3, 4, 5, 6, 7] {
             assert_eq!(
                 interpret_injury_total_bb2016(total, false, false),
                 Some(InjuryOutcome::Stunned),
@@ -353,49 +353,55 @@ mod tests {
     }
 
     #[test]
-    fn bb2016_8_and_9_are_ko() {
-        assert_eq!(interpret_injury_total_bb2016(8, false, false), Some(InjuryOutcome::KnockedOut));
-        assert_eq!(interpret_injury_total_bb2016(9, false, false), Some(InjuryOutcome::KnockedOut));
+    fn bb2016_mid_total_is_ko() {
+        for total in [8, 9] {
+            assert_eq!(
+                interpret_injury_total_bb2016(total, false, false),
+                Some(InjuryOutcome::KnockedOut),
+                "total={total}"
+            );
+        }
     }
 
     #[test]
-    fn bb2016_ten_plus_is_casualty() {
-        assert_eq!(interpret_injury_total_bb2016(10, false, false), None);
-        assert_eq!(interpret_injury_total_bb2016(12, false, false), None);
+    fn bb2016_high_total_is_casualty() {
+        for total in [10, 11, 12] {
+            assert_eq!(interpret_injury_total_bb2016(total, false, false), None, "total={total}");
+        }
     }
 
     #[test]
-    fn bb2016_thick_skull_at_8_becomes_stunned() {
+    fn bb2016_thick_skull_at8_becomes_stunned() {
         assert_eq!(interpret_injury_total_bb2016(8, false, true), Some(InjuryOutcome::Stunned));
     }
 
     #[test]
-    fn bb2016_thick_skull_checked_before_stunty_at_8() {
+    fn bb2016_thick_skull_at8_overrides_stunty_because_bb2016_checks_thick_skull_first() {
         // BB2016: ThickSkull check comes first, so even Stunty+ThickSkull at 8 → Stunned
         assert_eq!(interpret_injury_total_bb2016(8, true, true), Some(InjuryOutcome::Stunned));
     }
 
     #[test]
-    fn bb2016_stunty_at_7_becomes_ko() {
+    fn bb2016_stunty_at7_becomes_ko() {
         assert_eq!(interpret_injury_total_bb2016(7, true, false), Some(InjuryOutcome::KnockedOut));
     }
 
     #[test]
-    fn bb2016_stunty_thick_skull_at_7_is_ko_no_thick_skull_save() {
+    fn bb2016_stunty_thick_skull_at7_is_ko_because_thick_skull_only_activates_at8() {
         // ThickSkull only triggers at 8 in BB2016, not at 7
         assert_eq!(interpret_injury_total_bb2016(7, true, true), Some(InjuryOutcome::KnockedOut));
     }
 
     #[test]
-    fn bb2016_stunty_at_9_becomes_badly_hurt() {
+    fn bb2016_stunty_at9_becomes_badly_hurt() {
         assert_eq!(interpret_injury_total_bb2016(9, true, false), Some(InjuryOutcome::BadlyHurt));
     }
 
-    // ── interpret_injury_total_bb2020 ─────────────────────────────────────────
+    // ── interpret_injury_total_bb2020 (names mirror InjuryCalcTest) ───────────
 
     #[test]
-    fn bb2020_low_totals_are_stunned() {
-        for total in 2..=7 {
+    fn bb2020_low_total_is_stunned() {
+        for total in [2, 3, 4, 5, 6, 7] {
             assert_eq!(
                 interpret_injury_total_bb2020(total, false, false),
                 Some(InjuryOutcome::Stunned),
@@ -405,77 +411,108 @@ mod tests {
     }
 
     #[test]
-    fn bb2020_8_and_9_are_ko() {
-        assert_eq!(interpret_injury_total_bb2020(8, false, false), Some(InjuryOutcome::KnockedOut));
-        assert_eq!(interpret_injury_total_bb2020(9, false, false), Some(InjuryOutcome::KnockedOut));
+    fn bb2020_mid_total_is_ko() {
+        for total in [8, 9] {
+            assert_eq!(
+                interpret_injury_total_bb2020(total, false, false),
+                Some(InjuryOutcome::KnockedOut),
+                "total={total}"
+            );
+        }
     }
 
     #[test]
-    fn bb2020_ten_plus_is_casualty() {
-        assert_eq!(interpret_injury_total_bb2020(10, false, false), None);
+    fn bb2020_high_total_is_casualty() {
+        for total in [10, 11, 12] {
+            assert_eq!(interpret_injury_total_bb2020(total, false, false), None, "total={total}");
+        }
     }
 
     #[test]
-    fn bb2020_thick_skull_at_8_non_stunty_becomes_stunned() {
+    fn bb2020_thick_skull_at8_non_stunty_becomes_stunned() {
         assert_eq!(interpret_injury_total_bb2020(8, false, true), Some(InjuryOutcome::Stunned));
     }
 
     #[test]
-    fn bb2020_stunty_at_7_becomes_ko() {
+    fn bb2020_stunty_at7_becomes_ko() {
         assert_eq!(interpret_injury_total_bb2020(7, true, false), Some(InjuryOutcome::KnockedOut));
     }
 
     #[test]
-    fn bb2020_stunty_thick_skull_at_7_thick_skull_saves() {
+    fn bb2020_stunty_thick_skull_at7_thick_skull_saves() {
         // BB2020: Thick Skull overrides Stunty at 7 — Stunned instead of KO
         assert_eq!(interpret_injury_total_bb2020(7, true, true), Some(InjuryOutcome::Stunned));
     }
 
     #[test]
-    fn bb2020_stunty_thick_skull_at_8_no_save() {
+    fn bb2020_stunty_thick_skull_at8_thick_skull_does_not_save() {
         // ThickSkull only saves non-Stunty at 8 in BB2020
         assert_eq!(interpret_injury_total_bb2020(8, true, true), Some(InjuryOutcome::KnockedOut));
     }
 
     #[test]
-    fn bb2020_stunty_at_9_becomes_badly_hurt() {
+    fn bb2020_stunty_at9_becomes_badly_hurt() {
         assert_eq!(interpret_injury_total_bb2020(9, true, false), Some(InjuryOutcome::BadlyHurt));
     }
 
-    // ── casualty tier functions ───────────────────────────────────────────────
+    // ── casualty tier functions (names mirror CasualtyCalcTest) ───────────────
 
     #[test]
-    fn casualty_tier_bb2016_first_die() {
-        assert_eq!(casualty_tier_bb2016(1), CasualtyTier::BadlyHurt);
-        assert_eq!(casualty_tier_bb2016(3), CasualtyTier::BadlyHurt);
-        assert_eq!(casualty_tier_bb2016(4), CasualtyTier::SeriousInjury);
-        assert_eq!(casualty_tier_bb2016(5), CasualtyTier::SeriousInjury);
+    fn bb2016_first_die1to3_is_badly_hurt() {
+        for die in [1, 2, 3] {
+            assert_eq!(casualty_tier_bb2016(die), CasualtyTier::BadlyHurt, "die={die}");
+        }
+    }
+
+    #[test]
+    fn bb2016_first_die4or5_is_serious_injury() {
+        for die in [4, 5] {
+            assert_eq!(casualty_tier_bb2016(die), CasualtyTier::SeriousInjury, "die={die}");
+        }
+    }
+
+    #[test]
+    fn bb2016_first_die6_is_rip() {
         assert_eq!(casualty_tier_bb2016(6), CasualtyTier::Dead);
     }
 
     #[test]
-    fn casualty_tier_bb2020_d16() {
-        assert_eq!(casualty_tier_bb2020(1), CasualtyTier::BadlyHurt);
-        assert_eq!(casualty_tier_bb2020(6), CasualtyTier::BadlyHurt);
-        assert_eq!(casualty_tier_bb2020(7), CasualtyTier::SeriousInjury);
-        assert_eq!(casualty_tier_bb2020(14), CasualtyTier::SeriousInjury);
-        assert_eq!(casualty_tier_bb2020(15), CasualtyTier::Dead);
-        assert_eq!(casualty_tier_bb2020(16), CasualtyTier::Dead);
+    fn bb2016_requires_si_roll_only_for4and5() {
+        for die in [4, 5] {
+            assert!(requires_si_table_bb2016(die), "die={die}");
+        }
     }
 
     #[test]
-    fn casualty_tier_bb2025_higher_badly_hurt_threshold() {
-        assert_eq!(casualty_tier_bb2025(8), CasualtyTier::BadlyHurt);
-        assert_eq!(casualty_tier_bb2025(9), CasualtyTier::SeriousInjury);
-        assert_eq!(casualty_tier_bb2025(14), CasualtyTier::SeriousInjury);
-        assert_eq!(casualty_tier_bb2025(15), CasualtyTier::Dead);
-        // BB2025 vs BB2020: roll 7 is BadlyHurt in BB2025, SeriousInjury in BB2020
-        assert_eq!(casualty_tier_bb2020(7), CasualtyTier::SeriousInjury);
-        assert_eq!(casualty_tier_bb2025(7), CasualtyTier::BadlyHurt);
+    fn bb2016_no_si_roll_for1to3and6() {
+        for die in [1, 2, 3, 6] {
+            assert!(!requires_si_table_bb2016(die), "die={die}");
+        }
     }
 
     #[test]
-    fn requires_si_table_bb2020_only_13_and_14() {
+    fn bb2020_roll1to6_is_badly_hurt() {
+        for roll in [1, 2, 3, 4, 5, 6] {
+            assert_eq!(casualty_tier_bb2020(roll), CasualtyTier::BadlyHurt, "roll={roll}");
+        }
+    }
+
+    #[test]
+    fn bb2020_roll7to14_is_serious_injury() {
+        for roll in [7, 8, 9, 10, 11, 12, 13, 14] {
+            assert_eq!(casualty_tier_bb2020(roll), CasualtyTier::SeriousInjury, "roll={roll}");
+        }
+    }
+
+    #[test]
+    fn bb2020_roll15plus_is_rip() {
+        for roll in [15, 16, 17] {
+            assert_eq!(casualty_tier_bb2020(roll), CasualtyTier::Dead, "roll={roll}");
+        }
+    }
+
+    #[test]
+    fn bb2020_requires_si_roll_only_for13and14() {
         assert!(!requires_si_table_bb2020(12));
         assert!(requires_si_table_bb2020(13));
         assert!(requires_si_table_bb2020(14));
@@ -483,23 +520,85 @@ mod tests {
     }
 
     #[test]
-    fn si_sub_type_bb2020_ranges() {
+    fn bb2020_serious_injury_sub_type_seriously_hurt() {
         assert_eq!(si_sub_type_bb2020(7), Some(SiSubType::SeriouslyHurt));
         assert_eq!(si_sub_type_bb2020(9), Some(SiSubType::SeriouslyHurt));
+    }
+
+    #[test]
+    fn bb2020_serious_injury_sub_type_serious_injury() {
         assert_eq!(si_sub_type_bb2020(10), Some(SiSubType::SeriousInjury));
         assert_eq!(si_sub_type_bb2020(12), Some(SiSubType::SeriousInjury));
+    }
+
+    #[test]
+    fn bb2020_serious_injury_sub_type_null_for_si_table_rolls() {
         assert_eq!(si_sub_type_bb2020(13), None);
+        assert_eq!(si_sub_type_bb2020(14), None);
+    }
+
+    #[test]
+    fn bb2020_serious_injury_sub_type_null_below_si_range() {
         assert_eq!(si_sub_type_bb2020(6), None);
     }
 
     #[test]
-    fn si_sub_type_bb2025_ranges() {
+    fn bb2025_roll1to8_is_badly_hurt() {
+        for roll in [1, 2, 3, 4, 5, 6, 7, 8] {
+            assert_eq!(casualty_tier_bb2025(roll), CasualtyTier::BadlyHurt, "roll={roll}");
+        }
+    }
+
+    #[test]
+    fn bb2025_roll9to14_is_serious_injury() {
+        for roll in [9, 10, 11, 12, 13, 14] {
+            assert_eq!(casualty_tier_bb2025(roll), CasualtyTier::SeriousInjury, "roll={roll}");
+        }
+    }
+
+    #[test]
+    fn bb2025_roll15plus_is_rip() {
+        for roll in [15, 16] {
+            assert_eq!(casualty_tier_bb2025(roll), CasualtyTier::Dead, "roll={roll}");
+        }
+    }
+
+    #[test]
+    fn bb2025_serious_injury_sub_type_seriously_hurt() {
         assert_eq!(si_sub_type_bb2025(9), Some(SiSubType::SeriouslyHurt));
         assert_eq!(si_sub_type_bb2025(10), Some(SiSubType::SeriouslyHurt));
+    }
+
+    #[test]
+    fn bb2025_serious_injury_sub_type_serious_injury() {
         assert_eq!(si_sub_type_bb2025(11), Some(SiSubType::SeriousInjury));
         assert_eq!(si_sub_type_bb2025(12), Some(SiSubType::SeriousInjury));
-        assert_eq!(si_sub_type_bb2025(8), None);
+    }
+
+    #[test]
+    fn bb2025_serious_injury_sub_type_null_for_si_table_rolls() {
         assert_eq!(si_sub_type_bb2025(13), None);
+        assert_eq!(si_sub_type_bb2025(14), None);
+    }
+
+    #[test]
+    fn bb2025_serious_injury_sub_type_null_below_si_range() {
+        assert_eq!(si_sub_type_bb2025(8), None);
+    }
+
+    // ── Cross-edition comparison (names mirror CasualtyCalcTest) ──────────────
+
+    #[test]
+    fn bb2025_has_higher_badly_hurt_threshold_than_bb2020() {
+        // BB2020: roll 7 → SI; BB2025: roll 7 → Badly Hurt
+        assert_eq!(casualty_tier_bb2020(7), CasualtyTier::SeriousInjury);
+        assert_eq!(casualty_tier_bb2025(7), CasualtyTier::BadlyHurt);
+    }
+
+    #[test]
+    fn bb2025_roll8_is_badly_hurt_unlike_bb2020() {
+        assert_eq!(casualty_tier_bb2020(8), CasualtyTier::SeriousInjury);
+        assert_eq!(casualty_tier_bb2025(8), CasualtyTier::BadlyHurt);
     }
 
     // ── BB2016 SI detail table ────────────────────────────────────────────────
@@ -564,7 +663,7 @@ mod tests {
         assert_eq!(serious_injury_bb2025(5), Some(SeriousInjuryKind::DislocatedHipAg));
     }
 
-    // ── Missing parity tests (InjuryCalcTest / CasualtyCalcTest) ─────────────
+    // ── Remaining InjuryCalcTest mirrors ──────────────────────────────────────
 
     #[test]
     fn bb2016_thick_skull_at9_still_ko() {
@@ -573,55 +672,8 @@ mod tests {
     }
 
     #[test]
-    fn bb2016_requires_si_roll_only_for_4_and_5() {
-        assert!(requires_si_table_bb2016(4));
-        assert!(requires_si_table_bb2016(5));
-        assert!(!requires_si_table_bb2016(1));
-        assert!(!requires_si_table_bb2016(2));
-        assert!(!requires_si_table_bb2016(3));
-        assert!(!requires_si_table_bb2016(6));
-    }
-
-    #[test]
     fn bb2020_stunty_at10_is_casualty() {
         // Even with Stunty the casualty threshold is still 10+
         assert_eq!(interpret_injury_total_bb2020(10, true, false), None);
-    }
-
-    #[test]
-    fn casualty_bb2016_all_first_die_values() {
-        for d in 1..=3 {
-            assert_eq!(casualty_tier_bb2016(d), CasualtyTier::BadlyHurt, "d={d}");
-        }
-        for d in 4..=5 {
-            assert_eq!(casualty_tier_bb2016(d), CasualtyTier::SeriousInjury, "d={d}");
-        }
-        assert_eq!(casualty_tier_bb2016(6), CasualtyTier::Dead);
-    }
-
-    #[test]
-    fn casualty_bb2020_all_rolls() {
-        for r in 1..=6 {
-            assert_eq!(casualty_tier_bb2020(r), CasualtyTier::BadlyHurt, "r={r}");
-        }
-        for r in 7..=14 {
-            assert_eq!(casualty_tier_bb2020(r), CasualtyTier::SeriousInjury, "r={r}");
-        }
-        for r in 15..=17 {
-            assert_eq!(casualty_tier_bb2020(r), CasualtyTier::Dead, "r={r}");
-        }
-    }
-
-    #[test]
-    fn casualty_bb2025_all_rolls() {
-        for r in 1..=8 {
-            assert_eq!(casualty_tier_bb2025(r), CasualtyTier::BadlyHurt, "r={r}");
-        }
-        for r in 9..=14 {
-            assert_eq!(casualty_tier_bb2025(r), CasualtyTier::SeriousInjury, "r={r}");
-        }
-        for r in 15..=16 {
-            assert_eq!(casualty_tier_bb2025(r), CasualtyTier::Dead, "r={r}");
-        }
     }
 }

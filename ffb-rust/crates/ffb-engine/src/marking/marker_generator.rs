@@ -309,12 +309,38 @@ fn is_stat_increase(id: SkillId) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffb_model::enums::Rules;
+    use ffb_model::enums::{Rules, SeriousInjuryKind};
+    use ffb_model::marking::sort_mode::SortMode;
     use ffb_model::model::game::Game;
+    use ffb_model::model::game_result::PlayerResult;
+    use ffb_model::model::injury_attribute::InjuryAttribute;
     use ffb_model::model::player::Player;
     use ffb_model::model::skill_def::{SkillId, SkillWithValue};
     use crate::marking::auto_marking_config::AutoMarkingConfig;
     use crate::marking::auto_marking_record::Builder;
+
+    // ------------------------------------------------------------------
+    // Mirror of ffb-java MarkerGeneratorTest (ffb-server, 47 @Test methods).
+    // Java constants:
+    // ------------------------------------------------------------------
+    const BLOCK_MARKING: &str = "B";
+    const BLODGE_MARKING: &str = "X";
+    const DODGE_MARKING: &str = "D";
+    const BLACKLE_MARKING: &str = "Y";
+    const WRECKLE_MARKING: &str = "Q";
+    const MA_MARKING: &str = "Ma";
+    const AG_MARKING: &str = "Ag";
+    const NI_MARKING: &str = "Ni";
+    const TACKLE_MARKING: &str = "T";
+    const WRESTLE_MARKING: &str = "W";
+    const OTHER_MARKING: &str = "O";
+    const SEPARATOR: &str = ", ";
+
+    const MOVE: i32 = 6;
+    const STRENGTH: i32 = 3;
+    const AGILITY: i32 = 3;
+    const PASSING: i32 = 4;
+    const ARMOUR: i32 = 8;
 
     fn make_game() -> Game {
         Game::new(
@@ -324,15 +350,777 @@ mod tests {
         )
     }
 
-    fn make_player() -> Player {
-        Player::default()
+    /// Mirror of Java `MarkerGeneratorTest.setUp()`:
+    /// - position (base) skills: wrestle, tackle
+    /// - gained skills (`getSkillsIncludingTemporaryOnes`): block, dodge
+    /// - movement 4 vs position 6 → two MA injury attributes
+    /// - agility: Java stubs `getAgilityWithModifiers` = AGILITY + 1 under the
+    ///   mixed `StatsMechanic` where `improvementIncreasesValue()` is false
+    ///   (BB2020: higher AG number = worse), i.e. one net AG loss. Rust's
+    ///   `stat_diff` uses the BB2025 convention (higher AG = better), so the
+    ///   same single AG loss is expressed here as agility 2 vs position 3.
+    /// - passing / strength / armour unchanged → no attributes
+    /// - lasting injuries HEAD_INJURY (AV, filtered) + SERIOUS_INJURY (NI)
+    ///   → one NI injury attribute
+    fn setup_player() -> Player {
+        let mut p = Player::default();
+        p.id = "p1".to_string();
+        p.starting_skills.push(SkillWithValue::new(SkillId::Wrestle));
+        p.starting_skills.push(SkillWithValue::new(SkillId::Tackle));
+        p.extra_skills.push(SkillWithValue::new(SkillId::Block));
+        p.extra_skills.push(SkillWithValue::new(SkillId::Dodge));
+        p.position_movement = MOVE;
+        p.movement = MOVE - 2;
+        p.position_strength = STRENGTH;
+        p.strength = STRENGTH;
+        p.position_agility = AGILITY;
+        p.agility = AGILITY - 1;
+        p.position_passing = PASSING;
+        p.passing = PASSING;
+        p.position_armour = ARMOUR;
+        p.armour = ARMOUR;
+        p.stat_injuries = vec![
+            SeriousInjuryKind::HeadInjuryAv,
+            SeriousInjuryKind::SeriousInjuryNi,
+        ];
+        p
     }
+
+    /// Java equivalent of `@BeforeEach setUp()` — generator, game, player, config.
+    fn setup() -> (MarkerGenerator, Game, Player, AutoMarkingConfig) {
+        (MarkerGenerator::new(), make_game(), setup_player(), AutoMarkingConfig::new())
+    }
+
+    /// Java: `given(player.getSkillsIncludingTemporaryOnes()).willReturn(increases)` —
+    /// the gained-skill list is replaced by "+AG" stat increases, and the player's
+    /// modified agility reflects `count` net increases (Java: AGILITY - count under
+    /// the inverted BB2020 sign; BB2025 convention here: AGILITY + count).
+    fn replace_gained_with_ag_increases(p: &mut Player, count: i32) {
+        p.extra_skills.clear();
+        for _ in 0..count {
+            p.extra_skills.push(SkillWithValue::new(SkillId::AgilityIncrease));
+        }
+        p.agility = AGILITY + count;
+    }
+
+    // ------------------------------------------------------------------
+    // Ported Java tests (same order as MarkerGeneratorTest.java)
+    // ------------------------------------------------------------------
+
+    /// Java: generate().
+    #[test]
+    fn generate() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_marking(BLOCK_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(BLOCK_MARKING, marking);
+    }
+
+    /// Java: generateWithoutSorting().
+    #[test]
+    fn generate_without_sorting() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::Dodge).with_marking(DODGE_MARKING).build());
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::MA).with_marking(MA_MARKING).build());
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_marking(BLOCK_MARKING).build());
+
+        config.set_sort_mode(SortMode::None);
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(format!("{}{}{}", DODGE_MARKING, MA_MARKING, BLOCK_MARKING), marking);
+    }
+
+    /// Java: generateForSuperSetsWithoutSorting().
+    #[test]
+    fn generate_for_super_sets_without_sorting() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_skill(SkillId::Dodge).with_marking(DODGE_MARKING).build());
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_marking(BLOCK_MARKING).build());
+        config.markings.push(
+            Builder::new()
+                .with_skill(SkillId::Block)
+                .with_skill(SkillId::Dodge)
+                .with_skill(SkillId::Tackle)
+                .with_marking(BLACKLE_MARKING)
+                .build(),
+        );
+
+        config.set_sort_mode(SortMode::None);
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(BLACKLE_MARKING, marking);
+    }
+
+    /// Java: generateWithSeparator().
+    #[test]
+    fn generate_with_separator() {
+        let (generator, game, player, mut config) = setup();
+        config.set_separator(SEPARATOR);
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_marking(BLOCK_MARKING).build());
+        config.markings.push(Builder::new().with_skill(SkillId::Dodge).with_marking(DODGE_MARKING).build());
+        config.markings.push(
+            Builder::new()
+                .with_injury(InjuryAttribute::MA)
+                .with_marking(MA_MARKING)
+                .with_apply_repeatedly(true)
+                .build(),
+        );
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(
+            format!("{0}{4}{1}{4}{2}{4}{3}", BLOCK_MARKING, DODGE_MARKING, MA_MARKING, MA_MARKING, SEPARATOR),
+            marking
+        );
+    }
+
+    // Java: ignoreUnknownSkills() — NOT PORTABLE: relies on SkillFactory returning
+    // null for an unknown skill name so the record contains a null skill; Rust
+    // records hold SkillId values which cannot be null/unknown.
+
+    // Java: ignoreMarkingWithUnknownSkills() — NOT PORTABLE: same null-skill
+    // mechanism (record with a null skill is filtered out).
+
+    // Java: ignoreMarkingWithUnknownInjuries() — NOT PORTABLE: builds a record
+    // with a null InjuryAttribute via withInjury(null); Rust InjuryAttribute is
+    // a plain enum with no null state.
+
+    /// Java: generateNoMarking().
+    #[test]
+    fn generate_no_marking() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::SneakyGit).with_marking(BLOCK_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert!(marking.is_empty());
+    }
+
+    /// Java: generateOnlyForPresentSkills().
+    #[test]
+    fn generate_only_for_present_skills() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_marking(BLOCK_MARKING).build());
+        config.markings.push(Builder::new().with_skill(SkillId::SneakyGit).with_marking(DODGE_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(BLOCK_MARKING, marking);
+    }
+
+    /// Java: generateMarkingsForOverlappingConfigs().
+    #[test]
+    fn generate_markings_for_overlapping_configs() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_skill(SkillId::Dodge).with_marking(BLODGE_MARKING).build());
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_skill(SkillId::Tackle).with_marking(BLACKLE_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(format!("{}{}", BLODGE_MARKING, BLACKLE_MARKING), marking);
+    }
+
+    /// Java: ignoreCombinedConfigsForGainedSkillsWithOnlyPartialMatch().
+    #[test]
+    fn ignore_combined_configs_for_gained_skills_with_only_partial_match() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_skill(SkillId::Dodge).with_marking(BLODGE_MARKING).build());
+        config.markings.push(
+            Builder::new()
+                .with_skill(SkillId::Block)
+                .with_skill(SkillId::Tackle)
+                .with_marking(BLACKLE_MARKING)
+                .with_gained_only(true)
+                .build(),
+        );
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(BLODGE_MARKING, marking);
+    }
+
+    /// Java: ignoreSubsets().
+    #[test]
+    fn ignore_subsets() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_skill(SkillId::Dodge).with_marking(BLODGE_MARKING).build());
+        config.markings.push(Builder::new().with_skill(SkillId::Dodge).with_marking(DODGE_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(BLODGE_MARKING, marking);
+    }
+
+    /// Java: ignoreSubsetUnlessApplyToMakesDifference().
+    #[test]
+    fn ignore_subset_unless_apply_to_makes_difference() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(
+            Builder::new()
+                .with_skill(SkillId::Block)
+                .with_skill(SkillId::Dodge)
+                .with_marking(BLODGE_MARKING)
+                .with_apply_to(ApplyTo::Own)
+                .build(),
+        );
+        config.markings.push(Builder::new().with_skill(SkillId::Dodge).with_marking(DODGE_MARKING).with_apply_to(ApplyTo::Opponent).build());
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_marking(BLOCK_MARKING).with_apply_to(ApplyTo::Both).build());
+
+        let marking = generator.generate(&game, &player, &config, false);
+
+        assert_eq!(format!("{}{}", BLOCK_MARKING, DODGE_MARKING), marking);
+    }
+
+    /// Java: ignoreSubsetUnlessGainedOnlyMakesDifference().
+    #[test]
+    fn ignore_subset_unless_gained_only_makes_difference() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(
+            Builder::new()
+                .with_skill(SkillId::Wrestle)
+                .with_skill(SkillId::Tackle)
+                .with_marking(WRECKLE_MARKING)
+                .with_gained_only(true)
+                .build(),
+        );
+        config.markings.push(Builder::new().with_skill(SkillId::Wrestle).with_marking(WRESTLE_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, false);
+
+        assert_eq!(WRESTLE_MARKING, marking);
+    }
+
+    /// Java: generateForAllMatchingConfigs().
+    #[test]
+    fn generate_for_all_matching_configs() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_marking(BLOCK_MARKING).build());
+        config.markings.push(Builder::new().with_skill(SkillId::Dodge).with_marking(DODGE_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(format!("{}{}", BLOCK_MARKING, DODGE_MARKING), marking);
+    }
+
+    /// Java: generateForAllMatchingConfigsWithOpponent().
+    #[test]
+    fn generate_for_all_matching_configs_with_opponent() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_marking(BLOCK_MARKING).build());
+        config.markings.push(Builder::new().with_skill(SkillId::Dodge).with_marking(DODGE_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, false);
+
+        assert_eq!(format!("{}{}", BLOCK_MARKING, DODGE_MARKING), marking);
+    }
+
+    /// Java: generateForAllMatchingConfigsWithMatchingApplyTo().
+    #[test]
+    fn generate_for_all_matching_configs_with_matching_apply_to() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_marking(BLOCK_MARKING).with_apply_to(ApplyTo::Own).build());
+        config.markings.push(Builder::new().with_skill(SkillId::Dodge).with_marking(DODGE_MARKING).with_apply_to(ApplyTo::Opponent).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(BLOCK_MARKING, marking);
+    }
+
+    /// Java: generateForAllMatchingConfigsWithOpponentAndMatchingApplyTo().
+    #[test]
+    fn generate_for_all_matching_configs_with_opponent_and_matching_apply_to() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_marking(BLOCK_MARKING).with_apply_to(ApplyTo::Own).build());
+        config.markings.push(Builder::new().with_skill(SkillId::Dodge).with_marking(DODGE_MARKING).with_apply_to(ApplyTo::Opponent).build());
+
+        let marking = generator.generate(&game, &player, &config, false);
+
+        assert_eq!(DODGE_MARKING, marking);
+    }
+
+    /// Java: generateForAllMatchingConfigsWithGainedOnly().
+    #[test]
+    fn generate_for_all_matching_configs_with_gained_only() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::Wrestle).with_marking(WRESTLE_MARKING).with_gained_only(true).build());
+        config.markings.push(Builder::new().with_skill(SkillId::Dodge).with_marking(DODGE_MARKING).with_gained_only(true).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(DODGE_MARKING, marking);
+    }
+
+    /// Java: generateForAllMatchingConfigsWithOpponentAndGainedOnly().
+    #[test]
+    fn generate_for_all_matching_configs_with_opponent_and_gained_only() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::Wrestle).with_marking(WRESTLE_MARKING).with_gained_only(true).build());
+        config.markings.push(Builder::new().with_skill(SkillId::Dodge).with_marking(DODGE_MARKING).with_gained_only(true).build());
+
+        let marking = generator.generate(&game, &player, &config, false);
+
+        assert_eq!(DODGE_MARKING, marking);
+    }
+
+    /// Java: generateForAllMatchingConfigsWithMatchingGainedAndApplyTo().
+    #[test]
+    fn generate_for_all_matching_configs_with_matching_gained_and_apply_to() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(
+            Builder::new()
+                .with_skill(SkillId::Wrestle)
+                .with_marking(WRESTLE_MARKING)
+                .with_gained_only(true)
+                .with_apply_to(ApplyTo::Own)
+                .build(),
+        );
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_marking(BLOCK_MARKING).with_apply_to(ApplyTo::Own).build());
+        config.markings.push(Builder::new().with_skill(SkillId::Dodge).with_marking(DODGE_MARKING).with_apply_to(ApplyTo::Opponent).build());
+        config.markings.push(
+            Builder::new()
+                .with_skill(SkillId::Tackle)
+                .with_marking(TACKLE_MARKING)
+                .with_gained_only(true)
+                .with_apply_to(ApplyTo::Opponent)
+                .build(),
+        );
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(BLOCK_MARKING, marking);
+    }
+
+    /// Java: generateForAllMatchingConfigsWithOpponentAndMatchingGainedAndApplyTo().
+    #[test]
+    fn generate_for_all_matching_configs_with_opponent_and_matching_gained_and_apply_to() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(
+            Builder::new()
+                .with_skill(SkillId::Wrestle)
+                .with_marking(WRESTLE_MARKING)
+                .with_gained_only(true)
+                .with_apply_to(ApplyTo::Own)
+                .build(),
+        );
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_marking(BLOCK_MARKING).with_apply_to(ApplyTo::Own).build());
+        config.markings.push(Builder::new().with_skill(SkillId::Dodge).with_marking(DODGE_MARKING).with_apply_to(ApplyTo::Opponent).build());
+        config.markings.push(
+            Builder::new()
+                .with_skill(SkillId::Tackle)
+                .with_marking(TACKLE_MARKING)
+                .with_gained_only(true)
+                .with_apply_to(ApplyTo::Opponent)
+                .build(),
+        );
+
+        let marking = generator.generate(&game, &player, &config, false);
+
+        assert_eq!(DODGE_MARKING, marking);
+    }
+
+    /// Java: generateForSingleInjuryMarkings().
+    #[test]
+    fn generate_for_single_injury_markings() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::AG).with_marking(AG_MARKING).build());
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::MA).with_marking(MA_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(format!("{}{}", AG_MARKING, MA_MARKING), marking);
+    }
+
+    /// Java: ignoreGainedOnlyOnInjuryMarkings().
+    #[test]
+    fn ignore_gained_only_on_injury_markings() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::AG).with_marking(AG_MARKING).with_gained_only(true).build());
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::MA).with_marking(MA_MARKING).with_gained_only(true).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(format!("{}{}", AG_MARKING, MA_MARKING), marking);
+    }
+
+    /// Java: generateForMultiInjuryMarkings().
+    #[test]
+    fn generate_for_multi_injury_markings() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(
+            Builder::new()
+                .with_injury(InjuryAttribute::AG)
+                .with_injury(InjuryAttribute::AG)
+                .with_marking(AG_MARKING)
+                .build(),
+        );
+        config.markings.push(
+            Builder::new()
+                .with_injury(InjuryAttribute::MA)
+                .with_injury(InjuryAttribute::MA)
+                .with_marking(MA_MARKING)
+                .build(),
+        );
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(MA_MARKING, marking);
+    }
+
+    /// Java: generateForSingleInjuryMarkingsOnlyForOwnPlayer().
+    #[test]
+    fn generate_for_single_injury_markings_only_for_own_player() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::AG).with_apply_to(ApplyTo::Own).with_marking(AG_MARKING).build());
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::MA).with_apply_to(ApplyTo::Opponent).with_marking(MA_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(AG_MARKING, marking);
+    }
+
+    /// Java: generateForSingleInjuryMarkingsOnlyForOpponent().
+    #[test]
+    fn generate_for_single_injury_markings_only_for_opponent() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::AG).with_apply_to(ApplyTo::Own).with_marking(AG_MARKING).build());
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::MA).with_apply_to(ApplyTo::Opponent).with_marking(MA_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, false);
+
+        assert_eq!(MA_MARKING, marking);
+    }
+
+    /// Java: generateForCombinedSkillAndInjuryMarkings().
+    #[test]
+    fn generate_for_combined_skill_and_injury_markings() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::MA).with_marking(MA_MARKING).build());
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::MA).with_skill(SkillId::Block).with_marking(BLOCK_MARKING).build());
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::AV).with_skill(SkillId::Dodge).with_marking(DODGE_MARKING).build());
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::AG).with_skill(SkillId::SneakyGit).with_marking(AG_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(BLOCK_MARKING, marking);
+    }
+
+    /// Java: ignoreInjuryOnlyMarkingsIfTheyAreASubset().
+    #[test]
+    fn ignore_injury_only_markings_if_they_are_a_subset() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::MA).with_skill(SkillId::Block).with_marking(BLOCK_MARKING).build());
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::MA).with_marking(MA_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(BLOCK_MARKING, marking);
+    }
+
+    /// Java: ignoreCombinedSkillAndInjuryMarkingsIfGainedOnlyDoesNotMatch().
+    #[test]
+    fn ignore_combined_skill_and_injury_markings_if_gained_only_does_not_match() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(
+            Builder::new()
+                .with_injury(InjuryAttribute::MA)
+                .with_skill(SkillId::Wrestle)
+                .with_gained_only(true)
+                .with_marking(WRESTLE_MARKING)
+                .build(),
+        );
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::MA).with_marking(MA_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(MA_MARKING, marking);
+    }
+
+    /// Java: generateSingleMarkingForMultiStatIncreases().
+    #[test]
+    fn generate_single_marking_for_multi_stat_increases() {
+        let (generator, game, mut player, mut config) = setup();
+        replace_gained_with_ag_increases(&mut player, 2);
+        config.markings.push(Builder::new().with_skill(SkillId::AgilityIncrease).with_marking(AG_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(AG_MARKING, marking);
+    }
+
+    /// Java: generateMarkingMatchingForMultiStatIncreases().
+    #[test]
+    fn generate_marking_matching_for_multi_stat_increases() {
+        let (generator, game, mut player, mut config) = setup();
+        replace_gained_with_ag_increases(&mut player, 2);
+        config.markings.push(
+            Builder::new()
+                .with_skill(SkillId::AgilityIncrease)
+                .with_skill(SkillId::AgilityIncrease)
+                .with_marking(AG_MARKING)
+                .build(),
+        );
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(AG_MARKING, marking);
+    }
+
+    /// Java: ignoreMatchingForMultiStatIncreasesIfOnlyOneIsPresent().
+    #[test]
+    fn ignore_matching_for_multi_stat_increases_if_only_one_is_present() {
+        let (generator, game, mut player, mut config) = setup();
+        replace_gained_with_ag_increases(&mut player, 1);
+        config.markings.push(
+            Builder::new()
+                .with_skill(SkillId::AgilityIncrease)
+                .with_skill(SkillId::AgilityIncrease)
+                .with_marking(AG_MARKING)
+                .build(),
+        );
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert!(marking.is_empty());
+    }
+
+    /// Java: generateOnlyForNetStatIncreases().
+    /// (Java stubs `player.getSkills()` with two +AG increases, but the generator
+    /// only reads `getSkillsIncludingTemporaryOnes()`, so the net stat picture is
+    /// unchanged: one AG loss. Only the injury-based record applies.)
+    #[test]
+    fn generate_only_for_net_stat_increases() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::AgilityIncrease).with_marking(AG_MARKING).build());
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::AG).with_marking(AG_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(AG_MARKING, marking);
+    }
+
+    /// Java: generateOnlyForNetInjuries().
+    /// (Same as above: the `getSkills()` stub of "+MA" is never read; the player's
+    /// net MA is a loss, so only the injury record applies — exactly once.)
+    #[test]
+    fn generate_only_for_net_injuries() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::MovementIncrease).with_marking(MA_MARKING).build());
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::MA).with_marking(MA_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(MA_MARKING, marking);
+    }
+
+    /// Java: generateSingleMarkingForMultiInjuries().
+    #[test]
+    fn generate_single_marking_for_multi_injuries() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::MA).with_marking(MA_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(MA_MARKING, marking);
+    }
+
+    /// Java: ignoreStatInjuries().
+    #[test]
+    fn ignore_stat_injuries() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::AV).with_marking("Some marking").build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert!(marking.is_empty());
+    }
+
+    /// Java: generateNigglingMarker().
+    #[test]
+    fn generate_niggling_marker() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::NI).with_marking(NI_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(NI_MARKING, marking);
+    }
+
+    /// Java: generateCombinedInjuryMarkerWhenPlayerWasHurtDuringTheGame().
+    #[test]
+    fn generate_combined_injury_marker_when_player_was_hurt_during_the_game() {
+        let (generator, mut game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::NI).with_marking(NI_MARKING).build());
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::AG).with_marking(AG_MARKING).build());
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::MA).with_marking(MA_MARKING).build());
+
+        // Java: playerResult.getSeriousInjury() = NECK_INJURY,
+        //       playerResult.getSeriousInjuryDecay() = SMASHED_KNEE
+        let player_result = PlayerResult {
+            serious_injury: Some(SeriousInjuryKind::NeckInjuryAg),
+            serious_injury_decay: Some(SeriousInjuryKind::SmashedKneeMa),
+            ..Default::default()
+        };
+        game.game_result.home.player_results.insert(player.id.clone(), player_result);
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(format!("{}{}{}", AG_MARKING, MA_MARKING, NI_MARKING), marking);
+    }
+
+    /// Java: generateMarkingMatchingForMultiInjuries().
+    #[test]
+    fn generate_marking_matching_for_multi_injuries() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(
+            Builder::new()
+                .with_injury(InjuryAttribute::MA)
+                .with_injury(InjuryAttribute::MA)
+                .with_marking(MA_MARKING)
+                .build(),
+        );
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(MA_MARKING, marking);
+    }
+
+    /// Java: ignoreMatchingForMultiInjuriesIfOnlyOneIsPresent().
+    #[test]
+    fn ignore_matching_for_multi_injuries_if_only_one_is_present() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(
+            Builder::new()
+                .with_injury(InjuryAttribute::AG)
+                .with_injury(InjuryAttribute::AG)
+                .with_marking(MA_MARKING)
+                .build(),
+        );
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert!(marking.is_empty());
+    }
+
+    /// Java: sortInjuriesLastAndAlphabeticallyOtherwise().
+    #[test]
+    fn sort_injuries_last_and_alphabetically_otherwise() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_skill(SkillId::Dodge).with_marking(BLODGE_MARKING).build());
+        config.markings.push(Builder::new().with_skill(SkillId::Wrestle).with_marking(WRESTLE_MARKING).build());
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::MA).with_marking(MA_MARKING).build());
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::AG).with_skill(SkillId::Tackle).with_marking(OTHER_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(
+            format!("{}{}{}{}", OTHER_MARKING, WRESTLE_MARKING, BLODGE_MARKING, MA_MARKING),
+            marking
+        );
+    }
+
+    /// Java: ignoreIdenticalMarkingWithGainedOnly().
+    #[test]
+    fn ignore_identical_marking_with_gained_only() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_gained_only(true).with_marking(OTHER_MARKING).build());
+        config.markings.push(Builder::new().with_skill(SkillId::Block).with_marking(BLOCK_MARKING).build());
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(BLOCK_MARKING, marking);
+    }
+
+    /// Java: ignoreIdenticalMarkingWithNoRepetition().
+    #[test]
+    fn ignore_identical_marking_with_no_repetition() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(Builder::new().with_injury(InjuryAttribute::MA).with_marking(OTHER_MARKING).build());
+        config.markings.push(
+            Builder::new()
+                .with_injury(InjuryAttribute::MA)
+                .with_marking(MA_MARKING)
+                .with_apply_repeatedly(true)
+                .build(),
+        );
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(format!("{}{}", MA_MARKING, MA_MARKING), marking);
+    }
+
+    /// Java: generateRepeatedMarking().
+    #[test]
+    fn generate_repeated_marking() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(
+            Builder::new()
+                .with_injury(InjuryAttribute::MA)
+                .with_marking(MA_MARKING)
+                .with_apply_repeatedly(true)
+                .build(),
+        );
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(format!("{}{}", MA_MARKING, MA_MARKING), marking);
+    }
+
+    /// Java: generateMultiInjuryMarkingOverRepeated().
+    #[test]
+    fn generate_multi_injury_marking_over_repeated() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(
+            Builder::new()
+                .with_injury(InjuryAttribute::MA)
+                .with_marking(OTHER_MARKING)
+                .with_apply_repeatedly(true)
+                .build(),
+        );
+        config.markings.push(
+            Builder::new()
+                .with_injury(InjuryAttribute::MA)
+                .with_injury(InjuryAttribute::MA)
+                .with_marking(MA_MARKING)
+                .with_apply_repeatedly(true)
+                .build(),
+        );
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(MA_MARKING, marking);
+    }
+
+    /// Java: generateRepeatedMarkingOnlyOnceIfNotCompletelyApplicable().
+    #[test]
+    fn generate_repeated_marking_only_once_if_not_completely_applicable() {
+        let (generator, game, player, mut config) = setup();
+        config.markings.push(
+            Builder::new()
+                .with_skill(SkillId::Block)
+                .with_injury(InjuryAttribute::MA)
+                .with_marking(BLOCK_MARKING)
+                .with_apply_repeatedly(true)
+                .build(),
+        );
+
+        let marking = generator.generate(&game, &player, &config, true);
+
+        assert_eq!(BLOCK_MARKING, marking);
+    }
+
+    // ------------------------------------------------------------------
+    // Rust-only extras (no Java counterpart in MarkerGeneratorTest)
+    // ------------------------------------------------------------------
 
     #[test]
     fn generate_empty_config_returns_empty_string() {
         let gen = MarkerGenerator::new();
         let g = make_game();
-        let p = make_player();
+        let p = Player::default();
         let config = AutoMarkingConfig::new();
         let result = gen.generate(&g, &p, &config, false);
         assert!(result.is_empty());
@@ -342,7 +1130,7 @@ mod tests {
     fn generate_with_no_matching_skills_returns_empty() {
         let gen = MarkerGenerator::new();
         let g = make_game();
-        let p = make_player(); // no skills
+        let p = Player::default(); // no skills
         let mut config = AutoMarkingConfig::new();
         config.markings.push(
             Builder::new()
@@ -353,83 +1141,6 @@ mod tests {
         );
         let result = gen.generate(&g, &p, &config, false);
         assert!(result.is_empty());
-    }
-
-    #[test]
-    fn generate_matches_gained_skill() {
-        let gen = MarkerGenerator::new();
-        let g = make_game();
-        let mut p = make_player();
-        p.extra_skills.push(SkillWithValue::new(SkillId::Block));
-
-        let mut config = AutoMarkingConfig::new();
-        config.markings.push(
-            Builder::new()
-                .with_skill(SkillId::Block)
-                .with_marking("B")
-                .with_gained_only(true)
-                .build()
-        );
-        let result = gen.generate(&g, &p, &config, false);
-        assert_eq!(result, "B");
-    }
-
-    #[test]
-    fn generate_does_not_match_base_skill_when_gained_only() {
-        let gen = MarkerGenerator::new();
-        let g = make_game();
-        let mut p = make_player();
-        p.starting_skills.push(SkillWithValue::new(SkillId::Block));
-
-        let mut config = AutoMarkingConfig::new();
-        config.markings.push(
-            Builder::new()
-                .with_skill(SkillId::Block)
-                .with_marking("B")
-                .with_gained_only(true)
-                .build()
-        );
-        let result = gen.generate(&g, &p, &config, false);
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn generate_matches_base_skill_when_not_gained_only() {
-        let gen = MarkerGenerator::new();
-        let g = make_game();
-        let mut p = make_player();
-        p.starting_skills.push(SkillWithValue::new(SkillId::Block));
-
-        let mut config = AutoMarkingConfig::new();
-        config.markings.push(
-            Builder::new()
-                .with_skill(SkillId::Block)
-                .with_marking("B")
-                .with_gained_only(false)
-                .build()
-        );
-        let result = gen.generate(&g, &p, &config, false);
-        assert_eq!(result, "B");
-    }
-
-    #[test]
-    fn generate_multiple_skills_joined_with_separator() {
-        let gen = MarkerGenerator::new();
-        let g = make_game();
-        let mut p = make_player();
-        p.extra_skills.push(SkillWithValue::new(SkillId::Block));
-        p.extra_skills.push(SkillWithValue::new(SkillId::Tackle));
-
-        let mut config = AutoMarkingConfig::new();
-        config.set_separator("/");
-        config.markings.push(Builder::new().with_skill(SkillId::Block).with_marking("B").with_gained_only(true).build());
-        config.markings.push(Builder::new().with_skill(SkillId::Tackle).with_marking("T").with_gained_only(true).build());
-
-        let result = gen.generate(&g, &p, &config, false);
-        // Both "B" and "T" should appear (order depends on sort_mode=Default → sorted)
-        assert!(result.contains("B"));
-        assert!(result.contains("T"));
-        assert!(result.contains("/"));
     }
 
     #[test]

@@ -23,16 +23,24 @@ impl std::ops::Deref for BoneHead {
 }
 
 #[cfg(test)]
+// Mirrors ffb-java/ffb-server/src/test/java/com/fumbbl/ffb/server/skill tests.
+// Java test targets bb2025 ("Bone Head", TRAIT); bb2016/BoneHead.java is "Bone-Head", EXTRAORDINARY.
 mod tests {
     use super::*;
+    use crate::enums::SkillId;
 
     #[test]
-    fn name_is_correct() {
+    fn name_is_bone_head() {
         assert_eq!(BoneHead::new().get_name(), "Bone-Head");
     }
 
     #[test]
-    fn category_is_correct() {
+    fn category_is_extraordinary() {
         assert_eq!(BoneHead::new().get_category(), SkillCategory::Extraordinary);
+    }
+
+    #[test]
+    fn has_applies_confusion_property() {
+        assert!(SkillId::BoneHead.properties().contains(&"appliesConfusion"));
     }
 }
