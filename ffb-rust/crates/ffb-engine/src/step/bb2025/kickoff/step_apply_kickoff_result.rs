@@ -116,7 +116,8 @@ impl Step for StepApplyKickoffResult {
     fn id(&self) -> StepId { StepId::ApplyKickoffResult }
 
     fn start(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        self.execute_step(game, rng)
+        let outcome = self.execute_step(game, rng);
+        Self::with_placement_prompt(outcome, game)
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
@@ -144,7 +145,8 @@ impl Step for StepApplyKickoffResult {
             }
             _ => {}
         }
-        self.execute_step(game, rng)
+        let outcome = self.execute_step(game, rng);
+        Self::with_placement_prompt(outcome, game)
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
@@ -160,6 +162,21 @@ impl Step for StepApplyKickoffResult {
 }
 
 impl StepApplyKickoffResult {
+    /// Interactive kickoff events (Quick Snap / Solid Defence / High Kick) wait for the coach
+    /// with a bare Continue — Java models the interaction purely via TurnMode and the client
+    /// reacts to that; headless agents need a prompt. Java ParityRunner answers with EndTurn
+    /// at APPLY_KICKOFF_RESULT, declining the optional placements.
+    fn with_placement_prompt(outcome: StepOutcome, game: &Game) -> StepOutcome {
+        if outcome.action == crate::step::framework::StepAction::Continue && outcome.prompt.is_none() {
+            let mode = format!("{:?}", game.turn_mode);
+            return outcome.with_prompt(ffb_model::prompts::AgentPrompt::KickoffEventPlacement {
+                team_id: game.active_team().id.clone(),
+                mode,
+            });
+        }
+        outcome
+    }
+
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let result = match self.kickoff_result {
             Some(r) => r,

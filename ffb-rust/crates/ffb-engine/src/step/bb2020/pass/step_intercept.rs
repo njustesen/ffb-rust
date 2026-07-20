@@ -217,6 +217,13 @@ impl Step for StepIntercept {
                 self.interceptor_id = if player_id.is_empty() { None } else { Some(player_id.clone()) };
                 self.interceptor_chosen = true;
             }
+            // Agents answer the Interception prompt with a bare attempt yes/no (Java:
+            // CLIENT_INTERCEPTOR_CHOICE carries a player id or null). Accepting picks the
+            // offered candidate — the same first-interceptor the prompt named.
+            Action::Intercept { attempt } => {
+                self.interceptor_id = if *attempt { Self::find_interceptors(game).first().cloned() } else { None };
+                self.interceptor_chosen = true;
+            }
             _ => {}
         }
         self.execute_step(game, rng)
@@ -283,8 +290,12 @@ impl StepIntercept {
 
         // Java: if (!state.isInterceptorChosen()) → showDialog, TurnMode=INTERCEPTION, doNextStep=false
         if !self.interceptor_chosen {
-            // client-only: DialogInterceptionParameter — headless waits for CLIENT_INTERCEPTOR_CHOICE command
-            return StepOutcome::cont();
+            // Java: UtilServerDialog.showDialog(DialogInterceptionParameter) → the agent answers
+            // with Action::Intercept (or SelectPlayer). A bare cont() waited forever.
+            return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::Interception {
+                player_id: possible_interceptors[0].clone(),
+                target_number: 0,
+            });
         }
 
         // Java: else if (interceptor != null) → intercept(interceptor, state)

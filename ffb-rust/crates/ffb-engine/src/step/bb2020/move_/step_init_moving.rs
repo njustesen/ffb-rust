@@ -129,6 +129,12 @@ impl Step for StepInitMoving {
                 return self.execute_step(game, rng);
             }
 
+            // Java: CLIENT_ACTING_PLAYER with no playerId (deselect) → fEndPlayerAction = true, EXECUTE_STEP
+            Action::EndPlayerAction => {
+                self.end_player_action = true;
+                return self.execute_step(game, rng);
+            }
+
             Action::EndTurn => {
                 self.end_turn = true;
                 return self.execute_step(game, rng);
@@ -284,7 +290,22 @@ impl StepInitMoving {
                 clear_stack: false,
             };
         }
-        StepOutcome::cont()
+        // Empty move stack — compute legal move targets and prompt the agent for a destination.
+        // The live driver.rs/step architecture never carried this over from the pre-driver.rs
+        // engine.rs (`Step::InitMoving` there did exactly this via the same `legal_move_targets`/
+        // `legal_blitz_move_targets` helpers) — without it, `AgentPrompt::Move` was never emitted
+        // at all and the driver hung waiting for a client command nothing ever asked for.
+        let Some(player_id) = game.acting_player.player_id.clone() else {
+            return StepOutcome::next();
+        };
+        let squares = match game.acting_player.player_action {
+            Some(PlayerAction::Blitz) => match game.defender_id.clone() {
+                Some(def_id) => crate::legal_actions::legal_blitz_move_targets(game, &player_id, &def_id),
+                None => crate::legal_actions::legal_move_targets(game, &player_id),
+            },
+            _ => crate::legal_actions::legal_move_targets(game, &player_id),
+        };
+        StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::Move { player_id, squares })
     }
 }
 
@@ -335,6 +356,7 @@ mod tests {
     #[test]
     fn empty_move_stack_returns_continue() {
         let mut game = make_game();
+        game.acting_player.player_id = Some("p1".into());
         let mut step = StepInitMoving::new("end".into());
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::Continue);

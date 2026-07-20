@@ -255,8 +255,13 @@ impl StepFollowup {
                 && self.using_skill_preventing_follow_up.is_some()
                 && self.using_skill_forcing_follow_up != Some(true)
             {
-                // Would show DialogFollowupChoice — stub: wait for agent FollowUp action
-                return build_outcome(out_params, StepOutcome::cont());
+                // Java: UtilServerDialog.showDialog(DialogFollowupChoiceParameter) — emit the
+                // prompt so the agent can answer with Action::FollowUp.
+                let prompt = ffb_model::prompts::AgentPrompt::FollowUp {
+                    attacker_id: acting_player_id.clone().unwrap_or_default(),
+                    target_coord: self.defender_position.unwrap_or(FieldCoordinate::new(0, 0)),
+                };
+                return build_outcome(out_params, StepOutcome::cont().with_prompt(prompt));
             }
         }
 

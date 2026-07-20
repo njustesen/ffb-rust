@@ -9,6 +9,7 @@
 use ffb_model::enums::Direction;
 use ffb_model::enums::SkillId;
 use ffb_model::model::game::Game;
+use ffb_model::model::property::named_properties::NamedProperties;
 use ffb_model::model::re_rolled_action::ReRolledAction;
 use ffb_model::model::skill_use::SkillUse;
 use ffb_model::option::game_option_id;
@@ -49,6 +50,18 @@ impl StepMoveBallAndChain {
     pub fn new() -> Self { Self::default() }
 
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: if (actingPlayer.getPlayer().hasSkillProperty(NamedProperties.movesRandomly)) { ... }
+        // — the entire scatter body is gated on the acting player actually being a Ball & Chain
+        // carrier; without this guard every ordinary move (COORDINATE_FROM/TO are published for
+        // all of them) gets hijacked into a random scatter plus a forced block on landing.
+        let moves_randomly = game.acting_player.player_id.as_deref()
+            .and_then(|id| game.player(id))
+            .map(|p| p.has_skill_property(NamedProperties::MOVES_RANDOMLY))
+            .unwrap_or(false);
+        if !moves_randomly {
+            return StepOutcome::next();
+        }
+
         let coord_from = match self.coordinate_from {
             Some(c) => c,
             None => return StepOutcome::next(),
@@ -350,6 +363,34 @@ mod tests {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
     }
 
+    /// Install an acting player at (10,8) carrying the given skills. The step's whole body is
+    /// gated on the acting player having `movesRandomly` (Ball & Chain), so every test that
+    /// expects a scatter must set up a real carrier.
+    fn add_acting_player_with_skills(game: &mut Game, skills: Vec<ffb_model::model::skill_def::SkillWithValue>) {
+        use ffb_model::enums::{PlayerType, PlayerGender, PS_STANDING};
+        use ffb_model::model::player::Player;
+        game.team_home.players.push(Player {
+            id: "mover".into(), name: "mover".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: skills,
+            extra_skills: vec![], temporary_skills: vec![], used_skills: Default::default(),
+            niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
+            is_big_guy: false,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("mover", FieldCoordinate::new(10, 8));
+        game.field_model.set_player_state("mover", ffb_model::enums::PlayerState::new(PS_STANDING));
+        game.acting_player.set_player("mover".into(), ffb_model::enums::PlayerAction::Move);
+        game.home_playing = true;
+        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+    }
+
+    fn add_ball_and_chain_acting_player(game: &mut Game) {
+        use ffb_model::model::skill_def::SkillWithValue;
+        add_acting_player_with_skills(game, vec![SkillWithValue::new(SkillId::BallAndChain)]);
+    }
+
     #[test]
     fn id_is_move_ball_and_chain() {
         assert_eq!(StepMoveBallAndChain::new().id(), StepId::MoveBallAndChain);
@@ -373,6 +414,7 @@ mod tests {
         step.goto_label_on_end = "end".into();
         step.goto_label_on_fall_down = "fall".into();
         let mut game = make_game();
+        add_ball_and_chain_acting_player(&mut game);
         // Seed 2 → roll_d8 returns a specific value; all in-bounds landing
         let mut rng = GameRng::new(2);
         let out = step.start(&mut game, &mut rng);
@@ -412,9 +454,33 @@ mod tests {
         step.goto_label_on_end = "end".into();
         step.goto_label_on_fall_down = "fall".into();
         let mut game = make_game();
+        add_ball_and_chain_acting_player(&mut game);
         let mut rng = GameRng::new(2);
         step.start(&mut game, &mut rng);
         assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SCATTER_PLAYER));
+    }
+
+    /// Regression test: Java gates the whole step on
+    /// `actingPlayer.getPlayer().hasSkillProperty(NamedProperties.movesRandomly)` — a prior
+    /// translation dropped the guard, so EVERY ordinary move (COORDINATE_FROM/TO are published
+    /// for all of them by StepInitMoving) was hijacked into a random scatter plus a forced
+    /// block on whoever stood on the landing square.
+    #[test]
+    fn ordinary_mover_without_ball_and_chain_is_skipped() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut step = StepMoveBallAndChain::new();
+        step.coordinate_from = Some(FieldCoordinate::new(10, 8));
+        step.coordinate_to = Some(FieldCoordinate::new(11, 8));
+        step.original_coordinate_to = Some(FieldCoordinate::new(11, 8));
+        step.goto_label_on_end = "end".into();
+        step.goto_label_on_fall_down = "fall".into();
+        let mut game = make_game();
+        add_acting_player_with_skills(&mut game, vec![SkillWithValue::new(SkillId::Block)]);
+        let mut rng = GameRng::new(2);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::SCATTER_PLAYER));
+        assert!(out.events.is_empty(), "no ScatterPlayer event for an ordinary mover");
     }
 
     #[test]
@@ -452,7 +518,7 @@ mod tests {
         step.goto_label_on_fall_down = "fall".into();
 
         let mut game = make_game();
-        game.home_playing = true;
+        add_ball_and_chain_acting_player(&mut game);
         game.turn_data_home.rerolls = 1;
         game.turn_data_home.reroll_used = false;
         // Java defaults ALLOW_BALL_AND_CHAIN_RE_ROLL to false — the TRR offer only fires
@@ -487,7 +553,7 @@ mod tests {
         step.goto_label_on_fall_down = "fall".into();
 
         let mut game = make_game();
-        game.home_playing = true;
+        add_ball_and_chain_acting_player(&mut game);
         game.turn_data_home.rerolls = 1;
         game.turn_data_home.reroll_used = false;
         game.options.set(game_option_id::ALLOW_BALL_AND_CHAIN_RE_ROLL, "true");
@@ -517,7 +583,7 @@ mod tests {
         step.goto_label_on_fall_down = "fall".into();
 
         let mut game = make_game();
-        game.home_playing = true;
+        add_ball_and_chain_acting_player(&mut game);
         game.turn_data_home.rerolls = 1;
         game.turn_data_home.reroll_used = false;
         // ALLOW_BALL_AND_CHAIN_RE_ROLL left unset — Java's default is `false`.
@@ -554,7 +620,7 @@ mod tests {
             id: "mover".into(), name: "mover".into(), nr: 1, position_id: "lineman".into(),
             player_type: PlayerType::Regular, gender: PlayerGender::Male,
             movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
-            starting_skills: vec![SkillWithValue::new(SkillId::WhirlingDervish)],
+            starting_skills: vec![SkillWithValue::new(SkillId::BallAndChain), SkillWithValue::new(SkillId::WhirlingDervish)],
             extra_skills: vec![], temporary_skills: vec![], used_skills: Default::default(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
             is_big_guy: false,

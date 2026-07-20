@@ -301,10 +301,20 @@ impl StepPushback {
                 }
 
                 if !do_push {
-                    // Java: fieldModel.add(state.pushbackSquares)
+                    // Java: fieldModel.add(state.pushbackSquares) — the client then renders the
+                    // choice and answers with CLIENT_PUSHBACK. Emit the corresponding prompt so
+                    // the agent can reply with Action::PushTo (a bare cont() waits forever).
                     game.field_model.pushback_squares.clear();
                     game.field_model.pushback_squares.extend(final_pushback_squares);
-                    return StepOutcome::cont();
+                    let squares: Vec<FieldCoordinate> = game.field_model.pushback_squares.iter()
+                        .filter(|sq| !sq.locked)
+                        .map(|sq| sq.coordinate)
+                        .collect();
+                    return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::Pushback {
+                        attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
+                        defender_id: game.defender_id.clone().unwrap_or_default(),
+                        squares,
+                    });
                 }
                 // Java: falls through to the `if (state.doPush)` block below (crowd push sets doPush=true).
             }
@@ -312,9 +322,30 @@ impl StepPushback {
 
         // Java: if (state.doPush) { ... }
         if do_push {
+            // Coverage event: capture the candidate squares that were offered before they are
+            // cleared (drives the 1/2/3+ push-destination histogram). Crowd pushes arrive here
+            // with an empty pushback stack and emit no Pushback event (mirrors the monolith,
+            // whose crowd-push path emitted only the Injury event).
+            let candidate_squares: Vec<FieldCoordinate> = game.field_model.pushback_squares.iter()
+                .map(|sq| sq.coordinate)
+                .collect();
             // Java: publishParameter(StepParameterKey.DEFENDER_PUSHED, true)
             // Java: while (!pushbackStack.isEmpty()) { pop + pushPlayer }
             let pushes: Vec<(String, FieldCoordinate)> = self.pushback_stack.drain(..).collect();
+            let pushback_event = if pushes.is_empty() {
+                None
+            } else {
+                let squares = if candidate_squares.is_empty() {
+                    pushes.iter().map(|(_, c)| *c).collect()
+                } else {
+                    candidate_squares
+                };
+                Some(ffb_model::events::GameEvent::Pushback {
+                    attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
+                    defender_id: game.defender_id.clone().unwrap_or_default(),
+                    squares,
+                })
+            };
             let mut extra: Vec<StepParameter> = Vec::new();
             for (player_id, coord) in pushes {
                 extra.extend(push_player(game, &player_id, coord));
@@ -327,6 +358,7 @@ impl StepPushback {
             // Java: getResult().setNextAction(StepAction.NEXT_STEP)
 
             let mut outcome = StepOutcome::next();
+            if let Some(ev) = pushback_event { outcome = outcome.with_event(ev); }
             // Java: crowd-push params (INJURY_RESULT, THROW_IN mode/coord, END_TURN) were published
             // earlier in the method, before DEFENDER_PUSHED — publish them here in the same order.
             for p in extra_params { outcome = outcome.publish(p); }
@@ -345,7 +377,7 @@ impl StepPushback {
 /// Returns parameters to publish (Java calls publishParameter() directly; we collect them here).
 fn push_player(game: &mut Game, player_id: &str, coord: FieldCoordinate) -> Vec<StepParameter> {
     // Java: fieldModel.updatePlayerAndBallPosition(pPlayer, pCoordinate)
-    game.field_model.set_player_coordinate(player_id, coord);
+    game.field_model.update_player_and_ball_position(player_id, coord);
     UtilServerPlayerMove::update_move_squares(game, false);
 
     let mut params: Vec<StepParameter> = Vec::new();

@@ -284,10 +284,20 @@ impl StepPushback {
                     ));
                 }
 
-                // Java: fieldModel.add(state.pushbackSquares)
+                // Java: fieldModel.add(state.pushbackSquares) — the client then renders the
+                // choice and answers with CLIENT_PUSHBACK. Emit the corresponding prompt so
+                // the agent can reply with Action::PushTo (a bare cont() waits forever).
                 game.field_model.pushback_squares.clear();
                 game.field_model.pushback_squares.extend(pushback_squares);
-                return StepOutcome::cont();
+                let squares: Vec<FieldCoordinate> = game.field_model.pushback_squares.iter()
+                    .filter(|sq| !sq.locked)
+                    .map(|sq| sq.coordinate)
+                    .collect();
+                return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::Pushback {
+                    attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
+                    defender_id: game.defender_id.clone().unwrap_or_default(),
+                    squares,
+                });
             }
         }
 
@@ -322,7 +332,7 @@ impl StepPushback {
 /// Returns parameters to publish (Java calls publishParameter() directly; we collect them here).
 fn push_player(game: &mut Game, player_id: &str, coord: FieldCoordinate) -> Vec<StepParameter> {
     // Java: fieldModel.updatePlayerAndBallPosition(pPlayer, pCoordinate)
-    game.field_model.set_player_coordinate(player_id, coord);
+    game.field_model.update_player_and_ball_position(player_id, coord);
     // Java: UtilServerPlayerMove.updateMoveSquares(getGameState(), false)
     UtilServerPlayerMove::update_move_squares(game, false);
 

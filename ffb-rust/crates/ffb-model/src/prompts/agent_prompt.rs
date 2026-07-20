@@ -122,6 +122,11 @@ pub enum AgentPrompt {
     Touchback { eligible_players: Vec<(PlayerId, FieldCoordinate)> },
     KickoffReturn { eligible_players: Vec<PlayerId> },
     KickBall,
+    /// An interactive kickoff event (Quick Snap / Solid Defence / High Kick) is waiting for
+    /// the coach to optionally move players. Java models this purely via TurnMode (no dialog);
+    /// ParityRunner answers with EndTurn at APPLY_KICKOFF_RESULT, declining the placements.
+    /// `mode` is the TurnMode's name (e.g. "QuickSnap").
+    KickoffEventPlacement { team_id: String, mode: String },
 
     // ── Inducements ────────────────────────────────────────────────────────────
     BuyInducements {
