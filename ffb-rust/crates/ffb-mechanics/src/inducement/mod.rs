@@ -107,6 +107,29 @@ impl CardType {
     }
 }
 
+/// Whether `special_rules` (as stored on `Team::special_rules`, e.g. "Bribery and Corruption")
+/// contains the rule named by `key` (an inducement-catalog `availability` suffix such as
+/// "BRIBERY_AND_CORRUPTION", matching a `ffb_model::model::special_rule::SpecialRule` variant).
+/// Keys that don't map to a known `SpecialRule` variant (e.g. rules not yet ported) never match.
+pub fn special_rule_matches(special_rules: &[String], key: &str) -> bool {
+    use ffb_model::model::special_rule::SpecialRule;
+    const ALL: &[SpecialRule] = &[
+        SpecialRule::BADLANDS_BRAWL, SpecialRule::ELVEN_KINGDOMS_LEAGUE,
+        SpecialRule::HALFLING_THIMBLE_CUP, SpecialRule::LUSTRIAN_SUPERLEAGUE,
+        SpecialRule::OLD_WORLD_CLASSIC, SpecialRule::SYLVANIAN_SPOTLIGHT,
+        SpecialRule::UNDERWORLD_CHALLENGE, SpecialRule::WORLDS_EDGE_SUPERLEAGUE,
+        SpecialRule::BRIBERY_AND_CORRUPTION, SpecialRule::FAVOURED_OF_UNDIVIDED,
+        SpecialRule::FAVOURED_OF_KHORNE, SpecialRule::FAVOURED_OF_NURGLE,
+        SpecialRule::FAVOURED_OF_TZEENTCH, SpecialRule::FAVOURED_OF_SLAANESH,
+        SpecialRule::LOW_COST_LINEMEN, SpecialRule::SWARMING,
+        SpecialRule::MASTERS_OF_UNDEATH, SpecialRule::BRAWLIN_BRUTES,
+    ];
+    ALL.iter()
+        .find(|r| format!("{r:?}") == key)
+        .map(|r| special_rules.iter().any(|sr| sr == r.get_rule_name()))
+        .unwrap_or(false)
+}
+
 /// Whether a bribe inducement can be used at the point of a foul referee check.
 pub fn can_use_bribe(set: &InducementSet, _rules: Rules) -> bool {
     set.has_available("bribes")
@@ -212,6 +235,24 @@ mod tests {
         assert_eq!(card.name, back.name);
         assert_eq!(card.card_type, back.card_type);
         assert_eq!(card.duration, back.duration);
+    }
+
+    #[test]
+    fn special_rule_matches_when_present() {
+        let rules = vec!["Sylvanian Spotlight".to_string()];
+        assert!(special_rule_matches(&rules, "SYLVANIAN_SPOTLIGHT"));
+    }
+
+    #[test]
+    fn special_rule_matches_false_when_absent() {
+        let rules = vec!["Sylvanian Spotlight".to_string()];
+        assert!(!special_rule_matches(&rules, "BRIBERY_AND_CORRUPTION"));
+    }
+
+    #[test]
+    fn special_rule_matches_false_for_unknown_key() {
+        let rules = vec!["Sylvanian Spotlight".to_string()];
+        assert!(!special_rule_matches(&rules, "SPIRITED_CROWD"));
     }
 
     #[test]

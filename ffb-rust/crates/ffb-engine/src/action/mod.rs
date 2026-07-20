@@ -112,7 +112,10 @@ pub enum Action {
 
     // ── Inducement ────────────────────────────────────────────────────────────
     /// Purchase inducements before the game.
-    BuyInducements { purchases: Vec<InducementPurchase> },
+    /// `home` identifies which team's coach sent it (needed since both coaches may be
+    /// prompted for `AgentPrompt::BuyInducements`/`BuyPrayersAndInducements` before either
+    /// responds) — mirrors `Action::PettyCash`'s `home` field for the same reason.
+    BuyInducements { home: bool, purchases: Vec<InducementPurchase> },
     /// Play a card from the hand, optionally targeting a player.
     PlayCard { card_id: String, target_player_id: Option<PlayerId> },
     /// Use a purchased inducement during the game (Java: CLIENT_USE_INDUCEMENT).
@@ -316,6 +319,14 @@ mod tests {
             inducement_type: None,
             card_id: Some("distract".into()),
             player_ids: vec![],
+        });
+    }
+
+    #[test]
+    fn buy_inducements_round_trips_with_home_flag() {
+        rt(Action::BuyInducements {
+            home: true,
+            purchases: vec![InducementPurchase { id: "bribes".into(), count: 2 }],
         });
     }
 }

@@ -1007,6 +1007,7 @@ pub fn decode_command(cmd: ClientCommand, side: TeamSide) -> Result<Action, Deco
         }),
 
         ClientCommand::ClientBuyInducements(b) => Ok(Action::BuyInducements {
+            home: side == TeamSide::Home,
             purchases: b.purchases.into_iter().map(|(id, count)| {
                 ffb_engine::action::InducementPurchase { id, count: count as u32 }
             }).collect(),

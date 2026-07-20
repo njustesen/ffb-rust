@@ -11,11 +11,14 @@
 ///
 /// Receives: INDUCEMENT_GOLD_HOME, INDUCEMENT_GOLD_AWAY.
 ///
-/// InducementTypeFactory not ported; headless auto-skips inducement buying (no dialog, no predefined inducements).
+/// The catalog is data-driven from `data/inducements/bb2016_inducements.json` (see
+/// `util_inducement_catalog`) rather than a ported `InducementTypeFactory`. Dialogs are shown
+/// sequentially (home first, then away) via `AgentPrompt::BuyInducements`; `USE_PREDEFINED_INDUCEMENTS`
+/// still auto-skips (predefined-set application is out of scope for this pass).
 /// headless: BuyInducements action lacks star_player_position_ids / mercenary_position_ids —
 ///   add_star_players / add_mercenaries are implemented but require extended action fields to call.
 use std::collections::HashMap;
-use ffb_model::data::loader::find_position;
+use ffb_model::data::loader::{find_position, BB2016_INDUCEMENTS};
 use ffb_model::enums::{InducementPhase, PlayerType, PlayerState, PS_RESERVE};
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
@@ -24,12 +27,14 @@ use ffb_model::model::skill_def::{SkillId, SkillWithValue};
 use ffb_model::model::turn_data::TurnData;
 use ffb_model::option::game_option_id::{INDUCEMENTS, USE_PREDEFINED_INDUCEMENTS, ALLOW_STAR_ON_BOTH_TEAMS};
 use ffb_model::option::util_game_option::is_option_enabled;
+use ffb_model::prompts::AgentPrompt;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_box::UtilBox;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::generator::common::inducement::{Inducement, InducementParams};
 use crate::step::generator::common::riotous_rookies::RiotousRookies;
+use crate::step::game::start::util_inducement_catalog::{apply_purchases, available_list};
 use crate::step::game::start::util_inducement_sequence::UtilInducementSequence;
 
 const MINIMUM_PETTY_CASH_FOR_INDUCEMENTS: i32 = 50_000;
@@ -103,11 +108,25 @@ impl StepBuyInducements {
             game.report_list.add(report);
         }
 
-        // client-only: show inducement buying dialog — headless auto-skips
         if self.inducements_selected_home && self.inducements_selected_away {
             return self.leave_step(game);
         }
-        StepOutcome::cont()
+
+        // Show the dialog for whichever team hasn't bought yet (home first, then away).
+        if !self.inducements_selected_home {
+            let available = available_list(&BB2016_INDUCEMENTS.inducements, &game.team_home);
+            return StepOutcome::cont().with_prompt(AgentPrompt::BuyInducements {
+                team_id: game.team_home.id.clone(),
+                available,
+                budget: self.inducement_gold_home,
+            });
+        }
+        let available = available_list(&BB2016_INDUCEMENTS.inducements, &game.team_away);
+        StepOutcome::cont().with_prompt(AgentPrompt::BuyInducements {
+            team_id: game.team_away.id.clone(),
+            available,
+            budget: self.inducement_gold_away,
+        })
     }
 
     /// Java: `generateReport(Team)` — tallies inducement/star/mercenary counts bought by the
@@ -337,14 +356,31 @@ impl Step for StepBuyInducements {
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        match action {
-            Action::BuyInducements { .. } => {
-                // Java: CLIENT_BUY_INDUCEMENTS → handleBuyInducements → addStarPlayers, addMercenaries.
-                // headless: Action::BuyInducements lacks star_player_position_ids / mercenary_position_ids;
-                //   add_star_players and add_mercenaries are implemented but the call-site requires
-                //   extended action fields not yet present in the Rust action model.
+        // Java: CLIENT_BUY_INDUCEMENTS → handleBuyInducements → addStarPlayers, addMercenaries.
+        // headless: Action::BuyInducements lacks star_player_position_ids / mercenary_position_ids;
+        //   add_star_players and add_mercenaries are implemented but the call-site requires
+        //   extended action fields not yet present in the Rust action model (star players / staff
+        //   are out of scope for this pass — see module docs).
+        if let Action::BuyInducements { home, purchases } = action {
+            if *home {
+                self.gold_used_home += apply_purchases(
+                    &BB2016_INDUCEMENTS.inducements,
+                    &mut game.team_home,
+                    &mut game.turn_data_home.inducement_set,
+                    purchases,
+                    self.inducement_gold_home - self.gold_used_home,
+                );
+                self.inducements_selected_home = true;
+            } else {
+                self.gold_used_away += apply_purchases(
+                    &BB2016_INDUCEMENTS.inducements,
+                    &mut game.team_away,
+                    &mut game.turn_data_away.inducement_set,
+                    purchases,
+                    self.inducement_gold_away - self.gold_used_away,
+                );
+                self.inducements_selected_away = true;
             }
-            _ => {}
         }
         self.execute_step(game)
     }
@@ -469,6 +505,161 @@ mod tests {
         step.inducement_gold_away = 150_000;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(matches!(out.action, StepAction::NextStep));
+    }
+
+    // ── dialog + purchase flow tests ──────────────────────────────────────────
+
+    #[test]
+    fn rich_home_gets_buy_inducements_prompt_first() {
+        use ffb_model::option::game_option_id::INDUCEMENTS;
+        let mut game = make_game();
+        game.options.set(INDUCEMENTS, "true");
+        let mut step = StepBuyInducements::new();
+        step.inducement_gold_home = 200_000;
+        step.inducement_gold_away = 200_000;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        match out.prompt {
+            Some(AgentPrompt::BuyInducements { team_id, budget, .. }) => {
+                assert_eq!(team_id, "home");
+                assert_eq!(budget, 200_000);
+            }
+            other => panic!("expected BuyInducements prompt for home, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn buy_inducements_prompt_lists_filtered_catalog() {
+        use ffb_model::option::game_option_id::INDUCEMENTS;
+        let mut game = make_game();
+        game.options.set(INDUCEMENTS, "true");
+        let mut step = StepBuyInducements::new();
+        step.inducement_gold_home = 200_000;
+        step.inducement_gold_away = 200_000;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        match out.prompt {
+            Some(AgentPrompt::BuyInducements { available, .. }) => {
+                assert!(available.iter().any(|(id, _)| id == "bribes"));
+                // igor requires Sylvanian Spotlight — not present on this team.
+                assert!(!available.iter().any(|(id, _)| id == "igor"));
+                // starPlayer is roster-gated — out of scope, never listed.
+                assert!(!available.iter().any(|(id, _)| id == "starPlayer"));
+            }
+            other => panic!("expected BuyInducements prompt, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn handle_buy_inducements_applies_purchase_and_marks_home_selected() {
+        use ffb_model::option::game_option_id::INDUCEMENTS;
+        use crate::action::InducementPurchase;
+        let mut game = make_game();
+        game.options.set(INDUCEMENTS, "true");
+        let mut step = StepBuyInducements::new();
+        step.inducement_gold_home = 200_000;
+        step.inducement_gold_away = 0;
+        step.start(&mut game, &mut GameRng::new(0));
+        step.handle_command(
+            &Action::BuyInducements {
+                home: true,
+                purchases: vec![InducementPurchase { id: "bribes".into(), count: 1 }],
+            },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(step.inducements_selected_home);
+        assert_eq!(game.team_home.bribes, 1);
+        assert_eq!(step.gold_used_home, 100_000);
+    }
+
+    #[test]
+    fn handle_buy_inducements_deducts_treasury() {
+        use ffb_model::option::game_option_id::INDUCEMENTS;
+        use crate::action::InducementPurchase;
+        let mut game = make_game();
+        game.options.set(INDUCEMENTS, "true");
+        game.team_home.treasury = 500_000;
+        let mut step = StepBuyInducements::new();
+        step.inducement_gold_home = 200_000;
+        step.handle_command(
+            &Action::BuyInducements {
+                home: true,
+                purchases: vec![InducementPurchase { id: "bribes".into(), count: 1 }],
+            },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert_eq!(game.team_home.treasury, 400_000);
+    }
+
+    #[test]
+    fn handle_buy_inducements_routes_wizard_to_inducement_set() {
+        use ffb_model::option::game_option_id::INDUCEMENTS;
+        use crate::action::InducementPurchase;
+        let mut game = make_game();
+        game.options.set(INDUCEMENTS, "true");
+        let mut step = StepBuyInducements::new();
+        step.inducement_gold_home = 200_000;
+        step.handle_command(
+            &Action::BuyInducements {
+                home: true,
+                purchases: vec![InducementPurchase { id: "wizard".into(), count: 1 }],
+            },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert_eq!(game.turn_data_home.inducement_set.get("wizard").map(|i| i.get_value()), Some(1));
+    }
+
+    #[test]
+    fn handle_buy_inducements_clamps_over_budget_purchase() {
+        use ffb_model::option::game_option_id::INDUCEMENTS;
+        use crate::action::InducementPurchase;
+        let mut game = make_game();
+        game.options.set(INDUCEMENTS, "true");
+        let mut step = StepBuyInducements::new();
+        step.inducement_gold_home = 150_000;
+        step.handle_command(
+            &Action::BuyInducements {
+                home: true,
+                purchases: vec![InducementPurchase { id: "bribes".into(), count: 3 }], // 300,000 requested
+            },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        // Only 1 bribe (100,000) fits in a 150,000 budget.
+        assert_eq!(game.team_home.bribes, 1);
+        assert_eq!(step.gold_used_home, 100_000);
+    }
+
+    #[test]
+    fn both_teams_buying_advances_to_next_step_after_both_purchase() {
+        use ffb_model::option::game_option_id::INDUCEMENTS;
+        use crate::action::InducementPurchase;
+        let mut game = make_game();
+        game.options.set(INDUCEMENTS, "true");
+        let mut step = StepBuyInducements::new();
+        step.inducement_gold_home = 200_000;
+        step.inducement_gold_away = 200_000;
+        step.start(&mut game, &mut GameRng::new(0));
+        step.handle_command(
+            &Action::BuyInducements {
+                home: true,
+                purchases: vec![InducementPurchase { id: "bribes".into(), count: 1 }],
+            },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        let out = step.handle_command(
+            &Action::BuyInducements {
+                home: false,
+                purchases: vec![InducementPurchase { id: "cheerleaders".into(), count: 2 }],
+            },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert!(matches!(out.action, StepAction::NextStep));
+        assert_eq!(game.team_home.bribes, 1);
+        assert_eq!(game.team_away.cheerleaders, 2);
     }
 
     // ── add_star_players tests ────────────────────────────────────────────────
