@@ -150,6 +150,81 @@ pub struct CoverageReport {
     pub swarming_rolls: u32,
     pub bomb_explosions: u32,
     pub throw_team_mate_rolls: u32,
+
+    // ── Prayers / cards / inducement registration ───────────────────────────────
+    pub prayer_rolls: HashMap<String, u32>,
+    pub prayer_amount_events: u32,
+    pub card_effects_by_name: HashMap<String, u32>,
+    pub cards_deactivated: HashMap<String, u32>,
+    pub cards_and_inducements_bought_reports: u32,
+    pub inducements_registered: HashMap<String, u32>,
+    pub petty_cash_events: u32,
+
+    // ── Referee / discipline ─────────────────────────────────────────────────────
+    pub referee_spots_foul_rolls: RollStats,
+    pub biased_ref_rolls: RollStats,
+    pub coach_bans: u32,
+
+    // ── Kickoff misc events ──────────────────────────────────────────────────────
+    pub kickoff_sequence_activations_exhausted: u32,
+    pub solid_defence_rolls: u32,
+    pub cheering_fans_events: u32,
+    pub kickoff_extra_rerolls: u32,
+    pub quick_snap_rolls: u32,
+    pub kickoff_timeouts: u32,
+    pub kickoff_officious_ref_events: u32,
+    pub kickoff_dodgy_snack_events: u32,
+    pub dodgy_snack_rolls: u32,
+    pub kickoff_extra_reroll_bb2016_events: u32,
+    pub kickoff_throw_a_rock_bb2016_events: u32,
+    pub kickoff_pitch_invasion_bb2016_events: u32,
+
+    // ── Skill / special-action rolls ─────────────────────────────────────────────
+    pub then_i_started_blastin_rolls: RollStats,
+    pub then_i_started_blastin_fumbles: u32,
+    pub master_chef_rolls: u32,
+    pub master_chef_rerolls_stolen: u32,
+    pub keg_throws: RollStats,
+    pub keg_throw_fumbles: u32,
+    pub blitz_rolls: u32,
+    pub special_effect_rolls: HashMap<String, u32>,
+    pub throw_at_stalling_player_rolls: RollStats,
+    pub throw_at_player_rolls: RollStats,
+    pub fumblerooskie_uses: RollStats,
+    pub all_you_can_eat_rolls: RollStats,
+    pub pump_up_the_crowd_rerolls: u32,
+    pub select_blitz_targets: u32,
+    pub select_gaze_targets: u32,
+    pub hit_and_run_events: u32,
+    pub kick_team_mate_fumbles: u32,
+    pub bite_spectator_events: u32,
+    pub leader_events: u32,
+    pub defecting_players: u32,
+    pub regeneration_rolls: RollStats,
+    pub apothecary_rolls: u32,
+    pub block_actions: u32,
+    pub swoop_player_events: u32,
+    pub hand_overs: u32,
+    pub riotous_rookies: u32,
+    pub riotous_rookies_players: u32,
+    pub kickoff_pitch_invasion_stuns: u32,
+    pub pass_blocks: u32,
+    pub pass_block_eligible_events: u32,
+    pub spell_effect_rolls: u32,
+    pub player_notes: HashMap<String, u32>,
+    pub players_added: u32,
+    pub no_players_to_field_events: u32,
+
+    // ── Game flow misc ───────────────────────────────────────────────────────────
+    pub receive_choices: HashMap<String, u32>,
+    pub game_options_snapshots: u32,
+    pub double_hired_star_players: u32,
+    pub timeouts_enforced: u32,
+    pub winnings_rolls: u32,
+
+    // ── Diagnostics fed from outside tally() (e.g. UniformAgent unhandled-prompt
+    // tracking) — not populated by `tally()` itself, see `record_unhandled_prompt`.
+    pub unhandled_prompts: HashMap<String, u32>,
 }
 
 #[derive(Serialize)]
@@ -347,66 +422,123 @@ impl CoverageReport {
             GameEvent::BombExplodesAfterCatch { .. } | GameEvent::BombOutOfBounds { .. } => {
                 self.bomb_explosions += 1;
             }
-            GameEvent::RegenerationRoll { .. } => {}
+            GameEvent::RegenerationRoll { success, .. } =>
+                self.regeneration_rolls.record(*success, false),
 
-            GameEvent::ReceiveChoice { .. }
-            | GameEvent::GameOptions { .. }
-            | GameEvent::DoubleHiredStarPlayer
-            | GameEvent::TimeoutEnforced { .. }
-            | GameEvent::WinningsRoll { .. }
-            | GameEvent::HandOver { .. }
-            | GameEvent::SwoopPlayer { .. }
-            | GameEvent::RiotousRookies { .. }
-            | GameEvent::KickoffPitchInvasionStun { .. }
-            | GameEvent::PassBlock { .. }
-            | GameEvent::PassBlockEligible { .. }
-            | GameEvent::PettyCash { .. }
-            | GameEvent::CardDeactivated { .. }
-            | GameEvent::CardEffectRoll { .. }
-            | GameEvent::DefectingPlayers { .. }
-            | GameEvent::CoachBanned { .. }
-            | GameEvent::Leader { .. }
-            | GameEvent::ThenIStartedBlastin { .. }
-            | GameEvent::PrayerRoll { .. }
-            | GameEvent::SpellEffectRoll { .. }
-            | GameEvent::MasterChefRoll { .. }
-            | GameEvent::RefereeSpotsFoul { .. }
-            | GameEvent::BiasedRefRoll { .. }
-            | GameEvent::Block { .. }
-            | GameEvent::ApothecaryRoll { .. }
-            | GameEvent::SelectBlitzTarget { .. }
-            | GameEvent::SelectGazeTarget { .. }
-            | GameEvent::KegThrow { .. }
-            | GameEvent::BlitzRoll { .. }
-            | GameEvent::SpecialEffectRoll { .. }
-            | GameEvent::ThrowAtStallingPlayer { .. }
-            | GameEvent::NoPlayersToField { .. }
-            | GameEvent::PlayerNote { .. }
-            | GameEvent::HitAndRun { .. }
-            | GameEvent::KickTeamMateFumble
-            | GameEvent::PrayerAmount { .. }
-            | GameEvent::BiteSpectator { .. }
-            | GameEvent::CardsAndInducementsBought { .. }
-            | GameEvent::KickoffSequenceActivationsExhausted { .. }
-            | GameEvent::SolidDefenceRoll { .. }
-            | GameEvent::CheeringFans { .. }
-            | GameEvent::KickoffExtraReRoll { .. }
-            | GameEvent::QuickSnapRoll { .. }
-            | GameEvent::KickoffTimeout { .. }
-            | GameEvent::KickoffOfficiousRef { .. }
-            | GameEvent::KickoffDodgySnack { .. }
-            | GameEvent::DodgySnackRoll { .. }
-            | GameEvent::ThrowAtPlayer { .. }
-            | GameEvent::Fumblerooskie { .. }
-            | GameEvent::AllYouCanEatRoll { .. }
-            | GameEvent::KickoffExtraReRollBb2016 { .. }
-            | GameEvent::KickoffThrowARockBb2016 { .. }
-            | GameEvent::KickoffPitchInvasionBb2016 { .. }
-            | GameEvent::Inducement { .. }
-            | GameEvent::PumpUpTheCrowdReRoll { .. }
-            | GameEvent::PlayerAdded { .. }
-            => {}
+            GameEvent::PrayerRoll { prayer_id, .. } => {
+                *self.prayer_rolls.entry(prayer_id.clone()).or_default() += 1;
+            }
+            GameEvent::PrayerAmount { .. } => { self.prayer_amount_events += 1; }
+            GameEvent::CardEffectRoll { effect, .. } => {
+                *self.card_effects_by_name.entry(effect.clone()).or_default() += 1;
+            }
+            GameEvent::CardDeactivated { card_id, .. } => {
+                *self.cards_deactivated.entry(card_id.clone()).or_default() += 1;
+            }
+            GameEvent::CardsAndInducementsBought { .. } => {
+                self.cards_and_inducements_bought_reports += 1;
+            }
+            GameEvent::Inducement { inducement_type, .. } => {
+                *self.inducements_registered.entry(inducement_type.clone()).or_default() += 1;
+            }
+            GameEvent::PettyCash { .. } => { self.petty_cash_events += 1; }
+
+            GameEvent::RefereeSpotsFoul { referee_spots_foul, .. } =>
+                self.referee_spots_foul_rolls.record(*referee_spots_foul, false),
+            GameEvent::BiasedRefRoll { referee_spots_foul, .. } =>
+                self.biased_ref_rolls.record(*referee_spots_foul, false),
+            GameEvent::CoachBanned { .. } => { self.coach_bans += 1; }
+
+            GameEvent::KickoffSequenceActivationsExhausted { .. } => {
+                self.kickoff_sequence_activations_exhausted += 1;
+            }
+            GameEvent::SolidDefenceRoll { .. } => { self.solid_defence_rolls += 1; }
+            GameEvent::CheeringFans { .. } => { self.cheering_fans_events += 1; }
+            GameEvent::KickoffExtraReRoll { .. } => { self.kickoff_extra_rerolls += 1; }
+            GameEvent::QuickSnapRoll { .. } => { self.quick_snap_rolls += 1; }
+            GameEvent::KickoffTimeout { .. } => { self.kickoff_timeouts += 1; }
+            GameEvent::KickoffOfficiousRef { .. } => { self.kickoff_officious_ref_events += 1; }
+            GameEvent::KickoffDodgySnack { .. } => { self.kickoff_dodgy_snack_events += 1; }
+            GameEvent::DodgySnackRoll { .. } => { self.dodgy_snack_rolls += 1; }
+            GameEvent::KickoffExtraReRollBb2016 { .. } => {
+                self.kickoff_extra_reroll_bb2016_events += 1;
+            }
+            GameEvent::KickoffThrowARockBb2016 { .. } => {
+                self.kickoff_throw_a_rock_bb2016_events += 1;
+            }
+            GameEvent::KickoffPitchInvasionBb2016 { .. } => {
+                self.kickoff_pitch_invasion_bb2016_events += 1;
+            }
+
+            GameEvent::ThenIStartedBlastin { success, fumble, .. } => {
+                self.then_i_started_blastin_rolls.record(*success, false);
+                if *fumble { self.then_i_started_blastin_fumbles += 1; }
+            }
+            GameEvent::MasterChefRoll { rerolls_stolen, .. } => {
+                self.master_chef_rolls += 1;
+                self.master_chef_rerolls_stolen += *rerolls_stolen as u32;
+            }
+            GameEvent::KegThrow { success, fumble, .. } => {
+                self.keg_throws.record(*success, false);
+                if *fumble { self.keg_throw_fumbles += 1; }
+            }
+            GameEvent::BlitzRoll { .. } => { self.blitz_rolls += 1; }
+            GameEvent::SpecialEffectRoll { effect, .. } => {
+                *self.special_effect_rolls.entry(effect.clone()).or_default() += 1;
+            }
+            GameEvent::ThrowAtStallingPlayer { success, .. } =>
+                self.throw_at_stalling_player_rolls.record(*success, false),
+            GameEvent::ThrowAtPlayer { successful, .. } =>
+                self.throw_at_player_rolls.record(*successful, false),
+            GameEvent::Fumblerooskie { used, .. } =>
+                self.fumblerooskie_uses.record(*used, false),
+            GameEvent::AllYouCanEatRoll { success, rerolled, .. } =>
+                self.all_you_can_eat_rolls.record(*success, *rerolled),
+            GameEvent::PumpUpTheCrowdReRoll { .. } => { self.pump_up_the_crowd_rerolls += 1; }
+            GameEvent::SelectBlitzTarget { .. } => { self.select_blitz_targets += 1; }
+            GameEvent::SelectGazeTarget { .. } => { self.select_gaze_targets += 1; }
+            GameEvent::HitAndRun { .. } => { self.hit_and_run_events += 1; }
+            GameEvent::KickTeamMateFumble => { self.kick_team_mate_fumbles += 1; }
+            GameEvent::BiteSpectator { .. } => { self.bite_spectator_events += 1; }
+            GameEvent::Leader { .. } => { self.leader_events += 1; }
+            GameEvent::DefectingPlayers { .. } => { self.defecting_players += 1; }
+            GameEvent::ApothecaryRoll { roll, .. } => {
+                if roll.is_some() { self.apothecary_rolls += 1; }
+            }
+            GameEvent::Block { .. } => { self.block_actions += 1; }
+            GameEvent::SwoopPlayer { .. } => { self.swoop_player_events += 1; }
+            GameEvent::HandOver { .. } => { self.hand_overs += 1; }
+            GameEvent::RiotousRookies { player_count, .. } => {
+                self.riotous_rookies += 1;
+                self.riotous_rookies_players += *player_count as u32;
+            }
+            GameEvent::KickoffPitchInvasionStun { .. } => {
+                self.kickoff_pitch_invasion_stuns += 1;
+            }
+            GameEvent::PassBlock { .. } => { self.pass_blocks += 1; }
+            GameEvent::PassBlockEligible { .. } => { self.pass_block_eligible_events += 1; }
+            GameEvent::SpellEffectRoll { .. } => { self.spell_effect_rolls += 1; }
+            GameEvent::PlayerNote { note, .. } => {
+                *self.player_notes.entry(note.clone()).or_default() += 1;
+            }
+            GameEvent::PlayerAdded { .. } => { self.players_added += 1; }
+            GameEvent::NoPlayersToField { .. } => { self.no_players_to_field_events += 1; }
+
+            GameEvent::ReceiveChoice { receive, .. } => {
+                let key = if *receive { "receive" } else { "kick" };
+                *self.receive_choices.entry(key.to_string()).or_default() += 1;
+            }
+            GameEvent::GameOptions { .. } => { self.game_options_snapshots += 1; }
+            GameEvent::DoubleHiredStarPlayer => { self.double_hired_star_players += 1; }
+            GameEvent::TimeoutEnforced { .. } => { self.timeouts_enforced += 1; }
+            GameEvent::WinningsRoll { .. } => { self.winnings_rolls += 1; }
         }
+    }
+
+    /// Record a prompt the agent could not handle (fed from outside `tally()` by
+    /// e.g. a `UniformAgent`'s unhandled-prompt tracking).
+    pub fn record_unhandled_prompt(&mut self, prompt_name: &str) {
+        *self.unhandled_prompts.entry(prompt_name.to_string()).or_default() += 1;
     }
 }
 
@@ -470,6 +602,37 @@ pub fn skill_name_from_u16(id: u16) -> String {
 pub fn build_skill_names() -> HashMap<String, String> {
     SKILL_TABLE.iter()
         .map(|entry| (entry.id.class_name().to_string(), entry.id.class_name().to_string()))
+        .collect()
+}
+
+// ── Inducement catalog (for checklist cross-reference) ─────────────────────────
+
+/// One entry from an edition's `data/inducements/*.json` catalog, trimmed to what
+/// the coverage checklist needs to flag "inducement X was never bought."
+pub struct InducementCatalogEntry {
+    pub id: String,
+    pub name: String,
+    /// True when the JSON entry has no `availability` gate (i.e. it's purchasable
+    /// by any team in a normal game, not just under a special rule/edition quirk).
+    pub universally_available: bool,
+}
+
+/// Known inducement ids/names for one edition ("bb2016" | "bb2020" | "bb2025",
+/// defaulting to bb2025 for anything else). Backed by the same `include_str!`
+/// JSON catalogs already loaded by `ffb_model::data::loader`.
+pub fn known_inducements(edition: &str) -> Vec<InducementCatalogEntry> {
+    use ffb_model::data::loader::{BB2016_INDUCEMENTS, BB2020_INDUCEMENTS, BB2025_INDUCEMENTS};
+    let catalog = match edition {
+        "bb2016" => &*BB2016_INDUCEMENTS,
+        "bb2020" => &*BB2020_INDUCEMENTS,
+        _ => &*BB2025_INDUCEMENTS,
+    };
+    catalog.inducements.iter()
+        .map(|i| InducementCatalogEntry {
+            id: i.id.clone(),
+            name: i.name.clone(),
+            universally_available: i.availability.is_empty(),
+        })
         .collect()
 }
 
@@ -714,6 +877,63 @@ function render() {{
   const maxMisc = Math.max(...miscEntries.map(e=>e[1]), 1);
   sections.push(`<div class="card"><h2>Misc Events</h2><div class="bar-chart">${{barChart(miscEntries, maxMisc)}}</div></div>`);
 
+  // ── Unhandled prompts (key diagnostic: should always be empty) ───────────────
+  const unhandled = Object.entries(D.unhandled_prompts || {{}}).sort((a,b)=>b[1]-a[1]);
+  const unhandledTotal = unhandled.reduce((s,[,v])=>s+v, 0);
+  const maxUnhandled = unhandled.length ? unhandled[0][1] : 1;
+  const unhandledStyle = unhandledTotal > 0 ? 'border-color:var(--red)' : '';
+  sections.push(`<div class="card" style="${{unhandledStyle}}"><h2>Unhandled Prompts ${{unhandledTotal > 0 ? '<span class=\"badge badge-red\">' + fmt(unhandledTotal) + ' leaked</span>' : '<span class=\"badge badge-green\">none</span>'}}</h2>${{barChart(unhandled, maxUnhandled)}}</div>`);
+
+  // ── Misc/Other events (Task-1 gap-fill counters) ──────────────────────────────
+  const otherTiles = [
+    ['Leader Events', D.leader_events||0], ['Defecting Players', D.defecting_players||0],
+    ['Coach Bans', D.coach_bans||0], ['Hand Overs', D.hand_overs||0],
+    ['Swoop Player', D.swoop_player_events||0], ['Riotous Rookies', D.riotous_rookies||0],
+    ['Block Actions', D.block_actions||0], ['Apothecary Rolls', D.apothecary_rolls||0],
+    ['Select Blitz Target', D.select_blitz_targets||0], ['Select Gaze Target', D.select_gaze_targets||0],
+    ['Hit And Run', D.hit_and_run_events||0], ['Kick Team-Mate Fumble', D.kick_team_mate_fumbles||0],
+    ['Bite Spectator', D.bite_spectator_events||0], ['Pass Block', D.pass_blocks||0],
+    ['Pass Block Eligible', D.pass_block_eligible_events||0], ['Spell Effect Rolls', D.spell_effect_rolls||0],
+    ['Players Added', D.players_added||0], ['No Players To Field', D.no_players_to_field_events||0],
+    ['Petty Cash Events', D.petty_cash_events||0], ['Cards+Inducements Reports', D.cards_and_inducements_bought_reports||0],
+    ['Double Hired Star', D.double_hired_star_players||0], ['Timeouts Enforced', D.timeouts_enforced||0],
+    ['Winnings Rolls', D.winnings_rolls||0], ['Game Options Snapshots', D.game_options_snapshots||0],
+    ['Kickoff Seq. Exhausted', D.kickoff_sequence_activations_exhausted||0], ['Solid Defence Rolls', D.solid_defence_rolls||0],
+    ['Cheering Fans', D.cheering_fans_events||0], ['Kickoff Extra ReRoll', D.kickoff_extra_rerolls||0],
+    ['Quick Snap Rolls', D.quick_snap_rolls||0], ['Kickoff Timeouts', D.kickoff_timeouts||0],
+    ['Kickoff Officious Ref', D.kickoff_officious_ref_events||0], ['Kickoff Dodgy Snack', D.kickoff_dodgy_snack_events||0],
+    ['Dodgy Snack Rolls', D.dodgy_snack_rolls||0], ['Kickoff Pitch Invasion Stuns', D.kickoff_pitch_invasion_stuns||0],
+    ['BB2016 Extra ReRoll', D.kickoff_extra_reroll_bb2016_events||0], ['BB2016 Throw-A-Rock', D.kickoff_throw_a_rock_bb2016_events||0],
+    ['BB2016 Pitch Invasion', D.kickoff_pitch_invasion_bb2016_events||0], ['Master Chef Rolls', D.master_chef_rolls||0],
+    ['Master Chef Rerolls Stolen', D.master_chef_rerolls_stolen||0], ['Keg Throw Fumbles', D.keg_throw_fumbles||0],
+    ['Blitz Rolls', D.blitz_rolls||0], ['Pump Up The Crowd ReRoll', D.pump_up_the_crowd_rerolls||0],
+    ['Prayer Amount Events', D.prayer_amount_events||0], ['ThenIStartedBlastin Fumbles', D.then_i_started_blastin_fumbles||0],
+  ];
+  const maxOther = Math.max(...otherTiles.map(e=>e[1]), 1);
+  sections.push(`<div class="card"><h2>Misc/Other Events</h2><div class="bar-chart">${{barChart(otherTiles, maxOther)}}</div></div>`);
+
+  const rollRows2 = [
+    ['RegenerationRoll', D.regeneration_rolls],['ThenIStartedBlastinRoll', D.then_i_started_blastin_rolls],
+    ['KegThrowRoll', D.keg_throws],['ThrowAtStallingPlayerRoll', D.throw_at_stalling_player_rolls],
+    ['ThrowAtPlayerRoll', D.throw_at_player_rolls],['FumblerooskieUse', D.fumblerooskie_uses],
+    ['AllYouCanEatRoll', D.all_you_can_eat_rolls],['RefereeSpotsFoulRoll', D.referee_spots_foul_rolls],
+    ['BiasedRefRoll', D.biased_ref_rolls],
+  ];
+  sections.push(`<div class="card"><h2>Additional Dice Rolls</h2>${{rollTable(rollRows2)}}</div>`);
+
+  const prayerEntries = Object.entries(D.prayer_rolls || {{}}).sort((a,b)=>b[1]-a[1]);
+  const maxPrayer = prayerEntries.length ? prayerEntries[0][1] : 1;
+  const cardEffectEntries = Object.entries(D.card_effects_by_name || {{}}).sort((a,b)=>b[1]-a[1]);
+  const maxCardEffect = cardEffectEntries.length ? cardEffectEntries[0][1] : 1;
+  const inducementsRegEntries = Object.entries(D.inducements_registered || {{}}).sort((a,b)=>b[1]-a[1]);
+  const maxIndReg = inducementsRegEntries.length ? inducementsRegEntries[0][1] : 1;
+  sections.push(`<div class="card"><h2>Prayers, Cards &amp; Inducement Registration</h2>
+    <div class="two-col">
+      <div><h3>Prayers Rolled</h3><div class="bar-chart">${{barChart(prayerEntries, maxPrayer)}}</div></div>
+      <div><h3>Card Effects</h3><div class="bar-chart">${{barChart(cardEffectEntries, maxCardEffect)}}</div></div>
+    </div>
+    <div style="margin-top:12px"><h3>Inducements Registered (start-of-half)</h3><div class="bar-chart">${{barChart(inducementsRegEntries, maxIndReg)}}</div></div></div>`);
+
   document.getElementById('main').innerHTML = sections.join('');
 }}
 render();
@@ -721,4 +941,129 @@ render();
 </body>
 </html>
 "#, json = json)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffb_model::types::FieldCoordinate;
+
+    #[test]
+    fn tally_prayer_roll_by_id() {
+        let mut cov = CoverageReport::default();
+        cov.tally(&GameEvent::PrayerRoll { team_id: "t1".into(), roll: 4, prayer_id: "Blessed".into() });
+        cov.tally(&GameEvent::PrayerRoll { team_id: "t1".into(), roll: 6, prayer_id: "Blessed".into() });
+        assert_eq!(cov.prayer_rolls.get("Blessed"), Some(&2));
+    }
+
+    #[test]
+    fn tally_leader_and_defecting_players() {
+        let mut cov = CoverageReport::default();
+        cov.tally(&GameEvent::Leader { player_id: "p1".into(), reroll_available: true });
+        cov.tally(&GameEvent::DefectingPlayers { player_ids: vec!["p1".into(), "p2".into()] });
+        assert_eq!(cov.leader_events, 1);
+        assert_eq!(cov.defecting_players, 1);
+    }
+
+    #[test]
+    fn tally_coach_banned() {
+        let mut cov = CoverageReport::default();
+        cov.tally(&GameEvent::CoachBanned { team_id: "t1".into() });
+        assert_eq!(cov.coach_bans, 1);
+    }
+
+    #[test]
+    fn tally_card_effect_roll_by_effect() {
+        let mut cov = CoverageReport::default();
+        cov.tally(&GameEvent::CardEffectRoll { card_id: "c1".into(), roll: 3, effect: "Stun".into() });
+        assert_eq!(cov.card_effects_by_name.get("Stun"), Some(&1));
+    }
+
+    #[test]
+    fn tally_then_i_started_blastin_records_success_and_fumble() {
+        let mut cov = CoverageReport::default();
+        cov.tally(&GameEvent::ThenIStartedBlastin {
+            attacker_id: "p1".into(), defender_id: None, roll: 1, success: false, fumble: true,
+        });
+        assert_eq!(cov.then_i_started_blastin_rolls.total, 1);
+        assert_eq!(cov.then_i_started_blastin_rolls.failure, 1);
+        assert_eq!(cov.then_i_started_blastin_fumbles, 1);
+    }
+
+    #[test]
+    fn tally_master_chef_roll_accumulates_rerolls_stolen() {
+        let mut cov = CoverageReport::default();
+        cov.tally(&GameEvent::MasterChefRoll { team_id: "t1".into(), roll: 5, rerolls_stolen: 2 });
+        cov.tally(&GameEvent::MasterChefRoll { team_id: "t1".into(), roll: 3, rerolls_stolen: 0 });
+        assert_eq!(cov.master_chef_rolls, 2);
+        assert_eq!(cov.master_chef_rerolls_stolen, 2);
+    }
+
+    #[test]
+    fn tally_keg_throw_records_success_and_fumble() {
+        let mut cov = CoverageReport::default();
+        cov.tally(&GameEvent::KegThrow {
+            thrower_id: "p1".into(), target_id: Some("p2".into()), roll: 2, success: false, fumble: true,
+        });
+        assert_eq!(cov.keg_throws.total, 1);
+        assert_eq!(cov.keg_throw_fumbles, 1);
+    }
+
+    #[test]
+    fn tally_receive_choice_buckets_by_receive_flag() {
+        let mut cov = CoverageReport::default();
+        cov.tally(&GameEvent::ReceiveChoice { team_id: "t1".into(), receive: true });
+        cov.tally(&GameEvent::ReceiveChoice { team_id: "t2".into(), receive: false });
+        assert_eq!(cov.receive_choices.get("receive"), Some(&1));
+        assert_eq!(cov.receive_choices.get("kick"), Some(&1));
+    }
+
+    #[test]
+    fn tally_double_hired_star_player() {
+        let mut cov = CoverageReport::default();
+        cov.tally(&GameEvent::DoubleHiredStarPlayer);
+        assert_eq!(cov.double_hired_star_players, 1);
+    }
+
+    #[test]
+    fn tally_regeneration_roll_records_success() {
+        let mut cov = CoverageReport::default();
+        cov.tally(&GameEvent::RegenerationRoll { player_id: "p1".into(), roll: 4, success: true });
+        assert_eq!(cov.regeneration_rolls.total, 1);
+        assert_eq!(cov.regeneration_rolls.success, 1);
+    }
+
+    #[test]
+    fn tally_inducement_registered_by_type() {
+        let mut cov = CoverageReport::default();
+        cov.tally(&GameEvent::Inducement { team_id: "t1".into(), inducement_type: "WanderingApothecary".into(), value: 1 });
+        assert_eq!(cov.inducements_registered.get("WanderingApothecary"), Some(&1));
+    }
+
+    #[test]
+    fn tally_block_action_and_swoop_and_handover() {
+        let mut cov = CoverageReport::default();
+        cov.tally(&GameEvent::Block { defender_id: "d1".into() });
+        cov.tally(&GameEvent::SwoopPlayer { player_id: "p1".into(), coord: FieldCoordinate { x: 1, y: 1 } });
+        cov.tally(&GameEvent::HandOver { from_id: "p1".into(), to_id: "p2".into() });
+        assert_eq!(cov.block_actions, 1);
+        assert_eq!(cov.swoop_player_events, 1);
+        assert_eq!(cov.hand_overs, 1);
+    }
+
+    #[test]
+    fn record_unhandled_prompt_increments_map() {
+        let mut cov = CoverageReport::default();
+        cov.record_unhandled_prompt("SelectSquare");
+        cov.record_unhandled_prompt("SelectSquare");
+        cov.record_unhandled_prompt("SelectPlayer");
+        assert_eq!(cov.unhandled_prompts.get("SelectSquare"), Some(&2));
+        assert_eq!(cov.unhandled_prompts.get("SelectPlayer"), Some(&1));
+    }
+
+    #[test]
+    fn known_inducements_bb2025_includes_bribes() {
+        let entries = known_inducements("bb2025");
+        assert!(entries.iter().any(|e| e.id == "bribes" && e.universally_available));
+    }
 }
