@@ -1,0 +1,11 @@
+{"type":"startHalf","half":1}
+{"type":"kickoffScatter","start":{"x":20,"y":5},"direction":4,"distance":1}
+{"type":"kickoffResultEvent","result":"QuickSnap"}
+{"type":"quickSnapRoll","team_id":"home_halfling.lrb6","roll":2,"amount":5}
+{"type":"startHalf","half":2}
+{"type":"kickoffScatter","start":{"x":5,"y":5},"direction":3,"distance":4}
+{"type":"kickoffResultEvent","result":"BrilliantCoaching"}
+{"type":"kickoffExtraReRoll","team_id":"home_halfling.lrb6"}
+{"type":"kickoffExtraReRoll","team_id":"away_halfling.lrb6"}
+{"type":"scatterBall","from":{"x":19,"y":7},"directions":[3]}
+{"type":"catchRoll","player_id":"away_05","target":4,"roll":4,"success":true,"rerolled":false}

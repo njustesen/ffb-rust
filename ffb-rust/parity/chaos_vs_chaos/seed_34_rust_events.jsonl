@@ -1,0 +1,6 @@
+{"type":"startHalf","half":1}
+{"type":"kickoffScatter","start":{"x":20,"y":5},"direction":4,"distance":1}
+{"type":"kickoffResultEvent","result":"GetTheRef"}
+{"type":"kickoffScatter","start":{"x":5,"y":5},"direction":4,"distance":4}
+{"type":"kickoffResultEvent","result":"QuickSnap"}
+{"type":"quickSnapRoll","team_id":"away_chaos.lrb6","roll":3,"amount":6}

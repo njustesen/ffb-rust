@@ -1,0 +1,9 @@
+{"type":"startHalf","half":1}
+{"type":"kickoffScatter","start":{"x":5,"y":5},"direction":6,"distance":4}
+{"type":"kickoffResultEvent","result":"TimeOut"}
+{"type":"kickoffTimeout","turn_number":0,"turn_modifier":1}
+{"type":"scatterBall","from":{"x":15,"y":6},"directions":[2]}
+{"type":"startHalf","half":2}
+{"type":"kickoffScatter","start":{"x":20,"y":5},"direction":2,"distance":1}
+{"type":"kickoffResultEvent","result":"SolidDefence"}
+{"type":"solidDefenceRoll","team_id":"away_halfling.lrb6","roll":2,"amount":5}

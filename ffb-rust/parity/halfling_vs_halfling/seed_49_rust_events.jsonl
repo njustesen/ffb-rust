@@ -1,0 +1,6 @@
+{"type":"startHalf","half":1}
+{"type":"kickoffScatter","start":{"x":20,"y":5},"direction":8,"distance":2}
+{"type":"kickoffResultEvent","result":"QuickSnap"}
+{"type":"quickSnapRoll","team_id":"home_halfling.lrb6","roll":2,"amount":5}
+{"type":"kickoffScatter","start":{"x":5,"y":5},"direction":2,"distance":2}
+{"type":"kickoffResultEvent","result":"HighKick"}

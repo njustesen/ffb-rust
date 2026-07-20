@@ -1,0 +1,9 @@
+{"type":"startHalf","half":1}
+{"type":"kickoffScatter","start":{"x":20,"y":5},"direction":1,"distance":2}
+{"type":"kickoffResultEvent","result":"BrilliantCoaching"}
+{"type":"kickoffExtraReRoll","team_id":"home_halfling.lrb6"}
+{"type":"startHalf","half":2}
+{"type":"kickoffScatter","start":{"x":5,"y":5},"direction":1,"distance":4}
+{"type":"kickoffResultEvent","result":"TimeOut"}
+{"type":"kickoffTimeout","turn_number":0,"turn_modifier":1}
+{"type":"scatterBall","from":{"x":16,"y":3},"directions":[5]}

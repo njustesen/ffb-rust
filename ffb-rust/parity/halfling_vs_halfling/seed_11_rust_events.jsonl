@@ -1,0 +1,9 @@
+{"type":"startHalf","half":1}
+{"type":"kickoffScatter","start":{"x":20,"y":5},"direction":2,"distance":2}
+{"type":"kickoffResultEvent","result":"WeatherChange"}
+{"type":"weatherChange","weather":"Nice"}
+{"type":"startHalf","half":2}
+{"type":"kickoffScatter","start":{"x":5,"y":5},"direction":7,"distance":3}
+{"type":"kickoffResultEvent","result":"QuickSnap"}
+{"type":"quickSnapRoll","team_id":"away_halfling.lrb6","roll":2,"amount":5}
+{"type":"scatterBall","from":{"x":19,"y":13},"directions":[2]}

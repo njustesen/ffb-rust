@@ -1,6 +1,73 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-19, Phase AK done — full sweep of crates/ffb-model/src/skill/, 305 files)
+## Current Status (2026-07-20, full-game playability + mechanic coverage — both engines)
+
+**Goal (user, superseding the byte-for-byte-parity plan): both reference agents — Rust
+(`RandomAgent`/`UniformAgent`) and Java (`ParityRunner`) — play FULL games and reach ALL
+expected game events.** Achieved: 100/100 lineman-vs-lineman games run both halves to a natural
+`game_end` on BOTH engines with zero stalls/driver errors/panics; `T3_COVERAGE.md` reports
+**ALL REQUIRED ITEMS PRESENT** (dodge, GFI, pickup, catch, ball scatter, throw-in, pass, all
+block dice counts and results, pushbacks, falls, armor/stun/KO/casualty, fouls,
+argue-the-call, ejections, touchdowns — 4 games with TDs per 100 on each engine); amazon and
+halfling 30/30 full games; `cargo test --workspace` = **17,984 passed, 0 failed**.
+
+**The interrupted session's premature-game-end bug turned out to be ~a dozen stacked engine
+bugs**, the biggest being driver infrastructure (not per-step):
+1. **`DriverStepStack::publish` had first-acceptor-wins delivery; Java delivers to every step
+   until one *consumes*.** Both prior semantics were wrong — fixed with a new
+   `Step::consumes_parameter` trait method (mirrors Java's `consume(parameter)`), ported for
+   all ~60 Java consumer steps across editions (3 subagent batches). Consequences fixed en
+   route: `StepMove` never received `CoordinateTo` (players never moved); inducement windows
+   clobbered each other's `END_INDUCEMENT_PHASE` (turn handover double-flipped, same team
+   played forever).
+2. **`goto("")` silently drained the step stack and ended the game.** Systemic init-param-drop
+   audit (subagent) found ~20 steps whose `set_parameter` dropped generator init params
+   (fatal for GotoLabelOn*): StepBlockChoice (dodge/juggernaut/pushback labels), StepBribes
+   (both editions), TTM cluster (AlwaysHungry/RightStuff/InitThrowTeamMate/Swoop), InitFouling,
+   InitBomb, both punt steps, MultipleBlockFork (empty targets), etc. All fixed; driver now
+   prints `FFB DRIVER ERROR: goto unknown label` on stderr instead of dying silently.
+3. **Missing dialog→prompt emissions**: steps waited forever on `cont()` with no `AgentPrompt`
+   (Java shows a client dialog there). Added: BlockChoice, Pushback, FollowUp, Interception,
+   KickoffEventPlacement (QuickSnap/SolidDefence/HighKick — agents answer EndTurn like Java's
+   ParityRunner), Move (empty-stack legal-move prompt), TeamSetup re-emission.
+4. **Sequences**: hand-rolled `start_game_sequence`/`h2_kickoff_sequence` were missing
+   `KickoffAnimation` (so `ball_in_play` stayed false all game — pickups/catches dead) and the
+   post-touchback CatchScatterThrowIn; bb2025 EndFeeding pushed its 3 sequences in inverted
+   order; `StepEndTurn` never called `start_half` (game stuck in half 1); `StepInitInducement`
+   dropped Java's BETWEEN_TURNS + home_playing handover side effects.
+5. **Other**: mixed `StepMoveBallAndChain` missing the `movesRandomly` guard (every move became
+   a random scatter + forced block); stale `game.thrower_id` misrouting later same-turn
+   activations into the dump-off path (EndFeeding pass-continuation + InitPassing now 1:1 with
+   Java's unconditional thrower assignment); `update_move_squares` never ran at activation
+   (dodging flag never set → zero dodge rolls); block dice ignored assists (2-dice blocks
+   unreachable) — now uses `ServerUtilPlayer::find_block_strength` on both sides; prone blitz
+   now declared as `StandUpBlitz`; `Action::EndPlayerAction` added end-to-end (agent →
+   engine → protocol deselect with nullable `ClientActingPlayer` fields).
+6. **Agents**: activation eligibility now comes from `legal_activate_player_actions` (real
+   per-player action lists, shrinking via `acted_player_ids` bridging in InitSelecting);
+   `used_this_turn` tracking on both agents; canonical setup rewritten to Java's
+   `placeReserves` skip-occupied-squares semantics (H2 setup deadlock).
+7. **Coverage instrumentation**: `GameEvent` emissions wired into live steps (3 subagent
+   batches): Dodge/GFI/Pickup/Catch/Pass rolls, PlayerMoved, Block+BlockRoll, Pushback,
+   PlayerFellDown, Injury (exactly-once via `StateMechanic::report_injury`), PlayerAction,
+   Touchdown, Foul, ArgueTheCall, PlayerEjected, StartHalf(H2).
+8. **Touchdown reachability (deliberate, mirrored agent-policy change on BOTH sides)**: ball
+   carrier's move pick is biased to advance toward the opponent endzone, and Java's
+   `ParityRunner` INIT_MOVING now keeps the carrier moving until MA is spent instead of
+   deselecting after one square (`ffb-ai` rebuilt via
+   `/c/Users/Admin/bin/maven/bin/mvn -pl ffb-ai -am package`). Without both, a 1-square random
+   walk never covers ~15 squares in 8 turns — NO reference agent had ever scored.
+
+**Deliberately out of scope / known deltas:** byte-for-byte tier-3 hash parity is broken (the
+comparator reports 0/100 — expected: the goal changed to playability, and the RNG contracts
+diverged with the new prompts); `FFB_DRIVE_TRACE` env-gated step-dispatch trace kept in
+`driver.rs` (companion to `FFB_TRACE`); Java-side `ParityRunner.java` changes are uncommitted
+in the ffb repo (matching that repo's existing uncommitted-changes precedent).
+
+
+---
+
+## Prior Status (2026-07-19, Phase AK done — full sweep of crates/ffb-model/src/skill/, 305 files)
 
 **Context: Phase AJ's closing note named the ~305 skill files' full method-body logic as the top
 priority next pool** — only constructor arguments/property registrations had been spot-checked in
