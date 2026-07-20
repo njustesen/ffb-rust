@@ -930,10 +930,14 @@ pub fn decode_command(cmd: ClientCommand, side: TeamSide) -> Result<Action, Deco
         ClientCommand::ClientBlitzMove(m) => Ok(Action::Move { path: m.move_squares }),
 
         ClientCommand::ClientActingPlayer(a) => {
-            let player_action = player_action_to_choice(a.player_action)
-                .ok_or(DecodeError::NotImplemented(format!("player_action {:?}", a.player_action)))?;
+            // Java: a null playerId is a deselect — ends the acting player's activation.
+            let (Some(player_id), Some(raw_action)) = (a.player_id, a.player_action) else {
+                return Ok(Action::EndPlayerAction);
+            };
+            let player_action = player_action_to_choice(raw_action)
+                .ok_or(DecodeError::NotImplemented(format!("player_action {raw_action:?}")))?;
             Ok(Action::ActivatePlayer {
-                player_id: a.player_id,
+                player_id,
                 player_action,
                 block_defender_id: None,
             })
@@ -1291,8 +1295,8 @@ mod tests {
     fn decode_acting_player_move() {
         let r = decode_command(
             ClientCommand::ClientActingPlayer(ClientActingPlayer {
-                player_id: "p1".into(),
-                player_action: ffb_model::enums::PlayerAction::Move,
+                player_id: Some("p1".into()),
+                player_action: Some(ffb_model::enums::PlayerAction::Move),
                 standing_up: false,
             }),
             TeamSide::Home,
@@ -1308,8 +1312,8 @@ mod tests {
     fn decode_acting_player_block() {
         let r = decode_command(
             ClientCommand::ClientActingPlayer(ClientActingPlayer {
-                player_id: "p2".into(),
-                player_action: ffb_model::enums::PlayerAction::Block,
+                player_id: Some("p2".into()),
+                player_action: Some(ffb_model::enums::PlayerAction::Block),
                 standing_up: false,
             }),
             TeamSide::Away,
@@ -1321,8 +1325,8 @@ mod tests {
     fn decode_acting_player_foul() {
         let r = decode_command(
             ClientCommand::ClientActingPlayer(ClientActingPlayer {
-                player_id: "p3".into(),
-                player_action: ffb_model::enums::PlayerAction::Foul,
+                player_id: Some("p3".into()),
+                player_action: Some(ffb_model::enums::PlayerAction::Foul),
                 standing_up: false,
             }),
             TeamSide::Home,

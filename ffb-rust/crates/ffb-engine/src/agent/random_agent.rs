@@ -15,7 +15,7 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::enums::{PlayerAction, SkillId};
 
 use crate::action::{Action, PlayerActionChoice};
-use crate::legal_actions::{legal_block_targets, legal_foul_targets, legal_handoff_receivers, legal_pass_receivers, TeamSide};
+use crate::legal_actions::{canonical_setup_action, legal_block_targets, legal_foul_targets, legal_handoff_receivers, legal_pass_receivers, TeamSide};
 use crate::step::GameState;
 
 use super::Agent;
@@ -31,9 +31,9 @@ pub struct RandomAgent {
     action_rng: Xoshiro256StarStar,
     /// Players skipped this turn because they are inactive (just recovered from STUNNED).
     /// Mirrors Java ParityRunner's `usedThisTurn` for rejected-inactive picks.
-    skipped_this_turn: HashSet<String>,
+    used_this_turn: HashSet<String>,
     /// Turn key (half, turn_nr, home_playing) — detects when a new turn starts so we can
-    /// clear `skipped_this_turn`.
+    /// clear `used_this_turn`.
     last_turn_key: Option<(i32, i32, bool)>,
     /// Debug: cumulative actionRng call count (for FFB_TRACE divergence diagnosis).
     action_rng_count: u64,
@@ -45,7 +45,7 @@ impl RandomAgent {
         RandomAgent {
             decision_rng: Xoshiro256StarStar::seed_from_u64(game_seed ^ 0xDEAD_BEEF_CAFE_0001),
             action_rng: Xoshiro256StarStar::seed_from_u64(game_seed ^ 0xC0FFEE_ACE0_0001),
-            skipped_this_turn: HashSet::new(),
+            used_this_turn: HashSet::new(),
             last_turn_key: None,
             action_rng_count: 0,
         }
@@ -57,7 +57,7 @@ impl RandomAgent {
         RandomAgent {
             decision_rng: Xoshiro256StarStar::seed_from_u64(seed),
             action_rng: Xoshiro256StarStar::seed_from_u64(seed ^ 0xC0FFEE_ACE0_0001),
-            skipped_this_turn: HashSet::new(),
+            used_this_turn: HashSet::new(),
             last_turn_key: None,
             action_rng_count: 0,
         }
@@ -108,7 +108,7 @@ impl Agent for RandomAgent {
             //
             // Java inactive-skip (ParityRunner tier>=3): players that are PRONE with active=false
             // (just recovered from STUNNED this turn) are in the eligible list but rejected when
-            // picked. Each rejection consumes 1 decisionRng call. `skipped_this_turn` tracks
+            // picked. Each rejection consumes 1 decisionRng call. `used_this_turn` tracks
             // rejected players across multiple InitSelecting calls within the same turn.
             Some(AgentPrompt::ActivatePlayer { eligible_players }) => {
                 if std::env::var("FFB_TRACE").is_ok() {
@@ -123,12 +123,12 @@ impl Agent for RandomAgent {
                 let turn_key = (gs.game.half, turn_nr, gs.game.home_playing);
                 if self.last_turn_key != Some(turn_key) {
                     self.last_turn_key = Some(turn_key);
-                    self.skipped_this_turn.clear();
+                    self.used_this_turn.clear();
                 }
 
                 // Build `remaining` as indices into eligible_players, excluding already-skipped.
                 let mut remaining: Vec<usize> = (0..eligible_players.len())
-                    .filter(|&i| !self.skipped_this_turn.contains(&eligible_players[i].0))
+                    .filter(|&i| !self.used_this_turn.contains(&eligible_players[i].0))
                     .collect();
 
                 // Inactive-skip loop (mirrors Java ParityRunner while(true) pick loop).
@@ -139,14 +139,18 @@ impl Agent for RandomAgent {
                     let pick = self.pick(remaining.len()); // consumes 1 decisionRng
                     let player_list_idx = remaining.remove(pick);
                     let (pid, acts) = &eligible_players[player_list_idx];
+                    // Java: usedThisTurn.add(playerId) for EVERY pick — successful activations
+                    // included — so the remaining list shrinks each activation and EndTurn fires
+                    // once every player has been picked once. Without this the agent re-activates
+                    // the same players forever and the turn never ends.
+                    self.used_this_turn.insert(pid.clone());
                     // Check if the player is inactive (PRONE with active=false = just recovered
                     // from STUNNED this turn). Only PRONE+inactive players are skipped; STANDING
                     // players should always be active after refreshPlayersForTurnStart.
                     let ps = gs.game.field_model.player_state(pid);
                     let is_inactive = ps.map(|s| s.is_prone() && !s.is_active()).unwrap_or(false);
                     if is_inactive {
-                        // Rejected: decisionRng already consumed; mark as skipped for this turn.
-                        self.skipped_this_turn.insert(pid.clone());
+                        // Rejected: decisionRng already consumed; excluded for the rest of the turn.
                         continue;
                     }
                     break (pid, acts);
@@ -156,7 +160,7 @@ impl Agent for RandomAgent {
                 // list was captured at turn start, so single-use actions may already be consumed.
                 let td = if gs.game.home_playing { &gs.game.turn_data_home } else { &gs.game.turn_data_away };
                 let live_actions: Vec<PlayerAction> = actions.iter().filter(|a| match a {
-                    PlayerAction::Block | PlayerAction::Blitz => !td.blitz_used,
+                    PlayerAction::Block | PlayerAction::Blitz | PlayerAction::StandUpBlitz => !td.blitz_used,
                     PlayerAction::Pass => !td.pass_used,
                     PlayerAction::HandOver => !td.hand_over_used,
                     PlayerAction::Foul => !td.foul_used,
@@ -171,7 +175,8 @@ impl Agent for RandomAgent {
                 // For Foul: pick foul target from adjacent prone/stunned opponents (1 actionRng call)
                 let block_defender_id = match player_action {
                     PlayerActionChoice::Block
-                    | PlayerActionChoice::Blitz => {
+                    | PlayerActionChoice::Blitz
+                    | PlayerActionChoice::StandUpBlitz => {
                         let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
                         let targets = legal_block_targets(&gs.game, player_id, side);
                         if targets.is_empty() {
@@ -232,13 +237,38 @@ impl Agent for RandomAgent {
                     eprintln!("RUST_SMA pid={} N={}", player_id, squares.len());
                 }
                 if squares.is_empty() {
-                    return Action::Move { path: vec![] };
+                    // No adjacent empty square: deselect, ending the activation — 1:1 with Java
+                    // ParityRunner.sendMoveAction's `ClientCommandActingPlayer(null, null, false)`.
+                    // (An empty Move { path: [] } is a no-op the step ignores and re-prompts,
+                    // looping forever.) 0 RNG consumed on either side.
+                    return Action::EndPlayerAction;
                 }
-                let idx = self.pick_action(squares.len());
+                // Carrier-advance bias (mirrored 1:1 in Java ParityRunner.sendMoveAction): when
+                // the mover holds the ball, restrict the pick to squares that advance toward the
+                // opponent endzone when any exist. A pure 1-square random walk never covers the
+                // ~15 squares to the endzone in 8 turns, so touchdowns were unreachable for both
+                // reference agents; the bias makes them reachable without changing anything for
+                // non-carriers. Still 1 actionRng pick either way.
+                let carrying = !gs.game.field_model.ball_moving
+                    && gs.game.field_model.ball_coordinate.is_some()
+                    && gs.game.field_model.ball_coordinate
+                        == gs.game.field_model.player_coordinate(player_id);
+                let pool: Vec<FieldCoordinate> = if carrying {
+                    let cur_x = gs.game.field_model.player_coordinate(player_id).map(|c| c.x).unwrap_or(0);
+                    let dir = if gs.game.home_playing { 1 } else { -1 };
+                    let advancing: Vec<FieldCoordinate> = squares.iter()
+                        .filter(|c| (c.x - cur_x) * dir > 0)
+                        .copied()
+                        .collect();
+                    if advancing.is_empty() { squares.clone() } else { advancing }
+                } else {
+                    squares.clone()
+                };
+                let idx = self.pick_action(pool.len());
                 if std::env::var("FFB_TRACE").is_ok() {
-                    eprintln!("RUST_PICK pid={} N={} idx={} t=({},{})", player_id, squares.len(), idx, squares[idx].x, squares[idx].y);
+                    eprintln!("RUST_PICK pid={} N={} idx={} t=({},{})", player_id, pool.len(), idx, pool[idx].x, pool[idx].y);
                 }
-                Action::Move { path: vec![squares[idx]] }
+                Action::Move { path: vec![pool[idx]] }
             }
             // Pushback: uniformly sample from available squares (sorted by x,y for canonical
             // ordering that matches Java ParityRunner's sorted non-locked pushback list).
@@ -354,6 +384,16 @@ impl Agent for RandomAgent {
                 if total > 0 { let _ = self.pick(total); }
                 Action::Acknowledge
             }
+            // Team setup: deterministic canonical formation, 0 RNG consumed — 1:1 with Java
+            // ParityRunner's `resetCurrentTeam`/`placeReserves` (called directly per StepId,
+            // bypassing the dialog entirely on the Java side; here the engine models it as a
+            // real dialog, so the agent drip-feeds one PlacePlayer per prompt then confirms).
+            Some(AgentPrompt::TeamSetup { team_id, .. }) =>
+                canonical_setup_action(&gs.game, team_id),
+            // Interactive kickoff events (Quick Snap / Solid Defence / High Kick): decline the
+            // optional placements — 1:1 with Java ParityRunner's EndTurn at APPLY_KICKOFF_RESULT.
+            // 0 RNG consumed on either side.
+            Some(AgentPrompt::KickoffEventPlacement { .. }) => Action::EndTurn,
             // Inducement / pre-game: always decline / acknowledge with no RNG consumed.
             Some(AgentPrompt::BuyInducements { team_id, .. }) =>
                 Action::BuyInducements { home: *team_id == gs.game.team_home.id, purchases: vec![] },
@@ -456,9 +496,11 @@ mod tests {
         assert!(matches!(actions[0], Action::CoinChoice { heads } if heads == exp_heads));
         assert!(matches!(actions[1], Action::ReceiveChoice { receive } if receive == exp_receive));
         assert!(matches!(actions[2], Action::KickBall { .. }));
-        // After KickBall the engine drives to the first ActivatePlayer prompt (0 extra dice).
-        assert!(matches!(gs.current_prompt(), Some(AgentPrompt::ActivatePlayer { .. })),
-            "engine waits at first ActivatePlayer after the kickoff");
+        // After KickBall the engine drives to the next coach prompt. With this seed's kick and
+        // the empty-roster test teams the ball lands out of bounds, so that prompt is the
+        // touchback declaration (empty eligible list — no players to give the ball to).
+        assert!(matches!(gs.current_prompt(), Some(AgentPrompt::Touchback { .. })),
+            "engine waits at the touchback prompt after the kickoff, got {:?}", gs.current_prompt());
         // The agent's decision RNG must not touch the game dice: the game dice are the pregame
         // (spectators: d6×4, weather: d6×2, coin: d2) plus the opening kickoff
         // (scatter: d8+d6, result roll: d6×2=7=BrilliantCoaching, coaching handler: d6×2) = 13.
@@ -518,9 +560,9 @@ mod tests {
     }
 
     #[test]
-    fn skipped_this_turn_starts_empty() {
+    fn used_this_turn_starts_empty() {
         let a = RandomAgent::new(1);
-        assert!(a.skipped_this_turn.is_empty());
+        assert!(a.used_this_turn.is_empty());
         assert!(a.last_turn_key.is_none());
     }
 }

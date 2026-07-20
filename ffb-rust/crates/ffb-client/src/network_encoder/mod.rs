@@ -36,8 +36,17 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
         Action::ActivatePlayer { player_id, player_action, .. } => {
             let action = choice_to_player_action(player_action);
             Some(ClientCommand::ClientActingPlayer(ClientActingPlayer {
-                player_id,
-                player_action: action,
+                player_id: Some(player_id),
+                player_action: Some(action),
+                standing_up: false,
+            }))
+        }
+
+        // Java: ClientCommandActingPlayer(null, null, false) — deselect, ending the activation.
+        Action::EndPlayerAction => {
+            Some(ClientCommand::ClientActingPlayer(ClientActingPlayer {
+                player_id: None,
+                player_action: None,
                 standing_up: false,
             }))
         }
@@ -348,8 +357,8 @@ mod tests {
             player_action: PlayerActionChoice::Move,
             block_defender_id: None,
         }) {
-            assert_eq!(a.player_id, "p1");
-            assert_eq!(a.player_action, ffb_model::enums::PlayerAction::Move);
+            assert_eq!(a.player_id.as_deref(), Some("p1"));
+            assert_eq!(a.player_action, Some(ffb_model::enums::PlayerAction::Move));
         } else { panic!("expected ClientActingPlayer") }
     }
 

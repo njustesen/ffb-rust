@@ -146,8 +146,9 @@ pub struct ClientSetupPlayer {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClientActingPlayer {
-    pub player_id: PlayerId,
-    pub player_action: PlayerAction,
+    /// `None` = deselect the acting player (Java sends a null playerId to end the activation).
+    pub player_id: Option<PlayerId>,
+    pub player_action: Option<PlayerAction>,
     pub standing_up: bool,
 }
 
@@ -503,8 +504,14 @@ mod tests {
     #[test]
     fn client_acting_player_round_trip() {
         rt(&ClientCommand::ClientActingPlayer(ClientActingPlayer {
-            player_id: "p1".into(),
-            player_action: PlayerAction::Move,
+            player_id: Some("p1".into()),
+            player_action: Some(PlayerAction::Move),
+            standing_up: false,
+        }));
+        // Deselect form: null playerId/playerAction ends the activation (Java parity).
+        rt(&ClientCommand::ClientActingPlayer(ClientActingPlayer {
+            player_id: None,
+            player_action: None,
             standing_up: false,
         }));
     }

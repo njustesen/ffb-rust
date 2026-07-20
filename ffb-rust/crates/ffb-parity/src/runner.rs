@@ -13,10 +13,22 @@ use ffb_model::model::player::Player;
 use ffb_model::model::roster_position::RosterPosition;
 use ffb_model::model::team::Team;
 use ffb_model::prompts::AgentPrompt;
-use ffb_model::option::game_option_id::INDUCEMENTS;
+use ffb_model::option::game_option_id::{INDUCEMENTS, MAX_PLAYERS_ON_FIELD, MIN_PLAYERS_ON_LOS, MAX_PLAYERS_IN_WIDE_ZONE};
 use crate::log_format::{GameLog, LogLine, java_log_path_for, rust_log_path_for, rust_events_path_for};
 use crate::state_hash::state_hash;
 use ffb_model::util::state_hash::state_string;
+
+/// Baseline setup-validity options every headless full-game run needs: `Game::new` leaves every
+/// option unset (0/false), but `SetupMechanic::check_setup` treats `MAX_PLAYERS_ON_FIELD`/
+/// `MIN_PLAYERS_ON_LOS`/`MAX_PLAYERS_IN_WIDE_ZONE` literally — left at their 0 default, it
+/// rejects a legitimate 11-player formation as "too many players on the field" (`11 > 0`),
+/// stalling the game at the very first kickoff. Values match Java's real
+/// `GameOptionFactory` defaults (11 / 3 / 2) exactly.
+pub const BASELINE_SETUP_OPTIONS: &[(&str, &str)] = &[
+    (MAX_PLAYERS_ON_FIELD, "11"),
+    (MIN_PLAYERS_ON_LOS, "3"),
+    (MAX_PLAYERS_IN_WIDE_ZONE, "2"),
+];
 
 /// Invoke the Java parity runner as a subprocess.
 ///
@@ -114,7 +126,7 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
     let home = make_team(home_roster, "home", edition);
     let away = make_team(away_roster, "away", edition);
 
-    let mut engine = GameState::new(home, away, rules, seed);
+    let mut engine = GameState::new_with_options(home, away, rules, seed, BASELINE_SETUP_OPTIONS);
     // One shared agent for both teams. new_parity seeds both decision and action RNGs
     // to match Java's decisionRng and actionRng exactly.
     let mut agent = RandomAgent::new_parity(seed);
@@ -515,6 +527,7 @@ pub(crate) fn action_label(action: &ffb_engine::action::Action) -> String {
         Action::KickBall { coord } => format!("Kick({},{})", coord.x, coord.y),
         Action::Touchback { player_id } => format!("Touchback({player_id})"),
         Action::ActivatePlayer { player_id, player_action, .. } => format!("Activate({player_id},{player_action:?})"),
+        Action::EndPlayerAction => "EndPlayerAction".into(),
         Action::EndTurn => "EndTurn".into(),
         Action::Move { path } => path.last().map(|c| format!("Move→({},{})", c.x, c.y)).unwrap_or("Move".into()),
         Action::Block { defender_id } => format!("Block→{defender_id}"),
@@ -648,7 +661,7 @@ pub fn run_visual_game(
     let rules = edition_to_rules(edition);
     let home = make_team(home_roster, "home", edition);
     let away = make_team(away_roster, "away", edition);
-    let mut engine = GameState::new(home, away, rules, seed);
+    let mut engine = GameState::new_with_options(home, away, rules, seed, BASELINE_SETUP_OPTIONS);
 
     // Separate agents for home and away so they don't share RNG state.
     let mut home_agent = ffb_engine::agent::RandomAgent::new(seed);
@@ -690,7 +703,7 @@ pub fn run_coverage_game(
     let rules = edition_to_rules(edition);
     let home = make_team(home_roster, "home", edition);
     let away = make_team(away_roster, "away", edition);
-    let mut engine = GameState::new(home, away, rules, seed);
+    let mut engine = GameState::new_with_options(home, away, rules, seed, BASELINE_SETUP_OPTIONS);
 
     let mut home_agent = ffb_engine::agent::RandomAgent::new(seed);
     let mut away_agent = ffb_engine::agent::RandomAgent::new(seed ^ 0xFFFF_FFFF);
@@ -741,7 +754,9 @@ pub fn run_uniform_game(
     // this synchronous layer), `StepBuyInducements` now actually fires instead of
     // auto-skipping to DONE. This is the whole point of a "uniform sampling including
     // inducements" run.
-    let mut engine = GameState::new_full_pregame(home, away, rules, seed, &[(INDUCEMENTS, "true")]);
+    let mut options: Vec<(&str, &str)> = vec![(INDUCEMENTS, "true")];
+    options.extend_from_slice(BASELINE_SETUP_OPTIONS);
+    let mut engine = GameState::new_full_pregame(home, away, rules, seed, &options);
 
     let mut home_agent = UniformAgent::new(seed);
     let mut away_agent = UniformAgent::new(seed ^ 0xFFFF_FFFF);

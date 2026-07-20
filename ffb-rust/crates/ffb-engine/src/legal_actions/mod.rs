@@ -4,7 +4,7 @@ use ffb_model::model::player::PlayerId;
 use ffb_model::types::FieldCoordinate;
 use ffb_mechanics::skills::SkillId;
 use ffb_mechanics::mechanics::STANDARD_GFI_SQUARES;
-use ffb_model::enums::{Rules, PS_PRONE, SkillCategory};
+use ffb_model::enums::{Rules, PS_PRONE, PS_RESERVE, SkillCategory};
 use crate::action::{Action, PlayerActionChoice};
 
 /// The side (home or away) in the current game.
@@ -82,7 +82,9 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
                 if adj_opponent {
                     actions.push(Action::ActivatePlayer {
                         player_id: pid.clone(),
-                        player_action: PlayerActionChoice::Blitz,
+                        // A prone player blitzing declares STAND_UP_BLITZ, not plain Blitz —
+                        // the coverage checklist and Java both distinguish the two.
+                        player_action: PlayerActionChoice::StandUpBlitz,
                         block_defender_id: None,
                     });
                 }
@@ -244,6 +246,43 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
     }
 
     actions
+}
+
+/// The `(player, actions)` eligibility list for the `ActivatePlayer` prompt — the same
+/// per-player action enumeration as `legal_activate_player_actions` (which Java
+/// `ParityRunner.computeEligiblePlayers` mirrors), grouped per player and mapped into model
+/// `PlayerAction`s. This is what `StepInitSelecting` should prompt with; a bare
+/// "everyone with a coordinate can Move" list never shrinks as players act and never offers
+/// Block/Blitz/Pass/HandOver/Foul at all.
+pub fn eligible_players_for_activation(game: &Game) -> Vec<(PlayerId, Vec<ffb_model::enums::PlayerAction>)> {
+    use ffb_model::enums::PlayerAction as PA;
+    use crate::action::PlayerActionChoice as PAC;
+    let side = if game.home_playing { TeamSide::Home } else { TeamSide::Away };
+    let mut out: Vec<(PlayerId, Vec<PA>)> = Vec::new();
+    for action in legal_activate_player_actions(game, side) {
+        let Action::ActivatePlayer { player_id, player_action, .. } = action else { continue };
+        let pa = match player_action {
+            PAC::Move => PA::Move,
+            PAC::Block => PA::Block,
+            PAC::Blitz => PA::Blitz,
+            PAC::StandUp => PA::StandUp,
+            PAC::StandUpBlitz => PA::StandUpBlitz,
+            PAC::Foul => PA::Foul,
+            PAC::Pass => PA::Pass,
+            PAC::HandOff => PA::HandOver,
+            PAC::ThrowTeamMate => PA::ThrowTeamMate,
+            PAC::KickTeamMate => PA::KickTeamMate,
+            PAC::ThrowBomb => PA::ThrowBomb,
+            PAC::Punt => PA::Punt,
+            PAC::SecureTheBall => PA::SecureTheBall,
+            _ => continue,
+        };
+        match out.iter_mut().find(|(pid, _)| *pid == player_id) {
+            Some((_, acts)) => acts.push(pa),
+            None => out.push((player_id, vec![pa])),
+        }
+    }
+    out
 }
 
 /// Returns all squares the player can legally move to (BFS, within MA moves, empty squares only).
@@ -566,6 +605,79 @@ pub fn legal_skill_choices(available: &[(SkillCategory, Vec<u16>)]) -> Vec<u16> 
     available.iter().flat_map(|(_, ids)| ids.iter().copied()).collect()
 }
 
+/// The canonical LOS squares for team setup (home-side coordinates; away is mirrored `x -> 25-x`).
+/// 1:1 with Java `ParityRunner.placeReserves()`'s `losSquares` and Rust's (orphaned, pre-`driver.rs`)
+/// `engine.rs::place_team_canonical`'s `los` array.
+const SETUP_LOS_SQUARES: &[(i32, i32)] = &[(12, 7), (12, 6), (12, 8), (12, 5), (12, 9), (12, 4), (12, 10)];
+/// The canonical overflow squares (behind the LOS) for team setup, same provenance as
+/// `SETUP_LOS_SQUARES`.
+const SETUP_OVERFLOW_SQUARES: &[(i32, i32)] = &[
+    (5, 5), (5, 7), (5, 9), (6, 6), (6, 8), (4, 6), (4, 8), (3, 6), (3, 8), (2, 5), (2, 9), (1, 7),
+];
+
+/// The next legal action in response to `AgentPrompt::TeamSetup { team_id, .. }`: one
+/// `Action::PlacePlayer` for the next still-in-RESERVE player of the canonical formation, or
+/// `Action::ConfirmSetup` once no reserve remains to place. The engine re-emits `TeamSetup`
+/// after every `PlacePlayer` until `ConfirmSetup` is sent, so agents invoke this once per
+/// prompt — no internal state needed.
+///
+/// 1:1 with Java `ParityRunner.placeReserves()`: players in jersey-number order (top 11),
+/// **base == RESERVE only** (KO'd/injured players are never placed; a player placed by an
+/// earlier prompt is STANDING and simply drops out of the candidate list), first three fill
+/// the LOS squares, the rest the overflow squares — and, exactly like Java, each square is
+/// **skipped when already occupied** (checked on the mirrored coordinate for the away side;
+/// the raw home-side coordinate is what goes into `Action::PlacePlayer`, since
+/// `UtilServerSetup::setup_player` transforms it internally for away teams — mirroring here
+/// too would double-transform). Without the occupancy skip, one leftover player on a target
+/// square deadlocks the whole setup: the same rejected `PlacePlayer` repeats forever.
+pub fn canonical_setup_action(game: &Game, team_id: &str) -> Action {
+    let home = team_id == game.team_home.id;
+    let team = if home { &game.team_home } else { &game.team_away };
+
+    let mut players: Vec<(PlayerId, i32)> = team.players.iter().map(|p| (p.id.clone(), p.nr)).collect();
+    players.sort_by_key(|&(_, nr)| nr);
+    players.truncate(11);
+    let candidates: Vec<PlayerId> = players.into_iter()
+        .filter(|(pid, _)| game.field_model.player_state(pid)
+            .map(|s| s.base() == PS_RESERVE)
+            // At the very first setup no player_state entries exist yet — those players are
+            // reserves in all but name (Java's fresh game starts everyone as RESERVE).
+            .unwrap_or(true))
+        .map(|(pid, _)| pid)
+        .collect();
+    let Some(next_pid) = candidates.first().cloned() else { return Action::ConfirmSetup };
+
+    let occupied = |raw: FieldCoordinate| {
+        let stored = if home { raw } else { raw.transform() };
+        game.field_model.player_at(stored).is_some()
+    };
+    // Java's losNeeded = min(3, available): incrementally, keep filling the LOS until our
+    // team holds min(3, held + remaining) of the LOS squares.
+    let los_held = SETUP_LOS_SQUARES.iter().filter(|&&(x, y)| {
+        let stored = if home { FieldCoordinate::new(x, y) } else { FieldCoordinate::new(x, y).transform() };
+        game.field_model.player_at(stored)
+            .map(|pid| team.players.iter().any(|p| p.id == *pid))
+            .unwrap_or(false)
+    }).count();
+    let need_los = los_held < (los_held + candidates.len()).min(3);
+
+    let square_lists: &[&[(i32, i32)]] = if need_los {
+        &[SETUP_LOS_SQUARES, SETUP_OVERFLOW_SQUARES]
+    } else {
+        &[SETUP_OVERFLOW_SQUARES]
+    };
+    for list in square_lists {
+        for &(x, y) in *list {
+            let raw = FieldCoordinate::new(x, y);
+            if !occupied(raw) {
+                return Action::PlacePlayer { player_id: next_pid, coord: raw };
+            }
+        }
+    }
+    // Every canonical square is taken — nothing sensible left to place.
+    Action::ConfirmSetup
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -667,7 +779,8 @@ mod tests {
         add_player(&mut game, true, "p1", c(5, 5), PS_PRONE, vec![]);
         add_player(&mut game, false, "op1", c(6, 5), PS_STANDING, vec![]);
         let actions = legal_activate_player_actions(&game, TeamSide::Home);
-        assert!(has_action(&actions, "p1", PlayerActionChoice::Blitz));
+        // A prone player blitzing declares STAND_UP_BLITZ (stand up + blitz), not plain Blitz.
+        assert!(has_action(&actions, "p1", PlayerActionChoice::StandUpBlitz));
     }
 
     #[test]

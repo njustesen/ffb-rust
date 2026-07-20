@@ -29,6 +29,10 @@ pub enum Action {
     // ── Activation ──────────────────────────────────────────────────────────
     /// Activate a player with the given action type. `block_defender_id` is set for Block/Blitz.
     ActivatePlayer { player_id: PlayerId, player_action: PlayerActionChoice, block_defender_id: Option<PlayerId> },
+    /// End the acting player's activation without ending the turn.
+    /// Java: `ClientCommandActingPlayer` with a null playerId (deselect) —
+    /// `StepInitMoving.handleCommand` sets `fEndPlayerAction = true`.
+    EndPlayerAction,
     /// End the current team's turn.
     EndTurn,
 

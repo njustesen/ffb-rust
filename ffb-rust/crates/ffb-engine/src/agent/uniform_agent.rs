@@ -7,6 +7,7 @@
 //! Used for large-scale "how much of the game's mechanic surface does random play actually
 //! exercise" coverage runs — not for parity testing.
 
+use std::collections::HashSet;
 use rand_xoshiro::Xoshiro256StarStar;
 use rand_core::{RngCore, SeedableRng};
 use ffb_model::prompts::AgentPrompt;
@@ -14,8 +15,8 @@ use ffb_model::enums::PlayerAction;
 
 use crate::action::{Action, InducementPurchase, PlayerActionChoice};
 use crate::legal_actions::{
-    legal_block_targets, legal_foul_targets, legal_handoff_receivers, legal_inducement_purchases,
-    legal_pass_receivers, legal_skill_choices, TeamSide,
+    canonical_setup_action, legal_block_targets, legal_foul_targets, legal_handoff_receivers,
+    legal_inducement_purchases, legal_pass_receivers, legal_skill_choices, TeamSide,
 };
 use crate::step::GameState;
 
@@ -38,6 +39,13 @@ pub struct UniformAgent {
     /// expected to poll this after every `act()` to count/attribute unhandled prompts instead
     /// of the run silently no-oping forever.
     pub last_unhandled_prompt: Option<String>,
+    /// Players already picked for activation this turn (mirrors Java ParityRunner's
+    /// `usedThisTurn` and RandomAgent's `used_this_turn`): a player who was activated but
+    /// couldn't act (e.g. boxed in with no move squares) stays in the engine's eligible list,
+    /// so without pick-tracking the agent can re-pick them forever and the turn never ends.
+    used_this_turn: HashSet<String>,
+    /// Turn key (half, turn_nr, home_playing) — detects a new turn to clear `used_this_turn`.
+    last_turn_key: Option<(i32, i32, bool)>,
 }
 
 impl UniformAgent {
@@ -47,6 +55,8 @@ impl UniformAgent {
         UniformAgent {
             rng: Xoshiro256StarStar::seed_from_u64(seed),
             last_unhandled_prompt: None,
+            used_this_turn: HashSet::new(),
+            last_turn_key: None,
         }
     }
 
@@ -84,9 +94,21 @@ impl Agent for UniformAgent {
             // RandomAgent applies, but filtered directly instead of via a skip-set, since
             // UniformAgent has no RNG-stream discipline to preserve across repeated prompts).
             Some(AgentPrompt::ActivatePlayer { eligible_players }) => {
+                // New turn → forget which players were already picked.
+                let turn_nr = if gs.game.home_playing {
+                    gs.game.turn_data_home.turn_nr
+                } else {
+                    gs.game.turn_data_away.turn_nr
+                };
+                let turn_key = (gs.game.half, turn_nr, gs.game.home_playing);
+                if self.last_turn_key != Some(turn_key) {
+                    self.last_turn_key = Some(turn_key);
+                    self.used_this_turn.clear();
+                }
                 let remaining: Vec<usize> = (0..eligible_players.len())
                     .filter(|&i| {
                         let (pid, _) = &eligible_players[i];
+                        if self.used_this_turn.contains(pid) { return false; }
                         let ps = gs.game.field_model.player_state(pid);
                         !ps.map(|s| s.is_prone() && !s.is_active()).unwrap_or(false)
                     })
@@ -96,10 +118,11 @@ impl Agent for UniformAgent {
                 }
                 let ridx = self.pick(remaining.len());
                 let (player_id, actions) = &eligible_players[remaining[ridx]];
+                self.used_this_turn.insert(player_id.clone());
 
                 let td = if gs.game.home_playing { &gs.game.turn_data_home } else { &gs.game.turn_data_away };
                 let live_actions: Vec<PlayerAction> = actions.iter().filter(|a| match a {
-                    PlayerAction::Block | PlayerAction::Blitz => !td.blitz_used,
+                    PlayerAction::Block | PlayerAction::Blitz | PlayerAction::StandUpBlitz => !td.blitz_used,
                     PlayerAction::Pass => !td.pass_used,
                     PlayerAction::HandOver => !td.hand_over_used,
                     PlayerAction::Foul => !td.foul_used,
@@ -113,7 +136,7 @@ impl Agent for UniformAgent {
 
                 let side = if gs.game.home_playing { TeamSide::Home } else { TeamSide::Away };
                 let block_defender_id = match player_action {
-                    PlayerActionChoice::Block | PlayerActionChoice::Blitz => {
+                    PlayerActionChoice::Block | PlayerActionChoice::Blitz | PlayerActionChoice::StandUpBlitz => {
                         let targets = legal_block_targets(&gs.game, player_id, side);
                         if targets.is_empty() { None } else { Some(targets[self.pick(targets.len())].clone()) }
                     }
@@ -133,10 +156,29 @@ impl Agent for UniformAgent {
                 };
                 Action::ActivatePlayer { player_id: player_id.clone(), player_action, block_defender_id }
             }
-            Some(AgentPrompt::Move { squares, .. }) => {
-                if squares.is_empty() { return Action::Move { path: vec![] }; }
-                let idx = self.pick(squares.len());
-                Action::Move { path: vec![squares[idx]] }
+            Some(AgentPrompt::Move { player_id, squares }) => {
+                // Empty legal set: deselect (ends the activation) — an empty Move is a no-op
+                // the step ignores and re-prompts, looping forever.
+                if squares.is_empty() { return Action::EndPlayerAction; }
+                // Carrier-advance bias — see RandomAgent's Move handler: without it a 1-square
+                // random walk never reaches the endzone and touchdowns are unreachable.
+                let carrying = !gs.game.field_model.ball_moving
+                    && gs.game.field_model.ball_coordinate.is_some()
+                    && gs.game.field_model.ball_coordinate
+                        == gs.game.field_model.player_coordinate(player_id);
+                let pool: Vec<ffb_model::types::FieldCoordinate> = if carrying {
+                    let cur_x = gs.game.field_model.player_coordinate(player_id).map(|c| c.x).unwrap_or(0);
+                    let dir = if gs.game.home_playing { 1 } else { -1 };
+                    let advancing: Vec<ffb_model::types::FieldCoordinate> = squares.iter()
+                        .filter(|c| (c.x - cur_x) * dir > 0)
+                        .copied()
+                        .collect();
+                    if advancing.is_empty() { squares.clone() } else { advancing }
+                } else {
+                    squares.clone()
+                };
+                let idx = self.pick(pool.len());
+                Action::Move { path: vec![pool[idx]] }
             }
             Some(AgentPrompt::Pushback { squares, .. }) => {
                 if squares.is_empty() { return Action::Acknowledge; }
@@ -278,14 +320,18 @@ impl Agent for UniformAgent {
                 self.mark_unhandled("SelectPosition");
                 Action::Acknowledge
             }
-            // TeamSetup / ReRollForTargets: genuinely unimplemented for this agent (no legal-set
-            // enumerator exists yet for either — team placement combinatorics and multi-block
-            // re-roll target selection are out of this pass's scope). Non-fatal fallback instead
-            // of RandomAgent's panic!, tracked via last_unhandled_prompt.
-            Some(AgentPrompt::TeamSetup { .. }) => {
-                self.mark_unhandled("TeamSetup");
-                Action::ConfirmSetup
-            }
+            // Team setup: deterministic canonical formation, 0 RNG — same handler as
+            // RandomAgent (this isn't a "uniform vs random" divergence; there's exactly one
+            // legal formation an automated coach applies here, matching Java's ParityRunner
+            // `resetCurrentTeam`/`placeReserves`).
+            Some(AgentPrompt::TeamSetup { team_id, .. }) =>
+                canonical_setup_action(&gs.game, team_id),
+            // Interactive kickoff events (Quick Snap / Solid Defence / High Kick): decline the
+            // optional placements, matching Java ParityRunner's EndTurn at APPLY_KICKOFF_RESULT.
+            Some(AgentPrompt::KickoffEventPlacement { .. }) => Action::EndTurn,
+            // ReRollForTargets: genuinely unimplemented for this agent (no legal-set enumerator
+            // exists yet — multi-block re-roll target selection is out of this pass's scope).
+            // Non-fatal fallback instead of RandomAgent's panic!, tracked via last_unhandled_prompt.
             Some(AgentPrompt::ReRollForTargets { .. }) => {
                 self.mark_unhandled("ReRollForTargets");
                 Action::Acknowledge
@@ -342,7 +388,11 @@ mod tests {
         assert!(matches!(actions[0], Action::CoinChoice { .. }));
         assert!(matches!(actions[1], Action::ReceiveChoice { .. }));
         assert!(matches!(actions[2], Action::KickBall { .. }));
-        assert!(matches!(gs.current_prompt(), Some(AgentPrompt::ActivatePlayer { .. })));
+        // With the zero-player test harness the kickoff can resolve to different post-kick
+        // prompts depending on where this seed's ball lands (Touchback / ActivatePlayer /
+        // a kickoff-event placement) — the property under test is only that the pregame
+        // drove through without panicking and the engine is waiting on a real prompt.
+        assert!(gs.current_prompt().is_some());
     }
 
     /// Deterministic given a seed: replaying the same seed through the same pregame+first-N
@@ -406,12 +456,10 @@ mod tests {
         let mut gs = new_game(seed);
         gs.run_until_prompt();
         let mut agent = UniformAgent::new(seed);
-        for _ in 0..3 {
-            if gs.current_prompt().is_none() { break; }
-            let a = agent.act(&gs);
-            gs.apply_action(a);
-        }
-        assert!(matches!(gs.current_prompt(), Some(AgentPrompt::ActivatePlayer { eligible_players }) if eligible_players.is_empty()));
+        // The zero-player harness can't reach a real empty ActivatePlayer prompt organically
+        // any more (the kickoff routes to a Touchback dead-end with no receivers), so pin the
+        // prompt directly — the property under test is purely the agent's response to it.
+        gs.pending_prompt = Some(AgentPrompt::ActivatePlayer { eligible_players: vec![] });
         let a = agent.act(&gs);
         assert!(matches!(a, Action::EndTurn));
     }
