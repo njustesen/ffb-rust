@@ -44,6 +44,11 @@ impl Step for StepEndFouling {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param, StepParameter::EndPlayerAction(_) | StepParameter::EndTurn(_))
+    }
 }
 
 impl StepEndFouling {

@@ -41,6 +41,11 @@ impl Step for StepFoul {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param, StepParameter::UsingChainsaw(_))
+    }
 }
 
 impl StepFoul {

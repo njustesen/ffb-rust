@@ -159,6 +159,22 @@ impl Step for StepEndSelecting {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::BlockDefenderId(_) | StepParameter::DispatchPlayerAction(_)
+            | StepParameter::EndPlayerAction(_) | StepParameter::EndTurn(_)
+            | StepParameter::FoulDefenderId(_) | StepParameter::GazeVictimId(_)
+            | StepParameter::HailMaryPassFlag(_) | StepParameter::MoveStart(_)
+            | StepParameter::MoveStack(_) | StepParameter::TargetCoordinate(_)
+            | StepParameter::ThrownPlayerId(_) | StepParameter::KickedPlayerId(_)
+            | StepParameter::NumDice(_) | StepParameter::UsingStab(_)
+            | StepParameter::UsingChainsaw(_) | StepParameter::UsingVomit(_)
+            | StepParameter::UsingBreatheFire(_) | StepParameter::BlockTargets(_)
+            | StepParameter::IsKickedPlayer(_) | StepParameter::TargetPlayerId(_)
+            | StepParameter::BloodLustAction(_) | StepParameter::BallAndChainRrSetting(_))
+    }
 }
 
 impl StepEndSelecting {

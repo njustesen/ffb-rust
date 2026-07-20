@@ -49,6 +49,11 @@ impl Step for StepEndFeeding {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s END_PLAYER_ACTION and END_TURN (CheckForgo is not consumed).
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param, StepParameter::EndPlayerAction(_) | StepParameter::EndTurn(_))
+    }
 }
 
 impl StepEndFeeding {
@@ -80,10 +85,15 @@ impl StepEndFeeding {
                     let pick_me_up = vec![
                         crate::step::framework::SequenceStep::new(StepId::PickMeUp),
                     ];
+                    // Java push order (last pushed runs first): opponent window pushed FIRST,
+                    // own window second, PickMeUp last → run order PickMeUp → END_OF_OWN_TURN
+                    // window → END_OF_OPPONENT_TURN window. The opponent window must run LAST:
+                    // its InitInducement hands home_playing to the opposing team and its
+                    // EndInducement chains into the EndTurn sequence.
                     return StepOutcome::next()
-                        .push_seq(pick_me_up)
+                        .push_seq(seq_opponent)
                         .push_seq(seq_own)
-                        .push_seq(seq_opponent);
+                        .push_seq(pick_me_up);
                 }
                 TurnMode::KickoffReturn => {
                     let seq = EndTurn::build_sequence(&EndTurnParams { check_forgo: false });
@@ -97,9 +107,17 @@ impl StepEndFeeding {
         }
 
         // Java: else if (!fEndPlayerAction && throwerAction != null && throwerAction.isPassing())
+        // — the pass-continuation branch for PASS_MOVE activations (move first, throw later).
+        // Guarded here on thrower == acting player: game.thrower_id/thrower_action are only
+        // cleared at turn end (Java Game.startTurn), so a completed pass earlier in the SAME
+        // turn leaves them stale; without the guard the next player's plain Move activation
+        // pushed a Pass sequence for the old thrower, whose StepEndPassing then ended the
+        // game on an empty stack.
         let thrower_passing = game.thrower_action
             .map(|a| a.is_passing())
-            .unwrap_or(false);
+            .unwrap_or(false)
+            && game.thrower_id.is_some()
+            && game.thrower_id == game.acting_player.player_id;
         if !self.end_player_action && thrower_passing {
             let params = PassParams {
                 target_coordinate: game.pass_coordinate,
@@ -153,9 +171,11 @@ mod tests {
         step.end_turn = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
-        // Pushes: pick_me_up + inducement_own + inducement_opponent = 3 sequences
+        // Java push order (last pushed runs first): opponent window pushed FIRST, own window
+        // second, PickMeUp last → pushes = [seq_opponent, seq_own, pick_me_up].
         assert_eq!(out.pushes.len(), 3);
-        assert_eq!(out.pushes[0][0].step_id, StepId::PickMeUp);
+        assert_eq!(out.pushes[0][0].step_id, StepId::InitInducement);
+        assert_eq!(out.pushes[2][0].step_id, StepId::PickMeUp);
     }
 
     // Java: `new Inducement.SequenceParams(getGameState(), InducementPhase.END_OF_OPPONENT_TURN,
@@ -170,8 +190,8 @@ mod tests {
         step.end_turn = true;
         step.check_forgo = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
-        // pushes: [pick_me_up, seq_own, seq_opponent]
-        let seq_opponent = &out.pushes[2];
+        // pushes: [seq_opponent, seq_own, pick_me_up] (Java push order; last pushed runs first)
+        let seq_opponent = &out.pushes[0];
         let end_inducement = seq_opponent.iter().find(|s| s.step_id == StepId::EndInducement)
             .expect("expected EndInducement step in opponent-turn inducement sequence");
         assert!(

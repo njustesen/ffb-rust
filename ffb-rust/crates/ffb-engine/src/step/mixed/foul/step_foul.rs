@@ -1,4 +1,5 @@
 use ffb_model::enums::ApothecaryMode;
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::option::{game_option_id, game_option_string};
 use ffb_model::util::rng::GameRng;
@@ -48,6 +49,11 @@ impl Step for StepFoul {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param, StepParameter::UsingChainsaw(_))
+    }
 }
 
 impl StepFoul {
@@ -84,6 +90,12 @@ impl StepFoul {
         );
 
         let mut out = StepOutcome::next();
+
+        // Coverage: one Foul event per resolved foul (Java: ReportFoul above).
+        out = out.with_event(GameEvent::Foul {
+            attacker_id: attacker_id.clone().unwrap_or_default(),
+            defender_id: defender_id.clone(),
+        });
 
         // Java: String chainsawOption = game.getOptions().getOptionWithDefault(CHAINSAW_TURNOVER).getValueAsString();
         //       if (isArmorBroken && CHAINSAW_TURNOVER_ALL_AV_BREAKS.equalsIgnoreCase(chainsawOption))

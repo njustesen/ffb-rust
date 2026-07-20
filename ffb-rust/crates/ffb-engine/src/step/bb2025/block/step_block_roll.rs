@@ -144,6 +144,12 @@ impl Step for StepBlockRoll {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s SUCCESSFUL_DAUNTLESS and DOUBLE_TARGET_STRENGTH.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::SuccessfulDauntless(_) | StepParameter::DoubleTargetStrength(_))
+    }
 }
 
 impl StepBlockRoll {
@@ -156,7 +162,20 @@ impl StepBlockRoll {
                 game.away_additional_assists = 0;
             }
             let block_result = self.block_result.unwrap();
+            // Coverage event: one BlockRoll per resolved block action, carrying the final
+            // dice (post-reroll), the chosen die index (drives the Skull/BothDown/Pushback/
+            // PowPushback/Pow result counters) and whether any re-roll was used.
+            // re_roll_source stays Some only when a re-roll was accepted (declining clears it).
             return StepOutcome::next()
+                .with_event(ffb_model::events::GameEvent::BlockRoll {
+                    attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
+                    defender_id: game.defender_id.clone().unwrap_or_default(),
+                    nr_of_dice: self.nr_of_dice,
+                    dice: self.block_roll.clone(),
+                    selected_index: self.dice_index as i32,
+                    own_choice: self.nr_of_dice >= 0,
+                    rerolled: self.re_roll_source.is_some(),
+                })
                 .publish(StepParameter::NrOfDice(self.nr_of_dice))
                 .publish(StepParameter::BlockRoll(self.block_roll.clone()))
                 .publish(StepParameter::DiceIndex(self.dice_index))
@@ -203,7 +222,8 @@ impl StepBlockRoll {
                     self.handle_initial_roll_and_reroll_with_explicit_selection(game, rng);
                 }
             }
-            // Java: showBlockRollDialog(false)
+            // Java: showBlockRollDialog(false) — emit the die-selection prompt so the agent
+            // can answer with Action::BlockChoice (a bare cont() waits forever).
             // Java: getResult().addReport(new ReportBlockRoll(teamId, fBlockRoll))
             {
                 let team_id = if game.home_playing {
@@ -217,7 +237,17 @@ impl StepBlockRoll {
                     game.defender_id.clone(),
                 ));
             }
-            return StepOutcome::cont();
+            // Coverage event mirroring ReportBlock: emitted once per block action
+            // (initial roll only — re-roll passes have re_rolled_action set).
+            let mut out = StepOutcome::cont().with_prompt(self.block_choice_prompt(game));
+            if self.re_rolled_action.is_none() {
+                if let Some(ref did) = game.defender_id {
+                    out = out.with_event(ffb_model::events::GameEvent::Block {
+                        defender_id: did.clone(),
+                    });
+                }
+            }
+            return out;
         }
 
         // do_roll = false → show dialog (player has not yet chosen)
@@ -233,7 +263,22 @@ impl StepBlockRoll {
             }
         }
 
-        StepOutcome::cont()
+        // Java: showBlockRollDialog(true) — no re-roll available/used: re-present the
+        // already-rolled dice for selection.
+        StepOutcome::cont().with_prompt(self.block_choice_prompt(game))
+    }
+
+    /// Java: `showBlockRollDialog(...)` — the DialogBlockRollParameter presented to the coach,
+    /// as an agent prompt. `own_choice` follows Java: the attacking coach picks unless the
+    /// dice are "against" (negative die count → defender's choice).
+    fn block_choice_prompt(&self, game: &Game) -> ffb_model::prompts::AgentPrompt {
+        ffb_model::prompts::AgentPrompt::BlockChoice {
+            attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
+            defender_id: game.defender_id.clone().unwrap_or_default(),
+            dice: self.block_roll.clone(),
+            own_choice: self.nr_of_dice >= 0,
+            nr_of_dice: self.nr_of_dice,
+        }
     }
 
     /// Java: handleImplicitReRollIndex(actingPlayer, BlockResult resultToReplace).
@@ -274,6 +319,22 @@ impl StepBlockRoll {
                 .and_then(|id| game.player(id))
                 .map(|p| p.strength_with_modifiers())
                 .unwrap_or(3);
+            // Java: blockStrengthAttacker = RollMechanic.getTotalAttackerStrength(...) and
+            // blockStrengthDefender = ServerUtilPlayer.findBlockStrength(...) — BOTH sides
+            // add their assists (teammates with tackle zones adjacent to the opponent and
+            // otherwise unmarked). Comparing bare strengths made every equal-ST block a
+            // 1-die block; 2-dice blocks were unreachable without stat differences.
+            let coords = game.acting_player.player_id.as_deref()
+                .and_then(|aid| game.field_model.player_coordinate(aid))
+                .zip(game.defender_id.as_deref().and_then(|did| game.field_model.player_coordinate(did)));
+            let (attacker_str, defender_str) = if let Some((ac, dc)) = coords {
+                (
+                    crate::util::server_util_player::ServerUtilPlayer::find_block_strength(game, ac, attacker_str, dc),
+                    crate::util::server_util_player::ServerUtilPlayer::find_block_strength(game, dc, defender_str, ac),
+                )
+            } else {
+                (attacker_str, defender_str)
+            };
             self.nr_of_dice = block_dice_count(attacker_str, defender_str);
         }
 

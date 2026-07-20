@@ -477,6 +477,13 @@ pub trait Step: Send {
     fn start(&mut self, game: &mut ffb_model::model::game::Game, rng: &mut ffb_model::util::rng::GameRng) -> StepOutcome;
     fn handle_command(&mut self, action: &crate::action::Action, game: &mut ffb_model::model::game::Game, rng: &mut ffb_model::util::rng::GameRng) -> StepOutcome;
     fn set_parameter(&mut self, _param: &StepParameter) -> bool { false }
+    /// Java: `AbstractStep.consume(parameter)` — a `setParameter` implementation that calls
+    /// `consume()` stops `StepStack.publishStepParameter`'s delivery loop at this step; every
+    /// step ABOVE it still receives the parameter, everything below does not. Most steps set
+    /// their field without consuming (the parameter keeps propagating); a specific set of
+    /// End*/Roll steps consume specific keys. Implementations must mirror exactly the keys
+    /// their Java counterpart's setParameter consumes.
+    fn consumes_parameter(&self, _param: &StepParameter) -> bool { false }
 }
 
 /// Test helper: create a minimal team for unit tests.

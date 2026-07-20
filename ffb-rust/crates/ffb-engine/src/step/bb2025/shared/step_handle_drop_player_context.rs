@@ -73,6 +73,13 @@ impl Step for StepHandleDropPlayerContext {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys (SUCCESSFUL_PRO is consumed in Java even
+    // though the Rust set_parameter does not handle it yet).
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::DropPlayerContext(_) | StepParameter::SuccessfulPro(_))
+    }
 }
 
 impl StepHandleDropPlayerContext {
@@ -100,7 +107,22 @@ impl StepHandleDropPlayerContext {
                 Some(id) => id.clone(),
                 None => return StepOutcome::next(),
             };
+            // Coverage event: block-knockdown (and other injury-context) falls resolve here.
+            // Only emit when the player actually goes down now (not already prone/stunned) —
+            // the monolith emitted PlayerFellDown at each prone placement.
+            let was_upright = game.field_model.player_state(&player_id)
+                .map(|s| !s.is_prone_or_stunned())
+                .unwrap_or(false);
+            let fell_coord = game.field_model.player_coordinate(&player_id);
             let drop_params = drop_player(game, &player_id, ctx.eligible_for_safe_pair_of_hands);
+            if was_upright {
+                if let Some(coord) = fell_coord {
+                    out = out.with_event(ffb_model::events::GameEvent::PlayerFellDown {
+                        player_id: player_id.clone(),
+                        coord,
+                    });
+                }
+            }
             for p in drop_params {
                 out = out.publish(p);
             }

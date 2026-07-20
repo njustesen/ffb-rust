@@ -134,6 +134,19 @@ impl Step for StepEndMoving {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys (BLOCK_DEFENDER_ID, BLOOD_LUST_ACTION,
+    // CHECK_FORGO, DISPATCH_PLAYER_ACTION, END_PLAYER_ACTION, END_TURN, FEEDING_ALLOWED,
+    // MOVE_STACK, MOVE_START, THROWN_PLAYER_ID, USING_CHAINSAW).
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::BlockDefenderId(_) | StepParameter::BloodLustAction(_)
+            | StepParameter::CheckForgo(_) | StepParameter::DispatchPlayerAction(_)
+            | StepParameter::EndPlayerAction(_) | StepParameter::EndTurn(_)
+            | StepParameter::FeedingAllowed(_) | StepParameter::MoveStack(_)
+            | StepParameter::MoveStart(_) | StepParameter::ThrownPlayerId(_)
+            | StepParameter::UsingChainsaw(_))
+    }
 }
 
 impl StepEndMoving {

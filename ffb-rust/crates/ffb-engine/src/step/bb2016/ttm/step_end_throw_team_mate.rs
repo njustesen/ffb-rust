@@ -117,6 +117,14 @@ impl Step for StepEndThrowTeamMate {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::EndTurn(_) | StepParameter::ThrownPlayerCoordinate(_)
+            | StepParameter::ThrownPlayerHasBall(_) | StepParameter::ThrownPlayerId(_)
+            | StepParameter::ThrownPlayerState(_))
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

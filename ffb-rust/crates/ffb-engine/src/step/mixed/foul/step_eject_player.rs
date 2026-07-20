@@ -9,6 +9,7 @@
 /// player's state to BANNED/KNOCKED_OUT and set the send-to-box reason/turn/half) must
 /// land on `game` before `UtilBox.putPlayerIntoBox` runs.
 /// `UtilServerGame.updatePlayerStateDependentProperties` is deferred.
+use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_box::UtilBox;
@@ -47,13 +48,16 @@ impl StepEjectPlayer {
         };
         dispatch::execute_step_hooks(game, rng, StepId::EjectPlayer, &mut hook_state);
 
+        // Coverage: one PlayerEjected event per ejected player.
+        let mut ejected_event: Option<GameEvent> = None;
         if let Some(player_id) = game.acting_player.player_id.clone() {
             UtilBox::put_player_into_box(game, &player_id);
+            ejected_event = Some(GameEvent::PlayerEjected { player_id });
         }
         UtilBox::refresh_boxes(game);
         UtilServerGame::update_player_state_dependent_properties(game);
 
-        if self.fouler_has_ball == Some(true) {
+        let mut outcome = if self.fouler_has_ball == Some(true) {
             // Java: setNextAction(StepAction.NEXT_STEP)
             StepOutcome::next()
                 .publish(StepParameter::EndTurn(true))
@@ -62,7 +66,11 @@ impl StepEjectPlayer {
             // Java: setNextAction(StepAction.GOTO_LABEL, state.gotoLabelOnEnd)
             StepOutcome::goto(&self.goto_label_on_end)
                 .publish(StepParameter::EndTurn(true))
+        };
+        if let Some(ev) = ejected_event {
+            outcome = outcome.with_event(ev);
         }
+        outcome
     }
 }
 

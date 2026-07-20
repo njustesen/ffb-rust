@@ -319,6 +319,14 @@ impl Step for StepEndBlocking {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::DefenderPushed(_) | StepParameter::EndPlayerAction(_)
+            | StepParameter::EndTurn(_) | StepParameter::OldDefenderState(_)
+            | StepParameter::UsingStab(_))
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

@@ -64,6 +64,18 @@ impl Step for StepKickoffReturn {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys — but ONLY when
+    // game.getTurnMode() == TurnMode.KICKOFF_RETURN (TOUCHBACK is set WITHOUT consuming).
+    // That guard is not expressible here (consumes_parameter has no game access). This
+    // step is stack-resident during the whole kickoff, where the mode is NOT KickoffReturn
+    // and Java does not consume — consuming unconditionally would eat END_TURN publishes
+    // meant for steps below it. The headless port never enters KICKOFF_RETURN mode, so
+    // never-consume is the Java-equivalent runtime behavior; revisit if kickoff-return
+    // interactions are ever ported.
+    fn consumes_parameter(&self, _param: &StepParameter) -> bool {
+        false
+    }
 }
 
 impl StepKickoffReturn {

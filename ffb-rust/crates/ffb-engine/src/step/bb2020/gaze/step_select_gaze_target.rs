@@ -165,6 +165,11 @@ impl Step for StepSelectGazeTarget {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys (END_TURN is set without consuming).
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param, StepParameter::EndPlayerAction(_))
+    }
 }
 
 impl StepSelectGazeTarget {

@@ -153,6 +153,12 @@ impl Step for StepInitBomb {
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
+            // Java init(): CATCHER_ID, GOTO_LABEL_ON_END (mandatory), PASS_FUMBLE,
+            //              BOMB_OUT_OF_BOUNDS, DONT_DROP_FUMBLE
+            StepParameter::GotoLabelOnEnd(v) => { self.goto_label_on_end = v.clone(); true }
+            StepParameter::CatcherId(v) => { self.catcher_id = v.clone(); true }
+            StepParameter::PassFumble(v) => { self.pass_fumble = *v; true }
+            StepParameter::DontDropFumble(v) => { self.dont_drop_fumble = *v; true }
             StepParameter::BombOutOfBounds(v) => { self.bomb_out_of_bounds = *v; true }
             _ => false,
         }

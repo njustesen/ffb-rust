@@ -50,6 +50,11 @@ impl Step for StepEndFuriousOutburst {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys (END_TURN is set WITHOUT consuming).
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param, StepParameter::CheckForgo(_))
+    }
 }
 
 impl StepEndFuriousOutburst {

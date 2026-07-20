@@ -72,6 +72,27 @@ impl Step for StepMultipleBlockFork {
     fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         self.execute_step(game, rng)
     }
+
+    fn set_parameter(&mut self, param: &StepParameter) -> bool {
+        match param {
+            // Java init(): BLOCK_TARGETS → targets.addAll(...)
+            StepParameter::BlockTargets(v) => { self.targets.extend(v.iter().cloned()); true }
+            // Java setParameter: PLAYER_ID_TO_REMOVE → remove the matching target
+            // (consume() is mirrored separately via consumes_parameter below).
+            StepParameter::PlayerIdToRemove(v) => {
+                if let Some(pos) = self.targets.iter().position(|t| t == v) {
+                    self.targets.remove(pos);
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param, StepParameter::PlayerIdToRemove(_))
+    }
 }
 
 impl StepMultipleBlockFork {

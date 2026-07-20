@@ -80,6 +80,17 @@ impl Step for StepEndKickTeamMate {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys (END_TURN and the THROWN_/KICKED_PLAYER_*
+    // pairs; END_PLAYER_ACTION is not in Java's setParameter and is not consumed).
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::EndTurn(_)
+            | StepParameter::KickedPlayerCoordinate(_) | StepParameter::ThrownPlayerCoordinate(_)
+            | StepParameter::KickedPlayerHasBall(_) | StepParameter::ThrownPlayerHasBall(_)
+            | StepParameter::KickedPlayerId(_) | StepParameter::ThrownPlayerId(_)
+            | StepParameter::KickedPlayerState(_) | StepParameter::ThrownPlayerState(_))
+    }
 }
 
 impl StepEndKickTeamMate {

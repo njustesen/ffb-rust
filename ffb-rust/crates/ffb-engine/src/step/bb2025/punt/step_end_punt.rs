@@ -45,6 +45,13 @@ impl Step for StepEndPunt {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::CatcherId(_) | StepParameter::EndTurn(_)
+            | StepParameter::PlayerId(_))
+    }
 }
 
 impl StepEndPunt {

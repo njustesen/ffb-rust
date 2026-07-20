@@ -163,6 +163,18 @@ impl Step for StepPassBlock {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys — but ONLY when
+    // game.getTurnMode() == TurnMode.PASS_BLOCK. That guard is not expressible here
+    // (consumes_parameter has no game access). This step sits in EVERY pass sequence,
+    // where the mode is Regular and Java does NOT consume — consuming unconditionally
+    // would eat the END_TURN/END_PLAYER_ACTION meant for StepEndPassing below it (the
+    // exact clobber bug class this mechanism fixes). The headless port never enters
+    // PASS_BLOCK mode, so never-consume is the Java-equivalent runtime behavior; revisit
+    // if pass-block interactions are ever ported.
+    fn consumes_parameter(&self, _param: &StepParameter) -> bool {
+        false
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

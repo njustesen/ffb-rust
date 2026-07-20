@@ -78,6 +78,11 @@ impl Step for StepResetToMove {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param, StepParameter::ResetPlayerAction(_))
+    }
 }
 
 /// Build a Move sequence appropriate for the game's ruleset.

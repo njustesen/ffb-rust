@@ -68,6 +68,12 @@ impl Step for StepHandleDropPlayerContext {
         }
         false
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::DropPlayerContext(_) | StepParameter::SuccessfulPro(_))
+    }
 }
 
 impl StepHandleDropPlayerContext {

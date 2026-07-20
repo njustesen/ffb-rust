@@ -192,6 +192,20 @@ impl Step for StepEndBlocking {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys (BLOOD_LUST_ACTION, CHECK_FORGO,
+    // DEFENDER_PUSHED, END_PLAYER_ACTION, END_TURN, INJURY_RESULT, OLD_DEFENDER_STATE,
+    // TARGET_PLAYER_ID, USING_*).
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::BloodLustAction(_) | StepParameter::CheckForgo(_)
+            | StepParameter::DefenderPushed(_) | StepParameter::EndPlayerAction(_)
+            | StepParameter::EndTurn(_) | StepParameter::InjuryResult(_)
+            | StepParameter::OldDefenderState(_) | StepParameter::PlayerId(_)
+            | StepParameter::UsingStab(_) | StepParameter::UsingChainsaw(_)
+            | StepParameter::UsingVomit(_) | StepParameter::UsingBreatheFire(_)
+            | StepParameter::UsingChomp(_))
+    }
 }
 
 impl StepEndBlocking {

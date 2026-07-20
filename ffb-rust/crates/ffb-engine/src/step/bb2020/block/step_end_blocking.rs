@@ -151,6 +151,17 @@ impl Step for StepEndBlocking {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    // (ALLOW_SECOND_BLOCK_ACTION, OLD_DEFENDER_STATE, BLOOD_LUST_ACTION are set without consuming.)
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::DefenderPushed(_) | StepParameter::EndPlayerAction(_)
+            | StepParameter::EndTurn(_) | StepParameter::UsingStab(_)
+            | StepParameter::UsingChainsaw(_) | StepParameter::InjuryResult(_)
+            | StepParameter::UsingVomit(_) | StepParameter::UsingBreatheFire(_)
+            | StepParameter::PlayerId(_))
+    }
 }
 
 impl StepEndBlocking {

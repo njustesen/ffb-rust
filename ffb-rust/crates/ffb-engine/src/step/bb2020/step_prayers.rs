@@ -48,6 +48,11 @@ impl Step for StepPrayers {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param, StepParameter::TvHome(_) | StepParameter::TvAway(_))
+    }
 }
 
 impl StepPrayers {

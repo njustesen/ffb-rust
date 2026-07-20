@@ -100,6 +100,15 @@ impl Step for StepEndScatterPlayer {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys (THROWN/KICKED_PLAYER_COORDINATE,
+    // IS_KICKED_PLAYER and CRASH_LANDING are set without consuming).
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::ThrownPlayerId(_) | StepParameter::KickedPlayerId(_)
+            | StepParameter::ThrownPlayerHasBall(_) | StepParameter::KickedPlayerHasBall(_)
+            | StepParameter::ThrownPlayerState(_) | StepParameter::KickedPlayerState(_))
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

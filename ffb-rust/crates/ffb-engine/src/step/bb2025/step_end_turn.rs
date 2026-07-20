@@ -19,6 +19,7 @@
 /// - FumbblGame update → skip
 use std::collections::HashSet;
 use ffb_model::enums::{TurnMode, Weather, PS_KNOCKED_OUT, PS_EXHAUSTED, PS_RESERVE};
+use ffb_model::events::GameEvent;
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
 use ffb_model::report::mixed::report_turn_end::{ReportTurnEnd, KnockoutRecovery, HeatExhaustion};
@@ -165,6 +166,9 @@ impl StepEndTurn {
 
         self.new_half = Self::check_end_of_half(game);
 
+        // Events collected during this pass, attached to the final outcome.
+        let mut pending_events: Vec<GameEvent> = Vec::new();
+
         if !self.next_sequence_pushed {
             self.next_sequence_pushed = true;
 
@@ -173,6 +177,11 @@ impl StepEndTurn {
                 if let Some(ball_coord) = game.field_model.ball_coordinate {
                     if let Some(carrier_id) = game.field_model.player_at(ball_coord).cloned() {
                         self.touchdown_player_id = Some(carrier_id.clone());
+                        // Java: server reports the touchdown; coverage counts it via GameEvent.
+                        pending_events.push(GameEvent::Touchdown {
+                            player_id: carrier_id.clone(),
+                            coord: ball_coord,
+                        });
                         let home_has_carrier = game.team_home.player(&carrier_id).is_some();
                         let off_turn_touchdown;
                         if home_has_carrier {
@@ -323,12 +332,27 @@ impl StepEndTurn {
             use ffb_model::enums::InducementPhase;
             use crate::step::sequences::{inducement_sequence, h2_kickoff_sequence, end_game_sequence};
             let mut outcome = StepOutcome::next();
+            for ev in pending_events { outcome = outcome.with_event(ev); }
             if self.new_half {
                 // Java: half > 2 → end_game; half > 1 → overtime check or end_game; else → H2 kickoff
                 if game.half > 1 {
                     // Half 2+ ended → end game (overtime check not yet ported)
                     outcome = outcome.push_seq(end_game_sequence(game.admin_mode));
                 } else {
+                    // Java: if (game.getHalf() == 1 || (half == 2 && drawWithOvertime))
+                    //   stateMechanic.startHalf(this, game.getHalf() + 1)
+                    // — increments game.half and resets both teams' turn counters. Without it
+                    // the game stays in half 1 at turn 8 forever, re-running the H2 kickoff.
+                    {
+                        use crate::mechanic::bb2025::state_mechanic::StateMechanic;
+                        use crate::mechanic::state_mechanic::StateMechanic as StateMechanicTrait;
+                        let half_events = StateMechanic::new().start_half(game, game.half + 1);
+                        for ev in half_events { outcome = outcome.with_event(ev); }
+                        // Java: ReportStartHalf for the new (second) half. H1's StartHalf is
+                        // emitted by StepInitKickoff (TurnMode::StartGame path); the H2 kickoff
+                        // enters InitKickoff in TurnMode::Setup, so it must be emitted here.
+                        outcome = outcome.with_event(GameEvent::StartHalf { half: game.half });
+                    }
                     // End of first half → push H2 kickoff sequence
                     outcome = outcome.push_seq(h2_kickoff_sequence());
                 }

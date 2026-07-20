@@ -252,6 +252,15 @@ impl Step for StepEndPassing {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::CatcherId(_) | StepParameter::EndPlayerAction(_)
+            | StepParameter::EndTurn(_) | StepParameter::InterceptorId(_)
+            | StepParameter::PassAccurate(_) | StepParameter::PassFumble(_)
+            | StepParameter::DontDropFumble(_) | StepParameter::BombOutOfBounds(_))
+    }
 }
 
 #[cfg(test)]

@@ -47,6 +47,15 @@ impl Step for StepBlitzTurn {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s END_TURN, guarded by `game.getTurnMode() == BLITZ`.
+    // consumes_parameter has no game access; END_TURN is only ever published while this
+    // step is stack-resident during the blitz sub-turn (mode IS Blitz then — the step
+    // re-pushes itself under the Select sequence after setting TurnMode::Blitz), so the
+    // guard is always satisfied when it matters.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param, StepParameter::EndTurn(_))
+    }
 }
 
 impl StepBlitzTurn {

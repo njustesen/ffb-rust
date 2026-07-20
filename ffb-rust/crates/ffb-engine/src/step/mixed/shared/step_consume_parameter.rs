@@ -46,6 +46,12 @@ impl Step for StepConsumeParameter {
             other => self.parameters_to_consume.contains(&discriminant(other)),
         }
     }
+
+    // Java: setParameter consume()s every key contained in parameterToConsume (dynamic
+    // set, not a fixed key list).
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        self.parameters_to_consume.contains(&discriminant(param))
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

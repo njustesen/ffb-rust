@@ -245,6 +245,14 @@ impl Step for StepTrapDoor {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys (THROWN_PLAYER_HAS_BALL is set WITHOUT
+    // consuming; PLAYER_WAS_PUSHED is consumed in Java even though the Rust
+    // set_parameter does not handle it yet).
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::PlayerEnteringSquare(_) | StepParameter::PlayerWasPushed(_))
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

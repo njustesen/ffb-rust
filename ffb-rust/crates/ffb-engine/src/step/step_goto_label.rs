@@ -55,6 +55,11 @@ impl Step for StepGotoLabel {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param, StepParameter::UseAlternateLabel(_))
+    }
 }
 
 #[cfg(test)]

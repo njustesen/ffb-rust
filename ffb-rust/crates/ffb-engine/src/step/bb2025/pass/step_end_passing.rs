@@ -106,6 +106,17 @@ impl Step for StepEndPassing {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::CatcherId(_) | StepParameter::EndPlayerAction(_)
+            | StepParameter::EndTurn(_) | StepParameter::InterceptorId(_)
+            | StepParameter::PassAccurate(_) | StepParameter::PassFumble(_)
+            | StepParameter::DontDropFumble(_) | StepParameter::BombOutOfBounds(_)
+            | StepParameter::PassingDistance(_) | StepParameter::BloodLustAction(_)
+            | StepParameter::RevertEndTurn(_) | StepParameter::PlayerId(_))
+    }
 }
 
 impl StepEndPassing {
@@ -243,10 +254,10 @@ impl StepEndPassing {
 
         // Java path 5 (main branch): determine end_turn from thrower == actingPlayer
         // Java: boolean throwerIsActingPlayer = game.getThrower() == actingPlayer.getPlayer()
-        // Proxy: thrower_id == acting_player.player_id
-        let thrower_is_acting = game.thrower_id.is_some()
-            && game.acting_player.player_id.is_some()
-            && game.thrower_id == game.acting_player.player_id;
+        // — reference equality, so null == null is TRUE. Requiring both ids to be Some sent the
+        // both-None case down the dump-off path (path 6), which pushes no follow-up sequence and
+        // silently ended the game whenever the stack was already empty.
+        let thrower_is_acting = game.thrower_id == game.acting_player.player_id;
 
         // Java: fEndTurn || fEndPlayerAction || ((thrower == actingPlayer.getPlayer())
         //   && actingPlayer.isSufferingBloodLust() && !actingPlayer.hasFed())
@@ -277,6 +288,9 @@ impl StepEndPassing {
 
         // Java path 6: interception handling (thrower is NOT the acting player — dump-off path)
         if !thrower_is_acting {
+            if std::env::var_os("FFB_DRIVE_TRACE").is_some() {
+                eprintln!("ENDPASSING path6 thrower={:?} acting={:?} action={:?}", game.thrower_id, game.acting_player.player_id, game.thrower_action);
+            }
             // Java: catcher = game.getPlayerById(state.getInterceptorId())
             // Java: catcherResult.setInterceptions(+1)
             // Java: if (!isBomb && state.isInterceptionSuccessful() && !ballWasSnatched)

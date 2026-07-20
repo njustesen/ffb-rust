@@ -95,6 +95,15 @@ impl Step for StepEndScatterPlayer {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys (the *_PLAYER_COORDINATE pair and
+    // IS_KICKED_PLAYER are set WITHOUT consume in Java, so they keep propagating).
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::KickedPlayerId(_) | StepParameter::ThrownPlayerId(_)
+            | StepParameter::KickedPlayerHasBall(_) | StepParameter::ThrownPlayerHasBall(_)
+            | StepParameter::KickedPlayerState(_) | StepParameter::ThrownPlayerState(_))
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

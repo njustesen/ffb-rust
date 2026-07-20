@@ -444,6 +444,12 @@ impl Step for StepBlockRollMultiple {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys (PLAYER_ID_TO_REMOVE and
+    // DOUBLE_TARGET_STRENGTH_FOR_PLAYER are handled without consuming).
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param, StepParameter::PlayerIdDauntlessSuccess(_))
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

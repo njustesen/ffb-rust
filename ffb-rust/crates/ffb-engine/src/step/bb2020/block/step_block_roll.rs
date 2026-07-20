@@ -144,6 +144,12 @@ impl Step for StepBlockRoll {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::SuccessfulDauntless(_) | StepParameter::DoubleTargetStrength(_))
+    }
 }
 
 impl StepBlockRoll {

@@ -147,6 +147,21 @@ impl Step for StepSteadyFooting {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys. STEADY_FOOTING_CONTEXT is only consumed
+    // when the apothecary mode matches (same guard as set_parameter above); PUSHED_ON_BALL
+    // and BALL_KNOCKED_LOSE are consumed unconditionally. OLD_DEFENDER_STATE and
+    // ATTACKER_ALREADY_DOWN are set WITHOUT consuming.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        match param {
+            StepParameter::SteadyFootingContext(ctx) => {
+                self.apothecary_mode.is_none()
+                    || self.apothecary_mode == Some(ctx.get_apothecary_mode())
+            }
+            StepParameter::PushedOnBall(_) | StepParameter::BallKnockedLoose(_) => true,
+            _ => false,
+        }
+    }
 }
 
 impl StepSteadyFooting {

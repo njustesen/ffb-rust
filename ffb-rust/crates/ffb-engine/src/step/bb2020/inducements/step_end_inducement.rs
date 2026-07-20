@@ -61,6 +61,13 @@ impl Step for StepEndInducement {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::HomeTeam(_) | StepParameter::InducementPhase(_)
+            | StepParameter::EndInducementPhase(_) | StepParameter::EndTurn(_))
+    }
 }
 
 impl StepEndInducement {

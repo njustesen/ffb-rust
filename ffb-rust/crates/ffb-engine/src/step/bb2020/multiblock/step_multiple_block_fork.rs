@@ -216,6 +216,11 @@ impl Step for StepMultipleBlockFork {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param, StepParameter::PlayerIdToRemove(_))
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

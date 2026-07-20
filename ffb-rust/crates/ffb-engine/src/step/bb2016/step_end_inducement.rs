@@ -61,6 +61,14 @@ impl Step for StepEndInducement {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys — publish delivery stops here, so one
+    // inducement window's leaveStep() publishes never clobber the other pending window.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::HomeTeam(_) | StepParameter::InducementPhase(_)
+            | StepParameter::EndInducementPhase(_) | StepParameter::EndTurn(_))
+    }
 }
 
 impl StepEndInducement {

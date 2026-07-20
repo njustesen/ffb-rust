@@ -210,6 +210,12 @@ impl Step for StepCatchScatterThrowIn {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s CATCH_SCATTER_THROW_IN_MODE and THROW_IN_COORDINATE.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::CatchScatterThrowInMode(_) | StepParameter::ThrowInCoordinate(_))
+    }
 }
 
 impl StepCatchScatterThrowIn {

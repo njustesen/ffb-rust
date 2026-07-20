@@ -49,6 +49,12 @@ impl Step for StepEndFeeding {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::EndPlayerAction(_) | StepParameter::EndTurn(_))
+    }
 }
 
 impl StepEndFeeding {
@@ -87,8 +93,12 @@ impl StepEndFeeding {
                 return StepOutcome::next().push_seq(EndTurn::build_sequence());
             }
         } else if !self.end_player_action {
-            // Check if thrower action is passing
-            let is_passing = game.thrower_action.map(|a| a.is_passing()).unwrap_or(false);
+            // Check if thrower action is passing — guarded on thrower == acting player, see
+            // the bb2025 StepEndFeeding: thrower_id/thrower_action are only cleared at turn
+            // end, so an earlier pass in the same turn leaves them stale.
+            let is_passing = game.thrower_action.map(|a| a.is_passing()).unwrap_or(false)
+                && game.thrower_id.is_some()
+                && game.thrower_id == game.acting_player.player_id;
             if is_passing {
                 let coord = game.pass_coordinate;
                 return StepOutcome::next().push_seq(Pass::build_sequence(&PassParams {

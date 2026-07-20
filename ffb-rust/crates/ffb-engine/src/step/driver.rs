@@ -376,12 +376,28 @@ impl DriverStepStack {
             if top.label.as_deref() == Some(label) { return Ok(()); }
             self.steps.pop();
         }
+        // Java throws a StepException here. A missing label drains the entire stack, which
+        // downstream looks like a silent, premature game end — always say so on stderr.
+        eprintln!("FFB DRIVER ERROR: goto unknown label '{label}' — step stack drained, game will end");
         Err(format!("goto unknown label '{label}'"))
     }
 
-    pub fn publish(&mut self, param: &StepParameter) {
+    /// Java `StepStack.publishStepParameter`: deliver top-of-stack downward; a step whose
+    /// setParameter *consumes* the key (see `Step::consumes_parameter`) stops the delivery —
+    /// but only AFTER receiving it. Everything below stays untouched. Note both prior Rust
+    /// semantics were wrong: first-accepting-wins starved multi-consumer params like
+    /// COORDINATE_TO (MoveBallAndChain AND Move AND GoForIt all read it — StepMove never got
+    /// it, so players never moved), while deliver-to-all let one inducement window's
+    /// END_INDUCEMENT_PHASE/HOME_TEAM/INDUCEMENT_PHASE publishes clobber the other pending
+    /// window's steps (Java's StepEndInducement consumes those keys precisely to prevent that).
+    /// `already_consumed` mirrors self-delivery having consumed the parameter (Java delivers
+    /// to one more stack step before its post-delivery isConsumed() check breaks the loop).
+    pub fn publish(&mut self, param: &StepParameter, already_consumed: bool) {
+        let mut consumed = already_consumed;
         for entry in self.steps.iter_mut().rev() {
-            if entry.step.set_parameter(param) { return; }
+            entry.step.set_parameter(param);
+            consumed = consumed || entry.step.consumes_parameter(param);
+            if consumed { return; }
         }
     }
 }
@@ -400,7 +416,7 @@ pub struct DriverGameState {
     stack: DriverStepStack,
     current: Option<DriverStepEntry>,
     forwarded: Option<Action>,
-    pending_prompt: Option<AgentPrompt>,
+    pub(crate) pending_prompt: Option<AgentPrompt>,
     /// True exactly when the most recently dispatched outcome was
     /// `StepAction::Continue` — i.e. the step is waiting for an external
     /// command (whether or not that wait is surfaced as an `AgentPrompt`).
@@ -530,16 +546,23 @@ impl DriverGameState {
         self.push_sequence(end_game_sequence(admin_mode));
     }
 
-    fn apply_effects(&mut self, outcome: &mut StepOutcome) {
+    fn apply_effects(&mut self, entry: &mut DriverStepEntry, outcome: &mut StepOutcome) {
         self.events.append(&mut outcome.events);
         for seq in outcome.pushes.drain(..) { self.stack.push_sequence(seq); }
-        for param in outcome.published.drain(..) { self.stack.publish(&param); }
+        // Java AbstractStep.publishParameter: `setParameter(pParameter)` on the publishing step
+        // itself first, then `stepStack.publishStepParameter(pParameter)` to the stack
+        // (delivery stops at, but includes, the first consuming step — see stack.publish).
+        for param in outcome.published.drain(..) {
+            entry.step.set_parameter(&param);
+            let self_consumed = entry.step.consumes_parameter(&param);
+            self.stack.publish(&param, self_consumed);
+        }
     }
 
     pub fn apply_action(&mut self, action: Action) {
         let mut entry = self.current.take().expect("apply_action() with no waiting step");
         let mut outcome = entry.step.handle_command(&action, &mut self.game, &mut self.rng);
-        self.apply_effects(&mut outcome);
+        self.apply_effects(&mut entry, &mut outcome);
         self.pending_prompt = None;
         self.dispatch(entry, action, outcome);
         self.drive();
@@ -557,16 +580,26 @@ impl DriverGameState {
                 }
             }
             let mut entry = self.current.take().unwrap();
+            // Step-dispatch trace, enabled via FFB_DRIVE_TRACE (companion to lib.rs's FFB_TRACE
+            // dice/agent trace): one line per step the driver runs. This is the primary tool for
+            // diagnosing silent stalls and premature game-ends in headless runs.
+            if std::env::var_os("FFB_DRIVE_TRACE").is_some() {
+                eprintln!("DRIVE step={:?} stack_len={} forwarded={}", entry.step.id(), self.stack.len(), self.forwarded.is_some());
+            }
             let mut outcome = match self.forwarded.take() {
                 Some(cmd) => {
-                    let o = entry.step.handle_command(&cmd, &mut self.game, &mut self.rng);
+                    let mut o = entry.step.handle_command(&cmd, &mut self.game, &mut self.rng);
+                    // Same as apply_action: a forwarded command's outcome carries events, pushed
+                    // sequences, and published parameters too — dropping them silently diverged
+                    // from every other dispatch path.
+                    self.apply_effects(&mut entry, &mut o);
                     self.dispatch(entry, cmd, o);
                     if self.pending_prompt.is_some() || self.waiting_for_command { return; }
                     continue;
                 }
                 None => entry.step.start(&mut self.game, &mut self.rng),
             };
-            self.apply_effects(&mut outcome);
+            self.apply_effects(&mut entry, &mut outcome);
             self.dispatch_after_start(entry, outcome);
             if self.pending_prompt.is_some() || self.waiting_for_command { return; }
         }

@@ -99,6 +99,13 @@ impl Step for StepPassBlock {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s END_PLAYER_ACTION and END_TURN only when
+    // `game.getTurnMode() == PASS_BLOCK`. consumes_parameter has no game access, and the
+    // headless port never enters PASS_BLOCK mode (see headless(PassBlock-turnMode) above),
+    // so the Java-equivalent behavior here is to never consume. Revisit if the PASS_BLOCK
+    // sub-turn is ported.
+    fn consumes_parameter(&self, _param: &StepParameter) -> bool { false }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

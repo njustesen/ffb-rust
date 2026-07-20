@@ -99,6 +99,13 @@ impl Step for StepEndBomb {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::CatcherId(_) | StepParameter::EndTurn(_)
+            | StepParameter::BombExploded(_))
+    }
 }
 
 #[cfg(test)]

@@ -120,6 +120,16 @@ impl Step for StepEndMoving {
             _ => false,
         }
     }
+
+    // Java: setParameter consume()s these keys.
+    fn consumes_parameter(&self, param: &StepParameter) -> bool {
+        matches!(param,
+            StepParameter::BlockDefenderId(_) | StepParameter::DispatchPlayerAction(_)
+            | StepParameter::EndPlayerAction(_) | StepParameter::EndTurn(_)
+            | StepParameter::FeedingAllowed(_) | StepParameter::MoveStart(_)
+            | StepParameter::MoveStack(_) | StepParameter::UsingChainsaw(_)
+            | StepParameter::ThrownPlayerId(_))
+    }
 }
 
 impl StepEndMoving {
