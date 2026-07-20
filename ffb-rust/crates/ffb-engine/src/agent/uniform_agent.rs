@@ -220,23 +220,25 @@ impl Agent for UniformAgent {
             // BuyInducements / BuyPrayersAndInducements: actually attempt purchases (uniformly
             // sampled from every affordable subset), instead of RandomAgent's hardcoded
             // empty-purchase response.
-            Some(AgentPrompt::BuyInducements { available, budget, .. }) => {
+            Some(AgentPrompt::BuyInducements { team_id, available, budget }) => {
                 let subsets = legal_inducement_purchases(available, *budget);
                 let idx = self.pick(subsets.len().max(1));
                 let purchases = subsets.get(idx).cloned().unwrap_or_default();
                 Action::BuyInducements {
+                    home: *team_id == gs.game.team_home.id,
                     purchases: purchases.into_iter()
                         .map(|(id, _cost)| InducementPurchase { id, count: 1 })
                         .collect(),
                 }
             }
-            Some(AgentPrompt::BuyPrayersAndInducements { available, prayers, budget, .. }) => {
+            Some(AgentPrompt::BuyPrayersAndInducements { team_id, available, prayers, budget }) => {
                 let mut catalog = available.clone();
                 catalog.extend(prayers.clone());
                 let subsets = legal_inducement_purchases(&catalog, *budget);
                 let idx = self.pick(subsets.len().max(1));
                 let purchases = subsets.get(idx).cloned().unwrap_or_default();
                 Action::BuyInducements {
+                    home: *team_id == gs.game.team_home.id,
                     purchases: purchases.into_iter()
                         .map(|(id, _cost)| InducementPurchase { id, count: 1 })
                         .collect(),
