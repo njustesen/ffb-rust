@@ -131,7 +131,7 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
             Some(ClientCommand::ClientConfirm(ClientConfirm))
         }
 
-        Action::BuyInducements { purchases } => {
+        Action::BuyInducements { home: _, purchases } => {
             let team_id = String::new(); // filled by caller if needed
             Some(ClientCommand::ClientBuyInducements(ClientBuyInducements {
                 team_id,
@@ -356,6 +356,7 @@ mod tests {
     #[test]
     fn encode_buy_inducements() {
         let action = Action::BuyInducements {
+            home: true,
             purchases: vec![InducementPurchase { id: "wizard".into(), count: 1 }],
         };
         if let ClientCommand::ClientBuyInducements(b) = enc(action) {

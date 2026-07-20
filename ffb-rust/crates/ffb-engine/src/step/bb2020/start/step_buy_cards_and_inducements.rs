@@ -11,26 +11,34 @@
 ///   DONE → leaveStep() — push Kickoff + Inducement(AFTER_INDUCEMENTS_PURCHASED) × 2 +
 ///           RiotousRookies sequences; record treasury/pettyCash spent; NEXT_STEP.
 ///
-/// In "parallel" mode (equal-TV games with allowEvenCTV option set) both teams buy
-/// simultaneously: BuyInducements commands are buffered and applied in leaveStep().
+/// Inducement purchases are data-driven from `data/inducements/bb2020_inducements.json` (fixed
+/// costs; see `util_inducement_catalog`) rather than a ported `InducementTypeFactory`. Dialogs
+/// are shown sequentially (whichever team's `phase` is active) via `AgentPrompt::BuyInducements`.
+///
+/// In "parallel" mode (equal-TV games with allowEvenCTV option set) both teams' budgets are
+/// computed up front, but — since the driver only supports one pending prompt at a time — this
+/// translation still resolves the dialogs sequentially rather than truly simultaneously; the
+/// `buy_inducement_commands` buffer is unused (a known, narrower-path simplification).
 ///
 /// USE_PREDEFINED_INDUCEMENTS: skips dialog (predefined set application requires InducementTypeFactory — not ported).
-/// CardTypeFactory / CardDeck / card-choice randomisation — card system not ported.
+/// CardTypeFactory / CardDeck / card-choice randomisation — card system not ported; card buying
+/// via `CLIENT_SELECT_CARD_TO_BUY` is out of scope for this pass (see `handle_card`).
 /// headless: BuyInducements action lacks star_player_position_ids / mercenary_position_ids —
-///   add_star_players / add_mercenaries / add_staff are implemented but require extended action fields.
+///   add_star_players / add_mercenaries / add_staff are implemented but require extended action
+///   fields not yet present in the Rust action model (star players / infamous staff purchasing
+///   is out of scope for this pass — `roster_star`/`roster_staff` catalog entries are filtered
+///   out of the buyable list entirely, see `util_inducement_catalog`).
 /// BriberyAndCorruption: adds 1 briberyAndCorruption inducement if team has the special rule.
 /// rerollOnesOnKOs: adds 1 bugmansXXXXXX inducement if any team player has canReRollOnesOnKORecovery.
-/// no-op: apply buffered buyInducementCommands in leaveStep — no commands in headless mode (no dialog).
-/// client-only: DialogBuyCardsAndInducementsParameter / CLIENT_SELECT_CARD_TO_BUY / CLIENT_BUY_INDUCEMENTS
-///   dialog path — coaches interact via client; headless skips without buying.
 use std::collections::HashMap;
-use ffb_model::data::loader::find_position;
+use ffb_model::data::loader::{find_position, BB2020_INDUCEMENTS};
 use ffb_model::enums::{InducementPhase, PlayerType, PlayerState, PS_RESERVE};
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
 use ffb_model::model::player::Player;
 use ffb_model::model::skill_def::{SkillId, SkillWithValue};
 use ffb_model::model::turn_data::TurnData;
+use ffb_model::prompts::AgentPrompt;
 use ffb_model::util::util_box::UtilBox;
 use ffb_model::report::bb2020::report_cards_and_inducements_bought::ReportCardsAndInducementsBought;
 use ffb_model::report::mixed::report_bribery_and_corruption_re_roll::ReportBriberyAndCorruptionReRoll;
@@ -49,6 +57,7 @@ use crate::step::generator::sequence::SequenceStep;
 use crate::step::generator::common::inducement::InducementParams;
 use crate::step::generator::common::{Inducement, RiotousRookies};
 use crate::step::generator::mixed::kickoff::{Kickoff, KickoffParams};
+use crate::step::game::start::util_inducement_catalog::{apply_purchases, available_list};
 use crate::step::game::start::util_inducement_sequence::UtilInducementSequence;
 
 /// Phase enum mirroring the private inner `Phase` in Java.
@@ -135,8 +144,54 @@ impl StepBuyCardsAndInducements {
         if self.phase == Phase::Done {
             self.leave_step(game, rng)
         } else {
-            // client-only: dialog would pause here waiting for coach input; headless falls through
-            StepOutcome::cont()
+            self.build_prompt(game)
+        }
+    }
+
+    /// Java: `getAvailableGold(...)`, simplified: `petty_cash_from_tv_diff` (0 for the overdog)
+    /// plus free cash, plus treasury when overdog spending is allowed.
+    fn budget_for(game: &Game, home: bool, free_cash: i32, allow_overdog: bool) -> i32 {
+        let petty = if home {
+            game.game_result.home.petty_cash_from_tv_diff
+        } else {
+            game.game_result.away.petty_cash_from_tv_diff
+        };
+        let treasury = if home { game.team_home.treasury } else { game.team_away.treasury };
+        petty + free_cash + if allow_overdog { treasury } else { 0 }
+    }
+
+    /// Java: `showDialog(Team, ...)` — builds the `DialogBuyCardsAndInducementsParameter` for
+    /// whichever team's phase is active. Card drawing/choice is out of scope (see module docs),
+    /// so `available` here only carries the catalog-driven inducements.
+    fn build_prompt(&self, game: &Game) -> StepOutcome {
+        let home = self.phase == Phase::Home;
+        let team = if home { &game.team_home } else { &game.team_away };
+        let budget = if home {
+            self.available_inducement_gold_home.unwrap_or(0) - self.used_inducement_gold_home
+        } else {
+            self.available_inducement_gold_away.unwrap_or(0) - self.used_inducement_gold_away
+        };
+        let available = available_list(&BB2020_INDUCEMENTS.inducements, team);
+        StepOutcome::cont().with_prompt(AgentPrompt::BuyInducements {
+            team_id: team.id.clone(),
+            available,
+            budget,
+        })
+    }
+
+    /// Java: `handleBuyInducements(Game, ClientCommandBuyInducements)` — applies the purchase
+    /// list against the catalog (star players / mercenaries / infamous staff / cards are
+    /// handled via separate action fields not modeled here — see module docs).
+    fn apply_purchase(&mut self, game: &mut Game, home: bool, purchases: &[crate::action::InducementPurchase]) {
+        let catalog = &BB2020_INDUCEMENTS.inducements;
+        if home {
+            let budget = self.available_inducement_gold_home.unwrap_or(0) - self.used_inducement_gold_home;
+            let spent = apply_purchases(catalog, &mut game.team_home, &mut game.turn_data_home.inducement_set, purchases, budget);
+            self.used_inducement_gold_home += spent;
+        } else {
+            let budget = self.available_inducement_gold_away.unwrap_or(0) - self.used_inducement_gold_away;
+            let spent = apply_purchases(catalog, &mut game.team_away, &mut game.turn_data_away.inducement_set, purchases, budget);
+            self.used_inducement_gold_away += spent;
         }
     }
 
@@ -214,21 +269,18 @@ impl StepBuyCardsAndInducements {
         self.current_selection = None;
     }
 
-    /// Java: `swapTeam()` — move to the next team or DONE.
-    fn swap_team(&mut self, _game: &mut Game) {
-        // Java: if phase==HOME && availableInducementGoldAway==null → switch to AWAY.
-        //       if phase==AWAY && availableInducementGoldHome==null → switch to HOME.
-        //       else → DONE.
+    /// Java: `swapTeam()` — move to the next team (computing its budget on first visit) or DONE.
+    fn swap_team(&mut self, game: &mut Game) {
+        let free_cash = get_int_option(game, FREE_INDUCEMENT_CASH) + get_int_option(game, FREE_CARD_CASH);
+        let allow_overdog = is_option_enabled(game, INDUCEMENTS_ALLOW_OVERDOG_SPENDING);
         match self.phase {
             Phase::Home if self.available_inducement_gold_away.is_none() => {
                 self.phase = Phase::Away;
-                // client-only: DialogBuyCardsAndInducementsParameter for away if gold > min
-                self.phase = Phase::Done;
+                self.available_inducement_gold_away = Some(Self::budget_for(game, false, free_cash, allow_overdog));
             }
             Phase::Away if self.available_inducement_gold_home.is_none() => {
                 self.phase = Phase::Home;
-                // client-only: DialogBuyCardsAndInducementsParameter for home coach
-                self.phase = Phase::Done;
+                self.available_inducement_gold_home = Some(Self::budget_for(game, true, free_cash, allow_overdog));
             }
             _ => {
                 self.phase = Phase::Done;
@@ -238,7 +290,9 @@ impl StepBuyCardsAndInducements {
 
     /// Java: `leaveStep()` — push sequences, record gold spent, NEXT_STEP.
     fn leave_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // no-op: apply buffered buyInducementCommands — no commands buffered in headless mode (no dialog)
+        // no-op: apply buffered buyInducementCommands — `buy_inducement_commands` buffering is
+        // unused in this translation; purchases are applied immediately in `handle_command` /
+        // `apply_purchase` instead (see module docs on parallel-mode simplification).
 
         let new_tv_home = game.team_home.team_value
             + self.used_inducement_gold_home;
@@ -648,11 +702,8 @@ impl Step for StepBuyCardsAndInducements {
         //     if parallel: buffer command
         //     else: handleBuyInducements + addReport
         //     EXECUTE_STEP
-        match action {
-            Action::BuyInducements { .. } => {
-                // client-only: BuyInducements action arrives from coach dialog; headless has no coach
-            }
-            _ => {}
+        if let Action::BuyInducements { home, purchases } = action {
+            self.apply_purchase(game, *home, purchases);
         }
         self.execute_step(game, rng)
     }
@@ -665,6 +716,7 @@ impl Step for StepBuyCardsAndInducements {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::action::InducementPurchase;
     use crate::step::framework::{StepAction, test_team};
     use ffb_model::enums::Rules;
     use ffb_model::util::rng::GameRng;
@@ -833,6 +885,146 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.report_list.has_report(ReportId::BRIBERY_AND_CORRUPTION_RE_ROLL),
             "team without BriberyAndCorruption must NOT add BRIBERY_AND_CORRUPTION_RE_ROLL report");
+    }
+
+    // ── dialog + purchase flow tests ──────────────────────────────────────────
+
+    #[test]
+    fn home_underdog_gets_buy_inducements_prompt() {
+        use ffb_model::option::game_option_id::INDUCEMENTS;
+        let mut game = make_game_with_petty_cash(100_000, 0);
+        game.options.set(INDUCEMENTS, "true");
+        let mut step = StepBuyCardsAndInducements::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        match out.prompt {
+            Some(AgentPrompt::BuyInducements { team_id, budget, .. }) => {
+                assert_eq!(team_id, "home");
+                assert_eq!(budget, 100_000);
+            }
+            other => panic!("expected BuyInducements prompt for home, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn away_gets_prompted_after_home_submits() {
+        use ffb_model::option::game_option_id::INDUCEMENTS;
+        let mut game = make_game_with_petty_cash(100_000, 0);
+        game.options.set(INDUCEMENTS, "true");
+        let mut step = StepBuyCardsAndInducements::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        let out = step.handle_command(
+            &Action::BuyInducements { home: true, purchases: vec![] },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert_eq!(step.phase, Phase::Away);
+        match out.prompt {
+            Some(AgentPrompt::BuyInducements { team_id, .. }) => assert_eq!(team_id, "away"),
+            other => panic!("expected BuyInducements prompt for away, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn both_sides_submitting_advances_to_next_step() {
+        use ffb_model::option::game_option_id::INDUCEMENTS;
+        let mut game = make_game_with_petty_cash(200_000, 0);
+        game.options.set(INDUCEMENTS, "true");
+        let mut step = StepBuyCardsAndInducements::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        step.handle_command(
+            &Action::BuyInducements {
+                home: true,
+                purchases: vec![InducementPurchase { id: "bribes".into(), count: 1 }],
+            },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        let out = step.handle_command(
+            &Action::BuyInducements { home: false, purchases: vec![] },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(game.team_home.bribes, 1);
+    }
+
+    #[test]
+    fn purchase_deducts_treasury_and_tracks_used_gold() {
+        use ffb_model::option::game_option_id::INDUCEMENTS;
+        let mut game = make_game_with_petty_cash(200_000, 0);
+        game.options.set(INDUCEMENTS, "true");
+        game.team_home.treasury = 500_000;
+        let mut step = StepBuyCardsAndInducements::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        step.handle_command(
+            &Action::BuyInducements {
+                home: true,
+                purchases: vec![InducementPurchase { id: "bribes".into(), count: 1 }],
+            },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert_eq!(game.team_home.treasury, 400_000);
+        assert_eq!(step.used_inducement_gold_home, 100_000);
+    }
+
+    #[test]
+    fn purchase_routes_weather_mage_into_inducement_set() {
+        use ffb_model::option::game_option_id::INDUCEMENTS;
+        let mut game = make_game_with_petty_cash(200_000, 0);
+        game.options.set(INDUCEMENTS, "true");
+        let mut step = StepBuyCardsAndInducements::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        step.handle_command(
+            &Action::BuyInducements {
+                home: true,
+                purchases: vec![InducementPurchase { id: "weatherMage".into(), count: 1 }],
+            },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        assert_eq!(game.turn_data_home.inducement_set.get("weatherMage").map(|i| i.get_value()), Some(1));
+    }
+
+    #[test]
+    fn purchase_clamps_over_budget_purchase() {
+        use ffb_model::option::game_option_id::INDUCEMENTS;
+        let mut game = make_game_with_petty_cash(150_000, 0);
+        game.options.set(INDUCEMENTS, "true");
+        let mut step = StepBuyCardsAndInducements::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        step.handle_command(
+            &Action::BuyInducements {
+                home: true,
+                purchases: vec![InducementPurchase { id: "bribes".into(), count: 3 }], // 300,000 requested
+            },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        // Only 1 bribe (100,000) fits in a 150,000 budget.
+        assert_eq!(game.team_home.bribes, 1);
+        assert_eq!(step.used_inducement_gold_home, 100_000);
+    }
+
+    #[test]
+    fn leave_step_pushes_kickoff_and_inducement_sequences_after_both_submit() {
+        use ffb_model::option::game_option_id::INDUCEMENTS;
+        let mut game = make_game_with_petty_cash(200_000, 0);
+        game.options.set(INDUCEMENTS, "true");
+        let mut step = StepBuyCardsAndInducements::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        step.handle_command(
+            &Action::BuyInducements { home: true, purchases: vec![] },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        let out = step.handle_command(
+            &Action::BuyInducements { home: false, purchases: vec![] },
+            &mut game,
+            &mut GameRng::new(0),
+        );
+        // Kickoff + 2×Inducement + RiotousRookies = 4 sequences.
+        assert_eq!(out.pushes.len(), 4);
     }
 
     // ── add_star_players tests ─────────────────────────────────────────────────

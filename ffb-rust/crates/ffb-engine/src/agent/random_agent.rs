@@ -355,10 +355,10 @@ impl Agent for RandomAgent {
                 Action::Acknowledge
             }
             // Inducement / pre-game: always decline / acknowledge with no RNG consumed.
-            Some(AgentPrompt::BuyInducements { .. }) =>
-                Action::BuyInducements { purchases: vec![] },
-            Some(AgentPrompt::BuyPrayersAndInducements { .. }) =>
-                Action::BuyInducements { purchases: vec![] },
+            Some(AgentPrompt::BuyInducements { team_id, .. }) =>
+                Action::BuyInducements { home: *team_id == gs.game.team_home.id, purchases: vec![] },
+            Some(AgentPrompt::BuyPrayersAndInducements { team_id, .. }) =>
+                Action::BuyInducements { home: *team_id == gs.game.team_home.id, purchases: vec![] },
             // Confirm-only and informational prompts: single valid response, 0 RNG consumed.
             Some(AgentPrompt::KickoffReturn { .. })
             | Some(AgentPrompt::SetupError { .. })
