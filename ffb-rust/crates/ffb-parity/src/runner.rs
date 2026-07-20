@@ -476,6 +476,17 @@ pub(crate) fn edition_to_rules(edition: &str) -> Rules {
     }
 }
 
+/// Every non-star roster name available for the given edition (used by `--uniform` to
+/// sweep the full roster catalog rather than a single hardcoded matchup).
+pub fn roster_names_for_edition(edition: &str) -> Vec<String> {
+    let rosters = match edition {
+        "bb2016" => bb2016_rosters(),
+        "bb2020" => bb2020_rosters(),
+        _ => bb2025_rosters(),
+    };
+    rosters.into_iter().map(|r| r.name).collect()
+}
+
 /// Map a snake_case race name + side to the Java server parity team ID.
 /// Uses PascalCase conversion matching gen_java_teams.py exactly.
 /// e.g. "dark_elf_league_fumbbl" + "home" → "teamDarkElfLeagueFumbblParityHome"
@@ -703,4 +714,52 @@ pub fn run_coverage_game(
     let score_home = engine.game.game_result.home.score;
     let score_away = engine.game.game_result.away.score;
     (all_events, score_home, score_away)
+}
+
+/// Run a complete game using `UniformAgent` (uniform sampling over every legal action,
+/// including inducement purchases — unlike `RandomAgent`, which is fixed-response on
+/// several pre-game prompts to preserve Java-parity RNG-stream sync). Collects all
+/// `GameEvent`s for coverage reporting plus the names of any prompts `UniformAgent`
+/// couldn't turn into a real choice (see `UniformAgent::last_unhandled_prompt`).
+pub fn run_uniform_game(
+    seed: u64,
+    home_roster: &str,
+    away_roster: &str,
+    edition: &str,
+) -> (Vec<GameEvent>, i32, i32, Vec<String>) {
+    use ffb_engine::agent::{Agent, UniformAgent};
+
+    let rules = edition_to_rules(edition);
+    let home = make_team(home_roster, "home", edition);
+    let away = make_team(away_roster, "away", edition);
+    let mut engine = GameState::new(home, away, rules, seed);
+
+    let mut home_agent = UniformAgent::new(seed);
+    let mut away_agent = UniformAgent::new(seed ^ 0xFFFF_FFFF);
+
+    let mut all_events: Vec<GameEvent> = Vec::new();
+    let mut unhandled_prompts: Vec<String> = Vec::new();
+
+    for _ in 0..200_000 {
+        if engine.is_finished() { break; }
+        if engine.current_prompt().is_none() { break; }
+        let side = engine.active_side();
+        let action = if matches!(side, TeamSide::Home) {
+            let a = home_agent.act(&engine);
+            if let Some(p) = home_agent.last_unhandled_prompt.take() { unhandled_prompts.push(p); }
+            a
+        } else {
+            let a = away_agent.act(&engine);
+            if let Some(p) = away_agent.last_unhandled_prompt.take() { unhandled_prompts.push(p); }
+            a
+        };
+        match engine.apply(side, action) {
+            Ok(evs) => all_events.extend(evs),
+            Err(e) => { eprintln!("engine error seed {seed}: {e}"); break; }
+        }
+    }
+
+    let score_home = engine.game.game_result.home.score;
+    let score_away = engine.game.game_result.away.score;
+    (all_events, score_home, score_away, unhandled_prompts)
 }

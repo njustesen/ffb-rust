@@ -14,6 +14,16 @@ mod visual;
 struct ParityArgs {
     network: bool,
     coverage: bool,
+    /// `--uniform`: drive full games with `UniformAgent` (samples uniformly over every
+    /// legal action, including inducement purchases) instead of `RandomAgent`, tallying
+    /// into the same `CoverageReport` plus the data-driven `full_mechanic_items` checklist.
+    uniform: bool,
+    /// `--all-rosters`: sweep every roster in the edition (mirror matchups, roster vs
+    /// itself) instead of just `--home`/`--away`. Only consulted by `--uniform`.
+    all_rosters: bool,
+    /// `--all-editions`: sweep bb2016/bb2020/bb2025 instead of just `--edition`. Only
+    /// consulted by `--uniform`.
+    all_editions: bool,
     home: String,
     home_java: String,
     away: String,
@@ -39,6 +49,9 @@ impl ParityArgs {
         let mut seed_end = 100u64;
         let mut network = false;
         let mut coverage = false;
+        let mut uniform = false;
+        let mut all_rosters = false;
+        let mut all_editions = false;
         let mut no_abort = false;
         let mut verbose = false;
         let mut visualize = false;
@@ -49,6 +62,9 @@ impl ParityArgs {
             match raw[i].as_str() {
                 "--network" => network = true,
                 "--coverage" => coverage = true,
+                "--uniform" => uniform = true,
+                "--all-rosters" => all_rosters = true,
+                "--all-editions" => all_editions = true,
                 "--no-abort" => no_abort = true,
                 "--verbose" => verbose = true,
                 "--visualize" => visualize = true,
@@ -74,7 +90,7 @@ impl ParityArgs {
         let home_java = runner::java_team_id(&home, "home");
         let away_java = runner::java_team_id(&away, "away");
 
-        ParityArgs { network, coverage, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier }
+        ParityArgs { network, coverage, uniform, all_rosters, all_editions, home, home_java, away, away_java, edition, seed_start, seed_end, no_abort, verbose, visualize, tier }
     }
 }
 
@@ -109,6 +125,84 @@ fn main() {
     }
 
     let total = args.seed_end - args.seed_start + 1;
+
+    // ── Uniform mode ─────────────────────────────────────────────────────────────
+    // Uses `UniformAgent` (samples uniformly over every legal action, including
+    // inducement purchases) instead of `RandomAgent`. Sweeps every roster (mirror
+    // matchups) and/or every edition when `--all-rosters`/`--all-editions` are given.
+    // No Java invocation or parity comparison — this is a "how much of the mechanic
+    // surface does random play exercise" run, the "parity match run" harness.
+    if args.uniform {
+        let editions: Vec<String> = if args.all_editions {
+            vec!["bb2016".into(), "bb2020".into(), "bb2025".into()]
+        } else {
+            vec![args.edition.clone()]
+        };
+
+        let mut cov = coverage_report::CoverageReport::default();
+        let n_threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).max(1);
+
+        for edition in &editions {
+            let matchups: Vec<(String, String)> = if args.all_rosters {
+                runner::roster_names_for_edition(edition).into_iter().map(|r| (r.clone(), r)).collect()
+            } else {
+                vec![(args.home.clone(), args.away.clone())]
+            };
+
+            for (home, away) in &matchups {
+                println!("Uniform run: {home} vs {away} ({edition}) — {total} seeds");
+                let mut summary = coverage_report::MatchupSummary {
+                    home: home.clone(), away: away.clone(), seeds: total as u32,
+                    home_wins: 0, away_wins: 0, draws: 0,
+                    touchdowns_home: 0, touchdowns_away: 0,
+                };
+
+                let seeds: Vec<u64> = (args.seed_start..=args.seed_end).collect();
+                for chunk in seeds.chunks(n_threads.max(1)) {
+                    let results: Vec<(Vec<ffb_model::events::GameEvent>, i32, i32, Vec<String>)> =
+                        std::thread::scope(|scope| {
+                            let handles: Vec<_> = chunk.iter().map(|&seed| {
+                                let home = home.clone();
+                                let away = away.clone();
+                                let edition = edition.clone();
+                                scope.spawn(move || runner::run_uniform_game(seed, &home, &away, &edition))
+                            }).collect();
+                            handles.into_iter().map(|h| h.join().expect("uniform game thread panicked")).collect()
+                        });
+
+                    for (events, home_score, away_score, unhandled) in results {
+                        for ev in &events { cov.tally(&ev); }
+                        for prompt in &unhandled { cov.record_unhandled_prompt(prompt); }
+                        cov.games += 1;
+                        cov.touchdowns_home += home_score as u32;
+                        cov.touchdowns_away += away_score as u32;
+                        summary.touchdowns_home += home_score as u32;
+                        summary.touchdowns_away += away_score as u32;
+                        if home_score > away_score { cov.home_wins += 1; summary.home_wins += 1; }
+                        else if away_score > home_score { cov.away_wins += 1; summary.away_wins += 1; }
+                        else { cov.draws += 1; summary.draws += 1; }
+                    }
+                }
+                println!("  {} vs {} done ({}-{} home wins over {} seeds)",
+                    home, away, summary.home_wins, summary.away_wins, summary.seeds);
+                cov.matchups.push(summary);
+            }
+        }
+
+        cov.skill_names = coverage_report::build_skill_names();
+        let checklist_edition = if args.all_editions { "bb2025".to_string() } else { args.edition.clone() };
+        let (md, ok) = t3_checklist::render_full_mechanic_markdown(&cov, cov.games, &checklist_edition);
+        std::fs::write("FULL_MECHANIC_COVERAGE.md", &md).ok();
+        let json = serde_json::to_string(&cov).expect("coverage serialization failed");
+        std::fs::write("uniform_coverage.html", coverage_report::generate_html(&json)).ok();
+        println!("\n{md}");
+        println!("Coverage written to FULL_MECHANIC_COVERAGE.md and uniform_coverage.html ({} games)", cov.games);
+        if !ok {
+            eprintln!("UNIFORM RUN: required coverage items are MISSING (see FULL_MECHANIC_COVERAGE.md).");
+            std::process::exit(1);
+        }
+        return;
+    }
 
     // ── Coverage mode ────────────────────────────────────────────────────────────
     // Uses the full RandomAgent (players activate and take real actions) to collect
