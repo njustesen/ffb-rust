@@ -82,7 +82,17 @@ impl StepInitStartGame {
     }
 
     /// Java: `leaveStep()` — sets the game active and advances to the next step.
+    /// Java sets `game.setStarted(new Date())` once both coaches have started
+    /// (`fStartedHome && fStartedAway && game.getStarted() == null`), which is the
+    /// same condition that reaches this point.
     fn leave_step(&self, game: &mut Game) -> StepOutcome {
+        if game.started.is_none() {
+            let millis = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0);
+            game.started = Some(millis.to_string());
+        }
         game.status = GameStatus::Active;
         StepOutcome::next()
     }

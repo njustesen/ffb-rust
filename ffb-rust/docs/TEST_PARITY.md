@@ -114,27 +114,46 @@ which Rust already mirrors separately).
 ## Remaining known divergences (pinned by `#[ignore = "PARITY: ..."]` tests)
 
 - `injury_type_block.rs::all_modes_should_be_present` — Rust `BlockMode` has 7 variants (3
-  engine-internal: UseMightyBlow/UseClaws/UseClawsAndMightyBlow) vs Java's 4.
-- `sub_handler_game_state_marking.rs` (4 reconnect tests) — Rust `Game` has no `started` field;
-  reconnect flows behave as initial state.
+  engine-internal: UseMightyBlow/UseClaws/UseClawsAndMightyBlow) vs Java's 4. This is the ONLY
+  remaining ignored parity test.
 
 Windows note: two Java skill-test classes carry non-obvious names to avoid case-insensitive
 filesystem collisions — `SidestepBb2025SkillTest` (vs bb2016 `SideStepSkillTest`) and
-`BloodlustMixedSkillTest` (inside `BloodLustSkillTest.java`).
+`BloodlustMixedSkillTest` (inside `BloodLustSkillTest.java`); class FILES collide on NTFS, not
+just filenames.
+
+## Follow-up session (2026-07-21): reroll sources + remaining gaps closed
+
+- **Reroll-source system ported.** Java's `Skill.registerRerollSource(ReRolledAction,
+  ReRollSource)` mechanism (26 skills, ~37 pairs, consumed via
+  `UtilCards.getUnusedRerollSource` min-priority selection) now lives in Rust as the static
+  `SkillId::reroll_sources()` table (skill_id.rs, action strings in the Rust engine's
+  vocabulary: PICK_UP→"PICKUP", GO_FOR_IT/RUSH→"GFI"), consumed by the single chokepoint
+  `ffb-engine/src/step/abstract_step_with_re_roll.rs::find_skill_reroll_source` (replacing a
+  hardcoded 5-action property map + WhirlingDervish special case that left ~25 skills' rerolls
+  silently unavailable). Priority mirrors Java `ReRollSources` (all 1 except THE_BALLISTA = 2);
+  ties break by SkillId order. Tests: exhaustive table test, 31 Rust per-skill mirrors, 18 new
+  Java per-skill `getRerollSource` assertions, 6 chokepoint behavior tests (priority, tie-break,
+  used-skill fallthrough). The per-skill-struct `register_reroll_source` map remains a faithful
+  but inert translation, like the per-struct property registration.
+- **usage_type tables reconciled** — 26 `SKILL_TABLE` rows + 15 `SkillId::usage_type()` arms
+  fixed against Java constructors (latest-edition-wins flattening, e.g. WisdomOfTheWhiteDwarf
+  bb2025 OncePerGame beats bb2020 OncePerTurnByTeamMate); pinned by
+  `skills::tests::usage_type_agrees_with_skill_id_table`.
+- **Game date fields added** (`scheduled`/`started`/`finished`, Java Game.java:37-39);
+  `StepInitStartGame` sets `started` where Java does; the client marking handler derives
+  `reconnecting = started.is_some()` per Java; the 4 reconnect tests run un-ignored.
+- **Insignificant** now uses the plain two-arg constructor (bb2025 Java: not a negative trait).
+- Playability gate re-run after the engine changes: see SESSION.md.
 
 ## Known non-test gaps (need engine-level design decisions)
 
-- **Reroll sources:** no live SkillId-keyed reroll-source table exists in Rust; Java
-  `registerRerollSource` assertions (SureFeet, Catch, BlindRage, BoundingLeap, HalflingLuck,
-  LordOfChaos single-use grants, …) are unmirrored, marked by comments in the skill files.
 - **Modifier registrations** (NervesOfSteel/Titchy/StrongArm/Accurate pass modifiers,
   CrushingBlow) — Java registers on the skill; Rust models these in `ffb-mechanics` modifier
   collections; asserted there, not per-skill.
-- `SkillDef.usage_type` (ffb-mechanics table) disagrees with `SkillId::usage_type()` (ffb-model)
-  for several skills (Dodge, SureFeet, Leader, FrenziedRush) — latent inconsistency between two
-  Rust-side tables, flagged by P2.
-- Rust `Insignificant` is constructed as a negative trait; current bb2025 Java constructor is the
-  plain two-arg form — possible translation drift (M3).
+
+(Resolved 2026-07-21: reroll-source table ported; usage_type tables reconciled; Insignificant
+constructor fixed — see the follow-up section below.)
 
 ## How to run everything
 

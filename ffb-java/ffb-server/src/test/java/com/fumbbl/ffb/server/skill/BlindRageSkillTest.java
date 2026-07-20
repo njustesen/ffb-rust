@@ -1,5 +1,6 @@
 package com.fumbbl.ffb.server.skill;
 
+import com.fumbbl.ffb.ReRolledActions;
 import com.fumbbl.ffb.RulesCollection;
 import com.fumbbl.ffb.SkillCategory;
 import com.fumbbl.ffb.skill.mixed.special.BlindRage;
@@ -37,5 +38,11 @@ class BlindRageSkillTest {
     @Test
     void has_skill_properties_not_null() {
         assertNotNull(skill.getSkillProperties());
+    }
+
+    @Test
+    void has_blind_rage_reroll_source() {
+        assertNotNull(skill.getRerollSource(ReRolledActions.DAUNTLESS),
+            "Blind Rage must register a reroll source for dauntless rolls");
     }
 }

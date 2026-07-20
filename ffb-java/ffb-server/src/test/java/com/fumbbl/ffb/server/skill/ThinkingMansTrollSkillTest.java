@@ -1,5 +1,6 @@
 package com.fumbbl.ffb.server.skill;
 
+import com.fumbbl.ffb.ReRolledActions;
 import com.fumbbl.ffb.RulesCollection;
 import com.fumbbl.ffb.SkillCategory;
 import com.fumbbl.ffb.skill.mixed.special.ThinkingMansTroll;
@@ -37,5 +38,11 @@ class ThinkingMansTrollSkillTest {
     @Test
     void has_skill_properties_not_null() {
         assertNotNull(skill.getSkillProperties());
+    }
+
+    @Test
+    void has_thinking_mans_troll_reroll_source() {
+        assertNotNull(skill.getRerollSource(ReRolledActions.SINGLE_DIE),
+            "Thinking Man's Troll must register a reroll source for single die rolls");
     }
 }

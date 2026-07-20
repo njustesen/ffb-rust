@@ -35,4 +35,12 @@ mod tests {
     fn category_is_agility() {
         assert_eq!(SureFeet::new().get_category(), SkillCategory::Agility);
     }
+
+    #[test]
+    fn has_sure_feet_reroll_source() {
+        // Java: bb2025/SureFeet.postConstruct registers ReRolledActions.RUSH →
+        // ReRollSources.SURE_FEET; mirrored against the live SkillId::reroll_sources()
+        // table (Java RUSH → "GFI").
+        assert!(crate::enums::SkillId::SureFeet.reroll_sources().iter().any(|(a, _)| *a == "GFI"));
+    }
 }

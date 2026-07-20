@@ -40,4 +40,11 @@ mod tests {
     fn has_can_reroll_single_skull_property() {
         assert!(crate::enums::SkillId::Hatred.properties().contains(&"canRerollSingleSkull"));
     }
+
+    #[test]
+    fn has_hatred_reroll_source() {
+        // Java: bb2025/Hatred.postConstruct registers ReRolledActions.SINGLE_SKULL →
+        // ReRollSources.HATRED; mirrored against the live SkillId::reroll_sources() table.
+        assert!(crate::enums::SkillId::Hatred.reroll_sources().iter().any(|(a, _)| *a == "SINGLE_SKULL"));
+    }
 }

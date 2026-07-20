@@ -1,9 +1,7 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.mixed::Dodge.
-/// Deferred: Java's `postConstruct()` also calls `registerProperty`/`registerRerollSource`
-/// (canRerollDodge, ignoreDefenderStumblesResult, DODGE reroll source) — left untranslated
-/// because `Skill::register_reroll_source`/`register_property` are wired up nowhere else in
-/// the ~300-file skill tree (0 callers in ffb-engine/ffb-mechanics), so this is part of a
-/// systemic, cross-cutting postConstruct-registration gap rather than a Dodge-specific bug.
+/// Java's `postConstruct()` registrations live in the static tables:
+/// properties (canRerollDodge, ignoreDefenderStumblesResult) in `SkillId::properties()`,
+/// the DODGE reroll source in `SkillId::reroll_sources()`.
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 
@@ -49,5 +47,12 @@ mod tests {
     #[test]
     fn does_not_have_force_followup_property() {
         assert!(!crate::enums::SkillId::Dodge.properties().contains(&"forceFollowup"));
+    }
+
+    #[test]
+    fn has_dodge_reroll_source() {
+        // Java: assertNotNull(skill.getRerollSource(ReRolledActions.DODGE)) —
+        // mirrored against the live SkillId::reroll_sources() table.
+        assert!(crate::enums::SkillId::Dodge.reroll_sources().iter().any(|(a, _)| *a == "DODGE"));
     }
 }

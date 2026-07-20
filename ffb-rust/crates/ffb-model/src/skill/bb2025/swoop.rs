@@ -40,4 +40,11 @@ mod tests {
     fn has_ttm_scatters_in_single_direction_property() {
         assert!(crate::enums::SkillId::Swoop.properties().contains(&"ttmScattersInSingleDirection"));
     }
+
+    #[test]
+    fn has_swoop_reroll_source() {
+        // Java: bb2025/Swoop.postConstruct registers ReRolledActions.RIGHT_STUFF →
+        // ReRollSources.SWOOP; mirrored against the live SkillId::reroll_sources() table.
+        assert!(crate::enums::SkillId::Swoop.reroll_sources().iter().any(|(a, _)| *a == "RIGHT_STUFF"));
+    }
 }

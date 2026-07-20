@@ -51,4 +51,11 @@ mod tests {
     fn has_can_reroll_single_block_die_when_partner_is_marking_property() {
         assert!(crate::enums::SkillId::WorkingInTandem.properties().contains(&"canRerollSingleBlockDieWhenPartnerIsMarking"));
     }
+
+    #[test]
+    fn has_working_in_tandem_reroll_source() {
+        // Java: bb2025/special/WorkingInTandem.postConstruct registers ReRolledActions.SINGLE_BLOCK_DIE →
+        // ReRollSources.WORKING_IN_TANDEM; mirrored against the live SkillId::reroll_sources() table.
+        assert!(crate::enums::SkillId::WorkingInTandem.reroll_sources().iter().any(|(a, _)| *a == "SINGLE_BLOCK_DIE"));
+    }
 }

@@ -48,4 +48,11 @@ mod tests {
     fn usage_type_is_once_per_game() {
         assert_eq!(HalflingLuck::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
     }
+
+    #[test]
+    fn has_halfling_luck_reroll_source() {
+        // Java: mixed/special/HalflingLuck.postConstruct registers ReRolledActions.SINGLE_DIE →
+        // ReRollSources.HALFLING_LUCK; mirrored against the live SkillId::reroll_sources() table.
+        assert!(crate::enums::SkillId::HalflingLuck.reroll_sources().iter().any(|(a, _)| *a == "SINGLE_DIE"));
+    }
 }

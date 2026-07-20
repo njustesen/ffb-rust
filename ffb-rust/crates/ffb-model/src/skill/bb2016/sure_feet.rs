@@ -1,8 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2016::SureFeet.
-// DEFERRED: Java registers `registerRerollSource(ReRolledActions.GO_FOR_IT, ReRollSources.SURE_FEET)`.
-// There is no `ReRollSource::SureFeet` variant and no SkillId-keyed reroll-source lookup table
-// anywhere in the workspace (same gap affects bb2016 Monstrous Mouth), so this is deferred
-// pending that infrastructure.
+// Java registers `registerRerollSource(ReRolledActions.GO_FOR_IT, ReRollSources.SURE_FEET)`;
+// mirrored in the live `SkillId::reroll_sources()` table (Java GO_FOR_IT → "GFI").
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 
@@ -28,8 +26,6 @@ impl std::ops::Deref for SureFeet {
 
 #[cfg(test)]
 // Mirrors ffb-java/ffb-server/src/test/java/com/fumbbl/ffb/server/skill tests.
-// Java test's has_sure_feet_reroll_source is omitted: there is no live SkillId-keyed
-// reroll-source table in Rust yet (see DEFERRED note at top of this file).
 mod tests {
     use super::*;
 
@@ -41,5 +37,12 @@ mod tests {
     #[test]
     fn category_is_agility() {
         assert_eq!(SureFeet::new().get_category(), SkillCategory::Agility);
+    }
+
+    #[test]
+    fn has_sure_feet_reroll_source() {
+        // Java: assertNotNull(skill.getRerollSource(ReRolledActions.GO_FOR_IT)) —
+        // mirrored against the live SkillId::reroll_sources() table (GO_FOR_IT → "GFI").
+        assert!(crate::enums::SkillId::SureFeet.reroll_sources().iter().any(|(a, _)| *a == "GFI"));
     }
 }

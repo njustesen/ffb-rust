@@ -49,9 +49,10 @@ mod tests {
         assert_eq!(SavageBlow::new().skill_usage_type, SkillUsageType::OncePerGame);
     }
     #[test]
-    fn registers_multi_block_dice_reroll_source() {
-        let skill = SavageBlow::new();
-        let source = skill.base.reroll_sources.get(&ReRolledAction::new("Multi Block Dice"));
-        assert_eq!(source, Some(&ReRollSource::new("Savage Blow")));
+    fn has_savage_blow_reroll_source() {
+        // Java: assertNotNull(skill.getRerollSource(ReRolledActions.MULTI_BLOCK_DICE)) —
+        // mirrored against the live SkillId::reroll_sources() table (the per-struct
+        // register_reroll_source map is inert).
+        assert!(crate::enums::SkillId::SavageBlow.reroll_sources().iter().any(|(a, _)| *a == "MULTI_BLOCK_DICE"));
     }
 }

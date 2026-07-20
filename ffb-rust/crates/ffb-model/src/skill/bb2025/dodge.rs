@@ -45,4 +45,11 @@ mod tests {
     fn does_not_have_force_followup_property() {
         assert!(!crate::enums::SkillId::Dodge.properties().contains(&"forceFollowup"));
     }
+
+    #[test]
+    fn has_dodge_reroll_source() {
+        // Java: bb2025/Dodge.postConstruct registers ReRolledActions.DODGE →
+        // ReRollSources.DODGE; mirrored against the live SkillId::reroll_sources() table.
+        assert!(crate::enums::SkillId::Dodge.reroll_sources().iter().any(|(a, _)| *a == "DODGE"));
+    }
 }

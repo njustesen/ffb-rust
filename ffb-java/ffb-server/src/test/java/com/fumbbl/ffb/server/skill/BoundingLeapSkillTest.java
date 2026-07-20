@@ -1,5 +1,6 @@
 package com.fumbbl.ffb.server.skill;
 
+import com.fumbbl.ffb.ReRolledActions;
 import com.fumbbl.ffb.RulesCollection;
 import com.fumbbl.ffb.SkillCategory;
 import com.fumbbl.ffb.skill.mixed.special.BoundingLeap;
@@ -37,5 +38,11 @@ class BoundingLeapSkillTest {
     @Test
     void has_skill_properties_not_null() {
         assertNotNull(skill.getSkillProperties());
+    }
+
+    @Test
+    void has_bounding_leap_reroll_source() {
+        assertNotNull(skill.getRerollSource(ReRolledActions.JUMP),
+            "Bounding Leap must register a reroll source for failed jump rolls");
     }
 }

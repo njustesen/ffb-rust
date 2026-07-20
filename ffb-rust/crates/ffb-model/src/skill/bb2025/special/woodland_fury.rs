@@ -40,4 +40,11 @@ mod tests {
     fn has_can_reroll_single_block_die_when_would_be_knocked_down_property() {
         assert!(crate::enums::SkillId::WoodlandFury.properties().contains(&"canRerollSingleBlockDieWhenWouldBeKnockedDown"));
     }
+
+    #[test]
+    fn has_woodland_fury_reroll_source() {
+        // Java: bb2025/special/WoodlandFury.postConstruct registers ReRolledActions.SINGLE_BLOCK_DIE →
+        // ReRollSources.WOODLAND_FURY; mirrored against the live SkillId::reroll_sources() table.
+        assert!(crate::enums::SkillId::WoodlandFury.reroll_sources().iter().any(|(a, _)| *a == "SINGLE_BLOCK_DIE"));
+    }
 }

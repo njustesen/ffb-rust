@@ -439,15 +439,19 @@ impl SkillId {
             SkillId::GhostlyFlames | SkillId::ThenIStartedBlastin => OncePerHalf,
             // OncePerHalf (bb2025): Leader, BlastinSolvesEverything, MesmerisingDance, SlashingNails
             SkillId::Leader | SkillId::BlastinSolvesEverything | SkillId::MesmerisingDance | SkillId::SlashingNails => OncePerHalf,
-            // OncePerHalf (mixed): CatchOfTheDay, FuriousOutburst
-            SkillId::CatchOfTheDay | SkillId::FuriousOutburst => OncePerHalf,
+            // OncePerHalf (mixed): CatchOfTheDay, FuriousOutburst, ThinkingMansTroll,
+            // ViciousVines, WatchOut
+            SkillId::CatchOfTheDay | SkillId::FuriousOutburst | SkillId::ThinkingMansTroll |
+            SkillId::ViciousVines | SkillId::WatchOut => OncePerHalf,
             // FrenziedRush/PutridRegurgitation: bb2020=OncePerGame, bb2025=OncePerHalf — use bb2025
             SkillId::FrenziedRush | SkillId::PutridRegurgitation => OncePerHalf,
 
             // OncePerTurn (bb2025): Dodge, Pro, LoneFouler, SureFeet
             SkillId::Dodge | SkillId::Pro | SkillId::LoneFouler | SkillId::SureFeet => OncePerTurn,
-            // OncePerTurnByTeamMate: WisdomOfTheWhiteDwarf, Swoop
-            SkillId::WisdomOfTheWhiteDwarf | SkillId::Swoop => OncePerTurnByTeamMate,
+            // OncePerTurnByTeamMate: Swoop (bb2025). WisdomOfTheWhiteDwarf is
+            // OncePerTurnByTeamMate in bb2020 but OncePerGame in bb2025 — latest edition wins.
+            SkillId::Swoop => OncePerTurnByTeamMate,
+            SkillId::WisdomOfTheWhiteDwarf => OncePerGame,
 
             // OncePerGame (bb2020)
             SkillId::BlastIt | SkillId::BrutalBlock | SkillId::BurstOfSpeed |
@@ -463,7 +467,10 @@ impl SkillId {
             SkillId::GoredByTheBull | SkillId::HalflingLuck | SkillId::Indomitable |
             SkillId::Kaboom | SkillId::KickEmWhileTheyReDown | SkillId::LookIntoMyEyes |
             SkillId::MaximumCarnage | SkillId::OldPro | SkillId::PrimalSavagery |
-            SkillId::QuickBite => OncePerGame,
+            SkillId::QuickBite | SkillId::Ram | SkillId::SavageBlow |
+            SkillId::SavageMauling | SkillId::ShotToNothing | SkillId::StarOfTheShow |
+            SkillId::StrongPassingGame | SkillId::SwiftAsTheBreeze | SkillId::TastyMorsel |
+            SkillId::TheFlashingBlade | SkillId::Treacherous | SkillId::Yoink => OncePerGame,
 
             // All other skills are Regular
             _ => Regular,
@@ -1134,6 +1141,81 @@ impl SkillId {
             _ => &[],
         }
     }
+
+    /// Re-roll sources this skill registers: `(rerolled_action, priority)` pairs.
+    ///
+    /// 1:1 translation of the Java `Skill.registerRerollSource(ReRolledAction,
+    /// ReRollSource)` registrations in each skill's `postConstruct()`, folded into
+    /// a static table like `properties()` (the per-skill-struct
+    /// `register_reroll_source` map is a faithful but inert translation — this
+    /// table is what the engine consults, via
+    /// `abstract_step_with_re_roll::find_skill_reroll_source`).
+    ///
+    /// Action keys use the Rust engine's action vocabulary where a caller exists
+    /// (Java `PICK_UP` → `"PICKUP"`; Java `GO_FOR_IT`(bb2016)/`RUSH`(bb2020+) →
+    /// `"GFI"`); Java names are kept for actions no Rust step asks about yet
+    /// (`SINGLE_DIE`, `SINGLE_BLOCK_DIE`, `SINGLE_SKULL`, `SINGLE_BOTH_DOWN`,
+    /// `MULTI_BLOCK_DICE`, `SINGLE_DIE_PER_ACTIVATION`, `KICK_TEAM_MATE`).
+    /// The reroll source is always the skill itself; priority mirrors Java
+    /// `ReRollSources` (every source is priority 1 except THE_BALLISTA = 2).
+    /// Cross-edition union, like `properties()` — per-edition steps only ever ask
+    /// for their own edition's action string.
+    pub fn reroll_sources(self) -> &'static [(&'static str, i32)] {
+        match self {
+            // Java: common/Catch registers CATCH → CATCH
+            SkillId::Catch => &[("CATCH", 1)],
+            // Java: common/Pass registers PASS → PASS
+            SkillId::Pass => &[("PASS", 1)],
+            // Java: common/SureHands registers PICK_UP → SURE_HANDS
+            SkillId::SureHands => &[("PICKUP", 1)],
+            // Java: mixed/Dodge and bb2025/Dodge register DODGE → DODGE
+            SkillId::Dodge => &[("DODGE", 1)],
+            // Java: bb2016/SureFeet GO_FOR_IT → SURE_FEET; bb2020+bb2025 RUSH → SURE_FEET
+            SkillId::SureFeet => &[("GFI", 1)],
+            // Java: bb2016+bb2020/MonstrousMouth register CATCH → MONSTROUS_MOUTH
+            SkillId::MonstrousMouth => &[("CATCH", 1)],
+            // Java: bb2020+bb2025 special/WhirlingDervish register DIRECTION → WHIRLING_DERVISH
+            SkillId::WhirlingDervish => &[("DIRECTION", 1)],
+            // Java: bb2020/special/MesmerizingDance registers HYPNOTIC_GAZE → MESMERIZING_DANCE
+            SkillId::MesmerizingDance => &[("HYPNOTIC_GAZE", 1)],
+            // Java: bb2025/special/MesmerisingDance registers HYPNOTIC_GAZE → MESMERISING_DANCE
+            SkillId::MesmerisingDance => &[("HYPNOTIC_GAZE", 1)],
+            // Java: bb2020/special/ConsummateProfessional registers SINGLE_DIE → CONSUMMATE_PROFESSIONAL
+            SkillId::ConsummateProfessional => &[("SINGLE_DIE", 1)],
+            // Java: bb2020/special/TheBallista PASS+THROW_TEAM_MATE; bb2025 adds KICK_TEAM_MATE.
+            // THE_BALLISTA is the only priority-2 source in Java ReRollSources.
+            SkillId::TheBallista => &[("PASS", 2), ("THROW_TEAM_MATE", 2), ("KICK_TEAM_MATE", 2)],
+            // Java: mixed/special/UnstoppableMomentum registers SINGLE_BLOCK_DIE → UNSTOPPABLE_MOMENTUM
+            SkillId::UnstoppableMomentum => &[("SINGLE_BLOCK_DIE", 1)],
+            // Java: mixed/special/ThinkingMansTroll registers SINGLE_DIE → THINKING_MANS_TROLL
+            SkillId::ThinkingMansTroll => &[("SINGLE_DIE", 1)],
+            // Java: mixed/special/SavageBlow registers MULTI_BLOCK_DICE → SAVAGE_BLOW
+            SkillId::SavageBlow => &[("MULTI_BLOCK_DICE", 1)],
+            // Java: mixed/special/HalflingLuck registers SINGLE_DIE → HALFLING_LUCK
+            SkillId::HalflingLuck => &[("SINGLE_DIE", 1)],
+            // Java: mixed/special/BoundingLeap registers JUMP → BOUNDING_LEAP
+            SkillId::BoundingLeap => &[("JUMP", 1)],
+            // Java: mixed/special/BlindRage registers DAUNTLESS → BLIND_RAGE
+            SkillId::BlindRage => &[("DAUNTLESS", 1)],
+            // Java: bb2025/Pro registers SINGLE_DIE_PER_ACTIVATION → PRO
+            SkillId::Pro => &[("SINGLE_DIE_PER_ACTIVATION", 1)],
+            // Java: bb2025/Kick registers PUNT_DIRECTION → KICK + PUNT_DISTANCE → KICK
+            SkillId::Kick => &[("PUNT_DIRECTION", 1), ("PUNT_DISTANCE", 1)],
+            // Java: bb2025/Hatred registers SINGLE_SKULL → HATRED
+            SkillId::Hatred => &[("SINGLE_SKULL", 1)],
+            // Java: bb2025/Brawler registers SINGLE_BOTH_DOWN → BRAWLER
+            SkillId::Brawler => &[("SINGLE_BOTH_DOWN", 1)],
+            // Java: bb2025/Swoop registers RIGHT_STUFF → SWOOP
+            SkillId::Swoop => &[("RIGHT_STUFF", 1)],
+            // Java: bb2025/special/WorkingInTandem registers SINGLE_BLOCK_DIE → WORKING_IN_TANDEM
+            SkillId::WorkingInTandem => &[("SINGLE_BLOCK_DIE", 1)],
+            // Java: bb2025/special/WoodlandFury registers SINGLE_BLOCK_DIE → WOODLAND_FURY
+            SkillId::WoodlandFury => &[("SINGLE_BLOCK_DIE", 1)],
+            // Java: bb2025/special/LordOfChaos registers SINGLE_BLOCK_DIE → LORD_OF_CHAOS
+            SkillId::LordOfChaos => &[("SINGLE_BLOCK_DIE", 1)],
+            _ => &[],
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1579,5 +1661,89 @@ mod tests {
     #[test]
     fn properties_bounding_leap() {
         assert!(SkillId::BoundingLeap.properties().contains(&"canIgnoreJumpModifiers"));
+    }
+
+    // ── reroll_sources(): exhaustive pin of the live table ────────────────────
+
+    #[test]
+    fn reroll_sources_exhaustive_table() {
+        use std::collections::HashSet;
+
+        // Every action string the table is allowed to use (Rust engine vocabulary:
+        // Java PICK_UP → "PICKUP", GO_FOR_IT/RUSH → "GFI"; all others keep Java names).
+        const ALLOWED_ACTIONS: &[&str] = &[
+            "CATCH", "PASS", "PICKUP", "DODGE", "GFI", "DIRECTION", "HYPNOTIC_GAZE",
+            "SINGLE_DIE", "THROW_TEAM_MATE", "KICK_TEAM_MATE", "SINGLE_BLOCK_DIE",
+            "MULTI_BLOCK_DICE", "JUMP", "DAUNTLESS", "SINGLE_DIE_PER_ACTIVATION",
+            "PUNT_DIRECTION", "PUNT_DISTANCE", "SINGLE_SKULL", "SINGLE_BOTH_DOWN",
+            "RIGHT_STUFF",
+        ];
+
+        // Exactly these 25 skills call registerRerollSource somewhere in Java
+        // (union across bb2016/bb2020/bb2025, see per-arm citations in reroll_sources()).
+        let expected_non_empty: HashSet<SkillId> = [
+            SkillId::Catch,
+            SkillId::Pass,
+            SkillId::SureHands,
+            SkillId::Dodge,
+            SkillId::SureFeet,
+            SkillId::MonstrousMouth,
+            SkillId::WhirlingDervish,
+            SkillId::MesmerizingDance,
+            SkillId::MesmerisingDance,
+            SkillId::ConsummateProfessional,
+            SkillId::TheBallista,
+            SkillId::UnstoppableMomentum,
+            SkillId::ThinkingMansTroll,
+            SkillId::SavageBlow,
+            SkillId::HalflingLuck,
+            SkillId::BoundingLeap,
+            SkillId::BlindRage,
+            SkillId::Pro,
+            SkillId::Kick,
+            SkillId::Hatred,
+            SkillId::Brawler,
+            SkillId::Swoop,
+            SkillId::WorkingInTandem,
+            SkillId::WoodlandFury,
+            SkillId::LordOfChaos,
+        ]
+        .into_iter()
+        .collect();
+
+        // SkillFactory's map is built from the declaration-order ALL_SKILL_IDS list,
+        // giving us every SkillId variant (deduped via HashSet — the map holds
+        // BallAndChain under two extra alias keys).
+        let all_ids: HashSet<SkillId> =
+            crate::factory::skill_factory::SkillFactory::new().get_skills().collect();
+        assert!(all_ids.len() >= 190, "factory should enumerate every SkillId variant");
+
+        let mut non_empty: HashSet<SkillId> = HashSet::new();
+        let mut total_pairs = 0usize;
+        for &id in &all_ids {
+            let sources = id.reroll_sources();
+            if !sources.is_empty() {
+                non_empty.insert(id);
+            }
+            total_pairs += sources.len();
+            for (action, priority) in sources {
+                assert!(
+                    ALLOWED_ACTIONS.contains(action),
+                    "unexpected reroll action {action:?} for {id:?}"
+                );
+                // Java ReRollSources: every source is priority 1 except THE_BALLISTA (2).
+                let expected_priority = if id == SkillId::TheBallista { 2 } else { 1 };
+                assert_eq!(
+                    *priority, expected_priority,
+                    "wrong priority for {id:?} action {action}"
+                );
+            }
+        }
+
+        assert_eq!(non_empty, expected_non_empty, "set of skills with reroll sources changed");
+        // 23 single-pair skills + Kick (2) + TheBallista (3) = 28 pairs.
+        assert_eq!(total_pairs, 28, "total (action, priority) pair count changed");
+        assert_eq!(SkillId::TheBallista.reroll_sources().len(), 3);
+        assert_eq!(SkillId::Kick.reroll_sources().len(), 2);
     }
 }

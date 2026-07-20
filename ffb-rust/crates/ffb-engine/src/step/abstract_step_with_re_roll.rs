@@ -8,7 +8,7 @@
 ///   `fReRolledAction`            → `ReRollState::re_rolled_action`
 ///   `fReRollSource`              → `ReRollState::re_roll_source`
 ///   `playerIdForSingleUseReRoll` → `ReRollState::player_id_single_use_re_roll`
-use ffb_model::enums::{SkillId, TurnMode, ReRollSource};
+use ffb_model::enums::{TurnMode, ReRollSource};
 use ffb_model::model::game::Game;
 use ffb_model::model::re_rolled_action::ReRolledAction;
 
@@ -42,20 +42,16 @@ impl ReRollState {
     }
 }
 
-/// Java: `AbstractStepWithReRoll.findSkillReRollSource`.
+/// Java: `AbstractStepWithReRoll.findSkillReRollSource` →
+/// `UtilCards.getUnusedRerollSource(actingPlayer, reRolledAction)`.
 ///
-/// Returns the first unused skill `ReRollSource` that applies to `rerolled_action`
-/// when the game is in `TurnMode::Regular`.
-/// Since `Skill.getRerollSource(action)` is not yet fully translated (Skill is a stub),
-/// this looks up a hard-coded mapping of well-known skill re-roll pairs.
-///
-/// Hard-coded re-rolls (BB2025):
-///   Dodge → canRerollDodge
-///   GoForIt / Sprint → canMakeAnExtraGfi
-///   PickUp → canRerollPickup
-///   StandUp → (SureFeet: free-standup skill — checked separately in those steps)
-///   Jump → Leap skill
-///   Block → Brawler / Hatred
+/// Returns the unused skill `ReRollSource` that applies to `rerolled_action`
+/// when the game is in `TurnMode::Regular`, consulting the static
+/// `SkillId::reroll_sources()` table (the fold of every Java
+/// `registerRerollSource` call). Java streams the player's skills, maps each to
+/// `skill.getRerollSource(action)`, and picks the minimum
+/// `ReRollSource.getPriority()`; ties are broken here by `SkillId` order for
+/// determinism.
 pub fn find_skill_reroll_source(game: &Game, rerolled_action: &str) -> Option<ReRollSource> {
     if game.turn_mode != TurnMode::Regular {
         return None;
@@ -63,35 +59,16 @@ pub fn find_skill_reroll_source(game: &Game, rerolled_action: &str) -> Option<Re
     let acting_id = game.acting_player.player_id.as_deref()?;
     let player = game.player(acting_id)?;
 
-    // Java: `ReRolledActions.DIRECTION` — only `WhirlingDervish` (BB2020/BB2025) registers
-    // this reroll source (`registerRerollSource(ReRolledActions.DIRECTION,
-    // ReRollSources.WHIRLING_DERVISH)`), via the generic `Skill.registerRerollSource` API
-    // rather than a `NamedProperties` string, so it's special-cased here instead of going
-    // through the property-name table below.
-    if rerolled_action == "DIRECTION" {
-        if player.has_skill(SkillId::WhirlingDervish) && !player.used_skills.contains(&SkillId::WhirlingDervish) {
-            return Some(ReRollSource::new("WhirlingDervish"));
-        }
-        return None;
-    }
-
-    // Map rerolled_action name to NamedProperty that provides the re-roll for it.
-    // This mirrors Java Skill.getRerollSource(ReRolledAction) which checks
-    // skill.hasReRollSourceForAction(action).
-    let reroll_property = match rerolled_action {
-        "DODGE" => "canRerollDodge",
-        "GFI" => "canMakeAnExtraGfi",
-        "PICKUP" => "canRerollPickup",
-        "CATCH" => "canRerollCatch",
-        "PASS" => "canRerollPass",
-        _ => return None,
-    };
-
-    // Find the lowest-priority unused skill that has this property.
     player.all_skill_ids()
-        .filter(|id| id.properties().contains(&reroll_property) && !player.used_skills.contains(id))
-        .min_by_key(|id| *id as i32) // stable deterministic ordering
-        .map(|skill_id| ReRollSource::new(format!("{:?}", skill_id)))
+        .filter(|id| !player.used_skills.contains(id))
+        .filter_map(|id| {
+            id.reroll_sources()
+                .iter()
+                .find(|(action, _)| *action == rerolled_action)
+                .map(|(_, priority)| (id, *priority))
+        })
+        .min_by_key(|(id, priority)| (*priority, *id as i32))
+        .map(|(skill_id, priority)| ReRollSource::with_priority(format!("{:?}", skill_id), priority))
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -100,7 +77,7 @@ pub fn find_skill_reroll_source(game: &Game, rerolled_action: &str) -> Option<Re
 mod tests {
     use super::*;
     use crate::step::framework::test_team;
-    use ffb_model::enums::Rules;
+    use ffb_model::enums::{Rules, SkillId};
     use ffb_model::model::player::Player;
     use ffb_model::model::skill_def::SkillWithValue;
     use ffb_model::enums::{PlayerType, PlayerGender};
@@ -111,13 +88,15 @@ mod tests {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
     }
 
-    fn add_player_with_skill(game: &mut Game, id: &str, skill: SkillId) {
+    fn add_player_with_skills(game: &mut Game, id: &str, skills: &[SkillId]) {
         let coord = FieldCoordinate::new(5, 5);
         game.team_home.players.push(Player {
             id: id.into(), name: id.into(), nr: 1, position_id: "lineman".into(),
             player_type: PlayerType::Regular, gender: PlayerGender::Male,
             movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
-            starting_skills: vec![SkillWithValue { skill_id: skill, value: None }],
+            starting_skills: skills.iter()
+                .map(|&skill_id| SkillWithValue { skill_id, value: None })
+                .collect(),
             extra_skills: vec![], temporary_skills: vec![],
             used_skills: HashSet::new(),
             niggling_injuries: 0, stat_injuries: vec![], current_spps: 0, career_spps: 0, race: None,
@@ -125,6 +104,10 @@ mod tests {
             ..Default::default()
         });
         game.field_model.set_player_coordinate(id, coord);
+    }
+
+    fn add_player_with_skill(game: &mut Game, id: &str, skill: SkillId) {
+        add_player_with_skills(game, id, &[skill]);
     }
 
     #[test]
@@ -191,5 +174,91 @@ mod tests {
         if dodge_props.contains(&"canRerollDodge") {
             assert!(find_skill_reroll_source(&game, "DODGE").is_none());
         }
+    }
+
+    // ── reroll-source table lookups through the live chokepoint ──────────────
+
+    #[test]
+    fn pro_offers_single_die_per_activation_reroll() {
+        // Java: bb2025/Pro.postConstruct registers SINGLE_DIE_PER_ACTIVATION → ReRollSources.PRO.
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        add_player_with_skill(&mut game, "p1", SkillId::Pro);
+        game.acting_player.player_id = Some("p1".into());
+        let source = find_skill_reroll_source(&game, "SINGLE_DIE_PER_ACTIVATION")
+            .expect("Pro must offer a SINGLE_DIE_PER_ACTIVATION reroll");
+        assert_eq!(source.name, "Pro");
+        assert_eq!(source.priority, 1);
+    }
+
+    #[test]
+    fn brawler_offers_single_both_down_reroll() {
+        // Java: bb2025/Brawler.postConstruct registers SINGLE_BOTH_DOWN → ReRollSources.BRAWLER.
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        add_player_with_skill(&mut game, "p1", SkillId::Brawler);
+        game.acting_player.player_id = Some("p1".into());
+        let source = find_skill_reroll_source(&game, "SINGLE_BOTH_DOWN")
+            .expect("Brawler must offer a SINGLE_BOTH_DOWN reroll");
+        assert_eq!(source.name, "Brawler");
+        assert_eq!(source.priority, 1);
+    }
+
+    #[test]
+    fn catch_and_monstrous_mouth_tie_break_picks_lower_skill_id() {
+        // Both Catch and MonstrousMouth register CATCH at priority 1; the tie is
+        // broken deterministically by SkillId declaration order, and Catch is
+        // declared before MonstrousMouth.
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        add_player_with_skills(&mut game, "p1", &[SkillId::MonstrousMouth, SkillId::Catch]);
+        game.acting_player.player_id = Some("p1".into());
+        let source = find_skill_reroll_source(&game, "CATCH")
+            .expect("a CATCH reroll source must be found");
+        assert_eq!(source.name, "Catch");
+        assert_eq!(source.priority, 1);
+    }
+
+    #[test]
+    fn pass_beats_the_ballista_on_priority() {
+        // Pass registers PASS at priority 1; TheBallista at priority 2 (the only
+        // priority-2 source in Java ReRollSources) — the lower priority wins.
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        add_player_with_skills(&mut game, "p1", &[SkillId::TheBallista, SkillId::Pass]);
+        game.acting_player.player_id = Some("p1".into());
+        let source = find_skill_reroll_source(&game, "PASS")
+            .expect("a PASS reroll source must be found");
+        assert_eq!(source.name, "Pass");
+        assert_eq!(source.priority, 1);
+    }
+
+    #[test]
+    fn whirling_dervish_offers_direction_reroll() {
+        // Java: bb2020+bb2025 special/WhirlingDervish register DIRECTION → WHIRLING_DERVISH.
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        add_player_with_skill(&mut game, "p1", SkillId::WhirlingDervish);
+        game.acting_player.player_id = Some("p1".into());
+        let source = find_skill_reroll_source(&game, "DIRECTION")
+            .expect("Whirling Dervish must offer a DIRECTION reroll");
+        assert_eq!(source.name, "WhirlingDervish");
+        assert_eq!(source.priority, 1);
+    }
+
+    #[test]
+    fn used_skill_is_excluded_and_other_candidate_returned() {
+        // With Catch already used, the CATCH lookup must fall through to MonstrousMouth.
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        add_player_with_skills(&mut game, "p1", &[SkillId::Catch, SkillId::MonstrousMouth]);
+        game.acting_player.player_id = Some("p1".into());
+        if let Some(p) = game.team_home.player_mut("p1") {
+            p.used_skills.insert(SkillId::Catch);
+        }
+        let source = find_skill_reroll_source(&game, "CATCH")
+            .expect("MonstrousMouth must still offer a CATCH reroll");
+        assert_eq!(source.name, "MonstrousMouth");
+        assert_eq!(source.priority, 1);
     }
 }

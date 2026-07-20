@@ -1,7 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::ConsummateProfessional.
-// NOTE: Java also calls registerRerollSource(ReRolledActions.SINGLE_DIE, ReRollSources.CONSUMMATE_PROFESSIONAL);
-// there is no live reroll-source lookup table in the Rust codebase to mirror this into (Skill::register_reroll_source
-// is dead code), so this is left as a gap pending that infrastructure.
+// Java also calls registerRerollSource(ReRolledActions.SINGLE_DIE, ReRollSources.CONSUMMATE_PROFESSIONAL);
+// mirrored in the live `SkillId::reroll_sources()` table.
 use crate::model::skill::skill::Skill;
 use crate::enums::{SkillCategory, SkillUsageType};
 
@@ -48,5 +47,12 @@ mod tests {
     #[test]
     fn usage_type_is_correct() {
         assert_eq!(ConsummateProfessional::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
+    }
+
+    #[test]
+    fn has_consummate_professional_reroll_source() {
+        // Java: bb2020/special/ConsummateProfessional.postConstruct registers ReRolledActions.SINGLE_DIE →
+        // ReRollSources.CONSUMMATE_PROFESSIONAL; mirrored against the live SkillId::reroll_sources() table.
+        assert!(SkillId::ConsummateProfessional.reroll_sources().iter().any(|(a, _)| *a == "SINGLE_DIE"));
     }
 }

@@ -44,9 +44,10 @@ mod tests {
         let _properties: &'static [&'static str] = crate::enums::SkillId::UnstoppableMomentum.properties();
     }
     #[test]
-    fn registers_single_block_die_reroll_source() {
-        let skill = UnstoppableMomentum::new();
-        let source = skill.base.reroll_sources.get(&ReRolledAction::new("Single Block Die"));
-        assert_eq!(source, Some(&ReRollSource::new("Unstoppable Momentum")));
+    fn has_unstoppable_momentum_reroll_source() {
+        // Java: assertNotNull(skill.getRerollSource(ReRolledActions.SINGLE_BLOCK_DIE)) —
+        // mirrored against the live SkillId::reroll_sources() table (the per-struct
+        // register_reroll_source map is inert).
+        assert!(crate::enums::SkillId::UnstoppableMomentum.reroll_sources().iter().any(|(a, _)| *a == "SINGLE_BLOCK_DIE"));
     }
 }

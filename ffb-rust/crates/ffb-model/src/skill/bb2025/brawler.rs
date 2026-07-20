@@ -40,4 +40,11 @@ mod tests {
     fn has_can_reroll_single_both_down_property() {
         assert!(crate::enums::SkillId::Brawler.properties().contains(&"canRerollSingleBothDown"));
     }
+
+    #[test]
+    fn has_brawler_reroll_source() {
+        // Java: bb2025/Brawler.postConstruct registers ReRolledActions.SINGLE_BOTH_DOWN →
+        // ReRollSources.BRAWLER; mirrored against the live SkillId::reroll_sources() table.
+        assert!(crate::enums::SkillId::Brawler.reroll_sources().iter().any(|(a, _)| *a == "SINGLE_BOTH_DOWN"));
+    }
 }

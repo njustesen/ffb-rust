@@ -47,4 +47,13 @@ mod tests {
         // registers NamedProperties, so the live SkillId table must be populated.
         assert!(!crate::enums::SkillId::Kick.properties().is_empty());
     }
+
+    #[test]
+    fn has_kick_reroll_sources() {
+        // Java: bb2025/Kick.postConstruct registers PUNT_DIRECTION and PUNT_DISTANCE
+        // (both → ReRollSources.KICK); mirrored against the live SkillId::reroll_sources() table.
+        let sources = crate::enums::SkillId::Kick.reroll_sources();
+        assert!(sources.iter().any(|(a, _)| *a == "PUNT_DIRECTION"));
+        assert!(sources.iter().any(|(a, _)| *a == "PUNT_DISTANCE"));
+    }
 }

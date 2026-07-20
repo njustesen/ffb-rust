@@ -1,7 +1,7 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::TheBallista.
-// NOTE: Java postConstruct calls registerRerollSource(...) twice (PASS and THROW_TEAM_MATE, both via
-// ReRollSources.THE_BALLISTA). There is no live reroll-source lookup table in the Rust codebase to mirror this
-// into (Skill::register_reroll_source is dead code), so this is left as a gap pending that infrastructure.
+// Java postConstruct calls registerRerollSource(...) twice (PASS and THROW_TEAM_MATE, both via
+// ReRollSources.THE_BALLISTA); mirrored in the live `SkillId::reroll_sources()` table
+// (which also carries bb2025's KICK_TEAM_MATE — the table is a cross-edition union).
 use crate::model::skill::skill::Skill;
 use crate::enums::{SkillCategory, SkillUsageType};
 
@@ -50,5 +50,15 @@ mod tests {
     #[test]
     fn usage_type_is_correct() {
         assert_eq!(TheBallista::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
+    }
+
+    #[test]
+    fn has_the_ballista_reroll_sources() {
+        // Java: bb2020/special/TheBallista.postConstruct registers PASS and THROW_TEAM_MATE
+        // (both → ReRollSources.THE_BALLISTA, the only priority-2 source); mirrored against
+        // the live SkillId::reroll_sources() table.
+        let sources = SkillId::TheBallista.reroll_sources();
+        assert!(sources.iter().any(|(a, p)| *a == "PASS" && *p == 2));
+        assert!(sources.iter().any(|(a, p)| *a == "THROW_TEAM_MATE" && *p == 2));
     }
 }

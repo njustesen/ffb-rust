@@ -1,5 +1,6 @@
 package com.fumbbl.ffb.server.skill;
 
+import com.fumbbl.ffb.ReRolledActions;
 import com.fumbbl.ffb.RulesCollection;
 import com.fumbbl.ffb.SkillCategory;
 import com.fumbbl.ffb.model.property.NamedProperties;
@@ -50,5 +51,11 @@ class DodgeSkillTest {
             "Dodge must be available in BB2016");
         assertTrue(Arrays.stream(annotations).anyMatch(a -> a.value() == RulesCollection.Rules.BB2020),
             "Dodge must be available in BB2020");
+    }
+
+    @Test
+    void has_dodge_reroll_source() {
+        assertNotNull(skill.getRerollSource(ReRolledActions.DODGE),
+            "Dodge must register a reroll source for failed dodge rolls");
     }
 }

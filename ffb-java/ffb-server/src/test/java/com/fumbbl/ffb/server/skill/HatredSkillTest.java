@@ -1,5 +1,6 @@
 package com.fumbbl.ffb.server.skill;
 
+import com.fumbbl.ffb.ReRolledActions;
 import com.fumbbl.ffb.RulesCollection;
 import com.fumbbl.ffb.SkillCategory;
 import com.fumbbl.ffb.model.property.NamedProperties;
@@ -39,5 +40,11 @@ class HatredSkillTest {
         RulesCollection annotation = Hatred.class.getAnnotation(RulesCollection.class);
         assertNotNull(annotation);
         assertEquals(RulesCollection.Rules.BB2025, annotation.value());
+    }
+
+    @Test
+    void has_hatred_reroll_source() {
+        assertNotNull(skill.getRerollSource(ReRolledActions.SINGLE_SKULL),
+            "Hatred must register a reroll source for single skull rolls");
     }
 }

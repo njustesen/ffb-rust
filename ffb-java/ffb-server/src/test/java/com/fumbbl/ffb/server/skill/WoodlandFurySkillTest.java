@@ -1,5 +1,6 @@
 package com.fumbbl.ffb.server.skill;
 
+import com.fumbbl.ffb.ReRolledActions;
 import com.fumbbl.ffb.RulesCollection;
 import com.fumbbl.ffb.SkillCategory;
 import com.fumbbl.ffb.model.property.NamedProperties;
@@ -39,5 +40,11 @@ class WoodlandFurySkillTest {
         RulesCollection annotation = WoodlandFury.class.getAnnotation(RulesCollection.class);
         assertNotNull(annotation);
         assertEquals(RulesCollection.Rules.BB2025, annotation.value());
+    }
+
+    @Test
+    void has_woodland_fury_reroll_source() {
+        assertNotNull(skill.getRerollSource(ReRolledActions.SINGLE_BLOCK_DIE),
+            "Woodland Fury must register a reroll source for single block die rolls");
     }
 }

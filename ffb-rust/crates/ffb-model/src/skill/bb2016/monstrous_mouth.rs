@@ -1,9 +1,7 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2016::MonstrousMouth.
-// DEFERRED: Java registers `registerRerollSource(ReRolledActions.CATCH, ReRollSources.MONSTROUS_MOUTH)`.
-// The `cancelsForceOpponentToDropBallOnPushback` property is now in `SkillId::properties()`
-// (Phase AJ fix), but there is no `ReRollSource::MonstrousMouth` variant and no SkillId-keyed
-// reroll-source lookup table anywhere in the workspace (same gap affects bb2016 Sure Feet), so
-// the reroll-on-failed-catch grant is deferred pending that infrastructure.
+// Java registers `registerRerollSource(ReRolledActions.CATCH, ReRollSources.MONSTROUS_MOUTH)`;
+// mirrored in the live `SkillId::reroll_sources()` table. The
+// `cancelsForceOpponentToDropBallOnPushback` property lives in `SkillId::properties()`.
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 
@@ -47,5 +45,12 @@ mod tests {
         // Java: assertNotNull(skill.getSkillProperties()) — the live Rust property
         // table always yields a slice; assert every entry is a non-empty key.
         assert!(SkillId::MonstrousMouth.properties().iter().all(|p| !p.is_empty()));
+    }
+
+    #[test]
+    fn has_monstrous_mouth_reroll_source() {
+        // Java: bb2016/MonstrousMouth.postConstruct registers ReRolledActions.CATCH →
+        // ReRollSources.MONSTROUS_MOUTH; mirrored against the live SkillId::reroll_sources() table.
+        assert!(SkillId::MonstrousMouth.reroll_sources().iter().any(|(a, _)| *a == "CATCH"));
     }
 }

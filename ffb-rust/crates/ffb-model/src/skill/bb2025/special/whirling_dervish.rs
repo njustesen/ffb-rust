@@ -42,4 +42,11 @@ mod tests {
         // registers no NamedProperties, so the live SkillId table must be empty here.
         assert!(crate::enums::SkillId::WhirlingDervish.properties().is_empty());
     }
+
+    #[test]
+    fn has_whirling_dervish_reroll_source() {
+        // Java: bb2025/special/WhirlingDervish.postConstruct registers ReRolledActions.DIRECTION →
+        // ReRollSources.WHIRLING_DERVISH; mirrored against the live SkillId::reroll_sources() table.
+        assert!(crate::enums::SkillId::WhirlingDervish.reroll_sources().iter().any(|(a, _)| *a == "DIRECTION"));
+    }
 }

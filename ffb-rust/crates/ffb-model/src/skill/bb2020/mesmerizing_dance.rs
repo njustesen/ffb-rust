@@ -1,7 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::MesmerizingDance.
-// NOTE: Java postConstruct calls registerRerollSource(ReRolledActions.HYPNOTIC_GAZE, ReRollSources.
-// MESMERIZING_DANCE). There is no live reroll-source lookup table in the Rust codebase to mirror this into
-// (Skill::register_reroll_source is dead code), so this is left as a gap pending that infrastructure.
+// Java postConstruct calls registerRerollSource(ReRolledActions.HYPNOTIC_GAZE, ReRollSources.
+// MESMERIZING_DANCE); mirrored in the live `SkillId::reroll_sources()` table.
 use crate::model::skill::skill::Skill;
 use crate::enums::{SkillCategory, SkillUsageType};
 
@@ -50,5 +49,12 @@ mod tests {
     #[test]
     fn usage_type_is_correct() {
         assert_eq!(MesmerizingDance::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
+    }
+
+    #[test]
+    fn has_mesmerizing_dance_reroll_source() {
+        // Java: bb2020/special/MesmerizingDance.postConstruct registers ReRolledActions.HYPNOTIC_GAZE →
+        // ReRollSources.MESMERIZING_DANCE; mirrored against the live SkillId::reroll_sources() table.
+        assert!(SkillId::MesmerizingDance.reroll_sources().iter().any(|(a, _)| *a == "HYPNOTIC_GAZE"));
     }
 }

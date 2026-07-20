@@ -1,5 +1,6 @@
 package com.fumbbl.ffb.server.skill;
 
+import com.fumbbl.ffb.ReRolledActions;
 import com.fumbbl.ffb.RulesCollection;
 import com.fumbbl.ffb.SkillCategory;
 import com.fumbbl.ffb.model.property.CancelSkillProperty;
@@ -47,5 +48,11 @@ class SureHandsSkillTest {
         RulesCollection annotation = SureHands.class.getAnnotation(RulesCollection.class);
         assertNotNull(annotation, "Sure Hands must have a RulesCollection annotation");
         assertEquals(RulesCollection.Rules.COMMON, annotation.value());
+    }
+
+    @Test
+    void has_sure_hands_reroll_source() {
+        assertNotNull(skill.getRerollSource(ReRolledActions.PICK_UP),
+            "Sure Hands must register a reroll source for failed pick-up rolls");
     }
 }

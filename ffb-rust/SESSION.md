@@ -1,6 +1,38 @@
 # FFB-Rust Session State
 
-## Current Status (2026-07-20 later session, cross-engine TEST PARITY — see docs/TEST_PARITY.md)
+## Current Status (2026-07-21, parity follow-ups: reroll sources + remaining gaps closed)
+
+**Executed the test-parity follow-up plan** (docs/TEST_PARITY.md "Follow-up session" section has
+the full spec). `cargo test --workspace` **16,294 passed / 0 failed / 1 documented PARITY ignore**
+(BlockMode 7-vs-4, the only one left); Java **2,540 passed / 0 failed**; clippy clean in all
+touched files.
+
+- **Reroll-source system ported (the big one).** Java's `registerRerollSource` mechanism (26
+  skills / ~37 action→source pairs) now lives as `SkillId::reroll_sources()` (skill_id.rs),
+  consumed by the single chokepoint `find_skill_reroll_source` in
+  `ffb-engine/src/step/abstract_step_with_re_roll.rs` — replacing a hardcoded 5-action property
+  map + WhirlingDervish special case that left ~25 skills' rerolls (Pro, Brawler, Hatred,
+  TheBallista, HalflingLuck, Kick, Swoop, …) silently unavailable. Priorities mirror Java
+  ReRollSources (all 1, THE_BALLISTA 2); ~30 step call sites needed no edits. Mirrored tests
+  both sides (18 new Java `getRerollSource` assertions, 31 Rust mirrors, exhaustive table test,
+  6 chokepoint tests incl. priority/tie-break/used-skill fallthrough).
+- **usage_type tables reconciled**: 26 SKILL_TABLE rows + 15 `SkillId::usage_type()` arms fixed
+  against Java constructors (latest-edition-wins); cross-check test added so they can't drift.
+- **Game date fields**: `scheduled/started/finished` added (Java Game.java:37-39, serde default);
+  `StepInitStartGame::leave_step` sets `started` (Java:74); client marking handler now derives
+  `reconnecting = started.is_some()`; the 4 reconnect tests run un-ignored.
+- **Insignificant**: plain two-arg constructor (bb2025 Java is NOT a negative trait).
+- **Playability gates re-run** (before AND after the reroll/engine changes): lineman 100/100
+  full games, T3 coverage ALL REQUIRED ITEMS PRESENT; amazon + halfling 30/30 to natural
+  game_end. Halfling coverage shows throw-ins 0/**MISSING** — sample-size (ball never OOB in 30
+  halfling games), present in the lineman gate; not a regression.
+- Prior session's parity work committed as `13277a61`; this session's follow-ups committed on
+  top. BlockMode split (public 4-variant Mode vs internal dispatch enum) deliberately deferred
+  until injury dispatch is touched anyway.
+
+---
+
+## Prior Status (2026-07-20 later session, cross-engine TEST PARITY — see docs/TEST_PARITY.md)
 
 **Goal (user): remove non-sensible tests and mirror test coverage 1:1 across both engines —
 same tests, same function names (camelCase↔snake_case), same assertions — per the "mirrored

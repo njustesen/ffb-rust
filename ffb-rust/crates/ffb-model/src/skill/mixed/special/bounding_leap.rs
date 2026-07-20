@@ -48,4 +48,11 @@ mod tests {
     fn usage_type_is_once_per_game() {
         assert_eq!(BoundingLeap::new().get_skill_usage_type(), SkillUsageType::OncePerGame);
     }
+
+    #[test]
+    fn has_bounding_leap_reroll_source() {
+        // Java: mixed/special/BoundingLeap.postConstruct registers ReRolledActions.JUMP →
+        // ReRollSources.BOUNDING_LEAP; mirrored against the live SkillId::reroll_sources() table.
+        assert!(crate::enums::SkillId::BoundingLeap.reroll_sources().iter().any(|(a, _)| *a == "JUMP"));
+    }
 }

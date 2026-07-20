@@ -48,11 +48,8 @@ impl SubHandlerGameStateMarking {
         let existing_player_markers = existing_game.field_model.player_markers.clone();
         let existing_field_markers = existing_game.field_model.field_markers.clone();
 
-        // Java: `boolean reconnecting = incomingGame.getStarted() != null;` — the Rust
-        // `Game` (crates/ffb-model/src/model/game.rs) has no `started` field, so
-        // reconnecting can't be derived here and is treated as `false` (documented
-        // deviation, not invented).
-        let reconnecting = false;
+        // Java: `boolean reconnecting = incomingGame.getStarted() != null;`
+        let reconnecting = incoming_game.started.is_some();
         let is_initial_state = !reconnecting && existing_game.id == 0;
         let is_replay = client_mode == ClientMode::REPLAY;
 
@@ -305,10 +302,10 @@ mod tests {
 
     /// Java: `testManualPlayerReconnecting` (`given(incomingGame.getStarted()).willReturn(new Date())`).
     #[test]
-    #[ignore = "PARITY: Rust Game has no `started` field; handle_net_command hardcodes reconnecting=false, so reconnect scenarios behave like the initial state"]
     fn test_manual_player_reconnecting() {
-        let (existing, incoming) = setup();
+        let (existing, mut incoming) = setup();
         // Java: incomingGame.getStarted() returns a Date → reconnecting == true.
+        incoming.started = Some("1".to_owned());
         let handler = SubHandlerGameStateMarking::new();
 
         let result = handler.handle_net_command(&existing, incoming, ClientMode::PLAYER, true);
@@ -320,9 +317,10 @@ mod tests {
 
     /// Java: `testManualSpectatorReconnecting`.
     #[test]
-    #[ignore = "PARITY: Rust Game has no `started` field; handle_net_command hardcodes reconnecting=false, so reconnect scenarios behave like the initial state"]
     fn test_manual_spectator_reconnecting() {
-        let (existing, incoming) = setup();
+        let (existing, mut incoming) = setup();
+        // Java: incomingGame.getStarted() returns a Date → reconnecting == true.
+        incoming.started = Some("1".to_owned());
         let handler = SubHandlerGameStateMarking::new();
 
         let result = handler.handle_net_command(&existing, incoming, ClientMode::SPECTATOR, true);
@@ -334,9 +332,10 @@ mod tests {
 
     /// Java: `testAutomaticPlayerReconnecting`.
     #[test]
-    #[ignore = "PARITY: Rust Game has no `started` field; handle_net_command hardcodes reconnecting=false, so reconnect scenarios behave like the initial state"]
     fn test_automatic_player_reconnecting() {
-        let (existing, incoming) = setup();
+        let (existing, mut incoming) = setup();
+        // Java: incomingGame.getStarted() returns a Date → reconnecting == true.
+        incoming.started = Some("1".to_owned());
         let handler = SubHandlerGameStateMarking::new();
 
         let result = handler.handle_net_command(&existing, incoming, ClientMode::PLAYER, false);
@@ -348,9 +347,10 @@ mod tests {
 
     /// Java: `testAutomaticSpectatorReconnecting`.
     #[test]
-    #[ignore = "PARITY: Rust Game has no `started` field; handle_net_command hardcodes reconnecting=false, so reconnect scenarios behave like the initial state"]
     fn test_automatic_spectator_reconnecting() {
-        let (existing, incoming) = setup();
+        let (existing, mut incoming) = setup();
+        // Java: incomingGame.getStarted() returns a Date → reconnecting == true.
+        incoming.started = Some("1".to_owned());
         let handler = SubHandlerGameStateMarking::new();
 
         let result = handler.handle_net_command(&existing, incoming, ClientMode::SPECTATOR, false);

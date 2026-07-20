@@ -1,5 +1,6 @@
 package com.fumbbl.ffb.server.skill;
 
+import com.fumbbl.ffb.ReRolledActions;
 import com.fumbbl.ffb.RulesCollection;
 import com.fumbbl.ffb.SkillCategory;
 import com.fumbbl.ffb.skill.mixed.special.UnstoppableMomentum;
@@ -37,5 +38,11 @@ class UnstoppableMomentumSkillTest {
     @Test
     void has_skill_properties_not_null() {
         assertNotNull(skill.getSkillProperties());
+    }
+
+    @Test
+    void has_unstoppable_momentum_reroll_source() {
+        assertNotNull(skill.getRerollSource(ReRolledActions.SINGLE_BLOCK_DIE),
+            "Unstoppable Momentum must register a reroll source for single block die rolls");
     }
 }

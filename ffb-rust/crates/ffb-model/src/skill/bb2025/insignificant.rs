@@ -8,7 +8,9 @@ pub struct Insignificant {
 
 impl Insignificant {
     pub fn new() -> Self {
-        let base = Skill::as_negative_trait("Insignificant", SkillCategory::Trait);
+        // Java: super("Insignificant", SkillCategory.TRAIT) — the plain two-arg
+        // constructor; NOT a negative trait in the current bb2025 source.
+        let base = Skill::new("Insignificant", SkillCategory::Trait);
         Self { base }
     }
 }
@@ -44,7 +46,8 @@ mod tests {
     }
 
     #[test]
-    fn is_negative_trait() {
-        assert!(Insignificant::new().is_negative_trait());
+    fn is_not_negative_trait() {
+        // Java bb2025 uses the plain two-arg constructor (negativeTrait = false).
+        assert!(!Insignificant::new().is_negative_trait());
     }
 }

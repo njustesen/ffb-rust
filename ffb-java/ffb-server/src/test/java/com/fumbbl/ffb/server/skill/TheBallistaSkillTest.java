@@ -1,5 +1,6 @@
 package com.fumbbl.ffb.server.skill;
 
+import com.fumbbl.ffb.ReRolledActions;
 import com.fumbbl.ffb.RulesCollection;
 import com.fumbbl.ffb.SkillCategory;
 import com.fumbbl.ffb.skill.bb2020.special.TheBallista;
@@ -38,5 +39,13 @@ class TheBallistaSkillTest {
         RulesCollection annotation = TheBallista.class.getAnnotation(RulesCollection.class);
         assertNotNull(annotation);
         assertEquals(RulesCollection.Rules.BB2020, annotation.value());
+    }
+
+    @Test
+    void has_the_ballista_reroll_sources() {
+        assertNotNull(skill.getRerollSource(ReRolledActions.PASS),
+            "The Ballista (bb2020) must register a reroll source for pass rolls");
+        assertNotNull(skill.getRerollSource(ReRolledActions.THROW_TEAM_MATE),
+            "The Ballista (bb2020) must register a reroll source for throw team-mate rolls");
     }
 }

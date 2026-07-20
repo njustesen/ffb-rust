@@ -1,7 +1,6 @@
 /// 1:1 translation of com.fumbbl.ffb.skill.bb2020::WhirlingDervish.
-// NOTE: Java postConstruct calls registerRerollSource(ReRolledActions.DIRECTION, ReRollSources.
-// WHIRLING_DERVISH). There is no live reroll-source lookup table in the Rust codebase to mirror this into
-// (Skill::register_reroll_source is dead code), so this is left as a gap pending that infrastructure.
+// Java postConstruct calls registerRerollSource(ReRolledActions.DIRECTION, ReRollSources.
+// WHIRLING_DERVISH); mirrored in the live `SkillId::reroll_sources()` table.
 use crate::model::skill::skill::Skill;
 use crate::enums::SkillCategory;
 
@@ -45,5 +44,12 @@ mod tests {
         // Java: assertNotNull(skill.getSkillProperties()); the live Rust property table
         // is SkillId::WhirlingDervish.properties(), which always returns a valid slice.
         assert!(SkillId::WhirlingDervish.properties().iter().all(|p| !p.is_empty()));
+    }
+
+    #[test]
+    fn has_whirling_dervish_reroll_source() {
+        // Java: bb2020/special/WhirlingDervish.postConstruct registers ReRolledActions.DIRECTION →
+        // ReRollSources.WHIRLING_DERVISH; mirrored against the live SkillId::reroll_sources() table.
+        assert!(SkillId::WhirlingDervish.reroll_sources().iter().any(|(a, _)| *a == "DIRECTION"));
     }
 }

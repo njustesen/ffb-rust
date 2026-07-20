@@ -1,5 +1,6 @@
 package com.fumbbl.ffb.server.skill;
 
+import com.fumbbl.ffb.ReRolledActions;
 import com.fumbbl.ffb.RulesCollection;
 import com.fumbbl.ffb.SkillCategory;
 import com.fumbbl.ffb.model.property.NamedProperties;
@@ -39,5 +40,11 @@ class ConsummateProfessionalSkillTest {
         RulesCollection annotation = ConsummateProfessional.class.getAnnotation(RulesCollection.class);
         assertNotNull(annotation);
         assertEquals(RulesCollection.Rules.BB2020, annotation.value());
+    }
+
+    @Test
+    void has_consummate_professional_reroll_source() {
+        assertNotNull(skill.getRerollSource(ReRolledActions.SINGLE_DIE),
+            "Consummate Professional must register a reroll source for single die rolls");
     }
 }

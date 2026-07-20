@@ -35,4 +35,11 @@ mod tests {
     fn category_is_trait() {
         assert_eq!(LordOfChaos::new().get_category(), SkillCategory::Trait);
     }
+
+    #[test]
+    fn has_lord_of_chaos_reroll_source() {
+        // Java: bb2025/special/LordOfChaos.postConstruct registers ReRolledActions.SINGLE_BLOCK_DIE →
+        // ReRollSources.LORD_OF_CHAOS; mirrored against the live SkillId::reroll_sources() table.
+        assert!(crate::enums::SkillId::LordOfChaos.reroll_sources().iter().any(|(a, _)| *a == "SINGLE_BLOCK_DIE"));
+    }
 }

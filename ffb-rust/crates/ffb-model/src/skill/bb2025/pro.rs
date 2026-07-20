@@ -46,4 +46,11 @@ mod tests {
     fn class_name_is_pro() {
         assert_eq!(crate::enums::SkillId::Pro.class_name(), "Pro");
     }
+
+    #[test]
+    fn has_pro_reroll_source() {
+        // Java: bb2025/Pro.postConstruct registers ReRolledActions.SINGLE_DIE_PER_ACTIVATION →
+        // ReRollSources.PRO; mirrored against the live SkillId::reroll_sources() table.
+        assert!(crate::enums::SkillId::Pro.reroll_sources().iter().any(|(a, _)| *a == "SINGLE_DIE_PER_ACTIVATION"));
+    }
 }

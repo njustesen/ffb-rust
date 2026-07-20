@@ -42,6 +42,10 @@ mod tests {
         assert!(crate::enums::SkillId::Catch.properties().is_empty());
     }
 
-    // Java `has_catch_reroll_source` is not mirrored: there is no live Rust
-    // reroll-source table, and Catch::new() does not register one.
+    #[test]
+    fn has_catch_reroll_source() {
+        // Java: assertNotNull(skill.getRerollSource(ReRolledActions.CATCH)) —
+        // mirrored against the live SkillId::reroll_sources() table.
+        assert!(crate::enums::SkillId::Catch.reroll_sources().iter().any(|(a, _)| *a == "CATCH"));
+    }
 }

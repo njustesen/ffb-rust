@@ -49,9 +49,10 @@ mod tests {
         assert_eq!(ThinkingMansTroll::new().skill_usage_type, SkillUsageType::OncePerHalf);
     }
     #[test]
-    fn registers_single_die_reroll_source() {
-        let skill = ThinkingMansTroll::new();
-        let source = skill.base.reroll_sources.get(&ReRolledAction::new("Single Die"));
-        assert_eq!(source, Some(&ReRollSource::new("Thinking Man's Troll")));
+    fn has_thinking_mans_troll_reroll_source() {
+        // Java: assertNotNull(skill.getRerollSource(ReRolledActions.SINGLE_DIE)) —
+        // mirrored against the live SkillId::reroll_sources() table (the per-struct
+        // register_reroll_source map is inert).
+        assert!(crate::enums::SkillId::ThinkingMansTroll.reroll_sources().iter().any(|(a, _)| *a == "SINGLE_DIE"));
     }
 }

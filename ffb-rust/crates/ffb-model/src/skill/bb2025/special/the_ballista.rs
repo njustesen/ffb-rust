@@ -42,4 +42,15 @@ mod tests {
         // registers no NamedProperties, so the live SkillId table must be empty here.
         assert!(crate::enums::SkillId::TheBallista.properties().is_empty());
     }
+
+    #[test]
+    fn has_the_ballista_reroll_sources() {
+        // Java: bb2025/special/TheBallista.postConstruct registers PASS, THROW_TEAM_MATE and
+        // KICK_TEAM_MATE (all → ReRollSources.THE_BALLISTA, the only priority-2 source);
+        // mirrored against the live SkillId::reroll_sources() table.
+        let sources = crate::enums::SkillId::TheBallista.reroll_sources();
+        assert!(sources.iter().any(|(a, p)| *a == "PASS" && *p == 2));
+        assert!(sources.iter().any(|(a, p)| *a == "THROW_TEAM_MATE" && *p == 2));
+        assert!(sources.iter().any(|(a, p)| *a == "KICK_TEAM_MATE" && *p == 2));
+    }
 }

@@ -45,4 +45,11 @@ mod tests {
         // is SkillId::MonstrousMouth.properties(), which always returns a valid slice.
         assert!(SkillId::MonstrousMouth.properties().iter().all(|p| !p.is_empty()));
     }
+
+    #[test]
+    fn has_monstrous_mouth_reroll_source() {
+        // Java: bb2020/MonstrousMouth.postConstruct registers ReRolledActions.CATCH →
+        // ReRollSources.MONSTROUS_MOUTH; mirrored against the live SkillId::reroll_sources() table.
+        assert!(SkillId::MonstrousMouth.reroll_sources().iter().any(|(a, _)| *a == "CATCH"));
+    }
 }

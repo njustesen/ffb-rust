@@ -62,13 +62,11 @@ mod tests {
     }
 
     #[test]
-    fn registers_pick_up_reroll_source() {
-        // Java SureHands.postConstruct() registers a reroll source for PICK_UP;
-        // this would have failed before the fix since no reroll source was registered.
-        let s = SureHands::new();
-        let action = ReRolledAction::new("Pick Up");
-        let source = s.get_reroll_source(&action);
-        assert!(source.is_some());
-        assert_eq!(source.unwrap().name, "Sure Hands");
+    fn has_sure_hands_reroll_source() {
+        // Java: assertNotNull(skill.getRerollSource(ReRolledActions.PICK_UP)) —
+        // mirrored against the live SkillId::reroll_sources() table (the
+        // per-struct register_reroll_source map is inert; Java PICK_UP is
+        // "PICKUP" in the Rust engine's action vocabulary).
+        assert!(crate::enums::SkillId::SureHands.reroll_sources().iter().any(|(a, _)| *a == "PICKUP"));
     }
 }

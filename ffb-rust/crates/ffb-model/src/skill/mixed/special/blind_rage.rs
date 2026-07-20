@@ -43,4 +43,11 @@ mod tests {
         let props: &'static [&'static str] = crate::enums::SkillId::BlindRage.properties();
         assert!(props.iter().all(|p| !p.is_empty()));
     }
+
+    #[test]
+    fn has_blind_rage_reroll_source() {
+        // Java: mixed/special/BlindRage.postConstruct registers ReRolledActions.DAUNTLESS →
+        // ReRollSources.BLIND_RAGE; mirrored against the live SkillId::reroll_sources() table.
+        assert!(crate::enums::SkillId::BlindRage.reroll_sources().iter().any(|(a, _)| *a == "DAUNTLESS"));
+    }
 }

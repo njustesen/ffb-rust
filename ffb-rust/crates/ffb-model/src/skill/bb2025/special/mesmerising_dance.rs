@@ -42,4 +42,11 @@ mod tests {
         // registers no NamedProperties, so the live SkillId table must be empty here.
         assert!(crate::enums::SkillId::MesmerisingDance.properties().is_empty());
     }
+
+    #[test]
+    fn has_mesmerising_dance_reroll_source() {
+        // Java: bb2025/special/MesmerisingDance.postConstruct registers ReRolledActions.HYPNOTIC_GAZE →
+        // ReRollSources.MESMERISING_DANCE; mirrored against the live SkillId::reroll_sources() table.
+        assert!(crate::enums::SkillId::MesmerisingDance.reroll_sources().iter().any(|(a, _)| *a == "HYPNOTIC_GAZE"));
+    }
 }

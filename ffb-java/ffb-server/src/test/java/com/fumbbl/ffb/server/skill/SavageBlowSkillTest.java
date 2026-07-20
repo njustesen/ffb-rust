@@ -1,5 +1,6 @@
 package com.fumbbl.ffb.server.skill;
 
+import com.fumbbl.ffb.ReRolledActions;
 import com.fumbbl.ffb.RulesCollection;
 import com.fumbbl.ffb.SkillCategory;
 import com.fumbbl.ffb.skill.mixed.special.SavageBlow;
@@ -37,5 +38,11 @@ class SavageBlowSkillTest {
     @Test
     void has_skill_properties_not_null() {
         assertNotNull(skill.getSkillProperties());
+    }
+
+    @Test
+    void has_savage_blow_reroll_source() {
+        assertNotNull(skill.getRerollSource(ReRolledActions.MULTI_BLOCK_DICE),
+            "Savage Blow must register a reroll source for multi block dice rolls");
     }
 }

@@ -1,5 +1,6 @@
 package com.fumbbl.ffb.server.skill;
 
+import com.fumbbl.ffb.ReRolledActions;
 import com.fumbbl.ffb.RulesCollection;
 import com.fumbbl.ffb.SkillCategory;
 import com.fumbbl.ffb.skill.bb2025.special.MesmerisingDance;
@@ -38,5 +39,11 @@ class MesmerisingDanceSkillTest {
         RulesCollection annotation = MesmerisingDance.class.getAnnotation(RulesCollection.class);
         assertNotNull(annotation);
         assertEquals(RulesCollection.Rules.BB2025, annotation.value());
+    }
+
+    @Test
+    void has_mesmerising_dance_reroll_source() {
+        assertNotNull(skill.getRerollSource(ReRolledActions.HYPNOTIC_GAZE),
+            "Mesmerising Dance must register a reroll source for hypnotic gaze rolls");
     }
 }

@@ -20,6 +20,16 @@ use crate::report::report_list::ReportList;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Game {
     pub id: u64,
+    /// Java: fScheduled (Date; JSON timestamp string or null).
+    #[serde(default)]
+    pub scheduled: Option<String>,
+    /// Java: fStarted — set by StepInitStartGame once both coaches sent
+    /// CLIENT_START_GAME; `started != None` is Java's "reconnecting" signal.
+    #[serde(default)]
+    pub started: Option<String>,
+    /// Java: fFinished (Date; JSON timestamp string or null).
+    #[serde(default)]
+    pub finished: Option<String>,
     pub rules: Rules,
     pub status: GameStatus,
     pub turn_mode: TurnMode,
@@ -97,6 +107,9 @@ impl Game {
     pub fn new(home: Team, away: Team, rules: Rules) -> Self {
         Game {
             id: 0,
+            scheduled: None,
+            started: None,
+            finished: None,
             rules,
             status: GameStatus::Starting,
             turn_mode: TurnMode::StartGame,

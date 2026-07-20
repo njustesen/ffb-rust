@@ -1,5 +1,6 @@
 package com.fumbbl.ffb.server.skill;
 
+import com.fumbbl.ffb.ReRolledActions;
 import com.fumbbl.ffb.RulesCollection;
 import com.fumbbl.ffb.SkillCategory;
 import com.fumbbl.ffb.skill.bb2016.MonstrousMouth;
@@ -38,5 +39,11 @@ class MonstrousMouthSkillTest {
         RulesCollection annotation = MonstrousMouth.class.getAnnotation(RulesCollection.class);
         assertNotNull(annotation);
         assertEquals(RulesCollection.Rules.BB2016, annotation.value());
+    }
+
+    @Test
+    void has_monstrous_mouth_reroll_source() {
+        assertNotNull(skill.getRerollSource(ReRolledActions.CATCH),
+            "Monstrous Mouth must register a reroll source for failed catch rolls");
     }
 }
