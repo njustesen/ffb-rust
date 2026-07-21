@@ -50,8 +50,41 @@ Java counterpart) + any `// PARITY-EXEMPT` modules batch A3 tags (Rust-only infr
 - Step-port intel (from R3): generator tests ~100-150/agent-run; step-logic ~4-8 files/run,
   needs a seeded-dice delegate + GeneratorTestSupport promoted to fixture; ~4,700 step tests
   remain → budget ~40-50 agent-runs. THE dominant remaining cost.
-- Wave 3 (in progress): P-gen (prune ~150 Rust param-struct tests), B5r (client port),
-  B6r (server db/tasks port).
+- Wave 3 (a2b7f006/9a3edf3e/f4ce3c30): R2 model finish (ffb-common 1,939); P-gen pruned 134
+  Rust generator param tests (engine 7,108); B5r client partial (client-logic 101); B6r server
+  partial (server 2,505). Java now ~4,545 distinct. Rust ~14,540.
+- Recurring: session-limit interruptions kill agents mid-wave ~every wave; recovery = remove
+  broken partials (compile errors / initFrom-NPE-on-default / package-private access), restore
+  each module green, commit. Fixed ReportMessageTestBase.Run fields → public for subpackage tests.
+- Wave 4 (d2dc289d/003d1328): FX fixture enhancement (ScriptedFortuna scripted dice +
+  GeneratorTestSupport promoted, ffb-server 2,511); B5r2 client-logic 101→1,208 (301 classes).
+- **BLOCKED (2026-07-21): hit the 200-subagent session cap.** Raising
+  CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION only takes effect after a Claude Code session RESTART.
+  Set it high (e.g. 600) and restart to resume the parallel port.
+
+## RESUME STATE (start here after restart)
+Committed & green at 003d1328 (+ d2dc289d fixture). Counts:
+- Java: ffb-common 1,939 · ffb-client-logic 1,208 · ffb-server 2,511  = ~5,658 distinct.
+- Rust: 14,591.  Gap ≈ 8,900, dominated by the step port.
+
+Remaining work-list (each a batch; all use the recover-and-commit discipline, keep module green,
+no git in agents, IGNORE nested ffb-java/ffb/):
+1. **Steps (~4,600 — the bulk).** Use fixture/ (GameFixture, GeneratorTestSupport, ScriptedFortuna;
+   README has the recipe). Order: (a) generator families bb2020+bb2016 → step/generator/{bb2020,bb2016}
+   (mechanical, ~100-150 tests/run); (b) step-logic families step/{bb2016,bb2020,bb2025,mixed,action}
+   using installScriptedDice for exact outcomes (~4-8 files/run). Skip FUMBBL-mode + missing-roster-
+   position tests (README limits). One family per agent; many agents.
+2. **Client state/logic (25 modules, ~150 tests).** Recipe:
+   scratchpad/CLEANUP_STATE_LOGIC_INSTRUCTIONS.md (LOGIC_PLUGIN factory-cast wiring; green
+   reference MoveLogicModuleTest). Modules listed in the wave-4b commit body.
+3. **Server remainder (~850).** db/net/admin survivors → ffb-server (not step/, not fixture/).
+4. **Model/report tails** if any survivor lacks a Java mirror (mostly done).
+
+## Audit backlog (found during porting, not yet actioned)
+- SkillFactory (Java) vs SKILL_TABLE (Rust) membership divergence: union 203 vs 200, BB2016 86 vs
+  58, General 15 vs 29, Yoink absent in Java BB2025. Needs a dedicated editions+category audit.
+- 6 wire discrepancies from B1 (ServerCommandReplay commandNr, entropy byte-vs-u8, ZapPlayer arg
+  order, null-vs-omitted keys, FieldCoordinate array-vs-object, typed-vs-string fields).
 
 ## Wave 1 results (done, commit 2881831c)
 - A1 pruned 199 step tests (146 id_is_* → 1 exhaustive make_step test); step 4969→4771.
