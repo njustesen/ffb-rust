@@ -2,8 +2,12 @@ package com.fumbbl.ffb.dialog;
 
 import com.fumbbl.ffb.ReRollOptions;
 import com.fumbbl.ffb.ReRollProperty;
+import com.fumbbl.ffb.factory.IFactorySource;
 import com.fumbbl.ffb.inducement.InducementType;
+import com.fumbbl.ffb.model.Game;
 import com.fumbbl.ffb.net.NetCommandTestUtil;
+import com.fumbbl.ffb.option.GameOptionId;
+import com.fumbbl.ffb.option.GameOptionString;
 
 import com.eclipsesource.json.JsonValue;
 import org.junit.jupiter.api.Test;
@@ -40,8 +44,20 @@ public class DialogReRollRegenerationMultipleParameterTest {
 
 		JsonValue json = p.toJsonValue();
 		DialogReRollRegenerationMultipleParameter back = (DialogReRollRegenerationMultipleParameter)
-			new DialogReRollRegenerationMultipleParameter().initFrom(NetCommandTestUtil.gameSource(), json);
+			new DialogReRollRegenerationMultipleParameter().initFrom(bb2025Source(), json);
 		assertEquals(1, back.getReRollOptions().size());
+	}
+
+	// The ReRollProperty factory (RE_ROLL_PROPERTY) is registered only for BB2025 rules,
+	// so the JSON round-trip needs a BB2025 game context to resolve the property names.
+	private static IFactorySource bb2025Source() {
+		IFactorySource app = NetCommandTestUtil.applicationSource();
+		Game game = new Game(app, app.getFactoryManager());
+		GameOptionString rules = new GameOptionString(GameOptionId.RULESVERSION);
+		rules.setValue("BB2025");
+		game.getOptions().addOption(rules);
+		game.initializeRules();
+		return game.getRules();
 	}
 
 }
