@@ -27,13 +27,16 @@ impl Bomb {
             init_params.push(StepParameter::CatcherId(Some(id.clone())));
         }
         seq.add(StepId::InitBomb, init_params);
-        // 2 CATCH_SCATTER_THROW_IN
+        // 2 CATCH_SCATTER_THROW_IN (handles the bomb bounce)
         seq.add(StepId::CatchScatterThrowIn, vec![]);
-        // 3 RESOLVE_BOMB
+        // 3 RECHECK_EXPLODE_SKILL — Java Bomb.pushSequence inserts this between the
+        // bounce CatchScatterThrowIn and ResolveBomb (re-offers the explode skill).
+        seq.add(StepId::RecheckExplodeSkill, vec![]);
+        // 4 RESOLVE_BOMB
         seq.add(StepId::ResolveBomb, vec![]);
-        // 4 CATCH_SCATTER_THROW_IN
+        // 5 CATCH_SCATTER_THROW_IN
         seq.add(StepId::CatchScatterThrowIn, vec![]);
-        // 5 END_BOMB [END_BOMB]
+        // 6 END_BOMB [END_BOMB]
         seq.add_labelled(StepId::EndBomb, labels::END_BOMB, vec![]);
         seq.build()
     }
@@ -48,9 +51,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn bomb_has_5_steps() {
+    fn bomb_has_6_steps() {
+        // Java Bomb.pushSequence: INIT_BOMB, CATCH_SCATTER_THROW_IN, RECHECK_EXPLODE_SKILL,
+        // RESOLVE_BOMB, CATCH_SCATTER_THROW_IN, END_BOMB = 6.
         let steps = Bomb::build_sequence(&BombParams::default());
-        assert_eq!(steps.len(), 5);
+        assert_eq!(steps.len(), 6);
     }
 
     #[test]
