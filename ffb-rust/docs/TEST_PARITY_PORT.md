@@ -108,9 +108,12 @@ MultiBlock, RaidingParty, SelectBlitzTarget (17 files, ~110 methods) + the 10 pr
 **bb2025 generators: COMPLETE** (all 31 incl. the formerly-deferred special_effect,
 throw_team_mate, activation_sequence_builder, ScatterPlayer). ffb-server ~2,611+.
 
-**bb2020 generators: COMPLETE** (all 25). Added edition-aware GameFixture overload
-`createGameState(playersPerTeam, Rules)` for edition-gated steps. ffb-server 2,749.
-**bb2016 generators: NEXT** (15). Then step-logic (bulk), client state/logic (25), server remainder.
+**ALL generators COMPLETE** (bb2016 15 + bb2020 25 + bb2025 31). Added edition-aware
+GameFixture overload `createGameState(playersPerTeam, Rules)`. ffb-server 2,831.
+**NEXT: step-LOGIC port** (the actual step classes' behavior tests in
+crates/ffb-engine/src/step/{bb2016,bb2020,bb2025,mixed,action,...}/*.rs — the bulk, thousands),
+then client state/logic (25 modules), then server remainder (db/net/admin). Java totals now
+~5,978 (ffb-common 1,939 / client-logic 1,208 / server 2,831); Rust ~14,540.
 Reusable: nested-field reads via readField(readField(step,"state"),"goToLabelOnFailure") for
 StepBloodLust; CloudBurster hook field is fGotoLabelOnFailure; SpecialEffect generator/enum
 name clash → qualify the enum as com.fumbbl.ffb.SpecialEffect.
