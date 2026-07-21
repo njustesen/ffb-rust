@@ -105,10 +105,27 @@ BalefulHex, BlackInk, CatchOfTheDay, Treacherous, ThenIStartedBlastin, AutoGazeZ
 MultiBlock, RaidingParty, SelectBlitzTarget (17 files, ~110 methods) + the 10 pre-existing.
 **2 real Rust bugs found & fixed:** furious_outburst missing the activation sub-sequence
 (15→28 steps); bomb missing RECHECK_EXPLODE_SKILL (5→6 steps). Both fixed in Rust + tests.
-Deferred bb2025 generators (awkward construction, do next): special_effect (SpecialEffect
-factory object), throw_team_mate (conditional-defender step count), activation_sequence_builder
-(sequence not pushed to stack), ScatterPlayer (StepInitScatterPlayer strict param-init).
-Then: bb2020 generators (26), bb2016 (15), step-logic (bulk), client state/logic (25), server.
+**bb2025 generators: COMPLETE** (all 31 incl. the formerly-deferred special_effect,
+throw_team_mate, activation_sequence_builder, ScatterPlayer). ffb-server ~2,611+.
+
+**bb2020 generators: IN PROGRESS.** Done: baleful_hex, catch_of_the_day, raiding_party,
+treacherous. Remaining bb2020 (22): black_ink, blitz_block, blitz_move, block, bomb, end_game,
+end_player_action, foul, furious_outburst, look_into_my_eyes, move_, multi_block, pass,
+scatter_player, select, select_blitz_target, select_gaze_target, special_effect, start_game,
+then_i_started_blastin, throw_keg, throw_team_mate.
+Then: bb2016 generators (15), step-logic (bulk), client state/logic (25), server remainder.
+
+Port recipe (proven): read Rust `#[cfg(test)]` in
+crates/ffb-engine/src/step/generator/<ed>/<f>.rs → read Java pushSequence + SequenceParams
+ctor in ffb-server/.../step/generator/<ed>/<Name>.java (+ base class for the ctor) → write
+Java test in ffb-server/src/test/.../step/generator/<ed>/<Name>FixtureTest.java using
+GameFixture.createGameState(3) + `new <Name>().pushSequence(new <Name>.SequenceParams(...))`
++ GeneratorTestSupport.{sequence,find,findLabelled,contains,count,indexOf,booleanField,readField}.
+Param-content assertions: read the target Step's private field name and use readField/booleanField.
+SKIP (with comment): StepBloodLust goToLabelOnFailure (nested `state` field, not observable);
+ThenIStartedBlastin GOTO_LABEL_ON_END (Java init doesn't consume it). Watch for real Rust bugs
+(2 found & fixed so far: furious_outburst + bomb missing steps vs Java) — assert Java-true value
+and fix the Rust generator + its Rust test.
 
 ## Wire discrepancies found during porting (review later; NOT test-count blockers)
 Byte-parity is already knowingly broken; these are logged for a future wire-parity pass.
