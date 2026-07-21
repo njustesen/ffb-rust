@@ -98,6 +98,18 @@ no git in agents, IGNORE nested ffb-java/ffb/):
 Exemption set (Rust-only, excluded from 1:1 requirement): ffb-server net/wire.rs,
 net/wire_prompt.rs; ffb-client connection/mod.rs; all of ffb-parity (39 harness self-tests).
 
+## Direct (single-threaded) porting progress — bb2025 generators
+Subagent cap (200) is exhausted; continuing by hand. Done this pass (all committed, green):
+EndTurn, EndPlayerAction, Punt, ThrowKeg, ThrowARock, LookIntoMyEyes, FuriousOutburst,
+BalefulHex, BlackInk, CatchOfTheDay, Treacherous, ThenIStartedBlastin, AutoGazeZoat, Bomb,
+MultiBlock, RaidingParty, SelectBlitzTarget (17 files, ~110 methods) + the 10 pre-existing.
+**2 real Rust bugs found & fixed:** furious_outburst missing the activation sub-sequence
+(15→28 steps); bomb missing RECHECK_EXPLODE_SKILL (5→6 steps). Both fixed in Rust + tests.
+Deferred bb2025 generators (awkward construction, do next): special_effect (SpecialEffect
+factory object), throw_team_mate (conditional-defender step count), activation_sequence_builder
+(sequence not pushed to stack), ScatterPlayer (StepInitScatterPlayer strict param-init).
+Then: bb2020 generators (26), bb2016 (15), step-logic (bulk), client state/logic (25), server.
+
 ## Wire discrepancies found during porting (review later; NOT test-count blockers)
 Byte-parity is already knowingly broken; these are logged for a future wire-parity pass.
 - B1: `ServerCommandReplay.initFrom` doesn't restore `commandNr` (Java read/write asymmetry).
