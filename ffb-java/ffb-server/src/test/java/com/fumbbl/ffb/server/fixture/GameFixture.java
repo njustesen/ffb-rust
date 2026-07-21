@@ -22,6 +22,9 @@ import com.fumbbl.ffb.server.step.StepAction;
 import com.fumbbl.ffb.server.step.StepCommandStatus;
 import com.fumbbl.ffb.server.step.StepId;
 import com.fumbbl.ffb.server.util.UtilServerStartGame;
+import com.fumbbl.ffb.RulesCollection;
+import com.fumbbl.ffb.option.GameOptionId;
+import com.fumbbl.ffb.option.GameOptionString;
 import com.fumbbl.ffb.server.util.UtilSkillBehaviours;
 import com.fumbbl.ffb.server.util.rng.Fortuna;
 import com.fumbbl.ffb.util.UtilActingPlayer;
@@ -84,6 +87,20 @@ public final class GameFixture {
 	 * jersey numbers 1..N; all players start as reserves in the box.
 	 */
 	public static GameState createGameState(TestFantasyFootballServer server, int playersPerTeam) {
+		return createGameState(server, playersPerTeam, RulesCollection.Rules.BB2025);
+	}
+
+	/**
+	 * Edition-aware variant. Overrides the RULESVERSION game option before rules
+	 * initialization so edition-specific generators (e.g. bb2020/bb2016 EndGame,
+	 * whose StepFactory only handles that edition's steps) can be exercised.
+	 */
+	public static GameState createGameState(int playersPerTeam, RulesCollection.Rules rules) {
+		return createGameState(new TestFantasyFootballServer(), playersPerTeam, rules);
+	}
+
+	public static GameState createGameState(TestFantasyFootballServer server, int playersPerTeam,
+			RulesCollection.Rules rules) {
 		GameState gameState = new GameState(server);
 
 		// 1. Default game options (selects the BB2025 ruleset in STANDALONE mode)
@@ -91,6 +108,13 @@ public final class GameFixture {
 
 		// 2. Rules-dependent members and rules initialization
 		Game game = gameState.getGame();
+
+		// Override the ruleset edition before initializeRules() reads it.
+		GameOptionString ruleSet = (GameOptionString) game.getOptions().getFactory()
+			.createGameOption(GameOptionId.RULESVERSION);
+		ruleSet.setValue(rules.name());
+		game.getOptions().addOption(ruleSet);
+
 		game.setHomePlaying(true);
 		game.setTurnMode(TurnMode.START_GAME);
 		game.setTesting(true);
