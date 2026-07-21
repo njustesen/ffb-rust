@@ -1,6 +1,8 @@
 package com.fumbbl.ffb.net;
 
+import com.eclipsesource.json.JsonValue;
 import com.fumbbl.ffb.FactoryType.FactoryContext;
+import com.fumbbl.ffb.factory.IFactorySource;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -17,6 +19,14 @@ public class INetCommandHandlerTest {
 
 		public FactoryContext getContext() {
 			return FactoryContext.GAME;
+		}
+
+		public JsonValue toJsonValue() {
+			return null;
+		}
+
+		public Object initFrom(IFactorySource source, JsonValue jsonValue) {
+			return this;
 		}
 	}
 

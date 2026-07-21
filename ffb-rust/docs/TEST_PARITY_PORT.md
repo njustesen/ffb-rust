@@ -41,5 +41,30 @@ Java counterpart) + any `// PARITY-EXEMPT` modules batch A3 tags (Rust-only infr
   clearly a translation bug (with its own scoped verification).
 - Every batch runs its scoped `cargo test` / `mvn test` before reporting.
 
-## Wave 1 results
-(fill in as batches complete)
+## Wave 1 results (done, commit 2881831c)
+- A1 pruned 199 step tests (146 id_is_* → 1 exhaustive make_step test); step 4969→4771.
+- A2 pruned 887 model tests (dialog 356→66, injury 197→1 constant read-backs, model 585→317,
+  inducement 110→36, util/types/data trimmed); factory/events/prompts untouched.
+- A3 pruned 541 client/server tests; tagged 3 PARITY-EXEMPT Rust-only infra modules
+  (net/wire.rs, net/wire_prompt.rs, connection/mod.rs) + ffb-parity's 39 harness tests.
+- B0 built the Java headless GameState fixture (no Mockito) + StepInitStartGame POC (11/11).
+- Rust total 16,294 → 14,725. Workspace green.
+
+Exemption set (Rust-only, excluded from 1:1 requirement): ffb-server net/wire.rs,
+net/wire_prompt.rs; ffb-client connection/mod.rs; all of ffb-parity (39 harness self-tests).
+
+## Wire discrepancies found during porting (review later; NOT test-count blockers)
+Byte-parity is already knowingly broken; these are logged for a future wire-parity pass.
+- B1: `ServerCommandReplay.initFrom` doesn't restore `commandNr` (Java read/write asymmetry).
+- B1: anti-replay `entropy` is signed `byte` in Java vs `u8` in Rust — values ≥128 diverge.
+- B1: `ServerCommandZapPlayer`/`UnzapPlayer` ctor arg order reversed Java vs Rust (test-only).
+- B1: null-vs-omitted JSON keys; `FieldCoordinate` as `[x,y]` array in commands vs `{x,y}` object;
+  typed factory objects (Skill/Card/…) in Java vs name strings in Rust.
+
+## Wave 2 (medium ports)
+| B1 | ffb-protocol ~882 → ffb-common net/commands (137 classes, 815 methods) | DONE — ffb-common 1,044 green |
+| B2 | ffb-model survivors (dialog/model/util/types/inducement/injury/factory) → ffb-common | RUNNING |
+| B3 | ffb-model report/ 391 → ffb-common report JSON tests | RUNNING |
+| B4 | ffb-mechanics unmirrored (~700) → ffb-server tests | RUNNING |
+| B5 | ffb-client survivors ~1,698 → ffb-client-logic tests | RUNNING |
+| B6 | ffb-server survivors ~896 → ffb-server tests | RUNNING |

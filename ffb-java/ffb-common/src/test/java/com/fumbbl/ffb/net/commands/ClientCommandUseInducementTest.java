@@ -26,7 +26,8 @@ public class ClientCommandUseInducementTest {
 
 	private static InducementType inducementType() {
 		InducementTypeFactory factory = NetCommandTestUtil.gameSource().getFactory(FactoryType.Factory.INDUCEMENT_TYPE);
-		return factory.forName("Bribe");
+		// The InducementType's name (getName) is the id "bribes"; "Bribe" is the singular label.
+		return factory.forName("bribes");
 	}
 
 	private static Card anyCard() {

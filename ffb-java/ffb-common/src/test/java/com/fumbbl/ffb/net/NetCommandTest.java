@@ -1,6 +1,8 @@
 package com.fumbbl.ffb.net;
 
+import com.eclipsesource.json.JsonValue;
 import com.fumbbl.ffb.FactoryType.FactoryContext;
+import com.fumbbl.ffb.factory.IFactorySource;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -22,6 +24,14 @@ public class NetCommandTest {
 		public FactoryContext getContext() {
 			return FactoryContext.GAME;
 		}
+
+		public JsonValue toJsonValue() {
+			return null;
+		}
+
+		public Object initFrom(IFactorySource source, JsonValue jsonValue) {
+			return this;
+		}
 	}
 
 	private static class AppScoped extends NetCommand {
@@ -31,6 +41,14 @@ public class NetCommandTest {
 
 		public FactoryContext getContext() {
 			return FactoryContext.APPLICATION;
+		}
+
+		public JsonValue toJsonValue() {
+			return null;
+		}
+
+		public Object initFrom(IFactorySource source, JsonValue jsonValue) {
+			return this;
 		}
 	}
 

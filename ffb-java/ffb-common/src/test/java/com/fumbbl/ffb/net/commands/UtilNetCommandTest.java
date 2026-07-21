@@ -1,6 +1,8 @@
 package com.fumbbl.ffb.net.commands;
 
+import com.eclipsesource.json.JsonValue;
 import com.fumbbl.ffb.FactoryType.FactoryContext;
+import com.fumbbl.ffb.factory.IFactorySource;
 import com.fumbbl.ffb.net.NetCommand;
 import com.fumbbl.ffb.net.NetCommandId;
 import org.junit.jupiter.api.Test;
@@ -24,6 +26,14 @@ public class UtilNetCommandTest {
 
 			public FactoryContext getContext() {
 				return FactoryContext.GAME;
+			}
+
+			public JsonValue toJsonValue() {
+				return null;
+			}
+
+			public Object initFrom(IFactorySource source, JsonValue jsonValue) {
+				return this;
 			}
 		};
 	}
