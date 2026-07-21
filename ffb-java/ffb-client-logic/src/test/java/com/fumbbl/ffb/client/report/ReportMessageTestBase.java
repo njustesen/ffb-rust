@@ -31,7 +31,7 @@ import static org.mockito.Mockito.verify;
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-abstract class ReportMessageTestBase {
+public abstract class ReportMessageTestBase {
 
 	@Mock(answer = Answers.RETURNS_DEEP_STUBS)
 	protected FantasyFootballClient client;
@@ -50,9 +50,9 @@ abstract class ReportMessageTestBase {
 	}
 
 	protected static final class Run {
-		final ParagraphStyle paragraphStyle;
-		final TextStyle textStyle;
-		final String text;
+		public final ParagraphStyle paragraphStyle;
+		public final TextStyle textStyle;
+		public final String text;
 
 		Run(ParagraphStyle paragraphStyle, TextStyle textStyle, String text) {
 			this.paragraphStyle = paragraphStyle;
