@@ -41,6 +41,18 @@ Java counterpart) + any `// PARITY-EXEMPT` modules batch A3 tags (Rust-only infr
   clearly a translation bug (with its own scoped verification).
 - Every batch runs its scoped `cargo test` / `mvn test` before reporting.
 
+## Progress log
+- Baseline: Rust 16,294 / Java 2,540 surefire runs.
+- Wave 1 (2881831c): pruned ~1,570 Rust → 14,725; Java fixture built.
+- Wave 2 partial (8cba5a40): B1 protocol port; Java ~3,648.
+- Wave 2b (1a6ed1e1): R1 report (336), R2 model, R3 step pilot (78). Java ~4,376
+  (ffb-common 1,892 / client-logic 17 / server 2,467). All modules green.
+- Step-port intel (from R3): generator tests ~100-150/agent-run; step-logic ~4-8 files/run,
+  needs a seeded-dice delegate + GeneratorTestSupport promoted to fixture; ~4,700 step tests
+  remain → budget ~40-50 agent-runs. THE dominant remaining cost.
+- Wave 3 (in progress): P-gen (prune ~150 Rust param-struct tests), B5r (client port),
+  B6r (server db/tasks port).
+
 ## Wave 1 results (done, commit 2881831c)
 - A1 pruned 199 step tests (146 id_is_* → 1 exhaustive make_step test); step 4969→4771.
 - A2 pruned 887 model tests (dialog 356→66, injury 197→1 constant read-backs, model 585→317,

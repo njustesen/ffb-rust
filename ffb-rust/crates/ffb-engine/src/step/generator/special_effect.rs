@@ -19,33 +19,3 @@ impl SpecialEffect {
 impl Default for SpecialEffect {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn special_effect_params_default_no_effect() {
-        let p = SpecialEffectParams::default();
-        assert!(p.special_effect.is_none());
-    }
-
-    #[test]
-    fn special_effect_params_default_no_player() {
-        let p = SpecialEffectParams::default();
-        assert!(p.player_id.is_none());
-    }
-
-    #[test]
-    fn special_effect_params_default_no_roll() {
-        let p = SpecialEffectParams::default();
-        assert!(!p.roll_for_effect);
-    }
-
-    #[test]
-    fn special_effect_params_accepts_lightning() {
-        let p = SpecialEffectParams { special_effect: Some(SpecialEffectKind::LIGHTNING), ..Default::default() };
-        assert_eq!(p.special_effect, Some(SpecialEffectKind::LIGHTNING));
-    }
-
-}

@@ -26,36 +26,3 @@ impl AutoGazeZoat {
 impl Default for AutoGazeZoat {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn auto_gaze_zoat_params_default_no_label() {
-        let p = AutoGazeZoatParams::default();
-        assert!(p.go_to_label_failure.is_none());
-    }
-
-    #[test]
-    fn auto_gaze_zoat_params_default_no_player_state() {
-        let p = AutoGazeZoatParams::default();
-        assert!(p.old_player_state.is_none());
-    }
-
-    #[test]
-    fn auto_gaze_zoat_struct_is_default() {
-        let _ = AutoGazeZoat::default();
-    }
-
-    #[test]
-    fn params_with_fields_set() {
-        let p = AutoGazeZoatParams {
-            go_to_label_failure: Some("fail".into()),
-            ..Default::default()
-        };
-        assert_eq!(p.go_to_label_failure.as_deref(), Some("fail"));
-        assert!(p.old_player_state.is_none());
-    }
-
-}

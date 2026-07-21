@@ -64,10 +64,4 @@ mod tests {
         assert_eq!(steps[0].step_id, StepId::InitActivation);
     }
 
-    #[test]
-    fn params_with_fields_set() {
-        let p = CatchOfTheDayParams { failure_label: "myLabel".into() };
-        assert_eq!(p.failure_label, "myLabel");
-    }
-
 }

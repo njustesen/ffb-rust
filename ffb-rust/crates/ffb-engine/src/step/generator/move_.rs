@@ -21,38 +21,3 @@ impl Move {
 impl Default for Move {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn move_params_default_empty_stack() {
-        let p = MoveParams::default();
-        assert!(p.move_stack.is_empty());
-    }
-
-    #[test]
-    fn move_params_default_no_gaze_victim() {
-        let p = MoveParams::default();
-        assert!(p.gaze_victim_id.is_none());
-    }
-
-    #[test]
-    fn move_params_default_no_bloodlust_action() {
-        let p = MoveParams::default();
-        assert!(p.bloodlust_action.is_none());
-    }
-
-    #[test]
-    fn params_with_fields_set() {
-        let p = MoveParams {
-            gaze_victim_id: Some("victim".into()),
-            ball_and_chain_rr_setting: Some("setting".into()),
-            ..Default::default()
-        };
-        assert_eq!(p.gaze_victim_id.as_deref(), Some("victim"));
-        assert_eq!(p.ball_and_chain_rr_setting.as_deref(), Some("setting"));
-    }
-
-}

@@ -18,38 +18,3 @@ impl ThrowTeamMate {
 impl Default for ThrowTeamMate {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn throw_team_mate_params_default_no_player() {
-        let p = ThrowTeamMateParams::default();
-        assert!(p.thrown_player_id.is_none());
-    }
-
-    #[test]
-    fn throw_team_mate_params_default_not_kicked() {
-        let p = ThrowTeamMateParams::default();
-        assert!(!p.kicked);
-    }
-
-    #[test]
-    fn throw_team_mate_params_default_no_target() {
-        let p = ThrowTeamMateParams::default();
-        assert!(p.target_coordinate.is_none());
-    }
-
-    #[test]
-    fn params_with_fields_set() {
-        let p = ThrowTeamMateParams {
-            thrown_player_id: Some("p1".into()),
-            kicked: true,
-            ..Default::default()
-        };
-        assert_eq!(p.thrown_player_id.as_deref(), Some("p1"));
-        assert!(p.kicked);
-    }
-
-}

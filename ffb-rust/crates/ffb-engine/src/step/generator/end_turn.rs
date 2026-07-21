@@ -15,32 +15,3 @@ impl EndTurn {
 impl Default for EndTurn {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn end_turn_params_default_no_forgo() {
-        let p = EndTurnParams::default();
-        assert!(!p.check_forgo);
-    }
-
-    #[test]
-    fn end_turn_params_can_set_forgo() {
-        let p = EndTurnParams { check_forgo: true };
-        assert!(p.check_forgo);
-    }
-
-    #[test]
-    fn end_turn_struct_is_default() {
-        let _ = EndTurn::default();
-    }
-
-    #[test]
-    fn params_with_fields_set() {
-        let p = EndTurnParams { check_forgo: true };
-        assert!(p.check_forgo);
-    }
-
-}

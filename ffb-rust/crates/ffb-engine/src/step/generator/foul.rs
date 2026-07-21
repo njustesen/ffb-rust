@@ -16,36 +16,3 @@ impl Foul {
 impl Default for Foul {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn foul_params_default_no_defender() {
-        let p = FoulParams::default();
-        assert!(p.fouled_defender_id.is_none());
-    }
-
-    #[test]
-    fn foul_params_default_not_using_chainsaw() {
-        let p = FoulParams::default();
-        assert!(!p.using_chainsaw);
-    }
-
-    #[test]
-    fn foul_struct_is_default() {
-        let _ = Foul::default();
-    }
-
-    #[test]
-    fn params_with_fields_set() {
-        let p = FoulParams {
-            fouled_defender_id: Some("p1".into()),
-            using_chainsaw: true,
-        };
-        assert_eq!(p.fouled_defender_id.as_deref(), Some("p1"));
-        assert!(p.using_chainsaw);
-    }
-
-}

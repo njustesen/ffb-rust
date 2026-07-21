@@ -26,36 +26,3 @@ impl BlackInk {
 impl Default for BlackInk {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn black_ink_params_default_no_label() {
-        let p = BlackInkParams::default();
-        assert!(p.go_to_label_failure.is_none());
-    }
-
-    #[test]
-    fn black_ink_params_default_no_player_state() {
-        let p = BlackInkParams::default();
-        assert!(p.old_player_state.is_none());
-    }
-
-    #[test]
-    fn black_ink_struct_is_default() {
-        let _ = BlackInk::default();
-    }
-
-    #[test]
-    fn params_with_fields_set() {
-        let p = BlackInkParams {
-            go_to_label_failure: Some("fail".into()),
-            ..Default::default()
-        };
-        assert_eq!(p.go_to_label_failure.as_deref(), Some("fail"));
-        assert!(p.old_player_state.is_none());
-    }
-
-}

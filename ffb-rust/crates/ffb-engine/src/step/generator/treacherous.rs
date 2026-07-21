@@ -15,32 +15,3 @@ impl Treacherous {
 impl Default for Treacherous {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn treacherous_params_default_no_label() {
-        let p = TreacherousParams::default();
-        assert!(p.failure_label.is_none());
-    }
-
-    #[test]
-    fn treacherous_params_can_set_label() {
-        let p = TreacherousParams { failure_label: Some("end".to_string()) };
-        assert_eq!(p.failure_label.as_deref(), Some("end"));
-    }
-
-    #[test]
-    fn treacherous_struct_is_default() {
-        let _ = Treacherous::default();
-    }
-
-    #[test]
-    fn params_with_fields_set() {
-        let p = TreacherousParams { failure_label: Some("lbl".into()) };
-        assert_eq!(p.failure_label.as_deref(), Some("lbl"));
-    }
-
-}

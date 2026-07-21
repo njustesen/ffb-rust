@@ -18,33 +18,3 @@ impl Select {
 impl Default for Select {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn select_params_default_empty_targets() {
-        let p = SelectParams::default();
-        assert!(p.block_targets.is_empty());
-    }
-
-    #[test]
-    fn select_params_default_no_update_persistence() {
-        let p = SelectParams::default();
-        assert!(!p.update_persistence);
-    }
-
-    #[test]
-    fn select_struct_is_default() {
-        let _ = Select::default();
-    }
-
-    #[test]
-    fn select_params_accepts_block_target() {
-        let bt = BlockTarget::default();
-        let p = SelectParams { block_targets: vec![bt], ..Default::default() };
-        assert_eq!(p.block_targets.len(), 1);
-    }
-
-}

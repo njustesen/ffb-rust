@@ -86,15 +86,4 @@ mod tests {
         assert_eq!(steps[4].step_id, StepId::EndInducement);
     }
 
-    #[test]
-    fn params_with_fields_set() {
-        let p = InducementParams {
-            inducement_phase: InducementPhase::BeforeSetup,
-            home_team: true,
-            check_forgo: true,
-        };
-        assert!(p.home_team);
-        assert!(p.check_forgo);
-    }
-
 }

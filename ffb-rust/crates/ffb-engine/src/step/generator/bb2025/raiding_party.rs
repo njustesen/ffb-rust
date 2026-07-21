@@ -76,11 +76,4 @@ mod tests {
         assert!(last.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnSuccess(l) if l == "SUCCESS_LABEL")));
     }
 
-    #[test]
-    fn params_with_fields_set() {
-        let p = RaidingPartyParams { failure_label: "fail".into(), success_label: "ok".into() };
-        assert_eq!(p.failure_label, "fail");
-        assert_eq!(p.success_label, "ok");
-    }
-
 }

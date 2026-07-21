@@ -15,32 +15,3 @@ impl ThrowKeg {
 impl Default for ThrowKeg {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn throw_keg_params_default_no_player() {
-        let p = ThrowKegParams::default();
-        assert!(p.player_id.is_none());
-    }
-
-    #[test]
-    fn throw_keg_params_can_set_player() {
-        let p = ThrowKegParams { player_id: Some("player-1".to_string()) };
-        assert_eq!(p.player_id.as_deref(), Some("player-1"));
-    }
-
-    #[test]
-    fn throw_keg_struct_is_default() {
-        let _ = ThrowKeg::default();
-    }
-
-    #[test]
-    fn params_with_fields_set() {
-        let p = ThrowKegParams { player_id: Some("p1".into()) };
-        assert_eq!(p.player_id.as_deref(), Some("p1"));
-    }
-
-}

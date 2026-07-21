@@ -56,14 +56,4 @@ mod tests {
         assert!(steps[0].label.is_none());
     }
 
-    #[test]
-    fn params_with_fields_set() {
-        let p = CardParams {
-            card_id: Some(CardModel::new("card-1", None::<&str>)),
-            home_team: true,
-        };
-        assert_eq!(p.card_id.as_ref().map(|c| c.get_name()), Some("card-1"));
-        assert!(p.home_team);
-    }
-
 }
