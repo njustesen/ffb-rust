@@ -110,10 +110,18 @@ throw_team_mate, activation_sequence_builder, ScatterPlayer). ffb-server ~2,611+
 
 **ALL generators COMPLETE** (bb2016 15 + bb2020 25 + bb2025 31). Added edition-aware
 GameFixture overload `createGameState(playersPerTeam, Rules)`. ffb-server 2,831.
-**NEXT: step-LOGIC port** (the actual step classes' behavior tests in
-crates/ffb-engine/src/step/{bb2016,bb2020,bb2025,mixed,action,...}/*.rs — the bulk, thousands),
-then client state/logic (25 modules), then server remainder (db/net/admin). Java totals now
-~5,978 (ffb-common 1,939 / client-logic 1,208 / server 2,831); Rust ~14,540.
+**NEXT: step-LOGIC port.** Accurate count: **4,181** genuine behavioral `#[test]` in
+crates/ffb-engine/src/step/**/*.rs (excluding generators, which are done). These are NOT
+tautologies (only ~7 pure-tautology tests existed in all of ffb-engine — now pruned). Each is a
+real behavioral test (injury/KO/regen, block roll, end-moving, apothecary, dodge, …) needing
+per-step GameState setup + scripted dice via the fixture. Labor-intensive per test; this is the
+dominant remaining cost. Then client state/logic (25 modules) + server db/net remainder.
+Highest-value approachable targets (utilities/steps with many behavioral tests, make_game-style
+setup): step/util_server_injury.rs (42), mixed/shared/step_animal_savagery.rs (42),
+bb2025/move_/step_end_moving.rs (35), bb2025/shared/step_apothecary.rs (27),
+bb2025/block/step_block_roll.rs (27), bb2025/shared/step_end_selecting.rs (24).
+Java totals now ~5,971 (ffb-common 1,939 / client-logic 1,208 / server 2,831 minus small);
+Rust ~14,530.
 Reusable: nested-field reads via readField(readField(step,"state"),"goToLabelOnFailure") for
 StepBloodLust; CloudBurster hook field is fGotoLabelOnFailure; SpecialEffect generator/enum
 name clash → qualify the enum as com.fumbbl.ffb.SpecialEffect.
