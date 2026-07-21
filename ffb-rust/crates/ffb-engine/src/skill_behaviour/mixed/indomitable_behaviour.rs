@@ -22,14 +22,3 @@ impl IndomitableBehaviour {
 impl Default for IndomitableBehaviour {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn default_creates_instance_same_as_new() {
-        let _a = IndomitableBehaviour::new();
-        let _b = IndomitableBehaviour::default();
-    }
-}

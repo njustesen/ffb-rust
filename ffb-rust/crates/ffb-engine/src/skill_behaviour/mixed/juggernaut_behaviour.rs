@@ -22,14 +22,3 @@ impl JuggernautBehaviour {
 impl Default for JuggernautBehaviour {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn default_creates_instance_same_as_new() {
-        let _a = JuggernautBehaviour::new();
-        let _b = JuggernautBehaviour::default();
-    }
-}
