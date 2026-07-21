@@ -3,6 +3,7 @@
 use ffb_model::enums::ApothecaryMode;
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::sequence::{Sequence, SequenceStep, labels};
+use super::activation_sequence_builder::ActivationSequenceBuilder;
 
 pub struct FuriousOutburst;
 
@@ -15,6 +16,11 @@ impl FuriousOutburst {
         seq.add(StepId::InitFuriousOutburst, vec![
             StepParameter::GotoLabelOnEnd(labels::END.into()),
         ]);
+        // [ACTIVATION(END)] — Java pushSequence inserts the activation sub-sequence here
+        // (ActivationSequenceBuilder.create().withFailureLabel(END).addTo(sequence)).
+        ActivationSequenceBuilder::new()
+            .with_failure_label(labels::END)
+            .add_to(&mut seq);
         // 2 FOUL_APPEARANCE (goto END on failure)
         seq.add(StepId::FoulAppearance, vec![
             StepParameter::GotoLabelOnFailure(labels::END.into()),
@@ -66,9 +72,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn furious_outburst_has_15_steps() {
+    fn furious_outburst_has_28_steps_with_activation() {
+        // Java pushSequence: INIT_FURIOUS_OUTBURST (1) + ActivationSequenceBuilder (13)
+        // + 14 own steps = 28.
         let steps = FuriousOutburst::build_sequence();
-        assert_eq!(steps.len(), 15);
+        assert_eq!(steps.len(), 28);
+        assert_eq!(steps[1].step_id, StepId::InitActivation);
     }
 
     #[test]
