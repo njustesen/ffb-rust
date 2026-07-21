@@ -60,6 +60,13 @@ Byte-parity is already knowingly broken; these are logged for a future wire-pari
 - B1: `ServerCommandZapPlayer`/`UnzapPlayer` ctor arg order reversed Java vs Rust (test-only).
 - B1: null-vs-omitted JSON keys; `FieldCoordinate` as `[x,y]` array in commands vs `{x,y}` object;
   typed factory objects (Skill/Card/…) in Java vs name strings in Rust.
+- **B4 (INVESTIGATE — potential real bug):** Java `SkillFactory` skill membership disagrees
+  with Rust `SKILL_TABLE`: union 203 vs 200, BB2016 86 vs 58, General category 15 vs 29, and
+  Yoink absent from Java BB2025. The earlier "mirrored" skill work pinned the Rust numbers; the
+  Java side does NOT match. Either Rust's per-skill `editions`/`category` columns are wrong for
+  many skills, or the two count differently (e.g. stat-increase/positional skills). Needs a
+  dedicated audit of SKILL_TABLE editions+category vs Java SkillFactory registrations. The
+  ported Java SkillFactoryTableTest was removed (had Rust-specific pins) pending this audit.
 
 ## Wave 2 (medium ports)
 | B1 | ffb-protocol ~882 → ffb-common net/commands (137 classes, 815 methods) | DONE — ffb-common 1,044 green |
