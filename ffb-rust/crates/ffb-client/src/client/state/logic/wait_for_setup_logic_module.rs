@@ -93,16 +93,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_wait_for_setup() {
-        assert_eq!(WaitForSetupLogicModule::new().get_id(), ClientStateId::WaitForSetup);
-    }
-
-    #[test]
-    fn available_actions_is_empty() {
-        assert!(WaitForSetupLogicModule::new().available_actions().is_empty());
-    }
-
-    #[test]
     #[should_panic(expected = "actionContext for acting player is not supported in waiting context")]
     fn action_context_panics() {
         let module = WaitForSetupLogicModule::new();

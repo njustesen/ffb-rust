@@ -123,11 +123,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_reset_to_move() {
-        assert_eq!(StepResetToMove::new().id(), StepId::ResetToMove);
-    }
-
-    #[test]
     fn no_action_returns_next_step_without_clear() {
         let mut step = StepResetToMove::new();
         let mut game = make_game(Rules::Bb2025);

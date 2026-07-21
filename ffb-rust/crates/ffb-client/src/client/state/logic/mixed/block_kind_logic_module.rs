@@ -267,11 +267,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_select_block_kind() {
-        assert_eq!(BlockKindLogicModule::new().get_id(), ClientStateId::SelectBlockKind);
-    }
-
-    #[test]
     fn available_actions_contains_expected_variants() {
         let actions = BlockKindLogicModule::new().available_actions();
         assert!(actions.contains(&ClientAction::BLOCK));

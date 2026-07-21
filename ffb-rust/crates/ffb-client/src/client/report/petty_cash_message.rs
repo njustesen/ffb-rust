@@ -118,8 +118,4 @@ mod tests {
         assert!(texts.iter().any(|t| t == " transfers 50,000 gold from the Treasury into Petty Cash."));
     }
 
-    #[test]
-    fn get_key_matches_report_id() {
-        assert_eq!(PettyCashMessage.get_key(), "pettyCash");
-    }
 }

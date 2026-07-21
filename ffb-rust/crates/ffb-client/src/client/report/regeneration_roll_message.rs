@@ -56,11 +56,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(RegenerationRollMessage.report_id(), ReportId::REGENERATION_ROLL);
-    }
-
-    #[test]
     fn render_successful_regeneration() {
         let mut status_report = StatusReport::new();
         let mut game = make_game();

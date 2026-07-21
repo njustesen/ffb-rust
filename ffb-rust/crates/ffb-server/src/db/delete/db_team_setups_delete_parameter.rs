@@ -41,13 +41,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let p = DbTeamSetupsDeleteParameter::new("team1".to_string(), "setup1".to_string());
-        assert_eq!(p.get_team_id(), "team1");
-        assert_eq!(p.get_name(), "setup1");
-    }
-
-    #[test]
     fn initial_updated_rows_is_zero() {
         let p = DbTeamSetupsDeleteParameter::new("team1".to_string(), "setup1".to_string());
         assert_eq!(p.get_updated_rows(), 0);

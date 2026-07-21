@@ -42,29 +42,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let _ = InternalServerCommandApplyAutomatedPlayerMarkings::new(config(), 1);
-    }
-
-    #[test]
-    fn get_id() {
-        let c = InternalServerCommandApplyAutomatedPlayerMarkings::new(config(), 1);
-        assert_eq!(c.get_id(), "internalApplyAutomaticPlayerMarkings");
-    }
-
-    #[test]
-    fn get_game_id() {
-        let c = InternalServerCommandApplyAutomatedPlayerMarkings::new(config(), 7);
-        assert_eq!(c.get_game_id(), 7);
-    }
-
-    #[test]
-    fn is_internal() {
-        let c = InternalServerCommandApplyAutomatedPlayerMarkings::new(config(), 1);
-        assert!(c.is_internal());
-    }
-
-    #[test]
     fn get_auto_marking_config() {
         let c = InternalServerCommandApplyAutomatedPlayerMarkings::new(config(), 1);
         assert_eq!(c.get_auto_marking_config().get_separator(), "/");

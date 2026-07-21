@@ -63,13 +63,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new_starts_with_zero_uses() {
-        let i = Inducement::new("BRIBE", 2, vec![Usage::AVOID_BAN]);
-        assert_eq!(i.get_uses(), 0);
-        assert_eq!(i.get_uses_left(), 2);
-    }
-
-    #[test]
     fn uses_left_clamped() {
         let mut i = Inducement::new("BRIBE", 1, vec![Usage::AVOID_BAN]);
         i.set_uses(5);

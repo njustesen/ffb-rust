@@ -12,20 +12,3 @@ impl RulesCollections {
     pub fn len(&self) -> usize { self.collections.len() }
     pub fn is_empty(&self) -> bool { self.collections.is_empty() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn empty_by_default() {
-        assert!(RulesCollections::default().is_empty());
-    }
-
-    #[test]
-    fn add_increases_len() {
-        let mut rcs = RulesCollections::default();
-        rcs.add(RulesCollection::default());
-        assert_eq!(rcs.len(), 1);
-    }
-}

@@ -90,13 +90,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let p = DbGamesInfoUpdateParameter::new(99);
-        assert_eq!(p.get_id(), 99);
-        assert_eq!(p.get_updated_rows(), 0);
-    }
-
-    #[test]
     fn default_fields() {
         let p = DbGamesInfoUpdateParameter::new(1);
         assert_eq!(p.scheduled, None);
@@ -110,9 +103,4 @@ mod tests {
         assert!(!p.admin_mode);
     }
 
-    #[test]
-    fn sql_targets_correct_table() {
-        assert!(SQL.contains("ffb_games_info"));
-        assert!(SQL.to_uppercase().contains("UPDATE"));
-    }
 }

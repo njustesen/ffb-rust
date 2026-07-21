@@ -37,21 +37,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_name_returns_camel_case() {
-        assert_eq!(PushbackMode::REGULAR.get_name(), "regular");
-        assert_eq!(PushbackMode::SIDE_STEP.get_name(), "sideStep");
-        assert_eq!(PushbackMode::GRAB.get_name(), "grab");
-    }
-
-    #[test]
     fn for_name_round_trips() {
         assert_eq!(PushbackMode::for_name("sideStep"), Some(PushbackMode::SIDE_STEP));
         assert_eq!(PushbackMode::for_name("invalid"), None);
-    }
-
-    #[test]
-    fn default_is_regular() {
-        assert_eq!(PushbackMode::default(), PushbackMode::REGULAR);
     }
 
     #[test]
@@ -62,12 +50,4 @@ mod tests {
         assert_eq!(PushbackMode::for_name("unknown"), None);
     }
 
-    #[test]
-    fn copy_and_clone_produce_equal_values() {
-        let original = PushbackMode::SIDE_STEP;
-        let copied = original;
-        let cloned = original.clone();
-        assert_eq!(original, copied);
-        assert_eq!(original, cloned);
-    }
 }

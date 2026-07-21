@@ -27,33 +27,6 @@ impl Default for TrackNumber {
 mod tests {
     use super::*;
     #[test]
-    fn new_stores_coordinate_and_number() {
-        let t = TrackNumber::new(FieldCoordinate::new(5, 3), 7);
-        assert_eq!(t.get_number(), 7);
-        assert_eq!(t.get_coordinate(), Some(&FieldCoordinate::new(5, 3)));
-    }
-    #[test]
-    fn default_is_zero_and_none() {
-        let t = TrackNumber::default();
-        assert_eq!(t.get_number(), 0);
-        assert!(t.get_coordinate().is_none());
-    }
-
-    #[test]
-    fn equality_works() {
-        let a = TrackNumber::new(FieldCoordinate::new(1, 2), 5);
-        let b = TrackNumber::new(FieldCoordinate::new(1, 2), 5);
-        assert_eq!(a, b);
-    }
-
-    #[test]
-    fn different_numbers_are_not_equal() {
-        let a = TrackNumber::new(FieldCoordinate::new(1, 2), 5);
-        let b = TrackNumber::new(FieldCoordinate::new(1, 2), 6);
-        assert_ne!(a, b);
-    }
-
-    #[test]
     fn serde_round_trip() {
         let t = TrackNumber::new(FieldCoordinate::new(3, 4), 9);
         let s = serde_json::to_string(&t).unwrap();

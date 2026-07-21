@@ -69,29 +69,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let _ = InternalServerCommandAddLoadedTeam::new(42, "coach".to_string(), Some(true), team("t1"), vec![]);
-    }
-
-    #[test]
-    fn get_id() {
-        let c = InternalServerCommandAddLoadedTeam::new(1, "c".to_string(), None, team("t1"), vec![]);
-        assert_eq!(c.get_id(), "internalServerAddLoadedTeam");
-    }
-
-    #[test]
-    fn get_game_id() {
-        let c = InternalServerCommandAddLoadedTeam::new(99, "c".to_string(), None, team("t1"), vec![]);
-        assert_eq!(c.get_game_id(), 99);
-    }
-
-    #[test]
-    fn is_internal() {
-        let c = InternalServerCommandAddLoadedTeam::new(1, "c".to_string(), None, team("t1"), vec![]);
-        assert!(c.is_internal());
-    }
-
-    #[test]
     fn get_coach() {
         let c = InternalServerCommandAddLoadedTeam::new(1, "myCoach".to_string(), None, team("t1"), vec![]);
         assert_eq!(c.get_coach(), "myCoach");

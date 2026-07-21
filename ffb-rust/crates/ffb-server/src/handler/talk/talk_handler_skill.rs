@@ -115,12 +115,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let h = TalkHandlerSkill::new(Client::Spec, Environment::None, vec![Privilege::EditState]);
-        assert_eq!(h.required_client, Client::Spec);
-    }
-
-    #[test]
     fn handle_adds_skill_to_named_player() {
         let h = TalkHandlerSkill::default();
         let mut team = team_with_players();

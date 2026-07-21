@@ -64,11 +64,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = RedeployHandler::new();
-    }
-
-    #[test]
     fn is_valid_branch_accepts_alphanumeric_dash_underscore() {
         let h = RedeployHandler::new();
         assert!(h.is_valid_branch("feature-branch_1"));

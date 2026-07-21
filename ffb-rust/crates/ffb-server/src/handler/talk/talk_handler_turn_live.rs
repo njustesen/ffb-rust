@@ -63,13 +63,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let h = TalkHandlerTurnLive::new();
-        assert_eq!(h.required_client, Client::Spec);
-        assert_eq!(h.requires_one_privilege_of, vec![Privilege::EditState]);
-    }
-
-    #[test]
     fn handle_sets_home_turn_number() {
         let h = TalkHandlerTurnLive::new();
         let mut g = game();

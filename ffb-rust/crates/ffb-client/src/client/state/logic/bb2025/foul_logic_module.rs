@@ -443,11 +443,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_foul() {
-        assert_eq!(FoulLogicModule::new().get_id(), ClientStateId::Foul);
-    }
-
-    #[test]
     fn is_foulable_false_without_player() {
         let game = make_game();
         assert!(!is_foulable(&game, None));

@@ -36,24 +36,3 @@ impl Default for DbGamesSerializedQuery {
         Self::new()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct() {
-        let q = DbGamesSerializedQuery::new();
-        assert_eq!(q.get_id(), DbStatementId::GAMES_SERIALIZED_QUERY);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_games_serialized"));
-    }
-
-    #[test]
-    fn sql_has_where_clause() {
-        assert!(SQL.contains("WHERE id=?"));
-    }
-}

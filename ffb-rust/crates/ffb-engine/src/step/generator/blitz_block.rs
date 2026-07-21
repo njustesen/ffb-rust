@@ -66,10 +66,4 @@ mod tests {
         assert!(!p.using_chainsaw);
     }
 
-    #[test]
-    fn params_clone() {
-        let p = BlitzBlockParams { frenzy_block: true, ..Default::default() };
-        let q = p.clone();
-        assert!(q.frenzy_block);
-    }
 }

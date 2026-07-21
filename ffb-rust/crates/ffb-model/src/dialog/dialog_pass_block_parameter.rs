@@ -15,27 +15,6 @@ impl IDialogParameter for DialogPassBlockParameter {
 mod tests {
     use super::*;
     #[test]
-    fn dialog_id_is_pass_block() {
-        assert_eq!(DialogPassBlockParameter.get_id(), DialogId::PASS_BLOCK);
-    }
-    #[test]
-    fn transform_preserves_id() {
-        assert_eq!(DialogPassBlockParameter.transform().get_id(), DialogId::PASS_BLOCK);
-    }
-
-    #[test]
-    fn default_is_sensible() {
-        let _p = DialogPassBlockParameter::default();
-        // Unit struct — default constructs without panic
-    }
-
-    #[test]
-    fn clone_has_same_id() {
-        let p = DialogPassBlockParameter;
-        assert_eq!(p.clone().get_id(), DialogId::PASS_BLOCK);
-    }
-
-    #[test]
     fn serde_round_trip() {
         let p = DialogPassBlockParameter;
         let json = serde_json::to_string(&p).unwrap();

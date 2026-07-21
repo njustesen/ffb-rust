@@ -153,11 +153,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_pro() {
-        assert_eq!(StepPro::new().id(), StepId::Pro);
-    }
-
-    #[test]
     fn no_player_id_returns_next_step() {
         let mut step = StepPro::new();
         let mut game = make_game();

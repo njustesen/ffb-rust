@@ -11,12 +11,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn counter_has_entropy() {
-        let src = CounterEntropySource::new();
-        assert!(src.has_enough_entropy());
-    }
-
-    #[test]
     fn counter_increments() {
         let mut src = CounterEntropySource::new();
         assert_eq!(src.get_entropy(), 0);

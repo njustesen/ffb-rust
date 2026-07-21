@@ -152,11 +152,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_trickster() {
-        assert_eq!(TricksterLogicModule::new().get_id(), ClientStateId::Trickster);
-    }
-
-    #[test]
     fn available_actions_is_end_move_only() {
         let actions = TricksterLogicModule::new().available_actions();
         assert_eq!(actions.len(), 1);

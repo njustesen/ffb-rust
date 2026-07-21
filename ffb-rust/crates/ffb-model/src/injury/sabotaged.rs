@@ -20,23 +20,3 @@ impl Sabotaged {
 impl Default for Sabotaged {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(Sabotaged::new().base().name(), "sabotaged");
-    }
-
-    #[test]
-    fn worth_spps_is_false() {
-        assert!(!Sabotaged::new().base().is_worth_spps());
-    }
-
-    #[test]
-    fn is_caused_by_opponent_is_false() {
-        assert!(!Sabotaged::new().is_caused_by_opponent());
-    }
-}

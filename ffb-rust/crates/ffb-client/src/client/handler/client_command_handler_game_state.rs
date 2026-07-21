@@ -119,11 +119,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_server_game_state() {
-        assert_eq!(ClientCommandHandlerGameState::new().get_id(), NetCommandId::ServerGameState);
-    }
-
-    #[test]
     fn apply_game_state_keeps_existing_player_markers_on_initial_state() {
         let mut existing = make_game();
         existing.id = 0;

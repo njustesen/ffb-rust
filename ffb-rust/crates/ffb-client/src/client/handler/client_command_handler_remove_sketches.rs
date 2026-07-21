@@ -68,14 +68,6 @@ mod tests {
     use ffb_protocol::commands::server_command_remove_sketches::ServerCommandRemoveSketches;
 
     #[test]
-    fn get_id_is_server_remove_sketches() {
-        assert_eq!(
-            ClientCommandHandlerRemoveSketches::new().get_id(),
-            NetCommandId::ServerRemoveSketches
-        );
-    }
-
-    #[test]
     fn empty_ids_takes_remove_all_branch() {
         let mut handler = ClientCommandHandlerRemoveSketches::new();
         let cmd = AnyServerCommand::ServerRemoveSketches(ServerCommandRemoveSketches::new("Bob", vec![]));

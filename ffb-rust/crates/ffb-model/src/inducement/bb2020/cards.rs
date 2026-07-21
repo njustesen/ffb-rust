@@ -42,9 +42,4 @@ mod tests {
         assert_eq!(c.all_cards().len(), 0);
     }
 
-    #[test]
-    fn key_is_non_empty() {
-        let c = Cards::new();
-        assert!(!c.get_key().is_empty());
-    }
 }

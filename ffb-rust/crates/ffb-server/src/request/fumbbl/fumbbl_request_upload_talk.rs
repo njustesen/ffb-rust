@@ -47,11 +47,6 @@ mod tests {
     use crate::request::fumbbl::util_fumbbl_request::MockHttpClient;
 
     #[test]
-    fn construct() {
-        let _ = FumbblRequestUploadTalk::new();
-    }
-
-    #[test]
     fn process_sets_request_url_and_returns_response() {
         let client = MockHttpClient { response: Ok("ok".to_string()) };
         let mut r = FumbblRequestUploadTalk::new();

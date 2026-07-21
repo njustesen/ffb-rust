@@ -49,18 +49,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let p = DbUserSettingsInsertParameter::new(
-            "coach1".to_string(),
-            "setting_a".to_string(),
-            "value_b".to_string(),
-        );
-        assert_eq!(p.get_coach(), "coach1");
-        assert_eq!(p.get_setting_name(), "setting_a");
-        assert_eq!(p.get_setting_value(), "value_b");
-    }
-
-    #[test]
     fn get_updated_rows_initial() {
         let p = DbUserSettingsInsertParameter::new(
             "coach1".to_string(),

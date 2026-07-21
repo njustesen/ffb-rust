@@ -77,18 +77,6 @@ mod tests {
     use crate::request::fumbbl::util_fumbbl_request::MockHttpClient;
 
     #[test]
-    fn construct() {
-        let r = FumbblRequestCheckAuthorization::new(
-            "coach".to_string(),
-            "pass".to_string(),
-            1,
-            "game".to_string(),
-            "team".to_string(),
-        );
-        assert_eq!(r.get_coach(), "coach");
-    }
-
-    #[test]
     fn process_builds_url_from_coach_and_password() {
         let client = MockHttpClient {
             response: Ok("<response>OK</response>".to_string()),

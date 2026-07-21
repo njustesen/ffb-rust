@@ -79,11 +79,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(PrayerAmountMessage.report_id(), ReportId::PRAYER_AMOUNT);
-    }
-
-    #[test]
     fn renders_tv_text_for_both_teams() {
         let mut sr = StatusReport::new();
         let game = make_game();

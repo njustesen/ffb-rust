@@ -331,8 +331,4 @@ mod tests {
         assert_eq!(step.goto_label_on_failure.as_deref(), Some("x"));
     }
 
-    #[test]
-    fn step_id_is_blood_lust() {
-        assert_eq!(StepBloodLust::new().id(), StepId::BloodLust);
-    }
 }

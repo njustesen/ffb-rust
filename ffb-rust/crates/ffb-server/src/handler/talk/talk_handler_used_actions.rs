@@ -110,12 +110,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let h = TalkHandlerUsedActions::new(Client::Spec, Environment::None, vec![Privilege::EditState]);
-        assert_eq!(h.required_client, Client::Spec);
-    }
-
-    #[test]
     fn handle_marks_single_action_used() {
         let h = TalkHandlerUsedActions::default();
         let mut g = game();

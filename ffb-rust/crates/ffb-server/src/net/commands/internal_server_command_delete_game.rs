@@ -31,31 +31,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = InternalServerCommandDeleteGame::new(42, true);
-    }
-
-    #[test]
-    fn get_id() {
-        let c = InternalServerCommandDeleteGame::new(1, false);
-        assert_eq!(c.get_id(), "internalServerDeleteGame");
-    }
-
-    #[test]
-    fn get_game_id() {
-        let c = InternalServerCommandDeleteGame::new(7, false);
-        assert_eq!(c.get_game_id(), 7);
-    }
-
-    #[test]
     fn is_with_games_info() {
         let c = InternalServerCommandDeleteGame::new(1, true);
         assert!(c.is_with_games_info());
     }
 
-    #[test]
-    fn is_internal() {
-        let c = InternalServerCommandDeleteGame::new(1, false);
-        assert!(c.is_internal());
-    }
 }

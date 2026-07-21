@@ -267,11 +267,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_select_gaze_target() {
-        assert_eq!(SelectGazeTargetLogicModule::new().get_id(), ClientStateId::SelectGazeTarget);
-    }
-
-    #[test]
     fn available_actions_matches_java() {
         let actions = SelectGazeTargetLogicModule::new().available_actions();
         assert!(actions.contains(&ClientAction::END_MOVE));

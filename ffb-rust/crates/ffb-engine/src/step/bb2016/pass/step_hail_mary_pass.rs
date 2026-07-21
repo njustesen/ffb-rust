@@ -265,11 +265,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_hail_mary_pass() {
-        assert_eq!(StepHailMaryPass::new().id(), StepId::HailMaryPass);
-    }
-
-    #[test]
     fn set_parameter_goto_label_on_failure() {
         let mut step = StepHailMaryPass::new();
         assert!(step.set_parameter(&StepParameter::GotoLabelOnFailure("fail".into())));

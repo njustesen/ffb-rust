@@ -18,11 +18,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn empty_by_default() {
-        assert!(EnhancementRegistry::default().is_empty());
-    }
-
-    #[test]
     fn register_and_check() {
         let mut r = EnhancementRegistry::default();
         r.register("DrainPipe".to_string());

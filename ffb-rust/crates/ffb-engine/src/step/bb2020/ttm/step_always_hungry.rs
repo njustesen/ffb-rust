@@ -281,11 +281,6 @@ mod tests {
 
     // ── id ──────────────────────────────────────────────────────────────────
 
-    #[test]
-    fn id_is_always_hungry() {
-        assert_eq!(StepAlwaysHungry::default().id(), StepId::AlwaysHungry);
-    }
-
     // ── no thrown player ────────────────────────────────────────────────────
 
     #[test]

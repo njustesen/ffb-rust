@@ -51,21 +51,3 @@ impl InducementType {
         self.priority
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_name_roundtrip() {
-        let t = InducementType::new("Apothecary", "desc", "Apothecary", "Apothecaries", false, 0);
-        assert_eq!(t.get_name(), "Apothecary");
-    }
-
-    #[test]
-    fn test_singular_plural() {
-        let t = InducementType::new("Bribe", "desc", "Bribe", "Bribes", true, 1);
-        assert_eq!(t.get_singular(), "Bribe");
-        assert_eq!(t.get_plural(), "Bribes");
-    }
-}

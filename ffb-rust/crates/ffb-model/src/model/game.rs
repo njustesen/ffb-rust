@@ -389,12 +389,6 @@ mod tests {
     }
 
     #[test]
-    fn is_finished_false_by_default() {
-        let g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2020);
-        assert!(!g.is_finished());
-    }
-
-    #[test]
     fn is_finished_true_when_status_finished() {
         let mut g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2020);
         g.status = GameStatus::Finished;

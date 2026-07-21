@@ -604,13 +604,6 @@ mod tests {
     }
 
     #[test]
-    fn trap_doors_default_empty() {
-        let fm = FieldModel::new();
-        assert!(fm.trap_doors.is_empty());
-        assert!(!fm.has_trap_door(FieldCoordinate::new(10, 7)));
-    }
-
-    #[test]
     fn has_trap_door_detects_coordinate() {
         let mut fm = FieldModel::new();
         let trap = FieldCoordinate::new(10, 7);
@@ -768,12 +761,6 @@ mod tests {
     }
 
     #[test]
-    fn get_cards_empty_returns_empty_slice() {
-        let fm = FieldModel::new();
-        assert!(fm.get_cards("nobody").is_empty());
-    }
-
-    #[test]
     fn remove_card_removes_and_returns_it() {
         let mut fm = FieldModel::new();
         fm.add_card("p1", Card::new("Witch Brew", Some("WITCH_BREW")));
@@ -810,13 +797,6 @@ mod tests {
     }
 
     #[test]
-    fn player_markers_default_empty() {
-        let fm = FieldModel::new();
-        assert!(fm.get_player_markers().is_empty());
-        assert!(fm.get_player_marker("p1").is_none());
-    }
-
-    #[test]
     fn add_player_marker_stores_and_replaces() {
         let mut fm = FieldModel::new();
         let mut m1 = crate::marking::player_marker::PlayerMarker::with_player_id("p1");
@@ -838,12 +818,6 @@ mod tests {
         assert!(fm.remove_player_marker("p1"));
         assert!(fm.get_player_marker("p1").is_none());
         assert!(!fm.remove_player_marker("p1"));
-    }
-
-    #[test]
-    fn field_markers_default_empty() {
-        let fm = FieldModel::new();
-        assert!(fm.get_field_marker(FieldCoordinate::new(1, 1)).is_none());
     }
 
     #[test]

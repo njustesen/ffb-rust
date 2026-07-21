@@ -206,12 +206,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_internal_socket_closed() {
-        let (h, ..) = handler();
-        assert_eq!(h.get_id(), NetCommandId::InternalServerSocketClosed);
-    }
-
-    #[test]
     fn close_game_session_removes_session_and_notifies_remaining() {
         let (h, gc, sm, _rsm, _sk) = handler();
         let game_id = gc.lock().unwrap().create_game_state();

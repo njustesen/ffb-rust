@@ -355,11 +355,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_select_blitz_target() {
-        assert_eq!(SelectBlitzTargetLogicModule::new().get_id(), ClientStateId::SelectBlitzTarget);
-    }
-
-    #[test]
     fn available_actions_contains_end_move_and_incorporeal() {
         let module = SelectBlitzTargetLogicModule::new();
         let actions = module.available_actions();

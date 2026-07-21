@@ -123,19 +123,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let (gc, sm) = setup();
-        let _ = ServerCommandHandlerSetMarker::new(gc, sm);
-    }
-
-    #[test]
-    fn get_id_is_client_set_marker() {
-        let (gc, sm) = setup();
-        let handler = ServerCommandHandlerSetMarker::new(gc, sm);
-        assert_eq!(handler.get_id(), NetCommandId::ClientSetMarker);
-    }
-
-    #[test]
     fn spectator_session_is_a_noop() {
         let (gc, sm) = setup();
         let game_id = gc.lock().unwrap().create_game_state();

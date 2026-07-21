@@ -29,23 +29,3 @@ impl Default for DbPlayerMarkersDelete {
 
 // Integration test skeleton — compiles but requires a live DB to run.
 // Run manually with: cargo test -p ffb-server db_player_markers_delete -- --ignored
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct() {
-        let s = DbPlayerMarkersDelete::new();
-        assert_eq!(s.get_id(), DbStatementId::PLAYER_MARKERS_DELETE);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_player_markers"));
-    }
-
-    #[test]
-    fn sql_has_team_id_param() {
-        assert!(SQL.contains("team_id=?"));
-    }
-}

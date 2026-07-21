@@ -48,14 +48,6 @@ mod tests {
     use ffb_protocol::commands::server_command_sound::ServerCommandSound;
 
     #[test]
-    fn get_id_is_internal_server_socket_closed() {
-        assert_eq!(
-            ClientCommandHandlerSocketClosed::new().get_id(),
-            NetCommandId::InternalServerSocketClosed
-        );
-    }
-
-    #[test]
     fn handle_net_command_always_returns_true() {
         let mut handler = ClientCommandHandlerSocketClosed::new();
         let cmd = AnyServerCommand::ServerSound(ServerCommandSound::new(SoundId::TOUCHDOWN));
@@ -71,9 +63,4 @@ mod tests {
         assert!(handler.handle_net_command(&cmd, ClientCommandHandlerMode::QUEUING));
     }
 
-    #[test]
-    fn default_constructs_a_handler() {
-        let handler = ClientCommandHandlerSocketClosed::default();
-        assert_eq!(handler.get_id(), NetCommandId::InternalServerSocketClosed);
-    }
 }

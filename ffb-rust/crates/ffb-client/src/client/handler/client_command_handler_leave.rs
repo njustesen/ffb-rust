@@ -67,11 +67,6 @@ mod tests {
     use ffb_protocol::commands::server_command_sound::ServerCommandSound;
 
     #[test]
-    fn get_id_is_server_leave() {
-        assert_eq!(ClientCommandHandlerLeave::new().get_id(), NetCommandId::ServerLeave);
-    }
-
-    #[test]
     fn should_stop_turn_timer_true_for_player_mode() {
         assert!(ClientCommandHandlerLeave::should_stop_turn_timer(ClientMode::PLAYER));
     }

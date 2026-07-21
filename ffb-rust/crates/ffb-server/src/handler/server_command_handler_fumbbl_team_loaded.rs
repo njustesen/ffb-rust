@@ -137,17 +137,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn construct() {
-        let _ = ServerCommandHandlerFumbblTeamLoaded::new();
-    }
-
-    #[test]
-    fn get_id_is_fumbbl_team_loaded() {
-        let h = ServerCommandHandlerFumbblTeamLoaded::new();
-        assert_eq!(h.get_id(), NetCommandId::InternalServerFumbblTeamLoaded);
-    }
-
     #[tokio::test]
     async fn handle_command_missing_gamestate_returns_false() {
         let h = ServerCommandHandlerFumbblTeamLoaded::new();

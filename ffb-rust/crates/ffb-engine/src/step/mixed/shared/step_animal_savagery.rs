@@ -789,11 +789,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_animal_savagery() {
-        assert_eq!(StepAnimalSavagery::new("fail").id(), StepId::AnimalSavagery);
-    }
-
-    #[test]
     fn goto_label_set_from_parameter() {
         let mut step = StepAnimalSavagery::default();
         step.set_parameter(&StepParameter::GotoLabelOnFailure("skip".into()));

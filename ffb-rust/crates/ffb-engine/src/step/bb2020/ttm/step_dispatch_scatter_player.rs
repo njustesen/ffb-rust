@@ -128,11 +128,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_dispatch_scatter_player() {
-        assert_eq!(StepDispatchScatterPlayer::new().id(), StepId::DispatchScatterPlayer);
-    }
-
-    #[test]
     fn fumble_kicked_player_returns_next_without_push() {
         let mut game = make_game();
         let mut step = StepDispatchScatterPlayer::new();

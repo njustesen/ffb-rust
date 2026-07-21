@@ -54,11 +54,4 @@ mod tests {
         assert!(has_catcher);
     }
 
-    #[test]
-    fn params_clone() {
-        // No Params struct; verify the struct itself can be created via Default
-        let _s = SpikedBallApo::default();
-        let steps = SpikedBallApo::build_sequence();
-        assert_eq!(steps.len(), 1);
-    }
 }

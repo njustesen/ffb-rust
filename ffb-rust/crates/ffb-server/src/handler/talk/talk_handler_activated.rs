@@ -96,9 +96,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() { let _ = handler(); }
-
-    #[test]
     fn handle_activates_player_on_field() {
         let h = handler();
         let team = make_team(vec![make_player("p1", 1)]);

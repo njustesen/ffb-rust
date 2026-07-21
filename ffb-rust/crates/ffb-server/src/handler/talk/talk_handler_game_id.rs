@@ -30,9 +30,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() { let _ = TalkHandlerGameId::new(); }
-
-    #[test]
     fn handle_uses_test_url_in_test_mode() {
         let h = TalkHandlerGameId::new();
         let msg = h.handle(42, true);

@@ -98,12 +98,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let h = TalkHandlerSetBall::new(Client::Spec, Environment::None, vec![Privilege::EditState]);
-        assert_eq!(h.required_client, Client::Spec);
-    }
-
-    #[test]
     fn handle_moves_ball_to_coordinate() {
         let h = TalkHandlerSetBall::default();
         let mut g = game();

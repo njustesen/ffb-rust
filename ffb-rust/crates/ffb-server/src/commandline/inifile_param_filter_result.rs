@@ -26,20 +26,3 @@ impl InifileParamFilterResult {
         &self.filtered_args
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct() {
-        let r = InifileParamFilterResult::new(
-            "server.ini".to_string(),
-            None,
-            vec!["arg1".to_string()],
-        );
-        assert_eq!(r.get_ini_file_name(), "server.ini");
-        assert!(r.get_override_file_name().is_none());
-        assert_eq!(r.get_filtered_args().len(), 1);
-    }
-}

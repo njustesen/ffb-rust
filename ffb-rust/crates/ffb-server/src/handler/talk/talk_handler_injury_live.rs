@@ -98,9 +98,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() { let _ = TalkHandlerInjuryLive::new(); }
-
-    #[test]
     fn apply_injury_none_removes_existing_injuries() {
         let h = TalkHandlerInjuryLive::new();
         let home = make_team("home", vec![make_player("p1", 1)]);

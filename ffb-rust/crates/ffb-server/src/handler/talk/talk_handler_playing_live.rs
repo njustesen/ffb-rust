@@ -62,9 +62,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() { let _ = TalkHandlerPlayingLive::new(); }
-
-    #[test]
     fn handle_sets_home_playing_true_for_home_team() {
         let h = TalkHandlerPlayingLive::new();
         let mut g = game();

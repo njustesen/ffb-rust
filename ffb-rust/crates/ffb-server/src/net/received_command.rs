@@ -38,17 +38,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = ReceivedCommand::new("testCmd".to_string(), false, true, 1);
-    }
-
-    #[test]
-    fn get_id() {
-        let rc = ReceivedCommand::new("myCmd".to_string(), false, true, 42);
-        assert_eq!(rc.get_id(), "myCmd");
-    }
-
-    #[test]
     fn is_internal_command() {
         let rc = ReceivedCommand::new("x".to_string(), true, false, 1);
         assert!(rc.is_internal_command());

@@ -170,13 +170,6 @@ mod tests {
     use std::sync::Arc;
 
     #[test]
-    fn construct() {
-        let r = FumbblRequestLoadTeam::new(1, "coach".to_string(), "team1".to_string(), Some(true), vec![]);
-        assert_eq!(r.get_coach(), "coach");
-        assert_eq!(r.get_team_id(), "team1");
-    }
-
-    #[test]
     fn process_returns_parsed_team_when_present() {
         let client = MockHttpClient {
             response: Ok(r#"<team id="team1"><name>The Reavers</name><coach>coach</coach></team>"#.to_string()),

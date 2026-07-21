@@ -64,13 +64,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let h = TalkHandlerTurnTest::new();
-        assert_eq!(h.required_client, Client::Player);
-        assert_eq!(h.required_environment, Environment::TestGame);
-    }
-
-    #[test]
     fn handle_syncs_both_teams_by_delta() {
         let h = TalkHandlerTurnTest::new();
         let mut g = game();

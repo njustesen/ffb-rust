@@ -41,17 +41,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let q = DbTeamSetupsForTeamQuery::new();
-        assert_eq!(q.get_id(), DbStatementId::TEAM_SETUPS_QUERY_ALL_FOR_A_TEAM);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_team_setups"));
-    }
-
-    #[test]
     fn sql_is_distinct_name_select() {
         assert!(SQL.contains("DISTINCT name"));
     }

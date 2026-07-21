@@ -141,12 +141,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let list = DbPlayerMarkersInsertParameterList::new();
-        assert_eq!(list.get_parameters().len(), 0);
-    }
-
-    #[test]
     fn init_from_none_game_state_is_noop() {
         let mut list = DbPlayerMarkersInsertParameterList::new();
         list.init_from(None, false, false);

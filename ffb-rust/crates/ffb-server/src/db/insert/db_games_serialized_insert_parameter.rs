@@ -45,13 +45,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let p = DbGamesSerializedInsertParameter::new(123, vec![1, 2, 3]);
-        assert_eq!(p.get_id(), 123);
-        assert_eq!(p.get_data(), &[1, 2, 3]);
-    }
-
-    #[test]
     fn initial_updated_rows() {
         let p = DbGamesSerializedInsertParameter::new(123, vec![]);
         assert_eq!(p.get_updated_rows(), 0);

@@ -51,9 +51,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() { let _ = TalkHandlerBoxTest::new(); }
-
-    #[test]
     fn handle_delegates_to_base_logic() {
         let h = TalkHandlerBoxTest::new();
         let player = ffb_model::model::player::Player {

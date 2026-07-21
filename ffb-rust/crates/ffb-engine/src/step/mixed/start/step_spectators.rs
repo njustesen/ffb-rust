@@ -97,11 +97,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_spectators() {
-        assert_eq!(StepSpectators::new().id(), StepId::Spectators);
-    }
-
-    #[test]
     fn fan_factor_at_least_dedicated_fans_plus_2() {
         let mut step = StepSpectators::new();
         let mut game = make_game(5, 4);

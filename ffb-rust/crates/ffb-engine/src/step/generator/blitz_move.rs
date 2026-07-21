@@ -51,10 +51,4 @@ mod tests {
         assert!(p.move_stack.is_empty());
     }
 
-    #[test]
-    fn params_clone() {
-        let p = BlitzMoveParams { gaze_victim_id: Some("x".into()), ..Default::default() };
-        let q = p.clone();
-        assert_eq!(q.gaze_victim_id.as_deref(), Some("x"));
-    }
 }

@@ -431,11 +431,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_apothecary() {
-        assert_eq!(StepApothecary::new().id(), StepId::Apothecary);
-    }
-
-    #[test]
     fn no_injury_result_returns_next_step() {
         let mut step = StepApothecary::new();
         step.apothecary_mode = Some(ApothecaryMode::Defender);

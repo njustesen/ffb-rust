@@ -120,11 +120,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_end_then_i_started_blastin() {
-        assert_eq!(StepEndThenIStartedBlastin::new().id(), StepId::EndThenIStartedBlastin);
-    }
-
-    #[test]
     fn standing_player_no_flags_returns_next_without_epa() {
         let mut step = StepEndThenIStartedBlastin::new();
         let mut game = make_game();

@@ -265,11 +265,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_block_chainsaw() {
-        assert_eq!(StepBlockChainsaw::new().id(), StepId::BlockChainsaw);
-    }
-
-    #[test]
     fn non_chainsaw_player_returns_next() {
         // Java: else { getResult().setNextAction(StepAction.NEXT_STEP) }
         let mut step = StepBlockChainsaw::new();

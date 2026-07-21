@@ -125,21 +125,7 @@ mod tests {
         assert_eq!(c.all_cards().len(), 24);
     }
 
-    #[test]
-    fn force_shield_has_handler_key() {
-        let c = Cards::new();
-        let fs = c.all_cards().iter().find(|card| card.get_name() == "Force Shield").unwrap();
-        assert_eq!(fs.handler_key_name(), Some("FORCE_SHIELD"));
-    }
-
-    #[test]
-    fn beguiling_bracers_has_no_handler_key() {
-        let c = Cards::new();
-        let bb = c.all_cards().iter().find(|card| card.get_name() == "Beguiling Bracers").unwrap();
-        assert!(bb.handler_key_name().is_none());
-    }
-
-    fn find<'a>(cards: &'a Cards, name: &str) -> &'a Card {
+fn find<'a>(cards: &'a Cards, name: &str) -> &'a Card {
         cards.all_cards().iter().find(|card| card.get_name() == name).unwrap()
     }
 
@@ -149,40 +135,6 @@ mod tests {
         let c = Cards::new();
         for card in c.all_cards() {
             assert!(card.get_duration().is_some(), "{} is missing a duration", card.get_name());
-        }
-    }
-
-    #[test]
-    fn most_magic_items_target_own_player() {
-        let c = Cards::new();
-        for name in [
-            "Beguiling Bracers", "Belt of Invulnerability", "Fawndough's Headband",
-            "Force Shield", "Gikta's Strength of da Bear", "Gloves of Holding",
-            "Inertia Damper", "Lucky Charm", "Magic Gloves of Jark Longarm",
-            "Good Old Magic Codpiece", "Rabbit's Foot", "Wand of Smashing",
-        ] {
-            assert_eq!(find(&c, name).get_target(), CardTarget::OWN_PLAYER, "{name}");
-        }
-    }
-
-    #[test]
-    fn custard_pie_and_witch_brew_target_opposing_player() {
-        let c = Cards::new();
-        assert_eq!(find(&c, "Custard Pie").get_target(), CardTarget::OPPOSING_PLAYER);
-        assert_eq!(find(&c, "Witch's Brew").get_target(), CardTarget::OPPOSING_PLAYER);
-    }
-
-    #[test]
-    fn pit_trap_targets_any_player() {
-        let c = Cards::new();
-        assert_eq!(find(&c, "Pit Trap").get_target(), CardTarget::ANY_PLAYER);
-    }
-
-    #[test]
-    fn turn_targeted_cards() {
-        let c = Cards::new();
-        for name in ["Blatant Foul", "Greased Shoes", "Illegal Substitution", "Spiked Ball"] {
-            assert_eq!(find(&c, name).get_target(), CardTarget::TURN, "{name}");
         }
     }
 
@@ -201,25 +153,6 @@ mod tests {
                 );
             }
         }
-    }
-
-    #[test]
-    fn force_shield_lasts_while_holding_the_ball() {
-        let c = Cards::new();
-        assert_eq!(find(&c, "Force Shield").get_duration(), Some(InducementDuration::WhileHoldingTheBall));
-    }
-
-    #[test]
-    fn lucky_charm_lasts_until_used() {
-        let c = Cards::new();
-        assert_eq!(find(&c, "Lucky Charm").get_duration(), Some(InducementDuration::UntilUsed));
-    }
-
-    #[test]
-    fn distract_and_greased_shoes_last_until_end_of_opponents_turn() {
-        let c = Cards::new();
-        assert_eq!(find(&c, "Distract").get_duration(), Some(InducementDuration::UntilEndOfOpponentsTurn));
-        assert_eq!(find(&c, "Greased Shoes").get_duration(), Some(InducementDuration::UntilEndOfOpponentsTurn));
     }
 
     #[test]

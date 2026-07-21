@@ -135,11 +135,6 @@ mod tests {
     }
 
     #[test]
-    fn get_key_matches_report_id() {
-        assert_eq!(JumpUpRollMessage.get_key(), "jumpUpRoll");
-    }
-
-    #[test]
     fn bb2016_needed_roll_uses_ag_formula_not_bb2025_roll_formula() {
         // Regression test: BB2016's AgilityMechanic.formatJumpUpResult uses the
         // "(AG X ... + Roll > 6)." phrasing, not BB2020/BB2025's "(Roll ... >= N+)"

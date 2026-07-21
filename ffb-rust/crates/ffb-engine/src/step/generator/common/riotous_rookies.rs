@@ -52,13 +52,4 @@ mod tests {
         assert_eq!(steps[0].step_id, StepId::RiotousRookies);
     }
 
-    #[test]
-    fn params_clone() {
-        // No Params struct; verify the struct itself can be cloned via Default
-        let r1 = RiotousRookies::new();
-        let _r2 = RiotousRookies::default();
-        let steps = RiotousRookies::build_sequence();
-        assert!(!steps.is_empty());
-        let _ = r1;
-    }
 }

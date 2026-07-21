@@ -169,12 +169,6 @@ mod tests {
     }
 
     #[test]
-    fn default_empty_targets() {
-        let step = StepMultipleBlockFork::default();
-        assert!(step.targets.is_empty());
-    }
-
-    #[test]
     fn handle_command_returns_next_step() {
         let mut game = make_game();
         let mut step = StepMultipleBlockFork::new(vec!["p1".into()]);

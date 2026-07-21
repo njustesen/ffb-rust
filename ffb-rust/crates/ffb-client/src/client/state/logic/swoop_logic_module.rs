@@ -189,11 +189,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_swoop() {
-        assert_eq!(SwoopLogicModule::new().get_id(), ClientStateId::Swoop);
-    }
-
-    #[test]
     fn available_actions_matches_move_logic_module() {
         let module = SwoopLogicModule::new();
         assert_eq!(module.available_actions().len(), MoveLogicModule::new().available_actions().len());

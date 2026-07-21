@@ -17,21 +17,3 @@ impl CardReport {
         &self.description
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_new_and_getters() {
-        let report = CardReport::new("6", "Explosive Effect");
-        assert_eq!(report.get_roll(), "6");
-        assert_eq!(report.get_description(), "Explosive Effect");
-    }
-
-    #[test]
-    fn test_empty_roll() {
-        let report = CardReport::new("", "No effect");
-        assert_eq!(report.get_roll(), "");
-    }
-}

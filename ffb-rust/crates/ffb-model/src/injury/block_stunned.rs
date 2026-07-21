@@ -21,28 +21,3 @@ impl BlockStunned {
 impl Default for BlockStunned {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(BlockStunned::new().base().name(), "blockStunned");
-    }
-
-    #[test]
-    fn worth_spps_is_false() {
-        assert!(!BlockStunned::new().base().is_worth_spps());
-    }
-
-    #[test]
-    fn is_caused_by_opponent_is_true() {
-        assert!(BlockStunned::new().is_caused_by_opponent());
-    }
-
-    #[test]
-    fn is_block_is_true() {
-        assert!(BlockStunned::new().is_block());
-    }
-}

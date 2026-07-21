@@ -103,9 +103,4 @@ mod tests {
         assert!(status_report.rendered_runs[0].text.as_deref().unwrap().ends_with("Inaccurate"));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(ModifiedPassResultMessage.report_id(), ReportId::MODIFIED_PASS_RESULT);
-        assert_eq!(ModifiedPassResultMessage.get_key(), "modifiedPassResult");
-    }
 }

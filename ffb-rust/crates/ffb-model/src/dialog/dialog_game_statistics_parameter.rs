@@ -15,21 +15,6 @@ impl IDialogParameter for DialogGameStatisticsParameter {
 mod tests {
     use super::*;
     #[test]
-    fn dialog_id_is_game_statistics() {
-        assert_eq!(DialogGameStatisticsParameter.get_id(), DialogId::GAME_STATISTICS);
-    }
-    #[test]
-    fn transform_preserves_id() {
-        assert_eq!(DialogGameStatisticsParameter.transform().get_id(), DialogId::GAME_STATISTICS);
-    }
-
-    #[test]
-    fn default_is_sensible() {
-        let p = DialogGameStatisticsParameter::default();
-        assert_eq!(p.get_id(), DialogId::GAME_STATISTICS);
-    }
-
-    #[test]
     fn serde_round_trip() {
         let p = DialogGameStatisticsParameter;
         let json = serde_json::to_string(&p).unwrap();
@@ -37,10 +22,4 @@ mod tests {
         assert_eq!(back.get_id(), DialogId::GAME_STATISTICS);
     }
 
-    #[test]
-    fn clone_preserves_id() {
-        let p = DialogGameStatisticsParameter;
-        let cloned = p.clone();
-        assert_eq!(cloned.get_id(), DialogId::GAME_STATISTICS);
-    }
 }

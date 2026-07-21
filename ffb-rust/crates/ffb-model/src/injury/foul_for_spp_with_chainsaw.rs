@@ -25,33 +25,3 @@ impl FoulForSppWithChainsaw {
 impl Default for FoulForSppWithChainsaw {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(FoulForSppWithChainsaw::new().base().name(), "foulForSppWithChainsaw");
-    }
-
-    #[test]
-    fn worth_spps_is_true() {
-        assert!(FoulForSppWithChainsaw::new().base().is_worth_spps());
-    }
-
-    #[test]
-    fn is_foul_is_true() {
-        assert!(FoulForSppWithChainsaw::new().is_foul());
-    }
-
-    #[test]
-    fn is_chainsaw_is_true() {
-        assert!(FoulForSppWithChainsaw::new().is_chainsaw());
-    }
-
-    #[test]
-    fn is_caused_by_opponent_is_true() {
-        assert!(FoulForSppWithChainsaw::new().is_caused_by_opponent());
-    }
-}

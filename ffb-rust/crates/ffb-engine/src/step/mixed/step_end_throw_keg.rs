@@ -68,11 +68,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_end_throw_keg() {
-        assert_eq!(StepEndThrowKeg::new().id(), StepId::EndThrowKeg);
-    }
-
-    #[test]
     fn start_publishes_end_player_action_true() {
         let mut step = StepEndThrowKeg::new();
         let mut game = make_game();

@@ -58,11 +58,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(WizardUseMessage.report_id(), ReportId::WIZARD_USE);
-    }
-
-    #[test]
     fn home_team_lightning() {
         let game = make_game();
         let report = ReportWizardUse::new("home".into(), SpecialEffect::LIGHTNING);

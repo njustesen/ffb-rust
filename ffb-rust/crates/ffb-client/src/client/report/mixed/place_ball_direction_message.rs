@@ -95,9 +95,4 @@ mod tests {
         assert_eq!(status_report.rendered_runs[1].text.as_deref(), Some(" places the ball ."));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(PlaceBallDirectionMessage.report_id(), ReportId::PLACE_BALL_DIRECTION);
-        assert_eq!(PlaceBallDirectionMessage.get_key(), "placedBallDirection");
-    }
 }

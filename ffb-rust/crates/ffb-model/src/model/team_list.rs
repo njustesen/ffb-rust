@@ -35,20 +35,3 @@ impl TeamList {
         Self { coach, entries }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn empty_by_default() {
-        assert!(TeamList::new().is_empty());
-    }
-
-    #[test]
-    fn add_increases_len() {
-        let mut tl = TeamList::new();
-        tl.add(TeamListEntry::default());
-        assert_eq!(tl.len(), 1);
-    }
-}

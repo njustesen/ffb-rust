@@ -59,27 +59,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_is_empty() {
-        assert!(RosterSkeleton::default().id.is_empty());
-        assert!(RosterSkeleton::default().team_id.is_empty());
-    }
-
-    #[test]
-    fn get_team_id_returns_team_id() {
-        let r = RosterSkeleton { id: "1".to_string(), team_id: "284314".to_string() };
-        assert_eq!(r.get_team_id(), "284314");
-    }
-
-    #[test]
-    fn setters_update_fields() {
-        let mut r = RosterSkeleton::default();
-        r.set_id("undead");
-        r.set_team_id("42");
-        assert_eq!(r.get_id(), "undead");
-        assert_eq!(r.get_team_id(), "42");
-    }
-
-    #[test]
     fn parses_id_and_team_attributes_from_root_tag() {
         let xml = r#"<roster id="undead" team="42"/>"#;
         let parsed = crate::xml::XmlHandler::parse(None, xml, Box::new(RosterSkeleton::default()));

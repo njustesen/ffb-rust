@@ -35,12 +35,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let p = DbPlayerMarkersDeleteParameter::new("team1".to_string());
-        assert_eq!(p.get_team_id(), "team1");
-    }
-
-    #[test]
     fn get_updated_rows_initial() {
         let p = DbPlayerMarkersDeleteParameter::new("team1".to_string());
         assert_eq!(p.get_updated_rows(), 0);

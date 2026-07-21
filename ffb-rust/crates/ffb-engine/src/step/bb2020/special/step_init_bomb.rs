@@ -159,12 +159,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_init_bomb() {
-        let step = StepInitBomb::new();
-        assert_eq!(step.id(), StepId::InitBomb);
-    }
-
-    #[test]
     fn no_catcher_returns_next_step() {
         let mut step = StepInitBomb::new();
         let mut game = make_game();

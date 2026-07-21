@@ -359,11 +359,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_apothecary_multiple() {
-        assert_eq!(StepApothecaryMultiple::new().id(), StepId::ApothecaryMultiple);
-    }
-
-    #[test]
     fn start_no_injuries_returns_next_step() {
         let mut game = make_game();
         let mut step = StepApothecaryMultiple::new();

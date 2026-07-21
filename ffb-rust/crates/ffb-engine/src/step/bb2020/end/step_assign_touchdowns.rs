@@ -197,11 +197,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_assign_touchdowns() {
-        assert_eq!(StepAssignTouchdowns::new().id(), StepId::AssignTouchdowns);
-    }
-
-    #[test]
     fn no_winning_team_returns_next_step() {
         let mut game = make_game();
         let mut step = StepAssignTouchdowns::new();

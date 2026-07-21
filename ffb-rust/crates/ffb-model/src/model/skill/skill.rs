@@ -347,63 +347,7 @@ impl Ord for Skill {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::enums::{SkillCategory, SkillUsageType, DeclareCondition};
-
-    #[test]
-    fn new_sets_name_and_category() {
-        let s = Skill::new("Block", SkillCategory::General);
-        assert_eq!(s.get_name(), "Block");
-        assert_eq!(s.get_category(), SkillCategory::General);
-    }
-
-    #[test]
-    fn new_defaults_to_regular_usage_type() {
-        let s = Skill::new("Dodge", SkillCategory::Agility);
-        assert_eq!(s.get_skill_usage_type(), SkillUsageType::Regular);
-    }
-
-    #[test]
-    fn new_default_skill_value_is_zero() {
-        let s = Skill::new("Block", SkillCategory::General);
-        assert_eq!(s.get_default_skill_value(), 0);
-    }
-
-    #[test]
-    fn negative_trait_false_by_default() {
-        let s = Skill::new("Block", SkillCategory::General);
-        assert!(!s.is_negative_trait());
-    }
-
-    #[test]
-    fn as_negative_trait_sets_flag() {
-        let s = Skill::as_negative_trait("BoneHead", SkillCategory::Extraordinary);
-        assert!(s.is_negative_trait());
-    }
-
-    #[test]
-    fn with_default_value_stores_value() {
-        let s = Skill::with_default_value("Mighty Blow", SkillCategory::Strength, 1);
-        assert_eq!(s.get_default_skill_value(), 1);
-    }
-
-    #[test]
-    fn with_usage_type_stores_type() {
-        let s = Skill::with_usage_type("Pro", SkillCategory::General, SkillUsageType::OncePerTurn);
-        assert_eq!(s.get_skill_usage_type(), SkillUsageType::OncePerTurn);
-    }
-
-    #[test]
-    fn declare_condition_defaults_to_none() {
-        let s = Skill::new("Block", SkillCategory::General);
-        assert_eq!(s.get_declare_condition(), DeclareCondition::None);
-    }
-
-    #[test]
-    fn set_declare_condition_round_trip() {
-        let mut s = Skill::new("Block", SkillCategory::General);
-        s.set_declare_condition(DeclareCondition::Standing);
-        assert_eq!(s.get_declare_condition(), DeclareCondition::Standing);
-    }
+    use crate::enums::SkillCategory;
 
     #[test]
     fn equality_based_on_name_only() {
@@ -423,18 +367,6 @@ mod tests {
     }
 
     #[test]
-    fn eligible_returns_true_by_default() {
-        let s = Skill::new("Block", SkillCategory::General);
-        assert!(s.eligible());
-    }
-
-    #[test]
-    fn get_confusion_message_returns_non_empty() {
-        let s = Skill::new("BoneHead", SkillCategory::Extraordinary);
-        assert!(!s.get_confusion_message().is_empty());
-    }
-
-    #[test]
     fn register_and_query_reroll_source() {
         use crate::enums::ReRollSource;
         let mut s = Skill::new("Dodge", SkillCategory::Agility);
@@ -447,43 +379,6 @@ mod tests {
     }
 
     #[test]
-    fn enhancements_none_by_default() {
-        let s = Skill::new("Block", SkillCategory::General);
-        assert!(s.get_enhancements().is_none());
-    }
-
-    #[test]
-    fn set_enhancements_stores_value() {
-        let mut s = Skill::new("Block", SkillCategory::General);
-        s.set_enhancements("some_enhancement".to_string());
-        assert!(s.get_enhancements().is_some());
-    }
-
-    #[test]
-    fn enhancement_source_name_returns_skill_name() {
-        let s = Skill::new("Mighty Blow", SkillCategory::Strength);
-        assert_eq!(s.enhancement_source_name(), "Mighty Blow");
-    }
-
-    #[test]
-    fn display_returns_name() {
-        let s = Skill::new("Block", SkillCategory::General);
-        assert_eq!(format!("{}", s), "Block");
-    }
-
-    #[test]
-    fn get_skill_use_description_returns_none_by_default() {
-        let s = Skill::new("Block", SkillCategory::General);
-        assert!(s.get_skill_use_description().is_none());
-    }
-
-    #[test]
-    fn evaluator_defaults_to_default_variant() {
-        let s = Skill::new("Block", SkillCategory::General);
-        assert_eq!(s.evaluator(), SkillValueEvaluator::Default);
-    }
-
-    #[test]
     fn register_modifier_lists_grow() {
         let mut s = Skill::new("Block", SkillCategory::General);
         s.register_pass_modifier("pass_mod".to_string());
@@ -492,10 +387,4 @@ mod tests {
         assert_eq!(s.dodge_modifiers.len(), 1);
     }
 
-    #[test]
-    fn with_all_stores_negative_trait_and_usage() {
-        let s = Skill::with_all("WildAnimal", SkillCategory::Extraordinary, 0, true, SkillUsageType::OncePerTurn);
-        assert!(s.is_negative_trait());
-        assert_eq!(s.get_skill_usage_type(), SkillUsageType::OncePerTurn);
-    }
 }

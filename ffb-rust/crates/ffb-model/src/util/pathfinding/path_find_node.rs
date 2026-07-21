@@ -175,17 +175,6 @@ mod tests {
     }
 
     #[test]
-    fn getters_return_constructor_values() {
-        let targets = target_set(&[(3, 3)]);
-        let node = PathFindNode::new(PathFindState::HAS_JUMPED, coord(1, 2), 5, true, Some(targets), None);
-        assert_eq!(node.get_coord(), coord(1, 2));
-        assert_eq!(node.get_state(), PathFindState::HAS_JUMPED);
-        assert_eq!(node.get_distance(), 5);
-        assert!(node.is_tz());
-        assert!(node.get_parent().is_none());
-    }
-
-    #[test]
     fn eq_based_on_weights() {
         let targets = target_set(&[(5, 5)]);
         let a = PathFindNode::new(PathFindState::NORMAL, coord(4, 5), 1, false, Some(targets.clone()), None);
@@ -193,9 +182,4 @@ mod tests {
         assert_eq!(a, b);
     }
 
-    #[test]
-    fn get_parent_returns_none_for_root() {
-        let node = PathFindNode::new(PathFindState::NORMAL, coord(0, 0), 0, false, None, None);
-        assert!(node.get_parent().is_none());
-    }
 }

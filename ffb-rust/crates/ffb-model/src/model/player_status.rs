@@ -42,17 +42,6 @@ mod tests {
     }
 
     #[test]
-    fn default_is_active() {
-        assert_eq!(PlayerStatus::default(), PlayerStatus::ACTIVE);
-    }
-
-    #[test]
-    fn get_name_returns_lowercase() {
-        assert_eq!(PlayerStatus::ACTIVE.get_name(), "active");
-        assert_eq!(PlayerStatus::JOURNEYMAN.get_name(), "journeyman");
-    }
-
-    #[test]
     fn serde_round_trip() {
         for v in [PlayerStatus::ACTIVE, PlayerStatus::JOURNEYMAN] {
             let s = serde_json::to_string(&v).unwrap();

@@ -34,21 +34,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dump_off_get_id_is_1() {
-        assert_eq!(DefenderAction::DUMP_OFF.get_id(), 1);
-        assert_eq!(DefenderAction::DUMP_OFF.get_name(), "dumpOff");
-    }
-
-    #[test]
     fn from_id_round_trips() {
         assert_eq!(DefenderAction::from_id(1), Some(DefenderAction::DUMP_OFF));
         assert_eq!(DefenderAction::from_id(0), None);
-    }
-
-    #[test]
-    fn get_title_and_description() {
-        assert_eq!(DefenderAction::DUMP_OFF.get_title(), "Dump Off");
-        assert!(!DefenderAction::DUMP_OFF.get_description().is_empty());
     }
 
     #[test]

@@ -39,24 +39,3 @@ impl Default for DbPlayerMarkersQuery {
         Self::new()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct() {
-        let q = DbPlayerMarkersQuery::new();
-        assert_eq!(q.get_id(), DbStatementId::PLAYER_MARKERS_QUERY);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_player_markers"));
-    }
-
-    #[test]
-    fn sql_has_team_id_param() {
-        assert!(SQL.contains("team_id=?"));
-    }
-}

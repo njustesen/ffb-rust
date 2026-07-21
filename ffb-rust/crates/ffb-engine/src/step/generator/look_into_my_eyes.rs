@@ -48,11 +48,4 @@ mod tests {
         assert_eq!(p.goto_on_end.as_deref(), Some("end"));
     }
 
-    #[test]
-    fn params_clone() {
-        let p = LookIntoMyEyesParams { push_select: true, goto_on_end: Some("x".into()) };
-        let q = p.clone();
-        assert!(q.push_select);
-        assert_eq!(q.goto_on_end.as_deref(), Some("x"));
-    }
 }

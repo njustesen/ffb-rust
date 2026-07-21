@@ -207,11 +207,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = ReplaySessionManager::new();
-    }
-
-    #[test]
     fn add_and_remove_session() {
         let mut m = ReplaySessionManager::new();
         m.add_session(1, "replay1".to_string(), "coach1".to_string());

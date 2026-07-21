@@ -124,11 +124,6 @@ mod tests {
     use ffb_engine::server_sketch_manager::Sketch as ManagerSketch;
 
     #[test]
-    fn construct() {
-        let _ = ServerCommandHandlerSketchAddCoordinate::default();
-    }
-
-    #[test]
     fn get_id_returns_client_sketch_add_coordinate() {
         let handler = ServerCommandHandlerSketchAddCoordinate::default();
         assert_eq!(handler.get_id(), NetCommandId::ClientSketchAddCoordinate);

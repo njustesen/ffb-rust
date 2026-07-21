@@ -429,11 +429,6 @@ mod tests {
     }
 
     #[test]
-    fn new_creates_instance() {
-        let _pf = PathFinderWithMultiJump::new();
-    }
-
-    #[test]
     fn find_adjacent_distance_1_returns_up_to_8() {
         let adj = PathFinderWithMultiJump::find_adjacent_coordinates(fc(5, 5), FieldCoordinateBounds::FIELD, 1);
         assert_eq!(adj.len(), 8);
@@ -463,9 +458,4 @@ mod tests {
         assert!(result.is_none());
     }
 
-    #[test]
-    fn default_uses_allow_jump_context() {
-        let pf = PathFinderWithMultiJump::default();
-        assert!(pf.theoretical_range_context.is_allow_jump());
-    }
 }

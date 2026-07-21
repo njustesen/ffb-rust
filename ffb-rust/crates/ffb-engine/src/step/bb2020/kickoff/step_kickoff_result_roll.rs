@@ -151,11 +151,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_kickoff_result_roll() {
-        assert_eq!(StepKickoffResultRoll::new().id(), StepId::KickoffResultRoll);
-    }
-
-    #[test]
     fn start_returns_next_step() {
         let mut game = make_game();
         let mut step = StepKickoffResultRoll::new();

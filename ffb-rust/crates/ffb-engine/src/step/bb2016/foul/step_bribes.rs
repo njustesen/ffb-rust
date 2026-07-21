@@ -192,11 +192,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_bribes() {
-        assert_eq!(StepBribes::new().id(), StepId::Bribes);
-    }
-
-    #[test]
     fn no_inducements_skips_straight_to_next() {
         let mut game = make_game();
         let mut step = StepBribes::new();

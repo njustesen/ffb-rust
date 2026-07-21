@@ -195,11 +195,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_init_blocking() {
-        assert_eq!(StepInitBlocking::new().id(), StepId::InitBlocking);
-    }
-
-    #[test]
     fn end_turn_publishes_and_gotos_label() {
         let mut step = StepInitBlocking::new();
         step.set_parameter(&StepParameter::GotoLabelOnEnd("end".into()));

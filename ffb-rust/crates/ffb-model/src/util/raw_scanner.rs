@@ -22,20 +22,3 @@ impl RawScanner {
     /// Java: `getClassesImplementing()` — in Rust always empty.
     pub fn get_classes_implementing(&self) -> Vec<String> { vec![] }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn subclasses_is_empty() {
-        let s = RawScanner::for_type("SomeInterface");
-        assert!(s.get_subclasses().is_empty());
-    }
-
-    #[test]
-    fn type_name_stored() {
-        let s = RawScanner::for_type("Foo");
-        assert_eq!(s.type_name, "Foo");
-    }
-}

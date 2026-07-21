@@ -13,22 +13,3 @@ impl RulesCollection {
     pub fn len(&self) -> usize { self.rules.len() }
     pub fn is_empty(&self) -> bool { self.rules.is_empty() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::enums::Rules;
-
-    #[test]
-    fn empty_by_default() {
-        assert!(RulesCollection::default().is_empty());
-    }
-
-    #[test]
-    fn add_and_contains() {
-        let mut rc = RulesCollection::default();
-        rc.add(Rules::Bb2025);
-        assert!(rc.contains(Rules::Bb2025));
-        assert_eq!(rc.len(), 1);
-    }
-}

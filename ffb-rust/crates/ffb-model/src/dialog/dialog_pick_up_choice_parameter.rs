@@ -15,27 +15,6 @@ impl IDialogParameter for DialogPickUpChoiceParameter {
 mod tests {
     use super::*;
     #[test]
-    fn dialog_id_is_pick_up_choice() {
-        assert_eq!(DialogPickUpChoiceParameter.get_id(), DialogId::PICK_UP_CHOICE);
-    }
-    #[test]
-    fn transform_preserves_id() {
-        assert_eq!(DialogPickUpChoiceParameter.transform().get_id(), DialogId::PICK_UP_CHOICE);
-    }
-
-    #[test]
-    fn default_is_sensible() {
-        let _p = DialogPickUpChoiceParameter::default();
-        // Unit struct — default constructs without panic
-    }
-
-    #[test]
-    fn clone_has_same_id() {
-        let p = DialogPickUpChoiceParameter;
-        assert_eq!(p.clone().get_id(), DialogId::PICK_UP_CHOICE);
-    }
-
-    #[test]
     fn serde_round_trip() {
         let p = DialogPickUpChoiceParameter;
         let json = serde_json::to_string(&p).unwrap();

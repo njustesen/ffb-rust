@@ -164,27 +164,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new_game_has_no_status() {
-        let gs = GameState::new(1);
-        assert_eq!(gs.get_status(), None);
-    }
-
-    #[test]
-    fn set_status_updates_status() {
-        let mut gs = GameState::new(1);
-        gs.set_status(GameStatus::Replaying);
-        assert_eq!(gs.get_status(), Some(GameStatus::Replaying));
-    }
-
-    #[test]
-    fn new_game_not_started() {
-        let gs = GameState::new(1);
-        assert_eq!(gs.get_id(), 1);
-        assert!(!gs.is_started());
-        assert!(gs.get_game().is_none());
-    }
-
-    #[test]
     fn generate_command_nr_increments() {
         let mut gs = GameState::new(1);
         assert_eq!(gs.generate_command_nr(), 1);

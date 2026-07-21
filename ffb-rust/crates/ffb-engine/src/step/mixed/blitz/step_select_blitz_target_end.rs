@@ -107,11 +107,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_select_blitz_target_end() {
-        assert_eq!(StepSelectBlitzTargetEnd::new().id(), StepId::SelectBlitzTargetEnd);
-    }
-
-    #[test]
     fn returns_next_with_no_state() {
         let mut step = StepSelectBlitzTargetEnd::new();
         let mut game = make_game();

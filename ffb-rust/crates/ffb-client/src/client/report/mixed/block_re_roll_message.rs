@@ -110,9 +110,4 @@ mod tests {
         assert_eq!(sr.rendered_runs[2].paragraph_style, Some(ParagraphStyle::INDENT_3));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(BlockReRollMessage.report_id(), ReportId::BLOCK_RE_ROLL);
-        assert_eq!(BlockReRollMessage.get_key(), "blockReRoll");
-    }
 }

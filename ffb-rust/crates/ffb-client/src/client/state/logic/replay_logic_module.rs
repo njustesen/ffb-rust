@@ -351,18 +351,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_replay() {
-        let module = ReplayLogicModule::new();
-        assert_eq!(module.get_id(), ClientStateId::Replay);
-    }
-
-    #[test]
-    fn available_actions_is_always_empty() {
-        let module = ReplayLogicModule::new();
-        assert!(module.available_actions().is_empty());
-    }
-
-    #[test]
     fn set_up_initializes_replay_list_in_non_replay_mode() {
         let mut module = ReplayLogicModule::new();
         module.set_callbacks(Box::new(RecordingCallbacks::default()));

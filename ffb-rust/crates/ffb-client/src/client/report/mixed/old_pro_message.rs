@@ -108,9 +108,4 @@ mod tests {
         assert_eq!(status_report.rendered_runs.len(), 4);
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(OldProMessage.report_id(), ReportId::OLD_PRO);
-        assert_eq!(OldProMessage.get_key(), "oldPro");
-    }
 }

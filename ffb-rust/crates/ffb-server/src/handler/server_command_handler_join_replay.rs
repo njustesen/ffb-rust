@@ -171,19 +171,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let (rsm, cache, sketches) = setup();
-        let _ = handler(rsm, cache, sketches);
-    }
-
-    #[test]
-    fn get_id_is_client_join_replay() {
-        let (rsm, cache, sketches) = setup();
-        let h = handler(rsm, cache, sketches);
-        assert_eq!(h.get_id(), NetCommandId::ClientJoinReplay);
-    }
-
-    #[test]
     fn first_session_joining_creates_replay_state_and_gets_control() {
         use tokio::sync::mpsc;
         let (rsm, cache, sketches) = setup();

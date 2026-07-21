@@ -227,33 +227,6 @@ mod tests {
     }
 
     #[test]
-    fn player_result_fields_default_zero() {
-        let pr = PlayerResult::default();
-        assert_eq!(pr.touchdowns, 0);
-        assert_eq!(pr.casualties, 0);
-        assert_eq!(pr.spp_gained, 0);
-        assert!(!pr.mvp);
-        assert_eq!(pr.passing, 0);
-        assert_eq!(pr.player_awards, 0);
-        assert_eq!(pr.turns_played, 0);
-        assert_eq!(pr.current_spps, 0);
-        assert!(pr.serious_injury.is_none());
-        assert!(pr.send_to_box_reason.is_none());
-        assert!(!pr.has_used_secret_weapon);
-    }
-
-    #[test]
-    fn team_result_injury_fields_default_zero() {
-        let tr = TeamResult::default();
-        assert_eq!(tr.spectators, 0);
-        assert_eq!(tr.badly_hurt_suffered, 0);
-        assert_eq!(tr.serious_injury_suffered, 0);
-        assert_eq!(tr.rip_suffered, 0);
-        assert_eq!(tr.spiralling_expenses, 0);
-        assert_eq!(tr.treasury_spent_on_inducements, 0);
-    }
-
-    #[test]
     fn team_result_accumulates_player_results() {
         let mut tr = TeamResult::default();
         let mut pr = PlayerResult::default();

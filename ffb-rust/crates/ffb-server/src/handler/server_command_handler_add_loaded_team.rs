@@ -161,17 +161,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let _ = ServerCommandHandlerAddLoadedTeam::new();
-    }
-
-    #[test]
-    fn get_id_is_internal_server_add_loaded_team() {
-        let h = ServerCommandHandlerAddLoadedTeam::new();
-        assert_eq!(h.get_id(), NetCommandId::InternalServerAddLoadedTeam);
-    }
-
-    #[test]
     fn handle_command_missing_gamestate_returns_true() {
         let h = ServerCommandHandlerAddLoadedTeam::new();
         let mut cache = GameCache::new();

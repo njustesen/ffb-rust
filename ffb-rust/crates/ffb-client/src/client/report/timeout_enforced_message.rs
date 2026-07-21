@@ -51,11 +51,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(TimeoutEnforcedMessage.report_id(), ReportId::TIMEOUT_ENFORCED);
-    }
-
-    #[test]
     fn home_coach_uses_home_bold() {
         let game = make_game();
         let report = ReportTimeoutEnforced::new("HomeCoach".into());

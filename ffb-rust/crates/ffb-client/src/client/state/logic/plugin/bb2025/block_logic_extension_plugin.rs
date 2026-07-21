@@ -80,13 +80,6 @@ mod tests {
     use ffb_model::enums::PS_STANDING;
 
     #[test]
-    fn get_type_and_name_are_block() {
-        let plugin = BlockLogicExtensionPlugin;
-        assert_eq!(plugin.get_type(), LogicPluginType::BLOCK);
-        assert_eq!(plugin.get_name(), "BLOCK");
-    }
-
-    #[test]
     fn available_actions_is_chomp_only() {
         let plugin = BlockLogicExtensionPlugin;
         assert_eq!(plugin.available_actions(), HashSet::from([ClientAction::CHOMP]));

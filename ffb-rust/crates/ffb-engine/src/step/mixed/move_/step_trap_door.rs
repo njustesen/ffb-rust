@@ -271,11 +271,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_trap_door() {
-        assert_eq!(StepTrapDoor::new().id(), StepId::TrapDoor);
-    }
-
-    #[test]
     fn no_player_id_returns_next() {
         let mut step = StepTrapDoor::new();
         let mut game = make_game();

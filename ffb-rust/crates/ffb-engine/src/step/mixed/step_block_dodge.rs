@@ -252,11 +252,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_block_dodge() {
-        assert_eq!(StepBlockDodge::new().id(), StepId::BlockDodge);
-    }
-
-    #[test]
     fn no_dodge_sets_defender_falling() {
         let mut step = StepBlockDodge::new();
         let mut game = make_game();

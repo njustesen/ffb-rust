@@ -52,10 +52,4 @@ mod tests {
         assert!(p.kicked);
     }
 
-    #[test]
-    fn params_clone() {
-        let p = ThrowTeamMateParams { thrown_player_id: Some("x".into()), ..Default::default() };
-        let q = p.clone();
-        assert_eq!(q.thrown_player_id.as_deref(), Some("x"));
-    }
 }

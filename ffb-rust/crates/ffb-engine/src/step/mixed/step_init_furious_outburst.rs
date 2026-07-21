@@ -203,11 +203,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_init_furious_outburst() {
-        assert_eq!(StepInitFuriousOutburst::new("end").id(), StepId::InitFuriousOutburst);
-    }
-
-    #[test]
     fn prone_player_goes_to_label() {
         let mut step = StepInitFuriousOutburst::new("end_label");
         let mut game = make_game();

@@ -53,10 +53,4 @@ mod tests {
         assert_eq!(p.success_label.as_deref(), Some("ok"));
     }
 
-    #[test]
-    fn params_clone() {
-        let p = RadingPartyParams { failure_label: Some("x".into()), success_label: None };
-        let q = p.clone();
-        assert_eq!(q.failure_label.as_deref(), Some("x"));
-    }
 }

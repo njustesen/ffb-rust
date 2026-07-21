@@ -105,6 +105,11 @@ impl ServerConnection {
     }
 }
 
+// PARITY-EXEMPT: Rust-only infrastructure. These drive a live tokio-tungstenite
+// websocket round-trip (in-test TcpListener + accept_async) — the Rust async
+// transport layer, which the Java client implements over a different websocket
+// stack. No Java counterpart test can mirror this; kept because they pin real
+// connect / JSON-send / dispatch / close-frame transport behavior.
 #[cfg(test)]
 mod tests {
     use super::*;

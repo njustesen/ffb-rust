@@ -385,11 +385,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_synchronous_multi_block() {
-        assert_eq!(SynchronousMultiBlockLogicModule::new().get_id(), ClientStateId::SynchronousMultiBlock);
-    }
-
-    #[test]
     fn available_actions_matches_java() {
         let actions = SynchronousMultiBlockLogicModule::new().available_actions();
         assert!(actions.contains(&ClientAction::BLOCK));

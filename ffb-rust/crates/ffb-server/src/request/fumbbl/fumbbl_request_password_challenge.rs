@@ -48,12 +48,6 @@ mod tests {
     use crate::request::fumbbl::util_fumbbl_request::MockHttpClient;
 
     #[test]
-    fn construct() {
-        let r = FumbblRequestPasswordChallenge::new("coach".to_string());
-        assert_eq!(r.get_coach(), "coach");
-    }
-
-    #[test]
     fn process_builds_url_and_extracts_challenge() {
         let client = MockHttpClient {
             response: Ok("<challenge>abc123</challenge>".to_string()),

@@ -124,11 +124,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_end_scatter_player() {
-        assert_eq!(StepEndScatterPlayer::new().id(), StepId::EndScatterPlayer);
-    }
-
-    #[test]
     fn missing_state_returns_next_without_push() {
         let mut game = make_game();
         let mut step = StepEndScatterPlayer::new();

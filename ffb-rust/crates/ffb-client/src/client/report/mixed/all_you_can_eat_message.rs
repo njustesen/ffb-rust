@@ -125,9 +125,4 @@ mod tests {
         assert_eq!(sr.rendered_runs.len(), 5);
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(AllYouCanEatMessage.report_id(), ReportId::ALL_YOU_CAN_EAT);
-        assert_eq!(AllYouCanEatMessage.get_key(), "allYouCanEat");
-    }
 }

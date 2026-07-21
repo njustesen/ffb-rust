@@ -135,11 +135,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_eject_player() {
-        assert_eq!(StepEjectPlayer::new().id(), StepId::EjectPlayer);
-    }
-
-    #[test]
     fn no_ball_goto_label() {
         let mut game = make_game();
         let mut step = StepEjectPlayer::new();

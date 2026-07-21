@@ -17,24 +17,3 @@ impl Lightning {
 impl Default for Lightning {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(Lightning::new().base().name(), "lightning");
-    }
-
-    #[test]
-    fn worth_spps_is_false() {
-        assert!(!Lightning::new().base().is_worth_spps());
-    }
-
-    #[test]
-    fn send_to_box_reason_is_lightning() {
-        use crate::model::send_to_box_reason::SendToBoxReason;
-        assert_eq!(Lightning::new().base().send_to_box_reason(), SendToBoxReason::LIGHTNING);
-    }
-}

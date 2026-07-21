@@ -69,12 +69,6 @@ mod tests {
     use crate::request::fumbbl::util_fumbbl_request::MockHttpClient;
 
     #[test]
-    fn construct() {
-        let r = FumbblRequestUploadResults::new();
-        assert!(!r.is_upload_successful());
-    }
-
-    #[test]
     fn process_success_response_sets_flags() {
         let client = MockHttpClient {
             response: Ok("<response><result>success</result><description>ok</description></response>".to_string()),

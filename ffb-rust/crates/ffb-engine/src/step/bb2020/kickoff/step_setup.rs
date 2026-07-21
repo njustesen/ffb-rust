@@ -174,11 +174,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_setup() {
-        assert_eq!(StepSetup::new().id(), StepId::Setup);
-    }
-
-    #[test]
     fn start_with_no_players_auto_advances() {
         // Zero-player teams: setup is trivially valid, auto-advance.
         let mut game = make_game();

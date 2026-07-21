@@ -128,11 +128,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(JumpRollMessage.report_id(), ReportId::JUMP_ROLL);
-    }
-
-    #[test]
     fn successful_jump_reports_jumps_over_opponents() {
         let mut status_report = StatusReport::new();
         let mut game = make_game();

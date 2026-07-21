@@ -193,9 +193,4 @@ mod tests {
         assert_eq!(sr.rendered_runs.len(), 2);
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(BlockChoiceMessage.report_id(), ReportId::BLOCK_CHOICE);
-        assert_eq!(BlockChoiceMessage.get_key(), "blockChoice");
-    }
 }

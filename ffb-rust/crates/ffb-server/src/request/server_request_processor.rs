@@ -89,12 +89,6 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
 
-    #[test]
-    fn construct() {
-        let p = ServerRequestProcessor::new();
-        assert!(!p.is_stopped());
-    }
-
     struct CountingRequest {
         request_url: String,
         counter: Arc<AtomicUsize>,

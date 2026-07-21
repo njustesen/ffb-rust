@@ -24,36 +24,3 @@ impl InternalServerCommand for InternalServerCommandClearCache {
         0
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct() {
-        let _ = InternalServerCommandClearCache::new();
-    }
-
-    #[test]
-    fn get_id() {
-        let c = InternalServerCommandClearCache::new();
-        assert_eq!(c.get_id(), "internalServerClearCache");
-    }
-
-    #[test]
-    fn get_game_id() {
-        let c = InternalServerCommandClearCache::new();
-        assert_eq!(c.get_game_id(), 0);
-    }
-
-    #[test]
-    fn is_internal() {
-        let c = InternalServerCommandClearCache::new();
-        assert!(c.is_internal());
-    }
-
-    #[test]
-    fn default() {
-        let _ = InternalServerCommandClearCache::default();
-    }
-}

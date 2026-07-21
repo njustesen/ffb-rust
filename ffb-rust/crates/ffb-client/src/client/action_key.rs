@@ -195,18 +195,4 @@ mod tests {
         assert_eq!(unique.len(), names.len());
     }
 
-    #[test]
-    fn player_move_north_property_name() {
-        assert_eq!(ActionKey::PLAYER_MOVE_NORTH.property_name(), "key.player.move.north");
-    }
-
-    #[test]
-    fn menu_replay_property_name() {
-        assert_eq!(ActionKey::MENU_REPLAY.property_name(), "key.menu.replay");
-    }
-
-    #[test]
-    fn resize_reset_property_name() {
-        assert_eq!(ActionKey::RESIZE_RESET.property_name(), "key.resize.reset");
-    }
 }

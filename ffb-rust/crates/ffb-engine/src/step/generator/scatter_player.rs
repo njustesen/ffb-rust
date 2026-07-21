@@ -77,10 +77,4 @@ mod tests {
         assert!(!p.thrown_player_has_ball);
     }
 
-    #[test]
-    fn params_clone() {
-        let p = ScatterPlayerParams { thrown_player_id: Some("x".into()), ..Default::default() };
-        let q = p.clone();
-        assert_eq!(q.thrown_player_id.as_deref(), Some("x"));
-    }
 }

@@ -11,15 +11,3 @@ impl TalkHandlerSkillTest {
         TalkHandlerSkill::new(Client::Player, Environment::TestGame, Vec::new())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct_has_test_requirements() {
-        let h = TalkHandlerSkillTest::new();
-        assert_eq!(h.required_client, Client::Player);
-        assert_eq!(h.required_environment, Environment::TestGame);
-    }
-}

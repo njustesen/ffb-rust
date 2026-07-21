@@ -64,18 +64,6 @@ mod tests {
         Arc::new(Mutex::new(DbConnectionManager::new()))
     }
 
-    #[test]
-    fn construct() {
-        let _ = ServerDbKeepAliveTask::new(manager_without_pool());
-    }
-
-    #[test]
-    fn get_db_connection_manager_shares_same_arc() {
-        let mgr = manager_without_pool();
-        let task = ServerDbKeepAliveTask::new(Arc::clone(&mgr));
-        assert!(Arc::ptr_eq(&mgr, &task.get_db_connection_manager()));
-    }
-
     #[tokio::test]
     async fn run_without_pool_does_not_panic_or_exit() {
         // A DB-less configuration (no FFB_DB_URL) must not call doKeepAlivePing()

@@ -71,18 +71,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let q = DbUserSettingsQuery::new();
-        assert_eq!(q.get_id(), DbStatementId::USER_SETTINGS_QUERY);
-        assert_eq!(q.get_coach(), "");
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_user_settings"));
-    }
-
-    #[test]
     fn sql_has_where_and_order_by() {
         assert!(SQL.contains("WHERE coach=?"));
         assert!(SQL.contains("ORDER BY name"));

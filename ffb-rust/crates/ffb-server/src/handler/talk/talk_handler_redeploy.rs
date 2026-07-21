@@ -67,9 +67,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() { let _ = TalkHandlerRedeploy::new(); }
-
-    #[test]
     fn branch_argument_returns_none_without_extra_token() {
         let commands = vec!["/redeploy".to_string()];
         assert_eq!(TalkHandlerRedeploy::branch_argument(&commands), None);

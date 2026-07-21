@@ -186,11 +186,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_hit_and_run() {
-        assert_eq!(HitAndRunLogicModule::new().get_id(), ClientStateId::HitAndRun);
-    }
-
-    #[test]
     fn available_actions_is_hit_and_run_only() {
         let actions = HitAndRunLogicModule::new().available_actions();
         assert_eq!(actions.len(), 1);

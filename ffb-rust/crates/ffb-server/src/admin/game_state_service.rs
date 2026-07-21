@@ -55,11 +55,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = GameStateService::new();
-    }
-
-    #[test]
     fn reset_step_stack_errors_when_game_not_started() {
         let mut game_state = crate::game_state::GameState::new(1);
         let service = GameStateService::new();

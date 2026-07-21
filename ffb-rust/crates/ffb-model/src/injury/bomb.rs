@@ -17,24 +17,3 @@ impl Bomb {
 impl Default for Bomb {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(Bomb::new().base().name(), "bomb");
-    }
-
-    #[test]
-    fn worth_spps_is_false() {
-        assert!(!Bomb::new().base().is_worth_spps());
-    }
-
-    #[test]
-    fn send_to_box_reason_is_bomb() {
-        use crate::model::send_to_box_reason::SendToBoxReason;
-        assert_eq!(Bomb::new().base().send_to_box_reason(), SendToBoxReason::BOMB);
-    }
-}

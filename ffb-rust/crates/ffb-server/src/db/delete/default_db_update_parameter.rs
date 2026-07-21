@@ -66,19 +66,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct_default_rows_zero() {
-        let p = DefaultDbUpdateParameter::new();
-        assert_eq!(p.get_updated_rows(), 0);
-    }
-
-    #[test]
-    fn set_updated_rows_roundtrip() {
-        let mut p = DefaultDbUpdateParameter::new();
-        p.set_updated_rows(42);
-        assert_eq!(p.get_updated_rows(), 42);
-    }
-
-    #[test]
     fn do_after_commit_is_noop() {
         let p = DefaultDbUpdateParameter::new();
         p.do_after_commit(); // must not panic

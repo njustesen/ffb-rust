@@ -63,11 +63,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(KickTeamMateFumbleMessage.report_id(), ReportId::KICK_TEAM_MATE_FUMBLE);
-    }
-
-    #[test]
     fn renders_explanation_text() {
         let mut sr = StatusReport::new();
         let game = make_game();

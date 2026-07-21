@@ -53,14 +53,6 @@ mod tests {
     use ffb_protocol::commands::server_command_sketch_set_label::ServerCommandSketchSetLabel;
 
     #[test]
-    fn get_id_is_server_sketch_set_label() {
-        assert_eq!(
-            ClientCommandHandlerSketchSetLabel::new().get_id(),
-            NetCommandId::ServerSketchSetLabel
-        );
-    }
-
-    #[test]
     fn handle_net_command_returns_true_with_multiple_ids() {
         let mut handler = ClientCommandHandlerSketchSetLabel::new();
         let cmd = AnyServerCommand::ServerSketchSetLabel(ServerCommandSketchSetLabel::new(
@@ -93,9 +85,4 @@ mod tests {
         handler.update_sketch_manager(&cmd);
     }
 
-    #[test]
-    fn default_constructs_a_handler() {
-        let handler = ClientCommandHandlerSketchSetLabel::default();
-        assert_eq!(handler.get_id(), NetCommandId::ServerSketchSetLabel);
-    }
 }

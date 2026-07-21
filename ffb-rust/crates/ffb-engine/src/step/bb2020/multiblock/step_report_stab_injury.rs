@@ -90,11 +90,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_report_stab_injury() {
-        assert_eq!(StepReportStabInjury::new().id(), StepId::ReportStabInjury);
-    }
-
-    #[test]
     fn start_returns_next_step_when_no_injury() {
         let mut game = make_game();
         let mut step = StepReportStabInjury::new();

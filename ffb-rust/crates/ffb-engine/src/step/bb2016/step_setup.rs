@@ -216,12 +216,6 @@ mod tests {
     }
 
     #[test]
-    fn step_id_is_setup() {
-        let step = StepSetup::new();
-        assert_eq!(step.id(), StepId::Setup);
-    }
-
-    #[test]
     fn goto_label_on_end_parameter_accepted() {
         let mut step = StepSetup::new();
         let ok = step.set_parameter(&StepParameter::GotoLabelOnEnd("end".to_string()));

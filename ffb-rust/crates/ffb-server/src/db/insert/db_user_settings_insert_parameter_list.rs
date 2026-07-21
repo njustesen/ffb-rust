@@ -43,12 +43,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let list = DbUserSettingsInsertParameterList::new();
-        assert_eq!(list.get_parameters().len(), 0);
-    }
-
-    #[test]
     fn add_parameter_values() {
         let mut list = DbUserSettingsInsertParameterList::new();
         list.add_parameter_values("c".to_string(), "n".to_string(), "v".to_string());

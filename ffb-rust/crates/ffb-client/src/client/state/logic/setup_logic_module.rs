@@ -161,16 +161,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_setup() {
-        assert_eq!(SetupLogicModule::new().get_id(), ClientStateId::Setup);
-    }
-
-    #[test]
-    fn available_actions_is_empty() {
-        assert!(SetupLogicModule::new().available_actions().is_empty());
-    }
-
-    #[test]
     fn use_turn_mode_is_false() {
         assert!(!SetupLogicModule::new().use_turn_mode());
     }

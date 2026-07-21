@@ -35,17 +35,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = InternalServerCommandScheduleGame::new("home".to_string(), "away".to_string());
-    }
-
-    #[test]
-    fn get_id() {
-        let c = InternalServerCommandScheduleGame::new("h".to_string(), "a".to_string());
-        assert_eq!(c.get_id(), "internalServerScheduleGame");
-    }
-
-    #[test]
     fn get_team_home_id() {
         let c = InternalServerCommandScheduleGame::new("homeTeam".to_string(), "a".to_string());
         assert_eq!(c.get_team_home_id(), "homeTeam");
@@ -57,9 +46,4 @@ mod tests {
         assert_eq!(c.get_team_away_id(), "awayTeam");
     }
 
-    #[test]
-    fn is_internal() {
-        let c = InternalServerCommandScheduleGame::new("h".to_string(), "a".to_string());
-        assert!(c.is_internal());
-    }
 }

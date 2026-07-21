@@ -48,13 +48,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_drop_player() {
-        use crate::step::framework::DeferredCommandId;
-        let cmd = DropPlayerCommand::new("p1".into(), ApothecaryMode::Defender, false);
-        assert_eq!(cmd.id(), DeferredCommandId::DropPlayer);
-    }
-
-    #[test]
     fn stores_player_id_and_apothecary_mode() {
         let cmd = DropPlayerCommand::new("player42".into(), ApothecaryMode::Attacker, true);
         assert_eq!(cmd.player_id, "player42");

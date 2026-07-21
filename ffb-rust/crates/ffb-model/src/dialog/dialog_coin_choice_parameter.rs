@@ -15,22 +15,6 @@ impl IDialogParameter for DialogCoinChoiceParameter {
 mod tests {
     use super::*;
     #[test]
-    fn dialog_id_is_coin_choice() {
-        assert_eq!(DialogCoinChoiceParameter.get_id(), DialogId::COIN_CHOICE);
-    }
-    #[test]
-    fn transform_preserves_id() {
-        assert_eq!(DialogCoinChoiceParameter.transform().get_id(), DialogId::COIN_CHOICE);
-    }
-
-    #[test]
-    fn default_is_sensible() {
-        // Unit struct — default() and direct construction are identical
-        let p = DialogCoinChoiceParameter::default();
-        assert_eq!(p.get_id(), DialogId::COIN_CHOICE);
-    }
-
-    #[test]
     fn serde_round_trip() {
         let p = DialogCoinChoiceParameter;
         let json = serde_json::to_string(&p).unwrap();
@@ -38,10 +22,4 @@ mod tests {
         assert_eq!(back.get_id(), DialogId::COIN_CHOICE);
     }
 
-    #[test]
-    fn clone_preserves_id() {
-        let p = DialogCoinChoiceParameter;
-        let cloned = p.clone();
-        assert_eq!(cloned.get_id(), DialogId::COIN_CHOICE);
-    }
 }

@@ -64,12 +64,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let h = TalkHandlerWeather::new(Client::Spec, Environment::None, vec![Privilege::EditState]);
-        assert_eq!(h.required_client, Client::Spec);
-    }
-
-    #[test]
     fn handle_sets_weather_by_short_name() {
         let h = TalkHandlerWeather::default();
         let mut g = game();

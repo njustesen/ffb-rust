@@ -72,9 +72,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() { let _ = TalkHandlerOptions::new(); }
-
-    #[test]
     fn base_has_expected_command_and_threshold() {
         let h = TalkHandlerOptions::new();
         assert_eq!(h.base().command_parts_threshold, 0);

@@ -155,19 +155,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let (gc, sm, rsm) = setup();
-        let _ = ServerCommandHandlerTalk::new(gc, sm, rsm);
-    }
-
-    #[test]
-    fn get_id_is_client_talk() {
-        let (gc, sm, rsm) = setup();
-        let handler = ServerCommandHandlerTalk::new(gc, sm, rsm);
-        assert_eq!(handler.get_id(), NetCommandId::ClientTalk);
-    }
-
-    #[test]
     fn no_talk_text_is_a_noop() {
         let (gc, sm, rsm) = setup();
         let handler = ServerCommandHandlerTalk::new(gc, sm, rsm);

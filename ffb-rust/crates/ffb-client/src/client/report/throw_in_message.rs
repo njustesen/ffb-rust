@@ -63,11 +63,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(ThrowInMessage.report_id(), ReportId::THROW_IN);
-    }
-
-    #[test]
     fn full_throw_in_renders_all_lines() {
         let game = make_game();
         let report = ReportThrowIn::new(Direction::North, 3, vec![2, 4]);

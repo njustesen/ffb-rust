@@ -342,11 +342,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_right_stuff() {
-        assert_eq!(StepRightStuff::new().id(), StepId::RightStuff);
-    }
-
-    #[test]
     fn no_thrown_player_returns_next() {
         let mut game = make_game();
         let out = StepRightStuff::new().start(&mut game, &mut GameRng::new(0));

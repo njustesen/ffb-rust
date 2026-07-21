@@ -202,11 +202,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_second_move_furious_outburst() {
-        assert_eq!(StepSecondMoveFuriousOutburst::new("end").id(), StepId::SecondMoveFuriousOutburst);
-    }
-
-    #[test]
     fn no_coordinate_continues() {
         let mut step = StepSecondMoveFuriousOutburst::new("end");
         let mut game = make_game();

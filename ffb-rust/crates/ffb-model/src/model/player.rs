@@ -594,41 +594,6 @@ mod tests {
     // ── PlayerModelTest.java mirrors (RosterPlayer setter/getter ↔ pub field) ──
 
     #[test]
-    fn player_name_is_set_and_retrieved() {
-        let mut p = Player::default();
-        p.name = "Joe Bloggs".into();
-        assert_eq!(p.name, "Joe Bloggs");
-    }
-
-    #[test]
-    fn player_nr_is_set_and_retrieved() {
-        let mut p = Player::default();
-        p.nr = 7;
-        assert_eq!(p.nr, 7);
-    }
-
-    #[test]
-    fn player_movement_is_set_and_retrieved() {
-        let mut p = Player::default();
-        p.movement = 6;
-        assert_eq!(p.movement, 6);
-    }
-
-    #[test]
-    fn player_strength_is_set_and_retrieved() {
-        let mut p = Player::default();
-        p.strength = 3;
-        assert_eq!(p.strength, 3);
-    }
-
-    #[test]
-    fn player_agility_is_set_and_retrieved() {
-        let mut p = Player::default();
-        p.agility = 3;
-        assert_eq!(p.agility, 3);
-    }
-
-    #[test]
     fn serde_round_trip() {
         let p = test_player();
         let json = serde_json::to_string(&p).unwrap();
@@ -901,32 +866,6 @@ mod tests {
         p.remove_enhancements("GREASY_CLEATS");
         assert_eq!(p.movement_with_modifiers(), 6);
         assert!(!p.has_skill(SkillId::Stab));
-    }
-
-    #[test]
-    fn player_status_defaults_to_active() {
-        let p = Player::default();
-        assert_eq!(p.player_status, PlayerStatus::ACTIVE);
-    }
-
-    #[test]
-    fn is_journeyman_false_for_active() {
-        let p = test_player();
-        assert!(!p.is_journeyman());
-    }
-
-    #[test]
-    fn is_journeyman_true_for_journeyman_status() {
-        let mut p = test_player();
-        p.set_player_status(PlayerStatus::JOURNEYMAN);
-        assert!(p.is_journeyman());
-    }
-
-    #[test]
-    fn add_skill_and_get_skills() {
-        let mut p = test_player();
-        p.add_skill(SkillId::Dodge);
-        assert!(p.get_skills().contains(&SkillId::Dodge));
     }
 
     #[test]

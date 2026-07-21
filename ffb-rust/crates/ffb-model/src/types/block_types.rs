@@ -131,24 +131,6 @@ mod tests {
     }
 
     #[test]
-    fn block_roll_target_id_set_on_construction() {
-        let br = BlockRoll::new("player42".into(), PlayerState(PS_STANDING), 1);
-        assert_eq!(br.target_id, "player42");
-    }
-
-    #[test]
-    fn block_roll_dauntless_false_by_default() {
-        let br = BlockRoll::new("p1".into(), PlayerState(PS_STANDING), 1);
-        assert!(!br.successful_dauntless);
-    }
-
-    #[test]
-    fn block_roll_reroll_sources_empty_initially() {
-        let br = BlockRoll::new("p1".into(), PlayerState(PS_STANDING), 1);
-        assert!(br.reroll_sources.is_empty());
-    }
-
-    #[test]
     fn block_roll_reroll_tracking() {
         let mut br = BlockRoll::new("p1".into(), PlayerState(1), 1);
         br.reroll_dice_indexes = vec![0, 2];

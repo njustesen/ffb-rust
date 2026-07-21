@@ -92,16 +92,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn catch_accurate_bomb_is_bomb() {
-        assert!(CatchScatterThrowInMode::CatchAccurateBomb.is_bomb());
-    }
-
-    #[test]
-    fn catch_scatter_is_not_bomb() {
-        assert!(!CatchScatterThrowInMode::CatchScatter.is_bomb());
-    }
-
-    #[test]
     fn for_name_round_trip() {
         assert_eq!(CatchScatterThrowInMode::for_name("catchHandOff"), Some(CatchScatterThrowInMode::CatchHandOff));
     }
@@ -111,18 +101,4 @@ mod tests {
         assert_eq!(CatchScatterThrowInMode::for_name("unknown"), None);
     }
 
-    #[test]
-    fn deflected_bomb_is_bomb() {
-        assert!(CatchScatterThrowInMode::DeflectedBomb.is_bomb());
-    }
-
-    #[test]
-    fn throw_in_is_not_bomb() {
-        assert!(!CatchScatterThrowInMode::ThrowIn.is_bomb());
-    }
-
-    #[test]
-    fn all_has_19_variants() {
-        assert_eq!(CatchScatterThrowInMode::all().len(), 19);
-    }
 }

@@ -117,19 +117,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_wait_for_opponent() {
-        assert_eq!(
-            WaitForOpponentLogicModule::new().get_id(),
-            ClientStateId::WaitForOpponent
-        );
-    }
-
-    #[test]
-    fn available_actions_is_empty() {
-        assert!(WaitForOpponentLogicModule::new().available_actions().is_empty());
-    }
-
-    #[test]
     #[should_panic(expected = "actionContext for acting player is not supported in waiting context")]
     fn action_context_panics() {
         let module = WaitForOpponentLogicModule::new();

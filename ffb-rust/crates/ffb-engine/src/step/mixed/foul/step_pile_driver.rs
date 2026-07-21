@@ -141,11 +141,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_pile_driver() {
-        assert_eq!(StepPileDriver::new().id(), StepId::PileDriver);
-    }
-
-    #[test]
     fn no_target_player_gotos_label() {
         let mut step = StepPileDriver::new();
         step.set_parameter(&StepParameter::GotoLabelOnEnd("end".into()));

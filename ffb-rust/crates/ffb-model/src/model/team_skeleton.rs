@@ -91,34 +91,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_is_empty() {
-        assert!(TeamSkeleton::default().id.is_empty());
-    }
-
-    #[test]
-    fn get_name_returns_name() {
-        let t = TeamSkeleton { id: "42".to_string(), name: "Chaos".to_string(), coach: "Kalimar".to_string(), team_value: 1_000_000, xml_content: String::new(), parsing_player: false };
-        assert_eq!(t.get_name(), "Chaos");
-        assert_eq!(t.get_coach(), "Kalimar");
-        assert_eq!(t.get_team_value(), 1_000_000);
-    }
-
-    #[test]
-    fn setters_update_fields() {
-        let mut t = TeamSkeleton::default();
-        t.set_id("1");
-        t.set_name("Amazon");
-        t.set_coach("Coach");
-        t.set_team_value(1_100_000);
-        t.set_xml_content("<team/>");
-        assert_eq!(t.get_id(), "1");
-        assert_eq!(t.get_name(), "Amazon");
-        assert_eq!(t.get_coach(), "Coach");
-        assert_eq!(t.get_team_value(), 1_100_000);
-        assert_eq!(t.get_xml_content(), "<team/>");
-    }
-
-    #[test]
     fn parses_id_name_coach_from_xml() {
         let xml = r#"<team id="42"><coach>Kalimar</coach><name>Chaos</name></team>"#;
         let parsed = crate::xml::XmlHandler::parse(None, xml, Box::new(TeamSkeleton::default()));

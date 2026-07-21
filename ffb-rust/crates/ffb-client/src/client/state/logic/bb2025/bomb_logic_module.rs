@@ -450,11 +450,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_bomb() {
-        assert_eq!(BombLogicModule::new().get_id(), ClientStateId::Bomb);
-    }
-
-    #[test]
     fn is_end_turn_action_available_true_when_not_bomb_turn() {
         let game = make_game();
         assert!(is_end_turn_action_available(&game));

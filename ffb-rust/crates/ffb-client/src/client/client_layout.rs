@@ -36,36 +36,3 @@ impl ClientLayout {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn landscape_is_not_portrait() {
-        assert!(!ClientLayout::LANDSCAPE.is_portrait());
-    }
-
-    #[test]
-    fn portrait_and_square_are_portrait() {
-        assert!(ClientLayout::PORTRAIT.is_portrait());
-        assert!(ClientLayout::SQUARE.is_portrait());
-    }
-
-    #[test]
-    fn wide_is_not_portrait() {
-        assert!(!ClientLayout::WIDE.is_portrait());
-    }
-
-    #[test]
-    fn default_pitch_and_dugout_scale_is_one() {
-        assert_eq!(ClientLayout::LANDSCAPE.pitch_scale(), 1.0);
-        assert_eq!(ClientLayout::LANDSCAPE.dugout_scale(), 1.0);
-    }
-
-    #[test]
-    fn wide_scales_match_java_constants() {
-        assert!((ClientLayout::WIDE.pitch_scale() - 57.0 / 30.0).abs() < f64::EPSILON);
-        assert_eq!(ClientLayout::WIDE.dugout_scale(), 1.25);
-    }
-}

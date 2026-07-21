@@ -51,11 +51,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(AlwaysHungryMessage.report_id(), ReportId::ALWAYS_HUNGRY_ROLL);
-    }
-
-    #[test]
     fn renders_success() {
         let mut game = make_game();
         let mut thrower = Player::default();

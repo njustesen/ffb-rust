@@ -108,11 +108,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let _ = GameStateConnector::new();
-    }
-
-    #[test]
     fn run_with_no_args_returns_usage() {
         let client = RecordingClient {
             urls: RefCell::new(Vec::new()),

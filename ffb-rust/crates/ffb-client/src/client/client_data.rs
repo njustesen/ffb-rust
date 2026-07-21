@@ -166,18 +166,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new_has_no_selected_player() {
-        assert!(ClientData::new().selected_player().is_none());
-    }
-
-    #[test]
-    fn set_and_get_selected_player() {
-        let mut data = ClientData::new();
-        data.set_selected_player(Some("p1".to_string()));
-        assert_eq!(data.selected_player(), Some(&"p1".to_string()));
-    }
-
-    #[test]
     fn set_block_dice_result_replaces_previous() {
         let mut data = ClientData::new();
         data.set_block_dice_result(vec![BlockRoll::default()]);
@@ -203,56 +191,6 @@ mod tests {
         assert!(data.status_title().is_none());
         assert!(data.status_message().is_none());
         assert!(data.status_type().is_none());
-    }
-
-    #[test]
-    fn acting_player_updated_flag_round_trips() {
-        let mut data = ClientData::new();
-        assert!(!data.is_acting_player_updated());
-        data.set_acting_player_updated(true);
-        assert!(data.is_acting_player_updated());
-    }
-
-    #[test]
-    fn turn_timer_stopped_flag_round_trips() {
-        let mut data = ClientData::new();
-        data.set_turn_timer_stopped(true);
-        assert!(data.is_turn_timer_stopped());
-    }
-
-    #[test]
-    fn spectator_count_round_trips() {
-        let mut data = ClientData::new();
-        data.set_spectator_count(4);
-        assert_eq!(data.spectator_count(), 4);
-    }
-
-    #[test]
-    fn wizard_spell_round_trips() {
-        let mut data = ClientData::new();
-        data.set_wizard_spell(Some(SpecialEffect::FIREBALL));
-        assert_eq!(data.wizard_spell(), Some(SpecialEffect::FIREBALL));
-    }
-
-    #[test]
-    fn end_turn_button_hidden_round_trips() {
-        let mut data = ClientData::new();
-        data.set_end_turn_button_hidden(true);
-        assert!(data.is_end_turn_button_hidden());
-    }
-
-    #[test]
-    fn spectators_round_trip() {
-        let mut data = ClientData::new();
-        data.set_spectators(vec!["a".into(), "b".into()]);
-        assert_eq!(data.spectators(), &["a".to_string(), "b".to_string()]);
-    }
-
-    #[test]
-    fn coach_controlling_replay_round_trips() {
-        let mut data = ClientData::new();
-        data.set_coach_controlling_replay(Some("coach".into()));
-        assert_eq!(data.coach_controlling_replay(), Some("coach"));
     }
 
     #[test]

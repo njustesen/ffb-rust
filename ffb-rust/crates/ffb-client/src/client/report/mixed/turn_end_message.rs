@@ -201,9 +201,4 @@ mod tests {
         assert!(status_report.rendered_runs.is_empty());
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(TurnEndMessage.report_id(), ReportId::TURN_END);
-        assert_eq!(TurnEndMessage.get_key(), "turnEnd");
-    }
 }

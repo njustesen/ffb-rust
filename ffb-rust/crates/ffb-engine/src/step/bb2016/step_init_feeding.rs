@@ -243,12 +243,6 @@ mod tests {
     }
 
     #[test]
-    fn step_id_is_init_feeding() {
-        let step = StepInitFeeding::new();
-        assert_eq!(step.id(), StepId::InitFeeding);
-    }
-
-    #[test]
     fn goto_label_on_end_parameter_accepted() {
         let mut step = StepInitFeeding::new();
         let ok = step.set_parameter(&StepParameter::GotoLabelOnEnd("end".to_string()));

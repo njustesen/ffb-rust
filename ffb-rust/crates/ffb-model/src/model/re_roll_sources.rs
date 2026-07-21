@@ -87,11 +87,6 @@ mod tests {
         assert!(ReRollSources::new().for_name("NOT_VALID").is_none());
     }
     #[test]
-    fn values_is_non_empty() {
-        assert!(!ReRollSources::new().values().is_empty());
-    }
-
-    #[test]
     fn default_impl_produces_same_registry_as_new() {
         let via_new = ReRollSources::new();
         let via_default = ReRollSources::default();

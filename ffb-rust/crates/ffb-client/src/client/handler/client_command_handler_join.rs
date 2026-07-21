@@ -107,11 +107,6 @@ mod tests {
     use ffb_protocol::commands::server_command_sound::ServerCommandSound;
 
     #[test]
-    fn get_id_is_server_join() {
-        assert_eq!(ClientCommandHandlerJoin::new().get_id(), NetCommandId::ServerJoin);
-    }
-
-    #[test]
     fn home_away_coaches_none_for_fewer_than_two_names() {
         assert!(ClientCommandHandlerJoin::home_away_coaches(&[], "Alice").is_none());
         assert!(ClientCommandHandlerJoin::home_away_coaches(&["Alice".into()], "Alice").is_none());

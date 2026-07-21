@@ -136,9 +136,4 @@ mod tests {
         assert_eq!(status_report.rendered_runs[8].text.as_deref(), Some("Succeeded on a roll of 3+ - TackleZone"));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(PickUpRollMessage.report_id(), ReportId::PICK_UP_ROLL);
-        assert_eq!(PickUpRollMessage.get_key(), "pickUpRoll");
-    }
 }

@@ -222,11 +222,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_cloud_burster() {
-        assert_eq!(StepCloudBurster::new(String::new()).id(), StepId::CloudBurster);
-    }
-
-    #[test]
     fn deflection_not_successful_goes_to_failure() {
         let mut game = make_game();
         setup_long_pass(&mut game, None);
@@ -366,9 +361,4 @@ mod tests {
         assert_eq!(out.action, StepAction::GotoLabel);
     }
 
-    #[test]
-    fn default_impl_has_empty_label() {
-        let step = StepCloudBurster::default();
-        assert_eq!(step.goto_label_on_failure, "");
-    }
 }

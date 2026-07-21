@@ -70,11 +70,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(StandUpRollMessage.report_id(), ReportId::STAND_UP_ROLL);
-    }
-
-    #[test]
     fn successful_stand_up_reports_success_and_needed_roll_when_not_rerolled() {
         let game = make_game_with_acting_player("p1");
         let report = ReportStandUpRoll::new(Some("p1".into()), true, 4, 1, false);

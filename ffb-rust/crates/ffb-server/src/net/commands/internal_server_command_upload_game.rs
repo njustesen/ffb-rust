@@ -35,32 +35,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = InternalServerCommandUploadGame::new(42);
-    }
-
-    #[test]
     fn construct_with_conceding() {
         let c = InternalServerCommandUploadGame::new_with_conceding(1, Some("team1".to_string()));
         assert_eq!(c.get_conceding_team_id(), Some("team1"));
-    }
-
-    #[test]
-    fn get_id() {
-        let c = InternalServerCommandUploadGame::new(1);
-        assert_eq!(c.get_id(), "internalServerUploadGame");
-    }
-
-    #[test]
-    fn get_game_id() {
-        let c = InternalServerCommandUploadGame::new(7);
-        assert_eq!(c.get_game_id(), 7);
-    }
-
-    #[test]
-    fn is_internal() {
-        let c = InternalServerCommandUploadGame::new(1);
-        assert!(c.is_internal());
     }
 
     #[test]

@@ -407,11 +407,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_block_roll_multiple() {
-        assert_eq!(StepBlockRollMultiple::new().id(), StepId::BlockRollMultiple);
-    }
-
-    #[test]
     fn start_returns_next_step() {
         let mut game = make_game();
         let mut step = StepBlockRollMultiple::new();
@@ -426,12 +421,6 @@ mod tests {
         assert!(step.first_run);
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!step.first_run);
-    }
-
-    #[test]
-    fn default_block_rolls_empty() {
-        let step = StepBlockRollMultiple::default();
-        assert!(step.block_rolls.is_empty());
     }
 
     #[test]

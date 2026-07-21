@@ -37,30 +37,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new_with_stores_team_id_and_max_bribes() {
-        let p = DialogBribesParameter::new_with("team1", 3);
-        assert_eq!(p.get_team_id(), Some("team1"));
-        assert_eq!(p.get_max_nr_of_bribes(), 3);
-    }
-
-    #[test]
     fn add_player_id_appends_nonempty_strings() {
         let mut p = DialogBribesParameter::new_with("t", 2);
         p.add_player_id("p1");
         p.add_player_id("");
         assert_eq!(p.get_player_ids(), &["p1"]);
-    }
-
-    #[test]
-    fn dialog_id_is_bribes() {
-        assert_eq!(DialogBribesParameter::default().get_id(), DialogId::BRIBES);
-    }
-
-    #[test]
-    fn transform_preserves_id() {
-        let p = DialogBribesParameter::default();
-        let t = p.transform();
-        assert_eq!(t.get_id(), DialogId::BRIBES);
     }
 
     #[test]

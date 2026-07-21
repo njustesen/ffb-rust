@@ -186,13 +186,6 @@ mod tests {
     }
 
     #[test]
-    fn new_has_no_game_and_zero_game_id() {
-        let client = FantasyFootballClient::new(parameters_with_mode(ClientMode::SPECTATOR));
-        assert!(client.game().is_none());
-        assert_eq!(client.game_id(), 0);
-    }
-
-    #[test]
     fn new_takes_mode_from_parameters() {
         let client = FantasyFootballClient::new(parameters_with_mode(ClientMode::REPLAY));
         assert_eq!(client.mode(), Some(ClientMode::REPLAY));

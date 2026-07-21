@@ -391,6 +391,10 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
     }
 }
 
+// PARITY-EXEMPT: Rust-only infrastructure. AgentPrompt->WireDialog serializes the
+// Rust engine's AgentPrompt channel (Java uses UtilServerDialog.showDialog and has
+// no AgentPrompt class), so there is no Java counterpart to mirror into; kept
+// because they pin the real exhaustive prompt_to_wire serialization behavior.
 #[cfg(test)]
 mod tests {
     use super::*;

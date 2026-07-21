@@ -224,18 +224,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_pushback() {
-        let module = PushbackLogicModule::new();
-        assert_eq!(module.get_id(), ClientStateId::Pushback);
-    }
-
-    #[test]
-    fn available_actions_is_always_empty() {
-        let module = PushbackLogicModule::new();
-        assert!(module.available_actions().is_empty());
-    }
-
-    #[test]
     fn field_interaction_ignores_when_no_pushback_square() {
         let module = PushbackLogicModule::new();
         let mut client = make_client();

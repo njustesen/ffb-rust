@@ -74,11 +74,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_goto_label() {
-        assert_eq!(StepGotoLabel::new().id(), StepId::GotoLabel);
-    }
-
-    #[test]
     fn goto_label_param_accepted() {
         let mut step = StepGotoLabel::new();
         assert!(step.set_parameter(&StepParameter::GotoLabel("end".into())));

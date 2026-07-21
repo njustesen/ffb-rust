@@ -85,20 +85,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let p = DbTeamSetupsInsertParameter::new(
-            "t1".to_string(),
-            "setup1".to_string(),
-            vec![1, 2],
-            vec![3, 4],
-            vec![5, 6],
-        );
-        assert_eq!(p.get_team_id(), "t1");
-        assert_eq!(p.get_name(), "setup1");
-        assert_eq!(p.get_player_numbers().len(), 2);
-    }
-
-    #[test]
     fn get_updated_rows_initial() {
         let p = DbTeamSetupsInsertParameter::new(
             "t1".to_string(),

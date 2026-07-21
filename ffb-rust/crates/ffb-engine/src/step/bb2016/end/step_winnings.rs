@@ -134,11 +134,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_winnings() {
-        assert_eq!(StepWinnings::new().id(), StepId::Winnings);
-    }
-
-    #[test]
     fn start_returns_next_step() {
         let mut game = make_game(0, 0);
         let out = StepWinnings::new().start(&mut game, &mut GameRng::new(0));

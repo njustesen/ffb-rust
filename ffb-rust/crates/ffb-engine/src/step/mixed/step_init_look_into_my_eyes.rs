@@ -116,11 +116,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_init_look_into_my_eyes() {
-        assert_eq!(StepInitLookIntoMyEyes::new().id(), StepId::InitLookIntoMyEyes);
-    }
-
-    #[test]
     fn no_adjacent_ball_carrier_clears_defender() {
         let mut step = StepInitLookIntoMyEyes::new();
         let mut game = make_game();

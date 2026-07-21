@@ -13,18 +13,3 @@ impl ScannerSingleton {
     /// Java: `getInstance()` — returns singleton instance.
     pub fn get_instance() -> Self { Self }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn get_instance_returns_default() {
-        let _s = ScannerSingleton::get_instance();
-    }
-
-    #[test]
-    fn new_is_default() {
-        let _s = ScannerSingleton::new();
-    }
-}

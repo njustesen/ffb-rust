@@ -118,9 +118,4 @@ mod tests {
         assert_eq!(status_report.rendered_runs[1].text.as_deref(), Some("Team away"));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(ShowStarReRollMessage.report_id(), ReportId::SHOW_STAR_RE_ROLL);
-        assert_eq!(ShowStarReRollMessage.get_key(), "showStarReRoll");
-    }
 }

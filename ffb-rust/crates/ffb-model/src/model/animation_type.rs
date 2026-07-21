@@ -126,12 +126,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn pass_get_name_is_lowercase() {
-        assert_eq!(AnimationType::PASS.get_name(), "pass");
-        assert_eq!(AnimationType::SPELL_FIREBALL.get_name(), "spellFireball");
-    }
-
-    #[test]
     fn for_name_case_insensitive() {
         assert_eq!(AnimationType::for_name("pass"), Some(AnimationType::PASS));
         assert_eq!(AnimationType::for_name("PASS"), Some(AnimationType::PASS));
@@ -153,10 +147,4 @@ mod tests {
         }
     }
 
-    #[test]
-    fn copy_semantics() {
-        let a = AnimationType::CARD;
-        let b = a;
-        assert_eq!(a, b);
-    }
 }

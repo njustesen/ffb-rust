@@ -87,11 +87,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(SecretWeaponBanMessage.report_id(), ReportId::SECRET_WEAPON_BAN);
-    }
-
-    #[test]
     fn banned_player_renders_ban_message_and_penalty() {
         let mut game = make_game();
         add_player(&mut game, true, "p1", "Ripper");

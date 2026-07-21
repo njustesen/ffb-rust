@@ -252,11 +252,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_throw_keg() {
-        assert_eq!(StepThrowKeg::new().id(), StepId::ThrowKeg);
-    }
-
-    #[test]
     fn no_acting_player_returns_next_step() {
         let mut step = StepThrowKeg::new();
         let mut game = make_game();

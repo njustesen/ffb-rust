@@ -225,11 +225,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_kick_em_blitz() {
-        assert_eq!(KickEmBlitzLogicModule::new().get_id(), ClientStateId::KickEmBlitz);
-    }
-
-    #[test]
     fn move_action_is_kick_em_blitz() {
         assert_eq!(KickEmBlitzLogicModule::new().move_action(), PlayerAction::KickEmBlitz);
     }

@@ -50,13 +50,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let h = TalkHandlerRoll::new();
-        assert_eq!(h.required_client, Client::Player);
-        assert_eq!(h.required_environment, Environment::TestGame);
-    }
-
-    #[test]
     fn handle_queues_numeric_tokens_as_test_rolls() {
         let h = TalkHandlerRoll::new();
         let mut roller = DiceRoller::new();

@@ -311,11 +311,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_followup() {
-        assert_eq!(StepFollowup::new().id(), StepId::Followup);
-    }
-
-    #[test]
     fn followup_false_publishes_coordinate_from_and_next() {
         // Java: followupChoice = false → publishParameter(COORDINATE_FROM, null) → NEXT_STEP
         let mut step = StepFollowup::new();

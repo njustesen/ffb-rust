@@ -54,11 +54,6 @@ mod tests {
     use crate::request::fumbbl::util_fumbbl_request::MockHttpClient;
 
     #[test]
-    fn construct() {
-        let _ = FumbblRequestLoadPlayerMarkings::new();
-    }
-
-    #[test]
     fn process_builds_url_and_parses_config() {
         let client = MockHttpClient {
             response: Ok(r#"{"autoMarkingSeparator":"-","autoMarkingRecords":[{"skillArray":["Block"],"marking":"B","gainedOnly":true}]}"#.to_string()),

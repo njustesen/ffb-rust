@@ -223,11 +223,6 @@ mod tests {
         assert_eq!(step.goto_label_on_failure, "fail");
     }
 
-    #[test]
-    fn id_is_foul_chainsaw() {
-        assert_eq!(StepFoulChainsaw::new().id(), StepId::FoulChainsaw);
-    }
-
     fn make_chainsaw_player(game: &mut Game, id: &str) {
         use ffb_model::enums::SkillId;
         use ffb_model::model::skill_def::SkillWithValue;

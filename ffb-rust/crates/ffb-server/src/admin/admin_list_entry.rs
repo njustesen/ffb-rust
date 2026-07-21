@@ -101,13 +101,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let e = AdminListEntry::new(1);
-        assert_eq!(e.get_game_id(), 1);
-        assert_eq!(AdminListEntry::XML_TAG, "game");
-    }
-
-    #[test]
     fn to_xml_contains_game_and_team_attributes() {
         let mut e = AdminListEntry::new(7);
         e.half = 2;

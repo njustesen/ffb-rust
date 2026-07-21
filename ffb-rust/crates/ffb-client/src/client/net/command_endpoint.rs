@@ -135,12 +135,6 @@ mod tests {
     }
 
     #[test]
-    fn is_open_false_before_on_open() {
-        let ep = CommandEndpoint::default();
-        assert!(!ep.is_open());
-    }
-
-    #[test]
     fn on_open_then_on_close_toggles_is_open() {
         let mut ep = CommandEndpoint::default();
         ep.on_open();

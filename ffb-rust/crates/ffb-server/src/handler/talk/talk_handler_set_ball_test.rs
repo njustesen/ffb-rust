@@ -11,16 +11,3 @@ impl TalkHandlerSetBallTest {
         TalkHandlerSetBall::new(Client::Player, Environment::TestGame, Vec::new())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct_has_test_requirements() {
-        let h = TalkHandlerSetBallTest::new();
-        assert_eq!(h.required_client, Client::Player);
-        assert_eq!(h.required_environment, Environment::TestGame);
-        assert!(h.requires_one_privilege_of.is_empty());
-    }
-}

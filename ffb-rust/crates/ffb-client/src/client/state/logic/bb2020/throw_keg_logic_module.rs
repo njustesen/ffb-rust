@@ -349,11 +349,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_throw_keg() {
-        assert_eq!(ThrowKegLogicModule::new().get_id(), ClientStateId::ThrowKeg);
-    }
-
-    #[test]
     fn available_actions_matches_java() {
         let actions = ThrowKegLogicModule::new().available_actions();
         assert!(actions.contains(&ClientAction::END_MOVE));

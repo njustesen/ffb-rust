@@ -63,38 +63,4 @@ mod tests {
         assert_eq!(back.re_roll_skill, Some(SkillId::Pro));
     }
 
-    #[test]
-    fn get_id_is_re_roll() {
-        let p = DialogReRollParameter::default();
-        assert_eq!(p.get_id(), DialogId::RE_ROLL);
-    }
-
-    #[test]
-    fn transform_preserves_data() {
-        let p = DialogReRollParameter { fumble: true, minimum_roll: 2, ..Default::default() };
-        let t = p.transform();
-        assert_eq!(t.get_id(), DialogId::RE_ROLL);
-    }
-
-    #[test]
-    fn getters_return_expected_values() {
-        let p = DialogReRollParameter {
-            fumble: true,
-            pro_re_roll_option: true,
-            minimum_roll: 3,
-            ..Default::default()
-        };
-        assert!(p.is_fumble());
-        assert!(p.is_pro_re_roll_option());
-        assert_eq!(p.get_minimum_roll(), 3);
-    }
-
-    #[test]
-    fn messages_getter_returns_slice() {
-        let p = DialogReRollParameter {
-            messages: vec!["a".into(), "b".into()],
-            ..Default::default()
-        };
-        assert_eq!(p.get_messages().len(), 2);
-    }
 }

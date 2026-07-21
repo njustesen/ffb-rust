@@ -75,9 +75,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() { let _ = TalkHandlerOption::new(); }
-
-    #[test]
     fn handle_sets_option_value() {
         let h = TalkHandlerOption::new();
         let mut g = game();

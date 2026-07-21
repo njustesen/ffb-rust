@@ -48,13 +48,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let h = TalkHandlerResetStateLive::new();
-        assert_eq!(h.required_client, Client::Spec);
-        assert_eq!(h.requires_one_privilege_of, vec![Privilege::EditState]);
-    }
-
-    #[test]
     fn reset_message_lists_all_reset_items() {
         let msg = TalkHandlerResetStateLive::reset_message();
         assert!(msg.contains("Acting player"));

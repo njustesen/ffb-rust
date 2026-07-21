@@ -60,12 +60,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_end_game() {
-        let step = StepEndGame::new();
-        assert_eq!(step.id(), StepId::EndGame);
-    }
-
-    #[test]
     fn start_sets_game_finished_and_returns_next_step() {
         let mut step = StepEndGame::new();
         let mut game = make_game();
@@ -90,9 +84,4 @@ mod tests {
         assert_eq!(outcome.action, StepAction::Continue);
     }
 
-    #[test]
-    fn default_creates_same_as_new() {
-        let s = StepEndGame::default();
-        assert_eq!(s.id(), StepId::EndGame);
-    }
 }

@@ -231,17 +231,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let _ = ServerCommandHandlerApplyAutomatedPlayerMarkings::new();
-    }
-
-    #[test]
-    fn get_id_is_apply_automatic_player_markings() {
-        let h = ServerCommandHandlerApplyAutomatedPlayerMarkings::new();
-        assert_eq!(h.get_id(), NetCommandId::InternalApplyAutomaticPlayerMarkings);
-    }
-
-    #[test]
     fn handle_command_missing_gamestate_returns_true() {
         let h = ServerCommandHandlerApplyAutomatedPlayerMarkings::new();
         let cache = GameCache::new();

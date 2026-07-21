@@ -23,29 +23,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new_stores_all_fields() {
-        let h = HeatExhaustion::new("p1", true, 3);
-        assert_eq!(h.get_player_id(), Some("p1"));
-        assert!(h.is_exhausted());
-        assert_eq!(h.get_roll(), 3);
-    }
-
-    #[test]
-    fn default_has_no_player_id() {
-        let h = HeatExhaustion::default();
-        assert_eq!(h.get_player_id(), None);
-        assert!(!h.is_exhausted());
-        assert_eq!(h.get_roll(), 0);
-    }
-
-    #[test]
-    fn not_exhausted_stores_correctly() {
-        let h = HeatExhaustion::new("p2", false, 6);
-        assert!(!h.is_exhausted());
-        assert_eq!(h.get_roll(), 6);
-    }
-
-    #[test]
     fn serde_round_trip() {
         let h = HeatExhaustion::new("p1", true, 3);
         let s = serde_json::to_string(&h).unwrap();

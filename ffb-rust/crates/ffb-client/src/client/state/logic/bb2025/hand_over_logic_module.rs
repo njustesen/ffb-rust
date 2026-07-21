@@ -271,11 +271,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_hand_over() {
-        assert_eq!(HandOverLogicModule::new().get_id(), ClientStateId::HandOver);
-    }
-
-    #[test]
     fn ball_in_hand_false_without_acting_player() {
         let game = make_game();
         assert!(!ball_in_hand(&game));

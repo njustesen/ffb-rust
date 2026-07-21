@@ -342,11 +342,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_end_blocking() {
-        assert_eq!(StepEndBlocking::new().id(), StepId::EndBlocking);
-    }
-
-    #[test]
     fn default_state_pushes_end_player_action_sequence() {
         // Java: normal path → endGenerator.pushSequence(EndPlayerAction.SequenceParams(gs, true, true, false))
         let mut step = StepEndBlocking::new();

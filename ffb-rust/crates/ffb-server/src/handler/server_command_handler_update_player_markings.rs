@@ -226,17 +226,6 @@ mod tests {
         )
     }
 
-    #[test]
-    fn construct() {
-        let _ = handler();
-    }
-
-    #[test]
-    fn get_id_is_update_player_markings() {
-        let h = handler();
-        assert_eq!(h.get_id(), NetCommandId::ClientUpdatePlayerMarkings);
-    }
-
     #[tokio::test]
     async fn handle_command_missing_gamestate_returns_false() {
         let h = handler();

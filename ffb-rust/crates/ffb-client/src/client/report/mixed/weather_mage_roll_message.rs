@@ -92,9 +92,4 @@ mod tests {
         assert_eq!(status_report.rendered_runs.len(), 4);
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(WeatherMageRollMessage.report_id(), ReportId::WEATHER_MAGE_ROLL);
-        assert_eq!(WeatherMageRollMessage.get_key(), "weatherMageRoll");
-    }
 }

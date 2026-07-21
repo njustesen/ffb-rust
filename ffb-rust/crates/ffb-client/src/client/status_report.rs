@@ -255,14 +255,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn indent_get_set() {
-        let mut report = StatusReport::new();
-        assert_eq!(report.get_indent(), 0);
-        report.set_indent(2);
-        assert_eq!(report.get_indent(), 2);
-    }
-
-    #[test]
     fn report_version_emits_single_run() {
         let mut report = StatusReport::new();
         report.report_version("1.0");

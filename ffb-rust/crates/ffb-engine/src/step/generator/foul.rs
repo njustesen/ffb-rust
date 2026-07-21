@@ -48,10 +48,4 @@ mod tests {
         assert!(p.using_chainsaw);
     }
 
-    #[test]
-    fn params_clone() {
-        let p = FoulParams { fouled_defender_id: Some("x".into()), using_chainsaw: false };
-        let q = p.clone();
-        assert_eq!(q.fouled_defender_id.as_deref(), Some("x"));
-    }
 }

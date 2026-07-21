@@ -414,11 +414,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_foul() {
-        assert_eq!(FoulLogicModule::new().get_id(), ClientStateId::Foul);
-    }
-
-    #[test]
     fn available_actions_contains_foul_and_chainsaw() {
         let actions = FoulLogicModule::new().available_actions();
         assert!(actions.contains(&ClientAction::FOUL));

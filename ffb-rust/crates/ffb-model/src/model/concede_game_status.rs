@@ -33,13 +33,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_name_returns_expected_strings() {
-        assert_eq!(ConcedeGameStatus::REQUESTED.get_name(), "requested");
-        assert_eq!(ConcedeGameStatus::CONFIRMED.get_name(), "confirmed");
-        assert_eq!(ConcedeGameStatus::DENIED.get_name(), "denied");
-    }
-
-    #[test]
     fn from_name_round_trips() {
         assert_eq!(ConcedeGameStatus::from_name("requested"), Some(ConcedeGameStatus::REQUESTED));
         assert_eq!(ConcedeGameStatus::from_name("invalid"), None);
@@ -57,12 +50,6 @@ mod tests {
         let s = serde_json::to_string(&ConcedeGameStatus::CONFIRMED).unwrap();
         let back: ConcedeGameStatus = serde_json::from_str(&s).unwrap();
         assert_eq!(back, ConcedeGameStatus::CONFIRMED);
-    }
-
-    #[test]
-    fn variants_are_distinct() {
-        assert_ne!(ConcedeGameStatus::REQUESTED, ConcedeGameStatus::CONFIRMED);
-        assert_ne!(ConcedeGameStatus::CONFIRMED, ConcedeGameStatus::DENIED);
     }
 
 }

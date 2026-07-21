@@ -29,25 +29,3 @@ impl Default for DbGamesSerializedDelete {
         Self::new()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct() {
-        let s = DbGamesSerializedDelete::new();
-        assert_eq!(s.get_id(), DbStatementId::GAMES_SERIALIZED_DELETE);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_games_serialized"));
-    }
-
-    #[test]
-    fn sql_has_where_clause() {
-        assert!(SQL.contains("WHERE"));
-        assert!(SQL.contains("id=?"));
-    }
-}

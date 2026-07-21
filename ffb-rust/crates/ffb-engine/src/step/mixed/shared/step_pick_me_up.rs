@@ -174,11 +174,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_pick_me_up() {
-        assert_eq!(StepPickMeUp::new().id(), StepId::PickMeUp);
-    }
-
-    #[test]
     fn start_returns_next_when_no_eligible_players() {
         let mut step = StepPickMeUp::new();
         let mut game = make_game();

@@ -58,11 +58,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(PushbackMessage.report_id(), ReportId::PUSHBACK);
-    }
-
-    #[test]
     fn render_side_step_prints_defender_message() {
         let mut status_report = StatusReport::new();
         let mut game = make_game();

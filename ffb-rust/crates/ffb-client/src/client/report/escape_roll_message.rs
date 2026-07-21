@@ -86,11 +86,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(EscapeRollMessage.report_id(), ReportId::ESCAPE_ROLL);
-    }
-
-    #[test]
     fn successful_escape_reports_wriggle_free() {
         let mut status_report = StatusReport::new();
         let mut game = make_game();

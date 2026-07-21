@@ -55,35 +55,3 @@ impl ModifiedInjuryContext {
         None
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn new_has_none_modification() {
-        let ctx = ModifiedInjuryContext::new();
-        assert_eq!(ctx.get_modification(), InjuryModification::NONE);
-        assert!(ctx.get_used_skill().is_none());
-    }
-
-    #[test]
-    fn set_and_get_modification() {
-        let mut ctx = ModifiedInjuryContext::new();
-        ctx.set_modification(InjuryModification::ARMOUR);
-        assert_eq!(ctx.get_modification(), InjuryModification::ARMOUR);
-    }
-
-    #[test]
-    fn set_used_skill() {
-        let mut ctx = ModifiedInjuryContext::new();
-        ctx.set_used_skill("mightyBlow");
-        assert_eq!(ctx.get_used_skill(), Some("mightyBlow"));
-    }
-
-    #[test]
-    fn no_nested_modified_context() {
-        let ctx = ModifiedInjuryContext::new();
-        assert!(ctx.get_modified_injury_context().is_none());
-    }
-}

@@ -75,12 +75,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let h = TalkHandlerSpecs::new();
-        assert_eq!(h.required_client, Client::None);
-    }
-
-    #[test]
     fn handle_lists_no_spectators() {
         let mut sm = SessionManager::new();
         let (tx1, _) = tokio::sync::mpsc::unbounded_channel();

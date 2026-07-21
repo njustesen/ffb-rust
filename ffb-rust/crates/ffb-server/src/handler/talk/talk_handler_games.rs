@@ -36,9 +36,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() { let _ = TalkHandlerGames::new(); }
-
-    #[test]
     fn handle_returns_empty_when_no_active_games() {
         let h = TalkHandlerGames::new();
         let info = h.handle(&[]);

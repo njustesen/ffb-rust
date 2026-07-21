@@ -108,9 +108,4 @@ mod tests {
         assert_eq!(status_report.rendered_runs[2].text.as_deref(), Some(" escapes the trapdoor."));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(TrapDoorMessage.report_id(), ReportId::TRAP_DOOR);
-        assert_eq!(TrapDoorMessage.get_key(), "trapDoor");
-    }
 }

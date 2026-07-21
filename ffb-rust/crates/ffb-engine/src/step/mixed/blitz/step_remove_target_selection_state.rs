@@ -89,11 +89,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_remove_target_selection_state() {
-        assert_eq!(StepRemoveTargetSelectionState::new().id(), StepId::RemoveTargetSelectionState);
-    }
-
-    #[test]
     fn no_target_selection_state_returns_next() {
         let mut step = StepRemoveTargetSelectionState::new();
         let mut game = make_game();

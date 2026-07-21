@@ -197,14 +197,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_putrid_regurgitation_block() {
-        assert_eq!(
-            PutridRegurgitationBlockLogicModule::new().get_id(),
-            ClientStateId::PutridRegurgitationBlock
-        );
-    }
-
-    #[test]
     fn available_actions_has_expected_set() {
         let actions = PutridRegurgitationBlockLogicModule::new().available_actions();
         assert_eq!(actions.len(), 2);

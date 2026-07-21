@@ -231,13 +231,6 @@ mod tests {
     use crate::request::fumbbl::util_fumbbl_request::MockHttpClient;
 
     #[test]
-    fn construct() {
-        let r = ServerRequestLoadReplay::new(1, 0, ServerRequestLoadReplay::LOAD_GAME, String::new(), String::new());
-        assert_eq!(r.get_game_id(), 1);
-        assert_eq!(r.get_mode(), ServerRequestLoadReplay::LOAD_GAME);
-    }
-
-    #[test]
     fn process_builds_url_and_returns_json() {
         let client = MockHttpClient {
             response: Ok("{\"half\":1}".to_string()),

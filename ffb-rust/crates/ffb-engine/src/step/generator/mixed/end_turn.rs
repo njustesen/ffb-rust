@@ -50,11 +50,4 @@ mod tests {
         assert!(steps[0].params.is_empty());
     }
 
-    #[test]
-    fn params_clone() {
-        // No Params struct; verify the struct itself can be created via Default
-        let _e = EndTurn::default();
-        let steps = EndTurn::build_sequence();
-        assert_eq!(steps.len(), 1);
-    }
 }

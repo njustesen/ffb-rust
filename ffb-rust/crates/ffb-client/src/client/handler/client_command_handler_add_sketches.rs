@@ -53,14 +53,6 @@ mod tests {
     use ffb_model::model::sketch::sketch::Sketch;
 
     #[test]
-    fn get_id_is_server_add_sketches() {
-        assert_eq!(
-            ClientCommandHandlerAddSketches::new().get_id(),
-            NetCommandId::ServerAddSketches
-        );
-    }
-
-    #[test]
     fn handle_net_command_returns_true_with_sketches() {
         let mut handler = ClientCommandHandlerAddSketches::new();
         let cmd = AnyServerCommand::ServerAddSketches(ServerCommandAddSketches::new(
@@ -87,9 +79,4 @@ mod tests {
         handler.update_sketch_manager(&cmd);
     }
 
-    #[test]
-    fn default_constructs_a_handler() {
-        let handler = ClientCommandHandlerAddSketches::default();
-        assert_eq!(handler.get_id(), NetCommandId::ServerAddSketches);
-    }
 }

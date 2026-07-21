@@ -173,12 +173,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_riotous_rookies() {
-        let step = StepRiotousRookies::new();
-        assert_eq!(step.id(), StepId::RiotousRookies);
-    }
-
-    #[test]
     fn start_returns_next_step() {
         let mut step = StepRiotousRookies::new();
         let mut game = make_game();
@@ -194,12 +188,6 @@ mod tests {
         let mut rng = GameRng::new(0);
         let outcome = step.handle_command(&Action::EndTurn, &mut game, &mut rng);
         assert_eq!(outcome.action, StepAction::Continue);
-    }
-
-    #[test]
-    fn default_creates_same_as_new() {
-        let s = StepRiotousRookies::default();
-        assert_eq!(s.id(), StepId::RiotousRookies);
     }
 
     /// Java: roll = rollRiotousRookies()[0] + rollRiotousRookies()[1] + 1.

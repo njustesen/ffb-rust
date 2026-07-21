@@ -69,11 +69,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn swarming_rule_name() {
-        assert_eq!(SpecialRule::SWARMING.get_rule_name(), "Swarming");
-    }
-
-    #[test]
     fn from_case_insensitive() {
         assert_eq!(SpecialRule::from("swarming"), Some(SpecialRule::SWARMING));
         assert_eq!(SpecialRule::from("SWARMING"), Some(SpecialRule::SWARMING));

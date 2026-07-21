@@ -293,11 +293,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_foul_appearance_multiple() {
-        assert_eq!(StepFoulAppearanceMultiple::new("fail").id(), StepId::FoulAppearanceMultiple);
-    }
-
-    #[test]
     fn no_attacker_returns_next_step() {
         let mut step = StepFoulAppearanceMultiple::new("fail");
         let mut game = make_game();

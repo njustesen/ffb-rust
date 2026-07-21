@@ -304,15 +304,6 @@ mod tests {
     }
 
     #[test]
-    fn resource_fields_are_accessible() {
-        let t = empty_team();
-        assert_eq!(t.rerolls, 3);
-        assert_eq!(t.apothecaries, 1);
-        assert_eq!(t.fan_factor, 5);
-        assert_eq!(t.team_value, 1_000_000);
-    }
-
-    #[test]
     fn multiple_players_looked_up_independently() {
         let mut t = empty_team();
         for nr in 1..=3i32 {

@@ -311,11 +311,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_dauntless_multiple() {
-        assert_eq!(StepDauntlessMultiple::new().id(), StepId::DauntlessMultiple);
-    }
-
-    #[test]
     fn no_attacker_returns_next_step() {
         let mut step = StepDauntlessMultiple::new();
         let mut game = make_game();

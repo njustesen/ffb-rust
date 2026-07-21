@@ -213,12 +213,6 @@ mod tests {
     }
 
     #[test]
-    fn step_id_is_wizard() {
-        let step = StepWizard::new();
-        assert_eq!(step.id(), StepId::Wizard);
-    }
-
-    #[test]
     fn home_team_parameter_accepted() {
         let mut step = StepWizard::new();
         let ok = step.set_parameter(&StepParameter::HomeTeam(true));

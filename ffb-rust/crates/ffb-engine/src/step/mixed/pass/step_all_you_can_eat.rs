@@ -163,11 +163,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_all_you_can_eat() {
-        assert_eq!(StepAllYouCanEat::new().id(), StepId::AllYouCanEat);
-    }
-
-    #[test]
     fn no_thrower_returns_next() {
         let mut step = StepAllYouCanEat::new();
         let mut game = make_game();

@@ -48,16 +48,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = ClientPingTask::new();
-    }
-
-    #[test]
-    fn default_constructs() {
-        let _ = ClientPingTask::default();
-    }
-
-    #[test]
     fn tick_sends_ping_when_open() {
         let mut comm = ClientCommunication::new();
         ClientPingTask::tick(true, &mut comm, 12345);

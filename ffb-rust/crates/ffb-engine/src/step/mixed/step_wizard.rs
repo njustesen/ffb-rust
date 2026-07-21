@@ -232,11 +232,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_wizard() {
-        assert_eq!(StepWizard::new().id(), StepId::Wizard);
-    }
-
-    #[test]
     fn start_sets_wizard_turn_mode_and_continues() {
         let mut step = StepWizard::new();
         let mut game = make_game();

@@ -67,11 +67,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(BribesRollMessage.report_id(), ReportId::BRIBES_ROLL);
-    }
-
-    #[test]
     fn successful_singular_gender_remains() {
         let mut game = make_game();
         let mut player = Player::default();

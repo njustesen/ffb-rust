@@ -68,14 +68,6 @@ mod tests {
     }
 
     #[test]
-    fn new_sets_limit_and_available() {
-        let s = BlitzTurnState::new(5, 3);
-        assert_eq!(s.get_limit(), 5);
-        assert_eq!(s.get_available(), 3);
-        assert_eq!(s.get_amount(), 0);
-    }
-
-    #[test]
     fn change_acting_player_is_idempotent() {
         let mut s = BlitzTurnState::new(2, 2);
         s.change_acting_player();

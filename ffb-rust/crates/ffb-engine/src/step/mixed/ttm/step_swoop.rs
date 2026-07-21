@@ -194,11 +194,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_swoop() {
-        assert_eq!(StepSwoop::new("fall".into()).id(), StepId::Swoop);
-    }
-
-    #[test]
     fn no_player_returns_next_step() {
         let mut game = make_game();
         let mut step = StepSwoop::new("fall".into());

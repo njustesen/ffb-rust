@@ -20,31 +20,3 @@ impl InternalServerCommand for InternalServerCommandFumbblGameCreated {
         self.game_id
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct() {
-        let _ = InternalServerCommandFumbblGameCreated::new(42);
-    }
-
-    #[test]
-    fn get_id() {
-        let c = InternalServerCommandFumbblGameCreated::new(1);
-        assert_eq!(c.get_id(), "internalServerFumbblGameCreated");
-    }
-
-    #[test]
-    fn get_game_id() {
-        let c = InternalServerCommandFumbblGameCreated::new(7);
-        assert_eq!(c.get_game_id(), 7);
-    }
-
-    #[test]
-    fn is_internal() {
-        let c = InternalServerCommandFumbblGameCreated::new(1);
-        assert!(c.is_internal());
-    }
-}

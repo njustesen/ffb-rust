@@ -136,13 +136,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let gc = Arc::new(Mutex::new(GameCache::new()));
-        let sm = Arc::new(Mutex::new(SessionManager::new()));
-        let _ = ServerGameTimeTask::new(gc, sm);
-    }
-
-    #[test]
     fn run_with_no_games_does_not_panic() {
         let gc = Arc::new(Mutex::new(GameCache::new()));
         let sm = Arc::new(Mutex::new(SessionManager::new()));

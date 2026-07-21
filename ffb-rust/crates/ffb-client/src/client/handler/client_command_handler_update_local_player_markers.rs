@@ -109,14 +109,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_server_update_local_player_markers() {
-        assert_eq!(
-            ClientCommandHandlerUpdateLocalPlayerMarkers::new().get_id(),
-            NetCommandId::ServerUpdateLocalPlayerMarkers
-        );
-    }
-
-    #[test]
     fn replaces_existing_markers_with_the_new_set() {
         let mut game = make_game();
         game.field_model.add_player_marker(PlayerMarker::with_player_id("old"));

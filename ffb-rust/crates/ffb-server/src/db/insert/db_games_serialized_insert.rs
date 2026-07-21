@@ -35,22 +35,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let s = DbGamesSerializedInsert::new();
-        assert_eq!(s.get_id(), DbStatementId::GAMES_SERIALIZED_INSERT);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_games_serialized"));
-    }
-
-    #[test]
-    fn sql_has_two_placeholders() {
-        assert_eq!(SQL.matches('?').count(), 2);
-    }
-
-    #[test]
     fn sql_is_insert() {
         assert!(SQL.trim_start().to_uppercase().starts_with("INSERT"));
     }

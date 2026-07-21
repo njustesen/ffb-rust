@@ -347,11 +347,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_unchannelled_fury() {
-        assert_eq!(StepUnchannelledFury::new("fail").id(), StepId::UnchannelledFury);
-    }
-
-    #[test]
     fn skip_when_turn_mode_does_not_check_negatraits() {
         let mut game = make_game();
         game.turn_mode = TurnMode::KickoffReturn; // check_negatraits() = false

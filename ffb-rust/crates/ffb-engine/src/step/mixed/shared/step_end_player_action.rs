@@ -118,11 +118,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_end_player_action() {
-        assert_eq!(StepEndPlayerAction::new().id(), StepId::EndPlayerAction);
-    }
-
-    #[test]
     fn start_returns_next_step() {
         let mut step = StepEndPlayerAction::new();
         let mut game = make_game();

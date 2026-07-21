@@ -67,19 +67,3 @@ impl ICardType for CardType {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::inducement::card_type::CardType as ICardType;
-
-    #[test]
-    fn magic_item_name_is_camel_case() {
-        assert_eq!(CardType::MAGIC_ITEM.get_name(), "magicItem");
-    }
-
-    #[test]
-    fn dirty_trick_has_multiple_name() {
-        assert_eq!(CardType::DIRTY_TRICK.get_inducement_name_multiple(), "Dirty Trick Cards");
-    }
-}

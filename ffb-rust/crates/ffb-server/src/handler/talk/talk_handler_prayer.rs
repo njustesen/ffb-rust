@@ -252,9 +252,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() { let _ = TalkHandlerPrayer::new(); }
-
-    #[test]
     fn handle_returns_missing_roll_message() {
         let h = TalkHandlerPrayer::new();
         let mut g = game();

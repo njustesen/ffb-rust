@@ -318,11 +318,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_swarming() {
-        assert_eq!(StepSwarming::new().id(), StepId::Swarming);
-    }
-
-    #[test]
     fn no_swarming_reserves_returns_next_step() {
         // No players → no swarming reserves → NextStep
         let mut step = StepSwarming::new();

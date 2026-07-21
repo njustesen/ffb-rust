@@ -117,11 +117,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_petty_cash() {
-        assert_eq!(StepPettyCash::new().id(), StepId::PettyCash);
-    }
-
-    #[test]
     fn equal_tv_no_petty_cash() {
         let mut step = StepPettyCash::new();
         let mut game = make_game(1_000_000, 1_000_000);

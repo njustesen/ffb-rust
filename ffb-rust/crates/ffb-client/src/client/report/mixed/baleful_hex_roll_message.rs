@@ -96,9 +96,4 @@ mod tests {
         assert_eq!(sr.rendered_runs[3].text.as_deref(), Some(" fails to make "));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(BalefulHexRollMessage.report_id(), ReportId::BALEFUL_HEX);
-        assert_eq!(BalefulHexRollMessage.get_key(), "balefulHex");
-    }
 }

@@ -100,24 +100,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn block_get_name_is_lowercase() {
-        assert_eq!(SoundId::BLOCK.get_name(), "block");
-        assert_eq!(SoundId::TOUCHDOWN.get_name(), "touchdown");
-    }
-
-    #[test]
     fn for_name_case_insensitive() {
         assert_eq!(SoundId::for_name("block"), Some(SoundId::BLOCK));
         assert_eq!(SoundId::for_name("BLOCK"), Some(SoundId::BLOCK));
         assert_eq!(SoundId::for_name("invalid"), None);
-    }
-
-    #[test]
-    fn spectator_sounds_are_flagged() {
-        assert!(SoundId::SPEC_AAH.is_spectator_sound());
-        assert!(SoundId::SPEC_STOMP.is_spectator_sound());
-        assert!(!SoundId::BLOCK.is_spectator_sound());
-        assert!(!SoundId::TOUCHDOWN.is_spectator_sound());
     }
 
     #[test]

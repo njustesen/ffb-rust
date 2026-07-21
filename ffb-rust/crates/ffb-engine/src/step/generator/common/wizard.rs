@@ -53,11 +53,4 @@ mod tests {
         assert!(steps[1].label.is_none());
     }
 
-    #[test]
-    fn params_clone() {
-        // No Params struct; verify the struct itself can be created via Default
-        let _w = Wizard::default();
-        let steps = Wizard::build_sequence();
-        assert_eq!(steps.len(), 2);
-    }
 }

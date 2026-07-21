@@ -292,11 +292,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_blitz() {
-        assert_eq!(BlitzLogicModule::new().get_id(), ClientStateId::Blitz);
-    }
-
-    #[test]
     fn available_actions_includes_extension_and_own_actions() {
         let module = BlitzLogicModule::new();
         let actions = module.available_actions();

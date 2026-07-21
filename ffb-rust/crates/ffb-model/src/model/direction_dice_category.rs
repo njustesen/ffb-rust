@@ -14,11 +14,6 @@ mod tests {
     use crate::enums::Direction;
 
     #[test]
-    fn kind_is_direction() {
-        assert_eq!(DirectionDiceCategory::kind(), DiceCategoryKind::Direction);
-    }
-
-    #[test]
     fn roll_1_is_north() {
         assert_eq!(DirectionDiceCategory::roll_to_direction(1), Some(Direction::North));
     }

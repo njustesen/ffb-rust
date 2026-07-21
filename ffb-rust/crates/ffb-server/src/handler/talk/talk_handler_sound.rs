@@ -42,13 +42,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let h = TalkHandlerSound::new();
-        assert_eq!(h.required_client, Client::Player);
-        assert_eq!(h.required_environment, Environment::TestGame);
-    }
-
-    #[test]
     fn handle_resolves_known_sound() {
         let h = TalkHandlerSound::new();
         let commands = vec!["/sound".to_string(), "block".to_string()];

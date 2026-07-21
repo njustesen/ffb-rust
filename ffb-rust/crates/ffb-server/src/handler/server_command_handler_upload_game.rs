@@ -141,11 +141,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let _ = ServerCommandHandlerUploadGame::default();
-    }
-
-    #[test]
     fn get_id_returns_internal_server_upload_game() {
         let h = ServerCommandHandlerUploadGame::default();
         assert_eq!(h.get_id(), NetCommandId::InternalServerUploadGame);

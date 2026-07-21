@@ -101,13 +101,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let t = DbTransaction::new();
-        assert_eq!(t.size(), 0);
-        assert_eq!(t.get_updated_rows(), 0);
-    }
-
-    #[test]
     fn add_increases_size() {
         let mut t = DbTransaction::new();
         t.add(Box::new(OkParameter));

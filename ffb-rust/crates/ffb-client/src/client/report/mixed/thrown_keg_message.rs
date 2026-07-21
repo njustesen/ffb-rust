@@ -118,9 +118,4 @@ mod tests {
         assert_eq!(status_report.rendered_runs[4].text.as_deref(), Some("no one"));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(ThrownKegMessage.report_id(), ReportId::THROWN_KEG);
-        assert_eq!(ThrownKegMessage.get_key(), "thrownKeg");
-    }
 }

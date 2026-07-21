@@ -196,11 +196,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_kickoff_return() {
-        assert_eq!(KickoffReturnLogicModule::new().get_id(), ClientStateId::KickoffReturn);
-    }
-
-    #[test]
     fn available_actions_is_move_and_end_move() {
         let actions = KickoffReturnLogicModule::new().available_actions();
         assert_eq!(actions.len(), 2);

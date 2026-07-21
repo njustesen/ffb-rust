@@ -24,25 +24,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dialog_id_is_buy_inducements() {
-        assert_eq!(DialogBuyInducementsParameter::default().get_id(), DialogId::BUY_INDUCEMENTS);
-    }
-
-    #[test]
-    fn stores_team_id_and_gold() {
-        let p = DialogBuyInducementsParameter { team_id: Some("team1".into()), available_gold: 150_000 };
-        assert_eq!(p.get_team_id(), Some("team1"));
-        assert_eq!(p.get_available_gold(), 150_000);
-    }
-
-    #[test]
-    fn default_is_sensible() {
-        let p = DialogBuyInducementsParameter::default();
-        assert!(p.get_team_id().is_none());
-        assert_eq!(p.get_available_gold(), 0);
-    }
-
-    #[test]
     fn serde_round_trip() {
         let p = DialogBuyInducementsParameter { team_id: Some("teamY".into()), available_gold: 200_000 };
         let json = serde_json::to_string(&p).unwrap();
@@ -51,10 +32,4 @@ mod tests {
         assert_eq!(back.get_available_gold(), 200_000);
     }
 
-    #[test]
-    fn zero_gold_is_edge_case() {
-        let p = DialogBuyInducementsParameter { team_id: None, available_gold: 0 };
-        assert!(p.get_team_id().is_none());
-        assert_eq!(p.get_available_gold(), 0);
-    }
 }

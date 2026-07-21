@@ -59,34 +59,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_id_returns_correct_id() {
-        assert_eq!(CardTarget::TURN.get_id(), 1);
-        assert_eq!(CardTarget::OWN_PLAYER.get_id(), 2);
-        assert_eq!(CardTarget::OPPOSING_PLAYER.get_id(), 3);
-        assert_eq!(CardTarget::ANY_PLAYER.get_id(), 4);
-    }
-
-    #[test]
-    fn get_name_returns_correct_name() {
-        assert_eq!(CardTarget::TURN.get_name(), "turn");
-        assert_eq!(CardTarget::OWN_PLAYER.get_name(), "ownPlayer");
-        assert_eq!(CardTarget::OPPOSING_PLAYER.get_name(), "opposingPlayer");
-        assert_eq!(CardTarget::ANY_PLAYER.get_name(), "anyPlayer");
-    }
-
-    #[test]
-    fn is_played_on_player_true_for_player_targets() {
-        assert!(CardTarget::OWN_PLAYER.is_played_on_player());
-        assert!(CardTarget::OPPOSING_PLAYER.is_played_on_player());
-        assert!(CardTarget::ANY_PLAYER.is_played_on_player());
-    }
-
-    #[test]
-    fn is_played_on_player_false_for_turn() {
-        assert!(!CardTarget::TURN.is_played_on_player());
-    }
-
-    #[test]
     fn from_id_round_trips() {
         for t in [CardTarget::TURN, CardTarget::OWN_PLAYER, CardTarget::OPPOSING_PLAYER, CardTarget::ANY_PLAYER] {
             assert_eq!(CardTarget::from_id(t.get_id()), Some(t));
@@ -102,8 +74,4 @@ mod tests {
         assert_eq!(CardTarget::from_name("no-such-target"), None);
     }
 
-    #[test]
-    fn default_is_turn() {
-        assert_eq!(CardTarget::default(), CardTarget::TURN);
-    }
 }

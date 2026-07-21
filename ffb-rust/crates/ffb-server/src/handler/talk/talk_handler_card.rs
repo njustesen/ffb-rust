@@ -75,9 +75,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() { let _ = TalkHandlerCard::new(); }
-
-    #[test]
     fn handle_returns_empty_when_not_enough_parts() {
         let h = TalkHandlerCard::new();
         let home = make_team("home", "Alice");

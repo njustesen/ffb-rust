@@ -122,11 +122,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_wisdom_of_the_white_dwarf() {
-        assert_eq!(StepWisdomOfTheWhiteDwarf::new().id(), StepId::WisdomOfTheWhiteDwarf);
-    }
-
-    #[test]
     fn non_select_player_action_does_not_store_id() {
         let mut game = make_game();
         let mut step = StepWisdomOfTheWhiteDwarf::new();

@@ -24,21 +24,6 @@ impl IDialogParameter for DialogUseApothecariesParameter {
 mod tests {
     use super::*;
     #[test]
-    fn dialog_id_is_use_apothecaries() {
-        assert_eq!(DialogUseApothecariesParameter::default().get_id(), DialogId::USE_APOTHECARIES);
-    }
-    #[test]
-    fn stores_team_id() {
-        let p = DialogUseApothecariesParameter { team_id: Some("home".into()), ..Default::default() };
-        assert_eq!(p.get_team_id(), Some("home"));
-    }
-    #[test]
-    fn default_is_sensible() {
-        let p = DialogUseApothecariesParameter::default();
-        assert!(p.get_team_id().is_none());
-        assert!(p.get_injury_descriptions().is_empty());
-    }
-    #[test]
     fn stores_injury_descriptions() {
         let p = DialogUseApothecariesParameter {
             team_id: Some("away".into()),
@@ -46,10 +31,5 @@ mod tests {
         };
         assert_eq!(p.get_injury_descriptions().len(), 1);
         assert_eq!(p.get_team_id(), Some("away"));
-    }
-    #[test]
-    fn team_id_none_when_unset() {
-        let p = DialogUseApothecariesParameter { team_id: None, injury_descriptions: vec![] };
-        assert!(p.get_team_id().is_none());
     }
 }

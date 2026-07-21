@@ -276,14 +276,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_putrid_regurgitation_blitz() {
-        assert_eq!(
-            PutridRegurgitationBlitzLogicModule::new().get_id(),
-            ClientStateId::PutridRegurgitationBlitz
-        );
-    }
-
-    #[test]
     fn available_actions_has_expected_set() {
         let actions = PutridRegurgitationBlitzLogicModule::new().available_actions();
         assert_eq!(actions.len(), 5);

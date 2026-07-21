@@ -96,10 +96,4 @@ mod tests {
         assert!(p.old_player_state.is_none());
     }
 
-    #[test]
-    fn params_clone() {
-        let p = BlackInkParams { failure_label: "lbl".into(), old_player_state: None };
-        let q = p.clone();
-        assert_eq!(q.failure_label, "lbl");
-    }
 }

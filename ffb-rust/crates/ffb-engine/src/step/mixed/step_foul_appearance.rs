@@ -237,11 +237,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_foul_appearance() {
-        assert_eq!(StepFoulAppearance::new("fail").id(), StepId::FoulAppearance);
-    }
-
-    #[test]
     fn no_defender_returns_next_step() {
         let mut step = StepFoulAppearance::new("fail");
         let mut game = make_game();

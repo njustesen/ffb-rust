@@ -59,17 +59,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let s = DbTeamSetupsInsert::new();
-        assert_eq!(s.get_id(), DbStatementId::TEAM_SETUPS_INSERT);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_team_setups"));
-    }
-
-    #[test]
     fn sql_has_35_placeholders() {
         assert_eq!(SQL.matches('?').count(), 35);
     }

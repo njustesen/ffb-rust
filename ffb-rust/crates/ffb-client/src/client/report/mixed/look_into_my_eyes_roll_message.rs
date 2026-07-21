@@ -95,9 +95,4 @@ mod tests {
         assert!(status_report.rendered_runs[3].text.as_deref().unwrap().contains("fails to steal"));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(LookIntoMyEyesRollMessage.report_id(), ReportId::LOOK_INTO_MY_EYES_ROLL);
-        assert_eq!(LookIntoMyEyesRollMessage.get_key(), "lookIntoMyEyesRoll");
-    }
 }

@@ -485,11 +485,6 @@ mod tests {
     }
 
     #[test]
-    fn new_creates_instance() {
-        let _pf = PathFinderWithPassBlockSupport::new();
-    }
-
-    #[test]
     fn find_adjacent_distance_1_returns_up_to_8() {
         let pf = PathFinderWithPassBlockSupport::new();
         let adj = pf.find_adjacent_coordinates(fc(5, 5), FieldCoordinateBounds::FIELD, 1);

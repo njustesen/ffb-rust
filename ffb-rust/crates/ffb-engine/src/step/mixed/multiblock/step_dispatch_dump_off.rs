@@ -108,11 +108,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_dispatch_dump_off() {
-        assert_eq!(StepDispatchDumpOff::new().id(), StepId::DispatchDumpOff);
-    }
-
-    #[test]
     fn no_ball_carrier_in_targets_is_noop() {
         let mut step = StepDispatchDumpOff::new();
         step.set_parameter(&StepParameter::BlockTargets(vec!["p1".into()]));

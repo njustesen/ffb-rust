@@ -48,11 +48,6 @@ mod tests {
     use ffb_protocol::commands::server_command_sound::ServerCommandSound;
 
     #[test]
-    fn get_id_is_server_admin_message() {
-        assert_eq!(ClientCommandHandlerAdminMessage::new().get_id(), NetCommandId::ServerAdminMessage);
-    }
-
-    #[test]
     fn handle_net_command_returns_true_for_matching_command() {
         let mut handler = ClientCommandHandlerAdminMessage::new();
         let cmd = AnyServerCommand::ServerAdminMessage(ServerCommandAdminMessage::new(vec!["hi".into()]));
@@ -79,9 +74,4 @@ mod tests {
         ClientCommandHandlerAdminMessage::new().dialog_closed();
     }
 
-    #[test]
-    fn default_constructs_a_handler() {
-        let handler = ClientCommandHandlerAdminMessage::default();
-        assert_eq!(handler.get_id(), NetCommandId::ServerAdminMessage);
-    }
 }

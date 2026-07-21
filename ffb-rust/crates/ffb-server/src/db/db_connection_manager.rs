@@ -133,14 +133,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct_defaults() {
-        let m = DbConnectionManager::new();
-        assert_eq!(m.get_db_url(), "");
-        assert_eq!(m.get_db_user(), "");
-        assert!(!m.use_mysql_dialect());
-    }
-
-    #[test]
     fn use_mysql_dialect_case_insensitive() {
         let mut m = DbConnectionManager::new();
         m.set_db_type("mysql".to_string());
@@ -153,17 +145,6 @@ mod tests {
         assert!(m.use_mysql_dialect());
         m.set_db_type("other".to_string());
         assert!(!m.use_mysql_dialect());
-    }
-
-    #[test]
-    fn setters_persist() {
-        let mut m = DbConnectionManager::new();
-        m.set_db_url("jdbc:mysql://127.0.0.1:3306/ffblive".to_string());
-        m.set_db_user("root".to_string());
-        m.set_db_password("secret".to_string());
-        assert_eq!(m.get_db_url(), "jdbc:mysql://127.0.0.1:3306/ffblive");
-        assert_eq!(m.get_db_user(), "root");
-        assert_eq!(m.get_db_password(), "secret");
     }
 
     #[test]

@@ -20,11 +20,6 @@ mod tests {
     use crate::enums::{ModelChangeId, ModelChangeDataType};
 
     #[test]
-    fn empty_by_default() {
-        assert!(ModelChangeList::default().is_empty());
-    }
-
-    #[test]
     fn add_increases_len() {
         let mut list = ModelChangeList::default();
         list.add(ModelChange::new(ModelChangeId::GameSetActingTeam, ModelChangeDataType::String, serde_json::Value::Null));

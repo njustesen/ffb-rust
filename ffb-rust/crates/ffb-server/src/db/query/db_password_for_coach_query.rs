@@ -28,24 +28,3 @@ impl Default for DbPasswordForCoachQuery {
         Self::new()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct() {
-        let q = DbPasswordForCoachQuery::new();
-        assert_eq!(q.get_id(), DbStatementId::PASSWORD_FOR_COACH_QUERY);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_coaches"));
-    }
-
-    #[test]
-    fn sql_has_where_clause() {
-        assert!(SQL.contains("WHERE name = ?"));
-    }
-}

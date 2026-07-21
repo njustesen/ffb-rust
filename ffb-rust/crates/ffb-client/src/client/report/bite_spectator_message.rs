@@ -50,11 +50,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(BiteSpectatorMessage.report_id(), ReportId::BITE_SPECTATOR);
-    }
-
-    #[test]
     fn renders_for_known_player() {
         let mut game = make_game();
         let mut player = Player::default();

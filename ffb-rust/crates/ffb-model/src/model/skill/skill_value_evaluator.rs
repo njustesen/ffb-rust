@@ -46,11 +46,6 @@ mod tests {
     }
 
     #[test]
-    fn default_evaluator_returns_none() {
-        assert_eq!(SkillValueEvaluator::Default.int_value(&set_of(&["1", "2"])), None);
-    }
-
-    #[test]
     fn modifier_returns_max() {
         assert_eq!(SkillValueEvaluator::Modifier.int_value(&set_of(&["1", "3", "2"])), Some(3));
     }
@@ -76,8 +71,4 @@ mod tests {
         assert_eq!(SkillValueEvaluator::Modifier.int_value(&vals), Some(5));
     }
 
-    #[test]
-    fn default_impl_is_default_variant() {
-        assert_eq!(SkillValueEvaluator::default(), SkillValueEvaluator::Default);
-    }
 }

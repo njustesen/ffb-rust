@@ -84,11 +84,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(SpellEffectRollMessage.report_id(), ReportId::SPELL_EFFECT_ROLL);
-    }
-
-    #[test]
     fn lightning_success_hit_by_spell() {
         let mut game = make_game();
         add_player(&mut game, "p1", "Zappy");

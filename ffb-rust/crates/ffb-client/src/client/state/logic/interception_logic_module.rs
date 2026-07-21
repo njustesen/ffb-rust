@@ -167,16 +167,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_interception() {
-        assert_eq!(InterceptionLogicModule::new().get_id(), ClientStateId::Interception);
-    }
-
-    #[test]
-    fn available_actions_is_empty() {
-        assert!(InterceptionLogicModule::new().available_actions().is_empty());
-    }
-
-    #[test]
     fn set_up_clears_interception_skill() {
         let mut module = InterceptionLogicModule::new();
         module.set_interception_skill(Some(Skill::new("Pass Block", SkillCategory::General)));

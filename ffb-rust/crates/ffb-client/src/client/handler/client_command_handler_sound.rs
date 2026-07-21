@@ -56,11 +56,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_id_is_server_sound() {
-        assert_eq!(ClientCommandHandlerSound::new().get_id(), NetCommandId::ServerSound);
-    }
-
-    #[test]
     fn handle_net_command_records_the_sound() {
         let mut handler = ClientCommandHandlerSound::new();
         let cmd = AnyServerCommand::ServerSound(
@@ -90,9 +85,4 @@ mod tests {
         assert!(handler.handle_net_command(&cmd, ClientCommandHandlerMode::QUEUING));
     }
 
-    #[test]
-    fn default_constructs_a_handler_with_no_sound_yet() {
-        let handler = ClientCommandHandlerSound::default();
-        assert_eq!(handler.last_sound, None);
-    }
 }

@@ -57,12 +57,6 @@ mod tests {
     }
 
     #[test]
-    fn step_id_is_catch_of_the_day() {
-        let steps = CatchOfTheDay::build_sequence(&CatchOfTheDayParams::default());
-        assert_eq!(steps.last().unwrap().step_id, StepId::CatchOfTheDay);
-    }
-
-    #[test]
     fn activation_sub_sequence_precedes_catch_of_the_day() {
         // Java pushSequence: ActivationSequenceBuilder.create()...addTo(sequence) before CATCH_OF_THE_DAY.
         let steps = CatchOfTheDay::build_sequence(&CatchOfTheDayParams::default());
@@ -76,10 +70,4 @@ mod tests {
         assert_eq!(p.failure_label, "myLabel");
     }
 
-    #[test]
-    fn params_clone() {
-        let p = CatchOfTheDayParams { failure_label: "lbl".into() };
-        let q = p.clone();
-        assert_eq!(q.failure_label, "lbl");
-    }
 }

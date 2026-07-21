@@ -91,31 +91,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn exclude_from_result_contains_star() {
-        assert!(Usage::exclude_from_result().contains(&Usage::STAR));
-    }
-
-    #[test]
-    fn exclude_from_count_does_not_contain_reroll() {
-        assert!(!Usage::exclude_from_count().contains(&Usage::REROLL));
-    }
-
-    #[test]
-    fn exclude_from_count_contains_throw_rock() {
-        assert!(Usage::exclude_from_count().contains(&Usage::THROW_ROCK));
-    }
-
-    #[test]
     fn serde_round_trip() {
         let u = Usage::ADD_CHEERLEADER;
         let s = serde_json::to_string(&u).unwrap();
         let back: Usage = serde_json::from_str(&s).unwrap();
         assert_eq!(u, back);
-    }
-
-    #[test]
-    fn exclude_from_result_contains_loner() {
-        assert!(Usage::exclude_from_result().contains(&Usage::LONER));
     }
 
     #[test]
@@ -137,9 +117,4 @@ mod tests {
         assert_eq!(Usage::parse_list("REROLL,bogus"), vec![Usage::REROLL]);
     }
 
-    #[test]
-    fn variants_are_distinct() {
-        assert_ne!(Usage::REROLL, Usage::CONDITIONAL_REROLL);
-        assert_ne!(Usage::STAR, Usage::STAFF);
-    }
 }

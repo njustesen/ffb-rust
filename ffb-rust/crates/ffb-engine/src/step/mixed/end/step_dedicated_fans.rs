@@ -163,11 +163,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_dedicated_fans() {
-        assert_eq!(StepDedicatedFans::new().id(), StepId::DedicatedFans);
-    }
-
-    #[test]
     fn draw_sets_no_modifier() {
         let mut step = StepDedicatedFans::new();
         let mut game = make_game();

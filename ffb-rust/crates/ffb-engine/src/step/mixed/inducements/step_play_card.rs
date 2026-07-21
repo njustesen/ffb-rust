@@ -252,11 +252,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_play_card() {
-        assert_eq!(StepPlayCard::new().id(), StepId::PlayCard);
-    }
-
-    #[test]
     fn start_returns_next_by_default() {
         let mut step = StepPlayCard::new();
         let mut game = make_game();

@@ -65,25 +65,3 @@ impl Default for DbTeamSetupsQuery {
         Self::new()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct() {
-        let q = DbTeamSetupsQuery::new();
-        assert_eq!(q.get_id(), DbStatementId::TEAM_SETUPS_QUERY);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_team_setups"));
-    }
-
-    #[test]
-    fn sql_has_where_clause() {
-        assert!(SQL.contains("team_id = ?"));
-        assert!(SQL.contains("name = ?"));
-    }
-}

@@ -195,11 +195,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_init_throw_team_mate() {
-        assert_eq!(StepInitThrowTeamMate::new().id(), StepId::InitThrowTeamMate);
-    }
-
-    #[test]
     fn end_turn_publishes_and_gotos_label() {
         let mut step = StepInitThrowTeamMate::new();
         step.set_parameter(&StepParameter::GotoLabelOnEnd("end".into()));

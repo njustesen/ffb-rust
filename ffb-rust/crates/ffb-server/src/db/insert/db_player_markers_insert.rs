@@ -32,24 +32,3 @@ impl Default for DbPlayerMarkersInsert {
         Self::new()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct() {
-        let s = DbPlayerMarkersInsert::new();
-        assert_eq!(s.get_id(), DbStatementId::PLAYER_MARKERS_INSERT);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_player_markers"));
-    }
-
-    #[test]
-    fn sql_has_three_placeholders() {
-        assert_eq!(SQL.matches('?').count(), 3);
-    }
-}

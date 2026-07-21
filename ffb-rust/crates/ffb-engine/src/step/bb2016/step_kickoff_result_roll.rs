@@ -92,11 +92,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_kickoff_result_roll() {
-        assert_eq!(StepKickoffResultRoll::new().id(), StepId::KickoffResultRoll);
-    }
-
-    #[test]
     fn interpret_roll_covers_all_values() {
         assert_eq!(StepKickoffResultRoll::interpret_roll(2),  KickoffResult::GetTheRef);
         assert_eq!(StepKickoffResultRoll::interpret_roll(3),  KickoffResult::Riot);

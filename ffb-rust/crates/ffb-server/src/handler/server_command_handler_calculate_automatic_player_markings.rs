@@ -141,17 +141,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let _ = ServerCommandHandlerCalculateAutomaticPlayerMarkings::new();
-    }
-
-    #[test]
-    fn get_id_is_calculate_automatic_player_markings() {
-        let h = ServerCommandHandlerCalculateAutomaticPlayerMarkings::new();
-        assert_eq!(h.get_id(), NetCommandId::InternalCalculateAutomaticPlayerMarkings);
-    }
-
-    #[test]
     fn handle_game_maps_player_ids_to_markings() {
         let h = ServerCommandHandlerCalculateAutomaticPlayerMarkings::new();
         let game = game_with_players();

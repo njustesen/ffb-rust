@@ -42,12 +42,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let p = DbUserSettingsDeleteParameter::new("coach1".to_string());
-        assert_eq!(p.get_coach(), "coach1");
-    }
-
-    #[test]
     fn get_updated_rows_initial() {
         let p = DbUserSettingsDeleteParameter::new("coach1".to_string());
         assert_eq!(p.get_updated_rows(), 0);

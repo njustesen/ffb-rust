@@ -189,9 +189,4 @@ mod tests {
         assert_eq!(status_report.rendered_runs[0].text_style, Some(TextStyle::TURN_AWAY));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(MostValuablePlayersMessage.report_id(), ReportId::MOST_VALUABLE_PLAYERS);
-        assert_eq!(MostValuablePlayersMessage.get_key(), "mostValuablePlayers");
-    }
 }

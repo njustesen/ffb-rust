@@ -250,28 +250,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn can_avoid_falling_down_is_camel_case() {
-        assert_eq!(NamedProperties::CAN_AVOID_FALLING_DOWN, "canAvoidFallingDown");
-    }
-
-    #[test]
-    fn becomes_immovable_is_camel_case() {
-        assert_eq!(NamedProperties::BECOMES_IMMOVABLE, "becomesImmovable");
-    }
-
-    #[test]
-    fn can_make_an_extra_gfi_is_camel_case() {
-        assert_eq!(NamedProperties::CAN_MAKE_AN_EXTRA_GFI, "canMakeAnExtraGfi");
-    }
-
-    #[test]
     fn inflicts_confusion_matches_java_field_name() {
         assert_eq!(NamedProperties::INFLICTS_CONFUSION, "inflictsConfusion");
-    }
-
-    #[test]
-    fn can_follow_player_leaving_tacklezones_matches() {
-        assert_eq!(NamedProperties::CAN_FOLLOW_PLAYER_LEAVING_TACKLEZONES, "canFollowPlayerLeavingTacklezones");
     }
 
     #[test]

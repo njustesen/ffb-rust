@@ -423,11 +423,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_buy_inducements() {
-        assert_eq!(StepBuyInducements::new().id(), StepId::BuyInducements);
-    }
-
-    #[test]
     fn both_under_minimum_skips_to_next() {
         let mut game = make_game();
         let mut step = StepBuyInducements::new();

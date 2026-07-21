@@ -61,15 +61,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_client_close_session() {
-        let h = handler(
-            Arc::new(Mutex::new(SessionManager::new())),
-            Arc::new(Mutex::new(GameCache::new())),
-        );
-        assert_eq!(h.get_id(), NetCommandId::ClientCloseSession);
-    }
-
-    #[test]
     fn handle_command_removes_session_bookkeeping() {
         let sm = Arc::new(Mutex::new(SessionManager::new()));
         let gc = Arc::new(Mutex::new(GameCache::new()));

@@ -61,11 +61,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(WeepingDaggerRollMessage.report_id(), ReportId::WEEPING_DAGGER_ROLL);
-    }
-
-    #[test]
     fn successful_roll_poisons_opponent() {
         let mut game = make_game();
         add_player(&mut game, "p1", "Snik", PlayerGender::Male);

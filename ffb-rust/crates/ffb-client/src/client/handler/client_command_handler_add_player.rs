@@ -193,11 +193,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_server_add_player() {
-        assert_eq!(ClientCommandHandlerAddPlayer::new().get_id(), NetCommandId::ServerAddPlayer);
-    }
-
-    #[test]
     fn apply_to_game_adds_new_player_to_correct_team() {
         let mut game = make_game();
         let player = Player { id: "p1".into(), ..Player::default() };

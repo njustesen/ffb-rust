@@ -179,11 +179,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_end_bomb() {
-        assert_eq!(StepEndBomb::new().id(), StepId::EndBomb);
-    }
-
-    #[test]
     fn no_catcher_pushes_end_player_action() {
         let mut game = make_game();
         game.turn_mode = TurnMode::BombHome;

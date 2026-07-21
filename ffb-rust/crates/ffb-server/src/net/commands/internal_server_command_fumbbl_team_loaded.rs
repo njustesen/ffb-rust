@@ -41,31 +41,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = InternalServerCommandFumbblTeamLoaded::new(1, "c".to_string(), true, vec![]);
-    }
-
-    #[test]
-    fn get_id() {
-        let c = InternalServerCommandFumbblTeamLoaded::new(1, "c".to_string(), true, vec![]);
-        assert_eq!(c.get_id(), "internalServerFumbblTeamLoaded");
-    }
-
-    #[test]
-    fn get_game_id() {
-        let c = InternalServerCommandFumbblTeamLoaded::new(9, "c".to_string(), false, vec![]);
-        assert_eq!(c.get_game_id(), 9);
-    }
-
-    #[test]
     fn is_home_team() {
         let c = InternalServerCommandFumbblTeamLoaded::new(1, "c".to_string(), true, vec![]);
         assert!(c.is_home_team());
     }
 
-    #[test]
-    fn is_internal() {
-        let c = InternalServerCommandFumbblTeamLoaded::new(1, "c".to_string(), false, vec![]);
-        assert!(c.is_internal());
-    }
 }

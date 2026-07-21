@@ -64,11 +64,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(BlockRollMessage.report_id(), ReportId::BLOCK_ROLL);
-    }
-
-    #[test]
     fn empty_roll_renders_nothing() {
         let game = make_game();
         let report = ReportBlockRoll::new("home".into(), vec![], None);

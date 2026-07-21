@@ -74,11 +74,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(ApothecaryChoiceMessage.report_id(), ReportId::APOTHECARY_CHOICE);
-    }
-
-    #[test]
     fn reserve_state_patches_player() {
         let mut game = make_game();
         let mut player = Player::default();

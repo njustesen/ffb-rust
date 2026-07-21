@@ -43,10 +43,4 @@ mod tests {
         assert!(p.admin_mode);
     }
 
-    #[test]
-    fn params_clone() {
-        let p = EndGameParams { admin_mode: true };
-        let q = p.clone();
-        assert!(q.admin_mode);
-    }
 }

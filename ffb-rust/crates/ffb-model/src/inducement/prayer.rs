@@ -9,31 +9,3 @@ pub trait Prayer {
     fn event_message(&self) -> &str { "" }
     fn is_changing_player(&self) -> bool;
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    struct SimplePrayer;
-
-    impl Prayer for SimplePrayer {
-        fn get_name(&self) -> &str { "Test" }
-        fn affects_both_teams(&self) -> bool { false }
-        fn get_description(&self) -> &str { "A test prayer" }
-        fn get_duration(&self) -> InducementDuration { InducementDuration::UntilEndOfHalf }
-        fn is_changing_player(&self) -> bool { false }
-    }
-
-    #[test]
-    fn test_default_event_message() {
-        let p = SimplePrayer;
-        assert_eq!(p.event_message(), "");
-    }
-
-    #[test]
-    fn test_name_and_affects_both() {
-        let p = SimplePrayer;
-        assert_eq!(p.get_name(), "Test");
-        assert!(!p.affects_both_teams());
-    }
-}

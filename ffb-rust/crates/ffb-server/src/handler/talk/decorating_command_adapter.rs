@@ -100,9 +100,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() { let _ = DecoratingCommandAdapter::new(); }
-
-    #[test]
     fn decorate_commands_expands_into_home_and_away() {
         let adapter = DecoratingCommandAdapter::new();
         let mut input = HashSet::new();

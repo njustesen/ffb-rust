@@ -152,16 +152,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_swarming() {
-        assert_eq!(SwarmingLogicModule::new().get_id(), ClientStateId::Swarming);
-    }
-
-    #[test]
-    fn available_actions_is_empty() {
-        assert!(SwarmingLogicModule::new().available_actions().is_empty());
-    }
-
-    #[test]
     fn square_has_swarming_player_false_without_player() {
         let client = make_client();
         let module = SwarmingLogicModule::new();

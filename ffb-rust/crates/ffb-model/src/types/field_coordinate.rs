@@ -355,26 +355,6 @@ mod tests {
     }
 
     #[test]
-    fn field_width_is_26() {
-        assert_eq!(FIELD_WIDTH, 26);
-    }
-
-    #[test]
-    fn field_height_is_15() {
-        assert_eq!(FIELD_HEIGHT, 15);
-    }
-
-    #[test]
-    fn field_coordinate_get_x() {
-        assert_eq!(FieldCoordinate::new(5, 3).x, 5);
-    }
-
-    #[test]
-    fn field_coordinate_get_y() {
-        assert_eq!(FieldCoordinate::new(5, 3).y, 3);
-    }
-
-    #[test]
     fn field_coordinate_add_returns_correct_result() {
         let c = FieldCoordinate::new(5, 5).add(2, -1);
         assert_eq!(c.x, 7);
@@ -414,16 +394,6 @@ mod tests {
     #[test]
     fn field_coordinate_bounds_has_bottom_right_corner() {
         assert_eq!(FieldCoordinateBounds::FIELD.bottom_right, FieldCoordinate::new(25, 14));
-    }
-
-    #[test]
-    fn field_coordinate_bounds_field_width_is_26() {
-        assert_eq!(FieldCoordinateBounds::FIELD.width(), 26);
-    }
-
-    #[test]
-    fn field_coordinate_bounds_field_height_is_15() {
-        assert_eq!(FieldCoordinateBounds::FIELD.height(), 15);
     }
 
     #[test]

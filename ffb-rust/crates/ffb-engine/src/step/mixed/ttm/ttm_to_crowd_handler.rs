@@ -161,14 +161,4 @@ mod tests {
         assert!(matches!(params[4], StepParameter::ThrownPlayerCoordinate(None)));
     }
 
-    #[test]
-    fn new_constructs() {
-        let _ = TtmToCrowdHandler::new();
-        let _ = TtmToCrowdHandler::default();
-    }
-    #[test]
-    fn new_and_default_create_equivalent_instances() {
-        let _a = TtmToCrowdHandler::new();
-        let _b = TtmToCrowdHandler::default();
-    }
 }

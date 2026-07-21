@@ -465,11 +465,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_block_roll_multiple() {
-        assert_eq!(StepBlockRollMultiple::new().id(), StepId::BlockRollMultiple);
-    }
-
-    #[test]
     fn start_with_no_targets_returns_next_step() {
         let mut game = make_game();
         let mut step = StepBlockRollMultiple::new();

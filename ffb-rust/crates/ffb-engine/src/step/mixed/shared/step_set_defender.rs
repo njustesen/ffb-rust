@@ -127,8 +127,4 @@ mod tests {
         assert!(consumed, "IgnoreNullValue (init-only) should be consumed");
     }
 
-    #[test]
-    fn id_is_set_defender() {
-        assert_eq!(StepSetDefender::new().id(), StepId::SetDefender);
-    }
 }

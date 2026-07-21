@@ -43,9 +43,6 @@ mod tests {
     use std::collections::HashSet as Set;
 
     #[test]
-    fn construct() { let _ = TalkHandlerActivatedLive::new(); }
-
-    #[test]
     fn handle_delegates_to_base_logic() {
         let h = TalkHandlerActivatedLive::new();
         let player = ffb_model::model::player::Player {

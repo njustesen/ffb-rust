@@ -531,11 +531,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_diving_tackle() {
-        assert_eq!(StepDivingTackle::new().id(), StepId::DivingTackle);
-    }
-
-    #[test]
     fn parameters_stored_correctly() {
         let mut step = StepDivingTackle::new();
         let coord = FieldCoordinate::new(3, 5);

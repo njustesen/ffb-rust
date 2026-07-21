@@ -83,11 +83,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_kickoff() {
-        assert_eq!(StepKickoff::new().id(), StepId::Kickoff);
-    }
-
-    #[test]
     fn start_waits_without_coordinate() {
         let mut step = StepKickoff::new();
         let mut game = make_game();

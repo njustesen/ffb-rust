@@ -231,11 +231,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_first_move_furious_outburst() {
-        assert_eq!(StepFirstMoveFuriousOutburst::new("end").id(), StepId::FirstMoveFuriousOutburst);
-    }
-
-    #[test]
     fn no_coordinate_continues() {
         let mut step = StepFirstMoveFuriousOutburst::new("end");
         let mut game = make_game();

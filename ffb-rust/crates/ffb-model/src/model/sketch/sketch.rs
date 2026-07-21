@@ -87,24 +87,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn empty_by_default() {
-        assert!(Sketch::new().is_empty());
-    }
-
-    #[test]
-    fn add_position_increases_len() {
-        let mut s = Sketch::new();
-        s.add_position(FieldCoordinate::new(0, 0));
-        assert_eq!(s.len(), 1);
-    }
-
-    #[test]
-    fn with_rgb_sets_rgb() {
-        let s = Sketch::with_rgb(42);
-        assert_eq!(s.get_rgb(), 42);
-    }
-
-    #[test]
     fn add_coordinate_dedups_consecutive_duplicates() {
         let mut s = Sketch::new();
         s.add_coordinate(FieldCoordinate::new(1, 1));

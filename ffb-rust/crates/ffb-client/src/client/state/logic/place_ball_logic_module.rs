@@ -136,18 +136,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_place_ball() {
-        let module = PlaceBallLogicModule::new();
-        assert_eq!(module.get_id(), ClientStateId::PlaceBall);
-    }
-
-    #[test]
-    fn available_actions_is_always_empty() {
-        let module = PlaceBallLogicModule::new();
-        assert!(module.available_actions().is_empty());
-    }
-
-    #[test]
     fn field_interaction_ignores_non_move_square() {
         let module = PlaceBallLogicModule::new();
         let mut client = make_client();

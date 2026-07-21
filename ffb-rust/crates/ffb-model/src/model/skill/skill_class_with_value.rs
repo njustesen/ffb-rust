@@ -32,32 +32,3 @@ impl SkillClassWithValue {
         self.value.as_deref()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn new_has_no_value() {
-        let scv = SkillClassWithValue::new("Block");
-        assert!(scv.get_value().is_none());
-    }
-
-    #[test]
-    fn with_value_stores_value() {
-        let scv = SkillClassWithValue::with_value("MightyBlow", "+1");
-        assert_eq!(scv.get_value(), Some("+1"));
-    }
-
-    #[test]
-    fn get_skill_returns_class_name() {
-        let scv = SkillClassWithValue::new("Dodge");
-        assert_eq!(scv.get_skill(), "Dodge");
-    }
-
-    #[test]
-    fn with_value_get_skill_name_unchanged() {
-        let scv = SkillClassWithValue::with_value("Tackle", "val");
-        assert_eq!(scv.get_skill(), "Tackle");
-    }
-}

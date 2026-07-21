@@ -117,11 +117,6 @@ mod tests {
     use ffb_engine::server_sketch_manager::Sketch as ManagerSketch;
 
     #[test]
-    fn construct() {
-        let _ = ServerCommandHandlerSketchSetColor::default();
-    }
-
-    #[test]
     fn get_id_returns_client_sketch_set_color() {
         let handler = ServerCommandHandlerSketchSetColor::default();
         assert_eq!(handler.get_id(), NetCommandId::ClientSketchSetColor);

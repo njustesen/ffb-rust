@@ -91,11 +91,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_drop_acting_player() {
-        assert_eq!(StepDropActingPlayer::new().id(), StepId::DropActingPlayer);
-    }
-
-    #[test]
     fn standing_acting_player_becomes_prone() {
         let mut step = StepDropActingPlayer::new();
         let mut game = make_game();

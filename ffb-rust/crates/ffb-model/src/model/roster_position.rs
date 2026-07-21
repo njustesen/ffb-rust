@@ -303,18 +303,6 @@ mod tests {
     }
 
     #[test]
-    fn is_star_player_false_for_regular() {
-        assert!(!minimal().is_star_player());
-    }
-
-    #[test]
-    fn is_star_player_true_for_star_type() {
-        let mut pos = minimal();
-        pos.player_type = PlayerType::Star;
-        assert!(pos.is_star_player());
-    }
-
-    #[test]
     fn has_keyword_case_insensitive() {
         let mut pos = minimal();
         pos.keywords = vec!["Big Guy".into()];

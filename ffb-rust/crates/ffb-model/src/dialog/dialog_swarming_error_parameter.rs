@@ -18,35 +18,3 @@ impl IDialogParameter for DialogSwarmingErrorParameter {
     fn get_id(&self) -> DialogId { DialogId::SWARMING_ERROR }
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn dialog_id_is_swarming_error() {
-        assert_eq!(DialogSwarmingErrorParameter::default().get_id(), DialogId::SWARMING_ERROR);
-    }
-    #[test]
-    fn stores_allowed_and_actual() {
-        let p = DialogSwarmingErrorParameter { allowed: 4, actual: 6 };
-        assert_eq!(p.get_allowed(), 4);
-        assert_eq!(p.get_actual(), 6);
-    }
-    #[test]
-    fn default_is_sensible() {
-        let p = DialogSwarmingErrorParameter::default();
-        assert_eq!(p.get_allowed(), 0);
-        assert_eq!(p.get_actual(), 0);
-    }
-    #[test]
-    fn transform_preserves_id() {
-        let p = DialogSwarmingErrorParameter { allowed: 2, actual: 5 };
-        assert_eq!(p.transform().get_id(), DialogId::SWARMING_ERROR);
-    }
-    #[test]
-    fn zero_allowed_zero_actual() {
-        let p = DialogSwarmingErrorParameter { allowed: 0, actual: 0 };
-        assert_eq!(p.get_allowed(), 0);
-        assert_eq!(p.get_actual(), 0);
-    }
-}

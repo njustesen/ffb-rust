@@ -32,11 +32,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(FumbblResultUploadMessage.report_id(), ReportId::FUMBBL_RESULT_UPLOAD);
-    }
-
-    #[test]
     fn successful_upload_reports_ok() {
         let mut status_report = StatusReport::new();
         let game = ffb_model::model::game::Game::new(

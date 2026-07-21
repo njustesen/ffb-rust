@@ -41,25 +41,3 @@ impl CardChoice {
 impl Default for CardChoice {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_builder_pattern() {
-        let choice = CardChoice::new()
-            .with_type("CHAOS")
-            .with_choice_one("FireBall")
-            .with_choice_two("IceBolt");
-        assert_eq!(choice.get_type(), Some("CHAOS"));
-        assert_eq!(choice.get_choice_one(), Some("FireBall"));
-    }
-
-    #[test]
-    fn test_empty_choice() {
-        let choice = CardChoice::new();
-        assert!(choice.get_type().is_none());
-        assert!(choice.get_choice_one().is_none());
-    }
-}

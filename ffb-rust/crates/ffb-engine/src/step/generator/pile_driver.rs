@@ -43,10 +43,4 @@ mod tests {
         assert_eq!(p.target_player_id.as_deref(), Some("p2"));
     }
 
-    #[test]
-    fn params_clone() {
-        let p = PileDriverParams { target_player_id: Some("x".into()) };
-        let q = p.clone();
-        assert_eq!(q.target_player_id.as_deref(), Some("x"));
-    }
 }

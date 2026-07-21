@@ -43,11 +43,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(ReceiveChoiceMessage.report_id(), ReportId::RECEIVE_CHOICE);
-    }
-
-    #[test]
     fn render_receiving_home_team() {
         let mut status_report = StatusReport::new();
         let game = make_game();

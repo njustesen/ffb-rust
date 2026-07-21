@@ -71,26 +71,9 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let _ = InternalServerCommandCalculateAutomaticPlayerMarkings::new(config(), 0, game());
-    }
-
-    #[test]
-    fn get_id() {
-        let c = InternalServerCommandCalculateAutomaticPlayerMarkings::new(config(), 0, game());
-        assert_eq!(c.get_id(), "internalCalculateAutomaticPlayerMarkings");
-    }
-
-    #[test]
     fn get_index() {
         let c = InternalServerCommandCalculateAutomaticPlayerMarkings::new(config(), 3, game());
         assert_eq!(c.get_index(), 3);
-    }
-
-    #[test]
-    fn is_internal() {
-        let c = InternalServerCommandCalculateAutomaticPlayerMarkings::new(config(), 0, game());
-        assert!(c.is_internal());
     }
 
     #[test]

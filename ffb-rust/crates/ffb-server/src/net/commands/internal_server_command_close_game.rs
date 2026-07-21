@@ -20,31 +20,3 @@ impl InternalServerCommand for InternalServerCommandCloseGame {
         self.game_id
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct() {
-        let _ = InternalServerCommandCloseGame::new(42);
-    }
-
-    #[test]
-    fn get_id() {
-        let c = InternalServerCommandCloseGame::new(1);
-        assert_eq!(c.get_id(), "internalServerCloseGame");
-    }
-
-    #[test]
-    fn get_game_id() {
-        let c = InternalServerCommandCloseGame::new(7);
-        assert_eq!(c.get_game_id(), 7);
-    }
-
-    #[test]
-    fn is_internal() {
-        let c = InternalServerCommandCloseGame::new(1);
-        assert!(c.is_internal());
-    }
-}

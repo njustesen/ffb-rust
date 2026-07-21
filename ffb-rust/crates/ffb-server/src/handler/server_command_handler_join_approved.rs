@@ -530,19 +530,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn construct() {
-        let (gc, sm, db, tc, rc, cp) = setup();
-        let _ = handler(gc, sm, db, tc, rc, cp);
-    }
-
-    #[tokio::test]
-    async fn get_id_is_internal_server_join_approved() {
-        let (gc, sm, db, tc, rc, cp) = setup();
-        let h = handler(gc, sm, db, tc, rc, cp);
-        assert_eq!(h.get_id(), NetCommandId::InternalServerJoinApproved);
-    }
-
     #[tokio::test]
     async fn spectator_join_creates_game_by_name_and_broadcasts_real_join() {
         let (gc, sm, db, tc, rc, cp) = setup();

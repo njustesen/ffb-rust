@@ -258,11 +258,4 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
     }
 
-    #[test]
-    fn default_creates_fresh_instance() {
-        let step = StepKickoffReturn::default();
-        assert!(!step.touchback);
-        assert!(!step.end_player_action);
-        assert!(!step.end_turn);
-    }
 }

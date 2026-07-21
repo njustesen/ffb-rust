@@ -114,20 +114,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_init_start_game() {
-        let step = StepInitStartGame::new();
-        assert_eq!(step.id(), StepId::InitStartGame);
-    }
-
-    #[test]
-    fn default_fields_are_false() {
-        let step = StepInitStartGame::new();
-        assert!(!step.fumbbl_game_created);
-        assert!(!step.started_home);
-        assert!(!step.started_away);
-    }
-
-    #[test]
     fn start_without_both_coaches_ready_returns_continue_and_leaves_game_starting() {
         // Java: executeStep() only calls leaveStep() once `game.getStarted() != null`,
         // which requires BOTH fStartedHome and fStartedAway to be true. On the initial
@@ -211,9 +197,4 @@ mod tests {
         assert_eq!(outcome.action, StepAction::Continue);
     }
 
-    #[test]
-    fn default_creates_same_as_new() {
-        let s = StepInitStartGame::default();
-        assert_eq!(s.id(), StepId::InitStartGame);
-    }
 }

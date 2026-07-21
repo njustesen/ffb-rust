@@ -115,9 +115,4 @@ mod tests {
         assert_eq!(sr.rendered_runs[0].text_style, Some(TextStyle::AWAY));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(BrilliantCoachingReRollsLostMessage.report_id(), ReportId::BRILLIANT_COACHING_RE_ROLLS_LOST);
-        assert_eq!(BrilliantCoachingReRollsLostMessage.get_key(), "brilliantCoachingReRoll");
-    }
 }

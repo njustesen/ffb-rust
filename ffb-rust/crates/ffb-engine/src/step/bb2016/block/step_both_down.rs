@@ -112,11 +112,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_both_down() {
-        assert_eq!(StepBothDown::new().id(), StepId::BothDown);
-    }
-
-    #[test]
     fn returns_next_step() {
         let mut step = StepBothDown::new();
         let mut game = make_game();

@@ -111,11 +111,6 @@ mod tests {
     use ffb_engine::server_sketch_manager::Sketch as ManagerSketch;
 
     #[test]
-    fn construct() {
-        let _ = ServerCommandHandlerClearSketches::default();
-    }
-
-    #[test]
     fn get_id_returns_client_clear_sketches() {
         let handler = ServerCommandHandlerClearSketches::default();
         assert_eq!(handler.get_id(), NetCommandId::ClientClearSketches);

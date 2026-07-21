@@ -53,9 +53,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() { let _ = TalkHandlerMessage::new(); }
-
-    #[test]
     fn handle_returns_message_text_after_command() {
         let h = TalkHandlerMessage::new();
         let commands = vec!["/message".to_string(), "Hello".to_string(), "world".to_string()];

@@ -80,8 +80,4 @@ mod tests {
         assert_eq!(status_report.rendered_runs[0].paragraph_style, Some(crate::client::paragraph_style::ParagraphStyle::INDENT_1));
     }
 
-    #[test]
-    fn get_key_matches_report_id() {
-        assert_eq!(LeaderMessage.get_key(), "leader");
-    }
 }

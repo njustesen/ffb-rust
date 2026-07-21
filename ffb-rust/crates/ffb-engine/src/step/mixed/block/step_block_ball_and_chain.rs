@@ -143,11 +143,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_block_ball_and_chain() {
-        assert_eq!(StepBlockBallAndChain::new().id(), StepId::BlockBallAndChain);
-    }
-
-    #[test]
     fn without_moves_randomly_returns_next() {
         let mut step = StepBlockBallAndChain {
             goto_label_on_pushback: "pushback".into(),

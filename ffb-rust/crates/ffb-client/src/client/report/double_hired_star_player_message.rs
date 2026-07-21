@@ -64,11 +64,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(DoubleHiredStarPlayerMessage.report_id(), ReportId::DOUBLE_HIRED_STAR_PLAYER);
-    }
-
-    #[test]
     fn renders_bold_message_with_star_player_name() {
         let mut status_report = StatusReport::new();
         let game = make_game();

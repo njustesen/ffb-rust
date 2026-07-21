@@ -283,11 +283,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_kick_team_mate_throw() {
-        assert_eq!(KickTeamMateLikeThrowLogicModule::new().get_id(), ClientStateId::KickTeamMateThrow);
-    }
-
-    #[test]
     fn available_actions_matches_move_logic_module() {
         let module = KickTeamMateLikeThrowLogicModule::new();
         assert_eq!(module.available_actions().len(), MoveLogicModule::new().available_actions().len());

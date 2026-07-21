@@ -235,11 +235,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_kick_team_mate() {
-        assert_eq!(KtmLogicModule::new().get_id(), ClientStateId::KickTeamMate);
-    }
-
-    #[test]
     fn available_actions_matches_java() {
         let actions = KtmLogicModule::new().available_actions();
         assert!(actions.contains(&ClientAction::PASS_SHORT));

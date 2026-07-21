@@ -128,17 +128,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let q = DbGamesInfoInsertQuery::new();
-        assert_eq!(q.get_id(), DbStatementId::GAMES_INFO_INSERT_QUERY);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_games_info"));
-    }
-
-    #[test]
     fn sql_has_all_placeholders() {
         assert_eq!(SQL.matches('?').count(), 15);
     }

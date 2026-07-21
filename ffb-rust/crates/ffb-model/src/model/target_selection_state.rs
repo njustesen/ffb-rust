@@ -76,11 +76,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_status_is_started() {
-        assert_eq!(TargetSelectionState::default().get_status(), TargetSelectionStatus::STARTED);
-    }
-
-    #[test]
     fn cancel_sets_canceled() {
         let mut s = TargetSelectionState::default();
         s.cancel();

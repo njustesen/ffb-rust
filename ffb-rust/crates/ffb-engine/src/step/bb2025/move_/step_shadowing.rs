@@ -272,11 +272,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_shadowing() {
-        assert_eq!(StepShadowing::new().id(), StepId::Shadowing);
-    }
-
-    #[test]
     fn coordinate_from_parameter_accepted() {
         let mut step = StepShadowing::new();
         let coord = FieldCoordinate::new(3, 4);

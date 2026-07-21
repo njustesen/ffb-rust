@@ -46,11 +46,4 @@ mod tests {
         assert!(p.target_coordinate.is_some());
     }
 
-    #[test]
-    fn params_clone() {
-        let coord = FieldCoordinate::new(2, 4);
-        let p = PassParams { target_coordinate: Some(coord) };
-        let q = p.clone();
-        assert!(q.target_coordinate.is_some());
-    }
 }

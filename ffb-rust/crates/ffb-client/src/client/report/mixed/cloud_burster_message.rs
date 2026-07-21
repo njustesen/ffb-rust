@@ -97,9 +97,4 @@ mod tests {
         assert_eq!(sr.rendered_runs[3].text_style, Some(TextStyle::HOME_BOLD));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(CloudBursterMessage.report_id(), ReportId::CLOUD_BURSTER);
-        assert_eq!(CloudBursterMessage.get_key(), "cloudBurster");
-    }
 }

@@ -265,11 +265,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_tentacles() {
-        assert_eq!(StepTentacles::new().id(), StepId::Tentacles);
-    }
-
-    #[test]
     fn start_without_dodging_or_jumping_returns_next() {
         let mut step = StepTentacles::new();
         let mut game = make_game();

@@ -48,10 +48,4 @@ mod tests {
         assert_eq!(p.kicked_player_id.as_deref(), Some("p1"));
     }
 
-    #[test]
-    fn params_clone() {
-        let p = KickTeamMateParams { kicked_player_id: Some("x".into()), ..Default::default() };
-        let q = p.clone();
-        assert_eq!(q.kicked_player_id.as_deref(), Some("x"));
-    }
 }

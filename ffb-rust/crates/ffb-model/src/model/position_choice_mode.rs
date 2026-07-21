@@ -34,25 +34,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn raise_dead_get_name_is_camel_case() {
-        assert_eq!(PositionChoiceMode::RAISE_DEAD.get_name(), "raiseDead");
-    }
-
-    #[test]
     fn for_name_round_trips() {
         assert_eq!(PositionChoiceMode::for_name("raiseDead"), Some(PositionChoiceMode::RAISE_DEAD));
         assert_eq!(PositionChoiceMode::for_name("invalid"), None);
-    }
-
-    #[test]
-    fn get_dialog_header_non_empty() {
-        assert!(!PositionChoiceMode::RAISE_DEAD.get_dialog_header().is_empty());
-    }
-
-    #[test]
-    fn get_status_title_and_message_non_empty() {
-        assert!(!PositionChoiceMode::RAISE_DEAD.get_status_title().is_empty());
-        assert!(!PositionChoiceMode::RAISE_DEAD.get_status_message().is_empty());
     }
 
     #[test]

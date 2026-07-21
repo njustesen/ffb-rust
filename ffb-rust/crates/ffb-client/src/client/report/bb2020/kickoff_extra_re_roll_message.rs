@@ -110,11 +110,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(KickoffExtraReRollMessage.report_id(), ReportId::KICKOFF_EXTRA_RE_ROLL);
-    }
-
-    #[test]
     fn no_team_gains_reroll() {
         let mut sr = StatusReport::new();
         let game = make_game();

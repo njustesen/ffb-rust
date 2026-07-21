@@ -306,11 +306,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_punt() {
-        assert_eq!(PuntLogicModule::new().get_id(), ClientStateId::Punt);
-    }
-
-    #[test]
     fn available_actions_includes_punt() {
         let module = PuntLogicModule::new();
         assert!(module.available_actions().contains(&ClientAction::PUNT));

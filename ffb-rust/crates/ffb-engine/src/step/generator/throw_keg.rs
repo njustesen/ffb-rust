@@ -43,10 +43,4 @@ mod tests {
         assert_eq!(p.player_id.as_deref(), Some("p1"));
     }
 
-    #[test]
-    fn params_clone() {
-        let p = ThrowKegParams { player_id: Some("x".into()) };
-        let q = p.clone();
-        assert_eq!(q.player_id.as_deref(), Some("x"));
-    }
 }

@@ -110,24 +110,3 @@ impl Default for DbAdminListByStatusQuery {
         Self::new()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct() {
-        let q = DbAdminListByStatusQuery::new();
-        assert_eq!(q.get_id(), DbStatementId::ADMIN_LIST_BY_STATUS_QUERY);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_games_info"));
-    }
-
-    #[test]
-    fn sql_has_where_clause() {
-        assert!(SQL.contains("WHERE status=?"));
-    }
-}

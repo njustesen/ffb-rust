@@ -21,22 +21,6 @@ impl IDialogParameter for DialogKickOffResultParameter {
 mod tests {
     use super::*;
     #[test]
-    fn dialog_id_is_kick_off_result() {
-        assert_eq!(DialogKickOffResultParameter::default().get_id(), DialogId::KICK_OFF_RESULT);
-    }
-    #[test]
-    fn stores_team_id() {
-        let p = DialogKickOffResultParameter { team_id: Some("away".into()) };
-        assert_eq!(p.get_team_id(), Some("away"));
-    }
-
-    #[test]
-    fn default_is_sensible() {
-        let p = DialogKickOffResultParameter::default();
-        assert!(p.get_team_id().is_none());
-    }
-
-    #[test]
     fn serde_round_trip() {
         let p = DialogKickOffResultParameter { team_id: Some("home".into()) };
         let json = serde_json::to_string(&p).unwrap();
@@ -44,10 +28,4 @@ mod tests {
         assert_eq!(back.get_team_id(), Some("home"));
     }
 
-    #[test]
-    fn none_team_id_is_edge_case() {
-        let p = DialogKickOffResultParameter { team_id: None };
-        assert!(p.get_team_id().is_none());
-        assert_eq!(p.get_id(), DialogId::KICK_OFF_RESULT);
-    }
 }

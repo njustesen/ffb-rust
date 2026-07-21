@@ -292,11 +292,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_hand_over() {
-        assert_eq!(HandOverLogicModule::new().get_id(), ClientStateId::HandOver);
-    }
-
-    #[test]
     fn available_actions_delegates_to_move_logic() {
         let module = HandOverLogicModule::new();
         assert!(module.available_actions().contains(&ClientAction::MOVE));

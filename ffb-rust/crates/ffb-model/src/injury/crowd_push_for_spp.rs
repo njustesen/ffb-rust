@@ -23,33 +23,3 @@ impl CrowdPushForSpp {
 impl Default for CrowdPushForSpp {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(CrowdPushForSpp::new().base().name(), "crowdpushForSpp");
-    }
-
-    #[test]
-    fn worth_spps_is_true() {
-        assert!(CrowdPushForSpp::new().base().is_worth_spps());
-    }
-
-    #[test]
-    fn can_apo_ko_into_stun_is_false() {
-        assert!(!CrowdPushForSpp::new().can_apo_ko_into_stun());
-    }
-
-    #[test]
-    fn falling_down_causes_turnover_is_false() {
-        assert!(!CrowdPushForSpp::new().falling_down_causes_turnover());
-    }
-
-    #[test]
-    fn is_caused_by_opponent_is_true() {
-        assert!(CrowdPushForSpp::new().is_caused_by_opponent());
-    }
-}

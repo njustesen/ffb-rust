@@ -162,11 +162,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_penalty_shootout() {
-        assert_eq!(StepPenaltyShootout::new().id(), StepId::PenaltyShootout);
-    }
-
-    #[test]
     fn no_overtime_no_change() {
         let mut step = StepPenaltyShootout::new();
         let mut game = make_game();
@@ -216,13 +211,6 @@ mod tests {
         let total = game.game_result.home.penalty_score + game.game_result.away.penalty_score;
         assert_eq!(total, 5);
         assert_ne!(game.game_result.home.penalty_score, game.game_result.away.penalty_score);
-    }
-
-    #[test]
-    fn default_constructs() {
-        let s = StepPenaltyShootout::default();
-        assert!(!s.home_confirmed);
-        assert!(!s.away_confirmed);
     }
 
     #[test]

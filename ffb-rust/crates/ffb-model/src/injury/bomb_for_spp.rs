@@ -19,23 +19,3 @@ impl BombForSpp {
 impl Default for BombForSpp {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(BombForSpp::new().base().name(), "bombForSpp");
-    }
-
-    #[test]
-    fn worth_spps_is_true() {
-        assert!(BombForSpp::new().base().is_worth_spps());
-    }
-
-    #[test]
-    fn is_caused_by_opponent_is_true() {
-        assert!(BombForSpp::new().is_caused_by_opponent());
-    }
-}

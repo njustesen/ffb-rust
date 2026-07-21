@@ -216,11 +216,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_kick_em_block() {
-        assert_eq!(KickEmBlockLogicModule::new().get_id(), ClientStateId::KickEmBlock);
-    }
-
-    #[test]
     fn is_kickable_false_without_defender_state() {
         let game = make_game();
         let mut player = Player::default();

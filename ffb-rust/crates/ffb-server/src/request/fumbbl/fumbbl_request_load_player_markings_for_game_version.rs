@@ -61,13 +61,6 @@ mod tests {
     use crate::request::fumbbl::util_fumbbl_request::MockHttpClient;
 
     #[test]
-    fn construct() {
-        let r = FumbblRequestLoadPlayerMarkingsForGameVersion::new(3, "coach".to_string());
-        assert_eq!(r.get_index(), 3);
-        assert_eq!(r.get_coach(), "coach");
-    }
-
-    #[test]
     fn process_fetches_and_parses_config_when_none_cached() {
         let client = MockHttpClient {
             response: Ok(r#"{"autoMarkingSeparator":"/","autoMarkingRecords":[{"skillArray":["Tackle"],"marking":"T"}]}"#.to_string()),

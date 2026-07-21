@@ -357,16 +357,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_login() {
-        assert_eq!(LoginLogicModule::new().get_id(), ClientStateId::Login);
-    }
-
-    #[test]
-    fn available_actions_is_empty() {
-        assert!(LoginLogicModule::new().available_actions().is_empty());
-    }
-
-    #[test]
     fn check_version_conflict_true_when_actual_major_lower() {
         let module = LoginLogicModule::new();
         assert!(module.check_version_conflict("2.0.0", "1.9.9"));

@@ -21,28 +21,3 @@ impl ProjectileVomit {
 impl Default for ProjectileVomit {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(ProjectileVomit::new().base().name(), "projectileVomit");
-    }
-
-    #[test]
-    fn worth_spps_is_false() {
-        assert!(!ProjectileVomit::new().base().is_worth_spps());
-    }
-
-    #[test]
-    fn is_vomit_like_is_true() {
-        assert!(ProjectileVomit::new().is_vomit_like());
-    }
-
-    #[test]
-    fn is_caused_by_opponent_is_true() {
-        assert!(ProjectileVomit::new().is_caused_by_opponent());
-    }
-}

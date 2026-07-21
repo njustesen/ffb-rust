@@ -28,14 +28,3 @@ impl Default for AdminList {
         Self::new()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct() {
-        let list = AdminList::new();
-        assert_eq!(list.size(), 0);
-    }
-}

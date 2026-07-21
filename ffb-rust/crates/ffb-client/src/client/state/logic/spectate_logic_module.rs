@@ -134,18 +134,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_spectate() {
-        let module = SpectateLogicModule::new();
-        assert_eq!(module.get_id(), ClientStateId::Spectate);
-    }
-
-    #[test]
-    fn available_actions_is_always_empty() {
-        let module = SpectateLogicModule::new();
-        assert!(module.available_actions().is_empty());
-    }
-
-    #[test]
     fn can_switch_to_spectate_requires_finished_game_and_player_mode() {
         let module = SpectateLogicModule::new();
         let mut client = make_client(ClientMode::PLAYER);

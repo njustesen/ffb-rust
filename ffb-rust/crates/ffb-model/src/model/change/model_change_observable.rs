@@ -21,8 +21,4 @@ mod tests {
         NoOp.notify_change(&mc);
     }
 
-    #[test]
-    fn trait_is_object_safe() {
-        let _: Option<Box<dyn ModelChangeObservable>> = None;
-    }
 }

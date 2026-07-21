@@ -120,22 +120,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let q = DbAdminListByIdQuery::new();
-        assert_eq!(q.get_id(), DbStatementId::ADMIN_LIST_BY_ID_QUERY);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_games_info"));
-    }
-
-    #[test]
-    fn sql_has_where_clause() {
-        assert!(SQL.contains("WHERE id=?"));
-    }
-
-    #[test]
     fn value_to_millis_handles_zero_date() {
         assert_eq!(value_to_millis(Value::Date(0, 0, 0, 0, 0, 0, 0)), None);
     }

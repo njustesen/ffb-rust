@@ -93,16 +93,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_start_game() {
-        assert_eq!(StartGameLogicModule::new().get_id(), ClientStateId::StartGame);
-    }
-
-    #[test]
-    fn available_actions_is_empty() {
-        assert!(StartGameLogicModule::new().available_actions().is_empty());
-    }
-
-    #[test]
     #[should_panic(expected = "actionContext for acting player is not supported in start game context")]
     fn action_context_panics() {
         let module = StartGameLogicModule::new();

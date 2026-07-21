@@ -66,24 +66,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let s = DbGamesInfoUpdate::new();
-        assert_eq!(s.get_id(), DbStatementId::GAMES_INFO_UPDATE);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_games_info"));
-        assert!(SQL.to_uppercase().contains("UPDATE"));
-    }
-
-    #[test]
-    fn sql_has_where_clause() {
-        assert!(SQL.contains("WHERE"));
-        assert!(SQL.contains("id=?"));
-    }
-
-    #[test]
     fn sql_has_set_columns() {
         assert!(SQL.contains("scheduled=?"));
         assert!(SQL.contains("started=?"));

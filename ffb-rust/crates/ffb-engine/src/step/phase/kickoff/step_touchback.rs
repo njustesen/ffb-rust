@@ -149,11 +149,6 @@ mod tests {
     }
 
     #[test]
-    fn step_id_is_touchback() {
-        assert_eq!(StepTouchback::new().id(), StepId::Touchback);
-    }
-
-    #[test]
     fn no_touchback_returns_next_step_immediately() {
         let mut game = make_game();
         let mut step = StepTouchback::new();
@@ -241,10 +236,4 @@ mod tests {
         assert_eq!(game.turn_mode, TurnMode::Regular, "turn mode must be REGULAR even on the catch-scatter branch");
     }
 
-    #[test]
-    fn default_creates_fresh_instance() {
-        let step = StepTouchback::default();
-        assert!(!step.touchback);
-        assert!(step.touchback_coordinate.is_none());
-    }
 }

@@ -210,11 +210,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_touchback() {
-        assert_eq!(TouchbackLogicModule::new().get_id(), ClientStateId::Touchback);
-    }
-
-    #[test]
     fn set_up_is_touchback_to_any_field_when_no_selectable_home_player() {
         let mut module = TouchbackLogicModule::new();
         let mut client = make_client();

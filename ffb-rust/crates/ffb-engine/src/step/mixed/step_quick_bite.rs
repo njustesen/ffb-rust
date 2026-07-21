@@ -207,11 +207,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_quick_bite() {
-        assert_eq!(StepQuickBite::new().id(), StepId::QuickBite);
-    }
-
-    #[test]
     fn start_returns_next_step() {
         let mut step = StepQuickBite::new();
         let mut game = make_game();

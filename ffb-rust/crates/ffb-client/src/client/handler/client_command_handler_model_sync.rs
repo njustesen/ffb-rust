@@ -249,11 +249,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_server_model_sync() {
-        assert_eq!(ClientCommandHandlerModelSync::new().get_id(), NetCommandId::ServerModelSync);
-    }
-
-    #[test]
     fn should_sync_clock_true_for_queuing_and_playing() {
         assert!(ClientCommandHandlerModelSync::should_sync_clock(ClientCommandHandlerMode::QUEUING));
         assert!(ClientCommandHandlerModelSync::should_sync_clock(ClientCommandHandlerMode::PLAYING));

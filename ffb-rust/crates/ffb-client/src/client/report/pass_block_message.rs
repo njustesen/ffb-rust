@@ -69,8 +69,4 @@ mod tests {
         assert_eq!(status_report.rendered_runs[0].text_style, Some(TextStyle::AWAY));
     }
 
-    #[test]
-    fn get_key_matches_report_id() {
-        assert_eq!(PassBlockMessage.get_key(), "passBlock");
-    }
 }

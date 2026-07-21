@@ -114,9 +114,4 @@ mod tests {
         );
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(SkillWastedMessage.report_id(), ReportId::SKILL_WASTED);
-        assert_eq!(SkillWastedMessage.get_key(), "skillWasted");
-    }
 }

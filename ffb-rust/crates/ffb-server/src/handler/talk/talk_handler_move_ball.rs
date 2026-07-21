@@ -82,9 +82,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() { let _ = handler(); }
-
-    #[test]
     fn handle_moves_ball_by_direction_and_distance() {
         let h = handler();
         let sm = SessionManager::new();

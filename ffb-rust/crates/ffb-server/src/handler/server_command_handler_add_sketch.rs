@@ -126,11 +126,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = ServerCommandHandlerAddSketch::default();
-    }
-
-    #[test]
     fn get_id_returns_client_add_sketch() {
         let handler = ServerCommandHandlerAddSketch::default();
         assert_eq!(handler.get_id(), NetCommandId::ClientAddSketch);

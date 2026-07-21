@@ -15,21 +15,6 @@ impl IDialogParameter for DialogFollowupChoiceParameter {
 mod tests {
     use super::*;
     #[test]
-    fn dialog_id_is_followup_choice() {
-        assert_eq!(DialogFollowupChoiceParameter.get_id(), DialogId::FOLLOWUP_CHOICE);
-    }
-    #[test]
-    fn transform_preserves_id() {
-        assert_eq!(DialogFollowupChoiceParameter.transform().get_id(), DialogId::FOLLOWUP_CHOICE);
-    }
-
-    #[test]
-    fn default_is_sensible() {
-        let p = DialogFollowupChoiceParameter::default();
-        assert_eq!(p.get_id(), DialogId::FOLLOWUP_CHOICE);
-    }
-
-    #[test]
     fn serde_round_trip() {
         let p = DialogFollowupChoiceParameter;
         let json = serde_json::to_string(&p).unwrap();
@@ -37,10 +22,4 @@ mod tests {
         assert_eq!(back.get_id(), DialogId::FOLLOWUP_CHOICE);
     }
 
-    #[test]
-    fn clone_preserves_id() {
-        let p = DialogFollowupChoiceParameter;
-        let cloned = p.clone();
-        assert_eq!(cloned.get_id(), DialogId::FOLLOWUP_CHOICE);
-    }
 }

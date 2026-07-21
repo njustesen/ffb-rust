@@ -94,9 +94,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() { let _ = TalkHandlerEmote::new(); }
-
-    #[test]
     fn handle_returns_sound_and_cooldown_for_known_command() {
         let h = TalkHandlerEmote::new();
         let commands = vec!["/cheer".to_string()];

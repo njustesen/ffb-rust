@@ -270,11 +270,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_pass_block() {
-        assert_eq!(PassBlockLogicModule::new().get_id(), ClientStateId::PassBlock);
-    }
-
-    #[test]
     fn available_actions_has_four_entries() {
         let actions = PassBlockLogicModule::new().available_actions();
         assert_eq!(actions.len(), 4);

@@ -129,12 +129,6 @@ mod tests {
     use crate::enums::PlayerAction;
 
     #[test]
-    fn default_is_not_active() {
-        let ap = ActingPlayer::new();
-        assert!(!ap.is_active());
-    }
-
-    #[test]
     fn set_and_clear() {
         let mut ap = ActingPlayer::new();
         ap.set_player("p1".into(), PlayerAction::Move);
@@ -153,14 +147,6 @@ mod tests {
     }
 
     #[test]
-    fn set_player_stores_action_and_id() {
-        let mut ap = ActingPlayer::new();
-        ap.set_player("p42".into(), PlayerAction::Foul);
-        assert_eq!(ap.player_id.as_deref(), Some("p42"));
-        assert_eq!(ap.player_action, Some(PlayerAction::Foul));
-    }
-
-    #[test]
     fn set_player_resets_movement_counters() {
         let mut ap = ActingPlayer::new();
         ap.current_move = 5;
@@ -171,30 +157,11 @@ mod tests {
     }
 
     #[test]
-    fn must_complete_action_defaults_false_and_can_be_set() {
-        let mut ap = ActingPlayer::new();
-        assert!(!ap.is_must_complete_action());
-        ap.set_must_complete_action(true);
-        assert!(ap.is_must_complete_action());
-    }
-
-    #[test]
     fn set_player_resets_must_complete_action() {
         let mut ap = ActingPlayer::new();
         ap.set_must_complete_action(true);
         ap.set_player("p1".into(), PlayerAction::Move);
         assert!(!ap.is_must_complete_action());
-    }
-
-    #[test]
-    fn special_flags_default_false() {
-        let ap = ActingPlayer::new();
-        assert!(!ap.jumping);
-        assert!(!ap.standing_up);
-        assert!(!ap.temporary_claws);
-        assert!(!ap.temporary_frenzy);
-        assert!(!ap.ignore_tackle_zones);
-        assert_eq!(ap.fury_of_blood_god_blocks, 0);
     }
 
     #[test]

@@ -217,15 +217,6 @@ mod tests {
     }
 
     #[test]
-    fn roster_fields_accessible() {
-        let r = empty_roster();
-        assert_eq!(r.id, "human");
-        assert_eq!(r.reroll_cost, 50_000);
-        assert_eq!(r.max_rerolls, 8);
-        assert!(r.special_rules.is_empty());
-    }
-
-    #[test]
     fn position_count_reflects_added_positions() {
         let mut r = empty_roster();
         assert_eq!(r.positions.len(), 0);
@@ -260,12 +251,6 @@ mod tests {
     }
 
     #[test]
-    fn raised_roster_position_none_by_default() {
-        let r = empty_roster();
-        assert!(r.raised_roster_position().is_none());
-    }
-
-    #[test]
     fn raised_roster_position_resolves_by_id() {
         let mut r = empty_roster();
         r.positions.push(zombie_position());
@@ -279,19 +264,6 @@ mod tests {
         let mut r = empty_roster();
         r.raised_position_id = Some("missing.position".into());
         assert!(r.raised_roster_position().is_none());
-    }
-
-    #[test]
-    fn has_necromancer_false_by_default() {
-        let r = empty_roster();
-        assert!(!r.has_necromancer());
-    }
-
-    #[test]
-    fn has_necromancer_true_when_set() {
-        let mut r = empty_roster();
-        r.necromancer = true;
-        assert!(r.has_necromancer());
     }
 
     #[test]

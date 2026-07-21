@@ -83,11 +83,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = CommandServlet::new(false);
-    }
-
-    #[test]
     fn construct_with_compression() {
         let s = CommandServlet::new(true);
         assert!(s.command_compression);
@@ -116,9 +111,4 @@ mod tests {
         assert_eq!(COMMAND_PATH, "/command");
     }
 
-    #[test]
-    fn default() {
-        let s = CommandServlet::default();
-        assert!(!s.command_compression);
-    }
 }

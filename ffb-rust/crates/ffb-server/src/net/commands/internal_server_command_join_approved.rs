@@ -60,37 +60,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = InternalServerCommandJoinApproved::new(
-            1, "game".to_string(), "coach".to_string(), "team1".to_string(), "PLAYER".to_string(), vec![]
-        );
-    }
-
-    #[test]
-    fn get_id() {
-        let c = InternalServerCommandJoinApproved::new(
-            1, "g".to_string(), "c".to_string(), "t".to_string(), "m".to_string(), vec![]
-        );
-        assert_eq!(c.get_id(), "internalServerJoinApproved");
-    }
-
-    #[test]
-    fn get_game_id() {
-        let c = InternalServerCommandJoinApproved::new(
-            5, "g".to_string(), "c".to_string(), "t".to_string(), "m".to_string(), vec![]
-        );
-        assert_eq!(c.get_game_id(), 5);
-    }
-
-    #[test]
-    fn is_internal() {
-        let c = InternalServerCommandJoinApproved::new(
-            1, "g".to_string(), "c".to_string(), "t".to_string(), "m".to_string(), vec![]
-        );
-        assert!(c.is_internal());
-    }
-
-    #[test]
     fn get_team_id() {
         let c = InternalServerCommandJoinApproved::new(
             1, "g".to_string(), "c".to_string(), "myTeam".to_string(), "m".to_string(), vec![]

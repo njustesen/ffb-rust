@@ -35,23 +35,3 @@ impl CardChoices {
 impl Default for CardChoices {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_empty_choices() {
-        let choices = CardChoices::new();
-        assert!(choices.get_initial().is_none());
-        assert!(choices.get_rerolled().is_none());
-    }
-
-    #[test]
-    fn test_set_choices() {
-        let mut choices = CardChoices::new();
-        choices.set_initial(CardChoice::new().with_type("CHAOS"));
-        assert!(choices.get_initial().is_some());
-        assert!(choices.get_rerolled().is_none());
-    }
-}

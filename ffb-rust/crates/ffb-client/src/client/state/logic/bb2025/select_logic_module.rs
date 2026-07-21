@@ -530,11 +530,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_select_player() {
-        assert_eq!(SelectLogicModule::new().get_id(), ClientStateId::SelectPlayer);
-    }
-
-    #[test]
     fn available_actions_contains_move_and_punt() {
         let actions = SelectLogicModule::new().available_actions();
         assert!(actions.contains(&ClientAction::MOVE));

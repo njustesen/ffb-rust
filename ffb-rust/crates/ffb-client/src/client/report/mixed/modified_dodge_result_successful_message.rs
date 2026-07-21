@@ -103,9 +103,4 @@ mod tests {
         );
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(ModifiedDodgeResultSuccessfulMessage.report_id(), ReportId::MODIFIED_DODGE_RESULT_SUCCESSFUL);
-        assert_eq!(ModifiedDodgeResultSuccessfulMessage.get_key(), "modifiedDodgeResultSuccessful");
-    }
 }

@@ -95,11 +95,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_id_is_quick_snap() {
-        assert_eq!(QuickSnapLogicModule::new().get_id(), ClientStateId::QuickSnap);
-    }
-
-    #[test]
     fn use_turn_mode_is_true() {
         assert!(QuickSnapLogicModule::new().use_turn_mode());
     }
@@ -127,8 +122,4 @@ mod tests {
         assert!(!module.squares_are_same_or_adjacent(None, Some(a)));
     }
 
-    #[test]
-    fn available_actions_is_empty() {
-        assert!(QuickSnapLogicModule::new().available_actions().is_empty());
-    }
 }

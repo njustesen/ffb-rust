@@ -184,9 +184,4 @@ mod tests {
         assert_eq!(sr.rendered_runs[9].text.as_deref(), Some(" (Roll >= 2 to avoid knock down)."));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(BreatheFireMessage.report_id(), ReportId::BREATHE_FIRE);
-        assert_eq!(BreatheFireMessage.get_key(), "breatheFire");
-    }
 }

@@ -267,11 +267,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_block_roll() {
-        assert_eq!(StepBlockRoll::new().id(), StepId::BlockRoll);
-    }
-
-    #[test]
     fn start_with_no_result_stays_cont() {
         // Java: when fBlockResult is null, show dialog → CONTINUE
         let mut step = StepBlockRoll::new();

@@ -48,13 +48,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let h = TalkHandlerSounds::new();
-        assert_eq!(h.required_client, Client::Player);
-        assert_eq!(h.required_environment, Environment::TestGame);
-    }
-
-    #[test]
     fn sound_listing_prefixes_header_and_sorts() {
         let names = vec!["zap".to_string(), "block".to_string()];
         let listing = TalkHandlerSounds::sound_listing(&names);

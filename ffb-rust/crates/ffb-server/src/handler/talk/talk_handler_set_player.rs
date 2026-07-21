@@ -133,12 +133,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let h = TalkHandlerSetPlayer::new(Client::Spec, Environment::None, vec![Privilege::EditState]);
-        assert_eq!(h.required_client, Client::Spec);
-    }
-
-    #[test]
     fn handle_moves_player_and_promotes_from_reserve() {
         let h = TalkHandlerSetPlayer::default();
         let mut g = game();

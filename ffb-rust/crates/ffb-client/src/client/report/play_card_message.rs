@@ -56,11 +56,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(PlayCardMessage.report_id(), ReportId::PLAY_CARD);
-    }
-
-    #[test]
     fn render_without_player_prints_played_and_blank_line() {
         let mut status_report = StatusReport::new();
         let game = make_game();

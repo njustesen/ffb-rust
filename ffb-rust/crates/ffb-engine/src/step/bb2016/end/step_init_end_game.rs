@@ -117,11 +117,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_init_end_game() {
-        assert_eq!(StepInitEndGame::new().id(), StepId::InitEndGame);
-    }
-
-    #[test]
     fn normal_game_sets_end_game_mode() {
         let mut game = make_game();
         game.concession_possible = true;

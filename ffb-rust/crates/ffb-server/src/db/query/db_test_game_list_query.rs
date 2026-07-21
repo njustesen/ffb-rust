@@ -121,17 +121,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let q = DbTestGameListQuery::new();
-        assert_eq!(q.get_id(), DbStatementId::TEST_GAME_LIST_QUERY);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("testing=true"));
-    }
-
-    #[test]
     fn sql_has_limit_placeholder() {
         assert!(SQL.trim_end().ends_with("LIMIT ?"));
     }

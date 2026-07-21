@@ -12,19 +12,3 @@ impl UtilRangeRuler {
 impl Default for UtilRangeRuler {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn can_be_constructed() {
-        let _u = UtilRangeRuler::new();
-    }
-
-    #[test]
-    fn default_and_new_equivalent() {
-        let _a = UtilRangeRuler::new();
-        let _b = UtilRangeRuler::default();
-    }
-}

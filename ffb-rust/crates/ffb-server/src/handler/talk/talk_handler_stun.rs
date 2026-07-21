@@ -71,12 +71,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let h = TalkHandlerStun::new(Client::Spec, Environment::None, vec![Privilege::EditState]);
-        assert_eq!(h.required_client, Client::Spec);
-    }
-
-    #[test]
     fn handle_stuns_player_on_pitch() {
         let h = TalkHandlerStun::default();
         let (mut g, team) = game_with_player();

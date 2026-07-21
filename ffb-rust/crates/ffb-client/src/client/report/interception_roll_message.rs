@@ -158,11 +158,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(InterceptionRollMessage.report_id(), ReportId::INTERCEPTION_ROLL);
-    }
-
-    #[test]
     fn successful_ball_interception_reports_verb_and_inflection() {
         let mut status_report = StatusReport::new();
         let mut game = make_game();

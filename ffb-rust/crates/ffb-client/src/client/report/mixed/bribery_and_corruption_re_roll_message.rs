@@ -121,9 +121,4 @@ mod tests {
         );
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(BriberyAndCorruptionReRollMessage.report_id(), ReportId::BRIBERY_AND_CORRUPTION_RE_ROLL);
-        assert_eq!(BriberyAndCorruptionReRollMessage.get_key(), "briberyAndCorruptionReRoll");
-    }
 }

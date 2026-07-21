@@ -152,12 +152,6 @@ mod tests {
     use crate::request::fumbbl::util_fumbbl_request::MockHttpClient;
 
     #[test]
-    fn new_and_default_construct() {
-        let _a = MarkerLoadingService::new();
-        let _b = MarkerLoadingService::default();
-    }
-
-    #[test]
     fn load_marker_auto_enqueues_a_request() {
         let service = MarkerLoadingService::new();
         let processor = Arc::new(Mutex::new(ServerRequestProcessor::new()));

@@ -115,12 +115,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_and_key() {
-        assert_eq!(PrayerRollMessage.report_id(), ReportId::PRAYER_ROLL);
-        assert_eq!(PrayerRollMessage.get_key(), "prayerRoll");
-    }
-
-    #[test]
     fn renders_roll_line_and_prayer_details_for_treacherous_trapdoor() {
         let game = make_game();
         let report = ReportPrayerRoll::new(1);

@@ -185,17 +185,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn construct() {
-        let _ = ServerCommandHandlerFumbblGameChecked::new();
-    }
-
-    #[test]
-    fn get_id_is_fumbbl_game_checked() {
-        let h = ServerCommandHandlerFumbblGameChecked::new();
-        assert_eq!(h.get_id(), NetCommandId::InternalServerFumbblGameChecked);
-    }
-
     fn roster_xml(name: &str) -> String {
         format!("<roster id=\"human\"><name>{}</name></roster>", name)
     }

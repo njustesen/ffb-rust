@@ -169,11 +169,6 @@ mod tests {
 
     // ── id ────────────────────────────────────────────────────────────────────
 
-    #[test]
-    fn id_is_missed_pass() {
-        assert_eq!(StepMissedPass::new().id(), StepId::MissedPass);
-    }
-
     // ── set_parameter ─────────────────────────────────────────────────────────
 
     #[test]

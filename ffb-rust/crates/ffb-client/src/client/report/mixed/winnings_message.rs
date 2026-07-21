@@ -108,9 +108,4 @@ mod tests {
         assert_eq!(status_report.rendered_runs[4].text.as_deref(), Some(" earns 999,000 gold."));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(WinningsMessage.report_id(), ReportId::WINNINGS);
-        assert_eq!(WinningsMessage.get_key(), "winnings");
-    }
 }

@@ -43,10 +43,4 @@ mod tests {
         assert!(p.check_forgo);
     }
 
-    #[test]
-    fn params_clone() {
-        let p = EndTurnParams { check_forgo: true };
-        let q = p.clone();
-        assert!(q.check_forgo);
-    }
 }

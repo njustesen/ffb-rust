@@ -58,20 +58,6 @@ mod tests {
     }
 
     #[test]
-    fn roster_player_new_is_active() {
-        let p = RosterPlayer::default();
-        assert_eq!(p.player_status, PlayerStatus::ACTIVE);
-        assert!(!p.is_journeyman());
-    }
-
-    #[test]
-    fn set_journeyman_status() {
-        let mut p = make_roster_player();
-        p.set_player_status(PlayerStatus::JOURNEYMAN);
-        assert!(p.is_journeyman());
-    }
-
-    #[test]
     fn add_and_remove_skill() {
         use crate::model::skill_def::SkillId;
         let mut p = make_roster_player();
@@ -81,24 +67,4 @@ mod tests {
         assert!(!p.has_skill(SkillId::Loner));
     }
 
-    #[test]
-    fn get_player_status_roundtrip() {
-        let mut p = make_roster_player();
-        assert_eq!(p.get_player_status(), PlayerStatus::ACTIVE);
-        p.set_player_status(PlayerStatus::JOURNEYMAN);
-        assert_eq!(p.get_player_status(), PlayerStatus::JOURNEYMAN);
-    }
-
-    #[test]
-    fn roster_player_is_player() {
-        // RosterPlayer IS Player — same type, same fields
-        let p: RosterPlayer = RosterPlayer {
-            id: "star1".into(),
-            name: "Star Player".into(),
-            nr: 1,
-            player_type: PlayerType::Star,
-            ..RosterPlayer::default()
-        };
-        assert_eq!(p.player_type, PlayerType::Star);
-    }
 }

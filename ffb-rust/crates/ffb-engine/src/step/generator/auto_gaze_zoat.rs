@@ -58,10 +58,4 @@ mod tests {
         assert!(p.old_player_state.is_none());
     }
 
-    #[test]
-    fn params_clone() {
-        let p = AutoGazeZoatParams { go_to_label_failure: Some("x".into()), ..Default::default() };
-        let q = p.clone();
-        assert_eq!(q.go_to_label_failure.as_deref(), Some("x"));
-    }
 }

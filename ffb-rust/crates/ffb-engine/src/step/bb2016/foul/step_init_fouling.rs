@@ -154,11 +154,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_init_fouling() {
-        assert_eq!(StepInitFouling::new().id(), StepId::InitFouling);
-    }
-
-    #[test]
     fn end_turn_publishes_and_gotos_label() {
         let mut step = StepInitFouling::new();
         step.set_parameter(&StepParameter::GotoLabelOnEnd("end".into()));

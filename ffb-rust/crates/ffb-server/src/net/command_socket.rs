@@ -196,15 +196,6 @@ mod tests {
         assert!(b > a);
     }
 
-    #[test]
-    fn app_state_is_clone() {
-        let gc = Arc::new(Mutex::new(GameCache::new()));
-        let sm = Arc::new(Mutex::new(SessionManager::new()));
-        let (tx, _rx) = mpsc::unbounded_channel();
-        let state = AppState { game_cache: gc, session_manager: sm, dispatch_tx: tx };
-        let _clone = state.clone();
-    }
-
     /// Proves `handle_connection`'s disconnect-cleanup statement — enqueuing
     /// `AnyInternalServerCommand::SocketClosed` on `AppState::dispatch_tx` — really reaches
     /// the real `ServerCommandHandlerSocketClosed` (via `ServerCommunication`'s live dispatch

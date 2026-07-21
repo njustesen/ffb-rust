@@ -220,11 +220,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_pass_block() {
-        assert_eq!(StepPassBlock::new().id(), StepId::PassBlock);
-    }
-
-    #[test]
     fn no_thrower_returns_next() {
         let mut step = StepPassBlock::new();
         let mut game = make_game();

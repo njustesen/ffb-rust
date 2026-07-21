@@ -22,23 +22,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dialog_id_is_bloodlust_action() {
-        assert_eq!(DialogBloodlustActionParameter::default().get_id(), DialogId::BLOODLUST_ACTION);
-    }
-
-    #[test]
-    fn is_change_to_move_reflects_field() {
-        assert!(!DialogBloodlustActionParameter { change_to_move: false }.is_change_to_move());
-        assert!(DialogBloodlustActionParameter { change_to_move: true }.is_change_to_move());
-    }
-
-    #[test]
-    fn default_is_sensible() {
-        let p = DialogBloodlustActionParameter::default();
-        assert!(!p.is_change_to_move());
-    }
-
-    #[test]
     fn serde_round_trip() {
         let p = DialogBloodlustActionParameter { change_to_move: true };
         let json = serde_json::to_string(&p).unwrap();
@@ -46,10 +29,4 @@ mod tests {
         assert!(back.is_change_to_move());
     }
 
-    #[test]
-    fn false_change_to_move_is_edge_case() {
-        let p = DialogBloodlustActionParameter { change_to_move: false };
-        assert!(!p.is_change_to_move());
-        assert_eq!(p.get_id(), DialogId::BLOODLUST_ACTION);
-    }
 }

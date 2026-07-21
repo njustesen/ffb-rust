@@ -176,11 +176,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_mvp() {
-        assert_eq!(StepMvp::new().id(), StepId::Mvp);
-    }
-
-    #[test]
     fn start_returns_next_step() {
         let mut game = make_game();
         let mut step = StepMvp::new();

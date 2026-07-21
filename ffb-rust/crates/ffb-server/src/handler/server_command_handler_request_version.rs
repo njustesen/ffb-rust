@@ -79,13 +79,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_client_request_version() {
-        let (sm, _rx) = setup();
-        let handler = ServerCommandHandlerRequestVersion::new(sm, HashMap::new(), false);
-        assert_eq!(handler.get_id(), NetCommandId::ClientRequestVersion);
-    }
-
-    #[test]
     fn handle_command_sends_version_with_client_properties() {
         let (sm, mut rx) = setup();
         let mut props = HashMap::new();

@@ -17,24 +17,3 @@ impl DropJump {
 impl Default for DropJump {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(DropJump::new().base().name(), "dropLeap");
-    }
-
-    #[test]
-    fn worth_spps_is_false() {
-        assert!(!DropJump::new().base().is_worth_spps());
-    }
-
-    #[test]
-    fn send_to_box_reason_is_jump_fail() {
-        use crate::model::send_to_box_reason::SendToBoxReason;
-        assert_eq!(DropJump::new().base().send_to_box_reason(), SendToBoxReason::JUMP_FAIL);
-    }
-}

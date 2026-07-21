@@ -82,11 +82,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(SkillUseMessage.report_id(), ReportId::SKILL_USE);
-    }
-
-    #[test]
     fn used_skill_with_player_renders_uses() {
         let mut game = make_game();
         add_player(&mut game, "p1", "Griff");

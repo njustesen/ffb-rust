@@ -693,4 +693,56 @@ mod tests {
         gs.run_until_prompt();
         assert!(gs.is_finished());
     }
+
+    /// Exhaustive replacement for the per-file `id_is_*` tests: every `StepId`
+    /// variant constructs via `make_step` and round-trips its `id()`.
+    /// The wildcard-free `match` below fails to compile when a variant is added
+    /// or removed, forcing this list (and the pinned count) to be updated.
+    #[test]
+    fn make_step_round_trips_every_step_id() {
+        macro_rules! all_step_ids {
+            ($($v:ident),* $(,)?) => {{
+                #[allow(dead_code)]
+                fn assert_exhaustive(id: StepId) {
+                    match id { $(StepId::$v => {}),* }
+                }
+                [$(StepId::$v),*]
+            }};
+        }
+        let ids = all_step_ids![
+            InitStartGame, Spectators, Weather, Kickoff, Setup, KickoffScatterRoll, KickoffResultRoll,
+            ApplyKickoffResult, EndKickoff, CoinChoice, ReceiveChoice, Touchback, InitSelecting, EndSelecting,
+            InitActivation, StandUp, JumpUp, ResetFumblerooskie, InitMoving, Move, GoForIt, MoveDodge,
+            FallDown, EndMoving, InitBlocking, BlockRoll, BlockChoice, BlockDodge, Pushback, Followup,
+            BothDown, EndBlocking, DropFallingPlayers, PlaceBall, InitFouling, Foul, Referee, Bribes,
+            EjectPlayer, EndFouling, InitPassing, Pass, DispatchPassing, Intercept, ResolvePass, HandOver,
+            MissedPass, EndPassing, PickUp, CatchScatterThrowIn, Apothecary, EndPlayerAction, EndTurn,
+            EndGame, Mvp, NoOp, GotoLabel, NextStep, AlwaysHungry, DispatchScatterPlayer, EndScatterPlayer,
+            EndThrowTeamMate, InitScatterPlayer, InitThrowTeamMate, RightStuff, ThrowTeamMate, FumbleTtmPass,
+            InitKickoff, KickoffScatterRollAskAfter, KickoffAnimation, KickoffReturn, BuyCardsAndInducements,
+            BuyInducements, BuyCards, PettyCash, BlitzTurn, Jump, Swarming, HypnoticGaze, Shadowing,
+            BlockChainsaw, BreatheFire, Chomp, HitAndRun, Trickster, Juggernaut, BlockBallAndChain, MoveBallAndChain,
+            DivingTackle, Dauntless, DauntlessMultiple, DoubleStrength, SetDefender, Stab, HandleDropPlayerContext,
+            FoulChainsaw, FoulAppearance, FoulAppearanceMultiple, AnimalSavagery, Animosity, BoneHead,
+            ReallyStupid, WildAnimal, TakeRoot, ForgoneStalling, CheckStalling, StallingPlayer, AutoGazeZoat,
+            BalefulHex, BlackInk, Bombardier, Horns, GettingEven, ProjectileVomit, QuickBite, RaidingParty,
+            SafeThrow, Swoop, Tentacles, Treacherous, UnchannelledFury, WisdomOfTheWhiteDwarf, Wrestle,
+            HailMaryPass, PassBlock, DumpOff, DispatchDumpOff, InitInducement, EndInducement, WeatherMage,
+            Wizard, ThrowARock, InitKickTeamMate, EndKickTeamMate, KickTeamMate, KickTeamMateDoubleRolled,
+            AssignTouchdowns, InitEndGame, Winnings, PlayerLoss, FanFactor, DedicatedFans, MasterChef,
+            RiotousRookies, Prayer, Prayers, PrayerRoll, InitPunt, PuntDirection, PuntDistance, EndPunt,
+            InitBomb, EndBomb, ResolveBomb, Bombardier2, SelectGazeTarget, SelectGazeTargetEnd, LookIntoMyEyes,
+            InitLookIntoMyEyes, ApothecaryMultiple, BlockRollMultiple, MultipleBlockFork, ReportStabInjury,
+            InitFeeding, EndFeeding, EatTeamMate, AllYouCanEat, InitFuriousOutburst, FirstMoveFuriousOutburst,
+            SecondMoveFuriousOutburst, EndFuriousOutburst, SpecialEffect, ConsumeParameter, SetActingPlayerAndTeam,
+            SetActingTeam, StateMultipleRolls, SteadyFooting, PickMeUp, PileDriver, CatchOfTheDay, RecheckExplodeSkill,
+            DropActingPlayer, DropDivingTackler, ThenIStartedBlastin, EndThenIStartedBlastin, ThrowKeg,
+            EndThrowKeg, BlockStatistics, SelectBlitzTarget, SelectBlitzTargetEnd, RemoveTargetSelectionState,
+            ResetToMove, PenaltyShootout, TrapDoor, Pro, RevertEndTurn, BloodLust, PlayCard, CloudBurster,
+        ];
+        assert_eq!(ids.len(), 199, "StepId variant count changed - update this list and pin");
+        for id in ids {
+            assert_eq!(make_step(id).id(), id, "make_step({id:?}) built a step with a mismatched id");
+        }
+    }
 }

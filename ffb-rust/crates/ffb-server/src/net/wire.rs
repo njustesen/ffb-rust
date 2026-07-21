@@ -1099,6 +1099,10 @@ pub fn events_to_reports(events: &[GameEvent]) -> Vec<WireReport> {
     events.iter().filter_map(event_to_report).collect()
 }
 
+// PARITY-EXEMPT: Rust-only infrastructure. GameEvent->WireReport is the Rust
+// engine's event-output channel (Java uses direct server.sendXxx networking and
+// has no GameEvent class), so these serialization tests have no Java counterpart
+// to be mirrored into; kept because they pin real wire-serialization behavior.
 #[cfg(test)]
 mod tests {
     use super::*;

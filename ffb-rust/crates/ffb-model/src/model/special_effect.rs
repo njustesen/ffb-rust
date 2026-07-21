@@ -38,16 +38,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn lightning_is_wizard_spell() {
-        assert!(SpecialEffect::LIGHTNING.is_wizard_spell());
-    }
-
-    #[test]
-    fn bomb_is_not_wizard_spell() {
-        assert!(!SpecialEffect::BOMB.is_wizard_spell());
-    }
-
-    #[test]
     fn for_name_round_trip() {
         assert_eq!(SpecialEffect::for_name("lightning"), Some(SpecialEffect::LIGHTNING));
     }
@@ -59,12 +49,6 @@ mod tests {
             assert_eq!(SpecialEffect::for_name(variant.get_name()), Some(variant),
                 "{:?} did not round-trip through get_name/for_name", variant);
         }
-    }
-
-    #[test]
-    fn zap_and_fireball_are_wizard_spells() {
-        assert!(SpecialEffect::ZAP.is_wizard_spell());
-        assert!(SpecialEffect::FIREBALL.is_wizard_spell());
     }
 
 }

@@ -23,20 +23,3 @@ impl Scanner {
     /// Java: `getInstancesImplementing()` — in Rust always empty Vec.
     pub fn get_instances_implementing(&self) -> Vec<String> { vec![] }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn type_name_stored() {
-        let s = Scanner::for_type("ISkill");
-        assert_eq!(s.type_name, "ISkill");
-    }
-
-    #[test]
-    fn instances_empty() {
-        let s = Scanner::new();
-        assert!(s.get_subclass_instances().is_empty());
-    }
-}

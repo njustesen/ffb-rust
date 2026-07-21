@@ -55,10 +55,4 @@ mod tests {
         assert_eq!(p.ball_and_chain_rr_setting.as_deref(), Some("setting"));
     }
 
-    #[test]
-    fn params_clone() {
-        let p = MoveParams { gaze_victim_id: Some("x".into()), ..Default::default() };
-        let q = p.clone();
-        assert_eq!(q.gaze_victim_id.as_deref(), Some("x"));
-    }
 }

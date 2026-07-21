@@ -135,11 +135,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_reset_fumblerooskie() {
-        assert_eq!(StepResetFumblerooskie::new().id(), StepId::ResetFumblerooskie);
-    }
-
-    #[test]
     fn start_returns_next_no_acting_player() {
         let mut step = StepResetFumblerooskie::new();
         let mut game = make_game();

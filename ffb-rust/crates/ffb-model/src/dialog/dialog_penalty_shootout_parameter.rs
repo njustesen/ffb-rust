@@ -68,12 +68,6 @@ mod tests {
     }
 
     #[test]
-    fn transform_preserves_dialog_id() {
-        let p = DialogPenaltyShootoutParameter { home_score: 2, away_score: 1, home_team_wins: true, ..Default::default() };
-        assert_eq!(p.transform().get_id(), DialogId::PENALTY_SHOOTOUT);
-    }
-
-    #[test]
     fn add_shootout_multiple_rounds_accumulate() {
         let mut p = DialogPenaltyShootoutParameter::default();
         p.add_shootout(3, 5, false, "Round 1".into());
@@ -83,14 +77,4 @@ mod tests {
         assert_eq!(p.get_home_won()[1], true);
     }
 
-    #[test]
-    fn dialog_id_is_penalty_shootout() {
-        assert_eq!(DialogPenaltyShootoutParameter::default().get_id(), DialogId::PENALTY_SHOOTOUT);
-    }
-    #[test]
-    fn empty_has_no_rolls() {
-        let p = DialogPenaltyShootoutParameter::default();
-        assert!(p.get_home_rolls().is_empty());
-        assert!(p.get_away_rolls().is_empty());
-    }
 }

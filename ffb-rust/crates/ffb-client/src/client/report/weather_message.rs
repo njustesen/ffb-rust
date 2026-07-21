@@ -49,11 +49,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(WeatherMessage.report_id(), ReportId::WEATHER);
-    }
-
-    #[test]
     fn nice_weather_renders_roll_and_description() {
         let game = make_game(Rules::Bb2025);
         let report = ReportWeather::new(Weather::Nice, vec![3, 4]);

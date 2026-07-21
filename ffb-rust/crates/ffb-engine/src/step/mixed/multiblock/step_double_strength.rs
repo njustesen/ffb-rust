@@ -146,11 +146,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_double_strength() {
-        assert_eq!(StepDoubleStrength::new().id(), StepId::DoubleStrength);
-    }
-
-    #[test]
     fn no_targets_next_step_immediately() {
         let mut step = StepDoubleStrength::new();
         let mut game = make_game();

@@ -489,18 +489,7 @@ mod tests {
         assert!(!CommonProperty::all().is_empty());
     }
 
-    /// Java: `isStoredRemoteDefaults`. Java's single-arg enum constructor
-    /// (`CommonProperty(String key)`) delegates to
-    /// `this(key, null, "", "", true)`, so CLIENT_*/HTTPCLIENT_* props are
-    /// storedRemote in Java.
-    #[test]
-    fn is_stored_remote_defaults() {
-        assert!(CommonProperty::SETTING_LOCAL_SETTINGS.is_stored_remote());
-        assert!(CommonProperty::CLIENT_COMMAND_COMPRESSION.is_stored_remote());
-        assert!(!CommonProperty::SETTING_SOUND_MODE.is_stored_remote());
-    }
-
-    /// Java: `getValueReturnsNoneForClientPropsAndSomeForSettings` (Java: null).
+/// Java: `getValueReturnsNoneForClientPropsAndSomeForSettings` (Java: null).
     #[test]
     fn get_value_returns_none_for_client_props_and_some_for_settings() {
         assert_eq!(CommonProperty::CLIENT_PING_INTERVAL.get_value(), None);

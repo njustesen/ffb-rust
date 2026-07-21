@@ -47,12 +47,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let r = ServerRequestSaveReplay::new(42);
-        assert_eq!(r.get_game_id(), 42);
-    }
-
-    #[test]
     fn process_saves_backup_file() {
         let dir = std::env::temp_dir().join(format!("ffb_save_replay_test_{}", std::process::id()));
         let dir_str = dir.to_string_lossy().to_string();

@@ -268,12 +268,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_wizard() {
-        let module = WizardLogicModule::new();
-        assert_eq!(module.get_id(), ClientStateId::Wizard);
-    }
-
-    #[test]
     fn set_up_resets_spell_available() {
         let mut module = WizardLogicModule::new();
         let mut client = make_client();

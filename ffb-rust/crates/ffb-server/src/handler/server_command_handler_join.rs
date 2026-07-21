@@ -171,19 +171,6 @@ mod tests {
         (ServerCommandHandlerJoin::new(gc, sm, db, dispatch_tx), dispatch_rx)
     }
 
-    #[test]
-    fn construct() {
-        let (gc, sm, db, _rx) = setup_session();
-        let _ = handler_with_dispatch(gc, sm, db);
-    }
-
-    #[tokio::test]
-    async fn get_id_is_client_join() {
-        let (gc, sm, db, _rx) = setup_session();
-        let (handler, _drx) = handler_with_dispatch(gc, sm, db);
-        assert_eq!(handler.get_id(), NetCommandId::ClientJoin);
-    }
-
     #[tokio::test]
     async fn lobby_join_sends_game_list_of_known_games() {
         let (gc, sm, db, mut rx) = setup_session();

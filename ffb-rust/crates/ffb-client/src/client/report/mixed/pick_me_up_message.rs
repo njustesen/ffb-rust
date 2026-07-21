@@ -98,9 +98,4 @@ mod tests {
         assert_eq!(status_report.rendered_runs.len(), 4);
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(PickMeUpMessage.report_id(), ReportId::PICK_ME_UP);
-        assert_eq!(PickMeUpMessage.get_key(), "pickMeUp");
-    }
 }

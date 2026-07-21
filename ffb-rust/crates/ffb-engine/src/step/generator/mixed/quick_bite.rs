@@ -55,11 +55,4 @@ mod tests {
         assert_eq!(steps[1].step_id, StepId::HandleDropPlayerContext);
     }
 
-    #[test]
-    fn params_clone() {
-        // No Params struct; verify the struct itself can be created via Default
-        let _q = QuickBite::default();
-        let steps = QuickBite::build_sequence();
-        assert_eq!(steps.len(), 3);
-    }
 }

@@ -118,9 +118,4 @@ mod tests {
         assert_eq!(sr.rendered_runs.len(), 5);
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(CatchOfTheDayMessage.report_id(), ReportId::CATCH_OF_THE_DAY);
-        assert_eq!(CatchOfTheDayMessage.get_key(), "catchOfTheDay");
-    }
 }

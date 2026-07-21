@@ -154,11 +154,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_raiding_party() {
-        assert_eq!(RaidingPartyLogicModule::new().get_id(), ClientStateId::RaidingParty);
-    }
-
-    #[test]
     fn available_actions_is_raiding_party_only() {
         let actions = RaidingPartyLogicModule::new().available_actions();
         assert_eq!(actions.len(), 1);

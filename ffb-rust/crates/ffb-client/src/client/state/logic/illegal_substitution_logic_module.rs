@@ -146,14 +146,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_illegal_substitution() {
-        assert_eq!(
-            IllegalSubstitutionLogicModule::new().get_id(),
-            ClientStateId::IllegalSubstitution
-        );
-    }
-
-    #[test]
     fn set_up_records_players_on_pitch_only() {
         let params = crate::client::client_parameters::ClientParameters::create_valid_params(&[
             "-spectator".into(),

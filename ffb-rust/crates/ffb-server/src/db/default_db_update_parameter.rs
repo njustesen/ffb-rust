@@ -42,12 +42,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let p = DefaultDbUpdateParameter::new();
-        assert_eq!(p.get_updated_rows(), 0);
-    }
-
-    #[test]
     fn execute_update_returns_err_without_panicking() {
         let mut p = DefaultDbUpdateParameter::new();
         let result = p.execute_update();

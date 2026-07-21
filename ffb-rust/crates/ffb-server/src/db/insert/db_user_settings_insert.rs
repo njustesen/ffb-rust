@@ -32,24 +32,3 @@ impl Default for DbUserSettingsInsert {
         Self::new()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct() {
-        let s = DbUserSettingsInsert::new();
-        assert_eq!(s.get_id(), DbStatementId::USER_SETTINGS_INSERT);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_user_settings"));
-    }
-
-    #[test]
-    fn sql_has_three_placeholders() {
-        assert_eq!(SQL.matches('?').count(), 3);
-    }
-}

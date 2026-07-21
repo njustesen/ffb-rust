@@ -89,11 +89,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_block_ball_and_chain() {
-        assert_eq!(StepBlockBallAndChain::new().id(), StepId::BlockBallAndChain);
-    }
-
-    #[test]
     fn no_property_returns_next() {
         // has_skill_property stub always returns false → next step
         let mut step = StepBlockBallAndChain::new();

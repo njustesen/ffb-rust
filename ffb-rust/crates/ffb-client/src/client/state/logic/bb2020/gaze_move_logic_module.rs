@@ -152,11 +152,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_gaze_move() {
-        assert_eq!(GazeMoveLogicModule::new().get_id(), ClientStateId::GazeMove);
-    }
-
-    #[test]
     fn available_actions_matches_move_logic_module() {
         let module = GazeMoveLogicModule::new();
         assert_eq!(module.available_actions().len(), MoveLogicModule::new().available_actions().len());

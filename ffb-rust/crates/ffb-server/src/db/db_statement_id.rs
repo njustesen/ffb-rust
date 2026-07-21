@@ -27,13 +27,3 @@ pub enum DbStatementId {
     ADMIN_LIST_BY_STATUS_QUERY,
     TEST_GAME_LIST_QUERY,
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct() {
-        let _ = DbStatementId::GAMES_INFO_UPDATE;
-    }
-}

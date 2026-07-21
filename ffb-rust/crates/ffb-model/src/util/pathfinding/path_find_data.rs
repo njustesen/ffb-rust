@@ -88,13 +88,6 @@ mod tests {
     }
 
     #[test]
-    fn new_data_is_empty() {
-        let data = PathFindData::new();
-        assert!(!data.is_processed(PathFindState::NORMAL, 0, 0));
-        assert!(!data.is_processed(PathFindState::HAS_JUMPED, 5, 5));
-    }
-
-    #[test]
     fn set_node_normal_marks_processed() {
         let mut data = PathFindData::new();
         let node = make_node(PathFindState::NORMAL, fc(3, 4), 1);

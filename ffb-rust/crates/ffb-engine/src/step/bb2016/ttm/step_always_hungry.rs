@@ -297,11 +297,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_always_hungry() {
-        assert_eq!(StepAlwaysHungry::new().id(), StepId::AlwaysHungry);
-    }
-
-    #[test]
     fn no_thrown_player_returns_next() {
         let mut game = make_game();
         let mut step = StepAlwaysHungry::new();

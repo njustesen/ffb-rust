@@ -141,11 +141,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_server_zap_player() {
-        assert_eq!(ClientCommandHandlerZapPlayer::new().get_id(), NetCommandId::ServerZapPlayer);
-    }
-
-    #[test]
     fn zaps_a_not_yet_zapped_player() {
         let mut game = make_game(make_player("p1"));
         let mut handler = ClientCommandHandlerZapPlayer::new();

@@ -61,10 +61,4 @@ mod tests {
         assert!(c.get_types().iter().any(|t| t.id == "extraTeamTraining"));
     }
 
-    #[test]
-    fn star_players_usage_is_star() {
-        let c = InducementCollection::new();
-        let sp = c.get_types().iter().find(|t| t.id == "starPlayers").unwrap();
-        assert!(sp.usages.contains(&Usage::STAR));
-    }
 }

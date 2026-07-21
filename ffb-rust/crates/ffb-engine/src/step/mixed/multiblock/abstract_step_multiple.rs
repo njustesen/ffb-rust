@@ -176,13 +176,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_state_is_empty() {
-        let b = AbstractStepMultiple::new();
-        assert!(b.state.id.is_none());
-        assert!(b.state.re_roll_source.is_none());
-    }
-
-    #[test]
     fn lord_of_chaos_command_sets_id() {
         let mut b = AbstractStepMultiple::new();
         let mut game = ffb_model::model::game::Game::new(

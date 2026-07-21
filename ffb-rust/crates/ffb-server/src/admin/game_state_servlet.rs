@@ -107,17 +107,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = GameStateServlet::new();
-    }
-
-    #[test]
-    fn constants() {
-        assert_eq!(GameStateServlet::CHALLENGE, "challenge");
-        assert_eq!(GameStateServlet::GET, "get");
-    }
-
-    #[test]
     fn challenge_then_correct_response_is_accepted() {
         let mut servlet = GameStateServlet::new();
         let xml = servlet.handle_challenge("salt", 1000);

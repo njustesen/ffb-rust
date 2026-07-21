@@ -302,11 +302,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_projectile_vomit() {
-        assert_eq!(StepProjectileVomit::new().id(), StepId::ProjectileVomit);
-    }
-
-    #[test]
     fn without_vomit_skill_returns_next() {
         let mut step = StepProjectileVomit {
             goto_label_on_success: "success".into(),

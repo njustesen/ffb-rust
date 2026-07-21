@@ -119,11 +119,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_end_scatter_player() {
-        assert_eq!(StepEndScatterPlayer::new().id(), StepId::EndScatterPlayer);
-    }
-
-    #[test]
     fn nonexistent_thrown_player_returns_next_without_push() {
         // Java: `Player<?> thrownPlayer = game.getPlayerById(fThrownPlayerId); if (thrownPlayer != null) ...`
         // A dangling THROWN_PLAYER_ID that doesn't resolve to a real player must

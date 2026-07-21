@@ -282,11 +282,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_block() {
-        assert_eq!(BlockLogicModule::new().get_id(), ClientStateId::Block);
-    }
-
-    #[test]
     fn available_actions_contains_block_and_move() {
         let module = BlockLogicModule::new();
         let actions = module.available_actions();

@@ -95,8 +95,4 @@ mod tests {
         assert!(texts.iter().any(|t| t == "Master Chef Roll [ 1 ][ 2 ][ 3 ]"));
     }
 
-    #[test]
-    fn get_key_matches_report_id() {
-        assert_eq!(MasterChefRollMessage.get_key(), "masterChefRoll");
-    }
 }

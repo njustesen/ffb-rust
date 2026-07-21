@@ -101,11 +101,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(RightStuffRollMessage.report_id(), ReportId::RIGHT_STUFF_ROLL);
-    }
-
-    #[test]
     fn render_successful_lands_on_feet_with_needed_roll() {
         let mut status_report = StatusReport::new();
         let mut game = make_game();

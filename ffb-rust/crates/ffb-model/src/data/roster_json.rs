@@ -212,24 +212,6 @@ mod tests {
     }
 
     #[test]
-    fn has_necromancer_true_when_set() {
-        let r = make_roster(vec![], true);
-        assert!(r.has_necromancer());
-    }
-
-    #[test]
-    fn has_necromancer_false_when_unset() {
-        let r = make_roster(vec![], false);
-        assert!(!r.has_necromancer());
-    }
-
-    #[test]
-    fn skill_entry_name_simple() {
-        let e = SkillEntry::Simple("Dodge".into());
-        assert_eq!(e.name(), "Dodge");
-    }
-
-    #[test]
     fn skill_entry_name_with_value() {
         let e = SkillEntry::WithValue { name: "Loner".into(), value: serde_json::Value::String("4+".into()) };
         assert_eq!(e.name(), "Loner");

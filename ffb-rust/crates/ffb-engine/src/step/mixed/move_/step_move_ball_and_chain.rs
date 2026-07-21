@@ -392,11 +392,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_move_ball_and_chain() {
-        assert_eq!(StepMoveBallAndChain::new().id(), StepId::MoveBallAndChain);
-    }
-
-    #[test]
     fn no_coords_returns_next() {
         let mut step = StepMoveBallAndChain::new();
         let mut game = make_game();

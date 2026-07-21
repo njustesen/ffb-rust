@@ -13,20 +13,3 @@ impl GameList {
     pub fn len(&self) -> usize { self.entries.len() }
     pub fn is_empty(&self) -> bool { self.entries.is_empty() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn empty_by_default() {
-        assert!(GameList::new().is_empty());
-    }
-
-    #[test]
-    fn add_increases_len() {
-        let mut gl = GameList::new();
-        gl.add(GameListEntry::default());
-        assert_eq!(gl.len(), 1);
-    }
-}

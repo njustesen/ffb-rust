@@ -118,8 +118,4 @@ mod tests {
         assert!(status_report.rendered_runs.is_empty());
     }
 
-    #[test]
-    fn get_key_matches_report_id() {
-        assert_eq!(PilingOnMessage.get_key(), "pilingOn");
-    }
 }

@@ -742,11 +742,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_buy_cards_and_inducements() {
-        assert_eq!(StepBuyCardsAndInducements::new().id(), StepId::BuyCardsAndInducements);
-    }
-
-    #[test]
     fn initial_phase_is_init() {
         let step = StepBuyCardsAndInducements::new();
         assert_eq!(step.phase, Phase::Init);

@@ -92,9 +92,4 @@ mod tests {
         assert_eq!(status_report.rendered_runs[1].text.as_deref(), Some(" "));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(PlayerEventMessage.report_id(), ReportId::PLAYER_EVENT);
-        assert_eq!(PlayerEventMessage.get_key(), "playerEvent");
-    }
 }

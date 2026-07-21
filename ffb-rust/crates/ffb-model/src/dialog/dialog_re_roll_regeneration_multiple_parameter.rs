@@ -28,32 +28,6 @@ impl IDialogParameter for DialogReRollRegenerationMultipleParameter {
 mod tests {
     use super::*;
     #[test]
-    fn dialog_id_is_re_roll_regeneration_multiple() {
-        assert_eq!(DialogReRollRegenerationMultipleParameter::default().get_id(), DialogId::RE_ROLL_REGENERATION_MULTIPLE);
-    }
-    #[test]
-    fn stores_player_ids_vec() {
-        let p = DialogReRollRegenerationMultipleParameter { player_ids: vec!["p1".into(), "p2".into()], ..Default::default() };
-        assert_eq!(p.get_player_ids().len(), 2);
-    }
-
-    #[test]
-    fn default_is_sensible() {
-        let p = DialogReRollRegenerationMultipleParameter::default();
-        assert!(p.get_player_ids().is_empty());
-        assert!(p.get_inducement_type().is_none());
-    }
-
-    #[test]
-    fn inducement_type_accessor() {
-        let p = DialogReRollRegenerationMultipleParameter {
-            inducement_type: Some("APOTHECARY".into()),
-            ..Default::default()
-        };
-        assert_eq!(p.get_inducement_type(), Some("APOTHECARY"));
-    }
-
-    #[test]
     fn empty_player_ids_edge_case() {
         let p = DialogReRollRegenerationMultipleParameter { player_ids: vec![], inducement_type: None, re_roll_options: vec![] };
         assert!(p.get_player_ids().is_empty());

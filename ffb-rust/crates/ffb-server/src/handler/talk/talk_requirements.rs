@@ -87,13 +87,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let _ = Client::None;
-        let _ = Environment::None;
-        let _ = Privilege::EditState;
-    }
-
-    #[test]
     fn client_none_always_met() {
         let (sm, home, _away, _spec) = setup();
         assert!(Client::None.is_met(&sm, 100, home));

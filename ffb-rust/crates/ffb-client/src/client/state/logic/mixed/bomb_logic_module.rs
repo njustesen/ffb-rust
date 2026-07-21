@@ -446,11 +446,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_bomb() {
-        assert_eq!(BombLogicModule::new().get_id(), ClientStateId::Bomb);
-    }
-
-    #[test]
     fn available_actions_has_expected_len() {
         let actions = BombLogicModule::new().available_actions();
         assert_eq!(actions.len(), 11);

@@ -10,26 +10,3 @@ pub trait Cards {
     /// Java: `allCards()` — the full set of cards in this collection.
     fn all_cards(&self) -> &[Card];
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    struct EmptyCards;
-    impl Cards for EmptyCards {
-        fn get_key(&self) -> &str { "EmptyCards" }
-        fn all_cards(&self) -> &[Card] { &[] }
-    }
-
-    #[test]
-    fn empty_cards_key_is_non_empty() {
-        let c = EmptyCards;
-        assert!(!c.get_key().is_empty());
-    }
-
-    #[test]
-    fn empty_cards_has_no_cards() {
-        let c = EmptyCards;
-        assert_eq!(c.all_cards().len(), 0);
-    }
-}

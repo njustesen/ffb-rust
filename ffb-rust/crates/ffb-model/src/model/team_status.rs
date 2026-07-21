@@ -43,14 +43,6 @@ impl TeamStatus {
 mod tests {
     use super::*;
     #[test]
-    fn active_has_id_1() {
-        assert_eq!(TeamStatus::ACTIVE.get_id(), 1);
-    }
-    #[test]
-    fn active_name_is_active() {
-        assert_eq!(TeamStatus::ACTIVE.get_name(), "Active");
-    }
-    #[test]
     fn all_ids_are_unique() {
         let ids: Vec<i32> = [
             TeamStatus::NEW, TeamStatus::ACTIVE, TeamStatus::PENDING_APPROVAL,

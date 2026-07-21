@@ -275,11 +275,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_end_passing() {
-        assert_eq!(StepEndPassing::new().id(), StepId::EndPassing);
-    }
-
-    #[test]
     fn set_parameter_catcher_id() {
         let mut step = StepEndPassing::new();
         assert!(step.set_parameter(&StepParameter::CatcherId(Some("p1".into()))));

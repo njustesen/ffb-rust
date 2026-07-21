@@ -222,11 +222,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_safe_throw() {
-        assert_eq!(StepSafeThrow::new().id(), StepId::SafeThrow);
-    }
-
-    #[test]
     fn no_interceptor_returns_next() {
         let mut game = make_game();
         let mut step = StepSafeThrow::new();

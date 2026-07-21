@@ -77,12 +77,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let h = TalkHandlerStat::new(Client::Spec, Environment::None, vec![Privilege::EditState]);
-        assert_eq!(h.required_client, Client::Spec);
-    }
-
-    #[test]
     fn handle_sets_movement_stat() {
         let h = TalkHandlerStat::default();
         let mut team = team();

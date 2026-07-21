@@ -85,23 +85,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new_has_all_defaults() {
-        let ps = PassState::new();
-        assert!(ps.catcher_id.is_none());
-        assert!(ps.interceptor_id.is_none());
-        assert!(!ps.pass_skill_used);
-        assert!(!ps.interceptor_chosen);
-        assert!(!ps.deflection_successful);
-        assert!(!ps.interception_successful);
-        assert!(!ps.allow_move_after_bomb);
-        assert!(ps.result.is_none());
-        assert!(ps.thrower_coordinate.is_none());
-        assert!(ps.old_turn_mode.is_none());
-        assert!(ps.using_blast_it.is_none());
-        assert!(ps.throw_two_bombs.is_none());
-    }
-
-    #[test]
     fn populate_copies_bombardier_fields() {
         let mut src = PassState::new();
         src.original_bombardier = Some("player1".to_string());

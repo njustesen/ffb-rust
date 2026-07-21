@@ -21,28 +21,3 @@ impl Chainsaw {
 impl Default for Chainsaw {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(Chainsaw::new().base().name(), "chainsaw");
-    }
-
-    #[test]
-    fn worth_spps_is_false() {
-        assert!(!Chainsaw::new().base().is_worth_spps());
-    }
-
-    #[test]
-    fn is_caused_by_opponent_is_true() {
-        assert!(Chainsaw::new().is_caused_by_opponent());
-    }
-
-    #[test]
-    fn is_chainsaw_is_true() {
-        assert!(Chainsaw::new().is_chainsaw());
-    }
-}

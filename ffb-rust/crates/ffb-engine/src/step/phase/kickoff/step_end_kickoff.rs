@@ -61,11 +61,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_end_kickoff() {
-        assert_eq!(StepEndKickoff::new().id(), StepId::EndKickoff);
-    }
-
-    #[test]
     fn handle_command_also_pushes_sequences() {
         let mut game = make_game();
         let mut step = StepEndKickoff::new();
@@ -78,10 +73,5 @@ mod tests {
     fn set_parameter_always_returns_false() {
         let mut step = StepEndKickoff::new();
         assert!(!step.set_parameter(&StepParameter::EndTurn(true)));
-    }
-    #[test]
-    fn default_creates_equivalent_instance() {
-        let _a = StepEndKickoff::new();
-        let _b = StepEndKickoff::default();
     }
 }

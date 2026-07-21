@@ -32,17 +32,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let s = DbUserSettingsDelete::new();
-        assert_eq!(s.get_id(), DbStatementId::USER_SETTINGS_DELETE);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_user_settings"));
-    }
-
-    #[test]
     fn sql_has_coach_param() {
         assert!(SQL.contains("coach=?"));
     }

@@ -140,11 +140,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_server_unzap_player() {
-        assert_eq!(ClientCommandHandlerUnzapPlayer::new().get_id(), NetCommandId::ServerUnzapPlayer);
-    }
-
-    #[test]
     fn unzaps_a_currently_zapped_player() {
         let mut game = make_game_with_zapped_player();
         assert!(game.player("p1").unwrap().is_zapped());

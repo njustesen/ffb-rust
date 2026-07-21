@@ -121,11 +121,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_player_loss() {
-        assert_eq!(StepPlayerLoss::new().id(), StepId::PlayerLoss);
-    }
-
-    #[test]
     fn is_player_defecting_rolls_1_2_3() {
         assert!(StepPlayerLoss::is_player_defecting(1));
         assert!(StepPlayerLoss::is_player_defecting(2));

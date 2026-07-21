@@ -77,9 +77,4 @@ mod tests {
         assert_eq!(sr.rendered_runs[2].text.as_deref(), Some("The biased referee does not spot the foul."));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(BiasedRefMessage.report_id(), ReportId::BIASED_REF);
-        assert_eq!(BiasedRefMessage.get_key(), "biasedRef");
-    }
 }

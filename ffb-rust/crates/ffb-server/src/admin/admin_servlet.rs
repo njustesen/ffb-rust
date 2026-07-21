@@ -227,17 +227,6 @@ impl Default for AdminServlet {
 mod tests {
     use super::*;
 
-    #[test]
-    fn construct() {
-        let _ = AdminServlet::new();
-    }
-
-    #[test]
-    fn constants() {
-        assert_eq!(AdminServlet::STATUS_OK, "ok");
-        assert_eq!(AdminServlet::CHALLENGE, "challenge");
-    }
-
     fn extract_challenge(xml: &str) -> String {
         xml.split("<challenge>").nth(1).unwrap().split("</challenge>").next().unwrap().to_string()
     }

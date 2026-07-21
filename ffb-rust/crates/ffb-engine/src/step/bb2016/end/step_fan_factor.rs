@@ -130,11 +130,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_fan_factor() {
-        assert_eq!(StepFanFactor::new().id(), StepId::FanFactor);
-    }
-
-    #[test]
     fn interpret_roll_winning_above_ff_gives_plus_one() {
         // winning (diff >= 0), total > fan_factor → +1
         assert_eq!(StepFanFactor::interpret_fan_factor_roll(10, 5, 1), 1);

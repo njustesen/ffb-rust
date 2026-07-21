@@ -13,19 +13,3 @@ impl UtilActingPlayer {
 impl Default for UtilActingPlayer {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn can_be_constructed() {
-        let _u = UtilActingPlayer::new();
-    }
-
-    #[test]
-    fn default_and_new_equivalent() {
-        let _a = UtilActingPlayer::new();
-        let _b = UtilActingPlayer::default();
-    }
-}

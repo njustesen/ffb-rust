@@ -97,20 +97,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let t = ServerNetworkEntropyTask::new();
-        assert_eq!(t.endpoints.len(), 3);
-    }
-
-    #[test]
-    fn endpoints_match_java() {
-        let t = ServerNetworkEntropyTask::new();
-        assert!(t.endpoints.contains(&"www.google.com".to_string()));
-        assert!(t.endpoints.contains(&"slashdot.org".to_string()));
-        assert!(t.endpoints.contains(&"192.168.0.18".to_string()));
-    }
-
-    #[test]
     fn run_feeds_fortuna_pool_zero() {
         let task = ServerNetworkEntropyTask::new();
         let fortuna = Arc::new(Mutex::new(Fortuna::new()));
@@ -133,8 +119,4 @@ mod tests {
         let _ = task.get_entropy();
     }
 
-    #[test]
-    fn default() {
-        let _ = ServerNetworkEntropyTask::default();
-    }
 }

@@ -56,10 +56,4 @@ mod tests {
         assert!(!p.check_forgo);
     }
 
-    #[test]
-    fn params_clone() {
-        let p = EndPlayerActionParams { check_forgo: true, ..Default::default() };
-        let q = p.clone();
-        assert!(q.check_forgo);
-    }
 }

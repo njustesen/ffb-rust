@@ -17,24 +17,3 @@ impl KegHit {
 impl Default for KegHit {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(KegHit::new().base().name(), "kegHit");
-    }
-
-    #[test]
-    fn worth_spps_is_false() {
-        assert!(!KegHit::new().base().is_worth_spps());
-    }
-
-    #[test]
-    fn send_to_box_reason_is_thrown_keg() {
-        use crate::model::send_to_box_reason::SendToBoxReason;
-        assert_eq!(KegHit::new().base().send_to_box_reason(), SendToBoxReason::THROWN_KEG);
-    }
-}

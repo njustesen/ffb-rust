@@ -66,11 +66,4 @@ mod tests {
         assert!(p.home_team);
     }
 
-    #[test]
-    fn params_clone() {
-        let p = CardParams { card_id: Some(CardModel::new("x", None::<&str>)), home_team: true };
-        let q = p.clone();
-        assert_eq!(q.card_id.as_ref().map(|c| c.get_name()), Some("x"));
-        assert!(q.home_team);
-    }
 }

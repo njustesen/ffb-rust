@@ -75,17 +75,6 @@ mod tests {
         Arc::new(Mutex::new(DbConnectionManager::new()))
     }
 
-    #[test]
-    fn construct() {
-        let _ = ServerCommandHandlerDeleteGame::new(setup());
-    }
-
-    #[test]
-    fn get_id_is_internal_server_delete_game() {
-        let handler = ServerCommandHandlerDeleteGame::new(setup());
-        assert_eq!(handler.get_id(), NetCommandId::InternalServerDeleteGame);
-    }
-
     /// Without a live DB pool configured, the DB delete step is skipped (`pool_ready()` is
     /// false) — the handler still extracts the command fields and returns `true`.
     #[tokio::test]

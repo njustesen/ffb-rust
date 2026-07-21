@@ -111,11 +111,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_drop_diving_tackler() {
-        assert_eq!(StepDropDivingTackler::new().id(), StepId::DropDivingTackler);
-    }
-
-    #[test]
     fn without_diving_tackle_clears_defender() {
         let mut step = StepDropDivingTackler::new();
         let mut game = make_game();

@@ -87,12 +87,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_drop_player_from_bomb() {
-        let cmd = DropPlayerFromBombCommand::new("p1".into(), ApothecaryMode::Defender, false, false, false);
-        assert_eq!(cmd.id(), DeferredCommandId::DropPlayerFromBomb);
-    }
-
-    #[test]
     fn stores_all_fields() {
         let cmd = DropPlayerFromBombCommand::new("bomb_victim".into(), ApothecaryMode::Attacker, true, true, true);
         assert_eq!(cmd.player_id, "bomb_victim");

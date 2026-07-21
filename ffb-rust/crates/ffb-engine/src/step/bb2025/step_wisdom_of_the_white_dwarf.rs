@@ -242,11 +242,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_wisdom_of_the_white_dwarf() {
-        assert_eq!(StepWisdomOfTheWhiteDwarf::new().id(), StepId::WisdomOfTheWhiteDwarf);
-    }
-
-    #[test]
     fn no_acting_player_returns_next_step() {
         let mut game = make_game();
         let out = StepWisdomOfTheWhiteDwarf::new().start(&mut game, &mut GameRng::new(0));

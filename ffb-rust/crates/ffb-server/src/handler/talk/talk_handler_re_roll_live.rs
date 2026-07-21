@@ -51,9 +51,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() { let _ = TalkHandlerReRollLive::new(); }
-
-    #[test]
     fn handle_delegates_to_base_logic() {
         let h = TalkHandlerReRollLive::new();
         let mut game = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2025);

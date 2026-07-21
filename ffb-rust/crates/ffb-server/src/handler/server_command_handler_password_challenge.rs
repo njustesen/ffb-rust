@@ -111,19 +111,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let (sm, _rx) = setup_session();
-        let _ = ServerCommandHandlerPasswordChallenge::new(sm);
-    }
-
-    #[test]
-    fn get_id_is_client_password_challenge() {
-        let (sm, _rx) = setup_session();
-        let handler = ServerCommandHandlerPasswordChallenge::new(sm);
-        assert_eq!(handler.get_id(), NetCommandId::ClientPasswordChallenge);
-    }
-
-    #[test]
     fn standalone_mode_sends_password_challenge_directly() {
         let (sm, mut rx) = setup_session();
         let handler = ServerCommandHandlerPasswordChallenge::with_fumbbl_mode(sm, false);

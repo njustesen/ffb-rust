@@ -252,11 +252,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_stab() {
-        assert_eq!(StabLogicModule::new().get_id(), ClientStateId::Stab);
-    }
-
-    #[test]
     fn available_actions_includes_extension_and_own_actions() {
         let module = StabLogicModule::new();
         let actions = module.available_actions();

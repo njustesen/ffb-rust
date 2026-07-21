@@ -102,11 +102,6 @@ mod tests {
     use ffb_protocol::commands::server_command_talk::ServerCommandTalk;
 
     #[test]
-    fn get_id_is_server_talk() {
-        assert_eq!(ClientCommandHandlerTalk::new().get_id(), NetCommandId::ServerTalk);
-    }
-
-    #[test]
     fn talk_style_none_for_empty_coach() {
         assert_eq!(ClientCommandHandlerTalk::talk_style("", "REGULAR", "Alice", "Bob"), TalkStyle::None);
     }

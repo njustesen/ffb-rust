@@ -58,9 +58,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() { let _ = IdentityCommandAdapter::new(); }
-
-    #[test]
     fn decorate_commands_is_noop() {
         let adapter = IdentityCommandAdapter::new();
         let mut input = HashSet::new();

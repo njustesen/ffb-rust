@@ -37,26 +37,4 @@ mod tests {
         assert_eq!(p.get_position_ids(), &["pos1"]);
     }
 
-    #[test]
-    fn dialog_id_is_journeymen() {
-        assert_eq!(DialogJourneymenParameter::default().get_id(), DialogId::JOURNEYMEN);
-    }
-
-    #[test]
-    fn stores_nr_of_slots() {
-        let p = DialogJourneymenParameter { nr_of_slots: 3, ..Default::default() };
-        assert_eq!(p.get_nr_of_slots(), 3);
-    }
-
-    #[test]
-    fn team_id_stored() {
-        let p = DialogJourneymenParameter { team_id: Some("home".into()), ..Default::default() };
-        assert_eq!(p.get_team_id(), Some("home"));
-    }
-
-    #[test]
-    fn transform_preserves_id() {
-        let t = DialogJourneymenParameter::default().transform();
-        assert_eq!(t.get_id(), DialogId::JOURNEYMEN);
-    }
 }

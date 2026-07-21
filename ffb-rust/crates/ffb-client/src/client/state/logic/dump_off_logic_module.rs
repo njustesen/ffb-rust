@@ -233,16 +233,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_dump_off() {
-        assert_eq!(DumpOffLogicModule::new().get_id(), ClientStateId::DumpOff);
-    }
-
-    #[test]
-    fn available_actions_is_empty() {
-        assert!(DumpOffLogicModule::new().available_actions().is_empty());
-    }
-
-    #[test]
     fn set_up_clears_pass_coordinate() {
         let mut module = DumpOffLogicModule::new();
         let mut client = make_client();

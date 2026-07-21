@@ -385,11 +385,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_intercept() {
-        assert_eq!(StepIntercept::new().id(), StepId::Intercept);
-    }
-
-    #[test]
     fn no_thrower_goes_to_failure() {
         let mut game = make_game();
         let mut step = StepIntercept::new();

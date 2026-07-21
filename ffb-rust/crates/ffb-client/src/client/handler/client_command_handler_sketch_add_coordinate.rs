@@ -53,14 +53,6 @@ mod tests {
     use ffb_protocol::commands::server_command_sketch_add_coordinate::ServerCommandSketchAddCoordinate;
 
     #[test]
-    fn get_id_is_server_sketch_add_coordinate() {
-        assert_eq!(
-            ClientCommandHandlerSketchAddCoordinate::new().get_id(),
-            NetCommandId::ServerSketchAddCoordinate
-        );
-    }
-
-    #[test]
     fn handle_net_command_returns_true_for_matching_command() {
         let mut handler = ClientCommandHandlerSketchAddCoordinate::new();
         let cmd = AnyServerCommand::ServerSketchAddCoordinate(ServerCommandSketchAddCoordinate::new(
@@ -80,12 +72,6 @@ mod tests {
             FieldCoordinate::new(1, 2),
         ));
         handler.update_sketch_manager(&cmd);
-    }
-
-    #[test]
-    fn default_constructs_a_handler() {
-        let handler = ClientCommandHandlerSketchAddCoordinate::default();
-        assert_eq!(handler.get_id(), NetCommandId::ServerSketchAddCoordinate);
     }
 
     #[test]

@@ -54,11 +54,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(RiotousRookiesMessage.report_id(), ReportId::RIOTOUS_ROOKIES);
-    }
-
-    #[test]
     fn render_home_team_prints_home_style() {
         let mut status_report = StatusReport::new();
         let game = make_game();

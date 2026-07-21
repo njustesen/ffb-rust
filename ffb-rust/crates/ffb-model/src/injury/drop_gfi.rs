@@ -17,24 +17,3 @@ impl DropGfi {
 impl Default for DropGfi {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(DropGfi::new().base().name(), "dropGfi");
-    }
-
-    #[test]
-    fn worth_spps_is_false() {
-        assert!(!DropGfi::new().base().is_worth_spps());
-    }
-
-    #[test]
-    fn send_to_box_reason_is_gfi_fail() {
-        use crate::model::send_to_box_reason::SendToBoxReason;
-        assert_eq!(DropGfi::new().base().send_to_box_reason(), SendToBoxReason::GFI_FAIL);
-    }
-}

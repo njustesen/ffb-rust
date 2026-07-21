@@ -184,11 +184,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_gaze() {
-        assert_eq!(GazeLogicModule::new().get_id(), ClientStateId::Gaze);
-    }
-
-    #[test]
     fn can_be_gazed_false_without_victim() {
         let game = make_game();
         assert!(!can_be_gazed(&game, None));

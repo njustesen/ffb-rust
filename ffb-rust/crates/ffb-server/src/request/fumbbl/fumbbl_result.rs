@@ -62,17 +62,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = FumbblResult::new();
-    }
-
-    #[test]
-    fn constants() {
-        assert_eq!(FumbblResult::XML_TAG_TEAM_ID, "teamId");
-        assert_eq!(FumbblResult::XML_TAG_TOUCHDOWNS, "touchdowns");
-    }
-
-    #[test]
     fn to_xml_wraps_in_game_result_tag() {
         let xml = FumbblResult::new().to_xml();
         assert_eq!(xml, "<gameResult></gameResult>");

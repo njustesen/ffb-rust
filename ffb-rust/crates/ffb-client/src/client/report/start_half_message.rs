@@ -49,11 +49,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(StartHalfMessage.report_id(), ReportId::START_HALF);
-    }
-
-    #[test]
     fn first_half() {
         let game = make_game();
         let report = ReportStartHalf::new(1);

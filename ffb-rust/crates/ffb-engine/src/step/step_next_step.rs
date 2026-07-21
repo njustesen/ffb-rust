@@ -38,9 +38,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_next_step() { assert_eq!(StepNextStep::new().id(), StepId::NextStep); }
-
-    #[test]
     fn set_parameter_returns_false() { assert!(!StepNextStep::new().set_parameter(&StepParameter::EndTurn(true))); }
 
     #[test]
@@ -59,10 +56,5 @@ mod tests {
         let mut rng = GameRng::new(0);
         let outcome = step.handle_command(&Action::Acknowledge, &mut game, &mut rng);
         assert_eq!(outcome.action, StepAction::NextStep);
-    }
-    #[test]
-    fn new_and_default_both_create_instance() {
-        let _a = StepNextStep::new();
-        let _b = StepNextStep::default();
     }
 }

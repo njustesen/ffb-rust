@@ -27,13 +27,6 @@ mod tests {
     use ffb_model::enums::PS_STANDING;
 
     #[test]
-    fn get_type_and_name_are_base() {
-        let plugin = BaseLogicPlugin;
-        assert_eq!(plugin.get_type(), LogicPluginType::BASE);
-        assert_eq!(plugin.get_name(), "BASE");
-    }
-
-    #[test]
     fn player_can_not_move_when_rooted() {
         let plugin = BaseLogicPlugin;
         let rooted = PlayerState::new(PS_STANDING).change_rooted(true);

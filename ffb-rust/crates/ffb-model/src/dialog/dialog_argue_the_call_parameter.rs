@@ -48,20 +48,4 @@ mod tests {
         assert!(p.get_player_ids().is_empty());
     }
 
-    #[test]
-    fn dialog_id_is_argue_the_call() {
-        assert_eq!(DialogArgueTheCallParameter::default().get_id(), DialogId::ARGUE_THE_CALL);
-    }
-
-    #[test]
-    fn stay_on_pitch_flag() {
-        let p = DialogArgueTheCallParameter { stay_on_pitch: true, ..Default::default() };
-        assert!(p.is_stay_on_pitch());
-    }
-
-    #[test]
-    fn biased_refs_stored() {
-        let p = DialogArgueTheCallParameter { biased_refs: 2, ..Default::default() };
-        assert_eq!(p.get_biased_refs(), 2);
-    }
 }

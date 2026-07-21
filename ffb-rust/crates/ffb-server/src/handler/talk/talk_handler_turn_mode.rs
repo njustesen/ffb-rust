@@ -102,12 +102,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let h = TalkHandlerTurnMode::new(Client::Spec, Environment::None, vec![Privilege::EditState]);
-        assert_eq!(h.required_client, Client::Spec);
-    }
-
-    #[test]
     fn handle_lists_modes_when_no_args() {
         let h = TalkHandlerTurnMode::default();
         let mut g = game();

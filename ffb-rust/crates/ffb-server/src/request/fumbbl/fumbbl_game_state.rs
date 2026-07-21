@@ -61,12 +61,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let g = FumbblGameState::new("http://example.com".to_string());
-        assert!(!g.is_ok());
-    }
-
-    #[test]
     fn is_ok() {
         let mut g = FumbblGameState::new(String::new());
         g.result = "ok".to_string();

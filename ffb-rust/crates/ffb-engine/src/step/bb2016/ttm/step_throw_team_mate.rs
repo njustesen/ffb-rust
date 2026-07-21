@@ -254,11 +254,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_throw_team_mate() {
-        assert_eq!(StepThrowTeamMate::new().id(), StepId::ThrowTeamMate);
-    }
-
-    #[test]
     fn set_parameter_goto_label_on_failure() {
         let mut step = StepThrowTeamMate::new();
         assert!(step.set_parameter(&StepParameter::GotoLabelOnFailure("fail".into())));

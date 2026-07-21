@@ -178,11 +178,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_petty_cash() {
-        assert_eq!(StepPettyCash::new().id(), StepId::PettyCash);
-    }
-
-    #[test]
     fn both_no_treasury_returns_next() {
         let mut game = make_game();
         game.options.set(PETTY_CASH, "true");

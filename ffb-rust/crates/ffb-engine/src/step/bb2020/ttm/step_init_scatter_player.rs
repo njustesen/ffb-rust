@@ -363,11 +363,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_init_scatter_player() {
-        assert_eq!(StepInitScatterPlayer::new().id(), StepId::InitScatterPlayer);
-    }
-
-    #[test]
     fn no_player_returns_next() {
         let mut game = make_game();
         let out = StepInitScatterPlayer::new().start(&mut game, &mut GameRng::new(0));

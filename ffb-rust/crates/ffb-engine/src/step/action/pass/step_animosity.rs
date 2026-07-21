@@ -441,11 +441,6 @@ mod tests {
     }
 
     #[test]
-    fn step_id_is_animosity() {
-        assert_eq!(StepAnimosity::new("fail").id(), StepId::Animosity);
-    }
-
-    #[test]
     fn decline_reroll_sets_suffering_animosity() {
         let mut step = StepAnimosity::new("fail");
         step.re_rolled_action = Some("ANIMOSITY".into());

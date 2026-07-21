@@ -1202,13 +1202,6 @@ mod tests {
     }
 
     #[test]
-    fn new_starts_empty() {
-        let comm = ClientCommunication::new();
-        assert!(!comm.is_stopped());
-        assert!(comm.outbox.is_empty());
-    }
-
-    #[test]
     fn stop_sets_flag_once() {
         let mut comm = ClientCommunication::new();
         comm.stop();

@@ -71,12 +71,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let h = TalkHandlerStandup::new(Client::Spec, Environment::None, vec![Privilege::EditState]);
-        assert_eq!(h.required_client, Client::Spec);
-    }
-
-    #[test]
     fn handle_stands_up_prone_player_on_pitch() {
         let h = TalkHandlerStandup::default();
         let (mut g, team) = game_with_prone_player();

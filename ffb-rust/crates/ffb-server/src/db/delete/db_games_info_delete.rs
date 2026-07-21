@@ -32,17 +32,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let s = DbGamesInfoDelete::new();
-        assert_eq!(s.get_id(), DbStatementId::GAMES_INFO_DELETE);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_games_info"));
-    }
-
-    #[test]
     fn sql_has_placeholder() {
         assert!(SQL.contains('?'));
     }

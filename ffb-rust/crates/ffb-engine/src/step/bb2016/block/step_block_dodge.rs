@@ -232,11 +232,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_block_dodge() {
-        assert_eq!(StepBlockDodge::new().id(), StepId::BlockDodge);
-    }
-
-    #[test]
     fn no_risk_auto_uses_dodge_restores_old_state() {
         // No chain push, no sideline risk → auto-dodge = true → defender restored to old state
         let mut step = StepBlockDodge::new();

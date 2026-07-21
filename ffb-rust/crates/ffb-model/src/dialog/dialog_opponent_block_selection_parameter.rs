@@ -26,24 +26,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dialog_id_is_opponent_block_selection() {
-        assert_eq!(DialogOpponentBlockSelectionParameter::default().get_id(), DialogId::OPPONENT_BLOCK_SELECTION);
-    }
-
-    #[test]
-    fn stores_team_id() {
-        let p = DialogOpponentBlockSelectionParameter { team_id: Some("t1".into()), block_rolls: vec![] };
-        assert_eq!(p.get_team_id(), Some("t1"));
-    }
-
-    #[test]
-    fn default_is_sensible() {
-        let p = DialogOpponentBlockSelectionParameter::default();
-        assert!(p.get_team_id().is_none());
-        assert!(p.get_block_rolls().is_empty());
-    }
-
-    #[test]
     fn block_rolls_stored_correctly() {
         let roll = serde_json::json!({"die": "skull"});
         let p = DialogOpponentBlockSelectionParameter { team_id: None, block_rolls: vec![roll.clone()] };
@@ -51,9 +33,4 @@ mod tests {
         assert_eq!(p.get_block_rolls()[0], roll);
     }
 
-    #[test]
-    fn none_team_id_edge_case() {
-        let p = DialogOpponentBlockSelectionParameter { team_id: None, block_rolls: vec![] };
-        assert_eq!(p.get_team_id(), None);
-    }
 }

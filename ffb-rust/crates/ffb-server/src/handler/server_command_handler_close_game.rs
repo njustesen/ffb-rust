@@ -98,19 +98,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn construct() {
-        let (gc, sm, _comm, _db) = setup();
-        let _ = ServerCommandHandlerCloseGame::new(gc, sm);
-    }
-
-    #[tokio::test]
-    async fn get_id_is_internal_server_close_game() {
-        let (gc, sm, _comm, _db) = setup();
-        let handler = ServerCommandHandlerCloseGame::new(gc, sm);
-        assert_eq!(handler.get_id(), NetCommandId::InternalServerCloseGame);
-    }
-
-    #[tokio::test]
     async fn zero_game_id_returns_true_without_touching_sessions() {
         let (gc, sm, comm, db) = setup();
         let handler = ServerCommandHandlerCloseGame::new(gc, sm);

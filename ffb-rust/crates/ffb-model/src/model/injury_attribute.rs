@@ -95,11 +95,6 @@ mod tests {
     }
 
     #[test]
-    fn get_name_av_is_av() {
-        assert_eq!(InjuryAttribute::AV.get_name(), "AV");
-    }
-
-    #[test]
     fn for_name_case_insensitive() {
         assert_eq!(InjuryAttribute::for_name("ma"), Some(InjuryAttribute::MA));
     }

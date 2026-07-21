@@ -81,22 +81,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_selected_index_is_minus_one() {
-        assert_eq!(BlockRoll::default().get_selected_index(), -1);
-    }
-
-    #[test]
     fn index_was_re_rolled() {
         let mut br = BlockRoll::default();
         br.set_re_roll_dice_indexes(vec![0, 2]);
         assert!(br.index_was_re_rolled(0));
         assert!(!br.index_was_re_rolled(1));
         assert!(br.index_was_re_rolled(2));
-    }
-
-    #[test]
-    fn re_roll_sources_initially_empty() {
-        assert!(!BlockRoll::default().has_re_rolls_left());
     }
 
     #[test]

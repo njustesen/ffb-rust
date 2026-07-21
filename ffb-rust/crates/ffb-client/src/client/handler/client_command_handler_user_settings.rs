@@ -80,11 +80,6 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
-    fn get_id_is_server_user_settings() {
-        assert_eq!(ClientCommandHandlerUserSettings::new().get_id(), NetCommandId::ServerUserSettings);
-    }
-
-    #[test]
     fn should_show_change_list_true_for_new_fingerprint_not_yet_shown() {
         assert!(ClientCommandHandlerUserSettings::should_show_change_list("v2", "v1", false));
     }

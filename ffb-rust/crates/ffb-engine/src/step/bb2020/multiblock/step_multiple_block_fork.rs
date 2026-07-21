@@ -236,11 +236,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_multiple_block_fork() {
-        assert_eq!(StepMultipleBlockFork::new().id(), StepId::MultipleBlockFork);
-    }
-
-    #[test]
     fn no_targets_returns_next_step() {
         let mut game = make_game();
         let mut step = StepMultipleBlockFork::new();

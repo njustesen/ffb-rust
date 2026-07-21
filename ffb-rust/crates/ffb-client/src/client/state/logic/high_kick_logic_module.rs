@@ -210,16 +210,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_high_kick() {
-        assert_eq!(HighKickLogicModule::new().get_id(), ClientStateId::HighKick);
-    }
-
-    #[test]
-    fn available_actions_is_empty() {
-        assert!(HighKickLogicModule::new().available_actions().is_empty());
-    }
-
-    #[test]
     fn set_up_resets_old_coordinate() {
         let mut module = HighKickLogicModule::new();
         module.old_coordinate.set(Some(FieldCoordinate::new(3, 3)));

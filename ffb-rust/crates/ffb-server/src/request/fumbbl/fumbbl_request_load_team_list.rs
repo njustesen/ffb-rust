@@ -47,12 +47,6 @@ mod tests {
     use crate::request::fumbbl::util_fumbbl_request::MockHttpClient;
 
     #[test]
-    fn construct() {
-        let r = FumbblRequestLoadTeamList::new("coach".to_string());
-        assert_eq!(r.get_coach(), "coach");
-    }
-
-    #[test]
     fn process_builds_url_and_returns_xml() {
         let client = MockHttpClient {
             response: Ok("<teamList></teamList>".to_string()),

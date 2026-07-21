@@ -190,11 +190,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_kickoff() {
-        assert_eq!(KickoffLogicModule::new().get_id(), ClientStateId::Kickoff);
-    }
-
-    #[test]
     fn field_peek_performs_when_in_away_half_and_not_kicked() {
         let module = KickoffLogicModule::new();
         assert_eq!(

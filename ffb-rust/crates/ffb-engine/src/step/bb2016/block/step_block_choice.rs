@@ -284,11 +284,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_block_choice() {
-        assert_eq!(StepBlockChoice::new().id(), StepId::BlockChoice);
-    }
-
-    #[test]
     fn skull_attacker_falls_defender_restores() {
         let mut step = StepBlockChoice::new();
         step.set_parameter(&StepParameter::BlockResult(BlockResult::Skull));

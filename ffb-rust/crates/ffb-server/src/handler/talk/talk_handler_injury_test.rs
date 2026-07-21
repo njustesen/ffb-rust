@@ -90,9 +90,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() { let _ = TalkHandlerInjuryTest::new(); }
-
-    #[test]
     #[should_panic(expected = "Java calls lastingInjury.getName")]
     fn apply_injury_without_attribute_panics_like_java_npe() {
         let h = TalkHandlerInjuryTest::new();

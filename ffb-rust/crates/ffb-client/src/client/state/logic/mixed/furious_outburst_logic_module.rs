@@ -166,11 +166,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_furious_outburst() {
-        assert_eq!(FuriousOutburstLogicModule::new().get_id(), ClientStateId::FuriousOutburst);
-    }
-
-    #[test]
     fn available_actions_is_end_move_only() {
         let actions = FuriousOutburstLogicModule::new().available_actions();
         assert_eq!(actions.len(), 1);

@@ -121,11 +121,6 @@ mod tests {
     use tokio::sync::mpsc;
 
     #[test]
-    fn construct() {
-        let _ = ServerCommandHandlerReplayStatus::default();
-    }
-
-    #[test]
     fn get_id_returns_client_replay_status() {
         let h = ServerCommandHandlerReplayStatus::default();
         assert_eq!(h.get_id(), NetCommandId::ClientReplayStatus);

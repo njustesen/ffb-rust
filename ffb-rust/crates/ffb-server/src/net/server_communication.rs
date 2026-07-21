@@ -182,16 +182,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn enqueue_ping_does_not_panic() {
-        let gc = Arc::new(Mutex::new(GameCache::new()));
-        let sm = Arc::new(Mutex::new(SessionManager::new()));
-        let sc = ServerCommunication::new(gc, sm, db());
-        sc.receive_command(ReceivedCommand::new(ClientCommand::ClientPing(ClientPing { timestamp: 42 }), 0));
-        // Give the dispatch task a chance to run
-        tokio::task::yield_now().await;
-    }
-
-    #[tokio::test]
     async fn receive_internal_reaches_socket_closed_handler_via_dispatch_loop() {
         use crate::net::commands::internal_server_command_socket_closed::InternalServerCommandSocketClosed;
         use ffb_model::model::ClientMode;
@@ -213,17 +203,6 @@ mod tests {
         }
 
         assert!(sm.lock().unwrap().get_coach_for_session(1).is_none(), "SocketClosed should have removed the session");
-    }
-
-    #[test]
-    fn sender_clone_works() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            let gc = Arc::new(Mutex::new(GameCache::new()));
-            let sm = Arc::new(Mutex::new(SessionManager::new()));
-            let sc = ServerCommunication::new(gc, sm, db());
-            let _clone = sc.sender();
-        });
     }
 
     #[tokio::test]
@@ -284,11 +263,4 @@ mod tests {
         assert_eq!(rx.try_recv().unwrap(), "tick");
     }
 
-    #[tokio::test]
-    async fn session_manager_accessor_shares_same_arc() {
-        let gc = Arc::new(Mutex::new(GameCache::new()));
-        let sm = Arc::new(Mutex::new(SessionManager::new()));
-        let sc = ServerCommunication::new(gc, Arc::clone(&sm), db());
-        assert!(Arc::ptr_eq(&sm, &sc.session_manager()));
-    }
 }

@@ -37,11 +37,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn getting_even_get_name_is_camel_case() {
-        assert_eq!(KeywordChoiceMode::GETTING_EVEN.get_name(), "gettingEven");
-    }
-
-    #[test]
     fn for_name_round_trips() {
         assert_eq!(KeywordChoiceMode::for_name("gettingEven"), Some(KeywordChoiceMode::GETTING_EVEN));
         assert_eq!(KeywordChoiceMode::for_name("invalid"), None);
@@ -51,12 +46,6 @@ mod tests {
     fn get_dialog_header_contains_player_name() {
         let header = KeywordChoiceMode::GETTING_EVEN.get_dialog_header("Griff");
         assert!(header.contains("Griff"));
-    }
-
-    #[test]
-    fn get_status_title_non_empty() {
-        assert!(!KeywordChoiceMode::GETTING_EVEN.get_status_title().is_empty());
-        assert!(!KeywordChoiceMode::GETTING_EVEN.get_status_message().is_empty());
     }
 
     #[test]

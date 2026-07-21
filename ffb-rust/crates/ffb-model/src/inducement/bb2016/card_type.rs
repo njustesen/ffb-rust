@@ -73,16 +73,6 @@ mod tests {
     use crate::inducement::card_type::CardType as ICardType;
 
     #[test]
-    fn magic_item_name() {
-        assert_eq!(CardType::MAGIC_ITEM.get_name(), "magicItem");
-    }
-
-    #[test]
-    fn dirty_trick_deck_name() {
-        assert_eq!(CardType::DIRTY_TRICK.get_deck_name(), "Dirty Tricks Deck");
-    }
-
-    #[test]
     fn both_variants_have_non_empty_ids() {
         for ct in &[CardType::MAGIC_ITEM, CardType::DIRTY_TRICK] {
             assert!(!ct.get_max_id().is_empty());

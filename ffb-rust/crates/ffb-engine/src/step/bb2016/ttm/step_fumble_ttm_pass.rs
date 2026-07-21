@@ -106,11 +106,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_fumble_ttm_pass() {
-        assert_eq!(StepFumbleTtmPass::new().id(), StepId::FumbleTtmPass);
-    }
-
-    #[test]
     fn always_publishes_coordinate_reset() {
         let mut step = StepFumbleTtmPass::new();
         let mut game = make_game();

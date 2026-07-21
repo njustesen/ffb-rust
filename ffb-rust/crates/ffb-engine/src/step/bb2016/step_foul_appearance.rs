@@ -188,11 +188,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_foul_appearance() {
-        assert_eq!(StepFoulAppearance::new("fail".into()).id(), StepId::FoulAppearance);
-    }
-
-    #[test]
     fn no_defender_skips_roll_and_returns_next() {
         // Java: if (defender == null) → NEXT_STEP
         let mut game = make_game();

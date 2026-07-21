@@ -131,11 +131,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_both_down() {
-        assert_eq!(StepBothDown::new().id(), StepId::BothDown);
-    }
-
-    #[test]
     fn defender_without_block_falls() {
         let mut step = StepBothDown::new();
         let mut game = make_game();

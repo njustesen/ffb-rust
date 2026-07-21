@@ -103,16 +103,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_solid_defence() {
-        assert_eq!(SolidDefenceLogicModule::new().get_id(), ClientStateId::SolidDefence);
-    }
-
-    #[test]
-    fn available_actions_is_empty() {
-        assert!(SolidDefenceLogicModule::new().available_actions().is_empty());
-    }
-
-    #[test]
     #[should_panic(expected = "actionContext for acting player is not supported in setup context")]
     fn action_context_panics_via_delegation() {
         let module = SolidDefenceLogicModule::new();

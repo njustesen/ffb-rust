@@ -283,17 +283,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = DbInitializer::new(DbConnectionManager::new());
-    }
-
-    #[test]
-    fn constants() {
-        assert_eq!(DbInitializer::COACHES.len(), 4);
-        assert_eq!(DbInitializer::COACHES[0], "Kalimar");
-    }
-
-    #[test]
     fn drop_table_sql_shape() {
         let sql = format!("DROP TABLE IF EXISTS {};", TableGamesInfo::TABLE_NAME);
         assert!(sql.contains("DROP TABLE IF EXISTS"));

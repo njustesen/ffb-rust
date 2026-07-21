@@ -53,14 +53,6 @@ mod tests {
     use ffb_protocol::commands::server_command_sketch_set_color::ServerCommandSketchSetColor;
 
     #[test]
-    fn get_id_is_server_sketch_set_color() {
-        assert_eq!(
-            ClientCommandHandlerSketchSetColor::new().get_id(),
-            NetCommandId::ServerSketchSetColor
-        );
-    }
-
-    #[test]
     fn handle_net_command_returns_true_with_multiple_ids() {
         let mut handler = ClientCommandHandlerSketchSetColor::new();
         let cmd = AnyServerCommand::ServerSketchSetColor(ServerCommandSketchSetColor::new(
@@ -93,9 +85,4 @@ mod tests {
         handler.update_sketch_manager(&cmd);
     }
 
-    #[test]
-    fn default_constructs_a_handler() {
-        let handler = ClientCommandHandlerSketchSetColor::default();
-        assert_eq!(handler.get_id(), NetCommandId::ServerSketchSetColor);
-    }
 }

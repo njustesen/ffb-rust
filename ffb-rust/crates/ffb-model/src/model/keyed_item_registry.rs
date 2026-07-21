@@ -19,11 +19,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn empty_by_default() {
-        assert!(KeyedItemRegistry::default().is_empty());
-    }
-
-    #[test]
     fn register_and_get() {
         let mut r = KeyedItemRegistry::default();
         r.register("key1".to_string(), "val1".to_string());

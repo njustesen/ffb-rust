@@ -276,11 +276,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_then_i_started_blastin() {
-        assert_eq!(ThenIStartedBlastinLogicModule::new().get_id(), ClientStateId::ThenIStartedBlastin);
-    }
-
-    #[test]
     fn available_actions_is_end_move_only() {
         let actions = ThenIStartedBlastinLogicModule::new().available_actions();
         assert_eq!(actions.len(), 1);

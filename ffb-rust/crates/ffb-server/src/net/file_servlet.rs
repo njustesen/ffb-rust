@@ -66,16 +66,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = FileServlet::new();
-    }
-
-    #[test]
-    fn default() {
-        let _ = FileServlet::default();
-    }
-
-    #[test]
     fn resolve_path_strips_leading_slash() {
         let root = Path::new("/var/www");
         let resolved = FileServlet::resolve_path(root, "/index.html");

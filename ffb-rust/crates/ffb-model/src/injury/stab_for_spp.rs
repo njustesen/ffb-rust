@@ -21,28 +21,3 @@ impl StabForSpp {
 impl Default for StabForSpp {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(StabForSpp::new().base().name(), "stabForSpp");
-    }
-
-    #[test]
-    fn worth_spps_is_true() {
-        assert!(StabForSpp::new().base().is_worth_spps());
-    }
-
-    #[test]
-    fn is_caused_by_opponent_is_true() {
-        assert!(StabForSpp::new().is_caused_by_opponent());
-    }
-
-    #[test]
-    fn is_stab_is_true() {
-        assert!(StabForSpp::new().is_stab());
-    }
-}

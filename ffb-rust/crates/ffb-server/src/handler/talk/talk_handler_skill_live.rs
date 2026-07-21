@@ -11,15 +11,3 @@ impl TalkHandlerSkillLive {
         TalkHandlerSkill::new(Client::Spec, Environment::None, vec![Privilege::EditState])
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct_has_live_requirements() {
-        let h = TalkHandlerSkillLive::new();
-        assert_eq!(h.required_client, Client::Spec);
-        assert_eq!(h.requires_one_privilege_of, vec![Privilege::EditState]);
-    }
-}

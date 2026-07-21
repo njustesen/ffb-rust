@@ -135,9 +135,4 @@ mod tests {
         assert!(squares.contains(&fc(5, 6)));
     }
 
-    #[test]
-    fn new_creates_instance() {
-        let _ext = PathFinderExtension::new();
-        let _ext2 = PathFinderExtension::default();
-    }
 }

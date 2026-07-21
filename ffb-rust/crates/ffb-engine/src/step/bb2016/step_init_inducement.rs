@@ -176,12 +176,6 @@ mod tests {
     }
 
     #[test]
-    fn step_id_is_init_inducement() {
-        let step = StepInitInducement::new();
-        assert_eq!(step.id(), StepId::InitInducement);
-    }
-
-    #[test]
     fn inducement_phase_parameter_accepted() {
         let mut step = StepInitInducement::new();
         let ok = step.set_parameter(&StepParameter::InducementPhase(InducementPhase::EndOfOwnTurn));

@@ -110,19 +110,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let (rsm, states, sm) = setup();
-        let _ = ServerCommandHandlerSetPreventSketching::new(rsm, states, sm);
-    }
-
-    #[test]
-    fn get_id_is_client_set_prevent_sketching() {
-        let (rsm, states, sm) = setup();
-        let handler = ServerCommandHandlerSetPreventSketching::new(rsm, states, sm);
-        assert_eq!(handler.get_id(), NetCommandId::ClientSetPreventSketching);
-    }
-
-    #[test]
     fn non_replay_session_is_a_noop() {
         let (rsm, states, sm) = setup();
         let handler = ServerCommandHandlerSetPreventSketching::new(rsm, states, sm);

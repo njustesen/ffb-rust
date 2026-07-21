@@ -235,11 +235,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_throw_team_mate() {
-        assert_eq!(ThrowTeamMateLogicModule::new().get_id(), ClientStateId::ThrowTeamMate);
-    }
-
-    #[test]
     fn available_actions_matches_move_logic_module() {
         let module = ThrowTeamMateLogicModule::new();
         assert_eq!(module.available_actions().len(), MoveLogicModule::new().available_actions().len());

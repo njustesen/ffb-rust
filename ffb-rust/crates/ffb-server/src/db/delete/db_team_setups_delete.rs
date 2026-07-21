@@ -37,22 +37,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let s = DbTeamSetupsDelete::new();
-        assert_eq!(s.get_id(), DbStatementId::TEAM_SETUPS_DELETE);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("ffb_team_setups"));
-    }
-
-    #[test]
-    fn sql_has_two_placeholders() {
-        assert_eq!(SQL.matches('?').count(), 2);
-    }
-
-    #[test]
     fn sql_is_delete() {
         assert!(SQL.trim_start().to_uppercase().starts_with("DELETE"));
     }

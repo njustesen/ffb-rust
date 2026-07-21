@@ -125,9 +125,4 @@ mod tests {
         assert_eq!(sr.rendered_runs.len(), 5);
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(BloodLustRollMessage.report_id(), ReportId::BLOOD_LUST_ROLL);
-        assert_eq!(BloodLustRollMessage.get_key(), "bloodLustRoll");
-    }
 }

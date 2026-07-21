@@ -121,11 +121,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_server_remove_player() {
-        assert_eq!(ClientCommandHandlerRemovePlayer::new().get_id(), NetCommandId::ServerRemovePlayer);
-    }
-
-    #[test]
     fn apply_to_game_removes_player_from_home_team() {
         let mut game = make_game_with_player("p1");
         assert!(game.team_home.has_player("p1"));

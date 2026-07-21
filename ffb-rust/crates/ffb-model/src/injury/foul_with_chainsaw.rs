@@ -23,28 +23,3 @@ impl FoulWithChainsaw {
 impl Default for FoulWithChainsaw {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(FoulWithChainsaw::new().base().name(), "foulWithChainsaw");
-    }
-
-    #[test]
-    fn worth_spps_is_false() {
-        assert!(!FoulWithChainsaw::new().base().is_worth_spps());
-    }
-
-    #[test]
-    fn is_foul_is_true() {
-        assert!(FoulWithChainsaw::new().is_foul());
-    }
-
-    #[test]
-    fn is_chainsaw_is_true() {
-        assert!(FoulWithChainsaw::new().is_chainsaw());
-    }
-}

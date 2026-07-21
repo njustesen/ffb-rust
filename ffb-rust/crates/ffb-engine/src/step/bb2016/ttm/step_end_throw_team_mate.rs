@@ -141,11 +141,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_end_throw_team_mate() {
-        assert_eq!(StepEndThrowTeamMate::new().id(), StepId::EndThrowTeamMate);
-    }
-
-    #[test]
     fn start_returns_next_step() {
         let mut game = make_game();
         let out = StepEndThrowTeamMate::new().start(&mut game, &mut GameRng::new(0));

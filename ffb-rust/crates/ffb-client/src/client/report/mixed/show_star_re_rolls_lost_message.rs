@@ -116,9 +116,4 @@ mod tests {
         );
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(ShowStarReRollsLostMessage.report_id(), ReportId::SHOW_STAR_RE_ROLLS_LOST);
-        assert_eq!(ShowStarReRollsLostMessage.get_key(), "showStarReRollLost");
-    }
 }

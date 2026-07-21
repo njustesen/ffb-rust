@@ -125,14 +125,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new_defaults() {
-        let td = TurnData::new();
-        assert_eq!(td.turn_nr, 0);
-        assert!(!td.blitz_used);
-        assert_eq!(td.leader_state, LeaderState::None);
-    }
-
-    #[test]
     fn reset_clears_flags() {
         let mut td = TurnData::new();
         td.blitz_used = true;

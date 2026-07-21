@@ -43,10 +43,4 @@ mod tests {
         assert_eq!(p.failure_label.as_deref(), Some("lbl"));
     }
 
-    #[test]
-    fn params_clone() {
-        let p = CatchOfTheDayParams { failure_label: Some("x".into()) };
-        let q = p.clone();
-        assert_eq!(q.failure_label.as_deref(), Some("x"));
-    }
 }

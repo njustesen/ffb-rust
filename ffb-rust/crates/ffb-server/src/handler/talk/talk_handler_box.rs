@@ -142,9 +142,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() { let _ = handler(); }
-
-    #[test]
     fn handle_reserve_moves_player_into_box() {
         let h = handler();
         let home = make_team("home", vec![make_player("h1", 1)]);

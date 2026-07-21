@@ -64,13 +64,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let gc = Arc::new(Mutex::new(GameCache::new()));
-        let sm = Arc::new(Mutex::new(SessionManager::new()));
-        let _ = ServerCommandHandler::new(gc, sm, false);
-    }
-
-    #[test]
     fn exposes_shared_game_cache() {
         let gc = Arc::new(Mutex::new(GameCache::new()));
         let sm = Arc::new(Mutex::new(SessionManager::new()));

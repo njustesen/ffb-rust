@@ -56,11 +56,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(BombExplodesAfterCatchMessage.report_id(), ReportId::BOMB_EXPLODES_AFTER_CATCH);
-    }
-
-    #[test]
     fn explodes_uses_genitive_and_home_style() {
         let mut game = make_game();
         let mut catcher = Player::default();

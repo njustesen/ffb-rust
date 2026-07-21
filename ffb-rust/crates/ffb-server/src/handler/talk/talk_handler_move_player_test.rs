@@ -82,9 +82,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() { let _ = TalkHandlerMovePlayerTest::new(); }
-
-    #[test]
     fn handle_delegates_to_base_logic() {
         let h = TalkHandlerMovePlayerTest::new();
         let team = make_team(vec![make_player("p1", 1)]);

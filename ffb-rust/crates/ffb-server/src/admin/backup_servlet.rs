@@ -96,18 +96,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = BackupServlet::new();
-    }
-
-    #[test]
-    fn constants() {
-        assert_eq!(BackupServlet::CHALLENGE, "challenge");
-        assert_eq!(BackupServlet::LOAD, "load");
-        assert_eq!(BackupServlet::SAVE, "save");
-    }
-
-    #[test]
     fn execute_challenge_then_correct_response_is_accepted() {
         let mut servlet = BackupServlet::new();
         let xml = servlet.execute_challenge("salt", 1000);

@@ -23,33 +23,3 @@ impl FoulForSpp {
 impl Default for FoulForSpp {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(FoulForSpp::new().base().name(), "foulForSpp");
-    }
-
-    #[test]
-    fn worth_spps_is_true() {
-        assert!(FoulForSpp::new().base().is_worth_spps());
-    }
-
-    #[test]
-    fn should_play_fall_sound_is_false() {
-        assert!(!FoulForSpp::new().should_play_fall_sound());
-    }
-
-    #[test]
-    fn is_foul_is_true() {
-        assert!(FoulForSpp::new().is_foul());
-    }
-
-    #[test]
-    fn is_caused_by_opponent_is_true() {
-        assert!(FoulForSpp::new().is_caused_by_opponent());
-    }
-}

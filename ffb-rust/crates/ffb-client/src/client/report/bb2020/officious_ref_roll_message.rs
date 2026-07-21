@@ -70,11 +70,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(OfficiousRefRollMessage.report_id(), ReportId::OFFICIOUS_REF_ROLL);
-    }
-
-    #[test]
     fn roll_of_one_sends_player_off() {
         let mut sr = StatusReport::new();
         let game = make_game_with_player();

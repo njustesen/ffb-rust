@@ -120,11 +120,6 @@ mod tests {
     use ffb_engine::server_sketch_manager::Sketch as ManagerSketch;
 
     #[test]
-    fn construct() {
-        let _ = ServerCommandHandlerRemoveSketches::default();
-    }
-
-    #[test]
     fn get_id_returns_client_remove_sketches() {
         let handler = ServerCommandHandlerRemoveSketches::default();
         assert_eq!(handler.get_id(), NetCommandId::ClientRemoveSketches);

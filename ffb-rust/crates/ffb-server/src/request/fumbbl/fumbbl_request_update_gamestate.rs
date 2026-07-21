@@ -56,11 +56,6 @@ mod tests {
     use crate::request::fumbbl::util_fumbbl_request::MockHttpClient;
 
     #[test]
-    fn construct() {
-        let _ = FumbblRequestUpdateGamestate::new();
-    }
-
-    #[test]
     fn process_builds_url_with_all_fields() {
         let client = MockHttpClient {
             response: Ok("<gamestate><result>ok</result></gamestate>".to_string()),

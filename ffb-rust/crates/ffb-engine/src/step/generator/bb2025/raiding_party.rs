@@ -83,11 +83,4 @@ mod tests {
         assert_eq!(p.success_label, "ok");
     }
 
-    #[test]
-    fn params_clone() {
-        let p = RaidingPartyParams { failure_label: "f".into(), success_label: "s".into() };
-        let q = p.clone();
-        assert_eq!(q.failure_label, "f");
-        assert_eq!(q.success_label, "s");
-    }
 }

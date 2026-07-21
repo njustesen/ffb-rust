@@ -59,11 +59,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(GameOptionsMessage.report_id(), ReportId::GAME_OPTIONS);
-    }
-
-    #[test]
     fn render_produces_no_output() {
         let mut status_report = StatusReport::new();
         let game = make_game();

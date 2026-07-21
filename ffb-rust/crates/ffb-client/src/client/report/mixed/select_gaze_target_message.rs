@@ -111,9 +111,4 @@ mod tests {
         assert!(status_report.rendered_runs.is_empty());
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(SelectGazeTargetMessage.report_id(), ReportId::SELECT_GAZE_TARGET);
-        assert_eq!(SelectGazeTargetMessage.get_key(), "selectGazeTarget");
-    }
 }

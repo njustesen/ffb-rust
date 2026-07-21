@@ -49,14 +49,6 @@ mod tests {
     use ffb_model::model::SoundId;
 
     #[test]
-    fn get_id_is_server_clear_sketches() {
-        assert_eq!(
-            ClientCommandHandlerClearSketches::new().get_id(),
-            NetCommandId::ServerClearSketches
-        );
-    }
-
-    #[test]
     fn handle_net_command_returns_true_for_matching_command() {
         let mut handler = ClientCommandHandlerClearSketches::new();
         let cmd = AnyServerCommand::ServerClearSketches(ServerCommandClearSketches::new());
@@ -80,9 +72,4 @@ mod tests {
         handler.update_sketch_manager(&cmd);
     }
 
-    #[test]
-    fn default_constructs_a_handler() {
-        let handler = ClientCommandHandlerClearSketches::default();
-        assert_eq!(handler.get_id(), NetCommandId::ServerClearSketches);
-    }
 }

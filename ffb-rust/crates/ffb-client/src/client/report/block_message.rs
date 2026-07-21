@@ -66,11 +66,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(BlockMessage.report_id(), ReportId::BLOCK);
-    }
-
-    #[test]
     fn renders_block_action() {
         let mut game = make_game();
         setup(&mut game);

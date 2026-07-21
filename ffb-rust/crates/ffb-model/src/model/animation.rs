@@ -33,19 +33,3 @@ impl Animation {
     pub fn get_animation_type(&self) -> Option<AnimationType> { self.animation_type }
     pub fn get_direction(&self) -> Option<Direction> { self.direction }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn default_has_no_type() {
-        assert!(Animation::new().animation_type.is_none());
-    }
-
-    #[test]
-    fn with_type_sets_type() {
-        let a = Animation::new().with_type(AnimationType::PASS);
-        assert_eq!(a.get_animation_type(), Some(AnimationType::PASS));
-    }
-}

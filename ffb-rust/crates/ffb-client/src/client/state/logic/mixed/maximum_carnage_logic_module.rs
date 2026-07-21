@@ -202,11 +202,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_maximum_carnage() {
-        assert_eq!(MaximumCarnageLogicModule::new().get_id(), ClientStateId::MaximumCarnage);
-    }
-
-    #[test]
     fn available_actions_is_end_move_only() {
         let actions = MaximumCarnageLogicModule::new().available_actions();
         assert_eq!(actions.len(), 1);

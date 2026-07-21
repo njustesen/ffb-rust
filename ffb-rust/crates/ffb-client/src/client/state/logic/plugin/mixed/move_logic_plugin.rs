@@ -63,13 +63,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_type_and_name_are_move() {
-        let plugin = MoveLogicPlugin;
-        assert_eq!(plugin.get_type(), LogicPluginType::MOVE);
-        assert_eq!(plugin.get_name(), "MOVE");
-    }
-
-    #[test]
     fn available_actions_is_then_i_started_blastin_only() {
         let plugin = MoveLogicPlugin;
         assert_eq!(

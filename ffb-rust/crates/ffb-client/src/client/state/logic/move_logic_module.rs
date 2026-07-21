@@ -739,11 +739,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_move() {
-        assert_eq!(MoveLogicModule::new().get_id(), ClientStateId::Move);
-    }
-
-    #[test]
     fn available_actions_contains_expected_variants() {
         let actions = MoveLogicModule::new().available_actions();
         assert!(actions.contains(&ClientAction::MOVE));

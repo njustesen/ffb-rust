@@ -17,24 +17,3 @@ impl TtmHitPlayer {
 impl Default for TtmHitPlayer {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(TtmHitPlayer::new().base().name(), "ttmHitPlayer");
-    }
-
-    #[test]
-    fn worth_spps_is_false() {
-        assert!(!TtmHitPlayer::new().base().is_worth_spps());
-    }
-
-    #[test]
-    fn send_to_box_reason_is_hit_by_thrown_player() {
-        use crate::model::send_to_box_reason::SendToBoxReason;
-        assert_eq!(TtmHitPlayer::new().base().send_to_box_reason(), SendToBoxReason::HIT_BY_THROWN_PLAYER);
-    }
-}

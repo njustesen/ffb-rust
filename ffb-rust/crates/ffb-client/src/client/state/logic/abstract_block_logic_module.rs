@@ -44,11 +44,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_id_is_always_block() {
-        assert_eq!(get_id(), ClientStateId::Block);
-    }
-
-    #[test]
     fn is_suffering_blood_lust_reads_flag() {
         let mut ap = ActingPlayer::new();
         assert!(!is_suffering_blood_lust(&ap));

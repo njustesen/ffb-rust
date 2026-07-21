@@ -41,11 +41,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(BombOutOfBoundsMessage.report_id(), ReportId::BOMB_OUT_OF_BOUNDS);
-    }
-
-    #[test]
     fn renders_bold_message() {
         let game = make_game();
         let report = ReportBombOutOfBounds::new();

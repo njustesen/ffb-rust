@@ -36,31 +36,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let _ = InternalServerCommandReplayLoaded::new(1, 50, "coach".to_string());
-    }
-
-    #[test]
-    fn get_id() {
-        let c = InternalServerCommandReplayLoaded::new(1, 0, "c".to_string());
-        assert_eq!(c.get_id(), "internalServerReplayLoaded");
-    }
-
-    #[test]
-    fn get_game_id() {
-        let c = InternalServerCommandReplayLoaded::new(7, 0, "c".to_string());
-        assert_eq!(c.get_game_id(), 7);
-    }
-
-    #[test]
     fn get_replay_to_command_nr() {
         let c = InternalServerCommandReplayLoaded::new(1, 42, "c".to_string());
         assert_eq!(c.get_replay_to_command_nr(), 42);
     }
 
-    #[test]
-    fn is_internal() {
-        let c = InternalServerCommandReplayLoaded::new(1, 0, "c".to_string());
-        assert!(c.is_internal());
-    }
 }

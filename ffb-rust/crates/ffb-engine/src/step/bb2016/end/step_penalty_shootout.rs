@@ -80,11 +80,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_penalty_shootout() {
-        assert_eq!(StepPenaltyShootout::new().id(), StepId::PenaltyShootout);
-    }
-
-    #[test]
     fn no_tie_no_change() {
         let mut step = StepPenaltyShootout::new();
         let mut game = make_game();

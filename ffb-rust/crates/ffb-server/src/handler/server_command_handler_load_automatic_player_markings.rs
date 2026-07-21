@@ -134,17 +134,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let _ = handler_with_client(MockHttpClient { response: Ok(String::new()) });
-    }
-
-    #[test]
-    fn get_id_is_load_automatic_player_markings() {
-        let h = handler_with_client(MockHttpClient { response: Ok(String::new()) });
-        assert_eq!(h.get_id(), NetCommandId::ClientLoadAutomaticPlayerMarkings);
-    }
-
-    #[test]
     fn build_request_carries_index_and_coach() {
         let command = ClientCommandLoadAutomaticPlayerMarkings {
             entropy: None,

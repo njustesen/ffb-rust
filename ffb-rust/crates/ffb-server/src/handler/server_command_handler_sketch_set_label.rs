@@ -122,11 +122,6 @@ mod tests {
     use ffb_engine::server_sketch_manager::Sketch as ManagerSketch;
 
     #[test]
-    fn construct() {
-        let _ = ServerCommandHandlerSketchSetLabel::default();
-    }
-
-    #[test]
     fn get_id_returns_client_sketch_set_label() {
         let handler = ServerCommandHandlerSketchSetLabel::default();
         assert_eq!(handler.get_id(), NetCommandId::ClientSketchSetLabel);

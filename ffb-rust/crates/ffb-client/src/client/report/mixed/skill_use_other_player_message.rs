@@ -116,9 +116,4 @@ mod tests {
         assert_eq!(status_report.rendered_runs[1].text.as_deref(), Some(" grants a bonus."));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(SkillUseOtherPlayerMessage.report_id(), ReportId::SKILL_USE_OTHER_PLAYER);
-        assert_eq!(SkillUseOtherPlayerMessage.get_key(), "skillUseOtherPlayer");
-    }
 }

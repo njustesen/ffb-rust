@@ -105,11 +105,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let _ = ServerCommandHandlerScheduleGame::default();
-    }
-
-    #[test]
     fn get_id_returns_internal_server_schedule_game() {
         let h = ServerCommandHandlerScheduleGame::default();
         assert_eq!(h.get_id(), NetCommandId::InternalServerScheduleGame);

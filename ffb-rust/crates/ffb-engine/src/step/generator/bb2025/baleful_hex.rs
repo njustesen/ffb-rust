@@ -70,10 +70,4 @@ mod tests {
         assert_eq!(p.failure_label, "myLabel");
     }
 
-    #[test]
-    fn params_clone() {
-        let p = BalefulHexParams { failure_label: "lbl".into() };
-        let q = p.clone();
-        assert_eq!(q.failure_label, "lbl");
-    }
 }

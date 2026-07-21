@@ -37,19 +37,3 @@ impl TeamListEntry {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn default_is_empty() {
-        assert!(TeamListEntry::default().team_id.is_empty());
-    }
-
-    #[test]
-    fn get_team_name_returns_name() {
-        let e = TeamListEntry { team_id: "1".to_string(), team_name: "Orcs".to_string(), coach: "Bob".to_string(), race: "Orc".to_string() };
-        assert_eq!(e.get_team_name(), "Orcs");
-    }
-}

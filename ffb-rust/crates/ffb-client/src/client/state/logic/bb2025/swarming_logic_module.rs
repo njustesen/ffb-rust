@@ -155,16 +155,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_swarming() {
-        assert_eq!(SwarmingLogicModule::new().get_id(), ClientStateId::Swarming);
-    }
-
-    #[test]
-    fn available_actions_is_empty() {
-        assert!(SwarmingLogicModule::new().available_actions().is_empty());
-    }
-
-    #[test]
     #[should_panic(expected = "actionContext for acting player is not supported in setup context")]
     fn action_context_panics_like_setup_logic_module() {
         let module = SwarmingLogicModule::new();

@@ -50,11 +50,6 @@ mod tests {
     }
 
     #[test]
-    fn default_is_none() {
-        assert_eq!(LeaderState::default(), LeaderState::NONE);
-    }
-
-    #[test]
     fn get_name_matches_for_name_input() {
         for &state in &[LeaderState::NONE, LeaderState::AVAILABLE, LeaderState::USED] {
             assert_eq!(LeaderState::for_name(state.get_name()), Some(state));

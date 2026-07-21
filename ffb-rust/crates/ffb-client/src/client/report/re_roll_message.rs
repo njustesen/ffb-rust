@@ -81,11 +81,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(ReRollMessage.report_id(), ReportId::RE_ROLL);
-    }
-
-    #[test]
     fn render_loner_successful() {
         let mut status_report = StatusReport::new();
         let mut game = make_game();

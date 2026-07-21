@@ -276,11 +276,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_select_blitz_target() {
-        assert_eq!(SelectBlitzTargetLogicModule::new().get_id(), ClientStateId::SelectBlitzTarget);
-    }
-
-    #[test]
     fn available_actions_matches_java() {
         let actions = SelectBlitzTargetLogicModule::new().available_actions();
         assert!(actions.contains(&ClientAction::END_MOVE));

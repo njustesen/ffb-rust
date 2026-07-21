@@ -15,21 +15,6 @@ impl IDialogParameter for DialogDefenderActionParameter {
 mod tests {
     use super::*;
     #[test]
-    fn dialog_id_is_defender_action() {
-        assert_eq!(DialogDefenderActionParameter.get_id(), DialogId::DEFENDER_ACTION);
-    }
-    #[test]
-    fn transform_preserves_id() {
-        assert_eq!(DialogDefenderActionParameter.transform().get_id(), DialogId::DEFENDER_ACTION);
-    }
-
-    #[test]
-    fn default_is_sensible() {
-        let p = DialogDefenderActionParameter::default();
-        assert_eq!(p.get_id(), DialogId::DEFENDER_ACTION);
-    }
-
-    #[test]
     fn serde_round_trip() {
         let p = DialogDefenderActionParameter;
         let json = serde_json::to_string(&p).unwrap();
@@ -37,10 +22,4 @@ mod tests {
         assert_eq!(back.get_id(), DialogId::DEFENDER_ACTION);
     }
 
-    #[test]
-    fn clone_preserves_id() {
-        let p = DialogDefenderActionParameter;
-        let cloned = p.clone();
-        assert_eq!(cloned.get_id(), DialogId::DEFENDER_ACTION);
-    }
 }

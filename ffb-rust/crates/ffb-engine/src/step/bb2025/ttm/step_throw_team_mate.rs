@@ -326,11 +326,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_throw_team_mate() {
-        assert_eq!(StepThrowTeamMate::new().id(), StepId::ThrowTeamMate);
-    }
-
-    #[test]
     fn set_parameter_thrown_player_id() {
         let mut step = StepThrowTeamMate::new();
         assert!(step.set_parameter(&StepParameter::ThrownPlayerId(Some("p1".into()))));

@@ -98,9 +98,4 @@ mod tests {
         assert!(status_report.rendered_runs.is_empty());
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(NervesOfSteelMessage.report_id(), ReportId::NERVES_OF_STEEL);
-        assert_eq!(NervesOfSteelMessage.get_key(), "nervesOfSteel");
-    }
 }

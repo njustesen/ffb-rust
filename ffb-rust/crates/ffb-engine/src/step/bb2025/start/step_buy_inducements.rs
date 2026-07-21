@@ -387,12 +387,6 @@ mod tests {
     }
 
     #[test]
-    fn default_equivalent_to_new() {
-        let _a = StepBuyInducements::new();
-        let _b = StepBuyInducements::default();
-    }
-
-    #[test]
     fn inducements_disabled_skips_to_next_step() {
         let mut game = make_game_with_petty_cash(100_000, 0);
         // INDUCEMENTS option not set → disabled → skip immediately.

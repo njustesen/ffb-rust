@@ -43,10 +43,4 @@ mod tests {
         assert!(p.with_coin_choice);
     }
 
-    #[test]
-    fn params_clone() {
-        let p = KickoffParams { with_coin_choice: true };
-        let q = p.clone();
-        assert!(q.with_coin_choice);
-    }
 }

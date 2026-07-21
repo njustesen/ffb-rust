@@ -89,11 +89,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(FoulAppearanceRollMessage.report_id(), ReportId::FOUL_APPEARANCE_ROLL);
-    }
-
-    #[test]
     fn successful_roll_without_defender() {
         let mut status_report = StatusReport::new();
         let mut game = make_game();

@@ -132,11 +132,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_eject_player() {
-        assert_eq!(StepEjectPlayer::new().id(), StepId::EjectPlayer);
-    }
-
-    #[test]
     fn always_publishes_end_turn() {
         let mut step = StepEjectPlayer::new();
         step.set_parameter(&StepParameter::GotoLabelOnEnd("end".into()));

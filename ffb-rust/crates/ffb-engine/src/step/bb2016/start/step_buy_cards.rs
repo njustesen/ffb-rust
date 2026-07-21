@@ -116,11 +116,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_buy_cards() {
-        assert_eq!(StepBuyCards::new().id(), StepId::BuyCards);
-    }
-
-    #[test]
     fn start_returns_next_step() {
         let mut game = make_game();
         let mut step = StepBuyCards::new();
@@ -150,12 +145,6 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::InducementGoldAway(50_000))));
     }
-    #[test]
-    fn new_and_default_create_equivalent_instances() {
-        let _a = StepBuyCards::new();
-        let _b = StepBuyCards::default();
-    }
-
     /// Java: even in the (untranslated CardDeck) no-op branch, StepBuyCards must still
     /// compute and publish real inducement gold from team-value differences
     /// (StepBuyCards.executeStep lines 146-151), not leave it at 0 — since

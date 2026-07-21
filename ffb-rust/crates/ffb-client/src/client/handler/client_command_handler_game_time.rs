@@ -69,11 +69,6 @@ mod tests {
     use ffb_protocol::commands::server_command_game_time::ServerCommandGameTime;
 
     #[test]
-    fn get_id_is_server_game_time() {
-        assert_eq!(ClientCommandHandlerGameTime::new().get_id(), NetCommandId::ServerGameTime);
-    }
-
-    #[test]
     fn handle_net_command_records_game_and_turn_time() {
         let mut handler = ClientCommandHandlerGameTime::new();
         let cmd = AnyServerCommand::ServerGameTime(ServerCommandGameTime::new(60_000, 30_000));
@@ -102,9 +97,4 @@ mod tests {
         assert!(handler.handle_net_command(&cmd, ClientCommandHandlerMode::QUEUING));
     }
 
-    #[test]
-    fn default_constructs_a_handler_with_no_update_yet() {
-        let handler = ClientCommandHandlerGameTime::default();
-        assert_eq!(handler.last_update, None);
-    }
 }

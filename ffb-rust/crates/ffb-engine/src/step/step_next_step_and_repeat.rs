@@ -51,11 +51,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_next_step_and_repeat() {
-        assert_eq!(StepNextStepAndRepeat::new().id(), StepId::NextStepAndRepeat);
-    }
-
-    #[test]
     fn start_returns_next_step_and_repeat_action() {
         let out = StepNextStepAndRepeat::new().start(&mut make_game(), &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStepAndRepeat);
@@ -64,11 +59,6 @@ mod tests {
     #[test]
     fn set_parameter_returns_false() {
         assert!(!StepNextStepAndRepeat::new().set_parameter(&StepParameter::EndTurn(true)));
-    }
-    #[test]
-    fn new_and_default_create_equivalent_instances() {
-        let _a = StepNextStepAndRepeat::new();
-        let _b = StepNextStepAndRepeat::default();
     }
     #[test]
     fn handle_command_returns_next_step_action() {

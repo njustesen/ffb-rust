@@ -49,9 +49,6 @@ mod tests {
     use ffb_model::types::FieldCoordinate;
 
     #[test]
-    fn construct() { let _ = TalkHandlerMoveBallLive::new(); }
-
-    #[test]
     fn handle_delegates_to_base_logic() {
         let h = TalkHandlerMoveBallLive::new();
         let sm = SessionManager::new();

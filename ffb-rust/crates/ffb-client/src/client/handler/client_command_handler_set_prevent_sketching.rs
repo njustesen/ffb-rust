@@ -67,14 +67,6 @@ mod tests {
     use ffb_protocol::commands::server_command_sound::ServerCommandSound;
 
     #[test]
-    fn get_id_is_server_set_prevent_sketching() {
-        assert_eq!(
-            ClientCommandHandlerSetPreventSketching::new().get_id(),
-            NetCommandId::ServerSetPreventSketching
-        );
-    }
-
-    #[test]
     fn status_message_for_local_coach() {
         assert_eq!(
             ClientCommandHandlerSetPreventSketching::status_message("Alice", "Alice", true),

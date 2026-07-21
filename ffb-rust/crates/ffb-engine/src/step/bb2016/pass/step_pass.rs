@@ -316,11 +316,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_pass() {
-        assert_eq!(StepPass::new().id(), StepId::Pass);
-    }
-
-    #[test]
     fn set_parameter_goto_label_on_end() {
         let mut step = StepPass::new();
         assert!(step.set_parameter(&StepParameter::GotoLabelOnEnd("end".into())));

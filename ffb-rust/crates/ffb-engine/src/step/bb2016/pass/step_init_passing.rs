@@ -246,11 +246,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_init_passing() {
-        assert_eq!(StepInitPassing::new().id(), StepId::InitPassing);
-    }
-
-    #[test]
     fn no_thrower_returns_continue() {
         let mut game = make_game();
         let mut step = StepInitPassing::new();

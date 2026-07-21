@@ -186,11 +186,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() {
-        let _ = ServerCommandHandlerReplay::default();
-    }
-
-    #[test]
     fn get_id_returns_client_replay() {
         let h = ServerCommandHandlerReplay::default();
         assert_eq!(h.get_id(), NetCommandId::ClientReplay);

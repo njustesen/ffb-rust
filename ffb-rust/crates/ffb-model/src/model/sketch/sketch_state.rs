@@ -15,18 +15,3 @@ impl Default for SketchState {
 impl SketchState {
     pub fn is_done(self) -> bool { self == Self::Done }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn default_is_idle() {
-        assert_eq!(SketchState::default(), SketchState::Idle);
-    }
-
-    #[test]
-    fn done_is_done() {
-        assert!(SketchState::Done.is_done());
-    }
-}

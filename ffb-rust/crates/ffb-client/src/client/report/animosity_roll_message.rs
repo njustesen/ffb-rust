@@ -71,11 +71,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(AnimosityRollMessage.report_id(), ReportId::ANIMOSITY_ROLL);
-    }
-
-    #[test]
     fn success_not_rerolled_shows_needed_roll() {
         let mut game = make_game();
         setup_player(&mut game, PlayerGender::Male);

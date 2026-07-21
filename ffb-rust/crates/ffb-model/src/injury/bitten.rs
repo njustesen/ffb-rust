@@ -17,24 +17,3 @@ impl Bitten {
 impl Default for Bitten {
     fn default() -> Self { Self::new() }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn name_is_correct() {
-        assert_eq!(Bitten::new().base().name(), "bitten");
-    }
-
-    #[test]
-    fn worth_spps_is_false() {
-        assert!(!Bitten::new().base().is_worth_spps());
-    }
-
-    #[test]
-    fn send_to_box_reason_is_bitten() {
-        use crate::model::send_to_box_reason::SendToBoxReason;
-        assert_eq!(Bitten::new().base().send_to_box_reason(), SendToBoxReason::BITTEN);
-    }
-}

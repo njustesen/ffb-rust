@@ -68,11 +68,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_consume_parameter() {
-        assert_eq!(StepConsumeParameter::new().id(), StepId::ConsumeParameter);
-    }
-
-    #[test]
     fn start_returns_next_step() {
         let mut step = StepConsumeParameter::new();
         let mut game = make_game();

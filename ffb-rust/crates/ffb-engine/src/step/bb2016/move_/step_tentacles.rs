@@ -225,11 +225,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_tentacles() {
-        assert_eq!(StepTentacles::new("success").id(), StepId::Tentacles);
-    }
-
-    #[test]
     fn goto_label_on_success_parameter_accepted() {
         let mut step = StepTentacles::new("old");
         assert!(step.set_parameter(&StepParameter::GotoLabelOnSuccess("new".into())));

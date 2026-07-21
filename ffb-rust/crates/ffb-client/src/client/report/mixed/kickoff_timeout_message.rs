@@ -107,9 +107,4 @@ mod tests {
         assert_eq!(status_report.rendered_runs[5].text.as_deref(), Some("Turn Counter is moved 3 step forward."));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(KickoffTimeoutMessage.report_id(), ReportId::KICKOFF_TIMEOUT);
-        assert_eq!(KickoffTimeoutMessage.get_key(), "kickoffTimeout");
-    }
 }

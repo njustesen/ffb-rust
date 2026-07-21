@@ -395,11 +395,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_pass() {
-        assert_eq!(PassLogicModule::new().get_id(), ClientStateId::Pass);
-    }
-
-    #[test]
     fn available_actions_contains_hail_mary_pass() {
         let actions = PassLogicModule::new().available_actions();
         assert!(actions.contains(&ClientAction::HAIL_MARY_PASS));

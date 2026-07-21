@@ -76,11 +76,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(HandOverMessage.report_id(), ReportId::HAND_OVER);
-    }
-
-    #[test]
     fn renders_thrower_hands_over_to_catcher() {
         let mut status_report = StatusReport::new();
         let mut game = make_game();

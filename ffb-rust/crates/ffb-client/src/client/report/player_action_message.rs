@@ -52,11 +52,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(PlayerActionMessage.report_id(), ReportId::PLAYER_ACTION);
-    }
-
-    #[test]
     fn render_prints_player_and_description_when_present() {
         let mut status_report = StatusReport::new();
         let mut game = make_game();

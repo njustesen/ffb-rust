@@ -111,19 +111,3 @@ impl Default for DbGameListQueryOpenGamesByCoach {
         Self::new()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn construct() {
-        let q = DbGameListQueryOpenGamesByCoach::new();
-        assert_eq!(q.get_id(), DbStatementId::GAME_LIST_QUERY_OPEN_GAMES_BY_COACH);
-    }
-
-    #[test]
-    fn sql_constant() {
-        assert!(SQL.contains("coach_home=?"));
-    }
-}

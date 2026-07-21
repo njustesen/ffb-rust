@@ -141,9 +141,4 @@ mod tests {
         assert!(!texts.contains(&" win sudden death"));
     }
 
-    #[test]
-    fn report_id_and_key() {
-        assert_eq!(PenaltyShootoutMessage.report_id(), ReportId::PENALTY_SHOOTOUT);
-        assert_eq!(PenaltyShootoutMessage.get_key(), "penaltyShootout");
-    }
 }

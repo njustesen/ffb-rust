@@ -105,19 +105,6 @@ mod tests {
         )
     }
 
-    #[test]
-    fn construct() {
-        let (sm, dcm) = setup();
-        let _ = ServerCommandHandlerUserSettings::new(sm, dcm);
-    }
-
-    #[test]
-    fn get_id_is_client_user_settings() {
-        let (sm, dcm) = setup();
-        let handler = ServerCommandHandlerUserSettings::new(sm, dcm);
-        assert_eq!(handler.get_id(), NetCommandId::ClientUserSettings);
-    }
-
     #[tokio::test]
     async fn unknown_session_is_a_noop() {
         let (sm, dcm) = setup();

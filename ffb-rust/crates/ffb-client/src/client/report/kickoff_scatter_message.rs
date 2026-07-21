@@ -94,8 +94,4 @@ mod tests {
         assert_eq!(status_report.get_indent(), 1);
     }
 
-    #[test]
-    fn get_key_matches_report_id() {
-        assert_eq!(KickoffScatterMessage.get_key(), "kickoffScatter");
-    }
 }

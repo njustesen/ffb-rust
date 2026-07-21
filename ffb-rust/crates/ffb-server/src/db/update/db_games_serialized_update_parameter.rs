@@ -59,24 +59,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let p = DbGamesSerializedUpdateParameter::new(1);
-        assert_eq!(p.get_id(), 1);
-        assert_eq!(p.length(), 0);
-        assert_eq!(p.get_updated_rows(), 0);
-        assert!(p.data.is_empty());
-    }
-
-    #[test]
     fn gzip_returns_stored_bytes() {
         let mut p = DbGamesSerializedUpdateParameter::new(2);
         p.data = vec![1, 2, 3];
         assert_eq!(p.gzip().unwrap(), vec![1, 2, 3]);
     }
 
-    #[test]
-    fn sql_targets_correct_table() {
-        assert!(SQL.contains("ffb_games_serialized"));
-        assert!(SQL.to_uppercase().contains("UPDATE"));
-    }
 }

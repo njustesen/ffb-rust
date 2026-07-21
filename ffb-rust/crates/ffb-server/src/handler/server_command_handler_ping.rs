@@ -92,13 +92,6 @@ mod tests {
     }
 
     #[test]
-    fn get_id_is_client_ping() {
-        let (sm, rsm, _rx) = setup();
-        let handler = ServerCommandHandlerPing::new(sm, rsm);
-        assert_eq!(handler.get_id(), NetCommandId::ClientPing);
-    }
-
-    #[test]
     fn handle_command_updates_last_ping_and_returns_true() {
         let (sm, rsm, _rx) = setup();
         let handler = ServerCommandHandlerPing::new(Arc::clone(&sm), rsm);

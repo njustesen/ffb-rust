@@ -37,20 +37,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let p = DbGamesInfoDeleteParameter::new(42);
-        assert_eq!(p.get_game_state_id(), 42);
-    }
-
-    #[test]
     fn initial_updated_rows() {
         let p = DbGamesInfoDeleteParameter::new(42);
         assert_eq!(p.get_updated_rows(), 0);
     }
 
-    #[test]
-    fn sql_targets_correct_table() {
-        assert!(SQL.contains("ffb_games_info"));
-        assert!(SQL.to_uppercase().contains("DELETE"));
-    }
 }

@@ -79,11 +79,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_init_kickoff() {
-        assert_eq!(StepInitKickoff::new().id(), StepId::InitKickoff);
-    }
-
-    #[test]
     fn start_returns_next_step_and_pushes_two_inducement_sequences() {
         let mut step = StepInitKickoff::new();
         let mut game = make_game();

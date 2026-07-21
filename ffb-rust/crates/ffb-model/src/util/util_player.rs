@@ -1111,7 +1111,6 @@ mod tests {
 
     // PS_STUNNED base = 0x4; PS_PRONE base = 0x3 (see enums/player.rs constants)
     const STUNNED: PlayerState = PlayerState(crate::enums::PS_STUNNED);
-    const PRONE_INACTIVE: PlayerState = PlayerState(crate::enums::PS_PRONE);
 
     #[test]
     fn refresh_players_stunned_on_active_team_becomes_prone() {

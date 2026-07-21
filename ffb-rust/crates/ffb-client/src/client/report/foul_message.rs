@@ -77,11 +77,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(FoulMessage.report_id(), ReportId::FOUL);
-    }
-
-    #[test]
     fn renders_attacker_fouls_defender() {
         let mut status_report = StatusReport::new();
         let mut game = make_game();

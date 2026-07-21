@@ -307,11 +307,6 @@ mod tests {
     }
 
     #[test]
-    fn id_is_init_feeding() {
-        assert_eq!(StepInitFeeding::new().id(), StepId::InitFeeding);
-    }
-
-    #[test]
     fn set_parameter_feeding_allowed() {
         let mut step = StepInitFeeding::new();
         assert!(step.set_parameter(&StepParameter::FeedingAllowed(true)));

@@ -82,11 +82,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(KickoffOfficiousRefMessage.report_id(), ReportId::KICKOFF_OFFICIOUS_REF);
-    }
-
-    #[test]
     fn renders_rolls_for_both_teams() {
         let mut sr = StatusReport::new();
         let game = make_game();

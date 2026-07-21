@@ -48,53 +48,6 @@ impl IDialogParameter for DialogReRollPropertiesParameter {
 mod tests {
     use super::*;
     #[test]
-    fn dialog_id_is_re_roll_properties() {
-        assert_eq!(DialogReRollPropertiesParameter::default().get_id(), DialogId::RE_ROLL_PROPERTIES);
-    }
-    #[test]
-    fn stores_minimum_roll_and_fumble() {
-        let p = DialogReRollPropertiesParameter { minimum_roll: 3, fumble: true, ..Default::default() };
-        assert_eq!(p.get_minimum_roll(), 3);
-        assert!(p.is_fumble());
-    }
-
-    #[test]
-    fn default_is_sensible() {
-        let p = DialogReRollPropertiesParameter::default();
-        assert!(p.get_player_id().is_none());
-        assert!(p.get_default_value_key().is_none());
-        assert!(p.get_re_rolled_action().is_none());
-        assert_eq!(p.get_minimum_roll(), 0);
-        assert!(!p.is_fumble());
-        assert!(p.get_messages().is_empty());
-        assert!(p.get_re_roll_properties().is_empty());
-        assert!(p.get_menu_property().is_none());
-    }
-
-    #[test]
-    fn messages_and_player_id_stored() {
-        let p = DialogReRollPropertiesParameter {
-            player_id: Some("p1".into()),
-            messages: vec!["msg1".into(), "msg2".into()],
-            ..Default::default()
-        };
-        assert_eq!(p.get_player_id(), Some("p1"));
-        assert_eq!(p.get_messages().len(), 2);
-        assert_eq!(p.get_messages()[0], "msg1");
-    }
-
-    #[test]
-    fn menu_property_and_default_value_key() {
-        let p = DialogReRollPropertiesParameter {
-            menu_property: Some("prop_key".into()),
-            default_value_key: Some("def_key".into()),
-            ..Default::default()
-        };
-        assert_eq!(p.get_menu_property(), Some("prop_key"));
-        assert_eq!(p.get_default_value_key(), Some("def_key"));
-    }
-
-    #[test]
     fn has_property_true_when_present() {
         let p = DialogReRollPropertiesParameter {
             re_roll_properties: vec![ReRollProperty::Trr],

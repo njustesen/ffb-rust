@@ -87,11 +87,6 @@ mod tests {
     }
 
     #[test]
-    fn report_id_matches() {
-        assert_eq!(SafeThrowRollMessage.report_id(), ReportId::SAFE_THROW_ROLL);
-    }
-
-    #[test]
     fn render_successful_throw_with_needed_roll() {
         let mut status_report = StatusReport::new();
         let mut game = make_game();

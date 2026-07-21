@@ -71,9 +71,6 @@ mod tests {
     }
 
     #[test]
-    fn construct() { let _ = handler(); }
-
-    #[test]
     fn handle_sets_home_team_rerolls() {
         let h = handler();
         let mut game = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2025);

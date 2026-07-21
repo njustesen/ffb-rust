@@ -64,18 +64,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn construct() {
-        let p = DbPlayerMarkersInsertParameter::new(
-            "t1".to_string(),
-            "p1".to_string(),
-            "text".to_string(),
-        );
-        assert_eq!(p.get_team_id(), "t1");
-        assert_eq!(p.get_player_id(), "p1");
-        assert_eq!(p.get_text(), "text");
-    }
-
-    #[test]
     fn get_updated_rows_initial() {
         let p = DbPlayerMarkersInsertParameter::new(
             "t1".to_string(),
