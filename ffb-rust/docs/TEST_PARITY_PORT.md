@@ -108,12 +108,12 @@ MultiBlock, RaidingParty, SelectBlitzTarget (17 files, ~110 methods) + the 10 pr
 **bb2025 generators: COMPLETE** (all 31 incl. the formerly-deferred special_effect,
 throw_team_mate, activation_sequence_builder, ScatterPlayer). ffb-server ~2,611+.
 
-**bb2020 generators: IN PROGRESS.** Done: baleful_hex, catch_of_the_day, raiding_party,
-treacherous. Remaining bb2020 (22): black_ink, blitz_block, blitz_move, block, bomb, end_game,
-end_player_action, foul, furious_outburst, look_into_my_eyes, move_, multi_block, pass,
-scatter_player, select, select_blitz_target, select_gaze_target, special_effect, start_game,
-then_i_started_blastin, throw_keg, throw_team_mate.
-Then: bb2016 generators (15), step-logic (bulk), client state/logic (25), server remainder.
+**bb2020 generators: COMPLETE** (all 25). Added edition-aware GameFixture overload
+`createGameState(playersPerTeam, Rules)` for edition-gated steps. ffb-server 2,749.
+**bb2016 generators: NEXT** (15). Then step-logic (bulk), client state/logic (25), server remainder.
+Reusable: nested-field reads via readField(readField(step,"state"),"goToLabelOnFailure") for
+StepBloodLust; CloudBurster hook field is fGotoLabelOnFailure; SpecialEffect generator/enum
+name clash → qualify the enum as com.fumbbl.ffb.SpecialEffect.
 
 Port recipe (proven): read Rust `#[cfg(test)]` in
 crates/ffb-engine/src/step/generator/<ed>/<f>.rs → read Java pushSequence + SequenceParams
