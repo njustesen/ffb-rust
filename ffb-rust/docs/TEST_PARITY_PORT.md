@@ -120,8 +120,17 @@ Highest-value approachable targets (utilities/steps with many behavioral tests, 
 setup): step/util_server_injury.rs (42), mixed/shared/step_animal_savagery.rs (42),
 bb2025/move_/step_end_moving.rs (35), bb2025/shared/step_apothecary.rs (27),
 bb2025/block/step_block_roll.rs (27), bb2025/shared/step_end_selecting.rs (24).
-Java totals now ~5,971 (ffb-common 1,939 / client-logic 1,208 / server 2,831 minus small);
-Rust ~14,530.
+Java totals now ~5,992 (ffb-common 1,939 / client-logic 1,208 / server ~2,852); Rust ~14,530.
+
+**Step-logic port PATTERN PROVEN** (StepEndSelecting bb2025, 21 tests, committed): in the Java
+test, `IStep step = GameFixture.createStep(gs, StepId.X); step.setParameter(StepParameter.from(
+StepParameterKey.KEY, value)); GameFixture.startStep(step);` then read pushed sequences via
+`GeneratorTestSupport.sequence(gs)` and step fields via `readField`. Notes: Java often reads more
+state at push time than Rust (e.g. block/blitz dispatch needs USING_STAB set; move dispatch needs
+an on-pitch acting player via placePlayer+setActingPlayer) — set that state, it's not a bug.
+`PlayerAction.FURIOUS_OUTPBURST` is misspelled in Java. Done: bb2025/shared/step_end_selecting.
+Next tractable step-logic (transition/param-driven): other shared dispatch steps, then the
+state+dice-heavy ones (block_roll, end_moving, apothecary) using installScriptedDice.
 Reusable: nested-field reads via readField(readField(step,"state"),"goToLabelOnFailure") for
 StepBloodLust; CloudBurster hook field is fGotoLabelOnFailure; SpecialEffect generator/enum
 name clash → qualify the enum as com.fumbbl.ffb.SpecialEffect.
