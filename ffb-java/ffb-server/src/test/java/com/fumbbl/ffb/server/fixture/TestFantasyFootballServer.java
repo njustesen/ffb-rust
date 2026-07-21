@@ -63,7 +63,10 @@ public class TestFantasyFootballServer extends FantasyFootballServer {
 	private final DbUpdater dbUpdater;
 	private final GameCache gameCache;
 	private final SessionManager sessionManager;
-	private final Fortuna fortuna = new Fortuna();
+	// A ScriptedFortuna (subclass of Fortuna) so tests can install a deterministic
+	// roll sequence via GameFixture.installScriptedDice(...). With no script loaded
+	// it behaves exactly like the real random Fortuna.
+	private final ScriptedFortuna fortuna = new ScriptedFortuna();
 
 	public TestFantasyFootballServer() {
 		super(ServerMode.STANDALONE, new Properties());

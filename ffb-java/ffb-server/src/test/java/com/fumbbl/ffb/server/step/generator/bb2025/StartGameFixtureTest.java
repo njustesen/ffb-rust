@@ -2,9 +2,9 @@ package com.fumbbl.ffb.server.step.generator.bb2025;
 
 import com.fumbbl.ffb.server.GameState;
 import com.fumbbl.ffb.server.fixture.GameFixture;
+import com.fumbbl.ffb.server.fixture.GeneratorTestSupport;
 import com.fumbbl.ffb.server.step.IStep;
 import com.fumbbl.ffb.server.step.StepId;
-import com.fumbbl.ffb.server.step.generator.GeneratorTestSupport;
 import com.fumbbl.ffb.server.step.generator.SequenceGenerator;
 
 import org.junit.jupiter.api.BeforeEach;

@@ -1,4 +1,4 @@
-package com.fumbbl.ffb.server.step.generator;
+package com.fumbbl.ffb.server.fixture;
 
 import com.fumbbl.ffb.server.GameState;
 import com.fumbbl.ffb.server.step.IStep;
@@ -9,6 +9,10 @@ import java.lang.reflect.Field;
 /**
  * Shared helpers for porting the Rust generator push-order tests
  * ({@code ffb-rust/crates/ffb-engine/src/step/generator/**}).
+ *
+ * <p>Lives in the {@code fixture} package (alongside {@link GameFixture}) so any
+ * {@code step/generator/**} test package can reuse it without a cross-package
+ * dependency on {@code step.generator}.
  *
  * <p>A Rust generator test builds the sequence with {@code Xxx::build_sequence(&params)}
  * and inspects the returned {@code Vec<SequenceStep>} (each with {@code step_id},

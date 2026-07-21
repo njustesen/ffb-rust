@@ -23,6 +23,7 @@ import com.fumbbl.ffb.server.step.StepCommandStatus;
 import com.fumbbl.ffb.server.step.StepId;
 import com.fumbbl.ffb.server.util.UtilServerStartGame;
 import com.fumbbl.ffb.server.util.UtilSkillBehaviours;
+import com.fumbbl.ffb.server.util.rng.Fortuna;
 import com.fumbbl.ffb.util.UtilActingPlayer;
 import com.fumbbl.ffb.util.UtilBox;
 import com.fumbbl.ffb.util.UtilTeamValue;
@@ -254,6 +255,46 @@ public final class GameFixture {
 	/** Make {@code playerId} the acting player with the given action. */
 	public static void setActingPlayer(GameState gameState, String playerId, PlayerAction action) {
 		UtilActingPlayer.changeActingPlayer(gameState.getGame(), playerId, action, false);
+	}
+
+	// ── Deterministic dice ───────────────────────────────────────────────────
+
+	/**
+	 * Install a deterministic roll sequence on the game's dice source, mirroring
+	 * how the Rust step tests seed their RNG. The supplied faces are consumed, in
+	 * order, by subsequent die draws made through
+	 * {@code gameState.getDiceRoller()} (which resolves every roll via the test
+	 * server's {@link ScriptedFortuna}). Covers all categories: d3/d4/d6/d8/d16,
+	 * 2d6 rolls like weather/armour/injury (two faces), block dice (d6 faces
+	 * 1..6 = skull..pow) and scatter/throw-in direction (d8).
+	 *
+	 * <p>Faces must be valid for the die they land on (e.g. 1..6 for a d6) or the
+	 * draw throws {@link IllegalStateException}. Once the script is exhausted,
+	 * draws fall back to the real random {@link ScriptedFortuna} behaviour.
+	 *
+	 * <p>Calling this repeatedly appends to the existing script; use
+	 * {@link #clearScriptedDice(GameState)} to reset. Only works on a GameState
+	 * created by this fixture (backed by {@link TestFantasyFootballServer}).
+	 *
+	 * @see ScriptedFortuna for the sequential-ordering / re-roll constraints
+	 */
+	public static void installScriptedDice(GameState gameState, int... rolls) {
+		scriptedFortuna(gameState).script(rolls);
+	}
+
+	/** Discard any remaining scripted dice, reverting to real random draws. */
+	public static void clearScriptedDice(GameState gameState) {
+		scriptedFortuna(gameState).clearScript();
+	}
+
+	private static ScriptedFortuna scriptedFortuna(GameState gameState) {
+		Fortuna fortuna = gameState.getServer().getFortuna();
+		if (!(fortuna instanceof ScriptedFortuna)) {
+			throw new IllegalStateException(
+				"installScriptedDice requires a GameState from GameFixture (backed by "
+					+ "TestFantasyFootballServer); found Fortuna of type " + fortuna.getClass().getName());
+		}
+		return (ScriptedFortuna) fortuna;
 	}
 
 	// ── Step execution helpers ───────────────────────────────────────────────

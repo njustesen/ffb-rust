@@ -4,10 +4,10 @@ import com.fumbbl.ffb.PlayerAction;
 import com.fumbbl.ffb.model.BlockTarget;
 import com.fumbbl.ffb.server.GameState;
 import com.fumbbl.ffb.server.fixture.GameFixture;
+import com.fumbbl.ffb.server.fixture.GeneratorTestSupport;
 import com.fumbbl.ffb.server.step.IStep;
 import com.fumbbl.ffb.server.step.IStepLabel;
 import com.fumbbl.ffb.server.step.StepId;
-import com.fumbbl.ffb.server.step.generator.GeneratorTestSupport;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
