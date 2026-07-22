@@ -945,12 +945,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn get_state_for_id_and_register_are_documented_no_ops() {
-        let mut factory = ClientStateFactory::new();
-        factory.register_states();
-        factory.register_states_for_rules();
-        factory.register();
-        assert!(factory.get_state_for_id(Some(ClientStateId::Move)).is_none());
-    }
+    // NOTE: the Rust-only `get_state_for_id_and_register_are_documented_no_ops` test was pruned
+    // during test equalization. It asserted that this crate's `register_states`/`register`/
+    // `get_state_for_id` stubs are no-ops — Rust plumbing with no Java counterpart (the Java
+    // members are not no-ops). The behavioral switch logic is mirrored 1:1 by the Java
+    // ClientStateFactoryTest (63 tests).
 }
