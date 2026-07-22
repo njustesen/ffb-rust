@@ -469,12 +469,9 @@ mod tests {
         assert!(!is_foulable(&game, Some(&defender)));
     }
 
-    #[test]
-    fn bloodlust_action_context_empty_when_not_suffering() {
-        let ap = ActingPlayer::new();
-        let ctx = bloodlust_action_context(&ap);
-        assert!(ctx.get_actions().is_empty());
-    }
+    // NOTE (test equalization): `bloodlust_action_context_empty_when_not_suffering` pruned —
+    // Java `bloodlustActionContext` is private and only reached when suffering blood lust, so the
+    // empty branch is unreachable/unobservable in the mirror.
 
     #[test]
     fn bloodlust_action_context_has_move_and_end_move() {
@@ -493,38 +490,8 @@ mod tests {
         assert!(actions.contains(&ClientAction::INCORPOREAL));
     }
 
-    #[test]
-    fn player_peek_ignores_without_game() {
-        let client = make_client();
-        let module = FoulLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = FoulLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn perform_available_action_no_op_without_game() {
-        let mut module = FoulLogicModule::new();
-        let mut client = make_client();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        module.perform_available_action(&mut client, &player, ClientAction::FOUL);
-    }
+    // NOTE (test equalization): `player_peek_ignores_without_game`,
+    // `player_interaction_ignores_without_game`, and `perform_available_action_no_op_without_game`
+    // pruned — Rust-only `client.game()?` no-game short-circuits; Java dereferences the game
+    // unconditionally, so there is no faithful mirror.
 }
