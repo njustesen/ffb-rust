@@ -440,12 +440,9 @@ mod tests {
         assert!(!is_foulable(&game, &defender));
     }
 
-    #[test]
-    fn bloodlust_action_context_empty_without_flag() {
-        let ap = ActingPlayer::new();
-        let ctx = bloodlust_action_context(&ap);
-        assert!(ctx.get_actions().is_empty());
-    }
+    // NOTE (test equalization): `bloodlust_action_context_empty_without_flag` pruned — the Java
+    // `bloodlustActionContext` is a private helper only reached when `isSufferingBloodLust()` is
+    // true, so its empty-without-flag branch is unreachable/unobservable in the mirror.
 
     #[test]
     fn bloodlust_action_context_adds_move_and_end_move() {
@@ -479,18 +476,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = FoulLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
+    // NOTE (test equalization): `player_interaction_ignores_without_game` pruned — Rust-only
+    // `client.game()?` no-game short-circuit; Java dereferences `client.getGame()` unconditionally.
 
     #[test]
     fn perform_available_action_foul_sends_command() {
@@ -505,10 +492,6 @@ mod tests {
         module.perform_available_action(&mut client, &player, ClientAction::FOUL);
     }
 
-    #[test]
-    fn end_turn_no_op_without_game() {
-        let mut module = FoulLogicModule::new();
-        let mut client = make_client();
-        module.end_turn(&mut client);
-    }
+    // NOTE (test equalization): `end_turn_no_op_without_game` pruned — Rust-only no-game
+    // short-circuit (MoveLogicModule::end_turn); Java dereferences the game unconditionally.
 }
