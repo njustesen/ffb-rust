@@ -90,6 +90,11 @@ mismatches. Done so far:
   `getFinished()` → force `when(game.getFinished()).thenReturn(null)` in @BeforeEach. Pruned 1
   Rust plumbing test (register/get_state_for_id no-op).
 - **foul family DONE (commits 298066d6 mixed 7/7, cb34b176 bb2025 5/5).**
+- **hand_over family DONE (commit d4e159f7: bb2025 5/5, mixed 5/5).**
+- **Running client tally (verified full-module green):** Java ffb-client-logic 1208 → **1289**
+  (+81); Rust ffb-client → **1683** (~15 plumbing/unreachable tests pruned). Client gap
+  ~486 → **~394**. Modules 1:1 so far: client_state_factory, {mixed,bb2025} foul,
+  {bb2025,mixed} hand_over.
 
 **PROVEN LOGIC-MODULE RECIPE (use for all remaining client logic modules):**
 - Setup mirrors `MoveLogicModuleTest`: `@Mock(RETURNS_DEEP_STUBS) client` + plain `@Mock` game,
