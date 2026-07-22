@@ -62,7 +62,65 @@ Java counterpart) + any `// PARITY-EXEMPT` modules batch A3 tags (Rust-only infr
   CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION only takes effect after a Claude Code session RESTART.
   Set it high (e.g. 600) and restart to resume the parallel port.
 
-## RESUME STATE (start here after restart)
+## RESUME STATE — BY-HAND EXECUTION (2026-07-23, single-threaded, NO subagents)
+User decision: continue **single-threaded by hand** (no subagents / no Workflow); scope = "1:1 as
+much as it makes sense — use common sense" (port survivors, prune plumbing/tautology, SKIP-with-
+comment the fixture-inexpressible ones and tally them). Java src/main NEVER edited.
+
+**Fresh ground-truth method counts (grep of `#[test]` / `@Test|@ParameterizedTest`):**
+- Rust 14,477 (`ffb-parity` 39 exempt). Java 5,098 (ffb-common 1,789 · ffb-server 2,101 ·
+  ffb-client-logic 1,208 at baseline). Gap ≈ 9,379, dominated by ffb-engine step (4,637).
+- Per-crate Rust: model 2,769 · mechanics 1,146 · engine 7,149 · protocol 882 · client 1,694.
+  Mirror map: model+protocol→ffb-common; mechanics+engine→ffb-server; client→ffb-client-logic.
+
+**Toolchain (verified working):** mvn at `/c/Users/Admin/bin/maven/bin/mvn`; run from
+`ffb-java/` as `mvn -pl <module> [-am] test` (~11s for client-logic; add
+`-Dsurefire.failIfNoSpecifiedTests=false` when using `-Dtest=X` with `-am`). cargo from
+`ffb-rust/ffb-rust` as `cargo test -p <crate> [filter]`.
+
+**Step 1 (client) progress:** started. Full client gap analysis in scratchpad
+(rust_client.txt/java_client.txt); 33 Rust-only modules (~273 real; `action_keys`→
+`UtilClientActionKeys`, `chat`→`UtilClientChat` are just naming, already mirrored) + 77 count
+mismatches. Done so far:
+- **client_state_factory 64→63 (commit d4d1752c):** ported getStateForGame switch as Java
+  `ClientStateFactoryTest` (63). PROVEN PATTERN for factory/state tests whose real concrete impl
+  lives in the AWT ffb-client module: build a **test-local concrete `ClientStateFactory` + a stub
+  `ClientState`/`LogicModule` per `ClientStateId.values()`**, assert `getStateForGame().getId()`.
+  Deep-stub gotcha: `@Mock(RETURNS_DEEP_STUBS)` returns a NON-NULL mock for Date-returning
+  `getFinished()` → force `when(game.getFinished()).thenReturn(null)` in @BeforeEach. Pruned 1
+  Rust plumbing test (register/get_state_for_id no-op).
+- **foul family DONE (commits 298066d6 mixed 7/7, cb34b176 bb2025 5/5).**
+
+**PROVEN LOGIC-MODULE RECIPE (use for all remaining client logic modules):**
+- Setup mirrors `MoveLogicModuleTest`: `@Mock(RETURNS_DEEP_STUBS) client` + plain `@Mock` game,
+  actingPlayer, fieldModel, teamAway, communication, and raw `@Mock Player actor/defender`.
+  MoveLogicModule (and its subclasses) ctor eagerly resolves the MOVE plugin, so ALWAYS stub
+  `game.<LogicPluginFactory>getFactory(LOGIC_PLUGIN)` → `forType(MOVE)` → a MoveLogicPlugin mock
+  before `new XxxLogicModule(client)`. `@MockitoSettings(strictness = LENIENT)`.
+- Rust free fns like `is_foulable(&game, &def)` mirror Java statics (`UtilPlayer.isFoulable(game,
+  def)`) — call the static directly; drive it by stubbing the exact fieldModel/team lookups it
+  makes (getPlayerState → `new PlayerState(PlayerState.PRONE|STANDING)` [pkg com.fumbbl.ffb; PRONE=3
+  STANDING=1 STUNNED=4], getPlayerCoordinate → `new FieldCoordinate(x,y)` w/ isAdjacent, teamAway
+  .hasPlayer). Populated-Game construction NOT needed — targeted stubs suffice.
+- Private helpers (e.g. `bloodlustActionContext`, `foulActionContext`) aren't callable — exercise
+  them through the public method that reaches them (`playerInteraction` on the acting player when
+  suffering blood lust; `playerSelected` with the fouling-alternative skill). Assert
+  `InteractionResult.getKind()` (Kind.SELECT_ACTION/IGNORE/PERFORM/HANDLED) +
+  `getActionContext().getActions()`.
+- PRUNE from Rust (no faithful Java mirror): (a) `*_without_game` no-game `client.game()?`
+  short-circuits; (b) private-helper "empty/negative" branches unreachable in Java; leave a
+  `// NOTE (test equalization): ... pruned` breadcrumb. PRUNE from Java: trivial `getIdReturns*`
+  getter tautologies with no Rust twin. Build both scoped gates green, commit per family.
+- Gotcha: `-Dtest="pkg.ClassTest"` with `-am` needs `-Dsurefire.failIfNoSpecifiedTests=false`.
+
+- Next client targets (biggest Rust-extra first): hand_over (bb2025 8 + mixed 9), pass +15,
+  synchronous_multi_block +14, block +13, gaze +12, select_blitz_target +11, bomb +10,
+  throw_keg +9, logic_module +43 (mostly free-fns on &Game/&Player — expect many prunes/SKIPs per
+  LogicModuleTest precedent), plus the 33 Rust-only logic modules. Then the -N mismatches (Java
+  has MORE: setup, wait_for_opponent, quick_snap, solid_defence, spectate, start_game,
+  wait_for_setup) — port Java→Rust or prune Java extras.
+
+## RESUME STATE (prior — parallel/subagent era, superseded by by-hand above)
 Committed & green at 003d1328 (+ d2dc289d fixture). Counts:
 - Java: ffb-common 1,939 · ffb-client-logic 1,208 · ffb-server 2,511  = ~5,658 distinct.
 - Rust: 14,591.  Gap ≈ 8,900, dominated by the step port.
