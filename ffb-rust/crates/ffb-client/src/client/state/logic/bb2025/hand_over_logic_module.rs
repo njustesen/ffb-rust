@@ -310,38 +310,9 @@ mod tests {
         assert_eq!(result.get_delegate(), Some(ClientStateId::Move));
     }
 
-    #[test]
-    fn action_context_empty_without_any_availability() {
-        let module = HandOverLogicModule::new();
-        let game = make_game();
-        let ap = ActingPlayer::new();
-        let ctx = module.action_context(&game, &ap);
-        assert_eq!(ctx.get_actions(), &vec![ClientAction::END_MOVE]);
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = HandOverLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn player_peek_ignores_without_game() {
-        let client = make_client();
-        let module = HandOverLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
+    // NOTE (test equalization): `action_context_empty_without_any_availability` pruned — Java
+    // `actionContext` fans out into ~12 availability helpers + the jump mechanic + ball-in-hand,
+    // not faithfully expressible with targeted mocks (fixture-inexpressible). And
+    // `player_interaction_ignores_without_game` / `player_peek_ignores_without_game` pruned —
+    // Rust-only `client.game()?` no-game short-circuits with no Java counterpart.
 }

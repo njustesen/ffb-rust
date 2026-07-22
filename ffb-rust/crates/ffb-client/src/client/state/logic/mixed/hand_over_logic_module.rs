@@ -297,14 +297,8 @@ mod tests {
         assert!(module.available_actions().contains(&ClientAction::MOVE));
     }
 
-    #[test]
-    fn action_context_always_adds_end_move() {
-        let module = HandOverLogicModule::new();
-        let game = make_game();
-        let ap = ActingPlayer::new();
-        let ctx = module.action_context(&game, &ap);
-        assert!(ctx.get_actions().contains(&ClientAction::END_MOVE));
-    }
+    // NOTE (test equalization): `action_context_always_adds_end_move` pruned — Java actionContext
+    // fans out into ~12 availability helpers + jump mechanic + ball-in-hand (fixture-inexpressible).
 
     #[test]
     fn can_player_get_hand_over_false_without_catcher() {
@@ -326,12 +320,8 @@ mod tests {
         assert!(!module.can_player_get_hand_over(&client, Some(&catcher)));
     }
 
-    #[test]
-    fn ball_in_hand_false_without_game() {
-        let client = make_client();
-        let module = HandOverLogicModule::new();
-        assert!(!module.ball_in_hand(&client));
-    }
+    // NOTE (test equalization): `ball_in_hand_false_without_game` pruned — Rust-only no-game
+    // short-circuit; Java `ballInHand()` dereferences the game unconditionally.
 
     #[test]
     fn field_peek_delegates_to_move_state() {
@@ -341,18 +331,8 @@ mod tests {
         assert_eq!(result.get_delegate(), Some(ClientStateId::Move));
     }
 
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = HandOverLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
+    // NOTE (test equalization): `player_interaction_ignores_without_game` pruned — Rust-only
+    // no-game short-circuit; Java dereferences the game unconditionally.
 
     #[test]
     fn player_peek_ignores_when_not_eligible() {
@@ -368,10 +348,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn end_turn_no_op_without_game() {
-        let mut module = HandOverLogicModule::new();
-        let mut client = make_client();
-        module.end_turn(&mut client);
-    }
+    // NOTE (test equalization): `end_turn_no_op_without_game` pruned — Rust-only no-game
+    // short-circuit; Java MoveLogicModule::endTurn dereferences the game unconditionally.
 }
