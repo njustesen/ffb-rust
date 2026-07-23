@@ -283,55 +283,10 @@ mod tests {
         assert_eq!(actions.len(), 9);
     }
 
-    #[test]
-    fn action_context_always_has_end_move() {
-        let module = SelectBlitzTargetLogicModule::new();
-        let game = make_game();
-        let ap = ActingPlayer::new();
-        let ctx = module.action_context(&game, &ap);
-        assert_eq!(ctx.get_actions(), &vec![ClientAction::END_MOVE]);
-    }
-
-    #[test]
-    fn player_peek_invalid_without_game() {
-        let module = SelectBlitzTargetLogicModule::new();
-        let client = make_client();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Invalid
-        );
-    }
-
-    #[test]
-    fn player_peek_invalid_when_not_valid_blitz_target() {
-        let module = SelectBlitzTargetLogicModule::new();
-        let mut client = make_client();
-        let mut game = make_game();
-        add_player(&mut game, true, "h1", FieldCoordinate::new(5, 5));
-        client.set_game(game);
-        let player = client.game().unwrap().player("h1").unwrap().clone();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Invalid
-        );
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = SelectBlitzTargetLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
+    // NOTE (test equalization): pruned — no faithful Java unit mirror (see the bb2025 twin).
+    // action_context_always_has_end_move (actionContext isXAvailable fan-out needs the GAME-mechanic
+    // chain); player_peek_* (Java playerPeek touches client.getUserInterface() / unmockable
+    // BlockLogicExtension); player_interaction_ignores_without_game (Rust-only no-game short-circuit).
 
     #[test]
     fn perform_available_action_end_move_sends_target_selected() {

@@ -363,66 +363,13 @@ mod tests {
         assert_eq!(actions.len(), 12);
     }
 
-    #[test]
-    fn action_context_always_contains_end_move() {
-        let module = SelectBlitzTargetLogicModule::new();
-        let game = make_game();
-        let ap = ActingPlayer::new();
-        let ctx = module.action_context(&game, &ap);
-        assert!(ctx.get_actions().contains(&ClientAction::END_MOVE));
-    }
-
-    #[test]
-    fn can_be_blitzed_false_when_has_blocked() {
-        let module = SelectBlitzTargetLogicModule::new();
-        let mut game = make_game();
-        add_player(&mut game, false, "a1", FieldCoordinate::new(1, 1));
-        let target = game.player("a1").unwrap().clone();
-        let mut ap = ActingPlayer::new();
-        ap.has_blocked = true;
-        assert!(!module.can_be_blitzed(&game, &target, &ap));
-    }
-
-    #[test]
-    fn player_peek_invalid_without_game() {
-        let client = make_client();
-        let module = SelectBlitzTargetLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Invalid
-        );
-    }
-
-    #[test]
-    fn player_peek_invalid_when_not_blitzable() {
-        let mut client = make_client();
-        let mut game = make_game();
-        add_player(&mut game, false, "a1", FieldCoordinate::new(10, 10));
-        client.set_game(game);
-        let module = SelectBlitzTargetLogicModule::new();
-        let player = client.game().unwrap().player("a1").unwrap().clone();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Invalid
-        );
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = SelectBlitzTargetLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
+    // NOTE (test equalization): pruned — no faithful Java unit mirror.
+    // `action_context_always_contains_end_move` (actionContext fans out into isXAvailable helpers
+    // needing the GAME-mechanic factory chain — NPEs with targeted mocks);
+    // `can_be_blitzed_false_when_has_blocked` (Java canBeBlitzed is private + routes through the
+    // unmockable BlockLogicExtension.isValidBlitzTarget); `player_peek_*` (Java playerPeek touches
+    // client.getUserInterface() — UI, not headless); `player_interaction_ignores_without_game`
+    // (Rust-only no-game short-circuit). available_actions + perform END_MOVE are the 1:1 mirrors.
 
     #[test]
     fn perform_available_action_end_move_sends_target_selected() {

@@ -1,15 +1,13 @@
-package com.fumbbl.ffb.client.state.logic.bb2025;
+package com.fumbbl.ffb.client.state.logic.bb2020;
 
 import com.fumbbl.ffb.FactoryType;
 import com.fumbbl.ffb.client.FantasyFootballClient;
 import com.fumbbl.ffb.client.factory.LogicPluginFactory;
 import com.fumbbl.ffb.client.net.ClientCommunication;
 import com.fumbbl.ffb.client.state.logic.ClientAction;
-import com.fumbbl.ffb.client.state.logic.interaction.ActionContext;
 import com.fumbbl.ffb.client.state.logic.plugin.BlockLogicExtensionPlugin;
 import com.fumbbl.ffb.client.state.logic.plugin.LogicPlugin;
 import com.fumbbl.ffb.client.state.logic.plugin.MoveLogicPlugin;
-import com.fumbbl.ffb.model.ActingPlayer;
 import com.fumbbl.ffb.model.Game;
 import com.fumbbl.ffb.model.Player;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,19 +27,16 @@ import static org.mockito.Mockito.when;
 
 /**
  * Ported from
- * {@code ffb-rust/crates/ffb-client/src/client/state/logic/bb2025/select_blitz_target_logic_module.rs}
- * against the real bb2025 {@link SelectBlitzTargetLogicModule} (extends MoveLogicModule and builds
- * a BlockLogicExtension, so construction needs both the MOVE and BLOCK plugins).
+ * {@code ffb-rust/crates/ffb-client/src/client/state/logic/bb2020/select_blitz_target_logic_module.rs}
+ * against the real bb2020 {@link SelectBlitzTargetLogicModule} (extends MoveLogicModule and builds
+ * a BlockLogicExtension — construction needs both the MOVE and BLOCK plugins).
  *
  * <p>Rust tests pruned rather than ported (kept the suites 1:1):
- * {@code action_context_always_contains_end_move} (actionContext fans out into isXAvailable
- * helpers that need the GAME-mechanic factory chain — NPEs with targeted mocks);
- * {@code can_be_blitzed_false_when_has_blocked} (Java {@code canBeBlitzed} is private and routes
- * through the unmockable BlockLogicExtension.isValidBlitzTarget + PathFinder over a live Game);
- * {@code player_peek_invalid_*} (Java playerPeek calls
- * {@code client.getUserInterface().getFieldComponent()} — UI, not headless); and
- * {@code player_interaction_ignores_without_game} (Rust no-game short-circuit). The trivial
- * Java-only getIdReturnsSelectBlitzTarget getter was removed (no Rust twin).
+ * {@code action_context_always_has_end_move} (actionContext fans out into isXAvailable helpers
+ * needing the GAME-mechanic factory chain — NPEs with targeted mocks);
+ * {@code player_peek_invalid_without_game} / {@code player_peek_invalid_when_not_valid_blitz_target}
+ * (playerPeek touches {@code client.getUserInterface()} / the unmockable BlockLogicExtension over a
+ * live Game); {@code player_interaction_ignores_without_game} (Rust no-game short-circuit).
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -63,14 +58,7 @@ class SelectBlitzTargetLogicModuleTest {
 	BlockLogicExtensionPlugin blockLogicExtensionPlugin;
 
 	@Mock
-	ActingPlayer actingPlayer;
-
-	@Mock
 	ClientCommunication communication;
-
-	@SuppressWarnings("rawtypes")
-	@Mock
-	Player actor;
 
 	@SuppressWarnings("rawtypes")
 	@Mock
@@ -85,17 +73,16 @@ class SelectBlitzTargetLogicModuleTest {
 		when(logicPluginFactory.forType(LogicPlugin.Type.MOVE)).thenReturn(moveLogicPlugin);
 		when(logicPluginFactory.forType(LogicPlugin.Type.BLOCK)).thenReturn(blockLogicExtensionPlugin);
 		when(client.getCommunication()).thenReturn(communication);
-		when(actingPlayer.getPlayer()).thenReturn(actor);
 		module = new SelectBlitzTargetLogicModule(client);
 	}
 
-	// rust: available_actions_contains_end_move_and_incorporeal
+	// rust: available_actions_matches_java
 	@Test
-	void availableActionsContainsEndMoveAndIncorporeal() {
+	void availableActionsMatchesJava() {
 		Set<ClientAction> actions = module.availableActions();
 		assertTrue(actions.contains(ClientAction.END_MOVE));
-		assertTrue(actions.contains(ClientAction.INCORPOREAL));
-		assertEquals(12, actions.size());
+		assertTrue(actions.contains(ClientAction.THEN_I_STARTED_BLASTIN));
+		assertEquals(9, actions.size());
 	}
 
 	// rust: perform_available_action_end_move_sends_target_selected
