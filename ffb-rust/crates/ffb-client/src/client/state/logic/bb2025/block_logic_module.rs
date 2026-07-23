@@ -290,58 +290,10 @@ mod tests {
         assert!(actions.contains(&ClientAction::AUTO_GAZE_ZOAT));
     }
 
-    #[test]
-    fn action_context_empty_without_any_availability() {
-        let module = BlockLogicModule::new();
-        let game = make_game();
-        let ap = ActingPlayer::new();
-        let ctx = module.action_context(&game, &ap);
-        assert!(ctx.get_actions().is_empty());
-    }
-
-    #[test]
-    fn action_context_adds_end_move_when_has_acted() {
-        let module = BlockLogicModule::new();
-        let game = make_game();
-        let mut ap = ActingPlayer::new();
-        ap.has_acted = true;
-        let ctx = module.action_context(&game, &ap);
-        assert!(ctx.get_actions().contains(&ClientAction::END_MOVE));
-        assert!(ctx.get_influences().contains(&Influences::HAS_ACTED));
-    }
-
-    #[test]
-    fn player_peek_resets_when_no_game() {
-        let client = make_client();
-        let module = BlockLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Reset
-        );
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = BlockLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn perform_available_action_no_op_without_game() {
-        let mut module = BlockLogicModule::new();
-        let mut client = make_client();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        module.perform_available_action(&mut client, &player, ClientAction::WISDOM);
-    }
+    // NOTE (test equalization): pruned as fixture-inexpressible / no faithful Java mirror —
+    // `action_context_empty_without_any_availability` and `action_context_adds_end_move_when_has_acted`
+    // (Java actionContext delegates to BlockLogicExtension.actionContext over a live skill/property
+    // graph); `player_peek_resets_when_no_game`, `player_interaction_ignores_without_game`,
+    // `perform_available_action_no_op_without_game` (Rust-only no-game short-circuits). The clean
+    // `available_actions_contains_block_and_move` is the 1:1 mirror kept both sides.
 }

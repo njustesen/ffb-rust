@@ -223,50 +223,11 @@ mod tests {
         assert!(actions.contains(&ClientAction::BLOCK));
     }
 
-    #[test]
-    fn action_context_adds_end_move_when_has_acted() {
-        let module = BlockLogicModule::new();
-        let game = make_game();
-        let mut ap = ActingPlayer::new();
-        ap.has_acted = true;
-        let ctx = module.action_context(&game, &ap);
-        assert!(ctx.get_actions().contains(&ClientAction::END_MOVE));
-    }
-
-    #[test]
-    fn action_context_empty_without_acted_or_bloodlust() {
-        let module = BlockLogicModule::new();
-        let game = make_game();
-        let ap = ActingPlayer::new();
-        let ctx = module.action_context(&game, &ap);
-        assert!(ctx.get_actions().is_empty());
-    }
-
-    #[test]
-    fn player_peek_resets_without_game() {
-        let client = make_client();
-        let module = BlockLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Reset
-        );
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = BlockLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
+    // NOTE (test equalization): `action_context_adds_end_move_when_has_acted` and
+    // `action_context_empty_without_acted_or_bloodlust` pruned — Java actionContext delegates to
+    // BlockLogicExtension.actionContext over a live skill/property graph (fixture-inexpressible).
+    // `player_peek_resets_without_game` / `player_interaction_ignores_without_game` pruned —
+    // Rust-only no-game short-circuits.
 
     #[test]
     fn player_interaction_handles_blitz_action() {
@@ -295,10 +256,6 @@ mod tests {
         module.perform_available_action(&mut client, &player, ClientAction::MOVE);
     }
 
-    #[test]
-    fn end_turn_no_op_without_game() {
-        let mut module = BlockLogicModule::new();
-        let mut client = make_client();
-        module.end_turn(&mut client);
-    }
+    // NOTE (test equalization): `end_turn_no_op_without_game` pruned — Rust-only no-game
+    // short-circuit; Java dereferences the game unconditionally.
 }
