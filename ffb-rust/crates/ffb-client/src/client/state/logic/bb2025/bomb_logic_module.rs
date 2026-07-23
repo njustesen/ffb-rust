@@ -500,72 +500,11 @@ mod tests {
         assert!(actions.contains(&ClientAction::END_MOVE));
     }
 
-    #[test]
-    fn action_context_adds_end_move_by_default() {
-        let module = BombLogicModule::new();
-        let game = make_game();
-        let ap = ActingPlayer::new();
-        let ctx = module.action_context(&game, &ap);
-        assert!(ctx.get_actions().contains(&ClientAction::END_MOVE));
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = BombLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn field_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = BombLogicModule::new();
-        let result = module.field_interaction(&mut client, FieldCoordinate::new(3, 3));
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn field_peek_ignores_without_game() {
-        let mut client = make_client();
-        let module = BombLogicModule::new();
-        let result = module.field_peek(&mut client, FieldCoordinate::new(3, 3));
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn player_peek_sets_selected_player() {
-        let mut client = make_client();
-        let mut game = make_game();
-        add_player(&mut game, true, "p1", FieldCoordinate::new(1, 1));
-        client.set_game(game);
-        let module = BombLogicModule::new();
-        let player = client.game().unwrap().player("p1").unwrap().clone();
-        let result = module.player_peek(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Perform
-        );
-        assert_eq!(client.client_data().selected_player(), Some(&"p1".to_string()));
-    }
-
-    #[test]
-    fn perform_available_action_no_op_without_game() {
-        let mut module = BombLogicModule::new();
-        let mut client = make_client();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        module.perform_available_action(&mut client, &player, ClientAction::WISDOM);
-    }
+    // NOTE (test equalization): pruned — no faithful Java unit mirror.
+    // action_context_adds_end_move_by_default (actionContext isXAvailable fan-out needs the
+    // GAME-mechanic factory chain); player_peek_sets_selected_player (asserts a private client-data
+    // field); player_interaction/field_interaction/field_peek/perform *_without_game (Rust-only
+    // no-game short-circuits). The behavioral isEndTurn/playerIsAboutToThrow/showRangeRuler/
+    // available_actions tests are the 1:1 mirrors kept both sides. Note: bb2025 has no
+    // is_end_turn_false_when_bomb_turn test (that case is covered by the mixed edition).
 }

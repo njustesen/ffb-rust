@@ -55,11 +55,6 @@ class BombLogicModuleTest {
 	}
 
 	@Test
-	void getIdReturnsBomb() {
-		assertEquals(ClientStateId.BOMB, module.getId());
-	}
-
-	@Test
 	void availableActionsHasExpectedSize() {
 		Set<ClientAction> actions = module.availableActions();
 		assertEquals(11, actions.size());

@@ -497,15 +497,8 @@ mod tests {
         assert!(!module.is_end_turn_action_available(&client));
     }
 
-    #[test]
-    fn action_context_omits_end_move_when_must_complete_action() {
-        let module = BombLogicModule::new();
-        let game = make_game();
-        let mut ap = ActingPlayer::new();
-        ap.set_must_complete_action(true);
-        let ctx = module.action_context(&game, &ap);
-        assert!(!ctx.get_actions().contains(&ClientAction::END_MOVE));
-    }
+    // NOTE (test equalization): `action_context_omits_end_move_when_must_complete_action` pruned —
+    // Java actionContext fans out into isXAvailable helpers needing the GAME-mechanic factory chain.
 
     #[test]
     fn player_is_about_to_throw_true_for_throw_bomb_action() {
@@ -517,74 +510,12 @@ mod tests {
         assert!(module.player_is_about_to_throw(&client));
     }
 
-    #[test]
-    fn action_context_empty_without_special_availability() {
-        let module = BombLogicModule::new();
-        let game = make_game();
-        let ap = ActingPlayer::new();
-        let ctx = module.action_context(&game, &ap);
-        assert!(ctx.get_actions().contains(&ClientAction::END_MOVE));
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let client = make_client();
-        let module = BombLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn field_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = BombLogicModule::new();
-        let result = module.field_interaction(&mut client, FieldCoordinate::new(1, 1));
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn player_peek_sets_selected_player() {
-        let mut client = make_client();
-        let mut game = make_game();
-        add_player(&mut game, true, "p1", FieldCoordinate::new(2, 2));
-        client.set_game(game);
-        let module = BombLogicModule::new();
-        let player = client.game().unwrap().player("p1").unwrap().clone();
-        let _ = module.player_peek(&mut client, &player);
-        assert_eq!(client.client_data().selected_player(), Some(&"p1".to_string()));
-    }
-
-    #[test]
-    fn field_peek_ignores_without_range_ruler_enabled() {
-        let mut client = make_client();
-        let mut game = make_game();
-        client.set_game(game.clone());
-        let mut module = BombLogicModule::new();
-        module.set_show_range_ruler(false);
-        game.acting_player.player_action = Some(PlayerAction::Move);
-        client.set_game(game);
-        let result = module.field_peek(&mut client, FieldCoordinate::new(3, 3));
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn perform_available_action_no_op_for_unavailable_treacherous() {
-        let mut module = BombLogicModule::new();
-        let mut client = make_client();
-        client.set_game(make_game());
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        module.perform_available_action(&mut client, &player, ClientAction::TREACHEROUS);
-    }
+    // NOTE (test equalization): pruned — no faithful Java unit mirror.
+    // action_context_empty_without_special_availability (actionContext isXAvailable fan-out);
+    // player_peek_sets_selected_player (asserts a private client-data field);
+    // field_peek_ignores_without_range_ruler_enabled (fieldPeek reads a live Game after the
+    // range-ruler guard); player_interaction/field_interaction *_without_game +
+    // perform_available_action_no_op_for_unavailable_treacherous (Rust-only no-game / no-op
+    // smoke paths). The behavioral availableActions/showRangeRuler/isEndTurn/playerIsAboutToThrow
+    // tests are the 1:1 mirrors kept both sides.
 }

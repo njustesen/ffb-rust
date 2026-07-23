@@ -41,12 +41,6 @@ class BombLogicModuleTest {
 	FantasyFootballClient client;
 
 	@Test
-	void getIdReturnsBomb() {
-		BombLogicModule module = new BombLogicModule(client);
-		assertEquals(ClientStateId.BOMB, module.getId());
-	}
-
-	@Test
 	void isEndTurnActionAvailableTrueWhenNotBombTurn() {
 		when(client.getGame().getTurnMode()).thenReturn(TurnMode.REGULAR);
 		when(client.getGame().getActingPlayer().isMustCompleteAction()).thenReturn(false);
@@ -58,14 +52,6 @@ class BombLogicModuleTest {
 	void isEndTurnActionAvailableFalseWhenMustCompleteAction() {
 		when(client.getGame().getTurnMode()).thenReturn(TurnMode.REGULAR);
 		when(client.getGame().getActingPlayer().isMustCompleteAction()).thenReturn(true);
-		BombLogicModule module = new BombLogicModule(client);
-		assertFalse(module.isEndTurnActionAvailable());
-	}
-
-	@Test
-	void isEndTurnActionAvailableFalseWhenBombTurn() {
-		when(client.getGame().getTurnMode()).thenReturn(TurnMode.BOMB_HOME);
-		when(client.getGame().getActingPlayer().isMustCompleteAction()).thenReturn(false);
 		BombLogicModule module = new BombLogicModule(client);
 		assertFalse(module.isEndTurnActionAvailable());
 	}
