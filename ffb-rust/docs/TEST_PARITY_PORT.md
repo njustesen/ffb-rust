@@ -104,8 +104,23 @@ mismatches. Done so far:
 - **select_blitz_target family DONE (commit e336475f: bb2020 2, bb2025 2).**
 - **bomb family DONE (commit d6062bb7: bb2025 7, mixed 7).**
 - **throw_keg family DONE (commit 53245b4a: bb2020 3, bb2025 3).**
-- **ALL named "+N" logic-module targets now reconciled.** Tally (verified full-module green):
-  Java ffb-client-logic **1298**; Rust ffb-client **1608**. Client gap **310**.
+- **ALL named "+N" logic-module targets now reconciled.** + **blitz DONE (commit 8fcbc50c, 4/4:
+  availableActions, moveAction, playerActivationUsed→super.hasActed, isGoredAvailable).**
+  Tally (verified full-module green): Java **1302**; Rust **1604**. Client gap **302**.
+
+- **`logicmodule` (+43) ANALYSIS (deferred — biggest single item):** 46 `is_X_available_*` predicate
+  tests. ALL the Java `is*Available` methods touch the live game graph
+  (getFieldModel/getPlayerState/getActingTeam/GAME-mechanic factory) BEFORE or around the skill
+  check, so none port with a bare mock. Most short-circuit on a `hasUnusedSkillWithProperty`/
+  `hasSkillProperty` check → portable IF you build ONE comprehensive game mock in setUp
+  (getFieldModel→fieldModel [getPlayerCoordinate/getPlayerState non-null], getTurnData→turnData
+  [isPuntUsed/isBombUsed/isBlitzUsed/isPassUsed=false], getActingTeam/getOtherTeam→team,
+  getTurnMode→REGULAR, getFactory(MECHANIC).forName(GAME)→a GameMechanic mock) + player mock with
+  hasSkillProperty/getSkillWithProperty→false. Then ~30 `is_X_available_false_without_skill` tests
+  are one-liners `assertFalse(module.isXAvailable(player))`. The ~15 needing real state
+  (is_block/is_foul/is_stand_up/is_recover_*/chomp*/is_wisdom-mechanic/performs_range_grid/
+  is_special_block/is_pass_any_square/is_secure_the_ball/is_hail_mary_pass) are fixture-inexpressible
+  → prune. Budget: iterative NPE-chase to get the shared mock right. Do this as its own checkpoint.
   NEXT: the remaining smaller +N/±1 logic-module mismatches (e.g. select, kickoff, punt, wizard,
   raiding_party, then_i_started_blastin, hit_and_run, furious_outburst, pushback, high_kick,
   swarming, kick_em_*, gaze_move, ktm, stab, trickster, replay, login, interception, …), then the
