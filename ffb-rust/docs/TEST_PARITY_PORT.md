@@ -102,9 +102,17 @@ mismatches. Done so far:
 - **synchronous_multi_block family DONE (commit cfbab11e: bb2020 1, bb2025 1 — behavioral
   selection/isBlockable tests fixture-inexpressible, pruned).**
 - **select_blitz_target family DONE (commit e336475f: bb2020 2, bb2025 2).**
-- **Tally after select_blitz (verified full-module green):** Java ffb-client-logic **1303**; Rust
-  ffb-client **1632**. Client gap **329**.
-  NEXT: bomb, throw_keg, then the 33 Rust-only modules + the -N mismatches
+- **bomb family DONE (commit d6062bb7: bb2025 7, mixed 7).**
+- **throw_keg family DONE (commit 53245b4a: bb2020 3, bb2025 3).**
+- **ALL named "+N" logic-module targets now reconciled.** Tally (verified full-module green):
+  Java ffb-client-logic **1298**; Rust ffb-client **1608**. Client gap **310**.
+  NEXT: the remaining smaller +N/±1 logic-module mismatches (e.g. select, kickoff, punt, wizard,
+  raiding_party, then_i_started_blastin, hit_and_run, furious_outburst, pushback, high_kick,
+  swarming, kick_em_*, gaze_move, ktm, stab, trickster, replay, login, interception, …), then the
+  33 Rust-only modules (client_state/client_communication/command_endpoint/handlers/report/etc),
+  then the -N mismatches where Java currently has MORE (setup/wait_for_opponent/quick_snap/
+  solid_defence/spectate/start_game/wait_for_setup/kickoff/raiding_party/trickster — port Java→Rust
+  or prune the Java extra).
   (Java-has-more: setup/wait_for_opponent/quick_snap/solid_defence/spectate/start_game/
   wait_for_setup — port Java→Rust or prune Java).
   Heavy-prune note: modules holding a real BlockLogicExtension (block, synchronous_multi_block)
