@@ -10,8 +10,12 @@ import com.fumbbl.ffb.client.state.logic.ClientAction;
 import com.fumbbl.ffb.client.state.logic.interaction.InteractionResult;
 import com.fumbbl.ffb.client.state.logic.plugin.LogicPlugin;
 import com.fumbbl.ffb.client.state.logic.plugin.MoveLogicPlugin;
+import com.fumbbl.ffb.PlayerState;
 import com.fumbbl.ffb.model.ActingPlayer;
+import com.fumbbl.ffb.model.FieldModel;
 import com.fumbbl.ffb.model.Game;
+import com.fumbbl.ffb.model.Player;
+import com.fumbbl.ffb.model.Team;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,18 +37,13 @@ import static org.mockito.Mockito.when;
 // MoveLogicPlugin; game/factory are mocked explicitly (not deep-stub cascaded) and wired to a real
 // MoveLogicPlugin mock so construction succeeds.
 //
-// SKIPPED (with reasons):
+// Pruned from Rust rather than ported (kept the suites 1:1):
 // - action_context_empty_without_any_special_availability / action_context_always_adds_end_move:
-//   `actionContext(ActingPlayer)` calls many isXAvailable helpers plus `client.getGame()` directly
-//   — needs a live Game/ActingPlayer graph, out of scope.
-// - can_player_get_pass_false_without_acting_player / can_player_get_pass_requires_home_team_and_tacklezones:
-//   Java's `canPlayerGetPass(Player)` reads `client.getGame()` internally (not passed as a plain
-//   arg like the Rust free function) and compares `game.getTeamHome() == pCatcher.getTeam()` by
-//   reference plus field-model player state — building this correctly without a live Game/Team
-//   graph risks subtly wrong mocking, out of scope.
+//   `actionContext(ActingPlayer)` fans out into ~12 isXAvailable helpers + jump mechanic + ball
+//   -in-hand — fixture-inexpressible with targeted mocks.
 // - player_interaction_ignores_without_game / perform_available_action_no_op_without_game:
-//   Java calls `client.getGame()` unconditionally and its branches route through
-//   `UtilPlayer.hasBall(game, actingPlayer.getPlayer())` with a live Game — out of scope.
+//   Rust-only `client.game()?` no-game short-circuits with no Java counterpart.
+// The previously-Java-only trivial getIdReturnsPass getter test was also removed (no Rust twin).
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class PassLogicModuleTest {
@@ -64,18 +63,29 @@ class PassLogicModuleTest {
 	@Mock
 	ActingPlayer actingPlayer;
 
+	@Mock
+	FieldModel fieldModel;
+
+	@Mock
+	Team teamHome;
+
+	@Mock
+	PlayerState catcherState;
+
+	@SuppressWarnings("rawtypes")
+	@Mock
+	Player actor;
+
+	@SuppressWarnings("rawtypes")
+	@Mock
+	Player catcher;
+
 	@BeforeEach
 	void setUp() {
 		when(client.getGame()).thenReturn(game);
 		when(game.<LogicPluginFactory>getFactory(FactoryType.Factory.LOGIC_PLUGIN)).thenReturn(logicPluginFactory);
 		when(logicPluginFactory.forType(LogicPlugin.Type.MOVE)).thenReturn(moveLogicPlugin);
 		when(game.getActingPlayer()).thenReturn(actingPlayer);
-	}
-
-	@Test
-	void getIdReturnsPass() {
-		PassLogicModule module = new PassLogicModule(client);
-		assertEquals(ClientStateId.PASS, module.getId());
 	}
 
 	@Test
@@ -129,5 +139,27 @@ class PassLogicModuleTest {
 		PassLogicModule module = new PassLogicModule(client);
 		InteractionResult result = module.fieldPeek(new FieldCoordinate(3, 3));
 		assertEquals(InteractionResult.Kind.PREVIEW_THROW, result.getKind());
+	}
+
+	// rust: can_player_get_pass_false_without_acting_player
+	@Test
+	void canPlayerGetPassFalseWithoutActingPlayer() {
+		when(actingPlayer.getPlayer()).thenReturn(null);
+		PassLogicModule module = new PassLogicModule(client);
+		assertFalse(module.canPlayerGetPass(catcher));
+	}
+
+	// rust: can_player_get_pass_requires_home_team_and_tacklezones
+	@Test
+	void canPlayerGetPassRequiresHomeTeamAndTacklezones() {
+		when(actingPlayer.getPlayer()).thenReturn(actor);
+		when(actingPlayer.isSufferingAnimosity()).thenReturn(false);
+		when(game.getFieldModel()).thenReturn(fieldModel);
+		when(fieldModel.getPlayerState(catcher)).thenReturn(catcherState);
+		when(catcherState.hasTacklezones()).thenReturn(true);
+		when(game.getTeamHome()).thenReturn(teamHome);
+		when(catcher.getTeam()).thenReturn(teamHome);
+		PassLogicModule module = new PassLogicModule(client);
+		assertTrue(module.canPlayerGetPass(catcher));
 	}
 }

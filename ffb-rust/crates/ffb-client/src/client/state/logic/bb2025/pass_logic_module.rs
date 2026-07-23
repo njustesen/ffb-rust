@@ -392,23 +392,9 @@ mod tests {
         assert!(actions.contains(&ClientAction::MOVE));
     }
 
-    #[test]
-    fn action_context_empty_without_any_special_availability() {
-        let module = PassLogicModule::new();
-        let game = make_game();
-        let ap = ActingPlayer::new();
-        let ctx = module.action_context(&game, &ap);
-        assert!(!ctx.get_actions().contains(&ClientAction::PASS));
-    }
-
-    #[test]
-    fn action_context_always_adds_end_move() {
-        let module = PassLogicModule::new();
-        let game = make_game();
-        let ap = ActingPlayer::new();
-        let ctx = module.action_context(&game, &ap);
-        assert!(ctx.get_actions().contains(&ClientAction::END_MOVE));
-    }
+    // NOTE (test equalization): `action_context_empty_without_any_special_availability` and
+    // `action_context_always_adds_end_move` pruned — Java `actionContext` fans out into ~12
+    // availability helpers + jump mechanic + ball-in-hand (fixture-inexpressible).
 
     #[test]
     fn action_is_hmp_false_without_game() {
@@ -466,18 +452,8 @@ mod tests {
         assert!(!module.performs_range_grid_action(&ap, &game));
     }
 
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = PassLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
+    // NOTE (test equalization): `player_interaction_ignores_without_game` pruned — Rust-only
+    // no-game short-circuit; Java dereferences the game unconditionally.
 
     #[test]
     fn field_interaction_delegates_on_pass_move() {
@@ -506,12 +482,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn perform_available_action_no_op_without_game() {
-        let mut module = PassLogicModule::new();
-        let mut client = make_client();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        module.perform_available_action(&mut client, &player, ClientAction::HAIL_MARY_PASS);
-    }
+    // NOTE (test equalization): `perform_available_action_no_op_without_game` pruned — Rust-only
+    // no-game short-circuit; Java guards on player != null and otherwise dereferences the game.
 }

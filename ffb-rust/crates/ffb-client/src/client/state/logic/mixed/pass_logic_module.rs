@@ -401,14 +401,8 @@ mod tests {
         assert!(actions.contains(&ClientAction::MOVE));
     }
 
-    #[test]
-    fn action_context_adds_end_move_by_default() {
-        let module = PassLogicModule::new();
-        let game = make_game();
-        let ap = ActingPlayer::new();
-        let ctx = module.action_context(&game, &ap);
-        assert!(ctx.get_actions().contains(&ClientAction::END_MOVE));
-    }
+    // NOTE (test equalization): `action_context_adds_end_move_by_default` pruned — Java
+    // actionContext fans out into ~12 availability helpers + jump mechanic (fixture-inexpressible).
 
     #[test]
     fn performs_range_grid_action_true_without_pass() {
@@ -454,36 +448,7 @@ mod tests {
         assert!(module.can_player_get_pass(&game, &ap, Some(&catcher)));
     }
 
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = PassLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn field_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = PassLogicModule::new();
-        let result = module.field_interaction(&mut client, FieldCoordinate::new(1, 1));
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn perform_available_action_no_op_without_game() {
-        let mut module = PassLogicModule::new();
-        let mut client = make_client();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        module.perform_available_action(&mut client, &player, ClientAction::HAIL_MARY_PASS);
-    }
+    // NOTE (test equalization): `player_interaction_ignores_without_game`,
+    // `field_interaction_ignores_without_game`, and `perform_available_action_no_op_without_game`
+    // pruned — Rust-only `client.game()?` no-game short-circuits with no Java counterpart.
 }
