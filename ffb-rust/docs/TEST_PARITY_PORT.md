@@ -98,9 +98,17 @@ mismatches. Done so far:
   Rust ffb-client → **1665** (~33 plumbing/unreachable/fixture-inexpressible pruned). Client gap
   ~486 → **367**. Modules 1:1 so far: client_state_factory, {mixed,bb2025} foul, {bb2025,mixed}
   hand_over, {bb2025,mixed} pass, {bb2025,mixed} gaze.
-  NEXT: block, synchronous_multi_block, select_blitz_target, bomb, throw_keg, then the 33
-  Rust-only modules + the -N mismatches (Java-has-more: setup/wait_for_opponent/quick_snap/
-  solid_defence/spectate/start_game/wait_for_setup — port Java→Rust or prune Java).
+- **block family DONE (commit 0065ee05: bb2025 1, mixed 3).**
+- **synchronous_multi_block family DONE (commit cfbab11e: bb2020 1, bb2025 1 — behavioral
+  selection/isBlockable tests fixture-inexpressible, pruned).**
+- **Tally after block+SMB (verified full-module green):** Java ffb-client-logic **1301**; Rust
+  ffb-client **1641**. Client gap **340**.
+  NEXT: select_blitz_target, bomb, throw_keg, then the 33 Rust-only modules + the -N mismatches
+  (Java-has-more: setup/wait_for_opponent/quick_snap/solid_defence/spectate/start_game/
+  wait_for_setup — port Java→Rust or prune Java).
+  Heavy-prune note: modules holding a real BlockLogicExtension (block, synchronous_multi_block)
+  or private stateful maps can't have their behavioral tests unit-mirrored — keep availableActions
+  + the few command-verifiable paths, prune the rest to the ffb-parity harness.
   Recurring gaze/actionContext lesson: modules whose behavioral core routes through
   UtilPlayer.canGaze / a fanned-out actionContext / GAME-mechanic factory are fixture-inexpressible
   with targeted mocks — port the clean guards, prune the rest with a breadcrumb.
