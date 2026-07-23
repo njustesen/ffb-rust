@@ -101,9 +101,10 @@ mismatches. Done so far:
 - **block family DONE (commit 0065ee05: bb2025 1, mixed 3).**
 - **synchronous_multi_block family DONE (commit cfbab11e: bb2020 1, bb2025 1 — behavioral
   selection/isBlockable tests fixture-inexpressible, pruned).**
-- **Tally after block+SMB (verified full-module green):** Java ffb-client-logic **1301**; Rust
-  ffb-client **1641**. Client gap **340**.
-  NEXT: select_blitz_target, bomb, throw_keg, then the 33 Rust-only modules + the -N mismatches
+- **select_blitz_target family DONE (commit e336475f: bb2020 2, bb2025 2).**
+- **Tally after select_blitz (verified full-module green):** Java ffb-client-logic **1303**; Rust
+  ffb-client **1632**. Client gap **329**.
+  NEXT: bomb, throw_keg, then the 33 Rust-only modules + the -N mismatches
   (Java-has-more: setup/wait_for_opponent/quick_snap/solid_defence/spectate/start_game/
   wait_for_setup — port Java→Rust or prune Java).
   Heavy-prune note: modules holding a real BlockLogicExtension (block, synchronous_multi_block)
