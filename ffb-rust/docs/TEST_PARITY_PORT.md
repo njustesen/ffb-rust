@@ -92,12 +92,18 @@ mismatches. Done so far:
 - **foul family DONE (commits 298066d6 mixed 7/7, cb34b176 bb2025 5/5).**
 - **hand_over family DONE (commit d4e159f7: bb2025 5/5, mixed 5/5).**
 - **pass family DONE (commit 1380e776: bb2025 9/9, mixed 6/6).**
-- **Running client tally:** Java ffb-client-logic 1208 → **~1310**; Rust ffb-client → ~1674
-  (~23 plumbing/unreachable pruned). Client gap ~486 → **~365**. Modules 1:1 so far:
-  client_state_factory, {mixed,bb2025} foul, {bb2025,mixed} hand_over, {bb2025,mixed} pass.
-  NEXT: synchronous_multi_block, block, gaze, select_blitz_target, bomb, throw_keg, then the
-  33 Rust-only modules + the -N mismatches (Java-has-more: setup/wait_for_opponent/quick_snap/
+- **gaze family DONE (commit 62555da1: bb2025 2/2, mixed 2/2 — canGaze-chain tests pruned as
+  fixture-inexpressible).**
+- **Running client tally (verified full-module green):** Java ffb-client-logic 1208 → **1298**;
+  Rust ffb-client → **1665** (~33 plumbing/unreachable/fixture-inexpressible pruned). Client gap
+  ~486 → **367**. Modules 1:1 so far: client_state_factory, {mixed,bb2025} foul, {bb2025,mixed}
+  hand_over, {bb2025,mixed} pass, {bb2025,mixed} gaze.
+  NEXT: block, synchronous_multi_block, select_blitz_target, bomb, throw_keg, then the 33
+  Rust-only modules + the -N mismatches (Java-has-more: setup/wait_for_opponent/quick_snap/
   solid_defence/spectate/start_game/wait_for_setup — port Java→Rust or prune Java).
+  Recurring gaze/actionContext lesson: modules whose behavioral core routes through
+  UtilPlayer.canGaze / a fanned-out actionContext / GAME-mechanic factory are fixture-inexpressible
+  with targeted mocks — port the clean guards, prune the rest with a breadcrumb.
 
 **PROVEN LOGIC-MODULE RECIPE (use for all remaining client logic modules):**
 - Setup mirrors `MoveLogicModuleTest`: `@Mock(RETURNS_DEEP_STUBS) client` + plain `@Mock` game,
