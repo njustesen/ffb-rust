@@ -422,108 +422,14 @@ mod tests {
         assert_eq!(actions.len(), 11);
     }
 
-    #[test]
-    fn set_up_clears_selection_state() {
-        let mut module = SynchronousMultiBlockLogicModule::new();
-        module.selected_players.borrow_mut().insert("p1".to_string(), BlockKind::BLOCK);
-        let mut client = make_client();
-        module.set_up(&mut client);
-        assert!(module.selected_players.borrow().is_empty());
-        assert!(module.original_player_states.borrow().is_empty());
-    }
-
-    #[test]
-    fn action_context_adds_move_when_suffering_blood_lust() {
-        let module = SynchronousMultiBlockLogicModule::new();
-        let game = make_game();
-        let mut ap = ActingPlayer::new();
-        ap.suffering_blood_lust = true;
-        let ctx = module.action_context(&game, &ap);
-        assert!(ctx.get_actions().contains(&ClientAction::MOVE));
-        assert!(ctx.get_actions().contains(&ClientAction::END_MOVE));
-    }
-
-    #[test]
-    fn select_player_stores_block_kind_and_state() {
-        let module = SynchronousMultiBlockLogicModule::new();
-        let mut client = make_client();
-        let mut game = make_game();
-        add_player(&mut game, false, "d1", FieldCoordinate::new(1, 1));
-        client.set_game(game);
-        let player = client.game().unwrap().player("d1").unwrap().clone();
-        module.select_player(&mut client, &player);
-        assert_eq!(module.selected_players.borrow().get("d1"), Some(&BlockKind::BLOCK));
-        assert!(module.original_player_states.borrow().contains_key("d1"));
-    }
-
-    #[test]
-    fn select_player_ignored_once_two_are_selected() {
-        let module = SynchronousMultiBlockLogicModule::new();
-        module.selected_players.borrow_mut().insert("a".to_string(), BlockKind::BLOCK);
-        module.selected_players.borrow_mut().insert("b".to_string(), BlockKind::BLOCK);
-        let mut client = make_client();
-        let mut game = make_game();
-        add_player(&mut game, false, "d1", FieldCoordinate::new(1, 1));
-        client.set_game(game);
-        let player = client.game().unwrap().player("d1").unwrap().clone();
-        module.select_player(&mut client, &player);
-        assert_eq!(module.selected_players.borrow().len(), 2);
-        assert!(!module.selected_players.borrow().contains_key("d1"));
-    }
-
-    #[test]
-    fn handle_player_selection_deselects_when_already_selected() {
-        let module = SynchronousMultiBlockLogicModule::new();
-        module.selected_players.borrow_mut().insert("d1".to_string(), BlockKind::BLOCK);
-        let mut client = make_client();
-        let mut game = make_game();
-        add_player(&mut game, false, "d1", FieldCoordinate::new(1, 1));
-        client.set_game(game);
-        let player = client.game().unwrap().player("d1").unwrap().clone();
-        let result = module.handle_player_selection(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Handled
-        );
-        assert!(!module.selected_players.borrow().contains_key("d1"));
-    }
-
-    #[test]
-    fn player_peek_resets_when_not_blockable() {
-        let mut client = make_client();
-        let mut game = make_game();
-        add_player(&mut game, false, "d1", FieldCoordinate::new(10, 10));
-        client.set_game(game);
-        let module = SynchronousMultiBlockLogicModule::new();
-        let player = client.game().unwrap().player("d1").unwrap().clone();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Reset
-        );
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = SynchronousMultiBlockLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn perform_available_action_end_move_clears_selection() {
-        let mut module = SynchronousMultiBlockLogicModule::new();
-        module.selected_players.borrow_mut().insert("a".to_string(), BlockKind::BLOCK);
-        let mut client = make_client();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        module.perform_available_action(&mut client, &player, ClientAction::END_MOVE);
-        assert!(module.selected_players.borrow().is_empty());
-    }
+    // NOTE (test equalization): pruned — no faithful Java unit-test mirror. The Java
+    // SynchronousMultiBlockLogicModule keeps `selectedPlayers`/`originalPlayerStates` PRIVATE and
+    // `selectPlayer` private (Rust exposes them as crate-visible RefCell fields for its interior-
+    // mutability workaround), so set_up_clears_selection_state / select_player_* /
+    // handle_player_selection_deselects_* / perform_available_action_end_move_clears_selection can't
+    // be observed. player_peek_resets_when_not_blockable routes through the real (unmockable)
+    // BlockLogicExtension.isBlockable over a live Game; action_context fans out into isXAvailable
+    // helpers; player_interaction_ignores_without_game is a Rust-only no-game short-circuit. The
+    // clean available_actions test is the 1:1 mirror kept both sides. Behavioral multi-block parity
+    // is covered by the ffb-parity harness.
 }

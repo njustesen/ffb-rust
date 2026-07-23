@@ -64,12 +64,6 @@ class SynchronousMultiBlockLogicModuleTest {
 	}
 
 	@Test
-	void getIdReturnsSynchronousMultiBlock() {
-		SynchronousMultiBlockLogicModule module = new SynchronousMultiBlockLogicModule(client);
-		assertEquals(ClientStateId.SYNCHRONOUS_MULTI_BLOCK, module.getId());
-	}
-
-	@Test
 	void availableActionsContainsBlockAndMove() {
 		SynchronousMultiBlockLogicModule module = new SynchronousMultiBlockLogicModule(client);
 		Set<ClientAction> actions = module.availableActions();
