@@ -19,7 +19,7 @@ import org.mockito.quality.Strictness;
 import java.util.Collections;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -32,12 +32,15 @@ import static org.mockito.Mockito.when;
 // cascaded) and wired to a real MoveLogicPlugin mock so construction and availableActions() (which
 // merges in plugin.availableActions()) both work correctly.
 //
-// SKIPPED (with reasons):
-// - can_be_gazed_false_without_victim / can_be_gazed_false_without_adjacency /
-//   can_be_gazed_false_for_own_team_member: Java's `canBeGazed(Player)` needs a live Game (teams,
-//   field model with player coordinates/states) via client.getGame() — out of scope.
-// - player_interaction_ignores_without_game / player_peek_ignores_without_game: these call
-//   client.getGame() unconditionally in Java and require a live Game/ActingPlayer graph.
+// Pruned from Rust rather than ported (kept the suites 1:1):
+// - can_be_gazed_false_without_adjacency / can_be_gazed_false_for_own_team_member: Java's
+//   canBeGazed evaluates UtilPlayer.canGaze first, which needs the GAME-mechanic factory chain +
+//   findOtherTeam + a gaze-capable actor to isolate the named condition — fixture-inexpressible
+//   with targeted mocks (the canGaze path always short-circuits false for a skill-less mock actor).
+// - player_interaction_ignores_without_game / player_peek_ignores_without_game: Rust-only
+//   client.game()? no-game short-circuits with no Java counterpart.
+// The previously-Java-only trivial getIdReturnsGaze getter test was also removed (no Rust twin).
+// can_be_gazed_false_without_victim IS ported below (null-victim guard, no canGaze evaluation).
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class GazeLogicModuleTest {
@@ -63,17 +66,18 @@ class GazeLogicModuleTest {
 	}
 
 	@Test
-	void getIdReturnsGaze() {
-		GazeLogicModule module = new GazeLogicModule(client);
-		assertEquals(ClientStateId.GAZE, module.getId());
-	}
-
-	@Test
 	void availableActionsDelegatesToMoveLogicAndContainsGaze() {
 		GazeLogicModule module = new GazeLogicModule(client);
 		Set<ClientAction> actions = module.availableActions();
 		assertTrue(actions.contains(ClientAction.GAZE));
 		assertTrue(actions.contains(ClientAction.MOVE));
 		assertTrue(actions.contains(ClientAction.END_MOVE));
+	}
+
+	// rust: can_be_gazed_false_without_victim
+	@Test
+	void canBeGazedFalseWithoutVictim() {
+		GazeLogicModule module = new GazeLogicModule(client);
+		assertFalse(module.canBeGazed(null));
 	}
 }

@@ -216,67 +216,14 @@ mod tests {
         assert!(!can_be_gazed(&client, None));
     }
 
-    #[test]
-    fn can_be_gazed_false_without_adjacency() {
-        let mut client = make_client();
-        let mut game = make_game();
-        add_player(&mut game, true, "actor", FieldCoordinate::new(1, 1));
-        add_player(&mut game, false, "victim", FieldCoordinate::new(10, 10));
-        game.acting_player.player_id = Some("actor".to_string());
-        client.set_game(game);
-        let victim = client.game().unwrap().player("victim").unwrap().clone();
-        assert!(!can_be_gazed(&client, Some(&victim)));
-    }
-
-    #[test]
-    fn player_activation_used_falls_back_without_target_selection_state() {
-        let mut client = make_client();
-        client.set_game(make_game());
-        let module = GazeLogicModule::new();
-        assert!(!module.player_activation_used(&client));
-    }
-
-    #[test]
-    fn player_peek_invalid_when_not_gazeable() {
-        let mut client = make_client();
-        client.set_game(make_game());
-        let module = GazeLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Invalid
-        );
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = GazeLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn perform_available_action_delegates_without_panicking() {
-        let mut module = GazeLogicModule::new();
-        let mut client = make_client();
-        client.set_game(make_game());
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        module.perform_available_action(&mut client, &player, ClientAction::END_MOVE);
-    }
-
-    #[test]
-    fn end_turn_no_op_without_game() {
-        let mut module = GazeLogicModule::new();
-        let mut client = make_client();
-        module.end_turn(&mut client);
-    }
+    // NOTE (test equalization): pruned as fixture-inexpressible / no faithful Java mirror —
+    // `can_be_gazed_false_without_adjacency` and `player_peek_invalid_when_not_gazeable` (Java
+    // canBeGazed evaluates UtilPlayer.canGaze first: GAME-mechanic factory chain + findOtherTeam +
+    // a gaze-capable actor, so the named condition can't be isolated with targeted mocks);
+    // `player_activation_used_falls_back_without_target_selection_state` (falls through to
+    // super.playerActivationUsed() over a live acting-player graph);
+    // `perform_available_action_delegates_without_panicking` (a no-assertion smoke test); and
+    // `player_interaction_ignores_without_game` / `end_turn_no_op_without_game` (Rust-only no-game
+    // short-circuits). `can_be_gazed_false_without_victim` IS kept (mirrored via playerPeek's
+    // null-victim guard in Java).
 }

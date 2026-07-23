@@ -189,51 +189,12 @@ mod tests {
         assert!(!can_be_gazed(&game, None));
     }
 
-    #[test]
-    fn can_be_gazed_false_without_adjacency() {
-        let mut game = make_game();
-        add_player(&mut game, true, "attacker", FieldCoordinate::new(1, 1));
-        add_player(&mut game, false, "victim", FieldCoordinate::new(10, 10));
-        game.acting_player.player_id = Some("attacker".to_string());
-        let victim = game.player("victim").unwrap().clone();
-        assert!(!can_be_gazed(&game, Some(&victim)));
-    }
-
-    #[test]
-    fn can_be_gazed_false_for_own_team_member() {
-        let mut game = make_game();
-        add_player(&mut game, true, "attacker", FieldCoordinate::new(1, 1));
-        add_player(&mut game, true, "friend", FieldCoordinate::new(2, 1));
-        game.acting_player.player_id = Some("attacker".to_string());
-        let friend = game.player("friend").unwrap().clone();
-        assert!(!can_be_gazed(&game, Some(&friend)));
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = GazeLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn player_peek_ignores_without_game() {
-        let client = make_client();
-        let module = GazeLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
+    // NOTE (test equalization): `can_be_gazed_false_without_adjacency` and
+    // `can_be_gazed_false_for_own_team_member` pruned — Java canBeGazed evaluates
+    // UtilPlayer.canGaze first (GAME-mechanic factory chain + findOtherTeam + a gaze-capable
+    // actor), so the named condition can't be isolated with targeted mocks (fixture-inexpressible).
+    // `player_interaction_ignores_without_game` / `player_peek_ignores_without_game` pruned —
+    // Rust-only no-game short-circuits with no Java counterpart.
 
     #[test]
     fn available_actions_delegates_to_move_logic() {
