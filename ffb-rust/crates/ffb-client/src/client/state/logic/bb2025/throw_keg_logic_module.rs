@@ -378,77 +378,9 @@ mod tests {
         assert!(!module.is_end_player_action_available(&game));
     }
 
-    #[test]
-    fn is_valid_target_false_without_acting_player_coordinate() {
-        let module = ThrowKegLogicModule::new();
-        let mut game = make_game();
-        add_player(&mut game, false, "t1", FieldCoordinate::new(1, 1));
-        let target = game.player("t1").unwrap().clone();
-        assert!(!module.is_valid_target(&game, &target));
-    }
-
-    #[test]
-    fn is_valid_target_true_for_standing_opponent_within_three_squares() {
-        let module = ThrowKegLogicModule::new();
-        let mut game = make_game();
-        add_player(&mut game, true, "attacker", FieldCoordinate::new(5, 5));
-        add_player(&mut game, false, "t1", FieldCoordinate::new(6, 6));
-        game.acting_player.player_id = Some("attacker".to_string());
-        let target = game.player("t1").unwrap().clone();
-        assert!(module.is_valid_target(&game, &target));
-    }
-
-    #[test]
-    fn is_valid_target_false_for_own_team() {
-        let module = ThrowKegLogicModule::new();
-        let mut game = make_game();
-        add_player(&mut game, true, "attacker", FieldCoordinate::new(5, 5));
-        add_player(&mut game, true, "t1", FieldCoordinate::new(6, 6));
-        game.acting_player.player_id = Some("attacker".to_string());
-        let target = game.player("t1").unwrap().clone();
-        assert!(!module.is_valid_target(&game, &target));
-    }
-
-    #[test]
-    fn action_context_adds_end_move_when_available() {
-        let module = ThrowKegLogicModule::new();
-        let game = make_game();
-        let ap = ActingPlayer::new();
-        let ctx = module.action_context(&game, &ap);
-        assert!(ctx.get_actions().contains(&ClientAction::END_MOVE));
-    }
-
-    #[test]
-    fn set_up_and_teardown_do_not_panic_without_game() {
-        let mut module = ThrowKegLogicModule::new();
-        let mut client = make_client();
-        module.set_up(&mut client);
-        module.teardown(&mut client);
-    }
-
-    #[test]
-    fn set_up_adds_move_squares_around_acting_player() {
-        let mut module = ThrowKegLogicModule::new();
-        let mut client = make_client();
-        let mut game = make_game();
-        add_player(&mut game, true, "attacker", FieldCoordinate::new(5, 5));
-        game.acting_player.player_id = Some("attacker".to_string());
-        client.set_game(game);
-        module.set_up(&mut client);
-        let count = client.game().unwrap().field_model.move_squares.len();
-        assert!(count > 0);
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = ThrowKegLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
+    // NOTE (test equalization): pruned — no faithful Java unit mirror. is_valid_target_* (Java
+    // isValidTarget is private, reachable only via the UI-touching playerPeek); action_context
+    // isXAvailable fan-out; set_up_* (PathFinder move-square computation over a live Game;
+    // set_up_and_teardown no-panic smoke); player_interaction no-game short-circuit. The kept 1:1
+    // mirrors are available_actions + is_end_player_action_available true/false.
 }

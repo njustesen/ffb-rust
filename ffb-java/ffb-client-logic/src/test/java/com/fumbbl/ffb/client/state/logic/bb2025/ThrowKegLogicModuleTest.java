@@ -55,12 +55,6 @@ class ThrowKegLogicModuleTest {
 	}
 
 	@Test
-	void getIdReturnsThrowKeg() {
-		ThrowKegLogicModule module = new ThrowKegLogicModule(client);
-		assertEquals(ClientStateId.THROW_KEG, module.getId());
-	}
-
-	@Test
 	void availableActionsContainsEndMoveAndWisdom() {
 		ThrowKegLogicModule module = new ThrowKegLogicModule(client);
 		Set<ClientAction> actions = module.availableActions();
