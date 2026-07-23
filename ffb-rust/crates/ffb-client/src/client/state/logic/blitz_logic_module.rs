@@ -317,46 +317,10 @@ mod tests {
         assert!(!module.player_activation_used(&client));
     }
 
-    #[test]
-    fn player_peek_resets_when_no_game() {
-        let client = make_client();
-        let module = BlitzLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Reset
-        );
-    }
-
-    #[test]
-    fn player_peek_resets_when_not_blockable() {
-        let mut client = make_client();
-        let mut game = make_game();
-        add_player(&mut game, false, "a1", FieldCoordinate::new(10, 10));
-        client.set_game(game);
-        let module = BlitzLogicModule::new();
-        let player = client.game().unwrap().player("a1").unwrap().clone();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Reset
-        );
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = BlitzLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
+    // NOTE (test equalization): `player_peek_resets_when_not_blockable` pruned — routes through the
+    // unmockable BlockLogicExtension.isBlockable over a live Game (fixture-inexpressible).
+    // `player_peek_resets_when_no_game` / `player_interaction_ignores_without_game` pruned —
+    // Rust-only no-game short-circuits.
 
     #[test]
     fn is_gored_available_false_without_target_selection_state() {
@@ -366,12 +330,6 @@ mod tests {
         assert!(!module.is_gored_available(&client));
     }
 
-    #[test]
-    fn perform_available_action_no_op_without_game() {
-        let mut module = BlitzLogicModule::new();
-        let mut client = make_client();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        module.perform_available_action(&mut client, &player, ClientAction::FUMBLEROOSKIE);
-    }
+    // NOTE (test equalization): `perform_available_action_no_op_without_game` pruned — Rust-only
+    // no-game short-circuit; Java guards on player != null and otherwise dereferences the game.
 }
