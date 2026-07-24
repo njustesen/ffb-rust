@@ -111,8 +111,13 @@ mismatches. Done so far:
   dump_off 4, swoop 6, maximum_carnage 4, select_gaze_target 4, pass_block 7, kick_em_blitz 3,
   kick_em_block 2, block_kind 2. Tally (verified full-module green): Java **1346** / Rust **1575**,
   client gap **229**.
-  Still-remaining Rust-only logic modules: ktm(8), kick_team_mate_like_throw(8),
-  putrid_regurgitation_blitz(7), putrid_regurgitation_block(4), replay(9). Then logicmodule(+43,
+  Done since: bb2016 ktm 5, bb2020 kick_team_mate_like_throw 4, putrid_regurgitation_blitz 4,
+  putrid_regurgitation_block 2. Tally Java **1361** / Rust **1563**, client gap **202**.
+  Only Rust-only logic module LEFT: **replay(9)** — DEFERRED, complex (ReplayCallbacks interface,
+  session close, replayList state, network); needs its own checkpoint. Clean ports there:
+  action_context throws (assertThrows), replayStopped (mode+key), evaluateControl notifies a
+  mockable ReplayCallbacks; prune is_online "gap" + replayList/setUp state + network session tests.
+  Then logicmodule(+43,
   recipe above), the ±1 report-message mismatches, the -N Java-has-more cases (setup/
   wait_for_opponent/quick_snap/solid_defence/spectate/start_game/wait_for_setup), and the
   Rust-only INFRA modules (mod/clientstate/clientcommunication/commandendpoint/etc — candidate
