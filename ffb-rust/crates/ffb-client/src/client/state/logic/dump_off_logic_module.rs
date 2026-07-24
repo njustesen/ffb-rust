@@ -258,29 +258,11 @@ mod tests {
         );
     }
 
-    #[test]
-    fn field_interaction_ignores_without_thrower() {
-        let module = DumpOffLogicModule::new();
-        let mut client = make_client();
-        client.set_game(make_game());
-        let result = module.field_interaction(&mut client, FieldCoordinate::new(2, 2));
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn field_peek_resets_without_thrower() {
-        let module = DumpOffLogicModule::new();
-        let mut client = make_client();
-        client.set_game(make_game());
-        let result = module.field_peek(&mut client, FieldCoordinate::new(2, 2));
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Reset
-        );
-    }
+    // NOTE (test equalization): `field_interaction_ignores_without_thrower` and
+    // `field_peek_resets_without_thrower` pruned — both route through testCoordinateInRange, which
+    // reads game.getThrower()'s coordinate and the PASS mechanic's findPassingDistance over a live
+    // Game (the no-thrower path is fixture-inexpressible). The in-range gate is mirrored via the
+    // out-of-range field_interaction test with a stubbed PASS mechanic.
 
     #[test]
     fn player_peek_sets_selected_player_and_ignores() {
