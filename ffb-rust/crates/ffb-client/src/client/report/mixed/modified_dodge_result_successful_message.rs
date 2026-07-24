@@ -91,16 +91,7 @@ mod tests {
         assert_eq!(status_report.rendered_runs[0].paragraph_style, Some(ParagraphStyle::INDENT_3));
     }
 
-    #[test]
-    fn missing_skill_renders_empty_name() {
-        let game = make_game();
-        let report = ReportModifiedDodgeResultSuccessful::new(None);
-        let mut status_report = StatusReport::new();
-        ModifiedDodgeResultSuccessfulMessage.render(&mut status_report, &game, &report);
-        assert_eq!(
-            status_report.rendered_runs[0].text.as_deref(),
-            Some("Using  would result in a successful dodge")
-        );
-    }
-
+    // NOTE (test equalization): `missing_skill_renders_empty_name` pruned — Rust guards a null
+    // skill defensively, but Java's renderer dereferences report.getSkill().getName() (NPEs).
+    // Documented divergence, no Java mirror.
 }

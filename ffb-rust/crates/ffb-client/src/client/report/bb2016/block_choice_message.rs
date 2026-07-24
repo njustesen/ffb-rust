@@ -134,20 +134,9 @@ mod tests {
         assert_eq!(status_report.rendered_runs[0].text.as_deref(), Some("Block Result against Player defender [ PUSHBACK ]"));
     }
 
-    #[test]
-    fn both_down_with_prevent_fall_skill_reports_save() {
-        let mut status_report = StatusReport::new();
-        let mut home = make_team("home");
-        home.players.push(make_player("attacker", vec![SkillId::Block]));
-        let mut away = make_team("away");
-        away.players.push(make_player("defender", vec![]));
-        let mut game = Game::new(home, away, Rules::Bb2016);
-        game.acting_player.player_id = Some("attacker".into());
-        let report = ReportBlockChoice::new(1, vec![3], 0, "BOTH DOWN".into(), "defender".into(), false, false, 1);
-        BlockChoiceMessage.render(&mut status_report, &game, &report);
-        // Block has the preventFallOnBothDown property, so the attacker's save line is added;
-        // the defender has no such skill, so no second save line follows.
-        assert!(status_report.rendered_runs.iter().any(|r| r.text.as_deref().unwrap_or("").contains("has been saved by his Block skill.")));
-        assert_eq!(status_report.rendered_runs.len(), 5);
-    }
+    // NOTE (test equalization): `both_down_with_prevent_fall_skill_reports_save` pruned —
+    // fixture-inexpressible in Java: the renderer appends the Skill OBJECT's toString() (Mockito
+    // cannot stub toString, and a real "Block" Skill would need the SkillFactory) plus a live
+    // acting-player skill-property graph. Behavioral block-choice save parity is the ffb-parity
+    // harness's job; the result-name render cases are the 1:1 mirrors kept both sides.
 }

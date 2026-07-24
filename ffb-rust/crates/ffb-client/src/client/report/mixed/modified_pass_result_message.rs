@@ -82,17 +82,9 @@ mod tests {
         assert_eq!(status_report.rendered_runs[0].text_style, Some(TextStyle::EXPLANATION));
     }
 
-    #[test]
-    fn missing_skill_renders_empty_name() {
-        let game = make_game();
-        let report = ReportModifiedPassResult::new(None, "Accurate".into());
-        let mut status_report = StatusReport::new();
-        ModifiedPassResultMessage.render(&mut status_report, &game, &report);
-        assert_eq!(
-            status_report.rendered_runs[0].text.as_deref(),
-            Some("Using  would change the result to Accurate")
-        );
-    }
+    // NOTE (test equalization): `missing_skill_renders_empty_name` pruned — Rust guards a null
+    // skill defensively, but Java's renderer dereferences report.getSkill().getName() (NPEs).
+    // Documented divergence, no Java mirror.
 
     #[test]
     fn different_pass_result_value() {
