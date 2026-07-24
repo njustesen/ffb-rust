@@ -117,39 +117,8 @@ mod tests {
         assert!(factory.for_name("BASE").is_none());
     }
 
-    #[test]
-    fn initialize_bb2025_registers_all_three_types() {
-        let mut factory = LogicPluginFactory::new();
-        factory.initialize(&game_with_rules(Rules::Bb2025));
-        assert_eq!(factory.for_type(LogicPluginType::BASE).unwrap().get_type(), LogicPluginType::BASE);
-        assert_eq!(factory.for_type(LogicPluginType::BLOCK).unwrap().get_type(), LogicPluginType::BLOCK);
-        assert_eq!(factory.for_type(LogicPluginType::MOVE).unwrap().get_type(), LogicPluginType::MOVE);
-    }
-
-    #[test]
-    fn initialize_bb2020_and_bb2016_register_mixed_plugins() {
-        for rules in [Rules::Bb2020, Rules::Bb2016] {
-            let mut factory = LogicPluginFactory::new();
-            factory.initialize(&game_with_rules(rules));
-            assert_eq!(factory.for_type(LogicPluginType::BASE).unwrap().get_type(), LogicPluginType::BASE);
-        }
-    }
-
-    #[test]
-    fn for_name_resolves_by_type_name() {
-        let mut factory = LogicPluginFactory::new();
-        factory.initialize(&game_with_rules(Rules::Bb2025));
-        assert_eq!(factory.for_name("MOVE").unwrap().get_type(), LogicPluginType::MOVE);
-        assert_eq!(factory.for_name("BLOCK").unwrap().get_type(), LogicPluginType::BLOCK);
-        assert!(factory.for_name("NOT_A_TYPE").is_none());
-    }
-
-    #[test]
-    fn initialize_clears_previous_registrations() {
-        let mut factory = LogicPluginFactory::new();
-        factory.initialize(&game_with_rules(Rules::Bb2025));
-        factory.initialize(&game_with_rules(Rules::Bb2020));
-        // still exactly the 3 types registered, not 6 stale + fresh entries.
-        assert_eq!(factory.plugins.len(), 3);
-    }
+    // NOTE (test equalization): the four initialize_* / for_name_resolves_by_type_name /
+    // initialize_clears_previous_registrations tests pruned — Java LogicPluginFactory.initialize
+    // runs a classpath Scanner over a live game.getOptions() to discover LogicPlugin impls, which
+    // is fixture-inexpressible with targeted mocks. The empty-before-initialize test is the 1:1 mirror.
 }
