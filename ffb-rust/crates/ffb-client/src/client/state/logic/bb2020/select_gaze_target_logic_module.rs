@@ -282,26 +282,10 @@ mod tests {
         assert!(!is_valid_gaze_target(&game, &player));
     }
 
-    #[test]
-    fn is_valid_gaze_target_true_for_opponent_with_tacklezones() {
-        let mut game = make_game();
-        add_player(&mut game, false, "a1", FieldCoordinate::new(5, 5));
-        let player = game.player("a1").unwrap().clone();
-        assert!(is_valid_gaze_target(&game, &player));
-    }
-
-    #[test]
-    fn player_peek_invalid_without_game() {
-        let module = SelectGazeTargetLogicModule::new();
-        let client = make_client();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Invalid
-        );
-    }
+    // NOTE (test equalization): `is_valid_gaze_target_true_for_opponent_with_tacklezones` pruned —
+    // redundant with player_peek_performs_for_valid_gaze_target once the private isValidGazeTarget
+    // is observed through playerPeek (the two collapse to one observable in Java).
+    // `player_peek_invalid_without_game` pruned — Rust-only no-game short-circuit.
 
     #[test]
     fn player_peek_performs_for_valid_gaze_target() {
@@ -318,18 +302,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = SelectGazeTargetLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
+    // NOTE (test equalization): `player_interaction_ignores_without_game` pruned — Rust-only
+    // no-game short-circuit; Java dereferences the game unconditionally.
 
     #[test]
     fn perform_available_action_end_move_sends_target_selected() {
