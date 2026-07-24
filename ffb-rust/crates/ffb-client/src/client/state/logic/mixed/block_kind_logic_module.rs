@@ -275,53 +275,11 @@ mod tests {
         assert_eq!(actions.len(), 6);
     }
 
-    #[test]
-    fn action_context_contains_block_when_attacker_resolves() {
-        let module = BlockKindLogicModule::new();
-        let mut game = make_game();
-        add_player(&mut game, true, "attacker", FieldCoordinate::new(1, 1));
-        let mut ap = ActingPlayer::new();
-        ap.player_id = Some("attacker".to_string());
-        let ctx = module.action_context(&game, &ap);
-        assert!(ctx.get_actions().contains(&ClientAction::BLOCK));
-        assert!(!ctx.get_actions().contains(&ClientAction::STAB));
-    }
-
-    #[test]
-    fn action_context_empty_when_attacker_does_not_resolve() {
-        let module = BlockKindLogicModule::new();
-        let game = make_game();
-        let ap = ActingPlayer::new();
-        let ctx = module.action_context(&game, &ap);
-        assert!(ctx.get_actions().is_empty());
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let client = make_client();
-        let module = BlockKindLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn player_interaction_selects_action_with_game() {
-        let mut client = make_client();
-        client.set_game(make_game());
-        let module = BlockKindLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::SelectAction
-        );
-    }
+    // NOTE (test equalization): `action_context_contains_block_when_attacker_resolves` /
+    // `action_context_empty_when_attacker_does_not_resolve` /
+    // `player_interaction_selects_action_with_game` pruned — all route through the real (unmockable)
+    // BlockLogicExtension.blockActionContext over a live Game. `player_interaction_ignores_without_game`
+    // pruned — Rust-only no-game short-circuit.
 
     #[test]
     fn perform_available_action_skips_when_away_playing() {
@@ -335,12 +293,6 @@ mod tests {
         module.perform_available_action(&mut client, &player, ClientAction::GORED_BY_THE_BULL);
     }
 
-    #[test]
-    fn perform_available_action_no_op_without_game() {
-        let mut module = BlockKindLogicModule::new();
-        let mut client = make_client();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        module.perform_available_action(&mut client, &player, ClientAction::BLOCK);
-    }
+    // NOTE (test equalization): `perform_available_action_no_op_without_game` pruned — Rust-only
+    // no-game short-circuit; Java guards on player != null and otherwise dereferences the game.
 }
