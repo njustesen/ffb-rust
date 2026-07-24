@@ -261,79 +261,11 @@ mod tests {
         assert!(actions.contains(&ClientAction::STAB));
     }
 
-    #[test]
-    fn get_targets_empty_by_default() {
-        let module = StabLogicModule::new();
-        assert!(module.get_targets().is_empty());
-    }
-
-    #[test]
-    fn set_up_populates_targets_from_adjacent_opponents() {
-        let mut module = StabLogicModule::new();
-        let mut client = make_client();
-        let mut game = make_game();
-        add_player(&mut game, true, "attacker", FieldCoordinate::new(5, 5));
-        add_player(&mut game, false, "defender", FieldCoordinate::new(5, 6));
-        game.acting_player.player_id = Some("attacker".to_string());
-        client.set_game(game);
-        module.set_up(&mut client);
-        assert_eq!(module.get_targets().len(), 1);
-        assert_eq!(module.get_targets()[0].id, "defender");
-    }
-
-    #[test]
-    fn player_peek_performs_for_target() {
-        let mut module = StabLogicModule::new();
-        let mut player = Player::default();
-        player.id = "d1".to_string();
-        module.targets = vec![player.clone()];
-        let result = module.player_peek(&player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Perform
-        );
-    }
-
-    #[test]
-    fn player_peek_resets_for_non_target() {
-        let module = StabLogicModule::new();
-        let mut player = Player::default();
-        player.id = "other".to_string();
-        let result = module.player_peek(&player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Reset
-        );
-    }
-
-    #[test]
-    fn action_context_empty_without_special_ability_or_acted() {
-        let module = StabLogicModule::new();
-        let game = make_game();
-        let ap = ActingPlayer::new();
-        let ctx = module.action_context(&game, &ap);
-        assert!(ctx.get_actions().is_empty());
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = StabLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn perform_available_action_no_op_without_game_for_move() {
-        let mut module = StabLogicModule::new();
-        let mut client = make_client();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        module.perform_available_action(&mut client, &player, ClientAction::MOVE);
-    }
+    // NOTE (test equalization): pruned — no faithful Java unit mirror.
+    // get_targets_empty_by_default (Java `targets` is null before setUp, not empty — Rust-vs-Java
+    // default representation); set_up_populates_targets_from_adjacent_opponents /
+    // player_peek_performs_for_target / player_peek_resets_for_non_target (need a live field graph
+    // — setUp's findAdjacentBlockablePlayers, and Java playerPeek streams the null-until-setUp
+    // targets array); action_context_empty (fan-out); player_interaction / perform *_without_game
+    // (Rust no-game short-circuits). available_actions is the 1:1 mirror kept both sides.
 }
