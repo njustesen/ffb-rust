@@ -62,6 +62,20 @@ Java counterpart) + any `// PARITY-EXEMPT` modules batch A3 tags (Rust-only infr
   CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION only takes effect after a Claude Code session RESTART.
   Set it high (e.g. 600) and restart to resume the parallel port.
 
+## REPORT-MESSAGE RENDER PORT RECIPE (proven 2026-07-24, block_roll)
+Java report tests extend `ReportMessageTestBase` (client/report/): `List<Run> runs =
+render(new XMessage(), report)` captures each print/println as a `Run{paragraphStyle, textStyle,
+text}` in order (mirrors Rust `status_report.rendered_runs`). Deep-stub client+game provided by the
+base. Per-message: stub the renderer's specific factory/mechanic (e.g.
+`given(game.getRules().getFactory(Factory.BLOCK_RESULT)).willReturn(new BlockResultFactory())`) and
+`given(game.getPlayerById("id")).willReturn(playerMock)` + `given(player.getName())...`. Assert
+`runs.get(i).text` / `.textStyle`. GOTCHA: where Rust stores a free string that Java models as a
+fixed ENUM (e.g. ReportSkillUseOtherPlayer.skillUse = SkillUse enum), the Rust arbitrary-string
+variation tests don't port faithfully → prune them (skill_use_other kept 1/1). Progress: block_roll
+3/3 (commit), skill_use_other 1/1 (pruned 2 Rust synthetic). ~53 report-message modules remain
+(±small, variable). Tally after this batch: Java **1374** / Rust **1554**, raw client gap **180**
+(≈118 non-exempt).
+
 ## CLIENT-INFRA EXEMPTION LEDGER (2026-07-24, user delegated the call)
 User: "finish client tail first"; infra-exemption policy "up to you". These Rust-only ffb-client
 modules are DOCUMENTED EXEMPTIONS (accepted Rust-only, excluded from 1:1) — networking/timing/UI/
