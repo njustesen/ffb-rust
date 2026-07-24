@@ -113,6 +113,18 @@ mismatches. Done so far:
   client gap **229**.
   Done since: bb2016 ktm 5, bb2020 kick_team_mate_like_throw 4, putrid_regurgitation_blitz 4,
   putrid_regurgitation_block 2. Tally Java **1361** / Rust **1563**, client gap **202**.
+  **logicmodule(+43) CONFIRMED DEFERRED (tar pit):** 46 predicates, but many are chomp-map /
+  per-player-state (prone/confused/hypnotized/eye-gouge) / GAME-mechanic-cast / findAdjacent-heavy;
+  free-fns in Rust (can_chomp, not_chomped, chomps, chomped_by) vs private Java methods. Needs a
+  dedicated session with a comprehensive game mock + per-method NPE-chase. Recipe in prior note.
+  **Rust-only INFRA exemption assessment (2026-07-24):** command_endpoint(7, WebSocket endpoint),
+  client_ping_task(2, TimerTask), util_client_timeout(5, routes through Swing getStatusReport),
+  client_communication(12, client-side send/JSON — payload already covered by the ffb-protocol
+  command round-trip tests) — all networking/timing/UI infra with NO Java test, same category as
+  the already-exempt net/wire + connection. Candidate exemptions (pending user OK on the "same
+  number" contract). Still to individually assess: mod(27), clientstate(13), fantasyfootballclient(6),
+  logicpluginfactory(5), iplayerpopupmenukeys(3), reportmessagebase(2)/reportmessagetype(1)/actionkey(1).
+  Report-message ±N mismatches need Java ADDITIONS (Rust has more), across edition variants.
   Only Rust-only logic module LEFT: **replay(9)** — DEFERRED, complex (ReplayCallbacks interface,
   session close, replayList state, network); needs its own checkpoint. Clean ports there:
   action_context throws (assertThrows), replayStopped (mode+key), evaluateControl notifies a
