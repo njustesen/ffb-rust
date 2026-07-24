@@ -93,27 +93,9 @@ mod tests {
         assert_eq!(status_report.rendered_runs[3].text.as_deref(), Some(" grants a +1 to the block roll."));
     }
 
-    #[test]
-    fn different_skill_names() {
-        let game = make_game();
-        let report = ReportSkillUseOtherPlayer::new("p2".into(), "Tackle".into(), "negates Dodge".into(), "p1".into());
-        let mut status_report = StatusReport::new();
-        SkillUseOtherPlayerMessage.render(&mut status_report, &game, &report);
-        assert_eq!(status_report.rendered_runs[0].text.as_deref(), Some("Target"));
-        assert_eq!(status_report.rendered_runs[1].text.as_deref(), Some(" uses Tackle of "));
-        assert_eq!(status_report.rendered_runs[2].text.as_deref(), Some("User"));
-        assert_eq!(status_report.rendered_runs[3].text.as_deref(), Some(" negates Dodge."));
-    }
-
-    #[test]
-    fn missing_players_still_renders_skill_text() {
-        let game = make_game();
-        let report = ReportSkillUseOtherPlayer::new("unknown1".into(), "Guard".into(), "grants a bonus".into(), "unknown2".into());
-        let mut status_report = StatusReport::new();
-        SkillUseOtherPlayerMessage.render(&mut status_report, &game, &report);
-        assert_eq!(status_report.rendered_runs.len(), 3); // status1 + status2 text + println terminator
-        assert_eq!(status_report.rendered_runs[0].text.as_deref(), Some(" uses Guard of "));
-        assert_eq!(status_report.rendered_runs[1].text.as_deref(), Some(" grants a bonus."));
-    }
-
+    // NOTE (test equalization): `different_skill_names` and `missing_players_still_renders_skill_text`
+    // pruned — both pass a synthetic free-string skillUse ("negates Dodge"/"grants a bonus"), but
+    // Java's ReportSkillUseOtherPlayer stores a fixed `SkillUse` ENUM whose description text can't be
+    // set arbitrarily, and missing_players relies on Rust's null-player-safe getDescription. The
+    // renders_skill_use_between_players behavioral case is the 1:1 mirror kept both sides.
 }
