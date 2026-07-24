@@ -107,9 +107,14 @@ mismatches. Done so far:
 - **ALL named "+N" logic-module targets now reconciled.** + **blitz DONE (commit 8fcbc50c, 4/4:
   availableActions, moveAction, playerActivationUsed→super.hasActed, isGoredAvailable).**
   Tally (verified full-module green): Java **1302**; Rust **1604**. Client gap **302**.
-- **Rust-only logic modules DONE so far:** blitz 4 (8fcbc50c), stab 1 (c5d52d24),
-  throw_team_mate 4 (1ee27d7a), kickoff_return 7/7 all-port (26e3d873). Tally now Java **1314** /
-  Rust **1594**, client gap **280**. High-yield tip: modules extending MoveLogicModule with
+- **Rust-only logic modules DONE so far:** blitz 4, stab 1, throw_team_mate 4, kickoff_return 7,
+  dump_off 4, swoop 6, maximum_carnage 4, select_gaze_target 4, pass_block 7. Tally (verified
+  full-module green): Java **1339** / Rust **1587**, client gap **248**.
+  Still-remaining Rust-only logic modules: ktm(8), kick_team_mate_like_throw(8), block_kind(7),
+  kick_em_blitz(7), putrid_regurgitation_blitz(7), kick_em_block(5), putrid_regurgitation_block(4),
+  replay(9). Then logicmodule(+43, recipe above), the ±1 report-message mismatches, the -N
+  Java-has-more cases, and the Rust-only INFRA modules (mod/clientstate/clientcommunication/
+  commandendpoint/etc — candidate documented exemptions). High-yield tip: modules extending MoveLogicModule with
   command-verifiable performAvailableAction + delegate/ignore field/player peeks port well
   (kickoff_return = 7/7); modules extending BlockLogicModule (stab) mostly need the unmockable
   extension → only availableActions ports. NEXT Rust-only logic modules: ktm(8),
