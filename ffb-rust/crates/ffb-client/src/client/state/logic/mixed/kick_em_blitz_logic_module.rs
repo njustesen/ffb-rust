@@ -229,13 +229,9 @@ mod tests {
         assert_eq!(KickEmBlitzLogicModule::new().move_action(), PlayerAction::KickEmBlitz);
     }
 
-    #[test]
-    fn is_kickable_false_without_defender_state() {
-        let game = make_game();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        assert!(!is_kickable(&game, &player));
-    }
+    // NOTE (test equalization): `is_kickable_false_without_defender_state` pruned — Java
+    // UtilPlayer.isKickable calls defenderState.isProneOrStunned() first, so a null state NPEs
+    // rather than returning false (Rust-vs-Java representation difference).
 
     #[test]
     fn is_kickable_requires_away_team_and_adjacency() {
@@ -253,38 +249,7 @@ mod tests {
         assert!(actions.contains(&ClientAction::MOVE));
     }
 
-    #[test]
-    fn player_peek_resets_without_game() {
-        let client = make_client();
-        let module = KickEmBlitzLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Reset
-        );
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = KickEmBlitzLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn perform_available_action_no_op_without_game() {
-        let mut module = KickEmBlitzLogicModule::new();
-        let mut client = make_client();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        module.perform_available_action(&mut client, &player, ClientAction::MOVE);
-    }
+    // NOTE (test equalization): `player_peek_resets_without_game`,
+    // `player_interaction_ignores_without_game`, and `perform_available_action_no_op_without_game`
+    // pruned — Rust-only no-game short-circuits with no Java counterpart.
 }
