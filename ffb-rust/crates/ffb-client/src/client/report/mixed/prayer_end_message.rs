@@ -91,12 +91,7 @@ mod tests {
         assert_eq!(status_report.rendered_runs[2].text_style, Some(TextStyle::EXPLANATION));
     }
 
-    #[test]
-    fn missing_prayer_name_renders_empty_string() {
-        let mut status_report = StatusReport::new();
-        let game = make_game();
-        let report = ReportPrayerEnd::new(None);
-        PrayerEndMessage.render(&mut status_report, &game, &report);
-        assert_eq!(status_report.rendered_runs[0].text.as_deref(), Some("Prayer effect ended: "));
-    }
+    // NOTE (test equalization): `missing_prayer_name_renders_empty_string` pruned — Java's
+    // PrayerEndMessage dereferences the Prayer name unconditionally (NPEs on a null prayer). Rust
+    // guards it defensively; documented divergence, no Java mirror.
 }

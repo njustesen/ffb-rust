@@ -3,6 +3,7 @@ package com.fumbbl.ffb.client.report.mixed;
 import com.fumbbl.ffb.client.TextStyle;
 import com.fumbbl.ffb.client.report.ReportMessageTestBase;
 import com.fumbbl.ffb.report.mixed.ReportFreePettyCash;
+import com.fumbbl.ffb.util.StringTool;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -52,5 +53,14 @@ class FreePettyCashMessageTest extends ReportMessageTestBase {
 		List<Run> runs = render(new FreePettyCashMessage(), report);
 
 		assertEquals("Team away", runs.get(3).text);
+	}
+
+	// rust: format_thousands_matches_java_examples
+	@Test
+	public void formatThousandsMatchesJavaExamples() {
+		assertEquals("2,130,000", StringTool.formatThousands(2130000));
+		assertEquals("50,000", StringTool.formatThousands(50000));
+		assertEquals("0", StringTool.formatThousands(0));
+		assertEquals("100", StringTool.formatThousands(100));
 	}
 }

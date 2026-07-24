@@ -96,16 +96,9 @@ mod tests {
         assert_eq!(sr.rendered_runs[5].text.as_deref(), Some("."));
     }
 
-    #[test]
-    fn skips_gender_run_when_player_missing() {
-        let mut sr = StatusReport::new();
-        let game = make_game();
-        let report = ReportIndomitable::new(Some("missing".into()), Some("d1".into()));
-        IndomitableMessage.render(&mut sr, &game, &report);
-        assert_eq!(sr.rendered_runs[0].text.as_deref(), Some(" uses Indomitable to push "));
-        assert_eq!(sr.rendered_runs[1].text.as_deref(), Some(" strength to the double of "));
-        assert_eq!(sr.rendered_runs[2].text.as_deref(), Some("Target"));
-    }
+    // NOTE (test equalization): `skips_gender_run_when_player_missing` pruned — Java's
+    // IndomitableMessage calls player.getPlayerGender().getGenitive() unconditionally (NPEs on a
+    // missing player). Rust guards it defensively; documented divergence, no Java mirror.
 
     #[test]
     fn skips_defender_run_when_defender_missing() {

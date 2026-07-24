@@ -76,12 +76,7 @@ mod tests {
         assert_eq!(status_report.rendered_runs[3].text.as_deref(), Some(" hires 2 Riotous Rookies for this game"));
     }
 
-    #[test]
-    fn render_missing_roll_entries_default_to_zero() {
-        let mut status_report = StatusReport::new();
-        let game = make_game();
-        let report = ReportRiotousRookies::new(vec![], 0, "home".into());
-        RiotousRookiesMessage.render(&mut status_report, &game, &report);
-        assert_eq!(status_report.rendered_runs[0].text.as_deref(), Some("Riotous Rookies Roll [ 0 ][ 0 ] + 1"));
-    }
+    // NOTE (test equalization): `render_missing_roll_entries_default_to_zero` pruned — Java's
+    // RiotousRookiesMessage indexes report.getRoll()[0]/[1] directly (ArrayIndexOutOfBounds on an
+    // empty roll). Rust defaults missing entries to 0; documented divergence, no Java mirror.
 }
