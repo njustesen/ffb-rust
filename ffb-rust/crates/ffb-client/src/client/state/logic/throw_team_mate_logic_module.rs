@@ -240,31 +240,10 @@ mod tests {
         assert_eq!(module.available_actions().len(), MoveLogicModule::new().available_actions().len());
     }
 
-    #[test]
-    fn can_be_thrown_false_without_thrower() {
-        let mut client = make_client();
-        client.set_game(make_game());
-        let module = ThrowTeamMateLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        assert!(!module.can_be_thrown(&client, &player));
-    }
-
-    #[test]
-    fn player_peek_sets_selected_player_and_resets_when_not_throwable() {
-        let mut client = make_client();
-        let mut game = make_game();
-        add_player(&mut game, true, "p1", FieldCoordinate::new(2, 2));
-        client.set_game(game);
-        let module = ThrowTeamMateLogicModule::new();
-        let player = client.game().unwrap().player("p1").unwrap().clone();
-        let result = module.player_peek(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Reset
-        );
-        assert_eq!(client.client_data().selected_player(), Some(&"p1".to_string()));
-    }
+    // NOTE (test equalization): `can_be_thrown_false_without_thrower` pruned — Java canBeThrown is
+    // private and casts the TTM GAME-mechanic from the factory. `player_peek_sets_selected_player_
+    // and_resets_when_not_throwable` pruned — the reset branch needs canBeThrown (TTM mechanic +
+    // adjacency over a live Game). The defender-present preview-throw branch IS mirrored below.
 
     #[test]
     fn player_peek_preview_throw_when_defender_present() {
@@ -311,16 +290,6 @@ mod tests {
         assert_eq!(result.get_delegate(), Some(ClientStateId::Move));
     }
 
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = ThrowTeamMateLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
+    // NOTE (test equalization): `player_interaction_ignores_without_game` pruned — Rust-only
+    // no-game short-circuit; Java dereferences the game unconditionally.
 }
