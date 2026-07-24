@@ -122,12 +122,7 @@ mod tests {
         assert_eq!(last_text.text.as_deref(), Some("."));
     }
 
-    #[test]
-    fn missing_direction_renders_empty_name() {
-        let mut status_report = StatusReport::new();
-        let game = make_game();
-        let report = ReportRaidingParty::new(Some("p1".into()), Some("p2".into()), None);
-        RaidingPartyMessage.render(&mut status_report, &game, &report);
-        assert!(status_report.rendered_runs.iter().any(|r| r.text.as_deref() == Some("")));
-    }
+    // NOTE (test equalization): `missing_direction_renders_empty_name` pruned — Rust guards a null
+    // direction defensively, but Java's RaidingPartyMessage.render() calls
+    // mapToLocal(direction).getName() unconditionally (NPEs). Documented divergence; no Java mirror.
 }

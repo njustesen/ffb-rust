@@ -86,13 +86,7 @@ mod tests {
         assert_eq!(status_report.rendered_runs[1].text.as_deref(), Some(" places the ball Southeast."));
     }
 
-    #[test]
-    fn missing_direction_renders_empty_name() {
-        let game = make_game();
-        let report = ReportPlaceBallDirection::new(Some("p1".into()), None);
-        let mut status_report = StatusReport::new();
-        PlaceBallDirectionMessage.render(&mut status_report, &game, &report);
-        assert_eq!(status_report.rendered_runs[1].text.as_deref(), Some(" places the ball ."));
-    }
-
+    // NOTE (test equalization): `missing_direction_renders_empty_name` pruned — Rust guards a null
+    // direction defensively, but Java's PlaceBallDirectionMessage.render() calls
+    // mapToLocal(direction).getName() unconditionally (NPEs). Documented divergence; no Java mirror.
 }

@@ -107,15 +107,7 @@ mod tests {
         assert_eq!(status_report.rendered_runs[2].text_style, Some(TextStyle::AWAY));
     }
 
-    #[test]
-    fn missing_player_still_reports_team_line() {
-        let game = make_game();
-        let report = ReportShowStarReRoll::new(None);
-        let mut status_report = StatusReport::new();
-        ShowStarReRollMessage.render(&mut status_report, &game, &report);
-        // print_player is a no-op for a missing player, but the rest of the render proceeds.
-        assert_eq!(status_report.rendered_runs[0].text.as_deref(), Some(" is the Star of the Show and "));
-        assert_eq!(status_report.rendered_runs[1].text.as_deref(), Some("Team away"));
-    }
-
+    // NOTE (test equalization): `missing_player_still_reports_team_line` pruned — Rust's print_player
+    // no-ops for a missing player, but Java's ShowStarReRollMessage.render() dereferences
+    // player.getTeam() unconditionally (NPEs). Documented divergence; no faithful Java mirror.
 }

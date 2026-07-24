@@ -102,13 +102,7 @@ mod tests {
         assert_eq!(status_report.rendered_runs[3].text.as_deref(), Some("."));
     }
 
-    #[test]
-    fn missing_attacker_renders_nothing() {
-        let game = make_game();
-        let report = ReportSelectGazeTarget::new(None, Some("p2".into()));
-        let mut status_report = StatusReport::new();
-        SelectGazeTargetMessage.render(&mut status_report, &game, &report);
-        assert!(status_report.rendered_runs.is_empty());
-    }
-
+    // NOTE (test equalization): `missing_attacker_renders_nothing` pruned — Rust guards the missing
+    // attacker defensively, but Java's SelectGazeTargetMessage.render() dereferences attacker.getName()
+    // unconditionally (NPEs). Documented divergence; no faithful Java mirror.
 }
