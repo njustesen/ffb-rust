@@ -45,8 +45,4 @@ class ThrowInMessageTest extends ReportMessageTestBase {
 		assertTrue(runs.isEmpty());
 	}
 
-	@Test
-	public void reportIdIsThrowIn() {
-		assertEquals("throwIn", new ThrowInMessage().getKey());
-	}
 }

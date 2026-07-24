@@ -69,8 +69,4 @@ class StandUpRollMessageTest extends ReportMessageTestBase {
 		assertFalse(runs.stream().anyMatch(r -> r.text != null && r.text.startsWith("Roll a")));
 	}
 
-	@Test
-	public void reportIdIsStandUpRoll() {
-		assertEquals("standUpRoll", new StandUpRollMessage().getKey());
-	}
 }

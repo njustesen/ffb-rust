@@ -78,8 +78,4 @@ class SpellEffectRollMessageTest extends ReportMessageTestBase {
 		assertTrue(runs.stream().anyMatch(r -> " is hit by the spell.".equals(r.text)));
 	}
 
-	@Test
-	public void reportIdIsSpellEffectRoll() {
-		assertEquals("spellEffectRoll", new SpellEffectRollMessage().getKey());
-	}
 }

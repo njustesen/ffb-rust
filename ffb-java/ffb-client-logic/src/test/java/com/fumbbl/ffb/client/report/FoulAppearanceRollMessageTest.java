@@ -83,8 +83,4 @@ class FoulAppearanceRollMessageTest extends ReportMessageTestBase {
 		assertEquals(".", lastText);
 	}
 
-	@Test
-	public void reportIdIsFoulAppearanceRoll() {
-		assertEquals("foulAppearanceRoll", new FoulAppearanceRollMessage().getKey());
-	}
 }

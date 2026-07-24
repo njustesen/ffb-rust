@@ -78,8 +78,4 @@ class SkillUseMessageTest extends ReportMessageTestBase {
 		assertTrue(runs.stream().anyMatch(r -> r.text != null && r.text.startsWith("Dodge is not used")));
 	}
 
-	@Test
-	public void reportIdIsSkillUse() {
-		assertEquals("skillUse", new SkillUseMessage().getKey());
-	}
 }

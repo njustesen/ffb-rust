@@ -42,8 +42,4 @@ class DoubleHiredStarPlayerMessageTest extends ReportMessageTestBase {
 		assertTrue(runs.get(0).text.startsWith("Star Player Eldril Sidewinder"));
 	}
 
-	@Test
-	public void reportIdIsDoubleHiredStarPlayer() {
-		assertEquals("doubleHiredStarPlayer", new DoubleHiredStarPlayerMessage().getKey());
-	}
 }

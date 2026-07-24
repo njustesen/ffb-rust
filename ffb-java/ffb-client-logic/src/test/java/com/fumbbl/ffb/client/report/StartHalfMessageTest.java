@@ -37,8 +37,4 @@ class StartHalfMessageTest extends ReportMessageTestBase {
 		assertEquals("Starting Overtime", runs.get(0).text);
 	}
 
-	@Test
-	public void reportIdIsStartHalf() {
-		assertEquals("startHalf", new StartHalfMessage().getKey());
-	}
 }

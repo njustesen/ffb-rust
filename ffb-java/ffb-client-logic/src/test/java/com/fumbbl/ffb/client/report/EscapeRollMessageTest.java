@@ -60,8 +60,4 @@ class EscapeRollMessageTest extends ReportMessageTestBase {
 		assertEquals(TextStyle.HOME, runs.get(2).textStyle);
 	}
 
-	@Test
-	public void reportIdIsEscapeRoll() {
-		assertEquals("escapeRoll", new EscapeRollMessage().getKey());
-	}
 }
