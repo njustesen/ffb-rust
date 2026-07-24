@@ -107,6 +107,15 @@ mismatches. Done so far:
 - **ALL named "+N" logic-module targets now reconciled.** + **blitz DONE (commit 8fcbc50c, 4/4:
   availableActions, moveAction, playerActivationUsed→super.hasActed, isGoredAvailable).**
   Tally (verified full-module green): Java **1302**; Rust **1604**. Client gap **302**.
+- **Rust-only logic modules DONE so far:** blitz 4 (8fcbc50c), stab 1 (c5d52d24),
+  throw_team_mate 4 (1ee27d7a), kickoff_return 7/7 all-port (26e3d873). Tally now Java **1314** /
+  Rust **1594**, client gap **280**. High-yield tip: modules extending MoveLogicModule with
+  command-verifiable performAvailableAction + delegate/ignore field/player peeks port well
+  (kickoff_return = 7/7); modules extending BlockLogicModule (stab) mostly need the unmockable
+  extension → only availableActions ports. NEXT Rust-only logic modules: ktm(8),
+  kick_team_mate_like_throw(8), block_kind(7), kick_em_blitz(7), pass_block(7),
+  putrid_regurgitation_blitz(7), select_gaze_target(7), dump_off(6), maximum_carnage(6),
+  swoop(6), kick_em_block(5), putrid_regurgitation_block(4), replay(9).
 
 - **`logicmodule` (+43) ANALYSIS (deferred — biggest single item):** 46 `is_X_available_*` predicate
   tests. ALL the Java `is*Available` methods touch the live game graph
