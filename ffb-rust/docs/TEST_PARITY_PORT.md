@@ -62,6 +62,27 @@ Java counterpart) + any `// PARITY-EXEMPT` modules batch A3 tags (Rust-only infr
   CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION only takes effect after a Claude Code session RESTART.
   Set it high (e.g. 600) and restart to resume the parallel port.
 
+## CLIENT-INFRA EXEMPTION LEDGER (2026-07-24, user delegated the call)
+User: "finish client tail first"; infra-exemption policy "up to you". These Rust-only ffb-client
+modules are DOCUMENTED EXEMPTIONS (accepted Rust-only, excluded from 1:1) — networking/timing/UI/
+Rust-dispatch infra with NO sensible headless Java unit-test, same category as the pre-existing
+net/wire + connection + ffb-parity exemptions:
+- `client/net/network_encoder/mod.rs` (16) — wire command encoding (Tyrus-layer in Java, untested)
+- `client/net/command_endpoint.rs` (7) — WebSocket endpoint (compression/open/close/pong)
+- `client/net/client_communication.rs` (12) — client send-side; payload correctness already covered
+  by the ported ffb-protocol/ffb-common command round-trip tests
+- `client/net/client_ping_task.rs` (2) — TimerTask ping
+- `client/util/util_client_timeout.rs` (5) — routes through Swing getStatusReport (UI)
+- `client/state_dispatch/mod.rs` (7) — Rust-specific state dispatch (Java uses ClientStateFactory,
+  already mirrored)
+- `client/handlers/mod.rs` (4) — Rust-specific handler dispatch registry
+- `client/fantasy_football_client.rs` (6) — abstract client base (network/UI)
+- `client/iplayer_popup_menu_keys.rs` (3) — UI popup-menu key constants
+Total exempted: **62 tests.** Remaining non-exempt client tail after this = gap − 62.
+Still to individually assess (may be portable, not yet exempted): logic_plugin_factory(5),
+action_key(1), report_message_base(2)/report_message_type(1). action_keys(5)/chat(4) are NOT gaps
+(mirror Java UtilClientActionKeys/UtilClientChat, already 1:1). client_state(13) → PORTED (10, commit).
+
 ## RESUME STATE — BY-HAND EXECUTION (2026-07-23, single-threaded, NO subagents)
 User decision: continue **single-threaded by hand** (no subagents / no Workflow); scope = "1:1 as
 much as it makes sense — use common sense" (port survivors, prune plumbing/tautology, SKIP-with-
