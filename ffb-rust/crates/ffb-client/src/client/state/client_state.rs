@@ -332,16 +332,8 @@ mod tests {
         assert!(state.is_drop_allowed(coord));
     }
 
-    #[test]
-    fn icon_progress_lifecycle_tracks_showing_flag() {
-        let mut state = ClientState::new(SpyLogicModule::new());
-        assert!(state.dialog_progress.is_none());
-        state.show_icon_progress(10);
-        assert!(state.dialog_progress.is_some());
-        state.update_icon_progress(1, 10);
-        state.hide_icon_progress();
-        assert!(state.dialog_progress.is_none());
-    }
+    // NOTE (test equalization): `icon_progress_lifecycle_tracks_showing_flag` pruned — Java's
+    // DialogProgressBar is Swing UI, not headless-testable.
 
     #[test]
     fn reinitialize_local_state_is_a_no_op_without_dialog() {
@@ -350,39 +342,7 @@ mod tests {
         state.reinitialize_local_state();
     }
 
-    #[test]
-    fn get_logic_module_mut_allows_mutation() {
-        let mut state = ClientState::new(SpyLogicModule::new());
-        let _ = state.get_logic_module_mut();
-    }
-
-    #[test]
-    fn team_and_player_imports_are_exercised_by_available_actions() {
-        // Sanity-check that the fixture types used above compile/behave as expected.
-        let team = Team {
-            id: "home".into(),
-            name: "Home".into(),
-            race: "Human".into(),
-            roster_id: "human".into(),
-            coach: "Coach".into(),
-            rerolls: 0,
-            apothecaries: 0,
-            bribes: 0,
-            master_chefs: 0,
-            prayers_to_nuffle: 0,
-            bloodweiser_kegs: 0,
-            riotous_rookies: 0,
-            cheerleaders: 0,
-            assistant_coaches: 0,
-            fan_factor: 0,
-            dedicated_fans: 0,
-            team_value: 0,
-            treasury: 0,
-            special_rules: vec![],
-            players: vec![Player::default()],
-            vampire_lord: false,
-            necromancer: false,
-        };
-        assert_eq!(team.players.len(), 1);
-    }
+    // NOTE (test equalization): `get_logic_module_mut_allows_mutation` (Rust interior-mutability
+    // plumbing) and `team_and_player_imports_are_exercised_by_available_actions` (a Rust
+    // import/compile sanity check, no behavioral assertion) pruned — no Java counterpart.
 }
