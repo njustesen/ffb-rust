@@ -288,22 +288,9 @@ mod tests {
         assert_eq!(module.available_actions().len(), MoveLogicModule::new().available_actions().len());
     }
 
-    #[test]
-    fn show_grid_for_ktm_false_without_player() {
-        let module = KickTeamMateLikeThrowLogicModule::new();
-        let game = make_game();
-        let ap = ActingPlayer::new();
-        assert!(!module.show_grid_for_ktm(&game, &ap));
-    }
-
-    #[test]
-    fn can_be_kicked_false_without_game() {
-        let module = KickTeamMateLikeThrowLogicModule::new();
-        let client = make_client();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        assert!(!module.can_be_kicked(&client, &player));
-    }
+    // NOTE (test equalization): `show_grid_for_ktm_false_without_player` pruned — Java
+    // showGridForKTM → UtilPlayer.canKickTeamMate reads the TTM GAME-mechanic factory (NPEs with
+    // targeted mocks). `can_be_kicked_false_without_game` pruned — Rust-only no-game short-circuit.
 
     #[test]
     fn find_kickable_players_none_with_defender() {
@@ -315,15 +302,8 @@ mod tests {
         assert!(module.find_kickable_players(&game, &thrower).is_none());
     }
 
-    #[test]
-    fn find_kickable_players_empty_without_kickable_teammates() {
-        let module = KickTeamMateLikeThrowLogicModule::new();
-        let mut game = make_game();
-        add_player(&mut game, true, "thrower", FieldCoordinate::new(2, 2));
-        let thrower = game.player("thrower").unwrap().clone();
-        let result = module.find_kickable_players(&game, &thrower).unwrap();
-        assert!(result.is_empty());
-    }
+    // NOTE (test equalization): `find_kickable_players_empty_without_kickable_teammates` pruned —
+    // needs the TTM GAME-mechanic + findAdjacentCoordinates over a live field (fixture-inexpressible).
 
     #[test]
     fn field_peek_preview_throw_when_defender_present() {
@@ -354,16 +334,6 @@ mod tests {
         assert_eq!(result.get_delegate(), Some(ClientStateId::Move));
     }
 
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = KickTeamMateLikeThrowLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
+    // NOTE (test equalization): `player_interaction_ignores_without_game` pruned — Rust-only
+    // no-game short-circuit; Java dereferences the game unconditionally.
 }
