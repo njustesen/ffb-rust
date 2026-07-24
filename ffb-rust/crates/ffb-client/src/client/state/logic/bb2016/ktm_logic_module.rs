@@ -243,14 +243,8 @@ mod tests {
         assert_eq!(actions.len(), 3);
     }
 
-    #[test]
-    fn can_be_kicked_false_without_game() {
-        let module = KtmLogicModule::new();
-        let client = make_client();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        assert!(!module.can_be_kicked(&client, &player));
-    }
+    // NOTE (test equalization): `can_be_kicked_false_without_game` pruned — Rust-only no-game
+    // short-circuit; Java canBeKicked dereferences the game unconditionally.
 
     #[test]
     fn can_be_kicked_false_without_required_skills() {
@@ -307,25 +301,6 @@ mod tests {
         assert_eq!(client.client_data().selected_player(), Some(&"p1".to_string()));
     }
 
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = KtmLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn perform_available_action_no_op_without_game() {
-        let mut module = KtmLogicModule::new();
-        let mut client = make_client();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        module.perform_available_action(&mut client, &player, ClientAction::PASS_SHORT);
-    }
+    // NOTE (test equalization): `player_interaction_ignores_without_game` /
+    // `perform_available_action_no_op_without_game` pruned — Rust-only no-game short-circuits.
 }
