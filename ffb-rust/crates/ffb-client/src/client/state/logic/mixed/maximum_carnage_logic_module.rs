@@ -208,18 +208,8 @@ mod tests {
         assert!(actions.contains(&ClientAction::END_MOVE));
     }
 
-    #[test]
-    fn player_peek_resets_without_game() {
-        let client = make_client();
-        let module = MaximumCarnageLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Reset
-        );
-    }
+    // NOTE (test equalization): `player_peek_resets_without_game` pruned — Rust-only no-game
+    // short-circuit; Java dereferences the game unconditionally.
 
     #[test]
     fn player_peek_perform_for_opponent_not_last_defender() {
@@ -255,18 +245,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = MaximumCarnageLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
+    // NOTE (test equalization): `player_interaction_ignores_without_game` pruned — Rust-only
+    // no-game short-circuit; Java dereferences the game unconditionally.
 
     #[test]
     fn perform_available_action_no_op_for_unknown_action() {
