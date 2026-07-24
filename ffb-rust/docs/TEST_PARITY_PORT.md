@@ -62,6 +62,21 @@ Java counterpart) + any `// PARITY-EXEMPT` modules batch A3 tags (Rust-only infr
   CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION only takes effect after a Claude Code session RESTART.
   Set it high (e.g. 600) and restart to resume the parallel port.
 
+## REPORT-MESSAGE ±1 FAST PATTERN (proven 2026-07-25, 16 modules reconciled)
+Most report-message mismatches resolve WITHOUT a render port:
+- **-N (Java has more):** the Java extra is a trivial `reportIdIsX()`/`getKey()` getter test with
+  no Rust twin → PRUNE the Java getKey test (Rust-as-reference). Did 8: escape/standup/throwIn/
+  startHalf/skillUse/spellEffect/foulAppearance/doubleHired.
+- **+N (Rust has more):** the Rust extra is almost always a `missing_X`/defensive-guard edge case
+  (missing player/direction/prayer, empty roll) that Rust guards but the Java renderer dereferences
+  unconditionally (NPE/AIOOBE) — a documented divergence → PRUNE the Rust test (Java already
+  skip-commented it). Did 7: select_gaze_target/show_star_re_roll/raiding_party/place_ball_direction/
+  prayer_end/indomitable/riotous_rookies. EXCEPTION: a genuinely-portable helper test → ADD to Java
+  (free_petty_cash `format_thousands` → `StringTool.formatThousands` direct test).
+Remaining report ±N: pass_roll(+1, edition variants), prayer_roll(+1), injury(+2), block_choice(+1),
+modified_dodge(+1), modified_pass(+1), skill_use(mixed), + a few. Same pattern expected. Tally:
+Java **1367** / Rust **1547**.
+
 ## REPORT-MESSAGE RENDER PORT RECIPE (proven 2026-07-24, block_roll)
 Java report tests extend `ReportMessageTestBase` (client/report/): `List<Run> runs =
 render(new XMessage(), report)` captures each print/println as a `Run{paragraphStyle, textStyle,
