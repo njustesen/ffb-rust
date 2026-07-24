@@ -215,13 +215,8 @@ mod tests {
         FantasyFootballClient::new(params)
     }
 
-    #[test]
-    fn is_kickable_false_without_defender_state() {
-        let game = make_game();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        assert!(!is_kickable(&game, &player));
-    }
+    // NOTE (test equalization): `is_kickable_false_without_defender_state` pruned — Java
+    // UtilPlayer.isKickable NPEs on a null defender state rather than returning false.
 
     #[test]
     fn is_kickable_requires_away_team() {
@@ -232,31 +227,8 @@ mod tests {
         assert!(!is_kickable(&game, &player));
     }
 
-    #[test]
-    fn player_peek_resets_without_game() {
-        let client = make_client();
-        let module = KickEmBlockLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Reset
-        );
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = KickEmBlockLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
+    // NOTE (test equalization): `player_peek_resets_without_game` /
+    // `player_interaction_ignores_without_game` pruned — Rust-only no-game short-circuits.
 
     #[test]
     fn player_interaction_ignores_when_target_not_kickable() {
