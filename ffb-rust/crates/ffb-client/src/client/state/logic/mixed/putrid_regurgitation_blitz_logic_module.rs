@@ -310,36 +310,8 @@ mod tests {
         assert!(!module.is_putrid_regurgitation_available(&game));
     }
 
-    #[test]
-    fn player_peek_resets_without_game() {
-        let client = make_client();
-        let module = PutridRegurgitationBlitzLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_peek(&client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Reset
-        );
-    }
-
-    #[test]
-    fn player_interaction_ignores_without_game() {
-        let mut client = make_client();
-        let module = PutridRegurgitationBlitzLogicModule::new();
-        let mut player = Player::default();
-        player.id = "p1".to_string();
-        let result = module.player_interaction(&mut client, &player);
-        assert_eq!(
-            result.get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Ignore
-        );
-    }
-
-    #[test]
-    fn other_team_returns_away_for_home_id() {
-        let game = make_game();
-        let opp = other_team(&game, &game.team_home.id.clone());
-        assert_eq!(opp.id, game.team_away.id);
-    }
+    // NOTE (test equalization): `player_peek_resets_without_game` /
+    // `player_interaction_ignores_without_game` pruned — Rust-only no-game short-circuits.
+    // `other_team_returns_away_for_home_id` pruned — tests a Rust helper mirroring Game.getOtherTeam,
+    // not a module method.
 }
