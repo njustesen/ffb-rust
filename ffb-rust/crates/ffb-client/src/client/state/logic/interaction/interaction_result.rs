@@ -92,6 +92,14 @@ impl InteractionResult {
         self
     }
 
+    /// java: `with(FieldCoordinate coordinate)` where the argument may be `null`. The Rust
+    /// `Option` mirrors Java's nullable coordinate so callers can attach a possibly-absent
+    /// coordinate without gating the result Kind on its presence.
+    pub fn with_coordinate_opt(mut self, coordinate: Option<FieldCoordinate>) -> Self {
+        self.coordinate = coordinate;
+        self
+    }
+
     pub fn with_path(mut self, path: Vec<FieldCoordinate>) -> Self {
         self.path = Some(path);
         self

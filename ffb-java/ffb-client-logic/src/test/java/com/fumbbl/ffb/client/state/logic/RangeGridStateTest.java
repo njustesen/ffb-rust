@@ -70,6 +70,18 @@ class RangeGridStateTest {
 	}
 
 	@Test
+	public void testRefreshRangeGridPerformsWithoutPlayerCoordinate() {
+		RangeGridState state = new RangeGridState(client, false);
+		state.setShowRangeGrid(true);
+		// getPlayerCoordinate(player) is left unstubbed -> null. Java still returns PERFORM here,
+		// attaching the null coordinate; the Kind is not gated on coordinate presence.
+
+		InteractionResult result = state.refreshRangeGrid();
+		assertEquals(InteractionResult.Kind.PERFORM, result.getKind());
+		assertEquals(null, result.getCoordinate());
+	}
+
+	@Test
 	public void testRefreshRangeGridPerformsWhenShownAndNotGatedByTtm() {
 		RangeGridState state = new RangeGridState(client, false);
 		state.setShowRangeGrid(true);

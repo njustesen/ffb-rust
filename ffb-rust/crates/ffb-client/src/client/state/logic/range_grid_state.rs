@@ -51,9 +51,10 @@ impl RangeGridState {
                     .player_id
                     .as_deref()
                     .and_then(|id| game.field_model.player_coordinate(id));
-                if let Some(coordinate) = acting_player_coordinate {
-                    return InteractionResult::perform().with_coordinate(coordinate);
-                }
+                // java: `return InteractionResult.perform().with(actingPlayerCoordinate);` — Java
+                // always returns PERFORM here (attaching a possibly-null coordinate); it does NOT
+                // gate the Kind on coordinate presence.
+                return InteractionResult::perform().with_coordinate_opt(acting_player_coordinate);
             }
         }
         InteractionResult::reset()
@@ -128,12 +129,15 @@ mod tests {
     }
 
     #[test]
-    fn refresh_range_grid_resets_without_acting_player_coordinate() {
+    fn refresh_range_grid_performs_without_player_coordinate() {
         let mut state = RangeGridState::new(false);
         state.set_show_range_grid(true);
         let game = make_game();
-        // No acting player set up, so no coordinate is available -> falls through to reset.
-        assert_eq!(state.refresh_range_grid(&game).get_kind(), crate::client::state::logic::interaction::interaction_result::Kind::Reset);
+        // No acting player set up, so no coordinate is available. Java (and now Rust) still returns
+        // PERFORM here, attaching a null/None coordinate — the Kind is not gated on coordinate presence.
+        let result = state.refresh_range_grid(&game);
+        assert_eq!(result.get_kind(), crate::client::state::logic::interaction::interaction_result::Kind::Perform);
+        assert_eq!(result.get_coordinate(), None);
     }
 
     #[test]
@@ -150,6 +154,14 @@ mod tests {
         assert_eq!(result.get_kind(), crate::client::state::logic::interaction::interaction_result::Kind::Perform);
         assert_eq!(result.get_coordinate(), Some(FieldCoordinate::new(2, 3)));
     }
+
+    // NOTE (test equalization): Java's RangeGridStateTest has 3 additional `refreshSettings*`
+    // tests (testRefreshSettingsIgnoresWhenPropertyNotAlwaysOn / TurnsOnAndRefreshesWhenAlwaysOnAndHidden
+    // / IgnoresWhenAlreadyShown). They drive `client.getProperty(SETTING_RANGEGRID)`, which is a
+    // documented Rust infra gap — `getProperty()` is abstract with no in-scope body in the headless
+    // client, so `refresh_settings` always takes the no-setting branch (returns `ignore`). The
+    // property-driven auto-enable behavior those 3 tests assert cannot be reproduced here, so they
+    // are a Java-only exemption (client-infra ledger), not a 1:1 mirror.
 
     #[test]
     fn refresh_range_grid_gated_by_ttm_requires_matching_action() {
