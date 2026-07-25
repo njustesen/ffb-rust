@@ -21,6 +21,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.BDDMockito.given;
 
 /**
  * Port of the {@code #[cfg(test)]} module in logic_module.rs (ffb-rust crate
@@ -117,5 +118,95 @@ class LogicModuleTest {
 	void isIncorporealAvailableFalseWithoutSkill() {
 		RosterPlayer player = new RosterPlayer();
 		assertFalse(logicModule.isIncorporealAvailable(player));
+	}
+
+	// The following predicates read client.getGame() but short-circuit to false on the
+	// skill/used-flag gate before touching any live game state, so a plain (skill-less) RosterPlayer
+	// plus the deep-stub client reproduces the Rust "false without skill / when used" case faithfully.
+	// (Methods that evaluate an unconditional local before the boolean gate remain skipped: a
+	// (GameMechanic) cast — isBlockActionAvailable, isFoulActionAvailable, isViciousVinesAvailable,
+	// isThrowBombActionAvailable, isAllYouCanEatAvailable — ClassCastExceptions under deep stubs; and
+	// isSecureTheBallActionAvailable computes a UtilPlayer tacklezone sweep over getTeamAway() that
+	// NPEs on the deep-stub null player array. See the class doc.)
+
+	// rust: is_treacherous_available_false_without_skill
+	@Test
+	void isTreacherousAvailableFalseWithoutSkill() {
+		RosterPlayer player = new RosterPlayer();
+		assertFalse(logicModule.isTreacherousAvailable(player));
+	}
+
+	// rust: is_black_ink_available_false_without_skill
+	@Test
+	void isBlackInkAvailableFalseWithoutSkill() {
+		RosterPlayer player = new RosterPlayer();
+		assertFalse(logicModule.isBlackInkAvailable(player));
+	}
+
+	// rust: is_raiding_party_available_false_without_skill
+	@Test
+	void isRaidingPartyAvailableFalseWithoutSkill() {
+		RosterPlayer player = new RosterPlayer();
+		assertFalse(logicModule.isRaidingPartyAvailable(player));
+	}
+
+	// rust: is_look_into_my_eyes_available_false_without_skill
+	@Test
+	void isLookIntoMyEyesAvailableFalseWithoutSkill() {
+		RosterPlayer player = new RosterPlayer();
+		assertFalse(logicModule.isLookIntoMyEyesAvailable(player));
+	}
+
+	// rust: is_baleful_hex_available_false_without_skill
+	@Test
+	void isBalefulHexAvailableFalseWithoutSkill() {
+		RosterPlayer player = new RosterPlayer();
+		assertFalse(logicModule.isBalefulHexAvailable(player));
+	}
+
+	// rust: is_then_i_started_blastin_available_false_without_skill
+	@Test
+	void isThenIStartedBlastinAvailableFalseWithoutSkill() {
+		RosterPlayer player = new RosterPlayer();
+		assertFalse(logicModule.isThenIStartedBlastinAvailable(player));
+	}
+
+	// rust: is_chomp_available_false_without_pin_players_skill
+	@Test
+	void isChompAvailableFalseWithoutPinPlayersSkill() {
+		RosterPlayer player = new RosterPlayer();
+		RosterPlayer target = new RosterPlayer();
+		assertFalse(logicModule.isChompAvailable(player, target));
+	}
+
+	// rust: is_punt_action_available_false_without_skill
+	@Test
+	void isPuntActionAvailableFalseWithoutSkill() {
+		RosterPlayer player = new RosterPlayer();
+		assertFalse(logicModule.isPuntActionAvailable(player, false));
+	}
+
+	// rust: is_blitz_action_available_false_when_blitz_used
+	@Test
+	void isBlitzActionAvailableFalseWhenBlitzUsed() {
+		RosterPlayer player = new RosterPlayer();
+		given(client.getGame().getTurnData().isBlitzUsed()).willReturn(true);
+		assertFalse(logicModule.isBlitzActionAvailable(player));
+	}
+
+	// rust: is_pass_action_available_false_when_pass_used
+	@Test
+	void isPassActionAvailableFalseWhenPassUsed() {
+		RosterPlayer player = new RosterPlayer();
+		given(client.getGame().getTurnData().isPassUsed()).willReturn(true);
+		assertFalse(logicModule.isPassActionAvailable(player, false));
+	}
+
+	// rust: is_hand_over_action_available_false_when_used
+	@Test
+	void isHandOverActionAvailableFalseWhenUsed() {
+		RosterPlayer player = new RosterPlayer();
+		given(client.getGame().getTurnData().isHandOverUsed()).willReturn(true);
+		assertFalse(logicModule.isHandOverActionAvailable(player, false));
 	}
 }
