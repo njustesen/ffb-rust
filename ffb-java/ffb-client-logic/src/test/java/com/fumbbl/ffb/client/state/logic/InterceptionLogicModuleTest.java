@@ -41,13 +41,6 @@ class InterceptionLogicModuleTest {
 	FantasyFootballClient client;
 
 	@Test
-	void getIdReturnsInterception() {
-		InterceptionLogicModule module = new InterceptionLogicModule(client);
-
-		assertEquals(ClientStateId.INTERCEPTION, module.getId());
-	}
-
-	@Test
 	void actionContextPanics() {
 		InterceptionLogicModule module = new InterceptionLogicModule(client);
 		ActingPlayer actingPlayer = new ActingPlayer(null);

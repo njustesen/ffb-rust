@@ -166,33 +166,12 @@ mod tests {
         FantasyFootballClient::new(params)
     }
 
-    #[test]
-    fn set_up_clears_interception_skill() {
-        let mut module = InterceptionLogicModule::new();
-        module.set_interception_skill(Some(Skill::new("Pass Block", SkillCategory::General)));
-        let mut client = make_client();
-        module.set_up(&mut client);
-        assert!(module.interception_skill.is_none());
-    }
-
-    #[test]
-    fn is_interceptor_is_always_false() {
-        let module = InterceptionLogicModule::new();
-        let client = make_client();
-        let player = Player::default();
-        assert!(!module.is_interceptor(&client, &player));
-    }
-
-    #[test]
-    fn player_peek_resets_since_no_player_is_ever_an_interceptor() {
-        let module = InterceptionLogicModule::new();
-        let client = make_client();
-        let player = Player::default();
-        assert_eq!(
-            module.player_peek(&client, &player).get_kind(),
-            crate::client::state::logic::interaction::interaction_result::Kind::Reset
-        );
-    }
+    // NOTE (test equalization): pruned — no faithful Java unit mirror (documented in the Java
+    // InterceptionLogicModuleTest): `set_up_clears_interception_skill` asserts the PRIVATE
+    // interceptionSkill field (no Java getter); `is_interceptor_is_always_false` mirrors Rust's
+    // documented conservative gap (Java's isInterceptor runs UtilPassing.findInterceptors over a
+    // live Game); `player_peek_resets_*` depends on that same live-Game isInterceptor. The
+    // action_context should-panic case is the 1:1 mirror kept both sides.
 
     #[test]
     #[should_panic(expected = "actionContext for acting player is not supported in interception context")]

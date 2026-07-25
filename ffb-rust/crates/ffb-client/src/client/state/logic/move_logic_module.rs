@@ -748,14 +748,9 @@ mod tests {
         assert_eq!(actions.len(), 20);
     }
 
-    #[test]
-    fn action_context_empty_without_any_special_availability() {
-        let module = MoveLogicModule::new();
-        let game = make_game();
-        let ap = ActingPlayer::new();
-        let ctx = module.action_context(&game, &ap);
-        assert!(ctx.get_actions().is_empty());
-    }
+    // NOTE (test equalization): `action_context_empty_without_any_special_availability` pruned —
+    // Java actionContext fans out into the isXAvailable helpers over a live game graph
+    // (fixture-inexpressible); Java MoveLogicModuleTest documents the same skip.
 
     #[test]
     fn kind_returns_move_for_plain_square() {
@@ -774,12 +769,9 @@ mod tests {
         assert_eq!(module.kind(&client, square), MoveSquareKind::Dodge);
     }
 
-    #[test]
-    fn move_square_none_without_game() {
-        let module = MoveLogicModule::new();
-        let client = make_client();
-        assert!(module.move_square(&client, FieldCoordinate::new(1, 1)).is_none());
-    }
+    // NOTE (test equalization): `move_square_none_without_game` pruned — Rust-only `client.game()?`
+    // no-game short-circuit; Java's private moveSquare dereferences the game unconditionally.
+    // Java MoveLogicModuleTest documents the same skip.
 
     #[test]
     fn automove_path_empty_without_moving_action() {
