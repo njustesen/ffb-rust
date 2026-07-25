@@ -4,6 +4,8 @@ import com.fumbbl.ffb.ClientStateId;
 import com.fumbbl.ffb.PlayerAction;
 import com.fumbbl.ffb.PlayerState;
 import com.fumbbl.ffb.TurnMode;
+import com.fumbbl.ffb.Weather;
+import com.fumbbl.ffb.model.property.NamedProperties;
 import com.fumbbl.ffb.client.FantasyFootballClient;
 import com.fumbbl.ffb.client.state.logic.interaction.ActionContext;
 import com.fumbbl.ffb.model.ActingPlayer;
@@ -29,14 +31,20 @@ import static org.mockito.BDDMockito.given;
  * Port of the {@code #[cfg(test)]} module in logic_module.rs (ffb-rust crate
  * ffb-client/src/client/state/logic/logic_module.rs).
  *
- * Only the handful of Rust tests that exercise genuinely pure predicate methods (no
- * {@code client.getGame()} access) are ported here. The vast majority of Rust tests in that
- * module exercise free functions taking a fully-built {@code &Game}/{@code &Player} graph
- * directly; the corresponding Java {@code LogicModule} methods instead read
- * {@code client.getGame()} (often unconditionally, before any null-guard), which would require
- * either building a live {@code Game}/{@code FieldModel}/factory object graph or brittle
- * deep-stub mocking of factory/mechanic lookups that risks {@code ClassCastException} at
- * runtime. Per the porting brief those are skipped; see the final report for the itemized list.
+ * The predicate methods read {@code client.getGame()}, but the {@code @Mock(RETURNS_DEEP_STUBS)}
+ * client makes that safe: most predicates short-circuit to their result on a skill/state/used-flag
+ * gate before touching any live game state, and the few that gate on a live {@code PlayerState}
+ * term are reachable by stubbing that single deep-stub instance (see the batched notes below). 30
+ * of the 48 Rust tests are ported this way.
+ *
+ * The remaining ~18 are genuinely fixture-inexpressible and remain skipped: those computing an
+ * unconditional local before the boolean gate — a {@code (GameMechanic)} cast (isBlockActionAvailable,
+ * isFoulActionAvailable, isViciousVinesAvailable, isThrowBombActionAvailable, isAllYouCanEatAvailable,
+ * isWisdomAvailable, and isSpecialAbilityAvailable/isBlitzSpecialAbilityAvailable which OR through it),
+ * or a {@code UtilPlayer} tacklezone sweep over a deep-stub-null player array (isSecureTheBallActionAvailable,
+ * isPassAnySquareAvailable, performsRangeGridAction via showGridForKTM); the {@code FieldModel} chomp-map
+ * free functions (notChomped/chomps/chompedBy and the private canChomp); and isSpecialBlockActionAvailable
+ * (needs a live actionContext). These require a real Game/FieldModel/mechanic graph, out of scope here.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -308,5 +316,42 @@ class LogicModuleTest {
 		given(client.getGame().getFieldModel().getPlayerState(player).isActive()).willReturn(true);
 		given(client.getGame().getFieldModel().getPlayerState(player).getBase()).willReturn(PlayerState.PRONE);
 		assertFalse(logicModule.isRecoverFromConfusionActionAvailable(player));
+	}
+
+	// rust: is_end_player_action_available_true_when_not_yet_acted
+	@Test
+	void isEndPlayerActionAvailableTrueWhenNotYetActed() {
+		// deep-stub actingPlayer.hasActed() defaults to false -> !hasActed() short-circuits the OR to true.
+		assertTrue(logicModule.isEndPlayerActionAvailable());
+	}
+
+	// rust: is_catch_of_the_day_available_false_without_ball_moving
+	@Test
+	void isCatchOfTheDayAvailableFalseWithoutBallMoving() {
+		RosterPlayer player = new RosterPlayer();
+		assertFalse(logicModule.isCatchOfTheDayAvailable(player));
+	}
+
+	// rust: is_zoat_gaze_available_false_without_skill
+	@Test
+	void isZoatGazeAvailableFalseWithoutSkill() {
+		RosterPlayer player = new RosterPlayer();
+		assertFalse(logicModule.isZoatGazeAvailable(player));
+	}
+
+	// rust: is_hail_mary_pass_unavailable_without_skill
+	@Test
+	void isHailMaryPassUnavailableWithoutSkill() {
+		// deep-stub actingPlayer.getPlayer().hasSkillProperty(canPassToAnySquare) defaults to false.
+		assertFalse(logicModule.isHailMaryPassActionAvailable());
+	}
+
+	// rust: is_hail_mary_pass_unavailable_in_blizzard_even_with_skill
+	@Test
+	void isHailMaryPassUnavailableInBlizzardEvenWithSkill() {
+		given(client.getGame().getActingPlayer().getPlayer()
+			.hasSkillProperty(NamedProperties.canPassToAnySquare)).willReturn(true);
+		given(client.getGame().getFieldModel().getWeather()).willReturn(Weather.BLIZZARD);
+		assertFalse(logicModule.isHailMaryPassActionAvailable());
 	}
 }
