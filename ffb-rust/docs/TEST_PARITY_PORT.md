@@ -385,3 +385,37 @@ Byte-parity is already knowingly broken; these are logged for a future wire-pari
 | B4 | ffb-mechanics unmirrored (~700) → ffb-server tests | RUNNING |
 | B5 | ffb-client survivors ~1,698 → ffb-client-logic tests | RUNNING |
 | B6 | ffb-server survivors ~896 → ffb-server tests | RUNNING |
+
+## Session 2026-07-25 — client tail (report / range_grid / LogicModule / replay)
+Counts after: Rust ffb-client 1528, Java ffb-client-logic 1364 (both green).
+- **Report tail 1:1**: pass_roll bb2025 −missing_thrower (defensive null-thrower; Java NPEs) → 7/7;
+  injury bb2020 −2 Rust-internal (player_state_description table + parse_modifier_debug) → 4/4;
+  prayer_roll bb2020 left 2/2 (minor roll-scenario diff), bb2025 6/6; pass_roll bb2016/bb2020 &
+  injury bb2016/bb2025 already 1:1.
+- **REAL RUST BUG FIXED — range_grid_state**: Java `RangeGridState.refreshRangeGrid()` returns
+  `perform().with(coordinate)` UNCONDITIONALLY when shown+ungated (nullable coord, Kind not gated
+  on coord presence); Rust gated PERFORM on `Some(coordinate)` → wrongly RESET when no coordinate.
+  Fixed Rust: added `InteractionResult::with_coordinate_opt` + always-PERFORM. Renamed scoped test
+  `resets_→performs_without_player_coordinate` both sides + ported to Java. The 3 Java `refreshSettings*`
+  tests are a Java-only exemption (Rust getProperty/SETTING_RANGEGRID infra gap).
+- **LogicModule predicate tar pit: 5 → 30 Java** (of 48 Rust). Key: `@Mock(RETURNS_DEEP_STUBS)` client
+  makes `getGame()` safe; most predicates short-circuit on a skill/state/used-flag gate before live
+  state, and live-PlayerState gates are reachable by stubbing the single cached deep-stub instance
+  (isActive/getBase/isConfused/isHypnotized/isEyeGouged, turnMode). Ported: treacherous, blackInk,
+  raidingParty, lookIntoMyEyes, balefulHex, thenIStartedBlastin, chomp, punt, blitz/pass/handOver
+  (used-gates), multiBlock, furiousOutburst, kickEm, beerBarrel, standUp, recover-{confusion,gaze,
+  eyeGouge}, prone-gate, endPlayerAction, catchOfTheDay, zoatGaze, hailMary×2. Still blocked (~18):
+  unconditional `(GameMechanic)` casts (block/foul/viciousVines/throwBomb/allYouCanEat/wisdom/
+  specialAbility), UtilPlayer null-array sweeps (secureTheBall/passAnySquare/performsRangeGrid via
+  showGridForKTM), FieldModel chomp-map free fns (notChomped/chomps/chompedBy/private canChomp),
+  actionContext-dependent specialBlock. Rule: a method that computes ANY local before the boolean
+  gate (mechanic cast OR UtilPlayer sweep) blows up under deep stubs — those stay blocked.
+- **ReplayLogicModule**: new ReplayLogicModuleTest, +2 (replayStopped all-branches, actionContext
+  throws). Other 7 are a structural divergence (Rust asserts private replay_list; Java behavior only
+  observable as ClientReplayer/comm/overlays/callbacks interactions; getOverlays().stream() NPEs
+  under deep stubs) — Rust-only, documented.
+- **Command handlers**: NOT the huge divergence earlier feared — Java already has ~103 handler tests
+  (26 files mirror Rust 1:1 by name) vs Rust 125. Remaining per-file gaps (~22): model_sync −5,
+  user_settings −5, game_state −3, admin_message −2, join +2, leave/socket_closed/sound +1, and a
+  spread of −1s. NEXT: per-file reconcile (port Rust extras or prune defensive; investigate Java
+  extras). sub_handler_game_state_marking 14/14 & talk 7/7 already aligned.
