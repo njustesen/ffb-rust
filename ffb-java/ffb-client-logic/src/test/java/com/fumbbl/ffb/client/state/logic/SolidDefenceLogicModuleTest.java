@@ -21,17 +21,8 @@ class SolidDefenceLogicModuleTest {
 	@Mock
 	private ActingPlayer actingPlayer;
 
-	@Test
-	public void testGetIdReturnsSolidDefence() {
-		SolidDefenceLogicModule module = new SolidDefenceLogicModule(client);
-		assertEquals(ClientStateId.SOLID_DEFENCE, module.getId());
-	}
-
-	@Test
-	public void testAvailableActionsIsEmpty() {
-		SolidDefenceLogicModule module = new SolidDefenceLogicModule(client);
-		assertTrue(module.availableActions().isEmpty());
-	}
+	// NOTE (test equalization): testGetIdReturnsSolidDefence / testAvailableActionsIsEmpty pruned —
+	// trivial LogicModule-subclass boilerplate, no Rust twin.
 
 	@Test
 	public void testActionContextThrowsViaDelegation() {

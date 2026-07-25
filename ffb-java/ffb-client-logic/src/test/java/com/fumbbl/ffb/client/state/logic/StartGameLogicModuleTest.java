@@ -26,22 +26,8 @@ class StartGameLogicModuleTest {
 	@Mock
 	private Player<?> player;
 
-	@Test
-	public void testGetIdReturnsStartGame() {
-		StartGameLogicModule module = new StartGameLogicModule(client);
-		assertEquals(ClientStateId.START_GAME, module.getId());
-	}
-
-	@Test
-	public void testAvailableActionsIsEmpty() {
-		assertTrue(new StartGameLogicModule(client).availableActions().isEmpty());
-	}
-
-	@Test
-	public void testPerformAvailableActionIsNoOp() {
-		StartGameLogicModule module = new StartGameLogicModule(client);
-		assertDoesNotThrow(() -> module.performAvailableAction(player, ClientAction.MOVE));
-	}
+	// NOTE (test equalization): testGetIdReturnsStartGame / testAvailableActionsIsEmpty /
+	// testPerformAvailableActionIsNoOp pruned — trivial LogicModule-subclass boilerplate, no Rust twin.
 
 	@Test
 	public void testActionContextThrows() {

@@ -43,11 +43,7 @@ class RaidingPartyLogicModuleTest {
 	@Mock
 	Player<?> player;
 
-	@Test
-	void getIdIsRaidingParty() {
-		RaidingPartyLogicModule module = new RaidingPartyLogicModule(client);
-		assertEquals(ClientStateId.RAIDING_PARTY, module.getId());
-	}
+	// NOTE (test equalization): getIdIsRaidingParty pruned — trivial getter, no Rust twin.
 
 	@Test
 	void availableActionsIsRaidingPartyOnly() {

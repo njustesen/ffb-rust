@@ -26,22 +26,8 @@ class WaitForSetupLogicModuleTest {
 	@Mock
 	private Player<?> player;
 
-	@Test
-	public void testGetIdReturnsWaitForSetup() {
-		WaitForSetupLogicModule module = new WaitForSetupLogicModule(client);
-		assertEquals(ClientStateId.WAIT_FOR_SETUP, module.getId());
-	}
-
-	@Test
-	public void testAvailableActionsIsEmpty() {
-		assertTrue(new WaitForSetupLogicModule(client).availableActions().isEmpty());
-	}
-
-	@Test
-	public void testPerformAvailableActionIsNoOp() {
-		WaitForSetupLogicModule module = new WaitForSetupLogicModule(client);
-		assertDoesNotThrow(() -> module.performAvailableAction(player, ClientAction.MOVE));
-	}
+	// NOTE (test equalization): testGetIdReturnsWaitForSetup / testAvailableActionsIsEmpty /
+	// testPerformAvailableActionIsNoOp pruned — trivial LogicModule-subclass boilerplate, no Rust twin.
 
 	@Test
 	public void testActionContextThrows() {

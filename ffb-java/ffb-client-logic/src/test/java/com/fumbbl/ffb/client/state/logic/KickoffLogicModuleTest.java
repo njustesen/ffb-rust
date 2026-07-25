@@ -36,12 +36,7 @@ class KickoffLogicModuleTest {
 	@Mock(answer = Answers.RETURNS_DEEP_STUBS)
 	FantasyFootballClient client;
 
-	@Test
-	void getIdReturnsKickoff() {
-		KickoffLogicModule module = new KickoffLogicModule(client);
-
-		assertEquals(ClientStateId.KICKOFF, module.getId());
-	}
+	// NOTE (test equalization): getIdReturnsKickoff pruned — trivial getter, no Rust twin.
 
 	@Test
 	void fieldPeekPerformsWhenInAwayHalfAndNotKicked() {

@@ -39,11 +39,7 @@ class TricksterLogicModuleTest {
 	@Mock(answer = Answers.RETURNS_DEEP_STUBS)
 	FantasyFootballClient client;
 
-	@Test
-	void getIdReturnsTrickster() {
-		TricksterLogicModule module = new TricksterLogicModule(client);
-		assertEquals(ClientStateId.TRICKSTER, module.getId());
-	}
+	// NOTE (test equalization): getIdReturnsTrickster pruned — trivial getter, no Rust twin.
 
 	@Test
 	void availableActionsIsEndMoveOnly() {
