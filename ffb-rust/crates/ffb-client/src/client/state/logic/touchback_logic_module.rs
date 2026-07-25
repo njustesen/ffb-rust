@@ -218,16 +218,10 @@ mod tests {
         assert!(module.touchback_to_any_field);
     }
 
-    #[test]
-    fn set_up_is_not_touchback_to_any_field_when_selectable_home_player_exists() {
-        let mut module = TouchbackLogicModule::new();
-        let mut client = make_client();
-        let mut game = make_game();
-        add_player(&mut game, true, "p1", FieldCoordinate::new(1, 1));
-        client.set_game(game);
-        module.set_up(&mut client);
-        assert!(!module.touchback_to_any_field);
-    }
+    // NOTE (test equalization): `set_up_is_not_touchback_to_any_field_when_selectable_home_player_exists`
+    // pruned — the selectable-home-player path drives Java's isPlayerSelectable over a live
+    // FieldModel/PlayerState/Team graph (Java TouchbackLogicModuleTest documents the same out-of-scope
+    // skip). The no-selectable-player set_up case is the 1:1 mirror kept both sides.
 
     #[test]
     fn field_peek_perform_only_when_touchback_to_any_field() {

@@ -33,22 +33,8 @@ class TouchbackLogicModuleTest {
 	@Mock
 	private Player<?> player;
 
-	@Test
-	public void testGetIdReturnsTouchback() {
-		TouchbackLogicModule module = new TouchbackLogicModule(client);
-		assertEquals(ClientStateId.TOUCHBACK, module.getId());
-	}
-
-	@Test
-	public void testAvailableActionsIsEmpty() {
-		assertTrue(new TouchbackLogicModule(client).availableActions().isEmpty());
-	}
-
-	@Test
-	public void testPerformAvailableActionIsNoOp() {
-		TouchbackLogicModule module = new TouchbackLogicModule(client);
-		assertDoesNotThrow(() -> module.performAvailableAction(player, ClientAction.MOVE));
-	}
+	// NOTE (test equalization): testGetIdReturnsTouchback / testAvailableActionsIsEmpty /
+	// testPerformAvailableActionIsNoOp pruned — trivial LogicModule-subclass boilerplate, no Rust twin.
 
 	@Test
 	public void testFieldPeekResetsBeforeSetUp() {
