@@ -494,3 +494,27 @@ maps; prayer_state [ffb-server]; team_skeleton), option 14 (game_option_int/abst
 kickoff 17 (kickoff_result_mapping ×edition), xml 17 (util_xml/xml_handler/i_xml_readable), marking 4,
 dialog 2. Many util/option/model entries are Rust-invented-API or fixture-heavy → real portable subset
 is smaller than 165; judge per file (like game_options: only ~2/10 portable).
+
+## Session 2026-07-26 — Step 2 ffb-common ports (report/enum/option/marking/kickoff)
+Continued from the reconcile_step2.sh gap list. GAP 45 files/179 tests → **24 files/120 tests**
+(COVERED 810 files/3203 tests; INVENTED 23/282). ffb-common green (1991 runs). Ported this session:
+- Reports (round-trip via ReportTestUtil.source()): ConfusionRoll, KickoffResult, CardDeactivated,
+  ApothecaryChoice, Inducement, PlayCard, CardEffectRoll, ModifiedPassResult(mixed),
+  ModifiedDodgeResultSuccessful(mixed), SkillUseOtherPlayer(bb2020), Injury(bb2016+mixed).
+  Gotcha: ReportInjury(mixed) toJson does `skip.name()` → needs a real SkipInjuryParts (NONE), NOT
+  null. Most other factory-backed fields (Skill/Card/Prayer/InducementType/CardEffect/SeriousInjury)
+  ARE null-safe — EXCEPT ReportPrayerEnd (`prayer.getName()` NPEs → needs a real Prayer, still GAP).
+- SkipInjuryParts enum (isArmour/isInjury/isCas + name()).
+- GameOptionInt (keyed by GameOptionId.TURNTIME). **Divergence found:** Java StringTool.bind uses
+  "$N" 1-based placeholders (regex `[$]([0-9]+)`), Rust uses "{0}" 0-based → Java template "$1".
+- marking: TransientPlayerMarker (Mode.getDisplayText), FieldMarker (transform + static null-safe transform).
+- KickoffResultMapping bb2016/bb2020/bb2025 (getResult(int) → edition KickoffResult enum).
+**Remaining GAP (24 files/120, run script for live list)** is the hard/Rust-specific tail: util_player 39
+(+util_cards/util_passing/path_finder* — all need a live Game/FieldModel graph, fixture-heavy like the
+LogicModule predicates), game_options 10 (mostly Rust-invented string API; only getOptionWithDefault
+maps, needs Game+factory), prayer_state 6 (ffb-server), xml infra (util_xml/xml_handler/i_xml_readable),
+GameOptionAbstract (abstract + Rust static is_changed/Default), model_change_observable (Rust
+compile-test), keyed_item_registry/enhancement_registry/dice_category_factory (Rust registry patterns),
+report_prayer_end (needs Prayer), kickoff root mapping (Rust test-local mock of abstract base),
+team_skeleton/roster_skeleton (skeleton builders). Each needs per-file judgment; true portable subset
+is well under 120.
