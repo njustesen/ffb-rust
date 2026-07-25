@@ -62,6 +62,19 @@ Java counterpart) + any `// PARITY-EXEMPT` modules batch A3 tags (Rust-only infr
   CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION only takes effect after a Claude Code session RESTART.
   Set it high (e.g. 600) and restart to resume the parallel port.
 
+## -N LOGIC-MODULE PATTERN (Java has MORE — analysis 2026-07-25)
+The Java LogicModule-subclass tests carry boilerplate Rust never tests:
+`testGetIdReturnsX`, `testAvailableActionsIsEmpty`, `testPerformAvailableActionIsNoOp`,
+`testActionContextThrows[ViaDelegation]`. These are trivial (getter/empty/no-op/panic) →
+PRUNE from Java (Rust-as-reference), each -N module. Plus a FEW genuine behavioral variations
+Rust lacks (setup: square_is_empty_FALSE, handle_command_HANDLED; wait_for_opponent: get_player
+prefers-home / falls-back; etc.) — these are Rust UNDER-coverage; cheapest faithful fix is to ADD
+the Rust mirror (trivial #[test]), else prune the Java extra. DECISION for the grind: prune the
+trivial boilerplate; add Rust mirrors for the cheap behavioral extras. -N modules to do: setup(-5),
+wait_for_opponent(-5), quick_snap(-3), spectate(-3), start_game(-3), wait_for_setup(-3),
+solid_defence(-2), touchback(-2), kickoff(-1), raiding_party(-1), trickster(-1), rangegridstate(-2),
+several clientcommandhandler* (-1/-2). DONE this session: move_logic 10/10, interception 1/1 (commit).
+
 ## REPORT-MESSAGE ±1 FAST PATTERN (proven 2026-07-25, 16 modules reconciled)
 Most report-message mismatches resolve WITHOUT a render port:
 - **-N (Java has more):** the Java extra is a trivial `reportIdIsX()`/`getKey()` getter test with
