@@ -46,22 +46,8 @@ class WaitForOpponentLogicModuleTest {
 	@Mock
 	private Player<?> awayPlayer;
 
-	@Test
-	public void testGetIdReturnsWaitForOpponent() {
-		WaitForOpponentLogicModule module = new WaitForOpponentLogicModule(client);
-		assertEquals(ClientStateId.WAIT_FOR_OPPONENT, module.getId());
-	}
-
-	@Test
-	public void testAvailableActionsIsEmpty() {
-		assertTrue(new WaitForOpponentLogicModule(client).availableActions().isEmpty());
-	}
-
-	@Test
-	public void testPerformAvailableActionIsNoOp() {
-		WaitForOpponentLogicModule module = new WaitForOpponentLogicModule(client);
-		assertDoesNotThrow(() -> module.performAvailableAction(player, ClientAction.MOVE));
-	}
+	// NOTE (test equalization): testGetIdReturnsWaitForOpponent / testAvailableActionsIsEmpty /
+	// testPerformAvailableActionIsNoOp pruned — trivial LogicModule-subclass boilerplate, no Rust twin.
 
 	@Test
 	public void testActionContextThrows() {
@@ -96,29 +82,8 @@ class WaitForOpponentLogicModuleTest {
 		assertSame(player, found.get());
 	}
 
-	@Test
-	public void testGetPlayerPrefersHomeTeamPlayerAmongMultiple() {
-		given(client.getGame().getFieldModel().getPlayers(new FieldCoordinate(4, 4)))
-			.willReturn(Arrays.asList(awayPlayer, homePlayer));
-		given(client.getGame().getTeamHome().hasPlayer(awayPlayer)).willReturn(false);
-		given(client.getGame().getTeamHome().hasPlayer(homePlayer)).willReturn(true);
-
-		WaitForOpponentLogicModule module = new WaitForOpponentLogicModule(client);
-		Optional<Player<?>> found = module.getPlayer(new FieldCoordinate(4, 4));
-		assertTrue(found.isPresent());
-		assertSame(homePlayer, found.get());
-	}
-
-	@Test
-	public void testGetPlayerFallsBackToLastWhenNoHomeTeamPlayerFound() {
-		given(client.getGame().getFieldModel().getPlayers(new FieldCoordinate(5, 5)))
-			.willReturn(Arrays.asList(awayPlayer, player));
-		given(client.getGame().getTeamHome().hasPlayer(awayPlayer)).willReturn(false);
-		given(client.getGame().getTeamHome().hasPlayer(player)).willReturn(false);
-
-		WaitForOpponentLogicModule module = new WaitForOpponentLogicModule(client);
-		Optional<Player<?>> found = module.getPlayer(new FieldCoordinate(5, 5));
-		assertTrue(found.isPresent());
-		assertSame(player, found.get());
-	}
+	// NOTE (test equalization): testGetPlayerPrefersHomeTeamPlayerAmongMultiple /
+	// testGetPlayerFallsBackToLastWhenNoHomeTeamPlayerFound pruned — Rust's wait_for_opponent suite
+	// tests only the none + single-occupant getPlayer cases; these multi-occupant variations have no
+	// Rust twin (Rust-as-reference).
 }

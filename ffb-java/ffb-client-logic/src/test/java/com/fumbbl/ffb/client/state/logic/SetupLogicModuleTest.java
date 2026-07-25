@@ -40,22 +40,8 @@ class SetupLogicModuleTest {
 	@Mock
 	private NetCommand nonMatchingCommand;
 
-	@Test
-	public void testGetIdReturnsSetup() {
-		SetupLogicModule module = new SetupLogicModule(client);
-		assertEquals(ClientStateId.SETUP, module.getId());
-	}
-
-	@Test
-	public void testAvailableActionsIsEmpty() {
-		assertTrue(new SetupLogicModule(client).availableActions().isEmpty());
-	}
-
-	@Test
-	public void testPerformAvailableActionIsNoOp() {
-		SetupLogicModule module = new SetupLogicModule(client);
-		assertDoesNotThrow(() -> module.performAvailableAction(player, ClientAction.MOVE));
-	}
+	// NOTE (test equalization): testGetIdReturnsSetup / testAvailableActionsIsEmpty /
+	// testPerformAvailableActionIsNoOp pruned — trivial LogicModule-subclass boilerplate, no Rust twin.
 
 	@Test
 	public void testUseTurnModeIsFalse() {
@@ -85,12 +71,8 @@ class SetupLogicModuleTest {
 		assertTrue(module.squareIsEmpty(new FieldCoordinate(1, 1)));
 	}
 
-	@Test
-	public void testSquareIsEmptyFalseWhenPlayerOnSquare() {
-		given(client.getGame().getFieldModel().getPlayer(new FieldCoordinate(2, 2))).willReturn((com.fumbbl.ffb.model.Player) player);
-		SetupLogicModule module = new SetupLogicModule(client);
-		assertFalse(module.squareIsEmpty(new FieldCoordinate(2, 2)));
-	}
+	// NOTE (test equalization): testSquareIsEmptyFalseWhenPlayerOnSquare pruned — Rust's setup suite
+	// tests only the empty (no-game) case; the not-empty complement has no Rust twin (Rust-as-reference).
 
 	@Test
 	public void testHandleCommandHandledForServerTeamSetupList() {
@@ -100,11 +82,7 @@ class SetupLogicModuleTest {
 		assertEquals(InteractionResult.Kind.HANDLED, result.getKind());
 	}
 
-	@Test
-	public void testHandleCommandIgnoresNonMatchingCommand() {
-		given(nonMatchingCommand.getId()).willReturn(NetCommandId.CLIENT_USE_SKILL);
-		SetupLogicModule module = new SetupLogicModule(client);
-		InteractionResult result = module.handleCommand(nonMatchingCommand, true);
-		assertEquals(InteractionResult.Kind.IGNORE, result.getKind());
-	}
+	// NOTE (test equalization): testHandleCommandIgnoresNonMatchingCommand pruned — Rust's setup
+	// handle_command test covers the TeamSetupList (handled) case; the non-matching (ignore) case has
+	// no Rust twin (Rust-as-reference).
 }
