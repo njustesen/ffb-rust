@@ -62,6 +62,18 @@ Java counterpart) + any `// PARITY-EXEMPT` modules batch A3 tags (Rust-only infr
   CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION only takes effect after a Claude Code session RESTART.
   Set it high (e.g. 600) and restart to resume the parallel port.
 
+## CLIENT COMMAND-HANDLER STRUCTURAL DIVERGENCE (analysis 2026-07-25)
+The ~18 `ClientCommandHandler*` modules do NOT follow the clean ±1 pattern — the two engines test
+them at DIFFERENT GRANULARITIES: Rust unit-tests extracted helper fns (should_sync_clock,
+find_updates, home_away_coaches, should_report_join, prepare/restore_*_animation round-trips,
+should_wait_for_animation variations), while Java tests the end-to-end `handleNetCommand` +
+some helpers. E.g. ModelSync J7/R12, UserSettings J2/R7, GameState J1/R4, Join J10/R8 (Java has the
+end-to-end extras), Leave J6/R5. Reaching exact 1:1 needs BIDIRECTIONAL porting (~30-50 tests):
+port Rust helper tests → Java where the helper is callable, and Java end-to-end → Rust. This is a
+FOCUSED PASS (like logicmodule/replay), NOT inline ±1 work. Quick partial win available:
+prune trivial Java getIdReturnsServerX / reportId handler tests (Rust doesn't test handler ids).
+DEFERRED to a dedicated command-handler pass. All -N LOGIC modules DONE (touchback last, commit).
+
 ## -N LOGIC-MODULE PATTERN (Java has MORE — analysis 2026-07-25)
 The Java LogicModule-subclass tests carry boilerplate Rust never tests:
 `testGetIdReturnsX`, `testAvailableActionsIsEmpty`, `testPerformAvailableActionIsNoOp`,
