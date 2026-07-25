@@ -518,3 +518,28 @@ compile-test), keyed_item_registry/enhancement_registry/dice_category_factory (R
 report_prayer_end (needs Prayer), kickoff root mapping (Rust test-local mock of abstract base),
 team_skeleton/roster_skeleton (skeleton builders). Each needs per-file judgment; true portable subset
 is well under 120.
+
+## Session 2026-07-26 (cont.) — ffb-common tail, GAP 24 -> 18 files
+Ported: Team/RosterSkeleton (drive IXmlReadable startXmlElement/endXmlElement SAX callbacks
+directly — no parser needed; use org.xml.sax.helpers.AttributesImpl), UtilXml attribute helpers (8),
+UtilReport.validateReportId (3). GAP now **18 files/96 tests** (COVERED 816/3227; INVENTED 23/282).
+The remaining 18 are the genuinely hard/divergent tail — each documented here so they are NOT
+re-attempted blindly:
+- **Fixture-heavy (need a live Game/FieldModel graph)**: util_player 39, util_cards 5,
+  util_disturbing_presence 5, path_finder_with_pass_block_support 5, path_finder_with_multi_jump 4.
+  These are the ffb-common analogue of the LogicModule predicate tar-pit; each UtilPlayer/PathFinder
+  method needs players placed on a FieldModel with coordinates/states. Build a Game via
+  `IFactorySource app = NetCommandTestUtil.applicationSource(); new Game(app, app.getFactoryManager())`
+  (proven in PrayerFactoryTest) — but each test needs bespoke player/field setup. Deferred as a focused pass.
+- **Rust-invented / semantically-divergent API (NOT faithfully portable)**: game_options 10 & util_game_option 5
+  (Rust option store returns 0/absent; Java getOptionWithDefault returns FACTORY defaults e.g.
+  maxPlayersOnField=11 — values would differ), game_option_abstract 4 (Java abstract + Rust static
+  is_changed/Default), dice_category_factory 2 (Rust for_kind identity vs Java forCommandString/forDiceSize),
+  dialog_pile_driver_parameter 2 (Rust add-mutator vs Java list-ctor), util_passing 2 (canIntercept is
+  PRIVATE in Java — Rust exposed it pub for testing), model_change_observable 1 (Rust trait compile-test),
+  keyed_item_registry/enhancement_registry/entropy_source (Rust registry/RNG infra patterns).
+- **Needs a real factory object**: report_prayer_end 2 (prayer.getName() NPEs on null → needs a Prayer),
+  report_skill_roll 1 (abstract base).
+- **ffb-server module (not ffb-common)**: prayer_state 6 (com.fumbbl.ffb.server.PrayerState — belongs to Step 3).
+Session ffb-common tally: ~68 tests ported across reports/enum/option/marking/kickoff/skeleton/xml/util,
+all green (ffb-common 2016 runs). Both engines green throughout.
