@@ -47,22 +47,10 @@ class SpectateLogicModuleTest {
 		given(client.getGame()).willReturn(game);
 	}
 
-	@Test
-	public void testGetIdReturnsSpectate() {
-		SpectateLogicModule module = new SpectateLogicModule(client);
-		assertEquals(ClientStateId.SPECTATE, module.getId());
-	}
-
-	@Test
-	public void testAvailableActionsIsEmpty() {
-		assertTrue(new SpectateLogicModule(client).availableActions().isEmpty());
-	}
-
-	@Test
-	public void testPerformAvailableActionIsNoOp() {
-		SpectateLogicModule module = new SpectateLogicModule(client);
-		assertDoesNotThrow(() -> module.performAvailableAction(player, ClientAction.MOVE));
-	}
+	// NOTE (test equalization): testGetIdReturnsSpectate / testAvailableActionsIsEmpty /
+	// testPerformAvailableActionIsNoOp pruned — trivial LogicModule-subclass boilerplate with no Rust
+	// twin (Rust SpectateLogicModule tests only canSwitchToSpectate/setUp behavior + actionContext
+	// panic). Rust-as-reference.
 
 	@Test
 	public void testActionContextThrows() {

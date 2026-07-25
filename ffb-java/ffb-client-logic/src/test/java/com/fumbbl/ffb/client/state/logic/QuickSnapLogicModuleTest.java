@@ -23,11 +23,10 @@ class QuickSnapLogicModuleTest {
 	@Mock
 	private ActingPlayer actingPlayer;
 
-	@Test
-	public void testGetIdReturnsQuickSnap() {
-		QuickSnapLogicModule module = new QuickSnapLogicModule(client);
-		assertEquals(ClientStateId.QUICK_SNAP, module.getId());
-	}
+	// NOTE (test equalization): testGetIdReturnsQuickSnap / testAvailableActionsIsEmpty /
+	// testActionContextThrowsViaDelegation pruned — trivial LogicModule-subclass boilerplate with no
+	// Rust twin (Rust QuickSnapLogicModule tests only the behavioral useTurnMode/squareIsOnPitch/
+	// squaresAreSameOrAdjacent cases). Rust-as-reference.
 
 	@Test
 	public void testUseTurnModeIsTrue() {
@@ -55,16 +54,4 @@ class QuickSnapLogicModuleTest {
 		assertFalse(module.squaresAreSameOrAdjacent(null, a));
 	}
 
-	@Test
-	public void testAvailableActionsIsEmpty() {
-		assertTrue(new QuickSnapLogicModule(client).availableActions().isEmpty());
-	}
-
-	@Test
-	public void testActionContextThrowsViaDelegation() {
-		QuickSnapLogicModule module = new QuickSnapLogicModule(client);
-		UnsupportedOperationException exception = assertThrows(UnsupportedOperationException.class,
-			() -> module.actionContext(actingPlayer));
-		assertEquals("actionContext for acting player is not supported in setup context", exception.getMessage());
-	}
 }
