@@ -2,6 +2,8 @@ package com.fumbbl.ffb.client.state.logic;
 
 import com.fumbbl.ffb.ClientStateId;
 import com.fumbbl.ffb.PlayerAction;
+import com.fumbbl.ffb.PlayerState;
+import com.fumbbl.ffb.TurnMode;
 import com.fumbbl.ffb.client.FantasyFootballClient;
 import com.fumbbl.ffb.client.state.logic.interaction.ActionContext;
 import com.fumbbl.ffb.model.ActingPlayer;
@@ -208,5 +210,103 @@ class LogicModuleTest {
 		RosterPlayer player = new RosterPlayer();
 		given(client.getGame().getTurnData().isHandOverUsed()).willReturn(true);
 		assertFalse(logicModule.isHandOverActionAvailable(player, false));
+	}
+
+	// The following predicates gate on live PlayerState/turn-mode terms before the skill check; the
+	// deep-stub PlayerState reached via getFieldModel().getPlayerState(player) is stubbed so the
+	// skill/state gate is the genuine reason for the result (isolating the Rust intent), without
+	// building a live FieldModel graph. Each stub targets the same cached deep-stub instance.
+
+	// rust: is_multi_block_action_available_false_without_skill
+	@Test
+	void isMultiBlockActionAvailableFalseWithoutSkill() {
+		RosterPlayer player = new RosterPlayer();
+		given(client.getGame().getFieldModel().getPlayerState(player).isActive()).willReturn(true);
+		assertFalse(logicModule.isMultiBlockActionAvailable(player));
+	}
+
+	// rust: is_furious_outburst_available_false_without_skill
+	@Test
+	void isFuriousOutburstAvailableFalseWithoutSkill() {
+		RosterPlayer player = new RosterPlayer();
+		given(client.getGame().getFieldModel().getPlayerState(player).isActive()).willReturn(true);
+		given(client.getGame().getFieldModel().getPlayerState(player).getBase()).willReturn(PlayerState.STANDING);
+		assertFalse(logicModule.isFuriousOutburstAvailable(player));
+	}
+
+	// rust: is_kick_em_block_and_blitz_false_without_skill
+	@Test
+	void isKickEmBlockAndBlitzFalseWithoutSkill() {
+		RosterPlayer player = new RosterPlayer();
+		given(client.getGame().getFieldModel().getPlayerState(player).isActive()).willReturn(true);
+		assertFalse(logicModule.isKickEmBlockAvailable(player));
+		assertFalse(logicModule.isKickEmBlitzAvailable(player));
+	}
+
+	// rust: is_beer_barrel_bash_false_without_skill
+	@Test
+	void isBeerBarrelBashFalseWithoutSkill() {
+		RosterPlayer player = new RosterPlayer();
+		given(client.getGame().getTurnMode()).willReturn(TurnMode.REGULAR);
+		given(client.getGame().getFieldModel().getPlayerState(player).getBase()).willReturn(PlayerState.STANDING);
+		assertFalse(logicModule.isBeerBarrelBashAvailable(player));
+	}
+
+	// rust: is_stand_up_action_available_requires_prone_and_active
+	@Test
+	void isStandUpActionAvailableRequiresProneAndActive() {
+		RosterPlayer player = new RosterPlayer();
+		// default (standing) -> false
+		assertFalse(logicModule.isStandUpActionAvailable(player));
+		// prone + active -> true
+		given(client.getGame().getFieldModel().getPlayerState(player).getBase()).willReturn(PlayerState.PRONE);
+		given(client.getGame().getFieldModel().getPlayerState(player).isActive()).willReturn(true);
+		assertTrue(logicModule.isStandUpActionAvailable(player));
+	}
+
+	// rust: is_recover_from_confusion_action_available_requires_confused_state
+	@Test
+	void isRecoverFromConfusionActionAvailableRequiresConfusedState() {
+		RosterPlayer player = new RosterPlayer();
+		// not confused -> false
+		assertFalse(logicModule.isRecoverFromConfusionActionAvailable(player));
+		// confused + active + non-prone -> true
+		given(client.getGame().getFieldModel().getPlayerState(player).isConfused()).willReturn(true);
+		given(client.getGame().getFieldModel().getPlayerState(player).isActive()).willReturn(true);
+		assertTrue(logicModule.isRecoverFromConfusionActionAvailable(player));
+	}
+
+	// rust: is_recover_from_gaze_action_available_requires_hypnotized_state
+	@Test
+	void isRecoverFromGazeActionAvailableRequiresHypnotizedState() {
+		RosterPlayer player = new RosterPlayer();
+		// not hypnotized -> false
+		assertFalse(logicModule.isRecoverFromGazeActionAvailable(player));
+		// hypnotized + non-prone -> true
+		given(client.getGame().getFieldModel().getPlayerState(player).isHypnotized()).willReturn(true);
+		assertTrue(logicModule.isRecoverFromGazeActionAvailable(player));
+	}
+
+	// rust: is_recover_from_eye_gouge_action_available_requires_eye_gouged_state
+	@Test
+	void isRecoverFromEyeGougeActionAvailableRequiresEyeGougedState() {
+		RosterPlayer player = new RosterPlayer();
+		// not eye-gouged -> false
+		assertFalse(logicModule.isRecoverFromEyeGougeActionAvailable(player));
+		// eye-gouged + active + non-prone -> true
+		given(client.getGame().getFieldModel().getPlayerState(player).isEyeGouged()).willReturn(true);
+		given(client.getGame().getFieldModel().getPlayerState(player).isActive()).willReturn(true);
+		assertTrue(logicModule.isRecoverFromEyeGougeActionAvailable(player));
+	}
+
+	// rust: is_recover_from_confusion_and_stand_up_are_mutually_exclusive_prone_gate
+	@Test
+	void isRecoverFromConfusionAndStandUpAreMutuallyExclusiveProneGate() {
+		RosterPlayer player = new RosterPlayer();
+		// prone + active + confused: cannot recover from confusion yet (must stand up first)
+		given(client.getGame().getFieldModel().getPlayerState(player).isConfused()).willReturn(true);
+		given(client.getGame().getFieldModel().getPlayerState(player).isActive()).willReturn(true);
+		given(client.getGame().getFieldModel().getPlayerState(player).getBase()).willReturn(PlayerState.PRONE);
+		assertFalse(logicModule.isRecoverFromConfusionActionAvailable(player));
 	}
 }
