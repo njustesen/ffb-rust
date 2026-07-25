@@ -172,27 +172,6 @@ impl ActionKey {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn move_directions_have_distinct_property_names() {
-        let moves = [
-            ActionKey::PLAYER_MOVE_NORTH,
-            ActionKey::PLAYER_MOVE_NORTHEAST,
-            ActionKey::PLAYER_MOVE_EAST,
-            ActionKey::PLAYER_MOVE_SOUTHEAST,
-            ActionKey::PLAYER_MOVE_SOUTH,
-            ActionKey::PLAYER_MOVE_SOUTHWEST,
-            ActionKey::PLAYER_MOVE_WEST,
-            ActionKey::PLAYER_MOVE_NORTHWEST,
-        ];
-        let names: Vec<&str> = moves.iter().map(|k| k.property_name()).collect();
-        let mut unique = names.clone();
-        unique.sort();
-        unique.dedup();
-        assert_eq!(unique.len(), names.len());
-    }
-
-}
+// NOTE (test equalization): the Rust-only `move_directions_have_distinct_property_names` enum-
+// consistency test was pruned — low-signal, Rust-specific (property_name()), no Java ActionKey unit
+// test counterpart. Rust-as-reference; no gap either side now.

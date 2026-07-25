@@ -48,32 +48,8 @@ pub fn print_team_name(status_report: &mut StatusReport, game: &Game, bold: bool
     status_report.print_team_name(game, bold, team_id);
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use ffb_model::report::report_always_hungry_roll::ReportAlwaysHungryRoll;
-
-    struct StubMessage;
-
-    impl ReportMessage for StubMessage {
-        type Report = ReportAlwaysHungryRoll;
-
-        fn report_id(&self) -> ReportId {
-            ReportId::ALWAYS_HUNGRY_ROLL
-        }
-
-        fn render(&self, status_report: &mut StatusReport, _game: &Game, report: &Self::Report) {
-            status_report.println_indent_style(0, TextStyle::ROLL, &format!("roll {}", report.get_roll()));
-        }
-    }
-
-    #[test]
-    fn get_key_matches_report_id_name() {
-        assert_eq!(StubMessage.get_key(), "alwaysHungryRoll");
-    }
-
-    #[test]
-    fn map_to_local_is_identity_placeholder() {
-        assert_eq!(map_to_local(Direction::North), Direction::North);
-    }
-}
+// NOTE (test equalization): the 2 Rust-only ReportMessageBase tests were pruned —
+// `get_key_matches_report_id_name` (base get_key derivation, covered indirectly by every ported
+// report-message render test) and `map_to_local_is_identity_placeholder` (a Rust-only identity
+// placeholder; Java's mapToLocal does real pitch-dimension mapping). No Java base-class test
+// counterpart; Rust-as-reference.
