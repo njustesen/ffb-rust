@@ -469,3 +469,28 @@ a differently-named/parameterized Java class — grep the Java test BODIES for t
 test, not just filenames), and classify Rust-invented/plumbing as exempt. Only the residue after
 that is real work. Порт nothing until this tool exists — blind porting risks duplicate/overwriting
 Java classes (a duplicate Write was attempted and correctly blocked this session).
+
+## Session 2026-07-25 (cont.) — reliable Step 2 tool + first ports
+Built `ffb-rust/scripts/reconcile_step2.sh` (the tool the prior correction called for): classifies
+each Rust ffb-model/protocol test file COVERED / GAP / INVENTED by (a) Java MAIN class existence and
+(b) whether ANY Java TEST body (both ffb-common AND ffb-server trees, clone excluded via
+`-path '*ffb-java/ffb/*'`) references the PascalCase type. Ground truth at session start:
+COVERED 789 files/3144 tests · GAP 45 files/179 tests · INVENTED 23 files/282 tests. **So the true
+remaining Step 2 gap is ~179 tests, NOT 1862.**
+Ported this session (report JSON round-trip via `ReportTestUtil.source()`, all green): ReportConfusionRoll,
+ReportKickoffResult, ReportCardDeactivated, ReportApothecaryChoice, ReportInducement, ReportPlayCard,
+ReportCardEffectRoll (7 files / +14 ffb-common). Pattern: build report (factory-backed object fields —
+Card/Skill/Prayer/KickoffResult/SeriousInjury/InducementType/CardEffect — left null since their JSON
+options are null-safe EXCEPT ReportPrayerEnd which does `prayer.getName()` and NPEs on null → needs a
+real Prayer, skip), `toJsonValue()` → `new X().initFrom(ReportTestUtil.source(), json)`, assert scalar
+fields + `json.get("reportId").asString()`. After this batch: GAP 38 files/165 tests.
+**Remaining GAP worklist** (run the script for the live list; snapshot in scratchpad/STEP2_GAPLIST.txt):
+util 61 (util_player 39 — needs live Game/FieldModel graph, fixture-heavy like the LogicModule preds;
+util_cards/util_game_option/util_disturbing_presence/path_finder*/util_passing/util_report), report ~11
+(report_skill_use_other_player, report_modified_pass_result 3, report_modified_dodge_result_successful 3,
+report_injury ×3 [InjuryType abstract — construct or null], report_prayer_end [needs Prayer], util_report,
+skip_injury_parts 6), model 25 (game_options — mostly Rust-invented string API, only getOptionWithDefault
+maps; prayer_state [ffb-server]; team_skeleton), option 14 (game_option_int/abstract, util_game_option),
+kickoff 17 (kickoff_result_mapping ×edition), xml 17 (util_xml/xml_handler/i_xml_readable), marking 4,
+dialog 2. Many util/option/model entries are Rust-invented-API or fixture-heavy → real portable subset
+is smaller than 165; judge per file (like game_options: only ~2/10 portable).
