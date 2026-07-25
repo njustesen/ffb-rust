@@ -462,16 +462,8 @@ mod tests {
         assert!(sr.rendered_runs.iter().any(|r| r.text.as_deref().is_some_and(|t| t.contains("is badly hurt automatically because he has been zapped."))));
     }
 
-    #[test]
-    fn player_state_description_matches_java_table() {
-        assert_eq!(player_state_description(PlayerState::new(PS_STANDING)), "is standing");
-        assert_eq!(player_state_description(PlayerState::new(PS_BADLY_HURT)), "has been badly hurt");
-        assert_eq!(player_state_description(PlayerState::new(PS_RIP)), "has been killed");
-    }
-
-    #[test]
-    fn parse_modifier_debug_recovers_name_and_value() {
-        let parsed = parse_modifier_debug("Modifier { name: \"Dirty Player +1\", value: 1, rules: Bb2020 }");
-        assert_eq!(parsed, Some(("Dirty Player +1".to_string(), 1)));
-    }
+    // NOTE (test equalization): `player_state_description_matches_java_table` (Rust-internal string
+    // -table check) and `parse_modifier_debug_recovers_name_and_value` (a Rust Debug-format parsing
+    // helper) pruned — Rust-internal implementation tests with no Java behavioral twin. The four
+    // render tests are the 1:1 mirrors kept both sides.
 }

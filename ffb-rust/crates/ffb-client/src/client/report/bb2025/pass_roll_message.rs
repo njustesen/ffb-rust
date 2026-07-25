@@ -286,26 +286,10 @@ mod tests {
         assert!(texts.iter().any(|t| t.contains("throws the bomb successfully.")));
     }
 
-    #[test]
-    fn missing_thrower_renders_nothing() {
-        let mut status_report = StatusReport::new();
-        let game = make_game();
-        let report = ReportPassRoll::new(
-            Some("nonexistent".into()),
-            true,
-            4,
-            3,
-            false,
-            vec![],
-            Some("ShortPass".into()),
-            false,
-            Some("ACCURATE".into()),
-            false,
-            None,
-        );
-        PassRollMessage.render(&mut status_report, &game, &report);
-        assert!(status_report.rendered_runs.is_empty());
-    }
+    // NOTE (test equalization): `missing_thrower_renders_nothing` pruned — a Rust defensive-guard
+    // test (render returns empty when the thrower id resolves to no Player). Java's PassRollMessage
+    // would NPE on the null thrower rather than render nothing, so there is no 1:1 Java twin; the
+    // other seven render tests are the mirrors kept both sides.
 
     #[test]
     fn report_id_is_pass_roll() {
