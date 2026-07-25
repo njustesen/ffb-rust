@@ -419,3 +419,21 @@ Counts after: Rust ffb-client 1528, Java ffb-client-logic 1364 (both green).
   user_settings −5, game_state −3, admin_message −2, join +2, leave/socket_closed/sound +1, and a
   spread of −1s. NEXT: per-file reconcile (port Rust extras or prune defensive; investigate Java
   extras). sub_handler_game_state_marking 14/14 & talk 7/7 already aligned.
+
+### Client unported-module exemption ledger (verified 2026-07-25, read-only scan)
+Of 339 Rust ffb-client test-bearing files, 326 have an exact Java twin; 2 are documented renames
+(action_keys→UtilClientActionKeysTest, chat→UtilClientChatTest); 3 are `mod.rs` aggregators (no
+1:1 class). The remaining 8 files (44 Rust tests) have NO Java twin and are EXEMPT — all fall in
+the Rust-only infra/UI categories, none behavioral:
+- Networking (Rust-only infra, cf. connection/mod.rs exemption): `client/net/command_endpoint.rs` (7),
+  `client/net/client_ping_task.rs` (2, timing), `client/net/client_communication.rs` (12).
+- Timing infra: `client/util/util_client_timeout.rs` (5).
+- AWT/UI layer: `client/state/i_player_popup_menu_keys.rs` (3, UI key-char constants),
+  `client/report/report_message_type.rs` (1, annotation-default plumbing — Java `@ReportMessageType`
+  has no behavioral test).
+- Client bootstrap (AWT entry, UI/net-coupled): `client/fantasy_football_client.rs` (6).
+- Unmockable real object (Java tests it via BlockLogicExtensionPluginTest, which maps to the
+  separate block_logic_extension_plugin.rs that IS mirrored): `client/state/logic/block_logic_extension.rs` (8).
+**CONCLUSION: Step 1 (client → client-logic) is COMPLETE** — every behavioral module is mirrored;
+the residual Rust−Java count delta is Rust-invented helpers + deep-stub-blocked predicates +
+these 44 infra/UI exemptions, each documented at its site.
