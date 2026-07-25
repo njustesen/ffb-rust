@@ -437,3 +437,35 @@ the Rust-only infra/UI categories, none behavioral:
 **CONCLUSION: Step 1 (client → client-logic) is COMPLETE** — every behavioral module is mirrored;
 the residual Rust−Java count delta is Rust-invented helpers + deep-stub-blocked predicates +
 these 44 infra/UI exemptions, each documented at its site.
+
+## Session 2026-07-25 (cont.) — Step 2 scope CORRECTION (important)
+Ground-truth method counts today: Java ffb-common 1789, ffb-server 2101, ffb-client-logic 1364
+(=5254). Rust ffb-model 2769, protocol 882, mechanics 1146, engine 7149, client 1528, parity 39.
+
+**The plan's "ffb-common ~1862 gap" is UNRELIABLE and overstated. Do NOT port off the naive
+basename→PascalCaseTest-in-ffb-common heuristic — it produced false gaps all session.** Confirmed
+failure modes:
+1. **ffb-model tests are split across ffb-common AND ffb-server.** The enum round-trip suite lives
+   in `ffb-server/src/test/.../server/model/` (EnumRoundTripTest + 19 other `*EnumTest` classes:
+   Apothecary/Card/Net/Player/ReRoll/Skill/Team…), consolidating MANY Rust per-enum files
+   (weather.rs, direction.rs, pass.rs…) into a few parameterized Java classes. A ffb-common-only
+   scan misses all of it.
+2. **Consolidation:** one Java class often mirrors several Rust files (e.g. PlayerEnumTest covers
+   PlayerGender+PlayerType). Filename matching can't see this.
+3. **Rust count is inflated** by invented enums/helpers (Direction etc.), serde plumbing, and
+   per-value #[test] expansion of a single parameterized Java test.
+4. **`grep -v "/ffb/"` is WRONG** for excluding the `ffb-java/ffb/` clone — the Java package path
+   `com/fumbbl/ffb/` itself contains `/ffb/`, so that filter hides EVERY real file. Use
+   `grep -v "ffb-java/ffb/"` (the clone dir), never `"/ffb/"`.
+5. Spot-verified already-COMPLETE ffb-common ports that a scan flagged as "gaps": `model/turn_data.rs`
+   → `com/fumbbl/ffb/model/TurnDataTest.java` is a full 9-test 1:1 mirror (reset+serde+useApothecary
+   +allFlags). ffb-common has 482 test classes already; the model bucket is largely done.
+
+**CONCLUSION: Step 2 is far more complete than believed; the true remaining gap is unknown but
+much smaller than 1862.** NEXT SESSION must first build a RELIABLE per-file reconciliation tool
+before porting: for each Rust ffb-model/protocol test file, search BOTH ffb-common and ffb-server
+test trees (exclude only `ffb-java/ffb/`), resolve consolidation (a Rust file may be covered inside
+a differently-named/parameterized Java class — grep the Java test BODIES for the enum/class under
+test, not just filenames), and classify Rust-invented/plumbing as exempt. Only the residue after
+that is real work. Порт nothing until this tool exists — blind porting risks duplicate/overwriting
+Java classes (a duplicate Write was attempted and correctly blocked this session).
