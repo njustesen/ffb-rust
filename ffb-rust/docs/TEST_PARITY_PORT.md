@@ -633,6 +633,18 @@ bb2016 5, PassMechanic bb2016 5. PROVEN ffb-server PATTERNS:
   VariableArmour + TemporaryStat Incrementer/Decrementer/abstract (20); StaticInjuryModifierAttacker/Defender +
   VariableInjury (13). Skill-presence appliesToContext tests: hold ONE Skill instance and use it for BOTH
   player.addSkill(s) AND modifier.setRegisteredTo(s) (UtilCards.hasSkill uses list.contains == identity).
+## Step 4 DICE-SCRIPTING unlock (2026-07-26)
+- `GameFixture.installScriptedDice(gameState, int... rolls)` presets the exact roll sequence on the
+  test dice roller BEFORE `startStep` (clearScriptedDice to reset). Each int is one die face; 2d6
+  rolls (weather/armour/injury) take two ints; block dice / d3/d4/d8/d16 covered too. Example green:
+  fixture/ScriptedDiceFixtureTest.java (StepWeather: installScriptedDice(gs,6,5)=11→POURING_RAIN).
+- VALIDATED with StepGoForIt bb2016 (move_/StepGoForItFixtureTest.java): place acting player +
+  game.getActingPlayer().setGoingForIt(true)+setCurrentMove(10); installScriptedDice(gs, 2) → GFI
+  success → NEXT_STEP; installScriptedDice(gs, 1) + getTurnDataHome().setReRolls(0) → GFI fail →
+  GOTO_LABEL. This UNLOCKS the roll-driven step bulk (block_roll/go_for_it/move_dodge/jump/pass/
+  injury/armour): script the exact dice, assert the StepAction/state branch. Reroll-offer tests need
+  a team reroll (CONTINUE) then a CLIENT reroll/decline command (handleCommand) — deferrable.
+
 ## Step 4 step-logic: proven recipe + command injection (2026-07-26)
 - Templates (green): ffb-server/src/test/.../step/bb2016/move_/StepEndMovingFixtureTest.java (10/10),
   StepEndSelectingFixtureTest.java. Recipe: @BeforeEach `gameState = GameFixture.createGameState(3,
