@@ -605,3 +605,13 @@ bb2016 5, PassMechanic bb2016 5. PROVEN ffb-server PATTERNS:
   LOADED factories/skills use **GameFixture.createGameState().getGame()** then
   `(Skill) game.getFactory(FactoryType.Factory.SKILL).forName("Safe Pass")` (must cast — chained forName returns INamedObject).
 - Abstract mechanics w/ protected methods + abstract RollModifier (AgilityMechanic.formatRollModifiers) = document-exempt.
+
+## Step 3 modifier-factory + value-class patterns (2026-07-26)
+- Value modifiers (com.fumbbl.ffb.modifiers[.bb20XX]): test via ctor directly (StatBasedRollModifier,
+  CasualtyModifier). BUT: many Java value classes lack equals()/no-arg ctor, so Rust's derived-PartialEq
+  equality_by_value / Default tests are Rust-only (document-exempt). Rust with_predicate builders too.
+- Modifier FACTORIES (com.fumbbl.ffb.factory.XxxModifierFactory): new XxxModifierFactory(); factory.initialize(
+  GameFixture.createGameState().getGame()); then forName(name) / getFoulAssist(ctx) / findXxxModifiers(...).
+  Contexts: new XxxModifierContext(game, attacker, defender, isStab, isFoul, foulAssists) etc. (players = new
+  RosterPlayer()+setId). This unlocks the modifiers bucket (585). RollModifier is ABSTRACT in Java (roll_modifier.rs
+  Rust concrete struct = Rust-invented, exempt).
