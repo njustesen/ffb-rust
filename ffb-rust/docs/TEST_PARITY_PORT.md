@@ -633,6 +633,24 @@ bb2016 5, PassMechanic bb2016 5. PROVEN ffb-server PATTERNS:
   VariableArmour + TemporaryStat Incrementer/Decrementer/abstract (20); StaticInjuryModifierAttacker/Defender +
   VariableInjury (13). Skill-presence appliesToContext tests: hold ONE Skill instance and use it for BOTH
   player.addSkill(s) AND modifier.setRegisteredTo(s) (UtilCards.hasSkill uses list.contains == identity).
+## Step 3->4 BRIDGE: GameFixture acting-player fixture (2026-07-26)
+- ffb-server MODEL/injury value classes live in com.fumbbl.ffb.server.model + .injury.modification. Put the
+  test in the SAME package to reach PROTECTED methods (skillUse/tryInjuryModification/tryArmourRollModification).
+- ffb-server value classes CANNOT use NetCommandTestUtil (ffb-common test scope). Plain ctors/enums; Game/GameState
+  via GameFixture.createGameState() (2x11 linemen, BB2025; ~4s) or createGameState(11, RulesCollection.Rules.BBxxxx).
+- **ACTING-PLAYER fixture (unlocks the true branches, and is the Step-4 recipe):**
+  `GameState gs = GameFixture.createGameState(); GameFixture.placePlayer(gs, "home1", 5, 5); // sets STANDING
+   GameFixture.setActingPlayer(gs, "home1", PlayerAction.MOVE);` — player ids are home1..home11 / away1..away11.
+  Now game.getActingPlayer().getPlayer() is a standing player with tacklezones. Use @BeforeAll (static gs) to pay the
+  ~4s init once per class. Other GameFixture helpers: createStep(gs, StepId.X), startStep, skill(game,name), addPlayer.
+- Injury/modification port kit: InjuryType via new com.fumbbl.ffb.injury.Block()/Stab()/Chainsaw()/CrowdPush() (no-arg);
+  ModifiedInjuryContext via new ModifiedInjuryContext()+setApothecaryMode(+setArmorBroken); casualty ctx via
+  new InjuryContext()+setInjury(new PlayerState(PlayerState.SERIOUS_INJURY|BADLY_HURT)); ModificationParams(gs, newCtx, injuryType).
+  Ported: ModificationParams(5), BrutalBlock(4,1exempt), MasterAssassin(5), GhostlyFlames(4,1exempt), AvOrInj(7,1exempt),
+  plus ffb-server model DropPlayerContext(8)/SteadyFootingContext(8)/DropPlayerContextBuilder(8).
+  EXEMPT per file: no-active-player tests (Rust-defensive; Java always has an acting player during injury) and
+  modify_injury-needs-getSkill tests (Java derefs getSkill(); no no-skill path).
+
 - DOCUMENTED ARCHITECTURE DIVERGENCE (not a bug, not ported): Rust StaticInjuryModifierAttacker/Defender
   applies_to_context returns `true` when registered_to is None; the Rust injury FACTORY pre-filters by skill
   before constructing the modifier (registered_to stays None = "already qualified"). Java instead registers each
