@@ -10,6 +10,7 @@ import com.fumbbl.ffb.net.NetCommandTestUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -204,4 +205,64 @@ public class UtilPlayerTest {
 			game, game.getTeamHome(), new FieldCoordinate(5, 5), 1);
 		assertEquals(0, result.length);
 	}
+
+	// Offensive foul assists take an explicit SkillMechanic (used for canAlwaysAssistFoul); a fresh
+	// edition SkillMechanic returns false for skill-less players, matching the Rust scenarios.
+	private static final com.fumbbl.ffb.mechanics.SkillMechanic SKILL_MECHANIC =
+		new com.fumbbl.ffb.mechanics.bb2020.SkillMechanic();
+
+	// rust: find_offensive_foul_assists_no_assistants
+	@Test
+	public void findOffensiveFoulAssistsNoAssistants() {
+		Player<?> att = addPlayer(true, "att", new FieldCoordinate(5, 5), ACTIVE_STANDING);
+		Player<?> def = addPlayer(false, "def", new FieldCoordinate(5, 6), PlayerState.PRONE);
+		assertEquals(0, UtilPlayer.findOffensiveFoulAssists(game, att, def, SKILL_MECHANIC));
+	}
+
+	// rust: find_offensive_foul_assists_one_free_assistant
+	@Test
+	public void findOffensiveFoulAssistsOneFreeAssistant() {
+		Player<?> att = addPlayer(true, "att", new FieldCoordinate(5, 5), ACTIVE_STANDING);
+		Player<?> def = addPlayer(false, "def", new FieldCoordinate(7, 7), PlayerState.PRONE);
+		addPlayer(true, "assist1", new FieldCoordinate(7, 6), ACTIVE_STANDING);
+		assertEquals(1, UtilPlayer.findOffensiveFoulAssists(game, att, def, SKILL_MECHANIC));
+	}
+
+	// rust: find_offensive_foul_assists_assistant_marked_by_standing_defender
+	@Test
+	public void findOffensiveFoulAssistsAssistantMarkedByStandingDefender() {
+		Player<?> att = addPlayer(true, "att", new FieldCoordinate(5, 5), ACTIVE_STANDING);
+		Player<?> def = addPlayer(false, "def", new FieldCoordinate(7, 7), PlayerState.PRONE);
+		addPlayer(true, "assist1", new FieldCoordinate(7, 6), ACTIVE_STANDING);
+		addPlayer(false, "def2", new FieldCoordinate(7, 5), ACTIVE_STANDING);
+		assertEquals(0, UtilPlayer.findOffensiveFoulAssists(game, att, def, SKILL_MECHANIC));
+	}
+
+	// rust: find_defensive_foul_assists_no_assistants
+	@Test
+	public void findDefensiveFoulAssistsNoAssistants() {
+		Player<?> att = addPlayer(true, "att", new FieldCoordinate(5, 5), ACTIVE_STANDING);
+		Player<?> def = addPlayer(false, "def", new FieldCoordinate(5, 6), PlayerState.PRONE);
+		assertEquals(0, UtilPlayer.findDefensiveFoulAssists(game, att, def));
+	}
+
+	// rust: find_defensive_foul_assists_one_free_assistant
+	@Test
+	public void findDefensiveFoulAssistsOneFreeAssistant() {
+		Player<?> att = addPlayer(true, "att", new FieldCoordinate(5, 5), ACTIVE_STANDING);
+		Player<?> def = addPlayer(false, "def", new FieldCoordinate(10, 10), PlayerState.PRONE);
+		addPlayer(false, "def2", new FieldCoordinate(5, 6), ACTIVE_STANDING);
+		assertEquals(1, UtilPlayer.findDefensiveFoulAssists(game, att, def));
+	}
+
+	// rust: field_model_clear_track_numbers_is_no_op
+	@Test
+	public void fieldModelClearTrackNumbersIsNoOp() {
+		assertDoesNotThrow(() -> game.getFieldModel().clearTrackNumbers());
+	}
+
+	// NOTE (test equalization): the refresh_players/refresh_removes_enhancements Rust tests (7) and
+	// partner_marks_defender (4) are fixture-inexpressible here — refreshPlayersForTurnStart casts the
+	// GAME-mechanic factory and partner_marks_defender setup needs the SKILL factory to attach skills,
+	// both of which NPE on a null `factories` map in an applicationSource-built Game. Left Rust-only.
 }
