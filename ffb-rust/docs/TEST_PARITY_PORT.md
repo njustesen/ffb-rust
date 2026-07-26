@@ -746,3 +746,18 @@ NEXT_STEP. This unblocks the injury/armour-driven steps (StepFallDown ported 6 t
 start + blood-lust->RESERVE + no-blood-lust). The publishes-INJURY_RESULT / END_TURN-on-turnover /
 pass-block / move-square-clear / safe-pair-of-hands tests remain deferred (published-param / turn-mode
 / move-square inspection).
+
+## Step 4 REAL RUST BUG #3: StepSafeThrow early NEXT_STEP (fixed 2026-07-26)
+
+Found while porting bb2016/pass/StepSafeThrow. Rust step_safe_throw::execute_step early-returned
+`StepOutcome::next()` in two cases: (a) thrower lacks canCancelInterceptions (no Safe Throw skill),
+(b) interceptor cancels it (VeryLongLegs). Java's StepSafeThrow instead sets `doSafeThrow=false` and
+FALLS THROUGH to `fail_safe_throw` → GOTO_LABEL (the interception stands; ball/bomb moves to the
+interceptor). So the correct action is GOTO_LABEL, not NEXT_STEP. Fixed both early returns to
+`return self.fail_safe_throw(game, &interceptor_id);`, corrected the two Rust tests that had encoded
+the bug (asserted NextStep → now GotoLabel), updated the module doc comment. cargo -p ffb-engine 7101
+pass; Java twin StepSafeThrowFixtureTest asserts GOTO_LABEL. Pattern to watch: a Rust early
+`StepOutcome::next()` guard whose Java counterpart only sets a `doX=false` flag and continues — the
+Java fall-through often reaches a failure/GOTO branch, so the early return silently skips it. Running
+tally: 3 real Rust bugs found via this campaign (furious_outburst sub-sequence, bomb
+RECHECK_EXPLODE_SKILL, StepSafeThrow early-next).
