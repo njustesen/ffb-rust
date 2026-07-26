@@ -731,3 +731,18 @@ the start() head for a command dequeue (CONTINUE) vs inline executeStep (high yi
   This both satisfies the mandatory check AND sets the mode so downstream mode-conditional setParameter
   tests (DEFENDER_POISONED accepted only in DEFENDER mode, etc.) become portable. The
   param-accepted-via-setParameter twin stays EXEMPT (init-consumed → setParameter returns false).
+
+## Step 4 INJURY_TYPE param needs the SERVER injury type (this wave)
+
+Steps that store an INJURY_TYPE step-parameter (StepFallDown, and any step whose setParameter casts to
+`com.fumbbl.ffb.server.injury.injuryType.InjuryTypeServer`) require the SERVER injury type, NOT the
+ffb-common `com.fumbbl.ffb.injury.*` class. Passing `new com.fumbbl.ffb.injury.DropGFI()` throws
+ClassCastException at setParameter (DropGFI cannot be cast to InjuryTypeServer). Use the server twin:
+`new com.fumbbl.ffb.server.injury.injuryType.InjuryTypeDropGFI()` /
+`...InjuryTypeDropDodge()` etc. With the server InjuryType set + an acting player placed +
+installScriptedDice(armour/injury faces — values don't affect NEXT_STEP or the blood-lust->RESERVE
+assertion), the injury-driven start path runs through UtilServerInjury.handleInjury and returns
+NEXT_STEP. This unblocks the injury/armour-driven steps (StepFallDown ported 6 tests: 3 param +
+start + blood-lust->RESERVE + no-blood-lust). The publishes-INJURY_RESULT / END_TURN-on-turnover /
+pass-block / move-square-clear / safe-pair-of-hands tests remain deferred (published-param / turn-mode
+/ move-square inspection).
