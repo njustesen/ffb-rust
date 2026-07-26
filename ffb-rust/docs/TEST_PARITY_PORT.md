@@ -593,3 +593,15 @@ and UtilDisturbingPresence empty-player x1 — all commented at their Java test 
 **CONCLUSION: Step 2 ffb-common is COMPLETE** (every behavioral gap ported or documented-exempt).
 Next: Step 3 (ffb-server) starting with prayer_state, then ffb-mechanics/injury/util/skill_behaviour;
 then Step 4 (ffb-engine step-logic bulk) via GameFixture/GeneratorTestSupport/ScriptedFortuna.
+
+## Step 3 ffb-server progress (2026-07-26)
+GAP started 378/2646; ported: PrayerState 6, PassResult 5, DiceInterpreter 26/30, ThrowInMechanic
+bb2016 5, PassMechanic bb2016 5. PROVEN ffb-server PATTERNS:
+- Test file under com/fumbbl/ffb/<mirror-of-class-package>/ in ffb-server/src/test.
+- Singletons: DiceInterpreter.getInstance(). Concrete edition mechanics: new com.fumbbl.ffb.mechanics.bb20XX.XxxMechanic().
+- Lightweight: new Team((IFactorySource) null)+setId, new RosterPlayer()+setId (setMovement/setPassing available).
+- Direction is com.fumbbl.ffb.Direction; PassingDistance is com.fumbbl.ffb.PassingDistance; PassResult is com.fumbbl.ffb.mechanics.PassResult.
+- **ffb-server tests CANNOT use NetCommandTestUtil** (ffb-common test scope). For a live Game with
+  LOADED factories/skills use **GameFixture.createGameState().getGame()** then
+  `(Skill) game.getFactory(FactoryType.Factory.SKILL).forName("Safe Pass")` (must cast — chained forName returns INamedObject).
+- Abstract mechanics w/ protected methods + abstract RollModifier (AgilityMechanic.formatRollModifiers) = document-exempt.
