@@ -689,3 +689,30 @@ bb2016 5, PassMechanic bb2016 5. PROVEN ffb-server PATTERNS:
   modifier to its owning skill and re-checks via UtilCards.hasSkill, which returns false for a null skill — so
   Java's registeredTo is never null in practice. The `applies_true_when_no_registered_to` Rust tests have no
   faithful Java twin (would assert opposite) → EXEMPT. Builder tests (with_predicate/with_modifier_fn) EXEMPT.
+
+## Step 4 step-YIELD triage (proven this wave)
+
+A step file's portable-test yield is predictable from HOW its Java `start()` runs — check this first
+to set expectations and pick high-ROI targets:
+
+- **Immediate-execute steps** (start() runs executeStep inline, no command dequeue, no hook delegate):
+  HIGH yield (3-5 tests) — port the full param + roll subset. Examples ported: StepGoForIt, StepJump,
+  StepMoveDodge. Recipe: place acting player, set the flag it reads (jumping/dodging/goingForIt),
+  installScriptedDice(exact faces), assert NEXT_STEP(success)/GOTO_LABEL(fail+reRolls=0). Steps that
+  publish their own roll param back to themselves (StepMoveDodge publishes DODGE_ROLL=rollSkill()) are
+  driven correctly by installScriptedDice.
+- **Hook-delegating steps** (`executeStep(){ getGameState().executeStepHooks(this, state); }`): LOW yield
+  (~2 param tests) — the behavioural logic lives in a skill-behaviour hook + is command-driven (usingDodge
+  /usingTentacles set via use-skill command), NOT expressible through the headless fixture. Port only the
+  setParameter-stored keys; defer the state-mutation/select/report tests. Examples: StepBlockDodge
+  (stores OLD_DEFENDER_STATE), StepTentacles (stores COORDINATE_FROM).
+- **Command-loop action steps** (start() dequeues a client command before executeStep): the no-input
+  guard returns CONTINUE, not the Rust NEXT_STEP — the Rust `start_returns_next_step_when_no_X` twin is
+  EXEMPT (command-loop structural divergence). Port the setParameter-stored keys (StepPass stores
+  CATCHER_ID; GOTO_LABEL_ON_* + internally-computed PASS_RESULT are setParameter-false → exempt).
+- **StepBlockRoll**: no-block-result start rolls dice + shows dialog → CONTINUE (place attacker+defender
+  +BLOCK acting player); SUCCESSFUL_DAUNTLESS stored. Its negative-nr dialog-team-swap was a RUST bug
+  fix (Java is ground truth) — that + publishes/report/command tests deferred.
+
+Rule of thumb: `grep -c executeStepHooks <Step>.java` >0 ⇒ hook-delegating (low yield). Otherwise read
+the start() head for a command dequeue (CONTINUE) vs inline executeStep (high yield).
