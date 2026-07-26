@@ -557,3 +557,13 @@ canFoul, hasBall, isNextMovePossible, findStandUpAssists, findStandingOrPronePla
 find_offensive/defensive_foul_assists (geometry — likely portable), partner_marks_defender (geometry+skill),
 hasMoveLeft x3 (needs RosterPlayer movement/position setup). Blocked (mechanic-factory): can_gaze x4,
 refresh_players x3, refresh_removes_enhancements x2, field_model_clear_track_numbers (check).
+
+## util_player/util_cards done (2026-07-26)
+util_player: 26/39 ported (added hasMoveLeft x3 via RosterPlayer.setMovement); 13 documented exemptions.
+util_cards: 5/5 ported. **KEY UNLOCK for skill-dependent tests:** real Skill objects come from
+`NetCommandTestUtil.gameSource().getFactory(FactoryType.Factory.SKILL).forName(name)` — gameSource()'s
+factories ARE loaded (unlike an applicationSource-built Game whose game.getFactory() NPEs). Pattern:
+RosterPlayer p = new RosterPlayer(); p.setId("p1"); p.addSkill(skill("Wrestle")); markUsed(skill, game).
+This may unblock partner_marks_defender (skills only) and other skill-setup tests — RETRY those. Still
+blocked: anything calling pGame.getFactory(MECHANIC) on an applicationSource game (canGaze, refreshPlayersForTurnStart).
+NamedProperties are ISkillProperty constants (canRerollDodge, canTakeDownPlayersWithHimOnBothDown, ...).
