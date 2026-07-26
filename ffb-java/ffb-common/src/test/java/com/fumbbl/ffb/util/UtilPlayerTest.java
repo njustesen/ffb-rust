@@ -129,4 +129,79 @@ public class UtilPlayerTest {
 		game.getActingPlayer().setHeldInPlace(true);
 		assertFalse(UtilPlayer.isNextMovePossible(game, false));
 	}
+
+	// NOTE (test equalization): the 4 Rust can_gaze tests are fixture-inexpressible here — canGaze
+	// casts `(GameMechanic) game.getFactory(MECHANIC).forName(GAME)`, but a Game built via
+	// NetCommandTestUtil.applicationSource() has a null `factories` map, so game.getFactory() NPEs.
+	// The GAME-mechanic factory chain isn't available in a headless ffb-common test. Left Rust-only.
+
+	// rust: find_stand_up_assists_no_friendly_adjacent_returns_zero
+	@Test
+	public void findStandUpAssistsNoFriendlyAdjacentReturnsZero() {
+		Player<?> h1 = addPlayer(true, "h1", new FieldCoordinate(5, 5), ACTIVE_STANDING);
+		assertEquals(0, UtilPlayer.findStandUpAssists(game, h1));
+	}
+
+	// rust: find_stand_up_assists_friendly_not_pressured_counts
+	@Test
+	public void findStandUpAssistsFriendlyNotPressuredCounts() {
+		Player<?> h1 = addPlayer(true, "h1", new FieldCoordinate(5, 5), ACTIVE_STANDING);
+		addPlayer(true, "h2", new FieldCoordinate(6, 5), ACTIVE_STANDING);
+		assertEquals(1, UtilPlayer.findStandUpAssists(game, h1));
+	}
+
+	// rust: find_stand_up_assists_friendly_under_pressure_does_not_count
+	@Test
+	public void findStandUpAssistsFriendlyUnderPressureDoesNotCount() {
+		Player<?> h1 = addPlayer(true, "h1", new FieldCoordinate(5, 5), ACTIVE_STANDING);
+		addPlayer(true, "h2", new FieldCoordinate(6, 5), ACTIVE_STANDING);
+		addPlayer(false, "a1", new FieldCoordinate(7, 5), ACTIVE_STANDING);
+		assertEquals(0, UtilPlayer.findStandUpAssists(game, h1));
+	}
+
+	// rust: find_stand_up_assists_two_unpressured_friendlies
+	@Test
+	public void findStandUpAssistsTwoUnpressuredFriendlies() {
+		Player<?> h1 = addPlayer(true, "h1", new FieldCoordinate(5, 5), ACTIVE_STANDING);
+		addPlayer(true, "h2", new FieldCoordinate(6, 5), ACTIVE_STANDING);
+		addPlayer(true, "h3", new FieldCoordinate(5, 6), ACTIVE_STANDING);
+		assertEquals(2, UtilPlayer.findStandUpAssists(game, h1));
+	}
+
+	// rust: find_standing_or_prone_players_returns_non_stunned_team_mates
+	@Test
+	public void findStandingOrPronePlayersReturnsNonStunnedTeamMates() {
+		addPlayer(true, "h1", new FieldCoordinate(5, 5), ACTIVE_STANDING);
+		addPlayer(true, "h2", new FieldCoordinate(5, 6), ACTIVE_STANDING);
+		addPlayer(true, "h3", new FieldCoordinate(5, 7), PlayerState.STUNNED);
+		Player<?>[] result = UtilPlayer.findStandingOrPronePlayers(
+			game, game.getTeamHome(), new FieldCoordinate(5, 5), 1);
+		assertEquals(1, result.length);
+		assertEquals("h2", result[0].getId());
+	}
+
+	// rust: find_standing_or_prone_players_distance_2_includes_two_squares_away
+	@Test
+	public void findStandingOrPronePlayersDistance2IncludesTwoSquaresAway() {
+		addPlayer(true, "h1", new FieldCoordinate(5, 5), ACTIVE_STANDING);
+		addPlayer(true, "h2", new FieldCoordinate(5, 7), ACTIVE_STANDING);
+		Player<?>[] result = UtilPlayer.findStandingOrPronePlayers(
+			game, game.getTeamHome(), new FieldCoordinate(5, 5), 2);
+		boolean found = false;
+		for (Player<?> p : result) {
+			if ("h2".equals(p.getId())) {
+				found = true;
+			}
+		}
+		assertTrue(found, "should find player 2 squares away");
+	}
+
+	// rust: find_standing_or_prone_players_excludes_opposing_team
+	@Test
+	public void findStandingOrPronePlayersExcludesOpposingTeam() {
+		addPlayer(false, "a1", new FieldCoordinate(5, 6), ACTIVE_STANDING);
+		Player<?>[] result = UtilPlayer.findStandingOrPronePlayers(
+			game, game.getTeamHome(), new FieldCoordinate(5, 5), 1);
+		assertEquals(0, result.length);
+	}
 }
