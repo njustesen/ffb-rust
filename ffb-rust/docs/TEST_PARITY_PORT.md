@@ -633,6 +633,26 @@ bb2016 5, PassMechanic bb2016 5. PROVEN ffb-server PATTERNS:
   VariableArmour + TemporaryStat Incrementer/Decrementer/abstract (20); StaticInjuryModifierAttacker/Defender +
   VariableInjury (13). Skill-presence appliesToContext tests: hold ONE Skill instance and use it for BOTH
   player.addSkill(s) AND modifier.setRegisteredTo(s) (UtilCards.hasSkill uses list.contains == identity).
+## Step 4 step-logic: proven recipe + command injection (2026-07-26)
+- Templates (green): ffb-server/src/test/.../step/bb2016/move_/StepEndMovingFixtureTest.java (10/10),
+  StepEndSelectingFixtureTest.java. Recipe: @BeforeEach `gameState = GameFixture.createGameState(3,
+  RulesCollection.Rules.BB2016);` → `IStep step = GameFixture.createStep(gameState, StepId.X);` →
+  `step.setParameter(StepParameter.from(StepParameterKey.KEY, value));` → `StepAction a =
+  GameFixture.startStep(step);` (assert NEXT_STEP/CONTINUE/GOTO_LABEL) → `GeneratorTestSupport.sequence(
+  gameState)` IStep[] (assert .length>0); also find/findLabelled/contains/count/indexOf/booleanField/
+  readField(step,"fField"). StepId + accepted params from the Java step's getId()/setParameter switch.
+- **COMMAND INJECTION (unlocks command-driven steps):** `GameFixture.handleCommand(step, new
+  ClientCommandXxx(...), fromHomeCoach)` returns StepCommandStatus; `GameFixture.receivedCommand(cmd,
+  fromHomeCoach)` wraps a NetCommand. Example: step/game/start/StepInitStartGameFixtureTest.java.
+- STEP TYPE GUIDE: END/DISPATCH/SELECT steps port FULLY via setParameter (no commands). INIT/command-
+  driven steps set internal fields (end_turn, blitz_used, turn_started, ...) via CLIENT_* commands — the
+  Rust tests set those fields directly; in Java use handleCommand(step, new ClientCommandMove/BlitzMove/
+  Foul/Pass/EndTurn/..., true). Some paths (gaze) return CONTINUE until deeper state is set. Acting
+  player: placePlayer + setActingPlayer. Dice: installScriptedDice(...) before startStep.
+- DONE Step-4 this session: StepEndMoving bb2016 (10 full), StepInitMoving bb2016 (2 param-subset; rest
+  need handleCommand + deeper state — follow-up). bb2025/move_ frontier: step_end_moving(35),
+  step_init_moving(21), step_jump/go_for_it(19 each, dice), step_stand_up(17), step_shadowing(16), etc.
+
 ## Step 3->4 BRIDGE: GameFixture acting-player fixture (2026-07-26)
 - ffb-server MODEL/injury value classes live in com.fumbbl.ffb.server.model + .injury.modification. Put the
   test in the SAME package to reach PROTECTED methods (skillUse/tryInjuryModification/tryArmourRollModification).
