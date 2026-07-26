@@ -1,11 +1,14 @@
 package com.fumbbl.ffb.util;
 
+import com.fumbbl.ffb.FactoryType;
 import com.fumbbl.ffb.FieldCoordinate;
 import com.fumbbl.ffb.PlayerState;
 import com.fumbbl.ffb.factory.IFactorySource;
+import com.fumbbl.ffb.factory.SkillFactory;
 import com.fumbbl.ffb.model.Game;
 import com.fumbbl.ffb.model.Player;
 import com.fumbbl.ffb.model.RosterPlayer;
+import com.fumbbl.ffb.model.skill.Skill;
 import com.fumbbl.ffb.net.NetCommandTestUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -292,10 +295,52 @@ public class UtilPlayerTest {
 		assertTrue(UtilPlayer.hasMoveLeft(game, false));
 	}
 
-	// NOTE (test equalization): the refresh_players/refresh_removes_enhancements Rust tests (7) and
-	// partner_marks_defender (4) are fixture-inexpressible here — refreshPlayersForTurnStart casts the
-	// GAME-mechanic factory and partner_marks_defender setup needs the SKILL factory to attach skills,
-	// both of which NPE on a null `factories` map in an applicationSource-built Game. Left Rust-only.
-	// The Rust new()/default() tests exercise the UtilPlayer struct's Default/constructor; Java's
-	// UtilPlayer is a static-only utility class (no instance) — no faithful twin, pruned as plumbing.
+	private Skill skill(String name) {
+		SkillFactory factory = NetCommandTestUtil.gameSource().getFactory(FactoryType.Factory.SKILL);
+		return factory.forName(name);
+	}
+
+	private RosterPlayer addSkilledPlayer(boolean home, String id, FieldCoordinate coord, String skillName) {
+		RosterPlayer p = addPlayer(home, id, coord, ACTIVE_STANDING);
+		p.addSkill(skill(skillName));
+		return p;
+	}
+
+	// partnerMarksDefender's logic is skill-agnostic (counts >=2 adjacent opponents that hasSkill the
+	// given skill). Rust used A Sneaky Pair (an edition-specific skill that the default gameSource
+	// SkillFactory doesn't resolve -> null); the common Block skill (all editions) is used here.
+
+	// rust: partner_marks_defender_returns_false_with_one_adjacent_partner
+	@Test
+	public void partnerMarksDefenderReturnsFalseWithOneAdjacentPartner() {
+		RosterPlayer def = addPlayer(true, "def", new FieldCoordinate(5, 5), ACTIVE_STANDING);
+		addSkilledPlayer(false, "a1", new FieldCoordinate(6, 5), "Block");
+		assertFalse(UtilPlayer.partnerMarksDefender(game, def, skill("Block")));
+	}
+
+	// rust: partner_marks_defender_returns_true_with_two_adjacent_partners
+	@Test
+	public void partnerMarksDefenderReturnsTrueWithTwoAdjacentPartners() {
+		RosterPlayer def = addPlayer(true, "def", new FieldCoordinate(5, 5), ACTIVE_STANDING);
+		addSkilledPlayer(false, "a1", new FieldCoordinate(6, 5), "Block");
+		addSkilledPlayer(false, "a2", new FieldCoordinate(5, 6), "Block");
+		assertTrue(UtilPlayer.partnerMarksDefender(game, def, skill("Block")));
+	}
+
+	// rust: partner_marks_defender_returns_false_when_only_one_has_skill
+	@Test
+	public void partnerMarksDefenderReturnsFalseWhenOnlyOneHasSkill() {
+		RosterPlayer def = addPlayer(true, "def", new FieldCoordinate(5, 5), ACTIVE_STANDING);
+		addSkilledPlayer(false, "a1", new FieldCoordinate(6, 5), "Block");
+		addPlayer(false, "a2", new FieldCoordinate(5, 6), ACTIVE_STANDING);
+		assertFalse(UtilPlayer.partnerMarksDefender(game, def, skill("Block")));
+	}
+
+	// NOTE (test equalization): partner_marks_defender_returns_false_when_defender_not_on_field passes
+	// a defender with no coordinate; Rust defends the null, but Java's findAdjacentOpposingPlayersWithSkill
+	// derefs the null coordinate — Rust-only defensive-null case. The refresh_players/refresh_removes
+	// Rust tests (7) stay Rust-only — refreshPlayersForTurnStart casts the GAME-mechanic factory, which
+	// NPEs on the null `factories` map of an applicationSource-built Game. The Rust new()/default() tests
+	// exercise the UtilPlayer struct's Default/constructor; Java's UtilPlayer is a static-only utility
+	// class (no instance) — no faithful twin, pruned as plumbing.
 }
