@@ -543,3 +543,17 @@ re-attempted blindly:
 - **ffb-server module (not ffb-common)**: prayer_state 6 (com.fumbbl.ffb.server.PrayerState — belongs to Step 3).
 Session ffb-common tally: ~68 tests ported across reports/enum/option/marking/kickoff/skeleton/xml/util,
 all green (ffb-common 2016 runs). Both engines green throughout.
+
+## util_player fixture pass (2026-07-26, ongoing)
+ffb-common live-Game fixture: `IFactorySource app = NetCommandTestUtil.applicationSource(); Game game
+= new Game(app, app.getFactoryManager()); game.getTeamHome().setId("home"); getTeamAway().setId("away");`
+then addPlayer = new RosterPlayer().setId + team.addPlayer + fieldModel.setPlayerCoordinate/setPlayerState.
+State ints: ACTIVE_STANDING 0x101, ACTIVE_PRONE 0x103; PlayerState.PRONE 0x3 / STUNNED 0x4 constants.
+**KEY LIMITATION:** a Game built this way has a NULL `factories` map — any UtilPlayer path that does
+`game.getFactory(MECHANIC/SKILL)...` NPEs. So canGaze (mechanic cast) and refreshPlayersForTurnStart
+(mechanic + skill factory) are fixture-inexpressible here → those util_player tests stay Rust-only
+(documented at the site). Progress: util_player 17/39 ported (findOtherTeam, findAdjacent, findTacklezones,
+canFoul, hasBall, isNextMovePossible, findStandUpAssists, findStandingOrPronePlayers). Remaining to try:
+find_offensive/defensive_foul_assists (geometry — likely portable), partner_marks_defender (geometry+skill),
+hasMoveLeft x3 (needs RosterPlayer movement/position setup). Blocked (mechanic-factory): can_gaze x4,
+refresh_players x3, refresh_removes_enhancements x2, field_model_clear_track_numbers (check).
