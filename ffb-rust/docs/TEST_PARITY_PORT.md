@@ -615,3 +615,17 @@ bb2016 5, PassMechanic bb2016 5. PROVEN ffb-server PATTERNS:
   Contexts: new XxxModifierContext(game, attacker, defender, isStab, isFoul, foulAssists) etc. (players = new
   RosterPlayer()+setId). This unlocks the modifiers bucket (585). RollModifier is ABSTRACT in Java (roll_modifier.rs
   Rust concrete struct = Rust-invented, exempt).
+
+## Step 3 RECONCILE SCOPE FIX + true GAP (2026-07-26)
+- **CRITICAL tooling correction:** reconcile_step3.sh originally scanned ONLY ffb-server test bodies, but a Rust
+  ffb-mechanics type can be ported to a Java test in ANY module whose classpath has the class. The modifier
+  CONTEXTS + COLLECTIONS live in **com.fumbbl.ffb.modifiers = ffb-common** (25 modifier test files ALREADY there:
+  Catch/Dodge/Gaze/GoForIt/Interception/Jump/JumpUp/Pass/Pickup/RightStuff Modifier[+Collection], ModifierType,
+  PlayerStatKey/Limit, RollModifier, StatBasedRollModifierFactory). Widened corpus to ffb-server+ffb-common+
+  ffb-client-logic tests. GAP corrected **353/2419 → 274/1943** (COVERED 68→147); modifiers bucket 506→183.
+  ~79 files were phantom gaps. RULE: modifier VALUE/CONTEXT/COLLECTION tests go in ffb-common (use
+  NetCommandTestUtil.applicationSource() Game); modifier FACTORY tests go in ffb-server (need GameFixture loaded skills).
+- Ported (ffb-common, +15): CatchContext/DodgeContext/GazeModifierContext value classes (getters+defaults; build
+  Game via applicationSource, ActingPlayer via game.getActingPlayer(), coords new FieldCoordinate(x,y)).
+- TRUE remaining buckets (tests): injury 482, inducements 432, skill_behaviour 359, modifiers 183, util 138,
+  mechanic 136, model 53, factory 53.

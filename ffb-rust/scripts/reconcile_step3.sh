@@ -7,8 +7,11 @@ set -uo pipefail
 cd "$(dirname "$0")/../.."
 # Java MAIN classes (server + common, since server tests can target either)
 find ffb-java/ffb-server/src/main ffb-java/ffb-common/src/main -name "*.java" -not -path "*ffb-java/ffb/*" -exec basename {} .java \; 2>/dev/null | sort -u > /tmp/jmain3.txt
-# Java ffb-server TEST corpus + tokens
-find ffb-java/ffb-server/src/test -name "*.java" -not -path "*ffb-java/ffb/*" -print0 2>/dev/null | xargs -0 cat > /tmp/alltest3.txt
+# Java TEST corpus + tokens. Scan ffb-server AND ffb-common (+ client-logic): a Rust
+# ffb-mechanics type may be ported to a Java test in ANY module that has the class on its
+# classpath (modifier contexts/collections live in com.fumbbl.ffb.modifiers = ffb-common).
+find ffb-java/ffb-server/src/test ffb-java/ffb-common/src/test ffb-java/ffb-client-logic/src/test \
+  -name "*.java" -not -path "*ffb-java/ffb/*" -print0 2>/dev/null | xargs -0 cat > /tmp/alltest3.txt
 grep -oE '\b[A-Z][A-Za-z0-9]+\b' /tmp/alltest3.txt | sort -u > /tmp/jtok3.txt
 # Rust test-file counts: ffb-mechanics (all) + ffb-engine EXCLUDING step/
 { grep -rcE '^\s*#\[test\]' ffb-rust/crates/ffb-mechanics/src 2>/dev/null;
