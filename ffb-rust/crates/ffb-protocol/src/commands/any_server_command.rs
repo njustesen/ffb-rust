@@ -217,28 +217,30 @@ impl AnyServerCommand {
             AnyServerCommand::ServerLeave(c) => c.is_replayable(),
             AnyServerCommand::ServerPasswordChallenge(c) => c.is_replayable(),
             AnyServerCommand::ServerReplay(c) => c.is_replayable(),
-            AnyServerCommand::ServerAddPlayer(_)
-            | AnyServerCommand::ServerAddSketches(_)
-            | AnyServerCommand::ServerClearSketches(_)
-            | AnyServerCommand::ServerModelSync(_)
-            | AnyServerCommand::ServerPong(_)
-            | AnyServerCommand::ServerRemovePlayer(_)
-            | AnyServerCommand::ServerRemoveSketches(_)
+            // Java: these ServerCommand subclasses override isReplayable() to return false.
+            AnyServerCommand::ServerPong(_)
             | AnyServerCommand::ServerReplayControl(_)
             | AnyServerCommand::ServerReplayStatus(_)
-            | AnyServerCommand::ServerSetPreventSketching(_)
-            | AnyServerCommand::ServerSketchAddCoordinate(_)
-            | AnyServerCommand::ServerSketchSetColor(_)
-            | AnyServerCommand::ServerSketchSetLabel(_)
             | AnyServerCommand::ServerSound(_)
             | AnyServerCommand::ServerStatus(_)
             | AnyServerCommand::ServerTalk(_)
             | AnyServerCommand::ServerTeamList(_)
             | AnyServerCommand::ServerTeamSetupList(_)
+            | AnyServerCommand::ServerUserSettings(_)
+            | AnyServerCommand::ServerVersion(_) => false,
+            // Java: these inherit the ServerCommand base isReplayable() default of true.
+            AnyServerCommand::ServerAddPlayer(_)
+            | AnyServerCommand::ServerAddSketches(_)
+            | AnyServerCommand::ServerClearSketches(_)
+            | AnyServerCommand::ServerModelSync(_)
+            | AnyServerCommand::ServerRemovePlayer(_)
+            | AnyServerCommand::ServerRemoveSketches(_)
+            | AnyServerCommand::ServerSetPreventSketching(_)
+            | AnyServerCommand::ServerSketchAddCoordinate(_)
+            | AnyServerCommand::ServerSketchSetColor(_)
+            | AnyServerCommand::ServerSketchSetLabel(_)
             | AnyServerCommand::ServerUnzapPlayer(_)
             | AnyServerCommand::ServerUpdateLocalPlayerMarkers(_)
-            | AnyServerCommand::ServerUserSettings(_)
-            | AnyServerCommand::ServerVersion(_)
             | AnyServerCommand::ServerZapPlayer(_) => true,
         }
     }
@@ -337,10 +339,13 @@ mod tests {
     }
 
     #[test]
-    fn is_replayable_defaults_true_for_variants_without_an_override() {
-        // ServerCommandPong has no isReplayable() override in Java, so it inherits
-        // the ServerCommand base class default of true.
-        let cmd = AnyServerCommand::ServerPong(ServerCommandPong::default());
-        assert!(cmd.is_replayable());
+    fn is_replayable_matches_java_per_command_overrides() {
+        // Java: ServerCommandPong (and Sound/Talk/Status/Version/TeamList/TeamSetupList/
+        // ReplayControl/ReplayStatus/UserSettings) override isReplayable() to return false.
+        // Previously the Rust dispatch wrongly returned true for these (translation bug — the
+        // override was missing); it now matches Java.
+        assert!(!AnyServerCommand::ServerPong(ServerCommandPong::default()).is_replayable());
+        // Commands without an override inherit the ServerCommand base default of true.
+        assert!(AnyServerCommand::ServerRemovePlayer(ServerCommandRemovePlayer::new("p")).is_replayable());
     }
 }

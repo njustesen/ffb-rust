@@ -173,7 +173,7 @@ mod tests {
     use crate::game_log::GameLog;
     use ffb_protocol::commands::any_server_command::AnyServerCommand;
     use ffb_protocol::commands::server_command_add_player::ServerCommandAddPlayer;
-    use ffb_protocol::commands::server_command_pong::ServerCommandPong;
+    use ffb_protocol::commands::server_command_remove_player::ServerCommandRemovePlayer;
     use std::sync::Mutex;
 
     #[derive(Default)]
@@ -187,10 +187,10 @@ mod tests {
         }
     }
 
-    fn pong_cmd(command_nr: i32) -> AnyServerCommand {
-        let mut cmd = ServerCommandPong::default();
+    fn replayable_cmd(command_nr: i32) -> AnyServerCommand {
+        let mut cmd = ServerCommandRemovePlayer::new("p");
         cmd.command_nr = command_nr;
-        AnyServerCommand::ServerPong(cmd)
+        AnyServerCommand::ServerRemovePlayer(cmd)
     }
 
     #[test]
@@ -211,8 +211,8 @@ mod tests {
     #[test]
     fn run_drains_queue_and_sends_one_batch_for_a_small_replay() {
         let log = GameLog::new();
-        log.add(pong_cmd(1));
-        log.add(pong_cmd(2));
+        log.add(replayable_cmd(1));
+        log.add(replayable_cmd(2));
         let mut replayer = ServerReplayer::new();
         replayer.add(ServerReplay::new(1, 0, 42, &log));
 
@@ -249,7 +249,7 @@ mod tests {
     fn run_chunks_large_replays_into_multiple_batches() {
         let log = GameLog::new();
         for i in 1..=(ServerCommandReplay::MAX_NR_OF_COMMANDS as i32 + 5) {
-            log.add(pong_cmd(i));
+            log.add(replayable_cmd(i));
         }
         let mut replayer = ServerReplayer::new();
         replayer.add(ServerReplay::new(1, 0, 1, &log));

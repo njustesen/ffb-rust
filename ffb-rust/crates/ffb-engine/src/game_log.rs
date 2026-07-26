@@ -89,7 +89,7 @@ impl Default for GameLog {
 mod tests {
     use super::*;
     use ffb_protocol::commands::server_command_game_time::ServerCommandGameTime;
-    use ffb_protocol::commands::server_command_pong::ServerCommandPong;
+    use ffb_protocol::commands::server_command_remove_player::ServerCommandRemovePlayer;
 
     fn game_time_cmd(command_nr: i32) -> AnyServerCommand {
         // ServerCommandGameTime::is_replayable() returns false, so it's a useful
@@ -99,20 +99,20 @@ mod tests {
         AnyServerCommand::ServerGameTime(cmd)
     }
 
-    fn pong_cmd(command_nr: i32) -> AnyServerCommand {
+    fn replayable_cmd(command_nr: i32) -> AnyServerCommand {
         // ServerCommandPong has no isReplayable() override, so it's replayable
         // (inherits the ServerCommand base default of true).
-        let mut cmd = ServerCommandPong::default();
+        let mut cmd = ServerCommandRemovePlayer::new("p");
         cmd.command_nr = command_nr;
-        AnyServerCommand::ServerPong(cmd)
+        AnyServerCommand::ServerRemovePlayer(cmd)
     }
 
     #[test]
     fn test_add_and_size() {
         let log = GameLog::new();
         assert_eq!(log.size(), 0);
-        log.add(pong_cmd(1));
-        log.add(pong_cmd(2));
+        log.add(replayable_cmd(1));
+        log.add(replayable_cmd(2));
         assert_eq!(log.size(), 2);
     }
 
@@ -126,14 +126,14 @@ mod tests {
     #[test]
     fn add_keeps_replayable_commands() {
         let log = GameLog::new();
-        log.add(pong_cmd(1));
+        log.add(replayable_cmd(1));
         assert_eq!(log.size(), 1);
     }
 
     #[test]
     fn test_clear() {
         let log = GameLog::new();
-        log.add(pong_cmd(1));
+        log.add(replayable_cmd(1));
         log.clear();
         assert_eq!(log.size(), 0);
     }
@@ -141,9 +141,9 @@ mod tests {
     #[test]
     fn get_uncommitted_server_commands_filters_by_last_committed() {
         let log = GameLog::new();
-        log.add(pong_cmd(1));
-        log.add(pong_cmd(2));
-        log.add(pong_cmd(3));
+        log.add(replayable_cmd(1));
+        log.add(replayable_cmd(2));
+        log.add(replayable_cmd(3));
         log.set_last_committed_command_nr(1);
         assert_eq!(log.get_uncommitted_server_commands(), vec![2, 3]);
     }
@@ -151,7 +151,7 @@ mod tests {
     #[test]
     fn get_uncommitted_server_commands_empty_when_all_committed() {
         let log = GameLog::new();
-        log.add(pong_cmd(1));
+        log.add(replayable_cmd(1));
         log.set_last_committed_command_nr(5);
         assert!(log.get_uncommitted_server_commands().is_empty());
     }
@@ -165,9 +165,9 @@ mod tests {
     #[test]
     fn find_max_command_nr_finds_the_highest_command_nr() {
         let log = GameLog::new();
-        log.add(pong_cmd(3));
-        log.add(pong_cmd(7));
-        log.add(pong_cmd(2));
+        log.add(replayable_cmd(3));
+        log.add(replayable_cmd(7));
+        log.add(replayable_cmd(2));
         assert_eq!(log.find_max_command_nr(), 7);
     }
 
@@ -182,8 +182,8 @@ mod tests {
     #[test]
     fn get_server_commands_exposes_stored_commands() {
         let log = GameLog::new();
-        log.add(pong_cmd(1));
-        log.add(pong_cmd(2));
+        log.add(replayable_cmd(1));
+        log.add(replayable_cmd(2));
         let cmds = log.get_server_commands();
         let nrs: Vec<i32> = cmds.iter().map(|c| c.get_command_nr()).collect();
         assert_eq!(nrs, vec![1, 2]);

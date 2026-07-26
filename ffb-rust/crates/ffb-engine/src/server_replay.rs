@@ -136,12 +136,12 @@ fn order_commands(game_log: &GameLog) -> Vec<String> {
 mod tests {
     use super::*;
     use ffb_protocol::commands::any_server_command::AnyServerCommand;
-    use ffb_protocol::commands::server_command_pong::ServerCommandPong;
+    use ffb_protocol::commands::server_command_remove_player::ServerCommandRemovePlayer;
 
-    fn pong_cmd(command_nr: i32) -> AnyServerCommand {
-        let mut cmd = ServerCommandPong::default();
+    fn replayable_cmd(command_nr: i32) -> AnyServerCommand {
+        let mut cmd = ServerCommandRemovePlayer::new("p");
         cmd.command_nr = command_nr;
-        AnyServerCommand::ServerPong(cmd)
+        AnyServerCommand::ServerRemovePlayer(cmd)
     }
 
     #[test]
@@ -162,9 +162,9 @@ mod tests {
     #[test]
     fn new_from_game_log_orders_and_renumbers_commands() {
         let log = GameLog::new();
-        log.add(pong_cmd(1));
-        log.add(pong_cmd(2));
-        log.add(pong_cmd(3));
+        log.add(replayable_cmd(1));
+        log.add(replayable_cmd(2));
+        log.add(replayable_cmd(3));
         let replay = ServerReplay::new(7, 0, 1, &log);
         assert_eq!(replay.get_server_commands().len(), 3);
         // Each stored command is renumbered to its 1-based position, regardless of the
@@ -179,7 +179,7 @@ mod tests {
     fn find_relevant_commands_in_log_filters_by_from_and_to() {
         let log = GameLog::new();
         for i in 1..=5 {
-            log.add(pong_cmd(i));
+            log.add(replayable_cmd(i));
         }
         let mut replay = ServerReplay::new(1, 4, 1, &log);
         replay.set_from_command_nr(2);
@@ -196,7 +196,7 @@ mod tests {
     fn find_relevant_commands_in_log_with_zero_to_command_nr_takes_all_from_start() {
         let log = GameLog::new();
         for i in 1..=3 {
-            log.add(pong_cmd(i));
+            log.add(replayable_cmd(i));
         }
         let replay = ServerReplay::new(1, 0, 1, &log);
         assert_eq!(replay.find_relevant_commands_in_log().len(), 3);
