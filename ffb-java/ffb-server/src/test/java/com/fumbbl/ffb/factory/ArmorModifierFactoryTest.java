@@ -93,6 +93,41 @@ public class ArmorModifierFactoryTest {
 		assertTrue(factory.findArmorModifiers(game, attacker, player("d"), false, false).isEmpty());
 	}
 
+	private RosterPlayer playerWithArmour(String id, int armour) {
+		RosterPlayer p = player(id);
+		p.setArmour(armour);
+		return p;
+	}
+
+	// rust: find_armor_modifiers_claws_applies_when_armour_high
+	@Test
+	public void findArmorModifiersClawsAppliesWhenArmourHigh() {
+		RosterPlayer attacker = playerWithSkill("a", "Claws");
+		Set<ArmorModifier> mods = factory.findArmorModifiers(game, attacker, playerWithArmour("d", 9), false, false);
+		assertEquals(1, mods.size());
+		assertEquals("Claws", mods.iterator().next().getName());
+	}
+
+	// rust: find_armor_modifiers_claws_ignores_low_armour
+	@Test
+	public void findArmorModifiersClawsIgnoresLowArmour() {
+		RosterPlayer attacker = playerWithSkill("a", "Claws");
+		assertTrue(factory.findArmorModifiers(game, attacker, playerWithArmour("d", 8), false, false).isEmpty());
+	}
+
+	// TODO(investigate): the 3 Rust iron_hard_skin tests (find_armor blocks_all / special_effect
+	// blocks_fireball / get_foul_assist blocks_assists) expect Iron Hard Skin to suppress armour
+	// modifiers via ignoresArmourModifiersFromSkills, but here the GameFixture-loaded "Iron Hard Skin"
+	// skill on a bare RosterPlayer does not trigger the suppression (hasUnusedSkillWithProperty false).
+	// Deferred until the skill-property-loading path (or an unused-skill flag) is confirmed - not yet a
+	// demonstrated code divergence.
+
+	// rust: find_armor_modifiers_no_attacker_returns_empty
+	@Test
+	public void findArmorModifiersNoAttackerReturnsEmpty() {
+		assertTrue(factory.findArmorModifiers(game, null, player("d"), false, false).isEmpty());
+	}
+
 	// rust: for_name_finds_foul_assist
 	@Test
 	public void forNameFindsFoulAssist() {
