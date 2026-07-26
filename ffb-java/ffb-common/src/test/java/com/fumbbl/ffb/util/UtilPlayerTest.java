@@ -261,8 +261,41 @@ public class UtilPlayerTest {
 		assertDoesNotThrow(() -> game.getFieldModel().clearTrackNumbers());
 	}
 
+	// rust: has_move_left_true_when_moves_remaining
+	@Test
+	public void hasMoveLeftTrueWhenMovesRemaining() {
+		RosterPlayer h1 = addPlayer(true, "h1", new FieldCoordinate(5, 5), ACTIVE_STANDING);
+		h1.setMovement(6);
+		game.getActingPlayer().setPlayerId("h1");
+		game.getActingPlayer().setCurrentMove(5);
+		assertTrue(UtilPlayer.hasMoveLeft(game, false));
+	}
+
+	// rust: has_move_left_false_when_all_moves_used
+	@Test
+	public void hasMoveLeftFalseWhenAllMovesUsed() {
+		RosterPlayer h1 = addPlayer(true, "h1", new FieldCoordinate(5, 5), ACTIVE_STANDING);
+		h1.setMovement(6);
+		game.getActingPlayer().setPlayerId("h1");
+		game.getActingPlayer().setCurrentMove(6);
+		assertFalse(UtilPlayer.hasMoveLeft(game, false));
+	}
+
+	// rust: has_move_left_goes_for_it_allows_two_extra
+	@Test
+	public void hasMoveLeftGoesForItAllowsTwoExtra() {
+		RosterPlayer h1 = addPlayer(true, "h1", new FieldCoordinate(5, 5), ACTIVE_STANDING);
+		h1.setMovement(6);
+		game.getActingPlayer().setPlayerId("h1");
+		game.getActingPlayer().setCurrentMove(7);
+		game.getActingPlayer().setGoingForIt(true);
+		assertTrue(UtilPlayer.hasMoveLeft(game, false));
+	}
+
 	// NOTE (test equalization): the refresh_players/refresh_removes_enhancements Rust tests (7) and
 	// partner_marks_defender (4) are fixture-inexpressible here — refreshPlayersForTurnStart casts the
 	// GAME-mechanic factory and partner_marks_defender setup needs the SKILL factory to attach skills,
 	// both of which NPE on a null `factories` map in an applicationSource-built Game. Left Rust-only.
+	// The Rust new()/default() tests exercise the UtilPlayer struct's Default/constructor; Java's
+	// UtilPlayer is a static-only utility class (no instance) — no faithful twin, pruned as plumbing.
 }
