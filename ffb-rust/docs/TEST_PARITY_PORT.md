@@ -629,3 +629,13 @@ bb2016 5, PassMechanic bb2016 5. PROVEN ffb-server PATTERNS:
   Game via applicationSource, ActingPlayer via game.getActingPlayer(), coords new FieldCoordinate(x,y)).
 - TRUE remaining buckets (tests): injury 482, inducements 432, skill_behaviour 359, modifiers 183, util 138,
   mechanic 136, model 53, factory 53.
+- Ported (ffb-common, +55 more): InjuryModifierContext + StaticArmour/StaticInjury value classes (15);
+  VariableArmour + TemporaryStat Incrementer/Decrementer/abstract (20); StaticInjuryModifierAttacker/Defender +
+  VariableInjury (13). Skill-presence appliesToContext tests: hold ONE Skill instance and use it for BOTH
+  player.addSkill(s) AND modifier.setRegisteredTo(s) (UtilCards.hasSkill uses list.contains == identity).
+- DOCUMENTED ARCHITECTURE DIVERGENCE (not a bug, not ported): Rust StaticInjuryModifierAttacker/Defender
+  applies_to_context returns `true` when registered_to is None; the Rust injury FACTORY pre-filters by skill
+  before constructing the modifier (registered_to stays None = "already qualified"). Java instead registers each
+  modifier to its owning skill and re-checks via UtilCards.hasSkill, which returns false for a null skill — so
+  Java's registeredTo is never null in practice. The `applies_true_when_no_registered_to` Rust tests have no
+  faithful Java twin (would assert opposite) → EXEMPT. Builder tests (with_predicate/with_modifier_fn) EXEMPT.
