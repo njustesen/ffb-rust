@@ -1,8 +1,8 @@
 /// 1:1 translation of `com.fumbbl.ffb.server.step.bb2016.pass.StepSafeThrow`.
 ///
 /// Step in the pass sequence to handle skill SAFE_THROW (BB2016).
-/// - If thrower lacks canCancelInterceptions property, skip.
-/// - If interceptor can cancel the skill (VeryLongLegs), skip.
+/// - If thrower lacks canCancelInterceptions property, the interception stands → goto failure.
+/// - If interceptor can cancel the skill (VeryLongLegs), the interception stands → goto failure.
 /// - Rolls (AgilityMechanic.minimumRollSafeThrow): on success, nullify interceptor → NEXT_STEP.
 /// - On failure: set ball/bomb to interceptor coordinate → goto failure.
 /// - Re-roll (SAFE_THROW) supported.
@@ -61,20 +61,24 @@ impl StepSafeThrow {
         };
 
         // Java: Skill canForceInterceptionRerollSkill = thrower.getSkillWithProperty(canCancelInterceptions)
+        //       boolean doSafeThrow = (skill != null && !cancelsSkill(interceptor, skill));
+        // When the thrower cannot force a safe throw, Java sets doSafeThrow=false and falls through
+        // to the failure branch (fail_safe_throw → GOTO_LABEL); it does NOT skip to NEXT_STEP.
         let thrower_has_safe_throw = game.thrower()
             .map(|p| p.has_skill_property(NamedProperties::CAN_CANCEL_INTERCEPTIONS))
             .unwrap_or(false);
         if !thrower_has_safe_throw {
-            return StepOutcome::next();
+            return self.fail_safe_throw(game, &interceptor_id);
         }
 
         // VeryLongLegs registers CancelSkillProperty(canCancelInterceptions) →
-        // interceptor with VeryLongLegs cancels SafeThrow.
+        // interceptor with VeryLongLegs cancels SafeThrow. Java: !cancelsSkill(...) is false →
+        // doSafeThrow=false → falls through to the failure branch (GOTO_LABEL), not NEXT_STEP.
         let interceptor_cancels = game.player(&interceptor_id)
             .map(|p| p.has_skill_property(NamedProperties::CANCELS_CAN_CANCEL_INTERCEPTIONS))
             .unwrap_or(false);
         if interceptor_cancels {
-            return StepOutcome::next();
+            return self.fail_safe_throw(game, &interceptor_id);
         }
 
         // Java: if (ReRolledActions.SAFE_THROW == getReRolledAction()) {
@@ -230,14 +234,18 @@ mod tests {
     }
 
     #[test]
-    fn interceptor_but_thrower_lacks_safe_throw_skill_returns_next() {
+    fn interceptor_but_thrower_lacks_safe_throw_skill_goes_to_failure() {
+        // Ground truth: Java StepSafeThrow sets doSafeThrow=false when the thrower lacks
+        // canCancelInterceptions and falls through to fail_safe_throw → GOTO_LABEL (the interception
+        // stands). Previously this asserted NextStep, which was a translation bug (early return).
         let mut game = make_game();
         game.thrower_id = Some("thrower".into());
         add_player_with_skill(&mut game, true, "thrower", SkillId::Block); // no SafeThrow
+        add_player_with_skill(&mut game, false, "interceptor", SkillId::Block);
         let mut step = StepSafeThrow::new();
         step.interceptor_id = Some("interceptor".into());
         let out = step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(out.action, StepAction::GotoLabel);
     }
 
     #[test]
@@ -249,8 +257,9 @@ mod tests {
         let mut step = StepSafeThrow::new();
         step.interceptor_id = Some("interceptor".into());
         let out = step.start(&mut game, &mut GameRng::new(0));
-        // VeryLongLegs cancels SafeThrow → next step without roll
-        assert_eq!(out.action, StepAction::NextStep);
+        // VeryLongLegs cancels SafeThrow → doSafeThrow=false → the interception stands → GOTO_LABEL
+        // (Java fail_safe_throw). Previously asserted NextStep, which was a translation bug.
+        assert_eq!(out.action, StepAction::GotoLabel);
     }
 
     #[test]
