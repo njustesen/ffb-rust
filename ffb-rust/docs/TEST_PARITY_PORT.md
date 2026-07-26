@@ -716,3 +716,18 @@ to set expectations and pick high-ROI targets:
 
 Rule of thumb: `grep -c executeStepHooks <Step>.java` >0 ⇒ hook-delegating (low yield). Otherwise read
 the start() head for a command dequeue (CONTINUE) vs inline executeStep (high yield).
+
+## Step 4 two new fixture unlocks (this wave)
+
+- **Force a roll path via low movement.** Steps that only roll when MA < a threshold (StepStandUp:
+  MINIMUM_MOVE_TO_STAND_UP=3) skip the dice entirely at the default MA 6. Set the placed player's
+  movement below the threshold to reach the roll branch:
+  `((RosterPlayer) game.getPlayerById("home1")).setMovement(2);` then installScriptedDice(face). This
+  turned StepStandUp into a full 5-test port (guard + success + failure).
+- **Supply mandatory init-only params via init(StepParameterSet).** Some steps require a param that is
+  consumed in `init(StepParameterSet)` (NOT public setParameter) and throw StepException if absent —
+  e.g. StepApothecary's APOTHECARY_MODE. Build the set and init the step:
+  `StepParameterSet set = new StepParameterSet(); set.add(StepParameter.from(StepParameterKey.APOTHECARY_MODE, ApothecaryMode.DEFENDER)); step.init(set);`
+  This both satisfies the mandatory check AND sets the mode so downstream mode-conditional setParameter
+  tests (DEFENDER_POISONED accepted only in DEFENDER mode, etc.) become portable. The
+  param-accepted-via-setParameter twin stays EXEMPT (init-consumed → setParameter returns false).
