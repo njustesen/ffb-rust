@@ -103,4 +103,91 @@ public class DiceInterpreterTest {
 		assertFalse(di.isDouble(new int[]{2, 3}));
 		assertFalse(di.isDouble(new int[]{3}));
 	}
+
+	// rust: interpret_roll_weather_very_sunny
+	@Test
+	public void interpretRollWeatherVerySunny() {
+		assertEquals(Weather.VERY_SUNNY, di.interpretRollWeather(new int[]{1, 2}));
+	}
+
+	// rust: interpret_roll_weather_nice
+	@Test
+	public void interpretRollWeatherNice() {
+		assertEquals(Weather.NICE, di.interpretRollWeather(new int[]{3, 4}));
+	}
+
+	// rust: interpret_roll_weather_pouring_rain
+	@Test
+	public void interpretRollWeatherPouringRain() {
+		assertEquals(Weather.POURING_RAIN, di.interpretRollWeather(new int[]{5, 6}));
+	}
+
+	// rust: interpret_roll_weather_blizzard
+	@Test
+	public void interpretRollWeatherBlizzard() {
+		assertEquals(Weather.BLIZZARD, di.interpretRollWeather(new int[]{6, 6}));
+	}
+
+	// rust: tentacles_escape_requires_two_dice
+	@Test
+	public void tentaclesEscapeRequiresTwoDice() {
+		assertFalse(di.isTentaclesEscapeSuccessful(new int[]{5}, 3, 3));
+		assertTrue(di.isTentaclesEscapeSuccessful(new int[]{5, 5}, 3, 4));
+	}
+
+	// rust: interpret_fan_factor_roll_winning_gains
+	@Test
+	public void interpretFanFactorRollWinningGains() {
+		assertEquals(1, di.interpretFanFactorRoll(new int[]{4, 5}, 5, 1));
+	}
+
+	// rust: interpret_fan_factor_roll_losing_loses
+	@Test
+	public void interpretFanFactorRollLosingLoses() {
+		assertEquals(-1, di.interpretFanFactorRoll(new int[]{2, 1}, 5, -1));
+	}
+
+	// rust: interpret_master_chef_roll_counts_high_dice
+	@Test
+	public void interpretMasterChefRollCountsHighDice() {
+		assertEquals(2, di.interpretMasterChefRoll(new int[]{4, 2, 5}));
+	}
+
+	// rust: interpret_pick_me_up_five_and_six_succeed
+	@Test
+	public void interpretPickMeUpFiveAndSixSucceed() {
+		assertTrue(di.interpretPickMeUp(5));
+		assertTrue(di.interpretPickMeUp(6));
+		assertFalse(di.interpretPickMeUp(4));
+	}
+
+	// rust: is_bribes_successful_roll_greater_than_one
+	@Test
+	public void isBribesSuccessfulRollGreaterThanOne() {
+		assertTrue(di.isBribesSuccessful(2));
+		assertFalse(di.isBribesSuccessful(1));
+	}
+
+	// rust: is_argue_the_call_successful_six_only
+	@Test
+	public void isArgueTheCallSuccessfulSixOnly() {
+		assertTrue(di.isArgueTheCallSuccessful(6));
+		assertFalse(di.isArgueTheCallSuccessful(5));
+	}
+
+	// rust: is_coach_banned_only_on_one
+	@Test
+	public void isCoachBannedOnlyOnOne() {
+		assertTrue(di.isCoachBanned(1));
+		assertFalse(di.isCoachBanned(2));
+	}
+
+	// rust: interpret_riot_roll_low_advances_turn
+	@Test
+	public void interpretRiotRollLowAdvancesTurn() {
+		assertEquals(1, di.interpretRiotRoll(1));
+		assertEquals(1, di.interpretRiotRoll(3));
+		assertEquals(-1, di.interpretRiotRoll(4));
+		assertEquals(-1, di.interpretRiotRoll(6));
+	}
 }
