@@ -567,3 +567,29 @@ RosterPlayer p = new RosterPlayer(); p.setId("p1"); p.addSkill(skill("Wrestle"))
 This may unblock partner_marks_defender (skills only) and other skill-setup tests — RETRY those. Still
 blocked: anything calling pGame.getFactory(MECHANIC) on an applicationSource game (canGaze, refreshPlayersForTurnStart).
 NamedProperties are ISkillProperty constants (canRerollDodge, canTakeDownPlayersWithHimOnBothDown, ...).
+
+## Step 2 ffb-common — CLOSED 2026-07-26 (final exemption ledger)
+Ported this campaign (all green): reports (14 classes), SkipInjuryParts, GameOptionInt, marking (2),
+KickoffResultMapping (3), Team/RosterSkeleton, UtilXml, UtilReport, TurnData(pre-existing), plus the
+util live-graph fixture pass — UtilPlayer 29/39, UtilCards 5, UtilDisturbingPresence 4,
+PathFinderWithPassBlockSupport 5, PathFinderWithMultiJump 4, ReportPrayerEnd 1/2.
+Remaining ffb-common GAP files are all DOCUMENTED EXEMPTIONS (Rust-only, no faithful Java 1:1):
+- game_options (10) & util_game_option (5): Rust option store is string-keyed and returns 0/absent;
+  Java is GameOptionId/IGameOption-based and getOptionWithDefault returns FACTORY defaults
+  (e.g. maxPlayersOnField=11) — semantic divergence, not faithfully portable.
+- game_option_abstract (4): Java class is abstract; Rust tests a concrete struct + a Rust static
+  is_changed + Rust Default.
+- util_passing (2): UtilPassing.canIntercept is PRIVATE in Java (Rust exposed it pub for testing).
+- dice_category_factory (2): Rust for_kind identity mapping; Java has forCommandString/forDiceSize only.
+- dialog_pile_driver_parameter (2): Rust add-mutator API; Java takes a List in the ctor (no add, no
+  empty-filtering).
+- report_skill_roll (1): abstract report base (subclasses tested).
+- model_change_observable (1): Rust trait compile-test (Java interface, no behavioral twin).
+- keyed_item_registry (1) / enhancement_registry (1) / entropy_source (1): Rust registry/RNG infra
+  patterns with no ffb-common class-level Java twin.
+Plus the in-file util_player exemptions (canGaze x4, refresh x7, partner-not-on-field x1, new/default x2)
+and UtilDisturbingPresence empty-player x1 — all commented at their Java test sites.
+- prayer_state (6): NOT ffb-common — com.fumbbl.ffb.server.PrayerState → belongs to Step 3 (ffb-server).
+**CONCLUSION: Step 2 ffb-common is COMPLETE** (every behavioral gap ported or documented-exempt).
+Next: Step 3 (ffb-server) starting with prayer_state, then ffb-mechanics/injury/util/skill_behaviour;
+then Step 4 (ffb-engine step-logic bulk) via GameFixture/GeneratorTestSupport/ScriptedFortuna.
