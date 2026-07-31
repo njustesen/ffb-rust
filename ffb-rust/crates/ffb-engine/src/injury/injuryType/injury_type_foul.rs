@@ -203,14 +203,10 @@ mod tests {
         t.injury_roll(&game, &mut rng, Some("attacker"), "defender");
         assert!(!t.ctx.injury_modifiers.contains(&dirty_player_injury_modifier(game.rules)));
     }
-    #[test]
-    fn no_attacker_id_no_dirty_player_modifier() {
-        let game = game_with_armor(2);
-        let mut t = InjuryTypeFoul::new();
-        let mut rng = GameRng::new(1);
-        t.armour_roll(&game, &mut rng, None, "p1", true);
-        assert!(!t.ctx.armor_modifiers.contains(&ARMOR_DIRTY_PLAYER_1));
-    }
+    // NOTE (test equalization): no_attacker_id_no_dirty_player_modifier pruned — the
+    // None-attacker path is a Rust Option-guard; Java's armourRoll derefs the attacker
+    // unconditionally in UtilPlayer.findFoulAssists (a foul always has an attacker), so
+    // there is no faithful Java twin.
     #[test]
     fn blatant_foul_card_sets_armor_broken() {
         let mut game = game_with_armor(13);

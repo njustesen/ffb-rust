@@ -885,9 +885,27 @@ GoForItModifierFactoryTest pins min-roll 3 for a Drunkard player. Tally: 5 real 
   `new PlayerState(PlayerState.STANDING).changeActive(true)` manually; int game options via
   `(GameOptionInt) game.getOptions().getFactory().createGameOption(id)` + setValue + addOption;
   skill name "Ball and Chain"; checkSetup failure path shows a dialog headlessly (harmless).
-- Next: the three big buckets — inducements 432, injury 372, skill_behaviour 359, util 138 —
-  rerun scripts/reconcile_step3.sh; injury bucket (injury_type_* files, ~12 tests each) has the
-  established InjuryTypeServer + acting-player fixture recipe (see Step 3→4 BRIDGE section).
+## Step 3 INJURY BUCKET recipe proven (injury_type_foul 14/14, 2026-07-31)
+- **injury_type_foul → Java server/injury/injuryType/InjuryTypeFoulTest (ffb-server 3,566
+  green).** PROVEN RECIPE for the ~25 injury_type_* files: test in the SAME package
+  (com.fumbbl.ffb.server.injury.injuryType) to reach protected armourRoll/injuryRoll; fixture
+  attacker home1 + defender away1 placed NON-adjacent (foul-assist geometry); dice scripted
+  (armour and injury are 2d6 each). CRITICAL GOTCHAS:
+  1. Direct armourRoll/injuryRoll calls need `ctx.setAttackerId/setDefenderId` first —
+     DiceInterpreter.isArmourBroken reads the defender from the CONTEXT id, not the parameter
+     (normally set by UtilServerInjury before handleInjury). Same for handleInjury calls.
+  2. BB2025 armour semantics: roll + modifiers >= armour BREAKS (not >) — to reach the
+     findArmorModifiers branch use armour 9 with scripted [1,1].
+  3. handleInjury(step, game, gameState, diceRoller, attacker, defender, coord, null, null,
+     ApothecaryMode.X) is public on ModificationAwareInjuryTypeServer; armour save → PRONE.
+  4. Null-attacker paths are Rust-only guards (findFoulAssists derefs attacker) — PRUNED Rust
+     no_attacker_id_no_dirty_player_modifier (14 ↔ 14).
+  5. "Blatant Foul" is a bb2016 CARD: CARD factory forName + inducementSet
+     addAvailableCard/activateCard → game.isActive(foulBreaksArmourWithoutRoll).
+  Modifier names to assert: "Dirty Player" (armour + injury), "Chainsaw" (+3 armour).
+- Next: the rest of the injury bucket (injury_type_stab 13, stab_for_spp 13, piling_on ×2,
+  chainsaw ×2, lightning 11, drop_dodge_for_spp 11 — same recipe), then inducements 432,
+  skill_behaviour 359, util 138 — rerun scripts/reconcile_step3.sh.
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
 
