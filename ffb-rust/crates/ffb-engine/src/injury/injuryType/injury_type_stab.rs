@@ -143,20 +143,10 @@ mod tests {
         assert!(!t.ctx.armor_broken);
         assert!(t.ctx.injury.is_none());
     }
-    #[test]
-    fn default_equivalent_to_new_true() {
-        let t1 = InjuryTypeStab::new(true);
-        let t2 = InjuryTypeStab::default();
-        assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
-        assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
-    }
-
-    #[test]
-    fn new_context_uses_defender_apo_mode() {
-        use ffb_model::enums::ApothecaryMode;
-        let t = InjuryTypeStab::new(true);
-        assert_eq!(t.injury_context().apothecary_mode, ApothecaryMode::Defender);
-    }
+    // NOTE (test equalization): default_equivalent_to_new_true pruned — Rust `Default` impl
+    // plumbing; Java has no default constructor. new_context_uses_defender_apo_mode pruned —
+    // Rust stores the apothecary mode on the context at construction; Java's InjuryContext has
+    // no such field (the mode travels through handleInjury/InjuryResult), so no faithful twin.
 
     #[test]
     fn niggling_injury_modifier_applied_when_armor_breaks() {

@@ -903,9 +903,18 @@ GoForItModifierFactoryTest pins min-roll 3 for a Drunkard player. Tally: 5 real 
   5. "Blatant Foul" is a bb2016 CARD: CARD factory forName + inducementSet
      addAvailableCard/activateCard → game.isActive(foulBreaksArmourWithoutRoll).
   Modifier names to assert: "Dirty Player" (armour + injury), "Chainsaw" (+3 armour).
-- Next: the rest of the injury bucket (injury_type_stab 13, stab_for_spp 13, piling_on ×2,
-  chainsaw ×2, lightning 11, drop_dodge_for_spp 11 — same recipe), then inducements 432,
-  skill_behaviour 359, util 138 — rerun scripts/reconcile_step3.sh.
+- **injury_type_stab 11/11 → Java InjuryTypeStabTest (ffb-server 3,577 green).** Pruned 2 Rust
+  (Default-impl plumbing; ctor-stored apothecary_mode — Java InjuryContext has no such field).
+  KEY EDITION FACT verified both sides: only bb2016's InjuryModifiers collection carries the
+  "N Niggling Injury" modifiers — bb2020/bb2025 have NONE (rule change) — so niggling tests need
+  a BB2016 game + `defender.addLastingInjury(com.fumbbl.ffb.bb2016.SeriousInjury.SMASHED_KNEE)`
+  (NI attribute; Java counts lasting injuries with InjuryAttribute.NI, Rust uses the
+  niggling_injuries field). Stab takes a NULL attacker legally (no foul assists).
+  InjuryTypeStab(useInjuryModifiers[, addDefenderChainsaw]) ctor variants: (false) = bb2016
+  StabBehaviour, (true,true) = StepTreacherous. injuryType() accessor exposes
+  failedArmourPlacesProne (ctor sets false).
+- Next: rest of injury bucket (stab_for_spp 13, piling_on ×2, chainsaw ×2, lightning 11,
+  drop_dodge_for_spp 11 — same recipe), then inducements 432, skill_behaviour 359, util 138.
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
 
