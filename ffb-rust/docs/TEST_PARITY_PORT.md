@@ -824,9 +824,14 @@ GoForItModifierFactoryTest pins min-roll 3 for a Drunkard player. Tally: 5 real 
   GoForItContext ctor takes (game, player, Set teamsWithMolesUnderThePitch); JumpUpContext is
   (actingPlayer, game) — needs setActingPlayer. Registrant checks confirmed clean: RightStuff
   (Swoop bb2016 only), JumpUp (none).
-- NEXT: modifiers bucket only has armor_modifiers edition-collection files (5×3) + factory tails
-  left per reconcile; then the big buckets (inducements 432, injury 372, skill_behaviour 359) —
-  rerun scripts/reconcile_step3.sh for the live list.
+- **armor_modifiers edition collections 15/15 → Java ArmorModifiersTest (ffb-server 3,421
+  green).** Plain-ctor port (`new com.fumbbl.ffb.factory.bb20XX.ArmorModifiers()`, Stream.count()),
+  no fixture. Membership verified vs Java: bb2016 16 incl Bomb (values==allValues), bb2020 15 base
+  + Bomb legacy-gated behind setUseAll/allValues, bb2025 15 no Bomb w/ Fireball+Lightning.
+  **MODIFIERS BUCKET CLOSED.**
+- NEXT: the big buckets — inducements 432, injury 372, skill_behaviour 359, util 138, mechanic 136
+  (state_mechanic/roll_mechanic/setup_mechanic per-edition files are the biggest single files) —
+  rerun scripts/reconcile_step3.sh for the live list; pick one family per iteration.
 
 ## Step 4 REAL RUST BUG #3: StepSafeThrow early NEXT_STEP (fixed 2026-07-26)
 
