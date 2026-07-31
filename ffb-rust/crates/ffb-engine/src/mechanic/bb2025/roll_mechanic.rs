@@ -406,11 +406,20 @@ mod tests {
     }
 
     #[test]
-    fn interpret_si_roll_detail_table_no_defender_falls_back() {
-        // No defender → can't reduce any stat → fall back to SeriouslyHurt
+    fn interpret_si_roll_detail_table_defender_at_threshold_falls_back() {
+        // Defender whose AV is already at the reduction threshold (3) cannot be reduced
+        // further → the d6=1 HeadInjury(AV) detail result falls back to SeriouslyHurt.
+        // (Was previously written against a MISSING defender — a Rust-defensive branch with
+        // no Java twin: Java's currentValue derefs the defender unconditionally, and a
+        // defender is always set during a serious-injury roll.)
         let m = RollMechanic::new();
-        let g = make_game();
+        let mut g = make_game();
+        let mut defender = Player::default();
+        defender.id = "d1".into();
+        defender.armour = 3;
+        g.team_away.players.push(defender);
         let mut ctx = InjuryContext::new(ApothecaryMode::Attacker);
+        ctx.defender_id = Some("d1".into());
         ctx.casualty_roll = Some([13, 1]); // d6=1 → HeadInjuryAv
         assert_eq!(m.interpret_serious_injury_roll(&g, &ctx), Some(SeriousInjuryKind::SeriouslyHurt));
     }

@@ -829,8 +829,17 @@ GoForItModifierFactoryTest pins min-roll 3 for a Drunkard player. Tally: 5 real 
   no fixture. Membership verified vs Java: bb2016 16 incl Bomb (values==allValues), bb2020 15 base
   + Bomb legacy-gated behind setUseAll/allValues, bb2025 15 no Bomb w/ Fireball+Lightning.
   **MODIFIERS BUCKET CLOSED.**
-- NEXT: the big buckets — inducements 432, injury 372, skill_behaviour 359, util 138, mechanic 136
-  (state_mechanic/roll_mechanic/setup_mechanic per-edition files are the biggest single files) —
+- **roll_mechanic bb2025 17/17 → Java server/mechanic/bb2025/RollMechanicTest (ffb-server 3,438
+  green).** Server-mechanic recipe: test in com.fumbbl.ffb.server.mechanic.bb20XX package,
+  `new RollMechanic()` direct, GameFixture game for factories, `new
+  com.fumbbl.ffb.injury.context.InjuryContext()` + setCasualtyRoll/setInjuryRoll/setInjury/
+  setDefenderId, dice via gameState.getDiceRoller(), TurnData via game.getTurnDataHome().
+  bb2025 SeriousInjury enum is `com.fumbbl.ffb.bb2025.SeriousInjury`. CONVERTED (both sides):
+  the SI-detail-fallback test from a MISSING defender (Rust-defensive; Java currentValue derefs
+  defender unconditionally) to a defender-at-reduction-threshold (AV 3 + HeadInjury d6=1) —
+  faithful and tests the same fallback branch.
+- NEXT: roll_mechanic bb2016 (16) + bb2020 (16) same recipe, then state_mechanic (27/21/15),
+  setup_mechanic (10/9); then inducements 432, injury 372, skill_behaviour 359, util 138 —
   rerun scripts/reconcile_step3.sh for the live list; pick one family per iteration.
 
 ## Step 4 REAL RUST BUG #3: StepSafeThrow early NEXT_STEP (fixed 2026-07-26)
