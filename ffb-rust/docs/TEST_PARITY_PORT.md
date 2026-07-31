@@ -845,8 +845,20 @@ GoForItModifierFactoryTest pins min-roll 3 for a Drunkard player. Tally: 5 real 
   returned — same expected values). Edition enums: com.fumbbl.ffb.bb2016/bb2020/bb2025
   .SeriousInjury. bb2016 casualty is a pure d6 switch (1-3 BH / 4-5 SI / 6 RIP), decay via
   setCasualtyRollDecay + useDecayRoll=true.
-- NEXT: state_mechanic (27/21/15), setup_mechanic (10/9); then inducements 432, injury 372,
-  skill_behaviour 359, util 138 — rerun scripts/reconcile_step3.sh for the live list.
+- **state_mechanic bb2025 CORE 18/27 → Java server/mechanic/bb2025/StateMechanicTest (ffb-server
+  3,488 green).** Recipe: methods take IStep — `GameFixture.createStep(gs, StepId.INIT_START_GAME)`
+  carries gameState+result; startHalf/updateLeaderReRollsForTeam/handlePumpUp all drive cleanly.
+  handlePumpUp kit: `new InjuryResult()` + injuryContext() setAttackerId/setInjury(new
+  PlayerState(RIP))/setInjuryType(new com.fumbbl.ffb.injury.Block()/Foul()); attacker placed
+  standing on acting team with skill "Pump Up The Crowd" (capital The). Team setters
+  setReRolls/setApothecaries feed addReRolls/addApothecaries.
+  **REMAINING state_mechanic bb2025 tail (9 tests, next iteration):** reset_special_skills ×2
+  (drive through public startHalf + player.markUsed("Leader"/"Beer Barrel Bash")),
+  reset_inducements ×4 (CONDITIONAL_REROLL-usage inducement in turnData inducement set via the
+  INDUCEMENT_TYPE factory, uses reset at half<=2), wandering-apo events ×1 (+2 unseen — reread the
+  Rust file). Then state_mechanic root (21) + mixed (15), setup_mechanic (10/9).
+- Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
+  scripts/reconcile_step3.sh for the live list.
 
 ## Step 4 REAL RUST BUG #3: StepSafeThrow early NEXT_STEP (fixed 2026-07-26)
 
