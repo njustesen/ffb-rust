@@ -790,10 +790,19 @@ that a bb2016-named Rust match guard silently drops. Running tally: 4 real Rust 
   divergence, no Rust twin for the NPE path). VLL values verified: bb2016 -1, bb2020/bb2025 -2.
   NOTE (follow-up): Rust ModifierAggregator::get_interception_modifiers returns only the CARD half;
   Java's includes the skill half (ExtraArms/NoS/VLL) — reconcile when a consumer needs it.
-- NEXT in bucket: jump_modifier_factory (11) — same recipe; CHECK `find_registered_modifiers`
-  against the FULL Java skill-registration set first (grep `new JumpModifier(` across skill/**),
-  per bug #4 (VeryLongLegs registers JumpModifiers in all editions; bb2020's is
-  DEPENDS_ON_SUM_OF_OTHERS with an accumulated-modifier predicate).
+- **jump_modifier_factory 11/11 → Java JumpModifierFactoryTest (ffb-server 3,379 green).** Rust
+  find_registered_modifiers was missing mixed.DivingTackle's JumpModifier("Diving Tackle", 2,
+  DIVING_TACKLE) for BB2020/BB2025 (always-false predicate marker; bb2016.DivingTackle registers
+  only the DodgeModifier) — fixed, counts 2→3. Java factory is ABSTRACT with edition subclasses —
+  instantiate `new com.fumbbl.ffb.factory.{mixed,bb2016}.JumpModifierFactory()` directly (forName
+  lives on the subclasses, not the base). DEPENDS_ON_SUM_OF_OTHERS predicates (bb2020 VLL, Leap)
+  are drivable headlessly via `context.setAccumulatedModifiers(n)` before findModifiers — no
+  opponents needed. bb2016 jump collection is EMPTY (forName("1 Tacklezone") null is the twin of
+  Rust's empty-collection assert). setActingPlayer needed (mixed findNumberOfPrehensileTails
+  derefs game.getActingPlayer().getPlayer()).
+- **Modifier-factory nucleus DONE (dodge/catch/interception/jump).** Remaining modifiers-bucket
+  gap files (run reconcile_step3.sh): gaze/pickup/going_for_it/right_stuff/pass fall under the
+  same recipe; then the big buckets (inducements 432, injury 372, skill_behaviour 359).
 
 ## Step 4 REAL RUST BUG #3: StepSafeThrow early NEXT_STEP (fixed 2026-07-26)
 

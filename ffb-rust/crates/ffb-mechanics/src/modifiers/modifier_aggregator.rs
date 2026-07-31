@@ -170,7 +170,8 @@ mod tests {
     #[test]
     fn get_jump_modifiers_bb2025_includes_very_long_legs_and_leap() {
         let agg = ModifierAggregator::new();
-        assert_eq!(agg.get_jump_modifiers(Rules::Bb2025).len(), 2);
+        // VeryLongLegs, Leap, mixed.DivingTackle (DIVING_TACKLE marker).
+        assert_eq!(agg.get_jump_modifiers(Rules::Bb2025).len(), 3);
     }
 
     #[test]

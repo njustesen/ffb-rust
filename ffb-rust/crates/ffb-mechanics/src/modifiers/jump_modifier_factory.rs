@@ -155,8 +155,10 @@ impl JumpModifierFactory {
     /// (context-scoped: the `accumulated_modifier > 1`/`modifier_count > 1` guards are runtime
     /// predicates evaluated by `GenerifiedModifierFactory.findModifiers`, not conditions on
     /// whether the skill registers the modifier at all), this returns every edition-applicable
-    /// skill's raw registered `JumpModifier`, matching Java's `Skill.getJumpModifiers()`. Only
-    /// `VeryLongLegs` (all editions) and `Leap` (bb2020/bb2025 only) register one.
+    /// skill's raw registered `JumpModifier`, matching Java's `Skill.getJumpModifiers()`.
+    /// Registrants in the Java source: `VeryLongLegs` (all editions), `Leap` (bb2020/bb2025),
+    /// and `mixed.DivingTackle` (BB2020/BB2025 — DIVING_TACKLE type with an always-false
+    /// predicate; bb2016.DivingTackle registers only a DodgeModifier).
     pub fn find_registered_modifiers(rules: Rules) -> Vec<JumpModifier> {
         let mut result = Vec::new();
         for skill_id in ffb_model::factory::skill_factory::SkillFactory::new().get_skills() {
@@ -171,6 +173,10 @@ impl JumpModifierFactory {
                 }
                 SkillId::Leap if matches!(rules, Rules::Bb2020 | Rules::Bb2025 | Rules::Common) => {
                     result.push(JumpModifier::new("Leap", -1, ModifierType::DEPENDS_ON_SUM_OF_OTHERS));
+                }
+                SkillId::DivingTackle if matches!(rules, Rules::Bb2020 | Rules::Bb2025 | Rules::Common) => {
+                    // Java: mixed.DivingTackle registers JumpModifier("Diving Tackle", 2, DIVING_TACKLE).
+                    result.push(JumpModifier::new("Diving Tackle", 2, ModifierType::DIVING_TACKLE));
                 }
                 _ => {}
             }
@@ -202,12 +208,14 @@ mod tests {
     }
 
     #[test]
-    fn find_registered_modifiers_bb2025_has_both() {
+    fn find_registered_modifiers_bb2025_has_all_three() {
+        // Java aggregator skill half for BB2025: VeryLongLegs, Leap, mixed.DivingTackle.
         let mods = JumpModifierFactory::find_registered_modifiers(Rules::Bb2025);
         let names: Vec<&str> = mods.iter().map(|m| m.get_name()).collect();
         assert!(names.contains(&"Very Long Legs"));
         assert!(names.contains(&"Leap"));
-        assert_eq!(mods.len(), 2);
+        assert!(names.contains(&"Diving Tackle"));
+        assert_eq!(mods.len(), 3);
     }
 
     #[test]
