@@ -871,7 +871,14 @@ GoForItModifierFactoryTest pins min-roll 3 for a Drunkard player. Tally: 5 real 
   Rust wire layer — Java twins assert the Java-true no-report expectation
   (addApothecariesPlagueDoctorEmitsNoReport / WanderingAndPlagueEmitsOneReport). reportInjury kit:
   InjuryResult + ctx.setDefenderId + setInjuryType(new Block()); ReportId.INJURY + isAlreadyReported.
-  Next: state_mechanic mixed (15), setup_mechanic (10/9).
+- **state_mechanic mixed 15/15 → Java server/mechanic/mixed/StateMechanicTest (ffb-server 3,533
+  green). STATE_MECHANIC FAMILY COMPLETE (63 tests).** Rust handle_chef_rolls ↔ Java
+  UtilServerGame.handleChefRolls (invoked from mixed startHalf; tested against the utility
+  directly). Chef dice: 3d6 per chef via installScriptedDice, each face > 3 steals one re-roll —
+  scripted faces beat the Rust rng-read-back for determinism. bb2016 chef inducement type name is
+  "halflingMasterChef"; report id MASTER_CHEF_ROLL. Mixed gates differ from bb2025: apothecaries
+  at half < 2, re-rolls at half < 3.
+  Next: setup_mechanic (10/9); then inducements 432, injury 372, skill_behaviour 359, util 138.
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
 
