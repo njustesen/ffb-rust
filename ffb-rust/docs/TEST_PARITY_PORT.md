@@ -922,8 +922,13 @@ GoForItModifierFactoryTest pins min-roll 3 for a Drunkard player. Tally: 5 real 
   (armour 13 needs [1,1]: 2+3 < 13). Stunty-KO test made DETERMINISTIC in Java (script 3,4 →
   total 7 + mixed.Stunty isHurtMoreEasily marker → KNOCKED_OUT in BB2025) vs Rust's rng-guarded
   conditional. Dedup guard: pre-add via GameFixture.skill(game,"Chainsaw").getArmorModifiers().
-- Next: rest of injury bucket (chainsaw_for_spp 11, piling_on ×2, lightning 11,
-  drop_dodge_for_spp 11 — same recipe), then inducements 432, skill_behaviour 359, util 138.
+- **injury_type_chainsaw_for_spp 11/11 → Java InjuryTypeChainsawForSppTest (ffb-server 3,611
+  green).** Mechanical clone of chainsaw (isWorthSpps flips to true; no niggling test).
+- Next: piling_on ×2 (bb2016 game; PILING_ON_DOES_NOT_STACK / CLAW_DOES_NOT_STACK boolean game
+  options drive the stacking branches; InjuryTypePilingOnArmour extends plain InjuryTypeServer
+  with its own handleInjury — armour save → PRONE, claw = reducesArmourToFixedValue modifier;
+  prune the Rust default_equivalent tests), lightning 11, drop_dodge_for_spp 11; then
+  inducements 432, skill_behaviour 359, util 138.
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
 
