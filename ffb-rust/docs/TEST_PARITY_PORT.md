@@ -913,8 +913,11 @@ GoForItModifierFactoryTest pins min-roll 3 for a Drunkard player. Tally: 5 real 
   InjuryTypeStab(useInjuryModifiers[, addDefenderChainsaw]) ctor variants: (false) = bb2016
   StabBehaviour, (true,true) = StepTreacherous. injuryType() accessor exposes
   failedArmourPlacesProne (ctor sets false).
-- Next: rest of injury bucket (stab_for_spp 13, piling_on ×2, chainsaw ×2, lightning 11,
-  drop_dodge_for_spp 11 — same recipe), then inducements 432, skill_behaviour 359, util 138.
+- **injury_type_stab_for_spp 11/11 → Java InjuryTypeStabForSppTest (ffb-server 3,588 green).**
+  Straight clone of the stab recipe (same prunes: Default plumbing + ctor apo-mode). The ForSpp
+  siblings are mechanical clones — expect the same for drop_dodge_for_spp/chainsaw_for_spp etc.
+- Next: rest of injury bucket (piling_on ×2, chainsaw ×2, lightning 11, drop_dodge_for_spp 11 —
+  same recipe), then inducements 432, skill_behaviour 359, util 138.
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
 
