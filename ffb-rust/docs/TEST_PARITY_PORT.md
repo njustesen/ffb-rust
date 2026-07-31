@@ -878,7 +878,16 @@ GoForItModifierFactoryTest pins min-roll 3 for a Drunkard player. Tally: 5 real 
   scripted faces beat the Rust rng-read-back for determinism. bb2016 chef inducement type name is
   "halflingMasterChef"; report id MASTER_CHEF_ROLL. Mixed gates differ from bb2025: apothecaries
   at half < 2, re-rolls at half < 3.
-  Next: setup_mechanic (10/9); then inducements 432, injury 372, skill_behaviour 359, util 138.
+- **setup_mechanic bb2025 9/9 + mixed 10/10 → Java SetupMechanicTests (ffb-server 3,552 green).
+  MECHANIC BUCKET CLOSED** (roll 49 + state 63 + setup 19 + earlier misc). Recipes: empty-team
+  checks via `GameFixture.createGameState(0)` (0 players/team works); pinPlayersInTacklezones only
+  pins ACTIVE players — placePlayer alone sets STANDING without the active bit, so set
+  `new PlayerState(PlayerState.STANDING).changeActive(true)` manually; int game options via
+  `(GameOptionInt) game.getOptions().getFactory().createGameOption(id)` + setValue + addOption;
+  skill name "Ball and Chain"; checkSetup failure path shows a dialog headlessly (harmless).
+- Next: the three big buckets — inducements 432, injury 372, skill_behaviour 359, util 138 —
+  rerun scripts/reconcile_step3.sh; injury bucket (injury_type_* files, ~12 tests each) has the
+  established InjuryTypeServer + acting-player fixture recipe (see Step 3→4 BRIDGE section).
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
 
