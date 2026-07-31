@@ -860,8 +860,18 @@ GoForItModifierFactoryTest pins min-roll 3 for a Drunkard player. Tally: 5 real 
   "wanderingApothecaries"), value)` + setUses + turnData.getInducementSet().addInducement;
   Rust GameEvent::Inducement ↔ Java `step.getResult().getReportList().hasReport(
   ReportId.INDUCEMENT)`; conditional-reroll type retrieved back via
-  inducementSet.forUsage(Usage.CONDITIONAL_REROLL). Next: state_mechanic root (21) + mixed (15),
-  setup_mechanic (10/9).
+  inducementSet.forUsage(Usage.CONDITIONAL_REROLL).
+- **state_mechanic root/base 21/21 → Java server/mechanic/StateMechanicBaseTest (ffb-server 3,518
+  green).** Test lives in the BASE package (com.fumbbl.ffb.server.mechanic) to reach the protected
+  addApothecaries/addReRolls, driven through the concrete bb2025 subclass. Inducement type names:
+  "extraTeamTraining" (REROLL), "wanderingApothecaries" (APOTHECARY, hasSingleUsage filter),
+  "plagueDoctor" (bb2025, REGENERATION+APOTHECARY_JOURNEYMEN). Rust GameEvent::Inducement ↔ count
+  ReportInducement instances on step result. **DOCUMENTED DIVERGENCE:** Java's plague-doctor
+  branch adds NO ReportInducement (turnData sync only); the Rust GameEvent for plagueDoctor is the
+  Rust wire layer — Java twins assert the Java-true no-report expectation
+  (addApothecariesPlagueDoctorEmitsNoReport / WanderingAndPlagueEmitsOneReport). reportInjury kit:
+  InjuryResult + ctx.setDefenderId + setInjuryType(new Block()); ReportId.INJURY + isAlreadyReported.
+  Next: state_mechanic mixed (15), setup_mechanic (10/9).
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
 
