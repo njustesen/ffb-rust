@@ -390,22 +390,39 @@ mod tests {
         }
     }
 
+    fn make_game_with_defender() -> Game {
+        // Java derefs the defender in the reduceable-stat filter, so a defender must always be
+        // set during a serious-injury roll. Default lineman stats → every stat reduceable →
+        // the reduceable list contains the original injury → original returned.
+        let mut g = make_game();
+        let mut defender = Player::default();
+        defender.id = "d1".into();
+        defender.movement = 6;
+        defender.strength = 3;
+        defender.agility = 3;
+        defender.passing = 4;
+        defender.armour = 8;
+        g.team_away.players.push(defender);
+        g
+    }
+
     #[test]
     fn si_roll_detail_table_d6_1_is_head_injury_bb2020() {
         let m = RollMechanic::new();
-        let g = make_game();
+        let g = make_game_with_defender();
         let mut ctx = InjuryContext::new(ApothecaryMode::Attacker);
+        ctx.defender_id = Some("d1".into());
         // cas=13 → detail table, si_roll=1 → HeadInjuryAv
         ctx.casualty_roll = Some([13, 1]);
-        // No defender → reduceable filter yields nothing → return original
         assert_eq!(m.interpret_serious_injury_roll(&g, &ctx), Some(SeriousInjuryKind::HeadInjuryAv));
     }
 
     #[test]
     fn si_roll_detail_table_d6_6_is_dislocated_shoulder_bb2020() {
         let m = RollMechanic::new();
-        let g = make_game();
+        let g = make_game_with_defender();
         let mut ctx = InjuryContext::new(ApothecaryMode::Attacker);
+        ctx.defender_id = Some("d1".into());
         ctx.casualty_roll = Some([14, 6]);
         assert_eq!(m.interpret_serious_injury_roll(&g, &ctx), Some(SeriousInjuryKind::DislocatedShoulderSt));
     }

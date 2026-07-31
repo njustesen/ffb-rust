@@ -838,9 +838,15 @@ GoForItModifierFactoryTest pins min-roll 3 for a Drunkard player. Tally: 5 real 
   the SI-detail-fallback test from a MISSING defender (Rust-defensive; Java currentValue derefs
   defender unconditionally) to a defender-at-reduction-threshold (AV 3 + HeadInjury d6=1) —
   faithful and tests the same fallback branch.
-- NEXT: roll_mechanic bb2016 (16) + bb2020 (16) same recipe, then state_mechanic (27/21/15),
-  setup_mechanic (10/9); then inducements 432, injury 372, skill_behaviour 359, util 138 —
-  rerun scripts/reconcile_step3.sh for the live list; pick one family per iteration.
+- **roll_mechanic bb2016 16/16 + bb2020 16/16 → Java RollMechanicTests (ffb-server 3,470 green).
+  roll_mechanic family COMPLETE (49 tests).** Same recipe. Converted the two bb2020 SI
+  detail-table tests on both sides from no-defender (Rust-guarded; Java derefs in the
+  reduceable-stat filter) to a default-stat defender (all stats reduceable → original injury
+  returned — same expected values). Edition enums: com.fumbbl.ffb.bb2016/bb2020/bb2025
+  .SeriousInjury. bb2016 casualty is a pure d6 switch (1-3 BH / 4-5 SI / 6 RIP), decay via
+  setCasualtyRollDecay + useDecayRoll=true.
+- NEXT: state_mechanic (27/21/15), setup_mechanic (10/9); then inducements 432, injury 372,
+  skill_behaviour 359, util 138 — rerun scripts/reconcile_step3.sh for the live list.
 
 ## Step 4 REAL RUST BUG #3: StepSafeThrow early NEXT_STEP (fixed 2026-07-26)
 
