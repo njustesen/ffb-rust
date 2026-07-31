@@ -60,6 +60,36 @@ impl GoForItModifierFactory {
         crate::modifiers::card_roll_modifiers::find_go_for_it_card_modifiers(context)
     }
 
+    /// Returns skill-based GFI modifiers for the player.
+    /// Java: mixed.Drunkard (@RulesCollection BB2020 + BB2025) registers an unconditional
+    /// GoForItModifier("Drunkard", 1) — a Drunkard player rushes at 3+ instead of 2+.
+    pub fn find_skill_modifiers(&self, context: &GoForItContext<'_>) -> Vec<GoForItModifier> {
+        let rules = context.game.rules;
+        let mut result = Vec::new();
+        for skill_id in context.player.all_skill_ids() {
+            if skill_id == ffb_model::enums::SkillId::Drunkard
+                && matches!(rules, Rules::Bb2020 | Rules::Bb2025 | Rules::Common)
+            {
+                result.push(GoForItModifier::new("Drunkard", 1));
+            }
+        }
+        result
+    }
+
+    /// Java: `ModifierAggregator.getGoForItModifiers()`'s skill half. Only mixed.Drunkard
+    /// (BB2020/BB2025) registers a `GoForItModifier` in the Java source.
+    pub fn find_registered_modifiers(rules: Rules) -> Vec<GoForItModifier> {
+        let mut result = Vec::new();
+        for skill_id in ffb_model::factory::skill_factory::SkillFactory::new().get_skills() {
+            if skill_id == ffb_model::enums::SkillId::Drunkard
+                && matches!(rules, Rules::Bb2020 | Rules::Bb2025 | Rules::Common)
+            {
+                result.push(GoForItModifier::new("Drunkard", 1));
+            }
+        }
+        result
+    }
+
     /// 1:1 translation of DiceInterpreter.minimumRollGoingForIt.
     /// `max(2, 2 + sum(modifier))`
     pub fn minimum_roll_going_for_it(modifiers: &[&GoForItModifier]) -> i32 {
@@ -161,5 +191,31 @@ mod tests {
         let factory = GoForItModifierFactory::for_rules(Rules::Bb2025);
         assert!(factory.for_name("Blizzard").is_some());
         assert!(factory.for_name("NonExistent").is_none());
+    }
+
+    #[test]
+    fn find_skill_modifiers_drunkard_applies_in_bb2025() {
+        // Bug (fixed): Java's mixed.Drunkard (BB2020+BB2025) registers an unconditional
+        // GoForItModifier("Drunkard", 1); Rust had no skill-modifier path for GFI at all,
+        // so Drunkard players rushed at 2+ instead of 3+.
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::SkillWithValue;
+        let game = make_game(Weather::Nice);
+        let mut player = minimal_player();
+        player.starting_skills.push(SkillWithValue::new(SkillId::Drunkard));
+        let factory = GoForItModifierFactory::for_rules(Rules::Bb2025);
+        let ctx = GoForItContext::new(&game, &player);
+        let mods = factory.find_skill_modifiers(&ctx);
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].get_name(), "Drunkard");
+        assert_eq!(mods[0].get_modifier(), 1);
+    }
+
+    #[test]
+    fn find_registered_modifiers_drunkard_bb2025_not_bb2016() {
+        let mods = GoForItModifierFactory::find_registered_modifiers(Rules::Bb2025);
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].get_name(), "Drunkard");
+        assert!(GoForItModifierFactory::find_registered_modifiers(Rules::Bb2016).is_empty());
     }
 }

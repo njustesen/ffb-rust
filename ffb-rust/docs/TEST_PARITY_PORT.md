@@ -800,9 +800,33 @@ that a bb2016-named Rust match guard silently drops. Running tally: 4 real Rust 
   opponents needed. bb2016 jump collection is EMPTY (forName("1 Tacklezone") null is the twin of
   Rust's empty-collection assert). setActingPlayer needed (mixed findNumberOfPrehensileTails
   derefs game.getActingPlayer().getPlayer()).
-- **Modifier-factory nucleus DONE (dodge/catch/interception/jump).** Remaining modifiers-bucket
-  gap files (run reconcile_step3.sh): gaze/pickup/going_for_it/right_stuff/pass fall under the
-  same recipe; then the big buckets (inducements 432, injury 372, skill_behaviour 359).
+- **Modifier-factory nucleus DONE (dodge/catch/interception/jump).**
+
+## Step 3 REAL RUST BUG #5: Drunkard GFI modifier entirely missing (fixed 2026-07-31)
+
+Found via the bug-#4 registrant pre-check while porting the small factories. Java mixed.Drunkard
+(@RulesCollection BB2020 + BB2025) registers an unconditional `GoForItModifier("Drunkard", 1)` —
+a Drunkard player rushes at 3+ instead of 2+. Rust's GoForItModifierFactory had NO skill-modifier
+path at all and the three step_go_for_it files only chained find_applicable + card modifiers, so
+Drunkard's penalty never applied. Fixed: added find_skill_modifiers/find_registered_modifiers to
+the Rust factory + chained skill_mods in bb2016/bb2020/bb2025 step_go_for_it. Java
+GoForItModifierFactoryTest pins min-roll 3 for a Drunkard player. Tally: 5 real Rust bugs.
+
+## Step 3 small modifier factories DONE (2026-07-31) — modifiers bucket CLOSED
+- **pickup 9/9, right_stuff 7/7, go_for_it 8/8, jump_up 3/3 → 4 Java factory tests (ffb-server
+  3,406 green).** More bug-#4-family registrant gaps fixed: BigHand (mixed BB2016/BB2020 +
+  bb2025) registers a 0-value Pickup marker with EDITION-DEPENDENT report string ("…all negative
+  modifiers…" bb2025 vs "…tackle zones and weather effects…" mixed) + isModifierIncluded=true —
+  added with modifier_included_override on PickupModifier. Pruned: pickup
+  find_skill_modifiers_no_extra_arms (Java twin would duplicate niceWeatherNoModifiers), jump_up
+  default_uses_bb2025 (Rust Default plumbing). Java notes: GFI minimum roll lives in
+  DiceInterpreter.getInstance().minimumRollGoingForIt (server), NOT AgilityMechanic; Java
+  GoForItContext ctor takes (game, player, Set teamsWithMolesUnderThePitch); JumpUpContext is
+  (actingPlayer, game) — needs setActingPlayer. Registrant checks confirmed clean: RightStuff
+  (Swoop bb2016 only), JumpUp (none).
+- NEXT: modifiers bucket only has armor_modifiers edition-collection files (5×3) + factory tails
+  left per reconcile; then the big buckets (inducements 432, injury 372, skill_behaviour 359) —
+  rerun scripts/reconcile_step3.sh for the live list.
 
 ## Step 4 REAL RUST BUG #3: StepSafeThrow early NEXT_STEP (fixed 2026-07-26)
 

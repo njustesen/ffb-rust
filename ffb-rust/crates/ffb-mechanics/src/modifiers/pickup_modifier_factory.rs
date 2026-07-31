@@ -53,26 +53,55 @@ impl PickupModifierFactory {
         result
     }
 
+    /// Java: BigHand registers a 0-value reporting marker PickupModifier with an
+    /// edition-dependent report string and isModifierIncluded overridden to true
+    /// (mixed = BB2016/BB2020; bb2025 has its own wording).
+    fn big_hand_modifier(rules: Rules) -> PickupModifier {
+        let report = if rules == Rules::Bb2025 {
+            "0 ignoring all negative modifiers due to Big Hand"
+        } else {
+            "0 ignoring all tackle zones and weather effects due to Big Hand"
+        };
+        PickupModifier::new_full("Big Hand", report, 0, ModifierType::REGULAR)
+            .with_modifier_included(true)
+    }
+
     /// Returns skill-based pickup modifiers for the player.
     /// Java: common.ExtraArms registers PickupModifier("Extra Arms", -1, REGULAR).
+    ///       BigHand (mixed BB2016/BB2020 + bb2025) registers a 0-value reporting marker
+    ///       (the gameplay effect is the ignoreTacklezones/ignoreWeatherWhenPickingUp properties).
     pub fn find_skill_modifiers(&self, context: &PickupContext<'_>) -> Vec<PickupModifier> {
+        let rules = context.game.rules;
         let player = context.player;
         let mut result = Vec::new();
         for skill_id in player.all_skill_ids() {
-            if skill_id == SkillId::ExtraArms {
-                result.push(PickupModifier::new("Extra Arms", -1, ModifierType::REGULAR));
+            match skill_id {
+                SkillId::ExtraArms => {
+                    result.push(PickupModifier::new("Extra Arms", -1, ModifierType::REGULAR));
+                }
+                SkillId::BigHand => {
+                    result.push(Self::big_hand_modifier(rules));
+                }
+                _ => {}
             }
         }
         result
     }
 
-    /// Java: `ModifierAggregator.getPickupModifiers()`'s skill half. Only `common.ExtraArms`
-    /// registers a `PickupModifier` in the Java source, in every edition.
-    pub fn find_registered_modifiers(_rules: Rules) -> Vec<PickupModifier> {
+    /// Java: `ModifierAggregator.getPickupModifiers()`'s skill half. Registrants in the Java
+    /// source: `common.ExtraArms` (every edition) and `BigHand` (mixed BB2016/BB2020 + bb2025,
+    /// a 0-value reporting marker with edition-dependent wording).
+    pub fn find_registered_modifiers(rules: Rules) -> Vec<PickupModifier> {
         let mut result = Vec::new();
         for skill_id in ffb_model::factory::skill_factory::SkillFactory::new().get_skills() {
-            if skill_id == SkillId::ExtraArms {
-                result.push(PickupModifier::new("Extra Arms", -1, ModifierType::REGULAR));
+            match skill_id {
+                SkillId::ExtraArms => {
+                    result.push(PickupModifier::new("Extra Arms", -1, ModifierType::REGULAR));
+                }
+                SkillId::BigHand => {
+                    result.push(Self::big_hand_modifier(rules));
+                }
+                _ => {}
             }
         }
         result
@@ -101,10 +130,12 @@ mod tests {
     use crate::modifiers::pickup_context::PickupContext;
 
     #[test]
-    fn find_registered_modifiers_includes_extra_arms() {
+    fn find_registered_modifiers_includes_extra_arms_and_big_hand() {
         let mods = PickupModifierFactory::find_registered_modifiers(Rules::Bb2025);
-        assert_eq!(mods.len(), 1);
-        assert_eq!(mods[0].get_name(), "Extra Arms");
+        let names: Vec<&str> = mods.iter().map(|m| m.get_name()).collect();
+        assert!(names.contains(&"Extra Arms"));
+        assert!(names.contains(&"Big Hand"));
+        assert_eq!(mods.len(), 2);
     }
 
     fn empty_team(id: &str) -> Team {
@@ -203,13 +234,32 @@ mod tests {
         assert_eq!(mods.iter().find(|m| m.get_name() == "Extra Arms").unwrap().get_modifier(), -1);
     }
 
+    // NOTE (test equalization): find_skill_modifiers_no_extra_arms_returns_empty pruned — its
+    // Java twin (findModifiers empty for a bare player in NICE weather) would duplicate
+    // niceWeatherNoModifiers exactly.
+
     #[test]
-    fn find_skill_modifiers_no_extra_arms_returns_empty() {
+    fn find_skill_modifiers_big_hand_marker_edition_wording() {
+        // Java: BigHand registers a 0-value REGULAR PickupModifier with isModifierIncluded=true
+        // and an edition-dependent report string (mixed BB2016/BB2020 vs bb2025).
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::SkillWithValue;
         let game = make_game(Weather::Nice);
-        let player = minimal_player();
+        let mut player = minimal_player();
+        player.starting_skills.push(SkillWithValue::new(SkillId::BigHand));
         let factory = PickupModifierFactory::for_rules(Rules::Bb2025);
         let ctx = PickupContext::new(&game, &player);
         let mods = factory.find_skill_modifiers(&ctx);
-        assert!(mods.is_empty());
+        let bh = mods.iter().find(|m| m.get_name() == "Big Hand").expect("Big Hand marker");
+        assert_eq!(bh.get_modifier(), 0);
+        assert_eq!(bh.get_report_string(), "0 ignoring all negative modifiers due to Big Hand");
+        assert!(bh.is_modifier_included());
+
+        let mut game2016 = make_game(Weather::Nice);
+        game2016.rules = Rules::Bb2016;
+        let ctx = PickupContext::new(&game2016, &player);
+        let mods = factory.find_skill_modifiers(&ctx);
+        let bh = mods.iter().find(|m| m.get_name() == "Big Hand").expect("Big Hand marker");
+        assert_eq!(bh.get_report_string(), "0 ignoring all tackle zones and weather effects due to Big Hand");
     }
 }

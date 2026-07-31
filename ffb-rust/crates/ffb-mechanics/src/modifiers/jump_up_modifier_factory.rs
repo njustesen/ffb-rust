@@ -111,12 +111,6 @@ mod tests {
         assert_eq!(mods[0].get_modifier(), -1);
     }
 
-    #[test]
-    fn default_uses_bb2025_rules() {
-        let factory = JumpUpModifierFactory::default();
-        let game = make_game(Rules::Bb2025);
-        let acting = ActingPlayer::default();
-        let ctx = JumpUpContext::new(&game, &acting);
-        assert_eq!(factory.find_modifiers(&ctx).len(), 1);
-    }
+    // NOTE (test equalization): default_uses_bb2025_rules pruned — Rust `Default` impl plumbing;
+    // Java has no default-constructor equivalent (the Scanner selects the collection per game).
 }

@@ -8,6 +8,9 @@ pub struct PickupModifier {
     pub modifier: i32,
     pub modifier_type: ModifierType,
     applies_to_context: Option<Box<dyn Fn(&PickupContext<'_>) -> bool + Send + Sync>>,
+    /// Java: anonymous subclasses may override `isModifierIncluded()` (e.g. BigHand's 0-value
+    /// marker forces `true` on a REGULAR modifier). `None` = Java's type-based default.
+    modifier_included_override: Option<bool>,
 }
 
 impl PickupModifier {
@@ -19,6 +22,7 @@ impl PickupModifier {
             modifier,
             modifier_type,
             applies_to_context: None,
+            modifier_included_override: None,
         }
     }
 
@@ -34,6 +38,7 @@ impl PickupModifier {
             modifier,
             modifier_type,
             applies_to_context: None,
+            modifier_included_override: None,
         }
     }
 
@@ -45,13 +50,20 @@ impl PickupModifier {
         self
     }
 
+    /// Java: `isModifierIncluded()` override in an anonymous modifier subclass.
+    pub fn with_modifier_included(mut self, included: bool) -> Self {
+        self.modifier_included_override = Some(included);
+        self
+    }
+
     pub fn get_modifier(&self) -> i32 { self.modifier }
     pub fn get_type(&self) -> ModifierType { self.modifier_type }
     pub fn get_name(&self) -> &str { &self.name }
     pub fn get_report_string(&self) -> &str { &self.reporting_string }
 
     pub fn is_modifier_included(&self) -> bool {
-        self.modifier_type == ModifierType::TACKLEZONE
+        self.modifier_included_override
+            .unwrap_or(self.modifier_type == ModifierType::TACKLEZONE)
     }
 
     pub fn applies_to_context(&self, context: &PickupContext<'_>) -> bool {

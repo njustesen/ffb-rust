@@ -164,7 +164,8 @@ mod tests {
     #[test]
     fn get_pickup_modifiers_includes_extra_arms() {
         let agg = ModifierAggregator::new();
-        assert_eq!(agg.get_pickup_modifiers(Rules::Bb2025).len(), 1);
+        // ExtraArms, BigHand (0-value reporting marker).
+        assert_eq!(agg.get_pickup_modifiers(Rules::Bb2025).len(), 2);
     }
 
     #[test]
