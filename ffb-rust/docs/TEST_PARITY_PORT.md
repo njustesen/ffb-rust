@@ -852,11 +852,16 @@ GoForItModifierFactoryTest pins min-roll 3 for a Drunkard player. Tally: 5 real 
   PlayerState(RIP))/setInjuryType(new com.fumbbl.ffb.injury.Block()/Foul()); attacker placed
   standing on acting team with skill "Pump Up The Crowd" (capital The). Team setters
   setReRolls/setApothecaries feed addReRolls/addApothecaries.
-  **REMAINING state_mechanic bb2025 tail (9 tests, next iteration):** reset_special_skills ×2
-  (drive through public startHalf + player.markUsed("Leader"/"Beer Barrel Bash")),
-  reset_inducements ×4 (CONDITIONAL_REROLL-usage inducement in turnData inducement set via the
-  INDUCEMENT_TYPE factory, uses reset at half<=2), wandering-apo events ×1 (+2 unseen — reread the
-  Rust file). Then state_mechanic root (21) + mixed (15), setup_mechanic (10/9).
+  **state_mechanic bb2025 tail DONE → 27/27 (ffb-server 3,497 green).** Tail recipe: private
+  helpers exercised through public startHalf; skills via addSkill+markUsed then
+  player.isUsed(skill) — GOTCHA: the bb2025 once-per-drive skill display name is "Beer Barrel
+  Bash!" (with exclamation mark); inducements via
+  `new Inducement((InducementType) game.getFactory(INDUCEMENT_TYPE).forName("teamMascot" /
+  "wanderingApothecaries"), value)` + setUses + turnData.getInducementSet().addInducement;
+  Rust GameEvent::Inducement ↔ Java `step.getResult().getReportList().hasReport(
+  ReportId.INDUCEMENT)`; conditional-reroll type retrieved back via
+  inducementSet.forUsage(Usage.CONDITIONAL_REROLL). Next: state_mechanic root (21) + mixed (15),
+  setup_mechanic (10/9).
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
 

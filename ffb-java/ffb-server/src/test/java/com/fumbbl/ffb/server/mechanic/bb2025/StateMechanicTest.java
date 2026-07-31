@@ -218,4 +218,109 @@ public class StateMechanicTest {
 		mechanic.startHalf(step, 1);
 		assertEquals(2, game.getTurnDataHome().getApothecaries());
 	}
+
+	// ── skill / inducement resets (Java: private helpers exercised through startHalf) ────────
+
+	private com.fumbbl.ffb.model.skill.Skill addAndMarkUsed(String playerId, String skillName) {
+		RosterPlayer player = (RosterPlayer) game.getPlayerById(playerId);
+		com.fumbbl.ffb.model.skill.Skill skill = GameFixture.skill(game, skillName);
+		player.addSkill(skill);
+		player.markUsed(skill, game);
+		return skill;
+	}
+
+	// rust: reset_special_skills_clears_once_per_half_skill_for_all_players
+	@Test
+	public void resetSpecialSkillsClearsOncePerHalfSkillForAllPlayers() {
+		com.fumbbl.ffb.model.skill.Skill leader = addAndMarkUsed("home1", "Leader");
+		com.fumbbl.ffb.model.skill.Skill beerBarrelBash = addAndMarkUsed("away1", "Beer Barrel Bash!");
+		mechanic.startHalf(step, 1);
+		assertFalse(game.getPlayerById("home1").isUsed(leader), "ONCE_PER_HALF Leader reset");
+		assertFalse(game.getPlayerById("away1").isUsed(beerBarrelBash), "ONCE_PER_DRIVE reset too");
+	}
+
+	// rust: reset_special_skills_at_half_3_skips_once_per_half_but_clears_end_of_drive
+	@Test
+	public void resetSpecialSkillsAtHalf3SkipsOncePerHalfButClearsEndOfDrive() {
+		com.fumbbl.ffb.model.skill.Skill leader = addAndMarkUsed("home1", "Leader");
+		com.fumbbl.ffb.model.skill.Skill beerBarrelBash = addAndMarkUsed("home1", "Beer Barrel Bash!");
+		mechanic.startHalf(step, 3);
+		assertTrue(game.getPlayerById("home1").isUsed(leader), "half > 2: ONCE_PER_HALF not reset");
+		assertFalse(game.getPlayerById("home1").isUsed(beerBarrelBash), "ONCE_PER_DRIVE always reset");
+	}
+
+	private com.fumbbl.ffb.inducement.Inducement addInducement(TurnData turnData, String typeName,
+															   int value, int uses) {
+		com.fumbbl.ffb.inducement.InducementType type =
+			(com.fumbbl.ffb.inducement.InducementType) game
+				.getFactory(com.fumbbl.ffb.FactoryType.Factory.INDUCEMENT_TYPE).forName(typeName);
+		com.fumbbl.ffb.inducement.Inducement inducement =
+			new com.fumbbl.ffb.inducement.Inducement(type, value);
+		inducement.setUses(uses);
+		turnData.getInducementSet().addInducement(inducement);
+		return inducement;
+	}
+
+	private int conditionalRerollUses(TurnData turnData) {
+		com.fumbbl.ffb.inducement.InducementType type =
+			turnData.getInducementSet().forUsage(com.fumbbl.ffb.inducement.Usage.CONDITIONAL_REROLL);
+		return turnData.getInducementSet().get(type).getUses();
+	}
+
+	// rust: reset_inducements_resets_conditional_reroll_uses
+	@Test
+	public void resetInducementsResetsConditionalRerollUses() {
+		addInducement(game.getTurnDataHome(), "teamMascot", 2, 2);
+		mechanic.startHalf(step, 1);
+		assertEquals(0, conditionalRerollUses(game.getTurnDataHome()));
+	}
+
+	// rust: reset_inducements_no_op_when_no_conditional_reroll
+	@Test
+	public void resetInducementsNoOpWhenNoConditionalReroll() {
+		mechanic.startHalf(step, 1); // no conditional-reroll inducement — must not throw
+		assertEquals(1, game.getHalf());
+	}
+
+	// rust: reset_inducements_skips_at_half_3
+	@Test
+	public void resetInducementsSkipsAtHalf3() {
+		addInducement(game.getTurnDataHome(), "teamMascot", 2, 2);
+		mechanic.startHalf(step, 3);
+		assertEquals(2, conditionalRerollUses(game.getTurnDataHome()), "half > 2: uses not reset");
+	}
+
+	// rust: reset_inducements_resets_away_team_too
+	@Test
+	public void resetInducementsResetsAwayTeamToo() {
+		addInducement(game.getTurnDataAway(), "teamMascot", 1, 1);
+		mechanic.startHalf(step, 2);
+		assertEquals(0, conditionalRerollUses(game.getTurnDataAway()));
+	}
+
+	// rust: start_half_returns_inducement_events_for_wandering_apo_at_half_1
+	@Test
+	public void startHalfReturnsInducementEventsForWanderingApoAtHalf1() {
+		addInducement(game.getTurnDataHome(), "wanderingApothecaries", 1, 0);
+		mechanic.startHalf(step, 1);
+		assertTrue(step.getResult().getReportList().hasReport(com.fumbbl.ffb.report.ReportId.INDUCEMENT),
+			"wandering apothecary should produce an inducement report");
+	}
+
+	// rust: start_half_no_inducements_returns_empty_events
+	@Test
+	public void startHalfNoInducementsReturnsEmptyEvents() {
+		mechanic.startHalf(step, 1);
+		assertFalse(step.getResult().getReportList().hasReport(com.fumbbl.ffb.report.ReportId.INDUCEMENT),
+			"no inducements should produce no inducement report");
+	}
+
+	// rust: start_half_half_2_skips_apothecary_events
+	@Test
+	public void startHalfHalf2SkipsApothecaryEvents() {
+		addInducement(game.getTurnDataHome(), "wanderingApothecaries", 1, 0);
+		mechanic.startHalf(step, 2);
+		assertFalse(step.getResult().getReportList().hasReport(com.fumbbl.ffb.report.ReportId.INDUCEMENT),
+			"apothecaries not registered at half 2");
+	}
 }
