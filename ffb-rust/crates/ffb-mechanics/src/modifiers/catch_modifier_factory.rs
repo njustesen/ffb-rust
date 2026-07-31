@@ -102,6 +102,9 @@ impl CatchModifierFactory {
     ///
     /// Java: common.ExtraArms registers CatchModifier("Extra Arms", -1, REGULAR).
     ///       common.DivingCatch registers CatchModifier("Diving Catch", -1, REGULAR) only on accurate pass/bomb.
+    ///       NervesOfSteel (bb2016 + mixed BB2020/BB2025 — all editions) registers a 0-value
+    ///       reporting marker CatchModifier("Nerves of Steel", "0 for tackle zones due to Nerves
+    ///       of Steel", 0, REGULAR) with isModifierIncluded overridden to true.
     pub fn find_skill_modifiers(&self, context: &CatchContext<'_>) -> Vec<CatchModifier> {
         let Some(player) = context.player else { return vec![]; };
         let mut result = Vec::new();
@@ -116,6 +119,12 @@ impl CatchModifierFactory {
                         result.push(CatchModifier::new("Diving Catch", -1, crate::modifiers::modifier_type::ModifierType::REGULAR));
                     }
                 }
+                SkillId::NervesOfSteel => {
+                    result.push(CatchModifier::new_with_reporting(
+                        "Nerves of Steel", "0 for tackle zones due to Nerves of Steel", 0,
+                        crate::modifiers::modifier_type::ModifierType::REGULAR,
+                    ).with_modifier_included(true));
+                }
                 _ => {}
             }
         }
@@ -127,9 +136,10 @@ impl CatchModifierFactory {
     /// Every skill's statically-registered modifier objects, unfiltered by any predicate
     /// (Java's `Skill.getCatchModifiers()` returns the raw registered list; predicates are only
     /// evaluated later by callers like `GenerifiedModifierFactory.findModifiers`, not here).
-    /// Only `common.ExtraArms`/`common.DivingCatch` register a `CatchModifier` in the Java source.
+    /// Registering skills in the Java source: `common.ExtraArms`, `common.DivingCatch`, and
+    /// `NervesOfSteel` (bb2016 + mixed BB2020/BB2025 — all editions, a 0-value reporting marker).
     pub fn find_registered_modifiers(rules: Rules) -> Vec<CatchModifier> {
-        let _ = rules; // Both registrants are edition-agnostic (no @RulesCollection restriction).
+        let _ = rules; // All registrants exist in every edition.
         let mut result = Vec::new();
         for skill_id in ffb_model::factory::skill_factory::SkillFactory::new().get_skills() {
             match skill_id {
@@ -138,6 +148,12 @@ impl CatchModifierFactory {
                 }
                 SkillId::DivingCatch => {
                     result.push(CatchModifier::new("Diving Catch", -1, crate::modifiers::modifier_type::ModifierType::REGULAR));
+                }
+                SkillId::NervesOfSteel => {
+                    result.push(CatchModifier::new_with_reporting(
+                        "Nerves of Steel", "0 for tackle zones due to Nerves of Steel", 0,
+                        crate::modifiers::modifier_type::ModifierType::REGULAR,
+                    ).with_modifier_included(true));
                 }
                 _ => {}
             }
@@ -312,11 +328,12 @@ mod tests {
     }
 
     #[test]
-    fn find_registered_modifiers_includes_extra_arms_and_diving_catch() {
+    fn find_registered_modifiers_includes_extra_arms_diving_catch_and_nerves_of_steel() {
         let mods = CatchModifierFactory::find_registered_modifiers(Rules::Bb2025);
         assert!(mods.iter().any(|m| m.get_name() == "Extra Arms"));
         assert!(mods.iter().any(|m| m.get_name() == "Diving Catch"));
-        assert_eq!(mods.len(), 2);
+        assert!(mods.iter().any(|m| m.get_name() == "Nerves of Steel"));
+        assert_eq!(mods.len(), 3);
     }
 
     fn player_with_skill(agility: i32, skill_id: ffb_model::enums::SkillId) -> Player {
@@ -357,13 +374,28 @@ mod tests {
         assert!(!mods.iter().any(|m| m.get_name() == "Diving Catch"), "Diving Catch should NOT apply on scatter");
     }
 
+    // NOTE (test equalization): find_skill_modifiers_no_player_returns_empty pruned — the
+    // no-player short-circuit is a Rust Option-guard; Java's CatchContext.getPlayer() is never
+    // null at findModifiers call sites (getSkillModifiers would NPE), so there is no faithful
+    // Java twin.
+
     #[test]
-    fn find_skill_modifiers_no_player_returns_empty() {
+    fn find_skill_modifiers_nerves_of_steel_marker() {
+        // Java: NervesOfSteel (bb2016 + mixed BB2020/BB2025) registers a 0-value REGULAR
+        // CatchModifier with report string "0 for tackle zones due to Nerves of Steel" and
+        // isModifierIncluded overridden to true — a report-only marker (the gameplay effect is
+        // the ignoreTacklezonesWhenCatching property).
         let game = make_game(Weather::Nice);
+        let player = player_with_skill(3, ffb_model::enums::SkillId::NervesOfSteel);
         let factory = CatchModifierFactory::for_rules(Rules::Bb2025);
-        let ctx = CatchContext::new(&game, None, CatchScatterThrowInMode::CatchAccuratePass, None);
+        let ctx = CatchContext::new(&game, Some(&player), CatchScatterThrowInMode::CatchHandOff, None);
         let mods = factory.find_skill_modifiers(&ctx);
-        assert!(mods.is_empty());
+        let nos = mods.iter().find(|m| m.get_name() == "Nerves of Steel");
+        assert!(nos.is_some(), "Nerves of Steel marker should be present");
+        let nos = nos.unwrap();
+        assert_eq!(nos.get_modifier(), 0);
+        assert_eq!(nos.get_report_string(), "0 for tackle zones due to Nerves of Steel");
+        assert!(nos.is_modifier_included());
     }
 
     /// Regression test: `for_rules` previously fell through to the plain base

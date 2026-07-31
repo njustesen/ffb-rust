@@ -149,7 +149,8 @@ mod tests {
     fn get_catch_modifiers_includes_extra_arms_and_diving_catch() {
         let agg = ModifierAggregator::new();
         let mods = agg.get_catch_modifiers(Rules::Bb2025);
-        assert_eq!(mods.len(), 2);
+        // ExtraArms, DivingCatch, NervesOfSteel (0-value reporting marker).
+        assert_eq!(mods.len(), 3);
     }
 
     #[test]

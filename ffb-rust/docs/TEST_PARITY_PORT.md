@@ -770,9 +770,20 @@ that a bb2016-named Rust match guard silently drops. Running tally: 4 real Rust 
   edition variants via createGameState(3, Rules.BB2016/BB2020) re-init inside the test; minimumRoll
   via `new com.fumbbl.ffb.mechanics.bb2025.AgilityMechanic().minimumRoll(agility, set)`; aggregator
   via game.getModifierAggregator().getDodgeModifiers()). ffb-server 3,341 green.
-- NEXT in bucket: catch_modifier_factory (13), interception_modifier_factory (13),
-  jump_modifier_factory (11) — same recipe; CHECK each `find_registered_modifiers` against the FULL
-  Java skill-registration set first (grep `new XxxModifier(` across skill/**), per bug #4.
+- **catch_modifier_factory 13/13 → Java CatchModifierFactoryTest (ffb-server 3,354 green).**
+  Divergence found & fixed (same family as bug #4, lesser severity — report-only): NervesOfSteel
+  (bb2016 + mixed BB2020/BB2025) registers a 0-value CatchModifier("Nerves of Steel", "0 for tackle
+  zones due to Nerves of Steel", 0, REGULAR) with isModifierIncluded overridden true; Rust was
+  missing it from find_skill_modifiers/find_registered_modifiers (gameplay unaffected — the real
+  effect is the ignoreTacklezonesWhenCatching property — but the roll-report marker line was
+  dropped). Added `modifier_included_override` + `with_modifier_included()` builder to Rust
+  CatchModifier (mirrors Java anonymous-subclass isModifierIncluded overrides). Pruned Rust
+  find_skill_modifiers_no_player_returns_empty (Option-guard, no Java twin); added
+  find_skill_modifiers_nerves_of_steel_marker both sides (net 13 ↔ 13).
+- NEXT in bucket: interception_modifier_factory (13; NervesOfSteel + ExtraArms register
+  InterceptionModifiers — check VeryLongLegs/CloudBurster too), jump_modifier_factory (11) — same
+  recipe; CHECK each `find_registered_modifiers` against the FULL Java skill-registration set first
+  (grep `new XxxModifier(` across skill/**), per bug #4.
 
 ## Step 4 REAL RUST BUG #3: StepSafeThrow early NEXT_STEP (fixed 2026-07-26)
 
