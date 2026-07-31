@@ -9,6 +9,9 @@ pub struct InterceptionModifier {
     pub multiplier: i32,
     pub modifier_type: ModifierType,
     applies_to_context: Option<Box<dyn Fn(&InterceptionContext<'_>) -> bool + Send + Sync>>,
+    /// Java: anonymous subclasses may override `isModifierIncluded()` (e.g. NervesOfSteel's
+    /// 0-value marker forces `true` on a REGULAR modifier). `None` = Java's type-based default.
+    modifier_included_override: Option<bool>,
 }
 
 impl InterceptionModifier {
@@ -24,6 +27,7 @@ impl InterceptionModifier {
             multiplier: modifier,
             modifier_type,
             applies_to_context: None,
+            modifier_included_override: None,
         }
     }
 
@@ -42,7 +46,14 @@ impl InterceptionModifier {
             multiplier,
             modifier_type,
             applies_to_context: None,
+            modifier_included_override: None,
         }
+    }
+
+    /// Java: `isModifierIncluded()` override in an anonymous modifier subclass.
+    pub fn with_modifier_included(mut self, included: bool) -> Self {
+        self.modifier_included_override = Some(included);
+        self
     }
 
     pub fn with_predicate(
@@ -60,8 +71,10 @@ impl InterceptionModifier {
     pub fn get_report_string(&self) -> &str { &self.reporting_string }
 
     pub fn is_modifier_included(&self) -> bool {
-        self.modifier_type == ModifierType::TACKLEZONE
-            || self.modifier_type == ModifierType::DISTURBING_PRESENCE
+        self.modifier_included_override.unwrap_or(
+            self.modifier_type == ModifierType::TACKLEZONE
+                || self.modifier_type == ModifierType::DISTURBING_PRESENCE,
+        )
     }
 
     pub fn applies_to_context(&self, context: &InterceptionContext<'_>) -> bool {

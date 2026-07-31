@@ -780,10 +780,20 @@ that a bb2016-named Rust match guard silently drops. Running tally: 4 real Rust 
   CatchModifier (mirrors Java anonymous-subclass isModifierIncluded overrides). Pruned Rust
   find_skill_modifiers_no_player_returns_empty (Option-guard, no Java twin); added
   find_skill_modifiers_nerves_of_steel_marker both sides (net 13 ↔ 13).
-- NEXT in bucket: interception_modifier_factory (13; NervesOfSteel + ExtraArms register
-  InterceptionModifiers — check VeryLongLegs/CloudBurster too), jump_modifier_factory (11) — same
-  recipe; CHECK each `find_registered_modifiers` against the FULL Java skill-registration set first
-  (grep `new XxxModifier(` across skill/**), per bug #4.
+- **interception_modifier_factory 14/14 → Java InterceptionModifierFactoryTest (ffb-server 3,368
+  green).** Same NoS 0-marker gap fixed (find_skill_modifiers + modifier_included_override on
+  InterceptionModifier). Also fixed a VACUOUS Rust test: ignore_tacklezones_when_catching used
+  SureFeet (which does NOT grant ignoreTacklezonesWhenCatching) inside an `if has_prop` guard —
+  rewritten against NervesOfSteel, unconditional, both sides. GOTCHA for bb2025 interception
+  contexts: the "Thrower has Stunty" modifier derefs `game.getThrower()` unconditionally → Java
+  tests MUST `game.setThrowerId(...)` before findModifiers (Rust guards the None case — documented
+  divergence, no Rust twin for the NPE path). VLL values verified: bb2016 -1, bb2020/bb2025 -2.
+  NOTE (follow-up): Rust ModifierAggregator::get_interception_modifiers returns only the CARD half;
+  Java's includes the skill half (ExtraArms/NoS/VLL) — reconcile when a consumer needs it.
+- NEXT in bucket: jump_modifier_factory (11) — same recipe; CHECK `find_registered_modifiers`
+  against the FULL Java skill-registration set first (grep `new JumpModifier(` across skill/**),
+  per bug #4 (VeryLongLegs registers JumpModifiers in all editions; bb2020's is
+  DEPENDS_ON_SUM_OF_OTHERS with an accumulated-modifier predicate).
 
 ## Step 4 REAL RUST BUG #3: StepSafeThrow early NEXT_STEP (fixed 2026-07-26)
 

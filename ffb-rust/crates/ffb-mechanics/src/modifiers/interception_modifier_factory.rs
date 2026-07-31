@@ -105,6 +105,9 @@ impl InterceptionModifierFactory {
     /// Java: common.ExtraArms registers InterceptionModifier("Extra Arms", -1, REGULAR).
     ///       bb2016.VeryLongLegs registers InterceptionModifier("Very Long Legs", -1, REGULAR).
     ///       bb2020/bb2025.VeryLongLegs registers InterceptionModifier("Very Long Legs", -2, REGULAR).
+    ///       NervesOfSteel (bb2016 + mixed BB2020/BB2025 — all editions) registers a 0-value
+    ///       reporting marker InterceptionModifier("Nerves of Steel", "0 tackle zones due to
+    ///       Nerves of Steel", 0, REGULAR) with isModifierIncluded overridden to true.
     pub fn find_skill_modifiers(&self, game: &Game, interceptor: &Player) -> Vec<InterceptionModifier> {
         let rules = game.rules;
         let mut result = Vec::new();
@@ -116,6 +119,12 @@ impl InterceptionModifierFactory {
                 SkillId::VeryLongLegs => {
                     let value = if rules == Rules::Bb2016 { -1 } else { -2 };
                     result.push(InterceptionModifier::new("Very Long Legs", value, ModifierType::REGULAR));
+                }
+                SkillId::NervesOfSteel => {
+                    result.push(InterceptionModifier::new_full(
+                        "Nerves of Steel", "0 tackle zones due to Nerves of Steel", 0, 0,
+                        ModifierType::REGULAR,
+                    ).with_modifier_included(true));
                 }
                 _ => {}
             }
@@ -221,11 +230,12 @@ mod tests {
 
     #[test]
     fn ignore_tacklezones_when_catching_skips_tz_modifiers() {
-        use ffb_model::model::property::named_properties::NamedProperties;
+        // Nerves of Steel grants ignoreTacklezonesWhenCatching in every edition.
+        // (Was previously written against SureFeet, which does NOT grant the property,
+        // making the guarded assertion vacuous — now unconditional.)
         let mut game = make_game(Rules::Bb2016);
         let mut interceptor = minimal_player("i1", 3);
-        // Give interceptor the "ignoreTacklezonesWhenCatching" property via a skill
-        interceptor.starting_skills.push(SkillWithValue::new(SkillId::SureFeet));
+        interceptor.starting_skills.push(SkillWithValue::new(SkillId::NervesOfSteel));
         game.team_home.players.push(interceptor.clone());
         game.field_model.set_player_coordinate("i1", FieldCoordinate::new(5, 5));
         game.field_model.set_player_state("i1", PlayerState(PS_STANDING));
@@ -235,16 +245,11 @@ mod tests {
         game.field_model.set_player_coordinate("o1", FieldCoordinate::new(6, 5));
         game.field_model.set_player_state("o1", PlayerState(PS_STANDING));
 
-        // Check if interceptor actually has the property
         let interceptor_ref = game.player("i1").unwrap();
-        let has_prop = interceptor_ref.has_skill_property(NamedProperties::IGNORE_TACKLEZONES_WHEN_CATCHING);
-        if has_prop {
-            let factory = InterceptionModifierFactory::for_rules(Rules::Bb2016);
-            let mods = factory.find_applicable(&game, interceptor_ref, PassResult::ACCURATE, false);
-            let has_tz = mods.iter().any(|m| m.get_type() == ModifierType::TACKLEZONE);
-            assert!(!has_tz, "TZ modifier should be skipped when player ignores TZs when catching");
-        }
-        // If the skill doesn't have that property, the test is vacuously true.
+        let factory = InterceptionModifierFactory::for_rules(Rules::Bb2016);
+        let mods = factory.find_applicable(&game, interceptor_ref, PassResult::ACCURATE, false);
+        let has_tz = mods.iter().any(|m| m.get_type() == ModifierType::TACKLEZONE);
+        assert!(!has_tz, "TZ modifier should be skipped when player ignores TZs when catching");
     }
 
     #[test]
@@ -341,5 +346,25 @@ mod tests {
         let vll = mods.iter().find(|m| m.get_name() == "Very Long Legs");
         assert!(vll.is_some());
         assert_eq!(vll.unwrap().get_modifier(), -2);
+    }
+
+    #[test]
+    fn find_skill_modifiers_nerves_of_steel_marker() {
+        // Java: NervesOfSteel (bb2016 + mixed BB2020/BB2025) registers a 0-value REGULAR
+        // InterceptionModifier with report string "0 tackle zones due to Nerves of Steel" and
+        // isModifierIncluded overridden to true — a report-only marker (the gameplay effect is
+        // the ignoreTacklezonesWhenCatching property).
+        use ffb_model::model::SkillWithValue;
+        let game = make_game(Rules::Bb2025);
+        let mut interceptor = minimal_player("i1", 3);
+        interceptor.starting_skills.push(SkillWithValue::new(SkillId::NervesOfSteel));
+        let f = InterceptionModifierFactory::for_rules(Rules::Bb2025);
+        let mods = f.find_skill_modifiers(&game, &interceptor);
+        let nos = mods.iter().find(|m| m.get_name() == "Nerves of Steel");
+        assert!(nos.is_some(), "Nerves of Steel marker should be present");
+        let nos = nos.unwrap();
+        assert_eq!(nos.get_modifier(), 0);
+        assert_eq!(nos.get_report_string(), "0 tackle zones due to Nerves of Steel");
+        assert!(nos.is_modifier_included());
     }
 }
