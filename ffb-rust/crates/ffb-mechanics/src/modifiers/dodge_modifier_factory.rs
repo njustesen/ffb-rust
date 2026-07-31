@@ -151,8 +151,10 @@ impl DodgeModifierFactory {
                     // Java: common.TwoHeads registers DodgeModifier("Two Heads", -1, REGULAR).
                     result.push(DodgeModifier::new("Two Heads", -1, ModifierType::REGULAR));
                 }
-                SkillId::Titchy if rules == Rules::Bb2016 => {
-                    // Java: bb2016.Titchy registers DodgeModifier("Titchy", -1, REGULAR).
+                SkillId::Titchy => {
+                    // Java: bb2016.Titchy (BB2016) AND mixed.Titchy (BB2020+BB2025) both register
+                    // an unconditional DodgeModifier("Titchy", -1, REGULAR) — Titchy adds +1 to
+                    // dodge rolls in every edition, not just BB2016.
                     result.push(DodgeModifier::new("Titchy", -1, ModifierType::REGULAR));
                 }
                 SkillId::Stunty if rules == Rules::Bb2016 => {
@@ -222,9 +224,11 @@ impl DodgeModifierFactory {
     /// Java: `ModifierAggregator.getDodgeModifiers()`'s skill half — every skill's statically-
     /// registered modifier objects, unfiltered by any predicate (unlike `find_skill_modifiers`,
     /// which is context/player-scoped and evaluates `useBreakTackle` at call time; Java's
-    /// `Skill.getDodgeModifiers()` returns the raw registered list regardless). Only
-    /// `common.TwoHeads` (all editions) and bb2016's `Titchy`/`Stunty`/`BreakTackle` register a
-    /// `DodgeModifier` in the Java source.
+    /// `Skill.getDodgeModifiers()` returns the raw registered list regardless). Registering
+    /// skills in the Java source: `common.TwoHeads` (all editions), `Titchy` (bb2016 + mixed
+    /// BB2020/BB2025), `DivingTackle` (bb2016 + mixed BB2020/BB2025, DIVING_TACKLE type with an
+    /// always-false predicate), bb2016's `Stunty`, and the per-edition `BreakTackle` variants
+    /// (bb2016 flat 0; bb2020 ST-tiered -2/-1; bb2025 ST-tiered -3/-2/-1).
     pub fn find_registered_modifiers(rules: Rules) -> Vec<DodgeModifier> {
         let mut result = Vec::new();
         for skill_id in ffb_model::factory::skill_factory::SkillFactory::new().get_skills() {
@@ -232,14 +236,31 @@ impl DodgeModifierFactory {
                 SkillId::TwoHeads => {
                     result.push(DodgeModifier::new("Two Heads", -1, ModifierType::REGULAR));
                 }
-                SkillId::Titchy if rules == Rules::Bb2016 => {
+                SkillId::Titchy => {
+                    // bb2016.Titchy + mixed.Titchy (BB2020/BB2025) — all editions.
                     result.push(DodgeModifier::new("Titchy", -1, ModifierType::REGULAR));
                 }
                 SkillId::Stunty if rules == Rules::Bb2016 => {
                     result.push(DodgeModifier::new("Stunty", 0, ModifierType::REGULAR));
                 }
+                SkillId::DivingTackle => {
+                    // bb2016.DivingTackle + mixed.DivingTackle (BB2020/BB2025) — all editions.
+                    // Java: DodgeModifier("Diving Tackle", 2, DIVING_TACKLE) (multiplier = modifier).
+                    result.push(DodgeModifier::new_full(
+                        "Diving Tackle", "Diving Tackle", 2, 2, ModifierType::DIVING_TACKLE, false,
+                    ));
+                }
                 SkillId::BreakTackle if rules == Rules::Bb2016 => {
                     result.push(DodgeModifier::new_with_use_strength("Break Tackle", 0, ModifierType::REGULAR, true));
+                }
+                SkillId::BreakTackle if rules == Rules::Bb2020 => {
+                    result.push(DodgeModifier::new_with_use_strength("Break Tackle ST 5+", -2, ModifierType::REGULAR, true));
+                    result.push(DodgeModifier::new_with_use_strength("Break Tackle ST 4-", -1, ModifierType::REGULAR, true));
+                }
+                SkillId::BreakTackle if rules == Rules::Bb2025 => {
+                    result.push(DodgeModifier::new_with_use_strength("Break Tackle ST 5+", -3, ModifierType::REGULAR, true));
+                    result.push(DodgeModifier::new_with_use_strength("Break Tackle ST 4", -2, ModifierType::REGULAR, true));
+                    result.push(DodgeModifier::new_with_use_strength("Break Tackle ST 3-", -1, ModifierType::REGULAR, true));
                 }
                 _ => {}
             }
@@ -288,21 +309,30 @@ mod tests {
     }
 
     #[test]
-    fn find_registered_modifiers_bb2025_only_has_two_heads() {
+    fn find_registered_modifiers_bb2025_matches_java_aggregator() {
+        // Java aggregator skill half for BB2025: TwoHeads, mixed.Titchy, mixed.DivingTackle,
+        // bb2025.BreakTackle (3 ST tiers) = 6 modifiers.
         let mods = DodgeModifierFactory::find_registered_modifiers(Rules::Bb2025);
-        assert_eq!(mods.len(), 1);
-        assert_eq!(mods[0].get_name(), "Two Heads");
+        let names: Vec<&str> = mods.iter().map(|m| m.get_name()).collect();
+        assert!(names.contains(&"Two Heads"));
+        assert!(names.contains(&"Titchy"));
+        assert!(names.contains(&"Diving Tackle"));
+        assert!(names.contains(&"Break Tackle ST 5+"));
+        assert!(names.contains(&"Break Tackle ST 4"));
+        assert!(names.contains(&"Break Tackle ST 3-"));
+        assert_eq!(mods.len(), 6);
     }
 
     #[test]
-    fn find_registered_modifiers_bb2016_has_all_four() {
+    fn find_registered_modifiers_bb2016_has_all_five() {
         let mods = DodgeModifierFactory::find_registered_modifiers(Rules::Bb2016);
         let names: Vec<&str> = mods.iter().map(|m| m.get_name()).collect();
         assert!(names.contains(&"Two Heads"));
         assert!(names.contains(&"Titchy"));
         assert!(names.contains(&"Stunty"));
         assert!(names.contains(&"Break Tackle"));
-        assert_eq!(mods.len(), 4);
+        assert!(names.contains(&"Diving Tackle"));
+        assert_eq!(mods.len(), 5);
     }
 
     #[test]
@@ -468,7 +498,7 @@ mod tests {
     }
 
     #[test]
-    fn find_skill_modifiers_titchy_only_in_bb2016() {
+    fn find_skill_modifiers_titchy_applies_in_bb2016() {
         use ffb_model::model::{ActingPlayer, SkillWithValue};
         let (mut game, pid) = make_game_with_player(Rules::Bb2016);
         game.team_home.players[0].starting_skills.push(SkillWithValue::new(SkillId::Titchy));
@@ -481,7 +511,10 @@ mod tests {
     }
 
     #[test]
-    fn find_skill_modifiers_titchy_not_in_bb2025() {
+    fn find_skill_modifiers_titchy_applies_in_bb2025() {
+        // Bug (fixed): the Titchy arm was gated on Bb2016, but Java's mixed.Titchy
+        // (@RulesCollection BB2020 + BB2025) registers the same unconditional
+        // DodgeModifier("Titchy", -1, REGULAR) — Titchy's +1 dodge bonus applies in every edition.
         use ffb_model::model::{ActingPlayer, SkillWithValue};
         let (mut game, pid) = make_game_with_player(Rules::Bb2025);
         game.team_home.players[0].starting_skills.push(SkillWithValue::new(SkillId::Titchy));
@@ -490,7 +523,7 @@ mod tests {
         acting.player_id = Some(pid.clone());
         let ctx = DodgeContext::new(&game, &acting, ffb_model::types::FieldCoordinate::new(5, 5), ffb_model::types::FieldCoordinate::new(6, 5));
         let mods = factory.find_skill_modifiers(&ctx);
-        assert!(!mods.iter().any(|m| m.get_name() == "Titchy"), "Titchy should not appear in BB2025");
+        assert!(mods.iter().any(|m| m.get_name() == "Titchy" && m.get_modifier() == -1), "Titchy should appear in BB2025 (mixed.Titchy)");
     }
 
     #[test]

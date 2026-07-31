@@ -156,7 +156,8 @@ mod tests {
     fn get_dodge_modifiers_bb2016_includes_edition_specific_skills() {
         let agg = ModifierAggregator::new();
         let mods = agg.get_dodge_modifiers(Rules::Bb2016);
-        assert_eq!(mods.len(), 4);
+        // TwoHeads, Titchy, Stunty, Break Tackle, Diving Tackle (Java aggregator skill half).
+        assert_eq!(mods.len(), 5);
     }
 
     #[test]

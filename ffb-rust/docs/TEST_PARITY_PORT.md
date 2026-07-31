@@ -747,6 +747,33 @@ start + blood-lust->RESERVE + no-blood-lust). The publishes-INJURY_RESULT / END_
 pass-block / move-square-clear / safe-pair-of-hands tests remain deferred (published-param / turn-mode
 / move-square inspection).
 
+## Step 3 REAL RUST BUG #4: Titchy dodge modifier edition-gated to BB2016 (fixed 2026-07-31)
+
+Found while porting DodgeModifierFactory (modifiers bucket). Java has TWO Titchy classes:
+bb2016.Titchy (BB2016) AND mixed.Titchy (@RulesCollection BB2020 + BB2025) — BOTH register an
+unconditional `DodgeModifier("Titchy", -1, REGULAR)`. Rust `find_skill_modifiers` gated the Titchy
+arm on `rules == Bb2016`, so Titchy players got NO +1 dodge bonus in BB2020/BB2025 (live path:
+step_move_dodge / step_diving_tackle). Fixed: arm now unconditional; flipped the Rust test that had
+encoded the bug (`titchy_not_in_bb2025` → `titchy_applies_in_bb2025`). Also reconciled
+`find_registered_modifiers` (ModifierAggregator.getDodgeModifiers skill half) against the full Java
+registration set — it was missing Titchy(mixed), DivingTackle (bb2016+mixed, DIVING_TACKLE), and the
+bb2020/bb2025 BreakTackle ST tiers; BB2025 now yields 6 modifiers (was 1), BB2016 5 (was 4); updated
+the modifier_aggregator count test. Java DodgeModifierFactoryTest (ffb-server, 14 tests, 1:1 with the
+Rust file) all green first run — aggregator counts + Titchy-in-BB2025 verified against Java. Pattern
+to watch: mixed/-package Java skill classes carry @RulesCollection(BB2020)+(BB2025) registrations
+that a bb2016-named Rust match guard silently drops. Running tally: 4 real Rust bugs.
+
+## Step 3 modifier-factory port progress (2026-07-31)
+- **dodge_modifier_factory 14/14 → Java DodgeModifierFactoryTest (ffb-server)** — template:
+  ArmorModifierFactoryTest (@BeforeEach GameFixture.createGameState(3) + factory.initialize(game);
+  placePlayer home1 + setActingPlayer for context.getPlayer(); addSkill via GameFixture.skill;
+  edition variants via createGameState(3, Rules.BB2016/BB2020) re-init inside the test; minimumRoll
+  via `new com.fumbbl.ffb.mechanics.bb2025.AgilityMechanic().minimumRoll(agility, set)`; aggregator
+  via game.getModifierAggregator().getDodgeModifiers()). ffb-server 3,341 green.
+- NEXT in bucket: catch_modifier_factory (13), interception_modifier_factory (13),
+  jump_modifier_factory (11) — same recipe; CHECK each `find_registered_modifiers` against the FULL
+  Java skill-registration set first (grep `new XxxModifier(` across skill/**), per bug #4.
+
 ## Step 4 REAL RUST BUG #3: StepSafeThrow early NEXT_STEP (fixed 2026-07-26)
 
 Found while porting bb2016/pass/StepSafeThrow. Rust step_safe_throw::execute_step early-returned
