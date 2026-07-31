@@ -916,8 +916,14 @@ GoForItModifierFactoryTest pins min-roll 3 for a Drunkard player. Tally: 5 real 
 - **injury_type_stab_for_spp 11/11 → Java InjuryTypeStabForSppTest (ffb-server 3,588 green).**
   Straight clone of the stab recipe (same prunes: Default plumbing + ctor apo-mode). The ForSpp
   siblings are mechanical clones — expect the same for drop_dodge_for_spp/chainsaw_for_spp etc.
-- Next: rest of injury bucket (piling_on ×2, chainsaw ×2, lightning 11, drop_dodge_for_spp 11 —
-  same recipe), then inducements 432, skill_behaviour 359, util 138.
+- **injury_type_chainsaw 12/12 → Java InjuryTypeChainsawTest (ffb-server 3,600 green).** Chainsaw
+  kickback: NULL attacker legal; +3 chainsaw armour modifier sourced from the SKILL FACTORY inside
+  armourRoll (any skill with blocksLikeChainsaw) — remember it applies to the SAVE test scripting
+  (armour 13 needs [1,1]: 2+3 < 13). Stunty-KO test made DETERMINISTIC in Java (script 3,4 →
+  total 7 + mixed.Stunty isHurtMoreEasily marker → KNOCKED_OUT in BB2025) vs Rust's rng-guarded
+  conditional. Dedup guard: pre-add via GameFixture.skill(game,"Chainsaw").getArmorModifiers().
+- Next: rest of injury bucket (chainsaw_for_spp 11, piling_on ×2, lightning 11,
+  drop_dodge_for_spp 11 — same recipe), then inducements 432, skill_behaviour 359, util 138.
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
 
