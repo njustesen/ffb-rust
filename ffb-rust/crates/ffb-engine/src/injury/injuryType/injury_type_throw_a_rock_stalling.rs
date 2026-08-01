@@ -85,18 +85,8 @@ mod tests {
     fn send_to_box_reason_is_hit_by_rock() {
         assert_eq!(InjuryTypeThrowARockStalling::new().send_to_box_reason(), Some(SendToBoxReason::HitByRock));
     }
-    #[test]
-    fn new_creates_instance_with_correct_apo_mode() {
-        let t = InjuryTypeThrowARockStalling::new();
-        assert_eq!(t.ctx.apothecary_mode, ApothecaryMode::Defender);
-    }
-    #[test]
-    fn sets_attacker_and_defender_ids() {
-        let mut t = InjuryTypeThrowARockStalling::new(); let mut rng = GameRng::new(1);
-        t.handle_injury(&game_with_armor(13), &mut rng, Some("atk1"), "p1", coord(), None, None, ApothecaryMode::Defender);
-        assert_eq!(t.ctx.defender_id.as_deref(), Some("p1"));
-        assert_eq!(t.ctx.attacker_id.as_deref(), Some("atk1"));
-    }
+    // NOTE (test equalization): context-storage / ctor-apo-mode / accessor tests pruned —
+    // Rust plumbing with no faithful Java twin (Java's CALLER sets the context ids).
 
     fn make_player(id: &str, armour: i32, skills: Vec<ffb_model::enums::SkillId>) -> ffb_model::model::player::Player {
         use std::collections::HashSet;

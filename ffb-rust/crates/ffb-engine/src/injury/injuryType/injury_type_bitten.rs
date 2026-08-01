@@ -94,20 +94,8 @@ mod tests {
         use ffb_model::enums::SendToBoxReason;
         assert_eq!(InjuryTypeBitten::new().send_to_box_reason(), Some(SendToBoxReason::Bitten));
     }
-    #[test]
-    fn defender_id_stored_in_context() {
-        let mut t = InjuryTypeBitten::new(); let mut rng = GameRng::new(1);
-        t.handle_injury(&make_game(), &mut rng, Some("att"), "def", coord(), None, None, ApothecaryMode::Attacker);
-        assert_eq!(t.ctx.defender_id.as_deref(), Some("def"));
-        assert_eq!(t.ctx.attacker_id.as_deref(), Some("att"));
-    }
-    #[test]
-    fn default_equivalent_to_new() {
-        let t1 = InjuryTypeBitten::new();
-        let t2 = InjuryTypeBitten::default();
-        assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
-        assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
-    }
+    // NOTE (test equalization): context-storage / ctor-apo-mode / accessor tests pruned —
+    // Rust plumbing with no faithful Java twin (Java's CALLER sets the context ids).
 
     fn game_with_niggling_defender(niggling_injuries: i32) -> Game {
         use std::collections::HashSet;

@@ -975,10 +975,13 @@ Swept EVERY Rust injury_type_* flag override against the Java model classes + se
   save-leaves-no-injury / break-rolls-injury / turnover-default / sendToBox / causedByOpponent /
   failedArmourProne / niggling×2-BB2016).** Pruned 4 more Rust-structural (context_stores_*,
   default_equivalent ×2).
-- Next: remaining injury_type_* tail (~12 files: then_i_started_blastin, foul_for_spp, crowd,
-  bomb_with_modifier ×2, keg_hit, fumbled_ktm ×2, bitten, trap_door_fall_for_spp,
-  throw_a_rock ×2, saboteur, piling_on_knocked_out — most fit the shared template); then
-  inducements 432, skill_behaviour 359, util 138.
+- **bitten 7/7 + keg_hit 5/5 + throw_a_rock 6/6 + throw_a_rock_stalling 6/6 → Java tests (24,
+  all green first run; template-generated).** Bitten/ThrowARock bypass armour (always broken);
+  Bitten caps casualty-range totals at BADLY_HURT with no casualty dice; stalling variant rolls
+  armour normally. 10 more Rust-structural prunes (context storage, ctor apo-mode, accessor).
+- Next: remaining injury_type_* tail (~8 files: then_i_started_blastin, foul_for_spp, crowd,
+  bomb_with_modifier ×2, fumbled_ktm ×2, trap_door_fall_for_spp, saboteur,
+  piling_on_knocked_out); then inducements 432, skill_behaviour 359, util 138.
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
 
