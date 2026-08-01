@@ -4,7 +4,7 @@
 /// returns nothing for a defender with an `ignoresArmourModifiersFromSkills` skill like Iron Hard
 /// Skin) and applied. If broken: injury roll; the Lightning special-effect *injury* modifier is
 /// then added only if no special-effect armor modifier ended up applied (the bonus is either/or,
-/// never both). If not broken: PRONE. falling_down_causes_turnover=false.
+/// never both). If not broken: PRONE.
 use ffb_model::enums::{ApothecaryMode, PlayerState, SendToBoxReason, PS_PRONE};
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
@@ -66,7 +66,8 @@ impl InjuryTypeServer for InjuryTypeLightning {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn falling_down_causes_turnover(&self) -> bool { false }
+    // Bug (fixed): falling_down_causes_turnover was hardcoded false; Java's Lightning has NO
+    // override (InjuryType base default is true).
     /// Java: `Lightning()` constructor passes `SendToBoxReason.LIGHTNING`.
     fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::Lightning) }
 }
@@ -125,21 +126,17 @@ mod tests {
         assert!(t.ctx.armor_broken); assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
     #[test]
-    fn no_turnover() { assert!(!InjuryTypeLightning::new().falling_down_causes_turnover()); }
+    fn turnover_default_true() {
+        // Java: Lightning does not override fallingDownCausesTurnover (base default true).
+        assert!(InjuryTypeLightning::new().falling_down_causes_turnover());
+    }
     #[test]
     fn send_to_box_reason_is_lightning() {
         assert_eq!(InjuryTypeLightning::new().send_to_box_reason(), Some(SendToBoxReason::Lightning));
     }
-    #[test]
-    fn new_creates_instance_with_correct_apo_mode() {
-        let t = InjuryTypeLightning::new();
-        assert_eq!(t.ctx.apothecary_mode, ApothecaryMode::Defender);
-    }
-    #[test]
-    fn injury_context_returns_context() {
-        let t = InjuryTypeLightning::new();
-        assert_eq!(t.injury_context().apothecary_mode, ApothecaryMode::Defender);
-    }
+    // NOTE (test equalization): new_creates_instance_with_correct_apo_mode and
+    // injury_context_returns_context pruned — Rust ctor/accessor plumbing (Java's InjuryContext
+    // carries no apothecary mode; the accessor test is a tautology).
 
     #[test]
     fn mighty_blow_adds_injury_modifier() {

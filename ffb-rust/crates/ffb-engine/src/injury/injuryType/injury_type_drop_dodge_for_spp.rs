@@ -124,11 +124,9 @@ mod tests {
         assert_eq!(InjuryTypeDropDodgeForSpp::new().send_to_box_reason(), Some(SendToBoxReason::DodgeFail));
     }
 
-    #[test]
-    fn new_with_arm_bar_stores_player_id() {
-        let t = InjuryTypeDropDodgeForSpp::new_with_arm_bar(Some("arm_bar_player".into()));
-        assert_eq!(t.arm_bar_player_id.as_deref(), Some("arm_bar_player"));
-    }
+    // NOTE (test equalization): new_with_arm_bar_stores_player_id pruned — ctor field-storage
+    // plumbing; the behavioral twin is attacker_id_credited_to_arm_bar_player below (Java's
+    // constructor REQUIRES the arm-bar player and handleInjury credits it unconditionally).
 
     #[test]
     fn attacker_id_credited_to_arm_bar_player_not_handle_injury_attacker() {

@@ -937,8 +937,19 @@ no_apo/no_turnover Rust tests. Tally: 6 real Rust bugs.
   `(GameOptionBoolean) options.getFactory().createGameOption(id)` + setValue(true) + addOption.
   Pruned 3 more Rust-structural tests (Default plumbing; injury_context accessor tautology;
   sets_defender_id — Java's CALLER sets the context ids, not handleInjury).
-- Next: lightning 11, drop_dodge_for_spp 11, remaining injury_type_* tail; then inducements 432,
-  skill_behaviour 359, util 138 — rerun scripts/reconcile_step3.sh for the live list.
+## Step 3 REAL RUST BUG #7: Lightning turnover flag (fixed 2026-08-01)
+InjuryTypeLightning hardcoded `falling_down_causes_turnover=false`; Java's Lightning has NO
+override (base default true). Same copied-override family as bug #6. Fixed + test flipped.
+Tally: 7 real Rust bugs.
+- **injury_type_lightning 9/9 + drop_dodge_for_spp 10/10 → Java tests (ffb-server 3,652 green).**
+  Lightning: the +1 bonus applies to armour ONLY when needed to break, else to injury — never
+  both; IHS defender denies it entirely (specialEffectArmourModifiers gate). DropDodgeForSpp:
+  Java ctor REQUIRES the arm-bar player and credits it as ctx attackerId unconditionally; the
+  injury-modifier factory reads the pAttacker PARAMETER (not the arm-bar player) — MB test puts
+  the skill on the passed attacker. Pruned 3 more Rust-structural tests (apo-mode ctor, accessor
+  tautology, arm-bar ctor field storage).
+- Next: remaining injury_type_* tail (rerun reconcile for the live list); then inducements 432,
+  skill_behaviour 359, util 138.
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
 
