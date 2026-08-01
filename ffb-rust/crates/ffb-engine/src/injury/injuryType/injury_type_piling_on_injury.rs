@@ -103,17 +103,10 @@ mod tests {
         // Java: PilingOnInjury does not override fallingDownCausesTurnover (base default true).
         assert!(InjuryTypePilingOnInjury::new().falling_down_causes_turnover());
     }
-    #[test]
-    fn injury_context_returns_context() {
-        let t = InjuryTypePilingOnInjury::new();
-        assert_eq!(t.injury_context().apothecary_mode, ApothecaryMode::Defender);
-    }
-    #[test]
-    fn sets_defender_id_after_handle_injury() {
-        let mut t = InjuryTypePilingOnInjury::new(); let mut rng = GameRng::new(1);
-        t.handle_injury(&make_game(), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
-        assert_eq!(t.ctx.defender_id.as_deref(), Some("p1"));
-    }
+    // NOTE (test equalization): injury_context_returns_context pruned (trivial accessor
+    // plumbing) and sets_defender_id_after_handle_injury pruned — Rust's handle_injury stores
+    // the defender id on the context itself; in Java the CALLER (UtilServerInjury) sets it, so
+    // there is no faithful twin.
 
     fn game_with_niggling_defender(niggling_injuries: i32) -> Game {
         use std::collections::HashSet;

@@ -232,13 +232,8 @@ mod tests {
             "PILING_ON_DOES_NOT_STACK must suppress all armor modifiers, got {:?}", t.ctx.armor_modifiers);
     }
 
-    #[test]
-    fn default_equivalent_to_new() {
-        let t1 = InjuryTypePilingOnArmour::new();
-        let t2 = InjuryTypePilingOnArmour::default();
-        assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
-        assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
-    }
+    // NOTE (test equalization): default_equivalent_to_new pruned — Rust Default impl plumbing;
+    // Java has no default-constructor equivalent.
 
     #[test]
     fn mighty_blow_adds_injury_modifier() {

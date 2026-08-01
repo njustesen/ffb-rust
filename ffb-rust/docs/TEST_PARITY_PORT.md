@@ -932,12 +932,13 @@ inherit BOTH base defaults (true). Gameplay impact: the Rust apothecary steps
 (bb2016/bb2020 step_apothecary consult can_use_apo via make_injury_type) wrongly blocked the apo
 after a piled-on casualty. Fixed by deleting the overrides (trait defaults true); flipped the
 no_apo/no_turnover Rust tests. Tally: 6 real Rust bugs.
-- NEXT: Java piling_on test ports ×2 (bb2016 game recipe drafted: BB2025/BB2016 fixture,
-  PILING_ON_DOES_NOT_STACK / CLAW_DOES_NOT_STACK boolean options via createGameOption+setValue,
-  own handleInjury — armour save → PRONE, claw = reducesArmourToFixedValue modifier, "Claws"
-  mixed skill / "Claw" bb2016; Java canUseApo asserts TRUE per bug #6; prune Rust
-  default_equivalent tests), then lightning 11, drop_dodge_for_spp 11; then inducements 432,
-  skill_behaviour 359, util 138.
+- **piling_on_armour 12/12 + piling_on_injury 10/10 → Java tests (ffb-server 3,633 green).**
+  Bug-#6 apoAllowed tests confirmed against Java. Boolean options via
+  `(GameOptionBoolean) options.getFactory().createGameOption(id)` + setValue(true) + addOption.
+  Pruned 3 more Rust-structural tests (Default plumbing; injury_context accessor tautology;
+  sets_defender_id — Java's CALLER sets the context ids, not handleInjury).
+- Next: lightning 11, drop_dodge_for_spp 11, remaining injury_type_* tail; then inducements 432,
+  skill_behaviour 359, util 138 — rerun scripts/reconcile_step3.sh for the live list.
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
 
