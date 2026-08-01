@@ -117,19 +117,8 @@ mod tests {
     fn failed_armour_does_not_place_prone() {
         assert!(!InjuryTypeProjectileVomit::new().failed_armour_places_prone());
     }
-    #[test]
-    fn context_stores_defender_id() {
-        let mut t = InjuryTypeProjectileVomit::new(); let mut rng = GameRng::new(1);
-        t.handle_injury(&game_with_armor(13), &mut rng, None, "vomit_target", coord(), None, None, ApothecaryMode::Defender);
-        assert_eq!(t.ctx.defender_id.as_deref(), Some("vomit_target"));
-    }
-    #[test]
-    fn default_equivalent_to_new() {
-        let t1 = InjuryTypeProjectileVomit::new();
-        let t2 = InjuryTypeProjectileVomit::default();
-        assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
-        assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
-    }
+    // NOTE (test equalization): context_stores_* pruned (Java's CALLER sets the context ids)
+    // and default_equivalent_to_new pruned (Rust Default plumbing) — no faithful Java twins.
     #[test]
     fn niggling_injury_modifier_applied_when_armor_breaks() {
         // Proves InjuryModifierFactory is now reached from injury_roll (fixes the bug where

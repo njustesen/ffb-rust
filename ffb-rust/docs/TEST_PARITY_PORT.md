@@ -970,9 +970,14 @@ Swept EVERY Rust injury_type_* flag override against the Java model classes + se
   semantics (armour-when-needed else injury; pre-broken ctx variant). Bomb: NO bomb modifier of
   its own; defender-chainsaw +3 kickback (IHS suppresses); armour save leaves injury UNSET (no
   PRONE branch). Pruned fireball's 2 ctor/accessor plumbing tests.
-- Next: remaining injury_type_* tail (~14 files: then_i_started_blastin, quick_bite,
-  projectile_vomit, foul_for_spp, crowd, bomb_with_modifier ×2, keg_hit, fumbled_ktm ×2, bitten,
-  trap_door_fall_for_spp, throw_a_rock ×2, saboteur, piling_on_knocked_out...); then
+- **injury_type_quick_bite 8/8 + projectile_vomit 8/8 → Java tests (both green first run;
+  generated from a shared python template — the injury-tail files are template-uniform now:
+  save-leaves-no-injury / break-rolls-injury / turnover-default / sendToBox / causedByOpponent /
+  failedArmourProne / niggling×2-BB2016).** Pruned 4 more Rust-structural (context_stores_*,
+  default_equivalent ×2).
+- Next: remaining injury_type_* tail (~12 files: then_i_started_blastin, foul_for_spp, crowd,
+  bomb_with_modifier ×2, keg_hit, fumbled_ktm ×2, bitten, trap_door_fall_for_spp,
+  throw_a_rock ×2, saboteur, piling_on_knocked_out — most fit the shared template); then
   inducements 432, skill_behaviour 359, util 138.
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
