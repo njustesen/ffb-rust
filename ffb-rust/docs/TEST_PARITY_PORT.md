@@ -1835,3 +1835,12 @@ are mostly ported. 46 untested StepId families remain.
 Also noted: StepDedicatedFans is dice/modifier/report-heavy (fan-factor roll) — deferred; StepTrickster
 deferred (2 editions, setParameter returns false for USING_* flags by design, default-action-dependent
 usingTrickster==false path). 41 untested StepId families remain.
+
+## Iteration 108 — Step-4: StepEatTeamMate + StepCoinChoice guard/param subsets (+5 ffb-server)
+
+- **StepEatTeamMateFixtureTest (3)** — no thrown player → NEXT_STEP; THROWN_PLAYER_ID /
+  THROWN_PLAYER_COORDINATE accepted. Injury-publish + ball-at-coord scatter/END_TURN deferred (published param).
+- **StepCoinChoiceFixtureTest (2)** — no choice yet → CONTINUE (coin-choice dialog); setParameter → false
+  (choice arrives via CLIENT_COIN_CHOICE command). Coin-throw / choosing-team / report deferred (command+dice).
+
+StepAllYouCanEat deferred (dice + passState originalBombardier). 39 untested StepId families remain.
