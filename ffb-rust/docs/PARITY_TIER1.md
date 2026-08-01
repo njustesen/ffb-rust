@@ -563,3 +563,29 @@ Seeds 1 and 2 now FULLY match Java per-step. Four root-caused engine/agent fixes
   legal_actions tests. Seeds 1-2: 2/2 match.
 
 Next: seed 3 diverges early at step 6 (turn 1 half 1) — a distinct seed-3 divergence under investigation.
+
+## Iter 24 (2026-08-02) — prone player always runs Select StandUp (fbb90cd7)
+
+Seed 3 advanced step 6 → 131. Root cause: InitSelecting force-gotos to END_SELECTING for
+Block/Blitz (force_goto_on_dispatch), skipping the Select sequence's StandUp. Java skips it there
+too but runs StandUp inside SelectBlitzTarget (dispatched by BLITZ_SELECT); Rust bypasses
+SelectBlitzTarget entirely (dispatches Blitz straight to BlitzBlock, auto-picking the adjacent
+target in InitBlocking), so a prone blitzer with an ADJACENT target (no move → the move-path
+stand-up never fires) blocked while prone → attacker ended Prone vs Java Standing (seed 3 step 6).
+Fix: `if standing_up { next() }` (was `standing_up && !force_goto_on_dispatch`) — a prone player
+always runs StandUp; force_goto only skips it for an already-standing player. +2 unit tests. Seeds
+1-2 still 2/2.
+
+### Next (seed 3, first divergence i=131): blitz TARGET SELECTION diverges
+away_02 (PRONE at (13,6)) blitzes. Both pre-states match (2b15571f). Rust auto-picks the adjacent
+home_01@(12,7) and blocks directly: 1 die [2]=BOTH DOWN → away_02 (lineman, no Block) falls →
+TURNOVER (Rust jumps to home turn 2). Java instead stands away_02 up and DODGES/moves
+(dice pos75 = StepMoveDodge, pos76 = dodge-drop injury) — Java rolls 1 MORE die (74 vs Rust 75 at
+i=132; note stream already diverged) and stays in away turn 1 (away_07 acts next). So Java's blitz
+target/path differs from Rust's adjacent auto-pick. ROOT to check: Rust bypasses SelectBlitzTarget,
+auto-selecting the adjacent opponent in StepInitBlocking, whereas Java's ParityRunner SELECTS the
+blitz target (possibly a non-adjacent one, requiring a move+dodge) via the SelectBlitzTarget dialog.
+Compare the Rust parity agent's blitz-target pick (RUST_BLOCK_PICK, arc=) against Java ParityRunner
+SELECT_BLITZ_TARGET case + computeBlitzTargets; align the target-selection so both pick the same
+defender and the same move path. This likely needs Rust to route blitzes through SelectBlitzTarget
+(agent target choice) rather than auto-picking in InitBlocking — verify it doesn't regress seeds 1-2.
