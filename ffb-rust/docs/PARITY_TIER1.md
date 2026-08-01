@@ -203,3 +203,29 @@ find which coordinate(s) differ after away5's move; compare the move-square sequ
 (coord-sorted actionRng §3/§6), number of squares moved / MA-spend policy (INIT_MOVING keep-moving), GFI
 handling, or a dodge along the path. Root-cause, fix Rust only, add a test, rerun. Carry-over: still add a
 focused unit test for the blitz-end + follow-up agent fixes if a driver fixture is feasible.
+
+## Iter 9 (2026-08-01) — Open item #3 diagnosis: non-carrier move continuation (fix attempt REVERTED, unverified)
+
+Confirmed the Java policy from ParityRunner.java INIT_MOVING (lines 419-444): after the first move, the
+agent continues moving ONLY if `carrying && movesLeft`; every OTHER player DESELECTS after that single
+square. So: ball carrier moves until MA spent; all others move exactly ONE square then end. Rust's Move
+handler keeps moving every player until squares are empty → non-carriers wander their whole MA.
+
+Attempted a fix (moved_this_activation flag: after 1 square, end unless carrier). cargo test green, but the
+seed-1 rerun did NOT cleanly verify: post-step1 diff showed away5 (state-string a04) at Rust (20,7)=its
+START vs Java (20,8) — i.e. Rust appeared to move 0 squares while Java moved 1, suggesting the flag guard
+may fire BEFORE the first move (or a reset path is missed), plus a secondary a09 diff. Rather than commit
+an unverified/possibly-buggy change, REVERTED it (fixes 1-4 remain). ID-mapping + whole-game event
+interleaving made live verification error-prone this iteration.
+
+### Open item #3 (re-scoped, next): implement non-carrier-1-square carefully + VERIFY
+Re-implement the INIT_MOVING mirror with care: (1) the FIRST Move prompt of an activation must ALWAYS move
+one square (carrier or not) — confirm `moved_this_activation` is false at that point (reset on EVERY
+activation start, including StandUp/Move/Foul/Pass, not just via one return path); (2) the SECOND+ Move
+prompt ends unless carrying. Add a DRIVER-LEVEL test (drive a bare non-carrier Move activation and assert
+exactly one playerMoved) — the unit-level flag test isn't enough. VERIFY on seed 1: away5 (a04) must end
+at Java's (20,8), step1 post_hash == 69d972900b86dfd0. Watch the ID mapping: events 1-based (away_05),
+state string 0-based (a04). Also re-examine whether Java's away5 first-square pick (→20,8, moving AWAY from
+the ball) vs Rust's (→21,8, toward ball) is a separate move-square-PICK divergence (coord-sort/actionRng,
+§3/§6) that must ALSO be aligned — the destination difference may be the real step1 bug, independent of the
+continuation count.
