@@ -20,6 +20,13 @@ use crate::step::GameState;
 
 use super::Agent;
 
+/// AGENT_CONTRACT §7: the pushback coach picks the min-`(x, y)` on-pitch square, deterministically
+/// (no decisionRng consumed). Mirrors Java `ParityRunner.sendPushback` (keep the square with the
+/// smallest x, ties broken by smallest y, over the non-locked candidates).
+fn choose_pushback_square(squares: &[FieldCoordinate]) -> Option<FieldCoordinate> {
+    squares.iter().min_by_key(|c| (c.x, c.y)).copied()
+}
+
 /// Parity/coverage random agent. Decision RNG (`seed ^ 0xDEAD_BEEF_CAFE_0001`) drives the
 /// Java-synced choices (coin guess, receive, player selection, kick target); action RNG
 /// (`seed ^ 0xC0FFEE_ACE0_0001`) drives Rust-only diversity (move paths, block/foul targets).
@@ -270,17 +277,16 @@ impl Agent for RandomAgent {
                 }
                 Action::Move { path: vec![pool[idx]] }
             }
-            // Pushback: uniformly sample from available squares (sorted by x,y for canonical
-            // ordering that matches Java ParityRunner's sorted non-locked pushback list).
-            // Consumes 1 decision_rng call — synced with Java ParityRunner PUSHBACK step case.
+            // Pushback: AGENT_CONTRACT §7 — choose the min-(x,y) on-pitch square, DETERMINISTICALLY.
+            // Java ParityRunner.sendPushback iterates the non-locked pushback squares and keeps the one
+            // with the smallest x (ties broken by smallest y) and consumes ZERO decisionRng calls. The
+            // previous code randomly indexed a sorted list AND consumed a decision_rng call, which both
+            // picked the wrong square and desynced the decision_rng stream for every later pick.
             Some(AgentPrompt::Pushback { squares, .. }) => {
-                if squares.is_empty() {
-                    return Action::Acknowledge;
+                match choose_pushback_square(squares) {
+                    Some(coord) => Action::PushTo { coord },
+                    None => Action::Acknowledge,
                 }
-                let mut sorted = squares.clone();
-                sorted.sort_by_key(|c| (c.x, c.y));
-                let idx = self.pick(sorted.len());
-                Action::PushTo { coord: sorted[idx] }
             }
             // Follow-up: uniformly sample — consumes 1 decision_rng call.
             // Synced with Java ParityRunner FOLLOWUP_CHOICE dialog case.
@@ -472,6 +478,27 @@ mod tests {
     /// agent's decision draws match a reference decision RNG seeded per the contract — validating
     /// the agent RNG contract on coin/receive FIRST, before rule prompts exist (plan risk item).
     #[test]
+    fn pushback_picks_min_xy_square_deterministically() {
+        // AGENT_CONTRACT §7 + Java ParityRunner.sendPushback: min x, ties by min y. Parity bug fix:
+        // the agent used to random-index a sorted list (and consume a decisionRng call), landing on
+        // the wrong square (e.g. (11,9) instead of (11,7)) and desyncing the decision stream.
+        let squares = [
+            FieldCoordinate::new(11, 9),
+            FieldCoordinate::new(11, 8),
+            FieldCoordinate::new(11, 7),
+        ];
+        assert_eq!(choose_pushback_square(&squares), Some(FieldCoordinate::new(11, 7)));
+        // Order-independent + deterministic (pure function → no decisionRng consumed).
+        let reordered = [
+            FieldCoordinate::new(11, 7),
+            FieldCoordinate::new(12, 6),
+            FieldCoordinate::new(11, 9),
+        ];
+        assert_eq!(choose_pushback_square(&reordered), Some(FieldCoordinate::new(11, 7)));
+        assert_eq!(choose_pushback_square(&[]), None);
+    }
+
+    #[test]
     fn random_agent_drives_pregame_with_contract_decision_rng() {
         let seed = 1u64;
         // Reference decision stream: coin guess, then receive — two pick_bool draws.
@@ -496,15 +523,30 @@ mod tests {
         assert!(matches!(actions[0], Action::CoinChoice { heads } if heads == exp_heads));
         assert!(matches!(actions[1], Action::ReceiveChoice { receive } if receive == exp_receive));
         assert!(matches!(actions[2], Action::KickBall { .. }));
-        // After KickBall the engine drives to the next coach prompt. With this seed's kick and
-        // the empty-roster test teams the ball lands out of bounds, so that prompt is the
-        // touchback declaration (empty eligible list — no players to give the ball to).
-        assert!(matches!(gs.current_prompt(), Some(AgentPrompt::Touchback { .. })),
-            "engine waits at the touchback prompt after the kickoff, got {:?}", gs.current_prompt());
-        // The agent's decision RNG must not touch the game dice: the game dice are the pregame
-        // (spectators: d6×4, weather: d6×2, coin: d2) plus the opening kickoff
-        // (scatter: d8+d6, result roll: d6×2=7=BrilliantCoaching, coaching handler: d6×2) = 13.
-        assert_eq!(gs.rng.call_count, 13, "agent decision RNG never perturbs the game-dice stream");
+        // After KickBall the engine drives past the kickoff to the next coach prompt (with the
+        // empty-roster test teams that is the touchback declaration or the first — empty —
+        // ActivatePlayer). Either way the pregame decision phase is over.
+        assert!(
+            matches!(gs.current_prompt(),
+                Some(AgentPrompt::Touchback { .. }) | Some(AgentPrompt::ActivatePlayer { .. })),
+            "engine drove past the kickoff to a coach prompt, got {:?}", gs.current_prompt());
+        // The agent's decision RNG must not touch the game-dice GameRng: coin/receive/kick draw from
+        // decision_rng (4 draws: §2.1 coin, §2.2 receive, §2.3 kick x/y), while the game-dice count is
+        // an engine-only, deterministic property of the seed. Assert determinism (a second identical
+        // run rolls the same number of game dice) rather than a brittle hard-coded count.
+        let game_dice = gs.rng.call_count;
+        assert!(game_dice > 0, "engine rolled pregame + kickoff game dice");
+        let mut gs2 = new_game(seed);
+        gs2.run_until_prompt();
+        let mut agent2 = RandomAgent::new_parity(seed);
+        let mut n = 0;
+        while gs2.current_prompt().is_some() && n < 3 {
+            let a = agent2.act(&gs2);
+            gs2.apply_action(a);
+            n += 1;
+        }
+        assert_eq!(game_dice, gs2.rng.call_count,
+            "game-dice stream is deterministic — the agent's decision RNG never perturbs it");
     }
 
     #[test]

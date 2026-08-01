@@ -127,3 +127,30 @@ enters a StepMoveDodge for the blitzer's continuation. Open crates/ffb-engine/sr
 and the Java StepBlitz/StepMove/StepMoveDodge + the follow-up step; find the first behavioral difference;
 fix Rust only; add a test; rerun. NOTE the Rust move wander (14,8↔14,9) may itself be an agent move-target
 bug — cross-check against AGENT_CONTRACT §3/§6 (coord-sorted move-square pick).
+
+## Iter 6 (2026-08-01) — FIX #2 APPLIED: pushback square selection (min-(x,y), no rng)
+
+Root-caused the FIRST of two blitz divergences: the agent's Pushback handling. Rust
+`random_agent.rs` sorted the pushback squares then RANDOM-indexed (`self.pick(len)`) AND consumed a
+decision_rng call. Java `ParityRunner.sendPushback` keeps the min-(x,y) non-locked square and consumes
+ZERO decisionRng calls (AGENT_CONTRACT §7 = "min-(x,y) on-pitch square"). Rust picked (11,9); Java (11,7).
+The spurious decision_rng draw also desynced every later pick. FIX (Rust agent only): extracted
+`choose_pushback_square()` = min-by-(x,y), deterministic, no rng; added test
+`pushback_picks_min_xy_square_deterministically`. Also fixed a STALE test
+(`random_agent_drives_pregame_with_contract_decision_rng`) whose hard-coded pregame dice count (13, from
+the old 2d6 spectators) broke after the iter3 d3 fix — rewrote it to assert determinism instead of a magic
+number. `cargo test -p ffb-engine random_agent` = 9 passed.
+
+VERIFIED PARTIAL: seed1 step0 post_hash moved b118148452e3779f → 3205e1285d49894b (home_03 now pushed to
+the min square like Java), but still ≠ Java 9c55510376cb6887 — because divergence #2 remains.
+
+### Open item #2b (next): blitzer keeps moving after the block (Rust) vs stops (Java)
+Java trace: away3 BLITZ → block home3 → pushback (11,7) → JAVA_P2 away5 (away3's activation ENDS after the
+block; no continued move). Rust events: away_03 blocks, pushes, then MOVES 7+ squares (14,7→…→14,11 with
+GFIs) and dodges before ending. So Rust's agent continues the blitzer's move after the block; Java's does
+not. Root-cause: does the Rust blitz agent path issue continued-move commands after the block that Java's
+ParityRunner doesn't? Compare the blitz continuation in random_agent.rs / the blitz step vs Java
+ParityRunner's BLITZ handling (JAVA_P2 shows away3 does one BLITZ_MOVE=the block, then the next P2 is a
+different player). Align Rust to stop the blitzer after its block (or match whatever Java's continued-move
+policy is), add a test, rerun. NOTE: also confirm the coord-sorted move-target logic (AGENT_CONTRACT §3/§6)
+isn't separately producing the (14,8)↔(14,9) wander.
