@@ -224,6 +224,18 @@ impl StepEndTurn {
                     }
                     _ => {}
                 }
+                // Java StepEndTurn: UtilPlayer.refreshPlayersForTurnStart on the newly-active team —
+                // PRONE/STANDING players → active (per hasToMissTurn), STUNNED → PRONE inactive. The
+                // live driver path (this step) was missing it (only the deleted engine.rs had it), so a
+                // knocked-down (prone) player was never reactivated at its next turn and the agent
+                // wrongly rejected it as inactive. Run only when a real team turn starts (a flip
+                // happened): turn_mode is Regular and it is not the new-half Setup handoff.
+                if game.turn_mode == TurnMode::Regular && !self.new_half {
+                    let gm = crate::mechanic::game_mechanic_for(game.rules);
+                    let etr = gm.enhancements_to_remove_at_end_of_turn();
+                    let etr_wna = gm.enhancements_to_remove_at_end_of_turn_when_not_setting_active();
+                    ffb_model::util::util_player::UtilPlayer::refresh_players_for_turn_start(game, &etr, &etr_wna);
+                }
                 // Stub: sequence generator pushes (Kickoff, EndGame, Inducement) → skip
             }
 

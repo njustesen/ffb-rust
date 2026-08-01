@@ -430,3 +430,34 @@ start (and a just-unstunned player is NOT). Add a Rust test (fall a player, adva
 assert is_active()==true; stun a player, assert its recovery turn is_active()==false). Verify home_01's
 field_model is_active()==true at step23 (add a temp trace of home_01.is_active at the pick), step23 picks
 home1, and matches. NO hacks. (8 agent fixes + drc instrumentation committed; seed1 matches through step22.)
+
+## Iter 17 (2026-08-01) — FIX #9 (verified): live StepEndTurn now calls refresh_players_for_turn_start
+
+ROOT CAUSE nailed: the LIVE driver path (bb2025 StepEndTurn) flips home_playing/turn_nr at a turn
+transition but NEVER called UtilPlayer::refresh_players_for_turn_start — only the DELETED monolithic
+engine.rs:942 did. Java calls it at StepEndTurn:358. So a knocked-down (PRONE, non-stunned) player was
+never reactivated (active bit left false from the fall's change_active(false)); the active bit is NOT in
+the state_hash, so steps 1-22 matched anyway, and it only surfaced at step23 when the agent's pick loop
+rejected the (wrongly-inactive) prone home_01. FIX (Rust engine, bb2025/step_end_turn.rs): after the
+Kickoff/Regular flip (turn_mode==Regular && !new_half), call refresh_players_for_turn_start with the
+edition mechanic's enhancement sets (mirrors engine.rs:942 + Java StepEndTurn:358). The refresh FUNCTION
+itself was already correct + unit-tested (util_player); the bug was the missing call.
+
+VERIFIED (parity): home_01 is now active at turn 2 and ACTIVATED at step23 (matching Java's player choice);
+the pick order re-synced — Rust turn-2 picks now home7,home3,home1,home9,home8,... matching Java (were
+home7,home3,home9,... skipping home1). Comparator's failing step index is still 23 but the DIVERGENCE
+CHANGED (pick desync → resolved; new issue is home_01's StandUp execution). cargo step_end_turn tests pass.
+NOTE: bb2016 + bb2020 StepEndTurn have the SAME missing-call bug — apply the same fix there when those
+editions are parity-tested (bb2025 is the current target).
+
+### Open item #9 (next): prone-player activation — action label + no state change
+seed1 step23 (home_01 activation): Java chosen=Activate(Home1,MOVE) post=90e19713af7cd274; Rust
+chosen=Activate(home_01,StandUp) post=661cf20f9f6af1c9 (== pre-state, UNCHANGED). Two problems: (1) ACTION
+LABEL — Java activates a prone player with action MOVE (prone MOVE = stand up then move); Rust's eligible
+action for a prone player is StandUp (AGENT_CONTRACT §5 says "StandUp for prone" but Java's ParityRunner/
+engine uses MOVE — reconcile: what action does Java's eligible list give a prone player, and what does the
+Rust agent send?). (2) Rust's StandUp produced NO state change (home_01 stayed prone? post==pre), whereas
+Java's stands the player up (prone→standing, 90e1). Investigate the Rust StandUp activation path (does it
+actually stand the player up and spend/refresh state?) vs Java (StepInitMoving/standup + move). Also confirm
+the agent should pick the SAME action Java does (MOVE vs StandUp) so the `chosen` + post align. Fix Rust,
+add a test, verify step23 fully matches (chosen + post 90e1).
