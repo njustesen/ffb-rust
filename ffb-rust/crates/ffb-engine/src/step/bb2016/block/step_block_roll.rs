@@ -96,7 +96,7 @@ impl StepBlockRoll {
                     .map(|id| game.team_home.has_player(id) == attacker_on_home)
                     .unwrap_or(false);
                 self.nr_of_dice = ServerUtilBlock::find_nr_of_block_dice(
-                    attacker_str, defender_str, same_team, is_multiple_block, false);
+                    attacker_str, defender_str, same_team, is_multiple_block, game.rules, false);
 
                 // Java: fBlockRoll = getGameState().getDiceRoller().rollBlockDice(fNrOfDice)
                 let n = self.nr_of_dice.unsigned_abs() as usize;

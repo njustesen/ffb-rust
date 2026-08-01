@@ -1070,6 +1070,15 @@ tests are Rust-structural (exempt/prune as encountered).
   replaced it). Removed the file, mod entries, bb2025 registry registration; registry count
   test 35→34. Wild animal remains bb2016-only (matching Java). Behavior-neutral (no bb2025
   player can have the skill) but violates the no-invented-code ground rule.
+## Step 3 REAL RUST BUG #12: block-dice multi-block modifier hardcoded (fixed 2026-08-01)
+ServerUtilBlock::find_nr_of_block_dice hardcoded the multi-block adjustment as `defender + 1`
+(matching NO edition) AND the decoration path added a spurious `attacker + 1`. Java applies
+edition-specific RollMechanic modifiers: attacker gets multiBlockAttackerModifier
+(bb2020/bb2025 = -2, bb2016 = 0) and defender gets multiBlockDefenderModifier (bb2016 = 2,
+else 0). Fixed the helper to take `rules` and apply both via ffb_mechanics::mechanics
+multi_block_{attacker,defender}_modifier; removed the decoration-path attacker+1; updated the
+3 step_block_roll callers and the Rust tests; added ServerUtilBlockTest twin. Tally: 12 real
+Rust bugs. START of util bucket (server_util_block block-dice-count subset, 7 Java tests).
 - **sneaky_git bb2025 (eject-player) → Java tests (7 green first run).** Ejected fouler set
   BANNED unless Argue-the-Call succeeded; reason recorded on PlayerResult
   (OFFICIOUS_REF via state.officiousRef / THREW_TWO_BOMBS via passState.originalBombardier /

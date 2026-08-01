@@ -111,8 +111,9 @@ impl ServerUtilBlock {
                     .and_then(|id| game.player(id))
                     .map(|p| p.strength_with_modifiers())
                     .unwrap_or(1);
-                // Multi-block adds 1 to the attacker's own strength modifier (BB mechanic).
-                let attacker_base_str = if is_multi_block { attacker_base_str + 1 } else { attacker_base_str };
+                // Bug (fixed, #12): the multi-block strength modifier is applied inside
+                // find_nr_of_block_dice per edition (attacker/defender), not as a spurious
+                // attacker `+1` here.
 
                 // Java addDiceDecorations: for putrid/chainsaw we skip the dice-count path.
                 // For normal blocks we compute per-target strengths via ServerUtilPlayer.findBlockStrength.
@@ -128,7 +129,7 @@ impl ServerUtilBlock {
                             let def_str = ServerUtilPlayer::find_block_strength(
                                 game, target_coord, def_base_str, coord,
                             );
-                            Self::find_nr_of_block_dice(att_str, def_str, false, is_multi_block, false)
+                            Self::find_nr_of_block_dice(att_str, def_str, false, is_multi_block, game.rules, false)
                         } else {
                             0
                         };
@@ -146,7 +147,7 @@ impl ServerUtilBlock {
                         let def_str = ServerUtilPlayer::find_block_strength(
                             game, target_coord, def_base_str, coord,
                         );
-                        let nr_of_dice = Self::find_nr_of_block_dice(att_str, def_str, true, is_multi_block, false);
+                        let nr_of_dice = Self::find_nr_of_block_dice(att_str, def_str, true, is_multi_block, game.rules, false);
                         game.field_model.add_dice_decoration(DiceDecoration::new(target_coord, nr_of_dice, BlockKind::BLOCK));
                     }
                 }
@@ -198,14 +199,26 @@ impl ServerUtilBlock {
         defender_strength: i32,
         same_team: bool,
         using_multi_block: bool,
+        rules: ffb_model::enums::Rules,
         add_block_die: bool,
     ) -> i32 {
-        // Java: multiBlockDefenderModifier() is +1 when usingMultiBlock.
-        let effective_defender_str = if using_multi_block {
-            defender_strength + 1
+        // Bug (fixed, #12): the multi-block adjustment was hardcoded to `defender + 1`, which is
+        // wrong for EVERY edition. Java applies edition-specific modifiers instead — the attacker
+        // gets `RollMechanic.multiBlockAttackerModifier()` (bb2020/bb2025 = -2, bb2016 = 0) via
+        // getAttackerBaseStrength, and the defender gets `multiBlockDefenderModifier()`
+        // (bb2016 = 2, else 0). Both are applied to base strength before assists; since assists
+        // are strength-independent the order does not change the final sum, so applying them here
+        // to the already-assist-resolved totals is equivalent.
+        use ffb_mechanics::mechanics::{multi_block_attacker_modifier, multi_block_defender_modifier};
+        let (effective_attacker_str, effective_defender_str) = if using_multi_block {
+            (
+                (attacker_strength + multi_block_attacker_modifier(rules)).max(1),
+                defender_strength + multi_block_defender_modifier(rules),
+            )
         } else {
-            defender_strength
+            (attacker_strength, defender_strength)
         };
+        let attacker_strength = effective_attacker_str;
 
         let mut nr_of_dice = 1i32;
 
@@ -381,56 +394,65 @@ mod tests {
 
     #[test]
     fn equal_strength_gives_one_die() {
-        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(3, 3, false, false, false), 1);
+        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(3, 3, false, false, Rules::Bb2025, false), 1);
     }
 
     #[test]
     fn double_attacker_strength_gives_two_dice() {
-        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(6, 3, false, false, false), 2);
+        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(6, 3, false, false, Rules::Bb2025, false), 2);
     }
 
     #[test]
     fn triple_attacker_strength_gives_three_dice() {
-        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(9, 3, false, false, false), 3);
+        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(9, 3, false, false, Rules::Bb2025, false), 3);
     }
 
     #[test]
     fn weaker_attacker_gives_minus_two() {
-        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(3, 4, false, false, false), -2);
+        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(3, 4, false, false, Rules::Bb2025, false), -2);
     }
 
     #[test]
     fn much_weaker_attacker_gives_minus_three() {
-        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(3, 7, false, false, false), -3);
+        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(3, 7, false, false, Rules::Bb2025, false), -3);
     }
 
     #[test]
     fn same_team_block_always_positive() {
         // Ball & Chain vs own team: -2 becomes +2.
-        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(3, 4, true, false, false), 2);
+        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(3, 4, true, false, Rules::Bb2025, false), 2);
     }
 
     #[test]
     fn add_block_die_increments_one_die_to_two() {
-        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(3, 3, false, false, true), 2);
+        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(3, 3, false, false, Rules::Bb2025, true), 2);
     }
 
     #[test]
     fn add_block_die_increments_two_dice_to_three() {
-        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(6, 3, false, false, true), 3);
+        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(6, 3, false, false, Rules::Bb2025, true), 3);
     }
 
     #[test]
     fn add_block_die_does_not_increment_three_dice() {
-        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(9, 3, false, false, true), 3);
+        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(9, 3, false, false, Rules::Bb2025, true), 3);
     }
 
     #[test]
-    fn multi_block_adds_one_to_defender_strength() {
-        // With usingMultiBlock=true, effective defender str = 3+1 = 4. Attacker 5 > 4 → 2 dice.
-        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(5, 3, false, true, false), 2);
-        // Boundary: attacker 4 vs defender 3 normally → 2 dice; with multi → 4 vs 4 → 1 die.
-        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(4, 3, false, true, false), 1);
+    // Bug (fixed, #12): multi-block modifiers are edition-specific. bb2016 gives the DEFENDER +2;
+    // bb2020/bb2025 give the ATTACKER -2 (both net a -2 swing). The old test asserted a
+    // hardcoded defender +1 that matched no edition.
+    fn multi_block_applies_edition_modifiers() {
+        // bb2016: defender 3 + 2 = 5; attacker 5 == 5 -> 1 die.
+        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(5, 3, false, true, Rules::Bb2016, false), 1);
+        // bb2016: attacker 6 vs defender 5 -> 2 dice.
+        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(6, 3, false, true, Rules::Bb2016, false), 2);
+        // bb2025: attacker 5 - 2 = 3 == defender 3 -> 1 die.
+        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(5, 3, false, true, Rules::Bb2025, false), 1);
+        // bb2025: attacker 6 - 2 = 4 vs defender 3 -> 2 dice.
+        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(6, 3, false, true, Rules::Bb2025, false), 2);
+        // bb2020 matches bb2025 (attacker -2): attacker 4 - 2 = 2 < defender 3 -> -2 dice.
+        assert_eq!(ServerUtilBlock::find_nr_of_block_dice(4, 3, false, true, Rules::Bb2020, false), -2);
     }
 
     // ── add_dice_decoration_for_coord ────────────────────────────────────────

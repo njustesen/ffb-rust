@@ -119,6 +119,7 @@ impl StepBlockRollMultiple {
                     defender_str,
                     false,
                     true, // using_multi_block
+                    game.rules,
                     roll.is_successful_dauntless() || roll.is_double_target_strength(),
                 );
                 roll.set_nr_of_dice(nr_of_dice.unsigned_abs() as i32);
