@@ -623,6 +623,12 @@ Remaining ffb-common GAP files are all DOCUMENTED EXEMPTIONS (Rust-only, no fait
   commands pass move coordinates through unchanged; away commands transform() each to the home
   perspective; empty input → empty. Constructed ClientCommandMove. updateMoveSquares / isValidMove
   (movement-square population, GFI/dodge marking) deferred — needs full game/pathing state.
+- **util_server_player_swoop (updateSwoopSquares) → Java tests (3 green).** Clears move squares,
+  then for a Swoop (ttmScattersInSingleDirection) player in bounds adds the 4 orthogonally
+  adjacent squares. EXEMPT: Rust add_swoop_square private-helper tests + defensive
+  out-of-bounds/unknown-id no-panic (Rust-structural). Remaining util: util_server_db (2) +
+  entropy_pool/entropy_server/network_entropy_source (2 each) are RNG/DB infrastructure —
+  candidates for exemption; verify next then the util bucket closes.
 Plus the in-file util_player exemptions (canGaze x4, refresh x7, partner-not-on-field x1, new/default x2)
 and UtilDisturbingPresence empty-player x1 — all commented at their Java test sites.
 - prayer_state (6): NOT ffb-common — com.fumbbl.ffb.server.PrayerState → belongs to Step 3 (ffb-server).
