@@ -1528,3 +1528,20 @@ replay_cache (4), team_setup_cache (2), server_sketch_manager (2), i_server_prop
 i_server_json_option/i_game_id_listener/card_deck (2 each). Big buckets: skill_behaviour (118),
 bb2016/bb2020/bb2025 (11 each). Next: talk + replay_state (portable value classes) or triage the
 replay/DB/network infra (likely exempt).
+
+## Iteration 89 — replay_state (+7 ffb-server); talk exempt
+
+- **ReplayStateTest (7)** — ReplayState: name + zeroed command/speed + false running/forward defaults;
+  prevent/allow/query coaches-prevented-from-sketching (add, remove, idempotent, noop-on-unknown,
+  independent tracking, name preserved). (The command-driven handleCommand mutation path is not in the
+  Rust unit tests.)
+- **talk (8) — EXEMPT:** Java `Talk` is a JSON-transport DTO with PRIVATE fields and NO accessors (only
+  toJsonValue/initFrom); the Rust tests assert field storage via Rust's PUBLIC fields, which have no
+  Java-observable equivalent. The one genuinely Rust-specific case (talk_and_coach_are_owned_strings)
+  tests Rust ownership/drop. JSON round-trip is a separate serialization concern outside these unit tests.
+
+Remaining engine-infra singles: server_replayer/server_replay (6 each), replay_cache (4),
+team_setup_cache (2), server_sketch_manager (2), i_server_property/i_server_json_option/
+i_game_id_listener/card_deck (2 each) — mostly replay/DB/network/JSON infra (likely exempt). Big buckets:
+skill_behaviour (118), bb2016/bb2020/bb2025 (11 each). Next: triage the remaining infra singles, then
+start the skill_behaviour bucket verification pass.
