@@ -1512,3 +1512,19 @@ Remaining engine-infra singles: talk (8), replay_state (7), wording (6), server_
 i_server_property/i_server_json_option/i_game_id_listener/card_deck (2 each). Plus the big buckets:
 skill_behaviour (118), bb2016/bb2020/bb2025 (11 each). Next: triage engine-infra singles (many are
 DB/replay/network infra likely exempt) then start skill_behaviour verification.
+
+## Iteration 88 — mechanics value classes: stats_drawing_modifier + wording (+7 ffb-common)
+
+Both are ffb-common `com.fumbbl.ffb.mechanics` value classes (twins in ffb-common/src/test):
+- **StatsDrawingModifierTest (5)** — positiveImproves (positive→improvement, negative→impairment, zero→
+  neutral); positiveImpairs (reverse); absoluteModifier = |modifier|. Fully portable factory logic.
+- **WordingTest (2)** — getters (noun/verb/inflection/playerCharacterization) + empty-strings. Exempt:
+  the Rust equal_wordings/different_noun/different_verb/clone tests exercise Rust's DERIVED
+  PartialEq/Eq/Clone; Java's Wording has NO equals/hashCode/clone override (identity equality) — no Java
+  counterpart. (Rust-added-trait convenience, not a translation bug — Java never relies on Wording equality.)
+
+Remaining engine-infra singles: talk (8), replay_state (7), server_replayer/server_replay (6 each),
+replay_cache (4), team_setup_cache (2), server_sketch_manager (2), i_server_property/
+i_server_json_option/i_game_id_listener/card_deck (2 each). Big buckets: skill_behaviour (118),
+bb2016/bb2020/bb2025 (11 each). Next: talk + replay_state (portable value classes) or triage the
+replay/DB/network infra (likely exempt).
