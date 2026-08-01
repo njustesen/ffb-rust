@@ -1716,3 +1716,17 @@ Running tally unchanged: 13 real Rust bugs + 1 fidelity removal (Wrestle was a f
   eligible-tackler prompt / dodge-roll / goto-label / command tests are dice/command-driven — deferred.
 
 57 untested StepId families remain.
+
+## Iteration 98 — Step-4: StepDispatchPassing FULL port (+9 ffb-server)
+
+- **StepDispatchPassingFixtureTest (9)** — high-yield immediate-execute dispatch, fully ported:
+  PASS/THROW_BOMB/DUMP_OFF → NEXT_STEP; HAIL_MARY_PASS/HAIL_MARY_BOMB → GOTO_LABEL(hailmary);
+  HAND_OVER → GOTO_LABEL(handover); other → GOTO_LABEL(end); no thrower → CONTINUE; CATCHER_ID accepted.
+  NEW RECIPE UNLOCKS: (1) drive the dispatch by `game.setThrowerId(id)` + `game.setThrowerAction(action)`;
+  (2) the 3 goto labels are mandatory init params — build a `StepParameterSet`, add GOTO_LABEL_ON_END/
+  _HAIL_MARY_PASS/_HAND_OVER, `step.init(set)`; (3) **assert the exact goto label** via
+  `step.getResult().getNextActionParameter()` (distinguishes hailmary/handover/end GOTO branches — not
+  just the StepAction). This unlocks the other DISPATCH_* / action-routing steps for full ports.
+
+56 untested StepId families remain. Dispatch/report/immediate-execute steps (hooks=0) are the high-yield
+targets — prefer them over hook-delegating negatraits.
