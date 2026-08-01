@@ -1039,6 +1039,11 @@ handledPrayer()/selector()/addedSkills(). Test recipe:
 - **under_scrutiny ×3 + fan_interaction ×3 → Java tests (29 green).** Same PrayerState-flag
   shape; UNDER_SCRUTINY targets the OPPONENT team (getOtherTeam) — Rust verified matching.
   5 Rust prunes (case-sensitivity ×4 + duplicate animation test in mixed under_scrutiny).
+- **stiletto ×3 + necessary_violence ×1 → Java tests (19 green).** Stiletto = RandomSelection,
+  1 player, OWN-team selector (bb2025 twin proves home-team enhancement); necessary_violence =
+  bb2020-ONLY PrayerState flag (getAdditionalCasSppTeams). 2 Rust prunes. Prayer handler files
+  remaining: throw_a_rock ×3 (edition logic), base/selector/dialog files, then cards
+  (rabbits_foot, custard_pie, pit_trap — bb2016+bb2020 cards dirs; witch_brew ×2, card_handler).
 - **perfect_passing ×3 + treacherous_trapdoor ×3 → Java tests (26 green).** Perfect passing =
   PrayerState-flag (getAdditionalCompletionSppTeams); trapdoor initEffect adds TrapDoors at
   (6,1)/(19,13) — check via fieldModel.getTrapDoors().contains(new TrapDoor(coord)) (TrapDoor
