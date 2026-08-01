@@ -80,15 +80,10 @@ mod tests {
         assert_eq!(h.get_name(), "TestPrayerHandler");
     }
 
-    #[test]
-    fn handled_prayer_name_returned() {
-        assert_eq!(TestPrayerHandler.handled_prayer_name(), "FOULING_FRENZY");
-    }
+    // NOTE (test equalization): `handled_prayer_name_returned` and `animation_type_returned`
+    // pruned - accessor tautologies of the test double itself (they assert the stub's own
+    // hardcoded overrides; no production logic involved).
 
-    #[test]
-    fn animation_type_returned() {
-        assert_eq!(TestPrayerHandler.animation_type(), AnimationType::PRAYER_FOULING_FRENZY);
-    }
 
     #[test]
     fn remove_effect_delegates_to_internal() {

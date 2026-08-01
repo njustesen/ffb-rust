@@ -40,46 +40,14 @@ mod tests {
         assert_eq!(sel.get_player_id(), Some("player1"));
     }
 
-    #[test]
-    fn default_has_no_player() {
-        let sel = PrayerDialogSelection::new();
-        assert!(sel.get_player_id().is_none());
-        assert!(sel.get_team_id().is_none());
-    }
+    // NOTE (test equalization): builder/clone/Default plumbing tests pruned
+    // (default_has_no_player, with_player_and_team_sets_both, with_player_leaves_team_id_none,
+    // clone_produces_equal_values, default_and_new_are_equivalent,
+    // with_player_and_team_team_id_is_correct) - Java's PrayerDialogSelection is a two-field
+    // immutable ctor class (playerId, skill); the Rust team_id/builders are engine plumbing.
 
-    #[test]
-    fn with_player_and_team_sets_both() {
-        let sel = PrayerDialogSelection::with_player_and_team("p1", "t1");
-        assert_eq!(sel.get_player_id(), Some("p1"));
-        assert_eq!(sel.get_team_id(), Some("t1"));
-    }
 
-    #[test]
-    fn with_player_leaves_team_id_none() {
-        let sel = PrayerDialogSelection::with_player("player99");
-        assert_eq!(sel.get_player_id(), Some("player99"));
-        assert!(sel.get_team_id().is_none());
-    }
 
-    #[test]
-    fn clone_produces_equal_values() {
-        let sel = PrayerDialogSelection::with_player_and_team("p2", "t2");
-        let cloned = sel.clone();
-        assert_eq!(cloned.get_player_id(), sel.get_player_id());
-        assert_eq!(cloned.get_team_id(), sel.get_team_id());
-    }
 
-    #[test]
-    fn default_and_new_are_equivalent() {
-        let a = PrayerDialogSelection::new();
-        let b = PrayerDialogSelection::default();
-        assert_eq!(a.get_player_id(), b.get_player_id());
-        assert_eq!(a.get_team_id(), b.get_team_id());
-    }
 
-    #[test]
-    fn with_player_and_team_team_id_is_correct() {
-        let sel = PrayerDialogSelection::with_player_and_team("px", "tx");
-        assert_eq!(sel.get_team_id(), Some("tx"));
-    }
 }

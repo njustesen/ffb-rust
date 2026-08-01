@@ -1046,6 +1046,14 @@ The Rust bb2025 handler reused the mixed module's PRAYER_NAME ("BLESSED_STATUE_O
 so it could NEVER match the bb2025 prayer (data/prayers/bb2025_prayers.json id is
 BLESSING_OF_NUFFLE), and prayer_player_effect had no BLESSING_OF_NUFFLE arm (Pro never
 granted). Fixed handler const + effect map + flipped test. Tally: 11 real Rust bugs.
+- **enhancement_remover + prayer_dialog_selection + prayer_handler base → Java tests (9 green).**
+  EnhancementRemover twins incl. opponent-selector removal regression; PrayerDialogSelection =
+  1 getter twin; PrayerHandler base via named static nested TestPrayerHandler subclass
+  (getName() == simple class name; removeEffect delegation flag). 11 Rust prunes (Default/
+  Clone/builder plumbing + test-double accessor tautologies + Rust-only for_player helper).
+  Prayer infra remaining: random_selection_prayer_handler (6) + select_player_prayer_handler
+  (7) — mostly covered by concrete twins, triage next — and prayer_player_effect (9 —
+  Java twin = FieldModel.addPrayerEnhancements effect assertions).
 - **player_selector ×2 + opponent_player_selector ×2 → Java tests (24 green).** Eligibility
   twins: bb2020 = RESERVE@START_GAME / on-pitch@REGULAR (setTurnMode) + Loner excluded;
   bb2025 = RESERVE-only + PlayerType.STAR excluded (RosterPlayer.setType). selectPlayers count

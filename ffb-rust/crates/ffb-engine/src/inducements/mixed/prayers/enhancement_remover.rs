@@ -155,23 +155,10 @@ mod tests {
         assert!(!game.field_model.has_prayer_enhancement("h1", "BAD_HABITS"));
     }
 
-    #[test]
-    fn remove_enhancement_for_player() {
-        let remover = EnhancementRemover::new();
-        let mut game = make_game();
-        game.field_model.add_prayer_enhancement("h1", "GREASY_CLEATS");
-        remover.remove_enhancement_for_player(&mut game, "h1", "GREASY_CLEATS");
-        assert!(!game.field_model.has_prayer_enhancement("h1", "GREASY_CLEATS"));
-    }
+    // NOTE (test equalization): `remove_enhancement_for_player`,
+    // `enhancement_remover_is_default_constructible` and `enhancement_remover_is_clonable`
+    // pruned - Rust-only helper/Default/Clone plumbing (Java's EnhancementRemover has only
+    // removeEnhancement(gameState, team, selector, prayer)).
 
-    #[test]
-    fn enhancement_remover_is_default_constructible() {
-        let _ = EnhancementRemover::default();
-    }
 
-    #[test]
-    fn enhancement_remover_is_clonable() {
-        let a = EnhancementRemover::new();
-        let _b = a.clone();
-    }
 }
