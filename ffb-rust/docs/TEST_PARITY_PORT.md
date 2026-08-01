@@ -1941,3 +1941,16 @@ measure is the truth).
   unknown → false. Hook box-placement / END_TURN publish / scatter / GOTO deferred.
 
 28 untested StepId families remain.
+
+## Iteration 117 — Step-4: StepThrowTeamMate + StepBlockRollMultiple param subsets (+7 ffb-server)
+
+- **StepThrowTeamMateFixtureTest (4, bb2016)** — THROWN_PLAYER_ID / THROWN_PLAYER_STATE /
+  THROWN_PLAYER_HAS_BALL accepted; unknown → false. Hook throw-resolution (accuracy/scatter/landing/
+  reports) deferred (dice/command).
+- **StepBlockRollMultipleFixtureTest (3, bb2020)** — PLAYER_ID_TO_REMOVE / PLAYER_ID_DAUNTLESS_SUCCESS
+  accepted; unknown → false. DEFERRED: start_no_targets NPEs on null player state; and
+  DOUBLE_TARGET_STRENGTH_FOR_PLAYER is a CONDITIONAL accept (returns false unless the player is already in
+  the block-rolls list) — not a pure store, needs the set-block-targets fixture. New gotcha: some
+  setParameter keys are conditionally accepted (return false without prior state) — verify before asserting true.
+
+26 untested StepId families remain.
