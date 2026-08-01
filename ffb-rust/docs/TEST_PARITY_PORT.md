@@ -1743,3 +1743,16 @@ targets — prefer them over hook-delegating negatraits.
 
 55 untested StepId families remain. Immediate-execute steps with observable state (block/stat/turn
 flags, player-result counters) are full-yield — assert the mutated getters after startStep.
+
+## Iteration 100 — Step-4: StepSetActingTeam FULL port (+7 ffb-server)
+
+- **StepSetActingTeamFixtureTest (7)** — immediate-execute team-switch: start() clears the acting
+  player (getActingPlayer().getPlayer()==null) and flips homePlaying when the target team differs from
+  the current acting team (home-when-away→toggle, home-when-home→no-toggle, away-when-home→toggle);
+  no-teamId still clears + NEXT_STEP; NEXT_STEP action; unknown setParameter → false. TEAM_ID is
+  init-consumed (init(StepParameterSet)); the Rust set_parameter_team_id_accepted twin is EXEMPT
+  (init-consumed → setParameter false). Asserted via game.isHomePlaying()/getActingPlayer().getPlayer().
+
+54 untested StepId families remain. Milestone: 100 loop iterations. Step-4 momentum strong on
+immediate-execute/dispatch steps (StepDispatchPassing 9, StepBlockStatistics 6, StepSetActingTeam 7
+in the last three).
