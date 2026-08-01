@@ -1888,3 +1888,14 @@ covered by the Rust-side unit tests + would need a command/dice-injection harnes
   unknown → false. Ball-carrier dump-off sequence push + setDefenderId/DEFENDER_POSITION publish deferred.
 
 33 untested StepId families remain.
+
+## Iteration 112 — Step-4: StepPassBlock + StepHandleDropPlayerContext guard/param subsets (+6 ffb-server)
+
+- **StepPassBlockFixtureTest (4, bb2016)** — no thrower → CONTINUE; END_TURN / END_PLAYER_ACTION accepted;
+  unknown → false. Pass-block-report + dump-off/hand-over/bomb skip tests deferred (thrower + report);
+  GOTO_LABEL_ON_END init-consumed (twin exempt).
+- **StepHandleDropPlayerContextFixtureTest (2, bb2020)** — no context → NEXT_STEP; unknown → false.
+  DROP_PLAYER_CONTEXT + injury publish/drop/goto/command deferred; **SUCCESSFUL_PRO is NOT a pure
+  param-store** (true immediately marks the pro skill used → NPE without playerId+context) — that twin deferred.
+
+31 untested StepId families remain.
