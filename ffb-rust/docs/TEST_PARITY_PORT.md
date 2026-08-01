@@ -1658,3 +1658,22 @@ deferred_command / card_deck = partial-stub; replay/session/file/DB = infra; mod
 conditional_model_change_observer / SkillBehaviour base = abstract/interface plumbing; talk = JSON DTO).
 Next: verify the full ffb-server + cargo suites are green, check TRANSLATION_TRACKER for any remaining
 ○/~ non-GUI P1 files, and if clean, assess the stop condition / begin P3 Step-4 step-logic bulk.
+
+## Iteration 95 — P3 Step-4 BEGINS: StepDauntless param subset (+3 ffb-server)
+
+Step-4 frontier measured cleanly by **StepId** (not the crude PascalCase-token gap): 134/195 StepId
+families already have a Java fixture test → **61 untested families remain** (mostly hook-delegating
+negatraits + kickoff/inducement/dispatch steps — low per-file yield per the step-YIELD triage). The
+314-file/3485-test "gap" from the token measure is inflated (per-edition class names like
+StepGoForItBb2020FixtureTest don't match the StepGoForIt token though they cover it).
+
+- **StepDauntlessFixtureTest (3)** — block hook-delegating step, param subset per the StepBlockChainsaw
+  template: no-Dauntless acting player → NEXT_STEP; USING_STAB/VOMIT/CHAINSAW/BREATHE_FIRE accepted via
+  setParameter; unrecognised key → false. NOTE: StepDauntless reads the block defender's strength up
+  front, so the fixture must place away1 AND `game.setDefenderId("away1")` (else NPE) — new Step-4 recipe
+  detail for block steps. The strength-comparison skip-roll / dice-roll / indomitable / report tests need
+  full block-target setup + dice/commands — deferred (same scope as the other hook-delegating block steps).
+
+Step-4 approach going forward: one untested StepId family per iteration, porting the fixture-expressible
+subset (param keys + no-skill/guard fall-throughs) and deferring dice/command/target-state tests, per the
+established step-YIELD triage. 60 untested families remain after this.
