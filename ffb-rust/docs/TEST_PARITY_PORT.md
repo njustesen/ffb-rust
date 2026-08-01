@@ -1070,6 +1070,15 @@ tests are Rust-structural (exempt/prune as encountered).
   replaced it). Removed the file, mod entries, bb2025 registry registration; registry count
   test 35→34. Wild animal remains bb2016-only (matching Java). Behavior-neutral (no bb2025
   player can have the skill) but violates the no-invented-code ground rule.
+- **stand_firm bb2020 pilot → Java tests (6 green). PUSHBACK-HOOK RECIPE:** invoke the modifier
+  DIRECTLY like Rust does — `new StandFirmBehaviour()` + **bind the skill by setting the public
+  field** `behaviour.skill = (common.StandFirm) GameFixture.skill(game, "Stand Firm")` (a fresh
+  behaviour has skill==null; registration normally binds it), then
+  `behaviour.getStepModifiers().get(0).handleExecuteStepHook(new StepPushback(gs), state)` with
+  a hand-built public-static `StepPushback.StepState` (defender, standingFirm=new HashMap,
+  pushbackStack=new Stack, oldDefenderState). Needs an acting player set (hook derefs it).
+  hasTacklezones==false via changeConfused(true). Rust "headless auto-declines" for undecided =
+  documented divergence (Java shows skill-use dialog → assert getDialogParameter()).
 - **take_root + blood_lust (bb2025) → Java tests (6 green first run).** Take Root: rolls only
   when oldPlayerState was STANDING and not already rooted; failed roll → isRooted; with a team
   reroll available the dialog is asked first (not rooted yet, game.getDialogParameter() set).
