@@ -1000,10 +1000,21 @@ Tally: 9 real Rust bugs.
 - **fumbled_ktm 7/7 + fumbled_ktm_apo_ko 5/5 → Java tests (12 green).** ApoKo variant passes a
   NULL attacker to the factory internally (attacker skills never apply; defender niggling does).
   4 Rust prunes.
-- Next: LAST injury files — bomb_with_modifier ×2 (BOMB_USES_MB bb2020 option branches); then
-  inducements 432, skill_behaviour 359, util 138.
-- Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
-  scripts/reconcile_step3.sh for the live list.
+## Step 3 REAL RUST BUG #10: bomb_with_modifier attacker semantics SWAPPED (fixed 2026-08-01)
+Java AbstractInjuryTypeBombWithModifier passes `injuryType.isCausedByOpponent() ? pAttacker :
+null` to findInjuryModifiers. Bomb does NOT override isCausedByOpponent (base default false →
+null attacker, Mighty Blow must NOT apply); BombForSpp overrides it to TRUE (real attacker,
+MB DOES apply). Rust had it exactly inverted in BOTH files — the base variant passed the
+attacker, the ForSpp variant hardcoded None (with a comment misstating the Java source).
+Fixed both handle_injury bodies and flipped both tests. Tally: 10 real Rust bugs.
+- **bomb_with_modifier 8/8 + bomb_with_modifier_for_spp 9/9 → Java tests (17 green).**
+  2 Rust prunes (default_equivalent_to_new ×2). Java gotcha: ArmorModifierFactory caches the
+  bombUsesMb flag in initialize(game), so tests enabling the option afterwards must re-call
+  `game.getFactory(ARMOUR_MODIFIER).initialize(game)`. bb2020 "Bomb" armor modifier is
+  SpecialEffectArmourModifier("Bomb", 1, false, BOMB) — legacy entry behind setUseAll.
+- **INJURY BUCKET CLOSED** (all injuryType files ported or exempted with breadcrumbs).
+- Next: inducements 432, skill_behaviour 359, util 138 — rerun scripts/reconcile_step3.sh
+  for the live list.
 
 ## Step 4 REAL RUST BUG #3: StepSafeThrow early NEXT_STEP (fixed 2026-07-26)
 

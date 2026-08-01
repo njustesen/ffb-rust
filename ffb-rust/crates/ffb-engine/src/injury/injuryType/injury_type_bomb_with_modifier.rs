@@ -73,19 +73,21 @@ impl InjuryTypeServer for InjuryTypeBombWithModifier {
         }
 
         if self.ctx.armor_broken {
-            // Java: `((InjuryModifierFactory) game.getFactory(...)).findInjuryModifiers(game, injuryContext,
-            // pAttacker, pDefender, isStab(), isFoul(), isVomitLike())` — Bomb never overrides
-            // isStab/isFoul/isVomitLike, all false.
+            // Bug (fixed, #10): Java's AbstractInjuryTypeBombWithModifier passes
+            // `injuryType.isCausedByOpponent() ? pAttacker : null` to findInjuryModifiers.
+            // Bomb does NOT override isCausedByOpponent (InjuryType base default false), so the
+            // attacker is null here and attacker-sourced injury modifiers (Mighty Blow) must NOT
+            // apply. The old code passed the attacker (the ForSpp variant had the exact inverse
+            // mistake). Bomb never overrides isStab/isFoul/isVomitLike, all false.
             if let Some(defender) = game.player(defender_id) {
-                let attacker = attacker_id.and_then(|aid| game.player(aid));
                 let mut factory = InjuryModifierFactory::new(game.rules);
-                for m in factory.find_injury_modifiers(game, attacker, defender, false, false, false) {
-                    self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), attacker, defender, game.rules));
+                for m in factory.find_injury_modifiers(game, None, defender, false, false, false) {
+                    self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), None, defender, game.rules));
                 }
                 if !added_special_armor_modifier {
                     factory.set_use_all(is_option_enabled(game, BOMB_USES_MB));
                     for m in factory.special_effect_injury_modifiers(SpecialEffect::BOMB) {
-                        self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), attacker, defender, game.rules));
+                        self.ctx.add_injury_modifier(leak_injury_modifier(m.as_ref(), None, defender, game.rules));
                     }
                 }
             }
@@ -182,13 +184,8 @@ mod tests {
     // skip path is added here; the property-name lookup itself is covered indirectly by
     // `armor_save_results_in_prone`/`armor_break_results_in_injury_roll` exercising the
     // non-skip branch.
-    #[test]
-    fn default_equivalent_to_new() {
-        let t1 = InjuryTypeBombWithModifier::new();
-        let t2 = InjuryTypeBombWithModifier::default();
-        assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
-        assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
-    }
+    // NOTE (test equalization): `default_equivalent_to_new` pruned — Rust `Default`-impl
+    // plumbing with no Java counterpart (Java has no Default trait).
 
     fn game_with_attacker_and_defender(attacker_skills: Vec<ffb_model::enums::SkillId>, defender_armour: i32) -> Game {
         use std::collections::HashSet;
@@ -212,21 +209,19 @@ mod tests {
         Game::new(home, away, Rules::Bb2025)
     }
 
+    // Bug (fixed, #10): this test previously asserted the OPPOSITE (that the attacker's Mighty
+    // Blow applies). Java passes `isCausedByOpponent() ? pAttacker : null` and Bomb does not
+    // override isCausedByOpponent (base default false) — attacker is null, MB must NOT apply.
+    // (The former `no_mighty_blow_no_injury_modifier` twin was folded into this — with a null
+    // attacker it was a vacuous duplicate.)
     #[test]
-    fn mighty_blow_adds_injury_modifier() {
+    fn attacker_mighty_blow_does_not_apply_because_bomb_not_caused_by_opponent() {
         use ffb_model::enums::SkillId;
         let game = game_with_attacker_and_defender(vec![SkillId::MightyBlow], 2);
         let mut t = InjuryTypeBombWithModifier::new();
         let mut rng = GameRng::new(1);
         t.handle_injury(&game, &mut rng, Some("attacker"), "defender", coord(), None, None, ApothecaryMode::Defender);
-        assert!(t.ctx.injury_modifiers.iter().any(|m| m.name == "Mighty Blow"));
-    }
-    #[test]
-    fn no_mighty_blow_no_injury_modifier() {
-        let game = game_with_attacker_and_defender(vec![], 2);
-        let mut t = InjuryTypeBombWithModifier::new();
-        let mut rng = GameRng::new(1);
-        t.handle_injury(&game, &mut rng, Some("attacker"), "defender", coord(), None, None, ApothecaryMode::Defender);
+        assert!(t.ctx.armor_broken);
         assert!(!t.ctx.injury_modifiers.iter().any(|m| m.name == "Mighty Blow"));
     }
 }
