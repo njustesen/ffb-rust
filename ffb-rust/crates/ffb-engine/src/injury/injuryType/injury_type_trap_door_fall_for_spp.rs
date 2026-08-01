@@ -68,23 +68,6 @@ mod tests {
     fn send_to_box_reason_is_trap_door_fall() {
         assert_eq!(InjuryTypeTrapDoorFallForSpp::new().send_to_box_reason(), Some(SendToBoxReason::TrapDoorFall));
     }
-    #[test]
-    fn java_class_name_matches_can_apo_ko_into_stun_lookup() {
-        let t = InjuryTypeTrapDoorFallForSpp::new();
-        assert_eq!(t.java_class_name(), "InjuryTypeTrapDoorFallForSpp");
-        assert!(!crate::injury::can_apo_ko_into_stun(Some(t.java_class_name())));
-    }
-    #[test]
-    fn context_stores_defender_id() {
-        let mut t = InjuryTypeTrapDoorFallForSpp::new(); let mut rng = GameRng::new(1);
-        t.handle_injury(&make_game(), &mut rng, None, "trap_victim", coord(), None, None, ApothecaryMode::Defender);
-        assert_eq!(t.ctx.defender_id.as_deref(), Some("trap_victim"));
-    }
-    #[test]
-    fn default_equivalent_to_new() {
-        let t1 = InjuryTypeTrapDoorFallForSpp::new();
-        let t2 = InjuryTypeTrapDoorFallForSpp::default();
-        assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
-        assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
-    }
+    // NOTE (test equalization): context-storage / Default / Rust-dispatch plumbing tests
+    // pruned — no faithful Java twins (Java's CALLER sets the context ids).
 }

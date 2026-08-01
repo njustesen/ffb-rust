@@ -44,16 +44,6 @@ mod tests {
     use crate::step::framework::test_team;
     use ffb_model::types::FieldCoordinate;
 
-    #[test]
-    fn sets_defender_and_attacker_ids() {
-        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
-        let mut rng = GameRng::new(1);
-        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
-        crowd_handle_injury(&mut ctx, &game, &mut rng, Some("atk1"), "def1",
-            FieldCoordinate::new(0, 0), ApothecaryMode::Defender);
-        assert_eq!(ctx.defender_id.as_deref(), Some("def1"));
-        assert_eq!(ctx.attacker_id.as_deref(), Some("atk1"));
-    }
 
     #[test]
     fn sets_armor_broken_true() {
@@ -74,34 +64,7 @@ mod tests {
             FieldCoordinate::new(0, 0), ApothecaryMode::Defender);
         assert!(ctx.injury.is_some());
     }
-    #[test]
-    fn sets_defender_coordinate() {
-        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
-        let mut rng = GameRng::new(1);
-        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
-        let coord = FieldCoordinate::new(3, 7);
-        crowd_handle_injury(&mut ctx, &game, &mut rng, None, "def1", coord, ApothecaryMode::Defender);
-        assert_eq!(ctx.defender_coordinate, Some(coord));
-    }
-    #[test]
-    fn sets_apothecary_mode() {
-        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
-        let mut rng = GameRng::new(1);
-        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
-        crowd_handle_injury(&mut ctx, &game, &mut rng, None, "def1",
-            FieldCoordinate::new(0, 0), ApothecaryMode::Attacker);
-        assert_eq!(ctx.apothecary_mode, ApothecaryMode::Attacker);
-    }
 
-    #[test]
-    fn attacker_id_is_none_when_not_provided() {
-        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
-        let mut rng = GameRng::new(1);
-        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
-        crowd_handle_injury(&mut ctx, &game, &mut rng, None, "def1",
-            FieldCoordinate::new(0, 0), ApothecaryMode::Defender);
-        assert_eq!(ctx.attacker_id, None);
-    }
 
     #[test]
     fn coordinate_values_are_preserved() {
@@ -113,15 +76,8 @@ mod tests {
         assert_eq!(ctx.defender_coordinate, Some(coord));
     }
 
-    #[test]
-    fn injury_is_some_after_call() {
-        let game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2016);
-        let mut rng = GameRng::new(3);
-        let mut ctx = InjuryContext::new(ApothecaryMode::Defender);
-        crowd_handle_injury(&mut ctx, &game, &mut rng, None, "def1",
-            FieldCoordinate::new(1, 2), ApothecaryMode::Defender);
-        assert!(ctx.injury.is_some());
-    }
+    // NOTE (test equalization): context-storage / Default / Rust-dispatch plumbing tests
+    // pruned — no faithful Java twins (Java's CALLER sets the context ids).
 
     /// isStab/isFoul/isVomitLike are all false for CrowdPush/CrowdPushForSpp, so Mighty
     /// Blow applies normally (same as a block) — proves the factory is now reached with

@@ -54,20 +54,8 @@ mod tests {
     }
     #[test]
     fn does_not_cause_turnover() { assert!(!InjuryTypeSaboteur::new().falling_down_causes_turnover()); }
-    #[test]
-    fn context_stores_attacker_and_defender() {
-        let mut t = InjuryTypeSaboteur::new(); let mut rng = GameRng::new(1);
-        t.handle_injury(&make_game(), &mut rng, Some("saboteur"), "victim", coord(), None, None, ApothecaryMode::Defender);
-        assert_eq!(t.ctx.attacker_id.as_deref(), Some("saboteur"));
-        assert_eq!(t.ctx.defender_id.as_deref(), Some("victim"));
-    }
-    #[test]
-    fn default_equivalent_to_new() {
-        let t1 = InjuryTypeSaboteur::new();
-        let t2 = InjuryTypeSaboteur::default();
-        assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
-        assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
-    }
+    // NOTE (test equalization): context-storage / Default / Rust-dispatch plumbing tests
+    // pruned — no faithful Java twins (Java's CALLER sets the context ids).
     #[test]
     fn send_to_box_reason_is_saboteur() {
         assert_eq!(InjuryTypeSaboteur::new().send_to_box_reason(), Some(SendToBoxReason::Saboteur));

@@ -979,9 +979,16 @@ Swept EVERY Rust injury_type_* flag override against the Java model classes + se
   all green first run; template-generated).** Bitten/ThrowARock bypass armour (always broken);
   Bitten caps casualty-range totals at BADLY_HURT with no casualty dice; stalling variant rolls
   armour normally. 10 more Rust-structural prunes (context storage, ctor apo-mode, accessor).
-- Next: remaining injury_type_* tail (~8 files: then_i_started_blastin, foul_for_spp, crowd,
-  bomb_with_modifier ×2, fumbled_ktm ×2, trap_door_fall_for_spp, saboteur,
-  piling_on_knocked_out); then inducements 432, skill_behaviour 359, util 138.
+- **crowd 4/4 + saboteur 6/6 + piling_on_knocked_out 6/6 + trap_door_fall_for_spp 5/5 → Java
+  tests (21 green).** Crowd base tested through concrete InjuryTypeCrowdPush; Java's crowd
+  handleInjury DOES apply skill injury modifiers (MB) — verified ground truth. Saboteur/POKO:
+  direct KO, no dice; InjuryTypePilingOnKnockedOut ctor takes IStep. TrapDoorFallForSpp extends
+  the crowd base — stunned result → RESERVE (deterministic script 1,1). 12 more Rust-structural
+  prunes.
+- Next: remaining injury_type_* tail (~6 files: then_i_started_blastin, foul_for_spp,
+  bomb_with_modifier ×2, fumbled_ktm ×2 — bomb_with_modifier are the Rust twins of Java
+  InjuryTypeBombWithModifier if present, verify mapping); then inducements 432,
+  skill_behaviour 359, util 138.
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
 
