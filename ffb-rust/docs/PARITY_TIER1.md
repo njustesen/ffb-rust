@@ -620,3 +620,18 @@ Seeds 1-6: 6/6 match. +1 test. (Diagnosis: first rng_calls divergence → prior 
 DICE_TRACE caller=StepCatchScatterThrowIn.bounceBall pinpointed the missing bounce.)
 
 Next: seed 7 first divergence i=39/40 (turn 3 half 1, turn-structure desync — Java home vs Rust away active).
+
+## Iter 27 (2026-08-02) — agent caches turn-start eligibility; no-target blitz ends turn prone (62528277)
+
+Seed 7 i=39: Java Activate(away_01,BLITZ) vs Rust Activate(away_01,Move) — same board. away_01 (prone at
+(13,6)) was blitz-eligible at TURN START (home_02 adjacent-standing at (12,6)); away_02's Block at i=37
+knocked home_02 prone. Java ParityRunner computes eligibleThisTurn ONCE per turn (keeps the cached BLITZ);
+the Rust agent used the engine's LIVE per-activation list (recomputed to [Move] once home_02 fell). Three
+linked fixes: (1) RandomAgent snapshots the eligible player->actions list at turn start (eligible_this_turn),
+picking from it (targets stay live); (2) StepInitBlocking: a blitz with no defender ends the turn (Java
+BLITZ_TARGET_NONE -> EndTurn) instead of waiting forever; (3) StepInitSelecting: a prone Blitz with NO
+target suppresses the stand-up (Java resolves the target BEFORE standing up, so a null-target blitz ends
+the turn PRONE). Seeds 1-7: 7/7. Updated 1 test + added the no-target suppression test.
+
+Next: seed 8 first divergence i=9 (away_03 BLOCK) — Rust rolls 1 MORE game-die than Java (Rrng 15->20 vs
+Jrng 15->19). A block-resolution divergence (extra Rust roll); use FFB_DICE_TRACE Java caller= to pinpoint.
