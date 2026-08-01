@@ -486,8 +486,19 @@ impl StepDropFallingPlayers {
                 out = out.publish(StepParameter::DropPlayerContext(Box::new(dpc)));
                 out = out.publish(StepParameter::InjuryResult(Box::new(injury_result_attacker)));
             } else {
-                // Java: new SteadyFootingContext(injuryResultAttacker, deferredCommands)
-                // deferredCommands not yet ported — always empty; InjuryResult variant
+                // Java: new SteadyFootingContext(injuryResultAttacker, deferredCommands) where
+                // deferredCommands holds a DropPlayerCommand(attacker, ATTACKER, true) for the normal
+                // (non-fell-from-rush) block fall. The DeferredCommand mechanism isn't ported, so apply
+                // the attacker drop directly here — it converts FALLING→PRONE and, when the attacker
+                // was the ball carrier, sets the ball scattering (the bounce d8 is rolled later in
+                // StepCatchScatterThrowIn). For bb2016/bb2020 the drop already happened above under the
+                // PilingOn branch, so restrict this to the editions that skipped it (bb2025). The
+                // fell-from-rush and saboteur cases are handled by their own branches.
+                if !piling_on_supported && !fell_from_rush {
+                    for p in drop_player(game, &attacker_id, true) {
+                        out = out.publish(p);
+                    }
+                }
                 let ctx = SteadyFootingContext::from_injury_result(injury_result_attacker);
                 out = out.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
             }
@@ -604,6 +615,26 @@ mod tests {
             "expected SteadyFootingContext for falling attacker");
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
             "expected END_TURN for falling attacker");
+    }
+
+    #[test]
+    fn bb2025_falling_attacker_with_ball_scatters_it() {
+        // bb2025 Both Down: a ball-carrying attacker knocked down drops the ball. Java defers a
+        // DropPlayerCommand(attacker); Rust applies the drop here (DeferredCommand not ported). Without
+        // it the ball stayed put and the game-die stream desynced (seed 5 i=159).
+        let mut game = make_game();
+        let coord = FieldCoordinate::new(5, 5);
+        add_player(&mut game, "home", "atk", coord, PS_FALLING);
+        add_player(&mut game, "away", "def", FieldCoordinate::new(6, 5), PS_STANDING);
+        game.acting_player.player_id = Some("atk".into());
+        game.defender_id = Some("def".into());
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_in_play = true;
+        let mut step = StepDropFallingPlayers::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.field_model.ball_moving, "ball carried by a knocked-down attacker must be set moving");
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInMode(_))),
+            "expected a ball scatter for the falling ball-carrying attacker");
     }
 
     #[test]
