@@ -1456,3 +1456,25 @@ Remaining Step-3 factory GAP (21 tests): prayer_handler_factory (11), card_handl
   as the sequence_generator_factory stub). NOTE (known divergence).
 
 Remaining Step-3 factory GAP (11 tests): prayer_handler_factory (11) — next iteration.
+
+## Iteration 85 — factory bucket CLOSED: prayer_handler_factory (+6 ffb-server)
+
+- **PrayerHandlerFactoryTest (6)** — Scanner-populated PrayerHandlerFactory: forName miss → null;
+  forPrayer empty before init; forPrayer finds the handler after initialize (bb2020 FOULING_FRENZY,
+  bb2025 TREACHEROUS_TRAPDOOR + DAZZLING_CATCHING). Edition split verified: BB2020 has NECESSARY_VIOLENCE
+  and NOT DAZZLING_CATCHING; BB2025 the reverse. Key insight: `PrayerHandler.handles()` is an IDENTITY
+  compare (`prayer == handledPrayer()`) and BB2020/BB2025 are DISTINCT Prayer enums
+  (com.fumbbl.ffb.inducement.bb2020.Prayer vs bb2025.Prayer), so each edition factory only matches its
+  own edition's Prayer constants — cross-edition lookups (bb2025.DAZZLING_CATCHING on a bb2020 factory)
+  return empty by identity mismatch, matching the Rust edition-partition tests.
+- Exempt: initialize_bb20xx_registers_sixteen_handlers ×2 (Rust Vec len — no Java size getter);
+  new_factory_is_empty (folded into before-init checks); deactivate_prayers ×2 — Java's `deactivatePrayers`
+  is a PRIVATE method on StepEndTurn (bb2020/bb2025), NOT the factory (Rust method-placement divergence),
+  covered by StepEndTurn step tests.
+
+**Step-3 factory bucket now closed on testable surface.** Remaining factory GAP (11 tests) is all exempt:
+sequence_generator_factory (7, non-functional name stub), deferred_command_id_factory (2) +
+deferred_command_factory (2) (Phase-ZU stubs). Reconcile GAP by dir now: skill_behaviour (118),
+model (11), bb2016/bb2020/bb2025 (11 each), + engine-infra singles (talk/replay_state/id_generator/
+active_effects/etc.). Next: model (11) or the skill_behaviour bucket (largest — mostly negatrait step
+files whose behaviour is covered; verify vs exempt).
