@@ -106,10 +106,9 @@ mod tests {
         assert!(!game.field_model.has_prayer_enhancement("a1", PRAYER_NAME));
     }
 
-    #[test]
-    fn prayer_name_constant_is_bad_habits() {
-        assert_eq!(PRAYER_NAME, "BAD_HABITS");
-    }
+    // NOTE (test equalization): `prayer_name_constant_is_bad_habits` pruned — Rust-structural
+    // constant plumbing (Java's mixed handler is abstract with no name constant; the prayer
+    // identity is covered by the bb2020/bb2025 handledPrayer twins).
 
     #[test]
     fn affected_players_returns_one_for_roll_one() {

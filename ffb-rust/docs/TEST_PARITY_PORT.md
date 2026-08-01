@@ -1016,6 +1016,22 @@ Fixed both handle_injury bodies and flipped both tests. Tally: 10 real Rust bugs
 - Next: inducements 432, skill_behaviour 359, util 138 — rerun scripts/reconcile_step3.sh
   for the live list.
 
+## Step 3 inducements bucket — PRAYER HANDLER RECIPE (established 2026-08-01)
+Java: com.fumbbl.ffb.server.inducements.{mixed,bb2020,bb2025}/prayers. mixed handlers are
+abstract (RandomSelectionPrayerHandler/PrayerHandler); concrete per-edition subclasses override
+handledPrayer()/selector()/addedSkills(). Test recipe:
+- Instantiate concrete handler directly; `handler.initEffect(gameState, team)` (2-arg public
+  variant — the IStep wrapper isn't needed). affectedPlayers rolls d3 → installScriptedDice 1 die.
+- GameFixture players all start RESERVE + TurnMode.START_GAME → PlayerSelector.eligiblePlayers
+  returns everyone (RESERVE branch). selectPlayers uses Collections.shuffle — NO gameState dice.
+- Enhancement check: `player.hasActiveEnhancement(Prayer.X.getName())` ("Bad Habits" display
+  name, NOT the Rust "BAD_HABITS" enum string). Add via
+  `game.getFieldModel().addPrayerEnhancements(player, Prayer.X)`.
+- mixed abstract behavior tested from a SAME-PACKAGE Java test via a concrete subclass typed as
+  the mixed class (protected affectedPlayers reachable).
+- **bad_habits_handler ×3 (mixed 6 + bb2020 5 + bb2025 5) → Java tests (16 green).** 1 Rust
+  prune (PRAYER_NAME constant plumbing).
+
 ## Step 4 REAL RUST BUG #3: StepSafeThrow early NEXT_STEP (fixed 2026-07-26)
 
 Found while porting bb2016/pass/StepSafeThrow. Rust step_safe_throw::execute_step early-returned
