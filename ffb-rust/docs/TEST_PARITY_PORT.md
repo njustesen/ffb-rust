@@ -1677,3 +1677,20 @@ StepGoForItBb2020FixtureTest don't match the StepGoForIt token though they cover
 Step-4 approach going forward: one untested StepId family per iteration, porting the fixture-expressible
 subset (param keys + no-skill/guard fall-throughs) and deferring dice/command/target-state tests, per the
 established step-YIELD triage. 60 untested families remain after this.
+
+## Iteration 96 — Step-4: StepJuggernaut + StepWrestle (+6 ffb-server)
+
+- **StepJuggernautFixtureTest (4)** — Blitz-only block negatrait: no-Juggernaut Blitz player → NEXT_STEP;
+  non-Blitz action → NEXT_STEP; OLD_DEFENDER_STATE accepted via setParameter (GOTO_LABEL_ON_SUCCESS is
+  init-set → exempt); unknown key → false. Juggernaut's hook short-circuits to NEXT on the action/skill
+  guard, so the fall-throughs port cleanly (defender set via setDefenderId).
+- **StepWrestleFixtureTest (2)** — OLD_DEFENDER_STATE accepted; unknown → false. Its behavioural
+  fall-through is DEFERRED: **NEXT-vs-REPEAT observation** — Rust neither_has_wrestle_returns_next asserts
+  NextStep, but Java StepWrestle start (placed attacker+defender, no OLD_DEFENDER_STATE yet) returns REPEAT
+  — the WrestleBehaviour hook doesn't short-circuit to NEXT before consuming defender state (unlike
+  Juggernaut). Whether that's a fixture-state gap or a NEXT/REPEAT divergence needs a WrestleBehaviour-hook
+  vs Rust-start comparison — flagged for focused follow-up, not asserted here.
+
+Recipe note: hook-delegating block/blitz steps that only short-circuit on an action/skill guard (Juggernaut,
+Dauntless) port their guard fall-throughs cleanly with a placed defender + setDefenderId; those that consume
+defender state first (Wrestle, BlockDodge) yield only the setParameter subset. 58 untested StepId families remain.
