@@ -154,3 +154,29 @@ ParityRunner's BLITZ handling (JAVA_P2 shows away3 does one BLITZ_MOVE=the block
 different player). Align Rust to stop the blitzer after its block (or match whatever Java's continued-move
 policy is), add a test, rerun. NOTE: also confirm the coord-sorted move-target logic (AGENT_CONTRACT §3/§6)
 isn't separately producing the (14,8)↔(14,9) wander.
+
+## Iter 7 (2026-08-01) — FIX #3 APPLIED: blitzer ends after its block (no continued move)
+
+Java ParityRunner (lines 1007-1021): a BLITZ sends the block ONCE (blitzBlockSent guard) then ENDS the
+activation (JAVA_BLITZ_END → deselect). The blitzer never spends remaining MA moving. Rust's agent had no
+per-activation action memory, so the post-block Move prompt was treated as a normal move → the blitzer
+wandered 7+ squares. FIX (Rust agent only): added `current_activation_is_blitz` flag (mirrors Java
+blitzBlockSent), set when a Blitz/StandUpBlitz action is picked; the Move-prompt handler now returns
+EndPlayerAction (0 rng) on the first Move prompt of a blitz activation. VERIFIED via rust_events.jsonl:
+away_03 now blocks home_03, pushes, and STOPS (next player away_02) — 1:1 with Java's block-then-end.
+
+VERIFIED PARTIAL: seed1 step0 post_hash 3205e1285d49894b → 88336fa29764452e (still ≠ Java 9c55510376cb6887).
+home_03 (the pushed defender) now lands at (11,7) on BOTH engines (pushback fully correct). RESIDUAL: one
+away player's final position still differs (state-string a03 = 20,5 Rust vs 18,4 Java).
+
+ID MAPPING RESOLVED (important for reading state strings): the rust_events/JAVA player ids are 1-based
+(away_03) but the RUST_STEP/JSTEP state string is 0-based (a00..a10, h00..h10). So away_03 = a02,
+home_03 = h02. At step0 start a02(away_03)=13,8 and h02(home_03)=12,8 — ADJACENT, so the blitzer blocks
+with NO pre-block move (consistent with §8). The residual difference is at a03 = away_04 (20,5 vs 18,4),
+NOT the blitzer — a04 should NOT move during away_03's activation, so investigate why a04's position
+diverges in step0 (candidates: a chain-push of a04 during home_03's pushback? a04 adjacent to the push
+path? or the state snapshot timing). NEXT: diff the FULL step0 pre- vs post- state (all 22 players) Rust
+vs Java to find exactly which player(s) and coordinate differ, then root-cause that single delta.
+
+NOTE: fix #3 is verified at integration level (parity events match Java's blitz-end). A focused agent
+unit test needs a driver fixture that presents a Move prompt with the blitz flag set — add next iteration.

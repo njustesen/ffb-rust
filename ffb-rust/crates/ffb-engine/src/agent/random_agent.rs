@@ -44,6 +44,11 @@ pub struct RandomAgent {
     last_turn_key: Option<(i32, i32, bool)>,
     /// Debug: cumulative actionRng call count (for FFB_TRACE divergence diagnosis).
     action_rng_count: u64,
+    /// True once the current activation is a Blitz/StandUpBlitz. Mirrors Java ParityRunner's
+    /// `blitzBlockSent`: a blitzer blocks immediately and then ENDS its activation — it never
+    /// spends remaining MA moving (before or after the block). Set when a Blitz action is picked,
+    /// consumed by the Move-prompt handler to deselect instead of continuing to move.
+    current_activation_is_blitz: bool,
 }
 
 impl RandomAgent {
@@ -55,6 +60,7 @@ impl RandomAgent {
             used_this_turn: HashSet::new(),
             last_turn_key: None,
             action_rng_count: 0,
+            current_activation_is_blitz: false,
         }
     }
 
@@ -67,6 +73,7 @@ impl RandomAgent {
             used_this_turn: HashSet::new(),
             last_turn_key: None,
             action_rng_count: 0,
+            current_activation_is_blitz: false,
         }
     }
 
@@ -236,12 +243,26 @@ impl Agent for RandomAgent {
                 if std::env::var("FFB_TRACE").is_ok() {
                     eprintln!("RUST_ACT_END arc={}", self.action_rng_count);
                 }
+                // Java ParityRunner: a Blitz blocks immediately then ends the activation (no MA
+                // spent moving). Remember this so the follow-up Move prompt deselects instead of
+                // wandering with remaining movement.
+                self.current_activation_is_blitz = matches!(
+                    player_action,
+                    PlayerActionChoice::Blitz | PlayerActionChoice::StandUpBlitz
+                );
                 Action::ActivatePlayer { player_id: player_id.clone(), player_action, block_defender_id }
             }
             // Move prompt: pick destination from legal squares using actionRng.
             Some(AgentPrompt::Move { player_id, squares }) => {
                 if std::env::var("FFB_TRACE").is_ok() {
                     eprintln!("RUST_SMA pid={} N={}", player_id, squares.len());
+                }
+                // Java ParityRunner ends a Blitz activation right after its block (blitzBlockSent →
+                // deselect); the blitzer never spends remaining MA. Match that: on the post-block
+                // Move prompt, deselect instead of moving. 0 RNG consumed (same as Java's deselect).
+                if self.current_activation_is_blitz {
+                    self.current_activation_is_blitz = false;
+                    return Action::EndPlayerAction;
                 }
                 if squares.is_empty() {
                     // No adjacent empty square: deselect, ending the activation — 1:1 with Java
