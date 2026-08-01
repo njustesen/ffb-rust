@@ -592,6 +592,10 @@ Remaining ffb-common GAP files are all DOCUMENTED EXEMPTIONS (Rust-only, no fait
   (owner = turn-data inducement set the card is available in via addAvailableCard). Java fixture
   has 3 players/team so the twin asserts team-membership of ALL returned rather than an exact
   single. activate/deactivateCard subset deferred (needs IStep + CardHandler wiring).
+- **util_server_pushback (findStartingSquare) → Java tests (6 green).** Pure attacker->defender
+  delta → push Direction (N/S/E/W + diagonals), anchored on the defender coordinate; equal
+  coordinates return null. findPushbackSquares (out-of-bounds filter / free-square preference /
+  crowd-push) deferred — needs Game + field occupancy setup.
 Plus the in-file util_player exemptions (canGaze x4, refresh x7, partner-not-on-field x1, new/default x2)
 and UtilDisturbingPresence empty-player x1 — all commented at their Java test sites.
 - prayer_state (6): NOT ffb-common — com.fumbbl.ffb.server.PrayerState → belongs to Step 3 (ffb-server).
