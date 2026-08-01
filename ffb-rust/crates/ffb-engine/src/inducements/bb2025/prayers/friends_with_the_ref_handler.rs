@@ -71,10 +71,7 @@ mod tests {
         assert_eq!(h.get_name(), "FriendsWithTheRefHandler");
     }
 
-    #[test]
-    fn handles_prayer_is_case_sensitive() {
-        let h = FriendsWithTheRefHandler;
-        let prayer = h.handled_prayer_name();
-        assert!(!h.handles_prayer(&prayer.to_lowercase()));
-    }
+    // NOTE (test equalization): `handles_prayer_is_case_sensitive` pruned - Rust-structural
+    // (handles_prayer takes a string; Java's handles(Prayer) is enum-based, a lowercase
+    // variant is inexpressible there).
 }

@@ -1031,6 +1031,11 @@ handledPrayer()/selector()/addedSkills(). Test recipe:
   the mixed class (protected affectedPlayers reachable).
 - **bad_habits_handler ×3 (mixed 6 + bb2020 5 + bb2025 5) → Java tests (16 green).** 1 Rust
   prune (PRAYER_NAME constant plumbing).
+- **fouling_frenzy ×3 + friends_with_the_ref ×3 → Java tests (30 green).** PrayerState-flag
+  handlers: initEffect/removeEffectInternal flip gameState.getPrayerState()
+  add/remove/hasFoulingFrenzy / isFriendsWithRef — no dice, no players needed. 4 Rust prunes
+  (handles_prayer_is_case_sensitive ×4 — string-based check inexpressible against Java's
+  enum-typed handles(Prayer)). getName() == simple class name is portable.
 
 ## Step 4 REAL RUST BUG #3: StepSafeThrow early NEXT_STEP (fixed 2026-07-26)
 
