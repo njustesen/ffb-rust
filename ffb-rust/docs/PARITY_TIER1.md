@@ -250,3 +250,29 @@ the step that emits AgentPrompt::Move) — if the ENGINE includes occupied squar
 fix it there. If instead the agent should filter (mirroring ParityRunner computing its own list), filter in
 the agent. Verify targets=4 for away5 and step1 post_hash == 69d972900b86dfd0. Add a Rust test. NOTE ordering
 also matters: after excluding occupied, both sort by (x,y) then actionRng-pick — confirm idx aligns.
+
+## Iter 10 CORRECTION — step2 is a PLAYER-PICK divergence, not move-execution
+
+Read the authoritative JSONL (not just traces): step1 (away3 BLITZ) fully matches on both (post 9c55).
+The comparator's "step 2" failure is the PLAYER SELECTION at step2:
+- JAVA_ACT_PICK step2 = away5, N=1, idx=0.
+- RUST_ACT_PICK step2 = away_10, N=1, idx=0.
+Both pick idx=0 of a size-1 "remaining" list, but the list's element differs (Java away5 vs Rust away_10).
+Step1 picks matched (both N=3 idx=2 → away3). So entering step2 the boards match but the agent's
+eligible/remaining list resolves to a DIFFERENT first player. (My earlier "away5 → 21,8 vs 20,8 move" note
+was a RED HERRING — comparing away5's move across different activations/turns, not the step2 cause.)
+
+### Open item #3C (next): eligible/remaining player-list ordering or content at step2
+Root-cause why Rust's remaining list at step2 has away_10 where Java's has away5. Per AGENT_CONTRACT §4:
+eligible_this_turn = the engine's eligible list snapshot in ROSTER ORDER (not sorted); remaining =
+eligible minus used_this_turn (Phase-2 also drops players with empty action lists); pick idx via
+decisionRng. The size matches (both N=1) but the content differs, so either (a) the engine's
+AgentPrompt::ActivatePlayer eligible_players list is in a different ORDER in Rust vs Java, or (b) the
+used_this_turn / already-acted bridging removes different players, or (c) the "empty action list" Phase-2
+filter differs. Also investigate why N=1 (only 1 remaining) so early — the eligible snapshot semantics.
+Diagnose: FFB_TRACE=1, dump the full eligible_players list (add a trace of the list contents, not just N)
+at step2 on both sides; compare to Java ParityRunner's eligible construction + StepInitSelecting. Fix Rust
+(engine eligible-list order if it's the engine; agent remaining-logic if it's the agent) to match Java.
+Add a test. Verify step2 picks away5 and step2 post matches, then advance. NOTE: correct the iter10 commit's
+"move-target occupied squares" lead — that was mis-diagnosed; the occupied-square N=6 trace was away5 in a
+LATER turn, not step2.
