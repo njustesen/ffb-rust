@@ -619,6 +619,10 @@ Remaining ffb-common GAP files are all DOCUMENTED EXEMPTIONS (Rust-only, no fait
 - **util_server_dialog → Java tests (6 green).** showDialog stores the dialog parameter (sets
   waitingForOpponent only when the turn timer is stopped); hideDialog clears both (idempotent).
   Used DialogReRollParameter() as a simple IDialogParameter.
+- **util_server_player_move (fetchMoveStack / fetchFromSquare) → Java tests (5 green).** Home
+  commands pass move coordinates through unchanged; away commands transform() each to the home
+  perspective; empty input → empty. Constructed ClientCommandMove. updateMoveSquares / isValidMove
+  (movement-square population, GFI/dodge marking) deferred — needs full game/pathing state.
 Plus the in-file util_player exemptions (canGaze x4, refresh x7, partner-not-on-field x1, new/default x2)
 and UtilDisturbingPresence empty-player x1 — all commented at their Java test sites.
 - prayer_state (6): NOT ffb-common — com.fumbbl.ffb.server.PrayerState → belongs to Step 3 (ffb-server).
