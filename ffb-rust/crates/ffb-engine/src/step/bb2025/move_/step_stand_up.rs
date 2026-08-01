@@ -103,7 +103,14 @@ impl StepStandUp {
             .unwrap_or(true);
 
         if !roll_stand_up_needed {
-            // MA >= 3 or has canStandUpForFree — stand up for free
+            // MA >= 3 or has canStandUpForFree — stand up for free. Set the base PRONE→STANDING (the
+            // deleted engine.rs did this in its StandUp dispatch; Java reaches STANDING via the
+            // standing-up flow). current_move already holds the STAND_UP_COST from the activation.
+            if let Some(pid) = game.acting_player.player_id.clone() {
+                if let Some(ps) = game.field_model.player_state(&pid) {
+                    game.field_model.set_player_state(&pid, ps.change_base(ffb_model::enums::PS_STANDING));
+                }
+            }
             game.acting_player.has_moved = true;
             game.acting_player.standing_up = false;
             return StepOutcome::next();

@@ -74,19 +74,40 @@ impl ActingPlayer {
         *self = Self::default();
     }
 
+    /// Java `ActingPlayer.setPlayer(Player)` → `setPlayerId(id)` followed by `setPlayerAction(action)`.
+    /// `setPlayerId` returns early when the id is unchanged (`StringTool.isEqual`), so the per-activation
+    /// field reset only fires when a *different* player is set; the action is always (re)assigned.
+    /// Mirroring Java's early-return is essential: e.g. Move→Block on the same blitzer must NOT wipe
+    /// `has_moved`, and a fresh activation must reset `has_moved` so StepStandUp isn't skipped by a
+    /// stale flag left over from the player's previous turn.
     pub fn set_player(&mut self, id: PlayerId, action: PlayerAction) {
-        self.player_id = Some(id);
+        let same_id = self.player_id.as_ref() == Some(&id);
+        if !same_id {
+            // Java setPlayerId field reset (only the fields modelled in Rust).
+            self.player_id = Some(id);
+            self.defender_id = None;
+            self.current_move = 0;
+            self.goes_for_it = false;
+            self.dodging = false;
+            self.has_blocked = false;
+            self.has_fouled = false;
+            self.has_passed = false;
+            self.has_moved = false;
+            self.has_fed = false;
+            self.has_acted = false;
+            self.standing_up = false;
+            self.jumping = false;
+            self.suffering_blood_lust = false;
+            self.suffering_animosity = false;
+            self.fumblerooskie_pending = false;
+            self.held_in_place = false;
+            self.must_complete_action = false;
+            self.fell_from_rush = false;
+            self.has_triggered_effect = false;
+            self.forgone = false;
+        }
+        // Java setPlayerAction: always (re)assign the action.
         self.player_action = Some(action);
-        self.defender_id = None;
-        self.current_move = 0;
-        self.goes_for_it = false;
-        self.standing_up = false;
-        self.jumping = false;
-        self.has_acted = false;
-        self.held_in_place = false;
-        self.suffering_blood_lust = false;
-        self.forgone = false;
-        self.must_complete_action = false;
     }
 
     pub fn is_active(&self) -> bool {
@@ -162,6 +183,34 @@ mod tests {
         ap.set_must_complete_action(true);
         ap.set_player("p1".into(), PlayerAction::Move);
         assert!(!ap.is_must_complete_action());
+    }
+
+    #[test]
+    fn set_player_new_id_resets_has_moved() {
+        // Java setPlayerId resets fHasMoved on a fresh activation. A stale has_moved would make
+        // StepStandUp's `isStandingUp() && !hasMoved()` guard skip the free stand-up.
+        let mut ap = ActingPlayer::new();
+        ap.set_player("p1".into(), PlayerAction::Move);
+        ap.has_moved = true;
+        ap.has_blocked = true;
+        ap.dodging = true;
+        // Activate a different player: everything resets.
+        ap.set_player("p2".into(), PlayerAction::Move);
+        assert!(!ap.has_moved);
+        assert!(!ap.has_blocked);
+        assert!(!ap.dodging);
+    }
+
+    #[test]
+    fn set_player_same_id_preserves_has_moved_updates_action() {
+        // Java setPlayerId early-returns on an unchanged id (StringTool.isEqual), so per-activation
+        // flags survive; only the action is (re)assigned. E.g. Move→Block on the same blitzer.
+        let mut ap = ActingPlayer::new();
+        ap.set_player("p1".into(), PlayerAction::Move);
+        ap.has_moved = true;
+        ap.set_player("p1".into(), PlayerAction::Block);
+        assert!(ap.has_moved, "same-id set_player must not wipe has_moved");
+        assert_eq!(ap.player_action, Some(PlayerAction::Block), "action must update");
     }
 
     #[test]

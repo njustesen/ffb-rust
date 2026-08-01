@@ -29,7 +29,13 @@ pub fn check_command_with_acting_player(game: &Game, acting_player_id: &str) -> 
 /// actingPlayer.dodging and dodge rolls never fired.
 pub fn change_player_action(game: &mut Game, player_id: &str, action: PlayerAction, jumping: bool) {
     if !player_id.is_empty() {
+        // Java UtilActingPlayer.changeActingPlayer: standingUp = (oldState.base == PRONE). A prone
+        // player being activated is "standing up" this activation, which lets StepStandUp resolve the
+        // stand-up. set_player resets standing_up=false, so set it AFTER, from the pre-activation base.
+        let was_prone = game.field_model.player_state(player_id)
+            .map(|s| s.base() == ffb_model::enums::PS_PRONE).unwrap_or(false);
         game.acting_player.set_player(player_id.to_owned(), action);
+        game.acting_player.standing_up = was_prone;
         game.acting_player.jumping = jumping;
         // Java: UtilServerPlayerMove.updateMoveSquares(pStep.getGameState(), actingPlayer.isJumping());
         crate::util::util_server_player_move::UtilServerPlayerMove::update_move_squares(game, jumping);
