@@ -1570,3 +1570,16 @@ start the skill_behaviour bucket verification pass.
 Remaining Step-3 gaps: bb2016/bb2020 spp_mechanic (5 each), bb2016/bb2020/bb2025 apothecary_mechanic
 (6 each), and the big skill_behaviour bucket (118). Next: bb2020 + bb2016 spp_mechanic, then the
 apothecary mechanics.
+
+## Iteration 91 — bb2020 + bb2016 spp_mechanic (+10 ffb-server) — spp_mechanic complete
+
+- **bb2020 SppMechanicTest (5)** — MVP 4, deflection 1; addCompletion/addCasualty set the additional-SPP
+  flag when the player's team is in the extra set (else base counter only).
+- **bb2016 SppMechanicTest (5)** — MVP 5, touchdown 3 (flat), deflection 1; addCompletion/addCasualty
+  increment base counters.
+All three editions' SppMechanic now ported (bb2016/bb2020/bb2025), each with its edition-specific values
+(bb2016 MVP=5; bb2020/bb2025 MVP=4; bb2025 alone has Brawlin' Brutes touchdown/casualty deltas). Java
+add* methods read the team via pr.getPlayer().getTeam() (2-arg); the Rust threads team_id — structural-only.
+
+Remaining Step-3 mechanic gaps: bb2016/bb2020/bb2025 apothecary_mechanic (6 each). Then the big
+skill_behaviour bucket (118). Next: apothecary_mechanic across the three editions.
