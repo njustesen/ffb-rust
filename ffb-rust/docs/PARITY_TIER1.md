@@ -403,3 +403,30 @@ active bit? Compare Rust's turn-start/active-bit logic (refreshPlayersForTurnSta
 home_01's turn-1 fate (KD vs stunned) from the events log. Fix Rust so home_01 is active at step23 (matching
 Java); verify step23 picks home1 and matches. This is an ENGINE bug (active-bit), distinct from the agent
 0-rng pattern.
+
+## Iter 16 (2026-08-01) — step23 root cause narrowed: turn-start fails to reactivate a KD-prone player
+
+Facts (from events + trace): home_01 fell KD in turn 1 (playerFellDown at (11,8); armor_roll [4,3]=7,
+armor NOT broken, injury_roll null, was_ko/was_cas false) → a knocked-down, uninjured player. When a player
+falls, Rust sets change_active(false) (see step_wrestle / action/common/mod.rs / injury paths). At its
+team's NEXT turn (turn 2), a KD-prone player must be REACTIVATED (active=true) so it can stand up — Java
+does this and activates home_01 at step23. Rust's pick loop reads field_model.is_active(home_01)==FALSE and
+REJECTS it (is_prone && !is_active), drawing an extra decisionRng → picks home9 → desync. The active bit is
+NOT part of state_hash (steps 1-22 matched despite this), so the divergence only surfaces via the pick.
+
+HYPOTHESIS (precise): Rust's start-of-turn processing does NOT reset fallen (KD-prone) players' active bit
+to true in field_model. (The eligible-list build's ELIGIBLE_CHECK printed active=true — that may be a
+computed/snapshot value that does NOT reflect the persisted field_model bit the pick loop reads; OR the
+reset runs for standing players only.) Java's turn-start (refreshPlayersForTurnStart / StepEndTurn
+start-turn) sets all non-stunned players active, including prone KD ones; a JUST-recovered-from-STUNNED
+player is the only prone player left inactive that turn.
+
+### Open item #8 (next, engine): reactivate KD-prone players at turn start (Rust engine)
+Find the Rust start-of-turn/turn-handover step (StepEndTurn → start next turn; where turns_played
+increments, where STUNNED→PRONE recovery happens) and confirm whether it sets active=true for prone
+non-stunned players in field_model. Compare to Java ffb-server (StepEndTurn / UtilServerGame /
+refreshPlayersForTurnStart — READ-ONLY). Fix RUST engine so a KD-prone player is active at its team's turn
+start (and a just-unstunned player is NOT). Add a Rust test (fall a player, advance to its next turn,
+assert is_active()==true; stun a player, assert its recovery turn is_active()==false). Verify home_01's
+field_model is_active()==true at step23 (add a temp trace of home_01.is_active at the pick), step23 picks
+home1, and matches. NO hacks. (8 agent fixes + drc instrumentation committed; seed1 matches through step22.)
