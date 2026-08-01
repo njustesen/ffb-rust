@@ -50,6 +50,10 @@ pub fn remove_effect_internal_random_selection(
 }
 
 #[cfg(test)]
+// NOTE (test equalization): this Rust-side helper-module test suite has NO dedicated Java twin
+// class — Java's abstract RandomSelectionPrayerHandler is exercised through the concrete
+// handler twins (BadHabits/GreasyCleats/Stiletto/Moles initEffect + wasted-case + selector
+// tests), which call the exact same code paths. Documented exemption in TEST_PARITY_PORT.md.
 mod tests {
     use super::*;
     use ffb_model::enums::{Rules, PS_STANDING, PS_RESERVE};

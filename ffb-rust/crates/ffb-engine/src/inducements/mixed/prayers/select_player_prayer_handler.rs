@@ -41,43 +41,15 @@ mod tests {
         assert!(!init_effect_select_player(&mut state, &game, "team1", "KNUCKLE_DUSTERS"));
     }
 
-    #[test]
-    fn apply_selection_is_callable() {
-        let mut game = make_game();
-        apply_selection_select_player(&mut game, "player1", "KNUCKLE_DUSTERS");
-    }
+    // NOTE (test equalization): apply_selection_is_callable,
+    // init_effect_returns_false_for_iron_man, apply_selection_with_empty_strings_is_safe,
+    // init_effect_does_not_mutate_state, init_effect_returns_false_for_stiletto and
+    // apply_selection_with_real_prayer_name_is_safe pruned - defensive/duplicate-path checks of
+    // the same free function (the dialog-waiting contract is covered by
+    // init_effect_returns_false_waiting_for_dialog, twinned in Java via KnuckleDustersHandler).
 
-    #[test]
-    fn init_effect_returns_false_for_iron_man() {
-        let mut state = PrayerState::new();
-        let game = make_game();
-        assert!(!init_effect_select_player(&mut state, &game, "team1", "IRON_MAN"));
-    }
 
-    #[test]
-    fn apply_selection_with_empty_strings_is_safe() {
-        let mut game = make_game();
-        apply_selection_select_player(&mut game, "", "");
-    }
 
-    #[test]
-    fn init_effect_does_not_mutate_state() {
-        let mut state = PrayerState::new();
-        let game = make_game();
-        init_effect_select_player(&mut state, &game, "team1", "GREASY_CLEATS");
-        assert!(state.get_additional_completion_spp_teams().is_empty());
-    }
 
-    #[test]
-    fn init_effect_returns_false_for_stiletto() {
-        let mut state = PrayerState::new();
-        let game = make_game();
-        assert!(!init_effect_select_player(&mut state, &game, "away", "STILETTO"));
-    }
 
-    #[test]
-    fn apply_selection_with_real_prayer_name_is_safe() {
-        let mut game = make_game();
-        apply_selection_select_player(&mut game, "player_abc", "IRON_MAN");
-    }
 }

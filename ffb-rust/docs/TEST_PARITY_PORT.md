@@ -1046,6 +1046,15 @@ The Rust bb2025 handler reused the mixed module's PRAYER_NAME ("BLESSED_STATUE_O
 so it could NEVER match the bb2025 prayer (data/prayers/bb2025_prayers.json id is
 BLESSING_OF_NUFFLE), and prayer_player_effect had no BLESSING_OF_NUFFLE arm (Pro never
 granted). Fixed handler const + effect map + flipped test. Tally: 11 real Rust bugs.
+- **prayer_player_effect + select_player base → Java tests (9 green). PRAYER SUB-BUCKET
+  CLOSED.** PrayerEnhancementsTest twins the Rust effect map against Java
+  Prayer.enhancements()/FieldModel.addPrayerEnhancements (stat mods, skill grants with values,
+  removal, no-enhancement prayers). SelectPlayerPrayerHandlerTest twins the dialog-waiting
+  false return. 7 Rust prunes (defensive/duplicate-path); random_selection_prayer_handler's
+  6 helper tests EXEMPT with in-file note — Java's abstract class is exercised through the
+  concrete handler twins calling the same paths. Next: inducements/cards
+  (witch_brew ×2, rabbits_foot, custard_pie, pit_trap ×2 each bb2016+bb2020, card_handler),
+  then skill_behaviour 356 / util 121 / injury 91 leftovers per reconcile.
 - **enhancement_remover + prayer_dialog_selection + prayer_handler base → Java tests (9 green).**
   EnhancementRemover twins incl. opponent-selector removal regression; PrayerDialogSelection =
   1 getter twin; PrayerHandler base via named static nested TestPrayerHandler subclass

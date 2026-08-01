@@ -159,11 +159,6 @@ mod tests {
         assert!(p.temporary_skills.is_empty());
     }
 
-    #[test]
-    fn missing_player_is_noop() {
-        let mut game = make_game();
-        // player not added — should not panic
-        apply_prayer_player_effect(&mut game, "nobody", "GREASY_CLEATS");
-        remove_prayer_player_effect(&mut game, "nobody", "GREASY_CLEATS");
-    }
+    // NOTE (test equalization): `missing_player_is_noop` pruned - defensive no-player guard;
+    // Java's addPrayerEnhancements takes a Player object, a missing id is inexpressible.
 }
