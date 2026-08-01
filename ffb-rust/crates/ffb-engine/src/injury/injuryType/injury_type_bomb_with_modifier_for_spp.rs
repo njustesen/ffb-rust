@@ -85,7 +85,9 @@ impl InjuryTypeServer for InjuryTypeBombWithModifierForSpp {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn falling_down_causes_turnover(&self) -> bool { false }
+    // Bug (fixed, flag audit 2026-08-01): falling_down_causes_turnover was hardcoded false;
+    // the Java model class has NO override (InjuryType base default is true — only
+    // CrowdPush/Saboteur/TrapDoorFall families override to false).
     /// Java: `new BombForSpp()` constructor passes `worthSpps=true` and `SendToBoxReason.BOMB`.
     fn is_worth_spps(&self) -> bool { true }
     /// Java: `BombForSpp.isCausedByOpponent()` — true (overridden; plain `Bomb` keeps the false default).
@@ -128,7 +130,7 @@ mod tests {
         assert!(t.ctx.armor_broken); assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
     #[test]
-    fn does_not_cause_turnover() { assert!(!InjuryTypeBombWithModifierForSpp::new().falling_down_causes_turnover()); }
+    fn turnover_default_true() { assert!(InjuryTypeBombWithModifierForSpp::new().falling_down_causes_turnover()); }
     #[test]
     fn is_worth_spps_and_caused_by_opponent() {
         let t = InjuryTypeBombWithModifierForSpp::new();

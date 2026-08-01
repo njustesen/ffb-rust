@@ -1070,8 +1070,11 @@ mod tests {
 
     #[test]
     fn dispatch_breathe_fire_and_crowd_push_smoke_tests_survive_rewire() {
+        // BreatheFire no longer overrides falling_down_causes_turnover (flag audit: Java's
+        // BreatheFire inherits true) — use its is_caused_by_opponent override as the
+        // reached-the-real-struct marker instead.
         let it = make_injury_type("InjuryTypeBreatheFire");
-        assert!(!it.falling_down_causes_turnover());
+        assert!(it.is_caused_by_opponent());
         let it = make_injury_type("InjuryTypeCrowdPush");
         assert!(!it.falling_down_causes_turnover());
     }
@@ -1166,10 +1169,10 @@ mod tests {
     #[test]
     fn dispatch_quick_bite_alias_reaches_real_struct_not_generic_fallback() {
         // step_quick_bite.rs calls handle_injury_by_name with the Java lower-camel name directly.
-        // Real InjuryTypeQuickBite never causes a turnover; the generic fallback (unknown-name
-        // arm) defaults to true.
-        assert!(!make_injury_type("quickBite").falling_down_causes_turnover());
-        assert!(!make_injury_type("InjuryTypeQuickBite").falling_down_causes_turnover());
+        // Marker (flag audit: QuickBite inherits turnover=true in Java): the real struct sets
+        // failed_armour_places_prone=false; the generic fallback defaults to true.
+        assert!(!make_injury_type("quickBite").failed_armour_places_prone());
+        assert!(!make_injury_type("InjuryTypeQuickBite").failed_armour_places_prone());
     }
 
     #[test]
@@ -1191,14 +1194,19 @@ mod tests {
         // (InjuryTypeEatPlayer and InjuryTypeThenIStartedBlastin no longer belong here: neither
         // Java class overrides fallingDownCausesTurnover, so both now correctly resolve to the
         // base-default `true` — checked separately below via a marker field each does override.)
-        for name in [
-            "InjuryTypeTrapDoorFall", "InjuryTypeTrapDoorFallForSpp",
-            "InjuryTypeKTMCrowd", "InjuryTypeKtmCrowd",
-            "InjuryTypeBitten",
-            "InjuryTypeProjectileVomit",
-        ] {
+        for name in ["InjuryTypeTrapDoorFall", "InjuryTypeTrapDoorFallForSpp"] {
             assert!(!make_injury_type(name).falling_down_causes_turnover(), "{name} should not use the generic fallback");
         }
+        // Flag audit: KTMCrowd/Bitten/ProjectileVomit inherit turnover=true in Java — use their
+        // send-to-box / armour-prone overrides as reached-the-real-struct markers instead.
+        for name in ["InjuryTypeKTMCrowd", "InjuryTypeKtmCrowd"] {
+            assert_eq!(make_injury_type(name).send_to_box_reason(),
+                Some(ffb_model::enums::SendToBoxReason::CrowdKicked), "{name} should not use the generic fallback");
+        }
+        assert_eq!(make_injury_type("InjuryTypeBitten").send_to_box_reason(),
+            Some(ffb_model::enums::SendToBoxReason::Bitten), "InjuryTypeBitten should not use the generic fallback");
+        assert!(!make_injury_type("InjuryTypeProjectileVomit").failed_armour_places_prone(),
+            "InjuryTypeProjectileVomit should not use the generic fallback");
         assert!(!make_injury_type("InjuryTypeEatPlayer").can_use_apo(), "InjuryTypeEatPlayer should not use the generic fallback");
         assert_eq!(
             make_injury_type("InjuryTypeThenIStartedBlastin").send_to_box_reason(),

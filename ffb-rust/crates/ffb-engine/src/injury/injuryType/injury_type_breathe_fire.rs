@@ -19,7 +19,9 @@ impl InjuryTypeServer for InjuryTypeBreatheFire {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn falling_down_causes_turnover(&self) -> bool { false }
+    // Bug (fixed, flag audit 2026-08-01): falling_down_causes_turnover was hardcoded false;
+    // the Java model class has NO override (InjuryType base default is true — only
+    // CrowdPush/Saboteur/TrapDoorFall families override to false).
     /// Java: `BreatheFire.isCausedByOpponent()` — true.
     fn is_caused_by_opponent(&self) -> bool { true }
     /// Java: `new BreatheFire()` constructor passes `SendToBoxReason.BREATHE_FIRE` to the
@@ -80,7 +82,7 @@ mod tests {
         assert!(t.ctx.armor_broken); assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
     #[test]
-    fn does_not_cause_turnover() { assert!(!InjuryTypeBreatheFire::new().falling_down_causes_turnover()); }
+    fn turnover_default_true() { assert!(InjuryTypeBreatheFire::new().falling_down_causes_turnover()); }
     #[test]
     fn send_to_box_reason_is_breathe_fire() {
         use ffb_model::enums::SendToBoxReason;

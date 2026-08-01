@@ -56,7 +56,9 @@ impl InjuryTypeServer for InjuryTypeBomb {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn falling_down_causes_turnover(&self) -> bool { false }
+    // Bug (fixed, flag audit 2026-08-01): falling_down_causes_turnover was hardcoded false;
+    // the Java model class has NO override (InjuryType base default is true — only
+    // CrowdPush/Saboteur/TrapDoorFall families override to false).
     /// Java: `new Bomb()` constructor passes `SendToBoxReason.BOMB` to the `InjuryType` base class.
     fn send_to_box_reason(&self) -> Option<ffb_model::enums::SendToBoxReason> {
         Some(ffb_model::enums::SendToBoxReason::Bomb)
@@ -96,7 +98,7 @@ mod tests {
         assert!(t.ctx.armor_broken); assert!(t.ctx.injury.is_some());
     }
     #[test]
-    fn no_turnover() { assert!(!InjuryTypeBomb::new().falling_down_causes_turnover()); }
+    fn turnover_default_true() { assert!(InjuryTypeBomb::new().falling_down_causes_turnover()); }
     #[test]
     fn send_to_box_reason_is_bomb() {
         use ffb_model::enums::SendToBoxReason;

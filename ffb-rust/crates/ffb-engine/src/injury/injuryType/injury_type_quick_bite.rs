@@ -19,7 +19,9 @@ impl InjuryTypeServer for InjuryTypeQuickBite {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn falling_down_causes_turnover(&self) -> bool { false }
+    // Bug (fixed, flag audit 2026-08-01): falling_down_causes_turnover was hardcoded false;
+    // the Java model class has NO override (InjuryType base default is true — only
+    // CrowdPush/Saboteur/TrapDoorFall families override to false).
     /// Java: `QuickBite()` constructor passes `SendToBoxReason.QUICK_BITE`.
     fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::QuickBite) }
     /// Java: `QuickBite.isCausedByOpponent()` — true.
@@ -100,7 +102,7 @@ mod tests {
         assert!(t.ctx.armor_broken); assert!(t.ctx.injury.is_some());
     }
     #[test]
-    fn does_not_cause_turnover() { assert!(!InjuryTypeQuickBite::new().falling_down_causes_turnover()); }
+    fn turnover_default_true() { assert!(InjuryTypeQuickBite::new().falling_down_causes_turnover()); }
     #[test]
     fn send_to_box_reason_is_quick_bite() {
         assert_eq!(InjuryTypeQuickBite::new().send_to_box_reason(), Some(SendToBoxReason::QuickBite));

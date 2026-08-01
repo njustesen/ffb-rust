@@ -948,6 +948,24 @@ Tally: 7 real Rust bugs.
   injury-modifier factory reads the pAttacker PARAMETER (not the arm-bar player) — MB test puts
   the skill on the passed attacker. Pruned 3 more Rust-structural tests (apo-mode ctor, accessor
   tautology, arm-bar ctor field storage).
+## Step 3 REAL RUST BUG #8 (batch): systematic injury-type flag audit (fixed 2026-08-01)
+Swept EVERY Rust injury_type_* flag override against the Java model classes + server ctors
+(prompted by bugs #6/#7 sharing the copied-override root cause). Findings, all fixed:
+- **10 files wrongly overrode `falling_down_causes_turnover=false`** where Java inherits true:
+  bitten, bomb, bomb_with_modifier(+for_spp), breathe_fire(+for_spp), ktm_crowd,
+  piling_on_knocked_out, projectile_vomit, quick_bite. (Java only overrides false in
+  CrowdPush/CrowdPushForSpp/Saboteur/TrapDoorFall/TrapDoorFallForSpp.) Latent today — the flag
+  is only consulted by the three StepFallDown variants, which these types never reach — but
+  wrong for 1:1 and any future consumer.
+- **ball_and_chain wrongly overrode `failed_armour_places_prone=false`** (with a comment claiming
+  Java matches — it doesn't; Java only sets it false in Chainsaw(+ForSpp)/ProjectileVomit/
+  QuickBite/Stab(+ForSpp)/ThenIStartedBlastin server ctors, all of which Rust has correctly).
+- **Verified CORRECT:** can_use_apo set (eat_player/piling_on_knocked_out/saboteur after #6),
+  the can_apo_ko_into_stun name-fn (crowd/trapdoor/fumbled-ktm false set matches Java incl.
+  KTMFumbleInjury), worth_spps ctor args, is_caused_by_opponent set, saboteur turnover=false.
+- 13 Rust tests that had pinned the wrong flags flipped; 3 injury.rs dispatch tests re-anchored
+  on Java-correct markers (send_to_box_reason / failed_armour_places_prone) instead of the
+  removed turnover overrides. Full engine 7,090 green. Tally: 8 real Rust bugs (this one a batch).
 - Next: remaining injury_type_* tail (rerun reconcile for the live list); then inducements 432,
   skill_behaviour 359, util 138.
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun

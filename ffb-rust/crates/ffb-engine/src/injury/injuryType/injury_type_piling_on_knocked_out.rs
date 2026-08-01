@@ -21,7 +21,9 @@ impl InjuryTypeServer for InjuryTypePilingOnKnockedOut {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn falling_down_causes_turnover(&self) -> bool { false }
+    // Bug (fixed, flag audit 2026-08-01): falling_down_causes_turnover was hardcoded false;
+    // the Java model class has NO override (InjuryType base default is true — only
+    // CrowdPush/Saboteur/TrapDoorFall families override to false).
     /// Java: `PilingOnKnockedOut()` constructor passes `SendToBoxReason.KO_ON_PILING_ON`.
     fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::KoOnPilingOn) }
     /// Java: `PilingOnKnockedOut.canUseApo()` — false (unlike the base `InjuryType` default of true).
@@ -49,7 +51,7 @@ mod tests {
         assert_eq!(t.ctx.injury.map(|s| s.base()), Some(PS_KNOCKED_OUT));
     }
     #[test]
-    fn does_not_cause_turnover() { assert!(!InjuryTypePilingOnKnockedOut::new().falling_down_causes_turnover()); }
+    fn turnover_default_true() { assert!(InjuryTypePilingOnKnockedOut::new().falling_down_causes_turnover()); }
     #[test]
     fn send_to_box_reason_is_ko_on_piling_on() {
         assert_eq!(InjuryTypePilingOnKnockedOut::new().send_to_box_reason(), Some(SendToBoxReason::KoOnPilingOn));

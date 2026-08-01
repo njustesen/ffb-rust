@@ -21,7 +21,9 @@ impl InjuryTypeServer for InjuryTypeKTMCrowd {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    fn falling_down_causes_turnover(&self) -> bool { false }
+    // Bug (fixed, flag audit 2026-08-01): falling_down_causes_turnover was hardcoded false;
+    // the Java model class has NO override (InjuryType base default is true — only
+    // CrowdPush/Saboteur/TrapDoorFall families override to false).
     /// Java: `KTMCrowd()` constructor passes `SendToBoxReason.CROWD_KICKED`.
     fn send_to_box_reason(&self) -> Option<SendToBoxReason> { Some(SendToBoxReason::CrowdKicked) }
 }
@@ -45,7 +47,7 @@ mod tests {
         assert_eq!(t.ctx.injury.map(|s| s.base()), Some(PS_KNOCKED_OUT));
     }
     #[test]
-    fn does_not_cause_turnover() { assert!(!InjuryTypeKTMCrowd::new().falling_down_causes_turnover()); }
+    fn turnover_default_true() { assert!(InjuryTypeKTMCrowd::new().falling_down_causes_turnover()); }
     #[test]
     fn send_to_box_reason_is_crowd_kicked() {
         assert_eq!(InjuryTypeKTMCrowd::new().send_to_box_reason(), Some(SendToBoxReason::CrowdKicked));

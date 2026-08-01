@@ -33,9 +33,10 @@ impl InjuryTypeServer for InjuryTypeBallAndChain {
     }
     fn injury_context(&self) -> &InjuryContext { &self.ctx }
     fn injury_context_mut(&mut self) -> &mut InjuryContext { &mut self.ctx }
-    // Ball-and-Chain: falling down causes injury (never just prone), but the type itself
-    // already forces armor_broken=true, so failedArmourPlacesProne() = false in Java.
-    fn failed_armour_places_prone(&self) -> bool { false }
+    // Bug (fixed, flag audit 2026-08-01): failed_armour_places_prone was hardcoded false with a
+    // comment claiming Java does the same — Java's InjuryTypeBallAndChain ctor does NOT call
+    // setFailedArmourPlacesProne(false) (base default true). Latent either way: the type forces
+    // armor_broken=true so the flag is never consulted.
     fn send_to_box_reason(&self) -> Option<ffb_model::enums::SendToBoxReason> {
         Some(ffb_model::enums::SendToBoxReason::BallAndChain)
     }
@@ -101,8 +102,9 @@ mod tests {
         assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
     }
     #[test]
-    fn failed_armour_does_not_place_prone() {
-        assert!(!InjuryTypeBallAndChain::new().failed_armour_places_prone());
+    fn failed_armour_places_prone_default_true() {
+        // Java: InjuryTypeBallAndChain does not call setFailedArmourPlacesProne (default true).
+        assert!(InjuryTypeBallAndChain::new().failed_armour_places_prone());
     }
     #[test]
     fn send_to_box_reason_is_ball_and_chain() {
