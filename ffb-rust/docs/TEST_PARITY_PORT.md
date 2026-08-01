@@ -1070,6 +1070,10 @@ tests are Rust-structural (exempt/prune as encountered).
   replaced it). Removed the file, mod entries, bb2025 registry registration; registry count
   test 35→34. Wild animal remains bb2016-only (matching Java). Behavior-neutral (no bb2025
   player can have the skill) but violates the no-invented-code ground rule.
+- **grab ×3 → Java tests (10 green).** Grab is an ATTACKER skill (acting player must be adjacent
+  to the pushed defender during a block). GOTCHA: Java resets state.grabbing to null AFTER a
+  successful auto-grab (else-branch tail) — assert pushbackMode==GRAB only, not the grabbing
+  flag. bb2016 extra fires on MULTIPLE_BLOCK; Grab skill class is bb2016.Grab / mixed.Grab.
 - **side_step ×3 → Java tests (16 green first run).** Same pushback-hook recipe with the
   sideStepping map + freeSquareAroundDefender + pushbackSquares=new PushbackSquare[0]; the
   accepted path needs a startingPushbackSquare (new PushbackSquare(coord, Direction.NORTH,
