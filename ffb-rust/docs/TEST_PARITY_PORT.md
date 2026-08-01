@@ -1876,3 +1876,15 @@ covered by the Rust-side unit tests + would need a command/dice-injection harnes
   clear-catcher deferred (command + BOMB_BOUNCES_ON_EMPTY_SQUARES option).
 
 35 untested StepId families remain.
+
+## Iteration 111 — Step-4: StepProjectileVomit + StepDispatchDumpOff guard subsets (+4 ffb-server)
+
+- **StepProjectileVomitFixtureTest (2, bb2020)** — no vomit-armour property → NEXT_STEP; unknown → false.
+  Roll/report/reroll deferred (dice/command); USING_VOMIT/GOTO_LABEL_* init-consumed (twins exempt).
+  RECIPE NOTE: StepProjectileVomit is @RulesCollection(BB2020/BB2025) only — must use a BB2020 fixture game
+  (BB2016 StepFactory throws "Unhandled StepId"). General rule: match the fixture edition to the step's
+  @RulesCollection or createStep throws.
+- **StepDispatchDumpOffFixtureTest (2, bb2020)** — no ball-carrier in (init) targets → NEXT_STEP no-op;
+  unknown → false. Ball-carrier dump-off sequence push + setDefenderId/DEFENDER_POSITION publish deferred.
+
+33 untested StepId families remain.
