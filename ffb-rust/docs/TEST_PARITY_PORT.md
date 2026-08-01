@@ -645,6 +645,11 @@ trap_door_fall...). Same proven injury recipe (same-package handleInjury + scrip
   save prone / break injury / bb2016 niggling. GOTCHA: InjuryContext accessor is
   getDefenderPosition() (not getDefenderCoordinate); Java handleInjury does NOT store the defender
   coordinate (caller sets it) — context_stores twin asserts only defenderId (documented divergence).
+- **injury_type_breathe_fire_for_spp (8) + block_stunned (4) + block_stunned_for_spp (5)
+  → Java tests (17 green).** ForSpp variants add an isWorthSpps() assertion. BlockStunned:
+  armour save → STUNNED (not prone), SendToBoxReason BLOCKED; niggling-injured defender still
+  gets NO niggling modifier (block stun path). Plumbing tests (default_equivalent_to_new,
+  initial_context_has_no_injury, new_context_uses_defender_apo_mode) exempt.
 Plus the in-file util_player exemptions (canGaze x4, refresh x7, partner-not-on-field x1, new/default x2)
 and UtilDisturbingPresence empty-player x1 — all commented at their Java test sites.
 - prayer_state (6): NOT ffb-common — com.fumbbl.ffb.server.PrayerState → belongs to Step 3 (ffb-server).
