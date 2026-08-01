@@ -1063,9 +1063,14 @@ GOTO_LABEL_ON_FAILURE) + `step.start()`. Setup: TurnMode.REGULAR + placePlayer +
 fieldModel playerState isConfused, turnData flags (isPassUsed etc.).
 KICKOFF_RETURN/PASS_BLOCK/bomb turns skip negatraits. Rust registry/applies_to/flag-helper
 tests are Rust-structural (exempt/prune as encountered).
-- **bone_head bb2020 pilot → Java tests (5 green first run).** Next: bone_head bb2016/bb2025 +
-  really_stupid ×3 + wild_animal ×2 + take_root + blood_lust (same negatrait shape), then the
-  bigger behaviours (saboteur 17, throw_team_mate 15, the_ballista 14+12, swoop 13...).
+- **bone_head bb2020 pilot → Java tests (5 green first run).**
+- **bone_head bb2016 + bb2025 → Java tests (6 green).** bb2016 skill name is "Bone-Head";
+  bb2016 cancel maps KICK_TEAM_MATE→blitzUsed (vs bb2020 ktmUsed / bb2025 ttmUsed for TTM).
+  BUCKET-WIDE EXEMPTION: the Rust registry plumbing tests (register_into_adds_step_modifier,
+  step_modifier_applies_to_correct_step/wrong_step, Default impls, priority) are Rust-structural
+  — no Java twin anywhere in skill_behaviour; only behavioral hook tests get twins.
+  Next: really_stupid ×3 + wild_animal ×2 + take_root + blood_lust (same negatrait shape), then
+  the bigger behaviours (saboteur 17, throw_team_mate 15, the_ballista 14+12, swoop 13...).
 - **CARDS: chop_block/force_shield/illegal_substitution ×6 + card_handler base → Java tests
   (32 green). INDUCEMENTS BUCKET CLOSED.** ForceShield hasBall needs setBallInPlay(true) +
   setBallMoving(false) + ball on player coord. IllegalSubstitution activate returns FALSE and
