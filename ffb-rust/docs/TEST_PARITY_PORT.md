@@ -1545,3 +1545,28 @@ team_setup_cache (2), server_sketch_manager (2), i_server_property/i_server_json
 i_game_id_listener/card_deck (2 each) — mostly replay/DB/network/JSON infra (likely exempt). Big buckets:
 skill_behaviour (118), bb2016/bb2020/bb2025 (11 each). Next: triage the remaining infra singles, then
 start the skill_behaviour bucket verification pass.
+
+## Iteration 90 — bb2025 spp_mechanic (+5 ffb-server); infra singles exempt
+
+- **bb2025 SppMechanicTest (5)** — BB2025 SPP mechanic: touchdown 3 (2 for Brawlin' Brutes), casualty
+  2 (3 for Brawlin' Brutes); addLanding increments landings; addCatch increments the additional-SPP
+  catch counter when the player's team is in the extra set. Built via GameFixture (Team/PlayerResult
+  need the game graph; placed in ffb-server test tree since ffb-common lacks the fixture). NOTE: the
+  editions DIFFER — bb2016/bb2020 SppMechanic are flat (touchdown 3 / casualty 2, no Brawlin' Brutes),
+  so bb2016/bb2020 need their own edition-specific twins (next iterations). Java addCatch(Set,
+  PlayerResult) reads the team via pr.getPlayer().getTeam(); the Rust threads team_id explicitly (same
+  result — structural-only divergence).
+- **Infra singles EXEMPT:**
+  - card_deck (2) — Rust is a simplified String-based deck; Java `CardDeck` is Card/CardType-based with a
+    type-guarded add (skips null/wrong-type cards) and a build(Game) populate-from-CardFactory method the
+    Rust omits. Partial-port divergence (like the deferred_command / sequence_generator stubs), deferred.
+  - team_setup_cache (2) — file-backed saved-formation cache (HashMap<key,PathBuf>): filesystem infra.
+  - server_sketch_manager (2) — per-WebSocket-session sketch store: session/network infra.
+  - replay_cache (4), server_replayer (6), server_replay (6) — replay-session infra needing the live
+    session/networking layer (ffb-engine has no session layer); Rust docs already note the scope cut.
+  - i_server_property / i_server_json_option / i_game_id_listener (2 each) — marker/JSON-option/listener
+    interfaces (already noted as infra elsewhere).
+
+Remaining Step-3 gaps: bb2016/bb2020 spp_mechanic (5 each), bb2016/bb2020/bb2025 apothecary_mechanic
+(6 each), and the big skill_behaviour bucket (118). Next: bb2020 + bb2016 spp_mechanic, then the
+apothecary mechanics.
