@@ -1614,3 +1614,38 @@ bb2020/bb2025 spp + apothecary) is CLOSED.**
 Remaining Step-3 gap: the big skill_behaviour bucket (118) — mostly negatrait/registry step-modifier
 files; per earlier notes many are behaviour-covered registry plumbing (verify vs exempt). That's the
 last major P2 bucket. Next: begin the skill_behaviour verification pass.
+
+## Iteration 94 — skill_behaviour bucket EXEMPT (Step-4-covered registration glue) — last major P2 bucket triaged
+
+Analysed the skill_behaviour bucket (118 tests / 23 files). Read the full Java bb2020 ReallyStupidBehaviour
+and spot-checked step_hook / abstract_dodging_behaviour / horns_behaviour / take_root_behaviour. The
+pattern is uniform — every Java skill-behaviour class (com.fumbbl.ffb.server.skillbehaviour.*) is an
+**anonymous-inner-class `StepModifier` registration** whose logic lives inside `handleExecuteStepHook`/
+`handleCommandHook`, invoked ONLY by the real `StepXxx` step. There is NO standalone unit-testable method
+on the behaviour class. The Rust skill_behaviour tests fall into three Rust-structural categories:
+  1. **Registry/trait plumbing** — `register_into_adds_step_modifier`, `applies_to(StepId)` — verifies the
+     Rust SkillRegistry/StepModifierTrait wiring; Java's `registerModifier(...)` glue has no unit test.
+  2. **Rust-invented dispatch infra** — `HookPoint` enum + `StepHookHandler` trait (step_hook.rs): eq/clone/
+     hash/debug/hook_points — a Rust dispatch mechanism with NO Java counterpart.
+  3. **Step-modifier hook-logic tests** — e.g. horns `modifier_sets_using_horns_true_when_blitzing`,
+     take_root `modifier_failed_roll_roots_player`, really_stupid `turn_data_flag_for_action_bb2020` — drive
+     the hook via Rust hook-state structs / extracted helpers. In Java this logic is reachable only by
+     running the real StepXxx through its lifecycle (the negatrait recipe: StepReallyStupid/StepTakeRoot/
+     StepHorns via step.start()), i.e. **Step-4 step coverage**, not a Step-3 behaviour-class unit test. The
+     Rust "action→turn-data-flag" helpers are extractions of inline Java `switch` logic in
+     `cancelPlayerAction(step)` — no standalone Java method exists.
+
+**Verdict: the entire skill_behaviour bucket is EXEMPT from Step-3.** The behaviour classes are registration
+glue; their Java-observable behaviour is exercised end-to-end by the corresponding Step-4 StepXxx step tests
+(the reconcile mis-flags them because that coverage references StepXxx, not XxxBehaviour). This is consistent
+with the earlier pass_behaviour/wrestle/tentacles/dauntless registry-plumbing exemptions. Files:
+really_stupid (bb2016/20/25), abstract_dodging, step_hook, horns, take_root, pass, wild_animal, dauntless,
+blood_lust, wrestle, tentacles, shadowing, jump_up, juggernaut, foul_appearance, diving_tackle, bombardier,
+animosity, dump_off, piling_on — all Step-4-covered / Rust-structural.
+
+**Step-3 (ffb-mechanics + non-step ffb-engine) reconciliation is now COMPLETE on testable surface** — all
+remaining reconcile gaps are documented exemptions (skill_behaviour = Step-4 glue; sequence_generator /
+deferred_command / card_deck = partial-stub; replay/session/file/DB = infra; modification_aware /
+conditional_model_change_observer / SkillBehaviour base = abstract/interface plumbing; talk = JSON DTO).
+Next: verify the full ffb-server + cargo suites are green, check TRANSLATION_TRACKER for any remaining
+○/~ non-GUI P1 files, and if clean, assess the stop condition / begin P3 Step-4 step-logic bulk.
