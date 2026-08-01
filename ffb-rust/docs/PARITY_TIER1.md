@@ -73,3 +73,30 @@ armour / follow-up) produces different state. Dice-trace the blitz: FFB_DICE_TRA
 (`DICE_TRACE` no caller) vs Java (`caller=`) game dice AT/after the first activation to find the first
 differing block/armour/injury die or a step-logic difference. Root-cause in the relevant Rust block/blitz
 step vs its Java ground-truth class; fix Rust; add a test; rerun seeds 1-3.
+
+## Iter 4 (2026-08-01) — Open item #2 investigation: blitz-move dodge/fall divergence (NOT yet fixed)
+
+Dice-traced seed 1 (FFB_DICE_TRACE=1). Rust vs Java game dice are pos-for-pos IDENTICAL through pos 19
+(fan 2,2 d3; weather 3,6; coin d2=2; kickoff scatter/result/cheering/throw-in; then the first activation's
+rolls). First die divergence at **pos 20**: Java `s16=16` (RollMechanic.rollCasualty via
+InjuryTypeServer.setInjury) vs Rust `s6=2`.
+
+Java path (caller stacks): first activation = away3 BLITZ; the blitzer fails a DODGE during its move →
+`InjuryTypeDropDodge` → rollArmour (pos16,17 = 2,6 = 8, broken) → rollInjury (pos18,19 = 6,5 = 11) →
+11 ≥ 10 = CASUALTY → rollCasualty d16 (pos20) + d6 (pos21).
+
+BUT it's not a simple casualty-threshold miss: `interpret_injury_total_bb2020(11,false,false)` DOES return
+None→Casualty, and find_injury_modifiers is empty for two skill-less linemen — so Rust *should* roll the
+d16. The Rust events log instead shows away_03 dodging SUCCESSFULLY (target 3, roll 6) and a DIFFERENT
+player (away_02) failing/rerolling/falling later. So the two engines diverge in the blitz-move DODGE
+resolution / which player falls — the pos-value match through 19 is partly coincidental, and the true
+divergence is UPSTREAM of the casualty roll (in the blitz move / dodge path or activation sequencing).
+
+### Open item #2 (refined, next): correlate each die to its player/step on BOTH sides
+Rerun with FFB_DICE_TRACE=1 AND FFB_TRACE=1 (Rust `LOOP applied=`) AND FFB_DRIVE_TRACE=1 (Rust step
+dispatch). For pos13-20 map each roll to (step, acting player, action, dodge target) on Rust vs Java
+(Java caller stacks already identify the step/injury type). Determine at which pos the ACTING PLAYER or
+dodge CONTEXT first differs (e.g. does away3 attempt the same blitz path / same dodge square?). That first
+context divergence — not the casualty roll — is the real bug. Likely candidates: blitz move-square choice,
+dodge modifier/target computation, or the order in which the blitzer's move dodges resolve. Fix Rust only,
+add a test, rerun. (Fan-factor fix from iter 3 stands: pre-game fully aligned.)
