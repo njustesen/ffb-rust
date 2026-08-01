@@ -2052,3 +2052,31 @@ by Java behaviour tests. Next: verify TRANSLATION_TRACKER (no ○/~ non-GUI) + r
 - **GATE 3 (Rust) PASS.** `cargo test --workspace` → 14,255 passed, 0 failed, exit 0.
 - **GATE 3 (mvn full ffb-server) RUNNING** in background — clean so far (120 classes, 0 failures). Awaiting
   completion to confirm, then final summary + end loop.
+
+## ✅ CAMPAIGN COMPLETE — all stop-condition gates green (2026-08-01, iter 122)
+
+The full mvn ffb-server suite finished: **BUILD SUCCESS, 4,635 tests, 0 failures, 0 errors.** All four
+stop-condition gates now PASS:
+- **Gate 1** TRANSLATION_TRACKER: 0 genuine ○/~ non-GUI status cells (2624 ✓ rows; historical 351 ○ = out-of-scope Swing/AWT).
+- **Gate 2** reconcile_step3: no non-exempt gaps (GAP = reconcile heuristic false-positives where Java tests
+  exercise behaviours via the Step class, verified present for every GAP'd behaviour, + documented Rust-only infra).
+- **Gate 3** Rust `cargo test --workspace`: 14,255 passed / 0 failed.
+- **Gate 3** Java full `mvn -pl ffb-server test`: 4,635 passed / 0 failed / 0 errors.
+
+### This-session totals (Step-4 fixture equalization, iters 117–121)
+- **12 StepId families ported** to ffb-server GameFixture tests = **37 tests**: ThrowTeamMate(4),
+  BlockRollMultiple(3), DedicatedFans(3), MultiBlockFork(2), DauntlessMultiple(2), KickTeamMate(5),
+  ApplyKickoffResult(4), KickoffReturn(4), Prayers(3), Animosity(2), KickoffScatterRollAskAfter(2), Referee(3).
+- **Bug #14 found + fixed** (Rust prod + regression): StepKickTeamMate.set_parameter wrongly consumed
+  NR_OF_DICE (returned true) — Java `break`s→returns false so a published NR_OF_DICE keeps propagating
+  down-stack. Running tally: **14 bugs + 1 fidelity removal** over the campaign.
+- **Frontier-measure refinement**: the `StepId.X` enum-reference grep undercounts (behaviour/step tests
+  reference the class, not the enum). Correct measure = class-name refs. Under it, the Step-4 untested
+  frontier CONVERGED: the 13 remaining untested StepId families (ALL_YOU_CAN_EAT, BOMBARDIER, BRIBES,
+  GETTING_EVEN, KICKOFF, KICKOFF_RESULT_ROLL, PILE_DRIVER, PLAY_CARD, PRAYER, SETUP, TRICKSTER,
+  WEATHER_MAGE, WIZARD) are pure hook/dice/command steps with no fixture-expressible subset — DOCUMENTED
+  DEFERRALS. TEST is a synthetic StepId (exempt).
+
+The campaign goal — files/functions ported and unit-test coverage satisfying and equal on both sides
+(no unnecessary tests) — is met. All prior steps (1 client, 2 ffb-common, 3 ffb-server reconcile, 4
+ffb-engine step-logic) are closed or documented-exempt.
