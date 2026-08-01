@@ -111,19 +111,8 @@ mod tests {
     fn failed_armour_places_prone_is_false() {
         assert!(!InjuryTypeThenIStartedBlastin::new().failed_armour_places_prone());
     }
-    #[test]
-    fn context_stores_defender_id() {
-        let mut t = InjuryTypeThenIStartedBlastin::new(); let mut rng = GameRng::new(1);
-        t.handle_injury(&game_with_armor(13), &mut rng, None, "blastin_target", coord(), None, None, ApothecaryMode::Defender);
-        assert_eq!(t.ctx.defender_id.as_deref(), Some("blastin_target"));
-    }
-    #[test]
-    fn default_equivalent_to_new() {
-        let t1 = InjuryTypeThenIStartedBlastin::new();
-        let t2 = InjuryTypeThenIStartedBlastin::default();
-        assert_eq!(t1.ctx.armor_broken, t2.ctx.armor_broken);
-        assert!(t1.ctx.injury.is_none() && t2.ctx.injury.is_none());
-    }
+    // NOTE (test equalization): context_stores_defender_id and default_equivalent_to_new pruned
+    // — Rust plumbing with no faithful Java twin.
 
     fn make_player(id: &str, skills: Vec<ffb_model::enums::SkillId>) -> ffb_model::model::player::Player {
         use std::collections::HashSet;

@@ -208,6 +208,18 @@ mod tests {
         t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
         assert!(t.ctx.armor_modifiers.contains(&ARMOR_CHAINSAW_3));
     }
+
+    #[test]
+    fn iron_hard_skin_defender_blocks_chainsaw_modifier() {
+        // Same armourRoll IHS gate as InjuryTypeFoul (added for parity with the Java twin).
+        use ffb_model::model::SkillWithValue;
+        let mut game = game_with_attacker_and_defender(vec![SkillId::Chainsaw], 2);
+        game.team_away.players[0].extra_skills.push(SkillWithValue::new(SkillId::IronHardSkin));
+        let mut t = InjuryTypeFoulForSpp::new_with_chainsaw(true);
+        let mut rng = GameRng::new(1);
+        t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
+        assert!(!t.ctx.armor_modifiers.contains(&ARMOR_CHAINSAW_3));
+    }
     #[test]
     fn non_chainsaw_foul_no_chainsaw_modifier() {
         let game = game_with_attacker_and_defender(vec![SkillId::Chainsaw], 2);

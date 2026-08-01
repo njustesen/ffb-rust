@@ -985,9 +985,11 @@ Swept EVERY Rust injury_type_* flag override against the Java model classes + se
   direct KO, no dice; InjuryTypePilingOnKnockedOut ctor takes IStep. TrapDoorFallForSpp extends
   the crowd base — stunned result → RESERVE (deterministic script 1,1). 12 more Rust-structural
   prunes.
-- Next: remaining injury_type_* tail (~6 files: then_i_started_blastin, foul_for_spp,
-  bomb_with_modifier ×2, fumbled_ktm ×2 — bomb_with_modifier are the Rust twins of Java
-  InjuryTypeBombWithModifier if present, verify mapping); then inducements 432,
+- **then_i_started_blastin 8/8 + foul_for_spp 11/11 → Java tests (19 green).** ForSpp generated
+  as a Foul-test transform; ADDED the IHS-blocks-chainsaw test to the Rust ForSpp file for parity
+  (real shared armourRoll behavior, cheaper than deleting the Java twin). 2 Rust prunes.
+- Next: last injury_type_* files (bomb_with_modifier ×2, fumbled_ktm ×2 — the fumbled pair has
+  filtered-by-block-property semantics, read carefully); then inducements 432,
   skill_behaviour 359, util 138.
 - Then: inducements 432, injury 372, skill_behaviour 359, util 138 — rerun
   scripts/reconcile_step3.sh for the live list.
