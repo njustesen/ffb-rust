@@ -601,6 +601,11 @@ Remaining ffb-common GAP files are all DOCUMENTED EXEMPTIONS (Rust-only, no fait
   opponent, adds +1. Twins: no-assist base, standing assist counted, prone assist not counted,
   hindered assist not counted. The Rust find_block_strength_simple(base, assists) additive helper
   is Rust-only (exempt).
+- **util_server_setup (setupPlayer) → Java tests (6 green).** Acting-team player placed
+  STANDING+active (RESERVE on a box coordinate, FieldCoordinate.RSV_HOME_X); quick-snap move to a
+  new square is active=false; occupied square / unknown id / wrong-team-not-playing rejected.
+  GOTCHA: the fixture keeps unplaced players in a reserve BOX coordinate (-1,N), NOT null — assert
+  "not at target square", not null-coordinate.
 Plus the in-file util_player exemptions (canGaze x4, refresh x7, partner-not-on-field x1, new/default x2)
 and UtilDisturbingPresence empty-player x1 — all commented at their Java test sites.
 - prayer_state (6): NOT ffb-common — com.fumbbl.ffb.server.PrayerState → belongs to Step 3 (ffb-server).
